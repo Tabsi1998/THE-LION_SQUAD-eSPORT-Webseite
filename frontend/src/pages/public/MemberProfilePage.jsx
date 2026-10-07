@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Crown, ExternalLink, Gamepad2, Monitor, Radio, Trophy, User as UserIcon } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { LazyImg } from "@/components/tls/LazyImg";
+import { SizedImage } from "@/components/tls/SizedImage";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { AccountLevelPill, AccountLevelProgress, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
 import { CountLine, MedalStat, ReferenceCard, SectionTitle, entriesOf } from "@/components/tls/references/referenceParts";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { seoTextPreview } from "@/lib/textPreview";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -142,7 +144,7 @@ function MemberHero({ profile }) {
   return (
     <div className="relative min-h-[25rem] overflow-visible bg-[#0D0D0D] rounded-sm">
       {profile.cover_url && (
-        <img src={resolveMediaUrl(profile.cover_url)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-32" />
+        <LazyImg src={profile.cover_url} alt="" priority sizes="100vw" className="absolute inset-0 w-full h-full object-cover opacity-32" />
       )}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(255,215,0,0.13),rgba(41,182,232,0.07)_36%,rgba(10,10,10,0)_70%)]" />
       <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/68 to-[#0A0A0A]/10" />
@@ -150,7 +152,7 @@ function MemberHero({ profile }) {
         <div className="relative h-80 md:h-[22rem] flex items-end justify-center md:justify-start -mb-10 md:-mb-12">
           <div className="absolute inset-x-8 bottom-5 h-10 bg-black/50 blur-2xl rounded-full" />
           {profile.photo_url ? (
-            <img src={resolveMediaUrl(profile.photo_url)} alt="" className="relative z-10 max-h-[122%] w-full object-contain object-bottom drop-shadow-[0_30px_48px_rgba(0,0,0,0.62)]" />
+            <LazyImg src={profile.photo_url} alt="" priority sizes="(min-width: 768px) 18rem, 90vw" className="relative z-10 max-h-[122%] w-full object-contain object-bottom drop-shadow-[0_30px_48px_rgba(0,0,0,0.62)]" />
           ) : (
             <div className="relative z-10 w-44 h-56 flex items-center justify-center text-white/20"><UserIcon className="w-12 h-12" /></div>
           )}
@@ -202,7 +204,7 @@ function LinkedAccountCard({ account }) {
         <div className="flex items-center gap-3">
           <LevelAvatarFrame level={level} compact className="w-14 h-14 shrink-0">
             {account.avatar_url ? (
-              <img src={resolveMediaUrl(account.avatar_url)} alt="" className="w-full h-full object-cover" />
+              <SizedImage src={account.avatar_url} size={56} alt="" className="w-full h-full" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-white/25"><UserIcon className="w-6 h-6" /></div>
             )}

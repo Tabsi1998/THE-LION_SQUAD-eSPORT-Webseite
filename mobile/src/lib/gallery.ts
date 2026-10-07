@@ -55,8 +55,8 @@ export function posterUrl(item: GalleryItem | null | undefined): string {
   return item?.thumbnail_url || (mediaType(item) === "image" ? item?.image_url || "" : "");
 }
 
-/** Eigene Uploads in einer vorgehaltenen Breite (400, 800, 1600) - andere Adressen unverändert. */
-export function sizedUpload(url: string | null | undefined, width: 400 | 800 | 1600): string {
+/** Eigene Uploads in einer vorgehaltenen Breite (160, 320, 400, 800, 1600) - andere Adressen unverändert. */
+export function sizedUpload(url: string | null | undefined, width: 160 | 320 | 400 | 800 | 1600): string {
   const value = String(url || "");
   if (!value || !LOCAL_UPLOAD.test(value) || !/\.(webp|jpe?g|png)(\?|#|$)/i.test(value)) return value;
   // Trägt die Adresse schon eine Breite, bleibt sie - sonst stünde zweimal w= darin (#219).

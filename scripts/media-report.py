@@ -25,8 +25,8 @@ except ImportError:  # pragma: no cover - nur ausserhalb des Containers
     print("  docker compose exec backend python3 scripts/media-report.py")
     raise SystemExit(1)
 
-VARIANT_WIDTHS = (400, 800, 1600)
-QUALITY = {400: 78, 800: 80, 1600: 82}
+VARIANT_WIDTHS = (160, 320, 400, 800, 1600)
+QUALITY = {160: 80, 320: 80, 400: 78, 800: 80, 1600: 82}
 IMAGE_SUFFIXES = {".webp", ".jpg", ".jpeg", ".png"}
 
 

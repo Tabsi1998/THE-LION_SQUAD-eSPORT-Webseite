@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Trophy, Crown, Medal, Sparkles, Target, Flame, CircleHelp, Gem, ArrowDownWideNarrow, Layers, ChevronDown } from "lucide-react";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { AchievementCategoryGroups, CATEGORY_META, formatPercent } from "@/components/tls/AchievementGroups";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
 import { Badge } from "@/components/achievements/Badge";
 import { LevelAvatarFrame, useCrownFor } from "@/components/tls/LevelAvatarFrame";
 import { SkeletonTable } from "@/components/tls/Skeleton";
+import { SizedImage } from "@/components/tls/SizedImage";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useAuth } from "@/context/AuthContext";
@@ -611,7 +612,7 @@ function PodiumCard({ entry, index, byLevel = false }) {
       <div className={`mx-auto mb-2 sm:mb-3 flex justify-center ${crown ? "pt-4" : ""}`}>
         <LevelAvatarFrame level={level} crown={crown} compact className="w-12 h-12 sm:w-16 sm:h-16">
           {entry.avatar_url ? (
-            <img src={resolveMediaUrl(entry.avatar_url)} alt="" className="w-full h-full object-cover" />
+            <SizedImage src={entry.avatar_url} sizes="(min-width: 640px) 64px, 48px" widths={[160, 320]} alt="" className="w-full h-full" />
           ) : (
             <div className="w-full h-full flex items-center justify-center font-bold text-white/60">
               {(entry.display_name || "?").trim().charAt(0).toUpperCase()}
@@ -634,16 +635,16 @@ function PodiumCard({ entry, index, byLevel = false }) {
   );
 }
 
+// Profilbilder in passender Größe (#1227): 28 oder 36 Pixel bekommen die 160er Fassung statt des Originals.
 function Avatar({ entry, size = 10, ring = "border-white/15", center = false }) {
   const dim = `${size * 4}px`;
-  const src = entry.avatar_url ? resolveMediaUrl(entry.avatar_url) : null;
   const initial = (entry.display_name || "?").trim().charAt(0).toUpperCase();
-  return src ? (
-    <img
-      src={src}
+  return entry.avatar_url ? (
+    <SizedImage
+      src={entry.avatar_url}
+      size={size * 4}
       alt=""
-      className={`rounded-sm object-cover border ${ring} ${center ? "mx-auto" : ""}`}
-      style={{ width: dim, height: dim }}
+      className={`rounded-sm border ${ring} ${center ? "mx-auto" : ""}`}
     />
   ) : (
     <div

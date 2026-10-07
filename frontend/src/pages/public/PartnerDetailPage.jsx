@@ -4,6 +4,8 @@ import { ArrowRight, Calendar, ExternalLink, Eye, Handshake, Newspaper, Radio, U
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SmartLogo } from "@/components/tls/SmartLogo";
+import { LazyImg } from "@/components/tls/LazyImg";
+import { SizedImage } from "@/components/tls/SizedImage";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ChannelIcon, channelColor } from "@/components/tls/ChannelIcon";
@@ -193,7 +195,7 @@ export default function PartnerDetailPage() {
                   {news.map((post) => (
                     <Link key={post.id || post.slug} to={`/news/${post.slug}`} data-testid={`partner-news-${post.slug}`} className="flex gap-3 border border-white/10 rounded-sm bg-[#121212] p-3 hover:border-[#29B6E8]/60 transition min-w-0">
                       {post.banner_url ? (
-                        <img src={resolveMediaUrl(post.banner_url)} alt="" className="w-20 h-16 object-cover rounded-sm shrink-0" />
+                        <SizedImage src={post.banner_url} width={80} height={64} alt="" className="rounded-sm shrink-0" />
                       ) : (
                         <div className="w-20 h-16 rounded-sm bg-[#0A0A0A] border border-white/10 flex items-center justify-center shrink-0"><Newspaper className="w-5 h-5 text-white/30" /></div>
                       )}
@@ -320,7 +322,7 @@ function ChannelsCard({ channels, twitch, discord }) {
 function ToolCard({ tool, active, onEmbed }) {
   return (
     <div className={`border rounded-sm bg-[#121212] overflow-hidden flex flex-col ${active ? "border-[#FFD700]/60" : "border-white/10"}`} data-testid={`partner-tool-${tool.id}`}>
-      {tool.image_url && <img src={resolveMediaUrl(tool.image_url)} alt="" className="w-full h-36 object-cover border-b border-white/10" />}
+      {tool.image_url && <LazyImg src={tool.image_url} alt="" sizes="(min-width: 768px) 45vw, 100vw" className="w-full h-36 object-cover border-b border-white/10" />}
       <div className="p-4 flex-1 min-w-0">
         <div className="font-heading font-bold text-lg leading-tight break-words">{tool.title}</div>
         {tool.description && <p className="mt-1 text-sm text-white/55">{tool.description}</p>}

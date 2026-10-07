@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ChevronDown, Crown, LogOut, Shield } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { resolveMediaUrl } from "@/lib/api";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { userMenuEntries, userMenuTestId } from "@/pages/user/profile/constants";
 
 // Das Benutzermenü im Kopf (#282, #516, #1150): ein Knopf mit Avatar und Name, dahinter die Liste aus
@@ -16,7 +17,8 @@ function Avatar({ user }) {
   const initials = (label || "TL").slice(0, 2).toUpperCase();
   return (
     <span className="w-7 h-7 shrink-0 rounded-sm border border-white/15 bg-[#121212] overflow-hidden inline-flex items-center justify-center font-heading font-black text-[11px] text-[#29B6E8]">
-      {url && !failed ? <img src={url} alt="" className="w-full h-full object-cover" onError={() => setFailed(true)} /> : <span>{initials}</span>}
+      {/* Im Kopf jeder Seite (#1227): die 160er Fassung statt des Originals - das waren oft über 1000 Pixel für 28. */}
+      {url && !failed ? <LazyImg src={url} widths={[160]} sizes="28px" loading="eager" alt="" className="w-full h-full object-cover" onError={() => setFailed(true)} /> : <span>{initials}</span>}
     </span>
   );
 }

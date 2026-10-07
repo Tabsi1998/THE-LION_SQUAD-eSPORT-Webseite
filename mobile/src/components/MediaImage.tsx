@@ -4,21 +4,22 @@ import { resolveMediaUrl } from "../lib/api";
 import { sizedUpload } from "../lib/gallery";
 import { colors } from "../theme";
 
-export type UploadWidth = 400 | 800 | 1600;
+export type UploadWidth = 160 | 320 | 400 | 800 | 1600;
 
-/** Die kleinste vorgehaltene Fassung, die die gezeichnete Breite in Gerätepixeln abdeckt (#219). */
+/** Die vorgehaltenen Breiten des Servers - 160 und 320 seit #1227 für Profilbilder, Logos und kleine Kacheln. */
+export const UPLOAD_WIDTHS: UploadWidth[] = [160, 320, 400, 800, 1600];
+
+/** Die kleinste vorgehaltene Fassung, die die gezeichnete Breite in Gerätepixeln abdeckt (#219, #1227). */
 export function widthForLayout(layoutWidth: number, pixelRatio: number = PixelRatio.get()): UploadWidth {
   const px = Math.ceil(layoutWidth * pixelRatio);
-  if (px <= 400) return 400;
-  if (px <= 800) return 800;
-  return 1600;
+  return UPLOAD_WIDTHS.find((width) => px <= width) ?? 1600;
 }
 
 /**
  * Bild aus den Uploads in passender Breite: Ohne `width` misst die Hülle sich selbst und lädt
- * die kleinste Fassung, die die Fläche in Gerätepixeln füllt - eine Kachel bekommt 400, eine
- * Karte 800, ein Kopfbild 1600 statt immer des Originals (#219). Fremde Adressen bleiben, wie
- * sie sind. Lädt das Bild nicht, steht der Rückfall da.
+ * die kleinste Fassung, die die Fläche in Gerätepixeln füllt - ein Profilbild bekommt 160 oder
+ * 320, eine Kachel 400, eine Karte 800, ein Kopfbild 1600 statt immer des Originals (#219, #1227).
+ * Fremde Adressen bleiben, wie sie sind. Lädt das Bild nicht, steht der Rückfall da.
  */
 export function MediaImage({
   uri,

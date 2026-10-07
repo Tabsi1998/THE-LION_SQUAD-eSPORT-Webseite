@@ -1,4 +1,5 @@
 const { test, expect } = require("@playwright/test");
+const { routeFakeUploads } = require("./fixtures/fakeUploads");
 
 // Erfolge-Seite am Handy (#1229): beim ersten Laden höchstens vier Bildschirme lang, kein ganzer Katalog (nur Übersicht
 // und zehn Plätze der Bestenliste); eine Kategorie aufklappen zeigt ihre Abzeichen in unter einer Sekunde.
@@ -29,11 +30,13 @@ const OVERVIEW = {
   rarity: { base: 120, members_base: 30, groups: {}, tiers: {} },
   hidden: { total: 14, earned: 0 },
   week: { week_key: "2026-W40", award: { award_id: "aw-1", tier_code: "match_0_2", name: "Stufe 3", group_name: "Gruppe 1", material: "gold", material_name: "Gold", material_color: "#FFD700", icon: "trophy",
-          holders: 2, percent: 1.7, earned_at: "2026-09-30T18:00:00+00:00", user: { id: "u1", username: "pixelpanther", display_name: "PixelPanther" } } },
+          holders: 2, percent: 1.7, earned_at: "2026-09-30T18:00:00+00:00", user: { id: "u1", username: "pixelpanther", display_name: "PixelPanther", avatar_url: "/api/static/uploads/avatar-week.png" } } },
   recent: Array.from({ length: 6 }, (_, index) => ({ award_id: `r${index}`, tier_code: `match_0_${index % 5}`, name: `Stufe ${index + 1}`, material_name: "Holz", material_color: "#A0703C", user: { id: `u${index}`, username: `spieler${index}`, display_name: `Spieler ${index}` } })),
 };
 
-const BOARD = Array.from({ length: 10 }, (_, index) => ({ user_id: `u${index}`, username: `spieler${index}`, display_name: `Spieler ${index + 1}`, count: 40 - index, points: 2000 - 50 * index, level: 12 - index, prestige: 0, rank: index + 1 }));
+// Profilbilder in voller Größe (2048 px) - die Seite soll die kleine Fassung holen (#1227).
+const BOARD = Array.from({ length: 10 }, (_, index) => ({ user_id: `u${index}`, username: `spieler${index}`, display_name: `Spieler ${index + 1}`, avatar_url: `/api/static/uploads/avatar-${index}.png`,
+  count: 40 - index, points: 2000 - 50 * index, level: 12 - index, prestige: 0, rank: index + 1 }));
 
 async function mockAchievements(page) {
   await page.addInitScript(() => {
@@ -57,6 +60,7 @@ async function mockAchievements(page) {
       return json(row ? groupsOf(category, row.groups) : CATEGORIES.flatMap((item) => groupsOf(item.key, item.groups)));
     }
     if (url.pathname === "/api/achievements/crowns") return json({ crowns: {} });
+    if (url.pathname.startsWith("/api/static/uploads/")) return route.fallback();
     return route.abort();
   });
   return apiCalls;
@@ -66,6 +70,7 @@ test.describe("Erfolge-Seite am Handy", () => {
   test.use({ viewport: VIEWPORT });
 
   test("höchstens vier Bildschirme, kein ganzer Katalog, Aufklappen in unter einer Sekunde", async ({ page }) => {
+    const uploads = await routeFakeUploads(page);
     const apiCalls = await mockAchievements(page);
     const bytes = { own: 0 };
     page.on("response", async (response) => {
@@ -84,6 +89,10 @@ test.describe("Erfolge-Seite am Handy", () => {
     expect(apiCalls.some((call) => call.startsWith("/api/achievements/me"))).toBe(false);
     expect(apiCalls).toContain("/api/achievements/leaderboard?limit=10&by=points");
     expect(bytes.own, `geladen ${Math.round(bytes.own / 1024)} KB`).toBeLessThan(600 * 1024);
+    // Profilbilder der Bestenliste in der kleinen Fassung, nie das Original.
+    const avatars = uploads.filter((entry) => entry.name.startsWith("avatar-"));
+    expect(avatars.length).toBeGreaterThan(0);
+    for (const entry of avatars) expect(entry.w, entry.path).toBe(160);
     // Abzeichen gibt es erst nach dem Aufklappen.
     expect(await page.locator("[data-testid^='achievement-group-']").count()).toBe(0);
 

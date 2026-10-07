@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { SkeletonList } from "@/components/tls/Skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -87,9 +88,10 @@ export default function MembersDirectoryPage() {
                 <div className="absolute inset-x-8 bottom-[5.4rem] h-10 bg-black/45 blur-2xl rounded-full" />
                 <div className="relative h-[24rem] sm:h-[27rem] overflow-hidden rounded-sm border border-white/10 bg-[#111]">
                   {m.photo_url ? (
-                    <img
-                      src={resolveMediaUrl(m.photo_url)}
+                    <LazyImg
+                      src={m.photo_url}
                       alt=""
+                      sizes="(min-width: 1536px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
                       className="absolute inset-0 z-10 w-full h-full object-cover object-top group-hover:scale-[1.03] transition duration-500"
                     />
                   ) : (

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { sizedUpload, variantWidthFor } from "@/lib/imageVariants";
 
 const MAX_SAMPLE_SIDE = 520;
 const MAX_CANVAS_SIDE = 1200;
@@ -70,14 +71,29 @@ function detectContentBox(image) {
   };
 }
 
+/**
+ * Die Fassung für den Kasten, in dem das Logo steht (#1227): Breite des Kastens mal Pixeldichte (höchstens 2 - für
+ * ein Logo reicht das auch am Handy), aufgerundet auf eine feste Breite des Servers. Ohne messbaren Kasten (noch nicht
+ * gezeichnet, Tests) bleibt es beim Original - wie vorher.
+ */
+export function logoSourceFor(src, boxWidth, density = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1) {
+  if (!src || !(boxWidth > 0)) return src;
+  return sizedUpload(src, variantWidthFor(Math.ceil(boxWidth * Math.min(Math.max(density, 1), 2))));
+}
+
 export function SmartLogo({ src, alt = "", className = "", fallbackClassName = "" }) {
   const canvasRef = useRef(null);
   const [fallback, setFallback] = useState(false);
+  const [loadedSrc, setLoadedSrc] = useState(src);
 
   useEffect(() => {
     if (!src) return undefined;
     let cancelled = false;
     setFallback(false);
+    // Logos von Sponsoren und Partnern kamen in voller Größe, oft mehrere tausend Pixel breit, für einen Kasten von
+    // 100 bis 300 Pixeln - in der Fußzeile auf jeder Seite (#1227).
+    const sized = logoSourceFor(src, canvasRef.current?.parentElement?.clientWidth || 0);
+    setLoadedSrc(sized);
     const image = new Image();
     image.crossOrigin = "anonymous";
     image.decoding = "async";
@@ -102,7 +118,7 @@ export function SmartLogo({ src, alt = "", className = "", fallbackClassName = "
     image.onerror = () => {
       if (!cancelled) setFallback(true);
     };
-    image.src = src;
+    image.src = sized;
     return () => {
       cancelled = true;
     };
@@ -110,7 +126,7 @@ export function SmartLogo({ src, alt = "", className = "", fallbackClassName = "
 
   if (!src) return null;
   if (fallback) {
-    return <img src={src} alt={alt} loading="lazy" decoding="async" className={fallbackClassName || className} />;
+    return <img src={loadedSrc || src} alt={alt} loading="lazy" decoding="async" className={fallbackClassName || className} />;
   }
   return <canvas ref={canvasRef} role={alt ? "img" : undefined} aria-label={alt || undefined} className={`block ${className}`} />;
 }
