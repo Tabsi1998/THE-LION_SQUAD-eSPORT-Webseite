@@ -38,9 +38,9 @@ function newsDate(post) {
 
 function SectionHead({ icon: Icon, title, to, label = "Alle", testId }) {
   return (
-    <div className="flex items-end justify-between gap-3 mb-4">
-      <h2 className="font-heading text-xl md:text-2xl font-black uppercase inline-flex items-center gap-2"><Icon className="w-5 h-5 text-[#29B6E8]" /> {title}</h2>
-      {to ? <Link to={to} data-testid={testId} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:underline inline-flex items-center gap-1">{label} <ArrowRight className="w-3.5 h-3.5" /></Link> : null}
+    <div className="flex items-end justify-between gap-3 mb-4 min-w-0">
+      <h2 className="min-w-0 font-heading text-xl md:text-2xl font-black uppercase inline-flex items-center gap-2"><Icon className="w-5 h-5 shrink-0 text-[#29B6E8]" /> {title}</h2>
+      {to ? <Link to={to} data-testid={testId} className="shrink-0 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:underline inline-flex items-center gap-1">{label} <ArrowRight className="w-3.5 h-3.5" /></Link> : null}
     </div>
   );
 }
@@ -136,8 +136,8 @@ export default function VereinPage() {
 
         <div>
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/40">Vom Verein</span>
-          <div className="mt-4 grid gap-8 lg:grid-cols-2">
-            <section data-testid="verein-news">
+          <div className="mt-4 grid grid-cols-1 gap-8 lg:grid-cols-2">
+            <section className="min-w-0" data-testid="verein-news">
               <SectionHead icon={Newspaper} title="News" to="/news" label="Alle News" testId="verein-news-all" />
               {publicNews.length ? (
                 <div className="space-y-2">
@@ -154,7 +154,7 @@ export default function VereinPage() {
               ) : <p className="text-sm text-white/45">Noch keine News.</p>}
             </section>
 
-            <section data-testid="verein-gallery">
+            <section className="min-w-0" data-testid="verein-gallery">
               <SectionHead icon={ImageIcon} title="Galerie" to="/galerie" testId="verein-gallery-all" />
               {albums.length ? (
                 <div className="grid grid-cols-3 gap-2">
@@ -168,7 +168,7 @@ export default function VereinPage() {
               ) : <p className="text-sm text-white/45">Noch keine Alben.</p>}
             </section>
 
-            <section data-testid="verein-about">
+            <section className="min-w-0" data-testid="verein-about">
               <SectionHead icon={Shield} title="Über uns" to="/about" label="Mehr" testId="verein-about-more" />
               <div className="border border-white/10 bg-[#121212] rounded-sm p-4 text-sm text-white/65 space-y-2">
                 <p>Wer wir sind, wofür wir stehen und wer im Vorstand für dich da ist.</p>
@@ -181,7 +181,7 @@ export default function VereinPage() {
               </div>
             </section>
 
-            <section data-testid="verein-references">
+            <section className="min-w-0" data-testid="verein-references">
               <SectionHead icon={Medal} title="Referenzen" to="/references" testId="verein-references-all" />
               {references.length ? (
                 <div className="space-y-2">

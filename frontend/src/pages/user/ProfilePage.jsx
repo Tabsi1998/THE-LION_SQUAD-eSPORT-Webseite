@@ -311,9 +311,6 @@ export default function ProfilePage() {
                 <button type="submit" disabled={saving} data-testid="profile-save" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-6 py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50 text-xs">
                   <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
                 </button>
-                <Link to="/privacy-account" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm text-xs">
-                  DSGVO / Daten
-                </Link>
                 {dirty ? (
                   <span className="text-xs text-[#FFD700]" data-testid="profile-unsaved">Ungespeicherte Änderungen</span>
                 ) : null}

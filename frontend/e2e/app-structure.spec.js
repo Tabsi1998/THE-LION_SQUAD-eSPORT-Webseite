@@ -142,7 +142,8 @@ test("eigenes Profil: „Nur für dich“ und der Schalter „So sehen dich ande
   await expect(page).toHaveURL(/\/u\/neonfalke$/);
   await expect(page.getByTestId("profile-private-box")).toBeVisible();
   await expect(page.getByTestId("profile-private-invoices")).toContainText("1 offen");
-  await page.getByTestId("profile-as-others-switch").check();
+  await page.getByTestId("profile-as-others-switch").click();
+  await expect(page.getByTestId("profile-as-others-switch")).toHaveAttribute("aria-checked", "true");
   await expect(page.getByTestId("profile-private-box")).toHaveCount(0);
   await expect(page.getByTestId("profile-settings")).toHaveAttribute("href", "/profile");
 });

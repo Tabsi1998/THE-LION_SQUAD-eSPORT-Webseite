@@ -320,6 +320,23 @@ export function podiumHighlights(items, limit = 3) {
     .slice(0, limit);
 }
 
+/** Der Schalter „So sehen dich andere“ (#1149) - ein echter Schalter, mit Tastatur bedienbar. */
+function AsOthersSwitch({ on, onChange }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label="So sehen dich andere"
+      onClick={() => onChange(!on)}
+      data-testid="profile-as-others-switch"
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition ${on ? "border-[#29B6E8] bg-[#29B6E8]/40" : "border-white/20 bg-white/10"}`}
+    >
+      <span className={`inline-block h-4 w-4 rounded-full transition-transform ${on ? "translate-x-6 bg-[#29B6E8]" : "translate-x-1 bg-white/60"}`} />
+    </button>
+  );
+}
+
 /** Reiter aus der Adresse - auch die alten Namen von /profile (#1149, #1150). */
 const TAB_ALIASES = { achievements: "badges", erfolge: "badges", badges: "badges", awards: "awards", honours: "honours", references: "references", teams: "teams", overview: "overview" };
 
@@ -375,10 +392,10 @@ export default function PublicProfilePage() {
       <PublicLayout>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 space-y-6" data-testid="profile-own-private">
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">{user.display_name || user.username}</h1>
-          <label className="flex items-center justify-between gap-4 border border-white/10 bg-[#121212] rounded-sm px-4 py-3" data-testid="profile-as-others">
+          <div className="flex items-center justify-between gap-4 border border-white/10 bg-[#121212] rounded-sm px-4 py-3" data-testid="profile-as-others">
             <span><span className="block font-bold text-sm">So sehen dich andere</span><span className="block text-xs text-white/50">{asOthers ? "Nur, was deine Privatsphäre allen zeigt." : "Aus: du siehst auch „Nur für dich“."}</span></span>
-            <input type="checkbox" role="switch" checked={asOthers} onChange={(event) => setAsOthers(event.target.checked)} className="h-5 w-9 accent-[#29B6E8]" data-testid="profile-as-others-switch" aria-label="So sehen dich andere" />
-          </label>
+            <AsOthersSwitch on={asOthers} onChange={setAsOthers} />
+          </div>
           {asOthers ? null : <PrivateBox />}
           <div className="border border-dashed border-white/15 rounded-sm px-6 py-10 text-center text-white/55">
             <Lock className="w-7 h-7 mx-auto mb-3 opacity-60" />
@@ -653,13 +670,13 @@ export default function PublicProfilePage() {
             {headerStats.map((stat) => <QuickStat key={stat.key} icon={stat.icon} label={stat.label} value={stat.value} color={stat.color} glory={stat.glory} testId={`profile-stat-${stat.key}`} />)}
           </div>
           {isOwnProfile && (
-            <label className="mb-6 flex items-center justify-between gap-4 border border-white/10 bg-[#121212] rounded-sm px-4 py-3 max-w-xl" data-testid="profile-as-others">
+            <div className="mb-6 flex items-center justify-between gap-4 border border-white/10 bg-[#121212] rounded-sm px-4 py-3 max-w-xl" data-testid="profile-as-others">
               <span>
                 <span className="block font-bold text-sm">So sehen dich andere</span>
                 <span className="block text-xs text-white/50">{asOthers ? "Nur, was deine Privatsphäre allen zeigt – ohne Anmeldung." : "Aus: du siehst alles, auch „Nur für dich“."}</span>
               </span>
-              <input type="checkbox" role="switch" checked={asOthers} onChange={(event) => setAsOthers(event.target.checked)} className="h-5 w-9 shrink-0 accent-[#29B6E8]" data-testid="profile-as-others-switch" aria-label="So sehen dich andere" />
-            </label>
+              <AsOthersSwitch on={asOthers} onChange={setAsOthers} />
+            </div>
           )}
         </div>
       </header>
