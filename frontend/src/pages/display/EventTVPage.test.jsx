@@ -39,8 +39,18 @@ function renderAt(path) {
   );
 }
 
+// Die Testdaten legen den Tag in Wiener Zeit an (Turniere 12 bis 17 Uhr, das Abend-Turnier ab 18 Uhr). Die Uhr steht
+// deshalb fest auf 14:32 - sonst hinge das Ergebnis davon ab, um welche Uhrzeit der Test läuft.
+const NOW = Date.parse("2026-10-07T14:32:00+02:00");
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
   apiMock.get.mockReset();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 test("die Hallen-Tafel: Tagesplan, alle Stationen mit Stand, reserviert zählt als „aufgerufen“", async () => {
