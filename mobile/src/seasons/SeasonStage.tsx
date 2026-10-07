@@ -21,6 +21,8 @@ import { SnowCap } from "./snow/SnowCap";
 import { WinterSkyBackdrop } from "./snow/WinterSky";
 import { WeatherSky } from "./weather";
 import { useSeason, type ActiveSeason } from "./SeasonProvider";
+import { claimCardTouch } from "./cardLift";
+import { useCardKey } from "./useCardLift";
 
 // Die Bühne in der App (#636, #655, #665): Ebenen über allen Tabs; nur Fledermäuse und Gräber nehmen Berührungen. Je Saison ein
 // Eintrag in der Registry; jeder Screen bekommt aus seinem Namen eine eigene Anordnung. Grüße kommen als
@@ -140,6 +142,9 @@ export function SeasonStage() {
 export function SeasonWidgetSlot() {
   const mounted = useMountedSeasons().filter(({ module }) => module.Widget);
   const screen = useCurrentScreen();
+  // Das Widget hat seine eigene Antwort aufs Antippen (Kranz, Schneeflocke, Kürbis): ein Tippen darauf ist kein Tippen
+  // auf die Begrüßungskarte, deren Deko bleibt dann ruhig (#1087).
+  const cardKey = useCardKey();
   if (!mounted.length) return null;
   // Mehrere Widgets stehen übereinander: nebeneinander nahmen Kranz und Schneeflocke dem Namen den Platz (er
   // brach mitten im Wort um). So ist die Spalte nur so breit wie das breiteste Widget. Kleine (Türchen, Stiefel - #852)
@@ -152,7 +157,7 @@ export function SeasonWidgetSlot() {
     return <Widget key={season.key} season={season} screen={screen} />;
   };
   return (
-    <View style={[styles.widgetSlot, large.length + (small.length ? 1 : 0) > 1 && styles.widgetStack]} testID="season-widget-slot">
+    <View style={[styles.widgetSlot, large.length + (small.length ? 1 : 0) > 1 && styles.widgetStack]} testID="season-widget-slot" onTouchStart={cardKey ? () => claimCardTouch(cardKey) : undefined}>
       {large.map(render)}
       {small.length ? <View style={styles.widgetRow} testID="season-widget-row">{small.map(render)}</View> : null}
     </View>
