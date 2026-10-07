@@ -66,7 +66,9 @@ test("„Anmelden“ öffnet die Anmeldung, „Später“ schließt nur - gemerk
   mockOpenSignIn.mockClear();
   await render(<SignInNudge delayMs={10} />);
   await after(10);
-  expect(screen.getByText(/geht jederzeit unter „Mehr“/)).toBeTruthy();
+  // Seit #1143 gibt es keinen Tab „Mehr“: der Hinweis zeigt auf den Tab, in dem Gäste sich anmelden.
+  expect(screen.getByText(/geht jederzeit unter „Profil“/)).toBeTruthy();
+  expect(screen.queryByText(/„Mehr“/)).toBeNull();
   await fireEvent.press(screen.getByTestId("sign-in-nudge-later"));
   await act(flush);
   expect(mockOpenSignIn).not.toHaveBeenCalled();
