@@ -144,6 +144,8 @@ async def compact_match_overviews(
             "match_key": match.get("match_key"),
             "station_id": match.get("station_id"),
             "station_label": match.get("station_label") or match.get("station_name") or (match.get("station") or {}).get("name"),
+            # Station im Klartext (#1220): „Station A · Switch 2“ - Website und App zeigen diesen Text.
+            "station_text": match.get("station_text"),
             "participant_names": participant_names,
             "opponent_name": ", ".join(opponent_names),
             "participant_count": len(participant_ids),

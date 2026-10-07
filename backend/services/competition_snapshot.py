@@ -248,6 +248,7 @@ def _common_match_fields(match: dict, collection: str, engine: str) -> dict:
         "station": deepcopy(match.get("station")),
         "station_name": match.get("station_name"),
         "station_label": match.get("station_label"),
+        "station_text": match.get("station_text"),
         "best_of": match.get("best_of"),
         "map": match.get("map"),
         "order": match.get("order") if match.get("order") is not None else match.get("match_index"),

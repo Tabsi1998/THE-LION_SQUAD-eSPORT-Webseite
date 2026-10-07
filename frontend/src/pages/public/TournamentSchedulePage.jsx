@@ -12,15 +12,11 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useChangedKeys } from "@/hooks/useLiveChanges";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
+import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel, slotName, stationText } from "@/lib/tournamentLabels";
+import { formatWhen } from "@/lib/datetime";
 import { seoTextPreview } from "@/lib/textPreview";
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { viennaDate } from "@/lib/vienna";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
-
-function formatDateTime(value) {
-  if (!value) return "Termin offen";
-  return viennaDateTime(value, { dateStyle: "medium", timeStyle: "short" });
-}
 
 // Ein Spieltag ist eine Woche. Die Kopfzeile nennt deshalb den Zeitraum, nicht
 // nur die Nummer - "Spieltag 3" allein sagt niemandem, wann gespielt wird.
@@ -41,22 +37,19 @@ const SCHEDULE_SOURCE_LABELS = {
   manual: "von der Turnierleitung",
 };
 
-function stationLabel(match) {
-  return match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
-}
-
-// Leere Plätze späterer Runden im Klartext (#1113): „Sieger aus A“ statt „W:A:1“ - Setzplätze heißen weiter „Offen“.
-function participantLabel(slot, registrations, findMatch) {
+// Leere Plätze späterer Runden im Klartext (#1113): „Sieger aus A“ statt „W:A:1“. Ein Platz ohne Gegner heißt
+// „Freilos“, ein Setzplatz vor der Auslosung „noch offen“ (#1220).
+function participantLabel(slot, registrations, findMatch, match) {
   const reg = registrations[slot.registration_id] || {};
-  return reg.display_name || reg.ingame_name || reg.user?.display_name || sourceLabel(slot.source, findMatch) || "Offen";
+  return reg.display_name || reg.ingame_name || reg.user?.display_name || sourceLabel(slot.source, findMatch) || slotName("", slot, match);
 }
 
 function duelLabels(match, registrations) {
   const a = registrations[match.participant_a_id] || {};
   const b = registrations[match.participant_b_id] || {};
   return [
-    a.display_name || a.ingame_name || "Offen",
-    b.display_name || b.ingame_name || "Offen",
+    slotName(a.display_name || a.ingame_name, { registration_id: match.participant_a_id }, match),
+    slotName(b.display_name || b.ingame_name, { registration_id: match.participant_b_id }, match),
   ];
 }
 
@@ -111,7 +104,7 @@ export default function TournamentSchedulePage() {
       ...match,
       matchday: match.matchday_number || match.round || 0,
       matchdayLabel: formatScheduleGroupLabel(match, tournament),
-      labels: (match.slots || []).map((slot) => participantLabel(slot, registrations, finder(match))),
+      labels: (match.slots || []).map((slot) => participantLabel(slot, registrations, finder(match), match)),
     }));
     const duelRows = (data?.matches || []).map((match) => ({
       ...match,
@@ -287,15 +280,15 @@ function MatchCard({ match, resolved, changed = false }) {
         </span>
       </div>
       <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-sm text-white/55">{formatDateTime(scheduledAt)}</span>
+        <span className="text-sm text-white/55" data-testid={`schedule-when-${match.id}`}>{formatWhen(scheduledAt, { fallback: "Termin offen" })}</span>
         {sourceLabel && (
           <span className="text-[10px] uppercase tracking-widest text-white/35" data-testid={`schedule-source-${match.id}`}>
             {sourceLabel}
           </span>
         )}
       </div>
-      {stationLabel(match) && (
-        <div className="mt-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">Station {stationLabel(match)}</div>
+      {stationText(match) && (
+        <div className="mt-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]" data-testid={`schedule-station-${match.id}`}>{stationText(match)}</div>
       )}
     </Link>
   );

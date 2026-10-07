@@ -16,7 +16,9 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
-import { formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { formatRoundName, formatTournamentDisplay, slotName } from "@/lib/tournamentLabels";
+import { finderFor, sourceLabel } from "@/lib/slotSource";
+import { formatWhen } from "@/lib/datetime";
 import { gameLabel } from "@/lib/gameLabels";
 import { eventTypeLabel, normalizeEventType } from "@/lib/eventTypes";
 import { formatCents, offerSummary, previewQuote } from "@/lib/pricing";
@@ -551,30 +553,48 @@ function accessSuffix(accessToken) {
   return accessToken ? `?access=${encodeURIComponent(accessToken)}` : "";
 }
 
+// Turnier-Karte am Event (#1220): mit Ergebnissen die ersten drei Plätze, sonst die Baum-Vorschau, wenn es einen Baum
+// gibt. Kann der Baum nicht geladen werden, steht das da; Liga und Durchgänge haben keinen Baum - dort steht nichts statt
+// „noch nicht generiert“.
+const FINISHED_TOURNAMENT_STATES = new Set(["completed", "results_published", "archived"]);
+const NO_TREE_FORMATS = new Set(["league", "round_robin", "swiss", "ffa", "battle_royale", "time_trial", "grand_prix"]);
+
+export function tournamentEmbedMode(tournament) {
+  if (FINISHED_TOURNAMENT_STATES.has(tournament?.status) || FINISHED_TOURNAMENT_STATES.has(tournament?.public_phase?.state)) return "podium";
+  return NO_TREE_FORMATS.has(tournament?.format) ? "none" : "tree";
+}
+
 function EventTournamentEmbed({ tournament, accessToken = "" }) {
-  const [bracket, setBracket] = useState(null);
-  const [loaded, setLoaded] = useState(false);
+  const mode = tournamentEmbedMode(tournament);
+  const [state, setState] = useState({ loaded: false, failed: false, data: null });
 
   useEffect(() => {
+    if (mode === "none") return undefined;
     let active = true;
-    api.get(`/tournaments/${tournament.id}/bracket`, { params: tournament.access_link && accessToken ? { access: accessToken } : undefined })
-      .then(({ data }) => { if (active) setBracket(data); })
-      .catch(() => { if (active) setBracket(null); })
-      .finally(() => { if (active) setLoaded(true); });
+    setState({ loaded: false, failed: false, data: null });
+    const path = mode === "podium" ? `/tournaments/${tournament.id}/standings` : `/tournaments/${tournament.id}/bracket`;
+    api.get(path, { params: tournament.access_link && accessToken ? { access: accessToken } : undefined })
+      .then(({ data }) => { if (active) setState({ loaded: true, failed: false, data }); })
+      .catch(() => { if (active) setState({ loaded: true, failed: true, data: null }); });
     return () => { active = false; };
-  }, [tournament.id, tournament.access_link, accessToken]);
+  }, [mode, tournament.id, tournament.access_link, accessToken]);
 
-  const matches = (bracket?.matches || []).slice(0, 4);
-  const regMap = new Map((bracket?.registrations || []).map((r) => [r.id, r]));
+  const base = `/tournaments/${tournament.slug || tournament.id}`;
+  const suffix = tournament.access_link ? accessSuffix(accessToken) : "";
+  const podium = mode === "podium" && Array.isArray(state.data)
+    ? state.data.filter((row) => Number(row.rank) >= 1 && Number(row.rank) <= 3).sort((a, b) => Number(a.rank) - Number(b.rank)).slice(0, 3)
+    : [];
+  const treeMatches = mode === "tree" ? previewMatches(state.data) : [];
+  const showLower = mode !== "none" && (!state.loaded || state.failed || podium.length > 0 || treeMatches.length > 0);
 
   return (
-    <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden min-w-0">
-      <Link to={`/tournaments/${tournament.slug || tournament.id}${tournament.access_link ? accessSuffix(accessToken) : ""}`} className="block p-5 hover:bg-white/[0.03] transition">
+    <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden min-w-0" data-testid={`event-tournament-${tournament.id}`}>
+      <Link to={`${base}${suffix}`} className="block p-5 hover:bg-white/[0.03] transition">
         <div className="flex flex-wrap items-center gap-2">
           <Trophy className="w-4 h-4 text-[#FFD700]" />
           <PhaseBadge phase={tournament.public_phase} status={tournament.status} />
           {tournament.event_day && <span className="text-[10px] font-bold uppercase tracking-widest text-[#9F7AEA]" data-testid="embed-event-day">Tag {tournament.event_day.index}/{tournament.event_day.count}</span>}
-          {tournament.start_date && <span className="text-xs text-white/45">{viennaDateTime(tournament.start_date, { dateStyle: "medium", timeStyle: "short" })}</span>}
+          {tournament.start_date && <span className="text-xs text-white/45">{formatWhen(tournament.start_date)}</span>}
         </div>
         <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#FFD700] transition break-words">{tournament.title}</h3>
         <div className="mt-2 flex flex-wrap gap-3 text-xs text-white/55">
@@ -583,32 +603,62 @@ function EventTournamentEmbed({ tournament, accessToken = "" }) {
           {Number.isFinite(tournament.participant_count) && <span>{tournament.participant_count}/{tournament.max_participants} Teilnehmer</span>}
         </div>
       </Link>
-      <div className="border-t border-white/10 p-5">
-        <div className="flex items-center justify-between gap-3 mb-3 min-w-0">
-          <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">Turnierbaum-Vorschau</div>
-          <Link to={`/tournaments/${tournament.slug || tournament.id}/bracket`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">Öffnen</Link>
-        </div>
-        {!loaded ? (
-          <div className="text-sm text-white/40 py-4">Lade Turnierbaum…</div>
-        ) : matches.length ? (
-          <div className="space-y-2">
-            {matches.map((match) => (
-              <div key={match.id} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
-                <div className="text-[10px] uppercase tracking-widest text-white/35">{match.round_name || `Runde ${match.round}`}</div>
-                <div className="mt-1 text-sm text-white/75 flex items-center justify-between gap-3 min-w-0">
-                  <span className="truncate">{registrationName(regMap, match.participant_a_id)}</span>
-                  <span className="text-white/30">vs</span>
-                  <span className="truncate text-right">{registrationName(regMap, match.participant_b_id)}</span>
-                </div>
-              </div>
-            ))}
+      {showLower && (
+        <div className="border-t border-white/10 p-5" data-testid={`event-tournament-${mode}`}>
+          <div className="flex items-center justify-between gap-3 mb-3 min-w-0">
+            <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">{mode === "podium" ? "Die ersten drei Plätze" : "Turnierbaum-Vorschau"}</div>
+            <Link to={`${base}/${mode === "podium" ? "standings" : "bracket"}${suffix}`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">{mode === "podium" ? "Rangliste" : "Öffnen"}</Link>
           </div>
-        ) : (
-          <div className="text-sm text-white/45 border border-dashed border-white/10 rounded-sm p-4">Turnierbaum wurde noch nicht generiert.</div>
-        )}
-      </div>
+          {!state.loaded ? (
+            <div className="text-sm text-white/40 py-4">{mode === "podium" ? "Lade Ergebnisse…" : "Lade Turnierbaum…"}</div>
+          ) : state.failed ? (
+            <div className="text-sm text-white/45 border border-dashed border-white/10 rounded-sm p-4" data-testid="event-tournament-failed">{mode === "podium" ? "Ergebnisse gerade nicht ladbar." : "Baum gerade nicht ladbar."}</div>
+          ) : mode === "podium" ? (
+            <ol className="space-y-2">
+              {podium.map((row) => (
+                <li key={`${row.rank}-${row.registration_id || row.display_name}`} className="flex items-center gap-3 border border-white/10 bg-black/20 rounded-sm px-3 py-2 min-w-0">
+                  <span className={`font-display font-black w-7 shrink-0 ${Number(row.rank) === 1 ? "text-[#FFD700]" : Number(row.rank) === 2 ? "text-white/75" : "text-[#CD7F32]"}`}>#{row.rank}</span>
+                  <span className="truncate text-sm text-white/85">{row.display_name || row.ingame_name || row.user?.display_name || "Teilnehmer"}</span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="space-y-2">
+              {treeMatches.map((match) => (
+                <div key={match.id} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-widest text-white/35">{formatRoundName(match.round_name, match.round)}</div>
+                  <div className="mt-1 text-sm text-white/75 flex items-center justify-between gap-3 min-w-0">
+                    <span className="truncate">{match.labels[0]}</span>
+                    <span className="text-white/30">vs</span>
+                    <span className="truncate text-right">{match.labels[1]}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
+}
+
+/** Die ersten vier Spiele des Baums mit Namen - „Freilos“ und „noch offen“ statt leerer Plätze (#1220). */
+export function previewMatches(bracket) {
+  const registrations = new Map((bracket?.registrations || []).map((registration) => [registration.id, registration]));
+  const matches = (bracket?.matches_v2 || []).filter((match) => (match.slots || []).length >= 2);
+  const finder = finderFor(matches);
+  return matches
+    .slice()
+    .sort((a, b) => (Number(a.round) || 0) - (Number(b.round) || 0) || (Number(a.order ?? a.match_index) || 0) - (Number(b.order ?? b.match_index) || 0))
+    .slice(0, 4)
+    .map((match) => ({
+      ...match,
+      labels: (match.slots || []).slice(0, 2).map((slot) => {
+        const registration = registrations.get(slot.registration_id);
+        const name = registration?.display_name || registration?.user?.display_name || registration?.ingame_name || "";
+        return name || sourceLabel(slot.source, finder(match)) || slotName("", slot, match);
+      }),
+    }));
 }
 
 function EventFastLapEmbed({ challenge, accessToken = "" }) {
@@ -663,10 +713,4 @@ function EventFastLapEmbed({ challenge, accessToken = "" }) {
       </div>
     </div>
   );
-}
-
-function registrationName(regMap, id) {
-  const reg = regMap.get(id);
-  if (!id) return "Offen";
-  return reg?.display_name || reg?.user?.display_name || reg?.ingame_name || "Offen";
 }

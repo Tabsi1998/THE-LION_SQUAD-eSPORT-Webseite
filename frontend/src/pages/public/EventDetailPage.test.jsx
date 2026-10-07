@@ -114,3 +114,70 @@ test("Mehrtägig (#884): Zeitraum und Jetzt-Satz im Kopf, je Tag eine Karte, Tur
   expect(screen.getByTestId("add-to-calendar-ics")).toHaveTextContent("allen 3 Tagen");
   expect(screen.getByTestId("add-to-calendar-ics").getAttribute("href")).toBe("/api/calendar/events/ausflug.ics");
 });
+
+// Turnier-Karte am Event (#1220): Baum, wenn es einen gibt; bei Fehler „Baum gerade nicht ladbar“; ohne Baum nichts;
+// mit Ergebnissen die ersten drei Plätze - nie mehr „Turnierbaum wurde noch nicht generiert“.
+function renderWithTournament(tournament, answers) {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/ausflug") return { data: { ...base, tournaments: [tournament] } };
+    if (url in answers) {
+      if (answers[url] instanceof Error) throw answers[url];
+      return { data: answers[url] };
+    }
+    throw new Error(`unerwartet: ${url}`);
+  });
+  return render(
+    <MemoryRouter initialEntries={["/events/ausflug"]}>
+      <Routes><Route path="/events/:slug" element={<EventDetailPage />} /></Routes>
+    </MemoryRouter>,
+  );
+}
+
+const CUP = { id: "t1", slug: "mk-cup", title: "Mario Kart Cup", status: "registration_open", format: "single_elim" };
+
+test("Turnier-Karte: der Baum mit Namen, Freilos und noch offenen Plätzen", async () => {
+  renderWithTournament(CUP, {
+    "/tournaments/t1/bracket": {
+      registrations: [{ id: "r1", display_name: "NeonFalke" }, { id: "r2", display_name: "LunaByte" }],
+      matches_v2: [
+        { id: "m2", match_key: "B", round: 1, order: 2, status: "completed", winner_id: "r2", slots: [{ slot: 1, status: "bye" }, { slot: 2, registration_id: "r2", status: "filled" }] },
+        { id: "m1", match_key: "A", round: 1, order: 1, status: "scheduled", slots: [{ slot: 1, registration_id: "r1", status: "filled" }, { slot: 2, status: "pending" }] },
+      ],
+      matches: [],
+    },
+  });
+  const tree = await screen.findByTestId("event-tournament-tree");
+  expect(tree).toHaveTextContent("Turnierbaum-Vorschau");
+  expect(tree).toHaveTextContent("NeonFalke");
+  expect(tree).toHaveTextContent("noch offen");
+  expect(tree).toHaveTextContent("Freilos");
+  expect(screen.queryByText(/noch nicht generiert/)).toBeNull();
+});
+
+test("Turnier-Karte: Baum nicht ladbar - und Liga ohne Baum zeigt nichts", async () => {
+  const { unmount } = renderWithTournament(CUP, { "/tournaments/t1/bracket": new Error("kaputt") });
+  expect(await screen.findByTestId("event-tournament-failed")).toHaveTextContent("Baum gerade nicht ladbar.");
+  unmount();
+  apiMock.get.mockClear();
+  renderWithTournament({ ...CUP, format: "league" }, {});
+  expect(await screen.findByTestId("event-tournament-t1")).toHaveTextContent("Mario Kart Cup");
+  expect(screen.queryByTestId("event-tournament-none")).toBeNull();
+  expect(screen.queryByText(/Turnierbaum/)).toBeNull();
+  expect(apiMock.get.mock.calls.map(([url]) => url)).not.toContain("/tournaments/t1/bracket");
+});
+
+test("Turnier-Karte: mit Ergebnissen die ersten drei Plätze statt „noch nicht generiert“", async () => {
+  renderWithTournament({ ...CUP, status: "results_published" }, {
+    "/tournaments/t1/standings": [
+      { rank: 2, registration_id: "r2", display_name: "LunaByte" },
+      { rank: 1, registration_id: "r1", display_name: "NeonFalke" },
+      { rank: 3, registration_id: "r3", display_name: "KiwiKomet" },
+      { rank: 4, registration_id: "r4", display_name: "DriftDaniel" },
+    ],
+  });
+  const podium = await screen.findByTestId("event-tournament-podium");
+  expect(podium).toHaveTextContent("Die ersten drei Plätze");
+  expect(podium).toHaveTextContent("#1NeonFalke#2LunaByte#3KiwiKomet");
+  expect(podium).not.toHaveTextContent("DriftDaniel");
+  expect(screen.queryByText(/noch nicht generiert/)).toBeNull();
+});

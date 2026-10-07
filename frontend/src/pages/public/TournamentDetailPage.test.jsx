@@ -227,3 +227,18 @@ test("Teams (#875): der Hinweis nennt, wie viele beim Event sein müssen - der S
   expect(await screen.findByTestId("tournament-event-gate")).toHaveTextContent("Mindestens 5 Spieler deines Teams müssen beim Event „Vereins-LAN“ angemeldet sein.");
   expect(screen.queryByTestId("tournament-event-first")).toBeNull();
 });
+
+// Datum ganz (#1220): die Kachel „Start“ zeigt Tag und Uhrzeit vollständig - „Sa 23. Mai · 21:00“, ohne „…“.
+test("Start-Kachel mit ganzem Datum in Klartext", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-05-20T10:00:00Z"));
+  try {
+    mockApi({ ...base, start_date: "2026-05-23T19:00:00Z" });
+    renderPage();
+    const tile = await screen.findByTestId("tournament-start-tile");
+    expect(tile).toHaveTextContent("Sa 23. Mai · 21:00");
+    expect(tile.querySelector(".truncate")).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
+});
