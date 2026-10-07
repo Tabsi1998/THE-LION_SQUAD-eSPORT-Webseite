@@ -61,8 +61,12 @@ CAPABILITIES: tuple[Capability, ...] = (
     _c("tournament.lock", "Turnier sperren und entsperren",
        ["POST /api/tournaments/{tid}/lock", "POST /api/tournaments/{tid}/unlock"], [ENGINE_NEUTRAL]),
     _c("tournament.status", "Turnierstatus wechseln",
-       ["POST /api/tournaments/{tid}/status"], [ENGINE_NEUTRAL],
-       note="Löst bei check_in und live zusätzlich Strukturarbeit aus."),
+       ["POST /api/tournaments/{tid}/status", "PUT /api/tournaments/{tid}/pause"], [ENGINE_NEUTRAL],
+       note="Löst bei check_in und live zusätzlich Strukturarbeit aus. „Pause bis“ (#1123) gehört zum Status "
+            "„Pausiert“ und lässt sich während der Pause ändern."),
+    _c("tournament.round_sponsors", "Sponsor je Runde für den TV wählen",
+       ["PUT /api/tournaments/{tid}/round-sponsors"], [ENGINE_NEUTRAL],
+       note="„Runde 2 präsentiert von“ (#1125) - nur Sponsoren mit „TV / Anzeige“."),
     _c("tournament.chat", "Turnier-Chat",
        ["GET /api/tournaments/{tid}/chat", "POST /api/tournaments/{tid}/chat"], [ENGINE_NEUTRAL]),
 
