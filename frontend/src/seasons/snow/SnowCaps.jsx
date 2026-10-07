@@ -6,6 +6,9 @@ import { measureQuietZones, overlayZones, rectInQuiet, watchOverlays } from "../
 import { hashString } from "../rng";
 import { snowLightAt } from "../skyLight";
 import { OVERHANG, capLevel, capPath, capThickness, measureCaps } from "./caps";
+import { REST_MS, createRest, endReaction, startReaction } from "../cardLift";
+import { useCardSignal } from "../useCardSignal";
+import { SHAKE, shakeDuration, shakeFlakes } from "./shake";
 import { TRACK_MIN_RUN, TRACK_REST_MS, TRACK_STEP_MS, dentsAt, markTracks, trackSteps, tracksDuration, tracksToday } from "./tracks";
 
 // Schneehauben (S7, #638; W3, #729): still auf den Oberkanten von Karten, Rahmen und der Fußzeile im Fenster - je
@@ -117,8 +120,16 @@ function useSnowTracks(caps, enabled, level) {
   return { key: walk.key, run: walk.run, dents: dentsAt(walk.steps, elapsed) };
 }
 
-/** Eine Haube: je freiem Stück der Kante ein eigenes SVG, damit ihr Kasten nur dort liegt, wo Schnee ist. */
-function Cap({ cap, level, light, moonX, track = null }) {
+/** Der Kartenschlüssel einer Haube (`cap:card:<id>` -> `card:<id>`) - nur Karten heben sich (#1087). */
+export function capCard(cap) {
+  return cap && cap.kind === "card" && String(cap.key).startsWith("cap:") ? String(cap.key).slice(4) : null;
+}
+
+/**
+ * Eine Haube: je freiem Stück der Kante ein eigenes SVG, damit ihr Kasten nur dort liegt, wo Schnee ist. `shake` ist
+ * die Phase nach dem Abschütteln (#1088): „drop“ sackt auf ein Fünftel, „grow“ wächst in 90 Sekunden nach (snow.css).
+ */
+function Cap({ cap, level, light, moonX, track = null, shake = null }) {
   const ids = useId().replace(/[^a-zA-Z0-9]/g, "");
   const thickness = capThickness(level, cap.growth);
   const base = thickness + OVERHANG;
@@ -143,6 +154,8 @@ function Cap({ cap, level, light, moonX, track = null }) {
         data-yield={cap.yield ? "1" : undefined}
         data-tone={tone.top}
         data-tracks={dents.length || undefined}
+        data-season-card={capCard(cap) || undefined}
+        data-shake={shake || undefined}
       >
         <defs>
           <linearGradient id={`${ids}-${index}`} x1="0" x2="0" y1="0" y2="1">
@@ -151,10 +164,12 @@ function Cap({ cap, level, light, moonX, track = null }) {
             <stop offset="1" stopColor={tone.bottom} />
           </linearGradient>
         </defs>
-        <path d={d} fill={`url(#${ids}-${index})`} />
-        {dents.filter((dent) => dent.fresh).map((dent) => [-1, 0, 1].map((side) => (
-          <circle key={`${dent.x}:${side}`} className="tls-snow-crumb" cx={dent.x} cy={base - thickness} r={0.9} style={{ "--dx": `${side * 3}px` }} />
-        )))}
+        <g className="tls-snowcap__snow" style={{ transformOrigin: `0px ${base.toFixed(1)}px` }}>
+          <path d={d} fill={`url(#${ids}-${index})`} />
+          {dents.filter((dent) => dent.fresh).map((dent) => [-1, 0, 1].map((side) => (
+            <circle key={`${dent.x}:${side}`} className="tls-snow-crumb" cx={dent.x} cy={base - thickness} r={0.9} style={{ "--dx": `${side * 3}px` }} />
+          )))}
+        </g>
       </svg>
     );
   });
@@ -215,11 +230,81 @@ export function SnowCaps({ stage = 1, tempC = null, salt = "", max = 24, light =
   }, [location.pathname, salt, max]);
 
   const track = useSnowTracks(caps, tracksOn, level);
+  const shake = useSnowShake(capsRef, level, caps.length > 0);
   if (typeof document === "undefined" || !caps.length) return null;
   return createPortal(
     <div className="tls-snowcaps" aria-hidden="true" data-testid="snow-caps" data-level={level}>
-      {caps.map((cap) => <Cap key={cap.key} cap={cap} level={level} light={light || DAYLIGHT} moonX={moonX} track={track && track.key === cap.key ? track : null} />)}
+      {caps.map((cap) => <Cap key={cap.key} cap={cap} level={level} light={light || DAYLIGHT} moonX={moonX} track={track && track.key === cap.key ? track : null} shake={shake.phases[cap.key] || null} />)}
+      {shake.bursts.map((burst) => (
+        <div key={burst.id} className="tls-snowshake" style={{ transform: `translate(${burst.x.toFixed(1)}px, ${burst.y.toFixed(1)}px)` }} data-testid="snow-shake" data-cap={burst.capKey}>
+          {burst.flakes.map((flake, index) => (
+            <span
+              key={index}
+              className="tls-snowshake__flake"
+              style={{ "--x": `${flake.x}px`, "--y": `${flake.y}px`, "--s": `${flake.size}px`, "--delay": `${flake.delay}ms`, "--dur": `${flake.dur}ms`, "--fall": `${flake.fall}px`, "--drift": `${flake.drift}px` }}
+            />
+          ))}
+        </div>
+      ))}
     </div>,
     document.body,
   );
+}
+
+/**
+ * Schnee abschütteln (#1088): hebt sich eine Karte mit Haube (Karten-Signal #1087), lösen sich die Flocken in einer
+ * halben Sekunde, fallen und verblassen; die Haube sackt auf ein Fünftel und wächst in 90 Sekunden nach. Nur diese
+ * Karte, höchstens einmal je Minute je Karte, nie neben einer anderen großen Reaktion (Bewegungsbudget). Nur mit Maus,
+ * nicht mit „Bewegung reduzieren“ (das Signal kommt dann gar nicht).
+ */
+function useSnowShake(capsRef, level, enabled) {
+  const [phases, setPhases] = useState({});
+  const [bursts, setBursts] = useState([]);
+  const restRef = useRef(null);
+  if (!restRef.current) restRef.current = createRest(REST_MS.big);
+  const timers = useRef(new Set());
+  const tokens = useRef(new Set());
+  const later = (fn, ms) => {
+    const id = window.setTimeout(() => {
+      timers.current.delete(id);
+      fn();
+    }, ms);
+    timers.current.add(id);
+  };
+  useEffect(() => () => {
+    timers.current.forEach((id) => window.clearTimeout(id));
+    timers.current.clear();
+    tokens.current.forEach((token) => endReaction(token));
+    tokens.current.clear();
+  }, []);
+  useCardSignal((detail) => {
+    if (detail.type !== "lift") return;
+    const mine = capsRef.current.filter((cap) => capCard(cap) === detail.key && !cap.yield);
+    if (!mine.length || restRef.current.left(detail.key) > 0) return;
+    const token = startReaction();
+    if (!token) return;
+    restRef.current.take(detail.key);
+    tokens.current.add(token);
+    const now = Date.now();
+    const fresh = mine.map((cap, n) => {
+      const thickness = capThickness(level, cap.growth);
+      const flakes = shakeFlakes({ runs: cap.runs, thickness, seed: `${cap.key}:${now}:${n}` });
+      return { id: `${cap.key}:${now}`, capKey: cap.key, x: cap.x, y: cap.y, flakes, until: shakeDuration(flakes) };
+    });
+    setPhases((current) => ({ ...current, ...Object.fromEntries(mine.map((cap) => [cap.key, "drop"])) }));
+    setBursts((current) => [...current, ...fresh]);
+    later(() => setPhases((current) => ({ ...current, ...Object.fromEntries(mine.map((cap) => [cap.key, "grow"])) })), SHAKE.detachMs + 80);
+    later(() => setPhases((current) => {
+      const next = { ...current };
+      mine.forEach((cap) => delete next[cap.key]);
+      return next;
+    }), SHAKE.detachMs + SHAKE.regrowMs + 500);
+    const longest = fresh.reduce((max, burst) => Math.max(max, burst.until), 0);
+    later(() => {
+      setBursts((current) => current.filter((burst) => !fresh.some((item) => item.id === burst.id)));
+      endReaction(token);
+      tokens.current.delete(token);
+    }, longest + 120);
+  }, enabled);
+  return { phases, bursts };
 }

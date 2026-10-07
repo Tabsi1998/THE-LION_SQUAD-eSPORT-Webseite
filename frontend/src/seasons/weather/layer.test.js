@@ -112,3 +112,24 @@ test("Tropfen landen auf Kanten: Spritzer entstehen dort, höchstens eine Handvo
   expect(measured.map((edge) => [edge.x1, edge.x2, edge.y])).toEqual([[46, 394, 100], [6, 994, 500]]);
   expect(measureEdges(null)).toEqual([]);
 });
+
+test("Regen an der gehobenen Kante (#1094): ein paar Spritzer nur beim Regen, einmal je Karte in zehn Sekunden", () => {
+  let now = 0;
+  const layer = createRainLayer({ budget: 50, share: 1, seed: "lift", weather: { rain_mm: 2.5 }, win: fakeWindow(), measure: () => [], now: () => now, signal: null });
+  layer.draw(fakeContext([]), 0.016, SIZE);
+  const before = layer.state().splashes;
+  const lift = { type: "lift", key: "card:1", rect: { left: 100, right: 400, top: 300 } };
+  layer.card(lift);
+  const after = layer.state().splashes;
+  expect(after - before).toBeGreaterThanOrEqual(4);
+  expect(after - before).toBeLessThanOrEqual(7);
+  layer.card(lift);
+  expect(layer.state().splashes).toBe(after);
+  now += 10001;
+  layer.card(lift);
+  expect(layer.state().splashes).toBeGreaterThan(after);
+
+  const dry = createRainLayer({ budget: 50, share: 1, seed: "dry", weather: { rain_mm: 0 }, win: fakeWindow(), measure: () => [], now: () => 0, signal: null });
+  dry.card(lift);
+  expect(dry.state().splashes).toBe(0);
+});

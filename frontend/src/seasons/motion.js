@@ -27,6 +27,9 @@ export const EFFECTS = {
   lightning: { slots: 0, cooldownMs: 8000, priority: 1, ttlMs: 600 },
   // Die Spur im Schnee (W5 #731): selten - einmal am Tag je Gerät, dazu eine lange Abklingzeit.
   snow_tracks: { slots: 1, cooldownMs: 600000, priority: 1, ttlMs: 40000 },
+  // Deko reagiert auf eine gehobene Karte (Jahreszeiten IV, #1087): große Reaktionen (Schnee, Netz) belegen einen Platz,
+  // höchstens eine gleichzeitig (cardLift.startReaction); die Ruhezeit je Karte kennt das Modul.
+  card_big: { slots: 1, cooldownMs: 0, priority: 4, ttlMs: 4000 },
 };
 
 export function createMotionScheduler({ now = () => Date.now(), slots = DEFAULT_SLOTS, initialDelayMs = INITIAL_DELAY_MS, minGapMs = MIN_GAP_MS, doc = typeof document === "undefined" ? null : document, unlimited = false } = {}) {

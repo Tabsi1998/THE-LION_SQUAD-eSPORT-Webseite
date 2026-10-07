@@ -2256,12 +2256,13 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
     transform: scale(calc(1 + 0.03 * var(--tls-motion-on)));
   }
 }
-/* Trägt eine Karte gerade Saison-Deko (Schneehaube, Fledermaus, Lichterkette), bleibt sie stehen: die Deko sitzt in
-   einer eigenen Ebene auf der gemessenen Kante und würde sonst 5 px versetzt hängen. Rand, Schein und Bild reagieren. */
-html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-season-anchor="card"]:hover,
-html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-season-perch="card"]:hover,
-html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-season-anchor="card"]:focus-visible,
-html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-season-perch="card"]:focus-visible {
+/* Saison-Deko an Karten fährt beim Anheben mit und reagiert (Jahreszeiten IV, #1087: Schnee, Netz, Fledermaus, Ei,
+   Konfetti). Nur eine Saison, deren Deko an Karten hängt und noch nicht mitfährt, meldet `stillCards` - dann bleibt
+   die Karte stehen (SeasonStage.jsx setzt data-season-still-cards). Rand, Schein und Bild reagieren trotzdem. */
+html[data-season-still-cards] .tls-card[data-season-anchor="card"]:hover,
+html[data-season-still-cards] .tls-card[data-season-perch="card"]:hover,
+html[data-season-still-cards] .tls-card[data-season-anchor="card"]:focus-visible,
+html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible {
   transform: none;
 }
 

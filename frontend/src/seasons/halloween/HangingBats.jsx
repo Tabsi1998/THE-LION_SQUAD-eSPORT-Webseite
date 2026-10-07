@@ -9,6 +9,8 @@ import { recordSignal } from "../signals";
 import { FlyingBatShape, HangingBatShape, SittingBatShape } from "./art";
 import { KIND_WEIGHTS, MIN_DISTANCE, POSE, SHAPE_HEIGHT, choosePerches, measurePerches, nearestFreePerch } from "./perches";
 import { MAX_ACTIVE_FLIGHTS, SCROLL_STARTLE_SPEED, activeFlights, advanceBat, alert, createBat, fleePath, pointOn, reactToPointer, reactToScroll, startle } from "./batLife";
+import { CARD_SELECTOR, LIFTING_CLASS, REST_MS, cardKey, createRest } from "../cardLift";
+import { useCardSignal } from "../useCardSignal";
 
 // Fledermäuse (#661, Halloween IV H7–H9): sie sitzen auf Kanten und Ecken oder hängen unter ihnen (perches.js),
 // leben nach einer kleinen Zustandslogik (batLife.js) und reagieren auf Zeiger und Scrollen. Die Kopfzeile klebt
@@ -28,6 +30,17 @@ export function measureAnchors(doc, win, zonesOrOptions) {
 }
 
 const REFRESH_DELAYS = [400, 1500, 3500];
+/** Aufflattern an einer gehobenen Karte (#1090): eine Sekunde, mehrere Fledermäuse um 120 ms versetzt. */
+export const FLUTTER_MS = 1000;
+export const FLUTTER_STAGGER_MS = 120;
+
+/** Der Kartenschlüssel einer Fledermaus - nur an Karten, die sich heben (#1087); Kopfzeile, Bild, Fußzeile nicht. */
+export function batCard(bat) {
+  const perch = bat && (bat.target || bat.perch);
+  const element = perch && perch.element;
+  if (!element || typeof element.matches !== "function" || !element.matches(CARD_SELECTOR) || !element.classList.contains(LIFTING_CLASS)) return null;
+  return cardKey(element);
+}
 export const IDLE_TICK_MS = 250;
 const POINTER_EVERY_MS = 120;
 const SCROLL_EVERY_MS = 400;
@@ -319,6 +332,34 @@ export function HangingBats({ count, seed, salt, timeScale = 1, temperament = nu
     wakeRef.current();
   };
 
+  // Aufflattern (#1090): hebt sich die Karte, an der eine Fledermaus sitzt oder hängt, flattert sie eine Sekunde auf und
+  // landet wieder an derselben, gehobenen Kante. Nicht, solange eine andere fliegt (Bewegungsbudget); Ruhezeit je Karte.
+  const [flutters, setFlutters] = useState({});
+  const flutterRest = useRef(null);
+  if (!flutterRest.current) flutterRest.current = createRest(REST_MS.small);
+  const flutterTimers = useRef(new Set());
+  useEffect(() => () => {
+    flutterTimers.current.forEach((id) => window.clearTimeout(id));
+    flutterTimers.current.clear();
+  }, []);
+  useCardSignal((detail) => {
+    if (detail.type !== "lift") return;
+    const current = batsRef.current;
+    const mine = current.filter((bat) => REACTIVE.has(bat.state) && !bat.yield && batCard(bat) === detail.key);
+    if (!mine.length || activeFlights(current) > 0 || !flutterRest.current.take(detail.key)) return;
+    const started = Object.fromEntries(mine.map((bat, index) => [bat.id, index * FLUTTER_STAGGER_MS]));
+    setFlutters((existing) => ({ ...existing, ...started }));
+    const id = window.setTimeout(() => {
+      flutterTimers.current.delete(id);
+      setFlutters((existing) => {
+        const next = { ...existing };
+        mine.forEach((bat) => delete next[bat.id]);
+        return next;
+      });
+    }, FLUTTER_MS + mine.length * FLUTTER_STAGGER_MS + 50);
+    flutterTimers.current.add(id);
+  }, bats.length > 0);
+
   if (typeof document === "undefined") return null;
   const alive = bats.filter((bat) => bat.state !== "gone");
   if (!alive.length) return null;
@@ -335,13 +376,16 @@ export function HangingBats({ count, seed, salt, timeScale = 1, temperament = nu
     const sitting = bat.pose === POSE.sit;
     const top = sitting ? bat.y - shapeHeight(bat) : bat.y;
     const perch = bat.target || bat.perch;
+    const flutter = flutters[bat.id];
     return (
       <button
         key={bat.id}
         type="button"
         tabIndex={-1}
-        className={`tls-hbat ${sitting ? "tls-hbat--sitting" : "tls-hbat--hanging"} tls-hbat--${bat.state}${bat.yield ? " tls-hbat--yield" : ""}`}
-        style={{ transform: `translate(${(bat.x - bat.size / 2).toFixed(1)}px, ${top.toFixed(1)}px)` }}
+        className={`tls-hbat ${sitting ? "tls-hbat--sitting" : "tls-hbat--hanging"} tls-hbat--${bat.state}${bat.yield ? " tls-hbat--yield" : ""}${flutter !== undefined ? " tls-hbat--flutter" : ""}`}
+        style={{ transform: `translate(${(bat.x - bat.size / 2).toFixed(1)}px, ${top.toFixed(1)}px)`, "--flutter-delay": flutter !== undefined ? `${flutter}ms` : undefined }}
+        data-season-card={batCard(bat) || undefined}
+        data-flutter={flutter !== undefined ? "1" : undefined}
         onClick={() => scare(bat.id)}
         data-testid="halloween-bat-hanging"
         data-kind={perch?.kind}

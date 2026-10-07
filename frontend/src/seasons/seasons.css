@@ -7,6 +7,9 @@
 .tls-season-toast { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); z-index: 62; max-width: min(92vw, 30rem); }
 .tls-season-widget-slot { display: inline-flex; align-items: center; margin-left: 0.25rem; }
 .tls-season-footer-slot { position: relative; height: 0; }
+/* Karten-Signal (#1087): die Deko einer gehobenen Karte fährt mit - so weit wie die Karte (index.css, 5 px). Die Dauer
+   steht in der Übergangsliste jedes Moduls (translate var(--tls-motion-mid) var(--tls-ease)). */
+[data-season-card][data-season-lifted] { translate: 0 calc(-5px * var(--tls-motion-on, 1)); }
 
 /* Der Mond der Saisons (#681; MoonArt.jsx, MoonInSky.jsx): echte Phase und echter Stand am Himmel über dem
    Vereinsort - der Halter steht dort, wo der Mond gerade ist, und wandert jede Minute weiter (weicher Übergang, beim

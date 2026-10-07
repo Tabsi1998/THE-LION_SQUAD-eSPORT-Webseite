@@ -4,6 +4,8 @@
 // Dauerregen, der Loop schläft.
 import { mulberry32 } from "../rng";
 import { wakeSky } from "../sky";
+import { rectOf } from "../anchors";
+import { REST_MS as CARD_REST_MS, cardKey, createLiftOffsets, createRest, defaultSignal } from "../cardLift";
 import { COLORS, burstPieces, pieceAt, rainPieces } from "./confetti";
 
 /** Stücke je Gerät: der Himmel gibt sein Budget (40/60/120/240), Fasching nimmt davon - höchstens 150 bzw. 300. */
@@ -25,15 +27,18 @@ export function requestBurst(point) {
   wakeSky();
 }
 
-/** Oberkanten, auf denen Konfetti kurz liegen darf: Karten im Fenster (Seitenkoordinaten). */
+/**
+ * Oberkanten, auf denen Konfetti kurz liegen darf: Karten im Fenster (Seitenkoordinaten), am Ruheplatz gemessen (eine
+ * gehobene Karte rechnet die Ebene selbst dazu), mit dem Schlüssel der Karte (#1093).
+ */
 export function landingEdges(doc = typeof document === "undefined" ? null : document, win = typeof window === "undefined" ? null : window) {
   if (!doc || !win || typeof doc.querySelectorAll !== "function") return [];
   const scrollY = Number(win.scrollY) || 0;
   return [...doc.querySelectorAll("[data-season-anchor='card'], [data-season-perch='card']")]
-    .map((node) => node.getBoundingClientRect())
-    .filter((rect) => rect.width >= 80 && rect.bottom > 0 && rect.top < win.innerHeight)
+    .map((node) => ({ node, rect: rectOf(node) }))
+    .filter(({ rect }) => rect && rect.width >= 80 && rect.bottom > 0 && rect.top < win.innerHeight)
     .slice(0, 24)
-    .map((rect) => ({ left: rect.left + 6, right: rect.right - 6, top: rect.top + scrollY }));
+    .map(({ node, rect }) => ({ left: rect.left + 6, right: rect.right - 6, top: rect.top + scrollY, key: cardKey(node) }));
 }
 
 /** Liegend sieht man ein Stück schräg von vorn: flach, die lange Seite waagrecht, etwas schief. */
@@ -87,10 +92,31 @@ const monotonic = () => (typeof performance !== "undefined" && typeof performanc
  * und Zeichnen; den Zeitstempel des Loops nimmt die Ebene nicht, damit eine Explosion zwischen zwei Bildern nicht
  * aus einer anderen Zeitrechnung kommt.
  */
-export function createConfettiLayer({ budget = 120, effective = "normal", seed = 1, rain = false, wind = () => 0, edges = landingEdges, clock = monotonic, win = typeof window === "undefined" ? null : window, palette = null, burst = BURST_COUNT } = {}) {
+export function createConfettiLayer({ budget = 120, effective = "normal", seed = 1, rain = false, wind = () => 0, edges = landingEdges, clock = monotonic, win = typeof window === "undefined" ? null : window, palette = null, burst = BURST_COUNT, signal = defaultSignal(win) } = {}) {
   const cap = confettiCap(budget, effective);
   const rng = mulberry32(seed);
   const state = { flying: [], resting: [], ledges: [] };
+  // Konfetti wirbelt auf (#1093): hebt sich eine Karte, auf der Stücke liegen, wirbeln sie auf, segeln mit eigener
+  // Physik ab und landen tiefer wieder (nie auf derselben Karte). Liegende Stücke fahren beim Anheben mit. Dieselben
+  // Stücke - das Budget bleibt, wie es ist.
+  const lifts = createLiftOffsets(clock);
+  const whirlRest = createRest(CARD_REST_MS.small, clock);
+  const onCard = (detail) => {
+    lifts.onSignal(detail);
+    if (detail.type !== "lift") return;
+    const now = clock();
+    const lying = state.resting.filter((item) => item.ledgeKey === detail.key && now < item.until);
+    if (!lying.length || !whirlRest.take(detail.key)) return;
+    state.resting = state.resting.filter((item) => !lying.includes(item));
+    const scrollY = scroll();
+    const offset = lifts.offset(detail.key);
+    lying.forEach((item) => {
+      const piece = { ...item.piece, x: item.x, y: item.top - item.lift + offset - scrollY, vx: (rng() - 0.5) * 90, vy: -(110 + rng() * 120), at: 0, angle: item.angle };
+      state.flying.push({ piece, start: now, top: scrollY, rests: true, lastY: null, skip: detail.key });
+    });
+    wakeSky();
+  };
+  const unsubscribe = signal && typeof signal.subscribe === "function" ? signal.subscribe(onCard) : null;
   const scroll = () => (win ? Number(win.scrollY) || 0 : 0);
   const size = () => (win ? { width: win.innerWidth || 1280, height: win.innerHeight || 800 } : { width: 1280, height: 800 });
   const add = (pieces, origin) => {
@@ -119,10 +145,14 @@ export function createConfettiLayer({ budget = 120, effective = "normal", seed =
       const pageY = at.y + item.top;
       // Liegenbleiben: fällt ein Stück durch die Oberkante einer Karte, bleibt es dort kurz liegen.
       if (item.rests && item.lastY !== null && at.flip !== undefined) {
-        const ledge = state.ledges.find((edge) => at.x >= edge.left && at.x <= edge.right && item.lastY < edge.top && pageY >= edge.top);
+        const ledge = state.ledges.find((edge) => {
+          if (edge.key && edge.key === item.skip) return false;
+          const top = edge.top + lifts.offset(edge.key);
+          return at.x >= edge.left && at.x <= edge.right && item.lastY < top && pageY >= top;
+        });
         if (ledge) {
           const hold = REST_MS[0] + rng() * (REST_MS[1] - REST_MS[0]);
-          state.resting.push({ ...lying(item.piece, rng), x: at.x, top: ledge.top, until: now + hold });
+          state.resting.push({ ...lying(item.piece, rng), x: at.x, top: ledge.top, until: now + hold, ledgeKey: ledge.key || null });
           continue;
         }
       }
@@ -136,7 +166,7 @@ export function createConfettiLayer({ budget = 120, effective = "normal", seed =
     state.resting = state.resting.filter((rest) => now < rest.until + FADE_MS);
     for (const rest of state.resting) {
       const alpha = now < rest.until ? 1 : 1 - (now - rest.until) / FADE_MS;
-      const screenY = rest.top - rest.lift - scrollY;
+      const screenY = rest.top - rest.lift - scrollY + lifts.offset(rest.ledgeKey);
       if (screenY > -20 && screenY < view.height + 20) drawPiece(ctx, rest.piece, { x: rest.x, y: screenY, angle: rest.angle, flip: LYING_FLIP }, alpha);
     }
   };
@@ -146,10 +176,15 @@ export function createConfettiLayer({ budget = 120, effective = "normal", seed =
     draw,
     idle: () => state.flying.length === 0 && state.resting.length === 0,
     snapshot: () => ({ flying: state.flying.length, resting: state.resting.length, cap }),
+    /** Nur für Tests: auf welchen Karten gerade Stücke liegen (ohne die, die schon verblassen). */
+    restingOn: () => state.resting.filter((item) => clock() < item.until).map((item) => item.ledgeKey),
     dispose: () => {
       listeners.delete(onBurst);
+      if (unsubscribe) unsubscribe();
       state.flying = [];
       state.resting = [];
     },
+    /** Nur für Tests: das Signal von außen geben. */
+    card: onCard,
   };
 }

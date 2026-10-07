@@ -140,6 +140,33 @@ test("liegend: die lange Seite waagrecht, leicht schief, so hoch über der Kante
 test("Kanten zum Liegenbleiben: nur Karten im Fenster, breit genug, in Seitenkoordinaten", () => {
   const card = (top, width) => ({ getBoundingClientRect: () => ({ top, bottom: top + 100, left: 20, right: 20 + width, width }) });
   const doc = { querySelectorAll: () => [card(100, 300), card(900, 300), card(200, 40)] };
-  expect(landingEdges(doc, { scrollY: 50, innerHeight: 800 })).toEqual([{ left: 26, right: 314, top: 150 }]);
+  expect(landingEdges(doc, { scrollY: 50, innerHeight: 800 })).toEqual([{ left: 26, right: 314, top: 150, key: expect.stringMatching(/^card:\d+$/) }]);
   expect(landingEdges(null, null)).toEqual([]);
+});
+
+test("Konfetti wirbelt auf (#1093): die Stücke einer gehobenen Karte fliegen wieder und landen nie auf derselben Karte", () => {
+  const edges = () => [{ left: 0, right: 1280, top: 420, key: "card:1" }, { left: 0, right: 1280, top: 760, key: "card:2" }];
+  const { layer, frame, clock } = setup({ edges, signal: null });
+  requestBurst({ x: 640, y: 260 });
+  // Warten, bis nichts mehr fliegt und auf card:1 noch Stücke liegen - dann sind alle, die danach fliegen, aufgewirbelt.
+  for (let n = 0; n < 700 && !(layer.snapshot().flying === 0 && layer.restingOn().includes("card:1")); n += 1) frame(16);
+  expect(layer.snapshot().flying).toBe(0);
+  const lying = layer.restingOn().filter((key) => key === "card:1").length;
+  expect(lying).toBeGreaterThan(0);
+  const flyingBefore = layer.snapshot().flying;
+  layer.card({ type: "enter", key: "card:1" });
+  layer.card({ type: "lift", key: "card:1" });
+  expect(layer.restingOn()).not.toContain("card:1");
+  expect(layer.snapshot().flying).toBe(flyingBefore + lying);
+  // Sie segeln ab - nie zurück auf card:1; ein zweites Anheben gleich danach tut nichts.
+  for (let n = 0; n < 300; n += 1) {
+    frame(16);
+    if (n === 20) {
+      layer.card({ type: "leave", key: "card:1" });
+      layer.card({ type: "enter", key: "card:1" });
+      layer.card({ type: "lift", key: "card:1" });
+    }
+    expect(layer.restingOn().filter((key) => key === "card:1").length).toBeLessThanOrEqual(0);
+  }
+  expect(clock.now).toBeGreaterThan(1000);
 });

@@ -13,6 +13,7 @@ import { createSnowLayer } from "../snow/layer";
 import { requestMotion, releaseMotion } from "../motion";
 import { areaFactor } from "../sky";
 import { RAIN_DEPTHS, RAIN_ORDER, advanceDrop, createDrop, createSplash, crossedEdge, driftOf, dropCounts, rainFactor, scrollDrop, splashPoints } from "./rain";
+import { REST_MS as CARD_REST_MS, createLiftOffsets, createRest, defaultSignal } from "../cardLift";
 import { BOLT_ALPHA, GLOW_ALPHA, GLOW_REACH, createFlash, flashDone, flashLevel, isThunderstorm, nextFlashAt } from "./storm";
 
 export const EDGE_REFRESH_MS = 900;
@@ -42,12 +43,26 @@ export function snowSeasonActive(doc = typeof document === "undefined" ? null : 
  * Die Regen-Ebene. `budget` (Gerät, Stärke) und `share` (Seitenklasse) bestimmen die Zahl, `weather` Menge, Wind und
  * Nacht; `setActive(false)` lässt den Regen auslaufen. `win`, `measure` und `now` sind für Tests austauschbar.
  */
-export function createRainLayer({ budget = 120, share = 1, seed = "rain", weather = null, win = typeof window === "undefined" ? null : window, measure = () => measureEdges(), now = () => Date.now() } = {}) {
+export function createRainLayer({ budget = 120, share = 1, seed = "rain", weather = null, win = typeof window === "undefined" ? null : window, measure = () => measureEdges(), now = () => Date.now(), signal = defaultSignal(win) } = {}) {
   const rng = mulberry32(hashString(`rain:${seed}`));
   const state = { t: 0, wind: windFrom(weather), rain: rainFactor(weather), active: true, night: Boolean(weather && weather.night), gust: nextGust(rng, 0), drops: { back: [], mid: [], front: [] }, splashes: [], counts: null, lastCount: -1e9, edges: [], edgesAt: -1e9 };
   let lastScrollY = win ? Number(win.scrollY) || 0 : 0;
   const factor = () => (state.active ? state.rain : 0);
   const total = () => RAIN_ORDER.reduce((sum, depth) => sum + state.drops[depth].length, 0);
+  // Regen an der gehobenen Kante (#1094): hebt sich eine Karte, während es regnet, spritzen an ihrer Oberkante ein paar
+  // Tropfen; solange sie oben ist, landen die Tropfen auf der gehobenen Kante. Ruhezeit je Karte.
+  const lifts = createLiftOffsets(now);
+  const splashRest = createRest(CARD_REST_MS.small, now);
+  const onCard = (detail) => {
+    lifts.onSignal(detail);
+    if (detail.type !== "lift" || !detail.rect || factor() <= 0 || !splashRest.take(detail.key)) return;
+    const x1 = detail.rect.left + 6;
+    const x2 = detail.rect.right - 6;
+    const count = 4 + Math.floor(rng() * 4);
+    for (let n = 0; n < count && state.splashes.length < MAX_SPLASHES; n += 1) state.splashes.push(createSplash(x1 + rng() * Math.max(0, x2 - x1), detail.rect.top, rng));
+    state.edgesAt = -1e9;
+  };
+  const unsubscribe = signal && typeof signal.subscribe === "function" ? signal.subscribe(onCard) : null;
   const onWeather = (event) => {
     const detail = event && event.detail;
     if (!detail) return;
@@ -91,6 +106,11 @@ export function createRainLayer({ budget = 120, share = 1, seed = "rain", weathe
         state.edges = measure();
         state.edgesAt = stamp;
       }
+      // Die gehobene Kante liegt gerade ein paar Pixel höher (#1094).
+      const lifted = state.edges.map((edge) => {
+        const offset = lifts.offset(edge.key);
+        return offset ? { ...edge, y: edge.y + offset } : edge;
+      });
       ctx.save();
       ctx.lineCap = "round";
       RAIN_ORDER.forEach((depth) => {
@@ -104,7 +124,7 @@ export function createRainLayer({ budget = 120, share = 1, seed = "rain", weathe
             list.splice(i, 1);
             continue;
           }
-          const edge = crossedEdge(drop, previousY, state.edges);
+          const edge = crossedEdge(drop, previousY, lifted);
           if (edge) {
             if (state.splashes.length < MAX_SPLASHES) state.splashes.push(createSplash(drop.x, edge.y, rng));
             if (drop.leaving) {
@@ -155,8 +175,11 @@ export function createRainLayer({ budget = 120, share = 1, seed = "rain", weathe
     },
     dispose() {
       if (win && typeof win.removeEventListener === "function") win.removeEventListener("tls:season-weather", onWeather);
+      if (unsubscribe) unsubscribe();
       state.splashes.length = 0;
     },
+    /** Nur für Tests: das Signal von außen geben. */
+    card: onCard,
     /** Nur für Tests. */
     state() {
       return {
