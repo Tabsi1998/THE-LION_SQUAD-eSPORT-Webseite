@@ -172,7 +172,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Platz für einen wiederholten Browser-Download plus die Tests (gut 11 Minuten je Teil).
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -189,7 +190,20 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Install Playwright browser
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        # Antwortet ein Ubuntu-Paketspiegel nicht, wartete apt-get ohne Ende (am 7.10. zweimal 25 Minuten, dann brach
+        # der ganze Teil ab). Jetzt: kurze Zeitlimits für apt, je Versuch höchstens 5 Minuten, bis zu drei Versuche.
+        timeout-minutes: 18
+        run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Languages "none";\n' \
+            | sudo tee /etc/apt/apt.conf.d/99-tls-timeouts > /dev/null
+          for attempt in 1 2 3; do
+            if timeout --kill-after=15 300 npx playwright install --with-deps chromium; then exit 0; fi
+            echo "::warning::Browser-Installation hing oder brach ab (Versuch $attempt von 3)"
+            # Ein abgebrochenes apt-get hält sonst seine Sperre und der nächste Versuch scheitert sofort.
+            sudo pkill -9 -f '/usr/lib/apt/methods|apt-get' || true
+            sleep 10
+          done
+          exit 1
       - name: Run browser smoke tests desktop and mobile (part ${{ matrix.shard }} of 4)
         working-directory: frontend
         run: yarn test:e2e --shard=${{ matrix.shard }}/4
