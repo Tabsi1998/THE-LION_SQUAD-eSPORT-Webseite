@@ -84,7 +84,7 @@ export default function AdminTvPage() {
   return (
     <AdminLayout>
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 inline-flex items-center gap-3"><Tv className="w-7 h-7 text-[#29B6E8]" /> TV &amp; Beamer</h1>
+      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 flex items-center gap-3"><Tv className="w-7 h-7 text-[#29B6E8]" /> TV &amp; Beamer</h1>
       <p className="text-sm text-white/55 mt-2 max-w-3xl">
         Eine Stelle für alle Bildschirme: Turnierbaum, Event und Fast Lap am Fernseher oder Beamer. Die Grundwerte gelten überall und kommen ohne Neuladen am TV an.
         Ein einzelner Bildschirm darf abweichen – das steht dann in seinem Link. Ton gibt es am TV nicht; was nur ein Turnier betrifft, stellst du beim Turnier ein.
