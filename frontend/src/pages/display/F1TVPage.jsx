@@ -13,7 +13,8 @@ import { charsPerLine, fitItems, TV_LINE, wrapLines } from "@/lib/tvType";
 // Fast-Lap-TV: Podium, Rangliste und Vereins-Referenz. Größen aus tv.css (#1111); die Rangliste zeigt so viele
 // Zeilen, wie ohne Abschneiden Platz haben - nichts liegt mehr unter der Fußleiste.
 
-const medalColors = ["#FFD700", "#C0C0C0", "#CD7F32"];
+// Gold, Silber, Bronze - im Kontrast-Modus heller (tv.css), damit auch Bronze 7:1 schafft.
+const medalColors = ["var(--tv-medal-1)", "var(--tv-medal-2)", "var(--tv-medal-3)"];
 const TRACK_MS = 45000;
 const DEFAULT_AREA = { w: 170, h: 60 };
 
@@ -181,7 +182,7 @@ function FastLapTv() {
               animate={{ y: 0, opacity: 1 }}
               transition={motionOn ? { delay: i * 0.15 } : { duration: 0 }}
               className="tv-card tv-podium relative px-[calc(var(--tv-u)*2)] pt-[calc(var(--tv-u)*2.6)] pb-[calc(var(--tv-u)*1.4)]"
-              style={{ borderColor: `${medalColors[i]}99`, borderWidth: "max(2px, calc(var(--tv-u) * 0.2))" }}
+              style={{ borderColor: `color-mix(in srgb, ${medalColors[i]} 60%, transparent)`, borderWidth: "max(2px, calc(var(--tv-u) * 0.2))" }}
               data-testid="tv-podium"
             >
               <div className="absolute top-0 left-[calc(var(--tv-u)*2)] -translate-y-1/2 px-[0.6em] py-[0.15em] tv-t-num font-display font-black" style={{ backgroundColor: medalColors[i], color: "#000" }}>

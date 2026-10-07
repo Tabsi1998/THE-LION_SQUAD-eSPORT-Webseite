@@ -353,6 +353,37 @@ test.describe("TV & Beamer (Meilenstein 58)", () => {
         return found;
       });
       expect(translucent, `${name}: halb durchsichtig`).toEqual([]);
+      // Strenger als axe (das große Schrift schon ab 4,5:1 gelten lässt): jeder Text mindestens 7:1 zu seinem Grund.
+      const weak = await page.evaluate(() => {
+        const parse = (value) => {
+          const match = /rgba?\(([^)]+)\)/.exec(value || "");
+          if (!match) return null;
+          const parts = match[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+          return { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 };
+        };
+        const channel = (value) => { const v = value / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+        const luminance = (c) => 0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b);
+        const ratio = (a, b) => { const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+        const backgroundOf = (element) => {
+          for (let node = element; node; node = node.parentElement) {
+            const background = parse(getComputedStyle(node).backgroundColor);
+            if (background && background.a > 0) return background;
+          }
+          return { r: 0, g: 0, b: 0, a: 1 };
+        };
+        const root = document.querySelector("[data-testid='tv-screen']");
+        const found = [];
+        for (const element of root.querySelectorAll("*")) {
+          if (![...element.childNodes].some((node) => node.nodeType === 3 && node.textContent.trim())) continue;
+          if (element.closest("[aria-hidden='true'], option")) continue;
+          const color = parse(getComputedStyle(element).color);
+          if (!color) continue;
+          const value = ratio(color, backgroundOf(element));
+          if (value < 6.99) found.push(`${element.textContent.trim().slice(0, 30)}: ${value.toFixed(2)}`);
+        }
+        return found;
+      });
+      expect(weak, `${name}: unter 7:1`).toEqual([]);
       if (SHOTS) await page.screenshot({ path: `${SHOTS}/nachher-${name}-kontrast-1920x1080.png` });
     }
   });
