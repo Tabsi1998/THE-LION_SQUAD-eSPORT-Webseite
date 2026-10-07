@@ -7,7 +7,16 @@
 .tls-egg {
   position: absolute; margin: 0; padding: 0; border: 0; background: transparent; line-height: 0; cursor: pointer;
   pointer-events: auto; border-radius: 45%; transform: translate(-50%, -55%) rotate(var(--egg-tilt, 0deg));
-  transition: filter 0.2s ease-out;
+  transition: filter 0.2s ease-out, translate var(--tls-motion-mid, 240ms) var(--tls-ease, ease);
+}
+/* Ein Ei purzelt hervor (#1092): wackelt, kippt und rollt ein Stück nach außen - dort bleibt es liegen. */
+.tls-egg--tumble .tls-egg__svg { animation: tls-egg-tumble 0.9s cubic-bezier(0.3, 0.6, 0.4, 1) both; }
+@keyframes tls-egg-tumble {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  20% { transform: translate(calc(var(--tumble-x, 10px) * 0.3), -6px) rotate(-22deg); }
+  55% { transform: translate(var(--tumble-x, 10px), 3px) rotate(16deg); }
+  80% { transform: translate(var(--tumble-x, 10px), 0) rotate(-5deg); }
+  100% { transform: translate(var(--tumble-x, 10px), 0) rotate(0deg); }
 }
 .tls-egg svg { max-width: none; }
 .tls-egg__svg { display: block; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5)); transform-origin: 50% 90%; }

@@ -62,7 +62,17 @@
 .tls-hbats { top: 0; left: 0; width: 0; height: 0; z-index: 58; }
 .tls-hbats--fixed { position: fixed; }
 .tls-hbats--page { position: absolute; }
-.tls-hbat { position: absolute; top: 0; left: 0; margin: 0; padding: 0; border: 0; background: transparent; line-height: 0; }
+.tls-hbat { position: absolute; top: 0; left: 0; margin: 0; padding: 0; border: 0; background: transparent; line-height: 0; transition: translate var(--tls-motion-mid, 240ms) var(--tls-ease, ease); }
+/* Aufflattern an einer gehobenen Karte (#1090): eine Sekunde, zwei, drei Flügelschläge - hängend sackt sie kurz ab und
+   hängt sich wieder an, sitzend hüpft sie hoch und landet; danach genau dort, wo sie war. */
+.tls-hbat--flutter .tls-hbat__shape { animation: tls-hbat-drop 1s cubic-bezier(0.3, 0.6, 0.4, 1) var(--flutter-delay, 0ms) both; }
+.tls-hbat--sitting.tls-hbat--flutter .tls-hbat__shape { animation-name: tls-hbat-hop; }
+.tls-hbat--flutter .tls-hbat__wing--l { animation: tls-hbat-flap-l 0.32s ease-in-out var(--flutter-delay, 0ms) 3; }
+.tls-hbat--flutter .tls-hbat__wing--r { animation: tls-hbat-flap-r 0.32s ease-in-out var(--flutter-delay, 0ms) 3; }
+@keyframes tls-hbat-drop { 0% { transform: translateY(0); } 25% { transform: translateY(7px); } 55% { transform: translateY(-3px); } 80% { transform: translateY(1px); } 100% { transform: translateY(0); } }
+@keyframes tls-hbat-hop { 0% { transform: translateY(0); } 30% { transform: translateY(-9px); } 60% { transform: translateY(-4px); } 85% { transform: translateY(1px); } 100% { transform: translateY(0); } }
+@keyframes tls-hbat-flap-l { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-38deg); } }
+@keyframes tls-hbat-flap-r { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(38deg); } }
 .tls-hbat--hanging { cursor: pointer; pointer-events: auto; }
 .tls-hbat--hanging .tls-hbat__wing { transform-origin: 20px 12px; transition: transform 0.25s ease-out; }
 .tls-hbat--hanging:hover .tls-hbat__wing--l { transform: rotate(-14deg); }
@@ -186,7 +196,7 @@
 }
 
 /* Ruhezonen (H10): eine Fledermaus unter einem geöffneten Dialog oder Menü weicht aus. */
-.tls-hbat--yield { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+.tls-hbat--yield { opacity: 0; pointer-events: none; transition: opacity 0.3s ease, translate var(--tls-motion-mid, 240ms) var(--tls-ease, ease); }
 
 /* Halloween IV (H7–H9): Fledermäuse sitzen auf Kanten und Ecken, werden aufmerksam, starten, landen und setzen sich. */
 .tls-hbat--sitting { cursor: pointer; pointer-events: auto; }
@@ -214,7 +224,26 @@
 /* Kleine Netze an echten Ecken (H12): in den oberen Innenecken von Karten und Fußzeile, feiner und blasser als das
    große Netz; die winzige Spinne läuft selten über ihr Netz und zieht sich zurück, wenn der Zeiger näher kommt. */
 .tls-cwebs { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 41; pointer-events: none; }
-.tls-cweb { position: absolute; top: 0; left: 0; opacity: var(--cweb-opacity, 0.6); transition: opacity 0.3s ease; }
+.tls-cweb { position: absolute; top: 0; left: 0; opacity: var(--cweb-opacity, 0.6); transition: opacity 0.3s ease, translate var(--tls-motion-mid, 240ms) var(--tls-ease, ease); }
+/* Netz reißt (#1089): Anker und Rahmen ziehen sich nacheinander zurück, der Fetzen weht davon, der Rest löst sich auf,
+   die Spinne seilt sich ab; nach einer Minute spinnt sie neu - Faden für Faden. */
+.tls-cweb__net--torn { overflow: visible; }
+.tls-cweb__snap { stroke-dasharray: var(--len) var(--len); stroke-dashoffset: 0; animation: tls-cweb-snap 240ms cubic-bezier(0.5, 0, 0.9, 0.5) var(--delay, 0ms) forwards; }
+@keyframes tls-cweb-snap { to { stroke-dashoffset: var(--len); opacity: 0.2; } }
+.tls-cweb__scrap { transform-box: view-box; animation: tls-cweb-scrap 2000ms cubic-bezier(0.25, 0.4, 0.5, 1) 420ms forwards; }
+@keyframes tls-cweb-scrap {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  25% { transform: translate(calc(var(--dx) * 0.25), calc(var(--dy) * 0.08)) rotate(calc(var(--turn) * 0.3)); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--turn)); opacity: 0; }
+}
+.tls-cweb__rest { animation: tls-cweb-dissolve 900ms ease-in 520ms forwards; }
+@keyframes tls-cweb-dissolve { to { opacity: 0; transform: translateY(4px); } }
+.tls-cweb__spider--rappel { opacity: 1; animation: tls-cweb-rappel 2400ms ease-in forwards; }
+@keyframes tls-cweb-rappel { 0% { transform: translateY(0); opacity: 1; } 58% { transform: translateY(46px); opacity: 1; } 100% { transform: translateY(52px); opacity: 0; } }
+.tls-cweb__net--build line { stroke-dasharray: var(--len) var(--len); stroke-dashoffset: var(--len); animation: tls-cweb-build 420ms ease-out var(--delay, 0ms) forwards; }
+@keyframes tls-cweb-build { to { stroke-dashoffset: 0; } }
+.tls-cweb__spider--build { opacity: 0; animation: tls-cweb-spider-build var(--build-ms, 5200ms) ease-in-out forwards; }
+@keyframes tls-cweb-spider-build { 0% { opacity: 0; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0; } }
 .tls-cweb--yield { opacity: 0; }
 .tls-cweb__net { display: block; }
 .tls-cweb__spider { position: absolute; opacity: 0; filter: none; }

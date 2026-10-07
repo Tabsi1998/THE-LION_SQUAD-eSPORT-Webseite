@@ -140,12 +140,16 @@ export function SeasonStage() {
     // sonst stünde bei „Wetter: dezent“ auch der Adventkranz still.
     root.dataset.seasonIntensity = mounted.filter((season) => !modules[season.key].skyOnly).map((season) => season.effective).join(" ") || "";
     root.dataset.seasonPage = pageClass(location.pathname);
+    // Deko an Karten, die beim Anheben noch nicht mitfährt (#1087): dann bleibt die Karte stehen (index.css).
+    if (mounted.some((season) => modules[season.key].stillCards)) root.dataset.seasonStillCards = "";
+    else delete root.dataset.seasonStillCards;
     if (accents.length) root.style.setProperty("--season-accent", modules[accents[0].key].accent);
     else root.style.removeProperty("--season-accent");
     if (!mounted.length) {
       delete root.dataset.season;
       delete root.dataset.seasonIntensity;
       delete root.dataset.seasonPage;
+      delete root.dataset.seasonStillCards;
     }
   }, [mounted, modules, location.pathname]);
 

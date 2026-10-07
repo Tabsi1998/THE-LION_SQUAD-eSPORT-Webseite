@@ -9,6 +9,19 @@ import { hashString } from "../rng";
 import { EggShape } from "./EggShape";
 import { emitHuntProgress, fetchEggs, findEgg, reportHuntActive } from "./api";
 import { EGG_SIZE, placeEggs } from "./placement";
+import { CARD_SELECTOR, LIFTING_CLASS, REST_MS, cardKey, createRest } from "../cardLift";
+import { useCardSignal } from "../useCardSignal";
+
+/** Ein Ei purzelt hervor (#1092): so lange (ms), so weit zur Seite (px) - kein Ei fällt von der Seite. */
+export const TUMBLE_MS = 900;
+export const TUMBLE_PX = 10;
+
+/** Der Kartenschlüssel eines Eis - nur an Karten, die sich heben (#1087); Kopfzeile, Held, Fußzeile nicht. */
+export function eggCard(spot) {
+  const element = spot && spot.element;
+  if (!element || spot.kind !== "card" || typeof element.matches !== "function" || !element.matches(CARD_SELECTOR) || !element.classList.contains(LIFTING_CLASS)) return null;
+  return cardKey(element);
+}
 import "./easter-hunt.css";
 
 // Die Eier einer Seite (#646, #754, #755): der Server gibt nur die Eier dieser Seite (mit einem Schlüssel für diese
@@ -302,6 +315,32 @@ export function EasterEggs({ season }) {
     }
   };
 
+  // Ein Ei purzelt hervor (#1092): hebt sich die Karte, an der ein Ei liegt, purzelt es ein Stück nach außen - einmal je
+  // Ei - und zählt dann als gefunden wie ein Klick (auch für die Erfolge). Gäste sehen es purzeln, gesammelt wird mit
+  // Konto. Nie zwei auf einmal (der Server bremst sonst), Ruhezeit je Karte.
+  const [tumbled, setTumbled] = useState({});
+  const tumbledRef = useRef(new Set());
+  const tumbleRest = useRef(null);
+  if (!tumbleRest.current) tumbleRest.current = createRest(REST_MS.small);
+  const tumbleBusy = useRef(false);
+  useCardSignal((detail) => {
+    if (detail.type !== "lift" || reduced) return;
+    const egg = eggsRef.current.find((item) => !tumbledRef.current.has(item.egg_no) && eggCard(placedRef.current[item.egg_no]) === detail.key);
+    if (!egg || !tumbleRest.current.take(detail.key)) return;
+    tumbledRef.current.add(egg.egg_no);
+    const side = placedRef.current[egg.egg_no]?.side || "tl";
+    setTumbled((current) => ({ ...current, [egg.egg_no]: side.endsWith("r") ? TUMBLE_PX : -TUMBLE_PX }));
+    if ((!user && !previewing) || tumbleBusy.current) return;
+    tumbleBusy.current = true;
+    setTimeout(async () => {
+      try {
+        if (eggsRef.current.some((item) => item.egg_no === egg.egg_no)) await collect(egg);
+      } finally {
+        tumbleBusy.current = false;
+      }
+    }, TUMBLE_MS);
+  }, eggs.length > 0);
+
   // Auch nach dem letzten Ei der Seite bleibt der Hinweis (etwa „Korb voll“) stehen, bis er geht.
   if (typeof document === "undefined" || (!eggs.length && !note)) return null;
   const visible = eggs.filter((egg) => placed[egg.egg_no] && !placed[egg.egg_no].pending);
@@ -310,19 +349,22 @@ export function EasterEggs({ season }) {
     const { tilt, lively, delay } = personality(egg);
     // An der Kopfzeile hängt das Ei an einem Bändchen und pendelt; sonst liegt es schräg, manche wippen ab und zu.
     const hanging = spot.kind === "header";
-    const classes = ["tls-egg", hanging ? "tls-egg--hanging" : "", reduced ? "tls-egg--still" : "", lively && !reduced && !hanging ? "tls-egg--lively" : "", near[egg.egg_no] ? "tls-egg--near" : "", popping === egg.egg_no ? `tls-egg--pop tls-egg--pop-${egg.pattern === "lion" ? "spin" : "lift"}` : ""].filter(Boolean).join(" ");
+    const tumble = tumbled[egg.egg_no];
+    const classes = ["tls-egg", hanging ? "tls-egg--hanging" : "", reduced ? "tls-egg--still" : "", lively && !reduced && !hanging && tumble === undefined ? "tls-egg--lively" : "", near[egg.egg_no] ? "tls-egg--near" : "", tumble !== undefined ? "tls-egg--tumble" : "", popping === egg.egg_no ? `tls-egg--pop tls-egg--pop-${egg.pattern === "lion" ? "spin" : "lift"}` : ""].filter(Boolean).join(" ");
     const shape = <EggShape pattern={egg.pattern} size={EGG_SIZE} grass={spot.side === "bl" || spot.side === "br"} />;
     return (
       <button
         key={egg.egg_no}
         type="button"
         className={classes}
-        style={{ left: spot.x, top: spot.y, "--egg-tilt": `${hanging ? 0 : tilt}deg`, "--egg-delay": `${delay}s` }}
+        style={{ left: spot.x, top: spot.y, "--egg-tilt": `${hanging ? 0 : tilt}deg`, "--egg-delay": `${delay}s`, "--tumble-x": tumble !== undefined ? `${tumble}px` : undefined }}
         onClick={() => collect(egg)}
         aria-label="Osterei einsammeln"
         title="Osterei"
         data-testid={`easter-egg-${egg.egg_no}`}
         data-pattern={egg.pattern}
+        data-season-card={eggCard(spot) || undefined}
+        data-tumble={tumble !== undefined ? "1" : undefined}
       >
         {hanging ? <span className="tls-egg__hang"><span className="tls-egg__ribbon" />{shape}</span> : shape}
       </button>

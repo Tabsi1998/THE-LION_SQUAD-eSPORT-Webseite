@@ -52,7 +52,21 @@ export function scrollOf(win) {
 export function rectOf(element) {
   if (!element || typeof element.getBoundingClientRect !== "function") return null;
   const rect = element.getBoundingClientRect();
-  return rect && rect.width > 0 && rect.height > 0 ? rect : null;
+  if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+  // Eine gehobene Karte (#1071, #1087) wird an ihrem Ruheplatz gemessen: die Deko fährt beim Anheben per CSS mit
+  // (data-season-lifted) - sonst säße sie nach einem Nachmessen während des Anhebens doppelt so hoch.
+  const lift = liftOf(element);
+  return lift ? { left: rect.left, right: rect.right, width: rect.width, height: rect.height, x: rect.x, y: rect.y - lift, top: rect.top - lift, bottom: rect.bottom - lift } : rect;
+}
+
+/** Wie weit eine Karte gerade gehoben ist (px, negativ = nach oben) - nur reine Verschiebungen von .tls-card. */
+export function liftOf(element) {
+  if (!element || !element.classList || !element.classList.contains("tls-card")) return 0;
+  const view = element.ownerDocument && element.ownerDocument.defaultView;
+  if (!view || typeof view.getComputedStyle !== "function") return 0;
+  const match = /^matrix\(1, 0, 0, 1, [-\d.e]+, ([-\d.e]+)\)$/.exec(view.getComputedStyle(element).transform || "");
+  const dy = match ? Number(match[1]) : 0;
+  return Number.isFinite(dy) && dy < 0 ? dy : 0;
 }
 
 function isSticky(element, win) {

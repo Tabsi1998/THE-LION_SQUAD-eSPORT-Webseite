@@ -1,7 +1,20 @@
 /* Schnee (S7, #638; W2/W3, #728/#729): Hauben auf Kanten (eigene Ebene über der Seite, nie klickbar), Blauschein
    nachts bei „voll“ hinter dem Inhalt, die Schneeflocke neben dem Logo mit Splittern beim Fangen. */
 .tls-snowcaps { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 41; pointer-events: none; }
-.tls-snowcap { position: absolute; top: 0; left: 0; display: block; max-width: none; opacity: 0.94; transition: opacity 0.3s ease; filter: drop-shadow(0 1px 1px rgba(30, 60, 100, 0.35)); overflow: visible; }
+.tls-snowcap { position: absolute; top: 0; left: 0; display: block; max-width: none; opacity: 0.94; transition: opacity 0.3s ease, translate var(--tls-motion-mid, 240ms) var(--tls-ease, ease); filter: drop-shadow(0 1px 1px rgba(30, 60, 100, 0.35)); overflow: visible; }
+/* Abschütteln (#1088): die Haube sackt in einer halben Sekunde auf ein Fünftel und wächst in 90 Sekunden nach - um ihre
+   Unterkante, damit sie auf der Kante liegen bleibt. */
+.tls-snowcap__snow { transform-box: view-box; transition: transform 0.5s cubic-bezier(0.3, 0.7, 0.4, 1); }
+.tls-snowcap[data-shake="drop"] .tls-snowcap__snow { transform: scaleY(0.2); }
+.tls-snowcap[data-shake="grow"] .tls-snowcap__snow { transform: scaleY(1); transition: transform 90s linear; }
+.tls-snowshake { position: absolute; top: 0; left: 0; width: 0; height: 0; pointer-events: none; }
+.tls-snowshake__flake { position: absolute; left: var(--x); top: var(--y); width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); border-radius: 50%; background: rgba(255, 255, 255, 0.95); box-shadow: 0 0 2px rgba(200, 225, 255, 0.6); opacity: 0; animation: tls-snowshake-fall var(--dur) cubic-bezier(0.45, 0.05, 0.75, 0.6) var(--delay) forwards; }
+@keyframes tls-snowshake-fall {
+  0% { opacity: 0.95; transform: translate(0, 0); }
+  18% { opacity: 0.95; transform: translate(calc(var(--drift) * 0.1), 2px); }
+  100% { opacity: 0; transform: translate(var(--drift), var(--fall)); }
+}
+@media (prefers-reduced-motion: reduce) { .tls-snowshake { display: none; } .tls-snowcap__snow { transition: none; } }
 .tls-snowcap--yield { opacity: 0; }
 /* Die Spur im Schnee (W5 #731): beim Schritt stauben drei Krümel auf und fallen zurück. */
 .tls-snow-crumb { fill: #f4f8ff; opacity: 0; animation: tls-snow-crumb 0.65s ease-out forwards; }
