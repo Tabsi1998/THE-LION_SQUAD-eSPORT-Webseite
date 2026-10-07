@@ -406,10 +406,23 @@ test.describe("TV & Beamer (Meilenstein 58)", () => {
           const right = window.innerWidth - left;
           const bottom = window.innerHeight - top;
           const found = [];
+          const outside = (r) => r.left < left - 0.5 || r.top < top - 0.5 || r.right > right + 0.5 || r.bottom > bottom + 0.5;
+          // Gezählt wird, was man sieht: Fährt die Kamera über einen großen Baum, schneidet der Bildausschnitt
+          // (`.tv-viewport`) den Rest ab - der Ausschnitt selbst muss im sicheren Bereich liegen.
+          for (const clip of root.querySelectorAll("[data-testid='tv-stage'] .tv-viewport")) {
+            if (outside(clip.getBoundingClientRect())) found.push("Bildausschnitt");
+          }
           for (const element of root.querySelectorAll("[data-testid='tv-stage'] *")) {
-            const r = element.getBoundingClientRect();
-            if (!r.width || !r.height) continue;
-            if (r.left < left - 0.5 || r.top < top - 0.5 || r.right > right + 0.5 || r.bottom > bottom + 0.5) found.push(`${element.tagName} ${element.className}`.slice(0, 80));
+            let r = element.getBoundingClientRect();
+            const clip = element.closest(".tv-viewport");
+            if (clip && clip !== element) {
+              const c = clip.getBoundingClientRect();
+              r = { left: Math.max(r.left, c.left), top: Math.max(r.top, c.top), right: Math.min(r.right, c.right), bottom: Math.min(r.bottom, c.bottom) };
+              r.width = r.right - r.left;
+              r.height = r.bottom - r.top;
+            }
+            if (!(r.width > 0) || !(r.height > 0)) continue;
+            if (outside(r)) found.push(`${element.tagName} ${element.className}`.slice(0, 80));
           }
           return found;
         }, safe);
