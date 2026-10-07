@@ -59,7 +59,8 @@ export function parsePlaylist(raw) {
   if (!parts.length) return undefined;
   const list = [];
   for (const part of parts) {
-    const [name, secondsText] = part.split(/[-:.]/);
+    // Kein Doppelpunkt in eckigen Klammern: Tailwind liest so etwas als CSS-Klasse, und der Build bricht ab.
+    const [name, secondsText] = part.split(/[-.]|:/);
     const slide = SLIDE_ALIASES[name] || name;
     if (!PLAYLIST_SLIDES.includes(slide)) return undefined;
     if (secondsText !== undefined && !/^\d+$/.test(secondsText)) return undefined;
