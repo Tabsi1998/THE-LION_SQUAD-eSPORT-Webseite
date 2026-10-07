@@ -40,6 +40,14 @@ export function CommunityScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (route.params?.section) setSection(route.params.section);
   }, [route.params?.section]);
+  // Anmelden und Abmelden lassen die Tabs geladen (Gast zuerst, #918): wechselt der Stand, gilt der Standard neu -
+  // sonst stünde ein frisch angemeldetes Mitglied mit ungelesenen Chats weiter bei den Teams aus der Gast-Zeit.
+  const wasGuest = useRef(guest);
+  useEffect(() => {
+    if (wasGuest.current === guest) return;
+    wasGuest.current = guest;
+    setSection(guest ? "teams" : "chats");
+  }, [guest]);
   const { list } = useChats();
   const items = COMMUNITY_SECTIONS.map((item) => (item.key === "chats" && list.unread_total ? { ...item, label: `Chats ${badgeText(list.unread_total)}` } : item));
   const nav = navigation as unknown as { navigate: (screen: never, params?: never) => void };
@@ -190,7 +198,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingBottom: 12,
     paddingHorizontal: 18,
-    paddingTop: 10,
+    // Wie der Abstand der anderen Tabs (Inhalt mit padding 18): sonst springt der Titel beim Tab-Wechsel um 8 Punkte.
+    paddingTop: 18,
     zIndex: 2,
   },
   body: {
