@@ -1,12 +1,15 @@
 {
-  "version": "1.3.0",
-  "build": 89,
-  "date": "2026-10-06",
+  "version": "1.4.0",
+  "build": 90,
+  "date": "2026-10-07",
   "items": [
-    "Links öffnen die App: Turniere, Events, Matches, Fast Laps, Teams, News, Profile, Galerie, Erfolge, Jahreswertung und Rechnungen gehen aus News, Chat, Laufbanner, Dashboard, Info-Center und von außen (Discord, WhatsApp, Browser) gleich im passenden Bildschirm auf – alles andere wie bisher im Browser.",
-    "Passkey, den der Server nicht kennt: Liegt am Handy ein alter Passkey, sagt die Anmeldung das ruhig und bittet den Passwortmanager, ihn zu vergessen; nach der Anmeldung mit Passwort bietet die App einen neuen an.",
-    "Schneehaube: In der Schnee-Saison liegt auf der Begrüßungskarte im Dashboard eine Haube wie auf der Website – sie wächst mit der Stufe und taut bei Plusgraden.",
-    "Neigen des Handys: Das Halloween-Netz und die Spinne pendeln beim Neigen, Schneeflocken driften zur Seite, Sterne wandern leicht mit – nur mit eingeschalteter Deko, nie bei „Bewegung reduzieren“.",
-    "Einlass bei der Generalversammlung: Der Vorstand scannt die Mitgliedskarte mit der App; groß steht, ob die Person anwesend und stimmberechtigt ist, dazu die Zahlen zur Beschlussfähigkeit, Mitgliedsnummer von Hand und Rücknahme mit Grund."
+    "Neuer Aufbau mit fünf Tabs: Home, Events, Community, Verein und Profil. Oben in jeder Übersicht stehen Suche und Glocke, Einstellungen öffnest du über das Zahnrad im Profil, und Seiten öffnen dort, wo du gerade bist – „Zurück“ führt dorthin zurück.",
+    "Alle Chats in einer Liste unter Community – Direkt-, Team-, Turnier- und Matchchats, neueste zuerst, mit den ungelesenen Nachrichten. Was du in der App liest, ist auch auf der Website gelesen.",
+    "Tab „Verein“: Mitglieder sehen oben ihren Mitgliederbereich mit Karte, Versammlungen, Helfen und Dokumenten, alle anderen „Mitglied werden“. Darunter News, Galerie, Referenzen, Sponsoren und Partner.",
+    "Ein Profil: Dein eigenes Profil sieht aus wie das, was andere sehen, dazu der Kasten „Nur für dich“ mit Rechnungen und Gewinnen und der Schalter „So sehen dich andere“.",
+    "Angemeldet bleiben: Ohne Netz bleibt die Sitzung, jedes Gerät hat seine eigene, und „Angemeldet bleiben“ wirkt.",
+    "Mehrtägige Events zeigen jeden Tag mit Datum, Beginn und Ende; „In den Kalender“ trägt alle Tage ein.",
+    "Bewegung wie auf der Website: Karten geben beim Antippen nach, Listen blenden sich ruhig ein.",
+    "Saison-Deko an Karten: Antippen oder kurz Halten lässt Schnee abrutschen, das Netz reißen und Fledermäuse flattern; Lichterkette, Osterei, Luftschlange und Wimpel hängen jetzt auch an Karten (#1087–#1094)."
   ]
 }
