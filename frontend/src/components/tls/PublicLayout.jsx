@@ -21,7 +21,7 @@ import { DiscordLiveLine, useDiscordNow } from "@/components/tls/DiscordNow";
 import { DecoSwitch } from "@/seasons/DecoSwitch";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
-import { PLAY_BADGE_SRC, contactLines, footerButtons, footerColumns } from "@/lib/siteFooter";
+import { contactLines, footerButtons, footerColumns } from "@/lib/siteFooter";
 import { StoreButton } from "@/components/tls/StoreButton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, MessageSquare, Smartphone } from "lucide-react";
@@ -228,8 +228,8 @@ export function PublicLayout({ children }) {
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Dabei sein</div>
               <div className="mt-1 text-sm text-white/65">Auf Discord ist das Rudel jeden Tag da — mit der LionsAPP hast du Termine, Turniere und Chat am Handy.</div>
             </div>
-            {/* Knopfleiste (#425): Discord als offizieller Knopf; die LionsAPP als eigener Store-Knopf (#1084), das
-                offizielle Badge unverändert klein daneben - beides erst mit Play-Link. */}
+            {/* Knopfleiste (#425): Discord als offizieller Knopf; die LionsAPP als eigene Store-Knöpfe (#1084) für Google
+                Play und den App Store, je erst mit Link - sonst „bald …“ (für beide zusammen ein Chip). */}
             <div className="flex flex-wrap items-center gap-3 shrink-0" data-testid="footer-buttons">
               <DiscordLiveLine discord={discordNow} />
               {discordHref && (
@@ -237,17 +237,25 @@ export function PublicLayout({ children }) {
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={SOCIAL_ICONS.discord.path} /></svg> Discord beitreten
                 </a>
               )}
-              {footerCta.playStoreUrl ? (
-                <span className="inline-flex items-center gap-3">
-                  <StoreButton href={footerCta.playStoreUrl} testId="footer-play-button" />
-                  <a href={footerCta.playStoreUrl} target="_blank" rel="noreferrer" data-testid="footer-play-badge" className="inline-flex opacity-80 hover:opacity-100 transition-opacity duration-mid ease-tls">
-                    <img src={PLAY_BADGE_SRC} alt="Jetzt bei Google Play" className="h-8 w-auto" />
-                  </a>
+              {footerCta.playStoreUrl && <StoreButton href={footerCta.playStoreUrl} testId="footer-play-button" />}
+              {footerCta.appStoreUrl && <StoreButton href={footerCta.appStoreUrl} small="Laden im" big="App Store" icon="apple" testId="footer-appstore-button" />}
+              {!footerCta.playStoreUrl && !footerCta.appStoreUrl ? (
+                <span data-testid="footer-apps-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
+                  <Smartphone className="w-4 h-4" /> {footerCta.bothSoonLabel}
                 </span>
               ) : (
-                <span data-testid="footer-play-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
-                  <Smartphone className="w-4 h-4" /> {footerCta.playSoonLabel}
-                </span>
+                <>
+                  {!footerCta.playStoreUrl && (
+                    <span data-testid="footer-play-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
+                      <Smartphone className="w-4 h-4" /> {footerCta.playSoonLabel}
+                    </span>
+                  )}
+                  {!footerCta.appStoreUrl && (
+                    <span data-testid="footer-appstore-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
+                      <Smartphone className="w-4 h-4" /> {footerCta.appSoonLabel}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           </div>

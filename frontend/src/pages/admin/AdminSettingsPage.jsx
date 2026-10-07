@@ -55,7 +55,7 @@ export default function AdminSettingsPage() {
     content_responsible: "", phone: "", privacy_contact_email: "", hosting_provider: "", hosting_country: "Österreich/EU",
     vat_number: "", tournament_terms_url: "", paid_tournaments_enabled: false,
     imprint: "", privacy_policy: "", legal_extra: "", privacy_extra: "", terms_of_use: "",
-    discord_invite_url: "", play_store_url: "", twitch_channel: "", twitch_client_id: "", twitch_client_secret: "",
+    discord_invite_url: "", play_store_url: "", app_store_url: "", twitch_channel: "", twitch_client_id: "", twitch_client_secret: "",
     discord_client_id: "", discord_client_secret: "", discord_client_secret_masked: "", steam_api_key: "", steam_api_key_masked: "",
     ...Object.fromEntries(PLATFORM_APP_FIELDS.flatMap((field) => (field.endsWith("_secret") || field === "steam_api_key" ? [[field, ""], [`${field}_masked`, ""]] : [[field, ""]]))),
     whatsapp_channel_url: "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I",
