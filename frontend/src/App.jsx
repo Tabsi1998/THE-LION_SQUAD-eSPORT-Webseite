@@ -59,10 +59,11 @@ function PlayerLegacyRedirect() {
 
 // Turnierbaum-TV (#1110): mit Anzeige-Schlüssel im Link läuft er ohne Anmeldung - der Schlüssel erlaubt nur das
 // Anschauen dieses Turniers. Ohne Schlüssel bleibt es bei der Anmeldung der Turnierleitung.
-function BracketTvRoute() {
+function BracketTvRoute({ station = false }) {
   const [params] = useSearchParams();
-  if (params.get("key")) return <BracketTVPage />;
-  return <ProtectedRoute requireModerator><BracketTVPage /></ProtectedRoute>;
+  const page = station ? <StationTVPage /> : <BracketTVPage />;
+  if (params.get("key")) return page;
+  return <ProtectedRoute requireModerator>{page}</ProtectedRoute>;
 }
 
 import HomePage from "@/pages/public/HomePage";
@@ -179,6 +180,7 @@ const MyInvoicesPage = lazy(() => import("@/pages/user/MyInvoicesPage"));
 
 const F1TVPage = lazy(() => import("@/pages/display/F1TVPage"));
 const BracketTVPage = lazy(() => import("@/pages/display/BracketTVPage"));
+const StationTVPage = lazy(() => import("@/pages/display/StationTVPage"));
 const EventTVPage = lazy(() => import("@/pages/display/EventTVPage"));
 const MyPrizesPage = lazy(() => import("@/pages/user/MyPrizesPage"));
 const MyPenaltiesPage = lazy(() => import("@/pages/user/MyPenaltiesPage"));
@@ -391,6 +393,7 @@ function App() {
           <Route path="/display/f1/:id" element={<F1TVPage />} />
           <Route path="/display/event/:id" element={<EventTVPage />} />
           <Route path="/display/bracket/:id" element={<BracketTvRoute />} />
+          <Route path="/display/bracket/:id/station/:stationId" element={<BracketTvRoute station />} />
 
           {/* Error pages */}
           <Route path="/403" element={<ForbiddenPage />} />

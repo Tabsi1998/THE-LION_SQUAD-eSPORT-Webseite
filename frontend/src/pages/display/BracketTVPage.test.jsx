@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
-// Turnierbaum-TV (#1110, #1113): der Anzeige-Schlüssel geht mit an die API, ein widerrufener zeigt nichts mehr vom
-// Turnier; leere Plätze sagen im Klartext, wer kommt - kein „W:A:1“, kein „Freier Slot“, keine „Keine Station“.
+// Turnierbaum-TV (#1110, #1113, #1115): der Anzeige-Schlüssel geht mit an die API, ein widerrufener zeigt nichts mehr vom
+// Turnier; leere Plätze sagen im Klartext, wer kommt - kein „W:A:1“, kein „Freier Slot“, keine „Keine Station“. Seit
+// Meilenstein 59 ist es der echte Baum mit Linien; die Karte nennt oben die geplante Zeit („geplant ca. 14:20“).
 
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (value) => value }));
@@ -66,10 +67,16 @@ test("mit Schlüssel im Link fragt der TV mit Schlüssel - und zeigt leere Plät
   const open = screen.getByTestId("tv-match-m2");
   expect(open.querySelectorAll("[data-slot-kind='empty']")).toHaveLength(2);
   expect(open.querySelectorAll("[data-tv-name]")).toHaveLength(0);
-  // Kürzel aus zwei Buchstaben, Zeit und Dauer im Klartext.
+  // Kürzel aus zwei Buchstaben, die geplante Zeit im Klartext.
   expect(screen.getByTestId("tv-match-m1")).toHaveTextContent("NF");
   expect(screen.getByTestId("tv-match-m1")).toHaveTextContent("KK");
-  expect(screen.getByTestId("tv-match-m1")).toHaveTextContent("30 Minuten");
+  expect(screen.getByTestId("tv-match-m1")).toHaveTextContent(/geplant ca\. .*14:20/);
+  // Der echte Baum: Winner Bracket als Block, zwischen den Runden Linien, keine Spalten-Seiten mehr.
+  expect(screen.getByTestId("tv-tree")).toBeInTheDocument();
+  expect(screen.getByTestId("bracket-section-title-wb")).toHaveTextContent("Winner Bracket");
+  expect(screen.queryByTestId("tv-column")).not.toBeInTheDocument();
+  // Ton gibt es nur mit Einstellung - ohne sie auch kein „Für Ton einmal klicken“.
+  expect(screen.queryByTestId("tv-sound-hint")).not.toBeInTheDocument();
   // Der QR-Code zeigt die öffentliche Seite - nie den Schlüssel.
   expect(screen.getByTestId("branded-qr-code").getAttribute("data-value")).not.toContain("nur-anschauen");
   expect(screen.getByTestId("tv-screen")).toHaveAttribute("data-tv-text", "large");
@@ -84,6 +91,35 @@ test("ein widerrufener Schlüssel zeigt nichts mehr vom Turnier", async () => {
   renderTv("/display/bracket/t1?key=widerrufen");
   expect(await screen.findByTestId("tv-key-refused")).toHaveTextContent("Dieser TV-Link gilt nicht mehr");
   expect(screen.queryByText("Lions Herbst-Cup")).not.toBeInTheDocument();
+});
+
+test("Ton beim Ergebnis im Link: der TV bittet einmal klein um einen Klick - danach ist der Hinweis weg", async () => {
+  const created = [];
+  class FakeAudioContext {
+    constructor(options = {}) {
+      this.options = options;
+      this.state = "suspended";
+      created.push(this);
+    }
+
+    async resume() {
+      this.state = "running";
+    }
+  }
+  window.AudioContext = FakeAudioContext;
+  try {
+    serve(async () => ({ data: BRACKET }));
+    renderTv("/display/bracket/t1?key=nur-anschauen&result_sound=1");
+    await screen.findByText("Sieger aus A");
+    expect(screen.getByTestId("tv-sound-hint")).toHaveTextContent("Für Ton einmal klicken");
+    // Vor dem Klick legt der TV nichts für Ton an - danach ist der Ton bereit.
+    expect(created).toHaveLength(0);
+    fireEvent.pointerDown(window);
+    await waitFor(() => expect(screen.queryByTestId("tv-sound-hint")).not.toBeInTheDocument());
+    expect(created[0].state).toBe("running");
+  } finally {
+    delete window.AudioContext;
+  }
 });
 
 test("ohne Schlüssel fragt der TV ohne - für die angemeldete Turnierleitung", async () => {

@@ -145,6 +145,7 @@ export const BRACKET_SECTION_LABELS = {
   loser: "Loser Bracket",
   grand_final: "Grand Final",
   bronze: "Spiel um Platz 3",
+  BRONZE: "Spiel um Platz 3",
   // Eigene Bäume (#833): „TP“ heißt in den Vorlagen das Spiel um Platz 3.
   TP: "Spiel um Platz 3",
   tp: "Spiel um Platz 3",

@@ -61,6 +61,8 @@ module.exports = {
   				DEFAULT: 'hsl(var(--destructive))',
   				foreground: 'hsl(var(--destructive-foreground))'
   			},
+  			// „läuft gerade“ (#1116): eine Quelle für die Live-Farbe, index.css --tls-live-rgb.
+  			live: 'rgb(var(--tls-live-rgb) / <alpha-value>)',
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',

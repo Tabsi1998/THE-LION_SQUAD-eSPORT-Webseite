@@ -2,13 +2,8 @@
 import {
   TV_LIMITS,
   TV_SCALES,
-  bracketCardUnits,
-  bracketColumnWidths,
   charsPerLine,
-  chunkByUnits,
-  columnsFor,
   fitItems,
-  footerLines,
   minFontPx,
   nameFit,
   tvCssVars,
@@ -60,9 +55,6 @@ test("Umbruch nach Wörtern, lange Wörter brechen mitten drin", () => {
   expect(wrapLines("Der unglaublich lange Spielername Nummer Eins", 25)).toBe(2);
   expect(wrapLines("Donaudampfschifffahrtsgesellschaft", 10)).toBe(4);
   expect(charsPerLine(10, 2)).toBe(10);
-  expect(footerLines(["Station 1", "geplant ca. 14:20 · 30 Minuten"], 60)).toBe(1);
-  expect(footerLines(["Station 1", "geplant ca. 14:20 · 30 Minuten"], 30)).toBe(2);
-  expect(footerLines([], 30)).toBe(0);
 });
 
 test("lange Namen: erst kleiner, nie unter die Grenze, dann zweizeilig - nie „…“", () => {
@@ -76,27 +68,27 @@ test("lange Namen: erst kleiner, nie unter die Grenze, dann zweizeilig - nie „
   expect(longest.size).toBeGreaterThanOrEqual(TV_LIMITS.normal.name);
 });
 
-test("so viele Karten je Spalte, wie ohne Abschneiden passen", () => {
-  expect(chunkByUnits([5, 5, 5, 5], 16, (item) => item, 1)).toEqual([[5, 5], [5, 5]]);
-  expect(chunkByUnits([20, 3], 10, (item) => item)).toEqual([[20], [3]]);
-  expect(chunkByUnits([], 10, (item) => item)).toEqual([]);
+test("so viele Einträge, wie ohne Abschneiden passen - sonst „+ N weitere“", () => {
   expect(fitItems([4, 4, 4], 13, (item) => item, 0, 2)).toEqual({ shown: [4, 4, 4], hidden: 0 });
   // Passt nicht alles, bleibt Platz für „+ N weitere“.
   expect(fitItems([4, 4, 4, 4], 13, (item) => item, 0, 2)).toEqual({ shown: [4, 4], hidden: 2 });
 });
 
-test("Spalten: vier bei 16:9, weniger auf schmalen Bildschirmen und mit großer Schrift", () => {
-  expect(columnsFor(173, "normal")).toBe(4);
-  expect(columnsFor(173, "large")).toBe(3);
-  expect(columnsFor(130, "normal")).toBe(3);
-  expect(columnsFor(60, "normal")).toBe(1);
-});
-
-test("eine Karte mit zweizeiligem Namen und Station ist höher als eine kurze", () => {
-  const widths = bracketColumnWidths(42.7, "normal");
-  const short = bracketCardUnits({ labels: ["Max", "Turbo Tiger"], footer: ["geplant ca. 14:20 · 30 Minuten"] }, widths, "normal");
-  const long = bracketCardUnits({ labels: ["Der unglaublich lange Spielername Nummer Eins", "Max"], footer: ["Station 1 – Switch 2", "geplant ca. 10.10. 14:20 · 30 Minuten"] }, widths, "normal");
-  expect(long).toBeGreaterThan(short);
-  const large = bracketCardUnits({ labels: ["Max", "Turbo Tiger"], footer: ["geplant ca. 14:20 · 30 Minuten"] }, bracketColumnWidths(57, "large"), "large");
-  expect(large).toBeGreaterThan(short);
+test("Turnierbaum auf der Bühne (#1115): feste Einheit, und verkleinert halten Namen und Nebensachen die Grenze", async () => {
+  const { TV_STAGE_UNIT_PX, TV_TREE_SCALES, stageBase, treeCssVars, treeMinZoom } = await import("./tvType");
+  expect(TV_STAGE_UNIT_PX).toBe(10.8);
+  for (const size of ["normal", "large"]) {
+    const scale = TV_TREE_SCALES[size];
+    const limits = TV_LIMITS[size];
+    const zoom = treeMinZoom(size);
+    expect(zoom).toBeLessThan(1);
+    expect(scale.name * zoom).toBeGreaterThanOrEqual(limits.name - 1e-9);
+    expect(scale.nameMin * zoom).toBeGreaterThanOrEqual(limits.name - 1e-9);
+    for (const key of ["meta", "info", "num", "head"]) expect(scale[key] * zoom).toBeGreaterThanOrEqual(limits.other - 1e-9);
+  }
+  expect(treeMinZoom("large")).toBeGreaterThan(treeMinZoom("normal"));
+  expect(treeCssVars("normal")["--tv-u"]).toBe("10.8px");
+  expect(treeCssVars("large")["--tv-k-name"]).toBe("3.6");
+  // Bei 720p, 1080p und 4K wirkt die Bühne gleich groß: 1080 Bühnen-Punkte füllen die Höhe.
+  for (const [width, height] of [[1280, 720], [1920, 1080], [3840, 2160]]) expect(stageBase(width, height) * 1080).toBeCloseTo(height);
 });

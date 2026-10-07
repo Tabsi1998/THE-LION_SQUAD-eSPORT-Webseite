@@ -19,7 +19,8 @@ from flow_harness import make_flow  # noqa: E402
 from services import change_events, tv_display  # noqa: E402
 from services.access_links import hash_access_token  # noqa: E402
 
-DEFAULTS = {"text_size": "normal", "contrast": False, "safe_area": 0, "pixel_shift": True, "season_header": True, "reduce_motion": False}
+DEFAULTS = {"text_size": "normal", "contrast": False, "safe_area": 0, "pixel_shift": True, "season_header": True, "reduce_motion": False,
+            "result_sound": False}
 
 
 @pytest_asyncio.fixture
@@ -86,9 +87,10 @@ async def test_only_admins_with_the_tournaments_area_may_save(flow):
     leader = await flow.add_user(role="tournament_admin")
     flow.act_as(leader)
     saved = await flow.put("/api/tv/settings", json={"text_size": "large", "contrast": True, "safe_area": 5, "pixel_shift": False,
-                                                     "season_header": False, "reduce_motion": True})
+                                                     "season_header": False, "reduce_motion": True, "result_sound": True})
     assert saved.status_code == 200, saved.text
-    expected = {"text_size": "large", "contrast": True, "safe_area": 5, "pixel_shift": False, "season_header": False, "reduce_motion": True}
+    expected = {"text_size": "large", "contrast": True, "safe_area": 5, "pixel_shift": False, "season_header": False, "reduce_motion": True,
+                "result_sound": True}
     assert saved.json()["settings"] == expected
     flow.act_as(None)
     assert (await flow.get("/api/tv/settings")).json()["settings"] == expected, "die Bildschirme lesen ohne Anmeldung"
@@ -104,7 +106,7 @@ async def test_only_admins_with_the_tournaments_area_may_save(flow):
 async def test_wrong_values_are_refused_and_change_nothing(flow):
     flow.act_as(await flow.add_user(role="tournament_admin"))
     for body in ({"safe_area": 4}, {"safe_area": "3"}, {"safe_area": True}, {"text_size": "huge"}, {"contrast": "ja"},
-                 {"pixel_shift": 1}, {"blinken": True}, {"settings": {"contrast": True}}):
+                 {"pixel_shift": 1}, {"result_sound": "an"}, {"result_sound": 1}, {"blinken": True}, {"settings": {"contrast": True}}):
         response = await flow.put("/api/tv/settings", json=body)
         assert response.status_code == 422, (body, response.text)
     assert (await flow.get("/api/tv/settings")).json()["settings"] == DEFAULTS
@@ -118,6 +120,26 @@ async def test_missing_or_broken_stored_values_count_as_the_default(flow):
     flow.act_as(None)
     settings = (await flow.get("/api/tv/settings")).json()["settings"]
     assert settings == {**DEFAULTS, "text_size": "large", "season_header": False}
+
+
+@pytest.mark.asyncio
+async def test_sound_at_the_result_is_off_by_default_and_only_on_when_switched_on(flow):
+    """Ton beim Ergebnis (#1118): Fabians Wahl ist „ohne Ton“ - nur ein ausdrückliches An schaltet den Gong ein."""
+    assert tv_display.DEFAULTS["result_sound"] is False
+    flow.act_as(None)
+    assert (await flow.get("/api/tv/settings")).json()["settings"]["result_sound"] is False
+    await flow.db.settings.insert_one({"id": tv_display.SETTINGS_ID, "result_sound": "ja"})
+    assert (await flow.get("/api/tv/settings")).json()["settings"]["result_sound"] is False, "nur ein echtes An zählt"
+    await flow.db.settings.delete_one({"id": tv_display.SETTINGS_ID})
+
+    flow.act_as(await flow.add_user(role="tournament_admin"))
+    turned_on = await flow.put("/api/tv/settings", json={"result_sound": True})
+    assert turned_on.status_code == 200, turned_on.text
+    assert turned_on.json()["settings"] == {**DEFAULTS, "result_sound": True}
+    flow.act_as(None)
+    assert (await flow.get("/api/tv/settings")).json()["settings"]["result_sound"] is True, "die Bildschirme lesen es ohne Anmeldung"
+    flow.act_as(await flow.add_user(role="tournament_admin"))
+    assert (await flow.put("/api/tv/settings", json={"result_sound": None})).json()["settings"]["result_sound"] is False, "null = Standard"
 
 
 @pytest.mark.asyncio
@@ -170,6 +192,14 @@ async def test_a_display_key_opens_the_tv_without_login_and_only_with_tv_data(fl
     assert (await show_tv(flow, tournament["slug"], token)).status_code == 200
     seen = await flow.db.access_links.find_one({"id": created["id"]}, {"_id": 0})
     assert seen.get("last_used_at"), "der Admin sieht, wann der Bildschirm zuletzt da war"
+
+    # Live-Spotlight und Ergebnis-Moment (#1116, #1118): Startzeit und Zeit des Ergebnisses kommen mit - sonst nichts Neues.
+    started = "2026-10-10T12:20:00+00:00"
+    await flow.db.matches_v2.update_one({"id": body["matches_v2"][0]["id"]}, {"$set": {"status": "running", "started_at": started, "internal_note": "geheim"}})
+    shown = (await show_tv(flow, tournament["id"], token)).json()["matches_v2"]
+    live = next(row for row in shown if row["id"] == body["matches_v2"][0]["id"])
+    assert live["started_at"] == started and live["status"] == "running"
+    assert "internal_note" not in live
 
     # Der Schlüssel ist kein Speziallink zum Ansehen: die Turnierseite und der öffentliche Baum bleiben zu.
     assert (await flow.get(f"/api/tournaments/{tournament['slug']}", params={"access": token})).status_code in {403, 404}

@@ -3,6 +3,7 @@
 // Link ab - dieselben Namen wie am Server. Es gilt: Link vor Grundwert vor Standard. Was nicht passt, zählt nicht.
 // Der Standard ist Fabians Wahl aus der TV-Vorschau vom 07.10.2026; backend/services/tv_display.py hält dieselben Werte.
 // Weitere Werte (Wiedergabeliste #1121, Sponsoren #1125, Streckenwechsel #1127) kommen mit ihren Tickets dazu.
+// „Ton beim Ergebnis“ (#1118) ist der einzige Ton am TV und standardmäßig aus.
 
 export const TV_DEFAULTS = Object.freeze({
   text_size: "normal",
@@ -11,6 +12,7 @@ export const TV_DEFAULTS = Object.freeze({
   pixel_shift: true,
   season_header: true,
   reduce_motion: false,
+  result_sound: false,
 });
 
 /** Die Werte, wie die Admin-Seite sie zeigt - Reihenfolge, Name, Auswahl, Erklärung in Alltagssprache. */
@@ -51,12 +53,18 @@ export const TV_FIELDS = Object.freeze([
     key: "reduce_motion",
     label: "Bewegung reduzieren",
     type: "bool",
-    hint: "Nichts bewegt sich: Seiten wechseln ohne Gleiten, Laufband, Leuchten und Deko stehen still. Gilt auch, wenn das Gerät „Bewegung reduzieren“ eingestellt hat.",
+    hint: "Nichts bewegt sich: keine Kamerafahrt, kein Zoom, keine Fahrten über die Linien, kein Konfetti; Laufband, Leuchten und Deko stehen still. Gilt auch, wenn das Gerät „Bewegung reduzieren“ eingestellt hat.",
+  },
+  {
+    key: "result_sound",
+    label: "Ton beim Ergebnis",
+    type: "bool",
+    hint: "Ein kurzer Gong, wenn ein Ergebnis groß über dem Turnierbaum steht – nur für den Bildschirm mit Lautsprecher. Der Browser spielt Ton erst nach einem Klick auf den TV; bis dahin steht dort klein „Für Ton einmal klicken“.",
   },
 ]);
 
 const CHOICES = { text_size: ["normal", "large"], safe_area: [0, 3, 5] };
-const BOOLEANS = new Set(["contrast", "pixel_shift", "season_header", "reduce_motion"]);
+const BOOLEANS = new Set(["contrast", "pixel_shift", "season_header", "reduce_motion", "result_sound"]);
 const TRUE_WORDS = new Set(["1", "true", "an", "ja", "on"]);
 const FALSE_WORDS = new Set(["0", "false", "aus", "nein", "off"]);
 
@@ -129,25 +137,44 @@ export function tvValueLabel(key, value) {
   return option ? option[1] : String(value);
 }
 
-// Ansichten für den Link-Baukasten. Weitere Ansichten (Hallen-Tafel, Aufrufe …) kommen mit ihren Tickets.
+// Ansichten für den Link-Baukasten. Weitere Ansichten (Hallen-Tafel, Aufrufe …) kommen mit ihren Tickets. Die
+// Stations-Ansicht (#1120) gehört zum Turnierbaum: dasselbe Turnier, derselbe Anzeige-Schlüssel, dazu eine Station.
 export const TV_VIEWS = Object.freeze([
   { key: "bracket", label: "Turnierbaum", path: "/display/bracket/", target: "Turnier", needsKey: true },
+  { key: "station", label: "Station", path: "/display/bracket/", target: "Turnier", needsKey: true, needsStation: true },
   { key: "event", label: "Event", path: "/display/event/", target: "Event", needsKey: false },
   { key: "fastlap", label: "Fast Lap", path: "/display/f1/", target: "Fast-Lap-Challenge", needsKey: false },
 ]);
 
+const SAFE_ID = /^[A-Za-z0-9_-]+$/;
+
 /**
  * Der Link für einen Bildschirm: Ansicht, Ziel, beim Turnierbaum der Anzeige-Schlüssel und nur die Abweichungen, die
- * der Admin für diesen Bildschirm gewählt hat - alles andere kommt aus den Grundwerten und folgt ihnen live.
+ * der Admin für diesen Bildschirm gewählt hat - alles andere kommt aus den Grundwerten und folgt ihnen live. Die
+ * Stations-Ansicht braucht dazu die Station: /display/bracket/<Turnier>/station/<Station>.
  */
-export function buildTvLink({ origin = "", view, targetId, displayKey = "", overrides = {} }) {
+export function buildTvLink({ origin = "", view, targetId, stationId = "", displayKey = "", overrides = {} }) {
   const meta = TV_VIEWS.find((entry) => entry.key === view);
-  if (!meta || !targetId || !/^[A-Za-z0-9_-]+$/.test(String(targetId))) return "";
+  if (!meta || !targetId || !SAFE_ID.test(String(targetId))) return "";
+  if (meta.needsStation && (!stationId || !SAFE_ID.test(String(stationId)))) return "";
   const params = new URLSearchParams();
   if (meta.needsKey && displayKey) params.set("key", displayKey);
   for (const key of TV_KEYS) {
     if (validTvValue(key, overrides?.[key])) params.set(key, serializeTvParam(key, overrides[key]));
   }
   const query = params.toString();
-  return `${origin}${meta.path}${encodeURIComponent(targetId)}${query ? `?${query}` : ""}`;
+  const station = meta.needsStation ? `/station/${encodeURIComponent(stationId)}` : "";
+  return `${origin}${meta.path}${encodeURIComponent(targetId)}${station}${query ? `?${query}` : ""}`;
+}
+
+/** Ein TV-Link zurückgelesen: Ansicht, Ziel und Station - oder `null`, wenn es kein Link einer TV-Seite ist. */
+export function parseTvPath(pathname) {
+  const station = /^\/display\/bracket\/([^/]+)\/station\/([^/]+)\/?$/.exec(pathname || "");
+  if (station) return { view: "station", targetId: decodeURIComponent(station[1]), stationId: decodeURIComponent(station[2]) };
+  for (const entry of TV_VIEWS) {
+    if (entry.needsStation || !String(pathname || "").startsWith(entry.path)) continue;
+    const targetId = decodeURIComponent(String(pathname).slice(entry.path.length).split("/")[0] || "");
+    if (targetId) return { view: entry.key, targetId, stationId: "" };
+  }
+  return null;
 }
