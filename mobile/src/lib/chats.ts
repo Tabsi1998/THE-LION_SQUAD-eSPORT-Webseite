@@ -1,6 +1,5 @@
 import { api } from "./api";
-import { formatDate } from "./format";
-import { viennaDate } from "./vienna";
+import { dayBefore, viennaDate, viennaDay, viennaTime } from "./vienna";
 
 // Alle Chats an einem Ort (#1148): Direktnachrichten, Team-, Turnier- und Match-Chats aus `/api/chats`, das Neueste oben.
 // Der Server kennt je Unterhaltung „gelesen bis“ - Web und App setzen die Marke beim Öffnen, die Zahl ist überall gleich.
@@ -70,16 +69,15 @@ export function badgeText(count: number) {
   return count > 99 ? "99+" : String(count);
 }
 
-/** Uhrzeit für heute, „gestern“, sonst der Tag - wie in der Vorschau der Chat-Liste. */
+/** Uhrzeit für heute, „gestern“, sonst der Tag - wie in der Vorschau der Chat-Liste. Tage zählen in Wien. */
 export function chatTime(value?: string | null, now: Date = new Date()) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  const day = (d: Date) => viennaDate(d, { year: "numeric", month: "2-digit", day: "2-digit" });
-  if (day(date) === day(now)) return viennaDate(date, { hour: "2-digit", minute: "2-digit" });
-  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  if (day(date) === day(yesterday)) return "gestern";
-  return formatDate(value);
+  const today = viennaDay(now);
+  if (viennaDay(date) === today) return viennaTime(date, { hour: "2-digit", minute: "2-digit" });
+  if (viennaDay(date) === dayBefore(today)) return "gestern";
+  return viennaDate(date, { day: "2-digit", month: "2-digit" });
 }
 
 /** Wohin ein Eintrag der Liste führt - der Chat selbst, über dem aktuellen Tab. */
