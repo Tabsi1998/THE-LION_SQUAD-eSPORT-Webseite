@@ -25,6 +25,7 @@ export function TournamentChatScreen({ route }: Props) {
           const sender = senderOf(message);
           if (sender) setReport({ targetUserId: sender.id, targetName: sender.name, message });
         }}
+        read={{ kind: "tournament", id: route.params.id }}
         postUrl={`/tournaments/${route.params.id}/chat`}
       />
       <ReportSheet draft={report} onClose={() => setReport(null)} onSent={() => Alert.alert("Danke", "Die Moderation sieht sich das an.")} />

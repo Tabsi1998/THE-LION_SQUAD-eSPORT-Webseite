@@ -176,12 +176,12 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
     if (plan.sequence === "category") return "Kategorie abgeschlossen";
     if (plan.sequence === "legendary") return String(plan.top?.name || "Legendär").toUpperCase();
     if (plan.sequence === "diamond") return "Diamant";
-    return tiers.length === 1 ? "Neues Achievement!" : `${tiers.length} neue Achievements!`;
+    return tiers.length === 1 ? "Neuer Erfolg!" : `${tiers.length} neue Erfolge!`;
   }, [plan, tiers.length, isLevelOnly]);
   const sub = plan.sub || (isLevelOnly ? levelTexts(plan.levelUp).sub : plan.catchUp ? "Nachgeholte Erfolge" : `${look.name}${plan.top?.rank && plan.top.rank <= 7 ? ` ${ROMAN[plan.top.rank]}` : ""} freigeschaltet`);
   const liveText = `${heading}. ${tiers.map((t) => `${t.name}, ${t.material_name || look.name}, plus ${t.points} Punkte`).join(". ")}${plan.levelUp ? `. Level ${plan.levelUp.level}` : ""}`;
   const showBadge = phase === "badge" && !isLevelOnly;
-  const shareTo = plan.shareId ? `/achievements/a/${encodeURIComponent(plan.shareId)}` : "/profile?tab=achievements";
+  const shareTo = plan.shareId ? `/achievements/a/${encodeURIComponent(plan.shareId)}` : "/u/me?tab=achievements";
 
   return (
     <motion.div

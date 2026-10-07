@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
@@ -6,6 +6,7 @@ import { ContentCard } from "../../components/ContentCard";
 import { ListItemFadeIn, useListEntrance, type ListEntrance } from "../../components/FadeIn";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
+import { TabHeader, useTabScrollToTop } from "../../components/TabHeader";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { MonthCalendar } from "../../components/MonthCalendar";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
@@ -53,8 +54,14 @@ const scopes: Array<{ key: ScopeFilter; label: string }> = [
   { key: "club", label: "Verein" },
 ];
 
-export function TournamentsScreen({ navigation }: Props) {
-  const [filter, setFilter] = useState<Filter>("all");
+export function TournamentsScreen({ navigation, route }: Props) {
+  // Alte Links auf die Fast-Lap-Liste und auf /tournaments landen mit Vorauswahl hier (#1150).
+  const [filter, setFilter] = useState<Filter>(route?.params?.filter || "all");
+  useEffect(() => {
+    if (route?.params?.filter) setFilter(route.params.filter);
+  }, [route?.params?.filter]);
+  const scrollRef = useRef<ScrollView>(null);
+  useTabScrollToTop(scrollRef);
   const [scope, setScope] = useState<ScopeFilter>("all");
   const [view, setView] = useState<ViewMode>("list");
   const [month, setMonth] = useState<{ year: number; month: number } | null>(null);
@@ -183,6 +190,7 @@ export function TournamentsScreen({ navigation }: Props) {
   if (loading) {
     return (
       <Screen>
+        <TabHeader title="Events" testID="events-header" />
         <SkeletonList count={5} hasImage />
       </Screen>
     );
@@ -191,14 +199,14 @@ export function TournamentsScreen({ navigation }: Props) {
   return (
     <Screen padded={false}>
       <ScrollView
+        ref={scrollRef}
         {...seasonScrollProps("TournamentList")}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
       >
-        <View style={styles.header}>
-          <Heading>Events</Heading>
+        <TabHeader title="Events" testID="events-header">
           {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Was ansteht: Events, Turniere und Fast Laps.</Muted>}
-        </View>
+        </TabHeader>
         {offline && !error ? <OfflineNotice detail="Events, Turniere und Fast-Laps werden aus gespeicherten Daten angezeigt." /> : null}
 
         <SegmentedTabs items={views} value={view} onChange={setView} />
@@ -327,9 +335,6 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 18,
     paddingBottom: 28,
-  },
-  header: {
-    gap: 6,
   },
   scopeTabs: {
     marginTop: -6,

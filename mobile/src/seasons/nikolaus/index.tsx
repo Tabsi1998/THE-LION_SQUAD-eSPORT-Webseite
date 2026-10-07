@@ -7,7 +7,7 @@ import { Body } from "../../components/Text";
 import { api } from "../../lib/api";
 import { stickerSource } from "../../lib/stickers";
 import { isGuestUser } from "../../live";
-import { navigationRef } from "../../navigation/rootNavigation";
+import { openTab } from "../../navigation/rootNavigation";
 import { useScreenFocused } from "../anchors";
 import { greetingShownToday, markGreetingShown } from "../christmas/greeting";
 import { TAB_BAR } from "../halloween";
@@ -17,7 +17,7 @@ import { useSeason, type ActiveSeason } from "../SeasonProvider";
 import { BootSvg, VoucherSvg } from "./BootSvg";
 import { CARD_MS, OPEN_MS, bootWidth, cardFor, type BootCard, type OpenResult } from "./boot";
 
-// Nikolaus in der App (X3 #736, S11 #642 „Stiefel im Tab Mehr“): am 6. Dezember steht der Stiefel im Tab „Mehr“ auf
+// Nikolaus in der App (X3 #736, S11 #642 „Stiefel im Tab Mehr“, seit #1143 im Tab „Verein“): am 6. Dezember steht der Stiefel im Tab „Verein“ auf
 // der Kante der ersten Karte, das Tab-Symbol wird zum Stiefel, und einmal am Tag sagt eine Karte „Der Nikolaus war da“
 // mit dem Weg zum Stiefel. Antippen: der Stiefel wackelt (leichtes Tippen in der Hand), der Gutschein steigt heraus,
 // darunter erscheint die Karte mit dem Sticker, den der Nikolaus dieser Person bringt (einer je Person und Jahr, der
@@ -78,11 +78,11 @@ function ShelfCard({ card, onClose, width }: { card: BootCard; onClose: () => vo
 }
 
 /**
- * Der Stiefel im Tab „Mehr“: steht rechts im Kopf auf der Kante der ersten Karte. Angemeldet weiß er, ob er heuer schon
+ * Der Stiefel im Tab „Verein“ (seit #1143, vorher „Mehr“): steht rechts im Kopf auf der Kante der ersten Karte. Angemeldet weiß er, ob er heuer schon
  * geöffnet wurde; Antippen öffnet ihn - die Antwort des Servers läuft parallel zum Wackeln, die Karte kommt, wenn
  * beides fertig ist. Selten ein kleines Wippen, solange er voll ist und man hinsieht.
  */
-// Der Stiefel im Dashboard-Kopf (#852) bittet „öffnen“ - der Stiefel unter „Mehr“ erledigt es, sobald er zu sehen ist.
+// Der Stiefel im Dashboard-Kopf (#852) bittet „öffnen“ - der Stiefel im Tab „Verein“ erledigt es, sobald er zu sehen ist.
 let openRequested = false;
 const openListeners = new Set<() => void>();
 
@@ -97,14 +97,14 @@ export function resetBootOpenRequest(): void {
   openRequested = false;
 }
 
-/** Ab dem Moment, in dem „Mehr“ zu sehen ist, bis der Stiefel sich öffnet - man soll ihn dabei sehen. */
+/** Ab dem Moment, in dem „Verein“ zu sehen ist, bis der Stiefel sich öffnet - man soll ihn dabei sehen. */
 export const OPEN_AFTER_MS = 450;
 
-/** Der kleine Stiefel im Dashboard-Kopf unter dem Kranz (#852): ein Tipp führt zu „Mehr“ und öffnet ihn dort. */
+/** Der kleine Stiefel im Dashboard-Kopf unter dem Kranz (#852): ein Tipp führt zu „Verein“ und öffnet ihn dort. */
 export function NikolausWidget({ season }: { season: ActiveSeason; screen: string }) {
   const go = () => {
     requestBootOpen();
-    if (navigationRef.isReady()) navigationRef.navigate("More", { screen: "MoreHub" } as never);
+    openTab("VereinHub");
   };
   return (
     <Pressable onPress={go} accessibilityRole="button" accessibilityLabel={`${season.texts?.greeting || "Der Nikolaus war da"} – zum Stiefel`} hitSlop={6} style={styles.widget} testID="nikolaus-widget">
@@ -129,7 +129,7 @@ export function NikolausShelf({ season }: { season: ActiveSeason; screen: string
   const wobble = useRef(new Animated.Value(0)).current;
   const rise = useRef(new Animated.Value(0)).current;
   const timers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
-  // Bitte aus dem Dashboard-Kopf (#852): ist „Mehr“ zu sehen, öffnet sich der Stiefel kurz danach von selbst.
+  // Bitte aus dem Dashboard-Kopf (#852): ist „Verein“ zu sehen, öffnet sich der Stiefel kurz danach von selbst.
   const [asked, setAsked] = useState(() => openRequested);
   useEffect(() => {
     const listener = () => setAsked(true);
@@ -271,7 +271,7 @@ export function NikolausShelf({ season }: { season: ActiveSeason; screen: string
   );
 }
 
-/** Das Tab-Symbol „Mehr“ am Nikolaustag: der Stiefel. */
+/** Das Tab-Symbol „Verein“ am Nikolaustag: der Stiefel. */
 export function NikolausTabIcon({ size }: { size: number }) {
   return <BootSvg height={size + 6} />;
 }
@@ -279,8 +279,8 @@ export function NikolausTabIcon({ size }: { size: number }) {
 type HintState = "waiting" | "open" | "done";
 
 /**
- * Der Hinweis über der Tab-Leiste: einmal am Tag „Der Nikolaus war da“ mit dem Weg in den Tab „Mehr“ - nicht für wen,
- * der heuer schon geöffnet hat, nicht auf stillen Screens, nicht über einem Dialog und nicht im Tab „Mehr“ selbst.
+ * Der Hinweis über der Tab-Leiste: einmal am Tag „Der Nikolaus war da“ mit dem Weg in den Tab „Verein“ - nicht für wen,
+ * der heuer schon geöffnet hat, nicht auf stillen Screens, nicht über einem Dialog und nicht im Tab „Verein“ selbst.
  */
 export function NikolausGreeting({ season, screen }: { season: ActiveSeason; screen: string }) {
   const userId = useMember();
@@ -295,7 +295,7 @@ export function NikolausGreeting({ season, screen }: { season: ActiveSeason; scr
     });
     return () => subscription.remove();
   }, []);
-  const allowed = screenClass(screen) !== "quiet" && screen !== "MoreHub" && !covered;
+  const allowed = screenClass(screen) !== "quiet" && screen !== "VereinHub" && !covered;
   useEffect(() => {
     if (state === "done") return undefined;
     if (!allowed) {
@@ -325,11 +325,11 @@ export function NikolausGreeting({ season, screen }: { season: ActiveSeason; scr
       if (show) clearTimeout(show);
     };
   }, [allowed, state, userId]);
-  const text = useMemo(() => (userId ? "Im Tab „Mehr“ steht dein Stiefel – schau hinein!" : "Im Tab „Mehr“ steht ein Stiefel. Wer angemeldet ist, findet darin einen Sticker."), [userId]);
+  const text = useMemo(() => (userId ? "Im Tab „Verein“ steht dein Stiefel – schau hinein!" : "Im Tab „Verein“ steht ein Stiefel. Wer angemeldet ist, findet darin einen Sticker."), [userId]);
   if (state !== "open") return null;
   const toBoot = () => {
     setState("done");
-    if (navigationRef.isReady()) navigationRef.navigate("More", { screen: "MoreHub" } as never);
+    openTab("VereinHub");
   };
   return (
     <View pointerEvents="box-none" style={[styles.hintWrap, { bottom: TAB_BAR + Math.max(insets.bottom, 8) + 12, width: Math.min(width - 32, 440), left: Math.max(16, (width - 440) / 2) }]}>

@@ -51,8 +51,8 @@ export default function AchievementsShowcasePage() {
   const { user, isClubMember } = useAuth();
 
   useDocumentTitle(
-    "Achievements",
-    "Alle Erfolge, Abzeichen und Bestenliste von THE LION SQUAD eSports – schalte Achievements frei und klettere im Ranking.",
+    "Erfolge",
+    "Alle Erfolge, Abzeichen und Bestenliste von THE LION SQUAD eSports – schalte Erfolge frei und klettere im Ranking.",
   );
 
   const load = () => {
@@ -163,7 +163,7 @@ export default function AchievementsShowcasePage() {
           </div>
 
           <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3" data-testid="achievements-stats">
-            <StatCard icon={Trophy} label="Achievements" value={stats.tierCount} accent="#FFD700" />
+            <StatCard icon={Trophy} label="Erfolge" value={stats.tierCount} accent="#FFD700" />
             <StatCard icon={Target} label="Punkte zu holen" value={stats.pointsTotal} accent="#29B6E8" />
             <StatCard icon={Flame} label="Kategorien" value={stats.categoryCount} accent="#00FF88" />
             {myStats ? (
@@ -177,8 +177,8 @@ export default function AchievementsShowcasePage() {
 
           {myStats && (
             <div className="mt-4 text-sm text-white/60" data-testid="my-achievement-summary">
-              Du hast bereits <span className="text-[#FFD700] font-bold">{myStats.count}</span> Achievements
-              freigeschaltet · <Link to="/profile?tab=achievements" className="text-[#29B6E8] hover:underline">Meine Achievements ansehen</Link>
+              Du hast bereits <span className="text-[#FFD700] font-bold">{myStats.count}</span> Erfolge
+              freigeschaltet · <Link to="/u/me?tab=achievements" className="text-[#29B6E8] hover:underline">Meine Erfolge ansehen</Link>
             </div>
           )}
         </div>
@@ -259,7 +259,7 @@ export default function AchievementsShowcasePage() {
             <div className="border border-dashed border-white/10 rounded-sm p-10 text-center text-white/45" data-testid="leaderboard-empty">
               {board.period !== "all" || board.category
                 ? "In diesem Ausschnitt gibt es noch keine Platzierungen."
-                : "Noch keine Platzierungen – sei der Erste und schalte Achievements frei!"}
+                : "Noch keine Platzierungen – sei der Erste und schalte Erfolge frei!"}
             </div>
           ) : (
             <>
@@ -306,7 +306,7 @@ export default function AchievementsShowcasePage() {
           <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
             <div className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-[#29B6E8]" />
-              <h2 className="font-heading text-2xl md:text-3xl font-bold uppercase">Alle Achievements</h2>
+              <h2 className="font-heading text-2xl md:text-3xl font-bold uppercase">Alle Erfolge</h2>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {categoryFilter && (
@@ -328,7 +328,7 @@ export default function AchievementsShowcasePage() {
             </div>
           </div>
           {loading && groups.length === 0 ? (
-            <div className="text-white/40 py-10 text-center">Lade Achievements …</div>
+            <div className="text-white/40 py-10 text-center">Lade Erfolge …</div>
           ) : (
             <AchievementGroupsView
               groups={me?.groups || groups}

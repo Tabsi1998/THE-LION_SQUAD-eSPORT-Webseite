@@ -1,4 +1,5 @@
 import { areasOf, hasArea, isAnyAdmin } from "@/lib/permissions";
+import { clearRecentSearches } from "@/lib/recentSearches";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { normalizeApiPath } from "@/lib/apiInvalidation";
@@ -141,6 +142,8 @@ export function AuthProvider({ children }) {
       await api.post("/auth/logout");
       setMfaTicket("");
       setUser(null);
+      // Die letzten Suchen (#1145) gehen mit dem Konto.
+      clearRecentSearches();
       return true;
     } catch (e) {
       const msg = formatApiError(e.response?.data?.detail) || "Logout fehlgeschlagen.";

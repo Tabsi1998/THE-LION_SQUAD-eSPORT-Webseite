@@ -112,7 +112,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
 
   const openProfile = useCallback((username?: string | null) => {
     if (!username) return;
-    navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username }, initial: false });
+    navigation.navigate("PublicProfile", { username });
   }, [navigation]);
 
   const showActionResult = useCallback(async (action: () => Promise<void>, success: string) => {

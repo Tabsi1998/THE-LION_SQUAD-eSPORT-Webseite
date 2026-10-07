@@ -123,6 +123,8 @@ async def init_indexes():
     await db.direct_messages.create_index("id", unique=True)
     await db.direct_messages.create_index([("sender_id", 1), ("recipient_id", 1), ("created_at", -1)])
     await db.direct_messages.create_index([("recipient_id", 1), ("read_at", 1), ("created_at", -1)])
+    # Alle Chats an einem Ort (#1148): „gelesen bis“ je Person und Unterhaltung.
+    await db.chat_reads.create_index([("user_id", 1), ("key", 1)], unique=True)
     await db.friendships.create_index("id", unique=True)
     await db.friendships.create_index("pair_key", unique=True)
     await db.friendships.create_index([("requester_id", 1), ("status", 1), ("updated_at", -1)])

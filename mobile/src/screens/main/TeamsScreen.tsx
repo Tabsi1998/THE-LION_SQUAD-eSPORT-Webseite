@@ -1,28 +1,27 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
-import { Screen } from "../../components/Screen";
+import { useTabScrollToTop } from "../../components/TabHeader";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
-import { Body, Heading, Muted, Title } from "../../components/Text";
+import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import { chatTitle, splitTeams, teamMembers, teamMeta, teamSquads } from "../../lib/teams";
-import type { TeamStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { Team, TeamInvite } from "../../types";
 
 // Teams: eigene zuerst, mit Chat direkt auf der Karte; darunter die weiteren
 // öffentlichen Teams. Vorher zeigte die Liste entweder nur eigene oder nur
 // alle, und jede Karte trug "0 Squads" zweimal (#215).
+// Seit #1143 ein Bereich im Tab Community (Einladungen, Meine, Entdecken) statt eines eigenen Tabs.
 
-type Props = NativeStackScreenProps<TeamStackParamList, "TeamList">;
+type Props = { navigation: { navigate: (screen: never, params?: never) => void } };
 
 type Row = { kind: "heading"; key: string; title: string; count: number } | { kind: "team"; key: string; team: Team; mine: boolean };
 
-export function TeamsScreen({ navigation }: Props) {
+export function TeamsSection({ navigation }: Props) {
   const [myTeams, setMyTeams] = useState<Team[]>([]);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [invites, setInvites] = useState<TeamInvite[]>([]);
@@ -83,34 +82,27 @@ export function TeamsScreen({ navigation }: Props) {
   const squadTotal = useMemo(() => statTeams.reduce((sum, team) => sum + teamSquads(team), 0), [statTeams]);
 
   const openChat = useCallback((team: Team) => {
-    navigation.navigate("TeamChat", { id: team.id, title: chatTitle(team) });
+    navigation.navigate("TeamChat" as never, { id: team.id, title: chatTitle(team) } as never);
   }, [navigation]);
+  const listRef = useRef<FlatList<Row>>(null);
+  useTabScrollToTop(listRef);
 
   if (loading) {
     return (
-      <Screen>
+      <View style={styles.loading}>
         <SkeletonList count={5} hasImage={false} />
-      </Screen>
+      </View>
     );
   }
 
   return (
-    <Screen padded={false}>
       <FlatList
-        {...seasonScrollProps("TeamList")}
+        ref={listRef}
+        {...seasonScrollProps("CommunityHub")}
         data={rows}
         keyExtractor={(item) => item.key}
         ListHeaderComponent={
           <View style={styles.header}>
-            <View style={styles.headerTop}>
-              <View style={styles.headerIcon}>
-                <Ionicons name="people-outline" color={colors.black} size={22} />
-              </View>
-              <View style={styles.headerText}>
-                <Muted style={styles.eyebrow}>Community</Muted>
-                <Title>Teams</Title>
-              </View>
-            </View>
             {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
             {statTeams.length ? (
@@ -152,13 +144,12 @@ export function TeamsScreen({ navigation }: Props) {
           ) : (
             <TeamCard
               team={item.team}
-              onPress={() => navigation.navigate("TeamDetail", { id: item.team.id })}
+              onPress={() => navigation.navigate("TeamDetail" as never, { id: item.team.id } as never)}
               onChat={item.mine ? () => openChat(item.team) : undefined}
             />
           )
         }
       />
-    </Screen>
   );
 }
 
@@ -254,32 +245,13 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingHorizontal: 18,
   },
+  loading: {
+    paddingHorizontal: 18,
+  },
   header: {
     gap: 12,
     marginBottom: 2,
     paddingTop: 4,
-  },
-  headerTop: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-  },
-  headerIcon: {
-    alignItems: "center",
-    backgroundColor: colors.cyan,
-    borderRadius: 10,
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  headerText: {
-    flex: 1,
-    gap: 2,
-  },
-  eyebrow: {
-    color: colors.cyan,
-    fontWeight: "900",
-    textTransform: "uppercase",
   },
   stats: {
     flexDirection: "row",

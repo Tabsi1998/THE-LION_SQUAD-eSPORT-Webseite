@@ -35,7 +35,7 @@ export function popupBody(state: PopupState) {
   return latest.body || "";
 }
 
-type CurrentRoute = { name?: string; params?: Record<string, unknown> | undefined } | null | undefined;
+type CurrentRoute = { name?: string; params?: object | undefined } | null | undefined;
 
 /**
  * Im offenen Chat mit derselben Person (Direktnachricht) oder im selben

@@ -3,13 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 import { ChevronDown, Crown, LogOut, Shield } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { resolveMediaUrl } from "@/lib/api";
-import { useAccountBadges } from "@/hooks/useAccountBadges";
 import { userMenuEntries, userMenuTestId } from "@/pages/user/profile/constants";
 
-// Das Benutzermenü im Kopf (#282, #516): ein Knopf mit Avatar und Name, dahinter die Liste aus
-// userMenuEntries (Dashboard, Profil, öffentliches Profil, Nachrichten, Benachrichtigungen,
-// Mitgliedschaft oder „Mitglied werden“, Rechnungen, Strafen und Gewinne nur mit Zähler, Hilfe),
-// dann Mitgliederbereich (Mitglieder), Admin (Admins) und Abmelden.
+// Das Benutzermenü im Kopf (#282, #516, #1150): ein Knopf mit Avatar und Name, dahinter die Liste aus
+// userMenuEntries (Dashboard, Mein Profil, Einstellungen), dann Mitgliederbereich (Mitglieder), Admin (Admins) und
+// Abmelden. Jedes Thema an genau einem Ort: Chats unter Community, Benachrichtigungen hinter der Glocke, Rechnungen und
+// Gewinne im eigenen Profil („Nur für dich“).
 function Avatar({ user }) {
   const [failed, setFailed] = useState(false);
   const url = user?.avatar_url ? resolveMediaUrl(user.avatar_url) : "";
@@ -35,8 +34,6 @@ export function UserMenu() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const boxRef = useRef(null);
-  // Die Zähler holt das Menü erst, wenn es aufgeht - nicht bei jedem Seitenaufbau.
-  const badges = useAccountBadges(user?.id, open);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -86,7 +83,7 @@ export function UserMenu() {
             <div className="font-bold text-sm text-white truncate">{name}</div>
             <div className="text-[11px] text-white/45 truncate">@{user.username}</div>
           </div>
-          {userMenuEntries({ username: user.username, isClubMember, badges }).map((entry) => (
+          {userMenuEntries({ username: user.username }).map((entry) => (
             <Link key={entry.key} to={entry.to} role="menuitem" onClick={close} data-testid={userMenuTestId(entry.key)} className={itemClass}>
               <entry.icon className="w-3.5 h-3.5" /> {entry.label}
             </Link>

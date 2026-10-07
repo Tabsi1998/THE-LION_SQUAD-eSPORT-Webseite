@@ -152,15 +152,16 @@ class TestNavAchievementsLink:
         assert r.status_code == 200, r.text[:300]
         return r.json()
 
-    def test_esports_has_achievements_child(self, nav):
-        esports = next((i for i in nav["items"] if i.get("key") == "esports"), None)
-        assert esports, "eSports nav item missing"
-        children = esports.get("children") or []
+    def test_community_has_achievements_child(self, nav):
+        # Seit #1143 stehen die Erfolge (ein Name) unter Community - wie der Tab in der App.
+        community = next((i for i in nav["items"] if i.get("key") == "community"), None)
+        assert community, "Community nav item missing"
+        children = community.get("children") or []
         match = [c for c in children if c.get("to") == "/achievements"]
-        assert match, f"no /achievements child in eSports: {[c.get('to') for c in children]}"
+        assert match, f"no /achievements child in Community: {[c.get('to') for c in children]}"
         child = match[0]
         assert child.get("visible") is True
-        assert "achievement" in (child.get("label") or "").lower()
+        assert "erfolg" in (child.get("label") or "").lower()
 
     def test_nav_items_have_no_mongo_id(self, nav):
         for item in nav["items"]:

@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet } from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { ChatThreadView } from "../../components/ChatThreadView";
 import { ReportSheet, type ReportDraft } from "../../components/ReportSheet";
 import { Screen } from "../../components/Screen";
+import { HeaderBell } from "../../components/TabHeader";
 import { useAuth } from "../../auth/AuthContext";
 import { errorMessage } from "../../lib/api";
 import { blockUser, unblockUser } from "../../lib/moderation";
@@ -68,10 +69,14 @@ export function DirectThreadScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     navigation.setOptions({
+      // Rechts das Menü (Melden, Blockieren) und die Glocke wie in jedem Detail-Screen (#1145).
       headerRight: () => (
-        <Pressable onPress={openMenu} accessibilityRole="button" accessibilityLabel="Melden oder blockieren" hitSlop={10} style={styles.menuButton} testID="direct-thread-menu">
-          <Ionicons name="ellipsis-vertical" color={colors.cyan} size={20} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable onPress={openMenu} accessibilityRole="button" accessibilityLabel="Melden oder blockieren" hitSlop={10} style={styles.menuButton} testID="direct-thread-menu">
+            <Ionicons name="ellipsis-vertical" color={colors.cyan} size={20} />
+          </Pressable>
+          <HeaderBell />
+        </View>
       ),
     });
   }, [navigation, openMenu]);
@@ -88,6 +93,7 @@ export function DirectThreadScreen({ navigation, route }: Props) {
         onReportMessage={(message) => setReport({ targetUserId: otherId, targetName: otherName, direct: true, message })}
         onData={onData}
         refreshToken={refreshToken}
+        read={{ kind: "direct", id: otherId }}
         postUrl={`/messages/direct/${otherId}`}
       />
       <ReportSheet draft={report} onClose={() => setReport(null)} onSent={() => Alert.alert("Danke", "Die Moderation sieht sich das an.")} />
@@ -96,6 +102,11 @@ export function DirectThreadScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  headerActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
+  },
   menuButton: {
     padding: 4,
   },

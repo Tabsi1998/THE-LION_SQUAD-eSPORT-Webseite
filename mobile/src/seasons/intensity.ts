@@ -55,15 +55,16 @@ export type Capabilities = EffectClasses & HalloweenCapabilities & { season: str
 
 const LIVELY = new Set(["Dashboard", "NewsList", "Gallery", "GalleryAlbum", "SeasonPass"]);
 const CALM = new Set([
-  "TournamentList", "Tournaments", "TournamentDetail", "TournamentChat", "MatchDetail", "FastLapList", "FastLapDetail",
-  "TeamChat", "DirectMessages", "DirectThread", "Notifications", "Profile", "MemberArea", "MyMembership", "MyInvoices",
+  "TournamentList", "Tournaments", "TournamentDetail", "TournamentChat", "MatchDetail", "FastLapDetail",
+  // Seit #1143: Suche, Gewinne und „Profil bearbeiten“ wie die anderen Konto-Seiten ruhig.
+  "TeamChat", "DirectThread", "Notifications", "Search", "Profile", "ProfileEdit", "MyMembership", "MyInvoices", "MyPrizes",
   "MemberCard", "MemberDocuments", "MemberHelperShifts", "MemberMeetings", "Login", "Register", "GalleryViewer",
   // Der Adventkalender ist selbst das Bild - die Deko rundherum hält sich zurück.
   "AdventCalendar",
 ]);
 const QUIET = new Set(["Consent", "Lock", "Boot", "Settings", "Admin"]);
 
-/** Klasse eines Screens: lebendig (Dashboard, News, Galerie), mittel (Details, Teams, Mehr), ruhig (Turniere, Chats, Formulare, Konto), still (Sperre, Einwilligung, Einstellungen). */
+/** Klasse eines Screens: lebendig (Dashboard, News, Galerie), mittel (Details, Community, Verein), ruhig (Turniere, Chats, Formulare, Konto), still (Sperre, Einwilligung, Einstellungen). */
 export function screenClass(screen = "Dashboard"): ScreenClass {
   const name = String(screen || "Dashboard");
   if (QUIET.has(name) || /Settings|Admin|Consent|Lock/i.test(name)) return "quiet";

@@ -298,15 +298,7 @@ export default function DashboardPage() {
 
         <div className="mt-8 grid sm:grid-cols-2 md:grid-cols-3 gap-4" data-testid="dashboard-tiles">
           <AchievementsTile />
-          {isClubMember && (
-            <Link to="/members/benefits" data-testid="dashboard-benefits" className="border border-[#FFD700]/30 hover:border-[#FFD700]/60 rounded-sm p-5 bg-[#121212] transition">
-              <div className="flex items-center justify-between">
-                <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Exklusiv</div>
-                <Gift className="w-4 h-4 text-[#FFD700]" />
-              </div>
-              <div className="mt-2 font-heading text-lg font-bold">Mitgliedervorteile</div>
-            </Link>
-          )}
+          {/* Mitgliedervorteile stehen im Mitgliederbereich (#1150) - keine zweite Kachel hier. */}
           <Link
             to="/my/penalties"
             data-testid="dashboard-penalties-link"

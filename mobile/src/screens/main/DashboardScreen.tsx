@@ -1,14 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { openLink } from "../../lib/openLink";
-import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { ListItemFadeIn, useListEntrance } from "../../components/FadeIn";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
+import { TabHeader, useTabScrollToTop } from "../../components/TabHeader";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { SeasonEdgeSlot, SeasonWidgetSlot } from "../../seasons/SeasonStage";
 import { AdventHint } from "../../advent/entry";
@@ -21,16 +22,16 @@ import { compareByNearestDate } from "../../lib/contentSort";
 import { seasonLine, splitHomeTimeline, type HomeItem } from "../../lib/dashboard";
 import { displayName, formatDate, formatEventType, formatNewsCategory, formatStatus, placeParts } from "../../lib/format";
 import { isGuestUser } from "../../live";
-import { openSignIn } from "../../navigation/rootNavigation";
+import { openSignIn, openTab } from "../../navigation/rootNavigation";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
-import type { MainTabParamList } from "../../navigation/types";
+import type { AppStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ClubEvent, DashboardAction, LiveStream, Match, MobileDashboardData, NewsPost, Tournament } from "../../types";
 
 // Was das Dashboard zeigt: eigene Matches, Turniere, Events, News, Streams und die Glocke.
 const DASHBOARD_LIVE_RESOURCES = ["tournaments", "matches", "events", "news", "streams", "notifications", "teams", "f1"];
 
-type Props = BottomTabScreenProps<MainTabParamList, "Dashboard">;
+type Props = NativeStackScreenProps<AppStackParamList, "Dashboard">;
 type TimelineItem = HomeItem;
 type QuickActionItem = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -83,21 +84,12 @@ export function DashboardScreen({ navigation }: Props) {
   // Neuladen (Fokus, Live-Änderung, Ziehen).
   const entrance = useListEntrance();
   const isGuest = isGuestUser(user);
-  // Nur Ziele, die nicht ohnehin in der Tab-Leiste stehen. Turniere sind der
-  // Events-Tab, News und Jahreswertung haben unten eigene Abschnitte (#212).
-  const quickActions = useMemo(() => {
-    const actions: QuickActionItem[] = [
-      // Gast zuerst (#918): Nachrichten gibt es mit Konto - Gäste sehen hier den Weg dorthin.
-      isGuest
-        ? { icon: "log-in-outline", label: "Anmelden", onPress: () => { openSignIn(); } }
-        : { icon: "chatbubbles-outline", label: "Nachrichten", onPress: () => navigation.navigate("More", { screen: "DirectMessages", initial: false }) },
-      { icon: "flash-outline", label: "Fast Laps", onPress: () => navigation.navigate("More", { screen: "FastLapList", initial: false }) },
-    ];
-    if (user?.is_club_member) {
-      actions.push({ icon: "shield-checkmark-outline", label: "Verein", onPress: () => navigation.navigate("More", { screen: "InfoCenter", params: { section: "benefits" }, initial: false }) });
-    }
-    return actions;
-  }, [isGuest, navigation, user?.is_club_member]);
+  // Nur Ziele, die nicht ohnehin in der Tab-Leiste stehen. Jedes Thema an genau einem Ort (#1150): Nachrichten stehen
+  // unter Community → Chats, Fast Laps im Events-Tab, die Vorteile im Mitgliederbereich (Tab Verein) - die Kacheln dafür
+  // sind weg. Gäste sehen hier den Weg zum Konto (#918).
+  const quickActions = useMemo<QuickActionItem[]>(() => (
+    isGuest ? [{ icon: "log-in-outline", label: "Anmelden", onPress: () => { openSignIn(); } }] : []
+  ), [isGuest]);
 
   const load = useCallback(async () => {
     setError("");
@@ -119,6 +111,9 @@ export function DashboardScreen({ navigation }: Props) {
     }
   }, [isGuest, refreshMe]);
 
+  const scrollRef = useRef<ScrollView>(null);
+  // Tipp auf den aktiven Tab (#1144): ganz nach oben.
+  useTabScrollToTop(scrollRef);
   const isFocused = useIsFocused();
   useFocusEffect(useCallback(() => {
     void load();
@@ -143,7 +138,7 @@ export function DashboardScreen({ navigation }: Props) {
 
   const openTournament = useCallback((id?: string | null) => {
     if (!id) return;
-    navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id }, initial: false });
+    navigation.navigate("TournamentDetail", { id });
   }, [navigation]);
 
   const openAction = useCallback((action: DashboardAction) => {
@@ -152,11 +147,11 @@ export function DashboardScreen({ navigation }: Props) {
       return;
     }
     if (action.target_type === "match" && action.target_id) {
-      navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: action.target_id }, initial: false });
+      navigation.navigate("MatchDetail", { id: action.target_id });
       return;
     }
     if (action.target_type === "event" && action.target_id) {
-      navigation.navigate("Tournaments", { screen: "EventDetail", params: { id: action.target_id }, initial: false });
+      navigation.navigate("EventDetail", { id: action.target_id });
     }
   }, [navigation, openTournament]);
 
@@ -165,18 +160,16 @@ export function DashboardScreen({ navigation }: Props) {
       openTournament(item.targetId);
       return;
     }
-    navigation.navigate("Tournaments", { screen: "EventDetail", params: { id: item.targetId || item.id }, initial: false });
+    navigation.navigate("EventDetail", { id: item.targetId || item.id });
   }, [navigation, openTournament]);
 
   if (loading) {
     return (
       <Screen padded={false}>
         <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.header}>
-            <Muted>{clubName}</Muted>
-            <Title>LionsAPP</Title>
+          <TabHeader title="Home" testID="home-header">
             <Muted>Dein Vereins- und eSports-Hub wird vorbereitet.</Muted>
-          </View>
+          </TabHeader>
           <SkeletonList count={4} />
         </ScrollView>
       </Screen>
@@ -186,10 +179,13 @@ export function DashboardScreen({ navigation }: Props) {
   return (
     <Screen padded={false}>
       <ScrollView
+        ref={scrollRef}
         {...seasonScrollProps("Dashboard")}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
       >
+        {/* Dieselbe Kopfzeile wie in jedem Tab (#1145): Titel, Lupe, Glocke - die Glocke schwebt nicht mehr über der Karte. */}
+        <TabHeader title="Home" testID="home-header" />
         {invitation?.open ? (
           <Card style={styles.inviteCard} testID="dashboard-invitation">
             <Heading>Einladung zum Verein</Heading>
@@ -221,9 +217,8 @@ export function DashboardScreen({ navigation }: Props) {
           <SeasonEdgeSlot />
         </Card>
 
-        {/* Adventkalender (#641): der Weg zu den Türchen - nur solange der Kalender läuft. */}
-        {/* `initial: false`: unter dem Kalender liegt das Verzeichnis „Mehr“ - der Pfeil zurück führt dorthin. */}
-        <AdventHint onOpen={() => navigation.navigate("More", { screen: "AdventCalendar", initial: false })} />
+        {/* Adventkalender (#641): der Weg zu den Türchen - nur solange der Kalender läuft; Zurück führt zu Home (#1144). */}
+        <AdventHint onOpen={() => navigation.navigate("AdventCalendar")} />
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
         {offline && !error ? <OfflineNotice /> : null}
@@ -242,7 +237,7 @@ export function DashboardScreen({ navigation }: Props) {
               <ListItemFadeIn key={match.id} entrance={entrance} id={`match-${match.id}`} index={index}>
                 <MatchOverviewCard
                   match={match}
-                  onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id }, initial: false })}
+                  onPress={() => navigation.navigate("MatchDetail", { id: match.id })}
                 />
               </ListItemFadeIn>
             ))}
@@ -256,7 +251,7 @@ export function DashboardScreen({ navigation }: Props) {
                 <MatchOverviewCard
                   match={match}
                   staff
-                  onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id }, initial: false })}
+                  onPress={() => navigation.navigate("MatchDetail", { id: match.id })}
                 />
               </ListItemFadeIn>
             ))}
@@ -313,7 +308,7 @@ export function DashboardScreen({ navigation }: Props) {
         <Section
           title={isGuest ? "Aktuell geplant" : "Meine nächsten Termine"}
           actionLabel={moreCount > 0 ? `Alle (${nextItems.length + liveItems.length + moreCount})` : "Alle Termine"}
-          onAction={() => navigation.navigate("Tournaments")}
+          onAction={() => openTab("TournamentList")}
         >
           {nextItems.length ? (
             nextItems.map((item, index) => (
@@ -330,7 +325,7 @@ export function DashboardScreen({ navigation }: Props) {
 
         {data.season ? (
           <Pressable
-            onPress={() => navigation.navigate("More", { screen: "SeasonPass", initial: false })}
+            onPress={() => navigation.navigate("SeasonPass")}
             style={({ pressed }) => [pressed && styles.pressed]}
             accessibilityRole="button"
             accessibilityLabel={`${data.season.name || "Jahreswertung"}: ${seasonLine(data.season)}`}
@@ -348,13 +343,13 @@ export function DashboardScreen({ navigation }: Props) {
           </Pressable>
         ) : null}
 
-        <Section title="News" actionLabel="Alle News" onAction={() => navigation.navigate("More", { screen: "NewsList", initial: false })}>
+        <Section title="News" actionLabel="Alle News" onAction={() => navigation.navigate("NewsList")}>
           {data.news.length ? (
             data.news.slice(0, 3).map((post, index) => (
               <ListItemFadeIn key={post.id} entrance={entrance} id={`news-${post.id}`} index={index}>
                 <NewsCard
                   post={post}
-                  onPress={() => navigation.navigate("More", { screen: "NewsDetail", params: { id: post.slug || post.id }, initial: false })}
+                  onPress={() => navigation.navigate("NewsDetail", { id: post.slug || post.id })}
                 />
               </ListItemFadeIn>
             ))

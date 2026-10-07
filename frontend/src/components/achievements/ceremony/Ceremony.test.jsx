@@ -31,7 +31,7 @@ describe("Ceremony", () => {
     expect(overlay).toHaveAttribute("data-sequence", "single");
     expect(overlay).toHaveAttribute("data-motion", "driveby");
     expect(overlay).toHaveAttribute("data-material", "gold");
-    expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Neues Achievement!");
+    expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Neuer Erfolg!");
     expect(screen.getByTestId("ceremony-sub")).toHaveTextContent("Gold V freigeschaltet");
     expect(screen.getByTestId("ceremony-points")).toHaveTextContent("+50 Punkte");
     expect(screen.getByTestId("ceremony-badge")).toHaveAttribute("data-material", "gold");
@@ -45,7 +45,7 @@ describe("Ceremony", () => {
   it("fächert den Stapel auf und blättert mit Pfeilen", () => {
     renderPlan({ tiers: [tier("a", "silver", 4, "match"), tier("b", "gold", 5, "team"), tier("c", "wood", 1, "profile")] });
     expect(screen.getByTestId("achievement-unlock-overlay")).toHaveAttribute("data-sequence", "stack");
-    expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("3 neue Achievements!");
+    expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("3 neue Erfolge!");
     expect(screen.getByTestId("ceremony-stack-index")).toHaveTextContent("1 / 3");
     expect(screen.getByTestId("ceremony-tier-b")).toHaveAttribute("aria-current", "true");
     fireEvent.click(screen.getByTestId("ceremony-next"));

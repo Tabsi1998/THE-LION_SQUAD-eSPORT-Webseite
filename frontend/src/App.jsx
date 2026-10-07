@@ -35,11 +35,13 @@ function RouteFallback() {
 
 function MeRedirect() {
   const { user } = useAuth();
+  const [params] = useSearchParams();
   // Solange die Sitzung noch geladen wird (user undefined), nicht zum Login schicken - sonst landet jeder
-  // angemeldete Klick auf /u/me auf der Login-Seite.
+  // angemeldete Klick auf /u/me auf der Login-Seite. Der Reiter (?tab=achievements …) geht mit (#1149).
   if (user === undefined) return null;
-  if (!user) return <Navigate to="/login?next=/u/me" replace />;
-  return <Navigate to={`/u/${user.username}`} replace />;
+  const query = params.toString() ? `?${params.toString()}` : "";
+  if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`/u/me${query}`)}`} replace />;
+  return <Navigate to={`/u/${user.username}${query}`} replace />;
 }
 
 function FastLapLegacyRedirect() {
@@ -151,6 +153,7 @@ const AdminEasterHuntPage = lazy(() => import("@/pages/admin/AdminEasterHuntPage
 const EasterHuntPage = lazy(() => import("@/pages/public/EasterHuntPage"));
 
 const AboutPage = lazy(() => import("@/pages/public/AboutPage"));
+const VereinPage = lazy(() => import("@/pages/public/VereinPage"));
 const ContactPage = lazy(() => import("@/pages/public/ContactPage"));
 const SponsorsPage = lazy(() => import("@/pages/public/SponsorsPage"));
 const PartnersPage = lazy(() => import("@/pages/public/PartnersPage"));
@@ -230,6 +233,8 @@ function App() {
           {/* Public — Verein */}
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
+          {/* Verein (#1147): alles vom Verein an einem Ort - Ziel des Eintrags „Verein“ in der Handy-Leiste. */}
+          <Route path="/verein" element={<VereinPage />} />
           <Route path="/board" element={<BoardPage />} />
           <Route path="/values" element={<ValuesPage />} />
           <Route path="/contact" element={<ContactPage />} />

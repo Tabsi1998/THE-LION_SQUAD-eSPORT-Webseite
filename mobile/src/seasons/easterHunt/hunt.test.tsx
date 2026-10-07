@@ -14,7 +14,10 @@ const mockAuth: { user: Record<string, unknown> | null; logout: jest.Mock } = { 
 jest.mock("../../auth/AuthContext", () => ({ useAuth: () => mockAuth }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 24, bottom: 16, left: 0, right: 0 }) }));
 const mockNavigate = jest.fn();
-jest.mock("../../navigation/rootNavigation", () => ({ navigationRef: { isReady: () => true, navigate: (...args: unknown[]) => mockNavigate(...args), getCurrentRoute: () => ({ name: "Dashboard" }), addListener: () => () => {} } }));
+jest.mock("../../navigation/rootNavigation", () => ({
+  navigationRef: { isReady: () => true, navigate: (...args: unknown[]) => mockNavigate(...args), getCurrentRoute: () => ({ name: "Dashboard" }), addListener: () => () => {} },
+  openDetail: (...args: unknown[]) => mockNavigate("openDetail", ...args),
+}));
 jest.mock("@react-navigation/native", () => {
   const actual = jest.requireActual("@react-navigation/native");
   return { ...actual, useNavigation: () => ({ navigate: (...args: unknown[]) => mockNavigate(...args) }) };
@@ -75,7 +78,10 @@ afterEach(() => {
 test("die Screens mit Verstecken heißen beim Server wie im Admin", () => {
   expect(huntRoute("Dashboard")).toBe("app:Dashboard");
   expect(huntRoute("TournamentList")).toBe("app:Tournaments");
-  expect(huntRoute("MoreHub")).toBe("app:More");
+  // Die Tabs seit #1143: Community und Verein statt Teams und Mehr.
+  expect(huntRoute("CommunityHub")).toBe("app:Community");
+  expect(huntRoute("VereinHub")).toBe("app:Verein");
+  expect(huntRoute("MoreHub")).toBeNull();
   expect(huntRoute("DirectThread")).toBeNull();
 });
 
@@ -138,7 +144,7 @@ test("das letzte Ei füllt den Korb - mit dem Weg zum Korb", async () => {
   expect(title).toBe("Korb voll!");
   expect(text).toContain("Platz 2");
   buttons[1].onPress();
-  expect(mockNavigate).toHaveBeenCalledWith("More", { screen: "EasterHunt", initial: false });
+  expect(mockNavigate).toHaveBeenCalledWith("EasterHunt");
 });
 
 test("zu schnell: freundlicher Hinweis; abgelaufener Schlüssel: neu holen und einmal nachfassen", async () => {
@@ -167,7 +173,7 @@ test("das Widget zeigt den Korb und folgt jedem Fund; antippen öffnet den Korb"
   });
   expect(screen.getByTestId("hunt-widget-count")).toHaveTextContent("3/12");
   await fireEvent.press(screen.getByTestId("hunt-widget"));
-  expect(mockNavigate).toHaveBeenCalledWith("More", { screen: "EasterHunt", initial: false });
+  expect(mockNavigate).toHaveBeenCalledWith("openDetail", "EasterHunt");
 });
 
 test("Oster-Deko: während einer laufenden Suche Blumen an der Begrüßungskarte - Eier erst, wenn feststeht, dass keine läuft", async () => {

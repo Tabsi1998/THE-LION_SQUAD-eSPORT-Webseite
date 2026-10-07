@@ -6,7 +6,7 @@ import { useAuth } from "../auth/AuthContext";
 import { Body, Muted } from "../components/Text";
 import { api } from "../lib/api";
 import { isGuestUser } from "../live";
-import { navigateToNotification, navigationRef } from "../navigation/rootNavigation";
+import { navigateToNotification, navigationRef, openDetail } from "../navigation/rootNavigation";
 import { POPUP_AUTO_HIDE_MS, mergePopup, popupBody, popupTitle, suppressedByOpenChat, type PopupState } from "../lib/popups";
 import { announceAchievementUnlocked } from "../lib/achievements";
 
@@ -165,7 +165,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const openPopup = useCallback((state: PopupState) => {
     setPopup(null);
     if (state.items.length > 1) {
-      if (navigationRef.isReady()) navigationRef.navigate("More", { screen: "Notifications", initial: false });
+      // Mehrere auf einmal: die Liste der Glocke (#1145) über dem Tab, in dem man gerade ist.
+      openDetail("Notifications");
       return;
     }
     if (state.items[0]) void openNotification(state.items[0]);
@@ -263,6 +264,11 @@ export function useNotifications() {
   const context = useContext(NotificationContext);
   if (!context) throw new Error("useNotifications must be used inside NotificationProvider");
   return context;
+}
+
+/** Wie useNotifications, aber ohne Provider (Gast in Tests einzelner Screens) einfach null - für die Glocke im Kopf. */
+export function useOptionalNotifications() {
+  return useContext(NotificationContext);
 }
 
 const styles = StyleSheet.create({

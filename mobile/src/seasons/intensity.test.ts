@@ -10,10 +10,13 @@ test("Klassen: Dashboard und News lebendig, Details mittel, Turniere und Formula
   expect(screenClass("NewsDetail")).toBe("medium");
   expect(screenClass("EventDetail")).toBe("medium");
   expect(screenClass("Teams")).toBe("medium");
-  expect(screenClass("MoreHub")).toBe("medium");
+  expect(screenClass("VereinHub")).toBe("medium");
+  expect(screenClass("CommunityHub")).toBe("medium");
   expect(screenClass("TournamentDetail")).toBe("calm");
   expect(screenClass("MatchDetail")).toBe("calm");
-  expect(screenClass("FastLapList")).toBe("calm");
+  expect(screenClass("FastLapDetail")).toBe("calm");
+  expect(screenClass("Search")).toBe("calm");
+  expect(screenClass("MyPrizes")).toBe("calm");
   expect(screenClass("Login")).toBe("calm");
   expect(screenClass("Profile")).toBe("calm");
   expect(screenClass("DirectThread")).toBe("calm");

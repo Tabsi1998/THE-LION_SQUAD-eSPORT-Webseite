@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { navigationRef } from "../navigation/rootNavigation";
+import { openDetail } from "../navigation/rootNavigation";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Defs, Ellipse, LinearGradient, Path, RadialGradient, Stop, Text as SvgText } from "react-native-svg";
 import { useSeason, type ActiveSeason } from "../seasons/SeasonProvider";
@@ -67,14 +67,14 @@ export function DoorGlyph({ door, size = 40, waiting = false }: { door: number; 
 }
 
 /**
- * Das Türchen klein im Dashboard-Kopf unter dem Kranz (#852): ein Tipp öffnet den Kalender - unter ihm liegt „Mehr“, der
- * Pfeil zurück führt dorthin (wie der Hinweis). Nur mit angelegten Türchen.
+ * Das Türchen klein im Dashboard-Kopf unter dem Kranz (#852): ein Tipp öffnet den Kalender über dem Tab, in dem man ist
+ * (#1144) - der Pfeil zurück führt dorthin (wie der Hinweis). Nur mit angelegten Türchen.
  */
 export function AdventCalendarWidget({ season }: { season: ActiveSeason; screen: string }) {
   const entry = calendarEntry(season);
   if (!entry) return null;
   const open = () => {
-    if (navigationRef.isReady()) navigationRef.navigate("More", { screen: "AdventCalendar", initial: false } as never);
+    openDetail("AdventCalendar");
   };
   return (
     <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={entry.label} hitSlop={6} style={({ pressed }) => [styles.widget, pressed && styles.pressed]} testID="advent-calendar-widget">

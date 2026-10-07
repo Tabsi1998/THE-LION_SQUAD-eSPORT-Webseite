@@ -1,6 +1,7 @@
 const { test, expect } = require("@playwright/test");
 
-// Saison-Fundstücke im Profil (#678): die Karte steht im Reiter „Achievements“, die laufende Saison zuerst und über
+// Saison-Fundstücke im Profil (#678): die Karte steht im Reiter „Erfolge“ des eigenen Profils (seit #1149 unter /u/me;
+// /profile?tab=achievements leitet dorthin), die laufende Saison zuerst und über
 // die ganze Breite, die anderen darunter; nichts ist abgeschnitten, nichts läuft über den Rand - am PC wie am Handy.
 // Konto und API sind Attrappen im Browser.
 
@@ -36,6 +37,7 @@ async function mockProfile(page) {
     const pathname = new URL(route.request().url()).pathname;
     const json = (body) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
     if (pathname.endsWith("/api/auth/me")) return json(USER);
+    if (pathname.endsWith("/api/users/public/anna")) return json({ id: "u-anna", username: "anna", display_name: "Anna Beispiel", privacy_public_profile: true, stats: {}, teams: [], awards: [], honours: [], references: { items: [], stats: {} } });
     if (pathname.endsWith("/achievements/collectibles")) return json(FINDS);
     if (pathname.endsWith("/achievements/me")) return json({ groups: [], pinned: [], pinned_codes: [], awards: [], next_up: [], level: { level: 4, title: "Rudelmitglied", xp: 320, next_xp: 500, prestige: 0 } });
     if (pathname.includes("/seasonal/active")) return json({ now: "2026-06-01T12:00:00+02:00", enabled: false, preview: false, weather: null, seasons: [] });

@@ -1,9 +1,9 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
-import { TeamsScreen } from "./TeamsScreen";
+import { TeamsSection } from "./TeamsScreen";
 
 // Teamliste: eigene Teams mit Chat-Knopf, weitere Teams darunter, Squads nur
-// wenn es welche gibt (#215).
+// wenn es welche gibt (#215). Seit #1143 der Bereich „Teams“ im Tab Community.
 
 const mockGet = jest.fn();
 jest.mock("../../lib/api", () => ({
@@ -15,7 +15,6 @@ jest.mock("../../components/MediaImage", () => ({ MediaImage: () => null }));
 
 const navigate = jest.fn();
 const navigation = { navigate } as never;
-const route = { key: "teams", name: "TeamList" } as never;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -32,7 +31,7 @@ test("eigene Teams mit Chat, weitere darunter, keine Squads bei 0", async () => 
   const other = { id: "t2", name: "Andere", member_count: 3, squad_count: 2 };
   mockGet.mockImplementation((path: string) => answer(path, [lions], [lions, other]));
 
-  await render(<TeamsScreen navigation={navigation} route={route} />);
+  await render(<TeamsSection navigation={navigation} />);
 
   await waitFor(() => expect(screen.getByText("Meine Teams")).toBeTruthy());
   expect(screen.getByText("Weitere Teams")).toBeTruthy();
@@ -53,7 +52,7 @@ test("eigene Teams mit Chat, weitere darunter, keine Squads bei 0", async () => 
 test("ohne Teams erklärt die Seite, wie man in ein Team kommt", async () => {
   mockGet.mockImplementation((path: string) => answer(path, [], []));
 
-  await render(<TeamsScreen navigation={navigation} route={route} />);
+  await render(<TeamsSection navigation={navigation} />);
 
   await waitFor(() => expect(screen.getByText("Noch kein Team")).toBeTruthy());
   expect(screen.getByText(/Einladung oder einen Join-Code/)).toBeTruthy();

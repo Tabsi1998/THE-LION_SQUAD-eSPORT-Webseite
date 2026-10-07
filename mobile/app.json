@@ -186,6 +186,26 @@
             },
             {
               "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/verein"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/community"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/messages"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/messages/"
+            },
+            {
+              "scheme": "https",
               "host": "www.lionsquad.at",
               "path": "/tournaments"
             },
@@ -328,6 +348,26 @@
               "scheme": "https",
               "host": "www.lionsquad.at",
               "path": "/account/invoices"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/verein"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/community"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/messages"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/messages/"
             }
           ],
           "category": [

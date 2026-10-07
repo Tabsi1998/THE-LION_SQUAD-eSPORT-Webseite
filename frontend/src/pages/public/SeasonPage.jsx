@@ -161,7 +161,7 @@ export default function SeasonPage() {
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm min-w-[900px]">
               <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
-                <tr><th className="text-left px-4 py-3 w-14">#</th><th className="text-left px-4 py-3">Teilnehmer</th><th className="text-left px-4 py-3">Quellen</th><th className="text-right px-4 py-3">Wertungen</th><th className="text-right px-4 py-3">Achievements</th><th className="text-right px-4 py-3">Siege</th><th className="text-right px-4 py-3 font-display">Jahrespunkte</th></tr>
+                <tr><th className="text-left px-4 py-3 w-14">#</th><th className="text-left px-4 py-3">Teilnehmer</th><th className="text-left px-4 py-3">Quellen</th><th className="text-right px-4 py-3">Wertungen</th><th className="text-right px-4 py-3">Erfolge</th><th className="text-right px-4 py-3">Siege</th><th className="text-right px-4 py-3 font-display">Jahrespunkte</th></tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {standings.map((r)=>(

@@ -9,10 +9,13 @@ import { Search, Crown } from "lucide-react";
 import { AccountLevelPill, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 import { LevelAvatarFrame, useCrowns } from "@/components/tls/LevelAvatarFrame";
 import { SkeletonList } from "@/components/tls/Skeleton";
+import { FriendsPanel } from "@/pages/user/profile/FriendsPanel";
+import { useAuth } from "@/context/AuthContext";
 
 const PAGE_SIZE = 48;
 
 export default function PlayersPage() {
+  const { user } = useAuth();
   const [list, setList] = useState([]);
   const [members, setMembers] = useState([]);
   const [q, setQ] = useState("");
@@ -63,6 +66,13 @@ export default function PlayersPage() {
         <p className="mt-3 text-white/60 max-w-2xl">
           Alle Spieler der TLS Community. Klick auf ein Profil, um Statistiken, Auszeichnungen und Spiel-Historie zu sehen.
         </p>
+        {/* Spieler und Freunde (#1143): wie in der App unter Community - deine Freunde und offenen Anfragen zuerst. */}
+        {user ? (
+          <div className="mt-8" data-testid="players-friends">
+            <h2 className="font-heading text-2xl font-black uppercase mb-3">Deine Freunde</h2>
+            <FriendsPanel />
+          </div>
+        ) : null}
 
         <div className="mt-8 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
           <div className="flex gap-2">
@@ -132,7 +142,7 @@ export default function PlayersPage() {
                       </div>
                     )}
                     <div className="mt-2 flex items-center justify-between gap-2 text-[10px] uppercase tracking-widest text-white/35">
-                      <span>{p.achievements_count || 0} Achievements</span>
+                      <span>{p.achievements_count || 0} Erfolge</span>
                       {p.achievement_level && <AccountLevelPill level={p.achievement_level.level} className="px-1.5 py-0 text-[9px]" />}
                     </div>
                   </Link>

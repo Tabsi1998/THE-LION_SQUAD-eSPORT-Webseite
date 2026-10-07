@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, View } from "react-native";
 import { AwardCard } from "../../components/AwardCard";
 import { Card } from "../../components/Card";
 import { HonourList, type Honour } from "../../components/Honours";
@@ -22,14 +22,15 @@ import { api, errorMessage } from "../../lib/api";
 import { sortAwards, type Award } from "../../lib/awards";
 import { formatDate, formatStatus } from "../../lib/format";
 import { blockUser, listBlocked, unblockUser } from "../../lib/moderation";
-import type { MoreStackParamList } from "../../navigation/types";
+import type { AppStackParamList, ProfileTabKey } from "../../navigation/types";
+import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { colors } from "../../theme";
-import type { LiveStream } from "../../types";
+import type { LiveStream, PersonalReferenceItem } from "../../types";
+import { ReferenceCard } from "./profile/parts";
 
-type Props = NativeStackScreenProps<MoreStackParamList, "PublicProfile">;
-type TabKey = "overview" | "achievements" | "tournaments" | "fastlaps" | "teams";
+type Props = NativeStackScreenProps<AppStackParamList, "PublicProfile">;
 
-type PublicProfilePayload = {
+export type PublicProfilePayload = {
   id: string;
   username: string;
   display_name?: string | null;
@@ -100,20 +101,54 @@ type PublicProfilePayload = {
   tournaments?: any[];
   f1_bests?: any[];
   teams?: any[];
+  // Referenzen (#1149): dieselbe Liste wie im eigenen Profil - Turniere, Fast Laps, Jahreswertung.
+  references?: { items?: PersonalReferenceItem[]; stats?: Record<string, number> } | null;
+  privacy_public_profile?: boolean;
 };
 
 // Erfolge II (#619): Vergaben, Gruppen, die Angehefteten, die gefundenen Geheimen - oder „privat“.
 type AchievementPayload = PublicAchievementData;
 
-const tabs: Array<{ key: TabKey; label: string }> = [
-  { key: "overview", label: "Übersicht" },
-  { key: "achievements", label: "Erfolge" },
-  { key: "tournaments", label: "Turniere" },
-  { key: "fastlaps", label: "Fast Laps" },
-  { key: "teams", label: "Teams" },
-];
+/** Die Reiter (#1149): eigenes und fremdes Profil haben dieselben, in derselben Reihenfolge - Mitglieder zusätzlich
+ * „Ehrungen“. Referenzen (Turniere, Fast Laps, Jahreswertung) und Auszeichnungen (Banner, Trophäen) bleiben getrennt. */
+export function profileTabs(member: boolean): Array<{ key: ProfileTabKey; label: string }> {
+  return [
+    { key: "overview", label: "Übersicht" },
+    { key: "achievements", label: "Erfolge" },
+    { key: "awards", label: "Auszeichnungen" },
+    { key: "references", label: "Referenzen" },
+    { key: "teams", label: "Teams" },
+    ...(member ? [{ key: "honours" as const, label: "Ehrungen" }] : []),
+  ];
+}
+
+/** Was nur das eigene Profil zeigt (#1149) - ohne „So sehen dich andere“. */
+export type OwnProfileParts = {
+  /** Kasten „Nur für dich“ oben in der Übersicht. */
+  privateBox: React.ReactNode;
+  achievements: React.ReactNode;
+  awards: React.ReactNode;
+  references: React.ReactNode;
+  teams: React.ReactNode;
+  honours: React.ReactNode;
+  /** Ohne öffentliches Profil (privat): Kopf aus dem eigenen Konto. */
+  fallback: PublicProfilePayload;
+  refresh: () => Promise<void> | void;
+  initialTab?: ProfileTabKey;
+};
+
+type Nav = { navigate: (screen: never, params?: never) => void };
 
 export function PublicProfileScreen({ navigation, route }: Props) {
+  return <ProfileView username={route.params.username} navigation={navigation as unknown as Nav} />;
+}
+
+/**
+ * Ein Aufbau für jedes Profil (#1149): Kopf mit Bild, Level und Zahlenleiste, darunter die Reiter. Mit `own` ist es das
+ * eigene Profil: Schalter „So sehen dich andere“, Kasten „Nur für dich“, eigene Erfolge, Auszeichnungen (als Banner
+ * wählbar), Referenzen und Teams. Mit dem Schalter zeigt es genau, was die Privatsphäre allen zeigt.
+ */
+export function ProfileView({ username, navigation, own, header, scrollRef }: { username: string; navigation: Nav; own?: OwnProfileParts; header?: React.ReactNode; scrollRef?: React.RefObject<ScrollView | null> }) {
   const { user: me } = useAuth();
   const [profile, setProfile] = useState<PublicProfilePayload | null>(null);
   // Melden und Blockieren (#414): der Blockier-Stand kommt aus der eigenen Liste, nicht aus dem Profil.
@@ -121,15 +156,21 @@ export function PublicProfileScreen({ navigation, route }: Props) {
   const [report, setReport] = useState<(Omit<ReportDraft, "category" | "details"> & { targetName?: string }) | null>(null);
   const [achievements, setAchievements] = useState<AchievementPayload>({ awards: [], groups: [] });
   const [liveStreams, setLiveStreams] = useState<LiveStream[]>([]);
-  const [tab, setTab] = useState<TabKey>("overview");
+  const [tab, setTab] = useState<ProfileTabKey>(own?.initialTab || "overview");
+  const [asOthers, setAsOthers] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const ownMode = Boolean(own) && !asOthers;
+
+  useEffect(() => {
+    if (own?.initialTab) setTab(own.initialTab);
+  }, [own?.initialTab]);
 
   const load = useCallback(async () => {
     setError("");
     try {
-      const { data } = await api.get<PublicProfilePayload>(`/users/public/${route.params.username}`);
+      const { data } = await api.get<PublicProfilePayload>(`/users/public/${username}`, asOthers ? { params: { view_as: "public" } } : undefined);
       setProfile(data || null);
       if (data?.id && me?.id && data.id !== me.id) {
         listBlocked().then((entries) => setBlockedByMe(entries.some((entry) => (entry.blocked_id || entry.user?.id) === data.id))).catch(() => setBlockedByMe(false));
@@ -148,7 +189,7 @@ export function PublicProfileScreen({ navigation, route }: Props) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [me?.id, route.params.username]);
+  }, [asOthers, me?.id, username]);
 
   // Melden und Blockieren (#414) über „Mehr“ neben Nachricht und Freund.
   const toggleBlock = useCallback(() => {
@@ -167,7 +208,7 @@ export function PublicProfileScreen({ navigation, route }: Props) {
       void run();
       return;
     }
-    Alert.alert("Benutzer blockieren?", "Direktnachrichten und Freundschaftsanfragen werden in beide Richtungen unterbunden. Du kannst das unter Profil → Privatsphäre wieder aufheben.", [
+    Alert.alert("Benutzer blockieren?", "Direktnachrichten und Freundschaftsanfragen werden in beide Richtungen unterbunden. Du kannst das unter Einstellungen → Privatsphäre wieder aufheben.", [
       { text: "Abbrechen", style: "cancel" },
       { text: "Blockieren", style: "destructive", onPress: () => { void run(); } },
     ]);
@@ -184,86 +225,138 @@ export function PublicProfileScreen({ navigation, route }: Props) {
   }, [blockedByMe, profile?.display_name, profile?.id, profile?.username, toggleBlock]);
 
   useEffect(() => {
-    load();
+    setLoading(true);
+    void load();
   }, [load]);
 
+  // Ohne öffentliches Profil (privat) zeigt das eigene Profil den Kopf aus dem Konto - die Inhalte kommen ohnehin von dort.
+  const shown = profile || (ownMode ? own?.fallback || null : null);
   // Konten einmal sauber (#527): ein Kasten mit Socials und Spielkonten, jedes Konto genau einmal.
-  const accounts = useMemo(() => accountGroups(profile), [profile]);
+  const accounts = useMemo(() => accountGroups(shown), [shown]);
   const liveStream = useMemo(() => {
-    const twitch = cleanHandle(profile?.twitch_handle).toLowerCase();
-    if (!profile || !twitch) return null;
+    const twitch = cleanHandle(shown?.twitch_handle).toLowerCase();
+    if (!shown || !twitch) return null;
     return liveStreams.find((stream) => (
       cleanHandle(stream.twitch_login).toLowerCase() === twitch ||
-      stream.user_id === profile.id ||
-      stream.username === profile.username
+      stream.user_id === shown.id ||
+      stream.username === shown.username
     )) || null;
-  }, [liveStreams, profile]);
-  const stats = profile?.stats || {};
-  const display = profile?.display_name || profile?.username || "Spieler";
+  }, [liveStreams, shown]);
+  const stats = shown?.stats || {};
+  const display = shown?.display_name || shown?.username || "Spieler";
+  const member = Boolean(shown?.is_club_member);
+  const tabs = profileTabs(member);
+  const activeTab = tabs.some((item) => item.key === tab) ? tab : "overview";
+  const refresh = () => {
+    setRefreshing(true);
+    void load();
+    if (own) void own.refresh();
+  };
 
-  if (loading) {
+  // Auszeichnung antippen (#230): zum Turnier - über dem Tab, in dem man ist (#1144).
+  const openAward = (award: Award) => {
+    const target = award.tournament?.slug || award.tournament?.id;
+    if (target) navigation.navigate("TournamentDetail" as never, { id: target } as never);
+  };
+  const openReference = (item: PersonalReferenceItem) => {
+    if (!item.target_id) return;
+    if (item.kind === "fastlap") navigation.navigate("FastLapDetail" as never, { id: item.target_id } as never);
+    else if (item.kind === "season") navigation.navigate("SeasonPass" as never);
+    else navigation.navigate("TournamentDetail" as never, { id: item.target_id } as never);
+  };
+
+  const ownSwitch = own ? (
+    <View style={styles.asOthers} testID="profile-as-others">
+      <View style={styles.flex}>
+        <Body style={styles.strong}>So sehen dich andere</Body>
+        <Muted>{asOthers ? "Nur, was deine Privatsphäre allen zeigt – ohne Anmeldung." : "Aus: du siehst alles, auch „Nur für dich“."}</Muted>
+      </View>
+      <Switch
+        value={asOthers}
+        onValueChange={setAsOthers}
+        accessibilityLabel="So sehen dich andere"
+        trackColor={{ false: "rgba(255,255,255,0.16)", true: "rgba(41,182,232,0.45)" }}
+        thumbColor={asOthers ? colors.cyan : colors.muted}
+        testID="profile-as-others-switch"
+      />
+    </View>
+  ) : null;
+
+  if (loading && !shown) {
     return (
       <Screen>
+        {header}
         <SkeletonList count={4} hasImage={false} />
       </Screen>
     );
   }
 
-  if (!profile) {
+  if (!shown) {
     return (
-      <Screen>
-        <ErrorState title="Profil nicht sichtbar" detail={error || "Dieses Profil ist privat oder wurde entfernt."} />
+      <Screen padded={false}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.cyan} />}>
+          {header}
+          {ownSwitch}
+          {own ? (
+            <EmptyState icon="lock-closed-outline" title="Dein Profil ist privat" detail="Andere sehen dein Profil nicht. Öffentlich stellst du es in den Einstellungen unter Privatsphäre." />
+          ) : (
+            <ErrorState title="Profil nicht sichtbar" detail={error || "Dieses Profil ist privat oder wurde entfernt."} />
+          )}
+        </ScrollView>
       </Screen>
     );
   }
 
-  // Auszeichnung antippen (#230): zum Turnier.
-  const openAward = (award: Award) => {
-    const target = award.tournament?.slug || award.tournament?.id;
-    if (target) navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: target }, initial: false });
-  };
+  const references = Array.isArray(shown.references?.items) ? shown.references?.items || [] : [];
 
   return (
     <Screen padded={false}>
       <ScrollView
+        ref={scrollRef}
+        {...(own ? seasonScrollProps("Profile") : {})}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.cyan} />}
+        testID={own ? "own-profile" : "public-profile"}
       >
-        {profile.featured_award ? (
+        {header}
+        {shown.featured_award ? (
           <View style={styles.featured} testID="profile-featured-award">
-            <AwardCard award={profile.featured_award} featured onPress={() => openAward(profile.featured_award as Award)} />
+            <AwardCard award={shown.featured_award} featured onPress={() => openAward(shown.featured_award as Award)} />
           </View>
         ) : null}
         <View style={styles.hero}>
           <MediaImage
-            uri={profile.banner_url}
+            uri={shown.banner_url}
             style={styles.banner}
             fallback={<Ionicons name="person-circle-outline" color={colors.cyan} size={52} />}
           />
           <View style={styles.heroShade} />
           <View style={styles.identityCard}>
-            <MediaImage
-              uri={profile.avatar_url}
-              style={styles.avatar}
-              fallback={<Body style={styles.avatarText}>{display.slice(0, 1).toUpperCase()}</Body>}
-            />
+            <View style={styles.levelRing} testID="profile-level-ring">
+              <MediaImage
+                uri={shown.avatar_url}
+                style={styles.avatar}
+                fallback={<Body style={styles.avatarText}>{display.slice(0, 1).toUpperCase()}</Body>}
+              />
+              <View style={styles.levelChip}><Body style={styles.levelChipText}>LVL {shown.achievement_level?.level || stats.level || 1}</Body></View>
+            </View>
             <View style={styles.identityText}>
-              <Muted>@{profile.username}</Muted>
+              <Muted>@{shown.username}{shown.created_at ? ` · dabei seit ${formatDate(shown.created_at)}` : ""}</Muted>
               <Title>{display}</Title>
               <View style={styles.wrap}>
-                <Pill label={profile.is_club_member ? "Vereinsmitglied" : "Community"} tone={profile.is_club_member ? "success" : "cyan"} />
-                <Pill label={`${profile.achievement_level?.title || `Level ${profile.achievement_level?.level || stats.level || 1}`}${Number(profile.achievement_level?.prestige || 0) > 0 ? ` ${prestigeStars(profile.achievement_level?.prestige)}` : ""}`} tone="gold" />
-                {profile.role && profile.role !== "player" ? <Pill label={formatStatus(profile.role)} /> : null}
+                <Pill label={member ? "Vereinsmitglied" : "Community"} tone={member ? "success" : "cyan"} />
+                <Pill label={`${shown.achievement_level?.title || `Level ${shown.achievement_level?.level || stats.level || 1}`}${Number(shown.achievement_level?.prestige || 0) > 0 ? ` ${prestigeStars(shown.achievement_level?.prestige)}` : ""}`} tone="gold" />
+                {shown.role && shown.role !== "player" ? <Pill label={formatStatus(shown.role)} /> : null}
               </View>
-              {profile.can_message ? (
-                <Pressable onPress={() => navigation.navigate("DirectThread", { userId: profile.id, title: display })} style={({ pressed }) => [styles.messageButton, pressed && styles.pressed]}>
+              {!own && shown.can_message ? (
+                <Pressable onPress={() => navigation.navigate("DirectThread" as never, { userId: shown.id, title: display } as never)} style={({ pressed }) => [styles.messageButton, pressed && styles.pressed]}>
                   <Ionicons name="chatbubble-ellipses-outline" color={colors.black} size={16} />
                   <Body style={styles.messageButtonText}>Nachricht</Body>
                 </Pressable>
               ) : null}
               {/* Freund hinzufügen (#240): der Zustand kommt aus der Profil-Antwort und wird live nachgeladen. */}
-              {profile.relationship && profile.relationship.status !== "self" ? <FriendButton userId={profile.id} initial={profile.relationship} /> : null}
-              {me?.id && profile.id !== me.id ? (
+              {!own && shown.relationship && shown.relationship.status !== "self" ? <FriendButton userId={shown.id} initial={shown.relationship} /> : null}
+              {!own && me?.id && shown.id !== me.id ? (
                 <Pressable onPress={openMoreMenu} accessibilityRole="button" accessibilityLabel="Melden oder blockieren" style={({ pressed }) => [styles.moreButton, pressed && styles.pressed]} testID="profile-more">
                   <Ionicons name="ellipsis-horizontal" color={colors.cyan} size={16} />
                   <Muted style={styles.moreButtonText}>{blockedByMe ? "Blockiert" : "Mehr"}</Muted>
@@ -274,75 +367,93 @@ export function PublicProfileScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        <SegmentedTabs items={tabs} value={tab} onChange={setTab} />
+        {/* Die Zahlenleiste (#1149): dieselben Zahlen im eigenen und im fremden Profil. */}
+        <View style={styles.statBar} testID="profile-stats">
+          <BarStat label="Punkte" value={Number(stats.points ?? shown.achievement_level?.points ?? 0).toLocaleString("de-DE")} tone="gold" />
+          <BarStat label="Siege" value={stats.wins ?? 0} />
+          <BarStat label="Podium" value={stats.top3 ?? 0} />
+          <BarStat label="Turniere" value={stats.tournaments ?? shown.tournaments?.length ?? 0} />
+          <BarStat label="Fast Laps" value={stats.fast_laps ?? shown.f1_bests?.length ?? 0} />
+        </View>
 
-        {tab === "overview" ? (
+        {ownSwitch}
+
+        <SegmentedTabs items={tabs} value={activeTab} onChange={setTab} />
+
+        {activeTab === "overview" ? (
           <>
+            {ownMode ? own?.privateBox : null}
             <Card style={styles.card}>
               <Heading>Spielerprofil</Heading>
-              {profile.bio ? <Body>{profile.bio}</Body> : <Muted>Keine Bio freigegeben.</Muted>}
-              <View style={styles.statGrid}>
-                <Stat label="Punkte" value={stats.points ?? profile.achievement_level?.points ?? 0} tone="gold" />
-                <Stat label="Erfolge" value={achievements.awards?.length ?? profile.badges?.length ?? 0} />
-                <Stat label="Turniere" value={stats.tournaments ?? profile.tournaments?.length ?? 0} />
-                <Stat label="Siege" value={stats.wins ?? 0} tone="gold" />
-                <Stat label="Podien" value={stats.top3 ?? 0} />
-                <Stat label="Fast Laps" value={stats.fast_laps ?? profile.f1_bests?.length ?? 0} />
-              </View>
+              {shown.bio ? <Body>{shown.bio}</Body> : <Muted>Keine Bio freigegeben.</Muted>}
             </Card>
 
             {/* Angeheftete Erfolge (#619) zuerst, wie im Web - „Alle ansehen“ führt in den Reiter. */}
             {!achievements.achievements_hidden ? <PinnedAwardsCard pinned={achievements.pinned || []} onShowAll={() => setTab("achievements")} /> : null}
 
-            {(profile.awards || []).length ? (
-              <Card style={styles.card} testID="public-profile-awards">
-                <Heading>Auszeichnungen</Heading>
-                {sortAwards(profile.awards).slice(0, 6).map((award) => <AwardCard key={award.id} award={award} onPress={() => openAward(award)} />)}
-              </Card>
-            ) : null}
-
-            {(profile.honours || []).length ? (
-              <Card style={styles.card} testID="public-profile-honours">
-                <Heading>Ehrungen</Heading>
-                <HonourList honours={profile.honours || []} />
-              </Card>
-            ) : null}
-
             {/* Saison-Fundstücke (#678): nur mit dem Schalter der Person - und nur die Summen. */}
-            <PublicSeasonFindsCard userId={profile.id} own={me?.id === profile.id} />
+            <PublicSeasonFindsCard userId={shown.id} own={ownMode} />
 
             <InfoGrid
               title="Öffentliche Infos"
               rows={[
-                ["Mitglied seit", formatDate(profile.created_at)],
-                ["Geburtstag", profile.birth_date ? formatDate(profile.birth_date) : ""],
-                ["Ort", [profile.city, profile.country].filter(Boolean).join(", ")],
-                ["Mitgliedschaft", membershipLabel(profile)],
+                ["Mitglied seit", formatDate(shown.created_at)],
+                ["Geburtstag", shown.birth_date ? formatDate(shown.birth_date) : ""],
+                ["Ort", [shown.city, shown.country].filter(Boolean).join(", ")],
+                ["Mitgliedschaft", membershipLabel(shown)],
               ]}
             />
 
             <InfoGrid
               title="Gaming Setup"
               rows={[
-                ["Lieblingsspiele", (profile.favorite_games || []).join(", ")],
-                ["Plattformen", listValue(profile.main_platforms?.length ? profile.main_platforms : profile.main_platform)],
-                ["Eingabe", listValue(profile.input_devices)],
-                ["Abos", listValue(profile.gaming_subscriptions)],
+                ["Lieblingsspiele", (shown.favorite_games || []).join(", ")],
+                ["Plattformen", listValue(shown.main_platforms?.length ? shown.main_platforms : shown.main_platform)],
+                ["Eingabe", listValue(shown.input_devices)],
+                ["Abos", listValue(shown.gaming_subscriptions)],
               ]}
             />
 
-            {profile.show_twitch_embed && profile.twitch_handle ? (
-              <ProfileStreamCard profile={profile} stream={liveStream} />
+            {shown.show_twitch_embed && shown.twitch_handle ? (
+              <ProfileStreamCard profile={shown} stream={liveStream} />
             ) : null}
 
             <AccountsCard groups={accounts} />
           </>
         ) : null}
 
-        {tab === "achievements" ? <PublicAchievementsTab data={achievements} displayName={display} /> : null}
-        {tab === "tournaments" ? <TournamentTab items={profile.tournaments || []} onOpen={(item) => navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: item.slug || item.id }, initial: false })} /> : null}
-        {tab === "fastlaps" ? <FastLapTab items={profile.f1_bests || []} onOpen={(item) => navigation.getParent()?.navigate("Tournaments", { screen: "FastLapDetail", params: { id: item.challenge?.slug || item.challenge?.id }, initial: false })} /> : null}
-        {tab === "teams" ? <TeamTab items={profile.teams || []} onOpen={(item) => navigation.getParent()?.navigate("Teams", { screen: "TeamDetail", params: { id: item.id }, initial: false })} /> : null}
+        {activeTab === "achievements" ? (ownMode ? own?.achievements : <PublicAchievementsTab data={achievements} displayName={display} />) : null}
+
+        {activeTab === "awards" ? (ownMode ? own?.awards : (
+          (shown.awards || []).length ? (
+            <View style={styles.list} testID="public-profile-awards">
+              {sortAwards(shown.awards).map((award) => <AwardCard key={award.id} award={award} onPress={() => openAward(award)} />)}
+            </View>
+          ) : <EmptyState icon="medal-outline" title="Noch keine Auszeichnungen" detail="Auszeichnungen kommen aus öffentlichen Turnieren des Vereins." />
+        )) : null}
+
+        {activeTab === "references" ? (ownMode ? own?.references : (
+          references.length ? (
+            <View style={styles.list} testID="public-profile-references">
+              {references.map((item) => <ReferenceCard key={item.id} item={item} onOpen={openReference} />)}
+            </View>
+          ) : (shown.tournaments || []).length || (shown.f1_bests || []).length ? (
+            <>
+              <TournamentTab items={shown.tournaments || []} onOpen={(item) => navigation.navigate("TournamentDetail" as never, { id: item.slug || item.id } as never)} />
+              {(shown.f1_bests || []).length ? <FastLapTab items={shown.f1_bests || []} onOpen={(item) => navigation.navigate("FastLapDetail" as never, { id: item.challenge?.slug || item.challenge?.id } as never)} /> : null}
+            </>
+          ) : <EmptyState icon="ribbon-outline" title="Noch keine Referenzen" detail="Turniere und Fast-Lap-Zeiten erscheinen hier, sobald sie öffentlich sind." />
+        )) : null}
+
+        {activeTab === "teams" ? (ownMode ? own?.teams : <TeamTab items={shown.teams || []} onOpen={(item) => navigation.navigate("TeamDetail" as never, { id: item.id } as never)} />) : null}
+
+        {activeTab === "honours" ? (ownMode ? own?.honours : (
+          (shown.honours || []).length ? (
+            <Card style={styles.card} testID="public-profile-honours">
+              <HonourList honours={shown.honours || []} />
+            </Card>
+          ) : <EmptyState icon="ribbon-outline" title="Keine Ehrungen freigegeben" detail="Ehrungen aus der Mitgliederakte stehen hier, wenn der Verein sie freigibt und die Person sie zeigt." tone="gold" />
+        )) : null}
       </ScrollView>
     </Screen>
   );
@@ -472,6 +583,16 @@ function Stat({ label, value, tone = "cyan" }: { label: string; value: unknown; 
   );
 }
 
+/** Eine Zahl der Zahlenleiste im Profilkopf (#1149). */
+function BarStat({ label, value, tone }: { label: string; value: unknown; tone?: "gold" }) {
+  return (
+    <View style={styles.barStat}>
+      <Body style={[styles.barValue, tone === "gold" && styles.gold]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{String(value ?? 0)}</Body>
+      <Muted style={styles.barLabel} numberOfLines={1}>{label}</Muted>
+    </View>
+  );
+}
+
 function Rank({ rank }: { rank?: number | null }) {
   return (
     <View style={styles.rank}>
@@ -522,6 +643,49 @@ function membershipLabel(profile: PublicProfilePayload) {
 }
 
 const styles = StyleSheet.create({
+  asOthers: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  levelRing: {
+    alignItems: "center",
+    borderColor: colors.gold,
+    borderRadius: 44,
+    borderWidth: 3,
+    height: 82,
+    justifyContent: "center",
+    width: 82,
+  },
+  levelChip: {
+    backgroundColor: colors.gold,
+    borderRadius: 4,
+    bottom: -9,
+    paddingHorizontal: 6,
+    position: "absolute",
+  },
+  levelChipText: {
+    color: colors.black,
+    fontSize: 10,
+    fontWeight: "900",
+    lineHeight: 15,
+  },
+  statBar: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+  },
   content: {
     gap: 14,
     padding: 18,
@@ -558,11 +722,25 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   avatar: {
-    borderColor: colors.cyan,
-    borderRadius: 12,
-    borderWidth: 2,
-    height: 74,
-    width: 74,
+    borderRadius: 35,
+    height: 70,
+    overflow: "hidden",
+    width: 70,
+  },
+  barStat: {
+    alignItems: "center",
+    flex: 1,
+    gap: 1,
+  },
+  barValue: {
+    color: colors.white,
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  barLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
   avatarText: {
     color: colors.cyan,

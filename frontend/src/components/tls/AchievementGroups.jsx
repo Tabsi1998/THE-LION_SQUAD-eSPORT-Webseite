@@ -153,7 +153,7 @@ export function applyTierFilters(groups, filters) {
 
 export function AchievementGroupsView({
   groups = [],
-  emptyText = "Noch keine Achievements freigeschaltet.",
+  emptyText = "Noch keine Erfolge freigeschaltet.",
   earnedOnly = false,
   rarity = null,
   sortBy = "category",

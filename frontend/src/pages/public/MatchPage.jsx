@@ -12,6 +12,7 @@ import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useChatRead } from "@/hooks/useChats";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { CommendButton } from "@/components/tls/CommendButton";
@@ -122,6 +123,8 @@ export default function MatchPage() {
     };
   }, [load]);
   useLiveRefresh(load, ["matches", "matches-v2", "tournaments"], { fallbackMs: 10000 });
+  // Match-Chat gelesen (#1148) - nur für die, die mitschreiben dürfen.
+  useChatRead("match", id, chat, Boolean(user && data?.can_act));
 
   const title = data?.tournament?.title ? `${data.matchday_label} - ${data.tournament.title}` : "Match";
   const description = data?.tournament?.title

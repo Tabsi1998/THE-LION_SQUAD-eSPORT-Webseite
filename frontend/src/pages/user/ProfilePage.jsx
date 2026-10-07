@@ -2,17 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameLabel } from "@/lib/gameLabels";
 import { buildDirtyPayload, hasPayloadChanges, sameValue } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Save, Crown } from "lucide-react";
-import { enqueueCeremony } from "@/components/achievements/ceremony/queue";
-import { describePackage } from "@/components/achievements/ceremony/select";
+import { Save, Crown, UserCircle } from "lucide-react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
-import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, TABS, notificationPreferenceKey } from "./profile/constants";
-import { achievementInsights, profileFormPayload, profileToForm } from "./profile/form";
+import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, TABS, notificationPreferenceKey, tabRedirect } from "./profile/constants";
+import { profileFormPayload, profileToForm } from "./profile/form";
 import { applyGroupLevel } from "./profile/visibility";
 import { useAutosave } from "./profile/useAutosave";
 import { ProfileNav } from "./profile/ProfileNav";
@@ -20,19 +17,17 @@ import { BasicTab } from "./profile/BasicTab";
 import { GamingTab } from "./profile/GamingTab";
 import { SocialsTab } from "./profile/SocialsTab";
 import { linkErrorText, linkedText } from "@/lib/platformLinks";
-import { AchievementsTab } from "./profile/AchievementsTab";
 import { PrivacyTab } from "./profile/PrivacyTab";
 import { NotificationsTab } from "./profile/NotificationsTab";
 import { SecurityTab } from "./profile/SecurityTab";
-import { TeamsPanel } from "./profile/TeamsPanel";
-import { FriendsPanel } from "./profile/FriendsPanel";
-import { InvoicesPanel } from "./profile/InvoicesPanel";
-import { HonoursPanel } from "./profile/HonoursPanel";
+import { AppearanceTab } from "./profile/AppearanceTab";
+import { AboutTab } from "./profile/AboutTab";
 
-// Das Profil: Rahmen, Formularzustand und Speichern. Jeder Reiter ist eine
-// eigene Datei unter ./profile - vorher standen 1.800 Zeilen in dieser einen
-// (#253, Regel aus #223). Am PC steht das Menü links und der Inhalt nutzt die
-// Breite; am Tablet und Handy bleibt die Reiterreihe oben.
+// Die Einstellungen (#1146): Rahmen, Formularzustand und Speichern. Jeder Reiter ist eine eigene Datei unter ./profile
+// (#253, Regel aus #223). Dieselben Gruppen in derselben Reihenfolge wie in der App - Darstellung, Benachrichtigungen,
+// Sicherheit, Privatsphäre, Konto, Über die App. Was keine Einstellung ist (Teams, Freunde, Erfolge, Ehrungen,
+// Rechnungen), hat seinen Ort woanders; alte Links leiten dorthin weiter. Am PC steht das Menü links und der Inhalt nutzt
+// die Breite; am Tablet und Handy bleibt die Reiterreihe oben.
 //
 // Reiter mit Textfeldern haben eine Speicherleiste; Privatsphäre und
 // Benachrichtigungen bestehen nur aus Schaltern und Auswahlfeldern und
@@ -44,19 +39,19 @@ const FORM_TABS = new Set(["basic", "gaming", "socials"]);
 const TAB_ALIASES = { sessions: "security" };
 
 export default function ProfilePage() {
-  const { user, refresh, isClubMember } = useAuth();
+  const { user, refresh, isClubMember, logout } = useAuth();
   const siteSettings = usePublicSiteSettings();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const requestedParam = params.get("tab") || "basic";
-  // Die Inbox ist seit #254 die eigene Seite /messages; alte Links aus Mails,
-  // Benachrichtigungen und der App landen dort, mit ?to= direkt im Gespräch.
-  const inboxTarget = requestedParam === "inbox" ? `/messages${params.get("to") ? `/${params.get("to")}` : ""}` : null;
+  // Alte Reiter, die keine Einstellungen sind (#1150): die Inbox ist /messages (mit ?to= direkt im Gespräch), Teams und
+  // Freunde stehen unter Community, Erfolge, Ehrungen und Rechnungen im eigenen Profil bzw. unter /account/invoices.
+  const redirectTarget = tabRedirect(requestedParam, params, user?.username);
   useEffect(() => {
-    if (inboxTarget) navigate(inboxTarget, { replace: true });
-  }, [inboxTarget, navigate]);
+    if (redirectTarget) navigate(redirectTarget, { replace: true });
+  }, [redirectTarget, navigate]);
   const requestedTab = TAB_ALIASES[requestedParam] || requestedParam;
-  const tab = TABS.some((item) => item.k === requestedTab && (!item.membersOnly || isClubMember)) ? requestedTab : "basic";
+  const tab = TABS.some((item) => item.k === requestedTab) ? requestedTab : "basic";
   // Der Reiter steht in der Adresse (?tab=…, wie in Mails und Benachrichtigungen
   // verlinkt) und wird als eigener Verlaufseintrag gesetzt, damit „Zurück“ zum
   // vorigen Reiter führt statt aus dem Profil hinaus.
@@ -67,27 +62,9 @@ export default function ProfilePage() {
   }, [params, setParams]);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
-  const [evaluatingAchievements, setEvaluatingAchievements] = useState(false);
-  const [achData, setAchData] = useState(null);
-  const [completeness, setCompleteness] = useState(null);
   const [games, setGames] = useState([]);
   const initialProfileFormRef = useRef(null);
   const initialProfileUserIdRef = useRef("");
-  // Zähler im Reiter „Freunde“ und Punkt bei offenen Anfragen (#259).
-  const [friendCounts, setFriendCounts] = useState({ friends: 0, incoming: 0 });
-  const loadFriendCounts = useCallback(async () => {
-    try {
-      const { data } = await api.get("/friends");
-      setFriendCounts({
-        friends: Array.isArray(data?.friends) ? data.friends.length : 0,
-        incoming: Array.isArray(data?.incoming) ? data.incoming.length : 0,
-      });
-    } catch {
-      setFriendCounts({ friends: 0, incoming: 0 });
-    }
-  }, []);
-  useEffect(() => { loadFriendCounts(); }, [loadFriendCounts]);
-  useApiInvalidation(loadFriendCounts, ["friends"]);
   const autosave = useAutosave({
     form,
     setForm,
@@ -95,31 +72,6 @@ export default function ProfilePage() {
     initialUserIdRef: initialProfileUserIdRef,
     refresh,
   });
-
-  const loadAchievements = useCallback(async () => {
-    const [achievements, profileCompleteness] = await Promise.allSettled([
-      api.get("/achievements/me"),
-      api.get("/users/me/profile-completeness"),
-    ]);
-    if (achievements.status === "fulfilled") setAchData(achievements.value.data);
-    else setAchData({ groups: [], awards: [] });
-    if (profileCompleteness.status === "fulfilled") setCompleteness(profileCompleteness.value.data);
-  }, []);
-
-  // Achievements erst laden, wenn der Reiter offen ist.
-  useEffect(() => {
-    if (tab === "achievements" && !achData) {
-      loadAchievements();
-    }
-  }, [tab, achData, loadAchievements]);
-  useApiInvalidation(() => {
-    if (tab === "achievements") {
-      loadAchievements();
-    } else {
-      setAchData(null);
-      setCompleteness(null);
-    }
-  }, ["achievements", "users"]);
 
   useEffect(() => {
     api.get("/games").then(({ data }) => setGames(Array.isArray(data) ? data : [])).catch(() => setGames([]));
@@ -297,40 +249,8 @@ export default function ProfilePage() {
     }
   };
 
-  const evaluateAchievements = async () => {
-    if (evaluatingAchievements) return;
-    setEvaluatingAchievements(true);
-    try {
-      const { data } = await api.post("/achievements/evaluate");
-      const fresh = await api.get("/achievements/me").catch(() => null);
-      if (fresh) setAchData(fresh.data);
-      await loadAchievements();
-      await refresh();
-      if (data?.newly_awarded > 0 && fresh?.data?.groups) {
-        const earned = [];
-        for (const group of fresh.data.groups) {
-          if (group.is_negative) continue;
-          for (const tier of group.tiers || []) {
-            if (tier.earned && tier.earned_at) earned.push({ ...tier, category: group.category, group_name: group.name, group_code: group.code, hidden: group.hidden });
-          }
-        }
-        earned.sort((a, b) => new Date(b.earned_at) - new Date(a.earned_at));
-        const fresh_tiers = earned.slice(0, data.newly_awarded);
-        // Zeremonie (E8): Paket mit Kontext - erster Erfolg, Gruppe oder Kategorie vollständig.
-        enqueueCeremony(fresh_tiers, describePackage(fresh.data.groups, fresh_tiers));
-      } else {
-        toast.success("Achievements aktualisiert.");
-      }
-    } catch (err) {
-      toast.error(formatRequestError(err, "Achievements konnten nicht aktualisiert werden."));
-    } finally {
-      setEvaluatingAchievements(false);
-    }
-  };
-
   if (!user) return null;
 
-  const achInsights = achData ? achievementInsights(achData) : null;
   // Die Speicherleiste zeigt, ob auf den Text-Reitern noch etwas ungespeichert ist.
   const dirty = !!initialProfileFormRef.current
     && hasPayloadChanges(buildDirtyPayload(profileFormPayload(form), profileFormPayload(initialProfileFormRef.current)));
@@ -339,8 +259,8 @@ export default function ProfilePage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">EINSTELLUNGEN</span>
-            <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Mein Profil</h1>
+            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">KONTO</span>
+            <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Einstellungen</h1>
           </div>
           <div className="text-sm text-white/60">
             {isClubMember ? (
@@ -349,31 +269,21 @@ export default function ProfilePage() {
               <span>Community-Spieler</span>
             )}
             <span className="mx-2 text-white/20">·</span>
-            <Link to={`/u/${user.username}`} data-testid="profile-public-link" className="hover:text-white underline underline-offset-2" title="Öffentliches Profil ansehen">@{user.username}</Link>
-            <Link to={`/u/${user.username}`} data-testid="profile-public-button" className="inline-flex items-center gap-1 px-2 py-1 border border-white/15 text-[11px] uppercase tracking-wider hover:border-[#29B6E8] hover:text-[#29B6E8]">Öffentliches Profil ansehen</Link>
+            <span>@{user.username}</span>
+            {/* Zurück zum eigenen Profil (#1149) - dort steht auch „So sehen dich andere“. */}
+            <Link to={`/u/${user.username}`} data-testid="settings-to-profile" className="ml-2 inline-flex items-center gap-1 px-2 py-1 border border-white/15 text-[11px] uppercase tracking-wider hover:border-[#29B6E8] hover:text-[#29B6E8]"><UserCircle className="w-3.5 h-3.5" /> Mein Profil</Link>
           </div>
         </div>
 
         <div className="mt-8 lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10 lg:items-start">
-          <ProfileNav tab={tab} onSelect={setTab} isClubMember={isClubMember} badges={{ friends: { count: friendCounts.friends, alert: friendCounts.incoming > 0 } }} />
+          <ProfileNav tab={tab} onSelect={setTab} onLogout={async () => { if (await logout?.()) navigate("/"); }} />
 
           <form onSubmit={submit} className="mt-6 lg:mt-0 space-y-5 min-w-0">
             {tab === "basic" && <BasicTab form={form} set={set} />}
             {tab === "gaming" && <GamingTab form={form} set={set} setGameId={setGameId} gameIdGroups={gameIdGroups} />}
             {tab === "socials" && <SocialsTab form={form} set={set} links={platformLinks} onLink={startPlatformLink} onUnlink={unlinkPlatform} />}
-            {tab === "achievements" && (
-              <AchievementsTab
-                achData={achData}
-                achInsights={achInsights}
-                completeness={completeness}
-                evaluateAchievements={evaluateAchievements}
-                evaluatingAchievements={evaluatingAchievements}
-              />
-            )}
-            {tab === "teams" && <TeamsPanel />}
-            {tab === "friends" && <FriendsPanel onChanged={loadFriendCounts} />}
-            {tab === "invoices" && <InvoicesPanel />}
-            {tab === "honours" && <HonoursPanel />}
+            {tab === "appearance" && <AppearanceTab />}
+            {tab === "about" && <AboutTab />}
             {tab === "security" && <SecurityTab user={user} refresh={refresh} siteSettings={siteSettings} />}
             {tab === "privacy" && (
               <PrivacyTab
@@ -401,9 +311,6 @@ export default function ProfilePage() {
                 <button type="submit" disabled={saving} data-testid="profile-save" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-6 py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50 text-xs">
                   <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
                 </button>
-                <Link to="/privacy-account" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm text-xs">
-                  DSGVO / Daten
-                </Link>
                 {dirty ? (
                   <span className="text-xs text-[#FFD700]" data-testid="profile-unsaved">Ungespeicherte Änderungen</span>
                 ) : null}

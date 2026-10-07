@@ -83,7 +83,7 @@ export const ADMIN_GROUPS = [
       { to: "/admin/gallery", label: "Galerie", icon: ImageIcon, areas: ["content"] },
       { to: "/admin/media", label: "Medien", icon: FolderOpen, areas: ["content"] },
       { to: "/admin/nav", label: "Navigation", icon: Code2, areas: ["content"] },
-      { to: "/admin/achievements", label: "Achievements", icon: Medal, areas: ["content"] },
+      { to: "/admin/achievements", label: "Erfolge", icon: Medal, areas: ["content"] },
       { to: "/admin/stickers", label: "Sticker", icon: Sticker, areas: ["content"] },
       { to: "/admin/advent", label: "Adventkalender", icon: CalendarHeart, areas: ["content", "club"] },
       { to: "/admin/ostern", label: "Ostereiersuche", icon: Egg, areas: ["content", "club"] },

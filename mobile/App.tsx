@@ -10,6 +10,7 @@ import { usePhonePortrait } from "./src/lib/orientation";
 import { AppLockProvider } from "./src/lock/AppLockProvider";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { NotificationProvider } from "./src/notifications/NotificationContext";
+import { ChatsProvider } from "./src/chats/ChatsContext";
 import { LiveChangesProvider } from "./src/realtime/LiveChangesProvider";
 import { SeasonProvider } from "./src/seasons/SeasonProvider";
 import { AppUpdateProvider } from "./src/update/AppUpdateProvider";
@@ -30,10 +31,13 @@ export default function App() {
                 <SeasonProvider>
                 <AppLockProvider>
                   <NotificationProvider>
-                    <AppUpdateProvider>
-                      <StatusBar style="light" />
-                      <AppNavigator />
-                    </AppUpdateProvider>
+                    {/* Chats (#1148): die Liste unter Community und die Zahl am Tab aus einer Quelle. */}
+                    <ChatsProvider>
+                      <AppUpdateProvider>
+                        <StatusBar style="light" />
+                        <AppNavigator />
+                      </AppUpdateProvider>
+                    </ChatsProvider>
                   </NotificationProvider>
                 </AppLockProvider>
                 </SeasonProvider>

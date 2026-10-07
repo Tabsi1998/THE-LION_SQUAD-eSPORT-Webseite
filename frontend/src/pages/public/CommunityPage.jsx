@@ -81,7 +81,7 @@ export default function CommunityPage() {
         <Reveal className="tls-reveal-grid mt-10 grid md:grid-cols-2 xl:grid-cols-4 gap-6">
           <CommunityBlock
             title="Community-Profile"
-            text="Alle öffentlichen Benutzerkonten mit Profil, Achievements und Stats."
+            text="Alle öffentlichen Benutzerkonten mit Profil, Erfolgen und Stats."
             to="/players"
             cta="Profile öffnen"
             items={players.slice(0, 6).map((p) => ({
@@ -147,7 +147,7 @@ function CommunityPaths() {
     { to: "/servers", label: "Server", text: "Aktive Community- und Vereinsserver.", icon: Server, color: "#9F7AEA" },
     { to: "/members", label: "Mitglieder", text: "Offizielle Vereinsprofile und Rollen.", icon: Crown, color: "#FFD700" },
     { to: "/references", label: "Referenzen", text: "Turnier-, Event- und Community-Historie.", icon: Trophy, color: "#FFD700" },
-    { to: "/players", label: "Achievements", text: "Erfolge erscheinen direkt an den Spielerprofilen.", icon: Medal, color: "#29B6E8" },
+    { to: "/achievements", label: "Erfolge", text: "Erfolg der Woche, Bestenliste und alle Erfolge mit Seltenheit.", icon: Medal, color: "#29B6E8" },
   ];
   return (
     <section className="mt-10 rounded-sm border border-white/10 bg-[#0D0D0D] p-4 md:p-5">
@@ -157,7 +157,7 @@ function CommunityPaths() {
           <h2 className="mt-2 font-heading text-2xl font-black uppercase">Alles verbunden</h2>
         </div>
         <p className="max-w-xl text-sm text-white/55">
-          Profile, Teams, Server, Referenzen und Achievements greifen ineinander, damit Besucher schneller verstehen, was in der TLS-Community passiert.
+          Profile, Teams, Server, Referenzen und Erfolge greifen ineinander, damit Besucher schneller verstehen, was in der TLS-Community passiert.
         </p>
       </div>
       <Reveal className="tls-reveal-grid mt-5 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">

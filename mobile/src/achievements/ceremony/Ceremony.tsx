@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from "react-native-reanimated";
-import { navigationRef } from "../../navigation/rootNavigation";
+import { openTab } from "../../navigation/rootNavigation";
 import { useSeasonOverlay } from "../../seasons/anchors";
 import { colors, radius } from "../../theme";
 import { Badge } from "../Badge";
@@ -282,7 +282,8 @@ export function Ceremony({ plan, onClose, reduced = false, autoClose = true, use
   };
   const toAchievements = () => {
     onClose();
-    if (navigationRef.isReady()) navigationRef.navigate("Profile", { tab: "achievements" });
+    // Die eigenen Erfolge stehen im Tab Profil (#1149, #1150).
+    openTab("Profile", { tab: "achievements" });
   };
 
   return (

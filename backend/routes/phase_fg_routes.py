@@ -460,23 +460,30 @@ DEFAULT_NAV = {
             {"key": "esports_overview", "to": "/esports", "label": "Übersicht", "visible": True},
             {"key": "tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
             {"key": "fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
-            {"key": "achievements", "to": "/achievements", "label": "Achievements", "visible": True},
-            {"key": "season", "to": "/seasons/current", "label": "Jahreswertung", "visible": True},
         ]},
+        # Community (#1143): dieselbe Gruppe wie der Tab in der App - Chats (nur mit Konto), Teams, Spieler und die
+        # Bestenlisten Jahreswertung und Erfolge. Ein Name: „Erfolge“.
         {"key": "community", "label": "Community", "visible": True, "order": 5, "children": [
             {"key": "community_overview", "to": "/community", "label": "Übersicht", "visible": True},
+            {"key": "chats", "to": "/messages", "label": "Chats", "visible": True, "auth_only": True},
             {"key": "servers", "to": "/servers", "label": "Server", "visible": True},
             {"key": "players", "to": "/players", "label": "Community-Spieler", "visible": True},
             {"key": "community_teams", "to": "/teams", "label": "Teams", "visible": True},
+            {"key": "season", "to": "/seasons/current", "label": "Jahreswertung", "visible": True},
+            {"key": "achievements", "to": "/achievements", "label": "Erfolge", "visible": True},
         ]},
         {"key": "contact", "to": "/contact", "label": "Kontakt", "visible": True, "order": 6},
     ],
 }
 
 RETIRED_NAV_CHILD_KEYS = {
-    "esports": {"teams", "references"},
+    # Jahreswertung und Erfolge stehen seit #1143 unter Community - gespeicherte Menüs verlieren sie hier.
+    "esports": {"teams", "references", "achievements", "season"},
     "community": {"members", "join"},
 }
+
+# Alte Beschriftungen, die es nicht mehr gibt: ein Name für die Erfolge (#1143).
+NAV_RENAMED_LABELS = {"achievements": {"Achievements": "Erfolge"}}
 
 NAV_LABEL_REPLACEMENTS = {
     "Ue" + "bersicht": "Übersicht",
@@ -534,6 +541,8 @@ def _merge_nav_item(current: dict, default: dict) -> dict:
     merged = {**default, **current}
     if "label" in merged:
         merged["label"] = _normalize_nav_label(merged.get("label"))
+        key = default.get("key") or current.get("key")
+        merged["label"] = NAV_RENAMED_LABELS.get(key, {}).get(merged["label"], merged["label"])
     parent_key = default.get("key") or default.get("to") or default.get("label")
     default_children = default.get("children") or []
     current_children = current.get("children") or []

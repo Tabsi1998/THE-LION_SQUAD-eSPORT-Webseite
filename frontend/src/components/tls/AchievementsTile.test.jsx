@@ -22,7 +22,7 @@ describe("AchievementsTile", () => {
     render(<MemoryRouter><AchievementsTile /></MemoryRouter>);
     expect(await screen.findByTestId("dashboard-achievements-level")).toHaveTextContent("Level 12");
     const tile = screen.getByTestId("dashboard-achievements");
-    expect(tile).toHaveAttribute("href", "/profile?tab=achievements");
+    expect(tile).toHaveAttribute("href", "/u/me?tab=achievements");
     expect(tile).toHaveTextContent("Kämpfer");
     expect(screen.getByTestId("dashboard-achievements-prestige").querySelectorAll("svg")).toHaveLength(2);
     expect(screen.getByTestId("dashboard-achievements-count")).toHaveTextContent("2 Erfolge · 15 Pkt.");
@@ -42,6 +42,6 @@ describe("AchievementsTile", () => {
     apiMock.get.mockRejectedValueOnce(new Error("offline"));
     render(<MemoryRouter><AchievementsTile /></MemoryRouter>);
     await waitFor(() => expect(screen.getAllByTestId("dashboard-achievements")).toHaveLength(2));
-    await waitFor(() => expect(screen.getAllByTestId("dashboard-achievements")[1]).toHaveTextContent("Achievements"));
+    await waitFor(() => expect(screen.getAllByTestId("dashboard-achievements")[1]).toHaveTextContent("Erfolge"));
   });
 });

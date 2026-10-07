@@ -10,7 +10,11 @@ const mockSeasonState: Record<string, unknown> = { ready: true, seasons: [], byK
 jest.mock("./SeasonProvider", () => ({ useSeason: () => mockSeasonState }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 24, bottom: 0, left: 0, right: 0 }) }));
 const mockNavigate = jest.fn();
-jest.mock("../navigation/rootNavigation", () => ({ navigationRef: { isReady: () => true, getCurrentRoute: () => ({ name: "Dashboard" }), addListener: () => () => {}, navigate: (...args: unknown[]) => mockNavigate(...args) } }));
+jest.mock("../navigation/rootNavigation", () => ({
+  navigationRef: { isReady: () => true, getCurrentRoute: () => ({ name: "Dashboard" }), addListener: () => () => {}, navigate: (...args: unknown[]) => mockNavigate(...args) },
+  openTab: (...args: unknown[]) => mockNavigate("openTab", ...args),
+  openDetail: (...args: unknown[]) => mockNavigate("openDetail", ...args),
+}));
 
 const { SeasonStage, SeasonWidgetSlot, useSeasonTabIcon } = require("./SeasonStage");
 const { DecoSetting } = require("./DecoSetting");
@@ -107,9 +111,10 @@ test("#852: Türchen und Stiefel klein in einer Reihe unter dem Kranz - ein Tipp
   expect(StyleSheet.flatten(row.props.style).flexDirection).toBe("row");
   expect(within(row).getByTestId("advent-calendar-widget").props.accessibilityLabel).toBe("Adventkalender – Türchen 6 ist offen");
   await fireEvent.press(within(row).getByTestId("advent-calendar-widget"));
-  expect(mockNavigate).toHaveBeenLastCalledWith("More", { screen: "AdventCalendar", initial: false });
+  expect(mockNavigate).toHaveBeenLastCalledWith("openDetail", "AdventCalendar");
   await fireEvent.press(within(row).getByTestId("nikolaus-widget"));
-  expect(mockNavigate).toHaveBeenLastCalledWith("More", { screen: "MoreHub" });
+  // Der Stiefel steht seit #1143 im Tab „Verein“.
+  expect(mockNavigate).toHaveBeenLastCalledWith("openTab", "VereinHub");
   await screen.unmount();
   // Ohne angelegte Türchen kein Türchen; der Kranz allein steht wie bisher.
   mockSeasonState.seasons = [advent, { ...calendar, data: { ready: false } }];

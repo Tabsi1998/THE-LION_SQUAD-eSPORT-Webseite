@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Alert, Animated, Easing, Pressable, StyleSheet } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { isGuestUser } from "../../live";
-import type { MainTabParamList } from "../../navigation/types";
+import type { AppStackParamList } from "../../navigation/types";
 import { REST_MS, claimCardTouch, createRest } from "../cardLift";
 import { EggArt } from "../easter/art";
 import { useSeason } from "../SeasonProvider";
@@ -107,7 +107,7 @@ export function eggPosition(corner: Corner, clip: boolean): Record<string, numbe
 export function HuntEggView({ spot, clip = false, tumble }: { spot: EggSpot; clip?: boolean; tumble?: Tumble }) {
   const { user } = useAuth();
   const { showToast, reducedMotion } = useSeason();
-  const navigation = useNavigation<NavigationProp<MainTabParamList>>();
+  const navigation = useNavigation<NavigationProp<AppStackParamList>>();
   const guest = !user || isGuestUser(user);
   const pop = useRef(new Animated.Value(0)).current;
   const roll = useRef(new Animated.Value(tumble && Date.now() - tumble.at >= TUMBLE_MS ? 1 : 0)).current;
@@ -138,8 +138,8 @@ export function HuntEggView({ spot, clip = false, tumble }: { spot: EggSpot; cli
       if (result.completed_now) {
         Alert.alert("Korb voll!", `Du hast alle Eier gefunden – Platz ${result.rank}. Du bist in der Verlosung.`, [
           { text: "Schließen", style: "cancel" },
-          // Aus jedem Screen zum Korb unter Mehr (der Tab-Navigator nimmt den Weg nach oben).
-          { text: "Zum Korb", onPress: () => navigation.navigate("More", { screen: "EasterHunt", initial: false }) },
+          // Aus jedem Screen zum Korb - über dem Tab, in dem man gerade ist (#1144): jeder Tab-Stapel kennt den Korb.
+          { text: "Zum Korb", onPress: () => navigation.navigate("EasterHunt") },
         ]);
       } else {
         showToast(result.already ? "Das Ei hast du schon." : `Osterei gefunden: ${result.found} von ${result.total}`, 3000);
