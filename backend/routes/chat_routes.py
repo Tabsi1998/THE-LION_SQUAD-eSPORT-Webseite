@@ -358,8 +358,12 @@ async def mark_chat_read(kind: str, target_id: str, me: dict = Depends(get_curre
         )
         return {"ok": True, "read_at": now}
     collection = {"team": "teams", "tournament": "tournaments", "match": "matches_v2"}[kind]
-    if not await getattr(db, collection).find_one({"id": target_id}, {"_id": 0, "id": 1}):
+    # Turniere kommen auch mit ihrer Adresse (Slug) - die Marke gilt immer für die Kennung.
+    query = {"$or": [{"id": target_id}, {"slug": target_id}]} if kind == "tournament" else {"id": target_id}
+    found = await getattr(db, collection).find_one(query, {"_id": 0, "id": 1})
+    if not found:
         raise HTTPException(status_code=404, detail="Unterhaltung nicht gefunden")
+    target_id = found["id"]
     await db.chat_reads.update_one(
         {"user_id": me["id"], "key": chat_key(kind, target_id)},
         {"$set": {"user_id": me["id"], "key": chat_key(kind, target_id), "kind": kind, "target_id": target_id, "read_at": now}},

@@ -217,3 +217,16 @@ async def test_read_needs_a_known_chat_and_an_account(flow):
     flow.act_as(neon)
     assert (await flow.post("/api/chats/team/gibt-es-nicht/read")).status_code == 404
     assert (await flow.post("/api/chats/raum/x/read")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_tournament_read_mark_also_by_slug(flow):
+    neon = await flow.add_user(name="NeonFalke")
+    other = await flow.add_user(name="PixelPanther")
+    tournament = await flow.create_tournament(show_chat=True)
+    await flow.register(tournament, neon)
+    await flow.db.tournament_chat_messages.insert_one({"id": new_id(), "tournament_id": tournament["id"], "user_id": other["id"], "message": "Start um 18 Uhr", "created_at": ago(minutes=5)})
+    assert (await chat_list(flow, neon))["unread_total"] == 1
+    flow.act_as(neon)
+    assert (await flow.post(f"/api/chats/tournament/{tournament['slug']}/read")).status_code == 200
+    assert (await chat_list(flow, neon))["unread_total"] == 0

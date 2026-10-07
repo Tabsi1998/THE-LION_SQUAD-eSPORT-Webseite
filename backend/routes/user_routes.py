@@ -568,11 +568,15 @@ async def list_public_users(
 
 
 @router.get("/public/{username}")
-async def get_public_profile(username: str, viewer: dict | None = Depends(get_optional_user)):
+async def get_public_profile(username: str, view_as: str | None = None, viewer: dict | None = Depends(get_optional_user)):
     db = get_db()
     u = await db.users.find_one({"username": username}, {**PRIVATE_AUTH_FIELDS, "email": 0})
     if not u or u.get("is_active") is False or u.get("is_banned") is True:
         raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
+    # „So sehen dich andere“ (#1149): das eigene Profil so, wie es jemand ohne Anmeldung sieht - nur was die
+    # Privatsphäre allen zeigt. Gilt nur für die Person selbst; für alle anderen ändert der Schalter nichts.
+    if view_as == "public" and viewer and viewer.get("id") == u.get("id"):
+        viewer = None
     public = bool(u.get("privacy_public_profile"))
     # Die Stufen Community/Verein/Nur Admins/Privat gelten je Betrachter - nicht nur „öffentlich oder nichts“.
     ctx = await _viewer_context(db, viewer, u["id"])
