@@ -173,7 +173,8 @@ async def category_overview(db, *, rarity_data: dict | None = None) -> list[dict
             continue
         per_cat[key] = {"key": key, "label": meta["label"], "order": meta["order"], "icon": meta["icon"], "accent": meta["accent"],
                         "member_only": bool(meta.get("member_only")), "hidden": bool(meta.get("hidden")),
-                        "groups": 0, "tiers": 0, "awards": 0, "holders": 0, "community_percent": 0.0, "link": CATEGORY_LINKS.get(key)}
+                        "groups": 0, "tiers": 0, "points": 0, "awards": 0, "holders": 0, "community_percent": 0.0,
+                        "link": CATEGORY_LINKS.get(key)}
     tier_cat: dict[str, str] = {}
     for group in groups.values():
         if group.get("is_negative"):
@@ -188,6 +189,7 @@ async def category_overview(db, *, rarity_data: dict | None = None) -> list[dict
         for tier in tiers.values():
             if tier.get("group_code") == group["code"]:
                 row["tiers"] += 1
+                row["points"] += int(tier.get("points") or 0)
                 tier_cat[tier["code"]] = cat
     holders: dict[str, set] = {}
     async for award in db.user_achievements.find({}, {"_id": 0, "user_id": 1, "tier_code": 1}):
@@ -201,6 +203,30 @@ async def category_overview(db, *, rarity_data: dict | None = None) -> list[dict
         row["holders"] = len(holders.get(key, ()))
         row["community_percent"] = _percent(row["awards"], base * row["tiers"]) if row["tiers"] else 0.0
     return sorted(per_cat.values(), key=lambda r: r["order"])
+
+
+async def my_progress(db, user_id: str) -> dict:
+    """Der eigene Stand für die Erfolge-Seite (#1229): Stufen und Punkte insgesamt und je Kategorie - gezählt wie in
+    category_overview (öffentliche und geheime Gruppen), damit „12 von 40“ zusammenpasst. Negatives zählt nicht mit;
+    wie viele davon da sind, steht extra - dafür zeigt die Seite die eigene Zeile „Geheim / Fun“."""
+    groups, tiers = await _catalog(db)
+    per_cat: dict[str, int] = {}
+    count = points = negative = 0
+    async for award in db.user_achievements.find({"user_id": user_id}, {"_id": 0, "tier_code": 1}):
+        tier = tiers.get(award.get("tier_code"))
+        group = groups.get(tier.get("group_code")) if tier else None
+        if not group:
+            continue
+        if group.get("is_negative"):
+            negative += 1
+            continue
+        if not group.get("public") and not group.get("hidden"):
+            continue
+        cat = category_v2(group.get("category"))
+        per_cat[cat] = per_cat.get(cat, 0) + 1
+        count += 1
+        points += int(tier.get("points") or 0)
+    return {"count": count, "points": points, "categories": per_cat, "negative": negative}
 
 
 async def hidden_summary(db, user_id: str | None) -> dict:

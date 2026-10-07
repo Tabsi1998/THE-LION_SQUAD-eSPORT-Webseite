@@ -232,16 +232,7 @@ export function AchievementGroupsView({
                 {byCat[cat].length} Gruppen{cat === "hidden" && hidden ? ` · ${hidden.earned} von ${hidden.total} gefunden` : ""}
               </span>
             </div>
-            {isClub && clubTeaser && (
-              <div className="mb-4 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm px-4 py-3 text-sm text-white/70 flex items-center gap-3 flex-wrap" data-testid="club-showcase-note">
-                <span className="flex-1 min-w-[16rem]">
-                  Diese Vitrine gehört dem Verein: die Stufen gibt es nur für Mitglieder – für Jahre im Rudel, die Mitgliedskarte, Vereinsabende und Ehrenamt.
-                </span>
-                <Link to="/membership/join" className="tls-btn tls-btn--secondary shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-sm">
-                  Mitglied werden
-                </Link>
-              </div>
-            )}
+            {isClub && clubTeaser && <ClubShowcaseNote className="mb-4" />}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {byCat[cat].map(g => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} rarity={rarity} pins={pins} share={share} />)}
               {cat === "hidden" && showHiddenCard && <HiddenSummaryCard hidden={hidden} />}
@@ -249,6 +240,46 @@ export function AchievementGroupsView({
           </section>
         );
       })}
+    </div>
+  );
+}
+
+// Die Vereins-Vitrine (#619) für alle, die (noch) nicht Mitglied sind.
+function ClubShowcaseNote({ className = "" }) {
+  return (
+    <div className={`border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm px-4 py-3 text-sm text-white/70 flex items-center gap-3 flex-wrap ${className}`} data-testid="club-showcase-note">
+      <span className="flex-1 min-w-[16rem]">
+        Diese Vitrine gehört dem Verein: die Stufen gibt es nur für Mitglieder – für Jahre im Rudel, die Mitgliedskarte, Vereinsabende und Ehrenamt.
+      </span>
+      <Link to="/membership/join" className="tls-btn tls-btn--secondary shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-sm">
+        Mitglied werden
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * Eine aufgeklappte Kategorie der Erfolge-Seite (#1229): die Gruppen kommen erst beim Aufklappen vom Server und
+ * werden erst dann gezeichnet - wahlweise die seltensten zuerst. Dazu die Vereins-Vitrine (Verein, für
+ * Nicht-Mitglieder) und bei „Geheim“ die ?-Karte mit dem Zähler.
+ */
+export function AchievementCategoryGroups({ category, groups = [], rarity = null, sortBy = "category", hidden = null, clubTeaser = false }) {
+  const ordered = sortBy === "rarity" ? sortGroupsByRarity(groups, rarity) : groups;
+  const showHiddenCard = category === "hidden" && Boolean(hidden && Number(hidden.total || 0) > 0);
+  if (!ordered.length && !showHiddenCard) {
+    return (
+      <div className="border border-dashed border-white/10 rounded-sm p-6 text-center text-sm text-white/50" data-testid={`achievement-category-${category}-empty`}>
+        In dieser Kategorie gibt es noch keine Erfolge.
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3" data-testid={`achievement-category-${category}-groups`} data-sort={sortBy}>
+      {category === "club" && clubTeaser && <ClubShowcaseNote />}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {ordered.map((group) => <GroupCard key={group.code} group={group} rarity={rarity} />)}
+        {showHiddenCard && <HiddenSummaryCard hidden={hidden} />}
+      </div>
     </div>
   );
 }

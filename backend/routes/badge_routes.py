@@ -1,7 +1,8 @@
 """Achievement routes (Phase B v4) — group-aware listing, admin CRUD, manual award.
 
 Public/User endpoints (prefix /api/achievements):
-  GET  /api/achievements/groups            — full public catalog (no locked negative tiers)
+  GET  /api/achievements/groups            — full public catalog (no locked negative tiers);
+                                           ?category= nur eine Kategorie, ?mine=true mit eigenem Fortschritt (#1229)
   GET  /api/achievements/me                — my catalog with progress + earned
   GET  /api/achievements/user/{user_id}    — public profile achievements
   POST /api/achievements/evaluate          — re-evaluate (auto-award) for self
@@ -43,7 +44,7 @@ from badges import (
     NEGATIVE_INCIDENTS,
 )
 from models import now_utc, new_id
-from achievement_catalog import CATEGORIES, CONDITION_KEY_STATUS, MATERIALS, annotate_tier
+from achievement_catalog import CATEGORIES, CONDITION_KEY_STATUS, MATERIALS, annotate_tier, category_v2
 from services import achievement_visibility as visibility
 from services import xp
 
@@ -57,8 +58,16 @@ STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
 
 @router.get("/groups")
-async def public_groups(viewer: dict | None = Depends(get_optional_user)):
-    return await list_groups_for_user(None, viewer)
+async def public_groups(category: str | None = None, mine: bool = False, viewer: dict | None = Depends(get_optional_user)):
+    """Der Katalog. Seit #1229 wahlweise nur eine Kategorie - die Erfolge-Seite lädt beim Aufklappen nach, statt
+    alle Gruppen auf einmal zu schicken - und mit `mine` angemeldet der eigene Fortschritt dazu (wie unter /me)."""
+    if category is not None and category_v2(category) not in CATEGORIES:
+        raise HTTPException(422, "Unbekannte Kategorie.")
+    groups = await list_groups_for_user(viewer["id"] if mine and viewer else None, viewer)
+    if category:
+        wanted = category_v2(category)
+        groups = [group for group in groups if category_v2(group.get("category")) == wanted]
+    return groups
 
 
 @router.get("/me")
@@ -136,7 +145,7 @@ async def achievements_overview(viewer: dict | None = Depends(get_optional_user)
     Seltenheit je Gruppe und Stufe, die Zahl der geheimen Gruppen, der Erfolg der Woche, das Laufband."""
     db = get_db()
     rarity_data = await visibility.rarity(db)
-    return {
+    overview = {
         "categories": await visibility.category_overview(db, rarity_data=rarity_data),
         "rarity": {"base": rarity_data["base"], "members_base": rarity_data["members_base"], "groups": rarity_data["groups"],
                    "tiers": {code: row["percent"] for code, row in rarity_data["tiers"].items()}},
@@ -144,6 +153,10 @@ async def achievements_overview(viewer: dict | None = Depends(get_optional_user)
         "week": await visibility.achievement_of_week(db),
         "recent": await visibility.recent_unlocks(db, 20),
     }
+    # Angemeldet (#1229): der eigene Stand je Kategorie - die Seite braucht dafür nicht mehr den ganzen Katalog.
+    if viewer:
+        overview["mine"] = await visibility.my_progress(db, viewer["id"])
+    return overview
 
 
 @router.get("/award/{award_id}")
