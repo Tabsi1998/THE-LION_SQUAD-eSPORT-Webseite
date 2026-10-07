@@ -2536,6 +2536,139 @@ html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-seaso
   }
 }
 
+/* LionsAPP-Download (#1084): ein Knopf im Store-Stil mit Symbol und zwei Zeilen - drei Varianten aus der Vorschau
+   (a schwarz und kehrt sich um, b das Blau läuft von links ein [Vorgabe], c App-Kachel mit Lichtlauf und Anheben).
+   Bewegung über die Bewegungs-Regeln (#1070); mit „Bewegung reduzieren“ wechselt nur die Farbe. */
+.tls-store {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 18px 8px 14px;
+  border-radius: 8px;
+  overflow: hidden;
+  isolation: isolate;
+  text-decoration: none;
+  line-height: 1.1;
+  transition: background-color var(--tls-motion-slow) var(--tls-ease), color var(--tls-motion-slow) var(--tls-ease),
+    border-color var(--tls-motion-mid) var(--tls-ease), transform var(--tls-motion-mid) var(--tls-ease),
+    box-shadow var(--tls-motion-mid) var(--tls-ease);
+}
+.tls-store:focus-visible {
+  outline: 2px solid #FFFFFF;
+  outline-offset: 2px;
+}
+.tls-store__icon {
+  position: relative;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  transition: transform var(--tls-motion-mid) var(--tls-ease);
+}
+.tls-store__text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.tls-store__text small {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.tls-store__text b {
+  font-family: var(--font-heading, inherit);
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+}
+.tls-store--a {
+  background-color: #000000;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+}
+.tls-store--b {
+  background-color: transparent;
+  color: #FFFFFF;
+  border: 1px solid rgba(41, 182, 232, 0.65);
+}
+.tls-store--b::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--tls-cyan);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform var(--tls-motion-slow) var(--tls-ease);
+}
+.tls-store--c {
+  padding: 6px 18px 6px 6px;
+  background-color: #121212;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.tls-store__tile {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 9px;
+  overflow: hidden;
+  font-family: var(--font-heading, inherit);
+  font-size: 11px;
+  font-weight: 800;
+  color: #04141B;
+  background: linear-gradient(135deg, #29B6E8, #0B4A61);
+}
+.tls-store__tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.6) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform calc(var(--tls-motion-slow) * 1.6) var(--tls-ease);
+}
+@media (hover: hover) {
+  .tls-store--a:hover {
+    background-color: #FFFFFF;
+    color: #000000;
+  }
+  .tls-store--b:hover {
+    color: #04141B;
+  }
+  .tls-store--b:hover::before {
+    transform: scaleX(1);
+  }
+  .tls-store--b:hover .tls-store__icon {
+    transform: translateY(calc(3px * var(--tls-motion-on)));
+  }
+  .tls-store--c:hover {
+    transform: translateY(calc(-3px * var(--tls-motion-on)));
+    border-color: var(--tls-cyan);
+    box-shadow: 0 20px 32px -20px rgba(41, 182, 232, 0.85);
+  }
+  .tls-store--c:hover .tls-store__tile::after {
+    transform: translateX(120%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Die Farbe wechselt weiter, das Blau springt statt zu laufen. */
+  .tls-store--b::before {
+    transition: none;
+  }
+  .tls-store__tile::after {
+    transition: none;
+  }
+}
+
 /* Einblenden (#1074): in einem Raster blenden die Karten nacheinander ein - der Versatz folgt der Stelle im Raster,
    ohne dass jede Seite einen Zähler mitgeben muss. Der Rahmen bleibt stehen, nur der Inhalt blendet (Reveal.jsx). */
 .tls-reveal-grid > :nth-child(1) { --tls-i: 0; }

@@ -22,6 +22,7 @@ import { DecoSwitch } from "@/seasons/DecoSwitch";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { PLAY_BADGE_SRC, contactLines, footerButtons, footerColumns } from "@/lib/siteFooter";
+import { StoreButton } from "@/components/tls/StoreButton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, MessageSquare, Smartphone } from "lucide-react";
 import { UserMenu } from "@/components/tls/UserMenu";
@@ -227,7 +228,8 @@ export function PublicLayout({ children }) {
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Dabei sein</div>
               <div className="mt-1 text-sm text-white/65">Auf Discord ist das Rudel jeden Tag da — mit der LionsAPP hast du Termine, Turniere und Chat am Handy.</div>
             </div>
-            {/* Knopfleiste (#425): Discord als offizieller Knopf, Google Play als offizieller Badge (erst mit Link). */}
+            {/* Knopfleiste (#425): Discord als offizieller Knopf; die LionsAPP als eigener Store-Knopf (#1084), das
+                offizielle Badge unverändert klein daneben - beides erst mit Play-Link. */}
             <div className="flex flex-wrap items-center gap-3 shrink-0" data-testid="footer-buttons">
               <DiscordLiveLine discord={discordNow} />
               {discordHref && (
@@ -236,9 +238,12 @@ export function PublicLayout({ children }) {
                 </a>
               )}
               {footerCta.playStoreUrl ? (
-                <a href={footerCta.playStoreUrl} target="_blank" rel="noreferrer" data-testid="footer-play-badge" className="inline-flex">
-                  <img src={PLAY_BADGE_SRC} alt="Jetzt bei Google Play" className="h-11 w-auto" />
-                </a>
+                <span className="inline-flex items-center gap-3">
+                  <StoreButton href={footerCta.playStoreUrl} testId="footer-play-button" />
+                  <a href={footerCta.playStoreUrl} target="_blank" rel="noreferrer" data-testid="footer-play-badge" className="inline-flex opacity-80 hover:opacity-100 transition-opacity duration-mid ease-tls">
+                    <img src={PLAY_BADGE_SRC} alt="Jetzt bei Google Play" className="h-8 w-auto" />
+                  </a>
+                </span>
               ) : (
                 <span data-testid="footer-play-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
                   <Smartphone className="w-4 h-4" /> {footerCta.playSoonLabel}
