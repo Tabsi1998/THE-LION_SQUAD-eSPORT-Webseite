@@ -306,7 +306,7 @@ export default function TournamentDetailPage() {
         <TournamentTabs tournament={t} accessToken={accessToken} participantCount={regs.length} />
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-8 min-w-0">
           <MyStandCard tournament={t} registration={myReg} team={myRegTeam} isTeamTournament={isTeamTournament} canCheckIn={false} staffOnlyCheckIn={staffOnlyCheckIn}
             canUnregister={canSelfUnregister} onUnregister={handleUnregister} busy={loading} scheduleTo={subPage("matches")} />
           {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
@@ -371,7 +371,7 @@ export default function TournamentDetailPage() {
             </div>
           </section>
         </div>
-        <aside className="space-y-4">
+        <aside className="space-y-4 min-w-0">
           {t.location && <InfoRow icon={MapPin} label="Ort" value={t.location} />}
           {t.best_of > 1 && <InfoRow icon={Trophy} label="Best of" value={t.best_of} />}
           <InfoRow icon={Users} label="Modus" value={formatTeamMode(t.team_mode)} />

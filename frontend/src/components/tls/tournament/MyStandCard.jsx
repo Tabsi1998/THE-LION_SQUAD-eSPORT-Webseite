@@ -4,6 +4,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { StepBar, tournamentStep, tournamentSteps } from "@/components/tls/StepBar";
 import { formatDateTime } from "@/lib/datetime";
 import { formatCents } from "@/lib/pricing";
+import { TeamDayPanel } from "@/components/tls/tournament/TeamDayPanel";
 
 // Turnierseite (#401): „Dein Stand“ für Angemeldete - Status, Team, Startgeld und Zahlungsstand,
 // Check-in-Fenster, Weg zum Spielplan; Abmelden als leiser Link am Ende, nicht als roter Knopf vorne.
@@ -45,6 +46,8 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
           <div className="flex items-start gap-2"><CalendarClock className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="text-[10px] font-bold uppercase tracking-widest text-white/50">Check-in</dt><dd data-testid="tournament-my-checkin">{t.check_in_from ? `ab ${formatDateTime(t.check_in_from)}` : ""}{t.check_in_until ? ` bis ${formatDateTime(t.check_in_until)}` : ""}{staffOnlyCheckIn ? " · vor Ort bei der Turnierleitung" : ""}</dd></div></div>
         ) : null}
       </dl>
+      {/* Team am Spieltag (#1192): Aufstellung und „Wer ist da“ - nur bei Team-Turnieren. */}
+      {isTeamTournament ? <TeamDayPanel tournament={t} /> : null}
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {canCheckIn && myReg.status === "approved" && checkinOpen ? (
           <button type="button" onClick={onCheckin} disabled={busy} data-testid="tournament-checkin-btn" className="tls-btn tls-btn--primary px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Jetzt einchecken</button>

@@ -15,6 +15,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime, formatStatus, formatTournamentFormat } from "../../lib/format";
 import { getRegistrationState } from "../../lib/registration";
+import { TeamDayCard } from "../../components/tournament/TeamDayCard";
 import { basisLabel, formatCents, ownPriceLine, quoteTotal, startFeeSummary } from "../../lib/startFee";
 import { isGuestUser } from "../../live";
 import { openSignIn } from "../../navigation/rootNavigation";
@@ -369,6 +370,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 />
               ) : null}
             </Card>
+            {/* Team am Spieltag (#1192): Aufstellung und „Wer ist da“ - nur angemeldete Teams bei Team-Turnieren. */}
+            {registered && isTeamTournament && !guest ? <TeamDayCard tournamentId={tournament.id} /> : null}
             {isFinished ? (
               <>
                 <Card style={styles.card}>

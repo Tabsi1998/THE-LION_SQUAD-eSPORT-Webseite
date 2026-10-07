@@ -57,8 +57,11 @@ async def _participant_users(db, match: dict) -> list[dict]:
     reg_ids = participant_source_ids(match)
     if not reg_ids:
         return []
-    regs = await db.tournament_registrations.find({"id": {"$in": reg_ids}}, {"_id": 0, "user_id": 1}).to_list(64)
-    user_ids = list({reg.get("user_id") for reg in regs if reg.get("user_id")})
+    regs = await db.tournament_registrations.find({"id": {"$in": reg_ids}}, {"_id": 0, "user_id": 1, "team_id": 1, "lineup": 1}).to_list(64)
+    # Aufruf an der Station (#1192): bei Teams die Aufgestellten, ohne Aufstellung alle Mitglieder - nicht nur, wer
+    # das Team angemeldet hat.
+    from services.team_lineup import registration_recipients
+    user_ids = sorted(await registration_recipients(db, regs))
     if not user_ids:
         return []
     return await db.users.find(

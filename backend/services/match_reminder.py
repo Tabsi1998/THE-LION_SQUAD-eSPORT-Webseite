@@ -48,15 +48,11 @@ async def _participants_for_match(match: dict) -> list[dict]:
         if u:
             add_user(u)
             continue
-        # Try via registration
+        # Try via registration - Teams (#1192): die Aufgestellten, ohne Aufstellung alle Mitglieder.
         reg = await db.tournament_registrations.find_one({"id": raw}, {"_id": 0})
-        if reg and reg.get("user_id"):
-            u2 = await db.users.find_one({"id": reg["user_id"]}, {"id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1})
-            if u2:
-                add_user(u2)
-        elif reg and reg.get("team_id"):
-            members = await db.team_members.find({"team_id": reg["team_id"]}, {"_id": 0, "user_id": 1}).to_list(20)
-            uids = [m["user_id"] for m in members if m.get("user_id")]
+        if reg and reg.get("team_id"):
+            from services.team_lineup import registration_recipients
+            uids = sorted(await registration_recipients(db, [reg]))
             if uids:
                 users = await db.users.find(
                     {"id": {"$in": uids}},
@@ -64,6 +60,10 @@ async def _participants_for_match(match: dict) -> list[dict]:
                 ).to_list(20)
                 for team_user in users:
                     add_user(team_user)
+        elif reg and reg.get("user_id"):
+            u2 = await db.users.find_one({"id": reg["user_id"]}, {"id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1})
+            if u2:
+                add_user(u2)
     return out
 
 

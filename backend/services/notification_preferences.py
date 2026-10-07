@@ -148,6 +148,8 @@ NOTIFICATION_KIND_CATEGORY = {
     "match_reminder": "match_reminders",
     "match_station": "match_reminders",
     "match_result": "match_reminders",
+    # Team am Spieltag (#1192): „Bist du schon da?“ vom Kapitän - wie eine Spiel-Erinnerung.
+    "team_presence_nudge": "match_reminders",
     "match_chat_message": "community_messages",
     "match_chat_mention": "community_messages",
     "tournament_checkin": "tournament_updates",

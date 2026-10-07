@@ -14,6 +14,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { REGISTRATION_STATUS_OPTIONS, formatRegistrationStatus, formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { LineupMark, useTeamLineups } from "@/components/tls/tournament/LineupMark";
 import { ParticipantAddForm } from "./tournament/ParticipantAddForm";
 import { TournamentStaffPanel } from "./tournament/StaffPanel";
 import { TournamentStagesPanel } from "./tournament/StagesPanel";
@@ -28,6 +29,8 @@ export default function AdminTournamentEditPage() {
   const [t, setT] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [regs, setRegs] = useState([]);
+  // Team am Spieltag (#1192): Aufstellung und „da“ je Team beim Check-in.
+  const lineups = useTeamLineups(t);
   const [bracket, setBracket] = useState(null);
   const [tab, setTab] = useState(searchParams.get("tab") || "participants");
   const [groups, setGroups] = useState([]);
@@ -638,6 +641,7 @@ export default function AdminTournamentEditPage() {
                     <div className="mt-1 font-heading font-bold uppercase break-words">{r.display_name || r.user?.display_name || r.ingame_name}</div>
                     <div className="mt-1 text-xs text-white/45 break-all">{r.discord || "Kein Discord"}</div>
                     <EventGateMark mark={r.event_gate} />
+                    <LineupMark info={lineups[r.id]} />
                   </div>
                   <StatusBadge status={r.status} />
                 </div>
@@ -679,7 +683,7 @@ export default function AdminTournamentEditPage() {
               {filteredRegistrations.map((r, i) => (
                 <tr key={r.id}>
                   <td className="px-4 py-3 text-white/50">{i + 1}</td>
-                  <td className="px-4 py-3">{r.display_name || r.user?.display_name || r.ingame_name}<EventGateMark mark={r.event_gate} /></td>
+                  <td className="px-4 py-3">{r.display_name || r.user?.display_name || r.ingame_name}<EventGateMark mark={r.event_gate} /><LineupMark info={lineups[r.id]} /></td>
                   <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
                   <td className="px-4 py-3 text-white/60">{r.discord || "—"}</td>
                   <td className="px-4 py-3 text-right">
