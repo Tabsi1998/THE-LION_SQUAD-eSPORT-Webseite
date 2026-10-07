@@ -5,6 +5,9 @@ Ergebnis eingetragen hat, Einsprüche mit Begründung, die einzelnen Meldungen d
 sieht nur, wer das Turnier leitet. Alle anderen bekommen die öffentlichen Felder; wer selbst gemeldet oder
 widersprochen hat, sieht dazu seine eigene Meldung und seinen eigenen Einspruch. Wie viele Meldungen und Einsprüche
 es gibt, bleibt sichtbar.
+
+Dieselbe Sicht gilt überall, wo Spiele ohne Turnier-Recht gelesen werden: Spielseite, Turnierbaum und die
+Spieleliste eines Turniers. Turnierphasen verlieren dort ebenfalls, wer sie angelegt hat.
 """
 from __future__ import annotations
 
@@ -39,6 +42,13 @@ def public_match_view(match: dict | None, viewer_id: str | None = None) -> dict 
             for row in match.get("disputes") or [] if isinstance(row, dict)
         ]
     return out
+
+
+def public_stage_view(stage: dict | None) -> dict | None:
+    """Eine Turnierphase ohne Konto-Kennungen (`*_by`) und ohne den internen Anlege-Schlüssel."""
+    if not isinstance(stage, dict):
+        return stage
+    return {key: value for key, value in stage.items() if key != "creation_key" and not key.endswith("_by")}
 
 
 def public_tournament_view(tournament: dict | None) -> dict | None:

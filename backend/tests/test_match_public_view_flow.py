@@ -120,3 +120,66 @@ def test_public_view_keeps_unknown_shapes_calm():
     assert public_match_view(None) is None
     assert public_match_view({"id": "m1", "status": "ready"}) == {"id": "m1", "status": "ready"}
     assert public_match_view({"id": "m1", "reports": None, "disputes": None}) == {"id": "m1", "reports": [], "disputes": []}
+
+
+async def stages_with_internals(flow, tournament_id, staff):
+    """Phasen tragen, wer sie angelegt hat, und einen internen Anlege-Schlüssel."""
+    await flow.db.tournament_stages.update_many(
+        {"tournament_id": tournament_id}, {"$set": {"created_by": staff["id"], "creation_key": "intern-schluessel"}})
+    assert await flow.db.tournament_stages.count_documents({"tournament_id": tournament_id}) > 0
+
+
+@pytest.mark.asyncio
+async def test_bracket_and_match_list_show_only_public_fields(flow):
+    staff, tournament, match_id, first, _second = await match_with_internals(flow)
+    await stages_with_internals(flow, tournament["id"], staff)
+
+    flow.act_as(None)
+    bracket = await flow.get(f"/api/tournaments/{tournament['id']}/bracket")
+    assert bracket.status_code == 200, bracket.text
+    body = bracket.json()
+    assert_public(next(match for match in body["matches_v2"] if match["id"] == match_id))
+    assert "billing" not in body["tournament"], "die interne Abrechnung bleibt intern"
+    assert body["stages"] and all("created_by" not in stage and "creation_key" not in stage for stage in body["stages"])
+
+    listing = await flow.get(f"/api/tournaments/{tournament['id']}/matches-v2")
+    assert listing.status_code == 200, listing.text
+    assert_public(next(match for match in listing.json() if match["id"] == match_id))
+
+    stages = await flow.get(f"/api/tournaments/{tournament['id']}/stages")
+    assert stages.status_code == 200, stages.text
+    assert stages.json() and all("created_by" not in stage and "creation_key" not in stage for stage in stages.json())
+
+    # Wer mitspielt, sieht im Baum seine eigene Meldung und seinen eigenen Einspruch - nicht die der Gegenseite.
+    flow.act_as(first)
+    own = await flow.get(f"/api/tournaments/{tournament['id']}/bracket")
+    assert own.status_code == 200, own.text
+    own_match = next(match for match in own.json()["matches_v2"] if match["id"] == match_id)
+    assert_public(own_match, own_id=first["id"])
+    assert any(row.get("reason") == "Mein eigener Grund" for row in own_match["disputes"])
+
+
+@pytest.mark.asyncio
+async def test_tournament_staff_still_see_internals_in_bracket_and_list(flow):
+    staff, tournament, match_id, _first, _second = await match_with_internals(flow)
+    await stages_with_internals(flow, tournament["id"], staff)
+
+    flow.act_as(staff)
+    bracket = await flow.get(f"/api/tournaments/{tournament['id']}/bracket")
+    assert bracket.status_code == 200, bracket.text
+    body = bracket.json()
+    match = next(match for match in body["matches_v2"] if match["id"] == match_id)
+    assert match["admin_note"] == "Interne Notiz"
+    assert match["completed_by"] == staff["id"]
+    assert any(row.get("user_id") for row in match["results"])
+    assert any(row.get("reason") == "Grund der Gegenseite" for row in match["disputes"])
+    assert "billing" not in body["tournament"], "der Baum braucht die Abrechnung nie"
+    assert all(stage.get("created_by") == staff["id"] for stage in body["stages"])
+
+    listing = await flow.get(f"/api/tournaments/{tournament['id']}/matches-v2")
+    assert listing.status_code == 200, listing.text
+    assert next(match for match in listing.json() if match["id"] == match_id)["admin_note"] == "Interne Notiz"
+
+    stages = await flow.get(f"/api/tournaments/{tournament['id']}/stages")
+    assert stages.status_code == 200, stages.text
+    assert all(stage.get("created_by") == staff["id"] and "creation_key" not in stage for stage in stages.json())
