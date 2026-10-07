@@ -2486,6 +2486,17 @@ Die alte Fassung im Ganzen zeigt `git show 279c53c3:CLAUDE.md`.
   Zielzeit m:ss.mmm in `AdminF1EditPage.jsx` über `lib/laptime.js`.
 - Über-uns-Zahlen (#621, PR #651): `club_numbers` zeigt Preise vergeben,
   Turniere gespielt, Mitglieder, Jahre aktiv.
+- App-Sitzungen (#942; PR #1068): `auth_routes._device_identity` liest `X-Device-Id` (32 Hex, je Installation) und
+  `X-Device-Name` (ASCII); `_issue_mobile_session(remember=…)` schließt Sitzungen derselben `device_id`
+  (`device_relogin`), `_within_rotation_grace` gibt demselben Gerät 60 s statt 10 s (`DEVICE_REPLAY_GRACE_SECONDS`,
+  `rotation_device_id` am Token); `auth.touch_session_activity` schreibt `last_active` höchstens einmal je Stunde;
+  `services/auth_sessions.purge_stale_app_sessions` (30 Tage, `inactive_30d`) läuft mit `ops_retention`. App:
+  `lib/session.ts`, `lib/deviceIdentity.ts`, `refreshSession` als Single-Flight in `lib/api.ts`, `AuthContext.boot`
+  neu (offline bleibt die Sitzung, nur 401/403 melden ab). Web: `SessionsPanel.parseSessionDevice`.
+- Restore mit Schreiberstopp (#1008; PR #1067): `scripts/restore.sh` hält `RESTORE_WRITER_SERVICES` (Standard
+  `backend`) an, prüft per `docker inspect`, legt die Sicherung danach an, spielt ein, prüft Sammlungen und Uploads
+  (`RESTORE_ALLOW_EMPTY_UPLOADS`) und startet erst dann wieder; `trap` druckt bei Abbruch Rückweg und Zustand.
+  `BACKUP_RESTORE.md` „Destruktiver Restore“ in sechs Schritten.
 
 **Web**
 - Live-Aktualisierung: `frontend/src/hooks/useLiveRefresh.js`,
@@ -3358,6 +3369,44 @@ Die alte Fassung im Ganzen zeigt `git show 279c53c3:CLAUDE.md`.
   E-Mail und bei 2FA `auth_mfa_verified`), `/auth/passkeys/mobile/{id}/remove` (Passwort).
   **Falle Gitleaks:** erfundene Test-Passwörter ab 10 Zeichen (`geheim-123456`) meldet `generic-api-key` –
   in Tests kurz halten (`geheim-42`) oder in `.gitleaks.toml` mit Pfad und Wert eintragen.
+- Footer-Bänder (Wunsch 6.10.; PR #1069, Nachbesserung in #1086): `PartnerTicker` steht im Footer unter dem
+  kompakten `SponsorTicker` (Block `footer-logo-bands`, `empty:hidden`), beide mit kleiner Überschrift
+  (`LogoTicker.BAND_HEADING_CLASS`), 48 px Luft oben wie unten, 40 px dazwischen; Partner-Kästen schmaler. Jedes
+  Logo füllt seinen Kasten (`SmartLogo` mit `w-full h-full object-contain` – vorher wuchs die Zeichenfläche nie über
+  die Dateigröße). `e2e/home-tickers.spec.js` mit gemischten Logos (Wortmarke, Emblem, winzige Vorlage).
+- Oberfläche, Paket 1 (#1070, #1071, #1072, #1073, #1080, #1083; PR #1086): Bewegungs-Regeln als Tokens in
+  `index.css` (`--tls-motion-fast/-mid/-slow` 150/240/420 ms, `--tls-ease`, Schalter `--tls-motion-on`),
+  `lib/motion.js`, `mobile/src/theme.ts` `motion`; `lib/motion.test.js` hält die drei zusammen (liest die Dateien,
+  CRLF-tolerant seit #1098). Kopfleiste `tls-header`: Fläche `tls-header__bg` skaliert, Zeile `tls-header__row`
+  rückt über `top` (kein `transform` – Suche und Glocke öffnen feste Fenster darin), Logo `tls-header__logo`; die
+  Unschärfe liegt auf der Fläche, nicht mehr am `<header>` – das hatte das Suchfenster auf 80 px Höhe eingesperrt.
+  Menü-Linie `tls-nav-link`. Handy-Menü als `absolute top-full`-Auflage (als Block im Fluss wuchs der Kopf um die
+  Menühöhe und die Saison-Deko der Kopfzeile wanderte mit). Seitenwechsel `tls-route` (Modul-Merker `pageShown`,
+  jede Seite baut `PublicLayout` selbst auf). Karten `tls-card` (+ `--gold`, `--purple`, `--own`, `tls-card__media`)
+  an 24 Rahmen in 17 Dateien; Karten mit Saison-Anker heben sich nicht, solange eine Saison läuft
+  (`html[data-season-intensity]`). `tls-dim-siblings` (Teams, Spieler, Logo-Bänder). `e2e/ui-motion.spec.js`.
+  Social-Logos zuerst Variante A, seit PR #1098 Variante D: `tls-social` mit acht Eckwinkel-Verläufen, die sich
+  zum Rahmen schließen, Logo in Markenfarbe mit Schein; `socialIcons.socialInk`, Instagram `fill` (Verlauf).
+- Oberfläche, Paket 2 (#1076, #1077; PR #1095): `PhaseBadge` LIVE ohne Ganz-Puls, Punkt `tls-live-dot` mit Ring;
+  `tls-live-frame` (laufender Rahmen, `@property --tls-live-angle`) an `TournamentCard` und der Event-Karte nur bei
+  Phase `live`; `BracketTree`: Linien `pathLength="1"` + `tls-bracket-line--draw` mit Versatz je Runde (`--tls-i`),
+  Lichtkante `.tls-bracket-node::before`, `Row`/`HeatRow` `sweep` (goldener Schimmer nur, wenn die Partie gerade als
+  geändert gemeldet ist); `TournamentSchedulePage` `tls-match-edge`. Fast Lap: `components/tls/LapTime.jsx`
+  (`parseLap`, `formatLapLike`, `introOnce` einmal je Besuch und nur für die Dauer des Hochzählens), Zeilen
+  `tls-lap-row`, Podium-Strich `tls-lap-row--p1/2/3`, Board `tls-lap-board[data-intro]`.
+- Oberfläche, Paket 3 (#1081, #1082; PR #1096): `tls-btn tls-btn--primary` an 53 blauen Hauptknöpfen in 41
+  Dateien (Lichtlauf als wanderndes Hintergrundbild, Pfeil `.lucide-arrow-right` fährt 3 px, Nachgeben beim
+  Drücken), `tls-btn--secondary`/`--quiet` bereit; `components/tls/StepBar.jsx` (`MEMBERSHIP_STEPS`,
+  `membershipStep`) auf `JoinMembershipPage` und `MembershipApplyPage`, Styles `tls-steps` (+ `--gold`).
+  `e2e/ui-buttons.spec.js`.
+- Oberfläche, Paket 4 (#1074, #1075; PR #1097): `Reveal` um die Raster von News, Events, Turnieren, Fast Lap, Teams,
+  Spielern, Galerie, Partnern, Referenzen, eSports-Übersicht (`tls-reveal-grid`, Versatz über `nth-child` bis zwölf,
+  Karten `tls-reveal-item`). Hero: `tls-hero-drift` (22 s, eigene Hülle, `--tls-hero-play` über
+  `IntersectionObserver`), Körnung `tls-hero-grain` (SVG-Rauschen, overlay, 13 %).
+- Oberfläche, Paket 5 (#1078, #1079; PR #1099): `hooks/useTilt.js` (`tiltFor`, höchstens 3°, nur `pointer: fine`)
+  am Profilkopf (`tls-tilt`, `__deep` Bild, `__mid` Name); Galerie `tls-gallery-tile` mit `__caption` aus der
+  Maske, `useGrowFrom` lässt die Großansicht aus der Kachel wachsen (`tls-lightbox__stage`).
+  `e2e/gallery-media.spec.js` erweitert.
 
 **App**
 - Logik ohne UI: `mobile/src/lib/dashboard.ts` (`splitHomeTimeline`,
@@ -3576,7 +3625,9 @@ Die alte Fassung im Ganzen zeigt `git show 279c53c3:CLAUDE.md`.
 - App 1.3.0, Build 89 (PR #979; `mobile/app.json`, `package.json`, `package-lock.json`, `CHANGELOG.md`,
   `RELEASES.md`, `src/whatsnew.json`): Version 1.3.0 / `versionCode` 89; gebaut lokal mit
   `npm run release:local -- --aab` (erster Build nach Lockfile-Änderung), Tag `mobile-v1.3.0-build89`,
-  APK am Vereinsserver, AAB für den offenen Test bei Google Play (Versionshinweis im PR #979).
+  APK am Vereinsserver, AAB für den offenen Test bei Google Play (Versionshinweis im PR #979).- App-Bewegung (#1085; PR #1100, offen): `lib/motion.ts` (Werte aus `theme.motion`, `PRESS_SCALE` 0,98,
+  `staggerMs` 70 ms bis acht Stufen, `motionEasing`), `FadeIn` mit den Web-Dauern, `ContentCard`/`Button` geben
+  beim Antippen nach, `StatusBadge.LiveDot` mit Ring (Animated, `useReduceMotion`). Wirkt mit dem nächsten Build.
 ---
 
 ## Teil B – Stand-Verlauf (eingefroren am 5. Oktober 2026)
