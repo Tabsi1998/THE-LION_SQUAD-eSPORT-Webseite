@@ -209,9 +209,13 @@ export function TournamentsScreen({ navigation, route }: Props) {
         </TabHeader>
         {offline && !error ? <OfflineNotice detail="Events, Turniere und Fast-Laps werden aus gespeicherten Daten angezeigt." /> : null}
 
-        <SegmentedTabs items={views} value={view} onChange={setView} />
-        <SegmentedTabs items={filters} value={filter} onChange={setFilter} style={styles.scopeTabs} />
-        {hasInternal ? <SegmentedTabs items={scopes} value={scope} onChange={setScope} style={styles.scopeTabs} /> : null}
+        {/* Die Filterzeilen rücken mit eigenem Abstand zusammen: ein negativer Rand am Inhalt der waagrechten Liste schnitt
+            die Oberkante der Knöpfe ab (Geräteprobe vor 1.4.0). */}
+        <View style={styles.tabRows}>
+          <SegmentedTabs items={views} value={view} onChange={setView} />
+          <SegmentedTabs items={filters} value={filter} onChange={setFilter} />
+          {hasInternal ? <SegmentedTabs items={scopes} value={scope} onChange={setScope} /> : null}
+        </View>
 
         {view === "calendar" ? (
           <View style={styles.section}>
@@ -336,8 +340,8 @@ const styles = StyleSheet.create({
     padding: 18,
     paddingBottom: 28,
   },
-  scopeTabs: {
-    marginTop: -6,
+  tabRows: {
+    gap: 8,
   },
   stats: {
     flexDirection: "row",
