@@ -86,17 +86,27 @@ COVERAGE_FLOOR = 35
 BACKEND_PORT = 8001
 FRONTEND_PORT = 3000
 
+# Every working folder of this repository (the main checkout and the extra
+# worktrees such as C:\lsb) runs its own check. The main checkout keeps the
+# CI's names; any other folder gets its own database name and compose project,
+# so two folders can be checked at the same time without touching each other's
+# data. Only the container group still binds fixed ports - run it in one folder
+# at a time.
+MAIN_FOLDER = "THE-LION_SQUAD-eSPORT-Webseite"
+FOLDER_SLUG = "" if ROOT.name == MAIN_FOLDER else re.sub(r"[^a-z0-9]+", "_", ROOT.name.lower()).strip("_")
+
 # The compose project of the local run. docker compose down --volumes deletes
 # the volumes of its project; with the default project name that would be the
 # developer's own local database.
-COMPOSE_PROJECT = "tls-local-check"
+COMPOSE_PROJECT = "tls-local-check" + (f"-{FOLDER_SLUG.replace('_', '-')}" if FOLDER_SLUG else "")
 
 # The environment of the CI's backend job, and nothing more: a variable the CI
-# does not set can change what a test sees.
+# does not set can change what a test sees. Only the database name differs per
+# folder (see above).
 BACKEND_TEST_ENV = {
     "APP_ENV": "test",
     "MONGO_URL": "mongodb://127.0.0.1:27017",
-    "DB_NAME": "tls_ci",
+    "DB_NAME": "tls_ci" + (f"_{FOLDER_SLUG}" if FOLDER_SLUG else ""),
     "DISABLE_SCHEDULER": "true",
 }
 
