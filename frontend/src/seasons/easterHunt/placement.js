@@ -12,7 +12,7 @@
 // Scrollen darunter. Alles ohne React.
 
 import { MEDIA_OR_CONTROL, TEXT_PAD, ownTextNodes } from "../glyphs";
-import { measureAnchors, pointSlot, probeOf, rectOf } from "../anchors";
+import { MIN_SIZE, measureAnchors, pointSlot, probeOf, rectOf } from "../anchors";
 
 export const EGG_SIZE = 30;
 /** Höhe des gezeichneten Eis (viewBox 30 × 38) und wie weit es über seiner Mitte sitzt (translate(-50%, -55%)). */
@@ -174,6 +174,28 @@ function tryAnchor(anchor, spot, context) {
   return null;
 }
 
+/** So viele Blöcke der Fußzeile werden höchstens versucht (lange Linklisten). */
+const FOOTER_BLOCKS = 24;
+
+/**
+ * Die Blöcke in der Fußzeile (Spalten, Bänder, Zeilen) als letzte Ausweichstellen: sind alle vier Ecken der Fußzeile
+ * belegt - am Handy verdeckt die Leiste unten die unteren, und eine lange erste Zeile reicht bis in die obere rechte -,
+ * liegt das Ei in der Ecke eines Blocks darin. Seit die Vereinsschriften wirklich laden (#1228), laufen Zeilen anders
+ * um als mit der Ersatzschrift des Geräts; so bleibt das Ei der Fußzeile trotzdem auffindbar.
+ */
+function footerBlocks(doc) {
+  const footer = doc && typeof doc.querySelector === "function" ? doc.querySelector("footer") : null;
+  if (!footer) return [];
+  const [minWidth, minHeight] = MIN_SIZE.footer;
+  return Array.from(footer.querySelectorAll("div, section, nav, ul"))
+    .filter((element) => {
+      const rect = rectOf(element);
+      return Boolean(rect && rect.width >= minWidth && rect.height >= minHeight);
+    })
+    .slice(0, FOOTER_BLOCKS)
+    .map((element, index) => ({ element, key: `footer-block:${index}` }));
+}
+
 function contextFor({ doc, win, probe, taken }) {
   const cache = new Map();
   return {
@@ -193,7 +215,8 @@ function contextFor({ doc, win, probe, taken }) {
 /**
  * Wo ein Ei auf dieser Seite liegt: Seitenkoordinaten der Eimitte, die Ecke, das Element und ob es ausweichen
  * musste - `{pending: true}` nur für die Kopfzeile, solange die Seite gescrollt ist; null nur, wenn die Seite gar
- * keine passende Kante und keine Fußzeile hat. `taken`: schon belegte Plätze.
+ * keine passende Kante und keine Fußzeile mit einer freien Ecke (auch in ihren Blöcken) hat. `taken`: schon
+ * belegte Plätze.
  */
 export function placeEgg(egg, { doc = document, win = typeof window === "undefined" ? null : window, probe = eggProbe(doc), taken = new Set(), context = null } = {}) {
   const ctx = context || contextFor({ doc, win, probe, taken });
@@ -212,6 +235,10 @@ export function placeEgg(egg, { doc = document, win = typeof window === "undefin
       const found = tryAnchor(anchor, { ...spot, kind: "footer" }, ctx);
       if (found) return { ...found, kind: "footer", fallback: true };
     }
+  }
+  for (const anchor of footerBlocks(doc)) {
+    const found = tryAnchor(anchor, { ...spot, kind: "footer" }, ctx);
+    if (found) return { ...found, kind: "footer", fallback: true };
   }
   return null;
 }

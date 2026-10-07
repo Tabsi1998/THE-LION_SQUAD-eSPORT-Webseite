@@ -1,0 +1,61 @@
+/* Die Vereinsschriften (#1228) - als Dateien vom eigenen Server, keine Anfrage bei Google (Datenschutz).
+   index.css nennt die Namen schon lange (Unbounded für .font-heading, Outfit für den Text, Rajdhani für
+   .font-display), geladen wurden sie aber nie: jedes Gerät zeigte seine Ersatzschrift.
+
+   Nur die Schnitte, die die Website braucht (Fabians Auswahl vom 07.10.2026), und nur der lateinische
+   Zeichensatz - mit Umlauten, ß, €, „“ und Gedankenstrich:
+   - Unbounded 700 und 800: Bühne und Seitentitel („font-black“ nimmt den 800er).
+   - Outfit 400 bis 800: alles andere, eine variable Datei für alle Stärken (kleiner als fünf einzelne).
+   - Rajdhani 600 und 700: Zahlen. Die Ziffern sind gleich breit gemacht, damit Zahlen beim Hochzählen
+     und in Tabellen nicht springen (eigene Ableitung, die Lizenz erlaubt das).
+
+   font-display: swap - der Text steht sofort in der Ersatzschrift da und wechselt, sobald die Datei da ist.
+   index.html lädt Outfit und Unbounded 800 vorab, damit der erste Bildschirm nicht springt.
+   Die Dateien baut scripts/build_web_fonts.py; die Prüfsumme im Namen ändert sich mit dem Inhalt, weil nginx
+   Schriften ein Jahr lang unverändert zwischenspeichern lässt. Lizenzen: public/fonts/OFL-*.txt.
+   src/fonts.test.js prüft, dass jede genannte Datei da ist und zu ihrer Prüfsumme passt. */
+
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("/fonts/outfit-latin-wght-6c18d579.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Unbounded";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/unbounded-latin-700-477fa230.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Unbounded";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/unbounded-latin-800-fe6d4ea7.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Rajdhani";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/rajdhani-latin-600-43f1c5b8.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Rajdhani";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/rajdhani-latin-700-941ae208.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
