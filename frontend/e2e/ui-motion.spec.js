@@ -112,7 +112,7 @@ test.describe("Oberfläche, Welle 1: Kopfleiste, Menü, Seitenwechsel, Social-Lo
   test("Seitenwechsel ohne Übergangs-Funktion: der neue Inhalt blendet ein, der erste Aufbau nicht", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     // Browser ohne View Transitions (#1073): dann blendet der Inhalt selbst ein (page-transitions.spec.js für mit).
-    await page.addInitScript(() => { delete Document.prototype.startViewTransition; });
+    await page.addInitScript(() => { delete window.Document.prototype.startViewTransition; });
     await mockServer(page);
     await page.goto("/");
     const main = page.locator("main#main-content");

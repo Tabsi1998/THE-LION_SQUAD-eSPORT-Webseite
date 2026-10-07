@@ -13,9 +13,9 @@ async function mockServer(page) {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 86400000 }));
     // Jeden Übergang mitzählen, ohne ihn zu verändern.
     window.__transitions = 0;
-    const original = Document.prototype.startViewTransition;
+    const original = window.Document.prototype.startViewTransition;
     if (typeof original === "function") {
-      Document.prototype.startViewTransition = function counted(...args) {
+      window.Document.prototype.startViewTransition = function counted(...args) {
         window.__transitions += 1;
         return original.apply(this, args);
       };
