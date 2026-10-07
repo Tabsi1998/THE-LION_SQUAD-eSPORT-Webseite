@@ -88,6 +88,7 @@ export function DirectThreadScreen({ navigation, route }: Props) {
         onReportMessage={(message) => setReport({ targetUserId: otherId, targetName: otherName, direct: true, message })}
         onData={onData}
         refreshToken={refreshToken}
+        read={{ kind: "direct", id: otherId }}
         postUrl={`/messages/direct/${otherId}`}
       />
       <ReportSheet draft={report} onClose={() => setReport(null)} onSent={() => Alert.alert("Danke", "Die Moderation sieht sich das an.")} />

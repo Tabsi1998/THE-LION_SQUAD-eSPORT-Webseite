@@ -1,4 +1,5 @@
 import * as SecureStore from "expo-secure-store";
+import { clearRecentSearches } from "../lib/recentSearches";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { api, configureAuthBridge, refreshSession } from "../lib/api";
 import { clearAllCache } from "../lib/cache";
@@ -112,6 +113,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       SecureStore.deleteItemAsync(REFRESH_KEY),
       SecureStore.deleteItemAsync(USER_KEY),
       clearAllCache(),
+      // Die letzten Suchen (#1145) gehen mit dem Konto.
+      clearRecentSearches(),
     ]);
   }, [enterGuest]);
 

@@ -22,11 +22,12 @@ export function TeamChatScreen({ navigation, route }: Props) {
         lockedDetail="Team-Chat ist nur für Teammitglieder sichtbar."
         listUrl={`/teams/${route.params.id}/chat`}
         mentionSearchUrl={`/teams/${route.params.id}/mention-candidates`}
-        onOpenProfile={(username) => navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username }, initial: false })}
+        onOpenProfile={(username) => navigation.navigate("PublicProfile", { username })}
         onReportMessage={(message) => {
           const sender = senderOf(message);
           if (sender) setReport({ targetUserId: sender.id, targetName: sender.name, message });
         }}
+        read={{ kind: "team", id: route.params.id }}
         postUrl={`/teams/${route.params.id}/chat`}
       />
       <ReportSheet draft={report} onClose={() => setReport(null)} onSent={() => Alert.alert("Danke", "Die Moderation sieht sich das an.")} />

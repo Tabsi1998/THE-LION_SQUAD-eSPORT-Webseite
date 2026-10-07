@@ -7,8 +7,8 @@ import { useSeason, type SeasonPreference } from "./SeasonProvider";
 import { appNamesSeason } from "./SeasonStage";
 import { useSoundsOn } from "./sound/player";
 
-// Der Schalter unter „Mehr“ (#636): saisonale Deko an, dezent oder aus - angemeldet im Konto (gilt
-// auch auf der Website), als Gast auf dem Gerät. Sichtbar ist er immer, damit man ihn findet.
+// Der Schalter (#636): saisonale Deko an, dezent oder aus - angemeldet im Konto (gilt auch auf der Website), als Gast auf
+// dem Gerät. Seit #1146 steht er in den Einstellungen unter „Darstellung“ (Zahnrad im Profil; Gäste im Profil-Tab).
 
 export const DECO_ITEMS: Array<{ key: SeasonPreference; label: string }> = [
   { key: "on", label: "An" },
@@ -21,14 +21,14 @@ export const SOUND_ITEMS: Array<{ key: "on" | "off"; label: string }> = [
   { key: "off", label: "Aus" },
 ];
 
-export function DecoSetting() {
+export function DecoSetting({ title = "Darstellung" }: { title?: string | null } = {}) {
   const { preference, setPreference, seasons, reducedMotion } = useSeason();
   // Nur, was die App auch zeigt - eine Saison, die erst das Web zeichnet, hieße hier sonst „läuft gerade“ ohne Bild.
   const running = seasons.filter(appNamesSeason).map((season) => season.label).join(", ");
   const [soundsOn, setSoundsOn] = useSoundsOn();
   return (
     <View style={styles.group} testID="season-deco-setting">
-      <Heading>Darstellung</Heading>
+      {title ? <Heading>{title}</Heading> : null}
       <Card>
         <Body style={styles.title}>Saisonale Deko</Body>
         <Muted style={styles.hint}>

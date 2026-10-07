@@ -24,6 +24,7 @@ import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmen
 import { MessageSticker, StickerButton, StickerPicker } from "./ChatStickers";
 import { acceptKeyboardImages } from "../../modules/keyboard-image-input";
 import type { CatalogSticker } from "../lib/stickers";
+import { markChatRead, type ChatKind } from "../lib/chats";
 import { EmptyState, SkeletonList } from "./ListState";
 import { RichText } from "./RichText";
 import { Body, Muted } from "./Text";
@@ -44,6 +45,8 @@ type Props = {
   onData?: (data: unknown) => void;
   /** Ändert sich der Wert, lädt der Chat neu - etwa nach Blockieren oder Freigeben. */
   refreshToken?: number;
+  /** Welche Unterhaltung das ist (#1148): beim Öffnen und bei neuen Nachrichten „gelesen bis jetzt“ - überall gleich. */
+  read?: { kind: ChatKind; id: string };
 };
 
 // Außerhalb der Komponente, damit sie über alle Renderdurchläufe dieselben
@@ -66,6 +69,7 @@ export function ChatThreadView({
   onReportMessage,
   onData,
   refreshToken = 0,
+  read,
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
@@ -96,11 +100,21 @@ export function ChatThreadView({
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated }));
   }, []);
 
+  const lastReadMessage = useRef<string | null>(null);
+  const readKind = read?.kind;
+  const readId = read?.id;
   const load = useCallback(async () => {
     setError("");
     try {
       const { data } = await api.get(listUrl);
-      setMessages(extractMessages(data));
+      const loaded = extractMessages(data);
+      setMessages(loaded);
+      // Gelesen (#1148): beim ersten Laden und sobald eine neue Nachricht da ist - nicht bei jedem stillen Nachladen.
+      const newest = loaded.length ? String(loaded[loaded.length - 1]?.id || loaded.length) : "";
+      if (readKind && readId && newest !== lastReadMessage.current) {
+        lastReadMessage.current = newest;
+        void markChatRead(readKind, readId);
+      }
       setAllowed(canSend(data));
       onData?.(data);
       if (!didInitialScroll.current || nearBottomRef.current) {
@@ -113,7 +127,7 @@ export function ChatThreadView({
     } finally {
       setLoading(false);
     }
-  }, [canSend, extractMessages, listUrl, lockedDetail, onData, scrollToLatest]);
+  }, [canSend, extractMessages, listUrl, lockedDetail, onData, readId, readKind, scrollToLatest]);
 
   useEffect(() => {
     load();

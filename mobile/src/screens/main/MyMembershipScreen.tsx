@@ -18,7 +18,8 @@ import { colors } from "../../theme";
 
 // Meine Mitgliedschaft in der App (#339): Stand aus der Mitgliederverwaltung (Beitrag, Typ,
 // Nummer) - und wer noch nicht zugeordnet ist, kann es anfragen. Die Belege selbst stehen unter
-// „Meine Rechnungen“ (#320): Rechnungen gehören zum Konto, der Mitgliederbereich bleibt Verein.
+// „Meine Rechnungen“ (#320), erreichbar im Profil unter „Nur für dich“ (#1149): Rechnungen gehören zum Konto, der
+// Mitgliederbereich bleibt Verein.
 
 type Props = NativeStackScreenProps<MoreStackParamList, "MyMembership">;
 
@@ -379,7 +380,7 @@ export function MyMembershipScreen({ navigation }: Props) {
         ) : null}
 
         {/* Konten in der Mitgliederakte (#846): geprüfte Konten nur auf Wunsch in die Akte; verknüpft wird im Profil unter „Bearbeiten“. */}
-        <MemberFileAccounts onLink={() => navigation.getParent()?.navigate("Profile", { tab: "edit" })} />
+        <MemberFileAccounts onLink={() => navigation.navigate("ProfileEdit")} />
 
         {website ? (
           <Card style={styles.card} testID="membership-website">
@@ -406,8 +407,8 @@ export function MyMembershipScreen({ navigation }: Props) {
               {invoices.summary.overdue_count ? ` · ${invoices.summary.overdue_count} überfällig` : ""}
             </Muted>
           ) : null}
-          <Muted>Beitrag, Events und Turniere – alle deine Rechnungen stehen gesammelt unter „Meine Rechnungen“.</Muted>
-          <Button label="Meine Rechnungen" variant="secondary" onPress={() => navigation.navigate("MyInvoices")} testID="membership-invoices-link" />
+          {/* Jedes Thema an genau einem Ort (#1150): die Rechnungen öffnet man im Profil unter „Nur für dich“. */}
+          <Muted testID="membership-invoices-hint">Beitrag, Events und Turniere – alle deine Rechnungen stehen im Profil unter „Nur für dich“.</Muted>
         </Card>
       </ScrollView>
     </Screen>

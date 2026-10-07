@@ -138,7 +138,7 @@ export function InfoCenterScreen({ navigation, route }: Props) {
           <>
             {section === "sponsors" ? <Sponsors items={sponsors} /> : null}
             {section === "partners" ? <Partners items={partners} /> : null}
-            {section === "events" ? <Events items={events} onOpen={(event) => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id }, initial: false })} /> : null}
+            {section === "events" ? <Events items={events} onOpen={(event) => navigation.navigate("EventDetail", { id: event.slug || event.id })} /> : null}
             {section === "benefits" ? <Benefits isMember={Boolean(user?.is_club_member)} membership={user?.membership || null} items={benefits} /> : null}
             {section === "references" ? <References items={references} summary={referenceSummary} /> : null}
             {section === "profiles" ? <Profiles items={profiles} onOpen={(profile) => profile.username ? navigation.navigate("PublicProfile", { username: profile.username }) : undefined} /> : null}

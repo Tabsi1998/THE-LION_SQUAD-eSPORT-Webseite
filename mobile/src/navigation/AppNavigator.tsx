@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { createNativeStackNavigator, type NativeStackNavigationOptions } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import React, { useEffect } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { UnderHeaderContext } from "../components/Screen";
+import { HeaderBell } from "../components/TabHeader";
 import { BootScreen } from "../screens/BootScreen";
 import { LockScreen } from "../screens/LockScreen";
 import { AchievementCatchUpOverlay } from "../components/AchievementCatchUpOverlay";
@@ -13,65 +14,25 @@ import { BallotPopupOverlay } from "../components/BallotPopupOverlay";
 import { PasskeyInvite } from "../components/PasskeyInvite";
 import { markSignInNudgeSeen, SignInNudge } from "../components/SignInNudge";
 import { LoginScreen } from "../screens/auth/LoginScreen";
+import { DETAIL_SCREENS, TAB_ROOT_SCREENS } from "./screenRegistry";
 import { RegisterScreen } from "../screens/auth/RegisterScreen";
 import { ConsentScreen } from "../screens/auth/ConsentScreen";
-import { AdventCalendarScreen } from "../screens/main/AdventCalendarScreen";
-import { EasterHuntScreen } from "../screens/main/EasterHuntScreen";
-import { DashboardScreen } from "../screens/main/DashboardScreen";
-import { DirectMessagesScreen } from "../screens/main/DirectMessagesScreen";
-import { DirectThreadScreen } from "../screens/main/DirectThreadScreen";
-import { FastLapDetailScreen } from "../screens/main/FastLapDetailScreen";
-import { FastLapScreen } from "../screens/main/FastLapScreen";
-import { EventDetailScreen } from "../screens/main/EventDetailScreen";
-import { MoreScreen } from "../screens/main/MoreScreen";
 import { SiteBannerTicker } from "../components/SiteBannerTicker";
-import { GalleryScreen } from "../screens/main/GalleryScreen";
-import { GalleryAlbumScreen } from "../screens/main/GalleryAlbumScreen";
-import { GalleryViewerScreen } from "../screens/main/GalleryViewerScreen";
-import { MemberAreaScreen } from "../screens/main/MemberAreaScreen";
-import { AdmissionScreen } from "../screens/main/AdmissionScreen";
-import { MemberCardScreen } from "../screens/main/MemberCardScreen";
-import { MemberDocumentsScreen } from "../screens/main/MemberDocumentsScreen";
-import { MemberMeetingsScreen } from "../screens/main/MemberMeetingsScreen";
-import { MemberHelperShiftsScreen } from "../screens/main/MemberHelperShiftsScreen";
-import { MyInvoicesScreen } from "../screens/main/MyInvoicesScreen";
-import { MyMembershipScreen } from "../screens/main/MyMembershipScreen";
-import { MatchDetailScreen } from "../screens/main/MatchDetailScreen";
-import { NewsDetailScreen } from "../screens/main/NewsDetailScreen";
-import { NewsScreen } from "../screens/main/NewsScreen";
-import { NotificationsScreen } from "../screens/main/NotificationsScreen";
-import { SeasonPassScreen } from "../screens/main/SeasonPassScreen";
-import { ProfileScreen } from "../screens/main/ProfileScreen";
-import { PublicProfileScreen } from "../screens/main/PublicProfileScreen";
-import { AchievementShowcaseScreen } from "../screens/main/AchievementShowcaseScreen";
-import { InfoCenterScreen } from "../screens/main/InfoCenterScreen";
-import { TeamChatScreen } from "../screens/main/TeamChatScreen";
-import { TeamDetailScreen } from "../screens/main/TeamDetailScreen";
-import { TeamsScreen } from "../screens/main/TeamsScreen";
-import { TournamentChatScreen } from "../screens/main/TournamentChatScreen";
-import { TournamentDetailScreen } from "../screens/main/TournamentDetailScreen";
-import { TournamentsScreen } from "../screens/main/TournamentsScreen";
 import { useAuth } from "../auth/AuthContext";
+import { useUnreadChats } from "../chats/ChatsContext";
+import { badgeText } from "../lib/chats";
 import { isGuestUser } from "../live";
 import { useAppLock } from "../lock/AppLockProvider";
 import { SeasonStage, useSeasonTabIcon } from "../seasons/SeasonStage";
-import { useNotifications } from "../notifications/NotificationContext";
 import { colors } from "../theme";
 import { flushPendingNotification, navigationRef } from "./rootNavigation";
 import { flushPendingLink, listenForAppLinks } from "../lib/appLinks";
-import type {
-  MainTabParamList,
-  MoreStackParamList,
-  RootStackParamList,
-  TeamStackParamList,
-  TournamentStackParamList,
-} from "./types";
+import type { AppStackParamList, DetailScreenName, MainTabName, MainTabParamList, RootStackParamList, TabRootParamList } from "./types";
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const Tabs = createBottomTabNavigator<MainTabParamList>();
-const TournamentStack = createNativeStackNavigator<TournamentStackParamList>();
-const TeamStack = createNativeStackNavigator<TeamStackParamList>();
-const MoreStack = createNativeStackNavigator<MoreStackParamList>();
+// Ein Stapel-Bauplan für alle fünf Tabs (#1144): jeder Tab hat seinen eigenen Stapel mit denselben Detail-Screens.
+const AppStack = createNativeStackNavigator<AppStackParamList>();
 
 const theme = {
   ...DefaultTheme,
@@ -84,6 +45,15 @@ const theme = {
     primary: colors.cyan,
   },
 };
+
+/** Die fünf Tabs in ihrer Reihenfolge (#1143) - für alle gleich, damit Hilfe am Telefon funktioniert. */
+export const MAIN_TABS: Array<{ name: MainTabName; title: string; icon: keyof typeof Ionicons.glyphMap }> = [
+  { name: "HomeTab", title: "Home", icon: "home-outline" },
+  { name: "EventsTab", title: "Events", icon: "calendar-outline" },
+  { name: "CommunityTab", title: "Community", icon: "chatbubbles-outline" },
+  { name: "VereinTab", title: "Verein", icon: "shield-checkmark-outline" },
+  { name: "ProfileTab", title: "Profil", icon: "person-circle-outline" },
+];
 
 export function AppNavigator() {
   const { user, loading } = useAuth();
@@ -103,7 +73,6 @@ export function AppNavigator() {
   return (
     <NavigationContainer ref={navigationRef} theme={theme} onReady={() => { flushPendingNotification(); flushPendingLink(); }}>
       {signedIn && user?.consent_required ? <ConsentScreen /> : <RootScreens />}
-      {signedIn && !user?.consent_required ? <NotificationBellOverlay /> : null}
       {signedIn && !user?.consent_required ? <AchievementCatchUpOverlay /> : null}
       {/* Abstimmung live (#844): offene Abstimmung mit eigenem Stimmrecht über jedem Screen. */}
       {signedIn && !user?.consent_required ? <BallotPopupOverlay /> : null}
@@ -116,7 +85,7 @@ export function AppNavigator() {
 }
 
 // Gast zuerst (#918): Die App startet ohne Konto. Anmelden und Registrieren liegen über den Tabs - nach der Anmeldung geht
-// es zurück, woher man kam (Turnier, Adventkalender, „Mehr“ ...).
+// es zurück, woher man kam (Turnier, Adventkalender, Profil ...).
 function RootScreens() {
   return (
     <RootStack.Navigator screenOptions={stackOptions} screenLayout={stackScreenLayout}>
@@ -142,8 +111,10 @@ function MainScreen() {
 function MainTabs() {
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, 8);
-  // Jahreszeiten (#636): der Tab „Mehr“ trägt zur Saison ihr Symbol (Halloween: Kürbis).
+  // Jahreszeiten (#636, #1143): der Tab „Verein“ trägt zur Saison ihr Symbol (Halloween: Kürbis).
   const SeasonIcon = useSeasonTabIcon();
+  // Die Zahl am Tab „Community“ (#1148) zählt ungelesene Chats.
+  const unreadChats = useUnreadChats();
   return (
     <Tabs.Navigator
       screenOptions={({ route }) => ({
@@ -173,40 +144,29 @@ function MainTabs() {
           fontWeight: "900",
           textTransform: "uppercase",
         },
+        tabBarBadgeStyle: styles.tabBadge,
         tabBarIcon: ({ color, focused, size }) => (
           <View style={styles.tabIconWrap}>
             <View style={[styles.tabActiveLine, focused && styles.tabActiveLineVisible]} />
-            {route.name === "More" && SeasonIcon ? <SeasonIcon size={focused ? size + 1 : size} /> : <Ionicons name={iconFor(route.name)} color={color} size={focused ? size + 1 : size} />}
+            {route.name === "VereinTab" && SeasonIcon ? <SeasonIcon size={focused ? size + 1 : size} /> : <Ionicons name={iconFor(route.name)} color={color} size={focused ? size + 1 : size} />}
           </View>
         ),
       })}
     >
-      <Tabs.Screen name="Dashboard" component={DashboardScreen} options={{ title: "Home" }} />
+      <Tabs.Screen name="HomeTab" component={HomeStackScreen} options={{ title: "Home", tabBarButtonTestID: "tab-home" }} />
+      <Tabs.Screen name="EventsTab" component={EventsStackScreen} options={{ title: "Events", tabBarButtonTestID: "tab-events" }} />
       <Tabs.Screen
-        name="Tournaments"
-        component={TournamentStackScreen}
-        options={{ title: "Events", popToTopOnBlur: true }}
-        listeners={({ navigation }) => ({
-          tabPress: () => navigation.navigate("Tournaments", { screen: "TournamentList" }),
-        })}
+        name="CommunityTab"
+        component={CommunityStackScreen}
+        options={{
+          title: "Community",
+          tabBarButtonTestID: "tab-community",
+          tabBarBadge: unreadChats > 0 ? badgeText(unreadChats) : undefined,
+          tabBarAccessibilityLabel: unreadChats > 0 ? `Community, ${unreadChats} ungelesene Chats` : "Community",
+        }}
       />
-      <Tabs.Screen
-        name="Teams"
-        component={TeamStackScreen}
-        options={{ title: "Teams", popToTopOnBlur: true }}
-        listeners={({ navigation }) => ({
-          tabPress: () => navigation.navigate("Teams", { screen: "TeamList" }),
-        })}
-      />
-      <Tabs.Screen name="Profile" component={ProfileScreen} options={{ title: "Profil" }} />
-      <Tabs.Screen
-        name="More"
-        component={MoreStackScreen}
-        options={{ title: "Mehr", popToTopOnBlur: true }}
-        listeners={({ navigation }) => ({
-          tabPress: () => navigation.navigate("More", { screen: "MoreHub" }),
-        })}
-      />
+      <Tabs.Screen name="VereinTab" component={VereinStackScreen} options={{ title: "Verein", tabBarButtonTestID: "tab-verein" }} />
+      <Tabs.Screen name="ProfileTab" component={ProfileStackScreen} options={{ title: "Profil", tabBarButtonTestID: "tab-profile" }} />
     </Tabs.Navigator>
   );
 }
@@ -223,99 +183,84 @@ const stackOptions = {
   contentStyle: { backgroundColor: colors.black },
 };
 
-function TournamentStackScreen() {
+// Detail-Screens (#1145): Zurück-Pfeil links, rechts die Glocke - an derselben Stelle wie in den Übersichten.
+const detailOptions: NativeStackNavigationOptions = {
+  ...stackOptions,
+  headerRight: () => <HeaderBell />,
+};
+
+const gold = { headerTintColor: colors.gold };
+
+/** Titel und Kopfzeile der Detail-Screens - in jedem Tab-Stapel dieselben (#1144). */
+export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptions | ((props: { route: { params?: { title?: string } } }) => NativeStackNavigationOptions)> = {
+  TournamentDetail: { title: "Turnier" },
+  EventDetail: { title: "Event" },
+  FastLapDetail: { title: "Fast Lap" },
+  MatchDetail: { title: "Match" },
+  TournamentChat: ({ route }) => ({ title: route.params?.title || "Turnier-Chat" }),
+  TeamDetail: { title: "Team" },
+  TeamChat: ({ route }) => ({ title: route.params?.title || "Team-Chat" }),
+  PublicProfile: { title: "Profil" },
+  DirectThread: ({ route }) => ({ title: route.params?.title || "Chat" }),
+  NewsList: { title: "News" },
+  NewsDetail: { title: "News" },
+  Gallery: { title: "Galerie" },
+  GalleryAlbum: { title: "Album" },
+  GalleryViewer: { title: "Galerie", headerTintColor: colors.white },
+  // Die Liste der Glocke: rechts keine zweite Glocke.
+  Notifications: { title: "Benachrichtigungen", headerRight: () => null },
+  // Die Suche zeigt ihre eigene Zeile mit Eingabefeld und „Abbrechen“.
+  Search: { headerShown: false },
+  SeasonPass: { title: "Jahreswertung" },
+  AchievementShowcase: { title: "Erfolge" },
+  AdventCalendar: { title: "Adventkalender", headerTintColor: "#e9c46a" },
+  EasterHunt: { title: "Ostereiersuche", headerTintColor: "#e9c46a" },
+  MyInvoices: { title: "Meine Rechnungen", ...gold },
+  MyPrizes: { title: "Meine Gewinne", ...gold },
+  MyMembership: { title: "Meine Mitgliedschaft", ...gold },
+  MemberDocuments: { title: "Dokumente", ...gold },
+  MemberMeetings: { title: "Versammlungen", ...gold },
+  MemberHelperShifts: { title: "Helferdienste", ...gold },
+  MemberCard: { title: "Mitgliedskarte", ...gold },
+  Admission: { title: "Einlass" },
+  InfoCenter: { title: "Verein" },
+  Settings: { title: "Einstellungen" },
+  ProfileEdit: { title: "Profil bearbeiten" },
+};
+
+/** Alle Detail-Screens - in jedem Tab-Stapel dieselben (#1144). */
+function detailScreens() {
   return (
-    <TournamentStack.Navigator screenOptions={stackOptions} screenLayout={stackScreenLayout}>
-      <TournamentStack.Screen name="TournamentList" component={TournamentsScreen} options={{ headerShown: false }} />
-      <TournamentStack.Screen name="TournamentDetail" component={TournamentDetailScreen} options={{ title: "Turnier" }} />
-      <TournamentStack.Screen name="EventDetail" component={EventDetailScreen} options={{ title: "Event" }} />
-      <TournamentStack.Screen name="FastLapDetail" component={FastLapDetailScreen} options={{ title: "Fast Lap" }} />
-      <TournamentStack.Screen name="MatchDetail" component={MatchDetailScreen} options={{ title: "Match" }} />
-      <TournamentStack.Screen name="TournamentChat" component={TournamentChatScreen} options={({ route }) => ({ title: route.params.title || "Turnier-Chat" })} />
-    </TournamentStack.Navigator>
+    <AppStack.Group screenOptions={detailOptions}>
+      {(Object.keys(DETAIL_SCREENS) as DetailScreenName[]).map((name) => (
+        <AppStack.Screen key={name} name={name} component={DETAIL_SCREENS[name]} options={DETAIL_OPTIONS[name] as never} />
+      ))}
+    </AppStack.Group>
   );
 }
 
-function TeamStackScreen() {
-  return (
-    <TeamStack.Navigator screenOptions={stackOptions} screenLayout={stackScreenLayout}>
-      <TeamStack.Screen name="TeamList" component={TeamsScreen} options={{ headerShown: false }} />
-      <TeamStack.Screen name="TeamDetail" component={TeamDetailScreen} options={{ title: "Team" }} />
-      <TeamStack.Screen name="TeamChat" component={TeamChatScreen} options={({ route }) => ({ title: route.params.title || "Team-Chat" })} />
-    </TeamStack.Navigator>
-  );
-}
-
-function MoreStackScreen() {
-  return (
-    <MoreStack.Navigator screenOptions={stackOptions} screenLayout={stackScreenLayout}>
-      <MoreStack.Screen name="MoreHub" component={MoreScreen} options={{ headerShown: false }} />
-      <MoreStack.Screen name="InfoCenter" component={InfoCenterScreen} options={{ title: "Info Center" }} />
-      <MoreStack.Screen name="PublicProfile" component={PublicProfileScreen} options={{ title: "Profil" }} />
-      <MoreStack.Screen name="NewsList" component={NewsScreen} options={{ title: "News" }} />
-      <MoreStack.Screen name="NewsDetail" component={NewsDetailScreen} options={{ title: "News" }} />
-      <MoreStack.Screen name="Gallery" component={GalleryScreen} options={{ title: "Galerie" }} />
-      <MoreStack.Screen name="GalleryAlbum" component={GalleryAlbumScreen} options={{ title: "Album" }} />
-      <MoreStack.Screen name="GalleryViewer" component={GalleryViewerScreen} options={{ title: "Galerie", headerTintColor: colors.white }} />
-      <MoreStack.Screen name="FastLapList" component={FastLapScreen} options={{ title: "Fast Laps" }} />
-      <MoreStack.Screen name="FastLapDetail" component={FastLapDetailScreen} options={{ title: "Fast Lap" }} />
-      <MoreStack.Screen name="DirectMessages" component={DirectMessagesScreen} options={{ title: "Nachrichten" }} />
-      <MoreStack.Screen name="DirectThread" component={DirectThreadScreen} options={({ route }) => ({ title: route.params.title || "Chat" })} />
-      <MoreStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Benachrichtigungen" }} />
-      <MoreStack.Screen name="SeasonPass" component={SeasonPassScreen} options={{ title: "Jahreswertung" }} />
-      <MoreStack.Screen name="AchievementShowcase" component={AchievementShowcaseScreen} options={{ title: "Achievements" }} />
-      <MoreStack.Screen name="AdventCalendar" component={AdventCalendarScreen} options={{ title: "Adventkalender", headerTintColor: "#e9c46a" }} />
-      <MoreStack.Screen name="EasterHunt" component={EasterHuntScreen} options={{ title: "Ostereiersuche", headerTintColor: "#e9c46a" }} />
-      <MoreStack.Screen name="MyInvoices" component={MyInvoicesScreen} options={{ title: "Meine Rechnungen", headerTintColor: colors.gold }} />
-      <MoreStack.Screen name="MemberArea" component={MemberAreaScreen} options={{ title: "Mitgliederbereich", headerTintColor: colors.gold }} />
-      <MoreStack.Screen name="Admission" component={AdmissionScreen} options={{ title: "Einlass" }} />
-      <MoreStack.Screen name="MyMembership" component={MyMembershipScreen} options={{ title: "Meine Mitgliedschaft", headerTintColor: colors.gold }} />
-      <MoreStack.Screen name="MemberDocuments" component={MemberDocumentsScreen} options={{ title: "Dokumente", headerTintColor: colors.gold }} />
-      <MoreStack.Screen name="MemberMeetings" component={MemberMeetingsScreen} options={{ title: "Versammlungen", headerTintColor: colors.gold }} />
-      <MoreStack.Screen name="MemberHelperShifts" component={MemberHelperShiftsScreen} options={{ title: "Helferdienste", headerTintColor: colors.gold }} />
-      <MoreStack.Screen name="MemberCard" component={MemberCardScreen} options={{ title: "Mitgliedskarte", headerTintColor: colors.gold }} />
-    </MoreStack.Navigator>
-  );
-}
-
-function iconFor(route: keyof MainTabParamList) {
-  switch (route) {
-    case "Dashboard":
-      return "home-outline";
-    case "Tournaments":
-      return "calendar-outline";
-    case "Teams":
-      return "people-outline";
-    case "Profile":
-      return "person-circle-outline";
-    case "More":
-      return "menu-outline";
+/** Ein Tab-Stapel: seine Übersicht ohne Stapel-Kopf (die Übersicht zeigt ihre eigene Kopfzeile), darüber die Details. */
+function tabStack<R extends keyof TabRootParamList>(root: R) {
+  function TabStack() {
+    return (
+      <AppStack.Navigator screenOptions={stackOptions} screenLayout={stackScreenLayout} initialRouteName={root}>
+        <AppStack.Screen name={root} component={TAB_ROOT_SCREENS[root]} options={{ headerShown: false }} />
+        {detailScreens()}
+      </AppStack.Navigator>
+    );
   }
+  TabStack.displayName = `${root}Stack`;
+  return TabStack;
 }
 
-function NotificationBellOverlay() {
-  const insets = useSafeAreaInsets();
-  const { unread, load } = useNotifications();
-  return (
-    <Pressable
-      accessibilityHint="Öffnet die Benachrichtigungen"
-      accessibilityLabel={unread ? `${unread} ungelesene Benachrichtigungen` : "Benachrichtigungen"}
-      accessibilityRole="button"
-      onPress={() => {
-        load();
-        navigationRef.navigate("More", { screen: "Notifications", initial: false });
-      }}
-      style={({ pressed }) => [styles.bell, { right: Math.max(insets.right + 14, 14), top: Math.max(insets.top + 6, 12) }, pressed && styles.pressed]}
-      hitSlop={8}
-    >
-      <Ionicons name="notifications-outline" color={unread ? colors.cyan : colors.white} size={21} />
-      {unread ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{unread > 99 ? "99+" : unread}</Text>
-        </View>
-      ) : null}
-    </Pressable>
-  );
+const HomeStackScreen = tabStack("Dashboard");
+const EventsStackScreen = tabStack("TournamentList");
+const CommunityStackScreen = tabStack("CommunityHub");
+const VereinStackScreen = tabStack("VereinHub");
+const ProfileStackScreen = tabStack("Profile");
+
+function iconFor(route: MainTabName) {
+  return MAIN_TABS.find((tab) => tab.name === route)?.icon || "ellipse-outline";
 }
 
 const styles = StyleSheet.create({
@@ -350,39 +295,10 @@ const styles = StyleSheet.create({
   tabActiveLineVisible: {
     backgroundColor: colors.cyan,
   },
-  bell: {
-    alignItems: "center",
-    backgroundColor: "rgba(10,10,10,0.96)",
-    borderColor: "rgba(255,255,255,0.1)",
-    borderRadius: 20,
-    borderWidth: 1,
-    height: 40,
-    justifyContent: "center",
-    position: "absolute",
-    right: 14,
-    width: 40,
-    zIndex: 40,
-    elevation: 6,
-  },
-  badge: {
-    alignItems: "center",
+  tabBadge: {
     backgroundColor: colors.live,
-    borderColor: colors.black,
-    borderRadius: 9,
-    borderWidth: 1,
-    minWidth: 18,
-    paddingHorizontal: 4,
-    position: "absolute",
-    right: -2,
-    top: -3,
-  },
-  badgeText: {
     color: colors.white,
     fontSize: 10,
     fontWeight: "900",
-    lineHeight: 15,
-  },
-  pressed: {
-    opacity: 0.72,
   },
 });

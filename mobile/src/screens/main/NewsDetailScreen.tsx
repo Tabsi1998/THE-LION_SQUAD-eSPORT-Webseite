@@ -51,19 +51,19 @@ export function NewsDetailScreen({ navigation, route }: Props) {
       return;
     }
     if (target.type === "event") {
-      navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: target.id }, initial: false });
+      navigation.navigate("EventDetail", { id: target.id });
       return;
     }
     if (target.type === "tournament") {
-      navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: target.id }, initial: false });
+      navigation.navigate("TournamentDetail", { id: target.id });
       return;
     }
     if (target.type === "fastlap") {
-      navigation.getParent()?.navigate("Tournaments", { screen: "FastLapDetail", params: { id: target.id }, initial: false });
+      navigation.navigate("FastLapDetail", { id: target.id });
       return;
     }
     if (target.type === "team") {
-      navigation.getParent()?.navigate("Teams", { screen: "TeamDetail", params: { id: target.id }, initial: false });
+      navigation.navigate("TeamDetail", { id: target.id });
       return;
     }
     navigation.navigate("PublicProfile", { username: target.id });
@@ -140,7 +140,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
                 phase={tournament.public_phase}
                 status={tournament.status}
                 description={tournament.description}
-                onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: tournament.slug || tournament.id }, initial: false })}
+                onPress={() => navigation.navigate("TournamentDetail", { id: tournament.slug || tournament.id })}
               />
             ))}
           </Card>
@@ -159,7 +159,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
                 phase={event.public_phase}
                 status={event.status}
                 description={placeParts(event.location, event.city).join(", ")}
-                onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id }, initial: false })}
+                onPress={() => navigation.navigate("EventDetail", { id: event.slug || event.id })}
               />
             ))}
           </Card>
@@ -178,7 +178,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
                 phase={challenge.public_phase}
                 status={challenge.status}
                 description={challenge.description}
-                onPress={() => navigation.getParent()?.navigate("Tournaments", { screen: "FastLapDetail", params: { id: challenge.slug || challenge.id }, initial: false })}
+                onPress={() => navigation.navigate("FastLapDetail", { id: challenge.slug || challenge.id })}
               />
             ))}
           </Card>

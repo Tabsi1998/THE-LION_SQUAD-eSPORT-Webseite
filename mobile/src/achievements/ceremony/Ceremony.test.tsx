@@ -22,7 +22,7 @@ jest.mock("./sounds", () => ({
   writeCeremonyMuted: (...args: unknown[]) => mockWriteMuted(...args),
 }));
 const mockNavigate = jest.fn();
-jest.mock("../../navigation/rootNavigation", () => ({ navigationRef: { isReady: () => true, navigate: (...args: unknown[]) => mockNavigate(...args) } }));
+jest.mock("../../navigation/rootNavigation", () => ({ openTab: (...args: unknown[]) => mockNavigate(...args) }));
 
 const tier = (code: string, material: string, rank: number, category: string, extra: Partial<CeremonyTier> = {}): CeremonyTier => ({ code, name: `Stufe ${code}`, material, rank, category, points: rank * 10, group_name: "Gruppe", ...extra });
 

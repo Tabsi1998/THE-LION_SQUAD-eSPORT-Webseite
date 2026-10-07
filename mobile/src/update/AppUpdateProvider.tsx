@@ -142,3 +142,8 @@ export function useAppUpdate() {
   if (!context) throw new Error("useAppUpdate must be used inside AppUpdateProvider");
   return context;
 }
+
+/** Wie useAppUpdate, aber ohne Provider null - für „Über die App“ in den Einstellungen, auch in Tests einzelner Screens. */
+export function useOptionalAppUpdate() {
+  return useContext(AppUpdateContext);
+}

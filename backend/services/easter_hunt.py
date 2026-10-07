@@ -55,13 +55,14 @@ PLACES = ("top-left", "top-right", "bottom-left", "bottom-right")
 # Wo Eier liegen dürfen. Web: öffentliche Seiten mit Karten und Bildern; App: Screens mit benannten Plätzen.
 WEB_ROUTES = {
     "/": "Startseite", "/tournaments": "Turniere", "/events": "Events", "/news": "News", "/teams": "Teams",
-    "/achievements": "Achievements", "/about": "Über uns", "/community": "Community", "/players": "Spieler",
+    "/achievements": "Erfolge", "/about": "Über uns", "/community": "Community", "/players": "Spieler",
     "/calendar": "Kalender", "/sponsors": "Sponsoren", "/references": "Referenzen", "/esports": "eSports",
     "/board": "Vorstand", "/values": "Werte",
 }
+# Die App hat seit #1143 fünf Tabs: Home, Events, Community, Verein, Profil - Fast Laps stehen im Events-Tab.
 APP_ROUTES = {
-    "app:Dashboard": "Home", "app:Tournaments": "Events", "app:Teams": "Teams", "app:Profile": "Profil", "app:More": "Mehr",
-    "app:News": "News", "app:Gallery": "Galerie", "app:FastLap": "Fast Laps", "app:SeasonPass": "Jahreswertung",
+    "app:Dashboard": "Home", "app:Tournaments": "Events", "app:Community": "Community", "app:Verein": "Verein", "app:Profile": "Profil",
+    "app:News": "News", "app:Gallery": "Galerie", "app:SeasonPass": "Jahreswertung",
 }
 SPOT_KINDS = {"web": ("card", "image", "hero", "header", "footer"), "app": ("card", "hero", "header")}
 SPOT_LABELS = {"card": "an einer Karte", "image": "an einem Bild", "hero": "beim Löwen", "header": "in der Kopfzeile", "footer": "in der Fußzeile"}

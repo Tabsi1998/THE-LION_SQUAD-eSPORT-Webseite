@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Button } from "../../components/Button";
@@ -12,6 +12,7 @@ import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
+import { markChatRead } from "../../lib/chats";
 import { CommendButton } from "../../components/CommendButton";
 import { isGuestUser } from "../../live";
 import { api, errorMessage } from "../../lib/api";
@@ -119,6 +120,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const [forfeitWinnerId, setForfeitWinnerId] = useState("");
   const [v2Rows, setV2Rows] = useState<V2ResultRow[]>([]);
 
+  const lastReadChat = useRef<string | null>(null);
   const load = useCallback(async (options?: { preserveDrafts?: boolean }) => {
     const preserveDrafts = options?.preserveDrafts !== false;
     setError("");
@@ -130,7 +132,14 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       const nextPage = pageResult.data || null;
       const match = nextPage?.match || {};
       setPage(nextPage);
-      setChat(Array.isArray(chatResult.data) ? chatResult.data : []);
+      const loadedChat = Array.isArray(chatResult.data) ? chatResult.data : [];
+      setChat(loadedChat);
+      // Match-Chat gelesen (#1148) - nur für die, die mitschreiben dürfen, und nur bei einer neuen Nachricht.
+      const newest = loadedChat.length ? String(loadedChat[loadedChat.length - 1]?.id || loadedChat.length) : "";
+      if (nextPage?.can_act && newest !== lastReadChat.current) {
+        lastReadChat.current = newest;
+        void markChatRead("match", route.params.id);
+      }
       if (preserveDrafts) {
         setProposalAt((current) => current || formatDateInput(match.scheduled_at));
         setScoreA((current) => current || String(match.score_a ?? 0));

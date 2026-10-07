@@ -13,7 +13,7 @@ jest.mock("../../auth/AuthContext", () => ({ useAuth: () => mockAuth }));
 jest.mock("../../live", () => ({ isGuestUser: (user: Record<string, unknown> | null) => !user || user.user_type === "guest" }));
 jest.mock("../../realtime/LiveChangesProvider", () => ({ useLiveRefresh: () => {} }));
 const mockRootNavigate = jest.fn();
-jest.mock("../../navigation/rootNavigation", () => ({ navigationRef: { isReady: () => true, navigate: (...args: unknown[]) => mockRootNavigate(...args) } }));
+jest.mock("../../navigation/rootNavigation", () => ({ openTab: (...args: unknown[]) => mockRootNavigate(...args) }));
 jest.mock("@expo/vector-icons", () => {
   const { Text } = require("react-native");
   return { Ionicons: ({ name }: { name: string }) => <Text>{`icon:${name}`}</Text> };

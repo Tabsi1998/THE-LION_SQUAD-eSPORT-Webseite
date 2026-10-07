@@ -228,6 +228,8 @@ describe("Abmelden", () => {
       await result.current.login("fan@lionsquad.at", "geheim", true);
     });
     mockApi.post.mockClear();
+    // Die letzten Suchen (#1145) gehen mit dem Konto.
+    await SecureStore.setItemAsync("tls.recent-searches", JSON.stringify(["rocket"]));
 
     await act(async () => {
       await result.current.logout();
@@ -238,6 +240,7 @@ describe("Abmelden", () => {
     expect(await SecureStore.getItemAsync(ACCESS_KEY)).toBeNull();
     expect(await SecureStore.getItemAsync(REFRESH_KEY)).toBeNull();
     expect(mockClearAllCache).toHaveBeenCalled();
+    expect(await SecureStore.getItemAsync("tls.recent-searches")).toBeNull();
     expect(isGuestUser(result.current.user)).toBe(true);
   });
 

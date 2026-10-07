@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { MyMembershipScreen } from "./MyMembershipScreen";
 
 // Meine Mitgliedschaft (#339): Stand aus der Mitgliederverwaltung, Zuordnung anfragen. Die Belege
-// selbst liegen seit #320 unter „Meine Rechnungen“ - hier nur der Stand und der Weg dorthin.
+// selbst liegen seit #320 unter „Meine Rechnungen“ (im Profil, „Nur für dich“) - hier nur der Stand.
 
 const mockGet = jest.fn();
 const mockPost = jest.fn();
@@ -50,7 +50,7 @@ beforeEach(() => {
   mockOpenInvoice.mockResolvedValue(undefined);
 });
 
-test("Beitrag, Nummer, Funktion und der Stand der Belege; der Knopf führt zu „Meine Rechnungen“", async () => {
+test("Beitrag, Nummer, Funktion und der Stand der Belege; die Rechnungen selbst stehen im Profil (#1150)", async () => {
   await render(<MyMembershipScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByText("Aktives Mitglied")).toBeTruthy());
 
@@ -62,8 +62,9 @@ test("Beitrag, Nummer, Funktion und der Stand der Belege; der Knopf führt zu �
 
   expect(screen.getByText(/1 offen/)).toBeTruthy();
   expect(screen.queryByText("Rechnung RE-2026/0007")).toBeNull();
-  await fireEvent.press(screen.getByTestId("membership-invoices-link"));
-  expect(navigate).toHaveBeenCalledWith("MyInvoices");
+  // Jedes Thema an genau einem Ort (#1150): kein zweiter Weg zu „Meine Rechnungen“, nur der Hinweis aufs Profil.
+  expect(screen.queryByTestId("membership-invoices-link")).toBeNull();
+  expect(screen.getByTestId("membership-invoices-hint")).toHaveTextContent(/Nur für dich/);
 
   await fireEvent.press(screen.getByTestId("membership-card-link"));
   expect(navigate).toHaveBeenCalledWith("MemberCard");
@@ -79,7 +80,7 @@ test("nicht zugeordnet: Zuordnung anfragen, danach „Anfrage eingegangen“", a
   await render(<MyMembershipScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("membership-link")).toBeTruthy());
   expect(screen.getByText("Keine Mitgliedschaft")).toBeTruthy();
-  expect(screen.getByTestId("membership-invoices-link")).toBeTruthy();
+  expect(screen.getByTestId("membership-invoices-hint")).toBeTruthy();
 
   await fireEvent.changeText(screen.getByTestId("membership-link-ref"), "M-0042");
   await fireEvent.press(screen.getByText("Zuordnung anfragen"));

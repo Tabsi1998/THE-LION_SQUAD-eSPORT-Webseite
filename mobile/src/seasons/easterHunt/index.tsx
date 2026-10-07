@@ -3,7 +3,7 @@ import { Pressable, StyleSheet } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { Body } from "../../components/Text";
 import { isGuestUser } from "../../live";
-import { navigationRef } from "../../navigation/rootNavigation";
+import { openDetail } from "../../navigation/rootNavigation";
 import { EggArt } from "../easter/art";
 import { perchSnapshot, subscribePerches } from "../perches";
 import type { ActiveSeason } from "../SeasonProvider";
@@ -20,8 +20,9 @@ import { clearHunt, huntState, setHuntSpots } from "./store";
 
 /** Die App-Screens mit Verstecken - so heißen sie beim Server (wie im Admin wählbar). */
 export const HUNT_SCREENS: Record<string, string> = {
-  Dashboard: "app:Dashboard", TournamentList: "app:Tournaments", TeamList: "app:Teams", Profile: "app:Profile", MoreHub: "app:More",
-  NewsList: "app:News", Gallery: "app:Gallery", FastLapList: "app:FastLap", SeasonPass: "app:SeasonPass",
+  // Die fünf Tabs (#1143): Home, Events, Community, Verein, Profil - dazu News, Galerie und Jahreswertung.
+  Dashboard: "app:Dashboard", TournamentList: "app:Tournaments", CommunityHub: "app:Community", VereinHub: "app:Verein", Profile: "app:Profile",
+  NewsList: "app:News", Gallery: "app:Gallery", SeasonPass: "app:SeasonPass",
 };
 const RELAYOUT_MS = 250;
 /** Golden mit dunkler Pfote - das dunkle Löwenei ginge im Kopf unter (wie im Web). */
@@ -98,7 +99,8 @@ export function HuntStage({ screen }: { season: ActiveSeason; screen: string }) 
 
 /** Zum Korb-Screen (aus dem Dashboard und nach dem letzten Ei). */
 export function openBasket(): void {
-  if (navigationRef.isReady()) navigationRef.navigate("More", { screen: "EasterHunt", initial: false } as never);
+  // Über dem Tab, in dem man gerade ist (#1144).
+  openDetail("EasterHunt");
 }
 
 /** Der Stand im Dashboard-Kopf: ein goldenes Löwenei mit „3/12“ (angemeldet) - antippen öffnet den Korb. */

@@ -16,7 +16,7 @@ import { type AchievementGroup } from "../../lib/achievements";
 import { api } from "../../lib/api";
 import { useProgressiveCount } from "../../lib/progressive";
 import { isGuestUser } from "../../live";
-import { navigationRef } from "../../navigation/rootNavigation";
+import { openTab } from "../../navigation/rootNavigation";
 import type { MoreStackParamList } from "../../navigation/types";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -103,7 +103,8 @@ export function AchievementShowcaseScreen({ navigation }: Props) {
   const openUser = useCallback((username: string) => navigation.navigate("PublicProfile", { username }), [navigation]);
   const openCard = useCallback((awardId: string) => { Linking.openURL(achievementShareUrl(awardId)).catch(() => {}); }, []);
   const openOwn = useCallback(() => {
-    if (navigationRef.isReady()) navigationRef.navigate("Profile", { tab: "achievements" });
+    // Die eigenen Erfolge stehen im Tab Profil (#1149, #1150).
+    openTab("Profile", { tab: "achievements" });
   }, []);
   const pickCategory = useCallback((key: string) => setCategory((current) => (current === key ? null : key)), []);
   const refresh = useCallback(() => {
