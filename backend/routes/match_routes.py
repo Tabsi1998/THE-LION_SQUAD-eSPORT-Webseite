@@ -29,6 +29,7 @@ from models import (
 )
 from services.competition_read import canonical_match_for_source, find_match_source
 from services.match_overview import operational_match_overviews, own_match_overviews
+from services.match_public_view import public_match_view, public_tournament_view
 from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
 from services.match_v2_results import MatchV2ResultError
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
@@ -74,6 +75,13 @@ async def _ensure_match_tournament_unlocked(db, match: dict) -> None:
 
 def _is_staff(user: dict | None) -> bool:
     return bool(user and user.get("role") in STAFF_ROLES)
+
+
+async def _sees_internal(match: dict, user: dict | None) -> bool:
+    """Notizen, Entscheidungs-Begründungen, Einsprüche und Meldungen im Detail sieht nur, wer das Turnier leitet."""
+    if not user:
+        return False
+    return _is_staff(user) or await has_tournament_staff_permission(user, match.get("tournament_id"), READ_STAFF_ROLES)
 
 
 def _mode_value(value: object, allowed: set[str]) -> str | None:
@@ -598,10 +606,14 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         prefix = "Spieltag" if league_like else "Runde"
         matchday_label = f"{prefix} {round_number}" if round_number else "Match"
     canonical_match = await canonical_match_for_source(db, match, collection)
+    if not await _sees_internal(match, user):
+        viewer_id = (user or {}).get("id")
+        match = public_match_view(match, viewer_id)
+        canonical_match = public_match_view(canonical_match, viewer_id)
     return {
         "match": match,
         "canonical_match": canonical_match,
-        "tournament": tournament,
+        "tournament": public_tournament_view(tournament),
         "stage": stage,
         "participants": await _match_participants(match, user),
         "schedule_proposals": proposals,
@@ -931,7 +943,9 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
 async def get_match(match_id: str, user: dict | None = Depends(get_optional_user)):
     m, _collection = await _find_match_any(match_id)
     await _assert_match_visible(m, user)
-    return m
+    if await _sees_internal(m, user):
+        return m
+    return public_match_view(m, (user or {}).get("id"))
 
 
 @router.put("/{match_id}")
