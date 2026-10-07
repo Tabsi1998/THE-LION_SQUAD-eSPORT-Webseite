@@ -389,8 +389,8 @@ den ausgelieferten Skripten suchen.
   #1108/#1109 haben sie nachgezogen. Neu: `tls-btn--danger`, der Wächter `lib/buttons.test.js` (neue eigene
   Knopf-Stile fallen auf), Seitenwechsel über View Transitions (`lib/viewTransition.js`, nur nach Link-Klicks).
 - **Meilenstein 57 „Jahreszeiten IV“:** #1087–#1090 zu (Web #1106, App #1107). Offen #1091–#1094: Lichterkette,
-  normale Ostereier, Luftschlangen und Wimpel hängen nicht an Karten (Kopf, Footer, Seitenrand). Der Betreiber
-  entscheidet, ob sie an Karten kommen oder die Kartenteile (Ei der Eiersuche, Konfetti, Regen) reichen.
+  normale Ostereier, Luftschlangen und Wimpel hängen nicht an Karten (Kopf, Footer, Seitenrand). Entscheidung des
+  Betreibers (7.10.): Variante B – diese Deko kommt zusätzlich an Karten und reagiert dort, in Web und App.
 - **Events II** (46) ist fertig. Die eine Event-Anmeldung liegt in `services/event_registration.py` (Formular und
   Bot), Turniere über `self_register(…, via)`. Event-Erinnerungen verschickt die Website keine – je Tag erinnern
   ICS-Datei und Discord-Termin.
@@ -402,12 +402,13 @@ den ausgelieferten Skripten suchen.
   Speziallink mit der einzigen Freigabe `display`, gespeichert nur als Hash, Antwort `display_bracket_payload`).
 - **Stabilisierung 48** und die Audit-Meilensteine 52–55 warten auf die Audit-Unterlagen
   (`C:\GIT\lion-audit-2026-10-06\…`, noch nicht auf diesem Rechner) und das OK des Betreibers. Nichts erfinden.
-- **Server:** eingespielt bis #940 (5.10.). Alles seit #946 braucht `update.sh`; Zeilen in `UMBAUPLAN.md` „Nach dem
-  Update vom 6.10.“, „vom 7.10.“ und „vom 7.10. (Nachmittag)“.
+- **Server:** eingespielt bis #1109 (7.10. nachmittags; geprüft über das Stylesheet und `/api/settings/public`).
+  Was danach zu klicken ist, steht in `UMBAUPLAN.md` „Nach dem Update vom 7.10. (Nachmittag)“.
 - **App:** Build 89 (1.3.0) liegt beim Betreiber für den offenen Test. Der nächste Build trägt #942 (Sitzungen),
   #1100/#1108 (Bewegung, Listen) und #1107 (Saison-Reaktionen – vor dem Build einmal im Emulator ansehen).
-- **Offen beim Betreiber:** `update.sh`; Build 89 in den offenen Test; Entscheidung zu #1091–#1094; die drei
-  Fragen in PR #1128 (Ablauf der TV-Schlüssel, Cookie-Hinweis auf TV-Seiten, Link aus der Turnier-Bearbeitung); die
+- **Antworten zu PR #1128 (7.10.):** TV-Schlüssel laufen eine Woche nach Turnierende von selbst ab; auf den
+  TV-Seiten kein Cookie-Hinweis (dort auch keine Statistik). Wird in #1128 nachgezogen.
+- **Offen beim Betreiber:** Build 89 in den offenen Test; die
   Audit-Unterlagen; Sammelkanal + „Webhooks verwalten“ (#966); alte Passkeys am Handy; SHA-256-Fingerabdrücke.
 - **Fristen:** am **2.11.2026** laufen die drei Ausnahmen im Sicherheitscheck der App ab (`node-forge`, `braces`,
   `sprintf-js`; noch ohne Fix). `postcss-selector-parser` (frontend, nur beim Bauen): Fix nur in 7.x, Tailwind 3
