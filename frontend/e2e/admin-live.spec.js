@@ -6,7 +6,7 @@ const email = process.env.TLS_LIVE_EMAIL;
 const password = process.env.TLS_LIVE_PASSWORD;
 
 async function acceptCookies(page) {
-  const button = page.getByRole("button", { name: /alle akzeptieren/i });
+  const button = page.getByRole("button", { name: /alle erlauben/i });
   if (await button.count()) await button.click();
 }
 

@@ -41,7 +41,7 @@ async function mockServer(page) {
 }
 
 async function acceptCookies(page) {
-  const consent = page.getByRole("button", { name: /alle akzeptieren/i });
+  const consent = page.getByRole("button", { name: /alle erlauben/i });
   if (await consent.count()) await consent.click();
 }
 

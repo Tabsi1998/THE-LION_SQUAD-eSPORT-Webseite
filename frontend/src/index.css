@@ -2185,6 +2185,12 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 html.tls-vt .tls-header { view-transition-name: tls-header; }
 html.tls-vt .tls-bottom-nav { view-transition-name: tls-bottom-nav; }
 
+/* Cookie-Hinweis (#1226): am Handy und Tablet liegt das Blatt über der unteren Leiste, solange es sie gibt - so bleibt
+   die Leiste bedienbar. Ohne Leiste (Login, Verwaltung) sitzt es ganz unten. */
+@media (max-width: 1023px) {
+  body:has(.tls-bottom-nav) .tls-cookie-sheet { bottom: calc(4rem + env(safe-area-inset-bottom, 0px)); }
+}
+
 /* Social-Logos im Footer (#1083), Variante D aus der Vorschau: das Logo steht in seiner Markenfarbe, in den vier
    Ecken sitzen kleine Winkel. Beim Drüberfahren schließen sich die Winkel zum Rahmen, die Fläche bekommt einen Hauch
    der Markenfarbe, das Logo wächst leicht und glüht; ein kleines Schild nennt den Namen. Die Logos bleiben unverändert.

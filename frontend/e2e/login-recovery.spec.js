@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function dismissCookies(page) {
-  const button = page.getByRole("button", { name: /alle akzeptieren/i });
+  const button = page.getByRole("button", { name: /alle erlauben/i });
   if (await button.count()) await button.click();
 }
 

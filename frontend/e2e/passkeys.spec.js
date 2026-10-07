@@ -41,7 +41,7 @@ async function openLogin(page, baseURL) {
   const loginURL = new URL("/login", baseURL);
   loginURL.hostname = "localhost";
   await page.goto(loginURL.href);
-  const consent = page.getByRole("button", { name: /alle akzeptieren/i });
+  const consent = page.getByRole("button", { name: /alle erlauben/i });
   if (await consent.count()) await consent.click();
 }
 

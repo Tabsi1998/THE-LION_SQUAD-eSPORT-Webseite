@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 
 async function acceptCookies(page) {
-  const button = page.getByRole("button", { name: /alle akzeptieren/i });
+  const button = page.getByRole("button", { name: /alle erlauben/i });
   if (await button.count()) await button.click();
 }
 

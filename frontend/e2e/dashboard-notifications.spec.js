@@ -56,7 +56,7 @@ test("das Dashboard zeigt fünf gebündelte Benachrichtigungen mit Vorschau und 
   const readCalls = [];
   await mockServer(page, readCalls);
   await page.goto("/dashboard");
-  const consent = page.getByRole("button", { name: /alle akzeptieren/i });
+  const consent = page.getByRole("button", { name: /alle erlauben/i });
   if (await consent.count()) await consent.click();
 
   const panel = page.getByTestId("dashboard-notifications");
@@ -78,7 +78,7 @@ test("die Benachrichtigungsseite listet die Bündel und markiert alle als gelese
   const readCalls = [];
   await mockServer(page, readCalls);
   await page.goto("/notifications");
-  const consent = page.getByRole("button", { name: /alle akzeptieren/i });
+  const consent = page.getByRole("button", { name: /alle erlauben/i });
   if (await consent.count()) await consent.click();
 
   const list = page.getByTestId("notifications-page");

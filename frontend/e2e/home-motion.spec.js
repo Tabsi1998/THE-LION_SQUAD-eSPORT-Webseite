@@ -52,8 +52,11 @@ async function mockServer(page) {
 }
 
 async function acceptCookies(page) {
-  const consent = page.getByRole("button", { name: /alle akzeptieren/i });
+  const consent = page.getByRole("button", { name: /alle erlauben/i });
   if (await consent.count()) await consent.click();
+  // Der Knopf sitzt seit #1226 im Blatt unten - ohne diesen Schritt bliebe die Maus dort stehen und läge nach dem
+  // Scrollen schon vor der Messung über einer Karte.
+  await page.mouse.move(2, 2);
 }
 
 async function layoutShifts(page) {
