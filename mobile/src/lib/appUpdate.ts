@@ -38,7 +38,8 @@ export function channelLabel(channel: ReleaseChannel) {
 export function installPrompt(channel: ReleaseChannel, mandatory: boolean): { title: string; message: string } {
   const duty = mandatory ? " Dieses Update ist Pflicht – ohne geht es nicht weiter." : "";
   if (channel === "beta") {
-    return { title: "Testversion installieren?", message: `Diese Version ist eine Beta – sie kann Fehler enthalten. Rückmeldungen bitte an den Vorstand (Mehr → Kontakt).${duty}` };
+    // Ohne Pfad in der App: „Mehr → Kontakt“ gab es nie als Eintrag, und den Tab „Mehr“ gibt es seit #1143 nicht mehr.
+    return { title: "Testversion installieren?", message: `Diese Version ist eine Beta – sie kann Fehler enthalten. Rückmeldungen bitte an den Vorstand.${duty}` };
   }
   return { title: "Release installieren?", message: `Die neue Version ist geprüft und freigegeben.${duty}` };
 }

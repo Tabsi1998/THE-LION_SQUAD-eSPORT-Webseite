@@ -1,5 +1,5 @@
 import React from "react";
-import { AccessibilityInfo, Animated } from "react-native";
+import { AccessibilityInfo, Animated, StyleSheet } from "react-native";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { TournamentsScreen } from "./TournamentsScreen";
 
@@ -111,4 +111,24 @@ test("mit „Bewegung reduzieren“ stehen die Karten sofort da", async () => {
   expect(fadeDelays()).toEqual([]);
   expect(fadeStyle("Cup 0")).toEqual({ opacity: 1, transform: [{ translateY: 0 }] });
   expect(fadeStyle("Cup 2")).toEqual({ opacity: 1, transform: [{ translateY: 0 }] });
+});
+
+// Geräteprobe vor 1.4.0: ein negativer Rand am Inhalt der waagrechten Filterzeile schnitt die Oberkante der Knöpfe ab
+// (die waagrechte Liste schneidet ihren Inhalt). Kein Vorfahr eines Filterknopfs hat oben einen negativen Rand.
+test("die Filterknöpfe werden oben nicht abgeschnitten - kein negativer Rand in den Filterzeilen", async () => {
+  tournaments = [cup(1)];
+  await render(<TournamentsScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Cup 1")).toBeTruthy());
+  for (const label of ["Alle", "Fast Laps", "Kalender"]) {
+    for (const match of screen.getAllByText(label)) {
+      let node = match.parent;
+      for (let depth = 0; node && depth < 6; depth += 1, node = node.parent) {
+        // Auch der Inhalt der waagrechten Liste (contentContainerStyle) - genau dort saß der negative Rand.
+        for (const style of [node.props.style, node.props.contentContainerStyle]) {
+          const margin = StyleSheet.flatten(style)?.marginTop;
+          expect([label, typeof margin === "number" && margin < 0]).toEqual([label, false]);
+        }
+      }
+    }
+  }
 });

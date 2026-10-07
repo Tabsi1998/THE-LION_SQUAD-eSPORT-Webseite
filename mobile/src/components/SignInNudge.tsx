@@ -8,7 +8,8 @@ import { colors } from "../theme";
 import { useAppUpdate } from "../update/AppUpdateProvider";
 
 // Gast zuerst (#918): Die App startet ohne Konto. Nur beim allerersten Start kommt nach ein paar Sekunden einmal dieser
-// Hinweis - wegdrücken reicht, danach nie wieder (gemerkt im Gerätespeicher). Angemeldet geht es danach über „Mehr“.
+// Hinweis - wegdrücken reicht, danach nie wieder (gemerkt im Gerätespeicher). Angemeldet wird danach im Tab „Profil“
+// (seit #1143 gibt es keinen Tab „Mehr“ mehr - der Hinweis darf nicht auf ihn zeigen).
 // Ist gerade „Was ist neu“ offen, wartet er, bis die Karte zu ist; ist man schon beim Anmelden, entfällt er.
 
 export const NUDGE_KEY = "tls.mobile.signInNudgeSeen";
@@ -69,7 +70,7 @@ export function SignInNudge({ delayMs = NUDGE_DELAY_MS }: { delayMs?: number }) 
             <Button label="Anmelden" variant="secondary" onPress={() => close("Login")} testID="sign-in-nudge-login" />
           </View>
           <Pressable onPress={() => close()} style={styles.later} testID="sign-in-nudge-later">
-            <Muted>Später – geht jederzeit unter „Mehr“</Muted>
+            <Muted>Später – geht jederzeit unter „Profil“</Muted>
           </Pressable>
         </Pressable>
       </Pressable>

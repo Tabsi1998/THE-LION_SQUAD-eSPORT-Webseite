@@ -38,6 +38,8 @@ test("releaseChannel, channelLabel und installPrompt", () => {
   expect(releaseChannel({ version: "1.0.0" })).toBe("release");
   expect(channelLabel("beta")).toBe("BETA · Testversion");
   expect(installPrompt("beta", false)).toEqual({ title: "Testversion installieren?", message: expect.stringContaining("kann Fehler enthalten") });
+  // Kein Verweis auf den alten Tab „Mehr“ (#1143).
+  expect(installPrompt("beta", true).message).not.toContain("Mehr");
   expect(installPrompt("release", true).message).toContain("Pflicht");
   expect(installPrompt("release", false).title).toBe("Release installieren?");
 });

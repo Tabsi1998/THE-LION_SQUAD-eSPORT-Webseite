@@ -96,9 +96,13 @@ export function Field({ label, value, onChangeText, multiline = false }: { label
   );
 }
 
-export function Toggle({ label, detail, value, onValueChange }: { label: string; detail: string; value: boolean; onValueChange: (value: boolean) => void }) {
+/**
+ * Ein Schalter mit Trennlinie darüber. `first`: der oberste Schalter einer Karte - ohne Linie. Seit die Überschriften
+ * der Einstellungen über den Karten stehen (#1146), stand dort sonst eine Linie vor dem ersten Eintrag.
+ */
+export function Toggle({ label, detail, value, onValueChange, first = false, testID }: { label: string; detail: string; value: boolean; onValueChange: (value: boolean) => void; first?: boolean; testID?: string }) {
   return (
-    <View style={profileStyles.toggleRow}>
+    <View style={[profileStyles.toggleRow, first && profileStyles.toggleRowFirst]} testID={testID}>
       <View style={profileStyles.toggleText}>
         <Body style={profileStyles.strong}>{label}</Body>
         <Muted>{detail}</Muted>
@@ -490,6 +494,10 @@ export const profileStyles = StyleSheet.create({
     flexDirection: "row",
     gap: 14,
     paddingTop: 12,
+  },
+  toggleRowFirst: {
+    borderTopWidth: 0,
+    paddingTop: 0,
   },
   toggleText: {
     flex: 1,

@@ -185,7 +185,7 @@ function AccountSettings() {
     <>
       <Group title="Benachrichtigungen" testID="settings-group-notifications">
         <Card style={styles.card}>
-          <Toggle label="Newsletter" detail="Grundsätzliche Zustimmung für News und Events." value={form.newsletter_consent} onValueChange={(v) => change("newsletter_consent", v)} />
+          <Toggle first label="Newsletter" detail="Grundsätzliche Zustimmung für News und Events." value={form.newsletter_consent} onValueChange={(v) => change("newsletter_consent", v)} testID="settings-toggle-newsletter" />
           <Muted style={profileStyles.sectionText}>Kanäle</Muted>
           {visibleChannels.map((item) => (
             <Toggle key={item.key} label={item.label} detail={item.detail} value={channelEnabled(item.key)} onValueChange={(v) => changePreference(item.key, v)} />
@@ -217,7 +217,7 @@ function AccountSettings() {
       <Group title="Sicherheit" testID="settings-group-security">
         <Card style={styles.card}>
           {/* App-Sperre (#217): Einschalten fragt einmal den Fingerabdruck ab; ohne Gerätesperre bleibt der Schalter aus. */}
-          <Toggle label="App-Sperre mit Fingerabdruck" detail={`${availabilityText(appLock.availability)} Gilt nur auf diesem Gerät.`} value={appLock.enabled} onValueChange={(v) => { void appLock.setEnabled(v); }} />
+          <Toggle first label="App-Sperre mit Fingerabdruck" detail={`${availabilityText(appLock.availability)} Gilt nur auf diesem Gerät.`} value={appLock.enabled} onValueChange={(v) => { void appLock.setEnabled(v); }} testID="settings-toggle-app-lock" />
         </Card>
         {/* Passkeys (#919): dieselben wie auf der Website - anlegen und entfernen mit dem aktuellen Passwort. */}
         <PasskeysCard style={styles.card} />
@@ -226,13 +226,14 @@ function AccountSettings() {
 
       <Group title="Privatsphäre" testID="settings-group-privacy">
         <Card style={styles.card}>
-          <Toggle label="Öffentliches Profil" detail="Profil ist in der Community-Suche sichtbar." value={Boolean(form.privacy_public_profile)} onValueChange={(v) => change("privacy_public_profile", v)} />
+          <Toggle first label="Öffentliches Profil" detail="Profil ist in der Community-Suche sichtbar." value={Boolean(form.privacy_public_profile)} onValueChange={(v) => change("privacy_public_profile", v)} testID="settings-toggle-public-profile" />
           {/* Wie im Web (#619): eigene Erfolge öffentlich oder privat - privat heißt auch keine Ranglisten. */}
           <Toggle
             label="Erfolge öffentlich"
             detail={`Angeheftete und erreichte Erfolge stehen in deinem Profil, und du stehst in den Ranglisten und im Erfolg der Woche. Die Verein-Kategorie sehen nur Mitglieder.${form.privacy_public_profile ? "" : " Wirkt erst, sobald das Profil öffentlich ist."}`}
             value={form.privacy_achievements_public !== false}
             onValueChange={(v) => change("privacy_achievements_public", v)}
+            testID="settings-toggle-achievements-public"
           />
           <Toggle label="Twitch im Profil anzeigen" detail="Live-Embed darf auf deinem öffentlichen Profil erscheinen." value={Boolean(form.show_twitch_embed)} onValueChange={(v) => change("show_twitch_embed", v)} />
           <Toggle label="Saison-Fundstücke öffentlich" detail="Dein öffentliches Profil zeigt, was du über die Jahreszeiten gesammelt hast – nur die Summen, nie wann." value={form.privacy_season_finds_public === true} onValueChange={(v) => change("privacy_season_finds_public", v)} />
