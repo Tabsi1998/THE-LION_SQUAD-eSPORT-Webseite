@@ -2,8 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { openLink } from "../../lib/openLink";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View, type LayoutChangeEvent, type NativeSyntheticEvent, type TextLayoutEventData } from "react-native";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { ListItemFadeIn, useListEntrance } from "../../components/FadeIn";
@@ -204,7 +204,7 @@ export function DashboardScreen({ navigation }: Props) {
             <View style={styles.flex}>
               <Muted style={styles.heroEyebrow}>{isGuest ? clubName : "Hallo"}</Muted>
               {/* Gast zuerst (#918): die App startet ohne Konto - kein „Live“-Modus mehr, sondern ein Willkommen. */}
-              <Title>{isGuest ? "Willkommen" : displayName(user)}</Title>
+              <HeroTitle text={isGuest ? "Willkommen" : displayName(user)} />
             </View>
             <View style={styles.heroBadges}>
               <Badge label={isGuest ? "Gast" : user?.is_club_member ? "Vereinsmitglied" : "Community"} tone={isGuest || !user?.is_club_member ? "cyan" : "gold"} />
@@ -435,6 +435,48 @@ function Section({ title, actionLabel, onAction, children }: { title: string; ac
       </View>
       {children}
     </View>
+  );
+}
+
+/** Ein Wort, das über zwei Zeilen zerrissen wurde: die Zeile endet mit einem Buchstaben, die nächste beginnt mit einem. */
+export function breaksInsideWord(lines: ReadonlyArray<{ text: string }>): boolean {
+  const letter = /[0-9A-Za-zÀ-ÖØ-öø-ÿ]/;
+  return lines.some((line, index) => index < lines.length - 1 && letter.test(line.text.slice(-1)) && letter.test(lines[index + 1].text.charAt(0)));
+}
+
+const HERO_TITLE_SIZE = 30;
+const HERO_TITLE_MIN_SCALE = 0.55;
+
+/**
+ * Der Titel der Begrüßungskarte. Neben Pill und Saison-Widget (Adventkranz, Partyhüte …) bleibt nur eine schmale
+ * Spalte; Android bricht ein zu langes Wort dann mitten im Wort um („Willkomm|en“, Geräteprobe vor 1.4.0). Dann wird
+ * die Schrift in Schritten kleiner, bis kein Wort mehr zerrissen ist - Umbrüche an Leerzeichen bleiben erlaubt. Neuer
+ * Text oder mehr Platz (das Widget verschwindet) beginnen wieder bei voller Größe. Wird die Spalte schmaler (das Widget
+ * kommt nach dem Laden der Saisons dazu), setzt nichts zurück: Android meldet die Zeilen dann nur einmal, ein
+ * Zurücksetzen im selben Durchgang hätte das Verkleinern wieder aufgehoben.
+ */
+export function HeroTitle({ text }: { text: string }) {
+  const [scale, setScale] = useState(1);
+  const width = useRef(0);
+  const shownText = useRef(text);
+  useEffect(() => {
+    if (shownText.current === text) return;
+    shownText.current = text;
+    setScale(1);
+  }, [text]);
+  const onLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = Math.round(event.nativeEvent.layout.width);
+    if (width.current && next > width.current + 1) setScale(1);
+    width.current = next;
+  }, []);
+  const onTextLayout = useCallback((event: NativeSyntheticEvent<TextLayoutEventData>) => {
+    if (!breaksInsideWord(event.nativeEvent.lines)) return;
+    setScale((current) => (current > HERO_TITLE_MIN_SCALE ? Math.max(HERO_TITLE_MIN_SCALE, Math.round((current - 0.05) * 100) / 100) : current));
+  }, []);
+  return (
+    <Title onLayout={onLayout} onTextLayout={onTextLayout} style={scale < 1 ? { fontSize: Math.round(HERO_TITLE_SIZE * scale) } : null} testID="dashboard-hero-title">
+      {text}
+    </Title>
   );
 }
 
