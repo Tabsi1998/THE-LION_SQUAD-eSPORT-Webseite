@@ -10,7 +10,7 @@ export const INITIAL_DELAY_MS = 4000;
 export const MIN_GAP_MS = 2500;
 export const RESUME_GRACE_MS = 1500;
 
-export type EffectKind = "flock" | "bat_flight" | "bat_scare" | "rappel" | "crawler" | "ghost" | "web_spider" | "drop_spider" | "lightning";
+export type EffectKind = "flock" | "bat_flight" | "bat_scare" | "rappel" | "crawler" | "ghost" | "web_spider" | "drop_spider" | "lightning" | "card_big";
 export type EffectSpec = { slots: number; cooldownMs: number; priority: number; ttlMs: number; user?: boolean };
 
 export const EFFECTS: Record<EffectKind, EffectSpec> = {
@@ -24,6 +24,9 @@ export const EFFECTS: Record<EffectKind, EffectSpec> = {
   drop_spider: { slots: 1, cooldownMs: 20000, priority: 1, ttlMs: 12000 },
   // Wetterleuchten (#771) wie im Web: belegt keinen Platz, aber nie zwei Blitze binnen acht Sekunden.
   lightning: { slots: 0, cooldownMs: 8000, priority: 1, ttlMs: 600 },
+  // Deko reagiert auf eine angetippte Karte (Jahreszeiten IV, #1087), wie im Web: große Reaktionen (Schnee, Netz)
+  // belegen einen Platz, höchstens eine gleichzeitig (cardLift.startReaction); die Ruhezeit je Karte kennt das Modul.
+  card_big: { slots: 1, cooldownMs: 0, priority: 4, ttlMs: 4000 },
 };
 
 export type MotionToken = { id: number; kind: EffectKind; cost: number; startedAt: number; until: number };

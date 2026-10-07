@@ -14,6 +14,7 @@ import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import { SeasonPerch } from "../../seasons/anchors";
+import { cardLiftTouch } from "../../seasons/cardLift";
 
 // Galerie (#236): Alben wie im Web - öffentliche für alle, Mitglieder-Alben nur angemeldet
 // (das entscheidet der Server, die App zeigt, was er liefert).
@@ -66,6 +67,7 @@ export function GalleryScreen({ navigation }: Props) {
             accessibilityRole="button"
             style={({ pressed }) => [styles.album, pressed && styles.pressed]}
             testID={`gallery-album-${album.slug || album.id}`}
+            {...cardLiftTouch(`album-${album.id}`)}
           >
             <MediaImage uri={resolveMediaUrl(sizedUpload(album.cover_url, 800))} style={styles.cover} fallback={<Ionicons name="images-outline" color={colors.cyan} size={32} />} />
             <View style={styles.albumText}>

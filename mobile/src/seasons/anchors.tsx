@@ -2,16 +2,18 @@ import * as Haptics from "expo-haptics";
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { NavigationContext, NavigationRouteContext } from "@react-navigation/native";
-import { HangingBatShape, SHAPE_HEIGHT, SittingBatShape } from "./batArt";
+import { FlyingBatShape, HangingBatShape, SHAPE_HEIGHT, SittingBatShape } from "./batArt";
 import { ALERT_MS, TAKEOFF_MS, alertEveryMs, restMs, wantsToRoam, type Temperament } from "./batLife";
-import { fleePath, requestHop, startFlight } from "./flights";
+import { REST_MS, claimCardTouch, createRest } from "./cardLift";
+import { activeFlights, fleePath, requestHop, startFlight } from "./flights";
 import { getMotionScheduler, requestMotion } from "./motion";
 import { hashString, mulberry32 } from "./rng";
 import { clearAssignment, perchPoint, perchSnapshot, registerPerch, subscribePerches, unregisterPerch, type PerchAssignment, type PerchKind, type PerchRect, type WebAssignment } from "./perches";
 import { CornerWeb } from "./cornerWeb";
-import { HuntEggView } from "./easterHunt/HuntEgg";
+import { HuntEggView, useEggTumbles } from "./easterHunt/HuntEgg";
 import { useHuntSpots } from "./easterHunt/store";
 import { anyOverlayOpen, setOverlay, setQuietZone, subscribeQuiet } from "./quiet";
+import { useCardLift } from "./useCardLift";
 
 // Anker in der App (A1, #715): eine Karte, die einen Platz anbietet, legt `SeasonPerch` als unsichtbare Ebene über
 // sich (`Card perch="..."`). Die Ebene meldet die Karte als Platz an, solange sie auf dem Screen ist, und zeigt die
@@ -19,6 +21,8 @@ import { anyOverlayOpen, setOverlay, setQuietZone, subscribeQuiet } from "./quie
 // scrollt mit der Karte mit und nimmt Berührungen nur auf der Figur. Antippen verscheucht: die Figur verlässt die
 // Karte in Fensterkoordinaten, den Flug zeichnet die Bühne. Dazu zwei Haken für Ruhezonen: `useSeasonOverlay`
 // (Dialoge und Sheets) und `useSeasonQuietZone` (Formulare, Tabellen).
+// Jahreszeiten IV (#1087-#1092): wird die Karte angetippt (Karten-Signal, cardLift.ts), reißt ihr Netz, ihre Fledermaus
+// flattert kurz auf und landet wieder, ein Ei der Suche purzelt hervor - nur an genau dieser Karte.
 
 /** Der Name des Screens, auf dem die Komponente liegt - ohne Navigation „Dashboard“. */
 export function useRouteNameSafe(): string {
@@ -112,6 +116,7 @@ export function SeasonPerch({ id, kind = "card", timeScale = 1, clip = false }: 
   const [web, setWeb] = useState<WebAssignment | null>(() => perchSnapshot().webs[id] || null);
   const [covered, setCovered] = useState(anyOverlayOpen());
   const eggs = useHuntSpots(id);
+  const tumbles = useEggTumbles(id, eggs, clip);
   useEffect(() => {
     // Erst zuhören, dann anmelden: die Bühne teilt oft schon während der Anmeldung zu.
     const stop = subscribePerches((state) => {
@@ -130,9 +135,9 @@ export function SeasonPerch({ id, kind = "card", timeScale = 1, clip = false }: 
   }, [id, screen, kind, clip]);
   return (
     <View ref={ref} collapsable={false} pointerEvents="box-none" style={StyleSheet.absoluteFill} testID={`season-perch-${id}`}>
-      {web && !covered ? <CornerWeb side={web.side} seed={web.seed} radius={web.radius} /> : null}
+      {web && !covered ? <CornerWeb perchId={id} side={web.side} seed={web.seed} radius={web.radius} /> : null}
       {assignment && !covered ? <PerchBat perchId={id} screen={screen} assignment={assignment} landed={Boolean(assignment.landed)} timeScale={timeScale} measure={() => measurePerch(id, () => measureNode(ref.current))} /> : null}
-      {eggs.map((spot) => <HuntEggView key={spot.egg.egg_no} spot={spot} clip={clip} />)}
+      {eggs.map((spot) => <HuntEggView key={spot.egg.egg_no} spot={spot} clip={clip} tumble={tumbles[spot.egg.egg_no]} />)}
     </View>
   );
 }
@@ -141,12 +146,18 @@ export function SeasonPerch({ id, kind = "card", timeScale = 1, clip = false }: 
  * Die Fledermaus auf ihrem Platz (A1/A2): landet mit Einfedern (leichte Haptik), döst, hebt ab und zu kurz den Kopf
  * (Aufmerksamkeit, ohne Haptik), zieht als Unruhige nach der Ruhe um (Start am Platz, dann Flug über die Bühne) und
  * fliegt beim Antippen davon (mittlere Haptik). Sitzend auf einer oberen Ecke oder hängend unter der Unterkante.
+ * Wird ihre Karte angetippt (#1090), flattert sie eine Sekunde auf - Flügel auf, zwei, drei Schläge - und landet
+ * wieder genau dort; nicht, solange eine Fledermaus fliegt, höchstens einmal in zehn Sekunden je Karte.
  */
 export function PerchBat({ perchId, screen, assignment, measure, landed = false, timeScale = 1 }: { perchId: string; screen: string; assignment: PerchAssignment; measure: () => Promise<PerchRect | null>; landed?: boolean; timeScale?: number }) {
   const { width, height } = useWindowDimensions();
   const settle = useRef(new Animated.Value(0)).current;
   const wiggle = useRef(new Animated.Value(0)).current;
   const lift = useRef(new Animated.Value(0)).current;
+  const flutter = useRef(new Animated.Value(0)).current;
+  const flap = useRef(new Animated.Value(0)).current;
+  const [fluttering, setFluttering] = useState(false);
+  const flutterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [phase, setPhase] = useState<"settle" | "perched" | "alert" | "takeoff" | "gone">("settle");
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
@@ -210,6 +221,26 @@ export function PerchBat({ perchId, screen, assignment, measure, landed = false,
       if (restTimer) clearTimeout(restTimer);
     };
   }, [perchId, screen, temperament, assignment.corner, sitting, shapeHeight, size, measure, wiggle, lift, timeScale]);
+  // Aufflattern (#1090): nur aus der Ruhe (sitzt oder schaut), nicht neben einem Flug (Bewegungsbudget).
+  useEffect(() => () => {
+    if (flutterTimer.current) clearTimeout(flutterTimer.current);
+  }, []);
+  useCardLift((detail) => {
+    if (detail.key !== perchId || flutterTimer.current) return;
+    if (phaseRef.current !== "perched" && phaseRef.current !== "alert") return;
+    if (batsInFlight() || !flutterRest.take(perchId)) return;
+    setFluttering(true);
+    flutter.setValue(0);
+    flap.setValue(0);
+    Animated.parallel([
+      Animated.timing(flutter, { toValue: 1, duration: FLUTTER_MS / timeScale, easing: Easing.bezier(0.3, 0.6, 0.4, 1), useNativeDriver: true }),
+      Animated.timing(flap, { toValue: 1, duration: FLUTTER_MS / timeScale, easing: Easing.linear, useNativeDriver: true }),
+    ]).start();
+    flutterTimer.current = setTimeout(() => {
+      flutterTimer.current = null;
+      setFluttering(false);
+    }, FLUTTER_MS / timeScale + 50);
+  });
   const onPress = async () => {
     if (phaseRef.current === "gone" || phaseRef.current === "takeoff") return;
     setPhase("gone");
@@ -232,15 +263,45 @@ export function PerchBat({ perchId, screen, assignment, measure, landed = false,
   const liftOpacity = lift.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 1, 0] });
   const rotate = wiggle.interpolate({ inputRange: [-1, 1], outputRange: sitting ? ["-9deg", "9deg"] : ["7deg", "-7deg"] });
   const translateY = lift.interpolate({ inputRange: [0, 1], outputRange: [0, sitting ? -10 : 8] });
+  // Aufflattern wie im Web: sitzend hüpft sie hoch und landet, hängend sackt sie kurz ab und hängt sich wieder an.
+  const flutterY = flutter.interpolate(sitting ? { inputRange: [0, 0.3, 0.6, 0.85, 1], outputRange: [0, -9, -4, 1, 0] } : { inputRange: [0, 0.25, 0.55, 0.8, 1], outputRange: [0, 7, -3, 1, 0] });
+  const folded = flutter.interpolate({ inputRange: [0, 0.08, 0.9, 1], outputRange: [1, 0, 0, 1] });
+  const spread = flutter.interpolate({ inputRange: [0, 0.08, 0.9, 1], outputRange: [0, 1, 1, 0] });
+  // Drei Flügelschläge in der Sekunde; hängend bleibt sie kopfüber.
+  const beats = flap.interpolate({ inputRange: [0, 1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6, 1], outputRange: [1, 0.4, 1, 0.4, 1, 0.4, 1].map((value) => (sitting ? value : -value)) });
+  const wingWidth = size * 1.7;
+  const wingHeight = wingWidth * 0.55;
   return (
-    <Animated.View style={[styles.bat, position, { opacity: Animated.multiply(settleOpacity, liftOpacity), transform: [{ translateY }, { scale }, { rotate }] }]} testID={`season-perch-bat-${perchId}`} data-phase={phase}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Fledermaus verscheuchen" onPress={onPress} hitSlop={6} testID="halloween-bat-perched" accessibilityState={{ busy: phase === "takeoff" }} disabled={phase === "gone" || phase === "takeoff"}>
-        {sitting ? <SittingBatShape size={size} /> : <HangingBatShape size={size} />}
+    <Animated.View style={[styles.bat, position, { opacity: Animated.multiply(settleOpacity, liftOpacity), transform: [{ translateY: Animated.add(translateY, flutterY) }, { scale }, { rotate }] }]} testID={`season-perch-bat-${perchId}`} data-phase={phase} data-flutter={fluttering ? "1" : undefined}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Fledermaus verscheuchen" onPress={onPress} onTouchStart={() => claimCardTouch(perchId)} hitSlop={6} testID="halloween-bat-perched" accessibilityState={{ busy: phase === "takeoff" }} disabled={phase === "gone" || phase === "takeoff"}>
+        <Animated.View style={{ opacity: folded }}>
+          {sitting ? <SittingBatShape size={size} /> : <HangingBatShape size={size} />}
+        </Animated.View>
+        {fluttering ? (
+          <Animated.View pointerEvents="none" style={[styles.wings, { left: (size - wingWidth) / 2, top: (shapeHeight - wingHeight) / 2, opacity: spread, transform: [{ scaleY: beats }] }]} testID="halloween-bat-flutter">
+            <FlyingBatShape size={wingWidth} />
+          </Animated.View>
+        ) : null}
       </Pressable>
     </Animated.View>
   );
 }
 
+/** Aufflattern an einer angetippten Karte (#1090): eine Sekunde, wie im Web. */
+export const FLUTTER_MS = 1000;
+const flutterRest = createRest(REST_MS.small);
+
+/** Nur für Tests: die Ruhezeiten des Aufflatterns vergessen. */
+export function resetBatFlutter() {
+  flutterRest.clear();
+}
+
+/** Fliegt gerade eine Fledermaus - eine verscheuchte, eine umziehende oder der Schwarm? */
+function batsInFlight(): boolean {
+  return activeFlights().length > 0 || getMotionScheduler().snapshot().active.includes("flock");
+}
+
 const styles = StyleSheet.create({
   bat: { position: "absolute" },
+  wings: { position: "absolute" },
 });

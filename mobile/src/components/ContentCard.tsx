@@ -9,6 +9,7 @@ import { Body, Muted } from "./Text";
 import { MediaImage } from "./MediaImage";
 import { StatusBadge } from "./StatusBadge";
 import { SeasonPerch } from "../seasons/anchors";
+import { cardLiftTouch } from "../seasons/cardLift";
 
 export type ContentCardKind = "event" | "fastlap" | "news" | "team" | "tournament";
 
@@ -40,7 +41,10 @@ export function ContentCard({
   kind: ContentCardKind;
   label?: string | null;
   onPress?: () => void;
-  /** Ein Platz für die Jahreszeiten (Ostereier, #647) - die Karte schneidet ab, Eier liegen innen in der Ecke. */
+  /**
+   * Ein Platz für die Jahreszeiten (Ostereier, #647) - die Karte schneidet ab, Eier liegen innen in der Ecke. Ein Tippen
+   * lässt die Deko an dieser Karte reagieren (#1087); geöffnet wird weiter wie bisher.
+   */
   perch?: string;
   phase?: { label?: string | null; state?: string | null } | string | null;
   secondaryLabel?: string | null;
@@ -77,9 +81,9 @@ export function ContentCard({
     </>
   );
 
-  if (!onPress) return <View style={styles.card}>{content}</View>;
+  if (!onPress) return <View style={styles.card} {...cardLiftTouch(perch)}>{content}</View>;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" testID="content-card" style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+    <Pressable onPress={onPress} accessibilityRole="button" testID="content-card" style={({ pressed }) => [styles.card, pressed && styles.pressed]} {...cardLiftTouch(perch)}>
       {content}
     </Pressable>
   );
