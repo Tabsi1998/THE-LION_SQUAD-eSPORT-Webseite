@@ -45,6 +45,24 @@ test("ohne Zwei-Faktor geht es zur Einrichtung, außer für reine Moderation", (
   expect(screen.getByText("meldungen")).toBeInTheDocument();
 });
 
+test("Turnierseiten: Turnierleitung und Helfer mit Einsatz - Moderation allein nicht", () => {
+  const page = <ProtectedRoute requireTournamentStaff><div>turniere</div></ProtectedRoute>;
+
+  authState.user = { id: "u", role: "moderator", areas: ["moderation"], mfa_enabled: false };
+  const refused = renderAt("/admin/tournaments", page);
+  expect(screen.getByText("verboten")).toBeInTheDocument();
+  refused.unmount();
+
+  authState.user = { id: "u", role: "moderator", areas: ["moderation"], is_tournament_staff: true, mfa_enabled: false };
+  const helper = renderAt("/admin/tournaments", page);
+  expect(screen.getByText("turniere")).toBeInTheDocument();
+  helper.unmount();
+
+  authState.user = { id: "u", role: "tournament_admin", areas: ["tournaments", "moderation"], is_tournament_staff: true, ...mfa };
+  renderAt("/admin/tournaments", page);
+  expect(screen.getByText("turniere")).toBeInTheDocument();
+});
+
 test("requireAdmin heißt irgendein Adminbereich; ohne Anmeldung geht es zum Login", () => {
   authState.user = { id: "u", role: "player", areas: ["club"], ...mfa };
   renderAt("/admin", <ProtectedRoute requireAdmin><div>tageszentrale</div></ProtectedRoute>);

@@ -52,7 +52,8 @@ PUBLIC_RESOURCE_ALIASES = {
     "settings/branding": "settings",
     "settings/site-banners/admin": "settings",
 }
-STAFF_STREAM_ROLES = frozenset({"moderator", "tournament_admin", "club_admin", "superadmin"})
+# Volle Pfade interner Änderungen für die Verwaltungsseiten; die Moderationsseite braucht sie nicht.
+STAFF_STREAM_ROLES = frozenset({"tournament_admin", "club_admin", "superadmin"})
 USER_SCOPE = "user"
 # Held only in the in-memory buffer; stripped before an event reaches a client.
 TARGETS_KEY = "_target_user_ids"

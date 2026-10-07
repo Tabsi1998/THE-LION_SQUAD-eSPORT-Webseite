@@ -7,9 +7,10 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { toast } from "sonner";
 import { AREA_HINTS, AREA_LABELS, GRANTABLE_AREAS, ROLE_AREAS, roleLabel } from "@/lib/permissions";
-import { Link as LinkIcon, Plus, Trash2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Link as LinkIcon, Plus, Trash2, ShieldCheck, X } from "lucide-react";
 
 // Rollen und Rechte (#287–#292): die Rolle ist die Grundstufe, Freigaben je
 // Bereich kommen dazu. Die Rolle team_leader gibt es nicht mehr - Teamleitung
@@ -18,17 +19,20 @@ const ROLE_OPTIONS = ["player", "moderator", "tournament_admin", "club_admin", "
 const STAFF_ROLES = ["moderator", "tournament_admin", "club_admin", "superadmin"];
 export const ROLE_INFO = {
   player: { can: ["Teilnahme, Profil, App, eigene Anmeldungen"], cannot: ["Adminbereich – außer mit Freigabe oder Vorstandsposten"] },
-  moderator: { can: ["Meldungen und Chats moderieren", "Turnier-, Fast-Lap- und Stationsseiten lesen"], cannot: ["Turniere anlegen, Redaktion, Mitgliederdaten"] },
+  moderator: { can: ["Meldungen, Chats, Wortfilter, Bildprüfung und Verwarnungen", "Als Helfer eingetragen: genau die Rechte dieses Einsatzes"], cannot: ["Turniere, Fast Lap, Events und Exporte – außer als Helfer", "Redaktion, Mitgliederdaten"] },
   tournament_admin: { can: ["Turniere, Events, Stationen, Fast Lap, Saisons, Gewinne", "Moderation"], cannot: ["News, Galerie, Sponsoren (Redaktion)", "Mitglieder, Dokumente, Einstellungen"] },
-  club_admin: { can: ["Alle Bereiche inklusive System"], cannot: ["Rollen und Freigaben vergeben"] },
+  club_admin: { can: ["Alle Bereiche inklusive System"], cannot: ["Rollen und Freigaben vergeben", "Konten mit Adminbereich bannen"] },
   superadmin: { can: ["Alles, dazu Rollen, Freigaben und Setup"], cannot: [] },
 };
+// Bannen: jedes Mal mit Grund (steht im Audit-Log). Konten mit Adminbereich oder Admin-Rolle bannt nur der Superadmin.
+const BAN_REASON_MIN = 5;
 
 export default function AdminUsersPage() {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, user: me } = useAuth();
   const [list, setList] = useState([]);
   const [q, setQ] = useState("");
   const [creating, setCreating] = useState(false);
+  const [banTarget, setBanTarget] = useState(null);
   const confirm = useConfirm();
   const load = useCallback(async () => {
     const { data } = await api.get(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`);
@@ -74,14 +78,37 @@ export default function AdminUsersPage() {
     }
   };
 
-  const toggleBan = async (u) => {
+  // Bannen öffnet das Fenster mit Name und Pflichtgrund; Entbannen fragt nur nach.
+  const unban = async (u) => {
+    const name = u.display_name || u.username;
+    if (!await confirm({
+      title: `${name} entbannen?`,
+      description: `${name} kann sich danach wieder anmelden.`,
+      confirmLabel: "Entbannen",
+      tone: "info",
+    })) return;
     try {
-      await api.post(`/users/${u.id}/${u.is_banned ? "unban" : "ban"}`);
-      toast.success(u.is_banned ? "Entbannt." : "Gebannt.");
+      await api.post(`/users/${u.id}/unban`);
+      toast.success(`${name} ist entbannt.`);
       load();
     } catch (e) {
-      toast.error(formatRequestError(e, u.is_banned ? "Entbannen fehlgeschlagen." : "Bannen fehlgeschlagen."));
+      toast.error(formatRequestError(e, "Entbannen fehlgeschlagen."));
     }
+  };
+  const banControl = (u) => {
+    if (me?.id && me.id === u.id) return null;
+    if (u.ban_protected && !isSuperAdmin) {
+      return (
+        <span className="max-w-[12rem] text-left text-[10px] leading-snug text-white/45" data-testid={`user-ban-locked-${u.username}`}>
+          Konto mit Adminbereich – {u.is_banned ? "entbannen" : "bannen"} kann nur der Superadmin.
+        </span>
+      );
+    }
+    return (
+      <button onClick={() => (u.is_banned ? unban(u) : setBanTarget(u))} data-testid={`user-ban-${u.username}`} className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-sm ${u.is_banned ? "text-[#00FF88] border border-[#00FF88]/40" : "text-[#FF3B30] border border-[#FF3B30]/40 hover:bg-[#FF3B30]/10"}`}>
+        {u.is_banned ? "Entbannen" : "Bannen"}
+      </button>
+    );
   };
   const deleteUser = async (u) => {
     if (!await confirm({
@@ -208,9 +235,7 @@ export default function AdminUsersPage() {
                 </td>
                 <td className="px-4 py-3 text-center">
                   <div className="inline-flex items-center gap-2">
-                    <button onClick={() => toggleBan(u)} data-testid={`user-ban-${u.username}`} className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-sm ${u.is_banned ? "text-[#00FF88] border border-[#00FF88]/40" : "text-[#FF3B30] border border-[#FF3B30]/40 hover:bg-[#FF3B30]/10"}`}>
-                      {u.is_banned ? "Entbannen" : "Bannen"}
-                    </button>
+                    {banControl(u)}
                     {!u.is_club_member && !u.is_banned ? (
                       <button onClick={() => invite(u)} data-testid={`user-invite-${u.username}`} title="Mitgliedsantrag freischalten: das Konto bekommt eine Einladung und sieht den Antrag beim nächsten Besuch" className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-sm text-[#FFD700] border border-[#FFD700]/40 hover:bg-[#FFD700]/10">
                         Einladen
@@ -235,7 +260,74 @@ export default function AdminUsersPage() {
         </div>
       </div>
       {creating && <CreateUserModal onClose={() => setCreating(false)} onCreated={load} onSaved={() => { setCreating(false); load(); }} />}
+      {banTarget && <BanDialog target={banTarget} onCancel={() => setBanTarget(null)} onBanned={() => { setBanTarget(null); load(); }} />}
     </AdminLayout>
+  );
+}
+
+// Bannen im Fenster auf der Seite: nennt die Person, verlangt einen Grund und bestätigt erst mit dem Knopf.
+function BanDialog({ target, onCancel, onBanned }) {
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const dialogRef = useModalBehavior(true, onCancel);
+  const name = target.display_name || target.username;
+  const trimmed = reason.trim();
+  const missing = Math.max(0, BAN_REASON_MIN - trimmed.length);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (missing || saving) return;
+    setSaving(true);
+    try {
+      await api.post(`/users/${target.id}/ban`, { reason: trimmed });
+      toast.success(`${name} ist gebannt.`);
+      onBanned();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Bannen fehlgeschlagen."));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      role="presentation"
+      className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm p-4 flex items-center justify-center"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}
+    >
+      <form ref={dialogRef} tabIndex={-1} onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="ban-dialog-title" data-testid="ban-dialog" className="w-full max-w-md bg-[#121212] border border-white/10 rounded-sm shadow-2xl focus:outline-none">
+        <div className="flex items-start gap-3 p-5 border-b border-white/10">
+          <div className="w-10 h-10 rounded-sm border border-[#FF3B30]/45 text-[#FF3B30] bg-[#FF3B30]/10 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 id="ban-dialog-title" className="font-heading font-black uppercase text-lg break-words">{name} bannen?</h2>
+            <p className="mt-1 text-sm text-white/60 leading-relaxed">{name} (@{target.username}) kann sich danach nicht mehr anmelden. Der Grund steht im Audit-Log.</p>
+            <label htmlFor="ban-reason" className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/60">Grund (Pflicht)</label>
+            <textarea
+              id="ban-reason"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder={`Warum wird das Konto gebannt? Mindestens ${BAN_REASON_MIN} Zeichen.`}
+              maxLength={500}
+              data-testid="ban-dialog-reason"
+              className="mt-1 input min-h-24 resize-y"
+            />
+            {trimmed && missing ? <p className="mt-1 text-xs text-[#FFD700]" data-testid="ban-dialog-hint">Noch {missing} Zeichen.</p> : null}
+          </div>
+          <button type="button" onClick={onCancel} className="p-1 text-white/45 hover:text-white" aria-label="Schließen">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-5 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+          <button type="button" onClick={onCancel} data-testid="ban-dialog-cancel" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+            Abbrechen
+          </button>
+          <button type="submit" disabled={Boolean(missing) || saving} data-testid="ban-dialog-confirm" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm text-xs font-black uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed">
+            {saving ? "Banne …" : "Bannen"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

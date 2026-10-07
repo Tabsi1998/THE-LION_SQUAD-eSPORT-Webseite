@@ -549,13 +549,16 @@ def _banner_active(doc: dict, user: dict | None) -> bool:
     if ends_at and ends_at < now:
         return False
     audience = doc.get("audience") or "all"
+    # „Admins“ ist das Admin-Team samt Moderation (wie „Nur Admins“ im Profil); „Vereinsmitglieder“
+    # folgt der Regel für Mitglieder-Inhalte (services/visibility.py).
     admin_roles = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+    member_roles = {"tournament_admin", "club_admin", "superadmin"}
     if audience == "all":
         return True
     if audience == "logged_in":
         return bool(user)
     if audience == "members":
-        return bool(user and (user.get("is_club_member") or user.get("role") in admin_roles))
+        return bool(user and (user.get("is_club_member") or user.get("role") in member_roles))
     if audience == "admins":
         return bool(user and user.get("role") in admin_roles)
     return False

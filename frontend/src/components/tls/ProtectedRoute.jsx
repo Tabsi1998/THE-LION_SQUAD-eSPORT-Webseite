@@ -7,9 +7,11 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 // Bereiche (Turnierleitung, Redaktion, Vereinsverwaltung, System, Moderation).
 // `requireAdmin` heißt „irgendein Adminbereich“, `requireClubAdmin` bleibt als
 // Kurzform für System. Zwei-Faktor ist Pflicht für alles außer Moderation.
+// `requireTournamentStaff` öffnet die Turnierseiten (Turniere, Fast Lap, Stationen,
+// Turnierbaum-TV) für Helfer mit Einsatz und jeden Adminbereich - Moderation allein nicht.
 const MFA_AREAS = new Set(ADMIN_AREAS);
 
-export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireModerator = false }) {
+export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireTournamentStaff = false }) {
   const { user } = useAuth();
   const loc = useLocation();
   const wantedAreas = requireArea ? [requireArea].flat() : requireClubAdmin ? ["system"] : requireAdmin ? ADMIN_AREAS : [];
@@ -31,8 +33,8 @@ export function ProtectedRoute({ children, requireArea = null, requireAdmin = fa
     // Zwei-Faktor wohnt seit #258 unter „Sicherheit“ - dorthin, mit der Erklärung, warum (#348).
     return <Navigate to={`/profile?tab=security&mfa=required&next=${encodeURIComponent(loc.pathname)}`} replace />;
   }
-  if (requireModerator && !user.is_tournament_staff && !hasArea(user, "moderation") && !isAnyAdmin(user)) {
-    return <Navigate to="/403" replace state={{ areas: ["moderation"], from: loc.pathname }} />;
+  if (requireTournamentStaff && !user.is_tournament_staff && !isAnyAdmin(user)) {
+    return <Navigate to="/403" replace state={{ areas: ["tournaments"], from: loc.pathname }} />;
   }
   if (requireMember && !user.is_club_member && !isAnyAdmin(user)) {
     // Kein Mitglied: auf die Beitrittsseite, mit dem Grund - nicht stumm umgeleitet (#364).

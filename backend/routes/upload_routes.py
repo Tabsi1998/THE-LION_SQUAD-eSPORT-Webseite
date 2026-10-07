@@ -45,7 +45,9 @@ logger = logging.getLogger("tls-arena.uploads")
 ALLOWED_IMAGE = {"image/png", "image/jpeg", "image/webp"}
 ALLOWED_VIDEO = {"video/mp4", "video/webm", "video/quicktime", "video/x-m4v"}
 SUPPORTED_VIDEO_LABEL = "MP4, WebM, MOV oder M4V"
-ADMIN_MEDIA_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
+# Admin-Medien (Galerie, Sponsoren, Branding, Videos, Originaldateien, Upload-Protokoll); Moderatoren
+# laden wie alle Konten eigene Bilder hoch und prüfen fremde in der Bildprüfung.
+ADMIN_MEDIA_ROLES = {"admin", "tournament_admin", "club_admin", "superadmin"}
 ALLOWED_MEDIA_SCOPES = {"user", "admin", "sponsor", "branding", "gallery"}
 IMAGE_MIME_BY_EXT = BROWSER_IMAGE_MIME_BY_EXT
 VIDEO_MIME_BY_EXT = PLAYABLE_VIDEO_MIME_BY_EXT

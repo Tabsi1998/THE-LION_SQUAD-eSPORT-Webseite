@@ -100,14 +100,21 @@ async def test_club_admins_need_a_second_factor_for_member_data_too(flow):
 
 
 @pytest.mark.asyncio
-async def test_moderators_moderate_without_a_second_factor_but_exports_need_one(flow):
+async def test_moderators_moderate_without_a_second_factor_and_exports_belong_to_the_tournament_lead(flow):
     mod = await flow.add_user(role="moderator", name="moderator")
     mod["auth_mfa_verified"] = False
     flow.act_as(mod)
     assert await status(flow, REPORTS) == 200
     assert await status(flow, EXPORT) == 403
-    assert "Zwei-Faktor" in await detail(flow, EXPORT)
+    assert "Turnierleitung" in await detail(flow, EXPORT)
     assert await status(flow, NEWS_ADMIN) == 403
+
+    # Exporte sind Turnierleitung - mit bestätigter Zwei-Faktor-Anmeldung.
+    lead = await flow.add_user(role="tournament_admin", name="turnierleitung")
+    lead["auth_mfa_verified"] = False
+    flow.act_as(lead)
+    assert await status(flow, EXPORT) == 403
+    assert "Zwei-Faktor" in await detail(flow, EXPORT)
 
 
 @pytest.mark.asyncio

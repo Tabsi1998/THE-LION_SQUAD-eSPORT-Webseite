@@ -25,11 +25,12 @@ from PIL import Image
 
 from database import get_db
 from models import new_id, now_utc
+from services.permissions import holds_area
 from storage import PRIVATE_CHAT_DIR, ensure_directory
 
 logger = logging.getLogger("tls-arena.chat-attachments")
-# Bildprüfung (#415): wer ein noch ungeprüftes Bild trotzdem sehen darf.
-SCAN_STAFF_ROLES = ("moderator", "tournament_admin", "club_admin", "superadmin")
+# Bildprüfung (#415): ein noch ungeprüftes Bild sehen außer dem Absender nur, wer den Bereich Moderation hat.
+SCAN_AREA = "moderation"
 
 
 def _int_from_env(name: str, default: int) -> int:
@@ -244,7 +245,7 @@ async def can_access(attachment: dict, user: dict | None) -> bool:
     scan_state = attachment.get("scan_state") or "safe"
     if scan_state == "blocked":
         return False
-    if scan_state in ("pending", "review") and not (user and (user.get("id") == attachment.get("owner_id") or user.get("role") in SCAN_STAFF_ROLES)):
+    if scan_state in ("pending", "review") and not (user and (user.get("id") == attachment.get("owner_id") or holds_area(user, SCAN_AREA))):
         return False
     if attachment.get("status") != "attached":
         return bool(user and user.get("id") == attachment.get("owner_id"))

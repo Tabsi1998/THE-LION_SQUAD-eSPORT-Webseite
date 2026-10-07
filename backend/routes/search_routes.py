@@ -10,7 +10,8 @@ from services.visibility import user_can_see
 from services.query_filters import safe_regex
 
 router = APIRouter(prefix="/api/search", tags=["search"])
-STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+# Entwürfe und nicht öffentliche Turniere findet nur, wer sie auch verwaltet.
+STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
 
 def _parse_dt(value):

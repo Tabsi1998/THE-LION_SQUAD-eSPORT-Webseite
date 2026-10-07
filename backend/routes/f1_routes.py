@@ -44,7 +44,9 @@ def _max_attempts(challenge: dict) -> int | None:
 
 
 router = APIRouter(prefix="/api/f1", tags=["f1"])
-STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+# Fast-Lap-Zeiten für alle Challenges: Turnierleitung, Club-Admin, Superadmin; sonst nur mit Einsatz
+# in der Challenge (f1_staff_assignments).
+STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 F1_RESULT_STAFF_ROLES = {"organizer", "referee", "scorekeeper"}
 
 
@@ -924,7 +926,7 @@ async def delete_time(time_id: str, me: dict = Depends(get_current_user)):
 
 
 @router.get("/challenges/{cid}/export.csv")
-async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(require_area("tournaments", "moderation"))):
+async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(require_area("tournaments"))):
     db = get_db()
     c = await _get_visible_challenge(cid, me)
     cid = c["id"]

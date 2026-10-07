@@ -10,6 +10,7 @@ from models import new_id, now_utc
 from services.friend_service import are_friends
 from services.moderation import block_between, interaction_is_blocked
 from services.notification_preferences import send_user_template
+from services.permissions import holds_area
 from services.rate_limit import enforce_rate_limit
 from services.user_notifications import build_public_url, create_user_notification
 from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments
@@ -18,7 +19,6 @@ from services import word_filter
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
 
-STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 DM_PRIVACY_LABELS = {
     "everyone": "Alle eingeloggten Benutzer",
     "friends": "Nur Freunde",
@@ -36,7 +36,9 @@ class DirectMessageCreate(BaseModel):
 
 
 def _is_staff(user: dict | None) -> bool:
-    return bool(user and user.get("role") in STAFF_ROLES)
+    """Die Moderation erreicht jede Person - auch bei „Nur Admins“ oder ohne Direktnachrichten -,
+    etwa um eine Meldung zu klären. Der Bereich kommt aus der Rolle (Moderator und höher)."""
+    return holds_area(user, "moderation")
 
 
 def _label(user: dict | None) -> str:

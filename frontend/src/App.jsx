@@ -65,7 +65,7 @@ function BracketTvRoute({ station = false }) {
   const [params] = useSearchParams();
   const page = station ? <StationTVPage /> : <BracketTVPage />;
   if (params.get("key")) return page;
-  return <ProtectedRoute requireModerator>{page}</ProtectedRoute>;
+  return <ProtectedRoute requireTournamentStaff>{page}</ProtectedRoute>;
 }
 
 import HomePage from "@/pages/public/HomePage";
@@ -314,17 +314,17 @@ function App() {
           <Route path="/admin/member-profiles" element={<ProtectedRoute requireArea="club"><AdminClubMemberProfilesPage /></ProtectedRoute>} />
           <Route path="/admin/benefits" element={<ProtectedRoute requireArea="club"><AdminBenefitsPage /></ProtectedRoute>} />
           <Route path="/admin/einlass" element={<ProtectedRoute requireArea="club"><AdminAdmissionPage /></ProtectedRoute>} />
-          <Route path="/admin/tournaments" element={<ProtectedRoute requireModerator><AdminTournamentsPage /></ProtectedRoute>} />
+          <Route path="/admin/tournaments" element={<ProtectedRoute requireTournamentStaff><AdminTournamentsPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments/new" element={<ProtectedRoute requireArea="tournaments"><AdminTournamentNewPage /></ProtectedRoute>} />
           <Route path="/admin/tournament-guide" element={<ProtectedRoute requireArea="tournaments"><AdminTournamentGuidePage /></ProtectedRoute>} />
           <Route path="/admin/tv" element={<ProtectedRoute requireArea="tournaments"><AdminTvPage /></ProtectedRoute>} />
-          <Route path="/admin/tournaments/:id" element={<ProtectedRoute requireModerator><AdminTournamentEditPage /></ProtectedRoute>} />
-          <Route path="/admin/f1" element={<ProtectedRoute requireModerator><AdminF1Page /></ProtectedRoute>} />
+          <Route path="/admin/tournaments/:id" element={<ProtectedRoute requireTournamentStaff><AdminTournamentEditPage /></ProtectedRoute>} />
+          <Route path="/admin/f1" element={<ProtectedRoute requireTournamentStaff><AdminF1Page /></ProtectedRoute>} />
           <Route path="/admin/f1/new" element={<ProtectedRoute requireArea="tournaments"><AdminF1NewPage /></ProtectedRoute>} />
-          <Route path="/admin/f1/:id" element={<ProtectedRoute requireModerator><AdminF1EditPage /></ProtectedRoute>} />
+          <Route path="/admin/f1/:id" element={<ProtectedRoute requireTournamentStaff><AdminF1EditPage /></ProtectedRoute>} />
           <Route path="/admin/games" element={<ProtectedRoute requireArea="tournaments"><AdminGamesPage /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute requireArea="club"><AdminUsersPage /></ProtectedRoute>} />
-          <Route path="/admin/stations" element={<ProtectedRoute requireModerator><AdminStationsPage /></ProtectedRoute>} />
+          <Route path="/admin/stations" element={<ProtectedRoute requireTournamentStaff><AdminStationsPage /></ProtectedRoute>} />
           <Route path="/admin/events" element={<ProtectedRoute requireArea="tournaments"><AdminEventsPage /></ProtectedRoute>} />
           {/* Event und Beitrag als eigene Seite mit URL statt Fenster über der Liste (#434). */}
           <Route path="/admin/events/new" element={<ProtectedRoute requireArea="tournaments"><AdminEventEditPage /></ProtectedRoute>} />
@@ -343,7 +343,7 @@ function App() {
           <Route path="/admin/dolibarr" element={<ProtectedRoute requireArea={["club", "system"]}><AdminDolibarrPage /></ProtectedRoute>} />
           <Route path="/admin/finance" element={<ProtectedRoute requireArea={["finance"]}><AdminFinancePage /></ProtectedRoute>} />
           <Route path="/admin/audit" element={<Navigate to="/admin/ops?tab=events&source=audit" replace />} />
-          <Route path="/admin/moderation" element={<ProtectedRoute requireModerator><AdminModerationPage /></ProtectedRoute>} />
+          <Route path="/admin/moderation" element={<ProtectedRoute requireArea="moderation"><AdminModerationPage /></ProtectedRoute>} />
           <Route path="/admin/setup" element={<ProtectedRoute requireArea={["system"]}><AdminSetupPage /></ProtectedRoute>} />
           <Route path="/admin/integrations" element={<ProtectedRoute requireArea={["system"]}><AdminIntegrationsOverviewPage /></ProtectedRoute>} />
           <Route path="/admin/integrations/:key" element={<ProtectedRoute requireArea={["system"]}><AdminIntegrationPage /></ProtectedRoute>} />

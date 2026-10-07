@@ -52,7 +52,8 @@ logger = logging.getLogger(__name__)
 
 # ============ Public/User ============
 router = APIRouter(prefix="/api/achievements", tags=["achievements"])
-STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+# Wer fremde, nicht öffentliche Erfolge trotzdem sieht. Moderatoren moderieren und brauchen sie dafür nicht.
+STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
 
 @router.get("/groups")

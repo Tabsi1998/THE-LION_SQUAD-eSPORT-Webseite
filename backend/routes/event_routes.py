@@ -22,7 +22,8 @@ from services.permissions import areas_for, user_has_area
 from models import EventCreate, EventUpdate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
-STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+# Events gehören zur Turnierleitung (Bereich „tournaments“); Moderatoren moderieren.
+STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 LEGACY_SPONSOR_TIERS = {"supporter": "bronze", "partner": "bronze"}
 ACTIVE_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in"}
 PUBLIC_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in", "waitlist"}
@@ -492,7 +493,7 @@ async def list_events(
     user: dict | None = Depends(get_optional_user),
 ):
     db = get_db()
-    is_admin = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
+    is_admin = user and user.get("role") in STAFF_ROLES
     q: dict = {}
     if status:
         if status == "draft" and not (include_drafts and is_admin):
@@ -590,7 +591,7 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     event, was_old_slug = await _find_event(slug_or_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
-    is_admin = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
+    is_admin = user and user.get("role") in STAFF_ROLES
     access_link = await validate_access_link(db, access, "event", event["id"], user, "view")
     has_access = bool(access_link)
     if event.get("status") == "draft" and not (is_admin or has_access):

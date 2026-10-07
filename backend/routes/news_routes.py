@@ -23,7 +23,8 @@ from models import (
 )
 
 router = APIRouter(prefix="/api", tags=["news"])
-STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+# Entwürfe und unveröffentlichte Beiträge sehen diese Rollen; Moderatoren moderieren.
+STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 PROFILE_LINK_RE = re.compile(r"/u/([A-Za-z0-9_.-]{2,32})")
 
@@ -391,7 +392,7 @@ async def list_news(
     user: dict | None = Depends(get_optional_user),
 ):
     db = get_db()
-    is_admin = user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
+    is_admin = user and user.get("role") in STAFF_ROLES
     q: dict = {} if is_admin else {"published": True}
     if category:
         q["category"] = category

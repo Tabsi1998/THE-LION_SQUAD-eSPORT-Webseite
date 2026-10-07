@@ -3,7 +3,10 @@ from fastapi import HTTPException
 
 from database import get_db
 
-GLOBAL_TOURNAMENT_STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+# Turnierrechte für alle Turniere: Turnierleitung, Club-Admin und Superadmin. Moderatoren moderieren;
+# in einem einzelnen Turnier bekommen sie genau die Rechte eines Helfer-Einsatzes
+# (tournament_staff_assignments) - wie jede andere Person auch.
+GLOBAL_TOURNAMENT_STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 GLOBAL_TOURNAMENT_ADMIN_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
 RESULT_STAFF_ROLES = {"organizer", "referee", "scorekeeper"}

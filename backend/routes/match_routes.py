@@ -51,7 +51,8 @@ from services.competition_usage import engine_for_match, record_write
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
 logger = logging.getLogger("tls.match")
-STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+# Turnierleitung über alle Turniere; Helfer nur über ihren Einsatz (has_tournament_staff_permission).
+STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 EVENT_MODES = {"local", "online", "hybrid"}
 RESULT_ENTRY_MODES = {"staff_only", "player_confirmed", "hybrid"}
 SCHEDULE_MODES = {"fixed_by_staff", "player_proposal", "hybrid"}

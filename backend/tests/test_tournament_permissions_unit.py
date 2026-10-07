@@ -58,10 +58,24 @@ def test_global_tournament_staff_does_not_need_assignment(monkeypatch):
     monkeypatch.setattr(perms, "get_db", lambda: pytest.fail("global roles must not query assignments"))
 
     assert asyncio.run(perms.has_tournament_staff_permission(
-        {"id": "u1", "role": "moderator"},
+        {"id": "u1", "role": "tournament_admin"},
         "t1",
         perms.RESULT_STAFF_ROLES,
     ))
+
+
+def test_moderators_get_tournament_rights_only_through_an_assignment(monkeypatch):
+    """Moderatoren moderieren; im Turnier zählt allein ihr Einsatz - mit genau dessen Rechten."""
+    db = FakeDb([
+        {"tournament_id": "t1", "user_id": "mod", "role": "scorekeeper", "scope": "tournament", "is_active": True},
+    ])
+    monkeypatch.setattr(perms, "get_db", lambda: db)
+    moderator = {"id": "mod", "role": "moderator"}
+
+    assert not perms.is_global_tournament_staff(moderator)
+    assert asyncio.run(perms.has_tournament_staff_permission(moderator, "t1", perms.RESULT_STAFF_ROLES))
+    assert not asyncio.run(perms.has_tournament_staff_permission(moderator, "t1", perms.STRUCTURE_STAFF_ROLES))
+    assert not asyncio.run(perms.has_tournament_staff_permission(moderator, "t2", perms.RESULT_STAFF_ROLES))
 
 
 def test_assigned_tournament_ids_only_returns_active_assignments(monkeypatch):
