@@ -12,6 +12,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+from services import event_days
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
 
@@ -26,7 +27,7 @@ ALARM_MINUTES = 60
 VIENNA = ZoneInfo("Europe/Vienna")
 
 _EVENT_FIELDS = {"_id": 0, "id": 1, "slug": 1, "name": 1, "start_date": 1, "end_date": 1, "status": 1,
-                 "visibility": 1, "location": 1, "city": 1, "event_type": 1}
+                 "visibility": 1, "location": 1, "city": 1, "event_type": 1, "days": 1, "locations": 1}
 _TOURNAMENT_FIELDS = {"_id": 0, "id": 1, "slug": 1, "title": 1, "start_date": 1, "end_date": 1, "status": 1,
                       "visibility": 1, "is_public": 1, "registration_open_until": 1, "game_name": 1}
 _FASTLAP_FIELDS = {"_id": 0, "id": 1, "slug": 1, "title": 1, "start_date": 1, "end_date": 1, "status": 1,
@@ -80,6 +81,25 @@ def event_item(doc: dict, *, mine: bool = False) -> dict | None:
                  start=doc.get("start_date"), end=doc.get("end_date"), location=place, mine=mine)
 
 
+def event_items(doc: dict, *, mine: bool = False) -> list[dict]:
+    """Ein Event als Termine: eintägig einer, mehrtägig (#884) je Tag einer - „Name – Tag 2/3“, damit Kalender die
+    Nächte frei zeigen. Der Weg führt immer auf die eine Event-Seite."""
+    days = event_days.stored_days(doc)
+    if not days:
+        item = event_item(doc, mine=mine)
+        return [item] if item else []
+    names = {str(place.get("key")): str(place.get("name") or "") for place in doc.get("locations") or [] if isinstance(place, dict) and place.get("key")}
+    out = []
+    for index, day in enumerate(days, start=1):
+        place = names.get(day.get("location_key") or "") or ", ".join(part for part in (doc.get("location"), doc.get("city")) if part)
+        title = f"{doc.get('name') or 'Event'} – Tag {index}/{len(days)}" + (f" · {day['title']}" if day.get("title") else "")
+        item = _item("event", doc, title=title, path=f"/events/{doc.get('slug') or doc.get('id')}", start=day["start_at"], end=day["end_at"],
+                     location=place, mine=mine, marker="event_day", item_id=f"{doc.get('id')}-tag-{index}")
+        if item:
+            out.append(item)
+    return out
+
+
 def tournament_item(doc: dict, *, mine: bool = False) -> dict | None:
     return _item("tournament", doc, title=doc.get("title") or "Turnier", path=f"/tournaments/{doc.get('slug') or doc.get('id')}",
                  start=doc.get("start_date"), end=doc.get("end_date"), location=doc.get("game_name"), mine=mine)
@@ -125,9 +145,7 @@ async def collect(db, user: dict | None) -> list[dict]:
     for ev in events:
         if not await user_can_see(user, ev.get("visibility")):
             continue
-        item = event_item(ev, mine=ev.get("id") in my_events)
-        if item:
-            items.append(item)
+        items.extend(event_items(ev, mine=ev.get("id") in my_events))
     for t in tournaments:
         if not await user_can_see(user, t.get("visibility")):
             continue
@@ -236,6 +254,15 @@ def ics_single(item: dict, *, origin: str, now: datetime | None = None, alarm_mi
     """Ein Termin als ICS-Datei (#580): gleiche Felder wie im Feed, Erinnerung eine Stunde vorher."""
     now = now or datetime.now(timezone.utc)
     return _calendar(_vevent(item, origin=origin, now=now, alarm_minutes=alarm_minutes, extra_detail=extra_detail))
+
+
+def ics_bundle(items: list[dict], *, origin: str, now: datetime | None = None, alarm_minutes: int | None = ALARM_MINUTES) -> str:
+    """Mehrere Termine in einer Datei - ein mehrtägiges Event (#884) als ein Eintrag je Tag, jeder mit Erinnerung."""
+    now = now or datetime.now(timezone.utc)
+    lines: list[str] = []
+    for item in items:
+        lines += _vevent(item, origin=origin, now=now, alarm_minutes=alarm_minutes)
+    return _calendar(lines)
 
 
 def ics_filename(item: dict) -> str:

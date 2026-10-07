@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 const PHASE_STYLES = {
   // LIVE (#1076): der Chip steht ruhig, nur der Punkt pulsiert leise (index.css, .tls-live-dot).
   live: "bg-[#FF3B30]/20 text-[#FF3B30] border-[#FF3B30]/50",
+  // Mehrtägig (#884): zwischen zwei Tagen - ruhig, mit Countdown bis zum nächsten Tag.
+  day_break: "bg-[#9F7AEA]/15 text-[#C4B5FD] border-[#9F7AEA]/50",
   registration_open: "bg-[#00FF88]/15 text-[#00FF88] border-[#00FF88]/50",
   registration_pending: "bg-[#29B6E8]/10 text-[#29B6E8] border-[#29B6E8]/40",
   registration_closed: "bg-white/10 text-white/70 border-white/20",

@@ -268,6 +268,8 @@ export type ClubEvent = {
   visibility?: string | null;
   // Mehrere Standorte (#203); ein Event mit einem Ort hat genau einen Eintrag aus den Feldern oben.
   locations?: EventLocation[];
+  // Mehrtägig (#884): die Tage mit fertigen Texten vom Server - null bei einem Tag.
+  schedule?: EventSchedule | null;
   banner_url?: string | null;
   public_phase?: { countdown_kind?: string | null; label?: string; state?: string; target_at?: string | null };
   has_registration?: boolean;
@@ -284,6 +286,34 @@ export type ClubEvent = {
   participant_view?: "staff" | "public" | "none";
   can_check_in?: boolean;
   content_embeds?: ContentEmbed[];
+};
+
+export type EventScheduleDay = {
+  index: number;
+  date: string;
+  label: string;
+  time_label: string;
+  start: string;
+  end: string;
+  door?: string | null;
+  title?: string | null;
+  location_key?: string | null;
+  location_name?: string | null;
+  start_at: string;
+  end_at: string;
+  door_at?: string | null;
+  ends_next_day?: boolean;
+  state: "past" | "running" | "next" | "upcoming";
+};
+
+export type EventSchedule = {
+  multi_day: boolean;
+  count: number;
+  label: string;
+  range_label: string;
+  days: EventScheduleDay[];
+  now: { state: "before" | "running" | "break" | "after"; day_index?: number | null; text: string };
+  next_at?: string | null;
 };
 
 export type EventLocation = {

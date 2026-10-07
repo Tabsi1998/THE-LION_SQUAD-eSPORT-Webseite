@@ -14,6 +14,7 @@ import { plainTextPreview } from "@/lib/textPreview";
 import { sortByNearestDate } from "@/lib/contentSort";
 import { Calendar, MapPin, Users as UsersIcon, Crown, Lock } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
+import { scheduleLine } from "@/lib/eventDays";
 
 const VIS_ICON = { members: Crown, internal: Lock };
 
@@ -149,7 +150,7 @@ function EventCard({ e, meta }) {
         {e.start_date && (
           <div className="mt-2 inline-flex min-w-0 items-center gap-1.5 text-xs text-white/60">
             <Calendar className="w-3 h-3" />
-            <span className="min-w-0 truncate">{viennaDateTime(e.start_date, { dateStyle: "medium", timeStyle: "short" })}</span>
+            <span className="min-w-0 truncate" data-testid={e.schedule?.multi_day ? "event-card-days" : undefined}>{scheduleLine(e.schedule) || viennaDateTime(e.start_date, { dateStyle: "medium", timeStyle: "short" })}</span>
           </div>
         )}
         {e.location && (

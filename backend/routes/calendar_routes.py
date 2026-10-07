@@ -46,16 +46,24 @@ async def _single_ics(request: Request, db, kind: str, doc: dict | None) -> Resp
     hidden = not doc or doc.get("status") == "draft" or (kind == "tournament" and doc.get("is_public") is False)
     if hidden or not await user_can_see(None, doc.get("visibility")):
         raise HTTPException(404, "Diesen Termin gibt es nicht – oder er ist nicht öffentlich.")
-    item = calendar_items.event_item(doc) if kind == "event" else calendar_items.tournament_item(doc)
-    if not item:
+    items = calendar_items.event_items(doc) if kind == "event" else [calendar_items.tournament_item(doc)]
+    items = [item for item in items if item]
+    if not items:
         raise HTTPException(404, "Dieser Termin hat noch kein Datum.")
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "domain": 1}) or {}
     extra = calendar_items.check_in_note(doc) if kind == "tournament" else None
-    text = calendar_items.ics_single(item, origin=public_origin(request, branding), extra_detail=extra)
+    origin = public_origin(request, branding)
+    if len(items) > 1:
+        # Mehrtägig (#884): eine Datei mit einem Eintrag je Tag, benannt nach dem Event.
+        text = calendar_items.ics_bundle(items, origin=origin)
+        filename = calendar_items.ics_filename({"title": doc.get("name") or items[0]["title"]})
+    else:
+        text = calendar_items.ics_single(items[0], origin=origin, extra_detail=extra)
+        filename = calendar_items.ics_filename(items[0])
     return Response(
         content=text,
         media_type="text/calendar; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{calendar_items.ics_filename(item)}"', "Cache-Control": "public, max-age=600"},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "public, max-age=600"},
     )
 
 

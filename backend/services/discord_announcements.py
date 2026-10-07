@@ -27,6 +27,8 @@ from zoneinfo import ZoneInfo
 from database import get_db
 from models import now_utc
 
+from services import event_days
+
 logger = logging.getLogger("tls.discord.announce")
 
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -93,7 +95,12 @@ def news_message(post: dict) -> dict:
 
 def event_message(event: dict) -> dict:
     fields = []
-    if event.get("start_date"):
+    day_lines = event_days.lines(event)
+    if day_lines:
+        # Mehrtägig (#884): der Zeitraum und je Tag eine Zeile.
+        fields.append({"name": "Wann", "value": event_days.summary_text(event), "inline": True})
+        fields.append({"name": "Tage", "value": "\n".join(day_lines)[:1024], "inline": False})
+    elif event.get("start_date"):
         when = vienna(event["start_date"])
         end = _parse(event.get("end_date"))
         start = _parse(event.get("start_date"))
@@ -150,6 +157,9 @@ async def event_values(event: dict) -> dict:
     start, end = _parse(event.get("start_date")), _parse(event.get("end_date"))
     if when and start and end and end.astimezone(VIENNA).date() != start.astimezone(VIENNA).date():
         when = f"{when} – {vienna(end, with_time=False)}"
+    day_lines = event_days.lines(event)
+    if day_lines:
+        when = event_days.summary_text(event) + "\n" + "\n".join(day_lines)
     registration = bool(event.get("has_registration"))
     return {"name": str(event.get("name") or event.get("title") or "Event"),
             "text": plain_text(event.get("short_description") or event.get("description"), 400), "when": when,
@@ -207,8 +217,24 @@ def skip_reason(item: dict, *, published_at, now: datetime | None = None) -> str
     return None
 
 
+def _with_form_days(item: dict) -> dict:
+    """Das Formular schickt Tage als Wandzeit (#884); die Vorschau rechnet sie wie das Speichern. Unvollständige
+    Tage lässt sie weg - der Fehler kommt beim Speichern als Satz."""
+    raw = item.get("days")
+    if not isinstance(raw, list) or not raw or any(isinstance(day, dict) and day.get("start_at") for day in raw):
+        return item
+    keys = {str(place.get("key")) for place in item.get("locations") or [] if isinstance(place, dict) and place.get("key")}
+    try:
+        days = event_days.normalize_days(raw, location_keys=keys or None)
+    except ValueError:
+        return {**item, "days": None}
+    return {**item, "days": days, **event_days.derived_range(days)}
+
+
 async def preview(kind: str, item: dict) -> dict:
     """Dasselbe Embed wie beim Senden - mit den Knöpfen darunter (#573) -, plus ob und wohin es ginge."""
+    if kind == "event":
+        item = _with_form_days(item)
     from discord_service import EVENTS, _get_discord_config, build_embed, event_enabled, resolve_buttons, resolve_target
 
     from discord_service import allowed_in_target

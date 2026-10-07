@@ -274,3 +274,56 @@ async def test_member_tournaments_stay_on_main_and_a_blocked_game_server_does_no
     healed = await discord_scheduled.sync(db)
     assert healed["created"] == 3 and on(bot, COD) == ["CoD-Abend 0", "CoD-Abend 1", "CoD-Abend 2"]
     assert (await flow.patch(f"/api/settings/discord/guilds/{MAIN}", json={"mirror_events": False})).status_code == 400, "nur für Unterserver"
+
+
+@pytest.mark.asyncio
+async def test_multi_day_event_gets_one_scheduled_event_per_day(flow, bot):
+    """Mehrtägige Events (#884): je Tag ein Termin, keiner für das ganze Event; fällt ein Tag weg, geht nur sein
+    Termin; wird das Event wieder eintägig, gehen die Tagestermine und der eine Termin kommt."""
+    from services import event_days
+
+    await configure(flow)
+    first_day = (now_utc() + timedelta(days=3)).astimezone(event_days.VIENNA).date()
+    dates = [(first_day + timedelta(days=i)).isoformat() for i in range(3)]
+    days = event_days.normalize_days([{"date": d, "start": "10:00", "end": "22:00"} for d in dates])
+    await flow.db.events.insert_one({"id": "e9", "slug": "lan-we", "name": "LAN-Wochenende", "status": "scheduled", "visibility": "public",
+                                     "location": "Vereinsheim", "days": days, **event_days.derived_range(days)})
+
+    # Die Vorschau im Formular bekommt die Tage als Wandzeit und rechnet sie wie das Speichern.
+    raw = [{"date": d, "start": "10:00", "end": "22:00"} for d in dates]
+    shown = (await flow.post("/api/settings/discord/preview", json={"kind": "event", "item": {"name": "LAN-Wochenende", "status": "scheduled", "visibility": "public", "days": raw}})).json()
+    when = next(field["value"] for field in shown["embed"]["fields"] if field["name"] == "Wann")
+    assert when.startswith("3 Tage · ") and when.count("\n") == 3 and shown["scheduled_event"]["days"] == 3
+    broken = (await flow.post("/api/settings/discord/preview", json={"kind": "event", "item": {"name": "LAN", "status": "scheduled", "visibility": "public", "days": [raw[0]], "start_date": _at(3)}})).json()
+    assert "\n" not in next(field["value"] for field in broken["embed"]["fields"] if field["name"] == "Wann") and broken["scheduled_event"].get("days") is None
+
+    first = await discord_scheduled.sync(flow.db)
+    assert first["created"] == 3 and first["cancelled"] == 0 and first["errors"] == 0, first
+    assert sorted(e["name"] for e in bot.events.values()) == ["LAN-Wochenende – Tag 1/3", "LAN-Wochenende – Tag 2/3", "LAN-Wochenende – Tag 3/3"]
+    stored = await flow.db.events.find_one({"id": "e9"}, {"_id": 0})
+    assert not (stored.get("discord_scheduled_event") or {}).get("id"), "kein Termin für das ganze Event"
+    assert sorted(stored["discord_scheduled_days"]) == dates and all(entry["id"] for entry in stored["discord_scheduled_days"].values())
+    assert (await discord_scheduled.sync(flow.db))["created"] == 0, "kein Doppel"
+
+    # Die Vorschau im Formular nennt die Tage.
+    preview = await discord_scheduled.preview_for(flow.db, "event", stored)
+    assert preview["days"] == 3 and len(preview["payloads"]) == 3 and preview["would_create"] is True and preview["existing_id"]
+    assert preview["payloads"][2]["name"] == "LAN-Wochenende – Tag 3/3"
+
+    # Ein Tag fällt weg: sein Termin wird abgesagt, die zwei anderen heißen jetzt „Tag 1/2“ und „Tag 2/2“.
+    shorter = event_days.normalize_days([{"date": d, "start": "10:00", "end": "22:00"} for d in dates[:2]])
+    await flow.db.events.update_one({"id": "e9"}, {"$set": {"days": shorter, **event_days.derived_range(shorter)}})
+    cut = await discord_scheduled.sync(flow.db)
+    assert cut["cancelled"] == 1 and cut["created"] == 0 and cut["updated"] == 2, cut
+    assert sorted(e["name"] for e in bot.events.values() if e["status"] == "scheduled") == ["LAN-Wochenende – Tag 1/2", "LAN-Wochenende – Tag 2/2"]
+    stored = await flow.db.events.find_one({"id": "e9"}, {"_id": 0})
+    assert stored["discord_scheduled_days"][dates[2]]["cancel_reason"] == "day_removed"
+    assert (await discord_scheduled.sync(flow.db))["cancelled"] == 0
+
+    # Wieder eintägig: die Tagestermine gehen, ein Termin für das Event kommt.
+    await flow.db.events.update_one({"id": "e9"}, {"$unset": {"days": ""}, "$set": {"start_date": _at(3), "end_date": None}})
+    single = await discord_scheduled.sync(flow.db)
+    assert single["cancelled"] == 2 and single["created"] == 1, single
+    assert [e["name"] for e in bot.events.values() if e["status"] == "scheduled"] == ["LAN-Wochenende"]
+    stored = await flow.db.events.find_one({"id": "e9"}, {"_id": 0})
+    assert stored["discord_scheduled_event"]["id"] and all(entry["cancelled_at"] for entry in stored["discord_scheduled_days"].values())

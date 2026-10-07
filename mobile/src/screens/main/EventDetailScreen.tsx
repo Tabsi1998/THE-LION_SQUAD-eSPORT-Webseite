@@ -19,6 +19,7 @@ import { api, errorMessage } from "../../lib/api";
 import type { ContentTarget } from "../../lib/contentLinks";
 import { openLink } from "../../lib/openLink";
 import { companionChangeHint, eventBasisLabel, eventOfferSummary, formatCents, ownEventPriceLine, quoteTotal } from "../../lib/eventPrice";
+import { eventDayItems, scheduleLine } from "../../lib/eventDays";
 import { formatDateTime, formatStatus, placeParts } from "../../lib/format";
 import { internalLabel } from "../../lib/memberArea";
 import { getRegistrationState } from "../../lib/registration";
@@ -220,7 +221,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
         <View style={styles.header}>
           <View style={styles.headerMeta}>
             <StatusBadge phase={event.public_phase} status={event.status} />
-            <Muted>{formatDateTime(event.start_date || event.date)}</Muted>
+            <Muted testID="event-when">{scheduleLine(event.schedule) || formatDateTime(event.start_date || event.date)}</Muted>
           </View>
           <Title>{event.title || event.name || "Event"}</Title>
           <View style={styles.metaRow}>
@@ -234,11 +235,32 @@ export function EventDetailScreen({ navigation, route }: Props) {
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
         {event.start_date || event.date ? (
-          <AddToCalendarButton item={{
+          <AddToCalendarButton items={eventDayItems(event)} item={{
             id: event.id, kind: "event", title: event.title || event.name || "Event", start: (event.start_date || event.date) as string, end: event.end_date,
             location: placeParts(event.location, event.city).join(", ") || null, detail: event.event_type || event.type || null,
             url: event.slug ? `https://lionsquad.at/events/${event.slug}` : null,
           }} />
+        ) : null}
+
+        {event.schedule?.multi_day ? (
+          <Card style={styles.card} testID="event-days" perch="event-days">
+            <Heading>Die Tage</Heading>
+            {event.schedule.now?.text ? <Muted testID="event-days-now">{event.schedule.now.text}</Muted> : null}
+            {event.schedule.days.map((day) => (
+              <View key={day.index} style={[styles.place, day.state === "running" ? styles.dayRunning : null, day.state === "next" ? styles.dayNext : null, day.state === "past" ? styles.dayPast : null]} testID={`event-day-${day.index}`}>
+                <View style={styles.dayHead}>
+                  <Muted style={styles.placeIndex}>Tag {day.index}/{event.schedule!.count}</Muted>
+                  {day.state === "running" ? <Muted style={[styles.placeIndex, styles.dayTag, styles.dayTagLive]}>Läuft</Muted> : null}
+                  {day.state === "next" ? <Muted style={[styles.placeIndex, styles.dayTag]}>Als Nächstes</Muted> : null}
+                  {day.state === "past" ? <Muted style={styles.placeIndex}>Vorbei</Muted> : null}
+                </View>
+                <Body style={styles.placeName}>{day.label} · {day.time_label}{day.ends_next_day ? " (bis in den nächsten Morgen)" : ""}</Body>
+                {day.door ? <Muted>Einlass {day.door}</Muted> : null}
+                {day.title ? <Body>{day.title}</Body> : null}
+                {day.location_name ? <Muted>{day.location_name}</Muted> : null}
+              </View>
+            ))}
+          </Card>
         ) : null}
 
         {(event.locations?.length || 0) > 1 ? (
@@ -611,6 +633,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1,
     textTransform: "uppercase",
+  },
+  dayHead: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  dayTag: {
+    color: "#9F7AEA",
+    fontWeight: "800",
+  },
+  dayTagLive: {
+    color: colors.live,
+  },
+  dayRunning: {
+    borderLeftColor: colors.live,
+  },
+  dayNext: {
+    borderLeftColor: "#9F7AEA",
+  },
+  dayPast: {
+    opacity: 0.6,
   },
   placeName: {
     fontWeight: "900",

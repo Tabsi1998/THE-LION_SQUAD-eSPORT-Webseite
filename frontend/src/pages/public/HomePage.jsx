@@ -22,6 +22,7 @@ import { liveCountLine, nextCountdownTarget, timelineSignature } from "@/lib/liv
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { eventSortTime, scheduleLine } from "@/lib/eventDays";
 
 const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
 
@@ -434,7 +435,7 @@ function NextUp({ items }) {
               </div>
               {/* Einzeilig (#832): die Plakette brach in der schmalen Spalte um - jetzt so breit wie nötig. */}
               <div className="w-full sm:w-auto sm:shrink-0 sm:min-w-[12rem] flex flex-col gap-2 sm:items-start">
-                {item.start_date && <div className="text-xs text-white/45">{viennaDateTime(item.start_date, { dateStyle: "medium", timeStyle: "short" })}</div>}
+                {item.start_date && <div className="text-xs text-white/45">{scheduleLine(item.schedule) || viennaDateTime(item.start_date, { dateStyle: "medium", timeStyle: "short" })}</div>}
                 {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} className="self-start max-w-full sm:whitespace-nowrap" />}
               </div>
             </Link>
@@ -581,8 +582,8 @@ function buildHomeTimeline(state) {
     const liveRankA = a.public_phase?.state === "live" ? 0 : 1;
     const liveRankB = b.public_phase?.state === "live" ? 0 : 1;
     if (liveRankA !== liveRankB) return liveRankA - liveRankB;
-    const da = a.start_date ? new Date(a.start_date).getTime() : Number.MAX_SAFE_INTEGER;
-    const db = b.start_date ? new Date(b.start_date).getTime() : Number.MAX_SAFE_INTEGER;
+    const da = eventSortTime(a);
+    const db = eventSortTime(b);
     if (da !== db) return da - db;
     return a.sourcePriority - b.sourcePriority;
   });

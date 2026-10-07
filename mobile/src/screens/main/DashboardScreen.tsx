@@ -391,15 +391,17 @@ function tournamentToTimeline(tournament: Tournament): TimelineItem {
 }
 
 function eventToTimeline(event: ClubEvent): TimelineItem {
+  // Mehrtägig (#884): die Zeile zeigt den nächsten Tag und „3 Tage · Fr – So“ vor dem Ort.
+  const multi = event.schedule?.multi_day ? event.schedule : null;
   return {
     id: event.id,
     kind: "event",
     title: event.title || event.name || "Event",
-    date: event.start_date || event.date,
+    date: (multi?.next_at) || event.start_date || event.date,
     status: event.status,
     phaseState: event.public_phase?.state,
     phaseLabel: event.public_phase?.label,
-    detail: placeParts(event.location, event.city).join(" · ") || formatEventType(event.event_type || event.type),
+    detail: [multi?.label, placeParts(event.location, event.city).join(" · ") || formatEventType(event.event_type || event.type)].filter(Boolean).join(" · "),
     bannerUrl: event.banner_url,
     targetId: event.slug || event.id,
     registrationStatus: event.own_registration?.status,

@@ -319,6 +319,15 @@ async def _site_base_url() -> str:
     return domain or "https://lionsquad.at"
 
 
+def _event_when(item: dict) -> str:
+    from services import event_days
+
+    lines = event_days.lines(item)
+    if lines:
+        return event_days.summary_text(item) + " – " + "; ".join(lines)
+    return _format_de_datetime(item.get("start_date"))
+
+
 def _format_de_datetime(value: Any) -> str:
     if not value:
         return ""
@@ -366,7 +375,8 @@ async def enqueue_newsletter_for_item(kind: str, item: dict, dedupe_suffix: str 
         title = item.get("name") or "Neues Event"
         common_kwargs = {
             "title": title,
-            "when": _format_de_datetime(item.get("start_date")),
+            # Mehrtägig (#884): der Zeitraum und die Tage statt nur des Beginns.
+            "when": _event_when(item),
             "location": item.get("location") or item.get("city") or "",
             "url": url,
             "preferences_url": preferences_url,
