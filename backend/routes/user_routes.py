@@ -836,12 +836,14 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
 @router.get("/{user_id}")
 async def get_user(user_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
+    if me["id"] != user_id:
+        # Das ganze Konto (Namen, Geburtsdatum, Wohnort, Spiele-Kennungen, Einstellungen, Mitgliedschaft) braucht nur
+        # die Vereinsverwaltung, etwa beim Verknüpfen in der Mitgliederliste. Alle anderen nutzen das öffentliche
+        # Profil. Die Prüfung kommt vor der Suche, damit die Antwort nicht verrät, ob es das Konto gibt.
+        await require_area("club", "system")(me)
     u = await db.users.find_one({"id": user_id}, PRIVATE_AUTH_FIELDS)
     if not u:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
-    # Hide email for non-admins if not own
-    if me["id"] != user_id and me.get("role") not in ("tournament_admin", "club_admin", "superadmin"):
-        u.pop("email", None)
     await _attach_membership(u)
     return u
 
