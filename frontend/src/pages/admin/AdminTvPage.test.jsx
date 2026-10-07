@@ -2,7 +2,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // TV & Beamer (#1110): Grundwerte speichern nur, was sich geändert hat; der Baukasten baut Links mit den gewählten
-// Abweichungen, beim Turnierbaum mit Anzeige-Schlüssel; Schlüssel lassen sich widerrufen.
+// Abweichungen, beim Turnierbaum mit Anzeige-Schlüssel; Schlüssel lassen sich widerrufen. Meilenstein 59: „Ton beim
+// Ergebnis“ (#1118, Standard aus) und die Stations-Ansicht (#1120) mit demselben Schlüssel.
 
 const apiMock = { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn() };
@@ -15,7 +16,7 @@ vi.mock("@/components/tls/BrandedQRCode", () => ({ BrandedQRCode: ({ value }) =>
 
 const AdminTvPage = (await import("./AdminTvPage")).default;
 
-const DEFAULTS = { text_size: "normal", contrast: false, safe_area: 0, pixel_shift: true, season_header: true, reduce_motion: false };
+const DEFAULTS = { text_size: "normal", contrast: false, safe_area: 0, pixel_shift: true, season_header: true, reduce_motion: false, result_sound: false };
 let keys;
 
 beforeEach(() => {
@@ -27,6 +28,7 @@ beforeEach(() => {
     if (url.startsWith("/tournaments")) return { data: [{ id: "t1", title: "Lions Herbst-Cup" }] };
     if (url.startsWith("/events")) return { data: [{ id: "e1", name: "Lions LAN Herbst" }] };
     if (url.startsWith("/f1/challenges")) return { data: [{ id: "f1", title: "Lions Fast Lap" }] };
+    if (url === "/stations?tournament_id=t1") return { data: [{ id: "st-pc-3", name: "PC 3" }, { id: "st-pc-4", name: "PC 4" }] };
     return { data: [] };
   });
   apiMock.put.mockImplementation(async (_url, patch) => ({ data: { settings: { ...DEFAULTS, contrast: true, ...patch }, defaults: DEFAULTS } }));
@@ -133,4 +135,44 @@ test("aktive Schlüssel: Liste ohne Schlüssel selbst, Widerrufen fragt nach", a
   await user.click(screen.getByTestId("tv-key-revoke-k1"));
   expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ confirmLabel: "Widerrufen" }));
   await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/tv/keys/k1"));
+});
+
+test("Ton beim Ergebnis: Standard aus, einschalten speichert nur diesen Wert", async () => {
+  const user = userEvent.setup();
+  render(<AdminTvPage />);
+  const sound = await screen.findByTestId("tv-input-result_sound");
+  await waitFor(() => expect(screen.getByTestId("tv-input-contrast")).toBeChecked());
+  expect(sound).not.toBeChecked();
+  expect(screen.getByTestId("tv-setting-result_sound")).toHaveTextContent("Ton beim Ergebnis");
+  expect(screen.getByTestId("tv-setting-result_sound")).toHaveTextContent("Für Ton einmal klicken");
+  await user.click(sound);
+  await user.click(screen.getByTestId("tv-defaults-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/tv/settings", { result_sound: true }));
+});
+
+test("Stations-Ansicht: Turnier und Station wählen - der Link trägt den Schlüssel des Turniers", async () => {
+  const user = userEvent.setup();
+  render(<AdminTvPage />);
+  await user.click(screen.getByTestId("tv-view-station"));
+  await waitFor(() => expect(within(screen.getByTestId("tv-target")).getByText("Lions Herbst-Cup")).toBeInTheDocument());
+  expect(screen.getByTestId("tv-station")).toBeDisabled();
+  await user.selectOptions(screen.getByTestId("tv-target"), "t1");
+  await waitFor(() => expect(within(screen.getByTestId("tv-station")).getByText("PC 3")).toBeInTheDocument());
+  expect(screen.getByTestId("tv-link-missing")).toHaveTextContent("Station auswählen");
+  await user.selectOptions(screen.getByTestId("tv-station"), "st-pc-3");
+  await user.click(screen.getByTestId("tv-key-create"));
+  const link = await screen.findByTestId("tv-link");
+  expect(link.textContent).toBe(`${window.location.origin}/display/bracket/t1/station/st-pc-3?key=neuer-schluessel`);
+  // Dieselbe Abweichung wie beim Turnierbaum, zum Beispiel Ton nur an diesem Bildschirm.
+  await user.selectOptions(screen.getByTestId("tv-override-input-result_sound"), "true");
+  expect(screen.getByTestId("tv-link").textContent).toBe(`${window.location.origin}/display/bracket/t1/station/st-pc-3?key=neuer-schluessel&result_sound=1`);
+});
+
+test("einen Stations-Link übernehmen: Ansicht, Turnier, Station und Schlüssel bleiben", async () => {
+  const user = userEvent.setup();
+  render(<AdminTvPage />);
+  await user.type(screen.getByTestId("tv-link-paste"), "https://club.example/display/bracket/t1/station/st-pc-4?key=alt&contrast=1");
+  await user.click(screen.getByTestId("tv-link-takeover"));
+  await waitFor(() => expect(screen.getByTestId("tv-station")).toHaveValue("st-pc-4"));
+  expect(screen.getByTestId("tv-link").textContent).toBe(`${window.location.origin}/display/bracket/t1/station/st-pc-4?key=alt&contrast=1`);
 });

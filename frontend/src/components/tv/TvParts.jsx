@@ -54,10 +54,11 @@ export function TvFooter({ qrValue, kicker, text, sponsorMax = 4, children = nul
   );
 }
 
+// Live ist rot wie der LIVE-Rahmen der Karten (#1116), Grün heißt „frei“ oder „Anmeldung offen“.
 const TONES = {
-  live: "green",
-  running: "green",
-  in_progress: "green",
+  live: "live",
+  running: "live",
+  in_progress: "live",
   check_in: "gold",
   checkin_open: "gold",
   registration_open: "green",

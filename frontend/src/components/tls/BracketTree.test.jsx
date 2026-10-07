@@ -248,3 +248,43 @@ describe("Podium bei mehreren Phasen (#833)", () => {
     expect(podium.has("d")).toBe(false);
   });
 });
+
+describe("Turnierbaum am TV (#1115)", () => {
+  it("stellt kleine Blöcke neben andere, Liga allein, und alles in eine Reihe, wenn nur so der Baum ins Bild passt", async () => {
+    const { arrangeTvBlocks } = await import("./BracketTree");
+    const { doubleElimination, heatDoubleElimination, singleElimination } = await import("../../../e2e/fixtures/tvBrackets.mjs");
+    const blocksOf = (bracket) => {
+      const bySection = new Map();
+      for (const match of bracket.matches_v2) {
+        const rounds = bySection.get(match.section) || {};
+        (rounds[match.round] = rounds[match.round] || []).push(match);
+        bySection.set(match.section, rounds);
+      }
+      return [...bySection.entries()].map(([name, rounds]) => ({ name, rounds }));
+    };
+    const names = (rows) => rows.map((row) => row.map((block) => block.name));
+    // K.-o. mit Spiel um Platz 3: der kleine Block steht neben dem Winner Bracket.
+    expect(names(arrangeTvBlocks(blocksOf(singleElimination(8, { bronze: true })), { columns: 4 }))).toEqual([["WB", "BRONZE"]]);
+    // Doppel-K.-o.: Grand Final neben dem Winner Bracket, das Loser Bracket darunter.
+    expect(names(arrangeTvBlocks(blocksOf(doubleElimination(8)), { columns: 4 }))).toEqual([["WB", "GF"], ["LB"]]);
+    // Durchgänge mit Loser Bracket: übereinander zu hoch, nebeneinander passt der ganze Baum - also nebeneinander.
+    const heats = blocksOf(heatDoubleElimination());
+    expect(names(arrangeTvBlocks(heats, { columns: 4 }))).toEqual([["WB", "GF"], ["LB"]]);
+    expect(names(arrangeTvBlocks(heats, { columns: 4, viewport: { w: 173, h: 66 }, minZoom: 0.769, textSize: "normal" }))).toEqual([["WB", "LB", "GF"]]);
+    // Passt der Baum auch übereinander, bleibt er so wie auf der Turnierseite.
+    expect(names(arrangeTvBlocks(heats, { columns: 4, viewport: { w: 173, h: 90 }, minZoom: 0.769, textSize: "normal" }))).toEqual([["WB", "GF"], ["LB"]]);
+    // Liga und Gruppen stehen immer allein.
+    const league = blocksOf(singleElimination(4)).map((block) => ({ ...block, rounds: Object.fromEntries(Object.entries(block.rounds).map(([round, list]) => [round, list.map((match) => ({ ...match, stage_type: "league" }))])) }));
+    expect(names(arrangeTvBlocks([...league, { name: "GF", rounds: { 9: [{ id: "x", slots: [{}, {}] }] } }], { columns: 4 }))).toEqual([["WB"], ["GF"]]);
+  });
+
+  it("zeichnet am TV den echten Baum mit Linien und der TV-Karte", () => {
+    const Card = ({ match }) => <div data-testid={`karte-${match.id}`}>{match.match_key}</div>;
+    render(<BracketTree data={knockout()} viewMode="tv" nodeRenderer={Card} tvLayout={{ columns: 4 }} />);
+    expect(screen.getByTestId("tv-tree")).toBeInTheDocument();
+    expect(screen.getByTestId("karte-m1")).toHaveTextContent("WA1");
+    expect(screen.getByTestId("bracket-section-title-wb")).toHaveTextContent("Winner Bracket");
+    expect(document.querySelector("[data-tv-card='m3']")).not.toBeNull();
+    expect(screen.queryByTestId("bracket-next-match")).toBeNull();
+  });
+});

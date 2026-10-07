@@ -4,8 +4,8 @@ Grundwerte: stehen in ``settings`` unter ``tv_display`` und sind ohne Anmeldung 
 die TV-Seiten laufen ohne Anmeldung. Ein einzelner Bildschirm weicht über Werte im Link ab (Link-Baukasten im Admin,
 dieselben Namen als Parameter). Was fehlt oder nicht passt, ist der Standard: Fabians Wahl aus der TV-Vorschau vom
 07.10.2026. Regeln für alle TV-Tickets: immer nur ein Moment gleichzeitig (Ergebnis und Champion gehen vor), Ton ist
-überall standardmäßig aus. Weitere Werte (Wiedergabeliste #1121, Sponsoren #1125, Streckenwechsel #1127) kommen mit
-ihren Tickets dazu.
+überall standardmäßig aus - der einzige Ton ist der Gong beim Ergebnis (#1118), und auch der nur, wenn er eingeschaltet
+ist. Weitere Werte (Wiedergabeliste #1121, Sponsoren #1125, Streckenwechsel #1127) kommen mit ihren Tickets dazu.
 
 Anzeige-Schlüssel: ein Speziallink (``access_links``) mit der einzigen Freigabe ``display`` für genau ein Turnier.
 Gespeichert wird wie bei allen Speziallinks nur der Hash; den Schlüssel selbst sieht der Admin einmal beim Anlegen.
@@ -29,12 +29,13 @@ DEFAULTS: dict = {
     "pixel_shift": True,     # Pixel-Verschiebung (#1112): alle paar Minuten 1 bis 3 Punkte, gegen eingebrannte Logos
     "season_header": True,   # Jahreszeiten in der TV-Kopfleiste (#1114)
     "reduce_motion": False,  # Bewegung reduzieren (#1110): zusätzlich zur Einstellung des Geräts
+    "result_sound": False,   # Ton beim Ergebnis (#1118): ein kurzer Gong, Standard aus (Fabians Wahl „ohne Ton“)
 }
 CHOICES: dict = {
     "text_size": ("normal", "large"),
     "safe_area": (0, 3, 5),
 }
-BOOLEANS: tuple = ("contrast", "pixel_shift", "season_header", "reduce_motion")
+BOOLEANS: tuple = ("contrast", "pixel_shift", "season_header", "reduce_motion", "result_sound")
 
 DISPLAY_GRANT = "display"
 KEY_LABEL_MAX = 80
@@ -100,15 +101,16 @@ def key_label(value: str | None) -> str:
 
 
 # ------------------------------------------------------------------ Antwort für den Schlüssel
-# Nur, was der TV zeigt. Keine Konten (user_id, Benutzername, Bild), keine Notizen, keine Nachweise.
+# Nur, was der TV zeigt. Keine Konten (user_id, Benutzername, Bild), keine Notizen, keine Nachweise. Die Startzeit
+# braucht das Live-Spotlight (#1116, Spielzeit „12:34“), die Zeit des Ergebnisses der Ergebnis-Moment (#1118).
 
 TOURNAMENT_FIELDS = ("id", "slug", "title", "status", "format", "format_label", "format_display_name",
                      "public_phase", "start_date", "end_date", "team_mode")
 STAGE_FIELDS = ("id", "name", "number", "stage_type", "match_type")
 MATCH_FIELDS = ("id", "tournament_id", "stage_id", "stage_number", "stage_type", "match_type", "match_key", "section",
                 "round", "round_name", "matchday_number", "matchday_label", "order", "match_index", "status",
-                "scheduled_at", "duration_minutes", "station_id", "station_name", "station_label", "winner_id",
-                "is_preview")
+                "scheduled_at", "started_at", "completed_at", "duration_minutes", "station_id", "station_name",
+                "station_label", "winner_id", "is_preview")
 SLOT_FIELDS = ("slot", "registration_id", "status", "seed", "source")
 SOURCE_FIELDS = ("type", "flow", "match_key", "rank", "seed", "raw")
 RESULT_FIELDS = ("registration_id", "rank", "score", "points", "qualified")

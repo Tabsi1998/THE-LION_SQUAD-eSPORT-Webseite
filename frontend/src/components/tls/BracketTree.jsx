@@ -3,14 +3,24 @@ import { resolveMediaUrl } from "@/lib/api";
 import { formatBracketSection, formatMatchStatus, formatRoundName } from "@/lib/tournamentLabels";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
 import { describeSlot, finderFor, initials } from "@/lib/slotSource";
+import { buildPodiumMap, lastStageId, normalizeSection } from "@/lib/bracketPodium";
+import { TV_LINE, treeBlockUnits, treeBox, treeScale } from "@/lib/tvType";
 
 /**
  * Turnierbaum (#399): K.-o.-Runden als Spalten mit gemessenen Verbindungslinien, Mehrspieler-
  * Durchgänge als Karten, Sieger mit Akzent, leere Setzplätze (Entscheidung des Betreibers: vor dem
  * Start steht dort nichts), am Handy Runde für Runde. `data` ist die Antwort von
  * /api/tournaments/:id/bracket; `mineId` die eigene Anmeldung für „Dein nächstes Spiel“.
+ *
+ * TV-Fassung (#1115, `viewMode="tv"`): derselbe Baum mit Linien, Winner Bracket, Loser Bracket und Grand Final als
+ * Blöcke wie auf der Turnierseite; kleine Blöcke (Spiel um Platz 3, Grand Final) stehen neben einem anderen, wenn
+ * dort Platz ist (`tvLayout.columns` = so viele Spalten passen ins Bild). Die Karten zeichnet `nodeRenderer` (die TV-Karte),
+ * Liga, Gruppen und Schweizer System zeigen ihre Spieltage als Raster. Die Linien werden auch dann richtig gemessen,
+ * wenn die Kamera die Bühne vergrößert.
  */
 const EMPTY_SET = new Set();
+// Podium und letzte Phase wohnen seit #1119 in lib/bracketPodium (auch der Champion am TV braucht sie).
+export { buildPodiumMap, lastStageId };
 
 // Zuletzt geänderte Matches (#225) bekommen einen Rahmen. Über einen Kontext, damit die
 // Kennung nicht durch Stufe → Abschnitt → Runde → Knoten gereicht werden muss.
@@ -28,6 +38,9 @@ const FINISHED_TOURNAMENT = new Set(["completed", "results_published", "archived
 export { initials };
 // Wer in einen noch leeren Platz kommt (#1113): „Sieger aus A“ statt „—“. Setzplätze bleiben leer.
 const FinderContext = createContext(() => () => undefined);
+// TV (#1115): eine eigene Karte statt der Karte der Turnierseite, und wie viele Spalten ins Bild passen.
+const NodeRendererContext = createContext(null);
+const TvLayoutContext = createContext({ columns: 4, viewport: null, minZoom: 1, textSize: "normal" });
 
 /** Liegt diese Partie auf dem hervorgehobenen Weg - oder wird sie gedämpft? */
 export function pathState(ids, registrationIds) {
@@ -62,7 +75,7 @@ const DONE_STATUSES = new Set(["completed", "finished", "reported", "confirmed"]
 // unterschiedlich hoch (mit oder ohne Uhrzeit/Station).
 const COLUMN_GAP = 48;
 
-export function BracketTree({ data, compact = false, viewMode = "standard", onMatchClick, changedMatchIds = EMPTY_SET, mineId = null, layout = "auto" }) {
+export function BracketTree({ data, compact = false, viewMode = "standard", onMatchClick, changedMatchIds = EMPTY_SET, mineId = null, layout = "auto", nodeRenderer = null, tvLayout = null }) {
   const { matches_v2 = [], stages = [], registrations = [] } = data || {};
   const [pathIds, setPathIds] = useState(null);
   const path = useMemo(() => ({ ids: pathIds, show: setPathIds }), [pathIds]);
@@ -75,8 +88,21 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
   }, [registrations]);
   const mine = mineId || registrations.find((r) => r?.is_mine)?.id || null;
   const finder = useMemo(() => finderFor(matches_v2), [matches_v2]);
+  const tvColumns = tvLayout?.columns || 4;
+  const tvViewportW = tvLayout?.viewport?.w || 0;
+  const tvViewportH = tvLayout?.viewport?.h || 0;
+  const tvMinZoom = tvLayout?.minZoom || 1;
+  const tvTextSize = tvLayout?.textSize || "normal";
+  const tvValue = useMemo(() => ({
+    columns: tvColumns,
+    viewport: tvViewportW && tvViewportH ? { w: tvViewportW, h: tvViewportH } : null,
+    minZoom: tvMinZoom,
+    textSize: tvTextSize,
+  }), [tvColumns, tvViewportW, tvViewportH, tvMinZoom, tvTextSize]);
 
   return (
+    <NodeRendererContext.Provider value={nodeRenderer}>
+    <TvLayoutContext.Provider value={tvValue}>
     <FinderContext.Provider value={finder}>
     <ChangedMatchesContext.Provider value={changedMatchIds || EMPTY_SET}>
       <MineContext.Provider value={mine}>
@@ -98,6 +124,8 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
       </MineContext.Provider>
     </ChangedMatchesContext.Provider>
     </FinderContext.Provider>
+    </TvLayoutContext.Provider>
+    </NodeRendererContext.Provider>
   );
 }
 
@@ -141,9 +169,9 @@ function NextMatchBanner({ matches, regMap, mineId, onMatchClick }) {
       type="button"
       onClick={() => onMatchClick?.(match)}
       data-testid="bracket-next-match"
-      className={`mb-6 w-full text-left rounded-sm border px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-1 transition ${live ? "border-[#00FF88]/50 bg-[#00FF88]/8" : "border-[#FFD700]/45 bg-[#FFD700]/8"} hover:border-white/40`}
+      className={`mb-6 w-full text-left rounded-sm border px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-1 transition ${live ? "border-live/50 bg-live/8" : "border-[#FFD700]/45 bg-[#FFD700]/8"} hover:border-white/40`}
     >
-      <span className={`text-[11px] uppercase tracking-[0.25em] font-bold ${live ? "text-[#00FF88]" : "text-[#FFD700]"}`}>{live ? "Dein Spiel läuft" : "Dein nächstes Spiel"}</span>
+      <span className={`text-[11px] uppercase tracking-[0.25em] font-bold ${live ? "text-live" : "text-[#FFD700]"}`}>{live ? "Dein Spiel läuft" : "Dein nächstes Spiel"}</span>
       <span className="font-heading text-lg font-black uppercase">{formatRoundName(match.round_name, match.round)} · {match.match_key || "Spiel"}</span>
       {opponents.length ? <span className="text-sm text-white/75">gegen {opponents.join(", ")}</span> : <span className="text-sm text-white/45">Gegner steht noch nicht fest</span>}
       {(when || station) && <span className="text-xs uppercase tracking-wider text-white/55">{[when, station].filter(Boolean).join(" · ")}</span>}
@@ -177,8 +205,45 @@ function StageBracketTree({ stages, matches, regMap, podiumMap, compact = false,
     return grouped;
   }, [matches]);
 
+  const tvLayoutValue = useContext(TvLayoutContext);
+  if (isTv) {
+    return (
+      <div className="tv-tree" data-testid="tv-tree" data-season-quiet="bracket">
+        {stagesForView.map((stage) => {
+          const stageSections = byStage[stage.id] || {};
+          const blocks = Object.keys(stageSections).map((name) => ({ name, rounds: stageSections[name] }));
+          if (!blocks.length) return null;
+          const hasLoser = blocks.some((block) => ["lb", "loser"].includes(normalizeSection(block.name)));
+          return (
+            <section key={stage.id} className="tv-tree__stage" data-tv-stage={stage.id}>
+              {stagesForView.length > 1 ? <h3 className="tv-tree__phase tv-t-head font-heading">{stage.name || `Phase ${stage.number || ""}`}</h3> : null}
+              {arrangeTvBlocks(blocks, tvLayoutValue).map((row) => (
+                <div key={row.map((block) => block.name).join("+")} className="tv-tree__row">
+                  {row.map((block) => (
+                    <StageSection
+                      key={`${stage.id}-${block.name}`}
+                      section={block.name}
+                      rounds={block.rounds}
+                      regMap={regMap}
+                      podiumMap={podiumMap}
+                      compact={compact}
+                      viewMode={viewMode}
+                      layout={layout}
+                      onMatchClick={onMatchClick}
+                      flowHint={sectionFlowHint(block.name, hasLoser)}
+                    />
+                  ))}
+                </div>
+              ))}
+            </section>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
-    <div className={isTv ? "space-y-4 h-full overflow-hidden" : "space-y-10"} data-season-quiet="bracket">
+    <div className="space-y-10" data-season-quiet="bracket">
       {stagesForView.map((stage) => {
         const stageSections = byStage[stage.id] || {};
         const sectionNames = Object.keys(stageSections);
@@ -217,6 +282,58 @@ function StageBracketTree({ stages, matches, regMap, podiumMap, compact = false,
   );
 }
 
+/**
+ * TV (#1115): welche Blöcke nebeneinander stehen. Jeder Block mit mehreren Runden beginnt eine neue Zeile; ein kleiner
+ * Block (eine Runde, höchstens zwei Spiele - Spiel um Platz 3, Grand Final) stellt sich in die erste Zeile, in der
+ * neben den anderen noch eine Spalte Platz hat. `columns` = so viele Spalten passen ins Bild (oder so breit ist der
+ * breiteste Block). Liga, Gruppen und Schweizer System stehen immer allein in ihrer Zeile.
+ * Kennt der TV sein Bild (`viewport` in Einheiten, `minZoom`), stehen alle Blöcke nebeneinander, wenn nur so der ganze
+ * Baum ohne Kamera ins Bild passt (z. B. Durchgänge mit Loser Bracket).
+ */
+export function arrangeTvBlocks(blocks = [], layout = {}) {
+  const rows = arrangeTvRows(blocks, layout.columns || 4);
+  const isTable = (block) => isTableFormat(Object.values(block.rounds || {}).flat());
+  if (!layout.viewport || rows.length < 2 || blocks.some(isTable)) return rows;
+  const textSize = layout.textSize || "normal";
+  const box = treeBox(textSize);
+  const scale = treeScale(textSize);
+  const sizes = new Map(blocks.map((block) => {
+    const rounds = Object.keys(block.rounds || {}).map(Number).sort((a, b) => a - b).map((round) => block.rounds[round]);
+    return [block, treeBlockUnits(rounds, textSize)];
+  }));
+  const fit = (arrangement) => {
+    const rowSizes = arrangement.map((row) => ({
+      w: row.reduce((sum, block) => sum + sizes.get(block).w, 0) + (row.length - 1) * box.colGap,
+      h: Math.max(...row.map((block) => sizes.get(block).h)),
+    }));
+    const width = Math.max(...rowSizes.map((entry) => entry.w)) + 1.2;
+    const height = rowSizes.reduce((sum, entry) => sum + entry.h, 0) + (rowSizes.length - 1) * box.blockGap + 1.2 + scale.head * TV_LINE.head;
+    return Math.min(layout.viewport.w / width, layout.viewport.h / height);
+  };
+  const minZoom = layout.minZoom || 1;
+  return fit(rows) < minZoom && fit([blocks]) >= minZoom ? [blocks] : rows;
+}
+
+function arrangeTvRows(blocks, columns) {
+  const isTable = (block) => isTableFormat(Object.values(block.rounds || {}).flat());
+  const columnsOf = (block) => Object.keys(block.rounds || {}).length;
+  const isSmall = (block) => !isTable(block) && columnsOf(block) === 1 && (Object.values(block.rounds || {})[0] || []).length <= 2;
+  const widest = Math.max(columns, ...blocks.filter((block) => !isTable(block)).map(columnsOf));
+  const rows = [];
+  for (const block of blocks) {
+    if (isSmall(block)) {
+      const row = rows.find((entry) => !entry.table && entry.columns + 1 <= widest);
+      if (row) {
+        row.blocks.push(block);
+        row.columns += 1;
+        continue;
+      }
+    }
+    rows.push({ blocks: [block], columns: columnsOf(block), table: isTable(block) });
+  }
+  return rows.map((row) => row.blocks);
+}
+
 /** Der Fluss zwischen den Blöcken (#399): wer verliert, wechselt in die Verliererrunde. */
 function sectionFlowHint(section, hasLoser) {
   const key = normalizeSection(section);
@@ -228,6 +345,9 @@ function sectionFlowHint(section, hasLoser) {
 }
 
 function MatchNode({ match, regMap, podiumMap, compact, onMatchClick }) {
+  const Custom = useContext(NodeRendererContext);
+  const findMatch = useContext(FinderContext)(match);
+  if (Custom) return <Custom match={match} regMap={regMap} podiumMap={podiumMap} findMatch={findMatch} />;
   const isDuel = (match.match_type || "duel") === "duel" && (match.slots || []).length <= 2;
   const Node = isDuel ? V2DuelNode : HeatNode;
   return <Node match={match} regMap={regMap} podiumMap={podiumMap} compact={compact} onClick={onMatchClick} />;
@@ -252,6 +372,38 @@ function StageSection({ section, rounds, regMap, podiumMap, compact, viewMode, l
   const asTable = isTableFormat(roundNums.flatMap((rn) => rounds[rn]));
   const narrow = useIsNarrow();
   const steps = !isTv && !asTable && (layout === "steps" || (layout === "auto" && narrow));
+  const { columns: tvColumns } = useContext(TvLayoutContext);
+
+  if (isTv) {
+    const key = normalizeSection(section);
+    return (
+      <div className="tv-block" data-testid={`bracket-section-${key}`} data-tv-block={key}>
+        <div className="tv-block__title">
+          <span className="tv-block__mark" aria-hidden="true" />
+          <span className="tv-t-head font-heading" data-testid={`bracket-section-title-${key}`}>{formatBracketSection(section)}</span>
+        </div>
+        {asTable ? (
+          // Spieltage untereinander, die Spiele eines Spieltags als Raster - so breit wie das Bild.
+          <div className="tv-table" style={{ "--tv-table-cols": Math.max(1, Math.min(tvColumns, ...roundNums.map((rn) => rounds[rn].length))) }}>
+            {roundNums.map((rn) => (
+              <div key={rn} className="tv-table__day" data-tv-round={rn}>
+                <div className="tv-ko__round tv-t-meta">{formatRoundName(rounds[rn][0].round_name, rn)}</div>
+                <div className="tv-table__grid">
+                  {rounds[rn].map((match) => (
+                    <div key={match.id} className="tv-ko__card" data-tv-card={match.id}>
+                      <MatchNode match={match} regMap={regMap} podiumMap={podiumMap} compact onMatchClick={onMatchClick} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <KnockoutTree roundNums={roundNums} rounds={rounds} regMap={regMap} podiumMap={podiumMap} compact onMatchClick={onMatchClick} sectionTitle={formatBracketSection(section)} isTv />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3" data-testid={`bracket-section-${normalizeSection(section)}`}>
@@ -272,28 +424,10 @@ function StageSection({ section, rounds, regMap, podiumMap, compact, viewMode, l
               <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 px-2">
                 {formatRoundName(rounds[rn][0].round_name, rn)}
               </div>
-              <div className={isTv
-                ? "grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3"
-                : "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 md:gap-4"
-              }>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 md:gap-4">
                 {rounds[rn].map((match) => (
                   <MatchNode key={match.id} match={match} regMap={regMap} podiumMap={podiumMap}
-                             compact={compact || isTv} onMatchClick={onMatchClick} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : isTv ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 overflow-hidden">
-          {roundNums.map((rn) => (
-            <div key={rn} className="flex flex-col min-w-0 gap-2">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 px-2">
-                {formatRoundName(rounds[rn][0].round_name, rn)}
-              </div>
-              <div className="flex flex-col gap-2">
-                {rounds[rn].map((match) => (
-                  <MatchNode key={match.id} match={match} regMap={regMap} podiumMap={podiumMap} compact onMatchClick={onMatchClick} />
+                             compact={compact} onMatchClick={onMatchClick} />
                 ))}
               </div>
             </div>
@@ -355,7 +489,7 @@ export function roundTitle(match, number, sectionTitle = "") {
   return sectionTitle && title.toLowerCase() === String(sectionTitle).toLowerCase() ? "" : title;
 }
 
-function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchClick, sectionTitle = "" }) {
+function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchClick, sectionTitle = "", isTv = false }) {
   const containerRef = useRef(null);
   const nodeRefs = useRef(new Map());
   const [lines, setLines] = useState([]);
@@ -376,6 +510,9 @@ function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchCl
     if (!container) return undefined;
     const measure = () => {
       const base = container.getBoundingClientRect();
+      // Vergrößert die TV-Kamera die Bühne (#1115), sind die gemessenen Maße mit vergrößert - zurückrechnen.
+      const scale = container.offsetWidth ? base.width / container.offsetWidth : 1;
+      const local = (value) => value / (scale || 1);
       const next = [];
       for (let index = 0; index < roundNums.length - 1; index += 1) {
         const from = rounds[roundNums[index]];
@@ -386,10 +523,10 @@ function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchCl
           const a = nodeRefs.current.get(match.id)?.getBoundingClientRect();
           const b = target ? nodeRefs.current.get(target.id)?.getBoundingClientRect() : null;
           if (!a || !b || !a.width || !b.width) return;
-          const x1 = a.right - base.left + container.scrollLeft;
-          const y1 = a.top + a.height / 2 - base.top + container.scrollTop;
-          const x2 = b.left - base.left + container.scrollLeft;
-          const y2 = b.top + b.height / 2 - base.top + container.scrollTop;
+          const x1 = local(a.right - base.left) + container.scrollLeft;
+          const y1 = local(a.top + a.height / 2 - base.top) + container.scrollTop;
+          const x2 = local(b.left - base.left) + container.scrollLeft;
+          const y2 = local(b.top + b.height / 2 - base.top) + container.scrollTop;
           const mid = x1 + (x2 - x1) / 2;
           next.push({ id: `${match.id}-${target.id}`, from: match.id, to: target.id, round: index, d: `M${x1} ${y1} H${mid} V${y2} H${x2}` });
         });
@@ -405,7 +542,7 @@ function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchCl
   }, [roundNums, rounds]);
 
   return (
-    <div ref={containerRef} className="relative overflow-x-auto pb-4" data-testid="bracket-tree">
+    <div ref={containerRef} className={isTv ? "tv-ko" : "relative overflow-x-auto pb-4"} data-testid="bracket-tree">
       <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%" aria-hidden="true" data-testid="bracket-connectors">
         {lines.map((line) => {
           // Eine Linie liegt auf dem Weg, wenn die Person in beiden Partien steht (#833).
@@ -414,20 +551,20 @@ function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchCl
             : "";
           return (
             // Die Linien zeichnen sich beim ersten Erscheinen einmal, Runde für Runde (#1076).
-            <path key={line.id} d={line.d} fill="none" pathLength="1" className="tls-bracket-line tls-bracket-line--draw" style={{ "--tls-i": line.round }} data-path={state || undefined}
+            <path key={line.id} d={line.d} fill="none" pathLength="1" className="tls-bracket-line tls-bracket-line--draw" style={{ "--tls-i": line.round }} data-path={state || undefined} data-from={line.from} data-to={line.to}
               stroke={state === "on" ? "rgba(41,182,232,0.85)" : "rgba(255,255,255,0.22)"} strokeWidth={state === "on" ? 2.5 : 2} />
           );
         })}
       </svg>
-      <div className="flex items-stretch" style={{ gap: COLUMN_GAP, minWidth: "max-content" }}>
+      <div className={isTv ? "tv-ko__cols" : "flex items-stretch"} style={isTv ? undefined : { gap: COLUMN_GAP, minWidth: "max-content" }}>
         {roundNums.map((rn) => (
-          <div key={rn} className={`flex flex-col ${compact ? "w-[228px]" : "w-[272px]"} shrink-0`}>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 px-2 mb-3 sticky top-0 min-h-[1rem]">
+          <div key={rn} className={isTv ? "tv-ko__col" : `flex flex-col ${compact ? "w-[228px]" : "w-[272px]"} shrink-0`} data-tv-round={isTv ? rn : undefined}>
+            <div className={isTv ? "tv-ko__round tv-t-meta" : "text-[11px] font-bold uppercase tracking-wider text-white/50 px-2 mb-3 sticky top-0 min-h-[1rem]"}>
               {roundTitle(rounds[rn][0], rn, sectionTitle)}
             </div>
-            <div className="flex flex-col justify-around flex-1 gap-4">
+            <div className={isTv ? "tv-ko__cards" : "flex flex-col justify-around flex-1 gap-4"}>
               {rounds[rn].map((match) => (
-                <div key={match.id} ref={register(match.id)} className="relative">
+                <div key={match.id} ref={register(match.id)} className={isTv ? "tv-ko__card" : "relative"} data-tv-card={isTv ? match.id : undefined}>
                   <MatchNode match={match} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} />
                 </div>
               ))}
@@ -477,8 +614,8 @@ function LiveStatus({ status }) {
     return <span className="text-white/35" data-testid="bracket-not-played">nicht gespielt</span>;
   }
   return (
-    <span className={`inline-flex items-center gap-1.5 ${isLive ? "text-[#00FF88]" : ""}`}>
-      {isLive && <span className="w-1.5 h-1.5 rounded-full bg-[#00FF88] tv-live-dot" />}
+    <span className={`inline-flex items-center gap-1.5 ${isLive ? "text-live" : ""}`} data-live={isLive ? "1" : undefined}>
+      {isLive && <span className="w-1.5 h-1.5 rounded-full bg-live tv-live-dot" />}
       {formatMatchStatus(status)}
     </span>
   );
@@ -700,85 +837,6 @@ function Row({ registrationId, label, pending = "", empty, bye, score, isWinner,
       </div>
     </div>
   );
-}
-
-function normalizeSection(section) {
-  return String(section || "MAIN").toLowerCase();
-}
-
-function isCompleted(match) {
-  return DONE_STATUSES.has(String(match?.status || "").toLowerCase());
-}
-
-function isBronzeMatch(match) {
-  const haystack = [
-    match?.section,
-    match?.bracket,
-    match?.round_name,
-    match?.match_key,
-    match?.name,
-  ].filter(Boolean).join(" ").toLowerCase();
-  return haystack.includes("bronze") || haystack.includes("platz 3") || haystack.includes("third");
-}
-
-/** Mehrere Phasen (#833): die letzte Phase (höchste Nummer) - nur sie vergibt das Podium. */
-export function lastStageId(matches = [], stages = []) {
-  const ids = [...new Set(matches.map((match) => match.stage_id || "__default"))];
-  if (ids.length <= 1) return null;
-  const numbers = new Map(stages.map((stage) => [stage.id, Number(stage.number) || 0]));
-  const numberOf = (id) => (numbers.has(id)
-    ? numbers.get(id)
-    : Math.max(0, ...matches.filter((match) => (match.stage_id || "__default") === id).map((match) => Number(match.stage_number) || 0)));
-  return ids.reduce((best, id) => (best === null || numberOf(id) > numberOf(best) ? id : best), null);
-}
-
-export function buildPodiumMap(allMatches = [], stages = []) {
-  // Vorrunden-Sieger stehen nicht auf dem Podest: mit mehreren Phasen zählt nur die letzte (#833).
-  const lastStage = lastStageId(allMatches, stages);
-  const matchesV2 = lastStage ? allMatches.filter((match) => (match.stage_id || "__default") === lastStage) : allMatches;
-  const podium = new Map();
-  const place = (id, rank) => {
-    if (!id || ![1, 2, 3].includes(rank)) return;
-    const current = podium.get(id);
-    if (!current || rank < current) podium.set(id, rank);
-  };
-
-  const maxRoundBySection = new Map();
-  for (const match of matchesV2) {
-    const section = normalizeSection(match.section);
-    const round = Number(match.round || 1);
-    maxRoundBySection.set(section, Math.max(maxRoundBySection.get(section) || 0, round));
-  }
-  const hasGrandFinal = matchesV2.some((match) => ["gf", "grand_final"].includes(normalizeSection(match.section)));
-
-  for (const match of matchesV2) {
-    if (!isCompleted(match) || !(match.results || []).length) continue;
-    const section = normalizeSection(match.section);
-    const round = Number(match.round || 1);
-    const finalSection = ["gf", "grand_final"].includes(section) || (!hasGrandFinal && ["main", "wb", "winner"].includes(section) && round === maxRoundBySection.get(section));
-    const lowerFinal = ["lb", "loser"].includes(section) && round === maxRoundBySection.get(section);
-
-    if (isBronzeMatch(match)) {
-      const winner = (match.results || []).find((result) => Number(result.rank) === 1 || result.qualified);
-      place(winner?.registration_id, 3);
-      continue;
-    }
-
-    if (finalSection) {
-      for (const result of match.results || []) {
-        const rank = Number(result.rank);
-        if ([1, 2, 3].includes(rank)) place(result.registration_id, rank);
-      }
-      continue;
-    }
-
-    if (lowerFinal) {
-      const loser = (match.results || []).find((result) => Number(result.rank) === 2);
-      place(loser?.registration_id, 3);
-    }
-  }
-
-  return podium;
 }
 
 function topPodiumRank(ids, podiumMap) {
