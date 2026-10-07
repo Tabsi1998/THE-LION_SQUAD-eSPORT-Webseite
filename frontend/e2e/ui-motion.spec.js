@@ -165,7 +165,7 @@ test.describe("Oberfläche, Welle 1: Kopfleiste, Menü, Seitenwechsel, Social-Lo
     expect((await look("footer-x")).color).toBe("rgb(255, 255, 255)");
   });
 
-  test("Karten: 5 px anheben mit Rand in der Akzentfarbe; mit Saison-Deko bleibt die Karte stehen", async ({ page }) => {
+  test("Karten: 5 px anheben mit Rand in der Akzentfarbe - auch in der Saison; nur stille Saison-Deko hält sie an", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await mockServer(page, { news: NEWS });
     await page.goto("/");
@@ -181,10 +181,17 @@ test.describe("Oberfläche, Welle 1: Kopfleiste, Menü, Seitenwechsel, Social-Lo
       const box = await card.boundingBox();
       await page.screenshot({ path: `${SHOTS}/karte-hover-1440.png`, clip: { x: Math.max(0, box.x - 24), y: Math.max(0, box.y - 24), width: Math.min(1440, box.width + 48), height: box.height + 60 } });
     }
-    // Trägt die Karte Saison-Deko (die Saison-Bühne meldet das am Wurzelelement), bleibt sie stehen - der Rand reagiert.
+    // In der Saison hebt sie sich genauso - die Deko fährt mit (#1087). Nur eine Saison, deren Deko an Karten noch nicht
+    // mitfährt, meldet data-season-still-cards; dann bleibt die Karte stehen und nur der Rand reagiert.
     await page.mouse.move(2, 2);
     await page.waitForTimeout(450);
     await page.evaluate(() => { document.documentElement.dataset.seasonIntensity = "normal"; });
+    await card.hover();
+    await page.waitForTimeout(450);
+    expect(await look()).toEqual({ transform: "matrix(1, 0, 0, 1, 0, -5)", border: "rgba(41, 182, 232, 0.55)" });
+    await page.mouse.move(2, 2);
+    await page.waitForTimeout(450);
+    await page.evaluate(() => { document.documentElement.dataset.seasonStillCards = ""; });
     await card.hover();
     await page.waitForTimeout(450);
     expect(await look()).toEqual({ transform: "none", border: "rgba(41, 182, 232, 0.55)" });
