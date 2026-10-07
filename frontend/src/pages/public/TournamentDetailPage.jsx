@@ -7,6 +7,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { StepBar, tournamentSteps } from "@/components/tls/StepBar";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -178,31 +179,31 @@ export default function TournamentDetailPage() {
   // Die eine Hauptaktion je Phase (#401).
   let primaryKey = "none";
   let primaryAction = null;
-  const primaryClass = "px-6 py-3 font-bold uppercase tracking-wider rounded-sm transition disabled:opacity-50";
+  const primaryClass = "px-6 py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50";
   if (canSelfRegister && !myReg) {
     primaryKey = "register";
-    primaryAction = <button data-testid="tournament-register-btn" onClick={handleRegister} disabled={loading} className={`${primaryClass}tls-btn tls-btn--primary`}>{loading ? "Wird gesendet…" : (isTeamTournament ? "Team anmelden" : "Jetzt anmelden")}</button>;
+    primaryAction = <button data-testid="tournament-register-btn" onClick={handleRegister} disabled={loading} className={`${primaryClass} tls-btn tls-btn--primary`}>{loading ? "Wird gesendet…" : (isTeamTournament ? "Team anmelden" : "Jetzt anmelden")}</button>;
   } else if (eventBlocked && !myReg && (registration.canRegister || hasRegisterAccess)) {
     primaryKey = "event_first";
-    primaryAction = <Link to={eventHref} data-testid="tournament-event-first" className={`${primaryClass}tls-btn tls-btn--primary`}>Zuerst beim Event anmelden</Link>;
+    primaryAction = <Link to={eventHref} data-testid="tournament-event-first" className={`${primaryClass} tls-btn tls-btn--primary`}>Zuerst beim Event anmelden</Link>;
   } else if (clubMemberBlocked && !myReg) {
     primaryKey = "blocked";
-    primaryAction = <button type="button" disabled data-testid="tournament-blocked-btn" className={`${primaryClass} border border-[#FFD700]/30 text-[#FFD700]/70 cursor-not-allowed`}>Externe Anmeldung</button>;
+    primaryAction = <button type="button" disabled data-testid="tournament-blocked-btn" className={`${primaryClass} tls-btn tls-btn--quiet cursor-not-allowed`}>Externe Anmeldung</button>;
   } else if (checkinNow) {
     primaryKey = "checkin";
-    primaryAction = <button onClick={handleCheckin} disabled={loading} data-testid="tournament-checkin-btn" className={`${primaryClass} bg-[#FFD700] text-black hover:bg-[#ffe45c]`}>Check-in</button>;
+    primaryAction = <button onClick={handleCheckin} disabled={loading} data-testid="tournament-checkin-btn" className={`${primaryClass} tls-btn tls-btn--primary`}>Check-in</button>;
   } else if (staffOnlyCheckIn && myReg?.status === "approved" && t.status === "check_in") {
     primaryKey = "checkin_local";
-    primaryAction = <button type="button" disabled data-testid="tournament-checkin-local" className={`${primaryClass} border border-[#FFD700]/35 text-[#FFD700]/75 cursor-not-allowed`}>Check-in vor Ort</button>;
+    primaryAction = <button type="button" disabled data-testid="tournament-checkin-local" className={`${primaryClass} tls-btn tls-btn--quiet cursor-not-allowed`}>Check-in vor Ort</button>;
   } else if (finished) {
     primaryKey = "standings";
-    primaryAction = <Link to={subPage("standings")} data-testid="tournament-standings-link" className={`${primaryClass} bg-[#FFD700] text-black hover:bg-[#ffe45c]`}>Rangliste</Link>;
+    primaryAction = <Link to={subPage("standings")} data-testid="tournament-standings-link" className={`${primaryClass} tls-btn tls-btn--primary`}>Rangliste</Link>;
   } else if (t.started) {
     primaryKey = "bracket";
-    primaryAction = <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className={`${primaryClass}tls-btn tls-btn--primary`}>Turnierbaum</Link>;
+    primaryAction = <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className={`${primaryClass} tls-btn tls-btn--primary`}>Turnierbaum</Link>;
   } else if (myReg) {
     primaryKey = "schedule";
-    primaryAction = <Link to={subPage("matches")} data-testid="tournament-schedule-link" className={`${primaryClass} border border-[#29B6E8]/50 text-[#29B6E8] hover:bg-[#29B6E8]/10`}>Spielplan</Link>;
+    primaryAction = <Link to={subPage("matches")} data-testid="tournament-schedule-link" className={`${primaryClass} tls-btn tls-btn--secondary`}>Spielplan</Link>;
   } else {
     primaryKey = "closed";
     primaryAction = <button type="button" disabled data-testid="tournament-closed-btn" className={`${primaryClass} border border-white/10 text-white/35 cursor-not-allowed`}>{registration.label}</button>;
@@ -372,7 +373,7 @@ export default function TournamentDetailPage() {
           <InfoRow icon={Users} label="Modus" value={formatTeamMode(t.team_mode)} />
           {/* Der Discord-Server zum Spiel (#626): eigener, der des Hauptspiels oder der Hauptserver. */}
           <GameDiscordTile gameId={t.game?.id || t.game_id} gameName={gameLabel(t.game)} />
-          {t.discord_link && <a href={t.discord_link} target="_blank" rel="noreferrer" className="block px-4 py-3 border border-white/10 rounded-sm text-center text-sm font-bold uppercase tracking-wider hover:border-[#29B6E8]/60 hover:text-[#29B6E8]">Discord</a>}
+          {t.discord_link && <a href={t.discord_link} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet block px-4 py-3 rounded-sm text-center text-sm font-bold uppercase tracking-wider">Discord</a>}
         </aside>
       </div>
       {registerModal && (
@@ -571,6 +572,7 @@ function RegistrationModal({ tournament, user, myTeams = [], loading, error, onC
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="font-heading text-xl font-black uppercase">Turnier-Anmeldung</h3>
+            <StepBar steps={tournamentSteps(tournament)} current={0} className="mt-3" testId="tournament-register-steps" />
             <p className="text-xs text-white/50 mt-1">
               {needsTeam
                 ? "Wähle das Team aus, das du als Leader oder Co-Leader anmelden möchtest."
@@ -639,7 +641,7 @@ function RegistrationModal({ tournament, user, myTeams = [], loading, error, onC
         )}
         {error && <AuthFormAlert id="tournament-registration-error">{error}</AuthFormAlert>}
         <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
+          <button type="button" onClick={onClose} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
           <button disabled={loading || (needsTeam && !teamId) || (offer && !acceptCosts)} data-testid="tournament-register-submit" className="tls-btn tls-btn--primary px-5 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
             {loading ? "Sendet…" : quote && !quote.free ? `Verbindlich anmelden · ${formatCents(quote.total_cents, quote.currency)}` : "Anmelden"}
           </button>

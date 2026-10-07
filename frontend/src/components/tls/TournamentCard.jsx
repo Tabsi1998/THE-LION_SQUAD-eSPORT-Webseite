@@ -68,7 +68,7 @@ export function TournamentCard({ tournament, index = 0 }) {
             {t.platform && <span className="text-white/40 text-xs">{t.platform}</span>}
           </div>
         ) : null}
-        <h3 className="font-heading font-bold text-xl text-white group-hover:text-[#29B6E8] transition-colors line-clamp-2">
+        <h3 className="tls-card__title font-heading font-bold text-xl text-white line-clamp-2">
           {t.title}
         </h3>
         <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/60">
@@ -99,7 +99,7 @@ export function TournamentCard({ tournament, index = 0 }) {
         {/* Ein Knopf statt „Turnierdetails … Ansehen“ (#833). */}
         <div className="mt-4 flex items-center justify-end gap-3 border-t border-white/10 pt-3">
           <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]" data-testid="tournament-card-action">
-            {cardAction(t, registration)} <ArrowRight className="w-3 h-3 transition-transform duration-300 group-hover:translate-x-1" />
+            {cardAction(t, registration)} <ArrowRight className="tls-card__arrow w-3 h-3" />
           </span>
         </div>
       </div>

@@ -94,7 +94,7 @@ function FastLapCard({ challenge: c }) {
               <span className="text-[10px] font-bold uppercase tracking-wider text-white/65 border border-white/15 px-2 py-[3px] rounded-sm">Referenzzeiten</span>
             )}
           </div>
-          <h2 className="font-heading text-2xl font-bold group-hover:text-[#29B6E8] transition break-words">{c.title}</h2>
+          <h2 className="tls-card__title font-heading text-2xl font-bold break-words">{c.title}</h2>
           {c.description && <p className="mt-1 text-sm text-white/60 line-clamp-2">{c.description}</p>}
           <div className="mt-3 flex flex-wrap gap-5 text-xs text-white/60">
             <span className="inline-flex items-center gap-1.5"><Flag className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.track_count || 0} Strecken</span>
@@ -113,7 +113,7 @@ function FastLapCard({ challenge: c }) {
             </div>
           )}
         </div>
-        <ChevronRight className="w-6 h-6 shrink-0 text-white/30 group-hover:text-[#29B6E8] transition" />
+        <ChevronRight className="tls-card__arrow w-6 h-6 shrink-0 text-white/30" />
       </div>
     </Link>
   );

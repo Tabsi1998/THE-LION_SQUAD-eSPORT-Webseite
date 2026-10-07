@@ -77,10 +77,10 @@ export default function TournamentStandingsPage() {
           <h1 className="font-heading text-3xl md:text-5xl font-black uppercase">Rangliste</h1>
           {PUBLIC_RESULT_STATUSES.has(t.status) && (
             <div className="flex flex-wrap gap-2">
-              <a href={resultPdfUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10">
+              <a href={resultPdfUrl} target="_blank" rel="noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
                 <FileDown className="w-3.5 h-3.5" /> Ergebnis-PDF
               </a>
-              <a href={certificatePdfUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-4 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FFD700]/10">
+              <a href={certificatePdfUrl} target="_blank" rel="noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
                 <Award className="w-3.5 h-3.5" /> Urkunden
               </a>
             </div>

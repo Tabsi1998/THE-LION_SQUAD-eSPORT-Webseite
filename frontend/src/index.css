@@ -2150,6 +2150,17 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .tls-route[data-route-fade="a"] { animation: tls-route-in-a var(--tls-motion-mid) var(--tls-ease) backwards; }
 .tls-route[data-route-fade="b"] { animation: tls-route-in-b var(--tls-motion-mid) var(--tls-ease) backwards; }
 
+/* Wo der Browser es kann (#1073, lib/viewTransition.js): er blendet die alte Seite in die neue über. Kopf und untere
+   Leiste bekommen nur während des Wechsels einen eigenen Namen und stehen so still (wird der Kopf dabei größer, weil
+   die neue Seite oben steht, wächst er weich mit). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--tls-motion-mid);
+  animation-timing-function: var(--tls-ease);
+}
+html.tls-vt .tls-header { view-transition-name: tls-header; }
+html.tls-vt .tls-bottom-nav { view-transition-name: tls-bottom-nav; }
+
 /* Social-Logos im Footer (#1083), Variante D aus der Vorschau: das Logo steht in seiner Markenfarbe, in den vier
    Ecken sitzen kleine Winkel. Beim Drüberfahren schließen sich die Winkel zum Rahmen, die Fläche bekommt einen Hauch
    der Markenfarbe, das Logo wächst leicht und glüht; ein kleines Schild nennt den Namen. Die Logos bleiben unverändert.
@@ -2244,7 +2255,14 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
   border-color: rgba(var(--tls-card-accent), 0.55);
   box-shadow: 0 22px 44px -26px rgba(var(--tls-card-accent), 0.65);
 }
+/* Titel in der Akzentfarbe der Karte, Pfeil fährt 3 px nach rechts (#1071) - mit Maus und mit Tastatur gleich. */
+.tls-card__title { transition: color var(--tls-motion-mid) var(--tls-ease); }
+.tls-card__arrow { transition: transform var(--tls-motion-mid) var(--tls-ease), color var(--tls-motion-mid) var(--tls-ease); }
+.tls-card:focus-visible .tls-card__title { color: rgb(var(--tls-card-accent)); }
+.tls-card:focus-visible .tls-card__arrow { transform: translateX(calc(3px * var(--tls-motion-on))); color: rgb(var(--tls-card-accent)); }
 @media (hover: hover) {
+  .tls-card:hover .tls-card__title { color: rgb(var(--tls-card-accent)); }
+  .tls-card:hover .tls-card__arrow { transform: translateX(calc(3px * var(--tls-motion-on))); color: rgb(var(--tls-card-accent)); }
   .tls-card:hover {
     transform: translateY(calc(-5px * var(--tls-motion-on)));
   }
@@ -2440,6 +2458,7 @@ html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-seaso
    sich beim Weitergehen von links. Vorleseprogramme hören „Schritt x von y“ (aria-label am Element). */
 .tls-steps {
   --tls-steps-accent: var(--tls-cyan);
+  position: relative;
   display: grid;
   grid-template-columns: repeat(var(--tls-steps, 4), minmax(0, 1fr));
   gap: 0.4rem;
@@ -2481,6 +2500,18 @@ html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-seaso
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.tls-steps__count { display: none; }
+/* Zu schmal für alle Namen (#1081, StepBar misst): nur der aktuelle Schritt mit Zähler, über die ganze Breite. Die
+   anderen Namen bleiben unsichtbar stehen und halten die Zeilenhöhe. */
+.tls-steps[data-compact] .tls-steps__label { visibility: hidden; }
+.tls-steps[data-compact] .tls-steps__item[data-state="current"] .tls-steps__label {
+  visibility: visible;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+.tls-steps[data-compact] .tls-steps__item[data-state="current"] .tls-steps__count { display: inline; }
 
 /* Knöpfe (#1082): eine Sprache für die ganze Seite. Der wichtige Knopf ist blau mit einem Lichtlauf und einem Pfeil,
    der 3 px fährt; der zweitrangige ein Rahmen in Blau; der leise für Nebensachen. Größe, Form und Anzeige bleiben an
@@ -2505,7 +2536,7 @@ html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-seaso
   background-repeat: no-repeat;
   background-position: 150% 0;
 }
-.tls-btn--primary:focus-visible {
+.tls-btn:focus-visible {
   outline: 2px solid #FFFFFF;
   outline-offset: 2px;
 }
@@ -2519,6 +2550,12 @@ html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-seaso
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: rgba(255, 255, 255, 0.72);
 }
+/* Gefährlich (Löschen, Stornieren, Aufgeben): wie der zweitrangige Knopf, nur in Rot. */
+.tls-btn--danger {
+  background-color: transparent;
+  border: 1px solid rgba(255, 59, 48, 0.5);
+  color: #FF6B6B;
+}
 @media (hover: hover) {
   .tls-btn--primary:hover:not(:disabled) {
     background-color: var(--tls-cyan-hover);
@@ -2530,6 +2567,11 @@ html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-seaso
   .tls-btn--quiet:hover:not(:disabled) {
     color: #FFFFFF;
     border-color: rgba(255, 255, 255, 0.6);
+  }
+  .tls-btn--danger:hover:not(:disabled) {
+    color: #FFFFFF;
+    border-color: #FF3B30;
+    background-color: rgba(255, 59, 48, 0.16);
   }
   .tls-btn:hover:not(:disabled) .lucide-arrow-right {
     transform: translateX(calc(3px * var(--tls-motion-on)));
@@ -2771,8 +2813,16 @@ html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-seaso
 }
 .tls-lightbox {
   animation: tls-route-in-a var(--tls-motion-mid) var(--tls-ease) backwards;
+  transition: background-color var(--tls-motion-slow) var(--tls-ease);
 }
 .tls-lightbox__stage {
-  transition: transform var(--tls-motion-slow) var(--tls-ease), opacity var(--tls-motion-slow) var(--tls-ease);
   transform-origin: 50% 50%;
+}
+/* Beim Schließen (#1079): der Hintergrund wird durchsichtig, Knöpfe und Beschriftung gehen zuerst. */
+.tls-lightbox.is-leaving {
+  background-color: rgb(0 0 0 / 0);
+}
+.tls-lightbox.is-leaving > :not(.tls-lightbox__stage) {
+  opacity: 0;
+  transition: opacity var(--tls-motion-mid) var(--tls-ease);
 }

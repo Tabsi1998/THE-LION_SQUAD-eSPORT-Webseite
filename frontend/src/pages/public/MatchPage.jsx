@@ -425,7 +425,7 @@ export default function MatchPage() {
                   <Field label="Dispute-Grund">
                     <input value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} className="input" placeholder="Was stimmt nicht?" data-testid="match-dispute-input" />
                   </Field>
-                  <button disabled={busy || !disputeReason.trim()} className="mt-3 px-4 py-2 border border-[#FF3B30]/45 text-[#FF3B30] rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-dispute-btn">Dispute melden</button>
+                  <button disabled={busy || !disputeReason.trim()} className="tls-btn tls-btn--danger mt-3 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-dispute-btn">Dispute melden</button>
                 </form>
               )}
 
@@ -449,12 +449,12 @@ export default function MatchPage() {
                       <input value={forfeitReason} onChange={(e) => setForfeitReason(e.target.value)} className="input" placeholder="Mindestens 5 Zeichen" />
                     </Field>
                   </div>
-                  <button disabled={busy || forfeitReason.trim().length < 5 || !forfeitWinnerId} className="mt-3 px-4 py-2 bg-[#FF3B30] text-white rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Forfeit speichern</button>
+                  <button disabled={busy || forfeitReason.trim().length < 5 || !forfeitWinnerId} className="tls-btn tls-btn--danger mt-3 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Forfeit speichern</button>
                 </form>
               )}
             </div>
           ) : !user && !isCompleted ? (
-            <Link to={`/login?next=/matches/${id}`} className="mt-5 inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#29B6E8]/10">
+            <Link to={`/login?next=/matches/${id}`} className="tls-btn tls-btn--secondary mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
               Login zum Ergebnis melden
             </Link>
           ) : (
@@ -516,7 +516,7 @@ export default function MatchPage() {
                       <div className="mt-3 grid md:grid-cols-[1fr_1fr_auto] gap-2 items-end">
                         <input type="datetime-local" value={counterAt} onChange={(e) => setCounterAt(e.target.value)} className="input" />
                         <input value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} className="input" placeholder="Antwort / Grund" />
-                        <button type="button" disabled={busy} onClick={() => decide(p, "counter")} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">Gegenvorschlag</button>
+                        <button type="button" disabled={busy} onClick={() => decide(p, "counter")} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">Gegenvorschlag</button>
                       </div>
                     )}
                   </div>
@@ -543,7 +543,7 @@ export default function MatchPage() {
             {canUseChat ? (
               <form onSubmit={sendMessage} className="mt-4 space-y-2">
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={addStaffMention} className="px-2.5 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10">@leitung</button>
+                  <button type="button" onClick={addStaffMention} className="tls-btn tls-btn--secondary px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">@leitung</button>
                 </div>
                 <ChatAttachmentDrafts drafts={chatAttachments.drafts} onRemove={chatAttachments.remove} />
                 <ChatStickerPicker open={stickersOpen} onClose={() => setStickersOpen(false)} onPick={sendSticker} disabled={busy} />

@@ -86,10 +86,10 @@ export function ConfirmDialogProvider({ children }) {
               </button>
             </div>
             <div className="p-5 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-              <button type="button" onClick={() => close(false)} data-testid="confirm-dialog-cancel" className="px-4 py-2 border border-white/10 text-white/65 hover:text-white hover:bg-white/5 rounded-sm text-xs font-bold uppercase tracking-wider">
+              <button type="button" onClick={() => close(false)} data-testid="confirm-dialog-cancel" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
                 {dialog.cancelLabel}
               </button>
-              <button type="button" onClick={() => close(true)} disabled={promptInvalid} data-testid="confirm-dialog-confirm" className={`px-4 py-2 rounded-sm text-xs font-black uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed ${dialog.tone === "danger" ? "bg-[#FF3B30] text-white hover:bg-[#ff5b52]" : "bg-[#29B6E8] text-black hover:bg-[#6FD6FF]"}`}>
+              <button type="button" onClick={() => close(true)} disabled={promptInvalid} data-testid="confirm-dialog-confirm" className={`px-4 py-2 rounded-sm text-xs font-black uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed ${dialog.tone === "danger" ? "tls-btn tls-btn--danger" : "tls-btn tls-btn--primary"}`}>
                 {dialog.confirmLabel}
               </button>
             </div>

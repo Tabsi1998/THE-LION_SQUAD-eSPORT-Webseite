@@ -61,7 +61,7 @@ export default function AchievementSharePage() {
                 ? "Entweder gibt es ihn nicht, oder die Person zeigt ihre Erfolge nicht öffentlich."
                 : "Bitte versuch es gleich noch einmal."}
             </p>
-            <Link to="/achievements" className="mt-6 inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-[#29B6E8]/10">
+            <Link to="/achievements" className="tls-btn tls-btn--secondary mt-6 inline-flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-sm">
               <Trophy className="w-3.5 h-3.5" /> Zum Schaukasten
             </Link>
           </div>
@@ -100,10 +100,10 @@ export default function AchievementSharePage() {
                 </Link>
               </div>
               <div className="flex md:flex-col gap-2 shrink-0">
-                <button type="button" onClick={share} className="inline-flex items-center justify-center gap-2 px-4 py-2 border text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-white/5" style={{ borderColor: `${color}80`, color }} data-testid="share-button">
+                <button type="button" onClick={share} className="tls-btn tls-btn--secondary inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-sm" data-testid="share-button">
                   <Share2 className="w-3.5 h-3.5" /> Teilen
                 </button>
-                <a href={imageUrl} download={`achievement-${awardId}.png`} className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-white/15 text-white/70 text-xs font-bold uppercase tracking-widest rounded-sm hover:border-white/40 hover:text-white" data-testid="share-download">
+                <a href={imageUrl} download={`achievement-${awardId}.png`} className="tls-btn tls-btn--quiet inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-sm" data-testid="share-download">
                   <Download className="w-3.5 h-3.5" /> Bild speichern
                 </a>
               </div>

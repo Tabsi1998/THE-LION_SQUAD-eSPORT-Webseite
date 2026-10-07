@@ -313,7 +313,7 @@ export default function AchievementsShowcasePage() {
                 <button
                   type="button"
                   onClick={() => setCategoryFilter(null)}
-                  className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-1.5 border border-white/15 rounded-sm text-white/70 hover:border-white/40"
+                  className="tls-btn tls-btn--quiet text-[10px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-sm"
                   data-testid="catalog-filter-clear"
                 >
                   Nur {categories.find((c) => c.key === categoryFilter)?.label || categoryFilter} · alle zeigen

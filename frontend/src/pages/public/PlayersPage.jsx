@@ -116,7 +116,7 @@ export default function PlayersPage() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-heading font-bold text-white group-hover:text-[#29B6E8] truncate flex items-center gap-1.5">
+                        <div className="tls-card__title font-heading font-bold text-white truncate flex items-center gap-1.5">
                           {p.display_name || p.username}
                           {isMember && <Crown className="w-3 h-3 text-[#FFD700] shrink-0" />}
                         </div>
@@ -145,9 +145,9 @@ export default function PlayersPage() {
           <div className="mt-8 flex items-center justify-between gap-3 text-sm text-white/55">
             <span>{total.toLocaleString("de-DE")} öffentliche Profile</span>
             <div className="flex items-center gap-2">
-              <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="px-3 py-2 border border-white/10 rounded-sm disabled:opacity-40 hover:border-[#29B6E8]/50">Zurück</button>
+              <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm disabled:opacity-40">Zurück</button>
               <span className="text-xs uppercase tracking-widest">Seite {page} / {totalPages}</span>
-              <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="px-3 py-2 border border-white/10 rounded-sm disabled:opacity-40 hover:border-[#29B6E8]/50">Weiter</button>
+              <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm disabled:opacity-40">Weiter</button>
             </div>
           </div>
         )}

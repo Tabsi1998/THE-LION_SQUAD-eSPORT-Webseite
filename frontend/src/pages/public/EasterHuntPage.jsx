@@ -132,7 +132,7 @@ export default function EasterHuntPage() {
             {!user && (running || page.phase === "upcoming") ? (
               <section className="rounded-sm border border-[#e9c46a]/30 bg-[#e9c46a]/5 p-5 flex flex-wrap items-center gap-4" data-testid="easter-guest">
                 <p className="flex-1 min-w-[14rem] text-white/80">Eier siehst du auch ohne Konto – sammeln kannst du sie angemeldet. Wer alle {total} findet, ist in der Verlosung.</p>
-                <Link to="/login?next=%2Fostern" className="inline-flex items-center gap-2 px-4 py-2 bg-[#e9c46a] text-black font-bold uppercase tracking-wider text-xs rounded-sm"><LogIn className="w-4 h-4" /> Anmelden</Link>
+                <Link to="/login?next=%2Fostern" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider text-xs rounded-sm"><LogIn className="w-4 h-4" /> Anmelden</Link>
               </section>
             ) : null}
 

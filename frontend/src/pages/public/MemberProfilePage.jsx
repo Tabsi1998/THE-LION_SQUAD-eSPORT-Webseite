@@ -78,7 +78,7 @@ export default function MemberProfilePage() {
                   <LinkedAccountCard account={profile.linked_account} />
                 </InfoPanel>
                 <MemberTwitchEmbed account={profile.linked_account} />
-                <Link to="/members" className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 border border-white/10 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white hover:bg-white/5">
+                <Link to="/members" className="tls-btn tls-btn--quiet w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-sm text-xs font-bold uppercase tracking-wider">
                   <ArrowLeft className="w-4 h-4" /> Alle Mitglieder
                 </Link>
               </aside>
@@ -108,7 +108,7 @@ function MemberReferences({ profile }) {
     <section className="mt-10 border-t border-white/10 pt-8" data-testid="member-references">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <SectionTitle icon={Trophy} accent="#FFD700" eyebrow="Referenzen" title="Vereinsplatzierungen" />
-        <Link to={`/references?${new URLSearchParams({ member: profile.id, name: profile.gamertag || profile.display_name || "" })}`} data-testid="member-references-all" className="inline-flex items-center gap-2 border border-white/10 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/65 hover:text-[#29B6E8] hover:border-[#29B6E8]/45 rounded-sm">
+        <Link to={`/references?${new URLSearchParams({ member: profile.id, name: profile.gamertag || profile.display_name || "" })}`} data-testid="member-references-all" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-sm">
           Alle Referenzen
         </Link>
       </div>

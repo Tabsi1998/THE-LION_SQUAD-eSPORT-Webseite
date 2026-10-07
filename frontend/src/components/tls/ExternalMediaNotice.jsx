@@ -25,8 +25,7 @@ export function ExternalMediaNotice({
         <button
           type="button"
           onClick={openSettings}
-          className="px-4 py-2 border text-xs uppercase tracking-wider font-bold rounded-sm"
-          style={{ borderColor: `${accent}88`, color: accent }}
+          className="tls-btn tls-btn--secondary px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm"
         >
           Cookie-Einstellungen
         </button>
@@ -35,7 +34,7 @@ export function ExternalMediaNotice({
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-4 py-2 border border-white/15 text-white/70 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm"
+            className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm"
           >
             <ExternalLink className="h-3.5 w-3.5" /> Direkt öffnen
           </a>

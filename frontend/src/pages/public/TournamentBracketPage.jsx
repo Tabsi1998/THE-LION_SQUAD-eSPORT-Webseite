@@ -83,7 +83,7 @@ export default function TournamentBracketPage() {
             <TournamentTabs tournament={t} accessToken={accessToken} className="mt-4" />
           </div>
           {t.can_view_display && (
-            <Link to={`/display/bracket/${t.id}`} target="_blank" data-testid="bracket-tv-link" className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10 text-sm">
+            <Link to={`/display/bracket/${t.id}`} target="_blank" data-testid="bracket-tv-link" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2.5 font-bold uppercase tracking-wider rounded-sm text-sm">
               <Tv className="w-4 h-4" /> TV-/Beamer-Ansicht
             </Link>
           )}

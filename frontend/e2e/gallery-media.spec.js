@@ -128,8 +128,13 @@ test.describe("Galerie-Album", () => {
     // Direkt nach dem Öffnen liegt die Bühne noch verkleinert auf der Kachel, dann gleitet sie an ihren Platz.
     await expect.poll(() => stage.evaluate((node) => getComputedStyle(node).transform), { timeout: 3000 }).toBe("none");
     expect(await stage.evaluate((node) => getComputedStyle(node).opacity)).toBe("1");
+    // Weiterblättern wechselt nur den Inhalt; Schließen fliegt zurück in die Kachel des gerade offenen Bildes, danach
+    // liegt der Fokus auf ihr.
+    await page.keyboard.press("ArrowRight");
     await page.keyboard.press("Escape");
+    await expect(page.getByTestId("gallery-lightbox")).toHaveClass(/is-leaving/);
     await expect(page.getByTestId("gallery-lightbox")).toHaveCount(0);
+    await expect(page.getByTestId("gallery-photo-1")).toBeFocused();
   });
 
   test("das Album läuft am Telefon nicht quer", async ({ page }) => {

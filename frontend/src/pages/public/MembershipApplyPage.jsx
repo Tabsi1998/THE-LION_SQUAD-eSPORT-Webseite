@@ -223,7 +223,7 @@ export default function MembershipApplyPage() {
               </label>
             </div>
             {submitError && <AuthFormAlert id="apply-submit-error">{submitError}</AuthFormAlert>}
-            <button type="submit" disabled={submitting} data-testid="apply-submit" className="w-full px-6 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-50">
+            <button type="submit" disabled={submitting} data-testid="apply-submit" className="tls-btn tls-btn--primary w-full px-6 py-3 font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-50">
               <Crown className="w-4 h-4" /> {submitting ? "Sende …" : coupled ? "Antrag einreichen" : "Bewerbung einreichen"}
             </button>
             {coupled && <p className="text-[11px] text-white/40">Der Antrag geht direkt in die Mitgliederverwaltung des Vereins. Aufgenommen wird dort; du siehst hier den Stand und bekommst eine E-Mail.</p>}

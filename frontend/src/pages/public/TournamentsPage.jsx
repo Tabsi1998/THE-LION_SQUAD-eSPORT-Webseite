@@ -97,7 +97,7 @@ export default function TournamentsPage() {
           <div className="col-span-full text-center py-20">
             <div className="text-[#FF3B30] font-display tracking-widest text-sm">FEHLER BEIM LADEN</div>
             <p className="mt-2 text-white/40 text-sm">Turniere konnten nicht geladen werden. Bitte Seite neu laden.</p>
-            <button onClick={load} className="mt-4 px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10 transition">
+            <button onClick={load} className="tls-btn tls-btn--secondary mt-4 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
               Erneut versuchen
             </button>
           </div>

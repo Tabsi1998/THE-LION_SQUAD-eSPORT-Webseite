@@ -190,14 +190,14 @@ function NewsCard({ n, featured = false }) {
           {VIcon && <VIcon className="w-3 h-3 text-[#FFD700]" />}
           <span className="text-white/30 ml-auto">{viennaDate(n.published_at || n.created_at)}</span>
         </div>
-        <h3 className={`mt-2 font-heading font-black leading-tight break-words line-clamp-3 ${featured ? "text-xl md:text-2xl" : "text-lg"} group-hover:text-[#29B6E8] transition`}>
+        <h3 className={`mt-2 font-heading font-black leading-tight break-words line-clamp-3 ${featured ? "text-xl md:text-2xl" : "text-lg"} tls-card__title`}>
           {n.title}
         </h3>
         {n.excerpt && <p className="mt-2 text-sm text-white/65 line-clamp-3 flex-1">{n.excerpt}</p>}
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
           <span className="text-[10px] uppercase tracking-widest font-bold text-white/35">Beitrag</span>
           <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
-            Weiterlesen <ArrowRight className="w-3 h-3" />
+            Weiterlesen <ArrowRight className="tls-card__arrow w-3 h-3" />
           </span>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Reveal } from "@/components/tls/Reveal";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { SmartLogo } from "@/components/tls/SmartLogo";
@@ -68,11 +69,11 @@ export default function SponsorsPage() {
           Diese Marken und Unternehmen unterstützen THE LION SQUAD — eSports. Ohne sie wären viele unserer Events, Turniere und Aktionen nicht möglich. Danke!
         </p>
 
-        <div className="mt-8 grid md:grid-cols-3 gap-3">
+        <Reveal className="tls-reveal-grid mt-8 grid md:grid-cols-3 gap-3">
           <SupportLink to="/events" icon={Calendar} label="Event-Sichtbarkeit" text="Sponsoren erscheinen dort, wo Events und Turniere stattfinden." />
           <SupportLink to="/partners" icon={Handshake} label="Partner-Netzwerk" text="Befreundete Vereine, Veranstalter und Communitys." />
           <SupportLink to="/contact" icon={ArrowRight} label="Sponsor werden" text="Kontakt für Kooperationen, Pakete und gemeinsame Aktionen." />
-        </div>
+        </Reveal>
 
         {publicSponsors.length === 0 && (
           <div className="mt-12 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
@@ -90,7 +91,7 @@ export default function SponsorsPage() {
                 <h2 className="font-heading text-xl font-black uppercase tracking-wider">{tierLabel[t] || t}</h2>
                 <div className="flex-1 border-t border-white/10" />
               </div>
-              <div className={`grid gap-4 ${tierGrid[t] || tierGrid.bronze}`}>
+              <Reveal className={`tls-reveal-grid tls-dim-siblings grid gap-4 ${tierGrid[t] || tierGrid.bronze}`}>
                 {grouped[t].map((s) => (
                   <a
                     key={s.id}
@@ -99,7 +100,7 @@ export default function SponsorsPage() {
                     rel="noreferrer"
                     aria-label={s.name}
                     data-testid={`sponsor-${s.id}`}
-                    className={`border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] transition group flex flex-col items-center justify-center gap-2 ${tierCard[t] || tierCard.bronze}`}
+                    className={`tls-card tls-card--gold tls-reveal-item border border-white/10 rounded-sm bg-[#101010] group flex flex-col items-center justify-center gap-2 ${tierCard[t] || tierCard.bronze}`}
                   >
                     {s.banner_url ? (
                       <div className="w-full flex items-center justify-center overflow-hidden rounded-sm" data-testid={`sponsor-banner-${s.id}`}>
@@ -118,7 +119,7 @@ export default function SponsorsPage() {
                     )}
                   </a>
                 ))}
-              </div>
+              </Reveal>
             </div>
           ) : null)}
         </div>
@@ -128,10 +129,10 @@ export default function SponsorsPage() {
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/45">DANKE</span>
             <h2 className="mt-2 font-heading text-2xl font-black uppercase">Ehemalige Unterstützer</h2>
             <p className="mt-2 text-sm text-white/55 max-w-2xl">Sie haben den Verein ein Stück des Weges begleitet – ohne sie stünden wir nicht da, wo wir heute sind.</p>
-            <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <Reveal className="tls-reveal-grid tls-dim-siblings mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {former.map((s) => (
                 <a key={s.id} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" aria-label={s.name} data-testid={`sponsor-former-${s.id}`}
-                  className="border border-white/10 rounded-sm bg-[#0C0C0C] p-3 flex flex-col items-center gap-2 opacity-70 hover:opacity-100 transition">
+                  className="tls-card tls-card--gold tls-reveal-item border border-white/10 rounded-sm bg-[#0C0C0C] p-3 flex flex-col items-center gap-2">
                   <div className="h-16 w-full flex items-center justify-center overflow-hidden grayscale">
                     <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-w-full max-h-full w-auto h-auto" />
                   </div>
@@ -140,7 +141,7 @@ export default function SponsorsPage() {
                   </span>
                 </a>
               ))}
-            </div>
+            </Reveal>
           </div>
         )}
       </section>
@@ -150,13 +151,13 @@ export default function SponsorsPage() {
 
 function SupportLink({ to, icon: Icon, label, text }) {
   return (
-    <Link to={to} className="group rounded-sm border border-white/10 bg-[#101010] p-4 transition hover:border-[#FFD700]/35 hover:bg-white/[0.03]">
+    <Link to={to} className="tls-card tls-card--gold tls-reveal-item group rounded-sm border border-white/10 bg-[#101010] p-4">
       <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
       <p className="mt-2 text-sm text-white/55 line-clamp-2">{text}</p>
-      <span className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/35 group-hover:text-[#FFD700]">
-        Öffnen <ArrowRight className="h-3 w-3" />
+      <span className="tls-card__title mt-3 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/35">
+        Öffnen <ArrowRight className="tls-card__arrow h-3 w-3" />
       </span>
     </Link>
   );

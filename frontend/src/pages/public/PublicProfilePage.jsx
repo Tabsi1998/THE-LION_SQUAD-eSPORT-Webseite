@@ -1,5 +1,5 @@
 import { countryName } from "@/lib/countries";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTilt } from "@/hooks/useTilt";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
@@ -327,8 +327,7 @@ export default function PublicProfilePage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("overview");
   // Leichtes 3D im Profilkopf (#1078): der Rahmen für Bild und Name neigt sich mit der Maus.
-  const tiltRef = useRef(null);
-  useTilt(tiltRef);
+  const tiltRef = useTilt();
   const [referenceFilter, setReferenceFilter] = useState("all");
   const seoDescription = seoTextPreview(profile?.bio, "Community-Profil bei THE LION SQUAD eSports.");
   useDocumentTitle(profile?.display_name || profile?.username || "Community-Profil", seoDescription, {
@@ -564,24 +563,24 @@ export default function PublicProfilePage() {
                     <MessageSquare className="w-3.5 h-3.5" /> Nachricht
                   </button>
                   {relationship.status === "accepted" ? (
-                    <button type="button" onClick={() => updateFriendship("remove")} className="inline-flex items-center gap-2 px-4 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#FFD700]/10">
+                    <button type="button" onClick={() => updateFriendship("remove")} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
                       <UserCheck className="w-3.5 h-3.5" /> Freunde
                     </button>
                   ) : relationship.incoming ? (
                     <>
-                      <button type="button" onClick={() => updateFriendship("accept")} className="inline-flex items-center gap-2 px-4 py-2 border border-[#00FF88]/45 text-[#00FF88] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#00FF88]/10">
+                      <button type="button" onClick={() => updateFriendship("accept")} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
                         <UserCheck className="w-3.5 h-3.5" /> Annehmen
                       </button>
-                      <button type="button" onClick={() => updateFriendship("decline")} className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white">
+                      <button type="button" onClick={() => updateFriendship("decline")} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
                         <X className="w-3.5 h-3.5" /> Ablehnen
                       </button>
                     </>
                   ) : relationship.outgoing ? (
-                    <button type="button" onClick={() => updateFriendship("remove")} className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white">
+                    <button type="button" onClick={() => updateFriendship("remove")} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
                       <UserPlus className="w-3.5 h-3.5" /> Anfrage offen
                     </button>
                   ) : (
-                    <button type="button" onClick={() => updateFriendship("request")} className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white hover:border-[#29B6E8]/45">
+                    <button type="button" onClick={() => updateFriendship("request")} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
                       <UserPlus className="w-3.5 h-3.5" /> Freund hinzufügen
                     </button>
                   )}
@@ -591,7 +590,7 @@ export default function PublicProfilePage() {
                 type="button"
                 onClick={() => setShowHighlight(true)}
                 data-testid="highlight-card-open"
-                className="inline-flex items-center gap-2 px-4 py-2 border border-[#FFD700]/40 text-[#FFD700] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#FFD700]/10"
+                className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold"
               >
                 <Sparkles className="w-3.5 h-3.5" /> Highlight-Karte
               </button>

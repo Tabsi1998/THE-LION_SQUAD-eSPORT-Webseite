@@ -57,6 +57,23 @@ test("mehrere Standorte: Zähler im Kopf, je Standort Karte, Zeiten und Adresse"
   expect(screen.queryByTitle("Karte Vereinsausflug")).not.toBeInTheDocument();
 });
 
+// Schritt-Leiste (#1081): mit Kosten sieht man, wo die eigene Anmeldung steht; ohne Kosten ist es ein Schritt.
+test("Anmeldung mit Kosten: Leiste Anmeldung, Bezahlen, Dabei mit dem echten Stand", async () => {
+  const offer = { enabled: true, currency: "EUR", positions: [{ key: "ticket", label: "Ticket", amount_cents: 1500, basis: "per_person", optional: false }] };
+  const registered = { id: "r1", status: "registered", seat_count: 1, companion_count: 0, price: { total_cents: 1500, currency: "EUR", billing_status: "pending" } };
+  const { unmount } = renderPage({ ...base, has_registration: true, offer, own_registration: registered });
+  expect(await screen.findByTestId("event-register-steps")).toHaveAttribute("aria-label", "Schritt 2 von 3: Bezahlen");
+  unmount();
+  renderPage({ ...base, has_registration: true, offer, own_registration: { ...registered, price: { ...registered.price, billing_status: "paid" } } });
+  expect(await screen.findByTestId("event-register-steps")).toHaveAttribute("aria-label", "Schritt 3 von 3: Dabei");
+});
+
+test("Anmeldung ohne Kosten: keine Leiste", async () => {
+  renderPage({ ...base, has_registration: true, own_registration: { id: "r1", status: "registered", seat_count: 1 } });
+  expect(await screen.findByText("Angemeldet")).toBeInTheDocument();
+  expect(screen.queryByTestId("event-register-steps")).not.toBeInTheDocument();
+});
+
 test("Partner II (#469): das Event nennt seine Partner mit Link auf die Partnerseite", async () => {
   renderPage({ ...base, partners: [{ id: "p1", slug: "pineapps-esports", name: "PineApps eSports", logo_url: "" }] });
   expect(await screen.findByTestId("event-partners")).toHaveTextContent("Gemeinsam mit");

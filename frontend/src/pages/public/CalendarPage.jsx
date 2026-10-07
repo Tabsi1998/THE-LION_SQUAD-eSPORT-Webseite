@@ -145,7 +145,7 @@ export default function CalendarPage() {
                 <p className="mt-2 text-sm text-white/65">Alle öffentlichen Termine in deinem Kalender – Änderungen kommen von selbst nach. Ohne Personendaten, die Adresse darfst du weitergeben.</p>
                 <FeedAddress url={feed.https} />
                 <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                  <a href={feed.webcal} data-testid="calendar-webcal" className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#9F7AEA] text-black font-bold uppercase tracking-wider rounded-sm">
+                  <a href={feed.webcal} data-testid="calendar-webcal" className="tls-btn tls-btn--primary inline-flex items-center gap-1.5 px-3 py-2 font-bold uppercase tracking-wider rounded-sm">
                     <ExternalLink className="w-3.5 h-3.5" /> Im Kalender öffnen
                   </a>
                 </div>
@@ -203,7 +203,7 @@ function FeedAddress({ url }) {
   return (
     <div className="mt-3 flex gap-2 min-w-0">
       <input readOnly value={url} onFocus={(ev) => ev.target.select()} data-testid="calendar-feed-url" className="flex-1 min-w-0 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-xs font-mono" />
-      <button type="button" onClick={copy} data-testid="calendar-feed-copy" className="px-3 py-2 border border-white/15 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 hover:border-[#9F7AEA]/60 transition">
+      <button type="button" onClick={copy} data-testid="calendar-feed-copy" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
         {copied ? <Check className="w-3.5 h-3.5 text-[#10B981]" /> : <Copy className="w-3.5 h-3.5" />} {copied ? "Kopiert" : "Kopieren"}
       </button>
     </div>

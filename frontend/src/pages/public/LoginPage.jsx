@@ -200,7 +200,7 @@ export default function LoginPage() {
             <button type="button" disabled={enrolling} onClick={() => answerOffer("setup")} data-testid="passkey-offer-setup"
               className="tls-btn tls-btn--primary w-full py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{enrolling ? "Richte ein …" : "Jetzt einrichten"}</button>
             <button type="button" disabled={enrolling} onClick={() => answerOffer("later")} data-testid="passkey-offer-later"
-              className="w-full py-3 border border-white/15 text-white/80 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">Später</button>
+              className="tls-btn tls-btn--quiet w-full py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">Später</button>
             <button type="button" disabled={enrolling} onClick={() => answerOffer("never")} data-testid="passkey-offer-never"
               className="w-full text-xs text-white/45 hover:text-white">Nicht mehr fragen</button>
           </div>
@@ -286,7 +286,7 @@ export default function LoginPage() {
         {!mfaTicket && passkeysEnabled && (
           <div className="mt-4 space-y-2">
             <button type="button" disabled={loading} onClick={passkeyLogin} data-testid="login-passkey"
-              className="w-full min-h-11 py-3 border border-[#29B6E8]/60 text-[#29B6E8] rounded-sm font-bold disabled:opacity-50">Mit Passkey anmelden</button>
+              className="tls-btn tls-btn--secondary w-full min-h-11 py-3 rounded-sm font-bold disabled:opacity-50">Mit Passkey anmelden</button>
             <p className="text-xs text-white/60 text-center">Bereits im Profil eingerichtet? Verwende deinen gespeicherten Passkey.</p>
             {settings.password_login_enabled === false && err && <AuthFormAlert id="passkey-error">{err}</AuthFormAlert>}
           </div>

@@ -14,6 +14,7 @@ import { ChatMessageSticker, ChatStickerButton, ChatStickerPicker } from "@/comp
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
+import { useTilt } from "@/hooks/useTilt";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -69,7 +70,7 @@ function TeamList() {
               <Plus className="w-3.5 h-3.5" /> Team erstellen
             </button>
           ) : (
-            <Link to="/login?next=/teams" className="px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm font-bold uppercase tracking-wider text-xs">Login zum Erstellen</Link>
+            <Link to="/login?next=/teams" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm font-bold uppercase tracking-wider text-xs">Login zum Erstellen</Link>
           )}
         </div>
 
@@ -115,7 +116,7 @@ function TeamCard({ team: t, levelInfo, crown = null }) {
                 </span>
               )}
             </div>
-            <h3 className="font-heading text-xl font-bold group-hover:text-[#29B6E8] transition truncate">{t.name}</h3>
+            <h3 className="tls-card__title font-heading text-xl font-bold truncate">{t.name}</h3>
             <div className="text-xs text-white/50 inline-flex items-center gap-1 mt-0.5">
               <Users className="w-3.5 h-3.5" /> {t.member_count ?? t.member_ids?.length ?? 0} Mitglieder
               {levelInfo && <span className="text-white/35">· {levelInfo.points} Pkt.</span>}
@@ -144,6 +145,8 @@ function TeamDetail({ id }) {
   const { submitting: mutating, submitOnce } = useSubmissionGuard();
   const [actionError, setActionError] = useState("");
   const confirm = useConfirm();
+  // Leichtes 3D im Team-Kopf (#1078), wie im Spielerprofil: Logo und Name neigen sich mit der Maus.
+  const tiltRef = useTilt();
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/teams/${id}`);
@@ -267,15 +270,17 @@ function TeamDetail({ id }) {
               <AwardBanner award={team.featured_award} size="hero" linkTo={team.featured_award.tournament?.slug ? `/tournaments/${team.featured_award.tournament.slug}` : null} />
             </div>
           )}
-          <div className="mt-5 flex flex-col md:flex-row gap-6 md:items-center">
-            {levelInfo ? (
-              <LevelAvatarFrame level={levelInfo.level} crown={levelInfo.crown || null} team testId="team-detail-frame" className="w-28 h-28 shrink-0 mt-8 md:mt-4">
-                <TeamLogo team={team} bare />
-              </LevelAvatarFrame>
-            ) : (
-              <TeamLogo team={team} size="lg" />
-            )}
-            <div className="flex-1 min-w-0">
+          <div ref={tiltRef} className="tls-tilt mt-5 flex flex-col md:flex-row gap-6 md:items-center" data-testid="team-tilt">
+            <div className="tls-tilt__deep shrink-0">
+              {levelInfo ? (
+                <LevelAvatarFrame level={levelInfo.level} crown={levelInfo.crown || null} team testId="team-detail-frame" className="w-28 h-28 shrink-0 mt-8 md:mt-4">
+                  <TeamLogo team={team} bare />
+                </LevelAvatarFrame>
+              ) : (
+                <TeamLogo team={team} size="lg" />
+              )}
+            </div>
+            <div className="tls-tilt__mid flex-1 min-w-0">
               <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold flex items-center gap-2 flex-wrap">
                 <span>[{team.tag}]</span>
                 {levelInfo && (
@@ -296,8 +301,8 @@ function TeamDetail({ id }) {
             </div>
             {canEdit && (
               <div className="flex gap-2 flex-wrap">
-                <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
-                <button onClick={remove} disabled={mutating} data-testid="team-delete" className="px-4 py-2 border border-[#FF3B30]/50 text-[#FF3B30] rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Trash2 className="w-3.5 h-3.5" /> Löschen</button>
+                <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
+                <button onClick={remove} disabled={mutating} data-testid="team-delete" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Trash2 className="w-3.5 h-3.5" /> Löschen</button>
               </div>
             )}
           </div>
@@ -350,7 +355,7 @@ function TeamDetail({ id }) {
                                 "text-white/60 border-white/10 bg-white/5";
               return (
                 <div key={m.id} data-testid={`team-member-row-${m.id}`}
-                  className="border border-white/10 bg-[#121212] rounded-sm p-4 hover:border-[#29B6E8]/40 transition flex flex-col gap-2">
+                  className="tls-card border border-white/10 bg-[#121212] rounded-sm p-4 flex flex-col gap-2">
                   <Link to={`/u/${m.username}`} className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="font-heading text-lg font-bold truncate">{m.display_name || m.username}</div>
@@ -363,22 +368,22 @@ function TeamDetail({ id }) {
                       {showRole && !isCo && (
                         <button disabled={mutating} onClick={(e) => { e.preventDefault(); setRole(m, "co_leader"); }}
                           data-testid={`team-promote-${m.id}`}
-                          className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10 rounded-sm">↑ Co-Leader</button>
+                          className="tls-btn tls-btn--secondary px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">↑ Co-Leader</button>
                       )}
                       {showRole && isCo && (
                         <button disabled={mutating} onClick={(e) => { e.preventDefault(); setRole(m, "member"); }}
                           data-testid={`team-demote-${m.id}`}
-                          className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-white/15 text-white/60 hover:bg-white/5 rounded-sm">↓ Mitglied</button>
+                          className="tls-btn tls-btn--quiet px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">↓ Mitglied</button>
                       )}
                       {showTransfer && (
                         <button disabled={mutating} onClick={(e) => { e.preventDefault(); transferLead(m); }}
                           data-testid={`team-transfer-${m.id}`}
-                          className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 rounded-sm">★ Leader machen</button>
+                          className="tls-btn tls-btn--secondary px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">★ Leader machen</button>
                       )}
                       {showKick && (
                         <button disabled={mutating} onClick={(e) => { e.preventDefault(); kickMember(m); }}
                           data-testid={`team-kick-${m.id}`}
-                          className="ml-auto px-2 py-1 text-[10px] font-bold uppercase tracking-wider border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 rounded-sm">Entfernen</button>
+                          className="tls-btn tls-btn--danger ml-auto px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">Entfernen</button>
                       )}
                     </div>
                   )}
@@ -396,7 +401,7 @@ function TeamDetail({ id }) {
               <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Join-Code</div>
               <div className="mt-2 flex gap-2">
                 <code className="flex-1 bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm">{team.join_code}</code>
-                <button onClick={copyJoin} className="px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] rounded-sm"><Copy className="w-4 h-4" /></button>
+                <button onClick={copyJoin} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm"><Copy className="w-4 h-4" /></button>
               </div>
             </div>
           )}
@@ -409,9 +414,9 @@ function TeamDetail({ id }) {
             </form>
           )}
           {user && isMember && team.leader_id !== user.id && (
-            <button onClick={leave} disabled={mutating} data-testid="team-leave" className="w-full px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Team verlassen</button>
+            <button onClick={leave} disabled={mutating} data-testid="team-leave" className="tls-btn tls-btn--quiet w-full px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Team verlassen</button>
           )}
-          {team.discord_link && <a href={team.discord_link} target="_blank" rel="noreferrer" className="block px-4 py-3 border border-white/10 rounded-sm text-center text-sm font-bold uppercase tracking-wider hover:border-[#29B6E8]/60 hover:text-[#29B6E8]">Discord</a>}
+          {team.discord_link && <a href={team.discord_link} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet block px-4 py-3 rounded-sm text-center text-sm font-bold uppercase tracking-wider">Discord</a>}
         </aside>
       </div>
       {editing && <TeamModal team={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
@@ -602,7 +607,7 @@ function InviteMemberPanel({ team }) {
               type="button"
               disabled={candidate.has_pending_invite || inviting}
               onClick={() => invite(candidate)}
-              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-45 disabled:pointer-events-none"
+              className="tls-btn tls-btn--secondary shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-45 disabled:pointer-events-none"
             >
               <UserPlus className="w-3.5 h-3.5" /> {candidate.has_pending_invite ? "Offen" : "Einladen"}
             </button>
@@ -663,7 +668,7 @@ function TeamModal({ team, onClose, onSaved }) {
         </div>
         <div className="flex justify-end gap-2 p-5 border-t border-white/10">
           {submitError && <div className="mr-auto"><AuthFormAlert id="team-submit-error">{submitError}</AuthFormAlert></div>}
-          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Abbrechen</button>
+          <button type="button" onClick={onClose} disabled={saving} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Abbrechen</button>
           <button disabled={saving} data-testid="team-save" className="tls-btn tls-btn--primary px-5 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
         </div>
       </form>

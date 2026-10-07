@@ -56,11 +56,11 @@ export default function MembersDirectoryPage() {
             </p>
           </div>
           {isClubMember ? (
-            <Link to="/members/membership" data-testid="members-own-entry" className="inline-flex items-center self-start shrink-0 gap-2 px-5 py-3 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition">
+            <Link to="/members/membership" data-testid="members-own-entry" className="tls-btn tls-btn--secondary inline-flex items-center self-start shrink-0 gap-2 px-5 py-3 font-bold uppercase tracking-wider rounded-sm">
               <Crown className="w-4 h-4" /> Mein Eintrag
             </Link>
           ) : (
-            <Link to="/membership/join" data-testid="members-join-cta" className="inline-flex items-center self-start shrink-0 gap-2 px-5 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#e8c200] transition">
+            <Link to="/membership/join" data-testid="members-join-cta" className="tls-btn tls-btn--primary inline-flex items-center self-start shrink-0 gap-2 px-5 py-3 font-bold uppercase tracking-wider rounded-sm">
               <Crown className="w-4 h-4" /> Mitglied werden
             </Link>
           )}

@@ -44,7 +44,7 @@ export function CommendButton({ matchId, completed }) {
   }
   if (!state.can_commend) return null;
   return (
-    <button type="button" onClick={give} disabled={busy} data-testid="commend-button" className="inline-flex items-center gap-1.5 rounded-sm border border-[#00FF88]/40 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#00FF88] hover:bg-[#00FF88]/10 transition disabled:opacity-50">
+    <button type="button" onClick={give} disabled={busy} data-testid="commend-button" className="tls-btn tls-btn--secondary inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50">
       <HeartHandshake className="w-3.5 h-3.5" /> GG geben
     </button>
   );

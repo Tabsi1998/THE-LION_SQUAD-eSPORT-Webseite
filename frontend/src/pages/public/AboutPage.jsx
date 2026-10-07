@@ -9,6 +9,7 @@ import { formatDate } from "@/lib/datetime";
 import { useCountUp } from "@/hooks/useCountUp";
 import { numberItems } from "@/lib/clubNumbers";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Reveal } from "@/components/tls/Reveal";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -94,9 +95,9 @@ export default function AboutPage() {
             <Paragraphs text={texts.values_text} className="mt-5 text-white/70 leading-relaxed" />
           </div>
           {(texts.pillars || []).length > 0 && (
-            <div className="grid grid-cols-2 gap-3" data-testid="about-pillars">
+            <Reveal className="tls-reveal-grid grid grid-cols-2 gap-3" data-testid="about-pillars">
               {(texts.pillars || []).map((label, index) => <Pillar key={label} icon={PILLAR_ICONS[index % PILLAR_ICONS.length]} label={label} />)}
-            </div>
+            </Reveal>
           )}
         </div>
       </section>
@@ -108,9 +109,9 @@ export default function AboutPage() {
           <h2 className="mt-3 font-heading text-3xl md:text-4xl font-black uppercase">{texts.games_title}</h2>
           <Paragraphs text={texts.games_text} className="mt-4 text-white/70 max-w-3xl leading-relaxed" />
           {games.length > 0 && (
-            <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" data-testid="about-games">
+            <Reveal className="tls-reveal-grid mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" data-testid="about-games">
               {games.map((game) => (
-                <div key={game.id} className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] flex flex-col min-w-0 transition">
+                <div key={game.id} className="tls-card tls-reveal-item border border-white/10 rounded-sm bg-[#121212] flex flex-col min-w-0">
                   <Link to={game.tournaments > 0 ? "/tournaments" : "/esports"} data-testid={`about-game-${game.id}`} className="group p-4 flex items-center gap-3 min-w-0 flex-1">
                     {game.logo_url ? (
                       <LazyImg src={game.logo_url} alt="" className="w-12 h-12 rounded-sm object-cover shrink-0" />
@@ -118,14 +119,14 @@ export default function AboutPage() {
                       <span className="w-12 h-12 rounded-sm bg-[#29B6E8]/10 text-[#29B6E8] inline-flex items-center justify-center shrink-0"><Gamepad2 className="w-5 h-5" /></span>
                     )}
                     <span className="min-w-0">
-                      <span className="block font-heading font-black uppercase text-sm truncate group-hover:text-[#29B6E8] transition">{game.name}</span>
+                      <span className="tls-card__title block font-heading font-black uppercase text-sm truncate">{game.name}</span>
                       <span className="block text-[10px] uppercase tracking-widest text-white/40 font-bold">{gameLine(game)}</span>
                     </span>
                   </Link>
                   {game.discord ? <GameServerRow server={{ ...game.discord, member: joined[game.discord.guild_id] }} testId={`about-game-${game.id}-discord`} /> : null}
                 </div>
               ))}
-            </div>
+            </Reveal>
           )}
         </div>
       </section>
@@ -140,9 +141,9 @@ export default function AboutPage() {
             </div>
             <Link to="/board" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-white/60 hover:text-[#FFD700] transition">Ganzer Vorstand <ArrowRight className="w-3 h-3" /></Link>
           </div>
-          <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Reveal className="tls-reveal-grid mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {board.map((contact) => (
-              <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`about-board-${contact.id}`} data-season-anchor="card" className="tls-card tls-card--gold group flex items-center gap-4 border border-white/10 rounded-sm bg-[#111] p-4 min-w-0">
+              <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`about-board-${contact.id}`} data-season-anchor="card" className="tls-card tls-card--gold tls-reveal-item group flex items-center gap-4 border border-white/10 rounded-sm bg-[#111] p-4 min-w-0">
                 {contact.avatar ? (
                   <LazyImg src={contact.avatar} alt="" className="w-16 h-16 rounded-sm object-cover shrink-0" />
                 ) : (
@@ -150,11 +151,11 @@ export default function AboutPage() {
                 )}
                 <span className="min-w-0">
                   <span className="block text-[11px] uppercase tracking-widest font-bold text-[#FFD700] truncate">{contact.title}</span>
-                  <span className="block font-heading text-lg font-black uppercase leading-tight break-words group-hover:text-[#FFD700] transition">{contact.name}</span>
+                  <span className="tls-card__title block font-heading text-lg font-black uppercase leading-tight break-words">{contact.name}</span>
                 </span>
               </Link>
             ))}
-          </div>
+          </Reveal>
         </section>
       )}
 
@@ -182,9 +183,9 @@ export default function AboutPage() {
               <div className="text-[11px] uppercase tracking-[0.3em] font-bold flex items-center gap-2 text-[#29B6E8]"><CalendarDays className="w-3.5 h-3.5" /> So sah das zuletzt aus</div>
               <Link to="/events" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-white/60 hover:text-[#29B6E8] transition">Alle Events <ArrowRight className="w-3 h-3" /></Link>
             </div>
-            <div className="mt-5 grid grid-cols-2 md:grid-cols-3 gap-3">
+            <Reveal className="tls-reveal-grid mt-5 grid grid-cols-2 md:grid-cols-3 gap-3">
               {offlineEvents.map((event) => (
-                <Link key={event.id} to={`/events/${event.slug || event.id}`} data-testid={`about-offline-event-${event.id}`} className="tls-card group relative overflow-hidden rounded-sm border border-white/10 bg-[#111] aspect-[16/10]">
+                <Link key={event.id} to={`/events/${event.slug || event.id}`} data-testid={`about-offline-event-${event.id}`} className="tls-card tls-reveal-item group relative overflow-hidden rounded-sm border border-white/10 bg-[#111] aspect-[16/10]">
                   <LazyImg src={event.banner_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-[1.02] transition duration-500" />
                   <span className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/90 to-transparent">
                     <span className="block text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{formatDate(event.start_date)}</span>
@@ -192,7 +193,7 @@ export default function AboutPage() {
                   </span>
                 </Link>
               ))}
-            </div>
+            </Reveal>
           </div>
         )}
       </section>
@@ -206,7 +207,7 @@ export default function AboutPage() {
             <Link to="/register" data-testid="about-cta-register" className="tls-btn tls-btn--primary px-7 py-3.5 font-bold uppercase tracking-wider rounded-sm">
               Account erstellen
             </Link>
-            <Link to="/membership/join" data-testid="about-cta-join" className="px-7 py-3.5 border-2 border-[#FFD700] text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700] hover:text-black transition">
+            <Link to="/membership/join" data-testid="about-cta-join" className="tls-btn tls-btn--primary px-7 py-3.5 font-bold uppercase tracking-wider rounded-sm">
               Mitglied werden
             </Link>
           </div>
@@ -265,9 +266,9 @@ function ClubNumbers({ numbers, shown }) {
     <section className="border-b border-white/10 bg-[#080808]/35" data-testid="about-numbers">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-[11px] uppercase tracking-[0.3em] font-bold flex items-center gap-2 text-[#FFD700]"><Medal className="w-3.5 h-3.5" /> Der Verein in Zahlen</div>
-        <div className="mt-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <Reveal className="tls-reveal-grid mt-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {items.map(({ key, label, value }) => <NumberTile key={key} id={key} label={label} value={value} />)}
-        </div>
+        </Reveal>
       </div>
     </section>
   );
@@ -276,7 +277,7 @@ function ClubNumbers({ numbers, shown }) {
 function NumberTile({ id, label, value }) {
   const [shown, ref] = useCountUp(value);
   return (
-    <div ref={ref} data-testid={`about-number-${id}`}>
+    <div ref={ref} className="tls-reveal-item" data-testid={`about-number-${id}`}>
       <div className="font-heading text-3xl md:text-4xl font-black text-white tabular-nums" aria-label={`${value.toLocaleString("de-AT")} ${label}`}>{shown.toLocaleString("de-AT")}</div>
       <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">{label}</div>
     </div>
@@ -285,7 +286,7 @@ function NumberTile({ id, label, value }) {
 
 function Pillar({ icon: Icon, label }) {
   return (
-    <div className="border border-white/10 rounded-sm bg-[#121212] p-5 hover:border-[#29B6E8]/50 transition">
+    <div className="tls-reveal-item border border-white/10 rounded-sm bg-[#121212] p-5">
       {Icon ? <Icon className="w-6 h-6 text-[#29B6E8] mb-3" /> : <Star className="w-6 h-6 text-[#29B6E8] mb-3" />}
       <div className="font-heading font-black uppercase text-sm">{label}</div>
     </div>

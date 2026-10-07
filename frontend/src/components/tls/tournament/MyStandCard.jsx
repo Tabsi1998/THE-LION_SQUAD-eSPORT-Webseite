@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { CalendarClock, Users, Wallet } from "lucide-react";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { StepBar, tournamentStep, tournamentSteps } from "@/components/tls/StepBar";
 import { formatDateTime } from "@/lib/datetime";
 import { formatCents } from "@/lib/pricing";
 
@@ -20,12 +21,16 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
   if (!myReg) return null;
   const checkinOpen = t.status === "check_in";
   const line = paymentLine(myReg.price);
+  // Wo die Anmeldung steht (#1081): Freigabe, Startgeld, Check-in, Turnier - immer aus dem echten Stand.
+  const steps = tournamentSteps(t, myReg);
+  const step = tournamentStep(steps, myReg);
   return (
     <section className="border border-[#FFD700]/40 rounded-sm bg-[#FFD700]/5 p-4" data-testid="tournament-my-stand">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="font-heading font-bold uppercase text-sm">Dein Stand</div>
         <StatusBadge status={myReg.status} size="lg" />
       </div>
+      {step >= 0 ? <StepBar steps={steps} current={step} className="tls-steps--gold mt-3" testId="tournament-my-steps" /> : null}
       <dl className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
         {isTeamTournament ? (
           <div className="flex items-start gap-2"><Users className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="text-[10px] font-bold uppercase tracking-widest text-white/50">Team</dt><dd data-testid="tournament-my-team">{team?.name ? `${team.name}${team.tag ? ` [${team.tag}]` : ""}` : "–"}</dd></div></div>
@@ -42,7 +47,7 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
       </dl>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {canCheckIn && myReg.status === "approved" && checkinOpen ? (
-          <button type="button" onClick={onCheckin} disabled={busy} data-testid="tournament-checkin-btn" className="px-5 py-2.5 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#ffe45c] disabled:opacity-50">Jetzt einchecken</button>
+          <button type="button" onClick={onCheckin} disabled={busy} data-testid="tournament-checkin-btn" className="tls-btn tls-btn--primary px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Jetzt einchecken</button>
         ) : null}
         {scheduleTo ? <Link to={scheduleTo} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">Zum Spielplan</Link> : null}
         {canUnregister ? (

@@ -1,9 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motionAllowed } from "@/lib/motion";
 
-// Leichtes 3D (#1078): die große Karte im Profilkopf neigt sich nach der Mausposition, höchstens `maxDegrees`.
-// Nur mit Maus (pointer: fine), nie am Handy, nicht mit „Bewegung reduzieren“. Die Neigung steht als CSS-Variablen
-// am Element (--tls-tilt-x/-y in Grad, --tls-tilt-on 0/1), das CSS macht daraus die Drehung und die Tiefe der Teile.
+// Leichtes 3D (#1078): der Kopf im Profil und auf der Team-Seite neigt sich nach der Mausposition, höchstens
+// `maxDegrees`. Nur mit Maus (pointer: fine), nie am Handy, nicht mit „Bewegung reduzieren“. Die Neigung steht als
+// CSS-Variablen am Element (--tls-tilt-x/-y in Grad, --tls-tilt-on 0/1), das CSS macht daraus Drehung und Tiefe.
+//
+// Rückgabe ist eine Callback-Ref (`ref={tiltRef}`), keine Objekt-Ref: Profil und Team zeigen zuerst „Lade …“, der Kopf
+// erscheint erst nach dem Laden. Eine Objekt-Ref wäre beim ersten Effekt noch leer, die Neigung hinge nie an.
 
 export function tiltFor(x, y, width, height, maxDegrees = 3) {
   if (!width || !height) return { x: 0, y: 0 };
@@ -13,9 +16,9 @@ export function tiltFor(x, y, width, height, maxDegrees = 3) {
   return { x: Math.round(-dy * 2 * maxDegrees * 100) / 100 + 0, y: Math.round(dx * 2 * maxDegrees * 100) / 100 + 0 };
 }
 
-export function useTilt(ref, { maxDegrees = 3, enabled = true } = {}) {
+export function useTilt({ maxDegrees = 3, enabled = true } = {}) {
+  const [node, setNode] = useState(null);
   useEffect(() => {
-    const node = ref.current;
     if (!node || !enabled || typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
     if (!motionAllowed() || !window.matchMedia("(pointer: fine)").matches) return undefined;
     const move = (event) => {
@@ -35,6 +38,8 @@ export function useTilt(ref, { maxDegrees = 3, enabled = true } = {}) {
     return () => {
       node.removeEventListener("pointermove", move);
       node.removeEventListener("pointerleave", leave);
+      leave();
     };
-  }, [ref, maxDegrees, enabled]);
+  }, [node, maxDegrees, enabled]);
+  return setNode;
 }

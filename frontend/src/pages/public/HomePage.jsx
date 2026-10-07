@@ -138,8 +138,8 @@ export default function HomePage() {
             <h2 className="font-heading text-2xl font-black uppercase">Aktuell ruht das Rudel</h2>
             <p className="mt-3 text-white/60 max-w-xl mx-auto">Keine laufenden oder anstehenden Events. Folge uns auf Discord oder schau bei den News, um keine Ankündigung zu verpassen.</p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Link to="/news" className="px-5 py-2.5 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm">News lesen</Link>
-              <Link to="/membership/join" className="px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm">Mitglied werden</Link>
+              <Link to="/news" className="tls-btn tls-btn--secondary px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm">News lesen</Link>
+              <Link to="/membership/join" className="tls-btn tls-btn--secondary px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm">Mitglied werden</Link>
             </div>
           </div>
         </section>
@@ -371,10 +371,10 @@ function FeaturedNews({ news }) {
         <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
           <Newspaper className="w-3 h-3" /> Neueste News {news.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
         </div>
-        <h2 className="mt-3 max-w-2xl font-heading text-2xl md:text-3xl xl:text-[2.2rem] font-black uppercase leading-[1.03] group-hover:text-[#29B6E8] transition break-words line-clamp-4">{news.title}</h2>
+        <h2 className="mt-3 max-w-2xl font-heading text-2xl md:text-3xl xl:text-[2.2rem] font-black uppercase leading-[1.03] tls-card__title break-words line-clamp-4">{news.title}</h2>
         {news.excerpt && <p className="mt-4 max-w-2xl text-white/65 text-sm md:text-base leading-relaxed line-clamp-3">{news.excerpt}</p>}
         <span className="mt-5 inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-white/55 group-hover:text-[#29B6E8]">
-          Lesen <ArrowRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-1" />
+          Lesen <ArrowRight className="tls-card__arrow w-3.5 h-3.5" />
         </span>
       </div>
     </Link>
@@ -513,7 +513,7 @@ function NewsCard({ news, featured = false, index = 0, count = 1 }) {
           {newsCategoryLabel(news.category)}
           {news.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
         </div>
-        <h3 className={`mt-2 font-heading font-black uppercase leading-tight break-words line-clamp-3 group-hover:text-[#29B6E8] transition ${featured ? "text-xl md:text-2xl" : ""}`}>{news.title}</h3>
+        <h3 className={`tls-card__title mt-2 font-heading font-black uppercase leading-tight break-words line-clamp-3 ${featured ? "text-xl md:text-2xl" : ""}`}>{news.title}</h3>
         {(news.published_at || news.created_at) && <div className="mt-2 text-[11px] text-white/40">{viennaDate(news.published_at || news.created_at, { dateStyle: "medium" })}</div>}
         {news.excerpt && <p className="mt-2 text-xs text-white/60 line-clamp-3">{news.excerpt}</p>}
       </div>

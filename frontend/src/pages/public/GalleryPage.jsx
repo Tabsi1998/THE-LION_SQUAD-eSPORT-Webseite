@@ -95,7 +95,7 @@ function AlbumCard({ a }) {
         )}
       </div>
       <div className="p-4">
-        <div className="font-heading font-black uppercase group-hover:text-[#29B6E8] transition">{a.title}</div>
+        <div className="tls-card__title font-heading font-black uppercase">{a.title}</div>
         {a.taken_at && <div className="text-xs text-white/45 mt-1">{viennaDate(a.taken_at)}</div>}
         {a.description && <div className="text-xs text-white/55 mt-2 line-clamp-2">{a.description}</div>}
       </div>

@@ -143,13 +143,13 @@ export function CookieConsentProvider({ children }) {
                 </details>
               </div>
               <div className="mt-4 md:mt-6 grid gap-2 sm:grid-cols-3">
-                <button type="button" onClick={() => save(DEFAULT_CONSENT)} className="px-4 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-white/5">
+                <button type="button" onClick={() => save(DEFAULT_CONSENT)} className="tls-btn tls-btn--quiet px-4 py-3 font-bold uppercase tracking-wider rounded-sm text-xs">
                   Alle ablehnen
                 </button>
-                <button type="button" onClick={() => save(draft)} className="px-4 py-3 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 inline-flex items-center justify-center gap-2">
+                <button type="button" onClick={() => save(draft)} className="tls-btn tls-btn--secondary px-4 py-3 font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center justify-center gap-2">
                   <Settings className="w-4 h-4" /> Auswahl speichern
                 </button>
-                <button type="button" onClick={() => save({ external_media: true, analytics: true, meta: true, tiktok: true })} className="px-4 py-3 bg-white text-black font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center justify-center gap-2">
+                <button type="button" onClick={() => save({ external_media: true, analytics: true, meta: true, tiktok: true })} className="tls-btn tls-btn--primary px-4 py-3 font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center justify-center gap-2">
                   <Check className="w-4 h-4" /> Alle akzeptieren
                 </button>
               </div>

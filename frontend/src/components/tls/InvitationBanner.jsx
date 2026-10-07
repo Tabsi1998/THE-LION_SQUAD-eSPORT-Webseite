@@ -44,7 +44,7 @@ export function InvitationBanner({ pathname = "/" }) {
         <span className="font-bold uppercase tracking-wider text-[#FFD700] text-xs">Einladung zum Verein</span>
         <span className="text-white/80">Der Vorstand lädt dich ein, Mitglied zu werden – der Antrag ist für dich freigeschaltet.</span>
         {invitation.note ? <span className="text-white/60 italic" data-testid="invitation-note">„{invitation.note}“</span> : null}
-        <Link to="/membership/apply" data-testid="invitation-apply" className="ml-auto inline-flex items-center px-4 py-1.5 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#ffe45c]">Antrag ausfüllen</Link>
+        <Link to="/membership/apply" data-testid="invitation-apply" className="tls-btn tls-btn--primary ml-auto inline-flex items-center px-4 py-1.5 font-bold uppercase tracking-wider rounded-sm text-xs">Antrag ausfüllen</Link>
         <button type="button" onClick={dismiss} aria-label="Hinweis ausblenden" data-testid="invitation-dismiss" className="text-white/50 hover:text-white"><X className="w-4 h-4" /></button>
       </div>
     </div>
