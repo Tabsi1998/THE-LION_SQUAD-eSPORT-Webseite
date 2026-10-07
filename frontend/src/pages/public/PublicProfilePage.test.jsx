@@ -267,3 +267,18 @@ test("?tab=achievements öffnet die Erfolge - auch die alten Links von /profile"
     authState.user = null;
   }
 });
+
+// Lange Namen (#1218): auch im Spielerprofil höchstens zwei Zeilen, lange Namen eine Stufe kleiner.
+test("Spielerprofil: ein Name mit 24 Zeichen kommt eine Stufe kleiner", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/users/public/paula") return { data: { ...PROFILE, display_name: "NachtfalkeDerSuperliga24" } };
+    if (url === "/streams/live") return { data: [] };
+    if (url === "/achievements/user/u1") return { data: ACHIEVEMENTS };
+    return { data: [] };
+  });
+  renderPage();
+  const name = await screen.findByTestId("profile-head-name");
+  expect(name).toHaveTextContent("NachtfalkeDerSuperliga24");
+  expect(name.className).toContain("tls-head-name tls-head-name--long");
+  expect(name.className).toContain("text-2xl sm:text-3xl lg:text-4xl");
+});

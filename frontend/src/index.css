@@ -79,6 +79,44 @@ img, video, canvas, svg {
 .font-display { font-family: 'Rajdhani', 'Bahnschrift Condensed', 'Arial Narrow', sans-serif; }
 .font-body { font-family: 'Outfit', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; }
 
+/* Lange Überschriften (#1218): Handy und Tablet trennen große Überschriften mit Bindestrich (die Seite ist
+   lang="de"), statt sie mitten im Wort ohne Zeichen zu brechen oder aus dem Bild laufen zu lassen. Getrennt werden
+   nur Wörter ab zehn Buchstaben. Feste Wörter in Großbuchstaben tragen zusätzlich eine weiche Trennstelle (&shy;),
+   weil nicht jeder Browser großgeschriebene Wörter selbst trennt. Am PC bleibt alles, wie es ist. */
+@media (max-width: 1023px) {
+  h1, h2, .font-heading {
+    -webkit-hyphens: auto;
+    hyphens: auto;
+    hyphenate-limit-chars: 10 4 4;
+  }
+}
+/* Am Handy wird die große Schrift so klein, dass ein Wort mit 14 Buchstaben bei 360 px in die Zeile passt -
+   ab etwa 460 px Breite bleibt sie so groß wie vorher. */
+@media (max-width: 639px) {
+  :is(h1, h2).font-heading.text-3xl {
+    font-size: clamp(1.5rem, 7.8vw, 1.875rem);
+  }
+  :is(h1, h2).font-heading:is(.text-4xl, .text-5xl, .text-6xl, .text-7xl, .text-8xl) {
+    font-size: clamp(1.5rem, 7.8vw, 2.25rem);
+  }
+  h1.font-heading.tls-head-name--long {
+    font-size: clamp(1.375rem, 6.4vw, 1.875rem);
+  }
+}
+/* Namen im Profilkopf (Spieler- und Vereinsprofil): höchstens zwei Zeilen. Ein sehr langer Name kommt eine
+   Schriftstufe kleiner (tls-head-name--long), erst danach endet er mit „…“. Ein Name ohne Leerzeichen darf
+   überall umbrechen - er ist kein Wort aus dem Wörterbuch. Der kleine Innenabstand schützt die Umlaut-Punkte. */
+.tls-head-name {
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.08;
+  padding-block: 0.06em;
+}
+
 /* Selection */
 ::selection { background: var(--tls-cyan); color: #000; }
 

@@ -10,6 +10,7 @@ import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
 import { CountLine, MedalStat, ReferenceCard, SectionTitle, entriesOf } from "@/components/tls/references/referenceParts";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { seoTextPreview } from "@/lib/textPreview";
+import { headNameClass, isLongHeadName } from "@/lib/headName";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
@@ -139,6 +140,7 @@ function memberRealName(profile) {
 }
 
 function MemberHero({ profile }) {
+  const name = memberGamertag(profile);
   return (
     <div className="relative min-h-[25rem] overflow-visible bg-[#0D0D0D] rounded-sm">
       {profile.cover_url && (
@@ -155,9 +157,10 @@ function MemberHero({ profile }) {
             <div className="relative z-10 w-44 h-56 flex items-center justify-center text-white/20"><UserIcon className="w-12 h-12" /></div>
           )}
         </div>
-        <div className="pb-3 md:pb-8">
+        <div className="pb-3 md:pb-8 min-w-0">
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Vereinsmitglied</span>
-          <h1 className="mt-2 font-heading text-5xl md:text-7xl font-black uppercase leading-none break-words">{memberGamertag(profile)}</h1>
+          {/* Langer Name (#1218): höchstens zwei Zeilen, eine Stufe kleiner, erst dann „…“. */}
+          <h1 className={`mt-2 font-heading ${isLongHeadName(name) ? "text-4xl md:text-6xl" : "text-5xl md:text-7xl"} font-black uppercase ${headNameClass(name)}`} title={name} data-testid="member-head-name">{name}</h1>
           {memberRealName(profile) && <p className="mt-2 text-white/60 font-bold">{memberRealName(profile)}</p>}
           {profile.role_title && <p className="mt-2 text-[#FFD700] font-bold uppercase tracking-wider">{profile.role_title}</p>}
         </div>
