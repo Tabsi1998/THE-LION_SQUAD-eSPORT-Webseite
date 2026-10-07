@@ -23,12 +23,8 @@ export const TV_BOXES = Object.freeze({
 });
 
 export const TV_LINE = Object.freeze({ meta: 1.25, info: 1.25, name: 1.12, num: 1, head: 1.1, title: 1.05, hero: 1 });
-// Durchschnittliche Zeichenbreite in em - eher großzügig, die Ersatzschriften sind breiter als Outfit. Liegt die
-// Rechnung doch einmal daneben, merkt das der Turnierbaum-TV (eine Spalte läuft über) und rechnet mit Zuschlag neu.
+// Durchschnittliche Zeichenbreite in em - eher großzügig, die Ersatzschriften sind breiter als Outfit.
 export const CHAR_EM = 0.5;
-// Rahmen und Rundungsreste je Karte.
-const CARD_BORDER = 0.35;
-
 export function tvScale(textSize) {
   return TV_SCALES[textSize === "large" ? "large" : "normal"];
 }
@@ -92,27 +88,6 @@ export function nameFit(label, widthUnits, scale) {
   return { size: scale.nameMin, lines, small: true };
 }
 
-/** Wie viele Karten in eine Spalte passen: der Reihe nach, bis die nächste nicht mehr passt - mindestens eine. */
-export function chunkByUnits(items, availableUnits, heightOf, gap = 0) {
-  const chunks = [];
-  let current = [];
-  let used = 0;
-  for (const item of items) {
-    const height = heightOf(item);
-    const needed = current.length ? used + gap + height : height;
-    if (current.length && needed > availableUnits) {
-      chunks.push(current);
-      current = [item];
-      used = height;
-    } else {
-      current.push(item);
-      used = needed;
-    }
-  }
-  if (current.length) chunks.push(current);
-  return chunks;
-}
-
 /**
  * Was von einer Liste auf die Fläche passt, ohne abzuschneiden. Passt nicht alles, bleibt Platz für eine Zeile
  * „+ N weitere“ (`moreUnits`). Gibt die gezeigten Einträge und die Zahl der übrigen zurück.
@@ -135,66 +110,81 @@ export function fitItems(items, availableUnits, heightOf, gap = 0, moreUnits = 0
   return { shown: list.slice(0, count), hidden: list.length - count };
 }
 
-/** Wie viele gleich hohe Zeilen in eine Fläche passen - mindestens eine. */
-export function fitCount(availableUnits, rowUnits, gap = 0) {
-  if (!(rowUnits > 0)) return 1;
-  return Math.max(1, Math.floor((availableUnits + gap) / (rowUnits + gap)));
+// ---------------------------------------------------------------- Turnierbaum auf der Bühne (#1115)
+// Der Baum liegt auf einer festen Bühne: eine Einheit ist dort immer 10,8 Punkte (1 % von 1080) - so bricht jeder Name
+// auf jedem Bildschirm gleich um, und die Kamera rechnet überall gleich. Die Bühne wird dann passend vergrößert oder
+// verkleinert. Damit ein ganzer Baum etwas verkleinert stillstehen darf, sind die Größen dort größer als die
+// Untergrenze; wie weit verkleinert werden darf, sagt `treeMinZoom`. Lange Namen werden auf der Bühne nicht noch
+// kleiner (das Verkleinern übernimmt der Zoom), sondern zweizeilig - nie „…“.
+
+export const TV_STAGE_UNIT_PX = 10.8;
+
+export const TV_TREE_SCALES = Object.freeze({
+  normal: Object.freeze({ meta: 1.85, info: 2, name: 2.6, nameMin: 2.6, num: 3, head: 2.6, title: 4.2, hero: 6 }),
+  large: Object.freeze({ meta: 2.75, info: 2.8, name: 3.6, nameMin: 3.6, num: 4.2, head: 3.4, title: 5, hero: 7 }),
+});
+
+// card = Breite einer Karte, colGap = Platz für die Linien zwischen den Runden, blockGap = Abstand der Blöcke.
+export const TV_TREE_BOXES = Object.freeze({
+  normal: Object.freeze({ avatar: 3.4, padX: 1, padY: 0.45, rowPadY: 0.35, gap: 1.1, colPad: 0, card: 37, colGap: 6, blockGap: 3.4, qr: 9.5, colMin: 36 }),
+  large: Object.freeze({ avatar: 4.4, padX: 1.2, padY: 0.55, rowPadY: 0.45, gap: 1.3, colPad: 0, card: 49, colGap: 7, blockGap: 4, qr: 11, colMin: 46 }),
+});
+
+export function treeScale(textSize) {
+  return TV_TREE_SCALES[textSize === "large" ? "large" : "normal"];
+}
+
+export function treeBox(textSize) {
+  return TV_TREE_BOXES[textSize === "large" ? "large" : "normal"];
 }
 
 /**
- * Die Maße einer Turnierbaum-Spalte in Einheiten: wie breit Namen und Fußzeile sein dürfen.
- * `columnUnits` ist die Breite der ganzen Spalte.
+ * Wie weit der Baum höchstens verkleinert werden darf: so weit, dass Namen (auch lange, etwas kleinere) und alle
+ * Nebensachen noch die Untergrenze aus #1111 halten.
  */
-export function bracketColumnWidths(columnUnits, textSize) {
-  const scale = tvScale(textSize);
-  const box = tvBox(textSize);
-  const inner = columnUnits - 2 * box.colPad - 2 * box.padX - CARD_BORDER;
-  return {
-    name: Math.max(8, inner - box.avatar - 2 * box.gap - scale.num * 1.8),
-    footer: Math.max(8, inner),
+export function treeMinZoom(textSize) {
+  const limits = TV_LIMITS[textSize === "large" ? "large" : "normal"];
+  const scale = treeScale(textSize);
+  return Math.max(
+    limits.name / scale.name,
+    limits.name / scale.nameMin,
+    ...["meta", "info", "num", "head"].map((kind) => limits.other / scale[kind]),
+  );
+}
+
+/** Die CSS-Variablen der Bühne: feste Einheit, Baum-Größen. tv.css rechnet daraus dieselben Klassen wie sonst am TV. */
+export function treeCssVars(textSize) {
+  const vars = { "--tv-u": `${TV_STAGE_UNIT_PX}px` };
+  for (const [name, value] of Object.entries(treeScale(textSize))) vars[`--tv-k-${name}`] = String(value);
+  for (const [name, value] of Object.entries(treeBox(textSize))) vars[`--tv-b-${name}`] = String(value);
+  return vars;
+}
+
+/**
+ * Wie groß ein Block des Baums ungefähr wird (Einheiten): `rounds` sind die Spiele je Runde. Geschätzt aus den Größen
+ * oben - genau misst später der Browser; die Schätzung entscheidet nur, ob Blöcke neben- oder untereinander stehen.
+ */
+export function treeBlockUnits(rounds, textSize) {
+  const scale = treeScale(textSize);
+  const box = treeBox(textSize);
+  const row = 2 * box.rowPadY + Math.max(box.avatar, scale.name * TV_LINE.name, scale.num * TV_LINE.num);
+  // Ein Durchgang mit Ergebnis trägt rechts Platz und Punkte übereinander - die Zeile wird höher.
+  const rowWithPoints = 2 * box.rowPadY + Math.max(box.avatar, scale.name * TV_LINE.name, scale.num * TV_LINE.num + scale.meta * TV_LINE.meta);
+  const card = (match) => {
+    const slots = Math.max(2, (match?.slots || []).length);
+    const heat = slots > 2 || String(match?.match_type || "duel") !== "duel";
+    const head = 2 * box.padY + scale.meta * TV_LINE.meta * (heat ? 2 : 1);
+    const live = ["running", "in_progress", "live"].includes(String(match?.status || "").toLowerCase()) ? 2.4 * box.rowPadY + scale.num * TV_LINE.num : 0;
+    const scored = heat && (match?.results || []).length > 0;
+    return head + slots * (scored ? rowWithPoints : row) + live + 0.2;
   };
+  const columns = rounds.length;
+  const tallest = Math.max(0, ...rounds.map((list) => list.reduce((sum, match) => sum + card(match), 0) + Math.max(0, list.length - 1) * box.gap));
+  const title = scale.head * TV_LINE.head + 0.9 + scale.meta * TV_LINE.meta + 0.7;
+  return { w: columns * box.card + Math.max(0, columns - 1) * box.colGap, h: title + tallest };
 }
 
-/** Kopf einer Turnierbaum-Spalte (Phase und Runde). */
-export function bracketColumnHeadUnits(textSize) {
-  const scale = tvScale(textSize);
-  const box = tvBox(textSize);
-  return 2 * box.padY + scale.meta * TV_LINE.meta + scale.head * TV_LINE.head + CARD_BORDER;
-}
-
-/** Zeilen einer Fußzeile aus Teilen (Station, Zeit): passen beide nebeneinander, eine Zeile - sonst je Teil eigene. */
-export function footerLines(parts, perLine) {
-  const list = (Array.isArray(parts) ? parts : [parts]).map((part) => String(part || "").trim()).filter(Boolean);
-  if (!list.length) return 0;
-  const together = list.reduce((sum, part) => sum + [...part].length, 0) + 3 * (list.length - 1);
-  if (together <= perLine) return 1;
-  return list.reduce((sum, part) => sum + wrapLines(part, perLine), 0);
-}
-
-/**
- * Höhe einer Spielkarte in Einheiten: Kopfzeile, je Platz eine Zeile (Name ein- oder zweizeilig), Fußzeile mit
- * Station und Zeit. `labels` sind die Namen der Plätze, `footer` die Teile der Fußzeile (Station, Zeit).
- */
-export function bracketCardUnits({ labels, footer = [] }, widths, textSize) {
-  const scale = tvScale(textSize);
-  const box = tvBox(textSize);
-  const head = 2 * box.padY + scale.meta * TV_LINE.meta;
-  const rows = (labels.length ? labels : ["", ""]).reduce((sum, label) => {
-    const fit = nameFit(label, widths.name, scale);
-    const text = fit.lines * fit.size * TV_LINE.name;
-    return sum + 2 * box.rowPadY + Math.max(box.avatar, text, scale.num * TV_LINE.num);
-  }, 0);
-  const lines = footerLines(footer, charsPerLine(widths.footer, scale.info));
-  const foot = lines ? 2 * box.rowPadY + lines * scale.info * TV_LINE.info : 0;
-  return head + rows + foot + CARD_BORDER;
-}
-
-/** Wie viele Spalten nebeneinander passen, ohne dass eine schmaler als die Mindestbreite wird (1 bis 4). */
-export function columnsFor(widthUnits, textSize, max = 4) {
-  const box = tvBox(textSize);
-  for (let count = max; count > 1; count -= 1) {
-    const width = (widthUnits - (count - 1) * box.gap) / count;
-    if (width >= box.colMin) return count;
-  }
-  return 1;
+/** Bildschirm-Punkte je Bühnen-Punkt bei Zoom 1 - auf jedem 16:9-Bildschirm so, dass die Bühne 1080 Punkte hoch wirkt. */
+export function stageBase(width, height) {
+  return tvUnitPx(width, height) / TV_STAGE_UNIT_PX;
 }

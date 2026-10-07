@@ -28,6 +28,7 @@ class TvSettingsUpdate(BaseModel):
     pixel_shift: StrictBool | None = None
     season_header: StrictBool | None = None
     reduce_motion: StrictBool | None = None
+    result_sound: StrictBool | None = None
 
 
 class TvKeyCreate(BaseModel):

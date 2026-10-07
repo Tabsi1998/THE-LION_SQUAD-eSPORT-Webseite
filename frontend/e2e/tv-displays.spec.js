@@ -177,7 +177,9 @@ function measure(page, textSize) {
       if (style.visibility === "hidden" || style.display === "none" || !rect.width || !rect.height) continue;
       const isName = Boolean(element.closest("[data-tv-name]"));
       const min = (isName ? limits.name : limits.other) * height / 100;
-      const size = parseFloat(style.fontSize);
+      // Der Turnierbaum liegt auf einer Bühne, die die Kamera vergrößert oder verkleinert (#1115) - gezählt wird, was im Bild ankommt.
+      const stage = element.closest("[data-tv-scale]");
+      const size = parseFloat(style.fontSize) * (stage ? Number(stage.getAttribute("data-tv-scale")) || 1 : 1);
       if (size + 0.05 < min) tooSmall.push(`${text} (${size.toFixed(1)} < ${min.toFixed(1)})`);
       if (isName && (text.endsWith("…") || style.textOverflow === "ellipsis" || element.scrollWidth > element.clientWidth + 1)) ellipsis.push(text);
     }

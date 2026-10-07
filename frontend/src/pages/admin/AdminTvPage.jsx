@@ -6,13 +6,14 @@ import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api, formatRequestError } from "@/lib/api";
-import { TV_DEFAULTS, TV_FIELDS, TV_VIEWS, buildTvLink, linkOverrides, resolveTvSettings, tvValueLabel } from "@/lib/tvSettings";
+import { TV_DEFAULTS, TV_FIELDS, TV_VIEWS, buildTvLink, linkOverrides, parseTvPath, resolveTvSettings, tvValueLabel } from "@/lib/tvSettings";
 import { viennaDateTime } from "@/lib/vienna";
 
 // TV & Beamer (#1110): eine Stelle für alle Bildschirme. Oben die Grundwerte - sie gelten auf jedem TV und kommen
 // ohne Neuladen dort an. Darunter der Link-Baukasten: Ansicht wählen, nur die Abweichungen für diesen Bildschirm
 // anhaken, Link kopieren oder als QR-Code öffnen. Der Turnierbaum-TV braucht keinen Moderatoren-Login mehr: sein Link
-// trägt einen Anzeige-Schlüssel, der nur das Anschauen erlaubt und unten widerrufen wird.
+// trägt einen Anzeige-Schlüssel, der nur das Anschauen erlaubt und unten widerrufen wird. Die Stations-Ansicht (#1120)
+// nutzt denselben Schlüssel: ein Link je Station zeigt nur, was dort läuft oder als Nächstes kommt.
 
 const FIELD_BOX = "border border-white/10 bg-[#0F0F0F] rounded-sm p-4";
 
@@ -64,7 +65,7 @@ export default function AdminTvPage() {
   const reset = async () => {
     const approved = await confirm({
       title: "Alle Grundwerte auf Standard?",
-      description: "Schrift normal, Kontrast aus, kein sicherer Bereich, Pixel-Verschiebung an, Jahreszeiten an, Bewegung normal. Links mit eigenen Abweichungen behalten ihre Abweichungen.",
+      description: "Schrift normal, Kontrast aus, kein sicherer Bereich, Pixel-Verschiebung an, Jahreszeiten an, Bewegung normal, Ton beim Ergebnis aus. Links mit eigenen Abweichungen behalten ihre Abweichungen.",
       confirmLabel: "Auf Standard",
     });
     if (!approved) return;
@@ -86,8 +87,8 @@ export default function AdminTvPage() {
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 flex items-center gap-3"><Tv className="w-7 h-7 text-[#29B6E8]" /> TV &amp; Beamer</h1>
       <p className="text-sm text-white/55 mt-2 max-w-3xl">
-        Eine Stelle für alle Bildschirme: Turnierbaum, Event und Fast Lap am Fernseher oder Beamer. Die Grundwerte gelten überall und kommen ohne Neuladen am TV an.
-        Ein einzelner Bildschirm darf abweichen – das steht dann in seinem Link. Ton gibt es am TV nicht; was nur ein Turnier betrifft, stellst du beim Turnier ein.
+        Eine Stelle für alle Bildschirme: Turnierbaum, Station, Event und Fast Lap am Fernseher oder Beamer. Die Grundwerte gelten überall und kommen ohne Neuladen am TV an.
+        Ein einzelner Bildschirm darf abweichen – das steht dann in seinem Link. Ton gibt es nur als Gong beim Ergebnis und nur, wenn er eingeschaltet ist; was nur ein Turnier betrifft, stellst du beim Turnier ein.
       </p>
 
       <section className="mt-6 border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="tv-defaults">
@@ -181,8 +182,10 @@ function preset() {
 
 function LinkBuilder({ defaults }) {
   const [view, setView] = useState(() => preset().view);
-  const [targets, setTargets] = useState({ bracket: [], event: [], fastlap: [] });
+  const [targets, setTargets] = useState({ bracket: [], station: [], event: [], fastlap: [] });
   const [targetId, setTargetId] = useState(() => preset().target);
+  const [stationId, setStationId] = useState("");
+  const [stations, setStations] = useState([]);
   const [overrides, setOverrides] = useState({});
   const [label, setLabel] = useState("");
   const [created, setCreated] = useState(null);
@@ -199,16 +202,32 @@ function LinkBuilder({ defaults }) {
     ]).then(([tournaments, events, challenges]) => {
       if (!active) return;
       const rows = (result) => (result.status === "fulfilled" && Array.isArray(result.value.data) ? result.value.data : []);
-      setTargets({ bracket: rows(tournaments), event: rows(events), fastlap: rows(challenges) });
+      setTargets({ bracket: rows(tournaments), station: rows(tournaments), event: rows(events), fastlap: rows(challenges) });
     });
     return () => {
       active = false;
     };
   }, []);
 
-  // Der Schlüssel gehört zu genau einem Turnier: wechselt das Turnier, braucht der Link einen neuen.
-  const key = view === "bracket" && created?.tournament_id === targetId ? created.token : "";
-  const link = buildTvLink({ origin: window.location.origin, view, targetId, displayKey: key, overrides });
+  // Die Stationen des gewählten Turniers - für die Stations-Ansicht.
+  useEffect(() => {
+    if (view !== "station" || !targetId) {
+      setStations([]);
+      return undefined;
+    }
+    let active = true;
+    api.get(`/stations?tournament_id=${encodeURIComponent(targetId)}`)
+      .then(({ data }) => { if (active) setStations(Array.isArray(data) ? data : []); })
+      .catch(() => { if (active) setStations([]); });
+    return () => {
+      active = false;
+    };
+  }, [view, targetId]);
+
+  // Der Schlüssel gehört zu genau einem Turnier: wechselt das Turnier, braucht der Link einen neuen. Turnierbaum und
+  // Stationen desselben Turniers teilen sich einen Schlüssel.
+  const key = meta.needsKey && created?.tournament_id === targetId ? created.token : "";
+  const link = buildTvLink({ origin: window.location.origin, view, targetId, stationId, displayKey: key, overrides });
   const ready = Boolean(link) && (!meta.needsKey || key);
 
   const createKey = async () => {
@@ -229,14 +248,15 @@ function LinkBuilder({ defaults }) {
   const takeOver = () => {
     try {
       const url = new URL(pasted.trim(), window.location.origin);
-      const found = TV_VIEWS.find((entry) => url.pathname.startsWith(entry.path));
+      const found = parseTvPath(url.pathname);
       if (!found) throw new Error("kein TV-Link");
-      const id = decodeURIComponent(url.pathname.slice(found.path.length).split("/")[0] || "");
-      setView(found.key);
-      setTargetId(id);
+      setView(found.view);
+      setTargetId(found.targetId);
+      setStationId(found.stationId);
       setOverrides(linkOverrides(url.searchParams));
       const pastedKey = url.searchParams.get("key");
-      setCreated(found.key === "bracket" && pastedKey ? { token: pastedKey, tournament_id: id, label: "" } : null);
+      const needsKey = TV_VIEWS.find((entry) => entry.key === found.view)?.needsKey;
+      setCreated(needsKey && pastedKey ? { token: pastedKey, tournament_id: found.targetId, label: "" } : null);
       setPasted("");
       toast.success("Link übernommen – Abweichungen ändern, dann den neuen Link am TV öffnen.");
     } catch {
@@ -266,7 +286,7 @@ function LinkBuilder({ defaults }) {
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Ansicht">
             {TV_VIEWS.map((entry) => (
-              <button key={entry.key} type="button" role="radio" aria-checked={view === entry.key} onClick={() => { setView(entry.key); setTargetId(""); }}
+              <button key={entry.key} type="button" role="radio" aria-checked={view === entry.key} onClick={() => { setView(entry.key); setTargetId(""); setStationId(""); }}
                 className={`px-3 py-1.5 rounded-sm border text-xs font-bold uppercase tracking-wider ${view === entry.key ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/15 text-white/60 hover:text-white"}`}
                 data-testid={`tv-view-${entry.key}`}>
                 {entry.label}
@@ -275,11 +295,21 @@ function LinkBuilder({ defaults }) {
           </div>
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{meta.target}</div>
-            <select value={targetId} onChange={(event) => setTargetId(event.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" data-testid="tv-target">
+            <select value={targetId} onChange={(event) => { setTargetId(event.target.value); setStationId(""); }} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" data-testid="tv-target">
               <option value="">{meta.target} auswählen</option>
               {options.map((item) => <option key={item.id} value={item.id}>{titleOf(item)}</option>)}
             </select>
           </label>
+          {meta.needsStation ? (
+            <label className="block">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Station</div>
+              <select value={stationId} onChange={(event) => setStationId(event.target.value)} disabled={!targetId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm disabled:opacity-50" data-testid="tv-station">
+                <option value="">{targetId && !stations.length ? "Dieses Turnier hat noch keine Stationen" : "Station auswählen"}</option>
+                {stations.map((item) => <option key={item.id} value={item.id}>{item.name || item.label || item.id}</option>)}
+              </select>
+              <p className="mt-1.5 text-xs text-white/45">Der Bildschirm an dieser Station zeigt nur, was dort läuft oder als Nächstes kommt – Durchgänge als Startaufstellung.</p>
+            </label>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             {TV_FIELDS.map((field) => (
               <OverrideSelect key={field.key} field={field} value={overrides[field.key]} defaultValue={defaults[field.key]}
@@ -294,7 +324,7 @@ function LinkBuilder({ defaults }) {
           {meta.needsKey ? (
             <div className={FIELD_BOX}>
               <div className="text-sm font-bold text-white/90 inline-flex items-center gap-2"><KeyRound className="w-4 h-4 text-[#FFD700]" /> Anzeige-Schlüssel</div>
-              <p className="mt-1 text-xs text-white/50">Damit läuft der Turnierbaum am Hallen-PC ohne Anmeldung. Der Schlüssel erlaubt nur das Anschauen dieses einen Turniers und lässt sich unten widerrufen.</p>
+              <p className="mt-1 text-xs text-white/50">Damit läuft der Turnierbaum (und jede Station dieses Turniers) am Hallen-PC ohne Anmeldung. Der Schlüssel erlaubt nur das Anschauen dieses einen Turniers und lässt sich unten widerrufen.</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <input value={label} onChange={(event) => setLabel(event.target.value)} maxLength={80} placeholder="Name des Bildschirms, z. B. Beamer Halle"
                   className="flex-1 min-w-[12rem] bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" data-testid="tv-key-label" />
@@ -328,7 +358,11 @@ function LinkBuilder({ defaults }) {
             </>
           ) : (
             <p className="text-sm text-white/45 max-w-sm" data-testid="tv-link-missing">
-              {!targetId ? `Erst ${meta.target === "Event" ? "ein Event" : meta.target === "Turnier" ? "ein Turnier" : "eine Fast-Lap-Challenge"} auswählen.` : "Für den Turnierbaum erst „Link erstellen“ – der Link trägt dann den Anzeige-Schlüssel."}
+              {!targetId
+                ? `Erst ${meta.target === "Event" ? "ein Event" : meta.target === "Turnier" ? "ein Turnier" : "eine Fast-Lap-Challenge"} auswählen.`
+                : meta.needsStation && !stationId
+                  ? "Jetzt die Station auswählen."
+                  : "Für den Turnierbaum erst „Link erstellen“ – der Link trägt dann den Anzeige-Schlüssel."}
             </p>
           )}
         </div>
