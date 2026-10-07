@@ -11,6 +11,7 @@ from services.access_links import touch_access_link, validate_access_link
 from services.tv_display import DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, display_bracket_payload, key_expired, seat_summary
 from services.public_phase import derive_public_phase
 from services.station_labels import attach_station_info
+from services.match_public_view import public_match_view, public_stage_view, public_tournament_view
 from services.tournament_permissions import READ_STAFF_ROLES, require_tournament_staff_permission
 from services.matchday_schedule import build_matchday_plan, current_matchday_number
 from services.competition_read import load_competition_read_model, observe_structure_read
@@ -103,6 +104,11 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
     stages = read_model.stages
     matches_v2 = read_model.stage_matches
     await attach_station_info(db, matches_v2)
+    if not is_staff:
+        # Wer das Turnier nicht leitet, sieht im Baum dieselben Felder wie auf der Spielseite.
+        viewer_id = (user or {}).get("id")
+        matches_v2 = [public_match_view(match, viewer_id) for match in matches_v2]
+        stages = [public_stage_view(stage) for stage in stages]
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     regs = [_public_registration(r, user, is_staff) for r in regs]
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
@@ -117,7 +123,8 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
     structure = read_model.structure_snapshot()
     observe_structure_read(structure, surface="bracket")
     return {
-        "tournament": t,
+        # Die Abrechnung (`billing`) braucht der Baum nie; die Turnierseite zeigt sie nur dem Bereich Finanzen.
+        "tournament": public_tournament_view(t),
         "matches": matches,
         "registrations": regs,
         "stages": stages,

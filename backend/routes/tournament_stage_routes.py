@@ -19,12 +19,15 @@ from services.match_v2_results import (
     public_recalculation_error,
 )
 from models import TournamentStageCreate, TournamentStageUpdate, now_utc, new_id
+from services.match_public_view import public_match_view, public_stage_view
 from routes.tournament_common import (
     _apply_match_plan,
     _audit_tournament_action,
     _collect_match_plan,
     _ensure_tournament_unlocked,
     _get_visible_tournament,
+    _is_staff,
+    _is_tournament_staff,
     _resolve_tid,
     _serialized_tournament_write,
     _v2_plan_key,
@@ -44,9 +47,9 @@ async def list_tournament_stages(tid: str, user=Depends(get_optional_user)):
         {"tournament_id": tid},
         {"_id": 0},
     ).sort("number", 1).to_list(200)
-    for stage in stages:
-        stage.pop("creation_key", None)
-    return stages
+    if _is_staff(user) or await _is_tournament_staff(tid, user):
+        return [{key: value for key, value in stage.items() if key != "creation_key"} for stage in stages]
+    return [public_stage_view(stage) for stage in stages]
 
 
 @router.post("/{tid}/stages")
@@ -166,7 +169,11 @@ async def list_tournament_matches_v2(tid: str, stage_id: str | None = None,
     if stage_id:
         q["stage_id"] = stage_id
     matches = await db.matches_v2.find(q, {"_id": 0}).sort([("round", 1), ("match_key", 1)]).to_list(2000)
-    return matches
+    if _is_staff(user) or await _is_tournament_staff(tid, user):
+        return matches
+    # Ohne Turnier-Recht dieselbe Sicht wie auf der Spielseite und im Turnierbaum.
+    viewer_id = (user or {}).get("id")
+    return [public_match_view(match, viewer_id) for match in matches]
 
 
 @router.post("/{tid}/matches-v2/recalculate-advancement")

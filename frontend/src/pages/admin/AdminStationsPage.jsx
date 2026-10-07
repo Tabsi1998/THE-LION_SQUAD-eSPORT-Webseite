@@ -299,7 +299,7 @@ export default function AdminStationsPage() {
             <select value={form.device_type} onChange={(e) => setForm({ ...form, device_type: e.target.value })} data-testid="station-device" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
               {DEVICES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
-            <input placeholder="Notiz (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="station-notes" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            <input placeholder="Hinweis (öffentlich sichtbar, optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="station-notes" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             <button data-testid="station-submit" className="w-full px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Plus className="w-4 h-4" /> Anlegen</button>
           </form>}
 
@@ -312,7 +312,7 @@ export default function AdminStationsPage() {
             <select value={bulk.device_type} onChange={(e) => setBulk({ ...bulk, device_type: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
               {DEVICES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
-            <input placeholder="Notiz für alle Stationen" value={bulk.notes} onChange={(e) => setBulk({ ...bulk, notes: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            <input placeholder="Hinweis für alle Stationen (öffentlich sichtbar)" value={bulk.notes} onChange={(e) => setBulk({ ...bulk, notes: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             <button type="button" onClick={createBulk} disabled={!activeTid} className="w-full px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
               <Plus className="w-4 h-4" /> Mehrere anlegen
             </button>
