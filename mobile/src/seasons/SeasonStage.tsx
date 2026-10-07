@@ -7,11 +7,11 @@ import { AdventCalendarWidget } from "../advent/entry";
 import { navigationRef } from "../navigation/rootNavigation";
 import { colors } from "../theme";
 import { AdventWidget } from "./advent/AdventWidget";
-import { BirthdayEdge, BirthdayGreeting, BirthdaySky } from "./birthday";
+import { BirthdayCorners, BirthdayEdge, BirthdayGreeting, BirthdaySky } from "./birthday";
 import { BirthdayHatTabIcon, BirthdayHatWidget } from "./birthday/hat";
 import { CarnivalCorners, CarnivalGreeting, ConfettiSky, PartyHatTabIcon, PartyHatWidget } from "./carnival";
-import { ChristmasBackdrop, ChristmasEdge, ChristmasGreeting } from "./christmas";
-import { EasterBackdrop, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon } from "./easter";
+import { ChristmasBackdrop, ChristmasCorners, ChristmasEdge, ChristmasGreeting } from "./christmas";
+import { EasterBackdrop, EasterCorners, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon } from "./easter";
 import { HuntStage, HuntWidget } from "./easterHunt";
 import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
 import { FireworksSky, NewYearGreeting, NewYearWidget } from "./newYear";
@@ -62,8 +62,9 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   snow: { Sky: SnowSky, Widget: SnowflakeWidget, widgetOnTop: true, Backdrop: WinterSkyBackdrop, Edge: SnowCap },
   // Wetter das ganze Jahr (#771): Regen, leichter Schnee, Wetterleuchten - wie im Web; in der Schnee-Saison schneit es.
   weather: { Sky: WeatherSky, skyOnly: true },
-  // Weihnachten (S8, S11 #642): Lichterkette an der Begrüßungskarte, warme Lichtinseln, der Gruß einmal je Tag.
-  christmas: { Edge: ChristmasEdge, Greeting: ChristmasGreeting, Backdrop: ChristmasBackdrop },
+  // Weihnachten (S8, S11 #642): Lichterkette an der Begrüßungskarte, warme Lichtinseln, der Gruß einmal je Tag;
+  // Jahreszeiten IV (#1091): Ketten auch an einigen Karten (Corners wählt sie aus), sie schwingen beim Antippen nach.
+  christmas: { Edge: ChristmasEdge, Greeting: ChristmasGreeting, Backdrop: ChristmasBackdrop, Corners: ChristmasCorners },
   // Nikolaus (X3 #736, S11 „Stiefel im Tab Mehr“): der Stiefel im Kopf von „Mehr“, das Tab-Symbol, der Hinweis.
   nikolaus: { Shelf: NikolausShelf, Greeting: NikolausGreeting, TabIcon: NikolausTabIcon, Widget: NikolausWidget, compactWidget: true },
   // Silvester (S11 #642, wie #800 im Web): Feuerwerk mit Skia über allen Tabs, Hinweis im Kopf, Countdown und Gruß.
@@ -74,10 +75,12 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   // Vereinsgeburtstag (S13 #644, B1–B3, #856 wie im Web): die Karte mit der Torte, Konfetti in Vereinsfarben aus der
   // Torte und ab und zu, Luftballons am Rand, die Mütze mit der Zahl der Jahre im Dashboard-Kopf und am Tab „Mehr“, die
   // Wimpelkette an der Begrüßungskarte.
-  club_birthday: { Sky: BirthdaySky, Greeting: BirthdayGreeting, Edge: BirthdayEdge, Widget: BirthdayHatWidget, TabIcon: BirthdayHatTabIcon },
+  // Jahreszeiten IV (#1094): Wimpelketten auch an einigen Karten (Corners), sie flattern beim Antippen.
+  club_birthday: { Sky: BirthdaySky, Greeting: BirthdayGreeting, Edge: BirthdayEdge, Widget: BirthdayHatWidget, TabIcon: BirthdayHatTabIcon, Corners: BirthdayCorners },
   // Ostern (S14 #645, E1 #753, E4 #756, wie im Web): Hasenohren im Dashboard-Kopf, Eier-Reihe an der Begrüßungskarte,
   // das Osterei am Tab „Mehr“, Frühlingslicht, wenige Blätter, bei „voll“ der Zitronenfalter, selten der Feldhase, der Gruß.
-  easter: { Edge: EasterEdge, Greeting: EasterGreeting, Sky: EasterSky, TabIcon: EasterTabIcon, Backdrop: EasterBackdrop },
+  // Jahreszeiten IV (#1092): Eier auch auf einigen Karten (Corners), sie wackeln und rollen beim Antippen.
+  easter: { Edge: EasterEdge, Greeting: EasterGreeting, Sky: EasterSky, TabIcon: EasterTabIcon, Backdrop: EasterBackdrop, Corners: EasterCorners },
   // Ostereiersuche (S15 #646/#647, wie im Web): die Eier an den Karten der Screens (die Bühne lädt und verteilt sie),
   // das goldene Löwenei mit dem Stand im Dashboard-Kopf, der Korb unter „Mehr“.
   easter_hunt: { Corners: HuntStage, Widget: HuntWidget },

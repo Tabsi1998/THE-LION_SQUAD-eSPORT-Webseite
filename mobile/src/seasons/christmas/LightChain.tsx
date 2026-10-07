@@ -1,13 +1,20 @@
-import React, { useEffect, useMemo, useRef } from "react";
-import { Animated, Easing, StyleSheet } from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Easing, StyleSheet, View } from "react-native";
 import Svg, { Circle, Defs, Ellipse, G, Line, Path, RadialGradient, Rect, Stop } from "react-native-svg";
+import { REST_MS, createRest } from "../cardLift";
+import { easeDegrees, easeFrames } from "../frames";
+import { useCardLift } from "../useCardLift";
 import { BAND_HEIGHT, COLORS, GLOW, glowRadius, wirePath, type Bulb, type BulbColor, type ChainLayout } from "./lights";
+import { SWING, blinkFrames, swingPlan, type SwingPlan } from "./swing";
 
 // Die Lichterkette in der App (S11, #642): dasselbe Bild wie im Web (LightChain.jsx) - Draht, Nägel, Fassungen als
 // ein stilles Bild; jedes Lämpchen als zwei kleine Ebenen (Schein unter dem Draht, Kolben darüber) im selben Takt.
 // Bewegt wird nur die Deckkraft von Kästen, die genau auf dem Lämpchen sitzen - die Bauweise, die auf Android sauber
 // läuft (siehe Kranz). Jede Runde läuft als native Schleife, ohne JavaScript je Bild. Der Wind lässt die ganze Kette
-// minimal schwingen. Nie klickbar.
+// minimal schwingen. Nie klickbar. Nachschwingen (Jahreszeiten IV, #1091, wie im Web): wird die Karte angetippt, an der
+// die Kette hängt, hängt der Draht kurz tiefer durch und federt zweimal nach (eine Ebene, deren Mitte auf der
+// Nagellinie liegt, wird gestaucht - Android dreht und staucht Ansichten um ihre Mitte), die Lämpchen ziehen mit und
+// pendeln, ein Licht flackert einmal (swing.ts).
 
 /** Wie hoch die Ebene ist: das Band plus der Schein der untersten Lämpchen. */
 export const LAYER_HEIGHT = BAND_HEIGHT + GLOW;
@@ -96,20 +103,23 @@ function opacityOf(bulb: Bulb, mode: ChainMode, pulse: Animated.Value, layer: "g
   return pulse.interpolate(layer === "glow" ? pulseCurve(bulb.brightness * 0.55, bulb.brightness * 0.95) : pulseCurve(bulb.brightness * 0.85, 1));
 }
 
-function BulbGlow({ bulb, opacity }: { bulb: Bulb; opacity: number | Animated.AnimatedInterpolation<number> }) {
+type Opacity = number | Animated.AnimatedInterpolation<number> | Animated.AnimatedMultiplication<number>;
+type Motion = { translateY: Animated.AnimatedInterpolation<number>; rotate: Animated.AnimatedInterpolation<string> } | null;
+
+function BulbGlow({ bulb, opacity, motion = null }: { bulb: Bulb; opacity: Opacity; motion?: Motion }) {
   const r = glowRadius(bulb);
   return (
-    <Animated.View pointerEvents="none" style={[styles.layer, { left: bulb.x - r, top: bulb.y - r, width: r * 2, height: r * 2, opacity }]}>
+    <Animated.View pointerEvents="none" style={[styles.layer, { left: bulb.x - r, top: bulb.y - r, width: r * 2, height: r * 2, opacity }, motion ? { transform: [{ translateY: motion.translateY }] } : null]}>
       <GlowDot radius={r} color={bulb.color} id={`xmasGlow${bulb.index}`} />
     </Animated.View>
   );
 }
 
-function BulbBody({ bulb, opacity }: { bulb: Bulb; opacity: number | Animated.AnimatedInterpolation<number> }) {
+function BulbBody({ bulb, opacity, motion = null, blink = false }: { bulb: Bulb; opacity: Opacity; motion?: Motion; blink?: boolean }) {
   const r = bulb.radius;
   const box = r + 1;
   return (
-    <Animated.View pointerEvents="none" style={[styles.layer, { left: bulb.x - box, top: bulb.y - box, width: box * 2, height: box * 2, opacity }]} testID="christmas-bulb">
+    <Animated.View pointerEvents="none" style={[styles.layer, { left: bulb.x - box, top: bulb.y - box, width: box * 2, height: box * 2, opacity }, motion ? { transform: [{ translateY: motion.translateY }, { rotate: motion.rotate }] } : null]} testID="christmas-bulb" data-blink={blink ? "1" : undefined}>
       <Svg width={box * 2} height={box * 2} viewBox={`${-box} ${-box} ${box * 2} ${box * 2}`}>
         <Ellipse cx={0} cy={0} rx={r * 0.85} ry={r} fill={COLORS[bulb.color]} />
         <Ellipse cx={-r * 0.3} cy={-r * 0.35} rx={r * 0.28} ry={r * 0.4} fill="rgba(255, 255, 255, 0.55)" />
@@ -136,11 +146,73 @@ function Wire({ layout }: { layout: ChainLayout }) {
   );
 }
 
+/** Ein Nachschwingen (#1091): der Plan aus swing.ts und der Fortschritt von 0 bis 1 (nativer Treiber). */
+export type ChainSwing = { n: number; plan: SwingPlan; progress: Animated.Value };
+
+/** So lange ruht eine Karte nach dem Nachschwingen ihrer Kette (kleine Reaktion, wie im Web). */
+const swingRest = createRest(REST_MS.small);
+
+/** Nur für Tests: die Ruhezeiten vergessen. */
+export function resetChainSwing() {
+  swingRest.clear();
+}
+
+/**
+ * Nachschwingen (#1091): wird die Karte `cardKey` angetippt (Karten-Signal), schwingt ihre Kette einmal nach -
+ * höchstens alle zehn Sekunden je Karte, nichts mit „Bewegung reduzieren“ (dann gibt es kein Signal).
+ */
+export function useChainSwing(cardKey: string | null, layout: ChainLayout | null): ChainSwing | null {
+  const progress = useRef(new Animated.Value(0)).current;
+  const [swing, setSwing] = useState<ChainSwing | null>(null);
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+  useCardLift((detail) => {
+    const current = layoutRef.current;
+    if (!cardKey || detail.key !== cardKey || !current || !current.bulbs.length || !swingRest.take(cardKey)) return;
+    const n = Date.now();
+    progress.stopAnimation();
+    progress.setValue(0);
+    Animated.timing(progress, { toValue: 1, duration: SWING.ms, easing: Easing.linear, useNativeDriver: true }).start();
+    setSwing({ n, plan: swingPlan(current.bulbs, `${cardKey}:${n}`), progress });
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      setSwing(null);
+    }, SWING.ms + 60);
+  }, Boolean(cardKey && layout && layout.bulbs.length));
+  return swing;
+}
+
+const SWING_INPUT = SWING.keys.map(([t]) => t);
+
+/** Wie ein Lämpchen beim Nachschwingen mitzieht und pendelt. */
+function bulbMotion(swing: ChainSwing | null, index: number): Motion {
+  const entry = swing ? swing.plan.bulbs.find((item) => item.index === index) : null;
+  if (!swing || !entry) return null;
+  return {
+    translateY: swing.progress.interpolate(easeFrames(SWING_INPUT, SWING.keys.map(([, v]) => v * entry.h))),
+    rotate: swing.progress.interpolate(easeDegrees(SWING_INPUT, SWING.keys.map(([, v]) => Math.round((v / SWING.keys[1][1]) * entry.tilt * 1000) / 1000))),
+  };
+}
+
+/** Das eine Licht flackert: seine Helligkeit mal einen Faktor, der kurz zweimal einbricht. */
+function blinked(opacity: Opacity, swing: ChainSwing | null, index: number): Opacity {
+  if (!swing || swing.plan.blink !== index) return opacity;
+  const frames = blinkFrames();
+  if (typeof opacity === "number") return swing.progress.interpolate({ inputRange: frames.inputRange, outputRange: frames.outputRange.map((value) => Math.round(value * opacity * 1000) / 1000) });
+  return Animated.multiply(opacity, swing.progress.interpolate(frames));
+}
+
 /**
  * Die Kette über ihre Breite: Schein, Draht, Kolben. `wind` (Faktor aus dem Wetter, sonst 0,6) lässt sie in sieben
- * Sekunden um höchstens 1,2 Punkte je Windstärke hin- und herschwingen - nur, solange sie glimmt.
+ * Sekunden um höchstens 1,2 Punkte je Windstärke hin- und herschwingen - nur, solange sie glimmt. `swing`: sie schwingt
+ * gerade nach (#1091).
  */
-export function LightChain({ layout, mode, wind = 0.6 }: { layout: ChainLayout; mode: ChainMode; wind?: number }) {
+export function LightChain({ layout, mode, wind = 0.6, swing = null }: { layout: ChainLayout; mode: ChainMode; wind?: number; swing?: ChainSwing | null }) {
   const pulses = useBulbPulses(layout.bulbs, mode);
   const sway = useRef(new Animated.Value(0.25)).current;
   const amplitude = SWAY_PX * Math.max(0, Math.min(2, Number.isFinite(wind) ? wind : 0.6));
@@ -165,9 +237,16 @@ export function LightChain({ layout, mode, wind = 0.6 }: { layout: ChainLayout; 
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      {layout.bulbs.map((bulb, index) => <BulbGlow key={`glow-${bulb.index}`} bulb={bulb} opacity={opacityOf(bulb, mode, pulses[index], "glow")} />)}
-      <Wire layout={layout} />
-      {layout.bulbs.map((bulb, index) => <BulbBody key={`body-${bulb.index}`} bulb={bulb} opacity={opacityOf(bulb, mode, pulses[index], "body")} />)}
+      {layout.bulbs.map((bulb, index) => <BulbGlow key={`glow-${bulb.index}`} bulb={bulb} opacity={blinked(opacityOf(bulb, mode, pulses[index], "glow"), swing, bulb.index)} motion={bulbMotion(swing, bulb.index)} />)}
+      {swing ? (
+        // Der Draht federt um die Nagellinie (y = 1): die Ebene ist doppelt so hoch und steht mit ihrer Mitte darauf.
+        <Animated.View pointerEvents="none" style={[styles.sag, { width: layout.width, transform: [{ scaleY: swing.progress.interpolate(easeFrames(SWING_INPUT, SWING.keys.map(([, v]) => 1 + v))) }] }]} testID="christmas-chain-swing">
+          <View style={[styles.sagWire, { width: layout.width }]}>
+            <Wire layout={layout} />
+          </View>
+        </Animated.View>
+      ) : <Wire layout={layout} />}
+      {layout.bulbs.map((bulb, index) => <BulbBody key={`body-${bulb.index}`} bulb={bulb} opacity={blinked(opacityOf(bulb, mode, pulses[index], "body"), swing, bulb.index)} motion={bulbMotion(swing, bulb.index)} blink={Boolean(swing && swing.plan.blink === bulb.index)} />)}
     </Animated.View>
   );
 }
@@ -175,4 +254,7 @@ export function LightChain({ layout, mode, wind = 0.6 }: { layout: ChainLayout; 
 const styles = StyleSheet.create({
   chain: { height: LAYER_HEIGHT },
   layer: { position: "absolute", left: 0, top: 0 },
+  // Mitte auf der Nagellinie (y = 1): oben LAYER_HEIGHT darüber, unten der Draht.
+  sag: { position: "absolute", left: 0, top: 1 - LAYER_HEIGHT, height: LAYER_HEIGHT * 2 },
+  sagWire: { position: "absolute", left: 0, top: LAYER_HEIGHT - 1, height: LAYER_HEIGHT },
 });

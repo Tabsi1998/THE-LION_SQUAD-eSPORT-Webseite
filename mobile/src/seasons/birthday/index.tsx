@@ -17,9 +17,13 @@ import { greetingShownToday, markGreetingShown } from "../christmas/greeting";
 import { TAB_BAR } from "../halloween";
 import { screenClass } from "../intensity";
 import { anyOverlayOpen, subscribeQuiet } from "../quiet";
-import { seasonRng, seasonYear } from "../rng";
+import { seasonYear } from "../rng";
 import { useSeason, type ActiveSeason } from "../SeasonProvider";
+import { useCardDecoAssignments } from "../cardDeco";
+import { useCardKey } from "../useCardLift";
 import { BirthdayCelebration } from "./balloons";
+import { EDGE_GARLAND, edgePennants } from "./garland";
+import { GarlandBand, useGarlandFlutter } from "./garlandView";
 import { BOTTOM, CAKE_VIEW, CLUB, PLATE, TOP, cakePlan, ignitionOrder, type CakeCandle, type CakePlan, type DigitCandle } from "./cake";
 
 // Vereinsgeburtstag in der App (S13 #644, B1–B3 #749–#751), wie im Web (frontend/src/seasons/birthday): einmal am Tag
@@ -28,7 +32,8 @@ import { BOTTOM, CAKE_VIEW, CLUB, PLATE, TOP, cakePlan, ignitionOrder, type Cake
 // Begrüßungskarte hängt eine Wimpelkette, die sich beim ersten Mal entfaltet und dann kaum weht. Seit #856: die Jahre als
 // Zahlkerzen auf einer größeren Torte, die Geburtstagsmütze im Dashboard-Kopf und am Tab „Mehr“ (birthday/hat.tsx), ab
 // und zu eine Welle Luftballons am Rand und ein Konfetti-Schub (birthday/balloons.tsx). „dezent“ und „Bewegung
-// reduzieren“: die Kerzen brennen gleich, kein Konfetti, keine Ballons, die Wimpel hängen still.
+// reduzieren“: die Kerzen brennen gleich, kein Konfetti, keine Ballons, die Wimpel hängen still. Jahreszeiten IV (#1094):
+// die Wimpelkette flattert, wenn ihre Karte angetippt wird, und hängt auch an einigen weiteren Karten (garlandView.tsx).
 
 export const GREETING_KEY = "club-birthday-greeting";
 export const CARD_DELAY_MS = 1200;
@@ -38,9 +43,6 @@ export const IGNITE_STEP_MS = 220;
 const BURST = 30;
 const CARD_CAKE_WIDTH = 132;
 const CANDLE_WIDTH = 3.2;
-const EDGE_BAND = 16;
-const PENNANT_STEP = 18;
-const PENNANT_COLORS = [CLUB.cyan, CLUB.gold, CLUB.white];
 
 // Je Start der App nur einmal: entfaltet ist entfaltet.
 const once = { unfolded: false };
@@ -334,70 +336,42 @@ function IgnitedCake({ plan, moving }: { plan: CakePlan; moving: boolean }) {
   );
 }
 
-/** Die Wimpel an der Unterkante der Begrüßungskarte: Farbfolge und kleine Unterschiede aus dem Jahr. */
-export function edgePennants(width: number, year: number): Array<{ x: number; y: number; color: string; size: number }> {
-  const rng = seasonRng({ season: "club_birthday", year, screen: "edge" }, "garland");
-  const inset = 14;
-  const span = width - inset * 2;
-  if (span < 80) return [];
-  const count = Math.max(3, Math.round(span / PENNANT_STEP));
-  const first = Math.floor(rng() * PENNANT_COLORS.length);
-  const sag = 2.5 + rng() * 1.5;
-  return Array.from({ length: count }, (_, index) => {
-    const t = (index + 0.5) / count;
-    const x = inset + span * t;
-    // Zwei flache Bögen über die Breite - wie an zwei Nägeln aufgehängt.
-    const local = (t * 2) % 1;
-    return { x: Math.round(x * 10) / 10, y: Math.round((2 + 4 * sag * local * (1 - local)) * 10) / 10, color: PENNANT_COLORS[(first + index) % PENNANT_COLORS.length], size: Math.round((8 + rng() * 2) * 10) / 10 };
-  });
-}
+/** Die Wimpel an der Unterkante der Begrüßungskarte - dieselbe Rechnung wie im Web (garland.ts). */
+export { edgePennants } from "./garland";
 
-/** Die Wimpelkette an der Begrüßungskarte (Slot `SeasonEdgeSlot`): entfaltet sich einmal, weht dann kaum. */
+/**
+ * Die Wimpelkette an der Begrüßungskarte (Slot `SeasonEdgeSlot`): entfaltet sich einmal, weht dann kaum. Wird die Karte
+ * angetippt, flattert sie einmal durch (Jahreszeiten IV, #1094).
+ */
 export function BirthdayEdge({ season }: { season: ActiveSeason; screen: string }) {
   const { reducedMotion } = useSeason();
   const focused = useScreenFocused();
+  const cardKey = useCardKey();
   const [width, setWidth] = useState(0);
   const moving = season.effective !== "subtle" && !reducedMotion;
   const pennants = useMemo(() => (width > 0 ? edgePennants(width, yearOf(season)) : []), [width, season]);
   const [unfold] = useState(() => moving && !once.unfolded);
   const drop = useRef(new Animated.Value(unfold ? 0 : 1)).current;
-  const sway = useRef(new Animated.Value(0)).current;
+  const flutter = useGarlandFlutter(cardKey, pennants.length > 0);
   useEffect(() => {
     if (!unfold || !pennants.length) return;
     once.unfolded = true;
     Animated.timing(drop, { toValue: 1, duration: 900 + pennants.length * 40, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [unfold, pennants.length, drop]);
-  useEffect(() => {
-    if (!moving || !focused) return undefined;
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(sway, { toValue: 1, duration: 3200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(sway, { toValue: 0, duration: 3200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, [moving, focused, sway]);
-  const string = pennants.length ? `M 0 1 ${pennants.map((pennant) => `L ${pennant.x} ${pennant.y}`).join(" ")} L ${width} 1` : "";
   return (
-    <View pointerEvents="none" style={styles.edge} onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width))} testID="birthday-edge">
-      {width > 0 ? (
-        <Svg width={width} height={EDGE_BAND} style={StyleSheet.absoluteFill}>
-          <Path d={string} stroke="rgba(255, 255, 255, 0.45)" strokeWidth={0.8} fill="none" />
-        </Svg>
-      ) : null}
-      {pennants.map((pennant, index) => {
-        const reveal = drop.interpolate({ inputRange: [Math.min(0.95, index / (pennants.length + 2)), Math.min(1, (index + 3) / (pennants.length + 2))], outputRange: [0, 1], extrapolate: "clamp" });
-        // Drehen um den Aufhängepunkt: die Ebene ist doppelt so hoch und steht mit ihrer Mitte darauf.
-        const rotate = sway.interpolate({ inputRange: [0, 1], outputRange: index % 2 ? ["-3deg", "3deg"] : ["3deg", "-3deg"] });
-        return (
-          <Animated.View key={index} style={[styles.pennant, { left: pennant.x - pennant.size / 2, top: pennant.y - pennant.size, width: pennant.size, height: pennant.size * 2, opacity: reveal, transform: [{ rotate }] }]} testID="birthday-pennant">
-            <Svg width={pennant.size} height={pennant.size * 2} style={{ marginTop: 0 }}>
-              <Path d={`M 0 ${pennant.size} L ${pennant.size} ${pennant.size} L ${pennant.size / 2} ${pennant.size * 1.9} Z`} fill={pennant.color} stroke="rgba(0, 0, 0, 0.25)" strokeWidth={0.5} />
-            </Svg>
-          </Animated.View>
-        );
-      })}
+    <View pointerEvents="none" style={styles.edge} onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width))} testID="birthday-edge" data-flutter={flutter ? "1" : undefined}>
+      <GarlandBand width={width} pennants={pennants} moving={moving && focused} drop={drop} flutter={flutter} />
     </View>
   );
+}
+
+/**
+ * Wimpelketten an Karten (Jahreszeiten IV, Variante B, #1094): an einigen Karten des Screens hängt dieselbe Kette im
+ * unteren Innenabstand (cardDeco.tsx wählt sie aus) - zusätzlich zur Kette an der Begrüßungskarte.
+ */
+export function BirthdayCorners({ season, screen }: { season: ActiveSeason; screen: string }) {
+  useCardDecoAssignments(season, screen, "garland", screenClass(screen) !== "quiet");
+  return null;
 }
 
 const styles = StyleSheet.create({
@@ -418,6 +392,5 @@ const styles = StyleSheet.create({
   stickerImage: { width: 44, height: 44 },
   stickerTitle: { color: CLUB.gold, fontSize: 13, fontWeight: "800" },
   stickerText: { color: "rgba(255, 246, 224, 0.7)", fontSize: 12 },
-  edge: { position: "absolute", left: 0, right: 0, bottom: 0, height: EDGE_BAND },
-  pennant: { position: "absolute" },
+  edge: { position: "absolute", left: 0, right: 0, bottom: 0, height: EDGE_GARLAND.band },
 });

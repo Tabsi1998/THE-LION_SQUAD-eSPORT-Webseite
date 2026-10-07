@@ -11,7 +11,9 @@ import { screenClass, seasonCapabilities } from "../intensity";
 import { anyOverlayOpen, subscribeQuiet } from "../quiet";
 import { useSeason, type ActiveSeason } from "../SeasonProvider";
 import { CARD_LIGHTS, TOAST_DELAY_MS, TOAST_MS, greetingFor, greetingShownToday, linkTarget, markGreetingShown, starField, yearSaltFor, type Greeting, type Star } from "./greeting";
-import { GlowDot, LAYER_HEIGHT, LightChain, pulseCurve, type ChainMode } from "./LightChain";
+import { useCardDecoAssignments } from "../cardDeco";
+import { useCardKey } from "../useCardLift";
+import { GlowDot, LAYER_HEIGHT, LightChain, pulseCurve, useChainSwing, type ChainMode } from "./LightChain";
 import { COLORS, HEADER_BAND, chainLayout, type BulbColor } from "./lights";
 
 // Weihnachten in der App (S11, #642 - wie S8, X1, X2, X4 im Web): vom 24. bis 26. Dezember hängt die Lichterkette an
@@ -26,21 +28,37 @@ export function chainWind(windFactor: number | null | undefined): number {
   return windFactor === null || windFactor === undefined || !Number.isFinite(value) ? 0.6 : Math.max(0, Math.min(2, value));
 }
 
-/** Die Kette an der Unterkante der Begrüßungskarte: nur an den Feiertagen, nie auf stillen Screens, nie klickbar. */
+/**
+ * Die Kette an der Unterkante der Begrüßungskarte: nur an den Feiertagen, nie auf stillen Screens, nie klickbar. Wird die
+ * Karte angetippt, schwingt sie nach (Jahreszeiten IV, #1091).
+ */
 export function ChristmasEdge({ season, screen }: { season: ActiveSeason; screen: string }) {
   const { weather } = useSeason();
   const focused = useScreenFocused();
+  const cardKey = useCardKey();
   const [width, setWidth] = useState(0);
   const caps = useMemo(() => seasonCapabilities("christmas", screen, season.effective), [screen, season.effective]);
   const salt = yearSaltFor(season);
   const layout = useMemo(() => (width > 0 ? chainLayout({ width, year: salt, anchor: "header" }) : null), [width, salt]);
-  if (season.phase !== "gruss" || !caps.chain) return null;
+  const shown = season.phase === "gruss" && Boolean(caps.chain);
+  const swing = useChainSwing(shown ? cardKey : null, layout);
+  if (!shown) return null;
   const mode: ChainMode = season.effective === "subtle" ? "subtle" : focused ? "glimmer" : "still";
   return (
     <View pointerEvents="none" style={styles.edge} onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width))} testID="christmas-edge">
-      {layout ? <LightChain layout={layout} mode={mode} wind={chainWind(weather?.wind_factor)} /> : null}
+      {layout ? <LightChain layout={layout} mode={mode} wind={chainWind(weather?.wind_factor)} swing={swing} /> : null}
     </View>
   );
+}
+
+/**
+ * Ketten an Karten (Jahreszeiten IV, Variante B, #1091): an den Feiertagen hängt an einigen Karten des Screens eine
+ * kleine Kette im unteren Innenabstand (cardDeco.tsx wählt sie aus) - zusätzlich zur Kette an der Begrüßungskarte.
+ */
+export function ChristmasCorners({ season, screen }: { season: ActiveSeason; screen: string }) {
+  const caps = useMemo(() => seasonCapabilities("christmas", screen, season.effective), [screen, season.effective]);
+  useCardDecoAssignments(season, screen, "chain", season.phase === "gruss" && Boolean(caps.chain));
+  return null;
 }
 
 /** Warme Lichtinseln hinter dem Inhalt (X2): oben links, oben rechts und unten - nur an den Feiertagen, nie bei „dezent“. */
