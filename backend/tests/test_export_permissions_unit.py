@@ -34,13 +34,15 @@ def _depends_parameter(endpoint, name):
     return default.dependency
 
 
-def test_operational_pdf_exports_require_the_tournament_or_moderation_area():
-    """Seit #287/#291: Bereich statt Rang - und weil „Turnierleitung“ dabei ist, mit Zwei-Faktor."""
+def test_operational_pdf_exports_require_the_tournament_area():
+    """Seit #287/#291: Bereich statt Rang - Exporte gehören zur Turnierleitung, mit Zwei-Faktor.
+    Moderatoren moderieren; der Bereich Moderation öffnet keine Exporte."""
     for endpoint in STAFF_ONLY_EXPORTS:
         dependency = _depends_parameter(endpoint, "me")
         closure_values = [cell.cell_contents for cell in (dependency.__closure__ or [])]
 
-        assert ("tournaments", "moderation") in closure_values
+        assert ("tournaments",) in closure_values
+        assert not any(isinstance(value, tuple) and "moderation" in value for value in closure_values)
 
 
 def test_result_pdf_exports_are_optional_but_status_gated():

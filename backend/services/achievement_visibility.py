@@ -461,7 +461,7 @@ async def viewer_sees_club(db, viewer: dict | None, target_id: str) -> bool:
         return False
     if viewer.get("id") == target_id:
         return True
-    if viewer.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin"):
+    if viewer.get("role") in ("tournament_admin", "club_admin", "superadmin"):
         return True
     if viewer.get("is_club_member"):
         return True

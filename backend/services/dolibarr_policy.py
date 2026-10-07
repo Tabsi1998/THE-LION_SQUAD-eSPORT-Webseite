@@ -93,6 +93,12 @@ async def derived_grants(db, user_id: str | None, settings: dict | None = None) 
     membership = await db.memberships.find_one(
         {"user_id": user_id, "source": "dolibarr"}, {"_id": 0, "member_status": 1, "dolibarr": 1}
     )
+    return grants_from_membership(membership, settings)
+
+
+def grants_from_membership(membership: dict | None, settings: dict) -> list[dict]:
+    """Die abgeleiteten Bereiche einer Dolibarr-Mitgliedschaft - ohne Datenbank, auch für ganze Listen.
+    Setzt eine aktive Freigabe voraus (``policy_active``)."""
     if not membership or membership.get("member_status") not in ("active", "honorary"):
         return []
     state = membership.get("dolibarr") or {}

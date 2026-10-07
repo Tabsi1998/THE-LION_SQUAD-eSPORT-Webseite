@@ -89,6 +89,20 @@ test("abgehakte Plattformen fehlen im Menü, Alle Verbindungen bleibt", () => {
   expect(targets).toContain("/admin/integrations");
 });
 
+test("Moderatoren sehen die Moderation, Turniere, Fast Lap und Stationen nur mit Helfer-Einsatz", () => {
+  const targets = (user) => navGroupsFor(user, "").flatMap((entry) => entry.items).map((item) => item.to);
+  const moderator = { role: "moderator", areas: ["moderation"] };
+  expect(targets(moderator)).toContain("/admin/moderation");
+  for (const to of ["/admin/tournaments", "/admin/f1", "/admin/stations"]) {
+    expect(targets(moderator)).not.toContain(to);
+    expect(targets({ ...moderator, is_tournament_staff: true })).toContain(to);
+  }
+  // Ein Helfer ohne Bereich sieht seine Turnierseiten, aber keine Moderation.
+  const helper = { role: "player", areas: [], is_tournament_staff: true };
+  expect(targets(helper)).toContain("/admin/tournaments");
+  expect(targets(helper)).not.toContain("/admin/moderation");
+});
+
 test("TV & Beamer (#1110): ein Eintrag unter eSports, nur mit dem Bereich Turniere, die Suche findet Beamer und Fernseher", () => {
   const item = group("eSports").items.find((entry) => entry.to === "/admin/tv");
   expect(item.label).toBe("TV & Beamer");

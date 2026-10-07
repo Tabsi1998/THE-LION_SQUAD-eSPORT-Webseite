@@ -7,7 +7,7 @@ from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
 from services.visibility import user_can_see
 
-STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 PROFILE_LINK_RE = re.compile(r"/u/([A-Za-z0-9_.-]{2,32})")
 

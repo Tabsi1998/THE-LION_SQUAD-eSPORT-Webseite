@@ -19,7 +19,8 @@ from storage import PRIVATE_DOC_DIR, UPLOAD_DIR
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 logger = logging.getLogger("tls.documents")
-ADMIN_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+# Vereinsdokumente: Mitglieder und diese Rollen; Moderatoren moderieren und sehen sie als Mitglied.
+ADMIN_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
 
 def _normalise_visibility(value: str | None) -> str:

@@ -25,7 +25,8 @@ PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=at.lionsquad.app
 
 router = APIRouter(prefix="/api/mobile", tags=["mobile"])
 
-STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+# Entwürfe und nicht öffentliche Turniere/Events in der App: nur die Turnierleitung.
+STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 ACTIVE_TOURNAMENT_REGISTRATION_STATUSES = {"pending", "registered", "approved", "checked_in", "waitlist"}
 ACTIVE_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in", "waitlist"}
 HIDDEN_PUBLIC_STATUSES = {"draft", "completed", "results_published", "archived", "cancelled"}

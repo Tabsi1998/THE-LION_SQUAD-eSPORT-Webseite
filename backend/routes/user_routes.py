@@ -5,6 +5,7 @@ import re
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_current_user, get_optional_user, require_club_admin, require_super, hash_token, require_area
 from email_service import send_template
@@ -320,11 +321,15 @@ async def list_users(q: str | None = None, role: str | None = None,
             {"user_id": {"$in": user_ids}}, {"_id": 0}
         ).to_list(2000)
     }
+    from services.permissions import ban_protected_ids
+    protected = await ban_protected_ids(users, db)
     for u in users:
         m = members.get(u["id"])
         u["membership"] = m
         u["is_club_member"] = is_active_member(m)
         u["user_type"] = derived_user_type(u, m)
+        # Konten mit Adminbereich oder Admin-Rolle bannt nur der Superadmin - die Liste sagt es vorher.
+        u["ban_protected"] = u["id"] in protected
     return users
 
 
@@ -342,7 +347,7 @@ async def mention_search(
 
     query: dict = {"is_active": True, "is_banned": {"$ne": True}}
     scope_key = (scope or "").strip().lower()
-    staff = me.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
+    staff = me.get("role") in ("tournament_admin", "club_admin", "superadmin")
 
     if scope_key == "team":
         team = await db.teams.find_one({"id": scope_id}, {"_id": 0, "member_ids": 1, "leader_id": 1, "co_leader_ids": 1})
@@ -835,7 +840,7 @@ async def get_user(user_id: str, me: dict = Depends(get_current_user)):
     if not u:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
     # Hide email for non-admins if not own
-    if me["id"] != user_id and me["role"] not in ("moderator", "tournament_admin", "club_admin", "superadmin"):
+    if me["id"] != user_id and me.get("role") not in ("tournament_admin", "club_admin", "superadmin"):
         u.pop("email", None)
     await _attach_membership(u)
     return u
@@ -974,21 +979,54 @@ async def admin_update_user(user_id: str, body: UserUpdate,
     return u
 
 
+BAN_REASON_MIN_LENGTH = 5
+BAN_PROTECTED_DETAIL = "Konten mit Adminbereich oder Admin-Rolle bannt und entbannt nur der Superadmin."
+
+
+class BanBody(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+
+async def _ban_target(db, user_id: str, me: dict) -> dict:
+    """Wen die Vereinsverwaltung bannen oder entbannen darf: jedes Konto ohne Adminbereich und ohne
+    Admin-Rolle. Alles andere entscheidet der Superadmin."""
+    from services.permissions import ban_protected
+
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1, "areas": 1, "is_banned": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    if me.get("role") != "superadmin" and await ban_protected(target, db):
+        raise HTTPException(status_code=403, detail=BAN_PROTECTED_DETAIL)
+    return target
+
+
 @router.post("/{user_id}/ban")
-async def ban_user(user_id: str, me: dict = Depends(require_area("club"))):
+async def ban_user(user_id: str, body: BanBody | None = None, me: dict = Depends(require_area("club"))):
     db = get_db()
-    await db.users.update_one({"id": user_id}, {"$set": {"is_banned": True, "updated_at": now_utc().isoformat()}})
+    if user_id == me["id"]:
+        raise HTTPException(status_code=400, detail="Das eigene Konto lässt sich nicht bannen.")
+    target = await _ban_target(db, user_id, me)
+    reason = ((body.reason if body else None) or "").strip()
+    if len(reason) < BAN_REASON_MIN_LENGTH:
+        raise HTTPException(status_code=422, detail=f"Bitte einen Grund angeben (mindestens {BAN_REASON_MIN_LENGTH} Zeichen).")
+    if target.get("is_banned"):
+        return {"ok": True, "already": True}
+    now = now_utc().isoformat()
+    await db.users.update_one({"id": user_id}, {"$set": {"is_banned": True, "updated_at": now}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.ban", "target_id": user_id,
-                                     "actor_id": me["id"], "created_at": now_utc().isoformat()})
+                                     "actor_id": me["id"], "data": {"reason": reason}, "created_at": now})
     return {"ok": True}
 
 
 @router.post("/{user_id}/unban")
-async def unban_user(user_id: str, me: dict = Depends(require_area("club"))):
+async def unban_user(user_id: str, body: BanBody | None = None, me: dict = Depends(require_area("club"))):
     db = get_db()
-    await db.users.update_one({"id": user_id}, {"$set": {"is_banned": False, "updated_at": now_utc().isoformat()}})
+    await _ban_target(db, user_id, me)
+    note = ((body.reason if body else None) or "").strip()
+    now = now_utc().isoformat()
+    await db.users.update_one({"id": user_id}, {"$set": {"is_banned": False, "updated_at": now}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.unban", "target_id": user_id,
-                                     "actor_id": me["id"], "created_at": now_utc().isoformat()})
+                                     "actor_id": me["id"], "data": {"reason": note} if note else {}, "created_at": now})
     return {"ok": True}
 
 

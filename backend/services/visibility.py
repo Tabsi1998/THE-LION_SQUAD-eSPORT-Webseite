@@ -6,7 +6,9 @@ authorisation behaviour consistent.
 """
 from services.membership_service import is_active_member, get_membership
 
-ADMIN_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+# „Nur Mitglieder“ sehen Mitglieder und diese Rollen. Moderatoren moderieren; Mitglieder-Inhalte
+# sehen sie als Mitglied.
+ADMIN_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 INTERNAL_ROLES = {"club_admin", "superadmin"}
 
 

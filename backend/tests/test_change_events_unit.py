@@ -42,7 +42,9 @@ def test_only_global_staff_roles_receive_internal_stream_scope():
         "role": "player",
         "is_tournament_staff": True,
     }) == "public"
-    assert change_events.visibility_scope_for_user({"role": "moderator"}) == "staff"
+    # Moderatoren moderieren; die vollen Pfade interner Änderungen braucht die Moderationsseite nicht.
+    assert change_events.visibility_scope_for_user({"role": "moderator"}) == "public"
+    assert change_events.visibility_scope_for_user({"role": "tournament_admin"}) == "staff"
     assert change_events.visibility_scope_for_user({"role": "superadmin"}) == "staff"
 
 

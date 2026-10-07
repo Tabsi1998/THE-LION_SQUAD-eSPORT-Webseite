@@ -12,10 +12,10 @@ Rechte hängen an Bereichen, nicht an einer Rangfolge. Eine Person kann mehrere 
 | --- | --- | --- |
 | Turnierleitung | `tournaments` | Turniere, Events, Stationen, Fast Lap, Saisons, Spiele, Gewinne, Strafen, Zugangslinks, PDF-Exporte |
 | Redaktion | `content` | News, Galerie, Medien, Sponsoren, Partner, Referenzen, Navigation, Sticker, Achievements, Seiten-Banner, Newsletter, Twitch-Streams |
-| Vereinsverwaltung | `club` | Mitglieder und Mitgliederprofile, Anträge, Dokumente, Vorteile, Vorstand, Kontakt-Inbox, Benutzerliste (sperren, bearbeiten), Discord-Zähler |
+| Vereinsverwaltung | `club` | Mitglieder und Mitgliederprofile, Anträge, Dokumente, Vorteile, Vorstand, Kontakt-Inbox, Benutzerliste (bearbeiten, bannen mit Grund – Konten mit Adminbereich oder Admin-Rolle bannt nur der Superadmin), Discord-Zähler |
 | Finanzen | `finance` | Kosten und Abrechnung an Events (später Turnieren), Finanzübersicht mit Rechnungsaufträgen, Freigaben (#322, docs/ABRECHNUNG.md) |
 | System | `system` | Einstellungen (Mail, Branding, Discord, Auth), Game-Server, Betrieb, Logs, Audit, App-Logs, Push-Tests, App-Versionen, E-Mail-Vorlagen, Wartungsläufe für Uploads |
-| Moderation | `moderation` | Meldungen aus Chats, Moderationsseite; dazu die Lese-Seiten der Turnierleitung (Turniere, Fast Lap, Stationen) für zugewiesene Helfer |
+| Moderation | `moderation` | Moderationsseite: Meldungen, Wortfilter, Bildprüfung, Verwarnungen und Chat-Sperren; Direktnachrichten an jede Person. Keine Turnierrechte – wer zusätzlich als Helfer eingetragen ist, hat dort genau die Rechte des Einsatzes |
 
 ## Wer hat welchen Bereich
 
@@ -24,7 +24,7 @@ Rechte hängen an Bereichen, nicht an einer Rangfolge. Eine Person kann mehrere 
 | Superadmin | alle; vergibt Rollen und Freigaben | Pflicht |
 | Club-Admin | alle | Pflicht (seit #291 auch für Mitgliederdaten und Einstellungen) |
 | Turnierleitung (`tournament_admin`) | Turnierleitung, Moderation | Pflicht |
-| Moderator | Moderation | nur für Exporte |
+| Moderator | Moderation | nicht nötig |
 | Spieler | keiner – außer Freigaben oder Vorstandsposten | – |
 
 **Freigaben:** Der Superadmin kann einer Person einzelne Bereiche geben (Admin → Alle Benutzer):
@@ -48,6 +48,9 @@ Freigaben bleiben davon unberührt. Anleitung: `docs/DOLIBARR.md`.
 (Turnierseite → Staff: organizer, referee, scorekeeper, station_manager, stream_operator).
 Ein `organizer` darf in seinem Turnier alles – Struktur, Ergebnisse, Check-in, Stationen und die
 Gewinne dieses Turniers (#288). Das braucht keinen Bereich und keine Zwei-Faktor-Anmeldung.
+Dasselbe gilt je Fast Lap (Challenge → Staff). Turnierrechte, Fast-Lap-Zeiten, Events und Exporte
+kommen nur aus der Turnierleitung, Club-Admin, Superadmin oder einem solchen Einsatz – auch für
+Moderatoren.
 
 ## Zwei-Faktor und Anmeldung (#348)
 
@@ -125,7 +128,7 @@ Finanzen; die Turnierleitung Turniere, Stationen, Strafen und Gewinne; der Admin
 | Verein | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) | je Eintrag |
 | Mitglieder | Mitglieder, Mitgliederprofile, Bewerbungen, Mitgliedervorteile, Dokumente, Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung und System) | Vereinsverwaltung |
 | Finanzen | Finanzübersicht | Finanzen |
-| eSports | Turniere, Fast Lap, Stationen (Turnierleitung, Moderation, Helfer) · Turnier-Leitfaden, Jahreswertung, Spiele, Gewinne, Strafen (Turnierleitung) · Game-Server (System) | Turnierleitung |
+| eSports | Turniere, Fast Lap, Stationen (Turnierleitung, Helfer) · Turnier-Leitfaden, Jahreswertung, Spiele, Gewinne, Strafen (Turnierleitung) · Game-Server (System) | Turnierleitung |
 | Content | Events (Turnierleitung) · News, Galerie, Medien, Navigation, Achievements, Sticker (Redaktion) · Downloads & QR (alle) | Redaktion |
 | Verbindungen | Alle Verbindungen (Übersicht mit Zustand: aktiv, aus, fehlt, nicht lesbar, Fehler) · je Dienst eine Seite (Google, Resend, SMTP, Discord, Twitch, Steam, …) | System |
 | E-Mail | Newsletter, Mail-Queue, Versandlogs, E-Mail-Vorlagen | System |

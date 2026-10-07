@@ -60,6 +60,9 @@ ROLE_LABELS: dict[str, str] = {
     "superadmin": "Superadmin",
 }
 
+# Rollen mit einer Grundstufe im Adminbereich - alle außer Spieler.
+ADMIN_ROLES: frozenset[str] = frozenset(role for role, areas in ROLE_AREAS.items() if areas)
+
 MFA_MESSAGE = "Für den Adminbereich ist eine bestätigte Zwei-Faktor-Anmeldung erforderlich."
 
 
@@ -76,6 +79,15 @@ def base_areas(user: dict | None) -> set[str]:
     areas = set(ROLE_AREAS.get(str(user.get("role") or "player"), frozenset()))
     areas.update(clean_grants(user.get("areas")))
     return areas
+
+
+def holds_area(user: dict | None, *areas: str) -> bool:
+    """Ohne Datenbank: ein Bereich aus Rolle oder Freigabe.
+
+    Reicht für Moderation, Turnierleitung, Redaktion, Finanzen und System; die
+    Vereinsverwaltung kommt auch aus Vorstandsposten und Dolibarr - dafür ``areas_for``.
+    """
+    return bool(set(areas) & base_areas(user))
 
 
 def area_labels(areas) -> str:
@@ -146,6 +158,57 @@ async def areas_from_dolibarr(db, user_id: str | None) -> set[str] | None:
 
 async def user_has_area(user: dict | None, *areas: str, db=None) -> bool:
     return bool(set(areas) & await areas_for(user, db))
+
+
+async def board_holder_ids(db, user_ids) -> set[str]:
+    """Wer von diesen Personen einen aktiven Vorstandsposten hält oder vertritt - wie
+    ``is_board_holder``, aber für eine ganze Liste in zwei Abfragen."""
+    wanted = {user_id for user_id in user_ids if user_id}
+    if not wanted:
+        return set()
+    if db is None:
+        db = get_db()
+    refs: set[str] = set()
+    async for position in db.board_positions.find({"is_active": {"$ne": False}}, {"_id": 0, "user_id": 1, "deputy_user_id": 1}):
+        refs.update(ref for ref in (position.get("user_id"), position.get("deputy_user_id")) if ref)
+    if not refs:
+        return set()
+    holders = wanted & refs
+    async for profile in db.club_member_profiles.find({"id": {"$in": sorted(refs)}, "user_id": {"$in": sorted(wanted)}}, {"_id": 0, "user_id": 1}):
+        holders.add(profile["user_id"])
+    return holders
+
+
+# Sperren (Bannen): Konten mit einer Admin-Rolle oder irgendeinem Bereich - aus Rolle, Freigabe,
+# Vorstandsposten oder Dolibarr-Funktion - sperrt und entsperrt nur der Superadmin.
+async def ban_protected(user: dict | None, db=None) -> bool:
+    if not user:
+        return False
+    return str(user.get("role") or "") in ADMIN_ROLES or bool(await areas_for(user, db))
+
+
+async def ban_protected_ids(users: list[dict], db=None) -> set[str]:
+    """Dasselbe für die Benutzerliste: dieselben Quellen wie ``areas_for``, mit wenigen Abfragen statt je Person."""
+    if db is None:
+        db = get_db()
+    protected = {u["id"] for u in users if u.get("id") and (str(u.get("role") or "") in ADMIN_ROLES or base_areas(u))}
+    rest = [u["id"] for u in users if u.get("id") and u["id"] not in protected]
+    if not rest:
+        return protected
+    from services.dolibarr_client import load_settings
+    from services.dolibarr_policy import grants_from_membership, policy_active
+
+    settings = await load_settings(db)
+    if policy_active(settings):
+        # Ist die Funktions-Freigabe aktiv, zählt nur Dolibarr - wie in ``areas_for``.
+        async for membership in db.memberships.find(
+            {"user_id": {"$in": rest}, "source": "dolibarr"},
+            {"_id": 0, "user_id": 1, "member_status": 1, "dolibarr": 1},
+        ):
+            if grants_from_membership(membership, settings):
+                protected.add(membership["user_id"])
+        return protected
+    return protected | await board_holder_ids(db, rest)
 
 
 def needs_mfa(user: dict | None) -> bool:

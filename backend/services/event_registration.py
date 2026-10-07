@@ -10,7 +10,8 @@ from services.access_links import record_access_link_use
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
 
-STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+# Wer sich auch für einen Event-Entwurf anmelden darf: die Turnierleitung (Events gehören zu ihr).
+STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 ACTIVE_STATUSES = {"registered", "checked_in"}
 
 

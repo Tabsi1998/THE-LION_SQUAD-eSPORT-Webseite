@@ -36,7 +36,7 @@ logger = logging.getLogger("tls.media_scan")
 SETTINGS_ID = "media_scan"
 PROVIDERS = ("off", "local", "google_vision")
 STATES = ("pending", "safe", "review", "blocked", "failed")
-STAFF_ROLES = ("moderator", "tournament_admin", "club_admin", "superadmin")
+# Wer bei einem Fund benachrichtigt wird (siehe _notify_moderators).
 MODERATION_ROLES = ("moderator", "club_admin", "superadmin")
 MAX_ATTEMPTS = 3
 LOCK_SECONDS = 90
@@ -78,7 +78,10 @@ def immediate_scans() -> bool:
 
 
 def is_staff(user: dict | None) -> bool:
-    return bool(user and user.get("role") in STAFF_ROLES)
+    """Bildprüfung ist Moderation: entscheidet, wer den Bereich Moderation hat."""
+    from services.permissions import holds_area
+
+    return holds_area(user, "moderation")
 
 
 # ---------- Einstellungen ----------

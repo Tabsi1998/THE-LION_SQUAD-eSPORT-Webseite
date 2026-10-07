@@ -62,12 +62,13 @@ export const ADMIN_GROUPS = [
   {
     label: "eSports",
     items: [
-      { to: "/admin/tournaments", label: "Turniere", icon: Trophy, areas: ["tournaments", "moderation"], staff: true },
+      // Turniere, Fast Lap, Stationen: Turnierleitung und Helfer mit Einsatz (`staff`); Moderation allein nicht.
+      { to: "/admin/tournaments", label: "Turniere", icon: Trophy, areas: ["tournaments"], staff: true },
       { to: "/admin/tournament-guide", label: "Turnier-Leitfaden", icon: BookOpen, areas: ["tournaments"] },
-      { to: "/admin/f1", label: "Fast Lap", icon: Flag, areas: ["tournaments", "moderation"], staff: true },
+      { to: "/admin/f1", label: "Fast Lap", icon: Flag, areas: ["tournaments"], staff: true },
       { to: "/admin/seasons", label: "Jahreswertung", icon: Trophy, areas: ["tournaments"] },
       { to: "/admin/games", label: "Spiele", icon: Gamepad2, areas: ["tournaments"] },
-      { to: "/admin/stations", label: "Stationen", icon: Building2, areas: ["tournaments", "moderation"], staff: true },
+      { to: "/admin/stations", label: "Stationen", icon: Building2, areas: ["tournaments"], staff: true },
       // TV & Beamer (#1110): Grundwerte aller Bildschirme, Link-Baukasten und die Anzeige-Schlüssel des Turnierbaum-TVs.
       { to: "/admin/tv", label: "TV & Beamer", icon: Tv, areas: ["tournaments"] },
       { to: "/admin/game-servers", label: "Game-Server", icon: Server, areas: ["system"] },
@@ -122,7 +123,7 @@ export const ADMIN_GROUPS = [
       // Betrieb & Logs (#517 Teil 2): Überblick, Ereignisse aller Quellen, Fehler, Tempo, Vitals, Checks, App-Logs, Alarme.
       { to: "/admin/ops", label: "Betrieb & Logs", icon: AlertTriangle, areas: ["system"] },
       { to: "/admin/settings/status", label: "Status", icon: Activity, areas: ["system"] },
-      { to: "/admin/moderation", label: "Moderation", icon: MessagesSquare, areas: ["moderation"], staff: true },
+      { to: "/admin/moderation", label: "Moderation", icon: MessagesSquare, areas: ["moderation"] },
       { to: "/admin/mobile-push", label: "Push-Tests", icon: BellRing, areas: ["system"] },
       { to: "/admin/app-releases", label: "App-Versionen", icon: Smartphone, areas: ["system"] },
       { to: "/admin/settings/zugang", label: "Zugang", icon: LogIn, areas: ["system"] },

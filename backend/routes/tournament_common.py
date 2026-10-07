@@ -23,7 +23,8 @@ from models import now_utc, new_id
 from services.competition_usage import record_write
 
 
-STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+# Turnierleitung über alle Turniere; Moderatoren und andere Helfer nur über ihren Einsatz im Turnier.
+STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
 
 MAX_INITIAL_PREVIEW_MATCHES = 512

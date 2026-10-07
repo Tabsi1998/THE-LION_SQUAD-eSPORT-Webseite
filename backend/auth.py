@@ -288,8 +288,9 @@ async def get_current_user(request: Request) -> dict:
         user["user_type"] = "club_member"
     elif not user.get("user_type"):
         user["user_type"] = "community_user"
+    # Turnierleitung über alle Turniere oder Helfer in mindestens einem; Moderation allein zählt nicht.
     user["is_tournament_staff"] = bool(
-        user.get("role") in {"moderator", "tournament_admin", "club_admin", "superadmin"}
+        user.get("role") in {"tournament_admin", "club_admin", "superadmin"}
         or await db.tournament_staff_assignments.count_documents({
             "user_id": user["id"],
             "is_active": {"$ne": False},
@@ -336,8 +337,8 @@ def require_role(*allowed_roles: str):
 def require_club_member():
     """Active club member only — admins are also allowed."""
     async def dep(user: dict = Depends(get_current_user)) -> dict:
-        # Admins always pass
-        admin_roles = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+        # Admins always pass - wie bei Mitglieder-Inhalten (services/visibility.py)
+        admin_roles = {"tournament_admin", "club_admin", "superadmin"}
         if user.get("role") in admin_roles:
             return user
         if user.get("is_club_member"):

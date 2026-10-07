@@ -59,16 +59,21 @@ class TeamChatCreate(BaseModel):
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 
 
+# Teams verwalten außer Leitung und Co-Leitung: Turnierleitung, Club-Admin, Superadmin. Moderatoren
+# moderieren (Wortfilter für Teamnamen, Bildprüfung für Logos und Banner).
+TEAM_ADMIN_ROLES = ("tournament_admin", "club_admin", "superadmin")
+
+
 def _can_manage(team: dict, user: dict) -> bool:
     return (
         team.get("leader_id") == user["id"]
         or user["id"] in team.get("co_leader_ids", [])
-        or user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin")
+        or user.get("role") in TEAM_ADMIN_ROLES
     )
 
 
 def _is_staff(user: dict | None) -> bool:
-    return bool(user and user.get("role") in ("moderator", "tournament_admin", "club_admin", "superadmin"))
+    return bool(user and user.get("role") in TEAM_ADMIN_ROLES)
 
 
 def _is_member(team: dict, user: dict | None) -> bool:
@@ -647,7 +652,7 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if team["leader_id"] != me["id"] and me["id"] not in team.get("co_leader_ids", []):
-        if me["role"] not in ("moderator", "tournament_admin", "club_admin", "superadmin"):
+        if me["role"] not in TEAM_ADMIN_ROLES:
             raise HTTPException(status_code=403, detail="Keine Berechtigung")
     if body.tag and body.tag != team.get("tag") and await db.teams.find_one({"tag": body.tag}):
         raise HTTPException(status_code=409, detail="Team-Tag bereits vergeben")

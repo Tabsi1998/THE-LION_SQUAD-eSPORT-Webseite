@@ -80,7 +80,7 @@ async def my_collectibles(me: dict = Depends(get_current_user)):
 
 
 # Wer fremde Fundstücke immer sieht - dieselben Rollen wie bei den Erfolgen (badge_routes.py).
-STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
 
 @router.get("/api/achievements/collectibles/user/{user_id}")

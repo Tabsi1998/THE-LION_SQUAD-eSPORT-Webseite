@@ -47,7 +47,8 @@ def _slugify(value: str) -> str:
 
 
 def _is_admin(user: dict | None) -> bool:
-    return bool(user and user.get("role") in {"moderator", "tournament_admin", "club_admin", "superadmin"})
+    # „Nur Mitglieder“ sehen Mitglieder und die Admin-Rollen mit Bereichen außer Moderation.
+    return bool(user and user.get("role") in {"tournament_admin", "club_admin", "superadmin"})
 
 
 def _can_view(server: dict, user: dict | None) -> bool:
