@@ -30,11 +30,11 @@ test("Variante c trägt die App-Kachel statt des Symbols", () => {
   expect(link).toHaveAccessibleName("LionsAPP für Android Bei Google Play laden");
 });
 
-test("App Store (#1084): eigenes neutrales Symbol und eigene Zeilen", () => {
-  render(<StoreButton href="https://apps.apple.com/at/app/lionsapp/id123" small="Laden im" big="App Store" icon="phone" testId="appstore" />);
+test("App Store (#1084): das Apple-Zeichen und eigene Zeilen", () => {
+  render(<StoreButton href="https://apps.apple.com/at/app/lionsapp/id123" small="Laden im" big="App Store" icon="apple" testId="appstore" />);
   const link = screen.getByTestId("appstore");
   expect(link).toHaveTextContent("Laden im");
   expect(link).toHaveTextContent("App Store");
-  expect(link.querySelector("svg")).toHaveAttribute("data-icon", "phone");
+  expect(link.querySelector("svg")).toHaveAttribute("data-icon", "apple");
   expect(link).toHaveAccessibleName("Laden im App Store");
 });

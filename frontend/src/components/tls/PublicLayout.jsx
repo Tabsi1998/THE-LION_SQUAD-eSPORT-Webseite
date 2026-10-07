@@ -238,7 +238,7 @@ export function PublicLayout({ children }) {
                 </a>
               )}
               {footerCta.playStoreUrl && <StoreButton href={footerCta.playStoreUrl} testId="footer-play-button" />}
-              {footerCta.appStoreUrl && <StoreButton href={footerCta.appStoreUrl} small="Laden im" big="App Store" icon="phone" testId="footer-appstore-button" />}
+              {footerCta.appStoreUrl && <StoreButton href={footerCta.appStoreUrl} small="Laden im" big="App Store" icon="apple" testId="footer-appstore-button" />}
               {!footerCta.playStoreUrl && !footerCta.appStoreUrl ? (
                 <span data-testid="footer-apps-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
                   <Smartphone className="w-4 h-4" /> {footerCta.bothSoonLabel}
