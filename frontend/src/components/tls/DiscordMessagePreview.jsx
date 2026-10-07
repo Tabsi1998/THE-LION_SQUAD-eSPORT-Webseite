@@ -80,9 +80,12 @@ export function discordTime(value, now = new Date()) {
   return viennaDay(date) === viennaDay(now) ? `Heute um ${time} Uhr` : `${viennaDate(date, { day: "2-digit", month: "2-digit", year: "numeric" })} ${time}`;
 }
 
+const ACTION_STYLES = { primary: "bg-[#5865F2]", success: "bg-[#248046]", danger: "bg-[#DA373C]", secondary: "bg-[#4E5058]" };
+
 export function DiscordMessagePreview({ embed, content = "", buttons = [], botName = "Vereins-Bot", avatarUrl = "", time = "heute um 18:00", roles = {}, testId = "discord-message", embedTestId = "" }) {
   const fields = Array.isArray(embed?.fields) ? embed.fields : [];
-  const links = Array.isArray(buttons) ? buttons.filter((button) => button?.label && button?.url) : [];
+  // Link-Knöpfe (#573) und Aktionsknöpfe mit Kennung (#885, z. B. „Anmelden“) - beide wie im Discord.
+  const links = Array.isArray(buttons) ? buttons.filter((button) => button?.label && (button?.url || button?.custom_id)) : [];
   const author = embed?.author?.name ? embed.author : null;
   const footerTime = embed?.timestamp ? discordTime(embed.timestamp) : "";
   return (
@@ -138,13 +141,18 @@ export function DiscordMessagePreview({ embed, content = "", buttons = [], botNa
           )}
           {links.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2" data-testid={`${testId}-buttons`}>
-              {links.map((button) => (
+              {links.map((button) => (button.url ? (
                 <a key={button.url} href={button.url} target="_blank" rel="noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-[3px] bg-[#4E5058] hover:bg-[#6D6F78] px-4 py-1.5 text-sm font-medium text-white">
                   {button.label}
                   <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
                 </a>
-              ))}
+              ) : (
+                <span key={button.custom_id} data-testid={`${testId}-action`}
+                  className={`inline-flex items-center rounded-[3px] px-4 py-1.5 text-sm font-medium text-white ${ACTION_STYLES[button.style] || ACTION_STYLES.primary}`}>
+                  {button.label}
+                </span>
+              )))}
             </div>
           )}
         </div>

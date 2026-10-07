@@ -195,14 +195,22 @@ async def designed_news(db, post: dict) -> dict:
     return message if audience(post) == "internal" else await _design(db, "news", message, await news_values(post))
 
 
+async def _with_registration(db, kind: str, doc: dict, message: dict, status: str | None = None) -> dict:
+    """„Anmelden“ als erster Knopf (#885) - nur, wenn der Schalter an ist und nichts dagegen spricht."""
+    from services.discord_registration import announcement_button
+
+    button = await announcement_button(db, kind, doc, status)
+    return {**message, "buttons": [button, *(message.get("buttons") or [])]} if button else message
+
+
 async def designed_event(db, event: dict) -> dict:
-    message = event_message(event)
+    message = await _with_registration(db, "event", event, event_message(event))
     return message if audience(event) == "internal" else await _design(db, "event", message, await event_values(event))
 
 
 async def designed_tournament(db, tournament: dict, status: str, game: dict | None = None, *, in_thread: bool = False) -> dict:
     """Die Turnier-Meldung im Aussehen der Gestaltung: die Ankündigung im Kanal oder die kurze Fassung im Thread."""
-    message = tournament_message(tournament, status, game_name=(game or {}).get("name"), in_thread=in_thread)
+    message = await _with_registration(db, "tournament", tournament, tournament_message(tournament, status, game_name=(game or {}).get("name"), in_thread=in_thread), status)
     return await _design(db, "tournament_thread" if in_thread else "tournament", message, await tournament_values(tournament, status, game))
 
 

@@ -290,6 +290,10 @@ async def resolve_buttons(buttons: list | None) -> list[dict]:
     Adresse ergibt, fällt weg."""
     out = []
     for button in buttons or []:
+        if (button or {}).get("custom_id") and (button or {}).get("label"):
+            # Rückruf-Knopf (#885): keine Adresse, der Bot beantwortet den Klick privat.
+            out.append({"label": str(button["label"])[:80], "custom_id": str(button["custom_id"])[:100], "style": str(button.get("style") or "primary")})
+            continue
         url = await _public_link_url((button or {}).get("url"))
         if url and (button or {}).get("label"):
             out.append({"label": str(button["label"])[:80], "url": url})

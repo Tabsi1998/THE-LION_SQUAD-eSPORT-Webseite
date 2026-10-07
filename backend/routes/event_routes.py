@@ -7,7 +7,7 @@ from urllib.parse import quote, urlencode
 from database import get_db
 from auth import require_admin, get_optional_user, get_current_user
 from services.visibility import user_can_see
-from services.access_links import public_access_link_payload, record_access_link_use, touch_access_link, validate_access_link
+from services.access_links import public_access_link_payload, touch_access_link, validate_access_link
 from services.content_embed_service import resolve_content_embeds
 from services.public_phase import derive_public_phase
 from services.competition_read import load_competition_read_model, observe_structure_read
@@ -16,7 +16,8 @@ from services.sponsor_utils import dedupe_public_sponsors
 from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import billing_orders, event_days, event_locations, pricing
+from services import billing_orders, event_days, event_locations, event_registration, pricing
+from services.event_registration import RegistrationError
 from services.permissions import areas_for, user_has_area
 from models import EventCreate, EventUpdate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
 
@@ -167,11 +168,7 @@ async def _find_event(slug_or_id: str) -> tuple[dict | None, bool]:
 
 
 def _registration_seats(registration: dict) -> int:
-    try:
-        companion_count = int(registration.get("companion_count") or 0)
-    except (TypeError, ValueError):
-        companion_count = 0
-    return 1 + max(0, companion_count)
+    return event_registration.seats(registration)
 
 
 def _public_event_registration(registration: dict, is_staff: bool = False, with_price: bool | None = None) -> dict:
@@ -209,31 +206,7 @@ def _public_event_registration(registration: dict, is_staff: bool = False, with_
 
 
 async def _event_registration_summary(event: dict, exclude_registration_id: str | None = None) -> dict:
-    db = get_db()
-    regs = await db.event_registrations.find({"event_id": event["id"]}, {"_id": 0}).to_list(2000)
-    if exclude_registration_id:
-        regs = [r for r in regs if r.get("id") != exclude_registration_id]
-    active = [r for r in regs if r.get("status") in ACTIVE_EVENT_REGISTRATION_STATUSES]
-    waitlist = [r for r in regs if r.get("status") == "waitlist"]
-    reserved_seats = sum(_registration_seats(r) for r in active)
-    waitlist_seats = sum(_registration_seats(r) for r in waitlist)
-    companion_count = sum(max(0, int(r.get("companion_count") or 0)) for r in active)
-    max_participants = event.get("max_participants")
-    spots_left = None
-    if max_participants:
-        spots_left = max(int(max_participants) - reserved_seats, 0)
-    return {
-        "registered_count": len(active),
-        "waitlist_count": len(waitlist),
-        "checked_in_count": len([r for r in regs if r.get("status") == "checked_in"]),
-        "no_show_count": len([r for r in regs if r.get("status") == "no_show"]),
-        "cancelled_count": len([r for r in regs if r.get("status") == "cancelled"]),
-        "reserved_seats": reserved_seats,
-        "waitlist_seats": waitlist_seats,
-        "companion_count": companion_count,
-        "spots_left": spots_left,
-        "max_participants": max_participants,
-    }
+    return await event_registration.summary(get_db(), event, exclude_registration_id)
 
 
 async def _tournament_recap_podium(db, tournament: dict) -> list[dict]:
@@ -371,19 +344,14 @@ async def _build_event_recap_payload(db, event: dict) -> dict:
 
 
 def _event_registration_open(event: dict) -> bool:
-    return bool(event.get("has_registration") and derive_public_phase(event, "event").get("state") == "registration_open")
+    return event_registration.registration_open(event)
 
 
 def _validated_companion_count(event: dict, value: int | None) -> int:
-    companion_count = int(value or 0)
-    if companion_count < 0:
-        raise HTTPException(status_code=400, detail="Begleitpersonen duerfen nicht negativ sein")
-    max_companions = int(event.get("max_companions_per_registration") or 0)
-    if companion_count and not event.get("allow_companions"):
-        raise HTTPException(status_code=400, detail="Bei diesem Event sind keine Begleitpersonen aktiviert")
-    if companion_count > max_companions:
-        raise HTTPException(status_code=400, detail=f"Maximal {max_companions} Begleitpersonen erlaubt")
-    return companion_count
+    try:
+        return event_registration.validated_companion_count(event, value)
+    except RegistrationError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
 
 
 async def _apply_event_checkin_rewards(event: dict, registration: dict) -> None:
@@ -761,80 +729,13 @@ async def register_for_event(event_id: str, body: EventRegistrationCreate,
     view_access = await validate_access_link(db, access, "event", event["id"], me, "view")
     register_access = await validate_access_link(db, access, "event", event["id"], me, "register")
     has_access = bool(view_access or register_access)
-    if event.get("status") == "draft" and me.get("role") not in STAFF_ROLES and not has_access:
-        raise HTTPException(status_code=404, detail="Event nicht gefunden")
-    if not has_access and not await _user_can_see(me, event.get("visibility") or "public"):
-        raise HTTPException(status_code=403, detail="Event ist nicht sichtbar")
-    if not _event_registration_open(event) and not register_access:
-        raise HTTPException(status_code=400, detail="Die Anmeldung ist aktuell nicht offen")
-    if not event.get("has_registration"):
-        raise HTTPException(status_code=400, detail="Dieses Event hat keine Anmeldung")
-
-    companion_count = _validated_companion_count(event, body.companion_count)
-    requested_seats = 1 + companion_count
-    existing = await db.event_registrations.find_one(
-        {"event_id": event["id"], "user_id": me["id"]},
-        {"_id": 0},
-    )
-    if existing and existing.get("status") not in {"cancelled", "no_show"}:
-        raise HTTPException(status_code=409, detail="Du bist für dieses Event bereits angemeldet")
-
-    # Preis (#315, #318): vor der Buchung rechnen, damit eine unbekannte Position sauber scheitert.
-    offer = event.get("billing") or {}
+    # Die Anmeldung selbst rechnet services/event_registration.py - derselbe Weg wie der Discord-Knopf (#885).
     try:
-        price = pricing.quote(offer, seats=requested_seats, selected=body.selected_positions)
-    except pricing.PricingError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-    summary = await _event_registration_summary(event, exclude_registration_id=existing.get("id") if existing else None)
-    status = "registered"
-    max_participants = event.get("max_participants")
-    if max_participants and summary["reserved_seats"] + requested_seats > int(max_participants):
-        status = "waitlist"
-
-    now = now_utc().isoformat()
-    doc = {
-        "event_id": event["id"],
-        "user_id": me["id"],
-        "display_name": me.get("display_name") or me.get("username"),
-        "email": me.get("email"),
-        "status": status,
-        "companion_count": companion_count,
-        "seat_count": requested_seats,
-        "note": body.note,
-        "selected_positions": list(body.selected_positions or []),
-        "updated_at": now,
-    }
-    # Eingefroren wird nur eine verbindliche Anmeldung - die Warteliste bekommt ihren Preis beim
-    # Nachrücken (Admin setzt „registered“), nicht jetzt.
-    if status == "registered" and not price.get("free"):
-        doc["price_snapshot"] = pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")})
-        doc["billing_status"] = "pending"
-    if existing:
-        await db.event_registrations.update_one(
-            {"id": existing["id"]},
-            {"$set": doc},
-        )
-        doc = await db.event_registrations.find_one({"id": existing["id"]}, {"_id": 0})
-    else:
-        doc["id"] = new_id()
-        doc["created_at"] = now
-        await db.event_registrations.insert_one(doc)
-        doc.pop("_id", None)
-    await db.audit_logs.insert_one({
-        "id": new_id(),
-        "action": "event.registration.create",
-        "target_id": event["id"],
-        "actor_id": me["id"],
-        "data": {"registration_id": doc["id"], "status": status, "companion_count": companion_count,
-                 "total_cents": doc.get("price_snapshot", {}).get("total_cents")},
-        "created_at": now,
-    })
-    if doc.get("price_snapshot"):
-        await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=doc["id"], user_id=me["id"],
-                                          snapshot=doc["price_snapshot"], timing=offer.get("invoice_timing") or "on_confirm")
-    if register_access:
-        await record_access_link_use(db, register_access, me)
+        await event_registration.ensure_can_register(db, event, me, has_access=has_access, register_access=register_access)
+        doc = await event_registration.register(db, event, me, companion_count=body.companion_count, note=body.note,
+                                                selected_positions=body.selected_positions, register_access=register_access, via="web")
+    except RegistrationError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
     return _public_event_registration(doc, is_staff=True)
 
 
@@ -844,26 +745,10 @@ async def cancel_my_event_registration(event_id: str, me: dict = Depends(get_cur
     event, _ = await _find_event(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
-    reg = await db.event_registrations.find_one(
-        {"event_id": event["id"], "user_id": me["id"]},
-        {"_id": 0},
-    )
-    if not reg:
-        raise HTTPException(status_code=404, detail="Anmeldung nicht gefunden")
-    now = now_utc().isoformat()
-    await db.event_registrations.update_one(
-        {"id": reg["id"]},
-        {"$set": {"status": "cancelled", "updated_at": now, **({"billing_status": "cancelled"} if reg.get("price_snapshot") else {})}},
-    )
-    await billing_orders.cancel_orders_for(db, kind="event", registration_id=reg["id"], reason="Anmeldung storniert")
-    await db.audit_logs.insert_one({
-        "id": new_id(),
-        "action": "event.registration.cancel",
-        "target_id": event["id"],
-        "actor_id": me["id"],
-        "data": {"registration_id": reg["id"]},
-        "created_at": now,
-    })
+    try:
+        await event_registration.cancel(db, event, me, via="web")
+    except RegistrationError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
     return {"ok": True}
 
 

@@ -93,3 +93,19 @@ test("die Uhrzeit heißt heute „Heute um …“, sonst steht das Datum da", ()
   expect(discordTime("2026-10-02T23:50:00+02:00", now)).toMatch(/^02\.10\.2026 23:50$/);
   expect(discordTime("kein Datum", now)).toBe("");
 });
+
+test("Aktionsknöpfe mit Kennung (#885) stehen wie im Discord da - farbig, ohne Link", () => {
+  render(<DiscordMessagePreview embed={{ title: "LAN" }} buttons={[
+    { label: "Anmelden", custom_id: "tls:show:event:e1", style: "primary" },
+    { label: "Event ansehen", url: "https://lionsquad.at/events/lan" },
+    { label: "kaputt" },
+  ]} />);
+  const row = screen.getByTestId("discord-message-buttons");
+  expect(row).toHaveTextContent("Anmelden");
+  expect(row).toHaveTextContent("Event ansehen");
+  expect(row).not.toHaveTextContent("kaputt");
+  const action = screen.getByTestId("discord-message-action");
+  expect(action.tagName).toBe("SPAN");
+  expect(action).toHaveClass("bg-[#5865F2]");
+  expect(screen.getByRole("link", { name: "Event ansehen" })).toHaveAttribute("href", "https://lionsquad.at/events/lan");
+});

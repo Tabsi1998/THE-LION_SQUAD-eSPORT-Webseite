@@ -51,7 +51,9 @@ class FakeDiscord:
 
 
 def labels(row):
-    return [(button["label"], button["url"].split("://", 1)[-1].split("/", 1)[-1]) for button in row["buttons"] or []]
+    """Link-Knöpfe als Pfad, Rückruf-Knöpfe (#885) als ihre Kennung."""
+    return [(button["label"], button["url"].split("://", 1)[-1].split("/", 1)[-1] if button.get("url") else f"id:{button['custom_id']}")
+            for button in row["buttons"] or []]
 
 
 @pytest_asyncio.fixture
@@ -100,9 +102,10 @@ async def test_tournament_messages_carry_the_button_for_their_moment(flow, disco
     for prev, status in ((None, "registration_open"), ("registration_open", "check_in"), ("check_in", "live")):
         await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"status": status}})
         await discord_threads.status_written(flow.db, "t1", prev)
-    assert [labels(row) for row in discord.sent] == [[("Zur Anmeldung", "tournaments/sommer-cup")], [("Zum Check-in", "tournaments/sommer-cup")],
-                                                     [("Bracket ansehen", "tournaments/sommer-cup/bracket")]]
-    assert all(button["url"].startswith("http") for row in discord.sent for button in row["buttons"]), "volle Adressen"
+    # Zur offenen Anmeldung steht „Anmelden“ (#885) vorne - er öffnet die private Anmeldung im Discord.
+    assert [labels(row) for row in discord.sent] == [[("Anmelden", "id:tls:show:tournament:t1"), ("Zur Anmeldung", "tournaments/sommer-cup")],
+                                                     [("Zum Check-in", "tournaments/sommer-cup")], [("Bracket ansehen", "tournaments/sommer-cup/bracket")]]
+    assert all(button["url"].startswith("http") for row in discord.sent for button in row["buttons"] if button.get("url")), "volle Adressen"
 
     # Das Bracket hat seinen Knopf beim Posten und beim Bearbeiten.
     posted = await discord_bracket.refresh(flow.db, "t1")
@@ -137,7 +140,7 @@ async def test_news_event_board_and_resend_keep_their_buttons(flow, discord):
     preview = (await flow.post("/api/settings/discord/preview", json={"kind": "event", "item": {"name": "LAN-Party", "slug": "lan"}})).json()
     assert [(b["label"], b["url"].endswith("/events/lan")) for b in preview["buttons"]] == [("Event ansehen", True)]
     samples = {entry["key"]: entry for entry in (await flow.get("/api/settings/discord/samples")).json()["entries"]}
-    assert [b["label"] for b in samples["tournament.registration_open"]["buttons"]] == ["Zur Anmeldung"]
+    assert [b["label"] for b in samples["tournament.registration_open"]["buttons"]] == ["Anmelden", "Zur Anmeldung"]
     assert [b["label"] for b in samples["notify.achievement"]["buttons"]] == ["Profil"]
 
     # Erneut senden: mit den Knöpfen von damals.

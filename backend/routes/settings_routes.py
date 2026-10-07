@@ -331,6 +331,8 @@ class DiscordSettings(BaseModel):
     scheduled_events: Optional[dict[str, bool]] = None
     # Willkommensnachricht (#574): {enabled, text}; leerer Text heißt Vorlage.
     welcome: Optional[dict] = None
+    # Anmeldung über Discord (#885): {enabled}.
+    registration: Optional[dict[str, bool]] = None
 
 
 class YoutubeFeedSettings(BaseModel):
@@ -1567,6 +1569,9 @@ async def get_discord(me: dict = Depends(require_club_admin())):
     # Willkommensnachricht (#574): Schalter, Text, Vorschau, Zähler.
     from services.discord_welcome import welcome_status
     s["welcome"] = await welcome_status(db, s)
+    # Anmeldung über Discord (#885): Schalter und Zähler.
+    from services.discord_registration import status as registration_status
+    s["registration"] = await registration_status(db)
     for key in ("bot_token", "bot_enabled", "bot_guild_id", "bot_roles", "bot_count_messages"):
         s.pop(key, None)
     # Tests aus der Vorschau (#583) zählen nicht als Meldung.
@@ -1658,6 +1663,13 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
             if key not in ("enabled", "internal") or not isinstance(value, bool):
                 raise HTTPException(400, f"Unbekannte Einstellung für Discord-Termine: {key}")
             updates[f"scheduled_events.{key}"] = value
+    # Anmeldung über Discord (#885): ein Schalter.
+    incoming_registration = updates.pop("registration", None)
+    if incoming_registration is not None:
+        for key, value in incoming_registration.items():
+            if key != "enabled" or not isinstance(value, bool):
+                raise HTTPException(400, f"Unbekannte Einstellung für die Anmeldung über Discord: {key}")
+            updates["registration.enabled"] = value
     # Willkommensnachricht (#574): Schalter und Text - mehr nicht.
     incoming_welcome = updates.pop("welcome", None)
     if incoming_welcome is not None:

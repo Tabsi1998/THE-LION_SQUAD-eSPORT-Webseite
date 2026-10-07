@@ -54,6 +54,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     is_invite_only: !!source.is_invite_only,
     block_club_member_registration: !!source.block_club_member_registration,
     requires_event_registration: !!source.requires_event_registration,
+    discord_registration: source.discord_registration !== false,
     registration_open_from: dt(source.registration_open_from),
     registration_open_until: dt(source.registration_open_until),
     check_in_from: dt(source.check_in_from),
@@ -113,6 +114,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     is_invite_only: !!tournament.is_invite_only,
     block_club_member_registration: !!tournament.block_club_member_registration,
     requires_event_registration: !!tournament.requires_event_registration,
+    discord_registration: tournament.discord_registration !== false,
     registration_open_from: dt(tournament.registration_open_from),
     registration_open_until: dt(tournament.registration_open_until),
     check_in_from: dt(tournament.check_in_from),
@@ -292,6 +294,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <TextField label="Check-in öffnet" type="datetime-local" value={f.check_in_from} onChange={(v)=>set("check_in_from",v)} testId="tr-edit-checkin-from"/>
             <TextField label="Check-in endet" type="datetime-local" value={f.check_in_until} onChange={(v)=>set("check_in_until",v)} testId="tr-edit-checkin-until"/>
             <CheckField label="Öffentliche Anmeldung erlauben" checked={f.registration_enabled} onChange={(v)=>set("registration_enabled",v)} />
+            {/* Anmeldung im Discord (#885): Vorgabe an. */}
+            <CheckField label="Anmeldung über Discord erlauben" hint="Mit verknüpftem Konto über /anmelden oder den Knopf „Anmelden“ – privat, mit denselben Regeln; Teams meldet der Kapitän an." checked={f.discord_registration} onChange={(v)=>set("discord_registration",v)} accent="#5865F2" testId="tr-edit-discord-registration" />
             <CheckField label="Nur Einladung/manuelle Teilnehmer" checked={f.is_invite_only} onChange={(v)=>set("is_invite_only",v)} />
             <CheckField label="Automatisches Turnier-Hinweisbanner anzeigen" checked={f.site_banner_enabled} onChange={(v)=>set("site_banner_enabled",v)} accent="#FFD700" />
             <CheckField label="Start-/Endzeit darf Turnier automatisch live/beendet schalten" checked={f.auto_start_enabled} onChange={(v)=>set("auto_start_enabled",v)} testId="tr-edit-auto-start" />
