@@ -1,6 +1,6 @@
 # Jahreszeiten: der gemeinsame Kern (Seasonal Core)
 
-Stand: 2. Oktober 2026 mittags (Seasonal Core C1–C6, #721–#726; Saisons: Halloween, Adventkranz #765 und App #788, Schnee #766, Weihnachten #767, Wetter #770, Adventkalender #785; Fundstücke #773, #776, #777, #792; Klang in der App #792). Gilt für Web (`frontend/src/seasons/`) und App
+Stand: 7. Oktober 2026 (Seasonal Core C1–C6, #721–#726; Saisons: Halloween, Adventkranz #765 und App #788, Schnee #766, Weihnachten #767, Wetter #770, Adventkalender #785; Fundstücke #773, #776, #777, #792; Klang in der App #792; Deko reagiert auf Karten #1087–#1094, Abschnitt 21). Gilt für Web (`frontend/src/seasons/`) und App
 (`mobile/src/seasons/`). Halloween ist die erste Saison auf diesem Kern; Winter, Weihnachten, Silvester, Fasching,
 Ostern und Geburtstage bringen nur noch ihre Figuren und ihren Plan mit, nicht ihre eigenen Regeln.
 
@@ -399,3 +399,52 @@ Die Suche selbst (#646) steht in `docs/HISTORIE.md`, Teil A. Zur Vorschau:
 - Im Web sammelt ein Tipp das Ei probehalber ein (`EasterEggs.collectPreview`): Hinweis mit Nummer und Versteck-Text,
   der Korb zählt mit (`previewFind`, nur im Fenster bis zum Neuladen), bis er voll ist; am Server zählt nichts.
 
+## 21. Deko reagiert auf Karten (Jahreszeiten IV, #1087–#1094)
+
+Alle Karten heben sich beim Drüberfahren (#1071). Saison-Deko, die an genau dieser Karte hängt, fährt mit und reagiert –
+jede Saison auf ihre Art, Nachbarkarten bleiben unberührt.
+
+**Signal** (Web `cardLift.js`, `useCardSignal.js`; App `cardLift.ts`, `useCardLift.ts`):
+
+- Web: „enter“ sofort (Deko mit `data-season-card` fährt per CSS 5 px mit hoch), „lift“ nach 250 ms auf der Karte
+  (Drüberwischen löst nichts aus), „leave“ beim Verlassen. Nur mit Maus, nie mit „Bewegung reduzieren“. Gemessen wird
+  am Ruheplatz der Karte (`rectOf`/`liftOf`); Zeichenflächen rechnen den Versatz mit `createLiftOffsets`.
+- App: „lift“ beim Antippen (der Finger hebt sich innerhalb von 10 Punkten) oder nach 250 ms ruhigem Halten; Scrollen,
+  Wischen und zwei Finger lösen nichts aus. Karten lesen ihre Berührungen nur mit (`cardLiftTouch`), Deko mit eigener
+  Antwort beansprucht ihre Berührung (`claimCardTouch`).
+- Ruhezeit je Karte: große Reaktionen 60 s, kleine 10 s (`createRest`); höchstens eine große gleichzeitig
+  (`startReaction`, Effektklasse `card_big`).
+
+| Deko | Reaktion | Art |
+|---|---|---|
+| Schneehaube | sackt ab, die Flocken fallen, wächst in 90 s nach (`snow/shake`) | groß |
+| Ecknetz | reißt, die Spinne seilt sich ab, Neubau nach einer Minute (`webTear`) | groß |
+| Fledermaus | flattert eine Sekunde auf und landet wieder | klein |
+| Ei der Eiersuche | purzelt hervor und zählt als gefunden | klein |
+| Konfetti, Regen (Web) | wirbelt auf und landet tiefer; spritzt an der gehobenen Kante | klein |
+| Lichterkette (#1091) | schwingt zweimal nach, ein Licht flackert; im Web beim Loslassen dasselbe in klein (`christmas/swing`) | klein |
+| Osterei (#1092) | wackelt zweimal, rollt höchstens 6 px zur näheren Ecke und bleibt liegen (`easter/roll`) | klein |
+| Luftschlange (#1093) | flattert einmal durch: die Schlaufen heben sich nacheinander, das Ende pendelt nach außen (`carnival/cardStreamer`) | klein |
+| Wimpelkette (#1094) | flattert in einer Sekunde von links nach rechts durch (Web `birthday/cardGarland`, App `birthday/garland`) | klein |
+
+**Deko zusätzlich an Karten (Variante B, Entscheidung des Betreibers vom 7.10.2026):** Lichterkette, Osterei, Luftschlange
+und Wimpelkette bleiben an Kopf- und Fußzeile, am Seitenrand bzw. an der Begrüßungskarte der App (dort reagieren sie
+auf das Antippen der Begrüßungskarte) – und hängen zusätzlich an einigen Karten (Web `cardDeco.js`, `useCardDeco.js`;
+App `cardDeco.tsx`):
+
+- Welche Karten: im Web nur Karten, die sich heben (`.tls-card` mit Anker); in der App Karten mit Platz, die nichts
+  abschneiden – nicht die Begrüßungskarte (sie trägt ihre Deko schon) und keine Banner.
+- Wie viele: so viele wie die Ecken der Seiten- bzw. Screen-Klasse (Web je Fensterhöhe, App je Screen), höchstens vier
+  von zehn Karten, mindestens eine; „dezent“ eine; Handys (Web) und kleine Bildschirme (App) keine. Gewählt wird aus dem
+  Seed (Saison, Jahr, Seite bzw. Screen) mit Abstand, nie zwei an einer Karte; wer schon Deko trägt, behält sie.
+- Wo: Lichterkette und Wimpel im unteren Innenabstand (das Band beginnt 16 px über der Unterkante, wie an der
+  Begrüßungskarte), Ei und Luftschlange auf der Oberkante (das Ende der Luftschlange hängt außen neben der Ecke). Nie über
+  Schrift, Bild oder Bedienung, nie über einer anderen Karte, nie über den Rand der Seite – das Web prüft mit der Sonde
+  (`boxFree`, `bandGaps`); unter geöffneten Dialogen weicht die Deko aus.
+- Ostern: keine Eier an Karten, solange die Eiersuche läuft; am Karfreitag rührt sich nichts.
+- Parität: dieselbe Rechnung in Web und App, Fingerabdrücke `3121181676` (Kette), `277106003` (Ei), `1678939084`
+  (Luftschlange), `2695102931` (Wimpel). Die Keyframes im Web folgen denselben Stützstellen (die Vitest-Tests lesen das
+  CSS), die App legt weiche Zwischenpunkte dazwischen (`frames.ts`) und bewegt nur Ansichten mit der Mitte auf dem
+  Drehpunkt (Abschnitt 12).
+- Tests: Web `cardDeco.test.js`, `cardDecoReactions.test.jsx`, `e2e/season-card-reactions.spec.js`; App
+  `cardReactions.test.tsx`, `cardDecoReactions.test.tsx`.
