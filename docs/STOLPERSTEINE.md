@@ -427,3 +427,44 @@ was hilft.
 - **Patch-Skripte, die mittendrin abbrechen,** haben die Dateien davor schon geschrieben – Umwandlungen deshalb so
   bauen, dass ein zweiter Lauf schon Umgestelltes überspringt.
 - **Python 3.11:** In f-Strings darf im Ausdruck kein Backslash stehen (`re.sub(r'\s+', …)` erst vorher berechnen).
+
+## 7. Oktober 2026 (Abend) – TV, GitHub-Prüfung, gestapelte Zweige
+
+- **Push und „Ready“ in derselben Sekunde:** GitHub startet für den Push keinen Lauf (CI „skipped“, CodeQL
+  abgebrochen). Nach dem Push warten, bis der Lauf da ist, dann `gh pr ready`. Nachstarten mit einem leeren Commit
+  (`git commit-tree <zweig>^{tree} -p <zweig> -m …`, Zweig darauf setzen, pushen).
+- **Gestapelter Zweig, wenn `main` inzwischen weitere Merges hat:** Das `commit-tree`-Rezept auf `origin/main` würde
+  die anderen Merges zurückdrehen. Dann `git rebase --onto origin/main <alte-basis> <zweig>` – nur die eigenen Commits
+  wandern mit.
+- **Linux-Schriften sind breiter:** Auf GitHub fehlt Inter; die Ersatzschrift braucht mehr Platz, Layout-Tests mit
+  knappen Maßen kippen nur dort. Lokal nachstellen mit einer eingeschobenen Regel
+  `* { font-family: Verdana, 'DejaVu Sans', sans-serif !important; }`. Tests, die „liegt im sicheren Bereich“ prüfen,
+  messen nur, was der sichtbare Rahmen zeigt (`.tv-viewport` schneidet im Kamera-Modus bewusst ab).
+- **Zeit-Tests auf GitHub:** Feste Millisekunden-Grenzen hängen am Rechner des Tages (gleiche Seite 16,7 ms oder
+  26,8 ms je Bild). Auf GitHub im selben Lauf eine Vergleichsmessung ohne den geprüften Teil machen und das
+  Verhältnis prüfen (`e2e/snow-regression.spec.js`); feste Grenzen nur am PC.
+- **Browser-Tests in Teilen:** `yarn test:e2e --shard=N/4` verteilt nach Dateien. Ein Teil, der allein rot wird, lässt
+  sich lokal mit demselben `--shard` nachstellen. `fail-fast: false`, damit ein roter Teil die anderen nicht abbricht.
+- **„Update branch“ und Push mit „Internal Server Error“:** Am 7.10. lehnte GitHub eine Viertelstunde lang jede
+  Änderung am Repo ab (Statusseite grün, Lesen ging). Nicht umbauen – später erneut pushen. Laufende Prüfungen vorher
+  fertig laufen lassen: Ein Push bricht den alten Lauf ab (`concurrency` mit `cancel-in-progress`).
+
+## 7. Oktober 2026 (Nacht) – vier Ordner, Release-Ordner, Uhrzeit
+
+- **Vier Arbeitsordner gleichzeitig:** Haupt-Checkout, `C:\lsb`, `C:\lsc` und `C:\lsd` sind Worktrees desselben
+  Repos. Seit #1301 hat jeder Ordner eine eigene Test-Datenbank und ein eigenes Compose-Projekt; höchstens zwei
+  lokale Checks gleichzeitig (Rechenzeit), die Container-Gruppe nur in einem Ordner (feste Ports). Vor dem Start
+  zählen: `Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'python*' -and $_.CommandLine -like
+  '*local_check.py*' }`. Ein neuer Ordner braucht echte `node_modules` (kopieren, keine Verknüpfung) und eine venv
+  unter `~/.local-ci/<Ordnername>/venv`.
+- **Release, während `C:\lsb` arbeitet:** `LIONSAPP_BUILD_DIR=C:/lsbrel npm run release:local -- --aab` baut in einem
+  anderen Worktree; danach `git worktree remove --force C:/lsbrel` (es blockiert nur die Bau-Marke
+  `.lionsapp-build`). Der Haupt-Checkout muss trotzdem sauber auf `main` = `origin/main` stehen.
+- **Tests mit Uhrzeit:** Ein Test, der „jetzt“ aus der echten Uhr nimmt, wird zu bestimmten Tageszeiten rot
+  (`EventTVPage.test.jsx`). Uhr einfrieren: `vi.useFakeTimers({ toFake: ["Date"] })` und `vi.setSystemTime(…)`,
+  im `afterEach` `vi.useRealTimers()`.
+- **`apt-get update` hängt auf GitHub:** Ein schweigender Ubuntu-Spiegel hielt `npx playwright install --with-deps`
+  25 Minuten fest, bis der Teil abbrach. Seit #1299: kurze apt-Zeitlimits, drei Versuche mit `timeout`, hängende
+  apt-Prozesse beenden.
+- **Uhrzeit in Git Bash:** `TZ=Europe/Vienna date` zeigt UTC (MSYS kennt die Zonen nicht). Die Uhr des Betreibers
+  liefert PowerShell `Get-Date`.

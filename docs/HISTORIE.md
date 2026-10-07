@@ -3672,6 +3672,113 @@ Die alte Fassung im Ganzen zeigt `git show 279c53c3:CLAUDE.md`.
   #1111 lesbar aus 5 Metern, #1112 Beamer-Modus, #1113 Klartext statt Platzhalter, #1114 Jahreszeiten im Kopf),
   59 (Turnierbaum: #1115–#1120) und 60 (Ablauf, Hallen-Tafel, Fast Lap: #1121–#1127). Varianten werden Einstellungen,
   Vorgabe ist die Wahl des Betreibers (Ergebnis ohne Ton, Sponsoren Moment + „präsentiert von“, Laufband wählbar).
+- TV I (Meilenstein 58; PR #1128): `services/tv_display.py` (Grundwerte in `settings.tv_display`, ohne Anmeldung
+  lesbar; Anzeige-Schlüssel = Speziallink mit der einzigen Freigabe `display` für ein Turnier, nur der Hash liegt in
+  der Datenbank; `key_expires_at` rechnet beim Öffnen „Turnierende + 7 Tage“, ohne Ende ab Start, Fehler
+  `KEY_EXPIRED`), `routes/tv_routes.py` (Schlüssel-Liste mit `expires_at`/`expired`, Widerruf),
+  `tournament_view_routes.get_bracket_display` liefert mit Schlüssel nur die TV-Sicht. Web: `pages/admin/AdminTvPage.jsx`
+  (Grundwerte, Link-Baukasten „Wie Grundwert | Nur hier“, `?view=&target=` vorgewählt über `tournament-tv-link` in der
+  Turnier-Bearbeitung), `lib/tvSettings.js`, `components/tv/TvScreen.jsx` (Größen an der Bildschirmhöhe, Beamer-Modus,
+  sicherer Bereich), `lib/tvPixelShift.js`, `lib/wakeLock.js`, `lib/slotSource.js` (Klartext „Sieger aus A“ statt
+  `W:A:1` – auch öffentlicher Baum, Spielplan, Stationen, QR-Codes), Saison-Deko im TV-Kopf. `CookieConsent.jsx`
+  zeigt auf `/display` keinen Hinweis und lädt dort nur Nötiges; die Link-Werte `key`, `access`, `preview`, `token`
+  gehen nicht an die Statistik.
+- TV II (Meilenstein 59; PR #1131): `components/tv/TvBracketStage.jsx` (Kamera über `lib/tvCamera.js`: steht still,
+  wenn der ganze Baum lesbar passt, sonst ruhige Fahrten; wird der Plan kleiner, springt sie, statt zu fahren),
+  `TvTreeNode.jsx`, `TvMoments.jsx` mit Warteschlange `lib/tvMoments.js` (Champion vor Ergebnis vor Live-Start,
+  Sammelkarte ab vier Ergebnissen), `lib/tvTravel.js` (Fahrten über die Linien), `lib/tvChampion.js` (goldener Weg),
+  `lib/tvLive.js` (Live überall rot aus einer Quelle, Spielzeit sekundengenau), `TvStartGrid.jsx` + `lib/tvGrid.js`
+  (Startaufstellung für Durchgänge), `pages/display/StationTVPage.jsx` (`/display/bracket/<Turnier>/station/<Station>`
+  mit demselben Schlüssel), `lib/tvGong.js` (Einstellung „Ton beim Ergebnis“, Standard aus, `result_sound=1`).
+  `lib/bracketPodium.js`: Doppel-K.-o. mit Durchgängen markierte den Zweiten des Loser-Bracket-Finales auch als
+  Dritten. Der Safe-Area-Test in `e2e/tv-displays.spec.js` misst nur, was `.tv-viewport` zeigt (Linux-Schriften sind
+  breiter, Kamera-Modus schneidet bewusst ab).
+- Jahreszeiten IV, Variante B (Meilenstein 57; PR #1130): `seasons/cardDeco.js` + `useCardDeco.js` wählen 1–3
+  hebende Karten je Seite (bei „Dezent“ 1, höchstens 40 % der sichtbaren, nie über Text, Bild oder Knopf, am Handy im
+  Web keine); Lichterkette `christmas/CardChains.jsx` + `swing.js`, Osterei `easter/CardEggs.jsx` + `roll.js`,
+  Luftschlange `carnival/CardStreamers.jsx` + `cardStreamer.js`, Wimpel `birthday/CardGarlands.jsx` +
+  `cardGarland.js`; App gleich gerechnet (`mobile/src/seasons/cardDeco.tsx`, Paritätstests). `docs/SEASONS.md`
+  Abschnitt 21.
+- Spielseiten: Internes nur für die Turnierleitung (PR #1141): `services/match_public_view.py`
+  (`public_match_view`, `public_tournament_view`) liefert allen anderen die öffentlichen Felder, eigene Meldung und
+  eigener Einspruch bleiben sichtbar; `match_routes._sees_internal` (Staff oder Turnier-Recht) entscheidet in
+  `get_match` und `_match_page_payload`. Admin-Seiten nutzen die vollen Daten. Test
+  `test_match_public_view_flow.py`.
+- Schnee-Zeittest fair auf GitHub (PR #1142): `e2e/snow-regression.spec.js` misst auf GitHub (`GITHUB_ACTIONS`) im
+  selben Lauf zuerst die Seite ohne Saison und prüft das Verhältnis (unter 2-fach); am PC bleiben die festen Grenzen
+  (Schnitt unter 25 ms, höchstens 6 Bilder über 34 ms). Beide Werte stehen als „Bildbudget“ im Protokoll.
+- Browser-Tests auf GitHub in vier Teilen (PR #1214): Job `frontend-e2e` in `.github/workflows/ci.yml` mit
+  `--shard=N/4` (`fail-fast: false`, Anhang je Teil), der Job `frontend` prüft, baut und testet nur noch Vitest
+  (Zeitlimit 20 Minuten). Ein Lauf dauert gut 12 statt 30 Minuten.
+- TV III (Meilenstein 60; PR #1215): `lib/tvPlaylist.js` (Wiedergabeliste Baum/Live/Aufrufe/Sponsor/Zahlen, Ergebnis
+  hält an, leere Folien fallen weg), `TvCallBoard.jsx` + `lib/tvCalls.js` (Aufruf-Tafel mit Countdown-Ring, Event-Seite
+  `/display/event/<Event>/calls`), `TvScreens.jsx` + `lib/tvScreens.js` (Pause, Check-in, Anmeldung mit QR),
+  `lib/tvStats.js` (Zahlen-Kacheln), `lib/tvSponsors.js` (Sponsor-Moment, „präsentiert von“ je Runde, Laufband eigener
+  Schalter), `TvHall.jsx` + `useEventHall.js` + `lib/tvDayPlan.js` + `lib/tvStationGrid.js` (Hallen-Tafel: Zeitleiste
+  mit „jetzt“-Linie hinter den Blöcken, „Tag 2 von 3“, alle Stationen mit Blättern), `lib/tvFastLap.js`
+  (Bestzeit-Moment). Backend: `called_at` an Spiel und Station (gesetzt beim Reservieren, `services/station_runtime.py`),
+  `tournaments.paused_until` (`PUT /api/tournaments/{tid}/pause`), `tournaments.round_sponsors`
+  (`PUT …/round-sponsors`), beide im Fähigkeiten-Inventar `services/competition_capabilities.py`. Neue Einstellungen
+  in `settings.tv_display`: `playlist`, `call_sound`, `report_minutes`, `stats`/`stats_every`,
+  `sponsor_moment`/`sponsor_every`, `sponsor_presented`, `sponsor_ticker`, `track_seconds`. Tailwind liest Regex-
+  Zeichenfolgen wie `[-:.]` in JS-Dateien als Klasse und bricht den Produktions-Build (Browser-Tests über den
+  Entwicklungsserver sehen das nicht).
+- Turnierbaum und Spieleliste: Internes nur für die Turnierleitung (PR #1216): `_build_bracket_payload` und
+  `list_tournament_matches_v2` geben ohne Turnier-Recht `public_match_view` aus, Phasen ohne `*_by`
+  (`public_stage_view`), der Baum trägt nie `billing`. Der Hinweis einer Station ist öffentlich (Event-Live-Seite),
+  das Admin-Feld sagt das.
+- App- und UI-Plan (Auswahl des Betreibers vom 7.10. aus den App-Vorschauen, private Artefakt-Links beim Betreiber):
+  Meilenstein 61 „Turniere: Fehler aus der App-Prüfung“ (#1132–#1139), 62 App-Aufbau I, 63 App-Aufbau II,
+  64 Ergebnisse am Handy, 65 Turniertag vor Ort, 66 Home neu, 67 Turnierseite und Turnierbaum, 68 Events I,
+  69 Community, Teams und Rückblicke (fällig 10.12.), 70 Events II, 71 Benachrichtigungen – Tickets #1143–#1213.
+  Grundsatz: Die Website (Handy und PC) kann alles, was die App kann, passend umgesetzt; Varianten werden
+  Einstellungen mit der Wahl des Betreibers als Vorgabe.
+- App-Aufbau I (Meilenstein 62; PR #1217): App mit den Tabs Home · Events · Community · Verein · Profil (jeder Tab
+  mit eigenem Verlauf; Seiten, Benachrichtigungen und App-Links öffnen über dem aktuellen Tab), eine Kopfzeile mit
+  Suche und Glocke in jeder Übersicht, Einstellungen am Zahnrad im eigenen Profil (Darstellung, Benachrichtigungen,
+  Sicherheit, Privatsphäre, Konto, Über die App). Website: untere Leiste am Handy mit denselben fünf Einträgen, neue
+  Seite `/verein`, `/profile` heißt „Einstellungen“, Jahreswertung und Erfolge im Menü „Community“ („Achievements“
+  heißt „Erfolge“, gespeicherte Menüs werden umbenannt), Benutzer-Menü mit Dashboard, Mein Profil, Einstellungen
+  (+ Mitgliederbereich); alte Adressen leiten weiter. Server: `GET /api/chats`, `GET /api/chats/unread`,
+  `POST /api/chats/{art}/{id}/read` (Sammlung `chat_reads`, „gelesen bis“ je Person; ein nie geöffneter Chat zählt
+  nur die letzten 3 Tage), öffentliches Profil mit `view_as=public` („So sehen dich andere“). Eine Liste im Code lässt
+  einen Test scheitern, wenn ein zweiter Weg zum selben Thema entsteht (#1150).
+- Geräteprüfung vor App 1.4.0 (PR #1297): Hinweise zeigen auf „Profil“ statt „Mehr“, Community springt nach dem
+  Anmelden zu den Chats, keine leere Linie über dem ersten Schalter der Einstellungen, Filterknöpfe der Events nicht
+  mehr abgeschnitten, der Begrüßungstitel wird schrittweise kleiner, statt „Willkomm/en“ zu trennen. Nachgänge:
+  #1295 (Deko-Platz an Karten, vor Halloween), #1296 (Kleinigkeiten).
+- App 1.4.0 / Build 90 (PR #1298): Version, `versionCode` und iOS-`buildNumber` 90, Changelog, „Was ist neu“
+  (8 Punkte). Gebaut mit `LIONSAPP_BUILD_DIR=C:/lsbrel`, weil `C:\lsb` ein Arbeitsordner war (das Release-Skript
+  nimmt den Bau-Ordner aus der Umgebungsvariable oder aus `buildDir` in `signing.json`); Tag
+  `mobile-v1.4.0-build90`, APK am Vereinsserver, das AAB lädt der Betreiber in den offenen Test.
+- Rollen bekommen nur, was sie brauchen (Meilenstein 48; PR #1294): Systemstatus und Admin-Startseite zeigen
+  Bereichen ohne System nur eine Zusammenfassung (`admin_routes._system_status_summary`, letzte Protokolle nur mit
+  Aktion und Zeit), Helfer-Listen für Fast Lap, Challenges und Turniere geben Nicht-Staff keine E-Mail und keine
+  Rolle (`f1_routes.assignable_users`, `list_challenge_staff`, `list_assignable_tournament_users`). Test
+  `test_role_data_minimal_flow.py`. `EventTVPage.test.jsx` friert die Uhr ein (scheiterte zu manchen Tageszeiten).
+- Browser-Installation auf GitHub (PR #1299): `apt` mit kurzen Zeitlimits (`/etc/apt/apt.conf.d/99-tls-timeouts`),
+  bis zu drei Versuche mit `timeout 300 npx playwright install --with-deps chromium`, dazwischen hängende
+  apt-Prozesse beenden; der Schritt darf 18, ein Teil der Browser-Tests 35 Minuten dauern.
+- Lokaler Check je Arbeitsordner (PR #1301): `scripts/local_check.py` leitet aus dem Ordnernamen `FOLDER_SLUG` ab;
+  außer im Haupt-Checkout heißen Test-Datenbank `tls_ci_<ordner>` und Compose-Projekt `tls-local-check-<ordner>`.
+  Zwei Ordner können gleichzeitig prüfen, die Container-Gruppe (feste Ports) nur einer.
+- Rollen nach Bereichen (Meilenstein 48; PR #1300, „Bereich statt Rang“, #287): Moderatoren nur Moderation
+  (`services/permissions.holds_area(user, "moderation")`: Meldungen, Wortfilter, Bildprüfung, Verwarnungen,
+  Chat-Sperren, Einsprüche, Direktnachrichten an jede Person); Turnierrechte, Fast-Lap-Zeiten, Event- und
+  News-Entwürfe, Exporte, Team-Verwaltung, Mitglieder-Inhalte und Admin-Medien nur aus Turnierleitung,
+  Verein/System oder einem Helfer-Einsatz (`tournament_permissions.GLOBAL_TOURNAMENT_STAFF_ROLES`). Bannen:
+  `BanBody.reason` (mindestens 5 Zeichen), Audit `user.ban` mit Grund, kein Selbst-Bann; Konten mit Adminbereich
+  oder Admin-Rolle (Rolle, Freigabe, Vorstandsposten, Dolibarr-Funktion – `ban_protected`, `ban_protected_ids`)
+  bannt nur der Superadmin, `GET /api/users` liefert `ban_protected`, die Benutzerliste zeigt dann statt des Knopfs
+  einen Satz. `docs/ROLLEN.md` neu, Test `test_moderator_scope_flow.py`. Folge-Ticket #1350.
+- Web-Plan (Auswahl des Betreibers vom 7.10. aus der Web-Vorschau, 78 von 80 Ideen, privater Artefakt-Link beim
+  Betreiber): Meilensteine 72–81 plus Tickets in 63 und 66–70, #1218–#1293.
+- Design-Plan (alle 50 Ideen der Design-Vorschau): Meilensteine 82 „Stil-System I“, 83 „Stil-System II“, 84 „Marke
+  und Bausteine“ plus Tickets in bestehenden Meilensteinen, #1302–#1349 und 41 Kommentare. Die sieben offenen Fragen
+  beantwortete der Betreiber mit Variante A (Kommentare an #1302, #1232, #1304, #1307, #1322, #1337): das Stil-System
+  kommt in einem Fenster (fünf PRs), Kleintext 14 px, Datum „Sa 23. Mai · 18:00“ (`formatWhen`).
+- Rechte-Antworten des Betreibers (7.10.): Superadmin-Konten sind nicht bannbar (erst die Rolle wegnehmen),
+  Chat-Sperren und Strikes für Admin-Konten nur durch den Superadmin, Team-Chats bleiben für Moderatoren zu – #1350.
 ---
 
 ## Teil B – Stand-Verlauf (eingefroren am 5. Oktober 2026)
