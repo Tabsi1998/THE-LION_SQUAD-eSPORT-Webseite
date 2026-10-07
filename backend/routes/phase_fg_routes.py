@@ -448,7 +448,6 @@ DEFAULT_NAV = {
         {"key": "club", "to": "/about", "label": "Verein", "visible": True, "order": 3, "children": [
             {"key": "about", "to": "/about", "label": "Über uns", "visible": True},
             {"key": "board", "to": "/board", "label": "Vorstand", "visible": True},
-            {"key": "values", "to": "/values", "label": "Werte & Ziele", "visible": True},
             {"key": "partners", "to": "/partners", "label": "Partner", "visible": True},
             {"key": "sponsors", "to": "/sponsors", "label": "Sponsoren", "visible": True},
             {"key": "members", "to": "/members", "label": "Vereinsmitglieder", "visible": True},
@@ -479,6 +478,8 @@ DEFAULT_NAV = {
 RETIRED_NAV_CHILD_KEYS = {
     # Jahreswertung und Erfolge stehen seit #1143 unter Community - gespeicherte Menüs verlieren sie hier.
     "esports": {"teams", "references", "achievements", "season"},
+    # „Werte & Ziele“ ist seit #1253 ein Abschnitt von „Über uns“ (/values leitet auf /about#werte weiter).
+    "club": {"values"},
     "community": {"members", "join"},
 }
 

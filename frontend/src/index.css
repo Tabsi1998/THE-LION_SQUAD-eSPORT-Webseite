@@ -2371,6 +2371,66 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   color: rgba(255, 255, 255, 0.14);
 }
 
+/* Zeitstrahl auf „Über uns“ (#1253): am Handy und Tablet senkrecht mit der Linie links, ab 1024 px abwechselnd links und
+   rechts der Mittellinie. */
+.tls-timeline { position: relative; display: grid; gap: 1.25rem; padding-left: 1.75rem; }
+.tls-timeline::before {
+  content: "";
+  position: absolute;
+  left: 0.55rem;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(41, 182, 232, 0.75), rgba(41, 182, 232, 0.12));
+}
+.tls-timeline__item { position: relative; }
+.tls-timeline__dot {
+  position: absolute;
+  left: -1.5rem;
+  top: 1.15rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 9999px;
+  background: var(--tls-cyan);
+  box-shadow: 0 0 0 4px rgba(41, 182, 232, 0.18);
+}
+@media (min-width: 1024px) {
+  .tls-timeline { padding-left: 0; gap: 1.5rem; }
+  .tls-timeline::before { left: 50%; margin-left: -1px; }
+  .tls-timeline__item { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 3.5rem; }
+  .tls-timeline__item[data-side="left"] .tls-timeline__card { grid-column: 1; }
+  .tls-timeline__item[data-side="right"] .tls-timeline__card { grid-column: 2; }
+  .tls-timeline__dot { left: calc(50% - 0.4rem); }
+}
+
+/* Vitrine (#1334): jeder Platz trägt sein Stück Regalbrett (feine Linie, leichter Schatten) - nebeneinander ein
+   durchgehendes Brett je Reihe. Gold schimmert beim Drüberfahren einmal ruhig; mit „Bewegung reduzieren“ nie. */
+.tls-trophy-shelf { row-gap: 2rem; }
+.tls-trophy-shelf__slot { position: relative; padding-bottom: 14px; min-width: 0; }
+.tls-trophy-shelf__slot::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 12px;
+  background: linear-gradient(180deg, #2a2a30, #141417);
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 10px 18px -8px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+.tls-trophy__shine { transform: skewX(-18deg); }
+@media (hover: hover) {
+  .tls-trophy--gold:hover .tls-trophy__shine,
+  .tls-trophy--gold:focus-visible .tls-trophy__shine {
+    animation: tls-trophy-shine calc(3 * var(--tls-motion-slow)) var(--tls-ease) 1 both;
+  }
+}
+@keyframes tls-trophy-shine {
+  from { transform: translateX(0) skewX(-18deg); }
+  to { transform: translateX(calc(110px * var(--tls-motion-on))) skewX(-18deg); }
+}
+
 /* Nachbarn treten zurück (#1080): fährt die Maus über eine Kachel, werden die anderen leiser. Nur mit Maus. */
 @media (hover: hover) {
   .tls-dim-siblings > * {

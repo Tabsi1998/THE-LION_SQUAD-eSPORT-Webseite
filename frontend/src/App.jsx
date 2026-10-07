@@ -200,7 +200,6 @@ const NotFoundPage = lazy(() => import("@/pages/ErrorPages").then((m) => ({ defa
 const ForbiddenPage = lazy(() => import("@/pages/ErrorPages").then((m) => ({ default: m.ForbiddenPage })));
 const ServerErrorPage = lazy(() => import("@/pages/ErrorPages").then((m) => ({ default: m.ServerErrorPage })));
 const BoardPage = lazy(() => import("@/pages/public/ClubPages").then((m) => ({ default: m.BoardPage })));
-const ValuesPage = lazy(() => import("@/pages/public/ClubPages").then((m) => ({ default: m.ValuesPage })));
 const CurrentSeasonRedirect = lazy(() => import("@/pages/public/CurrentSeasonRedirect"));
 
 function App() {
@@ -236,7 +235,8 @@ function App() {
           {/* Verein (#1147): alles vom Verein an einem Ort - Ziel des Eintrags „Verein“ in der Handy-Leiste. */}
           <Route path="/verein" element={<VereinPage />} />
           <Route path="/board" element={<BoardPage />} />
-          <Route path="/values" element={<ValuesPage />} />
+          {/* „Werte & Ziele“ ist seit #1253 ein Abschnitt von „Über uns“ - die alte Adresse leitet weiter. */}
+          <Route path="/values" element={<Navigate to="/about#werte" replace />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/sponsors" element={<SponsorsPage />} />
           <Route path="/partners" element={<PartnersPage />} />

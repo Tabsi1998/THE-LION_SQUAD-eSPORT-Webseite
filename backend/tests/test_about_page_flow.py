@@ -102,3 +102,70 @@ async def test_texts_are_editable_by_content_and_dolibarr_wins_for_founding_and_
     flow.act_as(await flow.add_user(role="player"))
     assert (await flow.put("/api/home/about/admin", json={"hero_title": "x"})).status_code == 403
     assert (await flow.get("/api/home/about/admin")).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_story_timeline_values_goals_and_club_photo_are_saved_in_order(flow):
+    """Über uns erzählt die Geschichte (#1253): Zeitstrahl, Werte mit Satz und Beispiel, Ziele und das Vereinsfoto mit
+    Fokuspunkt - in der gespeicherten Reihenfolge, nur eigene Bilder, ohne leere Einträge."""
+    # Ohne gespeicherte Werte: die drei Werte und fünf Ziele der früheren Seite „Werte & Ziele“, eigener Kopf.
+    page = (await flow.get("/api/home/about")).json()
+    assert [value["title"] for value in page["texts"]["values"]] == ["Rudel-Mentalität", "Fairplay", "Ambition"]
+    assert len(page["texts"]["goals"]) == 5 and page["texts"]["timeline"] == [] and page["texts"]["club_photo"] is None
+    assert page["texts"]["hero_title"] == "" and page["texts"]["hero_eyebrow"] == "Über uns"
+
+    editor = await flow.add_user(role="club_admin")
+    flow.act_as(editor)
+    saved = await flow.put("/api/home/about/admin", json={
+        "timeline": [
+            {"year": "2024", "title": "Erste LAN", "text": "42 Gäste.", "image_url": "/api/static/uploads/lan.jpg"},
+            {"year": "2023", "title": "Gründung", "text": "", "image_url": "javascript:alert(1)"},
+        ],
+        "values": [{"title": " Fairplay ", "text": "Wir gratulieren auch, wenn wir verlieren.", "example": "Nach jedem Match ein GG."}, {"title": "Mut", "text": "", "example": ""}],
+        "goals": ["**Heimat** schaffen", " ", "Nachwuchs fördern"],
+        "club_photo": {"url": "/api/static/uploads/team.jpg", "focus_x": 30, "focus_y": 70},
+    })
+    assert saved.status_code == 200, saved.text
+    flow.act_as(None)
+    texts = (await flow.get("/api/home/about")).json()["texts"]
+    assert [(row["year"], row["title"]) for row in texts["timeline"]] == [("2024", "Erste LAN"), ("2023", "Gründung")]
+    assert texts["timeline"][0]["image_url"] == "/api/static/uploads/lan.jpg" and texts["timeline"][1]["image_url"] == "", "nur eigene Bilder"
+    assert texts["values"] == [{"title": "Fairplay", "text": "Wir gratulieren auch, wenn wir verlieren.", "example": "Nach jedem Match ein GG."}, {"title": "Mut", "text": "", "example": ""}]
+    assert texts["goals"] == ["**Heimat** schaffen", "Nachwuchs fördern"]
+    assert texts["club_photo"] == {"url": "/api/static/uploads/team.jpg", "focus_x": 30, "focus_y": 70}
+
+    # Fehlende Pflichtangaben, Fokus außerhalb 0-100: abgelehnt; ein leeres Foto löscht es.
+    flow.act_as(editor)
+    assert (await flow.put("/api/home/about/admin", json={"timeline": [{"year": "", "title": "x"}]})).status_code == 422
+    assert (await flow.put("/api/home/about/admin", json={"club_photo": {"url": "/api/static/uploads/a.jpg", "focus_x": 140}})).status_code == 422
+    assert (await flow.put("/api/home/about/admin", json={"club_photo": None})).json()["texts"]["club_photo"] is None
+
+
+@pytest.mark.asyncio
+async def test_old_homepage_title_counts_as_unset_and_own_pillars_become_values(flow):
+    """Startseite und „Über uns“ haben nicht mehr denselben Kopf (#1253): ein gespeichertes „Ein Rudel. Eine Familie.“
+    gilt als nicht gesetzt. Selbst gepflegte Ein-Wort-Werte gehen nicht verloren - sie werden Werte ohne Satz."""
+    await flow.db.settings.insert_one({"id": "about_page", "hero_title": "Ein Rudel.\nEine Familie.", "pillars": ["Mut", "Teamgeist"]})
+    texts = (await flow.get("/api/home/about")).json()["texts"]
+    assert texts["hero_title"] == ""
+    assert texts["values"] == [{"title": "Mut", "text": "", "example": ""}, {"title": "Teamgeist", "text": "", "example": ""}]
+    # Die alte Vorgabe der Ein-Wort-Kacheln ersetzt die neue Vorgabe mit Sätzen.
+    await flow.db.settings.update_one({"id": "about_page"}, {"$set": {"pillars": ["Fairplay", "Gemeinschaft", "Erfolg", "Leidenschaft"]}})
+    texts = (await flow.get("/api/home/about")).json()["texts"]
+    assert [value["title"] for value in texts["values"]] == ["Rudel-Mentalität", "Fairplay", "Ambition"]
+
+
+@pytest.mark.asyncio
+async def test_values_page_leaves_the_menu_and_the_sitemap(flow):
+    """„Werte & Ziele“ ist ein Abschnitt von „Über uns“ (#1253): kein Menüeintrag mehr - auch nicht in einem gespeicherten
+    Menü - und kein Eintrag in der Sitemap; /values leitet im Browser auf /about#werte."""
+    nav = (await flow.get("/api/nav")).json()
+    club = next(item for item in nav["items"] if item.get("key") == "club")
+    assert all(child.get("to") != "/values" for child in club["children"])
+    await flow.db.cms_nav.delete_many({})
+    await flow.db.cms_nav.insert_one({"id": "main_nav", "items": [{"key": "club", "to": "/about", "label": "Verein", "visible": True, "order": 3, "children": [
+        {"key": "about", "to": "/about", "label": "Über uns", "visible": True}, {"key": "values", "to": "/values", "label": "Werte & Ziele", "visible": True},
+    ]}]})
+    club = next(item for item in (await flow.get("/api/nav")).json()["items"] if item.get("key") == "club")
+    assert [child["key"] for child in club["children"]][0] == "about" and all(child["key"] != "values" for child in club["children"])
+    assert "/values<" not in (await flow.get("/api/sitemap.xml")).text

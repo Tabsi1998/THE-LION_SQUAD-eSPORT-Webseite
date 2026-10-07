@@ -14,7 +14,7 @@ import { SkeletonCards } from "@/components/tls/Skeleton";
 import { BoardPortrait, VacancyPortrait } from "@/components/tls/BoardPortrait";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Heart, Target, Sparkles, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
 import { statutesHref } from "@/lib/statutes";
 
@@ -172,46 +172,5 @@ function StatutesBox({ statutes }) {
         </div>
       )}
     </section>
-  );
-}
-
-export function ValuesPage() {
-  useDocumentTitle("Werte & Ziele", "Fairplay, Zusammenhalt, Gaming-Kultur und Vereinsziele von THE LION SQUAD eSports.");
-  return (
-    <PublicLayout>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Verein", to: "/about" }, { label: "Werte & Ziele" }]} className="mb-6" />
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Identität</span>
-        <h1 className="mt-2 font-heading text-4xl md:text-5xl font-black uppercase">Werte & Ziele</h1>
-        <p className="mt-4 text-white/70 max-w-2xl">
-          Was uns ausmacht, wofür wir stehen, und wohin wir wollen.
-        </p>
-
-        <Reveal className="tls-reveal-grid mt-10 grid grid-cols-1 md:grid-cols-3 gap-5">
-          {[
-            { icon: Heart, title: "Rudel-Mentalität", text: "Wir gewinnen gemeinsam, wir verlieren gemeinsam, wir feiern gemeinsam. Niemand wird zurückgelassen." },
-            { icon: Sparkles, title: "Fairplay", text: "Respekt vor Gegnern, Schiedsrichtern, Teammates. Cheating, Toxic Behaviour und Diskriminierung haben bei uns keinen Platz." },
-            { icon: Target, title: "Ambition", text: "Spaß zuerst — aber wir wollen besser werden, lernen, wachsen. Ob Casual oder Competitive: Jeder Pixel zählt." },
-          ].map((v) => (
-            <div key={v.title} className="tls-reveal-item border border-white/10 rounded-sm p-6 bg-gradient-to-br from-white/[0.02] to-transparent">
-              <v.icon className="w-6 h-6 text-[#29B6E8] mb-3" />
-              <div className="font-heading text-lg font-black uppercase">{v.title}</div>
-              <p className="mt-2 text-sm text-white/70 leading-relaxed">{v.text}</p>
-            </div>
-          ))}
-        </Reveal>
-
-        <div className="mt-10 border-t border-white/10 pt-8">
-          <h2 className="font-heading text-2xl font-bold uppercase mb-4">Unsere Ziele</h2>
-          <ul className="space-y-3 text-white/80 max-w-2xl">
-            <li>🦁 <strong>Eine Heimat schaffen</strong> für eSports-Begeisterte aller Plattformen, Spiele und Skill-Level.</li>
-            <li>🏁 <strong>Reguläre Vereinsevents</strong> (online &amp; offline) mit Pokal, Preisen und gutem Essen.</li>
-            <li>🏆 <strong>Eigene Turnierserie</strong> mit Jahreswertung, Erfolgen und Hall of Fame.</li>
-            <li>🎮 <strong>Förderung des Nachwuchses</strong> — auch für Kinder &amp; Jugendliche, mit klaren Regeln und sicheren Strukturen.</li>
-            <li>🤝 <strong>Kooperationen mit anderen Vereinen</strong>, Streamern, Spielentwicklern und Sponsoren.</li>
-          </ul>
-        </div>
-      </div>
-    </PublicLayout>
   );
 }

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { Reveal } from "@/components/tls/Reveal";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { seoTextPreview } from "@/lib/textPreview";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { AvatarStack, CountLine, EntryRow, FieldChips, GameChip, MEDAL, MEDAL_RANK, MedalStat, PlacementBadge, RefButton, ReferenceCard, SectionTitle, bestPlacement, displayTitle, entriesOf, entryTitle, formatDate, gameKey, gameTitle, hasMember, medalOf, memberEntryOf, memberName, platformLabel, referenceGameName, timeOf } from "@/components/tls/references/referenceParts";
+import { CountLine, EntryRow, FieldChips, GameChip, MEDAL, MEDAL_RANK, MedalStat, PlacementBadge, RefButton, ReferenceCard, SectionTitle, bestPlacement, displayTitle, entriesOf, entryTitle, formatDate, gameKey, gameTitle, hasMember, medalOf, memberEntryOf, memberName, platformLabel, referenceGameName, timeOf } from "@/components/tls/references/referenceParts";
 import { Medal, Trophy, User, Users, X } from "lucide-react";
+import { TrophyShelf } from "@/components/tls/TrophyShelf";
 
 // Referenzen als Erfolgswand (#409, Design-Rework nach Rückmeldung des Betreibers): oben die
 // Medaillenbilanz des Vereins, dann die Trophäenwand mit allen Podestplätzen (Spiel-Cover, große
@@ -130,13 +130,13 @@ export default function ReferencesPage() {
         </div>
       </section>
 
-      {/* Trophäenwand: jeder Podestplatz als Trophäe */}
+      {/* Vitrine (#1334): jeder Podestplatz ein Pokal in seinem Metall auf einem Regalbrett - ohne Cover-Schriftzug dahinter */}
       {trophies.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12" data-testid="references-trophies">
-          <SectionTitle icon={Trophy} accent="#FFD700" eyebrow="Trophäenwand" title="Unsere Podestplätze" hint={`${trophies.length} ${trophies.length === 1 ? "Podestplatz" : "Podestplätze"}`} />
-          <Reveal className="tls-reveal-grid mt-6 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 -mx-4 px-4 sm:mx-0 sm:px-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:pb-0">
-            {trophies.map((item) => <TrophyCard key={item.id} item={item} />)}
-          </Reveal>
+          <SectionTitle icon={Trophy} accent="#FFD700" eyebrow="Vitrine" title="Unsere Podestplätze" hint={`${trophies.length} ${trophies.length === 1 ? "Podestplatz" : "Podestplätze"}`} />
+          <div className="mt-8 rounded-sm bg-[radial-gradient(ellipse_at_50%_0%,rgba(255,215,0,0.10),transparent_60%)] px-2 pt-4">
+            <TrophyShelf items={trophies} testId="reference-trophy" />
+          </div>
         </section>
       )}
 
@@ -283,44 +283,6 @@ export function ReferenceDetailPage() {
 }
 
 // ---------------------------------------------------------------- Bausteine
-
-// Trophäe: Spiel-Cover als Hintergrund, große Platzierung, Titel, Saison, Aufstellung.
-function TrophyCard({ item }) {
-  const medal = medalOf(item);
-  const tone = MEDAL[medal] || MEDAL.bronze;
-  const cover = item.game?.cover_url;
-  const people = entriesOf(item).flatMap((entry) => entry.lineup_members || []);
-  const bestEntry = entriesOf(item).find((entry) => Number(entry.placement) === bestPlacement(item)) || entriesOf(item)[0];
-  return (
-    <Link to={`/references/${item.id}`} data-testid={`reference-trophy-${item.id}`} className={`tls-card tls-reveal-item tls-card--own group relative shrink-0 w-[85vw] max-w-sm lg:w-auto lg:max-w-none snap-start overflow-hidden rounded-sm border ${tone.soft} bg-[#0F0F0F] min-h-[18rem] flex flex-col ${tone.glow}`}>
-      {cover && <img src={resolveMediaUrl(cover)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-40 tls-card__media" />}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/80 to-transparent" />
-      <div className={`absolute top-0 inset-x-0 h-1 bg-gradient-to-r ${tone.ring}`} />
-      <div className="relative p-5 flex flex-col h-full">
-        <div className="flex items-start justify-between gap-3">
-          <GameChip item={item} />
-          <span className={`text-[10px] uppercase tracking-widest font-black ${tone.text}`}>{tone.label}</span>
-        </div>
-        <div className="mt-5 flex items-center gap-4">
-          <PlacementBadge placement={bestPlacement(item)} medal={medal} size="lg" />
-          <div className="min-w-0">
-            <div className="font-heading text-xl md:text-2xl font-black uppercase leading-tight break-words group-hover:text-[#FFD700] transition">{displayTitle(item)}</div>
-            <div className="mt-1 text-xs text-white/55">{[item.league, item.season, formatDate(item.start_date)].filter(Boolean).join(" · ")}</div>
-          </div>
-        </div>
-        <div className="mt-auto pt-5 flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-widest font-bold text-white/40">{bestEntry?.kind === "solo" ? "Einzelstarter" : bestEntry?.team_name || "Team"}</div>
-            <AvatarStack members={people} className="mt-1.5" />
-          </div>
-          <div className="text-[10px] uppercase tracking-widest font-bold text-white/45 whitespace-nowrap">
-            {bestEntry?.team_count ? `von ${bestEntry.team_count} Teams` : bestEntry?.participant_count ? `von ${bestEntry.participant_count}` : ""}
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-}
 
 function GameTile({ active, onClick, title, logo, count, podiums, best, testId }) {
   return (

@@ -174,7 +174,7 @@ export default function VereinPage() {
                 <p>Wer wir sind, wofür wir stehen und wer im Vorstand für dich da ist.</p>
                 <div className="flex flex-wrap gap-3 text-xs font-bold uppercase tracking-wider">
                   <Link to="/board" className="text-[#29B6E8] hover:underline">Vorstand</Link>
-                  <Link to="/values" className="text-[#29B6E8] hover:underline">Werte &amp; Ziele</Link>
+                  <Link to="/about#werte" className="text-[#29B6E8] hover:underline">Werte &amp; Ziele</Link>
                   <Link to="/members" className="text-[#29B6E8] hover:underline">Vereinsmitglieder</Link>
                   <Link to="/contact" className="text-[#29B6E8] hover:underline">Kontakt</Link>
                 </div>

@@ -44,11 +44,13 @@ test("drei Zahlen, Chips aus den Feldern, Einträge mit eigener Platzierung und 
   expect(screen.getByTestId("references-stat-gold")).toHaveTextContent("1");
   expect(screen.getByTestId("references-stat-silver")).toHaveTextContent("0");
 
-  // Trophäenwand: nur der Podestplatz hängt dort, mit Medaille, Platz und Aufstellung.
+  // Vitrine (#1334): nur der Podestplatz steht dort - als Pokal in seinem Metall, mit Platz, Wettbewerb und Feldgröße.
   const trophies = screen.getByTestId("references-trophies");
   expect(trophies).toHaveTextContent("1 Podestplatz");
-  expect(screen.getByTestId("reference-trophy-r1")).toHaveTextContent("Winter Cup");
-  expect(screen.getByTestId("reference-trophy-r1")).toHaveTextContent("Gold");
+  expect(screen.getByTestId("reference-trophy-r1")).toHaveTextContent("1. PlatzWinter CupCall of Duty");
+  expect(screen.getByTestId("reference-trophy-r1").querySelector("svg")).toHaveAttribute("data-medal", "gold");
+  expect(screen.getByTestId("reference-trophy-r1")).toHaveAttribute("href", "/references/r1");
+  expect(trophies.querySelector("img")).toBeNull();
   expect(screen.queryByTestId("reference-trophy-r2")).toBeNull();
 
   // Bilanz je Spiel: Teilnahmen und Podestplätze je Spiel.

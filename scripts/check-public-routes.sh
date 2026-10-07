@@ -110,6 +110,7 @@ while IFS='|' read -r legacy canonical; do
 done <<'ROUTES'
 /der-verein|/about
 /ueber-uns/|/about
+/values|/about#werte
 /datenschutzerklaerung|/privacy
 /datenschutz/|/privacy
 /impressum|/imprint

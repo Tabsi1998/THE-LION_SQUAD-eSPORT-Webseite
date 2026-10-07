@@ -328,9 +328,31 @@ ABOUT_TEXT_FIELDS = (
     "hero_eyebrow", "hero_title", "hero_text", "values_title", "values_text", "games_title", "games_text",
     "offline_title", "offline_text", "cta_title", "cta_text", "purpose",
 )
+# Über uns erzählt die Geschichte (#1253): eigener Kopf statt des Startseiten-Satzes („Ein Rudel. Eine Familie.“ - ein so
+# gespeicherter Titel gilt als nicht gesetzt), ein Zeitstrahl, das Vereinsfoto und die Werte mit Satz und Beispiel samt den
+# Zielen von der früheren Seite „Werte & Ziele“ (/values leitet auf /about#werte weiter). Ein leerer Titel heißt: die Seite
+# schreibt „Seit <Gründungsjahr> ein Rudel“.
+LEGACY_HERO_TITLE = "Ein Rudel.\nEine Familie."
+LEGACY_PILLARS = ["Fairplay", "Gemeinschaft", "Erfolg", "Leidenschaft"]
+DEFAULT_VALUES = [
+    {"title": "Rudel-Mentalität", "text": "Wir gewinnen gemeinsam, wir verlieren gemeinsam, wir feiern gemeinsam. Niemand wird zurückgelassen.", "example": ""},
+    {"title": "Fairplay", "text": "Respekt vor Gegnern, Schiedsrichtern und Teammates. Cheating, Toxic Behaviour und Diskriminierung haben bei uns keinen Platz.", "example": ""},
+    {"title": "Ambition", "text": "Spaß zuerst – aber wir wollen besser werden, lernen und wachsen. Ob Casual oder Competitive: Jeder Pixel zählt.", "example": ""},
+]
+DEFAULT_GOALS = [
+    "**Eine Heimat schaffen** für eSports-Begeisterte aller Plattformen, Spiele und Skill-Level.",
+    "**Reguläre Vereinsevents** online und offline – mit Pokal, Preisen und gutem Essen.",
+    "**Eigene Turnierserie** mit Jahreswertung, Erfolgen und Hall of Fame.",
+    "**Förderung des Nachwuchses** – auch für Kinder und Jugendliche, mit klaren Regeln und sicheren Strukturen.",
+    "**Kooperationen** mit anderen Vereinen, Streamern, Spielentwicklern und Sponsoren.",
+]
+TIMELINE_MAX = 30
+VALUES_MAX = 8
+GOALS_MAX = 10
+
 ABOUT_DEFAULTS = {
-    "hero_eyebrow": "Der Verein",
-    "hero_title": "Ein Rudel.\nEine Familie.",
+    "hero_eyebrow": "Über uns",
+    "hero_title": "",
     "hero_text": "THE LION SQUAD ist ein offiziell eingetragener österreichischer eSports-Verein mit einem klaren Ziel: **eSports und Gaming fördern** — und zeigen, was Gaming wirklich bedeutet.",
     "values_title": "Mehr als nur Zocken",
     "values_text": "Bei uns geht es nicht nur ums Zocken, sondern um **Gemeinschaft, Spaß und Zusammenhalt**. Egal ob Anfänger oder Pro — niemand bleibt allein oder wird im Stich gelassen.\n\n"
@@ -351,6 +373,11 @@ ABOUT_DEFAULTS = {
     "nonprofit": None,
     # Der Verein in Zahlen (#621): welche Zähler die Seite zeigt, in dieser Reihenfolge.
     "numbers_shown": ["prizes", "tournaments_completed", "members", "years_active"],
+    "values": DEFAULT_VALUES,
+    "goals": DEFAULT_GOALS,
+    "timeline": [],
+    # Das Vereinsfoto (#1253, #1327): eines für Über uns, später auch Anmelden und Startseite - mit Fokuspunkt in Prozent.
+    "club_photo": None,
 }
 # Zähler, die der Betreiber zeigen kann. „achievements“ (vergebene Erfolge) bleibt im JSON, ist aber keine Wahl mehr (#621).
 NUMBER_KEYS = ("prizes", "tournaments_completed", "members", "years_active", "tournaments", "events", "participations")
@@ -358,6 +385,25 @@ EURO_RE = re.compile(r"(?:€|eur)\s*(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{1,2})?)
 # Was „auch offline“ heißt: Termine, bei denen man sich trifft - keine Online-Events, keine internen Termine.
 OFFLINE_EVENT_TYPES = ("club_evening", "lan_party", "grill_evening", "expo", "community_evening", "public_event", "mario_kart_event", "tournament_finals", "sponsor_action")
 PUBLIC_TOURNAMENT_QUERY = {"status": {"$nin": ["draft", "cancelled"]}, "is_public": {"$ne": False}}
+
+
+class TimelineEntry(BaseModel):
+    year: str = Field(..., min_length=1, max_length=20)
+    title: str = Field(..., min_length=1, max_length=120)
+    text: Optional[str] = Field("", max_length=400)
+    image_url: Optional[str] = Field("", max_length=500)
+
+
+class ValueEntry(BaseModel):
+    title: str = Field(..., min_length=1, max_length=60)
+    text: Optional[str] = Field("", max_length=400)
+    example: Optional[str] = Field("", max_length=300)
+
+
+class ClubPhoto(BaseModel):
+    url: str = Field("", max_length=500)
+    focus_x: int = Field(50, ge=0, le=100)
+    focus_y: int = Field(50, ge=0, le=100)
 
 
 class AboutTexts(BaseModel):
@@ -380,6 +426,10 @@ class AboutTexts(BaseModel):
     purpose: Optional[str] = Field(None, max_length=1000)
     nonprofit: Optional[bool] = None
     numbers_shown: Optional[List[str]] = None
+    timeline: Optional[List[TimelineEntry]] = None
+    values: Optional[List[ValueEntry]] = None
+    goals: Optional[List[str]] = None
+    club_photo: Optional[ClubPhoto] = None
 
 
 def _clean_number_keys(values) -> list[str]:
@@ -413,6 +463,46 @@ def _clean_lines(values, *, limit: int = 12, max_length: int = 80) -> list[str]:
     return out[:limit]
 
 
+def _media_url(value) -> str:
+    """Nur eigene Uploads oder https-Adressen als Bild - nichts anderes landet in der Seite."""
+    text = str(value or "").strip()[:500]
+    return text if text.startswith("/api/static/uploads/") or text.startswith("https://") else ""
+
+
+def _clean_timeline(rows) -> list[dict]:
+    out = []
+    for row in rows or []:
+        row = row if isinstance(row, dict) else {}
+        year, title = str(row.get("year") or "").strip()[:20], str(row.get("title") or "").strip()[:120]
+        if year and title:
+            out.append({"year": year, "title": title, "text": str(row.get("text") or "").strip()[:400], "image_url": _media_url(row.get("image_url"))})
+    return out[:TIMELINE_MAX]
+
+
+def _clean_values(rows) -> list[dict]:
+    out = []
+    for row in rows or []:
+        row = row if isinstance(row, dict) else {}
+        title = str(row.get("title") or "").strip()[:60]
+        if title:
+            out.append({"title": title, "text": str(row.get("text") or "").strip()[:400], "example": str(row.get("example") or "").strip()[:300]})
+    return out[:VALUES_MAX]
+
+
+def _clean_photo(value) -> dict | None:
+    value = value if isinstance(value, dict) else {}
+    url = _media_url(value.get("url"))
+    if not url:
+        return None
+
+    def percent(key):
+        try:
+            return max(0, min(100, int(value.get(key, 50))))
+        except (TypeError, ValueError):
+            return 50
+    return {"url": url, "focus_x": percent("focus_x"), "focus_y": percent("focus_y")}
+
+
 async def _about_texts(db) -> dict:
     saved = await db.settings.find_one({"id": ABOUT_SETTINGS_ID}, {"_id": 0, "id": 0}) or {}
     texts = dict(ABOUT_DEFAULTS)
@@ -423,8 +513,21 @@ async def _about_texts(db) -> dict:
             texts[key] = _clean_number_keys(value) or list(ABOUT_DEFAULTS[key])
         elif key in ("founded_year", "founded_on", "nonprofit"):
             texts[key] = value
+        elif key == "timeline":
+            texts[key] = _clean_timeline(value)
+        elif key == "values":
+            texts[key] = _clean_values(value) or list(DEFAULT_VALUES)
+        elif key == "goals":
+            texts[key] = _clean_lines(value, limit=GOALS_MAX, max_length=200)
+        elif key == "club_photo":
+            texts[key] = _clean_photo(value)
+        elif key == "hero_title" and str(value or "") == LEGACY_HERO_TITLE:
+            continue   # derselbe Satz wie die Startseite: gilt als nicht gesetzt (#1253)
         elif key in ABOUT_DEFAULTS and value not in (None, ""):
             texts[key] = str(value)
+    # Früher gepflegte Ein-Wort-Werte (eigene, nicht die Vorgabe) werden zu Werten ohne Satz - nichts geht verloren.
+    if "values" not in saved and saved.get("pillars") and _clean_lines(saved.get("pillars")) != LEGACY_PILLARS:
+        texts["values"] = [{"title": word, "text": "", "example": ""} for word in _clean_lines(saved.get("pillars"))][:VALUES_MAX]
     return texts
 
 
@@ -589,6 +692,14 @@ async def about_admin_save(body: AboutTexts, me: dict = Depends(require_area("co
             updates[key] = _clean_lines(value)
         elif key == "numbers_shown":
             updates[key] = _clean_number_keys(value)
+        elif key == "timeline":
+            updates[key] = _clean_timeline(value)
+        elif key == "values":
+            updates[key] = _clean_values(value)
+        elif key == "goals":
+            updates[key] = _clean_lines(value, limit=GOALS_MAX, max_length=200)
+        elif key == "club_photo":
+            updates[key] = _clean_photo(value)
         elif key == "founded_on":
             # Ein gültiger Tag, nicht in der Zukunft - oder leer (löscht ihn).
             day = founding.parse_day(value) if value else None
