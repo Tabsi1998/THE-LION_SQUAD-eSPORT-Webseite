@@ -124,9 +124,10 @@ Repository.
 1. **Jede Arbeit hat ein Issue** – auch Doku. Labels: `bug` oder `enhancement` plus `app`, `web`, `admin`
    oder `backend`. Jedes Issue bekommt sofort einen Meilenstein.
 2. **Ein Zweig je Issue-Paket** ab `main`: `feat/<nr>-<stichwort>`, `fix/<nr>-<stichwort>`,
-   `release/<version>-build<N>` für ein App-Paket, `docs/…` für reine Doku. Gearbeitet wird **nur im
-   Haupt-Checkout**, ein Zweig nach dem anderen – keine Arbeitsbäume neben dem Ordner (einzige Ausnahme:
-   `C:\lsb`, Abschnitt 7) und kein Zweigwechsel, solange `local_check.py` läuft.
+   `release/<version>-build<N>` für ein App-Paket, `docs/…` für reine Doku. Gearbeitet wird in den **vier
+   Arbeitsordnern** (Haupt-Checkout, `C:\lsb`, `C:\lsc`, `C:\lsd`; Abschnitt 9), je Ordner ein Zweig – keine
+   weiteren Arbeitsbäume (außer kurz für einen Release-Bau, Abschnitt 7) und kein Zweigwechsel, solange
+   `local_check.py` läuft.
 3. **App-Issues werden je Version gesammelt**, in **einem** PR umgesetzt und danach als ein Build
    veröffentlicht. Zusammengehöriges kommt in einen PR.
 4. **Der PR-Text schließt die Issues mit `Closes #N`** – ein Schlüsselwort je Issue (`Closes #a, closes
@@ -335,6 +336,8 @@ einem Gebiet dessen Abschnitt lesen. Diese treffen fast jeden PR:
   Passkeys in der App nicht.
 - Gebaut wird im Git-Worktree `C:\lsb` (ohne Leerzeichen im Pfad; das Skript legt ihn an und hält ihn
   aktuell). Das Skript verlangt den Haupt-Checkout auf `main` = `origin/main` ohne Änderungen.
+  Arbeitet in `C:\lsb` gerade ein Zweig, in einem anderen Ordner bauen: `LIONSAPP_BUILD_DIR=C:/lsbrel` (oder
+  `buildDir` in `signing.json`), danach `git worktree remove --force C:/lsbrel`.
 - Vor dem Build die Metro-Caches leeren (`%LOCALAPPDATA%\Temp\metro-cache` und
   `metro-file-map-expo-*`), danach in APK und AAB `assets/index.android.bundle` prüfen:
   `https://lionsquad.at` muss darin stehen, eine Probe-Adresse (`10.0.2.2`) nicht.
@@ -378,47 +381,46 @@ den ausgelieferten Skripten suchen.
 
 ---
 
-## 9. Letzter Stand (7. Oktober 2026, Nachmittag)
+## 9. Letzter Stand (7. Oktober 2026, Nacht)
 
 **Ersetzen, nicht anhängen** – höchstens eine Seite. Was davor war: `docs/HISTORIE.md` Teil B.
 
-- **`main`** steht nach #1109 (`0b14ebcc`). Gemergt am 7.10.: #1100 (App-Bewegung), #1101 (Doku), #1102 (mehrtägige
-  Events, #884), #1103 und #1105 (Store-Knöpfe, #1084), #1104 (Anmeldung im Discord, #885), #1106 und #1107
-  (Jahreszeiten IV, Web und App), #1108 (App-Listen, #1085), #1109 (Lücken aus Meilenstein 56).
-- **Meilenstein 56 „Oberfläche“** ist geschlossen. Die Prüfung vom 7.10. fand neun nur teilweise erledigte Tickets;
-  #1108/#1109 haben sie nachgezogen. Neu: `tls-btn--danger`, der Wächter `lib/buttons.test.js` (neue eigene
-  Knopf-Stile fallen auf), Seitenwechsel über View Transitions (`lib/viewTransition.js`, nur nach Link-Klicks).
-- **Meilenstein 57 „Jahreszeiten IV“:** #1087–#1090 zu (Web #1106, App #1107). Offen #1091–#1094: Lichterkette,
-  normale Ostereier, Luftschlangen und Wimpel hängen nicht an Karten (Kopf, Footer, Seitenrand). Entscheidung des
-  Betreibers (7.10.): Variante B – diese Deko kommt zusätzlich an Karten und reagiert dort, in Web und App.
-- **Events II** (46) ist fertig. Die eine Event-Anmeldung liegt in `services/event_registration.py` (Formular und
-  Bot), Turniere über `self_register(…, via)`. Event-Erinnerungen verschickt die Website keine – je Tag erinnern
-  ICS-Datei und Discord-Termin.
-- **TV und Beamer** (Auswahl vom 7.10. aus der TV-Vorschau, privater Artefakt-Link beim Betreiber): Meilensteine 58
-  (Grundlage, #1110–#1114), 59 (Turnierbaum, #1115–#1120), 60 (Ablauf, Hallen-Tafel, Fast Lap, #1121–#1127).
-  Entscheidungen in #1110, #1113, #1116: Varianten werden Einstellungen unter „TV & Beamer“ (Vorgabe = Wahl des
-  Betreibers), der Hallen-TV läuft mit einem widerrufbaren Anzeige-Schlüssel im Link, Einstellungen je Bildschirm
-  über den Link, „live“ am TV in Rot. 58 ist PR #1128 (Einstellungen `settings.tv_display`, Anzeige-Schlüssel =
-  Speziallink mit der einzigen Freigabe `display`, gespeichert nur als Hash, Antwort `display_bracket_payload`).
-- **Stabilisierung 48** und die Audit-Meilensteine 52–55 warten auf die Audit-Unterlagen
-  (`C:\GIT\lion-audit-2026-10-06\…`, noch nicht auf diesem Rechner) und das OK des Betreibers. Nichts erfinden.
-- **Server:** eingespielt bis #1109 (7.10. nachmittags; geprüft über das Stylesheet und `/api/settings/public`).
-  Was danach zu klicken ist, steht in `UMBAUPLAN.md` „Nach dem Update vom 7.10. (Nachmittag)“.
-- **App:** Build 89 (1.3.0) liegt beim Betreiber für den offenen Test. Der nächste Build trägt #942 (Sitzungen),
-  #1100/#1108 (Bewegung, Listen) und #1107 (Saison-Reaktionen – vor dem Build einmal im Emulator ansehen).
-- **Antworten zu PR #1128 (7.10.):** TV-Schlüssel laufen eine Woche nach Turnierende von selbst ab; auf den
-  TV-Seiten kein Cookie-Hinweis (dort auch keine Statistik). Wird in #1128 nachgezogen.
-- **Offen beim Betreiber:** Build 89 in den offenen Test; die
-  Audit-Unterlagen; Sammelkanal + „Webhooks verwalten“ (#966); alte Passkeys am Handy; SHA-256-Fingerabdrücke.
+- **`main`** steht nach #1300 (`82660594`). Gemergt am 7.10. nach dem letzten Doku-Stand (#1129): #1128, #1131,
+  #1215 (TV I–III), #1130 (Jahreszeiten IV, Variante B), #1141, #1216, #1294 (Internes nur für die Turnierleitung,
+  Rollen-Daten), #1142, #1214, #1299 (CI), #1217 (App-Aufbau I), #1297 (Geräteprüfung), #1298 (App 1.4.0), #1301
+  (lokaler Check je Ordner), #1300 (Rollen nach Bereichen).
+- **Geschlossen:** Meilensteine 56–60 und 62. **Als Nächstes offen:** 61 „Turniere: Fehler aus der App-Prüfung“
+  (#1132–#1140; #1132 Entscheidung B: online melden Spieler, der Gegner bestätigt; die Antworten zu #1133, #1134,
+  #1137 und #1139 stehen in den Tickets) und #1350 (Rollen II).
+- **App:** Build 90 (1.4.0) ist gebaut (Tag `mobile-v1.4.0-build90`, APK am Vereinsserver); der Betreiber lädt das
+  AAB in den offenen Test – es ersetzt Build 89, der noch bei Google lag. Nachgänge #1295, #1296.
+- **Rollen** seit #1300: Bereich statt Rang (`docs/ROLLEN.md`). Moderatoren nur Moderation; Turnierrechte aus
+  Turnierleitung, Verein/System oder einem Helfer-Einsatz; Bannen mit Grund, Admin-Konten nur durch den Superadmin.
+- **Pläne vom 7.10.** (Auswahl des Betreibers aus den Vorschauen, private Artefakt-Links beim Betreiber): App 61–71
+  (#1132–#1213), Web 72–81 (#1218–#1293), Design 82–84 (#1302–#1349). Das Stil-System (82–84) kommt in einem
+  Fenster, wenn kein anderer Web-Zweig offen ist – es ändert rund 200 Dateien. Der Admin-Plan (alle 56 Ideen) folgt.
+  Grundsätze: Die Website kann alles, was die App kann; Varianten werden Einstellungen mit der Wahl des Betreibers
+  als Vorgabe; jedes Thema an genau einem Ort.
+- **In Arbeit** (je Ordner ein Zweig, Commits nur lokal bis zum Review): Haupt-Checkout `feat/73-tempo` (73),
+  `C:\lsb` `feat/72-web-fehler-1` (72), `C:\lsc` `feat/79-verein` (79), `C:\lsd` `feat/69-community` (69, fällig
+  10.12.). Der erste freie Ordner nimmt Meilenstein 61.
+- **Vier Arbeitsordner** (Freigabe des Betreibers vom 7.10.): Haupt-Checkout, `C:\lsb`, `C:\lsc`, `C:\lsd` –
+  Worktrees desselben Repos, venvs unter `~/.local-ci/<Ordnername>/venv`. Seit #1301 eigene Test-Datenbank
+  (`tls_ci_<ordner>`, im Haupt-Checkout `tls_ci`) und eigenes Compose-Projekt; höchstens zwei lokale Checks
+  gleichzeitig, die Container-Gruppe nur in einem Ordner. Browser-Ports 3105 (Haupt), 3106 (lsb), 3107 (lsc),
+  3108 (lsd); von Hand im Haupt-Checkout `DB_NAME=tls_ci_main`.
+- **Server:** eingespielt bis #1109. Ausstehend: `update.sh` für alles ab #1128; Klickschritte in `UMBAUPLAN.md`
+  „Nach dem Update vom 7.10. (Abend)“.
+- **Offen beim Betreiber:** AAB von Build 90 in den offenen Test; `update.sh`; die Audit-Unterlagen
+  (`C:\GIT\lion-audit-2026-10-06\…`) für die übrigen Tickets in 48 und 52–55 – nichts erfinden; Sammelkanal +
+  „Webhooks verwalten“ (#966); alte Passkeys am Handy; SHA-256-Fingerabdrücke.
 - **Fristen:** am **2.11.2026** laufen die drei Ausnahmen im Sicherheitscheck der App ab (`node-forge`, `braces`,
   `sprintf-js`; noch ohne Fix). `postcss-selector-parser` (frontend, nur beim Bauen): Fix nur in 7.x, Tailwind 3
   braucht 6.x – mit dem nächsten Tailwind heben.
-- **Zweiter Ordner `C:\lsb`** (Worktree desselben Repos) ist die einzige Ausnahme neben dem Haupt-Checkout. Zwei
-  lokale Checks nie gleichzeitig (gemeinsame Test-Datenbank `tls_ci`, gemeinsames Compose-Projekt); von Hand im
-  zweiten Ordner `DB_NAME=tls_ci_lsb` und `E2E_PORT=3106`.
 - **Arbeitsweise bei gestapelten PRs seit dem 6.10.:** nach einem Squash-Merge der Basis den nächsten Zweig nicht
   rebasen (kollidiert mit dem Squash), sondern `git commit-tree <zweig>^{tree} -p origin/main -F msg` und den Zweig
-  darauf setzen (Rezept in `docs/STOLPERSTEINE.md`). Windows-Checkout ist CRLF: Tests, die Dateien lesen,
+  darauf setzen (Rezept in `docs/STOLPERSTEINE.md`). Hat `main` inzwischen weitere Merges, stattdessen
+  `git rebase --onto origin/main <alte-basis> <zweig>`. Windows-Checkout ist CRLF: Tests, die Dateien lesen,
   normalisieren Zeilenenden.
 
 ---
