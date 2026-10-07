@@ -3625,9 +3625,53 @@ Die alte Fassung im Ganzen zeigt `git show 279c53c3:CLAUDE.md`.
 - App 1.3.0, Build 89 (PR #979; `mobile/app.json`, `package.json`, `package-lock.json`, `CHANGELOG.md`,
   `RELEASES.md`, `src/whatsnew.json`): Version 1.3.0 / `versionCode` 89; gebaut lokal mit
   `npm run release:local -- --aab` (erster Build nach Lockfile-Änderung), Tag `mobile-v1.3.0-build89`,
-  APK am Vereinsserver, AAB für den offenen Test bei Google Play (Versionshinweis im PR #979).- App-Bewegung (#1085; PR #1100, offen): `lib/motion.ts` (Werte aus `theme.motion`, `PRESS_SCALE` 0,98,
+  APK am Vereinsserver, AAB für den offenen Test bei Google Play (Versionshinweis im PR #979).
+- App-Bewegung (#1085; PR #1100): `lib/motion.ts` (Werte aus `theme.motion`, `PRESS_SCALE` 0,98,
   `staggerMs` 70 ms bis acht Stufen, `motionEasing`), `FadeIn` mit den Web-Dauern, `ContentCard`/`Button` geben
   beim Antippen nach, `StatusBadge.LiveDot` mit Ring (Animated, `useReduceMotion`). Wirkt mit dem nächsten Build.
+- Doku-Stand 7.10. nachts (PR #1101): HISTORIE #1067 bis #1100, `CLAUDE.md` §9, Umbauplan-Zeile „Nach dem Update vom
+  7.10.“, Stolpersteine der Oberflächen-Pakete.
+- Mehrtägige Events (#884; PR #1102; Web, App, Backend): `services/event_days.py` (Tage prüfen, Wiener Zeit über die
+  Zeitumstellung, Ende nach Mitternacht, Zeitraum ableiten, `schedule_view` mit Stand je Tag, gemeinsame Texte für
+  alle Kanäle), Phase „Tag 2/3 läuft“ bzw. „Pause bis zum nächsten Tag“ (`public_phase.py`), Kalender und ICS je Tag
+  (`calendar_items.event_items`, `ics_bundle`), Discord-Termin je Tag (`discord_scheduled_days.<datum>`), Ankündigung,
+  Newsletter (`_event_when`), Startseite (in der Pause „bald“), App-Antworten und Tageszentrale mit dem Plan. Web:
+  `EventDaysSection.jsx` im Formular (Haken „Mehrere Tage mit eigenen Zeiten“), Block „Die Tage“ auf der Event-Seite,
+  Kalender-Knopf je Tag, `lib/eventDays.js`. App: Karte „Die Tage“, „Alle 3 Tage in meinen Kalender“.
+- Download-Knopf im Store-Stil (#1084; PR #1103, Nachtrag PR #1105): `components/tls/StoreButton.jsx` (Varianten
+  a/b/c in `index.css` `.tls-store`, gebaut ist B), im Streifen „Dabei sein“ Google Play und App Store mit dem
+  Apple-Zeichen; Links unter Auftritt → Branding (`play_store_url`, neu `app_store_url`), ohne Link „bald …“, das
+  offizielle Play-Badge ist weg.
+- Anmeldung im Discord (#885; PR #1104): `services/event_registration.py` ist die eine Event-Anmeldung für Formular und
+  Bot (`registered_via` web/discord, Audit `via`), Turniere über `self_register`; `services/discord_registration.py`
+  (`/anmelden`, `/abmelden`, private Zusammenfassung, „Verbindlich anmelden“, Warteliste, Event-Pflicht #875, Team
+  nur über den Kapitän), Knöpfe mit Kennung `tls:show|reg|unreg:…` als `DynamicItem` (überleben einen Neustart),
+  Regeln und Antwort-Bausteine als Blätter (`discord_registration_rules.py`, `discord_texts.py` – so meldet CodeQL
+  keine Import-Zyklen). Schalter je Event/Turnier und unter Verbindungen → Discord → Bot & Aktivität.
+- Jahreszeiten IV im Web (Meilenstein 57; PR #1106): `seasons/cardLift.js` (Karten-Signal: Deko fährt sofort mit,
+  „lift“ nach 250 ms, Ruhezeit je Karte, eine große Reaktion gleichzeitig, `createLiftOffsets` für Canvas-Ebenen),
+  `anchors.rectOf` misst gehobene Karten am Ruheplatz, `snow/shake.js` (Schnee rutscht ab, 90 s Nachwachsen),
+  `halloween/webTear.js` (Netz reißt, Neubau nach 60 s), Fledermäuse flattern, Ei der Eiersuche purzelt und zählt,
+  Konfetti wirbelt auf, Regen spritzt an der gehobenen Kante. Die Ausnahme „Karten mit Deko bleiben stehen“ gilt nur
+  noch mit `stillCards` (`html[data-season-still-cards]`).
+- Jahreszeiten IV in der App (Meilenstein 57; PR #1107): `seasons/cardLift.ts` (Antippen oder eine Viertelsekunde
+  Halten, Scrollen löst nichts aus), `snow/shake.ts` und `webTear.ts` rechnen wie im Web (Paritätstests), Fledermaus
+  flattert, Ei der Eiersuche purzelt; Karten lesen Berührungen nur mit (`cardLiftTouch`).
+- App-Listen gestaffelt (#1085; PR #1108): `useListEntrance()` und `ListItemFadeIn` in `components/FadeIn.tsx` – Start,
+  Events-Reiter und News; jeder Screen merkt sich gezeigte Karten, Aktualisieren blendet nicht neu ein.
+- Lücken aus Meilenstein 56 (PR #1109): gemeinsame Kartenklasse für Titel und Pfeil (`.tls-card__title`,
+  `.tls-card__arrow`), Sponsoren/Community/Team-Mitglieder als `tls-card`, Logo-Übersichten mit `tls-dim-siblings`,
+  Einblenden auf Über uns, Vereinsseiten, Sponsoren, Community; `useTilt` liefert eine Callback-Ref (Team-Kopf, Profil
+  griff vorher nie); Galerie fliegt beim Schließen zurück (`lib/galleryFly.js`, `useModalBehavior`), Fokus auf der
+  Kachel; Schritt-Leiste in Turnier- und Event-Anmeldung (`tournamentSteps`, `eventSteps`, schmale Darstellung mit
+  Zähler); rund 110 öffentliche Knöpfe auf `tls-btn` (neu `tls-btn--danger`, Fokus für alle), Wächter
+  `lib/buttons.test.js`; Seitenwechsel über View Transitions (`lib/viewTransition.js`, `ViewTransitions.jsx` legt
+  `navigator.push` nach einem Link-Klick in `document.startViewTransition`).
+- TV und Beamer (Auswahl des Betreibers vom 7.10. aus der TV-Vorschau, privater Artefakt-Link beim Betreiber): alle
+  17 Ideen als Meilensteine 58 (Grundlage: #1110 Einstellungsseite „TV & Beamer“ mit Anzeige-Schlüssel im Link,
+  #1111 lesbar aus 5 Metern, #1112 Beamer-Modus, #1113 Klartext statt Platzhalter, #1114 Jahreszeiten im Kopf),
+  59 (Turnierbaum: #1115–#1120) und 60 (Ablauf, Hallen-Tafel, Fast Lap: #1121–#1127). Varianten werden Einstellungen,
+  Vorgabe ist die Wahl des Betreibers (Ergebnis ohne Ton, Sponsoren Moment + „präsentiert von“, Laufband wählbar).
 ---
 
 ## Teil B – Stand-Verlauf (eingefroren am 5. Oktober 2026)

@@ -387,3 +387,43 @@ was hilft.
 - **Zwei lokale Checks gleichzeitig.** Ein versehentlich zweites `local_check.py` (gestartet, während das erste lief)
   teilt sich Port 3105 und die Logs – nur über die Prozess-ID beenden (`Stop-Process -Id`), nie über den Namen.
 
+## 7. Oktober 2026 – Discord-Anmeldung, Saison-Reaktionen, Werkzeuge
+
+- **Vitest, ESLint, Playwright von Hand mit Node 22** (`~/.local-toolchain/node-v22.23.2-win-x64`; `frontend/package.json`
+  verlangt ≥ 22.22.2). Mit Node 20 stirbt der Vitest-Fork-Worker mit „webidl.util.markAsUncloneable is not a function“
+  und meldet „no tests“.
+- **Vitest-Worker startet einmal nicht** („Failed to start forks worker … SyntaxError: Invalid or unexpected token“ beim
+  Laden von jsdom): ein Zufall beim Prozessstart, die Datei ist heil. Der zweite Lauf ist grün – nicht am Code suchen.
+- **CodeQL `py/cyclic-import` zählt auch Importe in Funktionen.** Ein Zyklus über verzögerte Importe (Anmeldung ↔ Bot ↔
+  Befehle ↔ Ankündigungen) erscheint als Hinweis am PR. Auflösen mit Blättern ohne Rückimporte
+  (`discord_texts.py`, `discord_registration_rules.py`); die verknüpfte Person direkt aus `platform_links` lesen statt
+  über den Bot.
+- **Discord-Knöpfe mit Kennung** (`custom_id`) als `discord.ui.DynamicItem` mit `client.add_dynamic_items(...)`:
+  Discord schickt die Kennung mit jedem Klick, die Knöpfe funktionieren so auch nach einem Neustart des Bots. Die
+  Vorlage (`template`) muss die ganze Kennung treffen (`fullmatch`).
+- **Gehobene Karten messen** (`seasons/anchors.rectOf`): `getBoundingClientRect` enthält das Anheben (`translateY(-5px)`).
+  Wer während des Anhebens misst, setzt Deko doppelt hoch – `rectOf` rechnet die Verschiebung von `.tls-card` heraus,
+  die Deko fährt per CSS mit (`data-season-lifted`, Eigenschaft `translate`, damit `transform` frei bleibt).
+- **Zeitmess-Test Schnee auf GitHub:** `snow-regression.spec.js` (Bildabstand unter 25 ms) reißt auf einem langsamen
+  GitHub-Rechner (Lauf über 20 Minuten); lokal grün. Den Job neu starten (`gh run rerun <id> --failed`), nicht die Grenze
+  senken.
+- **Git Bash: `a && b && (c) &`** schickt die ganze Kette in den Hintergrund, nicht nur `(c)` – die Ausgaben von `a` und
+  `b` gehen verloren. Hintergrund-Starts in einen eigenen Aufruf.
+- **Objekt-Ref an spät erscheinenden Elementen:** Ein Effekt mit `ref.current` läuft beim ersten Aufbau – zeigt die
+  Seite da noch „Lade …“, ist die Ref leer und der Effekt hängt nie an (so die Profil-Neigung bis #1078). Für
+  Verhalten an einem Element, das erst nach dem Laden erscheint, eine Callback-Ref (`useState`-Setter) nehmen.
+- **Klassen zusammenkleben:** `` `${base}tls-btn tls-btn--primary` `` ohne Leerzeichen macht aus dem letzten Wort von
+  `base` und `tls-btn` ein Wort – die Grundklasse fehlt, nur die Variante greift. Prüfen mit
+  `grep -rno '[}a-zA-Z0-9]tls-btn' frontend/src`.
+- **ESLint-Unterdrückungen:** Wird ein unterdrückter Fund behoben, bricht `eslint .` mit Code 2 ab („suppressions
+  left that do not occur anymore“). `npm run lint:prune` (`eslint . --prune-suppressions`) nimmt die alten Einträge
+  heraus.
+- **`role="dialog"` mit `onClick`** meldet jsx-a11y (`no-noninteractive-element-interactions`). Klick daneben über eine
+  eigene, unsichtbare Ebene hinter dem Inhalt (`aria-hidden`), die Bühne davor mit `relative`.
+- **View Transitions mit `BrowserRouter`:** Der Router startet selbst keine. `UNSAFE_NavigationContext` liefert die
+  History; nur `navigator.push` in `document.startViewTransition` legen (Links mit `state`/`replace` navigieren weiter
+  selbst) und das neue Bild erst freigeben, wenn die Seite steht (Layout-Effekt nach `ScrollManager`). Die
+  Login-Seiten haben kein `main#main-content`.
+- **Patch-Skripte, die mittendrin abbrechen,** haben die Dateien davor schon geschrieben – Umwandlungen deshalb so
+  bauen, dass ein zweiter Lauf schon Umgestelltes überspringt.
+- **Python 3.11:** In f-Strings darf im Ausdruck kein Backslash stehen (`re.sub(r'\s+', …)` erst vorher berechnen).
