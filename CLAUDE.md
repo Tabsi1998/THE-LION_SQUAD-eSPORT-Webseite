@@ -195,7 +195,14 @@ suchen.
   `page.route` nachgestellt, kein Backend).
 - Live-Aktualisierung: `hooks/useLiveRefresh.js`, `lib/apiInvalidation.js`,
   `components/tls/ApiInvalidationBridge.jsx` (Ressourcen-Schlüssel ohne Unterstriche).
-- ESLint mit `eslint-suppressions.json`; nach dem Auslagern von Code `npx eslint --prune-suppressions src`.
+- ESLint mit `eslint-suppressions.json`; ist ein unterdrückter Fund behoben, bricht `eslint .` mit Code 2 ab –
+  dann `npm run lint:prune`.
+- Bewegung (#1070): `--tls-motion-fast` 150 ms für Drücken und kleine Zustände, `--tls-motion-mid` 240 ms für Hover,
+  Farben, Einblenden und Seitenwechsel, `--tls-motion-slow` 420 ms für Bühnen, Galerie und Füllbalken; Kurve
+  `--tls-ease`. `--tls-motion-on` (0/1) schaltet mit „Bewegung reduzieren“ ab – Wege immer damit multiplizieren.
+  JS `lib/motion.js` (`MOTION`, `motionAllowed`), App `theme.motion`; `lib/motion.test.js` hält alle drei gleich.
+  Knöpfe nur über `tls-btn--primary|secondary|quiet|danger` (Wächter `lib/buttons.test.js` mit begründeten
+  Ausnahmen), Karten über `tls-card` mit `tls-card__title`/`tls-card__arrow`.
 - `e2e/admin-navigation.spec.js` **zählt die Einträge des Adminmenüs** (83 seit #900) – jeder neue
   Menüpunkt braucht die neue Zahl; zwei parallele PRs ergeben zusammen eine dritte.
 - `public/.well-known/assetlinks.json` (Schlüssel der App für Passkeys), `nginx.conf` (liefert Uploads
@@ -371,37 +378,44 @@ den ausgelieferten Skripten suchen.
 
 ---
 
-## 9. Letzter Stand (7. Oktober 2026, nachts)
+## 9. Letzter Stand (7. Oktober 2026, Nachmittag)
 
 **Ersetzen, nicht anhängen** – höchstens eine Seite. Was davor war: `docs/HISTORIE.md` Teil B.
 
-- **`main`** steht nach #1099 (`4826ea49`). Gemergt am 6./7.10.: #1066 (Doku), #1067 (Restore-Schreiberstopp, #1008),
-  #1068 (App-Sitzungen, #942), #1069 (Footer-Bänder), #1086, #1095, #1096, #1097, #1099 (Oberfläche Paket 1–5),
-  #1098 (Social-Logos Variante D). Offen: **#1100** (App-Bewegung, #1085) – fertig geprüft, wartet auf den Merge.
-- **Meilenstein 56 „Oberfläche: Bewegung und Feinschliff“** (aus der UI-Auswahl des Betreibers vom 6.10., Vorschau
-  als privater Artefakt-Link beim Betreiber): 14 von 16 Tickets zu. Offen: **#1084** Download-Knopf für die
-  LionsAPP (Variante A/B/C aus der Vorschau, Abschnitt 10, fehlt noch) und #1085 (mit #1100). Das offizielle
-  Google-Play-Badge darf nicht umgefärbt oder animiert werden – der Knopf wird ein eigener mit neutralem Symbol.
-- **Meilenstein 57 „Jahreszeiten IV: Deko reagiert auf Karten“** (#1087 Signal, #1088–#1094 je Deko): Idee des
-  Betreibers vom 6.10. spät. Grundregeln stehen in jedem Ticket (nur die Deko der gehobenen Karte, Auslöser nach
-  einer Viertelsekunde, einmal je Anheben mit Ruhezeit, nichts ohne Maus oder mit „Bewegung reduzieren“). Bis dahin
-  heben sich Karten mit Saison-Deko nicht (`html[data-season-intensity]` in `index.css`).
-- **Dolibarr III** (21) und **Klammern** (50) sind geschlossen; #772 (Jahreszeiten-Geräteabnahme) liegt in 55.
-- **Events II** (46): #884 (mehrtägige Events) ist auf dem lokalen Zweig `feat/884-mehrtaegige-events` begonnen
-  (`backend/services/event_days.py`, reine Rechnung, noch nirgends eingebunden; Patch-Skript im Scratchpad der
-  Sitzung) – wird nach dem Oberflächen-Meilenstein fortgesetzt, danach #885 (Anmeldung im Discord; braucht einen
-  gemeinsamen Anmelde-Dienst, heute liegt die Logik in `event_routes.register_for_event`).
-- **Stabilisierung 48:** alle 18 offenen Tickets verweisen auf `C:\GIT\lion-audit-2026-10-06\prepared-issue-drafts.json`
-  – der Ordner liegt noch nicht auf diesem Rechner; der Betreiber bringt ihn nach. Nichts erfinden.
-- **Server:** eingespielt bis #940 (Stand 5.10.). Alles seit #946 braucht `update.sh` (Backend-Image baut einmal neu,
-  Migration 4 läuft einmal). Zeilen in `UMBAUPLAN.md` „Nach dem Update vom 6.10.“ und „Nach dem Update vom 7.10.“.
-- **App 1.3.0 / Build 89** (`mobile-v1.3.0-build89`): AAB lädt der Betreiber in den offenen Test (Text in PR #979).
-  Nächster Build trägt #942 (Sitzungen), #1085 (Bewegung) und die vier Expo-Patches aus #1068.
-- **Offen beim Betreiber:** `update.sh`; Build 89 in den offenen Test; Merge #1100; Variante für #1084; die
+- **`main`** steht nach #1109 (`0b14ebcc`). Gemergt am 7.10.: #1100 (App-Bewegung), #1101 (Doku), #1102 (mehrtägige
+  Events, #884), #1103 und #1105 (Store-Knöpfe, #1084), #1104 (Anmeldung im Discord, #885), #1106 und #1107
+  (Jahreszeiten IV, Web und App), #1108 (App-Listen, #1085), #1109 (Lücken aus Meilenstein 56).
+- **Meilenstein 56 „Oberfläche“** ist geschlossen. Die Prüfung vom 7.10. fand neun nur teilweise erledigte Tickets;
+  #1108/#1109 haben sie nachgezogen. Neu: `tls-btn--danger`, der Wächter `lib/buttons.test.js` (neue eigene
+  Knopf-Stile fallen auf), Seitenwechsel über View Transitions (`lib/viewTransition.js`, nur nach Link-Klicks).
+- **Meilenstein 57 „Jahreszeiten IV“:** #1087–#1090 zu (Web #1106, App #1107). Offen #1091–#1094: Lichterkette,
+  normale Ostereier, Luftschlangen und Wimpel hängen nicht an Karten (Kopf, Footer, Seitenrand). Entscheidung des
+  Betreibers (7.10.): Variante B – diese Deko kommt zusätzlich an Karten und reagiert dort, in Web und App.
+- **Events II** (46) ist fertig. Die eine Event-Anmeldung liegt in `services/event_registration.py` (Formular und
+  Bot), Turniere über `self_register(…, via)`. Event-Erinnerungen verschickt die Website keine – je Tag erinnern
+  ICS-Datei und Discord-Termin.
+- **TV und Beamer** (Auswahl vom 7.10. aus der TV-Vorschau, privater Artefakt-Link beim Betreiber): Meilensteine 58
+  (Grundlage, #1110–#1114), 59 (Turnierbaum, #1115–#1120), 60 (Ablauf, Hallen-Tafel, Fast Lap, #1121–#1127).
+  Entscheidungen in #1110, #1113, #1116: Varianten werden Einstellungen unter „TV & Beamer“ (Vorgabe = Wahl des
+  Betreibers), der Hallen-TV läuft mit einem widerrufbaren Anzeige-Schlüssel im Link, Einstellungen je Bildschirm
+  über den Link, „live“ am TV in Rot. 58 ist PR #1128 (Einstellungen `settings.tv_display`, Anzeige-Schlüssel =
+  Speziallink mit der einzigen Freigabe `display`, gespeichert nur als Hash, Antwort `display_bracket_payload`).
+- **Stabilisierung 48** und die Audit-Meilensteine 52–55 warten auf die Audit-Unterlagen
+  (`C:\GIT\lion-audit-2026-10-06\…`, noch nicht auf diesem Rechner) und das OK des Betreibers. Nichts erfinden.
+- **Server:** eingespielt bis #1109 (7.10. nachmittags; geprüft über das Stylesheet und `/api/settings/public`).
+  Was danach zu klicken ist, steht in `UMBAUPLAN.md` „Nach dem Update vom 7.10. (Nachmittag)“.
+- **App:** Build 89 (1.3.0) liegt beim Betreiber für den offenen Test. Der nächste Build trägt #942 (Sitzungen),
+  #1100/#1108 (Bewegung, Listen) und #1107 (Saison-Reaktionen – vor dem Build einmal im Emulator ansehen).
+- **Antworten zu PR #1128 (7.10.):** TV-Schlüssel laufen eine Woche nach Turnierende von selbst ab; auf den
+  TV-Seiten kein Cookie-Hinweis (dort auch keine Statistik). Wird in #1128 nachgezogen.
+- **Offen beim Betreiber:** Build 89 in den offenen Test; die
   Audit-Unterlagen; Sammelkanal + „Webhooks verwalten“ (#966); alte Passkeys am Handy; SHA-256-Fingerabdrücke.
 - **Fristen:** am **2.11.2026** laufen die drei Ausnahmen im Sicherheitscheck der App ab (`node-forge`, `braces`,
-  `sprintf-js`). Dependabot meldet zusätzlich `postcss-selector-parser` (frontend, mittel) – `yarn audit:high` ist
-  grün, bei Gelegenheit heben.
+  `sprintf-js`; noch ohne Fix). `postcss-selector-parser` (frontend, nur beim Bauen): Fix nur in 7.x, Tailwind 3
+  braucht 6.x – mit dem nächsten Tailwind heben.
+- **Zweiter Ordner `C:\lsb`** (Worktree desselben Repos) ist die einzige Ausnahme neben dem Haupt-Checkout. Zwei
+  lokale Checks nie gleichzeitig (gemeinsame Test-Datenbank `tls_ci`, gemeinsames Compose-Projekt); von Hand im
+  zweiten Ordner `DB_NAME=tls_ci_lsb` und `E2E_PORT=3106`.
 - **Arbeitsweise bei gestapelten PRs seit dem 6.10.:** nach einem Squash-Merge der Basis den nächsten Zweig nicht
   rebasen (kollidiert mit dem Squash), sondern `git commit-tree <zweig>^{tree} -p origin/main -F msg` und den Zweig
   darauf setzen (Rezept in `docs/STOLPERSTEINE.md`). Windows-Checkout ist CRLF: Tests, die Dateien lesen,
