@@ -4,10 +4,10 @@ Lesen der Grundwerte geht ohne Anmeldung (die TV-Seiten laufen ohne); speichern,
 dürfen nur Admins mit dem Bereich Turniere. Jede Änderung unter /api/tv meldet der Änderungsstrom öffentlich als
 „tv“ - so übernehmen die Bildschirme neue Grundwerte ohne Neuladen, und ein widerrufener Schlüssel wirkt sofort.
 """
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator
 
 from auth import require_admin
 from database import get_db
@@ -16,6 +16,14 @@ from services.access_links import hash_access_token, new_access_token
 from services.tv_display import DISPLAY_GRANT, SETTINGS_ID, display_path, key_expires_at, key_label, public_payload
 
 router = APIRouter(prefix="/api/tv", tags=["tv"])
+
+
+class PlaylistEntry(BaseModel):
+    """Eine Folie der Wiedergabeliste (#1121): welche und wie viele Sekunden (3 bis 120)."""
+    model_config = ConfigDict(extra="forbid")
+
+    slide: Literal["tree", "live", "calls", "sponsor", "stats"]
+    seconds: Annotated[StrictInt, Field(ge=3, le=120)]
 
 
 class TvSettingsUpdate(BaseModel):
@@ -29,6 +37,24 @@ class TvSettingsUpdate(BaseModel):
     season_header: StrictBool | None = None
     reduce_motion: StrictBool | None = None
     result_sound: StrictBool | None = None
+    # Meilenstein 60 (#1121-#1127) - Grenzen wie in services/tv_display.py.
+    playlist: Annotated[list[PlaylistEntry], Field(min_length=1, max_length=5)] | None = None
+    call_sound: StrictBool | None = None
+    report_minutes: Annotated[StrictInt, Field(ge=1, le=30)] | None = None
+    stats: StrictBool | None = None
+    stats_every: Annotated[StrictInt, Field(ge=1, le=60)] | None = None
+    sponsor_moment: StrictBool | None = None
+    sponsor_every: Annotated[StrictInt, Field(ge=1, le=60)] | None = None
+    sponsor_presented: StrictBool | None = None
+    sponsor_ticker: StrictBool | None = None
+    track_seconds: Annotated[StrictInt, Field(ge=20, le=120)] | None = None
+
+    @field_validator("playlist")
+    @classmethod
+    def _each_slide_once(cls, value):
+        if value is not None and len({entry.slide for entry in value}) != len(value):
+            raise ValueError("Jede Folie darf in der Wiedergabeliste nur einmal vorkommen.")
+        return value
 
 
 class TvKeyCreate(BaseModel):

@@ -11,7 +11,8 @@ const { mockTvApi } = require("./fixtures/tvMock");
 const SHOTS = process.env.SHOT_DIR || "";
 const SIZES = [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }, { width: 3840, height: 2160 }];
 const LIMITS = { name: 2, other: 1.4 };
-const TREE = "/display/bracket/t1?key=tv-schluessel&pixel_shift=0";
+// Nur der Baum: seit Meilenstein 60 zeigt der Turnierbaum-TV eine Wiedergabeliste (#1121) - hier geht es um den Baum.
+const TREE = "/display/bracket/t1?key=tv-schluessel&pixel_shift=0&playlist=tree";
 const ago = (seconds) => new Date(Date.now() - seconds * 1000).toISOString();
 
 let T;

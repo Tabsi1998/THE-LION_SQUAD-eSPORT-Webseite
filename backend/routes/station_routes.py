@@ -144,9 +144,24 @@ async def update_station(sid: str, body: StationUpdate, me: dict = Depends(requi
     if updates.get("tournament_id"):
         await _ensure_tournament_unlocked(db, updates["tournament_id"])
     updates["updated_at"] = now_utc().isoformat()
-    await db.stations.update_one({"id": sid}, {"$set": updates})
+    change: dict = {"$set": updates}
+    # Ein Aufruf (#1122) gilt nur, solange die Station für genau dieses Spiel reserviert ist.
+    previous_match = (current or {}).get("current_match_id")
+    status_left = "status" in updates and updates["status"] != "reserved"
+    match_changed = "current_match_id" in updates and updates["current_match_id"] != previous_match
+    if status_left or match_changed:
+        change["$unset"] = {"called_at": ""}
+        if previous_match and (current or {}).get("called_at"):
+            await _forget_call(db, previous_match)
+    await db.stations.update_one({"id": sid}, change)
     s = await db.stations.find_one({"id": sid}, {"_id": 0})
     return s
+
+
+async def _forget_call(db, match_id: str | None) -> None:
+    """Der Aufruf eines Spiels ist vorbei (gestartet, freigegeben, umgeplant): „aufgerufen um“ fällt weg."""
+    if match_id:
+        await db.matches_v2.update_one({"id": match_id}, {"$unset": {"called_at": ""}})
 
 
 async def _assign_match_to_station(db, station: dict, match: dict, collection_name: str, start_now: bool = False) -> None:
@@ -161,7 +176,8 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
         raise HTTPException(status_code=409, detail="Match hat zu wenige Teilnehmer und kann nicht gestartet werden.")
     await db.stations.update_many(
         {"current_match_id": match["id"], "id": {"$ne": station["id"]}},
-        {"$set": {"current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()}},
+        {"$set": {"current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()},
+         "$unset": {"called_at": ""}},
     )
     now_iso = now_utc().isoformat()
     match_updates = {
@@ -169,16 +185,29 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
         "status": _station_match_status(match, start_now),
         "updated_at": now_iso,
     }
-    if start_now:
-        match_updates["started_at"] = now_iso
-        match_updates["scheduled_at"] = match.get("scheduled_at") or now_iso
-    await db.stations.update_one({"id": station["id"]}, {"$set": {
+    station_updates = {
         "current_match_id": match["id"],
         "current_match_type": collection_name,
         "status": "busy" if start_now else "reserved",
         "updated_at": now_iso,
-    }})
-    await db[collection_name].update_one({"id": match["id"]}, {"$set": match_updates})
+    }
+    match_change: dict = {"$set": match_updates}
+    station_change: dict = {"$set": station_updates}
+    if start_now:
+        match_updates["started_at"] = now_iso
+        match_updates["scheduled_at"] = match.get("scheduled_at") or now_iso
+        # Gestartet: der Aufruf ist vorbei.
+        match_change["$unset"] = {"called_at": ""}
+        station_change["$unset"] = {"called_at": ""}
+    else:
+        # Reservieren heißt „aufgerufen“ (#1122): die Aufruf-Tafel zählt ab jetzt bis zur geplanten Zeit, ohne Uhrzeit die
+        # „Zeit zum Antreten“. Wird dasselbe Spiel an derselben Station noch einmal zugewiesen, bleibt die erste Zeit.
+        same_call = station.get("current_match_id") == match.get("id") and station.get("status") == "reserved"
+        called_at = station.get("called_at") if same_call and station.get("called_at") else now_iso
+        match_updates["called_at"] = called_at
+        station_updates["called_at"] = called_at
+    await db.stations.update_one({"id": station["id"]}, station_change)
+    await db[collection_name].update_one({"id": match["id"]}, match_change)
     if start_now:
         before = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "status": 1}) or {}
         went_live = await db.tournaments.update_one(
@@ -346,11 +375,14 @@ async def clear_station(sid: str, me: dict = Depends(get_current_user)):
         elif not is_global_tournament_admin(me):
             raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
         if collection_name:
-            await db[collection_name].update_one({"id": s["current_match_id"]}, {"$set": {"station_id": None, "updated_at": now_utc().isoformat()}})
+            # Freigeben beendet auch einen Aufruf (#1122).
+            await db[collection_name].update_one({"id": s["current_match_id"]}, {
+                "$set": {"station_id": None, "updated_at": now_utc().isoformat()}, "$unset": {"called_at": ""}})
     elif not is_global_tournament_admin(me):
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
     await db.stations.update_one({"id": sid}, {"$set": {
-        "current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()}})
+        "current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()},
+        "$unset": {"called_at": ""}})
     return {"ok": True}
 
 

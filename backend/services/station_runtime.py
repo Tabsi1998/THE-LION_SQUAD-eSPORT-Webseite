@@ -131,6 +131,9 @@ async def notify_match_started(db, match: dict, station: dict, collection_name: 
 
 
 async def release_station_for_match(db, match: dict, collection_name: str) -> bool:
+    # Mit dem Ergebnis ist auch ein Aufruf vorbei (#1122) - auch wenn das Spiel nie gestartet wurde.
+    if match.get("id") and match.get("called_at"):
+        await db[collection_name].update_one({"id": match["id"]}, {"$unset": {"called_at": ""}})
     station_id = match.get("station_id")
     if not station_id:
         return False
@@ -148,6 +151,6 @@ async def release_station_for_match(db, match: dict, collection_name: str) -> bo
             "last_match_type": collection_name,
             "freed_at": now,
             "updated_at": now,
-        }},
+        }, "$unset": {"called_at": ""}},
     )
     return True

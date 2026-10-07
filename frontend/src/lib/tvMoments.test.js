@@ -83,3 +83,29 @@ test("der Speicher meldet jede Änderung", () => {
   expect(seen).toEqual([1, 2, 3]);
   expect(instance.enqueue({})).toBeNull();
 });
+
+test("Sponsor und Zahlen machen Platz: kommt ein Ergebnis, weicht der leise Moment und kommt danach noch einmal ganz", () => {
+  const { instance } = queue();
+  instance.enqueue({ type: "sponsor", ms: 6000 });
+  const sponsor = instance.next();
+  expect(sponsor.type).toBe("sponsor");
+  instance.enqueue({ type: "result", items: ["m1"] });
+  expect(instance.getCurrent()).toBeNull();
+  const result = instance.next();
+  expect(result.type).toBe("result");
+  instance.finish(result.id);
+  const again = instance.next();
+  expect(again.id).toBe(sponsor.id);
+  expect(again.yielded).toBe(1);
+  // Ein gleich wichtiger leiser Moment drängelt nicht: die Zahlen warten hinter dem Sponsor.
+  instance.enqueue({ type: "stats", ms: 8000 });
+  expect(instance.getCurrent().id).toBe(sponsor.id);
+});
+
+test("die neue Bestzeit am Fast-Lap-TV zählt wie ein Ergebnis - vor dem Sponsor", () => {
+  const { instance } = queue();
+  instance.enqueue({ type: "sponsor" });
+  instance.enqueue({ type: "best", userId: "u5" });
+  expect(instance.next().type).toBe("best");
+  expect(MOMENT_PRIORITY.best).toBe(MOMENT_PRIORITY.result);
+});

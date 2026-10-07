@@ -55,6 +55,8 @@ STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 EVENT_MODES = {"local", "online", "hybrid"}
 RESULT_ENTRY_MODES = {"staff_only", "player_confirmed", "hybrid"}
 SCHEDULE_MODES = {"fixed_by_staff", "player_proposal", "hybrid"}
+# Solange ein Spiel einen dieser Zustände hat, darf ein Aufruf (#1122) stehen bleiben.
+CALL_OPEN_STATUSES = {"pending", "preview", "ready", "scheduled"}
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 STAFF_MENTION_HANDLES = {"leitung", "turnierleitung", "orga", "organizer", "staff", "admin", "referee", "schiri", "scorekeeper"}
 USER_PUBLIC_PROJECTION = {
@@ -978,7 +980,13 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         if updates and all(v2_match.get(key) == value for key, value in updates.items()):
             return {**v2_match, "idempotent_replay": True}
         updates["updated_at"] = now_utc().isoformat()
-        await db.matches_v2.update_one({"id": match_id}, {"$set": updates})
+        change: dict = {"$set": updates}
+        # Ein Aufruf (#1122) endet, wenn das Spiel losgeht, entschieden wird oder an eine andere Station wandert.
+        status_moved = "status" in updates and updates["status"] not in CALL_OPEN_STATUSES
+        station_moved = "station_id" in updates and updates["station_id"] != v2_match.get("station_id")
+        if v2_match.get("called_at") and (status_moved or station_moved):
+            change["$unset"] = {"called_at": ""}
+        await db.matches_v2.update_one({"id": match_id}, change)
         updated = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
         return {**updated, "idempotent_replay": False}
     raise HTTPException(status_code=404, detail="Match nicht gefunden")

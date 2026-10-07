@@ -1,6 +1,10 @@
 """Turnierstatus wechseln sowie Turniere sperren und entsperren.
+
+Dazu, was im Turnierablauf am Bildschirm gebraucht wird (Meilenstein 60): „Pause bis“ beim Status „Pausiert“ (#1123)
+und der Sponsor je Runde für „Runde 2 präsentiert von“ (#1125) - beides nur durch die Turnierleitung.
 """
 from fastapi import HTTPException, Depends
+from pydantic import BaseModel, ConfigDict, Field
 from database import get_db
 from auth import get_current_user, require_admin
 from services.tournament_permissions import (
@@ -12,6 +16,7 @@ from services.custom_bracket import BracketSchemaError, build_matches_v2_from_sc
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import placement_rows_for_structure
 from services.competition_versions import persist_competition_versions
+from services.tv_display import ROUND_SPONSOR_MAX, pause_until_value, round_sponsor_rows
 from models import now_utc
 from routes.tournament_common import (
     _apply_match_plan,
@@ -182,6 +187,96 @@ async def unlock_tournament(tid: str, me: dict = Depends(require_admin()),
     return {"ok": True, "idempotent_replay": False}
 
 
+def _pause_change(tournament: dict, previous: str | None, status: str, body: dict) -> tuple[dict, dict]:
+    """„Pause bis“ (#1123) beim Statuswechsel: nur zum Status „Pausiert“; ohne Uhrzeit „Kurze Pause“. Jeder andere
+    Status (Weiterspielen) löscht die Uhrzeit. Gibt zurück, was gesetzt und was gelöscht wird."""
+    if status == "paused" and ("paused_until" in body or previous != "paused"):
+        try:
+            until = pause_until_value(body.get("paused_until"), now_utc())
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        if until:
+            return {"paused_until": until}, {}
+        return {}, ({"paused_until": ""} if tournament.get("paused_until") else {})
+    if status != "paused" and tournament.get("paused_until"):
+        return {}, {"paused_until": ""}
+    return {}, {}
+
+
+async def _save_pause(db, me: dict, tid: str, pause_set: dict, pause_unset: dict) -> None:
+    change: dict = {"$set": {"updated_at": now_utc().isoformat(), **pause_set}}
+    if pause_unset:
+        change["$unset"] = pause_unset
+    await db.tournaments.update_one({"id": tid}, change)
+    await _audit_tournament_action(db, "tournament.pause_until", me.get("id"), tid, {"paused_until": pause_set.get("paused_until")})
+
+
+class PauseUntilUpdate(BaseModel):
+    """„Pause bis“ ändern, solange pausiert ist - ``null`` heißt „Kurze Pause“ ohne Uhrzeit."""
+    model_config = ConfigDict(extra="forbid")
+
+    paused_until: str | None = Field(default=None, max_length=64)
+
+
+@router.put("/{tid}/pause")
+async def set_pause_until(tid: str, body: PauseUntilUpdate, me: dict = Depends(get_current_user),
+                          _mutation_tid: str = Depends(_serialized_tournament_write)):
+    """„Pause bis“ (#1123) für die Turnierleitung: nur während der Pause. Der TV zeigt „Weiter um 14:30“ mit Countdown;
+    die App kann denselben Wert lesen."""
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await _ensure_tournament_unlocked(db, tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament")
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "status": 1, "paused_until": 1})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if tournament.get("status") != "paused":
+        raise HTTPException(status_code=409, detail="„Pause bis“ geht nur, solange das Turnier pausiert ist.")
+    pause_set, pause_unset = _pause_change(tournament, "paused", "paused", {"paused_until": body.paused_until})
+    if pause_set or pause_unset:
+        await _save_pause(db, me, tid, pause_set, pause_unset)
+    return {"paused_until": pause_set.get("paused_until")}
+
+
+class RoundSponsor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stage_id: str | None = Field(default=None, max_length=120)
+    section: str | None = Field(default=None, max_length=24)
+    round: int = Field(ge=1, le=99)
+    sponsor_id: str = Field(min_length=1, max_length=120)
+
+
+class RoundSponsorsUpdate(BaseModel):
+    """Der Sponsor je Runde (#1125) - die ganze Liste; eine leere Liste nimmt alle wieder weg."""
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[RoundSponsor] = Field(default_factory=list, max_length=ROUND_SPONSOR_MAX)
+
+
+@router.put("/{tid}/round-sponsors")
+async def set_round_sponsors(tid: str, body: RoundSponsorsUpdate, me: dict = Depends(get_current_user),
+                             _mutation_tid: str = Depends(_serialized_tournament_write)):
+    """„Runde 2 präsentiert von …“ (#1125): die Turnierleitung wählt je Runde einen Sponsor - nur aktive Sponsoren mit
+    dem Haken „TV / Anzeige“. Solange die Runde läuft, zeigt der TV oben den Sponsor; die App kann es genauso."""
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await _ensure_tournament_unlocked(db, tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament")
+    if not await db.tournaments.find_one({"id": tid}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    from routes.news_routes import list_sponsors  # dieselbe Liste, die die TV-Seiten bekommen
+
+    tv_sponsor_ids = {row.get("id") for row in await list_sponsors(placement="tv") if row.get("id")}
+    try:
+        rows = round_sponsor_rows([item.model_dump() for item in body.items], tv_sponsor_ids)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    await db.tournaments.update_one({"id": tid}, {"$set": {"round_sponsors": rows, "updated_at": now_utc().isoformat()}})
+    await _audit_tournament_action(db, "tournament.round_sponsors", me.get("id"), tid, {"rounds": len(rows)})
+    return {"round_sponsors": rows}
+
+
 @router.post("/{tid}/status")
 async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
                      _mutation_tid: str = Depends(_serialized_tournament_write)):
@@ -202,6 +297,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         raise HTTPException(status_code=403, detail="Turnierleitung darf nur operative Status setzen")
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
     prev = t.get("status")
+    pause_set, pause_unset = _pause_change(t, prev, status, body)
     auto_generated_bracket = None
     planning = None
     if prev != status and status == "check_in":
@@ -231,10 +327,10 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
 
     if prev != status:
         changed_at = now_utc().isoformat()
-        await db.tournaments.update_one(
-            {"id": tid},
-            {"$set": {"status": status, "updated_at": changed_at}},
-        )
+        change: dict = {"$set": {"status": status, "updated_at": changed_at, **pause_set}}
+        if pause_unset:
+            change["$unset"] = pause_unset
+        await db.tournaments.update_one({"id": tid}, change)
         await _audit_tournament_action(
             db,
             "tournament.status.change",
@@ -246,8 +342,11 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
                 "forced": force,
                 "planning_errors": (planning or {}).get("error_count", 0),
                 "planning_warnings": (planning or {}).get("warning_count", 0),
+                **({"paused_until": pause_set["paused_until"]} if pause_set else {}),
             },
         )
+    elif pause_set or pause_unset:
+        await _save_pause(db, me, tid, pause_set, pause_unset)
 
     # ---------- Season Points + Badges on results_published ----------
     if prev != status and status == "results_published":

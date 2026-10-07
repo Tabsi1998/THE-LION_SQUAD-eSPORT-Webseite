@@ -1,15 +1,20 @@
 // Momente am TV (#1110, #1116, #1118, #1119): Immer nur ein Moment gleichzeitig. Champion und Ergebnis gehen vor, der
-// Zoom beim Start eines Spiels kommt danach, Sponsor- und Zahlen-Momente (Meilenstein 60) warten, bis nichts Wichtigeres
-// ansteht. Mehr als drei Ergebnisse auf einmal werden eine Sammelkarte. Ein kleiner Speicher ohne Abhängigkeiten, den
-// React über useSyncExternalStore liest - wie die Zeremonie-Warteschlange der Erfolge.
+// Zoom beim Start eines Spiels kommt danach, Sponsor- und Zahlen-Momente (Meilenstein 60, #1124, #1125) warten, bis
+// nichts Wichtigeres ansteht. Kommt ein Ergebnis, während ein Sponsor oder die Zahlen stehen, macht der leise Moment
+// Platz und kommt danach noch einmal ganz. Die neue Bestzeit am Fast-Lap-TV (#1127) zählt wie ein Ergebnis. Mehr als drei
+// Ergebnisse auf einmal werden eine Sammelkarte. Ein kleiner Speicher ohne Abhängigkeiten, den React über
+// useSyncExternalStore liest - wie die Zeremonie-Warteschlange der Erfolge.
 
-export const MOMENT_PRIORITY = Object.freeze({ champion: 30, result: 20, live: 10, sponsor: 5, stats: 5 });
+export const MOMENT_PRIORITY = Object.freeze({ champion: 30, result: 20, best: 20, live: 10, sponsor: 5, stats: 5 });
+// Leise Momente: sie weichen, sobald etwas Wichtigeres kommt.
+export const YIELDING_MOMENTS = Object.freeze(new Set(["sponsor", "stats"]));
 // Wie lange ein Moment höchstens warten darf, bevor er nichts mehr bedeutet (ein Zoom auf ein Spiel, das schon eine
 // Weile läuft). Ohne Eintrag wartet er, bis er dran ist.
 export const MOMENT_MAX_WAIT_MS = Object.freeze({ live: 15000 });
 export const COLLECT_AFTER = 3;
-// Wie lange die Karten stehen: ein Ergebnis etwa 3 Sekunden, die Sammelkarte etwas länger, der Start-Zoom etwa 4.
-export const MOMENT_MS = Object.freeze({ result: 3000, collective: 4500, live: 4000, championCard: 4400 });
+// Wie lange die Karten stehen: ein Ergebnis etwa 3 Sekunden, die Sammelkarte etwas länger, der Start-Zoom etwa 4, die
+// neue Bestzeit etwa 3. Sponsor und Zahlen bringen ihre Dauer selbst mit (aus der Wiedergabeliste).
+export const MOMENT_MS = Object.freeze({ result: 3000, collective: 4500, live: 4000, championCard: 4400, best: 3200, sponsor: 6000, stats: 8000 });
 
 export function createMomentQueue({ now = () => Date.now() } = {}) {
   const listeners = new Set();
@@ -53,6 +58,12 @@ export function createMomentQueue({ now = () => Date.now() } = {}) {
     if (entry.type === "result") entry.items = [...(moment.items || [])];
     pending.push(entry);
     if (entry.type === "result") collectResults();
+    // Ein Sponsor oder die Zahlen stehen gerade, und es kommt etwas Wichtigeres: der leise Moment macht Platz und wartet -
+    // danach kommt er noch einmal ganz.
+    if (current && YIELDING_MOMENTS.has(current.type) && entry.priority > current.priority) {
+      pending.push({ ...current, yielded: (current.yielded || 0) + 1 });
+      current = null;
+    }
     emit();
     return entry;
   }

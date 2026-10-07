@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Turnierbaum-TV (#1110, #1113, #1115): der Anzeige-Schlüssel geht mit an die API, ein widerrufener zeigt nichts mehr vom
@@ -127,4 +127,153 @@ test("ohne Schlüssel fragt der TV ohne - für die angemeldete Turnierleitung", 
   renderTv("/display/bracket/t1");
   await screen.findByText("Sieger aus A");
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/tournaments/t1/bracket/display", undefined));
+});
+
+// ---------------------------------------------------------------- Meilenstein 60 (#1121-#1125)
+
+const NOW_ISO = () => new Date().toISOString();
+const inMinutes = (minutes) => new Date(Date.now() + minutes * 60000).toISOString();
+
+function serveAll({ bracket, stations = [], sponsors = [], settings = {} }) {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/tv/settings") return { data: { settings } };
+    if (url.startsWith("/tournaments/t1/bracket/display")) return { data: bracket };
+    if (url.startsWith("/stations")) return { data: stations };
+    if (url.startsWith("/sponsors")) return { data: sponsors };
+    return { data: [] };
+  });
+}
+
+test("#1123: „Pausiert“ zeigt die Pause - mit „Weiter um“ und Countdown; ohne Uhrzeit nur „Kurze Pause“", async () => {
+  serveAll({ bracket: { ...BRACKET, tournament: { ...BRACKET.tournament, status: "paused", paused_until: inMinutes(12.5) } } });
+  renderTv("/display/bracket/t1?key=k");
+  expect(await screen.findByTestId("tv-pause-screen")).toHaveAttribute("data-state", "running");
+  expect(screen.getByTestId("tv-pause-headline")).toHaveTextContent(/^Weiter um \d{2}:\d{2}$/);
+  expect(screen.getByTestId("tv-pause-countdown")).toHaveTextContent(/noch\s*12:\d{2}/);
+  expect(screen.getByTestId("tv-pause-next")).toHaveTextContent("Danach: Winner Bracket, Runde 1 · Spiel A");
+  expect(screen.queryByTestId("tv-tree")).not.toBeInTheDocument();
+});
+
+test("#1123: ist „Pause bis“ vorbei, steht „Gleich geht es weiter“ statt einer Minuszeit", async () => {
+  serveAll({ bracket: { ...BRACKET, tournament: { ...BRACKET.tournament, status: "paused", paused_until: inMinutes(-3) } } });
+  renderTv("/display/bracket/t1?key=k");
+  expect(await screen.findByTestId("tv-pause-headline")).toHaveTextContent("Gleich geht es weiter");
+  expect(screen.queryByTestId("tv-pause-countdown")).not.toBeInTheDocument();
+  expect(screen.getByTestId("tv-pause-screen")).not.toHaveTextContent(/-\d/);
+});
+
+test("#1123: Check-in läuft - „1 von 2 da“, alle Namen mit Haken, wer fehlt zuerst", async () => {
+  const registrations = [{ id: "r1", display_name: "NeonFalke", status: "checked_in" }, { id: "r2", display_name: "KartKönigin", status: "approved" }];
+  serveAll({ bracket: { ...BRACKET, registrations, tournament: { ...BRACKET.tournament, status: "check_in", check_in_until: inMinutes(13) } } });
+  renderTv("/display/bracket/t1?key=k");
+  expect(await screen.findByTestId("tv-checkin-screen")).toBeInTheDocument();
+  expect(screen.getByTestId("tv-checkin-count")).toHaveTextContent("1von 2 da");
+  expect(screen.getByTestId("tv-check-r1")).toHaveAttribute("data-present", "1");
+  expect(screen.getByTestId("tv-check-r2")).toHaveAttribute("data-present", "0");
+  expect(screen.getByTestId("tv-checkin-hint")).toHaveTextContent(/Check-in schließt um \d{2}:\d{2}\. Noch nicht da\? Bitte bei der Turnierleitung melden\./);
+});
+
+test("#1123: Anmeldung offen - großer QR-Code zur Anmeldung und freie Plätze", async () => {
+  serveAll({ bracket: { ...BRACKET, matches_v2: [], seats: { taken: 10, capacity: 16 }, tournament: { ...BRACKET.tournament, status: "registration_open", registration_enabled: true, start_date: inMinutes(120) } } });
+  renderTv("/display/bracket/t1?key=k");
+  expect(await screen.findByTestId("tv-registration-screen")).toBeInTheDocument();
+  expect(screen.getByTestId("tv-registration-seats")).toHaveTextContent("Noch 6 von 16 Plätzen frei");
+  const codes = screen.getAllByTestId("branded-qr-code").map((element) => element.getAttribute("data-value"));
+  expect(codes).toContain(`${window.location.origin}/tournaments/cup`);
+  expect(codes.join(" ")).not.toContain("key");
+});
+
+test("#1121/#1122: ein Link mit nur einer Folie - die Aufruf-Tafel, ohne Balken", async () => {
+  const bracket = JSON.parse(JSON.stringify(BRACKET));
+  Object.assign(bracket.matches_v2[0], { called_at: NOW_ISO(), station_id: "st-pc-3", station_name: "PC 3" });
+  delete bracket.matches_v2[0].scheduled_at;
+  serveAll({ bracket, stations: [{ id: "st-pc-3", name: "PC 3", status: "reserved", current_match_id: "m1", called_at: bracket.matches_v2[0].called_at }] });
+  renderTv("/display/bracket/t1?key=k&playlist=calls");
+  expect(await screen.findByTestId("tv-call-board")).toHaveAttribute("data-count", "1");
+  expect(screen.getByTestId("tv-call-station-m1")).toHaveTextContent("PC 3");
+  expect(screen.getByTestId("tv-call-m1")).toHaveTextContent("Bitte jetzt zur Station");
+  expect(screen.getByTestId("tv-call-clock-m1")).toHaveTextContent(/^[12]:\d{2}$/);
+  expect(screen.queryByTestId("tv-slide-bar")).not.toBeInTheDocument();
+  // Ohne Baum in der Liste gibt es auch keine Baum-Momente.
+  expect(screen.queryByTestId("tv-tree")).not.toBeInTheDocument();
+});
+
+test("#1122: ohne Aufrufe zeigt die Aufruf-Tafel „Gerade keine Aufrufe“", async () => {
+  serveAll({ bracket: BRACKET });
+  renderTv("/display/bracket/t1?key=k&playlist=calls");
+  expect(await screen.findByTestId("tv-calls-none")).toHaveTextContent("Gerade keine Aufrufe");
+});
+
+test("#1121: mehrere Folien mit Inhalt - der Balken zeigt, wann gewechselt wird", async () => {
+  const bracket = JSON.parse(JSON.stringify(BRACKET));
+  Object.assign(bracket.matches_v2[0], { called_at: NOW_ISO(), station_id: "st-pc-3", station_name: "PC 3" });
+  serveAll({ bracket });
+  renderTv("/display/bracket/t1?key=k");
+  expect(await screen.findByTestId("tv-tree")).toBeInTheDocument();
+  expect(screen.getByTestId("bracket-tv")).toHaveAttribute("data-slide", "tree");
+  expect(screen.getByTestId("tv-slide-bar")).toHaveAttribute("data-total", "12000");
+});
+
+test("#1125: „Runde 1 präsentiert von“ oben - nur mit Sponsor aus der TV-Liste und nur mit dem Schalter", async () => {
+  const bracket = { ...BRACKET, tournament: { ...BRACKET.tournament, round_sponsors: [{ stage_id: "s1", section: "WB", round: 1, sponsor_id: "sp1" }] } };
+  serveAll({ bracket, sponsors: [{ id: "sp1", name: "Pixelwerk", logo_url: "/logo.png" }] });
+  renderTv("/display/bracket/t1?key=k");
+  const presented = await screen.findByTestId("tv-presented-by");
+  expect(presented).toHaveTextContent("Runde 1");
+  expect(presented).toHaveTextContent("präsentiert von");
+  expect(presented.querySelector("[title='Pixelwerk']")).not.toBeNull();
+});
+
+test("#1125: mit „präsentiert von“ aus und ohne Laufband - keine Sponsoren am TV", async () => {
+  const bracket = { ...BRACKET, tournament: { ...BRACKET.tournament, round_sponsors: [{ stage_id: "s1", section: "WB", round: 1, sponsor_id: "sp1" }] } };
+  serveAll({ bracket, sponsors: [{ id: "sp1", name: "Pixelwerk", logo_url: "/logo.png" }] });
+  renderTv("/display/bracket/t1?key=k&sponsor_presented=0");
+  await screen.findByTestId("tv-tree");
+  expect(screen.queryByTestId("tv-presented-by")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("sponsor-grid")).not.toBeInTheDocument();
+});
+
+test("#1121: bleibt es bei derselben Folie, wird sie nicht neu eingeblendet - nur ihre Zeit beginnt von vorn", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    const bracket = JSON.parse(JSON.stringify(BRACKET));
+    Object.assign(bracket.matches_v2[0], { called_at: NOW_ISO(), station_id: "st-pc-3", station_name: "PC 3" });
+    serveAll({ bracket, stations: [{ id: "st-pc-3", name: "PC 3", status: "reserved", current_match_id: "m1", called_at: bracket.matches_v2[0].called_at }] });
+    renderTv("/display/bracket/t1?key=k&playlist=calls-8");
+    const board = await screen.findByTestId("tv-call-board");
+    await act(async () => {
+      vi.advanceTimersByTime(8100);
+    });
+    expect(screen.getByTestId("tv-call-board")).toBe(board);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("#1125: ein Link nur mit Sponsor - die Sponsoren stehen dauerhaft und wechseln sich ab, ohne Balken", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    const sponsors = [{ id: "sp1", name: "Pixelwerk", logo_url: "/a.png" }, { id: "sp2", name: "Muster Energie", logo_url: "/b.png" }];
+    serveAll({ bracket: BRACKET, sponsors });
+    renderTv("/display/bracket/t1?key=k&playlist=sponsor-6");
+    expect(await screen.findByTestId("tv-sponsor-moment")).toHaveAttribute("data-sponsor", "sp1");
+    expect(screen.getByTestId("bracket-tv")).toHaveAttribute("data-slide", "sponsor");
+    await act(async () => {
+      vi.advanceTimersByTime(6100);
+    });
+    expect(screen.getByTestId("tv-sponsor-moment")).toHaveAttribute("data-sponsor", "sp2");
+    expect(screen.queryByTestId("tv-slide-bar")).not.toBeInTheDocument();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("#1124/#1125: ein Link nur mit Sponsor oder Zahlen, aber nichts davon da - ein ruhiger Satz statt leerer Fläche", async () => {
+  serveAll({ bracket: BRACKET, sponsors: [{ id: "sp1", name: "Pixelwerk", logo_url: "/a.png" }] });
+  const { unmount } = renderTv("/display/bracket/t1?key=k&playlist=sponsor&sponsor_moment=0");
+  expect(await screen.findByTestId("tv-slide-empty")).toHaveTextContent("Sponsoren am TV sind ausgeschaltet");
+  unmount();
+  renderTv("/display/bracket/t1?key=k&playlist=stats");
+  // Noch kein Spiel gespielt: keine Zahlen.
+  expect(await screen.findByTestId("tv-slide-empty")).toHaveTextContent("Noch keine Zahlen zum Turnier");
 });

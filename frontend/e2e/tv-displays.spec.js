@@ -66,7 +66,8 @@ function bracketData(state = "before") {
   }
   if (state === "busy") r1[2].status = "running";
   return {
-    tournament: { id: "t1", slug: "herbst-cup", title: "Lions Herbst-Cup", status: state === "before" ? "checkin_open" : "live", format: "single_elim", public_phase: "live" },
+    // Vor der ersten Runde ist die Anmeldung zu; im Check-in zeigte der TV seit Meilenstein 60 (#1123) den Check-in-Bildschirm.
+    tournament: { id: "t1", slug: "herbst-cup", title: "Lions Herbst-Cup", status: state === "before" ? "registration_closed" : "live", format: "single_elim", public_phase: "live" },
     registrations: REGS,
     stages: [{ id: "stage-1", name: "Turnierbaum", number: 1, stage_type: "single_elimination" }],
     matches: [],
@@ -241,14 +242,15 @@ test.describe("TV & Beamer (Meilenstein 58)", () => {
         })
         .map((animation) => animation.animationName || animation.transitionProperty || "web-animation");
     });
-    // Gegenprobe: ohne „Bewegung reduzieren“ laufen Live-Punkt, Lichtlauf, Laufband und Deko.
-    await openTv(page, "/display/bracket/t1?key=tv-schluessel");
+    // Gegenprobe: ohne „Bewegung reduzieren“ laufen Live-Punkt, Lichtlauf, Laufband und Deko. Das Laufband ist seit
+    // Meilenstein 60 (#1125) ein Schalter, Standard aus - hier eingeschaltet.
+    await openTv(page, "/display/bracket/t1?key=tv-schluessel&sponsor_ticker=1");
     expect((await running()).length).toBeGreaterThan(0);
     await expect(page.getByTestId("sponsor-grid")).toHaveAttribute("data-mode", "marquee");
 
     for (const { name, path } of PAGES) {
       const join = path.includes("?") ? "&" : "?";
-      await openTv(page, `${path}${join}reduce_motion=1`);
+      await openTv(page, `${path}${join}reduce_motion=1&sponsor_ticker=1`);
       await expect(page.getByTestId("tv-screen")).toHaveAttribute("data-tv-motion", "off");
       await expect(page.getByTestId("sponsor-grid")).toHaveAttribute("data-mode", "pages");
       expect(await running(), `${name}: läuft noch`).toEqual([]);
