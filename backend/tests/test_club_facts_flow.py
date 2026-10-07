@@ -216,7 +216,8 @@ async def test_statutes_come_from_dolibarr_only_published_and_the_pdf_is_checked
     await flow.db.settings.update_one({"id": "branding"}, {"$set": MANUAL}, upsert=True)
     settings = await load_settings(flow.db)
     assert (await club_facts.refresh(flow.db, settings, DolibarrClient(settings)))["statutes"] == "in_force"
-    assert (await flow.get("/api/board/statutes")).json() == {"available": False, "reason": "switch_off"}
+    # Ohne „Vereinsdaten aus Dolibarr“ kommen die Statuten aus Verwaltung → Dokumente (#1252) - hier gibt es keins.
+    assert (await flow.get("/api/board/statutes")).json() == {"available": False, "reason": "no_document"}
 
     await flow.db.settings.update_one({"id": "branding"}, {"$set": {"legal_from_dolibarr": True}})
     public = (await flow.get("/api/board/statutes")).json()

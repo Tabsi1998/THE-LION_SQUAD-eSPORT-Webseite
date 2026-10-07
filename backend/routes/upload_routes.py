@@ -18,6 +18,7 @@ from auth import require_admin, get_current_user, require_area
 from database import get_db
 from models import new_id, now_utc
 from services.image_variants import schedule_variants
+from services.photo_cutout import is_cutout
 from services.rate_limit import enforce_rate_limit, get_client_ip
 from storage import PRIVATE_DOC_DIR, PUBLIC_UPLOAD_DIR, ensure_directory
 from services.media_formats import (
@@ -460,6 +461,7 @@ def _encode_image_bytes(
     original_height = 0
     stored_width = 0
     stored_height = 0
+    cutout = False
     try:
         with Image.open(BytesIO(data)) as img:
             img.verify()
@@ -510,6 +512,8 @@ def _encode_image_bytes(
                     img = img.convert("RGBA" if "A" in img.getbands() else "RGB")
                 save_kwargs = {"quality": 88, "method": 6}
             stored_width, stored_height = img.width, img.height
+            # Freigestellt (#1332): Vorstands-Porträts bekommen dann den Vereins-Hintergrund dahinter.
+            cutout = is_cutout(img)
             img.save(out, format=output_format, **save_kwargs)
             data = out.getvalue()
     except UnidentifiedImageError:
@@ -528,6 +532,7 @@ def _encode_image_bytes(
         "original_height": original_height,
         "width": stored_width,
         "height": stored_height,
+        "cutout": cutout,
     }
 
 
@@ -556,6 +561,7 @@ async def _upload_image_impl(
     original_size = encoded["original_size"]
     original_width, original_height = encoded["original_width"], encoded["original_height"]
     stored_width, stored_height = encoded["width"], encoded["height"]
+    cutout = bool(encoded.get("cutout"))
     filename = f"{uuid.uuid4().hex}{ext}"
     path = PUBLIC_UPLOAD_DIR / filename
     try:
@@ -587,6 +593,7 @@ async def _upload_image_impl(
             "owner_id": me.get("id"),
             "owner_role": me.get("role"),
             "media_scope": media_scope,
+            "cutout": cutout,
             "created_at": now_utc().isoformat(),
             "updated_at": now_utc().isoformat(),
         })
@@ -611,6 +618,7 @@ async def _upload_image_impl(
         "height": stored_height,
         "original_width": original_width,
         "original_height": original_height,
+        "cutout": cutout,
     }
 
 

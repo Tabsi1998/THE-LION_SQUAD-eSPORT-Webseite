@@ -42,14 +42,14 @@ test("interne News: nur Mitglieder- und interne Beiträge, höchstens drei", () 
 
 test("Ansprechpartner: nur besetzte, aktive Posten mit Titel, Name und Profil-Link", () => {
   const positions = [
-    { id: "p1", display_title: "Obfrau", title_male: "Obmann", is_active: true, user: { display_name: "Lea", avatar_url: "/api/static/uploads/lea.webp", profile_url: "/members/lea" } },
+    { id: "p1", display_title: "Obfrau", title_male: "Obmann", is_active: true, user: { display_name: "Lea", gamertag: "LeaLion", photo_cutout: true, avatar_url: "/api/static/uploads/lea.webp", profile_url: "/members/lea" } },
     { id: "p2", display_title: "Kassier", is_active: true, user: null },
     { id: "p3", title_male: "Schriftführer", is_active: false, user: { display_name: "Max" } },
     { id: "p4", title_male: "Beirat", user: { gamertag: "Tabsi98", slug: "tabsi98" } },
   ];
   expect(boardContacts(positions)).toEqual([
-    { id: "p1", title: "Obfrau", name: "Lea", avatar: "/api/static/uploads/lea.webp", profileUrl: "/members/lea" },
-    { id: "p4", title: "Beirat", name: "Tabsi98", avatar: "", profileUrl: "/members/tabsi98" },
+    { id: "p1", title: "Obfrau", name: "Lea", avatar: "/api/static/uploads/lea.webp", profileUrl: "/members/lea", cutout: true, gamertag: "LeaLion" },
+    { id: "p4", title: "Beirat", name: "Tabsi98", avatar: "", profileUrl: "/members/tabsi98", cutout: false, gamertag: "" },
   ]);
   expect(boardContacts("kaputt")).toEqual([]);
 });

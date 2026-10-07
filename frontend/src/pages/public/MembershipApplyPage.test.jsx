@@ -8,7 +8,7 @@ import { MemoryRouter } from "react-router-dom";
 
 const apiMock = { get: vi.fn(), post: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler" }));
+vi.mock("@/lib/api", () => ({ API: "https://api.test/api", api: apiMock, formatApiError: (detail) => detail || "Fehler" }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
 vi.mock("@/components/tls/GermanDateField", () => ({
@@ -134,4 +134,24 @@ test("Hilfsfunktionen", () => {
   expect(feeLine({ subscription_required: true, amount: 75, currency: "EUR", period_label: "je Jahr" })).toBe("75,00 € je Jahr");
   expect(splitDisplayName("Amelie Beispiel")).toEqual({ firstname: "Amelie", lastname: "Beispiel" });
   expect(splitDisplayName("amelie")).toEqual({ firstname: "", lastname: "" });
+});
+
+test("der Link „Vereinsstatuten“ führt auf genau die geltenden Statuten - ohne öffentliche auf „Vorstand“ (#1252)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/apply/form") return { data: { coupled: false } };
+    if (url === "/board/statutes") return { data: { available: true, source: "dolibarr", pdf_url: "/api/board/statutes/3/pdf", current: { id: 3 } } };
+    return { data: null };
+  });
+  const { unmount } = render(<MemoryRouter><MembershipApplyPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("apply-statutes-link")).toHaveAttribute("href", "https://api.test/api/board/statutes/3/pdf"));
+  expect(screen.getByTestId("apply-statutes-link")).not.toHaveAttribute("href", "/imprint");
+  unmount();
+
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/apply/form") return { data: { coupled: false } };
+    if (url === "/board/statutes") return { data: { available: false, reason: "members_only" } };
+    return { data: null };
+  });
+  render(<MemoryRouter><MembershipApplyPage /></MemoryRouter>);
+  expect(await screen.findByTestId("apply-statutes-link")).toHaveAttribute("href", "/board#statuten");
 });

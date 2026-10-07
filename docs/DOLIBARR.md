@@ -311,6 +311,13 @@ nicht (Fehler 502). Den Entwurf, an dem der Vorstand arbeitet, kennt die Website
 oder mit einem Modul vor 0.11 bleibt der Hinweis auf den Mitgliederbereich; im Reiter Rechtliches
 steht, was Sache ist.
 
+**Statuten öffentlich zeigen (#1252):** ein eigener Schalter unter *Dolibarr → Funktionen*, ab Werk **an**.
+Mit „Vereinsdaten aus Dolibarr“ zeigt „Vorstand“ nur, was der Verein im Modul freigibt (die Freigabe bleibt
+dort, die Zeile sagt, ob eine Fassung freigegeben ist); ohne Dolibarr das Dokument der Kategorie „Statuten“
+aus *Verwaltung → Dokumente* (angepinnt oder das neueste, nie ein internes) als PDF für alle. Aus: die
+Statuten stehen wie früher nur im Mitgliederbereich. Der Link „Vereinsstatuten“ im Mitgliedsantrag führt
+auf genau diese Fassung.
+
 ## Ehrungen im Profil (Vereine ab 1.8.0, #848)
 
 Ehrenmitgliedschaft, Verdienstnadel, Jubiläum: Was der Vorstand in Dolibarr an der Mitgliedskarte unter

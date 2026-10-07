@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -22,19 +22,21 @@ export default function ContactPage() {
 
   const { user } = useAuth();
   const branding = usePublicSiteSettings();
+  // Vorbelegt über die Adresse (#1252, #1254): „Interesse melden“ und „Unterlagen anfordern“ bringen Thema und Betreff mit.
+  const [params] = useSearchParams();
   const [topics, setTopics] = useState([]);
   const [done, setDone] = useState(false);
   const { submitting, submitOnce } = useSubmissionGuard();
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => ({
     name: user?.display_name || user?.username || "",
     email: user?.email || "",
-    topic: "general",
-    subject: "",
+    topic: /^[a-z_]{2,20}$/.test(params.get("topic") || "") ? params.get("topic") : "general",
+    subject: String(params.get("subject") || "").slice(0, 200),
     message: "",
     accept_privacy: false,
-  });
+  }));
 
   const loadTopics = useCallback(() => {
     api.get("/contact/topics").then(({ data }) => setTopics(data)).catch(() => {});

@@ -33,6 +33,7 @@ from __future__ import annotations
 import base64
 import binascii
 import hashlib
+import re
 from datetime import datetime, timezone
 
 from models import now_utc
@@ -281,6 +282,34 @@ BOARD_CORE = {
     "schriftfuehrer": ("schriftfuehrer", "schriftführer", "sekretaer", "sekretär", "schrift"),
 }
 DEPUTY_MARKERS = ("stv", "stellvertret", "vize", "deputy")
+# Rollen in der Form der Person (#1332): „Kassier:in“, „Kassier*in“, „KassierIn“, „Kassier/in“ und Paare wie
+# „Obmann/Obfrau“ - mit bekanntem Geschlecht steht nur die passende Form da, sonst bleibt die Bezeichnung neutral.
+_INCLUSIVE_SUFFIX = re.compile(r"(?<=[a-zäöüß])(?:[:*_]in|/-?in|In)(?![a-zäöüß])")
+_WORD_PAIR = re.compile(r"(?<![A-Za-zÄÖÜäöüß])([A-Za-zÄÖÜäöüß-]{3,})\s*/\s*([A-Za-zÄÖÜäöüß-]{3,})(?![A-Za-zÄÖÜäöüß])")
+
+
+def _looks_female(word: str) -> bool:
+    lower = word.lower()
+    return lower.endswith("in") or "frau" in lower
+
+
+def gendered_label(label: str | None, gender: str | None) -> str:
+    """Die Bezeichnung einer Funktion in der Form der Person - unverändert, wenn das Geschlecht nicht bekannt ist."""
+    text = str(label or "").strip()
+    if gender not in ("male", "female") or not text:
+        return text
+    female = gender == "female"
+
+    def pair(match: re.Match) -> str:
+        first, second = match.group(1), match.group(2)
+        if _looks_female(first) == _looks_female(second):
+            return match.group(0)
+        wanted_female = first if _looks_female(first) else second
+        wanted_male = second if wanted_female is first else first
+        return wanted_female if female else wanted_male
+
+    text = _INCLUSIVE_SUFFIX.sub("in" if female else "", text)
+    return _WORD_PAIR.sub(pair, text)
 
 
 def board_slug(code: str | None, label: str | None) -> str:
@@ -289,7 +318,6 @@ def board_slug(code: str | None, label: str | None) -> str:
     core = next((slug for slug, needles in BOARD_CORE.items() if any(needle in raw for needle in needles)), None)
     if core:
         return f"{core}-stv" if deputy else core
-    import re
     return re.sub(r"[^a-z0-9]+", "-", str(code or label or "funktion").lower()).strip("-") or "funktion"
 
 
@@ -362,7 +390,8 @@ async def board_positions(db, branding: dict) -> list[dict] | None:
             slug = board_slug(row.get("code"), row.get("label"))
             positions.append({
                 "id": f"dolibarr-{row.get('code')}-{offset}", "slug": slug if offset == 0 else f"{slug}-{offset + 1}", "code": row.get("code"),
-                "title_male": row.get("label"), "title_female": row.get("label"), "display_title": row.get("label"), "description": "",
+                "title_male": gendered_label(row.get("label"), "male"), "title_female": gendered_label(row.get("label"), "female"),
+                "display_title": gendered_label(row.get("label"), (person or {}).get("gender")), "neutral_title": row.get("label"), "description": "",
                 "allow_deputy": False, "is_active": True, "is_default": False, "order_index": index * 10 + offset, "source": "dolibarr",
                 "represents": bool(row.get("represents")), "since": (holder or {}).get("since"),
                 "vacant": holder is None, "name_withheld": withheld, "user": person, "deputy_user": None,

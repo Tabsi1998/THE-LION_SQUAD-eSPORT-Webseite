@@ -62,12 +62,19 @@ export function memberNews(posts, limit = 3) {
 export function boardContacts(positions, limit = 4) {
   return (Array.isArray(positions) ? positions : [])
     .filter((position) => position?.user && position.is_active !== false)
-    .map((position) => ({
-      id: position.id,
-      title: position.display_title || position.title_male || "",
-      name: position.user.display_name || position.user.gamertag || position.user.username || "",
-      avatar: position.user.avatar_url || position.user.photo_url || "",
-      profileUrl: position.user.profile_url || (position.user.slug ? `/members/${position.user.slug}` : "/board"),
-    }))
+    .map((position) => {
+      const name = position.user.display_name || position.user.gamertag || position.user.username || "";
+      const gamertag = position.user.gamertag && position.user.gamertag !== name ? position.user.gamertag : "";
+      return {
+        id: position.id,
+        title: position.display_title || position.title_male || "",
+        name,
+        avatar: position.user.avatar_url || position.user.photo_url || "",
+        profileUrl: position.user.profile_url || (position.user.slug ? `/members/${position.user.slug}` : "/board"),
+        // Kleines Porträt (#1332): freigestellt auf dem Vereins-Hintergrund, sonst Duoton; der Spielername klein darunter.
+        cutout: Boolean(position.user.photo_cutout),
+        gamertag,
+      };
+    })
     .slice(0, limit);
 }

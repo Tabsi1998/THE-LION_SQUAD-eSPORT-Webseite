@@ -16,7 +16,7 @@ const STATUS_LABEL = {
 };
 
 const TOPIC_LABEL = {
-  general: "Allgemein", membership: "Mitgliedschaft", tournament: "Turnier",
+  general: "Allgemein", membership: "Mitgliedschaft", volunteer: "Mitarbeit", tournament: "Turnier",
   fastlap: "Fast Lap", sponsorship: "Sponsoring", press: "Presse",
   report_bug: "Bug", abuse: "Missbrauch", other: "Sonstiges",
 };

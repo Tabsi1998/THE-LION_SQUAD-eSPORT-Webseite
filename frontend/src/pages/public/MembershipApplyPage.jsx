@@ -21,6 +21,7 @@ import { SkeletonLines } from "@/components/tls/Skeleton";
 import { toast } from "sonner";
 import { Crown, FileText, Mail, Clock, Send, Undo2, AlertTriangle } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
+import { statutesHref } from "@/lib/statutes";
 
 const CONTRIB_OPTIONS = [
   { value: "full", label: "Vollmitgliedschaft" },
@@ -66,6 +67,11 @@ export default function MembershipApplyPage() {
   const confirm = useConfirm();
   const [existing, setExisting] = useState(null);
   const [setup, setSetup] = useState({ coupled: false, contribution_options: CONTRIB_OPTIONS });
+  // Der Link „Vereinsstatuten“ führt auf genau die geltende Fassung (#1252) - nicht mehr aufs Impressum.
+  const [statutes, setStatutes] = useState(null);
+  useEffect(() => {
+    api.get("/board/statutes").then(({ data }) => setStatutes(data || null)).catch(() => setStatutes(null));
+  }, []);
   const [loading, setLoading] = useState(true);
   const [renew, setRenew] = useState(false);
   const [form, setForm] = useState({
@@ -215,7 +221,7 @@ export default function MembershipApplyPage() {
             <div className="space-y-2 pt-2 border-t border-white/5">
               <label className="flex items-start gap-2 cursor-pointer">
                 <input id="apply-statutes" type="checkbox" required checked={form.accept_statutes} onChange={(e) => updateField("accept_statutes", e.target.checked)} data-testid="apply-statutes" aria-invalid={!!fieldErrors.accept_statutes} aria-describedby={fieldErrors.accept_statutes ? "apply-statutes-error" : undefined} className="mt-1 accent-[#FFD700]" />
-                <span className="text-sm text-white/70">Ich habe die <a href="/imprint" className="text-[#29B6E8] underline">Vereinsstatuten</a> gelesen und akzeptiere sie.{fieldErrors.accept_statutes && <span id="apply-statutes-error" role="alert" className="block mt-1 text-xs text-[#FF8A80]">{fieldErrors.accept_statutes}</span>}</span>
+                <span className="text-sm text-white/70">Ich habe die <a href={statutesHref(statutes)} target="_blank" rel="noreferrer" data-testid="apply-statutes-link" className="text-[#29B6E8] underline">Vereinsstatuten</a> gelesen und akzeptiere sie.{fieldErrors.accept_statutes && <span id="apply-statutes-error" role="alert" className="block mt-1 text-xs text-[#FF8A80]">{fieldErrors.accept_statutes}</span>}</span>
               </label>
               <label className="flex items-start gap-2 cursor-pointer">
                 <input id="apply-privacy" type="checkbox" required checked={form.accept_privacy} onChange={(e) => updateField("accept_privacy", e.target.checked)} data-testid="apply-privacy" aria-invalid={!!fieldErrors.accept_privacy} aria-describedby={fieldErrors.accept_privacy ? "apply-privacy-error" : undefined} className="mt-1 accent-[#FFD700]" />

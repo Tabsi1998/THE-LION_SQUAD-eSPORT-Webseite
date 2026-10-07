@@ -11,6 +11,7 @@ import { numberItems } from "@/lib/clubNumbers";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Reveal } from "@/components/tls/Reveal";
 import { LazyImg } from "@/components/tls/LazyImg";
+import { BoardAvatar } from "@/components/tls/BoardPortrait";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSeason } from "@/seasons/SeasonContext";
@@ -141,19 +142,13 @@ export default function AboutPage() {
             </div>
             <Link to="/board" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-white/60 hover:text-[#FFD700] transition">Ganzer Vorstand <ArrowRight className="w-3 h-3" /></Link>
           </div>
+          {/* Kleine Porträts aus einem Guss (#1332): rund, freigestellt auf dem Vereins-Hintergrund, sonst Duoton; die Rolle
+              steht ganz da (keine „…“), der Spielername klein darunter. */}
           <Reveal className="tls-reveal-grid mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {board.map((contact) => (
-              <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`about-board-${contact.id}`} data-season-anchor="card" className="tls-card tls-card--gold tls-reveal-item group flex items-center gap-4 border border-white/10 rounded-sm bg-[#111] p-4 min-w-0">
-                {contact.avatar ? (
-                  <LazyImg src={contact.avatar} alt="" className="w-16 h-16 rounded-sm object-cover shrink-0" />
-                ) : (
-                  <span className="w-16 h-16 rounded-sm bg-[#FFD700]/15 text-[#FFD700] font-heading font-black text-2xl inline-flex items-center justify-center shrink-0">{(contact.name || "?").slice(0, 1).toUpperCase()}</span>
-                )}
-                <span className="min-w-0">
-                  <span className="block text-[11px] uppercase tracking-widest font-bold text-[#FFD700] truncate">{contact.title}</span>
-                  <span className="tls-card__title block font-heading text-lg font-black uppercase leading-tight break-words">{contact.name}</span>
-                </span>
-              </Link>
+              <div key={contact.id} data-season-anchor="card" className="tls-card tls-reveal-item border border-white/10 rounded-sm bg-[#111] p-4 min-w-0">
+                <BoardAvatar contact={{ ...contact, profileUrl: contact.profileUrl || "/board" }} testId={`about-board-${contact.id}`} />
+              </div>
             ))}
           </Reveal>
         </section>

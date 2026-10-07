@@ -1,27 +1,45 @@
 /**
  * Phase D — Statische Vereins-Sub-Pages.
  *
- * BoardPage ist jetzt dynamisch: liest /api/board und rendert nur is_active=true.
+ * BoardPage ist dynamisch: liest /api/board und rendert nur is_active=true. Seit #1332 und #1252: Porträts aus einem
+ * Guss (BoardPortrait), offene Funktionen als Einladung „Wir suchen …“ und die Statuten als PDF für alle (Schalter
+ * „Statuten öffentlich zeigen“ unter Dolibarr → Funktionen).
  */
 import { useCallback, useEffect, useState } from "react";
-import { API, api, resolveMediaUrl } from "@/lib/api";
+import { API, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Reveal } from "@/components/tls/Reveal";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonCards } from "@/components/tls/Skeleton";
+import { BoardPortrait, VacancyPortrait } from "@/components/tls/BoardPortrait";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Crown, Heart, Target, Sparkles, User as UserIcon, ArrowRight, FileText } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Heart, Target, Sparkles, FileText } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
+import { statutesHref } from "@/lib/statutes";
 
-function personGamertag(person) {
-  return person?.gamertag || person?.username || person?.display_name;
+const CORE = ["obmann", "kassier", "schriftfuehrer"];
+
+/** Was auf „Vorstand“ steht: Vorsitz (groß), Stellvertretungen und weitere Funktionen (kleiner) - offene als Einladung. */
+export function boardSections(positions) {
+  const list = Array.isArray(positions) ? positions : [];
+  const core = CORE.map((slug) => list.find((p) => p.slug === slug)).filter(Boolean);
+  const rest = list.filter((p) => !CORE.includes(p.slug));
+  const deputies = core.filter((p) => p.allow_deputy).map((p) => ({
+    key: `${p.id}-stv`, slug: `${p.slug}-stv`, person: p.deputy_user || null, title: p.deputy_user ? (p.deputy_title || p.display_title) : (p.neutral_title || p.title_male),
+    label: "Stellvertretung", vacant: !p.deputy_user, text: p.deputy_vacancy_text || "",
+  }));
+  const entry = (p) => ({
+    key: p.id, slug: p.slug, person: p.user || null, title: p.user ? p.display_title : (p.neutral_title || p.display_title || p.title_male),
+    label: "", withheld: Boolean(p.name_withheld), vacant: !p.user && !p.name_withheld, text: p.vacancy_text || "",
+    since: p.since ? viennaDate(p.since, { month: "long", year: "numeric" }) : "",
+  });
+  return { core: core.map(entry), deputies, rest: rest.map(entry) };
 }
 
-function personRealName(person) {
-  const tag = personGamertag(person);
-  return person?.real_name || (person?.display_name && person.display_name !== tag ? person.display_name : "");
+function Seat({ seat, size }) {
+  if (seat.vacant) return <VacancyPortrait title={seat.title} label={seat.label} text={seat.text} size={size} testId={`board-vacancy-${seat.slug}`} />;
+  return <BoardPortrait person={seat.person} title={seat.title} label={seat.label} withheld={seat.withheld} since={seat.since} size={size} testId={`board-position-${seat.slug}`} />;
 }
 
 export function BoardPage() {
@@ -33,22 +51,23 @@ export function BoardPage() {
   const load = useCallback(() => {
     setLoading(true);
     api.get("/board?active_only=true")
-      .then(({ data }) => setPositions(data))
+      .then(({ data }) => setPositions(Array.isArray(data) ? data : []))
       .catch(() => {})
       .finally(() => setLoading(false));
-    // Statuten aus Dolibarr (#326 Teil 3) - ohne Schalter oder Freigabe bleibt der Hinweis von früher.
+    // Statuten (#326 Teil 3, #1252): aus Dolibarr (freigegeben) oder aus den Dokumenten - oder der Hinweis von früher.
     api.get("/board/statutes")
       .then(({ data }) => setStatutes(data))
       .catch(() => setStatutes(null));
   }, []);
   useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["board", "users", "membership"]);
+  useApiInvalidation(load, ["board", "users", "membership", "documents"]);
+  const sections = boardSections(positions);
 
   return (
     <PublicLayout>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Verein", to: "/about" }, { label: "Vorstand" }]} className="mb-6" />
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Organisation</span>
+        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Organisation</span>
         <h1 className="mt-2 font-heading text-4xl md:text-5xl font-black uppercase">Vorstand</h1>
         <p className="mt-4 text-white/70 max-w-2xl">
           Das Team hinter THE LION SQUAD — eSports. Ehrenamtlich, leidenschaftlich, mit klarem Fokus auf Community und Fairplay.
@@ -61,19 +80,23 @@ export function BoardPage() {
             Es sind noch keine Vorstandspositionen aktiv.
           </div>
         ) : (
-          <div className="mt-10 space-y-8" data-testid="board-grid">
-            <Reveal className="tls-reveal-grid grid grid-cols-1 lg:grid-cols-3 gap-5">
-              {getCoreBoardPositions(positions).map((p) => (
-                <BoardRoleColumn key={p.id} p={p} />
-              ))}
+          <div className="mt-10 space-y-10" data-testid="board-grid">
+            <Reveal className="tls-reveal-grid grid grid-cols-2 sm:grid-cols-3 gap-4 lg:gap-6 justify-items-center" data-testid="board-core">
+              {sections.core.map((seat) => <div key={seat.key} className="tls-reveal-item w-full flex justify-center"><Seat seat={seat} size="lg" /></div>)}
             </Reveal>
-            {getSpecialBoardPositions(positions).length > 0 && (
+            {sections.deputies.length > 0 && (
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] mb-4">Sonderfunktionen</div>
-                <Reveal className="tls-reveal-grid grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {getSpecialBoardPositions(positions).map((p) => (
-                    <div key={p.id} className="tls-reveal-item"><BoardCard p={p} compact /></div>
-                  ))}
+                <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/50 mb-4">Stellvertretungen</div>
+                <Reveal className="tls-reveal-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="board-deputies">
+                  {sections.deputies.map((seat) => <div key={seat.key} className="tls-reveal-item"><Seat seat={seat} size="sm" /></div>)}
+                </Reveal>
+              </div>
+            )}
+            {sections.rest.length > 0 && (
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/50 mb-4">Weitere Funktionen</div>
+                <Reveal className="tls-reveal-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="board-special">
+                  {sections.rest.map((seat) => <div key={seat.key} className="tls-reveal-item"><Seat seat={seat} size="sm" /></div>)}
                 </Reveal>
               </div>
             )}
@@ -103,23 +126,30 @@ export function statuteLine(version) {
 function StatutesBox({ statutes }) {
   const available = Boolean(statutes?.available);
   const current = available ? statutes.current : null;
+  const fromDocuments = statutes?.source === "documents";
   const others = available ? (statutes.versions || []).filter((v) => !current || v.id !== current.id) : [];
   return (
-    <div className="mt-10 border border-white/10 bg-[#121212] rounded-sm p-6" data-testid="board-statutes">
-      <h2 className="font-heading text-xl font-bold uppercase mb-2">Statuten & Vereinsregister</h2>
+    <section id="statuten" className="mt-12 border border-white/10 bg-[#121212] rounded-sm p-5 md:p-6 scroll-mt-24" data-testid="board-statutes">
+      <h2 className="font-heading text-xl font-bold uppercase mb-2">Statuten</h2>
       {!available ? (
         <p className="text-sm text-white/60">
           THE LION SQUAD — eSports ist ein eingetragener österreichischer eSports-Verein. Statuten und ZVR-Nummer werden im Mitgliederbereich nach Login angezeigt.
         </p>
       ) : (
         <div className="space-y-4">
+          <p className="text-sm text-white/70">Die Statuten sind die Regeln unseres Vereins – wer Mitglied wird, stimmt ihnen zu.</p>
           {current ? (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="board-statutes-current">
-              <div>
-                <div className="text-sm text-white font-bold">Geltende Fassung: Fassung {current.version}</div>
-                <div className="text-xs text-white/50">beschlossen am {formatDay(current.decided_on)} · gültig seit {formatDay(current.valid_from)}</div>
+              <div className="flex items-start gap-3 min-w-0">
+                <FileText className="w-5 h-5 text-[#29B6E8] shrink-0 mt-0.5" aria-hidden="true" />
+                <div className="min-w-0">
+                  <div className="text-sm text-white font-bold break-words">{fromDocuments ? current.title : `Geltende Fassung: Fassung ${current.version}`}</div>
+                  <div className="text-xs text-white/50">
+                    {fromDocuments ? `Stand ${formatDay(current.updated_at)}` : `beschlossen am ${formatDay(current.decided_on)} · gültig seit ${formatDay(current.valid_from)}`}
+                  </div>
+                </div>
               </div>
-              <a href={`${API}/board/statutes/${current.id}/pdf`} target="_blank" rel="noreferrer" data-testid={`board-statutes-pdf-${current.id}`} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider text-xs rounded-sm">
+              <a href={statutesHref(statutes)} target="_blank" rel="noreferrer" data-testid={`board-statutes-pdf-${current.id}`} className="tls-btn tls-btn--secondary inline-flex w-full sm:w-auto justify-center items-center gap-2 px-4 py-2.5 font-bold uppercase tracking-wider text-xs rounded-sm">
                 <FileText className="w-4 h-4" /> Statuten (PDF)
               </a>
             </div>
@@ -133,143 +163,15 @@ function StatutesBox({ statutes }) {
               {others.map((v) => (
                 <li key={v.id} className="flex flex-wrap items-center gap-x-2">
                   <span>{statuteLine(v)}</span>
-                  <a href={`${API}/board/statutes/${v.id}/pdf`} target="_blank" rel="noreferrer" data-testid={`board-statutes-pdf-${v.id}`} className="text-[#FFD700] hover:underline">PDF</a>
+                  <a href={`${API}/board/statutes/${v.id}/pdf`} target="_blank" rel="noreferrer" data-testid={`board-statutes-pdf-${v.id}`} className="text-[#29B6E8] hover:underline">PDF</a>
                 </li>
               ))}
             </ul>
           )}
-          <p className="text-xs text-white/40">Die Fassungen kommen aus der Vereinsverwaltung; jede Datei wird gegen die Prüfsumme der Vereinsakte geprüft.</p>
+          {!fromDocuments && <p className="text-xs text-white/40">Die Fassungen kommen aus der Vereinsverwaltung; jede Datei wird gegen die Prüfsumme der Vereinsakte geprüft.</p>}
         </div>
       )}
-    </div>
-  );
-}
-
-function getCoreBoardPositions(positions) {
-  const priority = ["obmann", "kassier", "schriftfuehrer"];
-  return priority.map((slug) => positions.find((p) => p.slug === slug)).filter(Boolean);
-}
-
-function getSpecialBoardPositions(positions) {
-  const core = new Set(["obmann", "kassier", "schriftfuehrer"]);
-  return positions.filter((p) => !core.has(p.slug));
-}
-
-function BoardRoleColumn({ p }) {
-  return (
-    <div className="tls-reveal-item space-y-3" data-testid={`board-position-${p.slug}`}>
-      <BoardCard p={p} featured />
-      {p.allow_deputy && (
-        <BoardDeputyCard position={p} />
-      )}
-    </div>
-  );
-}
-
-// Aus Dolibarr (#326 Teil 2) kommen Posten ohne Profil-Link (nur Name), ohne Namen („nicht
-// freigegeben“) oder unbesetzt - jede Lage sagt ehrlich, was gilt.
-function boardPersonTarget(u) {
-  if (!u) return null;
-  if (u.profile_url) return u.profile_url;
-  return u.username ? `/u/${u.username}` : null;
-}
-
-function BoardEmpty({ p, compact }) {
-  const text = p.name_withheld ? "Name nicht freigegeben" : p.vacant ? "Unbesetzt" : "Position offen";
-  return <div className={`${compact ? "mt-3" : "m-5"} text-[10px] uppercase tracking-widest text-white/40`} data-testid={`board-empty-${p.slug}`}>{text}</div>;
-}
-
-function BoardCard({ p, compact = false, featured = false }) {
-  const u = p.user;
-  const target = boardPersonTarget(u);
-  const Wrapper = target ? Link : "div";
-  const wrapperProps = target ? { to: target } : {};
-  return (
-    <div className={`border rounded-sm bg-[#121212] hover:border-[#FFD700]/40 transition overflow-hidden ${featured ? "border-[#FFD700]/30" : "border-white/10"} ${compact ? "p-5" : ""}`} data-season-anchor="card">
-      {!compact && (
-        <div className="px-5 pt-5">
-          <Crown className="w-5 h-5 text-[#FFD700] mb-3" />
-          <div className="font-heading font-bold uppercase">{p.display_title}</div>
-          {p.description && <p className="mt-2 text-sm text-white/55">{p.description}</p>}
-        </div>
-      )}
-      {compact && (
-        <>
-          <Crown className="w-5 h-5 text-[#FFD700] mb-3" />
-          <div className="font-heading font-bold uppercase">{p.display_title}</div>
-          {p.description && <p className="mt-2 text-sm text-white/55">{p.description}</p>}
-        </>
-      )}
-
-      {u ? (
-        <Wrapper {...wrapperProps} className={`${compact ? "mt-4" : "mt-5"} flex ${compact ? "items-center gap-3" : "flex-col"} group`} data-testid={`board-person-${p.slug}`}>
-          {!compact && (
-            <div className="relative min-h-[17rem] bg-[radial-gradient(circle_at_50%_15%,rgba(255,215,0,0.14),rgba(10,10,10,0)_68%)] overflow-hidden">
-              {u.avatar_url ? (
-                <img src={resolveMediaUrl(u.avatar_url)} alt="" className="absolute inset-x-0 bottom-0 mx-auto h-[108%] w-full object-contain object-bottom group-hover:scale-[1.025] transition duration-500" />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <UserIcon className="w-12 h-12 text-white/20" />
-                </div>
-              )}
-              <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black via-black/70 to-transparent">
-                <div className="font-heading text-xl font-black text-white group-hover:text-[#FFD700] transition uppercase truncate">{personGamertag(u)}</div>
-                {personRealName(u) && <div className="mt-0.5 text-xs text-white/55 truncate">{personRealName(u)}</div>}
-                {u.role_title && <div className="mt-1 text-[10px] uppercase tracking-widest text-white/45">{u.role_title}</div>}
-                {p.since && <div className="mt-1 text-[10px] uppercase tracking-widest text-white/45">seit {viennaDate(p.since, { month: "long", year: "numeric" })}</div>}
-              </div>
-            </div>
-          )}
-          {compact && (
-            <>
-              {u.avatar_url ? (
-                <img src={resolveMediaUrl(u.avatar_url)} alt="" className="w-12 h-12 rounded-sm object-contain object-bottom bg-[#0A0A0A] border border-white/10" />
-              ) : (
-                <div className="w-12 h-12 rounded-sm bg-[#0A0A0A] border border-white/10 flex items-center justify-center">
-                  <UserIcon className="w-5 h-5 text-white/40" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="font-bold text-white text-sm group-hover:text-[#FFD700] transition truncate">{personGamertag(u)}</div>
-                {personRealName(u) && <div className="text-[10px] text-white/50 truncate">{personRealName(u)}</div>}
-                <div className="text-[10px] text-white/40 uppercase tracking-widest">{u.source === "member_profile" ? "Vereinsprofil" : u.source === "dolibarr" ? "laut Vereinsregister" : `@${u.username}`}</div>
-              </div>
-              {target && <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-[#FFD700] transition" />}
-            </>
-          )}
-        </Wrapper>
-      ) : (
-        <BoardEmpty p={p} compact={compact} />
-      )}
-    </div>
-  );
-}
-
-function BoardDeputyCard({ position }) {
-  const d = position.deputy_user;
-  const title = `${position.display_title || position.title_male}-Stv.`;
-  if (!d) {
-    return (
-      <div className="border border-dashed border-white/10 rounded-sm bg-[#0A0A0A] p-6 text-[11px] uppercase tracking-widest text-white/35 min-h-[10rem] flex items-center">
-        {title} offen
-      </div>
-    );
-  }
-  return (
-    <Link to={d.profile_url || `/u/${d.username}`} className="tls-card tls-card--gold group border border-white/10 rounded-sm bg-[#0A0A0A] p-6 flex items-center gap-5 min-h-[11.5rem]">
-      {d.avatar_url ? (
-        <img src={resolveMediaUrl(d.avatar_url)} alt="" className="w-28 h-32 rounded-sm object-contain object-bottom bg-black border border-white/10" />
-      ) : (
-        <div className="w-28 h-32 rounded-sm bg-black border border-white/10 flex items-center justify-center">
-          <UserIcon className="w-8 h-8 text-white/35" />
-        </div>
-      )}
-      <div className="min-w-0">
-        <div className="text-[11px] uppercase tracking-[0.18em] text-[#FFD700]/70 font-bold">{title}</div>
-        <div className="mt-1 font-heading text-xl md:text-2xl font-black uppercase group-hover:text-[#FFD700] transition truncate">{personGamertag(d)}</div>
-        {personRealName(d) && <div className="text-sm text-white/55 truncate">{personRealName(d)}</div>}
-      </div>
-    </Link>
+    </section>
   );
 }
 
