@@ -480,7 +480,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
             <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Fahrer</span>
             <select value={form.user_id} onChange={(e) => set("user_id", e.target.value)} required data-testid="fastlap-user" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
               <option value="">- auswählen -</option>
-              {users.map((item) => <option key={item.id} value={item.id}>{item.display_name || item.username || item.email}</option>)}
+              {users.map((item) => <option key={item.id} value={item.id}>{item.display_name || item.username}</option>)}
             </select>
           </label>
           <label className="block">

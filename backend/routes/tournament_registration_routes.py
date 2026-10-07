@@ -351,18 +351,17 @@ async def list_assignable_tournament_users(tid: str, q: str | None = None, limit
     db = get_db()
     tid = await _resolve_tid(tid)
     await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
+    # Helfer eines einzelnen Turniers wählen Konten nach Name und Bild; E-Mail und Rolle sehen nur Vorstand und Admins.
+    full_view = _is_staff(me)
     query = {"is_banned": {"$ne": True}}
     if q:
         pattern = safe_regex(q)
-        query["$or"] = [
-            {"username": {"$regex": pattern, "$options": "i"}},
-            {"display_name": {"$regex": pattern, "$options": "i"}},
-            {"email": {"$regex": pattern, "$options": "i"}},
-        ]
-    users = await db.users.find(
-        query,
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1, "avatar_url": 1, "role": 1},
-    ).sort("display_name", 1).to_list(max(1, min(int(limit or 200), 500)))
+        fields = ["username", "display_name"] + (["email"] if full_view else [])
+        query["$or"] = [{field: {"$regex": pattern, "$options": "i"}} for field in fields]
+    projection = {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1}
+    if full_view:
+        projection.update({"email": 1, "role": 1})
+    users = await db.users.find(query, projection).sort("display_name", 1).to_list(max(1, min(int(limit or 200), 500)))
     return users
 
 

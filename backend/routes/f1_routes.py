@@ -361,9 +361,10 @@ async def assignable_users(cid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     cid = await _resolve_cid(cid)
     await _require_f1_result_permission(me, cid)
+    # Für die Auswahl am Simulator reichen Name und Bild; Kontodaten wie E-Mail oder Rolle braucht dort niemand.
     users = await db.users.find(
         {},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1, "avatar_url": 1, "role": 1},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
     ).sort("display_name", 1).to_list(1000)
     member_ids = set(await db.memberships.distinct("user_id", {"member_status": {"$in": ["active", "honorary"]}}))
     for user in users:
@@ -381,7 +382,13 @@ async def list_challenge_staff(cid: str, me: dict = Depends(get_current_user)):
         {"challenge_id": cid},
         {"_id": 0},
     ).sort("created_at", -1).to_list(500)
-    return await _enrich_f1_staff_assignments(assignments)
+    rows = await _enrich_f1_staff_assignments(assignments)
+    if not _is_staff(me):
+        # Helfer einer einzelnen Fast Lap sehen die anderen Helfer mit Namen, nicht mit E-Mail.
+        for row in rows:
+            if isinstance(row.get("user"), dict):
+                row["user"] = {key: value for key, value in row["user"].items() if key != "email"}
+    return rows
 
 
 @router.post("/challenges/{cid}/staff")
