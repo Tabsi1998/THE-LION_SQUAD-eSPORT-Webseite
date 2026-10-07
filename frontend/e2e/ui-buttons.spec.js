@@ -67,4 +67,55 @@ test.describe("Oberfläche, Paket 3: Knöpfe und Schritt-Anzeige", () => {
     // Die Farbe wechselt weiter - das ist keine Bewegung.
     expect(await button.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe("rgb(30, 149, 194)");
   });
+
+  // LionsAPP-Download (#1084): der Store-Knopf steht mit Play-Link im Streifen „Dabei sein“; beim Drüberfahren läuft
+  // das Blau von links ein und die Schrift wird dunkel. Ohne Link steht „bald bei Google Play“.
+  test("Download-Knopf: mit Play-Link, beim Drüberfahren läuft das Blau ein", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockServer(page);
+    await page.route("**/api/settings/public", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({
+      club_name: "THE LION SQUAD", tagline: "eSports", domain: "lionsquad.at", play_store_url: "https://play.google.com/store/apps/details?id=at.lionsquad.app",
+    }) }));
+    await page.goto("/");
+    const button = page.getByTestId("footer-play-button");
+    await button.scrollIntoViewIfNeeded();
+    await expect(button).toHaveAttribute("href", "https://play.google.com/store/apps/details?id=at.lionsquad.app");
+    await expect(button).toHaveClass(/tls-store--b/);
+    await expect(page.getByTestId("footer-play-badge")).toBeVisible();
+    const look = () => button.evaluate((node) => ({
+      fill: getComputedStyle(node, "::before").transform, color: getComputedStyle(node).color,
+    }));
+    expect((await look()).fill).toBe("matrix(0, 0, 0, 1, 0, 0)");
+    if (SHOTS) await page.getByTestId("footer-cta").screenshot({ path: `${SHOTS}/store-streifen-1440.png` });
+    await button.hover();
+    await expect.poll(async () => (await look()).fill).toBe("matrix(1, 0, 0, 1, 0, 0)");
+    await expect.poll(async () => (await look()).color).toBe("rgb(4, 20, 27)");
+    if (SHOTS) await button.screenshot({ path: `${SHOTS}/store-knopf-hover.png` });
+    const box = await button.boundingBox();
+    const strip = await page.getByTestId("footer-cta").boundingBox();
+    expect(box.y + box.height).toBeLessThanOrEqual(strip.y + strip.height + 1);
+  });
+
+  test("Download-Knopf: am Handy brechen Knopf und Badge sauber um, kein Querlauf", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockServer(page);
+    await page.route("**/api/settings/public", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({
+      club_name: "THE LION SQUAD", tagline: "eSports", domain: "lionsquad.at", play_store_url: "https://play.google.com/store/apps/details?id=at.lionsquad.app",
+    }) }));
+    await page.goto("/");
+    const strip = page.getByTestId("footer-cta");
+    await strip.scrollIntoViewIfNeeded();
+    await expect(page.getByTestId("footer-play-button")).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    if (SHOTS) await strip.screenshot({ path: `${SHOTS}/store-streifen-390.png` });
+  });
+
+  test("Download-Knopf: ohne Play-Link steht „bald bei Google Play“", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockServer(page);
+    await page.goto("/");
+    await expect(page.getByTestId("footer-play-soon")).toContainText("bald bei Google Play");
+    await expect(page.getByTestId("footer-play-button")).toHaveCount(0);
+  });
 });
