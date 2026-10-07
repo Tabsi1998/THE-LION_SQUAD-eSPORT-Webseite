@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Bug, CheckCircle2, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
@@ -26,9 +27,11 @@ function badgeClass(level) {
 
 // App-Logs (#517 Teil 2): der frühere Menüpunkt ist ein Reiter unter Betrieb & Logs - mit Triage wie bisher.
 export function AppLogsTab() {
+  const [searchParams] = useSearchParams();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [q, setQ] = useState("");
+  // Von der Fehlerseite (#1230) kommt die Kennung der Meldung als ?q= mit - die Suche findet den Eintrag sofort.
+  const [q, setQ] = useState(() => searchParams.get("q") || "");
   const [level, setLevel] = useState("");
   const [status, setStatus] = useState("");
   const [priority, setPriority] = useState("");
@@ -110,7 +113,7 @@ export function AppLogsTab() {
           <input
             value={q}
             onChange={(event) => setQ(event.target.value)}
-            placeholder="Nachricht, Quelle, Benutzer suchen..."
+            placeholder="Nachricht, Quelle, Benutzer oder Kennung suchen..."
             className="w-full bg-[#0A0A0A] border border-white/10 pl-9 pr-3 py-2.5 rounded-sm text-sm"
           />
         </label>
@@ -155,6 +158,9 @@ export function AppLogsTab() {
               </button>
               {isExpanded && (
                 <div className="border-t border-white/10 p-4 space-y-3">
+                  <p className="text-xs text-white/45">
+                    Kennung <span className="font-mono text-white/70 select-all" data-testid={`app-log-id-${log.id}`}>{log.id}</span>
+                  </p>
                   {log.stack && (
                     <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-sm bg-[#0A0A0A] border border-white/10 p-3 text-xs text-white/70">{log.stack}</pre>
                   )}

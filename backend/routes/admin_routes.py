@@ -258,6 +258,8 @@ async def mobile_client_logs(
     search = re.escape(q.strip()[:80])
     if search:
         query["$or"] = [
+            # Die Kennung von der Fehlerseite (#1230) - auch nur ihr Anfang findet den Eintrag.
+            {"id": {"$regex": f"^{search}"}},
             {"message": {"$regex": search, "$options": "i"}},
             {"source": {"$regex": search, "$options": "i"}},
             {"screen": {"$regex": search, "$options": "i"}},

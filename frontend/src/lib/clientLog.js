@@ -7,6 +7,9 @@ const MAX_LOGS_PER_MINUTE = 12;
 // im Adminbereich an. Nur VITE_CLIENT_LOGGING=false schaltet es ab (#233).
 const CLIENT_LOGGING_ENABLED = import.meta.env.VITE_CLIENT_LOGGING !== "false";
 const sentAtByFingerprint = new Map();
+// Die Kennung der Meldung je Fingerabdruck (#1230): ein zweiter gleicher Fehler innerhalb der Sperrfrist zeigt
+// dieselbe Kennung wie der erste - unter „Betrieb & Logs“ ist es auch derselbe Eintrag.
+const reportIdByFingerprint = new Map();
 let recentSendTimes = [];
 
 function clip(value, limit) {
@@ -36,18 +39,20 @@ function fingerprintFor(payload) {
   ].join("|").toLowerCase();
 }
 
+/** Schickt die Meldung; zurück kommt die Kennung des Eintrags unter „Betrieb & Logs“ - oder null (nicht gesendet,
+ *  ohne Anmeldung, Fehler beim Senden). */
 function sendClientLog(payload) {
-  if (!CLIENT_LOGGING_ENABLED) return;
+  if (!CLIENT_LOGGING_ENABLED) return Promise.resolve(null);
   const fingerprint = fingerprintFor(payload);
   const now = Date.now();
   const lastSentAt = sentAtByFingerprint.get(fingerprint) || 0;
-  if (now - lastSentAt < DEDUPE_MS) return;
+  if (now - lastSentAt < DEDUPE_MS) return reportIdByFingerprint.get(fingerprint) || Promise.resolve(null);
   recentSendTimes = recentSendTimes.filter((sentAt) => now - sentAt < 60000);
-  if (recentSendTimes.length >= MAX_LOGS_PER_MINUTE) return;
+  if (recentSendTimes.length >= MAX_LOGS_PER_MINUTE) return Promise.resolve(null);
   sentAtByFingerprint.set(fingerprint, now);
   recentSendTimes.push(now);
 
-  api.post("/mobile/client-logs", {
+  const reportId = api.post("/mobile/client-logs", {
     level: payload.level || "error",
     message: scrubClientLogText(payload.message || "Web client error", 2000),
     source: "web",
@@ -60,12 +65,15 @@ function sendClientLog(payload) {
     platform: "web",
     app_version: import.meta.env.VITE_APP_VERSION || "",
     created_at: new Date().toISOString(),
-  }).catch(() => {});
+  }).then(({ data } = {}) => (data && typeof data.id === "string" ? data.id : null)).catch(() => null);
+  reportIdByFingerprint.set(fingerprint, reportId);
+  return reportId;
 }
 
-/** Ein Fehler, den eine Fehlergrenze gefangen hat (#944) - der Browser meldet ihn nicht mehr von selbst. */
+/** Ein Fehler, den eine Fehlergrenze gefangen hat (#944) - der Browser meldet ihn nicht mehr von selbst.
+ *  Liefert die Kennung der Meldung (#1230), damit Admins sie auf der Fehlerseite sehen und weitergeben können. */
 export function reportCaughtError(error, componentStack = "") {
-  sendClientLog({
+  return sendClientLog({
     level: "error",
     message: error?.message || "Seite konnte nicht angezeigt werden",
     error_name: error?.name || "Error",
