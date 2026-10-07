@@ -79,6 +79,7 @@ test("Mitglied: oben der Mitgliederbereich mit sechs Kacheln und internen News -
     ["member-area-helping", ["MemberHelperShifts", undefined]],
     ["member-area-documents", ["MemberDocuments", undefined]],
     ["member-area-benefits", ["InfoCenter", { section: "benefits" }]],
+    ["verein-row-about", ["ClubAbout", undefined]],
     ["verein-row-gallery", ["Gallery", undefined]],
     ["verein-row-news", ["NewsList", undefined]],
     ["verein-row-sponsors", ["InfoCenter", { section: "sponsors" }]],
@@ -137,8 +138,9 @@ test("Vorstand: der Einlass steht oben - sonst nicht", async () => {
 });
 
 test("Adventkalender: die Zeile steht nur da, solange der Kalender läuft - als erste unter „Vom Verein“", () => {
-  expect(clubRows(false).map((row) => row.title)).toEqual(["News", "Galerie", "Referenzen", "Sponsoren", "Partner"]);
-  expect(clubRows(true).map((row) => row.title)).toEqual(["Adventkalender", "News", "Galerie", "Referenzen", "Sponsoren", "Partner"]);
+  // Über uns, Vorstand, Kontakt (#1024) steht als erste Zeile - für Gäste, Eltern und Neue.
+  expect(clubRows(false).map((row) => row.title)).toEqual(["Über uns, Vorstand, Kontakt", "News", "Galerie", "Referenzen", "Sponsoren", "Partner"]);
+  expect(clubRows(true).map((row) => row.title)).toEqual(["Adventkalender", "Über uns, Vorstand, Kontakt", "News", "Galerie", "Referenzen", "Sponsoren", "Partner"]);
 });
 
 test("Symbole je Kanal, Unbekanntes als Link; Discord-Server-Zeile", () => {

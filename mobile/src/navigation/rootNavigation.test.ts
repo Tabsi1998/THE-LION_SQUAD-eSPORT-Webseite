@@ -118,7 +118,9 @@ test("jede bekannte Adresse hat ihren Ort - Übersichten wechseln den Tab, alles
   expect(targetFromUrl("https://lionsquad.at/news/saisonstart")).toEqual(detail("NewsDetail", { id: "saisonstart" }));
   expect(targetFromUrl("https://start.gg/tournaments/t-1")).toBeNull();
   // Seiten ohne Screen in der App öffnen sich im Browser.
-  for (const url of ["/servers", "/about", "/membership/join", "/privacy", "/imprint", "/privacy-account", "", null, undefined]) {
+  // Über uns (#1024) hat jetzt einen Screen - der Rest bleibt auf der Website.
+  expect(targetFromUrl("/about")).toEqual(detail("ClubAbout"));
+  for (const url of ["/servers", "/membership/join", "/privacy", "/imprint", "/privacy-account", "", null, undefined]) {
     expect([url, targetFromUrl(url)]).toEqual([url, null]);
   }
 });

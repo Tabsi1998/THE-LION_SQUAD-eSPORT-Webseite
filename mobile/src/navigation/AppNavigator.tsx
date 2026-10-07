@@ -224,6 +224,7 @@ export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptio
   MemberCard: { title: "Mitgliedskarte", ...gold },
   Admission: { title: "Einlass" },
   InfoCenter: { title: "Verein" },
+  ClubAbout: { title: "Über uns" },
   Settings: { title: "Einstellungen" },
   ProfileEdit: { title: "Profil bearbeiten" },
 };

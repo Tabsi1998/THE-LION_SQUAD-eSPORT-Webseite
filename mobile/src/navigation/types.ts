@@ -84,6 +84,8 @@ export type DetailParamList = {
   // Einlass bei der Generalversammlung (#845): nur für den Vorstand (Bereich „Verein“).
   Admission: undefined;
   InfoCenter: { section?: "sponsors" | "partners" | "events" | "benefits" | "references" | "profiles" } | undefined;
+  // Über uns, Vorstand, Werte, Kontakt (#1024): kurz in der App, lange Seiten bleiben auf der Website.
+  ClubAbout: undefined;
   // Einstellungen an einem Ort (#1146): Zahnrad oben im Profil.
   Settings: undefined;
   ProfileEdit: undefined;

@@ -2,6 +2,7 @@ import type React from "react";
 import { AchievementShowcaseScreen } from "../screens/main/AchievementShowcaseScreen";
 import { AdmissionScreen } from "../screens/main/AdmissionScreen";
 import { AdventCalendarScreen } from "../screens/main/AdventCalendarScreen";
+import { ClubAboutScreen } from "../screens/main/ClubAboutScreen";
 import { CommunityScreen } from "../screens/main/CommunityScreen";
 import { DashboardScreen } from "../screens/main/DashboardScreen";
 import { DirectThreadScreen } from "../screens/main/DirectThreadScreen";
@@ -81,6 +82,7 @@ export const DETAIL_SCREENS: Record<DetailScreenName, Screen> = {
   MemberCard: MemberCardScreen,
   Admission: AdmissionScreen,
   InfoCenter: InfoCenterScreen,
+  ClubAbout: ClubAboutScreen,
   Settings: SettingsScreen,
   ProfileEdit: ProfileEditScreen,
 };

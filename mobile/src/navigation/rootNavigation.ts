@@ -248,6 +248,11 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
     // Ostereiersuche (#647): Korb, Hinweise, Preise - auch aus Benachrichtigungen (Gewinn, voller Korb).
     case "ostern":
       return detail("EasterHunt");
+    // Über uns, Vorstand, Werte (#1024): kurz in der App.
+    case "about":
+    case "board":
+    case "values":
+      return detail("ClubAbout");
     case "sponsors":
       return detail("InfoCenter", { section: "sponsors" });
     case "partners":
