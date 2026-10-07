@@ -77,6 +77,14 @@ OPTIONAL_EMAIL_PREFERENCES = {
         "description": "Interne Events und News, die nur Mitglieder sehen.",
         "default": True,
     },
+    # Helferdienste (#1197): Aufruf des Vorstands für offene Schichten und die Erinnerung am Vortag - nur Mitglieder
+    # bekommen das; eine Mail dafür gibt es nicht.
+    "helper_shifts": {
+        "label": "Helferdienste",
+        "description": "Nur für Vereinsmitglieder: Aufrufe für offene Helferschichten und die Erinnerung am Vortag.",
+        "default": True,
+        "channels": ["in_app", "push", "discord"],
+    },
 }
 
 DELIVERY_CHANNEL_PREFERENCES = {
@@ -181,6 +189,9 @@ NOTIFICATION_KIND_CATEGORY = {
     "event_board": "club_internal",
     # Abstimmung offen (#844): einmal je Abstimmung, nur mit offenem Stimmrecht.
     "ballot_open": "club_internal",
+    # Helferdienste (#1197): Aufruf und Erinnerung am Vortag - eigenes Thema, abschaltbar.
+    "helper_call": "helper_shifts",
+    "helper_reminder": "helper_shifts",
     "membership_update": "membership_updates",
     "invoice_ready": "billing_updates",
 }

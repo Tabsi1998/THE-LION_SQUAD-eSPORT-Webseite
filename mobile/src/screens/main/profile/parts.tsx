@@ -44,6 +44,8 @@ export const notificationLabels: Array<{ key: string; label: string; detail: str
   { key: "community_messages", label: "Community", detail: "Direktnachrichten und Erwähnungen." },
   { key: "news_events", label: "News & Events", detail: "Vereinsnews, Events und Ankündigungen." },
   { key: "club_internal", label: "Vereinsintern", detail: "Interne Events und News nur für Mitglieder." },
+  // Helferdienste (#1197): Aufruf des Vorstands und Erinnerung am Vortag - nur Mitglieder, keine Mail.
+  { key: "helper_shifts", label: "Helferdienste", detail: "Nur für Mitglieder: Aufrufe für offene Schichten und Erinnerung am Vortag.", channels: ["in_app", "push", "discord"] },
 ];
 export const notificationPreferenceKey = (channel: string, topic: string) => `${channel}:${topic}`;
 

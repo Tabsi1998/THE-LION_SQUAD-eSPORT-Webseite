@@ -78,7 +78,8 @@ export type DetailParamList = {
   // Versammlungen und Abstimmungen (#327): aus der Vereinsakte, nur mit Weg dorthin.
   MemberMeetings: undefined;
   // Helferdienste (#331): Schichten aus der Vereinsakte.
-  MemberHelperShifts: undefined;
+  // `event` (#1197): aus dem Helfer-Aufruf - diese Veranstaltung steht oben und leuchtet.
+  MemberHelperShifts: { event?: number } | undefined;
   MemberCard: undefined;
   // Einlass bei der Generalversammlung (#845): nur für den Vorstand (Bereich „Verein“).
   Admission: undefined;

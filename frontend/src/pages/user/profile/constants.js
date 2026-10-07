@@ -130,6 +130,8 @@ export const EMAIL_PREFERENCES = [
   { k: "community_messages", l: "Nachrichten & Erwähnungen", d: "Direktnachrichten, Team-Chat-Erwähnungen und ähnliche Community-Hinweise.", defaultOn: true },
   { k: "news_events", l: "News & Events", d: "Neue Vereinsnews, neue Events und wichtige Ankündigungen.", requiresNewsletter: true },
   { k: "club_internal", l: "Vereinsintern", d: "Interne Events und News, die nur Mitglieder sehen.", defaultOn: true },
+  // Helferdienste (#1197): Aufruf des Vorstands und Erinnerung am Vortag - nur für Mitglieder, keine Mail.
+  { k: "helper_shifts", l: "Helferdienste", d: "Nur für Vereinsmitglieder: Aufrufe für offene Helferschichten und die Erinnerung am Vortag.", defaultOn: true, channels: ["in_app", "push", "discord"] },
 ];
 
 export const NOTIFICATION_CHANNELS = [

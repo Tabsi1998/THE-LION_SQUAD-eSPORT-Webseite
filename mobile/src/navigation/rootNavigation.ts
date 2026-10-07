@@ -201,6 +201,8 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   if (first === "profile") return profileTarget(query);
   if (first === "account" && second === "invoices") return detail("MyInvoices", invoiceParams(query));
   if ((first === "me" || first === "my") && second === "prizes") return detail("MyPrizes");
+  // Helfer-Aufruf (#1197): /members/helfen?event=5 öffnet die Helferdienste mit dieser Veranstaltung oben.
+  if (first === "members" && second === "helfen" && Number(query.get("event"))) return detail("MemberHelperShifts", { event: Number(query.get("event")) });
   if (first === "members" && second) return memberTarget(second);
   if (first === "seasons") return detail("SeasonPass");
   if (second) return null;

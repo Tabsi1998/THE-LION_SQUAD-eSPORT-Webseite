@@ -2,6 +2,9 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
+import { HelperCallCard } from "../../components/HelperCallCard";
+import { useAuth } from "../../auth/AuthContext";
+import { canAdmit } from "../../lib/admission";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
@@ -40,7 +43,10 @@ export function shiftWhen(shift: HelperShift): string {
 
 type Props = NativeStackScreenProps<MoreStackParamList, "MemberHelperShifts"> & { confirmShift?: ConfirmShift };
 
-export function MemberHelperShiftsScreen({ confirmShift = defaultConfirmShift }: Props) {
+export function MemberHelperShiftsScreen({ confirmShift = defaultConfirmShift, route }: Props) {
+  // Helfer-Aufruf (#1197): den Knopf sieht nur der Vorstand; aus der Meldung steht die genannte Veranstaltung oben.
+  const { user } = useAuth();
+  const wanted = Number(route?.params?.event || 0);
   const [view, setView] = useState<HelperShiftsView | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,11 +97,13 @@ export function MemberHelperShiftsScreen({ confirmShift = defaultConfirmShift }:
   };
 
   const events = view?.events ?? [];
-  const sorted = [...events.filter((e) => e.upcoming), ...events.filter((e) => !e.upcoming)];
+  const sorted = [...events.filter((e) => e.upcoming), ...events.filter((e) => !e.upcoming)]
+    .sort((a, b) => Number(b.id === wanted) - Number(a.id === wanted));
 
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.gold} />}>
+        {canAdmit(user) ? <HelperCallCard /> : null}
         {loading ? <SkeletonList count={2} hasImage={false} /> : null}
         {error ? <EmptyState icon="alert-circle-outline" tone="gold" title="Nicht geladen" detail={error} /> : null}
 
@@ -112,7 +120,7 @@ export function MemberHelperShiftsScreen({ confirmShift = defaultConfirmShift }:
             {view.my_count ? <Muted testID="helper-shifts-mine">Du bist bei {view.my_count === 1 ? "einem Dienst" : `${view.my_count} Diensten`} eingetragen.</Muted> : null}
             {!events.length ? <Muted testID="helper-shifts-empty">Derzeit keine Veranstaltung mit Helferdiensten.</Muted> : null}
             {sorted.map((event) => (
-              <Card key={event.id} style={[styles.card, event.upcoming && styles.upcoming]} testID={`helper-event-${event.id}`}>
+              <Card key={event.id} style={[styles.card, event.upcoming && styles.upcoming, event.id === wanted && styles.wanted]} testID={`helper-event-${event.id}`}>
                 <Muted style={styles.eyebrow}>{event.visibility_label} · {event.status_label}</Muted>
                 <Heading>{event.label}</Heading>
                 <Muted>{formatDate(event.day)}{event.end_day && event.end_day !== event.day ? ` – ${formatDate(event.end_day)}` : ""}{event.place ? ` · ${event.place}` : ""}</Muted>
@@ -151,6 +159,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 40, gap: 12 },
   card: { gap: 8 },
   upcoming: { borderColor: "rgba(255,215,0,0.45)" },
+  wanted: { borderColor: colors.gold, borderWidth: 2 },
   eyebrow: { fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: colors.gold },
   shift: { flexDirection: "row", alignItems: "center", gap: 10, borderColor: "rgba(255,255,255,0.12)", borderRadius: 6, borderWidth: 1, padding: 10 },
   flex: { flex: 1, gap: 2 },

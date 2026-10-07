@@ -12,6 +12,9 @@ vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) =
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => confirmAnswer }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// Helfer-Aufruf (#1197): den Knopf sieht nur der Vorstand (Bereich „Verein“).
+const authState = { areas: [] };
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ can: (area) => authState.areas.includes(area) }) }));
 
 const { default: MemberHelperShiftsPage, shiftWhen } = await import("./MemberHelperShiftsPage");
 
@@ -63,4 +66,34 @@ test("ohne Weg zur Akte steht der Grund", async () => {
   render(<MemoryRouter><MemberHelperShiftsPage /></MemoryRouter>);
   await waitFor(() => expect(screen.getByTestId("helper-shifts-unavailable")).toHaveTextContent("verbunden sein"));
   expect(screen.getByText("Zu Meine Mitgliedschaft")).toBeInTheDocument();
+});
+
+test("Helfer-Aufruf (#1197): der Vorstand sendet mit einem Knopf, einmal am Tag; die Meldung hebt die Veranstaltung hervor", async () => {
+  const user = userEvent.setup();
+  authState.areas = ["club"];
+  const CALLS = { available: true, events: [{ id: 5, label: "Sommerfest 2026", open_shifts: [{ id: 51 }], open_places: 4, text: "Es fehlen noch 4 Helfer: Sa 14–16 Uhr Aufbau, Sa 21–23 Uhr Abbau.", called_today: false, can_call: true, last_call_at: null }] };
+  apiMock.get.mockImplementation(async (url) => (url === "/membership/helper-calls" ? { data: structuredClone(CALLS) } : { data: VIEW }));
+  apiMock.post = vi.fn().mockResolvedValue({ data: { ok: true, recipients: 12 } });
+  render(<MemoryRouter initialEntries={["/members/helfen?event=5"]}><MemberHelperShiftsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("helper-call-panel")).toBeInTheDocument();
+  expect(screen.getByTestId("helper-call-text-5")).toHaveTextContent("Es fehlen noch 4 Helfer");
+  expect(screen.getByTestId("helper-event-5")).toHaveAttribute("data-highlight", "true");
+  confirmAnswer = false;
+  await user.click(screen.getByTestId("helper-call-send-5"));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  confirmAnswer = true;
+  CALLS.events[0] = { ...CALLS.events[0], called_today: true, can_call: false };
+  await user.click(screen.getByTestId("helper-call-send-5"));
+  expect(apiMock.post).toHaveBeenCalledWith("/membership/helper-calls/5");
+  await waitFor(() => expect(screen.getByTestId("helper-call-send-5")).toBeDisabled());
+  expect(screen.getByTestId("helper-call-send-5")).toHaveTextContent("Heute gesendet");
+  authState.areas = [];
+});
+
+test("Mitglieder ohne Vorstandsposten sehen keinen Aufruf-Knopf", async () => {
+  authState.areas = [];
+  render(<MemoryRouter><MemberHelperShiftsPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("helper-event-5")).toBeInTheDocument());
+  expect(screen.queryByTestId("helper-call-panel")).toBeNull();
+  expect(apiMock.get).not.toHaveBeenCalledWith("/membership/helper-calls");
 });

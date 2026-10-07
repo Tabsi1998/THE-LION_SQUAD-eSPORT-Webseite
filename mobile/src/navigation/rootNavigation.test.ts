@@ -94,6 +94,8 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/members/documents", detail("MemberDocuments")],
   ["/members/meetings", detail("MemberMeetings")],
   ["/members/helfen", detail("MemberHelperShifts")],
+  // Helfer-Aufruf (#1197): die Veranstaltung aus der Meldung steht oben.
+  ["/members/helfen?event=5", detail("MemberHelperShifts", { event: 5 })],
   ["/members/benefits", detail("InfoCenter", { section: "benefits" })],
   ["/notifications", detail("Notifications")],
   ["/achievements", detail("AchievementShowcase")],
