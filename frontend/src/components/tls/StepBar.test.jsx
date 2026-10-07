@@ -58,7 +58,17 @@ test("zu schmal für alle Namen: nur der aktuelle Schritt mit Zähler, nichts ab
   const realRange = document.createRange;
   const realWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
   const RealObserver = globalThis.ResizeObserver;
-  globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+  // Mit Konstruktor wie das Original - eine Klasse ohne ihn hält CodeQL für das echte ResizeObserver und meldet dann
+  // jedes `new ResizeObserver(callback)` im Projekt (js/superfluous-trailing-arguments).
+  globalThis.ResizeObserver = class FakeResizeObserver {
+    constructor(callback) {
+      this.callback = callback;
+    }
+
+    observe() {}
+
+    disconnect() {}
+  };
   let textWidth = 50;
   document.createRange = () => ({ selectNodeContents() {}, getBoundingClientRect: () => ({ width: textWidth }) });
   Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 60 });
