@@ -182,6 +182,7 @@ const F1TVPage = lazy(() => import("@/pages/display/F1TVPage"));
 const BracketTVPage = lazy(() => import("@/pages/display/BracketTVPage"));
 const StationTVPage = lazy(() => import("@/pages/display/StationTVPage"));
 const EventTVPage = lazy(() => import("@/pages/display/EventTVPage"));
+const EventCallsTVPage = lazy(() => import("@/pages/display/EventCallsTVPage"));
 const MyPrizesPage = lazy(() => import("@/pages/user/MyPrizesPage"));
 const MyPenaltiesPage = lazy(() => import("@/pages/user/MyPenaltiesPage"));
 const AdminPrizesPage = lazy(() => import("@/pages/admin/AdminPrizesPage"));
@@ -392,6 +393,7 @@ function App() {
           {/* Display / TV */}
           <Route path="/display/f1/:id" element={<F1TVPage />} />
           <Route path="/display/event/:id" element={<EventTVPage />} />
+          <Route path="/display/event/:id/calls" element={<EventCallsTVPage />} />
           <Route path="/display/bracket/:id" element={<BracketTvRoute />} />
           <Route path="/display/bracket/:id/station/:stationId" element={<BracketTvRoute station />} />
 

@@ -163,9 +163,11 @@ test("Stations-Ansicht: Turnier und Station wählen - der Link trägt den Schlü
   await user.click(screen.getByTestId("tv-key-create"));
   const link = await screen.findByTestId("tv-link");
   expect(link.textContent).toBe(`${window.location.origin}/display/bracket/t1/station/st-pc-3?key=neuer-schluessel`);
-  // Dieselbe Abweichung wie beim Turnierbaum, zum Beispiel Ton nur an diesem Bildschirm.
-  await user.selectOptions(screen.getByTestId("tv-override-input-result_sound"), "true");
-  expect(screen.getByTestId("tv-link").textContent).toBe(`${window.location.origin}/display/bracket/t1/station/st-pc-3?key=neuer-schluessel&result_sound=1`);
+  // Abweichungen wie beim Turnierbaum - aber nur, was eine Station nutzt (keine Wiedergabeliste, kein Ton).
+  await user.selectOptions(screen.getByTestId("tv-override-input-contrast"), "true");
+  expect(screen.getByTestId("tv-link").textContent).toBe(`${window.location.origin}/display/bracket/t1/station/st-pc-3?key=neuer-schluessel&contrast=1`);
+  expect(screen.queryByTestId("tv-override-input-playlist")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("tv-override-input-result_sound")).not.toBeInTheDocument();
 });
 
 test("einen Stations-Link übernehmen: Ansicht, Turnier, Station und Schlüssel bleiben", async () => {

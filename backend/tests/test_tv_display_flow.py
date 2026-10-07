@@ -20,7 +20,12 @@ from services import change_events, tv_display  # noqa: E402
 from services.access_links import hash_access_token  # noqa: E402
 
 DEFAULTS = {"text_size": "normal", "contrast": False, "safe_area": 0, "pixel_shift": True, "season_header": True, "reduce_motion": False,
-            "result_sound": False}
+            "result_sound": False,
+            # Meilenstein 60 (#1121-#1127): Fabians Wahl aus der TV-Vorschau vom 07.10.2026.
+            "playlist": [{"slide": "tree", "seconds": 12}, {"slide": "live", "seconds": 8}, {"slide": "calls", "seconds": 8},
+                         {"slide": "sponsor", "seconds": 6}, {"slide": "stats", "seconds": 8}],
+            "call_sound": False, "report_minutes": 2, "stats": True, "stats_every": 10, "sponsor_moment": True, "sponsor_every": 3,
+            "sponsor_presented": True, "sponsor_ticker": False, "track_seconds": 45}
 
 
 @pytest_asyncio.fixture
@@ -64,6 +69,8 @@ async def test_settings_read_without_login_and_without_stored_values_are_the_def
     assert body["settings"] == DEFAULTS
     assert body["defaults"] == DEFAULTS
     assert body["choices"] == {"text_size": ["normal", "large"], "safe_area": [0, 3, 5]}
+    assert body["ranges"] == {"report_minutes": [1, 30], "stats_every": [1, 60], "sponsor_every": [1, 60], "track_seconds": [20, 120]}
+    assert body["playlist_slides"] == ["tree", "live", "calls", "sponsor", "stats"] and body["playlist_seconds"] == [3, 120]
     assert tv_display.DEFAULTS == DEFAULTS, "Fabians Wahl aus der TV-Vorschau ist der Standard"
 
 
@@ -89,13 +96,14 @@ async def test_only_admins_with_the_tournaments_area_may_save(flow):
     saved = await flow.put("/api/tv/settings", json={"text_size": "large", "contrast": True, "safe_area": 5, "pixel_shift": False,
                                                      "season_header": False, "reduce_motion": True, "result_sound": True})
     assert saved.status_code == 200, saved.text
-    expected = {"text_size": "large", "contrast": True, "safe_area": 5, "pixel_shift": False, "season_header": False, "reduce_motion": True,
-                "result_sound": True}
+    changed = {"text_size": "large", "contrast": True, "safe_area": 5, "pixel_shift": False, "season_header": False, "reduce_motion": True,
+               "result_sound": True}
+    expected = {**DEFAULTS, **changed}
     assert saved.json()["settings"] == expected
     flow.act_as(None)
     assert (await flow.get("/api/tv/settings")).json()["settings"] == expected, "die Bildschirme lesen ohne Anmeldung"
     audit = await flow.db.audit_logs.find_one({"action": "settings.tv.update"}, {"_id": 0})
-    assert audit["actor_id"] == leader["id"] and audit["data"]["changed_fields"] == sorted(expected)
+    assert audit["actor_id"] == leader["id"] and audit["data"]["changed_fields"] == sorted(changed)
 
     granted = await flow.add_user(role="player", name="Freigabe Turniere")
     flow.act_as({**granted, "areas": ["tournaments"]})

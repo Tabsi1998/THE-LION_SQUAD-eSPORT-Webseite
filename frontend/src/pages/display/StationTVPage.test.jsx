@@ -103,3 +103,14 @@ test("ein widerrufener Schlüssel zeigt nichts mehr vom Turnier", async () => {
   renderStation("/display/bracket/t1/station/st-1?key=widerrufen");
   expect(await screen.findByTestId("tv-key-refused")).toHaveTextContent("Dieser TV-Link gilt nicht mehr");
 });
+
+test("#1122: ist das nächste Spiel hier aufgerufen, steht es mit Countdown da", async () => {
+  const bracket = singleElimination(8);
+  const next = bracket.matches_v2.find((match) => match.match_key === "C");
+  Object.assign(next, { station_id: "st-pc-4", station_name: "PC 4", called_at: new Date(Date.now() - 30_000).toISOString() });
+  serve(bracket, [{ id: "st-pc-4", name: "PC 4", status: "reserved", current_match_id: "m-C", called_at: next.called_at }]);
+  renderStation("/display/bracket/t1/station/st-pc-4?key=k");
+  expect(await screen.findByTestId("station-tv-call")).toHaveTextContent("Aufgerufen");
+  expect(screen.getByTestId("station-tv-state")).toHaveTextContent("Aufgerufen");
+  expect(screen.getByTestId("tv-call-clock-m-C")).toHaveTextContent(/^1:[23]\d$/);
+});

@@ -17,6 +17,7 @@ import { REGISTRATION_STATUS_OPTIONS, formatRegistrationStatus, formatTournament
 import { ParticipantAddForm } from "./tournament/ParticipantAddForm";
 import { TournamentStaffPanel } from "./tournament/StaffPanel";
 import { TournamentStagesPanel } from "./tournament/StagesPanel";
+import { PauseUntilControl, RoundSponsorsPanel } from "./tournament/TvTournamentPanel";
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
 import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
 
@@ -536,6 +537,8 @@ export default function AdminTournamentEditPage() {
                   {visibleStatusOptions.map(([s, label]) => <option key={s} value={s}>{label}</option>)}
                 </select>
                 <div className="mt-1 max-w-[16rem] text-[10px] text-white/40">Operativ durch Turnierleitung; Zeitautomatik nur wenn ausdrücklich aktiviert.</div>
+                {/* „Pause bis“ (#1123): nur beim Status „Pausiert“ - der TV zählt bis dahin herunter. */}
+                <PauseUntilControl tournament={t} onSaved={load} />
               </div>
             )}
           </div>
@@ -717,6 +720,10 @@ export default function AdminTournamentEditPage() {
           ) : (
             <BracketTree data={bracket} />
           )}
+          {/* Sponsor je Runde (#1125): „Runde 2 präsentiert von“ am Turnierbaum-TV. */}
+          {canOperateTournament && (bracket.matches_v2?.length || 0) > 0 ? (
+            <RoundSponsorsPanel tournament={t} matches={bracket.matches_v2} stages={bracket.stages || stages} onSaved={load} />
+          ) : null}
         </div>
       )}
 

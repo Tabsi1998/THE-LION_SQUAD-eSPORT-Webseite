@@ -97,7 +97,7 @@ function useElementSize(ref, measure) {
 const viewportSize = (element) => ({ w: element.clientWidth, h: element.clientHeight, base: stageBase(window.innerWidth, window.innerHeight) });
 const contentSize = (element) => ({ w: element.offsetWidth, h: element.offsetHeight });
 
-export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots = EMPTY, onReveal, champion = null, championParked = false, onChampionParked, onParkSpot, gong = null }) {
+export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots = EMPTY, onReveal, champion = null, championParked = false, onChampionParked, onParkSpot, gong = null, active = true }) {
   const { motionOn, textSize, settings } = useTv();
   const viewportRef = useRef(null);
   const stageRef = useRef(null);
@@ -244,8 +244,9 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
   }, []);
 
   // Kamerafahrt über einen großen Baum: Halt, Fahrt, Halt … Ein Moment hält sie an; danach geht es vom nächstgelegenen
-  // Halt weiter. Neue Daten ändern nur die Halte, nicht die Stelle, an der die Kamera gerade steht.
-  const tourOn = plan?.mode === "tour" && !moment;
+  // Halt weiter. Neue Daten ändern nur die Halte, nicht die Stelle, an der die Kamera gerade steht. Zeigt die
+  // Wiedergabeliste (#1121) gerade eine andere Folie, wartet die Kamera.
+  const tourOn = plan?.mode === "tour" && !moment && active;
   useEffect(() => {
     if (!tourOn) return undefined;
     let cancelled = false;

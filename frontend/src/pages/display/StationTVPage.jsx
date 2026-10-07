@@ -4,13 +4,15 @@ import { api } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { isTableFormat } from "@/components/tls/BracketTree";
-import { TvScreen } from "@/components/tv/TvScreen";
+import { TvScreen, useTv } from "@/components/tv/TvScreen";
+import { TvCallCountdown } from "@/components/tv/TvCallBoard";
 import { TvFooter, TvHeader, TvPill } from "@/components/tv/TvParts";
 import { TvSpotlight } from "@/components/tv/TvTreeNode";
 import { TvLineup } from "@/components/tv/TvStartGrid";
 import { avatarOfRegistration, nameOfRegistration } from "@/components/tv/TvMoments";
 import { lastStageId } from "@/lib/bracketPodium";
 import { isMatchDone, plannedText } from "@/lib/slotSource";
+import { callsOf } from "@/lib/tvCalls";
 import { stationLineup } from "@/lib/tvGrid";
 import { isLiveMatch, matchName } from "@/lib/tvLive";
 import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
@@ -18,7 +20,8 @@ import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
 // Stations-Ansicht (#1120): ein Bildschirm direkt an einer Station zeigt nur, was dort läuft oder als Nächstes kommt -
 // Durchgänge als Startaufstellung, Duelle als „A gegen B“. Ist das Spiel dort gerade entschieden, bleibt das Ergebnis
 // eine Minute stehen (weiter / Loser Bracket / raus), dann kommt das nächste. Derselbe Anzeige-Schlüssel wie beim
-// Turnierbaum; der Link kommt aus dem Link-Baukasten unter TV & Beamer.
+// Turnierbaum; der Link kommt aus dem Link-Baukasten unter TV & Beamer. Ist das nächste Spiel hier aufgerufen (#1122),
+// steht „Aufgerufen – bitte jetzt hierher“ mit demselben Countdown wie auf der Aufruf-Tafel.
 
 const RESULT_HOLD_MS = 60000;
 
@@ -32,6 +35,7 @@ export default function StationTVPage() {
 
 function StationTv() {
   const { id, stationId } = useParams();
+  const { settings } = useTv();
   const [params] = useSearchParams();
   const displayKey = params.get("key") || "";
   const [data, setData] = useState(null);
@@ -108,7 +112,8 @@ function StationTv() {
   const avatarOf = avatarOfRegistration(data?.registrations || []);
   const lastStage = lastStageId(matches, data?.stages || []);
   const publicUrl = t ? `${window.location.origin}/tournaments/${t.slug || t.id}/bracket` : window.location.origin;
-  const pill = mode === "live" ? ["live", "Läuft"] : mode === "done" ? ["gold", "Entschieden"] : mode === "next" ? ["accent", "Als Nächstes"] : ["green", "Frei"];
+  const call = mode === "next" && match ? callsOf([match], station ? [station] : [], { reportMinutes: settings.report_minutes })[0] || null : null;
+  const pill = mode === "live" ? ["live", "Läuft"] : mode === "done" ? ["gold", "Entschieden"] : call ? ["gold", "Aufgerufen"] : mode === "next" ? ["accent", "Als Nächstes"] : ["green", "Frei"];
 
   return (
     <div className="tv-page" data-testid="station-tv">
@@ -138,6 +143,11 @@ function StationTv() {
               </div>
               {mode === "live" && isLiveMatch(match) ? (
                 <TvSpotlight match={match} className="tv-station__spot" />
+              ) : call ? (
+                <div className="tv-station__call" data-testid="station-tv-call">
+                  <span className="tv-call__go tv-t-info">Aufgerufen – bitte jetzt hierher</span>
+                  <TvCallCountdown call={call} small />
+                </div>
               ) : mode === "next" && plannedText(match) ? (
                 <div className="tv-station__when tv-t-head" data-testid="station-tv-when">{plannedText(match)}</div>
               ) : null}

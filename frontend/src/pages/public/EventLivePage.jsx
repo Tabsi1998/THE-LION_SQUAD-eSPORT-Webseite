@@ -254,7 +254,7 @@ export default function EventLivePage() {
               </div>
               <div className="space-y-2">
                 {stations.slice(0, 12).map((station) => <StationRow key={station.id} station={station} />)}
-                {!stations.length && <InlineEmpty text="Keine Stationen mit diesem Event verknuepft." />}
+                {!stations.length && <InlineEmpty text="Keine Stationen mit diesem Event verknüpft." />}
               </div>
             </LivePanel>
 
@@ -268,7 +268,7 @@ export default function EventLivePage() {
 
             <LivePanel icon={Activity} title="Aktivitäten" count={activityItems.length}>
               {activityItems.length ? activityItems.map((item) => <ActivityRow key={`${item.kind}-${item.id}`} item={item} accessToken={accessToken} />) : (
-                <InlineEmpty text="Keine Turniere oder Fast-Laps verknuepft." />
+                <InlineEmpty text="Keine Turniere oder Fast Laps verknüpft." />
               )}
             </LivePanel>
           </aside>
