@@ -208,6 +208,55 @@ async def test_changing_the_station_by_hand_ends_the_call(flow):
     assert "called_at" not in await flow.reload(match)
 
 
+def keys_ending_in_by(value) -> list[str]:
+    """Alle Schlüssel „…_by“ (wer etwas getan hat) - irgendwo in einer Antwort."""
+    if isinstance(value, dict):
+        return [key for key in value if key.endswith("_by")] + [found for item in value.values() for found in keys_ending_in_by(item)]
+    if isinstance(value, list):
+        return [found for item in value for found in keys_ending_in_by(item)]
+    return []
+
+
+@pytest.mark.asyncio
+async def test_players_and_the_tv_see_call_and_pause_but_not_who_made_them(flow):
+    """Spielseiten zeigen Internes nur der Turnierleitung (#1141). Station, „aufgerufen um“ und „Pause bis“ brauchen
+    Spieler, Gäste, der TV und später die App („Du bist dran an PC 3“) - wer aufgerufen oder pausiert hat, nicht."""
+    staff, tournament, users, registrations = await bracket_of(flow, 4)
+    station = await station_for(flow, tournament)
+    match = await playable_match(flow, tournament)
+    token = await display_key(flow, tournament)
+    assert (await flow.post(f"/api/stations/{station['id']}/assign/{match['id']}")).status_code == 200
+    called_at = (await flow.reload(match))["called_at"]
+    # Internes, wie es Abläufe hineinschreiben - auch ein „wer hat aufgerufen“, falls es später jemand speichert.
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {
+        "admin_note": "Interne Notiz", "called_by": staff["id"], "updated_by": staff["id"]}})
+    until = (datetime.now(timezone.utc) + timedelta(minutes=15)).replace(microsecond=0)
+    paused = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "paused", "paused_until": until.isoformat()})
+    assert paused.status_code == 200, paused.text
+
+    owners = {reg["id"]: reg.get("user_id") for reg in registrations}
+    player = next(user for user in users if user["id"] == owners[match["slots"][0]["registration_id"]])
+    for viewer in (player, None):
+        flow.act_as(viewer)
+        detail = await flow.get(f"/api/matches/{match['id']}")
+        page = await flow.get(f"/api/matches/{match['id']}/page")
+        assert detail.status_code == 200 and page.status_code == 200, (detail.text, page.text)
+        for shown in (detail.json(), page.json()["match"]):
+            assert shown["called_at"] == called_at and shown["station_id"] == station["id"], "Aufruf und Station bleiben sichtbar"
+            assert "admin_note" not in shown and keys_ending_in_by(shown) == [], "wer aufgerufen hat, bleibt intern"
+        assert datetime.fromisoformat(page.json()["tournament"]["paused_until"]) == until, "„Pause bis“ für Spieler und App"
+
+    flow.act_as(None)
+    tv = await show_tv(flow, tournament, token)
+    shown = next(row for row in tv["matches_v2"] if row["id"] == match["id"])
+    assert shown["called_at"] == called_at and shown["station_name"] == "PC 3"
+    assert datetime.fromisoformat(tv["tournament"]["paused_until"]) == until
+    assert keys_ending_in_by(tv) == [] and staff["id"] not in json.dumps(tv) and "Interne Notiz" not in json.dumps(tv)
+
+    flow.act_as(staff)
+    assert (await flow.get(f"/api/matches/{match['id']}")).json()["called_by"] == staff["id"], "die Turnierleitung sieht alles"
+
+
 # ---------------------------------------------------------------- Pause bis (#1123)
 
 @pytest.mark.asyncio
