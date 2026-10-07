@@ -6,7 +6,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (e, f) => f, resolveMediaUrl: (u) => u }));
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: null }) }));
+const authState = { user: null };
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/CookieConsent", () => ({ useCookieConsent: () => ({ hasConsent: () => true }) }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
@@ -15,6 +16,14 @@ vi.mock("@/hooks/useCanonicalSlugRedirect", () => ({ useCanonicalSlugRedirect: (
 vi.mock("@/components/tls/RichContent", () => ({ RichContent: () => null }));
 
 const EventDetailPage = (await import("./EventDetailPage")).default;
+
+// Die Seite rechnet „vorbei“ nach dem Wiener Tag (#1221) - die Uhr steht in diesen Tests fest.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-10T10:00:00Z"));
+  authState.user = null;
+});
+afterEach(() => vi.useRealTimers());
 
 const base = {
   id: "e1", slug: "ausflug", name: "Vereinsausflug", status: "scheduled", visibility: "public", show_map: true,
@@ -180,4 +189,58 @@ test("Turnier-Karte: mit Ergebnissen die ersten drei Plätze statt „noch nicht
   expect(podium).toHaveTextContent("#1NeonFalke#2LunaByte#3KiwiKomet");
   expect(podium).not.toHaveTextContent("DriftDaniel");
   expect(screen.queryByText(/noch nicht generiert/)).toBeNull();
+});
+
+// Nach dem Ende (#1221): kein Kalender, kein „Live verfolgen“, kein „Display“ - stattdessen der Satz mit den Turnieren.
+// „Display“ sehen auch vorher nur Konten mit dem Bereich Turniere.
+const SUMMER = {
+  ...base, slug: "ausflug", status: "scheduled", start_date: "2026-06-20T08:00:00Z", end_date: "2026-06-21T18:00:00Z",
+  tournaments: [{ id: "t9", slug: "sommer-cup", title: "Sommer-Cup", status: "results_published", format: "league" }],
+};
+
+test("beendetes Event: Satz mit den Turnieren, kein Kalender, kein Live, kein Display", async () => {
+  authState.user = { id: "u9", role: "club_admin", areas: ["tournaments"] };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/ausflug") return { data: SUMMER };
+    if (url === "/tournaments/t9/standings") return { data: [] };
+    throw new Error(url);
+  });
+  render(
+    <MemoryRouter initialEntries={["/events/ausflug"]}>
+      <Routes><Route path="/events/:slug" element={<EventDetailPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  const over = await screen.findByTestId("event-over");
+  expect(over).toHaveTextContent("Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:");
+  expect(over.querySelector("a")).toHaveAttribute("href", "/tournaments/sommer-cup");
+  expect(screen.queryByTestId("add-to-calendar-ics")).toBeNull();
+  expect(screen.queryByTestId("event-live-links")).toBeNull();
+  expect(screen.queryByText("Live verfolgen")).toBeNull();
+  expect(screen.queryByTestId("event-display-link")).toBeNull();
+});
+
+test("laufendes Event: Gäste sehen „Live verfolgen“ ohne „Display“, die Turnierleitung beides", async () => {
+  const running = { ...SUMMER, start_date: "2026-10-10T08:00:00Z", end_date: "2026-10-11T18:00:00Z", tournaments: [{ ...SUMMER.tournaments[0], status: "live" }] };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/ausflug") return { data: running };
+    return { data: [] };
+  });
+  const { unmount } = render(
+    <MemoryRouter initialEntries={["/events/ausflug"]}>
+      <Routes><Route path="/events/:slug" element={<EventDetailPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByTestId("event-live-links")).toHaveTextContent("Live verfolgen");
+  expect(screen.queryByTestId("event-display-link")).toBeNull();
+  expect(screen.queryByTestId("event-over")).toBeNull();
+  expect(screen.getByTestId("add-to-calendar-ics")).toBeInTheDocument();
+  unmount();
+
+  authState.user = { id: "u9", role: "tournament_admin", areas: ["tournaments", "moderation"] };
+  render(
+    <MemoryRouter initialEntries={["/events/ausflug"]}>
+      <Routes><Route path="/events/:slug" element={<EventDetailPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByTestId("event-display-link")).toHaveAttribute("href", "/display/event/e1");
 });

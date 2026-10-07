@@ -242,3 +242,15 @@ test("Start-Kachel mit ganzem Datum in Klartext", async () => {
     vi.useRealTimers();
   }
 });
+
+// Nach dem Ende (#1221): ein beendetes Turnier hat keinen Kalender-Knopf mehr.
+test("Kalender-Knopf nur, solange das Turnier nicht vorbei ist", async () => {
+  mockApi({ ...base, start_date: "2026-11-14T13:00:00Z" });
+  const { unmount } = renderPage();
+  expect(await screen.findByTestId("add-to-calendar")).toBeInTheDocument();
+  unmount();
+  mockApi({ ...base, status: "results_published", start_date: "2026-05-23T19:00:00Z", public_phase: { state: "results_published" } });
+  renderPage();
+  expect(await screen.findByTestId("tournament-title")).toBeInTheDocument();
+  expect(screen.queryByTestId("add-to-calendar")).toBeNull();
+});

@@ -102,3 +102,56 @@ test("offenes Spiel: „Noch offen“ nur ohne Termin, mit Termin der Tag in Kla
   expect(dated).toHaveTextContent("morgen 18:00");
   expect(dated).not.toHaveTextContent("Noch offen");
 });
+
+// Nach dem Ende (#1221): Ergebnis und Verlauf - kein Live-Refresh, keine Terminabstimmung; den Chat sehen nur noch
+// Teilnehmer und Turnierleitung zum Nachlesen, ein leerer Chat verschwindet.
+const DONE = {
+  ...BASE,
+  match: { id: "m1", match_key: "B", status: "completed", winner_id: "r2", round_name: "Halbfinale",
+    slots: [{ slot: 1, registration_id: "r1" }, { slot: 2, registration_id: "r2" }],
+    results: [{ registration_id: "r1", rank: 2, score: 1 }, { registration_id: "r2", rank: 1, score: 3 }] },
+  participants: [NEON, LUNA],
+  matchday_label: "Halbfinale",
+};
+
+function renderWithChat(page, chat) {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/matches/m1/page") return { data: page };
+    if (url === "/matches/m1/chat") return { data: chat };
+    return { data: [] };
+  });
+  return render(
+    <MemoryRouter initialEntries={["/matches/m1"]}>
+      <Routes><Route path="/matches/:id" element={<MatchPage />} /></Routes>
+    </MemoryRouter>,
+  );
+}
+
+test("beendetes Match: kein Live-Refresh, keine Terminabstimmung, leerer Chat weg", async () => {
+  renderWithChat(DONE, []);
+  expect(await screen.findByTestId("match-finished")).toBeInTheDocument();
+  expect(screen.queryByTestId("match-live-refresh")).toBeNull();
+  expect(screen.queryByTestId("match-scheduling")).toBeNull();
+  expect(screen.queryByTestId("match-chat")).toBeNull();
+});
+
+test("beendetes Match: Teilnehmer lesen den Chat nach, schreiben geht nicht mehr; Gäste sehen ihn nicht", async () => {
+  const chat = [{ id: "c1", message: "GG!", author: { display_name: "LunaByte" } }];
+  const { unmount } = renderWithChat({ ...DONE, can_act: true }, chat);
+  const box = await screen.findByTestId("match-chat");
+  expect(box).toHaveTextContent("GG!");
+  expect(screen.getByTestId("match-chat-closed")).toHaveTextContent("Das Match ist beendet – der Chat bleibt zum Nachlesen.");
+  expect(box.querySelector("form")).toBeNull();
+  unmount();
+  renderWithChat(DONE, chat);
+  expect(await screen.findByTestId("match-finished")).toBeInTheDocument();
+  expect(screen.queryByTestId("match-chat")).toBeNull();
+});
+
+test("offenes Match: Live-Refresh, Terminabstimmung und Chat bleiben", async () => {
+  renderWithChat({ ...DONE, match: { ...DONE.match, status: "scheduled", winner_id: null, results: [] } }, []);
+  expect(await screen.findByTestId("match-schedule")).toBeInTheDocument();
+  expect(screen.getByTestId("match-live-refresh")).toBeInTheDocument();
+  expect(screen.getByTestId("match-scheduling")).toBeInTheDocument();
+  expect(screen.getByTestId("match-chat")).toBeInTheDocument();
+});

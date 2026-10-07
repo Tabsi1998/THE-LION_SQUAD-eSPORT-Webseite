@@ -21,7 +21,14 @@ jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: (...args: unkn
 jest.mock("../../realtime/LiveChangesProvider", () => ({ useLiveRefresh: () => {} }));
 jest.mock("../../seasons/anchors", () => ({ useSeasonOverlay: () => null, SeasonAnchor: ({ children }: { children?: React.ReactNode }) => children ?? null }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
-jest.mock("../../components/AddToCalendarButton", () => ({ AddToCalendarButton: () => null }));
+// Der Kalender-Knopf als Marke: da, wenn die Seite ihm einen Termin gibt (#1221).
+jest.mock("../../components/AddToCalendarButton", () => ({
+  AddToCalendarButton: ({ item, items }: { item?: unknown; items?: unknown[] | null }) => {
+    const { createElement } = jest.requireActual("react");
+    const { Text } = jest.requireActual("react-native");
+    return item || items?.length ? createElement(Text, { testID: "add-to-calendar" }, "In meinen Kalender") : null;
+  },
+}));
 
 const navigate = jest.fn();
 const navigation = { navigate, setOptions: jest.fn(), getParent: () => ({ navigate }) } as never;
@@ -87,4 +94,16 @@ test("Teams sehen, wie viele beim Event sein müssen; ohne Schalter kein Hinweis
   await render(<TournamentDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByText("Zum Turnier anmelden")).toBeTruthy());
   expect(screen.queryByTestId("tournament-event-gate")).toBeNull();
+});
+
+// Nach dem Ende (#1221): ein beendetes Turnier hat keinen Kalender-Knopf mehr.
+test("Kalender-Knopf nur, solange das Turnier nicht vorbei ist", async () => {
+  answer({ ...TOURNAMENT, event_gate: null, start_date: "2099-11-14T13:00:00Z" });
+  const view = await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("add-to-calendar")).toBeTruthy());
+  await view.unmount();
+  answer({ ...TOURNAMENT, event_gate: null, start_date: "2026-05-23T19:00:00Z", status: "results_published", public_phase: { state: "results_published", label: "Ergebnisse veröffentlicht" } });
+  await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("LAN-Cup")).toBeTruthy());
+  expect(screen.queryByTestId("add-to-calendar")).toBeNull();
 });

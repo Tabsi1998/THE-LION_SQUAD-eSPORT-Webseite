@@ -19,6 +19,7 @@ import { CommendButton } from "@/components/tls/CommendButton";
 import { viennaDateTime } from "@/lib/vienna";
 import { formatWhen } from "@/lib/datetime";
 import { finishedMatchText, formatMatchKind, formatMatchStatus, isByeSlot, isMatchFinished, matchHeadline, slotName, stationText } from "@/lib/tournamentLabels";
+import { matchIsOver } from "@/lib/afterEnd";
 
 const scheduleLabels = {
   proposed: "Terminvorschlag offen",
@@ -130,7 +131,8 @@ export default function MatchPage() {
       document.removeEventListener("visibilitychange", refreshVisible);
     };
   }, [load]);
-  useLiveRefresh(load, ["matches", "matches-v2", "tournaments"], { fallbackMs: 10000 });
+  // Ein fertiges Match ändert sich nicht mehr - die Live-Aktualisierung hört dann auf (#1221).
+  useLiveRefresh(load, ["matches", "matches-v2", "tournaments"], { fallbackMs: 10000, enabled: !matchIsOver(data?.match) });
   // Match-Chat gelesen (#1148) - nur für die, die mitschreiben dürfen.
   useChatRead("match", id, chat, Boolean(user && data?.can_act));
 
@@ -299,6 +301,10 @@ export default function MatchPage() {
   const finished = isMatchFinished(match);
   const isBye = participants.some((participant) => isByeSlot(participant, match));
   const station = stationText(match);
+  // Nach dem Ende (#1221): Ergebnis und Verlauf. Den Chat sehen dann nur noch Teilnehmer und Turnierleitung, und nur,
+  // wenn darin etwas steht.
+  const over = matchIsOver(match);
+  const showChat = !over || (Boolean(data.can_act) && chat.length > 0);
   const canReportScore = Boolean(data.can_player_report_result || data.can_report_score);
   const canSubmitLegacyResult = Boolean(!isV2 && duelParticipants.length >= 2 && !isCompleted && (canReportScore || data.can_staff_submit_result || data.can_submit_result));
   const canSubmitV2Result = Boolean(isV2 && !isCompleted && data.can_staff_submit_result && v2Rows.length);
@@ -372,14 +378,17 @@ export default function MatchPage() {
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Ergebnis</h2>
-              <p className="mt-1 text-sm text-white/55">Der Matchstand aktualisiert sich automatisch.</p>
+              {!over && <p className="mt-1 text-sm text-white/55">Der Matchstand aktualisiert sich automatisch.</p>}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {/* GG (#616): eine Seite lobt die andere - einmal je Match, nur nach dem Ende. */}
               {user && isV2 ? <CommendButton matchId={id} completed={String(match.status) === "completed"} /> : null}
-              <div className="inline-flex items-center gap-2 rounded-sm border border-[#29B6E8]/25 bg-[#29B6E8]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]">
-                <RefreshCw className="w-3.5 h-3.5" /> Live-Refresh
-              </div>
+              {/* Nach dem Ende (#1221) aktualisiert sich nichts mehr - der Hinweis fällt weg. */}
+              {!over && (
+                <div className="inline-flex items-center gap-2 rounded-sm border border-[#29B6E8]/25 bg-[#29B6E8]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]" data-testid="match-live-refresh">
+                  <RefreshCw className="w-3.5 h-3.5" /> Live-Refresh
+                </div>
+              )}
             </div>
           </div>
 
@@ -503,7 +512,9 @@ export default function MatchPage() {
           {reports.length > 0 && <p className="mt-3 text-xs text-white/45">{reports.length} Ergebnismeldung{reports.length === 1 ? "" : "en"} vorhanden.</p>}
         </div>
 
-        <div className="mt-6 grid lg:grid-cols-[minmax(0,1fr)_24rem] gap-6">
+        {/* Nach dem Ende (#1221): Ergebnis und Verlauf - keine Terminabstimmung mehr; der Matchchat bleibt für
+            Teilnehmer und Turnierleitung zum Nachlesen, ein leerer Chat verschwindet. */}
+        <div className={`mt-6 grid gap-6 ${showChat ? "lg:grid-cols-[minmax(0,1fr)_24rem]" : ""}`}>
           <div className="space-y-6">
             <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
               <h2 className="font-heading text-xl font-black uppercase">Teilnehmer</h2>
@@ -518,7 +529,8 @@ export default function MatchPage() {
               </div>
             </div>
 
-            <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
+            {!over && (
+            <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="match-scheduling">
               <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung</h2>
               {canProposeSchedule ? (
                 <form onSubmit={propose} className="mt-4 grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
@@ -564,9 +576,11 @@ export default function MatchPage() {
                 {!latestProposal && (data.schedule_proposals || []).length === 0 && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
               </div>
             </div>
+            )}
           </div>
 
-          <aside className="border border-white/10 bg-[#121212] rounded-sm p-5 h-fit">
+          {showChat && (
+          <aside className="border border-white/10 bg-[#121212] rounded-sm p-5 h-fit" data-testid="match-chat">
             <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><MessageSquare className="w-5 h-5 text-[#29B6E8]" /> Matchchat</h2>
             <div className="mt-4 space-y-3 max-h-[28rem] overflow-y-auto pr-1">
               {chat.map((m) => (
@@ -580,7 +594,9 @@ export default function MatchPage() {
               ))}
               {chat.length === 0 && <div className="text-sm text-white/40">Noch keine Nachrichten.</div>}
             </div>
-            {canUseChat ? (
+            {over ? (
+              <p className="mt-4 text-xs text-white/45" data-testid="match-chat-closed">Das Match ist beendet – der Chat bleibt zum Nachlesen.</p>
+            ) : canUseChat ? (
               <form onSubmit={sendMessage} className="mt-4 space-y-2">
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={addStaffMention} className="tls-btn tls-btn--secondary px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">@leitung</button>
@@ -608,6 +624,7 @@ export default function MatchPage() {
               <p className="mt-4 text-xs text-white/45">Schreiben können Teilnehmer, Team-Captains und Turnierleitung.</p>
             )}
           </aside>
+          )}
         </div>
       </section>
     </PublicLayout>

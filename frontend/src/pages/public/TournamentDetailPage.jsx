@@ -23,6 +23,7 @@ import { MentionText } from "@/components/tls/MentionText";
 import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
 import { ChatMessageSticker, ChatStickerButton, ChatStickerPicker } from "@/components/tls/ChatStickers";
 import { formatWhen, getRegistrationState } from "@/lib/datetime";
+import { tournamentIsOver } from "@/lib/afterEnd";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
 import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels";
@@ -308,7 +309,8 @@ export default function TournamentDetailPage() {
         <div className="lg:col-span-2 space-y-8">
           <MyStandCard tournament={t} registration={myReg} team={myRegTeam} isTeamTournament={isTeamTournament} canCheckIn={false} staffOnlyCheckIn={staffOnlyCheckIn}
             canUnregister={canSelfUnregister} onUnregister={handleUnregister} busy={loading} scheduleTo={subPage("matches")} />
-          <TournamentTimeline tournament={t} calendarItem={calendarItem} />
+          {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
+          <TournamentTimeline tournament={t} calendarItem={tournamentIsOver(t) ? null : calendarItem} />
           {t.rules && (
             <section>
               <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-[#29B6E8]" /> Regeln</h2>

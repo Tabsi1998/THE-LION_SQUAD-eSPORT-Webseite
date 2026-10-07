@@ -19,6 +19,8 @@ import { seoTextPreview } from "@/lib/textPreview";
 import { formatRoundName, formatTournamentDisplay, slotName } from "@/lib/tournamentLabels";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { formatWhen } from "@/lib/datetime";
+import { eventIsOver } from "@/lib/afterEnd";
+import { hasArea } from "@/lib/permissions";
 import { gameLabel } from "@/lib/gameLabels";
 import { eventTypeLabel, normalizeEventType } from "@/lib/eventTypes";
 import { formatCents, offerSummary, previewQuote } from "@/lib/pricing";
@@ -157,6 +159,7 @@ export default function EventDetailPage() {
   const eventSponsors = uniqueLogoSponsors(e.sponsors || []);
   const organizerName = e.organizer_name || (e.owned_by_club ? "THE LION SQUAD - eSports" : "");
   const liveUrl = `/events/${e.slug || e.id}/live${accessSuffix(accessToken)}`;
+  const over = eventIsOver(e);
 
   return (
     <PublicLayout>
@@ -191,19 +194,39 @@ export default function EventDetailPage() {
               ) : <span className="inline-flex items-center gap-2">{organizerName}</span>
             )}
           </div>
-          <AddToCalendar className="mt-6" days={e.schedule?.multi_day ? e.schedule.days : null} item={{
-            id: e.id, slug: e.slug, kind: "event", title: e.name, start: e.start_date, end: e.end_date,
-            location: [e.location, fullAddress(e)].filter(Boolean).join(", ") || null,
-            detail: eventKindLabel(e.event_type), url: typeof window !== "undefined" && e.slug ? `${window.location.origin}/events/${e.slug}` : null,
-          }} />
-          {(e.tournaments?.length || e.f1_challenges?.length) && (
-            <div className="mt-7 flex flex-wrap gap-3">
+          {/* Nach dem Ende (#1221): kein Kalender, kein „Live verfolgen“, kein „Display“ - stattdessen der Satz, wo die
+              Ergebnisse stehen (bis der Rückblick kommt). „Display“ sehen auch vorher nur Konten mit dem Bereich Turniere. */}
+          {over && e.status !== "cancelled" && (
+            <div className="mt-6 max-w-3xl border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3" data-testid="event-over">
+              <div className="text-sm text-white/85">{e.tournaments?.length ? "Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:" : "Das Event ist vorbei."}</div>
+              {!!e.tournaments?.length && (
+                <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+                  {e.tournaments.map((t) => (
+                    <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex items-center gap-1.5 text-sm font-bold text-[#FFD700] hover:text-white">
+                      <Trophy className="w-3.5 h-3.5" /> {t.title}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {!over && (
+            <AddToCalendar className="mt-6" days={e.schedule?.multi_day ? e.schedule.days : null} item={{
+              id: e.id, slug: e.slug, kind: "event", title: e.name, start: e.start_date, end: e.end_date,
+              location: [e.location, fullAddress(e)].filter(Boolean).join(", ") || null,
+              detail: eventKindLabel(e.event_type), url: typeof window !== "undefined" && e.slug ? `${window.location.origin}/events/${e.slug}` : null,
+            }} />
+          )}
+          {!over && Boolean(e.tournaments?.length || e.f1_challenges?.length) && (
+            <div className="mt-7 flex flex-wrap gap-3" data-testid="event-live-links">
               <Link to={liveUrl} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
                 <Radio className="w-4 h-4" /> Live verfolgen
               </Link>
-              <Link to={`/display/event/${e.id}`} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
-                <ExternalLink className="w-4 h-4" /> Display
-              </Link>
+              {hasArea(user, "tournaments") && (
+                <Link to={`/display/event/${e.id}`} data-testid="event-display-link" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
+                  <ExternalLink className="w-4 h-4" /> Display
+                </Link>
+              )}
             </div>
           )}
         </div>

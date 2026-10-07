@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AddToCalendarButton } from "../../components/AddToCalendarButton";
+import { tournamentIsOver } from "../../lib/afterEnd";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
@@ -353,7 +354,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
               <Info label="Ort" value={tournament.event?.location || "-"} />
               <Info label="Anmeldung" value={registration.label} />
               <Info label="Modus" value={formatTeamMode(tournament.team_mode)} />
-              <AddToCalendarButton item={tournament.start_date ? {
+              {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
+              <AddToCalendarButton item={tournament.start_date && !tournamentIsOver(tournament) ? {
                 id: tournament.id, kind: "tournament", title: tournament.title, start: tournament.start_date, end: tournament.end_date,
                 location: tournament.event?.location || null, detail: [tournament.game?.display_name || tournament.game?.name, formatTournamentFormat(tournament.format)].filter(Boolean).join(" · ") || null,
                 url: tournament.slug ? `https://lionsquad.at/tournaments/${tournament.slug}` : null,

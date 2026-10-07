@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { Activity, CalendarClock, CheckCircle2, Flag, MapPin, Monitor, Radio, RotateCw, Trophy, Users } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -15,6 +15,7 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { seoTextPreview } from "@/lib/textPreview";
 import { viennaTime } from "@/lib/vienna";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
+import { eventIsOver } from "@/lib/afterEnd";
 
 const ACTIVE_MATCH_STATUSES = new Set(["in_progress", "running", "waiting_result", "disputed"]);
 const NEXT_MATCH_STATUSES = new Set(["ready", "scheduled", "pending", "preview"]);
@@ -102,11 +103,18 @@ export default function EventLivePage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
+  // Nach dem Ende (#1221) gibt es nichts mehr live zu verfolgen: die Adresse führt auf die Event-Seite.
+  const [ended, setEnded] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get(`/events/${slug}`, accessParams(accessToken));
+      if (eventIsOver(data)) {
+        setEvent(data);
+        setEnded(true);
+        return;
+      }
       const tournaments = sortByNearestDate(data?.tournaments || []);
       const bracketResponses = await Promise.allSettled(
         tournaments.map((tournament) => api.get(`/tournaments/${tournament.id}/bracket`, accessParams(accessToken)))
@@ -138,7 +146,7 @@ export default function EventLivePage() {
   useEffect(() => {
     load();
   }, [load]);
-  useLiveRefresh(load, ["events", "tournaments", "matches", "matches-v2", "stations", "f1"], { fallbackMs: 20000 });
+  useLiveRefresh(load, ["events", "tournaments", "matches", "matches-v2", "stations", "f1"], { fallbackMs: 20000, enabled: !ended });
 
   const stationMap = useMemo(() => new Map(stations.map((station) => [station.id, station])), [stations]);
   const liveMatches = useMemo(() => matches.filter((match) => ACTIVE_MATCH_STATUSES.has(match.status)).sort((a, b) => a.sortTime - b.sortTime), [matches]);
@@ -161,6 +169,10 @@ export default function EventLivePage() {
     image: event?.banner_url,
     canonical: event?.slug ? `${window.location.origin}/events/${event.slug}/live` : undefined,
   });
+
+  if (ended && event) {
+    return <Navigate to={`/events/${event.slug || event.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} replace />;
+  }
 
   if (loading && !event) {
     return <PublicLayout><PublicLoadingState label="Lade Event-Live" /></PublicLayout>;

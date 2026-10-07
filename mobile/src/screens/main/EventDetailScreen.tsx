@@ -20,6 +20,7 @@ import type { ContentTarget } from "../../lib/contentLinks";
 import { openLink } from "../../lib/openLink";
 import { companionChangeHint, eventBasisLabel, eventOfferSummary, formatCents, ownEventPriceLine, quoteTotal } from "../../lib/eventPrice";
 import { eventDayItems, scheduleLine } from "../../lib/eventDays";
+import { eventIsOver } from "../../lib/afterEnd";
 import { formatDateTime, formatStatus, placeParts } from "../../lib/format";
 import { internalLabel } from "../../lib/memberArea";
 import { getRegistrationState } from "../../lib/registration";
@@ -234,7 +235,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
-        {event.start_date || event.date ? (
+        {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
+        {(event.start_date || event.date) && !eventIsOver(event) ? (
           <AddToCalendarButton items={eventDayItems(event)} item={{
             id: event.id, kind: "event", title: event.title || event.name || "Event", start: (event.start_date || event.date) as string, end: event.end_date,
             location: placeParts(event.location, event.city).join(", ") || null, detail: event.event_type || event.type || null,
