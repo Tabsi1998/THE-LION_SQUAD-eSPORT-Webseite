@@ -7,6 +7,7 @@ Turnier A nie Turnier B, und mit keinem lässt sich etwas schreiben.
 import json
 import pathlib
 import sys
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
@@ -192,6 +193,37 @@ async def test_a_revoked_key_opens_nothing_any_more(flow):
     assert (await show_tv(flow, tournament["id"], created["token"])).status_code == 403, "steht ein Schlüssel im Link, zählt nur er"
     assert (await show_tv(flow, tournament["id"], "erfunden")).status_code == 403
     assert (await flow.delete("/api/tv/keys/gibt-es-nicht")).status_code == 404
+
+
+def test_a_key_ends_one_week_after_the_end_or_else_the_start():
+    end = {"start_date": "2026-10-09T10:00:00+00:00", "end_date": "2026-10-10T18:00:00+00:00"}
+    assert tv_display.key_expires_at(end).isoformat() == "2026-10-17T18:00:00+00:00"
+    assert tv_display.key_expires_at({"start_date": "2026-10-09T10:00:00+00:00"}).isoformat() == "2026-10-16T10:00:00+00:00"
+    assert tv_display.key_expires_at({}) is None, "ohne Termin gilt der Schlüssel bis zum Widerruf"
+    assert tv_display.key_expired(end, datetime(2026, 10, 17, 18, 1, tzinfo=timezone.utc))
+    assert not tv_display.key_expired(end, datetime(2026, 10, 17, 17, 59, tzinfo=timezone.utc))
+
+
+@pytest.mark.asyncio
+async def test_an_expired_key_opens_nothing_and_the_list_says_so(flow):
+    staff, tournament, _users, _registrations = await bracket_of(flow, 4)
+    created = await new_key(flow, tournament)
+    flow.act_as(None)
+    # Turnier vor sechs Tagen zu Ende: der Schlüssel gilt noch. Vor acht Tagen: abgelaufen.
+    for days, status in ((6, 200), (8, 403)):
+        end = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"end_date": end}})
+        response = await show_tv(flow, tournament["id"], created["token"])
+        assert response.status_code == status, (days, response.text)
+    assert response.json()["detail"] == tv_display.KEY_EXPIRED
+    flow.act_as(staff)
+    row = (await flow.get("/api/tv/keys")).json()[0]
+    assert row["expired"] is True and row["expires_at"]
+    # Wird das Turnier verschoben, wandert das Ende mit - der Schlüssel gilt wieder.
+    later = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"end_date": later}})
+    flow.act_as(None)
+    assert (await show_tv(flow, tournament["id"], created["token"])).status_code == 200
 
 
 @pytest.mark.asyncio

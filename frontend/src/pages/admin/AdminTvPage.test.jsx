@@ -100,6 +100,29 @@ test("vorhandenen Link übernehmen: Ansicht, Ziel, Schlüssel und Abweichungen",
   expect(screen.getByTestId("tv-link").textContent).toBe(`${window.location.origin}/display/bracket/t1?key=alt&text_size=large`);
 });
 
+test("aus der Turnier-Bearbeitung: Ansicht und Turnier stehen schon da", async () => {
+  window.history.pushState({}, "", "/admin/tv?view=bracket&target=t1");
+  try {
+    render(<AdminTvPage />);
+    await waitFor(() => expect(screen.getByTestId("tv-target")).toHaveValue("t1"));
+    expect(screen.getByTestId("tv-link-missing")).toHaveTextContent("Link erstellen");
+  } finally {
+    window.history.pushState({}, "", "/");
+  }
+});
+
+test("Schlüssel-Liste: wie lange er gilt - eine Woche nach dem Turnier, sonst bis zum Widerruf", async () => {
+  keys = [
+    { ...keys[0], expires_at: "2026-10-17T18:00:00+00:00", expired: false },
+    { ...keys[0], id: "k2", label: "Bar", expires_at: "2026-10-01T18:00:00+00:00", expired: true },
+    { ...keys[0], id: "k3", label: "Foyer", expires_at: null, expired: false },
+  ];
+  render(<AdminTvPage />);
+  expect(await screen.findByTestId("tv-key-until-k1")).toHaveTextContent("gilt bis 17.10.26");
+  expect(screen.getByTestId("tv-key-until-k2")).toHaveTextContent("abgelaufen");
+  expect(screen.getByTestId("tv-key-until-k3")).toHaveTextContent("gilt bis zum Widerruf");
+});
+
 test("aktive Schlüssel: Liste ohne Schlüssel selbst, Widerrufen fragt nach", async () => {
   const user = userEvent.setup();
   render(<AdminTvPage />);

@@ -172,10 +172,17 @@ function OverrideSelect({ field, value, defaultValue, onChange }) {
   );
 }
 
+// Aus der Turnier-Bearbeitung kommt man mit ?view=bracket&target=<id> - Ansicht und Turnier stehen dann schon da.
+function preset() {
+  const params = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
+  const view = TV_VIEWS.some((entry) => entry.key === params.get("view")) ? params.get("view") : "bracket";
+  return { view, target: params.get("target") || "" };
+}
+
 function LinkBuilder({ defaults }) {
-  const [view, setView] = useState("bracket");
+  const [view, setView] = useState(() => preset().view);
   const [targets, setTargets] = useState({ bracket: [], event: [], fastlap: [] });
-  const [targetId, setTargetId] = useState("");
+  const [targetId, setTargetId] = useState(() => preset().target);
   const [overrides, setOverrides] = useState({});
   const [label, setLabel] = useState("");
   const [created, setCreated] = useState(null);
@@ -376,7 +383,7 @@ function TvKeyList() {
           <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-[#0F0F0F] rounded-sm px-4 py-3" data-testid={`tv-key-${row.id}`}>
             <div className="min-w-0">
               <div className="text-sm font-bold text-white/90">{row.label}</div>
-              <div className="text-xs text-white/50">{row.tournament_title} · erstellt {row.created_at ? viennaDateTime(row.created_at, { dateStyle: "short", timeStyle: "short" }) : "–"} · {row.last_used_at ? `zuletzt da ${viennaDateTime(row.last_used_at, { dateStyle: "short", timeStyle: "short" })}` : "noch nie geöffnet"}</div>
+              <div className="text-xs text-white/50">{row.tournament_title} · erstellt {row.created_at ? viennaDateTime(row.created_at, { dateStyle: "short", timeStyle: "short" }) : "–"} · {row.last_used_at ? `zuletzt da ${viennaDateTime(row.last_used_at, { dateStyle: "short", timeStyle: "short" })}` : "noch nie geöffnet"} · <span data-testid={`tv-key-until-${row.id}`} className={row.expired ? "text-[#FF6B6B]" : undefined}>{row.expired ? "abgelaufen (eine Woche nach dem Turnier)" : row.expires_at ? `gilt bis ${viennaDateTime(row.expires_at, { dateStyle: "short" })}` : "gilt bis zum Widerruf"}</span></div>
             </div>
             <button type="button" onClick={() => revoke(row)} className="inline-flex items-center gap-2 px-3 py-2 border border-[#FF3B30]/40 text-[#FF6B6B] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#FF3B30]/10" data-testid={`tv-key-revoke-${row.id}`}>
               <Trash2 className="w-3.5 h-3.5" /> Widerrufen

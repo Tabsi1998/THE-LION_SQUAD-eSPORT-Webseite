@@ -13,7 +13,7 @@ from auth import require_admin
 from database import get_db
 from models import new_id, now_utc
 from services.access_links import hash_access_token, new_access_token
-from services.tv_display import DISPLAY_GRANT, SETTINGS_ID, display_path, key_label, public_payload
+from services.tv_display import DISPLAY_GRANT, SETTINGS_ID, display_path, key_expires_at, key_label, public_payload
 
 router = APIRouter(prefix="/api/tv", tags=["tv"])
 
@@ -85,6 +85,7 @@ async def reset_tv_settings(me: dict = Depends(require_admin())):
 
 def _key_payload(link: dict, tournaments: dict) -> dict:
     tournament = tournaments.get(link.get("target_id")) or {}
+    until = key_expires_at(tournament)
     return {
         "id": link.get("id"),
         "label": link.get("note") or "Bildschirm",
@@ -95,11 +96,14 @@ def _key_payload(link: dict, tournaments: dict) -> dict:
         "created_by": link.get("created_by"),
         "last_used_at": link.get("last_used_at"),
         "is_active": link.get("is_active") is not False,
+        # Eine Woche nach dem Turnier endet der Schlüssel von selbst (aus den Turnierdaten gerechnet, nicht gespeichert).
+        "expires_at": until.isoformat() if until else None,
+        "expired": bool(until and now_utc() > until),
     }
 
 
 async def _tournaments_by_id(db, ids: list[str]) -> dict:
-    rows = await db.tournaments.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "title": 1, "slug": 1}).to_list(len(ids) or 1)
+    rows = await db.tournaments.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "end_date": 1}).to_list(len(ids) or 1)
     return {row["id"]: row for row in rows}
 
 
@@ -119,7 +123,7 @@ async def list_tv_keys(tournament_id: str | None = None, me: dict = Depends(requ
 async def create_tv_key(body: TvKeyCreate, me: dict = Depends(require_admin())):
     """Ein neuer Schlüssel für einen Bildschirm. Den Schlüssel gibt es nur in dieser Antwort - gespeichert wird der Hash."""
     db = get_db()
-    tournament = await db.tournaments.find_one({"id": body.tournament_id}, {"_id": 0, "id": 1, "title": 1, "slug": 1})
+    tournament = await db.tournaments.find_one({"id": body.tournament_id}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "end_date": 1})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     token = new_access_token()

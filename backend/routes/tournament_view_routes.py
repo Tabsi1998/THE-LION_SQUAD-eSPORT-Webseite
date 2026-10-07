@@ -5,9 +5,10 @@ import io
 from fastapi import HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from database import get_db
+from models import now_utc
 from auth import get_current_user, get_optional_user
 from services.access_links import touch_access_link, validate_access_link
-from services.tv_display import DISPLAY_GRANT, KEY_INVALID, display_bracket_payload
+from services.tv_display import DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, display_bracket_payload, key_expired
 from services.public_phase import derive_public_phase
 from services.station_labels import attach_station_info
 from services.tournament_permissions import READ_STAFF_ROLES, require_tournament_staff_permission
@@ -157,6 +158,8 @@ async def get_bracket_display(tid: str, key: str | None = None, me: dict | None 
         t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
         if not t:
             raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+        if key_expired(t, now_utc()):
+            raise HTTPException(status_code=403, detail=KEY_EXPIRED)
         await touch_access_link(db, link)
         return display_bracket_payload(await _build_bracket_payload(db, t, None, False))
     if not me:

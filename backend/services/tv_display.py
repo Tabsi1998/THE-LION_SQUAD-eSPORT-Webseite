@@ -14,7 +14,10 @@ widerrufbar. Die Antwort für den Schlüssel ist schmaler als die für die Turni
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from urllib.parse import urlencode
+
+from services.access_links import parse_dt
 
 SETTINGS_ID = "tv_display"
 
@@ -36,6 +39,25 @@ BOOLEANS: tuple = ("contrast", "pixel_shift", "season_header", "reduce_motion")
 DISPLAY_GRANT = "display"
 KEY_LABEL_MAX = 80
 KEY_INVALID = "Dieser TV-Link gilt nicht mehr. Im Admin unter eSports → TV & Beamer einen neuen Link erstellen."
+KEY_DAYS_AFTER = 7
+KEY_EXPIRED = ("Dieser TV-Link ist abgelaufen: TV-Links enden eine Woche nach dem Turnier von selbst. "
+               "Im Admin unter eSports → TV & Beamer einen neuen Link erstellen.")
+
+
+def key_expires_at(tournament: dict | None) -> datetime | None:
+    """Bis wann ein Anzeige-Schlüssel gilt (Entscheidung vom 07.10.2026): eine Woche nach Turnierende, ohne Ende eine
+    Woche nach dem Start, ohne Termin bis zum Widerruf. Gerechnet wird beim Öffnen - wird das Turnier verschoben,
+    wandert das Ende mit."""
+    for field in ("end_date", "start_date"):
+        moment = parse_dt((tournament or {}).get(field))
+        if moment:
+            return moment + timedelta(days=KEY_DAYS_AFTER)
+    return None
+
+
+def key_expired(tournament: dict | None, now: datetime) -> bool:
+    until = key_expires_at(tournament)
+    return bool(until and now > until)
 
 
 def valid_value(key: str, value) -> bool:
