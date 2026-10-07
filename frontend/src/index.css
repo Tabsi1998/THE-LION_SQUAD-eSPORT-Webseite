@@ -2431,6 +2431,98 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   to { transform: translateX(calc(110px * var(--tls-motion-on))) skewX(-18deg); }
 }
 
+/* Die Mitgliedskarte (#1335): Bankkarten-Format, schwarz mit feinem Löwen-Muster, Vereinslogo und Lichtkante in Gold.
+   Die Maße darin hängen an der Kartenbreite (cqw) - so sieht die Karte als Muster, echt, klein und als Bild gleich aus.
+   Der Lichtlauf zieht einmal über die Karte (data-shine); mit „Bewegung reduzieren“ bleibt er unsichtbar. */
+.tls-member-card {
+  position: relative;
+  container-type: inline-size;
+  width: 100%;
+  aspect-ratio: 1.586 / 1;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 14px;
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #1b1b1f 0%, #0b0b0d 60%, #16130a 100%);
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 236, 150, 0.55), inset 0 0 0 1px rgba(255, 215, 0, 0.28);
+}
+.tls-member-card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  right: -14%;
+  top: -22%;
+  width: 66%;
+  aspect-ratio: 1 / 1;
+  background: url("/assets/brand/tls-mascot.png") center / contain no-repeat;
+  opacity: 0.06;
+}
+@media (min-width: 640px) {
+  .tls-member-card--tilt { transform: rotate(-6deg); }
+}
+.tls-member-card__shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--tls-motion-on);
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.2) 45%, transparent 60%);
+  transform: translateX(-130%);
+}
+.tls-member-card[data-shine="1"] .tls-member-card__shine {
+  animation: tls-member-card-sweep calc(3 * var(--tls-motion-slow)) var(--tls-ease) 1 both;
+}
+@keyframes tls-member-card-sweep {
+  from { transform: translateX(-130%); }
+  to { transform: translateX(130%); }
+}
+.tls-member-card__head { position: absolute; left: 6cqw; top: 5.5cqw; display: flex; align-items: center; gap: 2.4cqw; }
+.tls-member-card__logo {
+  width: 9cqw;
+  height: 9cqw;
+  object-fit: contain;
+  /* Das weiße Maskottchen in Gold (#FFD700). */
+  filter: brightness(0) saturate(100%) invert(84%) sepia(61%) saturate(1530%) hue-rotate(359deg) brightness(103%) contrast(104%);
+}
+.tls-member-card__club { font-size: 3.1cqw; line-height: 1.25; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; }
+.tls-member-card__club > span { display: block; opacity: 0.7; }
+.tls-member-card__chip {
+  position: absolute;
+  left: 6cqw;
+  top: 31cqw;
+  width: 12cqw;
+  height: 9cqw;
+  border-radius: 1.6cqw;
+  background: linear-gradient(135deg, #f8e08e, #b8860b 50%, #f8e08e);
+}
+.tls-member-card__body { position: absolute; left: 6cqw; right: 38cqw; bottom: 6cqw; display: flex; flex-direction: column; gap: 0.8cqw; }
+.tls-member-card__name { font-size: 6.2cqw; line-height: 1.1; font-weight: 800; overflow-wrap: anywhere; }
+.tls-member-card__number { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 3.5cqw; letter-spacing: 0.12em; opacity: 0.85; font-variant-numeric: tabular-nums; }
+.tls-member-card__meta { font-size: 2.9cqw; opacity: 0.7; }
+.tls-member-card__qr {
+  position: absolute;
+  right: 6cqw;
+  bottom: 6cqw;
+  width: 26cqw;
+  aspect-ratio: 1 / 1;
+  border-radius: 2cqw;
+}
+.tls-member-card__qr--off {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5cqw;
+  padding: 2cqw;
+  text-align: center;
+  font-size: 2.7cqw;
+  font-weight: 700;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.75);
+  border: 1px dashed rgba(255, 215, 0, 0.45);
+  background: rgba(0, 0, 0, 0.35);
+}
+.tls-member-card__qr--off svg { width: 6cqw; height: 6cqw; color: #FFD700; }
+
 /* Nachbarn treten zurück (#1080): fährt die Maus über eine Kachel, werden die anderen leiser. Nur mit Maus. */
 @media (hover: hover) {
   .tls-dim-siblings > * {
@@ -2704,6 +2796,16 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   border: 1px solid rgba(255, 59, 48, 0.5);
   color: #FF6B6B;
 }
+/* Ehre (#1335): wie der wichtige Knopf, nur in Gold mit dunkler Schrift - Mitgliedschaft ist Ehre. Nur auf „Mitglied
+   werden“ und im Mitgliederbereich. */
+.tls-btn--honor {
+  background-color: var(--tls-gold);
+  color: #1A1400;
+  background-image: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.6) 50%, transparent 65%);
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-position: 150% 0;
+}
 @media (hover: hover) {
   .tls-btn--primary:hover:not(:disabled) {
     background-color: var(--tls-cyan-hover);
@@ -2720,6 +2822,10 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
     color: #FFFFFF;
     border-color: #FF3B30;
     background-color: rgba(255, 59, 48, 0.16);
+  }
+  .tls-btn--honor:hover:not(:disabled) {
+    background-color: #E8C200;
+    background-position: calc(150% - 200% * var(--tls-motion-on)) 0;
   }
   .tls-btn:hover:not(:disabled) .lucide-arrow-right {
     transform: translateX(calc(3px * var(--tls-motion-on)));

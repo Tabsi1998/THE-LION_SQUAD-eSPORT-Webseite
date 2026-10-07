@@ -11,6 +11,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Check, X as XIcon, Inbox, Eye, ExternalLink } from "lucide-react";
 import { InvitationsBox } from "./membership/InvitationsBox";
+import { JoinPageBox } from "./membership/JoinPageBox";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
 
 const TABS = [
@@ -75,6 +76,7 @@ export default function AdminMembershipApplicationsPage() {
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Mitglieder</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 flex items-center gap-3"><Inbox className="w-6 h-6" /> Mitgliedsbewerbungen</h1>
       <InvitationsBox />
+      <JoinPageBox />
 
       <div className="mt-6 flex gap-1 border-b border-white/10">
         {TABS.map(t => (
@@ -99,7 +101,7 @@ export default function AdminMembershipApplicationsPage() {
                 <tr key={a.id} data-testid={`app-row-${a.id}`}>
                   <td className="px-4 py-3 text-xs text-white/45 whitespace-nowrap">{viennaDate(a.created_at)}</td>
                   <td className="px-4 py-3"><div className="font-semibold">{a.user_display_name || a.user_username}</div><div className="text-xs text-white/40">@{a.user_username}</div></td>
-                  <td className="px-4 py-3 text-xs uppercase tracking-wider">{a.coupled ? (a.type_label || "Mitgliedsart aus Dolibarr") : (PREF_LABEL[a.contribution_pref] || a.contribution_pref)}</td>
+                  <td className="px-4 py-3 text-xs uppercase tracking-wider">{a.type_label || (a.coupled ? "Mitgliedsart aus Dolibarr" : (PREF_LABEL[a.contribution_pref] || a.contribution_pref))}</td>
                   <td className="px-4 py-3 max-w-md text-white/60 truncate">{a.motivation}</td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <button onClick={() => setSelected(a)} className="text-[#29B6E8] hover:underline text-xs mr-3 inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Detail</button>
@@ -140,7 +142,7 @@ export default function AdminMembershipApplicationsPage() {
           <div className="space-y-3 text-sm">
             <Row k="Spieler" v={`${selected.user_display_name || selected.user_username} (@${selected.user_username})`} />
             <Row k="E-Mail" v={selected.user_email} />
-            <Row k="Wunsch" v={selected.coupled ? (selected.type_label || "aus Dolibarr") : PREF_LABEL[selected.contribution_pref]} />
+            <Row k="Wunsch" v={selected.type_label || (selected.coupled ? "aus Dolibarr" : PREF_LABEL[selected.contribution_pref])} />
             {selected.coupled && (
               <div className="border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 text-xs text-white/70" data-testid="application-sheet-dolibarr">
                 Dieser Antrag liegt in der Mitgliederverwaltung (Dolibarr): Stand <span className="text-white font-bold">{DOLIBARR_STATE[selected.dolibarr?.application_status] || selected.status}</span>

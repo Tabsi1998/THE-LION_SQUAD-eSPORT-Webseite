@@ -2,7 +2,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
 // Knöpfe (#1082): eine Sprache für alle öffentlichen Seiten - wichtig (blau, Lichtlauf, Pfeil fährt 3 px),
-// zweitrangig (blauer Rahmen), leise (Nebensachen) und gefährlich (Löschen, Stornieren, Aufgeben in Rot).
+// zweitrangig (blauer Rahmen), leise (Nebensachen), gefährlich (Löschen, Stornieren, Aufgeben in Rot) und seit #1335
+// Ehre (Gold mit dunkler Schrift - nur „Antrag stellen“ auf „Mitglied werden“ und im Mitgliederbereich).
 
 const root = path.resolve(__dirname, "../..");
 const css = readFileSync(path.join(root, "src/index.css"), "utf8").replace(/\r\n/g, "\n");
@@ -13,15 +14,19 @@ function rule(selector) {
   return css.slice(start, css.indexOf("}", start));
 }
 
-test("die vier Arten haben je ihren Stil, Fokus ist für alle sichtbar, Hover nur mit Maus", () => {
+test("die fünf Arten haben je ihren Stil, Fokus ist für alle sichtbar, Hover nur mit Maus", () => {
   expect(rule(".tls-btn--primary")).toMatch(/background-color: var\(--tls-cyan\)/);
   expect(rule(".tls-btn--primary")).toMatch(/background-image: linear-gradient/);
   expect(rule(".tls-btn--secondary")).toMatch(/border: 1px solid rgba\(41, 182, 232/);
   expect(rule(".tls-btn--quiet")).toMatch(/border: 1px solid rgba\(255, 255, 255/);
   expect(rule(".tls-btn--danger")).toMatch(/border: 1px solid rgba\(255, 59, 48/);
+  expect(rule(".tls-btn--honor")).toMatch(/background-color: var\(--tls-gold\)/);
+  expect(rule(".tls-btn--honor")).toMatch(/color: #1A1400/);
   expect(rule(".tls-btn:focus-visible")).toMatch(/outline: 2px solid/);
   const hover = css.slice(css.indexOf(".tls-btn--primary:hover"), css.indexOf(".tls-btn:hover:not(:disabled) .lucide-arrow-right"));
-  for (const variant of ["primary", "secondary", "quiet", "danger"]) expect(hover).toContain(`.tls-btn--${variant}:hover:not(:disabled)`);
+  for (const variant of ["primary", "secondary", "quiet", "danger", "honor"]) expect(hover).toContain(`.tls-btn--${variant}:hover:not(:disabled)`);
+  // Der goldene Lichtlauf hängt wie der blaue an „Bewegung reduzieren“.
+  expect(hover).toMatch(/\.tls-btn--honor:hover:not\(:disabled\) \{[^}]*calc\(150% - 200% \* var\(--tls-motion-on\)\)/);
   // Lichtlauf und Pfeil hängen an „Bewegung reduzieren“.
   expect(css).toMatch(/\.tls-btn:hover:not\(:disabled\) \.lucide-arrow-right \{\s*transform: translateX\(calc\(3px \* var\(--tls-motion-on\)\)\)/);
 });

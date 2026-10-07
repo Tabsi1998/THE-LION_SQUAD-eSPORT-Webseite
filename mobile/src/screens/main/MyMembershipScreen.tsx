@@ -5,6 +5,7 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextI
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { SkeletonList } from "../../components/ListState";
+import { MemberCardArt } from "../../components/MemberCardArt";
 import { MemberFileAccounts } from "../../components/MemberFileAccounts";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
@@ -14,6 +15,7 @@ import { feeCard, formatMoney, linkPrompt, STATUS_LABELS, TYPE_LABELS, type Doli
 import type { InvoiceList } from "../../lib/memberDocuments";
 import { changedFields, exitLine, fieldLabel, selfRequestLine, validWishedDay, changedWebsiteFields, websiteFieldText, websiteStateLine, type IdentityState, type SelfService, type WebsiteField, type WebsiteProfile } from "../../lib/selfService";
 import type { MoreStackParamList } from "../../navigation/types";
+import { useAuth } from "../../auth/AuthContext";
 import { colors } from "../../theme";
 
 // Meine Mitgliedschaft in der App (#339): Stand aus der Mitgliederverwaltung (Beitrag, Typ,
@@ -30,6 +32,7 @@ type MembershipMe = {
 };
 
 export function MyMembershipScreen({ navigation }: Props) {
+  const { user } = useAuth();
   const [me, setMe] = useState<MembershipMe | null>(null);
   const [invoices, setInvoices] = useState<InvoiceList | null>(null);
   const [loading, setLoading] = useState(true);
@@ -222,6 +225,13 @@ export function MyMembershipScreen({ navigation }: Props) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.gold} />}
       >
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
+
+        {/* Dieselbe Karte wie im Web (#1335): schwarz mit Gold - ein Tipp öffnet sie mit Prüfcode. */}
+        {status === "active" || status === "honorary" ? (
+          <Pressable onPress={() => navigation.navigate("MemberCard")} accessibilityRole="button" accessibilityHint="Öffnet die Mitgliedskarte mit Prüfcode" testID="membership-card-art" style={({ pressed }) => [pressed && styles.pressed]}>
+            <MemberCardArt name={user?.display_name || user?.username || "Mitglied"} number={view?.member_ref || membership?.member_number} since={membership?.member_since} typeLabel={view?.type_label || TYPE_LABELS[String(membership?.membership_type)] || null} validUntil={view?.membership_ends || view?.paid_until || null} />
+          </Pressable>
+        ) : null}
 
         <Card style={styles.card} testID="membership-status">
           <View style={styles.rowBetween}>

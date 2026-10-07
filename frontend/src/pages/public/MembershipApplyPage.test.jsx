@@ -155,3 +155,22 @@ test("der Link „Vereinsstatuten“ führt auf genau die geltenden Statuten - o
   render(<MemoryRouter><MembershipApplyPage /></MemoryRouter>);
   expect(await screen.findByTestId("apply-statutes-link")).toHaveAttribute("href", "/board#statuten");
 });
+
+test("ohne Kopplung zeigt die Auswahl dieselben Beträge wie „Mitglied werden“ und schickt die Mitgliedsart (#1251)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/apply/form") return { data: { coupled: false, contribution_options: [{ value: "full", label: "Vollmitgliedschaft" }], fees: SETUP.fees, fees_as_of: "2026-10-07T08:00:00Z" } };
+    return { data: null };
+  });
+  apiMock.post.mockResolvedValue({ data: { id: "a1", status: "pending", created_at: "2026-09-23T10:00:00Z" } });
+  render(<MemoryRouter><MembershipApplyPage /></MemoryRouter>);
+  const select = await screen.findByTestId("apply-fee-select");
+  expect(select).toHaveValue("2");
+  expect(select).toHaveTextContent("Ordentliches Mitglied – 50,00 € je Jahr · Eintritt unterm Jahr anteilig");
+  expect(screen.queryByTestId("apply-contribution")).toBeNull();
+  fireEvent.change(select, { target: { value: "3" } });
+  fireEvent.change(screen.getByTestId("apply-motivation"), { target: { value: "Ich möchte den Verein langfristig aktiv unterstützen." } });
+  fireEvent.click(screen.getByTestId("apply-statutes"));
+  fireEvent.click(screen.getByTestId("apply-privacy"));
+  fireEvent.click(screen.getByTestId("apply-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/membership/apply", expect.objectContaining({ type_id: 3, contribution_pref: "full" })));
+});

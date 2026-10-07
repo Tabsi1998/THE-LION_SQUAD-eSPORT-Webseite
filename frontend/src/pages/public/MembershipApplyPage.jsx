@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { Crown, FileText, Mail, Clock, Send, Undo2, AlertTriangle } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
 import { statutesHref } from "@/lib/statutes";
+import { feeLine } from "@/lib/membershipFees";
 
 const CONTRIB_OPTIONS = [
   { value: "full", label: "Vollmitgliedschaft" },
@@ -36,18 +37,8 @@ const PERSON_FIELDS = [
 ];
 const INPUT = "w-full bg-[#0A0A0A] border border-white/10 focus:border-[#FFD700] px-3 py-2.5 rounded-sm text-sm text-white focus:outline-none";
 
-export function formatMoney(value, currency = "EUR") {
-  const number = Number(value || 0).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `${number} ${currency === "EUR" ? "€" : currency}`;
-}
-
-export function feeLine(fee) {
-  if (!fee.subscription_required || fee.amount === null || fee.amount === undefined) return "Ohne Beitrag";
-  const parts = [`${formatMoney(fee.amount, fee.currency)} ${fee.period_label || "je Jahr"}`];
-  if (fee.admission_fee) parts.push(`einmalig ${formatMoney(fee.admission_fee, fee.currency)} Aufnahme`);
-  if (fee.prorated) parts.push("Eintritt unterm Jahr anteilig");
-  return parts.join(" · ");
-}
+// Dieselben Zahlen wie auf „Mitglied werden“ (#1251) - eine Quelle für Betrag und Zeitraum.
+export { feeLine, formatMoney } from "@/lib/membershipFees";
 
 export function splitDisplayName(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
@@ -92,6 +83,9 @@ export default function MembershipApplyPage() {
         setSetup(data);
         if (data.coupled && data.available) {
           setForm((current) => ({ ...current, ...(current.firstname || current.lastname ? {} : splitDisplayName(data.account?.display_name)), type_id: current.type_id || (data.fees?.[0]?.id ?? null) }));
+        } else if (!data.coupled && data.fees?.length) {
+          // Ohne Kopplung zeigt die Auswahl dieselben Beträge wie „Mitglied werden“ (#1251).
+          setForm((current) => ({ ...current, type_id: current.type_id || data.fees[0].id }));
         }
       }
     }).catch(() => {});
@@ -127,7 +121,10 @@ export default function MembershipApplyPage() {
   };
 
   const payloadFor = () => {
-    if (!coupled) return { motivation: form.motivation.trim(), contribution_pref: form.contribution_pref, notes: form.notes.trim() || null, accept_statutes: form.accept_statutes, accept_privacy: form.accept_privacy };
+    if (!coupled) {
+      const withFees = (setup.fees || []).length > 0;
+      return { motivation: form.motivation.trim(), contribution_pref: form.contribution_pref, notes: form.notes.trim() || null, accept_statutes: form.accept_statutes, accept_privacy: form.accept_privacy, ...(withFees ? { type_id: form.type_id } : {}) };
+    }
     return {
       accept_statutes: form.accept_statutes, accept_privacy: form.accept_privacy, type_id: form.type_id,
       firstname: form.firstname.trim(), lastname: form.lastname.trim(), phone: form.phone.trim() || null, birth: form.birth || null,
@@ -205,11 +202,19 @@ export default function MembershipApplyPage() {
               <CoupledFields setup={setup} form={form} updateField={updateField} fieldErrors={fieldErrors} requiredPerson={requiredPerson} />
             ) : (
               <>
-                <Field id="apply-contribution" label="Beitragsart">
-                  <select id="apply-contribution" className={INPUT} value={form.contribution_pref} onChange={(e) => updateField("contribution_pref", e.target.value)} data-testid="apply-contribution">
-                    {(setup.contribution_options || CONTRIB_OPTIONS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </Field>
+                {(setup.fees || []).length ? (
+                  <Field id="apply-fee-select" label="Mitgliedsart und Beitrag">
+                    <select id="apply-fee-select" className={INPUT} value={form.type_id || ""} onChange={(e) => updateField("type_id", e.target.value ? Number(e.target.value) : null)} data-testid="apply-fee-select">
+                      {setup.fees.map((fee) => <option key={fee.id} value={fee.id}>{fee.label} – {feeLine(fee)}</option>)}
+                    </select>
+                  </Field>
+                ) : (
+                  <Field id="apply-contribution" label="Beitragsart">
+                    <select id="apply-contribution" className={INPUT} value={form.contribution_pref} onChange={(e) => updateField("contribution_pref", e.target.value)} data-testid="apply-contribution">
+                      {(setup.contribution_options || CONTRIB_OPTIONS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </Field>
+                )}
                 <Field id="apply-motivation" label={`Motivation (${form.motivation.length}/2000)`} error={fieldErrors.motivation}>
                   <textarea id="apply-motivation" required minLength={20} maxLength={2000} rows={6} value={form.motivation} onChange={(e) => updateField("motivation", e.target.value)} placeholder="Warum möchtest du Mitglied werden? Welche Spiele/Plattformen? Wie viel Zeit kannst du einbringen?" className={INPUT} data-testid="apply-motivation" aria-invalid={!!fieldErrors.motivation} aria-describedby={fieldErrors.motivation ? "apply-motivation-error" : undefined} />
                 </Field>

@@ -136,6 +136,16 @@ sich danach filtern (Abrechnung I, #320).
 - Voraussetzung im Modul: `GET /vereine/members/{id}/invoices` und `…/pdf`
   (Vereine ab 0.3). Der Website-Benutzer braucht dafür keine Rechnungsrechte.
 
+## Mitgliedsbeitrag auf „Mitglied werden“ (#1251)
+
+„Mitglied werden“ nennt die Beiträge offen – ohne Anmeldung: alle Mitgliedsarten **für Personen** aus
+*Mitglieder → Mitgliedsarten* mit Betrag, Zeitraum, Aufnahmegebühr und dem Hinweis „anteilig“. Gepflegt wird
+nur in Dolibarr; die Website liest die Liste höchstens einmal je Stunde (dazu der stündliche Abgleich) und zeigt
+dieselben Zahlen in der Auswahl des Antrags – auch, wenn die Anträge nicht nach Dolibarr gehen. Antwortet
+Dolibarr nicht, bleibt der letzte Stand mit Datum stehen; gibt es keinen Stand oder ist die Anbindung aus, steht
+dort „Die Beiträge nennen wir dir im Antrag“. Den Satz, wofür das Geld verwendet wird, und die vier
+Vorteils-Kacheln pflegt der Vorstand unter *Verwaltung → Bewerbungen → Seite „Mitglied werden“*.
+
 ## Mitgliedskarte (App 0.7.0-beta)
 
 Aktive Mitglieder sehen unter **Meine Mitgliedschaft** (Web) und in der LionsAPP

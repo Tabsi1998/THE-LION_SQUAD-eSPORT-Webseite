@@ -28,9 +28,11 @@ beforeEach(() => {
 test("zeigt Karte, QR-Code und holt auf Tipp einen frischen Code", async () => {
   await render(<MemberCardScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("member-card")).toBeTruthy());
-  expect(screen.getByText("Paula")).toBeTruthy();
-  expect(screen.getByText("TLS-0007")).toBeTruthy();
-  expect(screen.getByText("Ordentliches Mitglied")).toBeTruthy();
+  // Die Karte wie im Web (#1335): Name, Nummer mit Jahr, Art und „gültig bis“ auf der schwarzen Karte, der Prüfcode darunter.
+  expect(screen.getByTestId("member-card-art-name")).toHaveTextContent("Paula");
+  expect(screen.getByText("Nr. TLS-0007 · seit 2024")).toBeTruthy();
+  expect(screen.getByText("Ordentliches Mitglied · gültig bis 31.12.2026")).toBeTruthy();
+  expect(screen.getByTestId("member-card-art-logo").props.style).toEqual(expect.objectContaining({ tintColor: "#FFD700" }));
   expect(screen.getByText("Gültig bis 31.12.2026")).toBeTruthy();
   expect(screen.getByTestId("member-card-qr")).toBeTruthy();
   expect(mockGet).toHaveBeenCalledTimes(1);

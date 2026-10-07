@@ -16,7 +16,7 @@ from database import get_db
 from auth import get_current_user, require_club_admin, require_area
 from models import now_utc, new_id
 from badges import compute_profile_completeness, PROFILE_FIELDS, evaluate_user_progress
-from services import dolibarr_applications, membership_invitations
+from services import dolibarr_applications, membership_fees, membership_invitations
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings as load_dolibarr_settings
 
 router = APIRouter(prefix="/api", tags=["phase-c"])
@@ -133,16 +133,75 @@ async def _application_client(db):
         raise HTTPException(503, f"Mitgliederverwaltung nicht erreichbar: {exc.text}")
 
 
+# „Mitglied werden“ (#1251, #1335): die vier Vorteils-Kacheln und der Satz, wofür der Beitrag verwendet wird - gepflegt
+# unter Verwaltung → Bewerbungen. Die Vorgabe sind die Punkte, die die Seite bisher fest aufzählte.
+JOIN_PAGE_ID = "join_page"
+JOIN_ICONS = ("vote", "gift", "trophy", "card", "users", "calendar", "star", "shield", "heart", "gamepad")
+DEFAULT_JOIN_BENEFITS = [
+    {"icon": "vote", "title": "Stimmrecht im Verein", "text": "Bei den Versammlungen redest du mit und wählst den Vorstand."},
+    {"icon": "gift", "title": "Vorteile bei Partnern", "text": "Mit der Mitgliedskarte gibt es Rabatte und Partnerangebote."},
+    {"icon": "trophy", "title": "Turniere nur für Mitglieder", "text": "Mitglieder-Turniere, Challenges und eine frühere Anmeldung zu Events."},
+    {"icon": "card", "title": "Eigene Mitgliedskarte", "text": "Mit Mitgliedsnummer und Prüfcode – im Browser und in der LionsAPP."},
+]
+
+
+class JoinBenefit(BaseModel):
+    icon: str = Field("star", max_length=20)
+    title: str = Field(..., min_length=1, max_length=60)
+    text: str = Field("", max_length=200)
+
+
+class JoinPageBody(BaseModel):
+    fee_purpose: str = Field("", max_length=300)
+    benefits: list[JoinBenefit] = Field(default_factory=list)
+
+
+async def _join_page(db) -> dict:
+    saved = await db.settings.find_one({"id": JOIN_PAGE_ID}, {"_id": 0}) or {}
+    benefits = [
+        {"icon": row.get("icon") if row.get("icon") in JOIN_ICONS else "star", "title": str(row.get("title") or "").strip()[:60], "text": str(row.get("text") or "").strip()[:200]}
+        for row in saved.get("benefits") or [] if isinstance(row, dict) and str(row.get("title") or "").strip()
+    ]
+    return {"fee_purpose": str(saved.get("fee_purpose") or "").strip()[:300], "benefits": benefits[:4] if "benefits" in saved else [dict(row) for row in DEFAULT_JOIN_BENEFITS],
+            "icons": list(JOIN_ICONS)}
+
+
+@router.get("/membership/join-page")
+async def membership_join_page():
+    """Die Texte von „Mitglied werden“: vier Vorteile mit Symbol und Satz, dazu wofür der Beitrag verwendet wird."""
+    return await _join_page(get_db())
+
+
+@router.put("/membership/join-page")
+async def save_membership_join_page(body: JoinPageBody, me: dict = Depends(require_area("club"))):
+    db = get_db()
+    benefits = [{"icon": row.icon if row.icon in JOIN_ICONS else "star", "title": row.title.strip(), "text": row.text.strip()} for row in body.benefits if row.title.strip()]
+    await db.settings.update_one({"id": JOIN_PAGE_ID}, {"$set": {"fee_purpose": body.fee_purpose.strip(), "benefits": benefits[:4], "updated_at": now_utc().isoformat(), "updated_by": me.get("id")},
+                                                        "$setOnInsert": {"id": JOIN_PAGE_ID}}, upsert=True)
+    return await _join_page(db)
+
+
+@router.get("/membership/fees")
+async def membership_fees_public():
+    """Die Mitgliedsbeiträge offen (#1251): Mitgliedsarten für Personen aus Dolibarr (nur lesen, zwischengespeichert), der
+    letzte Stand mit Datum, wenn Dolibarr nicht antwortet - und der Satz, wofür der Beitrag verwendet wird."""
+    db = get_db()
+    fees = await membership_fees.public_fees(db)
+    return {**fees, "purpose": (await _join_page(db))["fee_purpose"]}
+
+
 @router.get("/membership/apply/form")
 async def membership_apply_form(me: dict = Depends(get_current_user)):
     """Was „Mitglied werden“ fragt: mit Dolibarr die Pflichtfelder, Mitgliedsarten und Einwilligungstexte
-    von dort - sonst die Beitragswünsche der Website."""
+    von dort - sonst die Beitragswünsche der Website (mit den Beträgen aus Dolibarr, wenn es welche gibt, #1251)."""
     db = get_db()
     settings, client = await _application_client(db)
     me = await _account(db, me)
     account = {"email": me.get("email"), "display_name": me.get("display_name") or me.get("username")}
     if client is None:
-        return {"coupled": False, "contribution_options": CONTRIBUTION_OPTIONS, "account": account}
+        fees = await membership_fees.public_fees(db)
+        return {"coupled": False, "contribution_options": CONTRIBUTION_OPTIONS, "account": account,
+                "fees": fees["fees"] if fees.get("available") else [], "fees_as_of": fees.get("as_of"), "fees_stale": bool(fees.get("stale"))}
     try:
         bundle = await dolibarr_applications.form_bundle(client)
     except DolibarrError as exc:
@@ -172,11 +231,20 @@ async def membership_apply(body: ApplyBody, me: dict = Depends(get_current_user)
         return result
     if not body.motivation or len(body.motivation) < 20:
         raise HTTPException(422, "Bitte beschreibe deine Motivation mit mindestens 20 Zeichen.")
+    # Gewählte Mitgliedsart mit Betrag (#1251): nur eine, die die Seite gerade zeigt - der Vorstand sieht sie im Antrag.
+    chosen = None
+    if body.type_id:
+        public = await membership_fees.public_fees(db)
+        chosen = membership_fees.fee_by_id(public.get("fees") if public.get("available") else [], body.type_id)
+        if not chosen:
+            raise HTTPException(422, "Diese Mitgliedsart gibt es gerade nicht – bitte neu wählen.")
     doc = {
         "id": new_id(),
         "user_id": me["id"],
         "motivation": body.motivation,
         "contribution_pref": body.contribution_pref,
+        "type_id": chosen["id"] if chosen else None,
+        "type_label": chosen["label"] if chosen else None,
         "notes": body.notes,
         "status": "pending",
         "created_at": now_utc().isoformat(),

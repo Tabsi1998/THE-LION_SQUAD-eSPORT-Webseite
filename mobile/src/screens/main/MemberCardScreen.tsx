@@ -4,18 +4,19 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { EmptyState, SkeletonList } from "../../components/ListState";
+import { MemberCardArt } from "../../components/MemberCardArt";
 import { QrCode } from "../../components/QrCode";
 import { Screen } from "../../components/Screen";
-import { Body, Heading, Muted } from "../../components/Text";
+import { Body, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
-import { formatDate } from "../../lib/format";
 import { cardExpired, refreshDelayMs, validUntilLine, type MemberCard } from "../../lib/memberCard";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 
 // Die Mitgliedskarte (#346): Name, Nummer, Art, gültig bis - und ein QR-Code, den ein Partner
 // mit der Handykamera prüft. Der Code erneuert sich vor Ablauf von selbst und sobald die App
-// aus dem Hintergrund zurückkommt.
+// aus dem Hintergrund zurückkommt. Seit #1335 sieht die Karte aus wie im Web (schwarz mit Gold, Lichtkante); der
+// Prüfcode steht groß darunter auf Weiß, damit er sich gut scannen lässt.
 
 type Props = NativeStackScreenProps<MoreStackParamList, "MemberCard">;
 
@@ -86,33 +87,18 @@ export function MemberCardScreen(_: Props) {
     );
   }
 
-  const accent = card.accent_color || colors.gold;
   return (
     <Screen padded={false}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Card style={[styles.card, { borderColor: accent }]} testID="member-card">
-          <View style={styles.head}>
-            <View>
-              <Muted style={[styles.eyebrow, { color: accent }]}>{card.club_name}</Muted>
-              <Heading>Mitgliedskarte</Heading>
+        <View testID="member-card" style={styles.stack}>
+          <MemberCardArt name={card.name} number={card.member_number} since={card.member_since} typeLabel={card.type_label} validUntil={card.valid_until} clubName={card.club_name} />
+          <Card style={styles.card}>
+            <View style={styles.qrWrap}>
+              <QrCode value={card.verify_url} size={224} testID="member-card-qr" />
             </View>
-            <Ionicons name="ribbon-outline" color={accent} size={28} />
-          </View>
-
-          <View style={styles.qrWrap}>
-            <QrCode value={card.verify_url} size={224} testID="member-card-qr" />
-          </View>
-
-          <View style={styles.facts}>
-            <Body style={styles.name}>{card.name}</Body>
-            <Muted>{card.type_label}</Muted>
-            <View style={styles.factRow}>
-              {card.member_number ? <Fact label="Nummer" value={card.member_number} accent={accent} /> : null}
-              {card.member_since ? <Fact label="Seit" value={formatDate(card.member_since)} accent={accent} /> : null}
-            </View>
-            <Muted style={styles.valid}>{validUntilLine(card)}</Muted>
-          </View>
-        </Card>
+            <Body style={styles.valid}>{validUntilLine(card)}</Body>
+          </Card>
+        </View>
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
         <Muted style={styles.hint}>
@@ -127,68 +113,26 @@ export function MemberCardScreen(_: Props) {
   );
 }
 
-function Fact({ label, value, accent }: { label: string; value: string; accent: string }) {
-  return (
-    <View style={styles.fact}>
-      <Muted style={styles.factLabel}>{label}</Muted>
-      <Body style={[styles.factValue, { color: accent }]}>{value}</Body>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   content: {
     gap: 14,
     padding: 18,
     paddingBottom: 32,
   },
+  stack: {
+    gap: 14,
+  },
   card: {
     backgroundColor: colors.black,
-    borderWidth: 1.5,
-    gap: 16,
+    gap: 12,
     padding: 18,
-  },
-  head: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  eyebrow: {
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 2,
-    textTransform: "uppercase",
   },
   qrWrap: {
     alignItems: "center",
   },
-  facts: {
-    gap: 4,
-  },
-  name: {
-    fontSize: 22,
-    fontWeight: "900",
-  },
-  factRow: {
-    flexDirection: "row",
-    gap: 18,
-    marginTop: 8,
-  },
-  fact: {
-    gap: 1,
-  },
-  factLabel: {
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-  },
-  factValue: {
-    fontFamily: "monospace",
-    fontWeight: "900",
-  },
   valid: {
     color: colors.white,
-    marginTop: 8,
+    textAlign: "center",
   },
   hint: {
     textAlign: "center",
