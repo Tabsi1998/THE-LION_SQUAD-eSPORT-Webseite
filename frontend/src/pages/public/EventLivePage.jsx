@@ -14,6 +14,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { seoTextPreview } from "@/lib/textPreview";
 import { viennaTime } from "@/lib/vienna";
+import { finderFor, sourceLabel } from "@/lib/slotSource";
 
 const ACTIVE_MATCH_STATUSES = new Set(["in_progress", "running", "waiting_result", "disputed"]);
 const NEXT_MATCH_STATUSES = new Set(["ready", "scheduled", "pending", "preview"]);
@@ -43,9 +44,11 @@ function participantLabel(registration) {
   return registration?.display_name || registration?.ingame_name || registration?.user?.display_name || registration?.user?.username || "Offen";
 }
 
-function slotLabel(slot, registrationMap) {
+// Leere Plätze späterer Runden im Klartext (#1113): „Sieger aus A“ statt „Offen“.
+function slotLabel(slot, registrationMap, findMatch) {
   const registration = registrationMap.get(slot.registration_id);
-  return participantLabel(registration) || slot.source?.raw || "Offen";
+  if (registration) return participantLabel(registration);
+  return sourceLabel(slot.source, findMatch) || "Offen";
 }
 
 function resultLine(match, registrationMap) {
@@ -70,11 +73,12 @@ function resultLine(match, registrationMap) {
 function normalizeBracketRows(payload) {
   const tournament = payload?.tournament || {};
   const registrationMap = new Map((payload?.registrations || []).map((registration) => [registration.id, registration]));
+  const finder = finderFor(payload?.matches_v2 || []);
 
   const v2Rows = (payload?.matches_v2 || []).map((match) => ({
     ...match,
     tournament,
-    labels: (match.slots || []).map((slot) => slotLabel(slot, registrationMap)).filter(Boolean),
+    labels: (match.slots || []).map((slot) => slotLabel(slot, registrationMap, finder(match))).filter(Boolean),
     groupLabel: formatScheduleGroupLabel(match, tournament),
     resultText: resultLine(match, registrationMap),
     source: "v2",

@@ -15,6 +15,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
 import { seoTextPreview } from "@/lib/textPreview";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { finderFor, sourceLabel } from "@/lib/slotSource";
 
 function formatDateTime(value) {
   if (!value) return "Termin offen";
@@ -44,9 +45,10 @@ function stationLabel(match) {
   return match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
 }
 
-function participantLabel(slot, registrations) {
+// Leere Plätze späterer Runden im Klartext (#1113): „Sieger aus A“ statt „W:A:1“ - Setzplätze heißen weiter „Offen“.
+function participantLabel(slot, registrations, findMatch) {
   const reg = registrations[slot.registration_id] || {};
-  return reg.display_name || reg.ingame_name || reg.user?.display_name || slot.source?.raw || "Offen";
+  return reg.display_name || reg.ingame_name || reg.user?.display_name || sourceLabel(slot.source, findMatch) || "Offen";
 }
 
 function duelLabels(match, registrations) {
@@ -104,11 +106,12 @@ export default function TournamentSchedulePage() {
   const groups = useMemo(() => {
     const tournament = data?.tournament || {};
     const registrations = Object.fromEntries((data?.registrations || []).map((r) => [r.id, r]));
+    const finder = finderFor(data?.matches_v2 || []);
     const multiSlotRows = (data?.matches_v2 || []).map((match) => ({
       ...match,
       matchday: match.matchday_number || match.round || 0,
       matchdayLabel: formatScheduleGroupLabel(match, tournament),
-      labels: (match.slots || []).map((slot) => participantLabel(slot, registrations)),
+      labels: (match.slots || []).map((slot) => participantLabel(slot, registrations, finder(match))),
     }));
     const duelRows = (data?.matches || []).map((match) => ({
       ...match,

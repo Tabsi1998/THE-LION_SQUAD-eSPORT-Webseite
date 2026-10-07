@@ -6,7 +6,8 @@ from fastapi import HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from database import get_db
 from auth import get_current_user, get_optional_user
-from services.access_links import validate_access_link
+from services.access_links import touch_access_link, validate_access_link
+from services.tv_display import DISPLAY_GRANT, KEY_INVALID, display_bracket_payload
 from services.public_phase import derive_public_phase
 from services.station_labels import attach_station_info
 from services.tournament_permissions import READ_STAFF_ROLES, require_tournament_staff_permission
@@ -141,9 +142,25 @@ async def get_bracket(tid: str, access: str | None = None, user=Depends(get_opti
 
 
 @router.get("/{tid}/bracket/display")
-async def get_bracket_display(tid: str, me: dict = Depends(get_current_user)):
+async def get_bracket_display(tid: str, key: str | None = None, me: dict | None = Depends(get_optional_user)):
+    """Der Turnierbaum-TV: mit Anzeige-Schlüssel (#1110) ohne Anmeldung, sonst für die Turnierleitung.
+
+    Ein Schlüssel öffnet nur die TV-Daten genau dieses Turniers. Steht einer im Link, zählt nur er - auch für
+    Angemeldete; so sieht der Admin am TV dasselbe wie die Halle, auch nach dem Widerrufen.
+    """
     db = get_db()
     tid = await _resolve_tid(tid)
+    if key:
+        link = await validate_access_link(db, key, "tournament", tid, None, DISPLAY_GRANT)
+        if not link:
+            raise HTTPException(status_code=403, detail=KEY_INVALID)
+        t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+        if not t:
+            raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+        await touch_access_link(db, link)
+        return display_bracket_payload(await _build_bracket_payload(db, t, None, False))
+    if not me:
+        raise HTTPException(status_code=401, detail="Nicht angemeldet")
     await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES)
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not t:

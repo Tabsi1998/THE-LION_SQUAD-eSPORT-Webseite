@@ -29,6 +29,7 @@ from routes.moderation_routes import router as moderation_router
 from routes.game_routes import router as game_router
 from routes.game_server_routes import router as game_server_router
 from routes.access_link_routes import router as access_link_router
+from routes.tv_routes import router as tv_router
 from routes.event_routes import router as event_router
 from routes.tournament_routes import router as tournament_router
 from routes.match_routes import router as match_router
@@ -243,6 +244,7 @@ app.include_router(moderation_router)
 app.include_router(game_router)
 app.include_router(game_server_router)
 app.include_router(access_link_router)
+app.include_router(tv_router)
 app.include_router(event_router)
 app.include_router(tournament_router)
 app.include_router(match_router)
