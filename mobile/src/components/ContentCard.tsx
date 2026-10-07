@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import { PRESS_SCALE } from "../lib/motion";
 import { formatDate } from "../lib/format";
 import { internalLabel } from "../lib/memberArea";
 import { colors } from "../theme";
@@ -78,7 +79,7 @@ export function ContentCard({
 
   if (!onPress) return <View style={styles.card}>{content}</View>;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+    <Pressable onPress={onPress} accessibilityRole="button" testID="content-card" style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       {content}
     </Pressable>
   );
@@ -172,8 +173,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 7,
   },
+  // Beim Antippen gibt die Karte leicht nach - wie im Web der Knopf (#1085).
   pressed: {
-    opacity: 0.72,
+    opacity: 0.85,
+    transform: [{ scale: PRESS_SCALE }],
   },
   title: {
     fontWeight: "900",

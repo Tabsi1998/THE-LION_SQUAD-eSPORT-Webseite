@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
 import { colors, radius } from "../theme";
+import { PRESS_SCALE } from "../lib/motion";
 
 export function Button({
   label,
@@ -56,7 +57,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   pressed: {
-    transform: [{ scale: 0.99 }],
+    transform: [{ scale: PRESS_SCALE }],
   },
   label: {
     color: colors.black,
