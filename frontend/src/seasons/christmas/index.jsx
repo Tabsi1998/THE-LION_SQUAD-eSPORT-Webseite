@@ -5,6 +5,7 @@ import { capabilities, scaleForViewport } from "../intensity";
 import { getMotionScheduler } from "../motion";
 import { markToastShown, toastShownToday } from "../SeasonStage";
 import { Logo } from "../../components/tls/Logo";
+import { CardChains } from "./CardChains";
 import { LightChain } from "./LightChain";
 import { MIN_WIDTH } from "./lights";
 import "./christmas.css";
@@ -69,7 +70,10 @@ export function Backdrop({ season }) {
   return <div className="tls-season-backdrop tls-xmas-glow" aria-hidden="true" data-testid="christmas-glow" />;
 }
 
-/** Kanten: die Lichterkette; an den Feiertagen bleibt dem Planer nur ein Platz für große Bewegungen. */
+/**
+ * Kanten: die Lichterkette an Kopf- und Fußzeile und - seit Jahreszeiten IV (#1091) - kleine Ketten an einigen Karten,
+ * die nachschwingen, wenn sich ihre Karte hebt; an den Feiertagen bleibt dem Planer nur ein Platz für große Bewegungen.
+ */
 export function Corners({ season }) {
   const location = useLocation();
   const width = useViewportWidth();
@@ -84,8 +88,13 @@ export function Corners({ season }) {
       scheduler.setSlots(previous);
     };
   }, [holiday]);
-  if (season.phase !== "gruss" || !layout.chain) return null;
-  return <LightChain salt={yearSaltFor(season)} footer={layout.footerChain} width={width} />;
+  if (season.phase !== "gruss") return null;
+  return (
+    <>
+      {layout.chain ? <LightChain salt={yearSaltFor(season)} footer={layout.footerChain} width={width} /> : null}
+      <CardChains season={season} salt={yearSaltFor(season)} />
+    </>
+  );
 }
 
 /** Sterne der Grußkarte: je Jahr anders, innerhalb des Jahres gleich. */

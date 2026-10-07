@@ -17,7 +17,8 @@ defineSeasonQa({
   seasonKey: "club_birthday",
   now: NOW,
   season: birthday(),
-  pieces: "[data-testid='birthday-garland'], [data-testid='birthday-hat'], [data-testid='birthday-hero-hat']",
+  // Seit #1094 auch Wimpelketten an Karten - jeder Wimpel einzeln.
+  pieces: "[data-testid='birthday-garland'], [data-testid='birthday-hat'], [data-testid='birthday-hero-hat'], [data-testid='birthday-card-pennant']",
   layers: ".tls-garlands, .tls-mascot-hat-page, [data-testid='birthday-card']",
   exempt: "[data-testid='tls-logo-link'], [data-testid='tls-logo'], [data-season-anchor='lion']",
   offPieces: "[data-testid^='birthday-']",

@@ -6,6 +6,7 @@ import { hashString, seasonYear } from "../rng";
 import { readPreviewToken } from "../preview";
 import { markToastShown, toastShownToday } from "../SeasonStage";
 import { openSpot } from "../space";
+import { CardStreamers } from "./CardStreamers";
 import { confettiWind } from "./confetti";
 import { streamerPath, streamerPlan } from "./geometry";
 import { createConfettiLayer, requestBurst } from "./layer";
@@ -190,13 +191,14 @@ function Streamers({ season, moving }) {
   );
 }
 
-/** Ecken und Kanten: Hüte und Luftschlangen. */
+/** Ecken und Kanten: Hüte, Luftschlangen am Rand und - seit Jahreszeiten IV (#1093) - auf einigen Karten. */
 export function Corners({ season }) {
   const moving = season.effective !== "subtle";
   return (
     <>
       <Hats moving={moving} />
       <Streamers season={season} moving={moving} />
+      <CardStreamers season={season} />
     </>
   );
 }

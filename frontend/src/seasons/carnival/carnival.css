@@ -1,5 +1,5 @@
 /* Fasching (S12 #643, F1–F3): Partyhut auf dem Löwen (antippbar, sonst nichts), Luftschlangen am oberen Rand des
-   Inhalts (gehören zur Seite), der Gruß als Karte. Konfetti zeichnet die gemeinsame Himmelsfläche. */
+   Inhalts (gehören zur Seite) und seit #1093 auf einigen Karten, der Gruß als Karte. Konfetti zeichnet die gemeinsame Himmelsfläche. */
 /* Partyhut (#855): Platz und Knopf aus seasons/mascot; im Kopf weniger geneigt, damit er gerade auf dem Kopf sitzt. */
 .tls-party-hat--header { --hat-tilt: -5deg; }
 .tls-party-hat--hero { --hat-tilt: -8deg; }
@@ -16,10 +16,34 @@
 @keyframes tls-streamer-unfold { to { stroke-dashoffset: 0; } }
 @keyframes tls-streamer-fade { from { opacity: 0; } to { opacity: 1; } }
 
+/* Luftschlangen an Karten (Jahreszeiten IV, #1093): gekringelt auf der Oberkante, das Ende hängt außen über die Ecke; sie
+   fahren mit der Karte hoch (seasons.css). Flattern: die Schlaufen heben sich nacheinander (um die Kante), das Ende
+   pendelt nach außen und federt an der Karte zurück - die Stützstellen sind CARD_STREAMER aus cardStreamer.js
+   (Schlaufe 0,25 · 1,75 | 0,5 · 0,78 | 0,75 · 1,14; Ende 0,2 · 1 | 0,42 · 0 | 0,6 · 0,42 | 0,78 · 0 | 0,9 · 0,12), die App
+   rechnet mit denselben. Unter Kopfzeile, Menüs und Leiste unten (z 39). */
+.tls-card-streamers { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 39; pointer-events: none; }
+.tls-cstreamer { position: absolute; max-width: none; overflow: visible; transition: translate var(--tls-motion-mid, 240ms) var(--tls-ease, ease), opacity 0.2s ease-out; }
+.tls-cstreamer--yield { opacity: 0; }
+.tls-cstreamer__rig, .tls-cstreamer__hang, .tls-cstreamer__loop { transform-box: view-box; }
+.tls-cstreamer--flutter .tls-cstreamer__loop { animation: tls-cstreamer-lift 520ms ease-in-out var(--delay, 0ms) both; }
+.tls-cstreamer--flutter .tls-cstreamer__hang { animation: tls-cstreamer-swing 900ms ease-in-out both; }
+@keyframes tls-cstreamer-lift {
+  0%, 100% { transform: scaleY(1); }
+  25% { transform: scaleY(1.75); }
+  50% { transform: scaleY(0.78); }
+  75% { transform: scaleY(1.14); }
+}
+@keyframes tls-cstreamer-swing {
+  0%, 42%, 78%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(var(--swing, 16deg)); }
+  60% { transform: rotate(calc(var(--swing, 16deg) * 0.42)); }
+  90% { transform: rotate(calc(var(--swing, 16deg) * 0.12)); }
+}
+
 .tls-carnival-toast { display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 0.9rem; background: #0e1220; border: 1px solid rgba(255, 215, 0, 0.35); border-radius: 0.6rem; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); color: #fff6e0; }
 .tls-carnival-toast__text { font-weight: 800; letter-spacing: 0.02em; }
 .tls-carnival-toast__close { margin-left: 0.4rem; border: 0; background: transparent; color: rgba(255, 255, 255, 0.6); font-size: 1.1rem; cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tls-streamer--sway, .tls-party-hat--wiggle, .tls-streamer--unfold path { animation: none; stroke-dashoffset: 0; }
+  .tls-streamer--sway, .tls-party-hat--wiggle, .tls-streamer--unfold path, .tls-cstreamer--flutter .tls-cstreamer__loop, .tls-cstreamer--flutter .tls-cstreamer__hang { animation: none; stroke-dashoffset: 0; }
 }
