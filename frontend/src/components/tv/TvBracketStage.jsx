@@ -216,12 +216,17 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       if (!appliedRef.current) {
         apply(plan.view);
         appliedRef.current = true;
+      } else if (plan.view.zoom < viewRef.current.zoom - 0.001) {
+        // Der Baum ist gewachsen (neuer Name, Schrift nachgeladen): sofort auf die neue Größe - eine Fahrt würde ihn
+        // 600 ms lang mit dem alten, zu großen Maßstab über den Rand (und den sicheren Bereich) schieben.
+        cancelMove();
+        apply(plan.view);
       } else moveTo(plan.view, 600);
     } else if (!appliedRef.current) {
       apply(clampView({ x: 0, y: 0, zoom: plan.zoom }, content, vp));
       appliedRef.current = true;
     }
-  }, [plan, moment, apply, moveTo, content, vp]);
+  }, [plan, moment, apply, moveTo, cancelMove, content, vp]);
 
   /** Die Karten mit „läuft“ und „als Nächstes dran“ - daraus die Halte der Kamera. */
   const computeStops = useCallback(() => {

@@ -397,6 +397,8 @@ test.describe("TV & Beamer (Meilenstein 58)", () => {
       for (const { name, path } of PAGES) {
         const join = path.includes("?") ? "&" : "?";
         await openTv(page, `${path}${join}safe_area=${safe}`);
+        // Gemessen wird der Ruhezustand: eine laufende Kamerafahrt erst zu Ende gehen lassen.
+        await expect(page.locator("[data-tv-moving]")).toHaveCount(0);
         const outside = await page.evaluate((percent) => {
           const root = document.querySelector("[data-testid='tv-screen']");
           const left = window.innerWidth * percent / 100;
