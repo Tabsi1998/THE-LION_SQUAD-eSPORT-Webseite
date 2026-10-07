@@ -415,6 +415,9 @@ async def _attach_event_registration_view(event: dict, user: dict | None) -> Non
         )
         if own:
             event["own_registration"] = _public_event_registration(own, is_staff=True)
+            # Ob die Person ihre Anmeldung noch zurückziehen kann (#1223): bis zum Beginn, nicht nach dem Check-in -
+            # dieselbe Regel, die der Dienst beim Stornieren prüft (Website, App und Discord).
+            event["own_registration"]["can_cancel"] = event_registration.can_cancel(event, own)
     if event.get("show_participants") or manages:
         statuses = ADMIN_EVENT_REGISTRATION_STATUSES if manages else PUBLIC_EVENT_REGISTRATION_STATUSES
         regs = await db.event_registrations.find(

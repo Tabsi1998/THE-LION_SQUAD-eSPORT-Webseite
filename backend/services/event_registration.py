@@ -158,11 +158,45 @@ async def register(db, event: dict, me: dict, *, companion_count: int | None = 0
     return doc
 
 
+CANCELLABLE_STATUSES = {"registered", "waitlist"}
+FINISHED_EVENT_STATUSES = {"completed", "archived", "cancelled", "results_published"}
+
+
+def cancel_block_reason(event: dict, registration: dict | None, now=None) -> str | None:
+    """Warum die eigene Anmeldung nicht mehr zurückgezogen werden kann - ``None``, solange es geht (#1223).
+
+    Zurückziehen geht nur bis zum Beginn des Events und nicht nach dem Check-in: wer da war oder dabei ist, kann
+    seine Anmeldung (samt Kostenbeitrag) nicht mehr selbst stornieren. Dieselbe Regel gilt für Website, App und
+    Discord - die Seiten fragen ``can_cancel``, der Dienst prüft beim Stornieren selbst.
+    """
+    from services.public_phase import parse_dt
+
+    status = (registration or {}).get("status")
+    if status == "checked_in":
+        return "Du bist schon eingecheckt – abmelden geht jetzt nicht mehr. Wende dich bitte an die Turnierleitung."
+    if status not in CANCELLABLE_STATUSES:
+        return "Du bist für dieses Event nicht angemeldet."
+    if event.get("status") in FINISHED_EVENT_STATUSES:
+        return "Das Event ist vorbei – abmelden geht nicht mehr."
+    start = parse_dt(event.get("start_date"))
+    if start and (parse_dt(now) if now else now_utc()) >= start:
+        return "Das Event hat schon begonnen – abmelden geht jetzt nicht mehr. Wende dich bitte an die Turnierleitung."
+    return None
+
+
+def can_cancel(event: dict, registration: dict | None, now=None) -> bool:
+    return cancel_block_reason(event, registration, now) is None
+
+
 async def cancel(db, event: dict, me: dict, *, via: str = "web") -> dict:
-    """Die eigene Anmeldung zurückziehen - Aufträge dazu werden storniert, Audit mit dem Weg."""
+    """Die eigene Anmeldung zurückziehen - nur bis zum Beginn und nicht nach dem Check-in; Aufträge dazu werden
+    storniert, Audit mit dem Weg."""
     reg = await existing_registration(db, event, me)
-    if not reg:
+    if not reg or reg.get("status") in {"cancelled", "no_show"}:
         raise RegistrationError(404, "Anmeldung nicht gefunden")
+    blocked = cancel_block_reason(event, reg)
+    if blocked:
+        raise RegistrationError(409, blocked)
     now = now_utc().isoformat()
     await db.event_registrations.update_one(
         {"id": reg["id"]},

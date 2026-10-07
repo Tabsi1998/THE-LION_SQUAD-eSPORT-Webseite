@@ -20,6 +20,8 @@ import { formatRoundName, formatTournamentDisplay, slotName } from "@/lib/tourna
 import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { formatWhen } from "@/lib/datetime";
 import { eventIsOver } from "@/lib/afterEnd";
+import { countText, ownSeatsSentence, seatsLabel } from "@/lib/eventSeats";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { hasArea } from "@/lib/permissions";
 import { gameLabel } from "@/lib/gameLabels";
 import { eventTypeLabel, normalizeEventType } from "@/lib/eventTypes";
@@ -389,6 +391,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
   const offer = event.offer;
   const quote = offer ? previewQuote(offer, { seats: 1 + Number(companionCount || 0), selected: selectedPositions }) : null;
   const { submitting: saving, submitOnce } = useSubmissionGuard();
+  const confirm = useConfirm();
   const [actionError, setActionError] = useState("");
   const summary = event.registration_summary || {};
   const own = event.own_registration;
@@ -429,8 +432,18 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
     }
   };
 
+  // Stornieren (#1223): ein leiser Link mit Rückfrage - nur, solange der Server es erlaubt (bis zum Beginn, nicht nach
+  // dem Check-in). Der Server prüft beim Stornieren selbst noch einmal.
   const cancel = async () => {
     setActionError("");
+    const ok = await confirm({
+      title: "Event-Anmeldung stornieren?",
+      description: own?.price ? "Deine Anmeldung und dein Kostenbeitrag werden storniert, dein Platz wird frei." : "Deine Anmeldung wird storniert, dein Platz wird frei.",
+      confirmLabel: "Stornieren",
+      cancelLabel: "Behalten",
+      tone: "danger",
+    });
+    if (!ok) return;
     const attempt = await submitOnce(async () => {
       await api.delete(`/events/${event.id}/registrations/me`);
       toast.success("Anmeldung storniert.");
@@ -454,7 +467,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
         <MiniStat label="Begleitp." value={summary.companion_count || 0} />
       </div>
       {!!summary.waitlist_count && (
-        <div className="mt-2 text-xs text-[#FFD700]">{summary.waitlist_count} Anmeldung(en) auf der Warteliste.</div>
+        <div className="mt-2 text-xs text-[#FFD700]">{countText(summary.waitlist_count, "Anmeldung", "Anmeldungen")} auf der Warteliste.</div>
       )}
       {offer && (
         <div className="mt-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 text-sm" data-testid="event-offer">
@@ -477,15 +490,16 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
           Anmelden <ExternalLink className="w-3.5 h-3.5" />
         </a>
       ) : activeOwn ? (
-        <div className="mt-5 border border-[#10B981]/30 bg-[#10B981]/10 rounded-sm p-4">
-          <div className="inline-flex items-center gap-2 text-[#10B981] text-sm font-bold uppercase tracking-wider">
-            <CheckCircle className="w-4 h-4" /> {EVENT_REGISTRATION_LABELS[own.status] || own.status}
+        // Die eigene Anmeldung (#1223): „Du bist dabei“ (oder Warteliste) mit Plätzen in Einzahl und Mehrzahl; „Stornieren“
+        // als leiser Link - am Handy unter dem Kasten, ab 640 px rechts im Kasten.
+        <div className="mt-5 relative" data-testid="event-own-registration">
+        <div className={`border border-[#10B981]/30 bg-[#10B981]/10 rounded-sm p-4 ${own.can_cancel ? "sm:pr-32" : ""}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 text-[#10B981] text-sm font-bold uppercase tracking-wider" data-testid="event-own-status">
+              <CheckCircle className="w-4 h-4" /> {own.status === "waitlist" ? EVENT_REGISTRATION_LABELS.waitlist : "Du bist dabei"}
+            </span>
           </div>
-          <div className="mt-2 text-sm text-white/65">
-            {own.status === "waitlist"
-              ? `Du stehst mit ${own.seat_count || 1} Platz/Plätzen auf der Warteliste${own.companion_count ? `, davon ${own.companion_count} Begleitperson(en)` : ""}.`
-              : `${own.seat_count || 1} Platz/Plätze reserviert${own.companion_count ? `, davon ${own.companion_count} Begleitperson(en)` : ""}.`}
-          </div>
+          <div className="mt-2 text-sm text-white/65" data-testid="event-own-seats">{ownSeatsSentence(own)}</div>
           {own.price && (
             <div className="mt-2 text-sm" data-testid="event-own-price">
               <span className="text-white/65">Dein Kostenbeitrag: </span>
@@ -500,9 +514,13 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
             </div>
           )}
           {own.status === "waitlist" && offer && <div className="mt-1 text-xs text-white/45">Bezahlt wird erst, wenn du nachrückst.</div>}
-          <button type="button" disabled={saving} onClick={cancel} className="tls-btn tls-btn--danger mt-4 inline-flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
+        </div>
+        {own.can_cancel && (
+          <button type="button" disabled={saving} onClick={cancel} data-testid="event-cancel-link"
+            className="mt-2 sm:mt-0 sm:absolute sm:top-4 sm:right-4 inline-flex items-center gap-1.5 text-xs font-bold text-white/55 underline-offset-4 hover:text-[#FF6B6B] hover:underline disabled:opacity-50">
             <XCircle className="w-3.5 h-3.5" /> Stornieren
           </button>
+        )}
         </div>
       ) : !registrationOpen && !hasRegisterAccess ? (
         <div className="mt-5 border border-white/10 rounded-sm p-4 text-sm text-white/55">Die Anmeldung ist aktuell nicht offen.</div>
@@ -553,7 +571,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
             {event.registrations.slice(0, 12).map((registration) => (
               <div key={registration.id} className="flex items-center justify-between gap-3 text-sm border border-white/5 bg-black/15 rounded-sm px-3 py-2">
                 <span className="truncate">{registration.display_name || "Teilnehmer"}</span>
-                <span className="text-xs text-white/45 shrink-0">{registration.seat_count || 1} Platz/Plätze</span>
+                <span className="text-xs text-white/45 shrink-0">{seatsLabel(registration)}</span>
               </div>
             ))}
           </div>

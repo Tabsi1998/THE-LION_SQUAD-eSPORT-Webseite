@@ -53,7 +53,8 @@ export function ConfirmDialogProvider({ children }) {
     <ConfirmContext.Provider value={value}>
       {children}
       {dialog && (
-        <div className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm p-4 flex items-center justify-center" role="presentation" onClick={() => close(false)}>
+        // Am Handy kommt die Rückfrage als Blatt von unten (Daumen-Reichweite, #1223), ab 640 px mittig.
+        <div className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm p-4 flex items-end sm:items-center justify-center" role="presentation" onClick={() => close(false)}>
           {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- fängt nur den Klick ab, damit er den Dialog nicht schließt; Escape und Abbrechen bleiben der Tastaturweg */}
           <div ref={dialogRef} tabIndex={-1} className="w-full max-w-md bg-[#121212] border border-white/10 rounded-sm shadow-2xl focus:outline-none" role="dialog" aria-modal="true" aria-labelledby="confirm-title" data-testid="confirm-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start gap-3 p-5 border-b border-white/10">

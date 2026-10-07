@@ -1,10 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Events an mehreren Standorten (#203) und Karte aus der Adresse (#204): ein Standort sieht aus wie
 // vorher, mehrere werden als Karten mit je eigener Karte gezeigt; die Kartensuche nimmt die Adresse.
 
-const apiMock = { get: vi.fn() };
+const apiMock = { get: vi.fn(), delete: vi.fn() };
+const confirmMock = vi.fn(async () => true);
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (e, f) => f, resolveMediaUrl: (u) => u }));
 const authState = { user: null };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
@@ -14,6 +15,8 @@ vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("@/hooks/useCanonicalSlugRedirect", () => ({ useCanonicalSlugRedirect: () => {} }));
 vi.mock("@/components/tls/RichContent", () => ({ RichContent: () => null }));
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const EventDetailPage = (await import("./EventDetailPage")).default;
 
@@ -79,7 +82,7 @@ test("Anmeldung mit Kosten: Leiste Anmeldung, Bezahlen, Dabei mit dem echten Sta
 
 test("Anmeldung ohne Kosten: keine Leiste", async () => {
   renderPage({ ...base, has_registration: true, own_registration: { id: "r1", status: "registered", seat_count: 1 } });
-  expect(await screen.findByText("Angemeldet")).toBeInTheDocument();
+  expect(await screen.findByTestId("event-own-status")).toHaveTextContent("Du bist dabei");
   expect(screen.queryByTestId("event-register-steps")).not.toBeInTheDocument();
 });
 
@@ -157,7 +160,7 @@ test("Turnier-Karte: der Baum mit Namen, Freilos und noch offenen Plätzen", asy
   });
   const tree = await screen.findByTestId("event-tournament-tree");
   expect(tree).toHaveTextContent("Turnierbaum-Vorschau");
-  expect(tree).toHaveTextContent("NeonFalke");
+  await waitFor(() => expect(tree).toHaveTextContent("NeonFalke"));
   expect(tree).toHaveTextContent("noch offen");
   expect(tree).toHaveTextContent("Freilos");
   expect(screen.queryByText(/noch nicht generiert/)).toBeNull();
@@ -186,7 +189,7 @@ test("Turnier-Karte: mit Ergebnissen die ersten drei Plätze statt „noch nicht
   });
   const podium = await screen.findByTestId("event-tournament-podium");
   expect(podium).toHaveTextContent("Die ersten drei Plätze");
-  expect(podium).toHaveTextContent("#1NeonFalke#2LunaByte#3KiwiKomet");
+  await waitFor(() => expect(podium).toHaveTextContent("#1NeonFalke#2LunaByte#3KiwiKomet"));
   expect(podium).not.toHaveTextContent("DriftDaniel");
   expect(screen.queryByText(/noch nicht generiert/)).toBeNull();
 });
@@ -243,4 +246,52 @@ test("laufendes Event: Gäste sehen „Live verfolgen“ ohne „Display“, die
     </MemoryRouter>,
   );
   expect(await screen.findByTestId("event-display-link")).toHaveAttribute("href", "/display/event/e1");
+});
+
+// Eigene Event-Anmeldung (#1223): „Du bist dabei“ mit Plätzen in Einzahl und Mehrzahl; „Stornieren“ ist ein leiser Link
+// mit Rückfrage - nur, solange der Server es erlaubt (bis zum Beginn, nicht nach dem Check-in).
+function renderOwn(own) {
+  return renderPage({ ...base, has_registration: true, own_registration: { id: "r1", ...own } });
+}
+
+test("vor dem Beginn: Stornieren als Link mit Rückfrage", async () => {
+  apiMock.delete.mockResolvedValue({ data: { ok: true } });
+  renderOwn({ status: "registered", seat_count: 1, companion_count: 0, can_cancel: true });
+  expect(await screen.findByTestId("event-own-seats")).toHaveTextContent("1 Platz reserviert.");
+  const link = screen.getByTestId("event-cancel-link");
+  expect(link.className).not.toContain("tls-btn");
+  fireEvent.click(link);
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/events/e1/registrations/me"));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Event-Anmeldung stornieren?", confirmLabel: "Stornieren" }));
+});
+
+test("Rückfrage abgelehnt: nichts wird storniert", async () => {
+  confirmMock.mockResolvedValueOnce(false);
+  apiMock.delete.mockClear();
+  renderOwn({ status: "registered", seat_count: 2, companion_count: 1, can_cancel: true });
+  fireEvent.click(await screen.findByTestId("event-cancel-link"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+  expect(apiMock.delete).not.toHaveBeenCalled();
+  expect(screen.getByTestId("event-own-seats")).toHaveTextContent("2 Plätze reserviert, davon 1 Begleitperson.");
+});
+
+test("nach dem Beginn oder dem Check-in: kein Storno-Weg, der Kasten sagt „Du bist dabei“", async () => {
+  const { unmount } = renderOwn({ status: "registered", seat_count: 3, companion_count: 2, can_cancel: false });
+  expect(await screen.findByTestId("event-own-status")).toHaveTextContent("Du bist dabei");
+  expect(screen.getByTestId("event-own-seats")).toHaveTextContent("3 Plätze reserviert, davon 2 Begleitpersonen.");
+  expect(screen.queryByTestId("event-cancel-link")).toBeNull();
+  expect(screen.queryByText("Stornieren")).toBeNull();
+  unmount();
+  renderOwn({ status: "checked_in", seat_count: 2, companion_count: 1, can_cancel: false });
+  expect(await screen.findByTestId("event-own-status")).toHaveTextContent("Du bist dabei");
+  expect(screen.getByTestId("event-own-seats")).toHaveTextContent("Eingecheckt · 2 Plätze, davon 1 Begleitperson.");
+  expect(screen.queryByTestId("event-cancel-link")).toBeNull();
+});
+
+test("Warteliste: Satz in der Mehrzahl, zurückziehen vor dem Beginn möglich", async () => {
+  renderOwn({ status: "waitlist", seat_count: 3, companion_count: 2, can_cancel: true });
+  expect(await screen.findByTestId("event-own-status")).toHaveTextContent("Warteliste");
+  expect(screen.getByTestId("event-own-seats")).toHaveTextContent("Du stehst mit 3 Plätzen auf der Warteliste, davon 2 Begleitpersonen.");
+  expect(screen.getByTestId("event-cancel-link")).toBeInTheDocument();
+  expect(screen.queryByText(/Platz\/Plätze|Person\(en\)|davon 0/)).toBeNull();
 });
