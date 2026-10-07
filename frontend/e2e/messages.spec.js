@@ -42,6 +42,12 @@ async function mockServer(page, seen) {
   await page.route("**/api/sponsors**", (route) => route.fulfill({ contentType: "application/json", body: "[]" }));
   await page.route("**/api/auth/me", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(me) }));
   await page.route("**/api/notifications**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ items: [], unread: 0 }) }));
+  // Die Liste links kommt seit #1148 aus /api/chats - alle Arten in einer Liste.
+  await page.route("**/api/chats", (route) => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ items: [{ key: "direct:user-2", kind: "direct", target_id: bob.id, title: bob.display_name, subtitle: "Nachricht", last_message: { text: "Nachricht 120", created_at: all[TOTAL - 1].created_at }, unread_count: 0, updated_at: all[TOTAL - 1].created_at }], unread_total: 0 }),
+  }));
+  await page.route("**/api/chats/**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, unread_total: 0 }) }));
   await page.route("**/api/messages/conversations", (route) => route.fulfill({
     contentType: "application/json",
     body: JSON.stringify([{ user: bob, latest_message: all[TOTAL - 1], unread_count: 0, can_send: true, message_hint: "", blocked_by_me: false }]),
