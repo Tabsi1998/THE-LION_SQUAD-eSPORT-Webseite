@@ -402,6 +402,8 @@ class EventCreate(BaseModel):
     registration_url: Optional[str] = None
     allow_companions: bool = False
     max_companions_per_registration: int = Field(0, ge=0, le=20)
+    # Anmeldung über Discord (#885): Vorgabe an; ohne Wirkung bei externem Link oder Begleitpersonen.
+    discord_registration: bool = True
     location: Optional[str] = None
     address: Optional[str] = None
     postal_code: Optional[str] = None
@@ -447,6 +449,7 @@ class EventUpdate(BaseModel):
     has_registration: Optional[bool] = None
     registration_url: Optional[str] = None
     allow_companions: Optional[bool] = None
+    discord_registration: Optional[bool] = None
     max_companions_per_registration: Optional[int] = Field(default=None, ge=0, le=20)
     location: Optional[str] = None
     address: Optional[str] = None
@@ -540,6 +543,8 @@ class TournamentCreate(BaseModel):
     block_club_member_registration: bool = False
     # Turnier nur mit Event-Anmeldung (#875): wirkt nur mit `event_id`.
     requires_event_registration: bool = False
+    # Anmeldung über Discord (#885): Vorgabe an.
+    discord_registration: bool = True
     registration_open_from: Optional[datetime] = None
     registration_open_until: Optional[datetime] = None
     check_in_from: Optional[datetime] = None
@@ -611,6 +616,7 @@ class TournamentUpdate(BaseModel):
     registration_enabled: Optional[bool] = None
     block_club_member_registration: Optional[bool] = None
     requires_event_registration: Optional[bool] = None
+    discord_registration: Optional[bool] = None
     is_invite_only: Optional[bool] = None
     registration_open_from: Optional[datetime] = None
     registration_open_until: Optional[datetime] = None

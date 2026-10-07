@@ -14,7 +14,9 @@ Drei Aufgaben, jede nur für **verknüpfte Konten** (#260, ``platform_links`` mi
 - **Befehle:** ``/naechstes-event``, ``/turniere`` (offene Anmeldungen), ``/meine-erfolge`` (nur
   verknüpft), ``/status`` (nur Vorstand/System); seit #573 ``/rangliste``, ``/bracket``,
   ``/wer-streamt``, ``/mitglied`` (nur verknüpft) und ``/verknuepfen`` - die Antworten rechnet
-  ``services/discord_commands.py``. Jede Antwort sieht nur die fragende Person.
+  ``services/discord_commands.py``; seit #885 ``/anmelden`` und ``/abmelden`` (nur verknüpft, Antworten in
+  ``services/discord_registration.py``, Knöpfe mit Kennung ``tls:...`` über ``RegistrationButton``).
+  Jede Antwort sieht nur die fragende Person.
 
 Bricht die Verbindung ab (fehlender Intent im Developer Portal, falscher Token, Netz), steht der
 Grund als Klickweg in ``last_error`` (``friendly_bot_error``) und der Scheduler-Job
@@ -79,23 +81,34 @@ def role_diff(current: set[str], wanted: set[str]) -> tuple[set[str], set[str]]:
 
 
 def clean_buttons(buttons: list[dict] | None) -> list[dict]:
-    """Link-Knöpfe (#573): nur mit Beschriftung und http(s)-Adresse, jede Adresse einmal, höchstens fünf."""
+    """Link-Knöpfe (#573) und Rückruf-Knöpfe mit Kennung (#885): nur mit Beschriftung, jede Adresse bzw. Kennung einmal,
+    höchstens fünf."""
     out: list[dict] = []
     seen: set[str] = set()
     for button in buttons or []:
         label = str((button or {}).get("label") or "").strip()[:80]
-        url = str((button or {}).get("url") or "").strip()
-        if not label or not url.startswith(("https://", "http://")) or len(url) > 512 or url in seen:
+        if not label:
             continue
-        seen.add(url)
-        out.append({"label": label, "url": url})
+        custom_id = str((button or {}).get("custom_id") or "").strip()
+        if custom_id:
+            if len(custom_id) > 100 or custom_id in seen:
+                continue
+            seen.add(custom_id)
+            out.append({"label": label, "custom_id": custom_id, "style": str((button or {}).get("style") or "primary")})
+        else:
+            url = str((button or {}).get("url") or "").strip()
+            if not url.startswith(("https://", "http://")) or len(url) > 512 or url in seen:
+                continue
+            seen.add(url)
+            out.append({"label": label, "url": url})
         if len(out) >= MAX_BUTTONS:
             break
     return out
 
 
 def link_view(buttons: list[dict] | None):
-    """Die Knöpfe als discord.py-Ansicht - oder None. Link-Knöpfe brauchen keinen laufenden Bot-Rückruf."""
+    """Die Knöpfe als discord.py-Ansicht - oder None. Link-Knöpfe brauchen keinen Rückruf; Knöpfe mit Kennung beantwortet
+    der Bot über ``RegistrationButton`` (#885), auch nach einem Neustart."""
     rows = clean_buttons(buttons)
     if not rows:
         return None
@@ -103,7 +116,11 @@ def link_view(buttons: list[dict] | None):
 
     view = discord.ui.View(timeout=None)
     for row in rows:
-        view.add_item(discord.ui.Button(label=row["label"], url=row["url"], style=discord.ButtonStyle.link))
+        if row.get("custom_id"):
+            style = getattr(discord.ButtonStyle, row.get("style") or "primary", discord.ButtonStyle.primary)
+            view.add_item(discord.ui.Button(label=row["label"], custom_id=row["custom_id"], style=style))
+        else:
+            view.add_item(discord.ui.Button(label=row["label"], url=row["url"], style=discord.ButtonStyle.link))
     return view
 
 
@@ -629,6 +646,48 @@ class BotRunner:
         @tree.command(name="wer-streamt", description="Wer aus dem Verein gerade live ist")
         async def wer_streamt(interaction):
             await runner._reply(interaction, lambda: discord_commands.answer_wer_streamt(db))
+
+        # Anmeldung im Discord (#885): privat, nur verknüpft, derselbe Dienst wie das Formular. Die Knöpfe tragen ihre
+        # Kennung (tls:show|reg|unreg:...), Discord schickt sie mit - so überleben sie einen Neustart des Bots.
+        from services import discord_registration
+
+        class RegistrationButton(discord.ui.DynamicItem[discord.ui.Button], template=discord_registration.CUSTOM_ID_PATTERN):
+            def __init__(self, button_id: str):
+                super().__init__(discord.ui.Button(label="Anmelden", custom_id=button_id, style=discord.ButtonStyle.primary))
+                self.button_id = button_id
+
+            @classmethod
+            async def from_custom_id(cls, interaction, item, match, /):
+                return cls(match.group(0))
+
+            async def callback(self, interaction):
+                await runner._reply(interaction, lambda: discord_registration.handle_button(db, interaction.user.id, self.button_id))
+
+        client.add_dynamic_items(RegistrationButton)
+
+        @tree.command(name="anmelden", description="Zu einem Event oder Turnier anmelden (nur mit verknüpftem Konto)")
+        @app_commands.describe(auswahl="Welches Event oder Turnier")
+        async def anmelden(interaction, auswahl: str | None = None):
+            async def produce():
+                scope = await discord_commands.server_scope(db, interaction.guild_id)
+                return await discord_registration.answer_anmelden(db, interaction.user.id, auswahl, scope.get("games"))
+            await runner._reply(interaction, produce)
+
+        @anmelden.autocomplete("auswahl")
+        async def anmelden_auswahl(interaction, current: str):
+            scope = await discord_commands.server_scope(db, interaction.guild_id)
+            return [app_commands.Choice(name=row["name"], value=row["value"])
+                    for row in await discord_registration.choices(db, interaction.user.id, scope.get("games"), current)]
+
+        @tree.command(name="abmelden", description="Eine Event-Anmeldung zurückziehen (nur mit verknüpftem Konto)")
+        @app_commands.describe(auswahl="Welches Event")
+        async def abmelden(interaction, auswahl: str | None = None):
+            await runner._reply(interaction, lambda: discord_registration.answer_abmelden(db, interaction.user.id, auswahl))
+
+        @abmelden.autocomplete("auswahl")
+        async def abmelden_auswahl(interaction, current: str):
+            return [app_commands.Choice(name=row["name"], value=row["value"])
+                    for row in await discord_registration.own_choices(db, interaction.user.id, current)]
 
         @tree.command(name="mitglied", description="Dein Stand im Verein (nur mit verknüpftem Konto)")
         async def mitglied(interaction):

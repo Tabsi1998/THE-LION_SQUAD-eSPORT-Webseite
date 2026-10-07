@@ -199,3 +199,26 @@ test("Mehrtägig (#884): Schalter aus bringt Start und Ende aus dem ersten und l
   expect(patch.days).toEqual([]);
   expect(patch.start_date).toContain("2026-10-16T");
 });
+
+// Anmeldung im Discord (#885): Vorgabe an, Hinweis bei externem Link, der Haken geht beim Speichern mit.
+test("Anmeldung im Discord: Vorgabe an, Hinweis bei externem Link, Abwahl geht mit", async () => {
+  apiMock.patch.mockResolvedValue({ data: EVENTS[0] });
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/meta") return { data: META };
+    if (url.startsWith("/events?")) return { data: [{ ...EVENTS[0], has_registration: true }] };
+    return { data: [] };
+  });
+  renderAt("/admin/events/ev-1");
+  const box = await screen.findByTestId("event-discord-registration");
+  expect(box).toBeChecked();
+  expect(box.closest("label")).toHaveTextContent("/anmelden");
+
+  fireEvent.change(screen.getByLabelText("Externer Anmeldelink"), { target: { value: "https://example.test/anmeldung" } });
+  expect(screen.getByTestId("event-discord-registration").closest("label")).toHaveTextContent("Gerade ohne Wirkung");
+
+  fireEvent.click(screen.getByTestId("event-discord-registration"));
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  const [, patch] = apiMock.patch.mock.calls[0];
+  expect(patch.discord_registration).toBe(false);
+});

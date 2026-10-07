@@ -79,7 +79,7 @@ export default function AdminTournamentNewPage() {
     platform: "", event_id: "", format: "single_elim", format_label: "",
     team_mode: "solo", team_size: 1,
     max_participants: 16, min_participants: 2,
-    registration_enabled: true, is_invite_only: false, block_club_member_registration: false, requires_event_registration: false,
+    registration_enabled: true, is_invite_only: false, block_club_member_registration: false, requires_event_registration: false, discord_registration: true,
     registration_open_from: "", registration_open_until: "",
     check_in_from: "", check_in_until: "",
     start_date: "", end_date: "",
@@ -198,6 +198,7 @@ export default function AdminTournamentNewPage() {
                 <TextField label="Check-in öffnet" type="datetime-local" value={form.check_in_from} onChange={(v) => set("check_in_from", v)} testId="new-tr-checkin-from" />
                 <TextField label="Check-in endet" type="datetime-local" value={form.check_in_until} onChange={(v) => set("check_in_until", v)} testId="new-tr-checkin-until" />
                 <CheckField label="Nur Einladung/manuelle Teilnehmer, keine öffentliche Anmeldung" checked={form.is_invite_only} onChange={(v) => set("is_invite_only", v)} testId="new-tr-invite-only" />
+                <CheckField label="Anmeldung über Discord erlauben (/anmelden und Knopf unter der Ankündigung)" checked={form.discord_registration} onChange={(v) => set("discord_registration", v)} testId="new-tr-discord-registration" accent="#5865F2" />
                 <CheckField label="Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten" checked={form.block_club_member_registration} onChange={(v) => set("block_club_member_registration", v)} testId="new-tr-block-members" accent="#FFD700" />
                 {form.event_id && <CheckField label="Anmeldung nur mit Event-Anmeldung – wer nicht beim Event angemeldet ist, kann sich nicht anmelden (Teams: so viele Spieler wie die Teamgröße)" checked={form.requires_event_registration} onChange={(v) => set("requires_event_registration", v)} testId="new-tr-event-gate" accent="#29B6E8" />}
               </FormSection>

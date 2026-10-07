@@ -10,6 +10,7 @@ import { DiscordEmbedsPanel } from "./DiscordEmbedsPanel";
 import { DiscordForwardPanel } from "./DiscordForwardPanel";
 import { DiscordGuildsPanel } from "./DiscordGuildsPanel";
 import { DiscordScheduledPanel } from "./DiscordScheduledPanel";
+import { DiscordRegistrationPanel } from "./DiscordRegistrationPanel";
 import { DiscordStreamsPanel } from "./DiscordStreamsPanel";
 import { DiscordSamplesPanel } from "./DiscordSamplesPanel";
 import { DiscordStatsPanel } from "./DiscordStatsPanel";
@@ -35,7 +36,7 @@ export const DISCORD_TABS = [
 ];
 
 const EMPTY_DISCORD = { enabled: true, configured: false, last_status: "", last_error: "", last_event_key: "", last_checked_at: "" };
-const READ_ONLY = ["configured", "channels", "events", "embeds", "scheduled_events", "welcome", "streams", "streams_state", "target_status", "bot", "last_status", "last_error", "last_event_key", "last_checked_at", "updated_at"];
+const READ_ONLY = ["configured", "channels", "events", "embeds", "scheduled_events", "welcome", "registration", "streams", "streams_state", "target_status", "bot", "last_status", "last_error", "last_event_key", "last_checked_at", "updated_at"];
 
 /** Nur, was sich einstellen lässt - der Rest der Antwort ist Stand, kein Feld. */
 export function discordPayload(source) {
@@ -171,6 +172,7 @@ export function DiscordSettings({ initialTab = "messages" }) {
       {tab === "stats" && <DiscordStatsPanel />}
       {tab === "bot" && <>
       <DiscordBotPanel canSystem={user?.role === "superadmin"} />
+      <DiscordRegistrationPanel />
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>

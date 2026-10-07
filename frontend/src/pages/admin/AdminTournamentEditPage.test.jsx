@@ -375,3 +375,17 @@ test("ein K.-o.-Turnier zeigt keine Spielwochen-Einstellungen", async () => {
   await screen.findByLabelText("Turnierstruktur");
   expect(screen.queryByTestId("tr-edit-matchdays")).not.toBeInTheDocument();
 });
+
+test("Anmeldung im Discord (#885): Vorgabe an, Abwahl geht beim Speichern mit", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+
+  const box = await screen.findByTestId("tr-edit-discord-registration");
+  expect(box).toBeChecked();
+  expect(box.closest("label")).toHaveTextContent("Kapitän");
+  await user.click(box);
+  await user.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ discord_registration: false })));
+});

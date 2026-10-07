@@ -149,6 +149,7 @@ function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges 
     has_registration: source.has_registration ?? false,
     registration_url: source.registration_url || "",
     allow_companions: source.allow_companions ?? false,
+    discord_registration: source.discord_registration !== false,
     max_companions_per_registration: source.max_companions_per_registration ?? 0,
     location: source.location || "",
     address: source.address || "",
@@ -383,6 +384,19 @@ function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges 
               )}
             </div>
           </FormGrid>
+        )}
+        {/* Anmeldung im Discord (#885): Vorgabe an; mit externem Link oder Begleitpersonen geht sie nur auf der Website. */}
+        {form.has_registration && (
+          <CheckField
+            label="Anmeldung über Discord erlauben"
+            hint={form.registration_url || form.allow_companions
+              ? "Gerade ohne Wirkung: mit externem Anmeldelink oder Begleitpersonen geht die Anmeldung nur auf der Website."
+              : "Mit verknüpftem Konto über /anmelden oder den Knopf „Anmelden“ unter der Ankündigung – privat, mit denselben Regeln."}
+            checked={form.discord_registration}
+            onChange={(v) => set("discord_registration", v)}
+            accent="#5865F2"
+            testId="event-discord-registration"
+          />
         )}
         {form.has_registration && !form.registration_url && (
           <EventBillingSection value={billingForm} onChange={setBillingForm} canEdit={canFinance} dolibarrConnected={Boolean(meta?.dolibarr_connected)} />

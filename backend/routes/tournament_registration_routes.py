@@ -367,7 +367,7 @@ async def list_assignable_tournament_users(tid: str, q: str | None = None, limit
 
 
 async def _create_self_registration(db, tid: str, tournament: dict, body: RegistrationCreate,
-                                    me: dict, register_access: dict | None) -> dict:
+                                    me: dict, register_access: dict | None, *, via: str = "web") -> dict:
     existing = await db.tournament_registrations.find_one(
         {"tournament_id": tid, "user_id": me["id"]},
         {"_id": 0},
@@ -428,6 +428,7 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
         "display_name": (f"[{team.get('tag')}] {team.get('name')}" if team and team.get("tag") else (team.get("name") if team else None)) or me.get("display_name") or me.get("username"),
         "registration_type": "team" if team else "solo",
         "registered_by": me["id"],
+        "registered_via": via,
         "selected_positions": list(body.selected_positions or []),
         "costs_accepted_by": me["id"] if body.accept_costs else None,
         "created_at": now_utc().isoformat(),
@@ -484,6 +485,13 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
         t = await _get_visible_tournament(tid, me)
     elif t.get("status") == "draft" and not register_access:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    return await self_register(db, t, body, me, register_access, via="web")
+
+
+async def self_register(db, t: dict, body: RegistrationCreate, me: dict, register_access: dict | None, *, via: str = "web") -> dict:
+    """Die Selbstanmeldung hinter der Route - das Website-Formular und der Discord-Knopf (#885) laufen hier durch
+    dieselben Prüfungen (Sperre, Regeln und Datenschutz, Frist, Vereinsmitglieder, Event-Pflicht, Startgeld)."""
+    tid = t["id"]
     if _is_tournament_locked(t):
         raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
     if not body.accept_rules or not body.accept_privacy:
@@ -503,7 +511,7 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
             current_error = _registration_error(current)
             if current_error and not register_access:
                 raise HTTPException(status_code=400, detail=current_error)
-            return await _create_self_registration(db, tid, current, body, me, register_access)
+            return await _create_self_registration(db, tid, current, body, me, register_access, via=via)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
 

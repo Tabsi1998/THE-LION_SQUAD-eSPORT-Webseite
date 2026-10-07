@@ -134,3 +134,22 @@ def test_link_buttons_are_cleaned_and_become_link_components():
     view = asyncio.run(build())
     [button] = view.children
     assert button.url == "https://lionsquad.at/tournaments/cup/bracket" and button.label == "Bracket ansehen" and button.style.name == "link"
+
+
+def test_callback_buttons_keep_their_id_and_style():
+    """Anmelden im Discord (#885): Knöpfe mit Kennung statt Adresse - jede Kennung einmal, Stil wie angegeben, neben Link-Knöpfen."""
+    rows = discord_bot.clean_buttons([{"label": "Anmelden", "custom_id": "tls:show:event:e1", "style": "primary"},
+                                      {"label": "nochmal", "custom_id": "tls:show:event:e1"}, {"label": "", "custom_id": "tls:reg:event:e1"},
+                                      {"label": "zu lang", "custom_id": "x" * 101}, {"label": "Event ansehen", "url": "https://x/e"}])
+    assert rows == [{"label": "Anmelden", "custom_id": "tls:show:event:e1", "style": "primary"}, {"label": "Event ansehen", "url": "https://x/e"}]
+
+    async def build():
+        return discord_bot.link_view([{"label": "Verbindlich anmelden", "custom_id": "tls:reg:event:e1", "style": "success"},
+                                      {"label": "Abmelden", "custom_id": "tls:unreg:event:e1", "style": "danger"},
+                                      {"label": "Auf der Website", "url": "https://lionsquad.at/events/lan"}])
+
+    view = asyncio.run(build())
+    first, second, third = view.children
+    assert (first.custom_id, first.style.name, first.url) == ("tls:reg:event:e1", "success", None)
+    assert (second.custom_id, second.style.name) == ("tls:unreg:event:e1", "danger")
+    assert third.style.name == "link" and third.url == "https://lionsquad.at/events/lan"
