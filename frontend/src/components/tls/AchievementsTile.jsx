@@ -30,7 +30,7 @@ export function AchievementsTile({ className = "" }) {
   const prestige = Number(level?.prestige || 0);
   return (
     <Link
-      to="/profile?tab=achievements"
+      to="/u/me?tab=achievements"
       data-testid="dashboard-achievements"
       className={`border border-[#A855F7]/30 hover:border-[#A855F7]/70 rounded-sm p-5 bg-gradient-to-br from-[#A855F7]/10 to-transparent transition block ${className}`}
     >
@@ -39,7 +39,7 @@ export function AchievementsTile({ className = "" }) {
         <Medal className="w-4 h-4 text-[#A855F7]" />
       </div>
       {failed && !summary ? (
-        <div className="mt-2 font-heading text-lg font-bold">Achievements</div>
+        <div className="mt-2 font-heading text-lg font-bold">Erfolge</div>
       ) : !summary ? (
         <div className="mt-2 text-sm text-white/40" data-testid="dashboard-achievements-loading">Wird geladen …</div>
       ) : (

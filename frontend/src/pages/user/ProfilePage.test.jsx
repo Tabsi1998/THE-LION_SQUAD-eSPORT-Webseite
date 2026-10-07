@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 
 // Das Profil ist die Seite, die jedes Mitglied selbst bearbeitet. Getestet wird
@@ -50,6 +50,12 @@ vi.mock("@/components/tls/PasskeysPanel", () => ({ PasskeysPanel: () => <div dat
 vi.mock("sonner", () => ({ toast: toastMock }));
 
 const ProfilePage = (await import("./ProfilePage")).default;
+const { FriendsPanel } = await import("./profile/FriendsPanel");
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location-probe" data-path={location.pathname} data-search={location.search} />;
+}
 
 function renderPage(entries = ["/profile"]) {
   return render(
@@ -279,7 +285,8 @@ test("?tab=inbox leitet zur eigenen Nachrichten-Seite weiter, mit to= direkt ins
   expect(screen.queryByRole("button", { name: /Inbox/i })).toBeNull();
 });
 
-test("Freunde: suchen, Anfrage senden, Eintrag unter Gesendet, Zaehler im Reiter", async () => {
+// Freunde stehen seit #1143 unter Community → Spieler (/players); die Tafel ist dieselbe.
+test("Freunde: suchen, Anfrage senden, Eintrag unter Gesendet", async () => {
   const user = userEvent.setup();
   const bob = { id: "u-2", username: "bob", display_name: "Bob", avatar_url: "" };
   let outgoing = [];
@@ -295,9 +302,15 @@ test("Freunde: suchen, Anfrage senden, Eintrag unter Gesendet, Zaehler im Reiter
     }
     return Promise.resolve({ data: {} });
   });
-  renderPage(["/profile?tab=friends"]);
+  render(
+    <ConfirmDialogProvider>
+      <MemoryRouter>
+        <FriendsPanel />
+      </MemoryRouter>
+    </ConfirmDialogProvider>
+  );
 
-  expect(await screen.findByRole("button", { name: /Freunde \(1\)/ })).toBeInTheDocument();
+  expect(await screen.findByTestId("friends-friend-f-1")).toBeInTheDocument();
   await user.type(screen.getByTestId("profile-friends-search"), "bo");
   await user.click(await screen.findByTestId("friends-request-u-2"));
 
@@ -307,13 +320,38 @@ test("Freunde: suchen, Anfrage senden, Eintrag unter Gesendet, Zaehler im Reiter
   expect(screen.getByTestId("friends-friend-f-1")).toHaveTextContent("Anna");
 });
 
-// Ehrungen (#848): eigener Reiter für Mitglieder; er liest die Ehrungen aus der Mitgliederakte.
-test("der Reiter Ehrungen lädt die eigenen Ehrungen aus der Akte", async () => {
-  apiMock.get.mockImplementation(async (url) => (url === "/me/honours"
-    ? { data: { available: true, public: false, shown: 0, honours: [{ kind: "jubilee", kind_label: "Jubiläum", title: "10 Jahre Mitgliedschaft", years: 10, label: "", given_on: "2026-04-20", publishable: true }] } }
-    : { data: [] }));
-  renderPage(["/profile?tab=honours"]);
-  expect(await screen.findByTestId("honours-panel")).toHaveTextContent("10 Jahre Mitgliedschaft");
-  expect(screen.getByTestId("profile-tab-honours")).toHaveAttribute("aria-current", "page");
+// Was keine Einstellung ist, hat seinen Ort woanders (#1146, #1150) - alte Links leiten dorthin weiter.
+test("alte Reiter leiten weiter: Ehrungen und Erfolge ins eigene Profil, Teams und Freunde zu Community, Rechnungen auf ihre Adresse", async () => {
+  const cases = [
+    ["/profile?tab=honours", "/u/lionfan", "honours"],
+    ["/profile?tab=achievements", "/u/lionfan", "achievements"],
+    ["/profile?tab=teams", "/teams", ""],
+    ["/profile?tab=friends", "/players", ""],
+    ["/profile?tab=invoices&invoice=d-501", "/account/invoices", "invoice=d-501"],
+  ];
+  for (const [from, path, query] of cases) {
+    const { unmount } = render(
+      <ConfirmDialogProvider>
+        <MemoryRouter initialEntries={[from]}>
+          <Routes>
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path={path} element={<LocationProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </ConfirmDialogProvider>
+    );
+    const probe = await screen.findByTestId("location-probe");
+    expect([from, probe.getAttribute("data-path")]).toEqual([from, path]);
+    if (query) expect(probe.getAttribute("data-search")).toContain(query);
+    unmount();
+  }
+});
+
+test("Darstellung: Saison-Deko und Töne stehen in den Einstellungen", async () => {
+  renderPage(["/profile?tab=appearance"]);
+  expect(await screen.findByTestId("settings-appearance")).toBeInTheDocument();
+  expect(screen.getByTestId("settings-deco-on")).toBeInTheDocument();
+  expect(screen.getByTestId("settings-sound-off")).toBeInTheDocument();
+  expect(screen.getByTestId("profile-tab-appearance")).toHaveAttribute("aria-current", "page");
 });
 

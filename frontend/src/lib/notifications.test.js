@@ -12,7 +12,8 @@ test("die Zielzuordnung folgt der App: Nachricht, Match, Team, Turnier, Freunde,
   expect(notificationTarget(note("b", { kind: "match_reminder", url: "/matches/m-1", meta: { match_id: "m-1" } }))).toBe("/matches/m-1");
   expect(notificationTarget(note("c", { kind: "team_chat_message", url: "/teams/t-1", meta: { team_id: "t-1" } }))).toBe("/teams/t-1");
   expect(notificationTarget(note("d", { kind: "tournament_chat_message", url: "/tournaments/cup/chat", meta: { tournament_id: "t-9" } }))).toBe("/tournaments/cup");
-  expect(notificationTarget(note("e", { kind: "friend_request", url: "/profile?tab=friends", meta: { requester_id: "u-3" } }))).toBe("/profile?tab=friends");
+  // Freunde stehen seit #1143 unter Community → Spieler.
+  expect(notificationTarget(note("e", { kind: "friend_request", url: "/profile?tab=friends", meta: { requester_id: "u-3" } }))).toBe("/players");
   expect(notificationTarget(note("f", { kind: "prize_pending", url: "/me/prizes", meta: { pickup_id: "p-1" } }))).toBe("/my/prizes");
   expect(notificationTarget(note("g", { kind: "crown_gained", url: "/achievements" }))).toBe("/achievements");
 });

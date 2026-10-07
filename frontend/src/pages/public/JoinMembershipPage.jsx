@@ -42,7 +42,7 @@ export default function JoinMembershipPage() {
                 <li>• Exklusive Mitgliedervorteile, Rabatte und Partnerangebote</li>
                 <li>• Mitglieder-only Turniere und Challenges</li>
                 <li>• Frühere Anmeldung zu öffentlichen Events</li>
-                <li>• Spezielle Mitglieder-Achievements</li>
+                <li>• Spezielle Mitglieder-Erfolge</li>
                 <li>• Eigene Mitgliedsnummer und Vereinsausweis</li>
                 <li>• Stimmrecht in Vereinsversammlungen</li>
               </ul>

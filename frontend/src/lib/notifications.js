@@ -57,7 +57,7 @@ export function notificationTarget(item) {
   const newsSlug = metaString(meta, "slug") || metaString(meta, "news_id");
   if (newsSlug && kind.includes("news") && !url) return `/news/${newsSlug}`;
 
-  if (kind.includes("friend")) return "/profile?tab=friends";
+  if (kind.includes("friend")) return "/players";
   if (kind.includes("crown")) return "/achievements";
 
   return rewriteLegacyPath(url);

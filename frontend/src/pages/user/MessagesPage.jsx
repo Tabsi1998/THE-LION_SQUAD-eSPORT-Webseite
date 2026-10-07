@@ -1,32 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, MessageSquare, Search, Send } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Gamepad2, MessageSquare, Search, Send, Trophy, User, Users } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useChatList } from "@/hooks/useChats";
+import { badgeText, chatHref, chatPreview, chatTime, markChatRead } from "@/lib/chats";
 import { ChatAttachButton, ChatAttachmentDrafts, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
 import { ChatStickerButton, ChatStickerPicker } from "@/components/tls/ChatStickers";
 import { ConversationView } from "./messages/ConversationView";
 import { mergeMessages } from "./messages/messageGroups";
 
-// Nachrichten als eigene Seite (#254, der Rest von #222): Liste links, die
-// Unterhaltung rechts in fester Höhe mit eigener Scrollleiste; am Handy zwei
-// Ansichten mit Zurück. Die Unterhaltung lädt die neuesten 50 und beim
-// Hochscrollen die älteren; neue Nachrichten kommen über den Änderungsstrom.
+// Chats (#1148, vorher „Nachrichten“, #254): links alle Unterhaltungen - Direktnachrichten, Team-, Turnier- und
+// Match-Chats - das Neueste oben, mit der Zahl der Ungelesenen; rechts die Direktnachricht in fester Höhe mit eigener
+// Scrollleiste. Gruppen-Chats öffnen ihre Seite (Team, Turnier, Match), dort steht der Chat. Am Handy zuerst die Liste,
+// dann die Unterhaltung mit Zurück. Die Unterhaltung lädt die neuesten 50 und beim Hochscrollen die älteren.
 export const PAGE_SIZE = 50;
 
-function threadPreview(thread) {
-  const latest = thread.latest_message;
-  if (!latest) return "Noch keine Nachricht";
-  if (latest.message) return latest.message;
-  if (latest.attachments?.length) return "[Anhang]";
-  if (latest.sticker) return "[Sticker]";
-  return "Noch keine Nachricht";
-}
+const KIND_ICONS = { direct: User, team: Users, tournament: Trophy, match: Gamepad2 };
 
 export default function MessagesPage() {
   const { user } = useAuth();
@@ -34,7 +28,7 @@ export default function MessagesPage() {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const prompt = usePrompt();
-  const [threads, setThreads] = useState(null);
+  const { list: chats, loading: chatsLoading, reload: reloadChats } = useChatList(Boolean(user));
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
   const [hasMore, setHasMore] = useState(false);
@@ -55,12 +49,6 @@ export default function MessagesPage() {
     messagesRef.current = messages;
   }, [messages]);
 
-  const loadThreads = useCallback(async () => {
-    const { data } = await api.get("/messages/conversations");
-    setThreads(data || []);
-  }, []);
-  useEffect(() => { loadThreads().catch(() => setThreads([])); }, [loadThreads]);
-  useApiInvalidation(loadThreads, ["messages", "admin/notifications"]);
 
   // Öffnen lädt die neueste Seite und markiert sie gelesen. Ein stiller Lauf
   // (Änderungsstrom) führt nur zusammen, was neu ist, und lässt geladene
@@ -75,17 +63,21 @@ export default function MessagesPage() {
       if (silent && messagesRef.current.length) {
         const { messages: merged, appended } = mergeMessages(messagesRef.current, data.messages || []);
         setMessages(merged);
-        if (appended > 0) setNewCount((count) => count + appended);
+        if (appended > 0) {
+          setNewCount((count) => count + appended);
+          void markChatRead("direct", id);
+        }
       } else {
         setMessages(data.messages || []);
         setHasMore(!!data.has_more);
         setNewCount(0);
+        // Gelesen (#1148): die Zahl verschwindet hier, in der Leiste und in der App.
+        void markChatRead("direct", id);
       }
-      loadThreads().catch(() => {});
     } catch (err) {
       if (!silent) toast.error(formatRequestError(err, "Nachrichten konnten nicht geladen werden."));
     }
-  }, [loadThreads]);
+  }, []);
 
   useEffect(() => {
     setMessages([]);
@@ -152,7 +144,7 @@ export default function MessagesPage() {
       dmAttachments.reset();
       setHint("");
       setCanSend(true);
-      loadThreads().catch(() => {});
+      reloadChats();
     } catch (err) {
       toast.error(formatRequestError(err, "Nachricht konnte nicht gesendet werden."));
     } finally {
@@ -167,7 +159,7 @@ export default function MessagesPage() {
       const { data } = await api.post(`/messages/direct/${userId}`, { sticker_id: sticker.id });
       setMessages((rows) => mergeMessages(rows, [data]).messages);
       setStickersOpen(false);
-      loadThreads().catch(() => {});
+      reloadChats();
     } catch (err) {
       toast.error(formatRequestError(err, "Sticker konnte nicht gesendet werden."));
     } finally {
@@ -234,7 +226,7 @@ export default function MessagesPage() {
             <div className="px-4 py-3 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-[#29B6E8]" />
-                <h1 className="font-heading font-black uppercase">Nachrichten</h1>
+                <h1 className="font-heading font-black uppercase">Chats</h1>
               </div>
               <div className="relative mt-3">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
@@ -242,8 +234,8 @@ export default function MessagesPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
-                  placeholder="Benutzer suchen"
-                  aria-label="Benutzer suchen"
+                  placeholder="Neue Nachricht: Name suchen"
+                  aria-label="Neue Nachricht: Name suchen"
                   data-testid="messages-search"
                   className="w-full bg-[#0A0A0A] border border-white/10 pl-9 pr-3 py-2 rounded-sm text-sm"
                 />
@@ -269,28 +261,40 @@ export default function MessagesPage() {
                 </div>
               ) : (
                 <>
-                  {(threads || []).map((thread) => {
-                    const other = thread.user || {};
-                    const current = userId === other.id;
-                    return (
-                      <button
-                        key={other.id}
-                        type="button"
-                        onClick={() => open(other.id)}
-                        aria-current={current ? "true" : undefined}
-                        data-testid={`conversation-item-${other.id}`}
-                        className={`w-full text-left px-4 py-3 border-b border-white/5 transition ${current ? "bg-[#29B6E8]/10" : "hover:bg-white/[0.03]"}`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="font-bold text-sm truncate">{other.display_name || other.username}</div>
-                          {thread.unread_count > 0 ? <span className="tls-btn tls-btn--primary shrink-0 min-w-5 h-5 px-1 rounded-sm text-[10px] font-black inline-flex items-center justify-center">{thread.unread_count}</span> : null}
-                        </div>
-                        <div className="text-xs text-white/40 truncate">{threadPreview(thread)}</div>
+                  {chats.items.map((item) => {
+                    const Icon = KIND_ICONS[item.kind] || MessageSquare;
+                    const current = item.kind === "direct" && userId === item.target_id;
+                    const unread = Number(item.unread_count || 0);
+                    const body = (
+                      <>
+                        <span className={`mt-0.5 shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-sm ${item.kind === "tournament" ? "bg-[#FFD700]/10 text-[#FFD700]" : "bg-[#29B6E8]/10 text-[#29B6E8]"}`}>
+                          <Icon className="w-4 h-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center justify-between gap-2">
+                            <span className={`font-bold text-sm truncate ${unread ? "text-white" : "text-white/85"}`}>{item.title}</span>
+                            <span className={`shrink-0 text-[11px] ${unread ? "text-[#29B6E8]" : "text-white/35"}`}>{chatTime(item.updated_at)}</span>
+                          </span>
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-white/45 truncate">{chatPreview(item)}</span>
+                            {unread ? <span className="tls-btn tls-btn--primary shrink-0 min-w-5 h-5 px-1 rounded-sm text-[10px] font-black inline-flex items-center justify-center" data-testid={`chat-unread-${item.key}`}>{badgeText(unread)}</span> : null}
+                          </span>
+                        </span>
+                      </>
+                    );
+                    const className = `w-full text-left px-4 py-3 border-b border-white/5 transition flex items-start gap-3 ${current ? "bg-[#29B6E8]/10" : "hover:bg-white/[0.03]"}`;
+                    return item.kind === "direct" ? (
+                      <button key={item.key} type="button" onClick={() => open(item.target_id)} aria-current={current ? "true" : undefined} data-testid={`conversation-item-${item.target_id}`} className={className}>
+                        {body}
                       </button>
+                    ) : (
+                      <Link key={item.key} to={chatHref(item)} data-testid={`chat-item-${item.key}`} className={className}>
+                        {body}
+                      </Link>
                     );
                   })}
-                  {threads === null ? <div className="p-5 text-sm text-white/35">Lade Gespräche …</div> : null}
-                  {threads && threads.length === 0 ? <div className="p-5 text-sm text-white/35">Noch keine Gespräche. Suche oben einen Benutzer.</div> : null}
+                  {chatsLoading && !chats.items.length ? <div className="p-5 text-sm text-white/35">Lade Chats …</div> : null}
+                  {!chatsLoading && chats.items.length === 0 ? <div className="p-5 text-sm text-white/35">Noch keine Chats. Suche oben einen Namen für eine neue Nachricht – Team- und Turnier-Chats erscheinen hier von selbst.</div> : null}
                 </>
               )}
             </div>
@@ -354,8 +358,8 @@ export default function MessagesPage() {
               <div className="flex-1 flex items-center justify-center p-8 text-center text-white/40">
                 <div>
                   <MessageSquare className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                  <div className="font-heading font-bold uppercase">Gespräch auswählen</div>
-                  <div className="mt-1 text-sm">Wähle links ein Gespräch oder suche einen Benutzer.</div>
+                  <div className="font-heading font-bold uppercase">Chat auswählen</div>
+                  <div className="mt-1 text-sm">Wähle links einen Chat oder suche oben einen Namen für eine neue Nachricht.</div>
                 </div>
               </div>
             )}

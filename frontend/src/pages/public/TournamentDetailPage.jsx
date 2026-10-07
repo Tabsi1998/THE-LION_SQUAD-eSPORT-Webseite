@@ -11,6 +11,7 @@ import { StepBar, tournamentSteps } from "@/components/tls/StepBar";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useChatRead } from "@/hooks/useChats";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
 import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag, MessageSquare, Send, Handshake, ExternalLink } from "lucide-react";
@@ -414,6 +415,8 @@ function TournamentChat({ tournament, user }) {
 
   useEffect(() => { load(); }, [load]);
   useLiveRefresh(load, ["tournaments"], { fallbackMs: 6000, enabled: Boolean(user) });
+  // Gelesen (#1148): beim Öffnen und bei jeder neuen Nachricht.
+  useChatRead("tournament", tournament.id, messages, Boolean(user) && !blocked);
 
   useEffect(() => {
     const box = scrollRef.current;

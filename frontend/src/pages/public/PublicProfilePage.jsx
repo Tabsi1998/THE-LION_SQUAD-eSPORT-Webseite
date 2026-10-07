@@ -1,7 +1,7 @@
 import { countryName } from "@/lib/countries";
 import { useCallback, useEffect, useState } from "react";
 import { useTilt } from "@/hooks/useTilt";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { formatLinkedAt } from "@/lib/platformLinks";
@@ -18,7 +18,8 @@ import { AccountLevelPill, AccountLevelProgress } from "@/components/tls/Account
 import { LevelAvatarFrame, useCrownFor } from "@/components/tls/LevelAvatarFrame";
 import { SeasonHighlightCard } from "@/components/tls/SeasonHighlightCard";
 import { AwardBanner } from "@/components/tls/AwardBanner";
-import { HonourCard } from "@/pages/user/profile/HonoursPanel";
+import { HonourCard, HonoursPanel } from "@/pages/user/profile/HonoursPanel";
+import { OwnAchievements, PrivateBox } from "@/pages/public/profile/OwnProfileParts";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -29,14 +30,16 @@ import {
   Trophy, Flag, Medal, Shield, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
   MessageSquare, UserPlus, UserCheck, X, Info, Cake, Crown,
-  Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles, Copy, Award,
+  Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles, Copy, Award, Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 import { asInstant, viennaDate } from "@/lib/vienna";
 
 // Öffentliches Profil, Umbau 24.09.: Banner als echtes Banner mit überlappendem Avatar, eine Zeile
-// mit Level, Rolle und verknüpften Konten, eine Zahlenleiste, fünf Reiter (Übersicht, Achievements,
-// Auszeichnungen, Referenzen mit Turnieren und Fast Laps, Teams). Die Übersicht zeigt links die
+// mit Level, Rolle und verknüpften Konten, eine Zahlenleiste und dieselben Reiter wie in der App (#1149): Übersicht,
+// Erfolge, Auszeichnungen, Referenzen mit Turnieren und Fast Laps, Teams, für Mitglieder Ehrungen. Das eigene Profil
+// zeigt dazu „Nur für dich“ (Rechnungen, Gewinne, was fehlt), die eigenen Erfolge mit Fortschritt, das Zahnrad zu den
+// Einstellungen und den Schalter „So sehen dich andere“. Die Übersicht zeigt links die
 // Erfolge (Podestplätze, Auszeichnungen, Achievements, Referenzen) und rechts eine Konten-Karte,
 // „Über“, Setup und Teams; der Twitch-Player steht nur, wenn der Stream gerade läuft. Konten stehen
 // genau einmal - im Kasten „Konten“ (#527), oben nur ein Zähler.
@@ -317,15 +320,22 @@ export function podiumHighlights(items, limit = 3) {
     .slice(0, limit);
 }
 
+/** Reiter aus der Adresse - auch die alten Namen von /profile (#1149, #1150). */
+const TAB_ALIASES = { achievements: "badges", erfolge: "badges", badges: "badges", awards: "awards", honours: "honours", references: "references", teams: "teams", overview: "overview" };
+
 export default function PublicProfilePage() {
   const { username } = useParams();
   const nav = useNavigate();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [profile, setProfile] = useState(null);
+  // „So sehen dich andere“ (#1149): das eigene Profil, wie es jemand ohne Anmeldung sieht.
+  const [asOthers, setAsOthers] = useState(false);
   const [achievementsData, setAchievementsData] = useState(null);
   const [liveStreams, setLiveStreams] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("overview");
+  // Reiter aus der Adresse (#1149): ?tab=achievements (früher /profile?tab=achievements), honours, references …
+  const [tab, setTab] = useState(() => TAB_ALIASES[searchParams.get("tab") || ""] || "overview");
   // Leichtes 3D im Profilkopf (#1078): der Rahmen für Bild und Name neigt sich mit der Maus.
   const tiltRef = useTilt();
   const [referenceFilter, setReferenceFilter] = useState("all");
@@ -341,7 +351,7 @@ export default function PublicProfilePage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/users/public/${username}`);
+      const { data } = await api.get(`/users/public/${username}`, asOthers ? { params: { view_as: "public" } } : undefined);
       setProfile(data);
       api.get("/streams/live").then(({ data: streams }) => setLiveStreams(Array.isArray(streams) ? streams : [])).catch(() => setLiveStreams([]));
       if (data?.id) {
@@ -352,13 +362,33 @@ export default function PublicProfilePage() {
       }
     } catch { setProfile(null); }
     setLoading(false);
-  }, [username]);
+  }, [asOthers, username]);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["users", "achievements", "tournaments", "f1", "teams"]);
   const crown = useCrownFor(profile?.id);
   const [showHighlight, setShowHighlight] = useState(false);
 
   if (loading) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE PROFIL …</div></PublicLayout>;
+  // Das eigene Profil ist privat (oder „So sehen dich andere“ zeigt nichts): der Kasten bleibt, dazu der Weg zur Einstellung.
+  if (!profile && user && (user.username || "").toLowerCase() === String(username || "").toLowerCase()) {
+    return (
+      <PublicLayout>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 space-y-6" data-testid="profile-own-private">
+          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">{user.display_name || user.username}</h1>
+          <label className="flex items-center justify-between gap-4 border border-white/10 bg-[#121212] rounded-sm px-4 py-3" data-testid="profile-as-others">
+            <span><span className="block font-bold text-sm">So sehen dich andere</span><span className="block text-xs text-white/50">{asOthers ? "Nur, was deine Privatsphäre allen zeigt." : "Aus: du siehst auch „Nur für dich“."}</span></span>
+            <input type="checkbox" role="switch" checked={asOthers} onChange={(event) => setAsOthers(event.target.checked)} className="h-5 w-9 accent-[#29B6E8]" data-testid="profile-as-others-switch" aria-label="So sehen dich andere" />
+          </label>
+          {asOthers ? null : <PrivateBox />}
+          <div className="border border-dashed border-white/15 rounded-sm px-6 py-10 text-center text-white/55">
+            <Lock className="w-7 h-7 mx-auto mb-3 opacity-60" />
+            <p className="font-bold text-white/80">Dein Profil ist privat</p>
+            <p className="mt-1 text-sm">Andere sehen dein Profil nicht. Öffentlich stellst du es unter <Link to="/profile?tab=privacy" className="text-[#29B6E8] hover:underline">Einstellungen → Privatsphäre</Link>.</p>
+          </div>
+        </div>
+      </PublicLayout>
+    );
+  }
   if (!profile) return <PublicLayout><div className="p-20 text-center">
     <h1 className="font-heading text-3xl uppercase">Spieler nicht gefunden</h1>
     <Link to="/" className="inline-block mt-4 text-[#29B6E8] hover:underline">← Zurück zur Startseite</Link>
@@ -397,6 +427,8 @@ export default function PublicProfilePage() {
   const openTournaments = tournaments.filter((t) => !referenceTargets.has(t.slug) && !referenceTargets.has(t.id));
   const relationship = profile.relationship || { status: user?.id === profile.id ? "self" : "anonymous" };
   const isOwnProfile = user?.id === profile.id;
+  // Das eigene Profil ohne „So sehen dich andere“: mit Kasten, eigenen Erfolgen und Ehrungen mit Schalter.
+  const ownMode = isOwnProfile && !asOthers;
   const displayName = profile.display_name || profile.username;
   const referenceKinds = new Set(referenceItems.map((item) => item.kind || "tournament"));
   const referenceFilters = REFERENCE_FILTERS.filter(([key]) => key === "all" || referenceKinds.has(key));
@@ -455,7 +487,7 @@ export default function PublicProfilePage() {
 
   const headerStats = [
     { key: "points", icon: Zap, label: "Punkte", value: s.points || 0, color: "#29B6E8" },
-    { key: "badges", icon: Medal, label: "Achievements", value: badges.length },
+    { key: "badges", icon: Medal, label: "Erfolge", value: badges.length },
     { key: "wins", icon: Trophy, label: "Siege", value: s.wins || 0, color: "#FFD700", glory: true },
     { key: "top3", icon: Medal, label: "Podium", value: s.top3 || 0, color: "#C0C0C0", glory: true },
     { key: "tournaments", icon: Flag, label: "Turniere", value: s.tournaments || tournaments.length || 0 },
@@ -463,13 +495,14 @@ export default function PublicProfilePage() {
     ...((twitchChannel || s.twitch_live_sessions > 0) ? [{ key: "streams", icon: Radio, label: "Streams", value: s.twitch_live_sessions || 0, color: "#9146FF" }] : []),
   ];
 
+  // Dieselben Reiter in derselben Reihenfolge wie in der App (#1149); Mitglieder zusätzlich „Ehrungen“.
   const tabs = [
     ["overview", "Übersicht"],
-    ["badges", `Achievements (${badges.length})`],
+    ["badges", `Erfolge (${badges.length})`],
     ["awards", `Auszeichnungen (${awards.length})`],
-    ...(honours.length ? [["honours", `Ehrungen (${honours.length})`]] : []),
     ["references", `Referenzen (${referenceStats.total || referenceItems.length})`],
     ["teams", `Teams (${teams.length})`],
+    ...(profile.is_club_member || honours.length ? [["honours", `Ehrungen (${honours.length})`]] : []),
   ];
 
   const lockedTab = isPrivate && (tab === "references" || tab === "teams");
@@ -586,6 +619,11 @@ export default function PublicProfilePage() {
                   )}
                 </>
               )}
+              {isOwnProfile && (
+                <Link to="/profile" data-testid="profile-settings" aria-label="Einstellungen" title="Einstellungen" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+                  <Settings className="w-3.5 h-3.5" /> Einstellungen
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={() => setShowHighlight(true)}
@@ -614,6 +652,15 @@ export default function PublicProfilePage() {
           <div className="mt-6 pb-6 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3" data-testid="profile-stats">
             {headerStats.map((stat) => <QuickStat key={stat.key} icon={stat.icon} label={stat.label} value={stat.value} color={stat.color} glory={stat.glory} testId={`profile-stat-${stat.key}`} />)}
           </div>
+          {isOwnProfile && (
+            <label className="mb-6 flex items-center justify-between gap-4 border border-white/10 bg-[#121212] rounded-sm px-4 py-3 max-w-xl" data-testid="profile-as-others">
+              <span>
+                <span className="block font-bold text-sm">So sehen dich andere</span>
+                <span className="block text-xs text-white/50">{asOthers ? "Nur, was deine Privatsphäre allen zeigt – ohne Anmeldung." : "Aus: du siehst alles, auch „Nur für dich“."}</span>
+              </span>
+              <input type="checkbox" role="switch" checked={asOthers} onChange={(event) => setAsOthers(event.target.checked)} className="h-5 w-9 shrink-0 accent-[#29B6E8]" data-testid="profile-as-others-switch" aria-label="So sehen dich andere" />
+            </label>
+          )}
         </div>
       </header>
 
@@ -640,6 +687,7 @@ export default function PublicProfilePage() {
         {tab === "overview" && (
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
             <div className="space-y-8 min-w-0" data-testid="profile-overview-main">
+              {ownMode && <PrivateBox />}
               {showTwitchLive && (
                 <TwitchLiveCard channel={twitchChannel} url={twitchUrl} stream={liveStream} hasConsent={hasConsent} />
               )}
@@ -681,7 +729,7 @@ export default function PublicProfilePage() {
 
               {badges.length > 0 && (
                 <section>
-                  <SectionTitle icon={Medal} color="#29B6E8" kicker="Zuletzt" title="Achievements" action={badges.length > 6 ? { label: "Alle ansehen", onClick: () => setTab("badges") } : null} />
+                  <SectionTitle icon={Medal} color="#29B6E8" kicker="Zuletzt" title="Erfolge" action={badges.length > 6 ? { label: "Alle ansehen", onClick: () => setTab("badges") } : null} />
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2" data-testid="profile-recent-awards">
                     {badges.slice(0, 6).map((a) => (
                       <div key={a.code} className="flex items-center gap-3 p-3 border border-white/10 rounded-sm bg-[#121212]" style={{ boxShadow: `inset 2px 0 0 ${a.material_color || a.level_color}` }}>
@@ -725,7 +773,8 @@ export default function PublicProfilePage() {
           </div>
         )}
 
-        {tab === "badges" && (
+        {tab === "badges" && ownMode && <OwnAchievements />}
+        {tab === "badges" && !ownMode && (
           <div className="space-y-6">
             {achievementsHidden ? (
               <div className="border border-dashed border-white/15 rounded-sm px-6 py-14 text-center" data-testid="profile-achievements-private">
@@ -756,7 +805,7 @@ export default function PublicProfilePage() {
                     )}
                   </div>
                 )}
-                <AchievementGroupsView groups={achievementsData?.groups || []} earnedOnly emptyText="Noch keine Achievements freigeschaltet." />
+                <AchievementGroupsView groups={achievementsData?.groups || []} earnedOnly emptyText="Noch keine Erfolge freigeschaltet." />
               </>
             )}
             {/* Saison-Fundstücke (#678): eigener Schalter der Person, unabhängig von „Erfolge öffentlich“ - nur die Summen. */}
@@ -797,7 +846,11 @@ export default function PublicProfilePage() {
 
         {/* Ehrungen (#848, eigener Reiter): aus der Mitgliederakte - Ehrenmitgliedschaft, Verdienstnadel, Jubiläum.
             Keine Auszeichnungen: die kommen aus Turnieren. */}
-        {tab === "honours" && honours.length > 0 && (
+        {tab === "honours" && ownMode && <HonoursPanel />}
+        {tab === "honours" && !ownMode && honours.length === 0 && (
+          <div className="py-16 text-center text-white/40" data-testid="public-profile-honours-empty">Keine Ehrungen freigegeben.</div>
+        )}
+        {tab === "honours" && !ownMode && honours.length > 0 && (
           <div className="space-y-3" data-testid="public-profile-honours">
             <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Award className="w-5 h-5 text-[#FFD700]" /> Ehrungen</h2>
             <ul className="grid gap-3 md:grid-cols-2">

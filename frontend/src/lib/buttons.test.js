@@ -46,6 +46,8 @@ const EXCEPTIONS = {
   "pages/public/PublicProfilePage.jsx": 2, // Zeilen (Team, Referenz)
   "pages/public/ServersPage.jsx": 2, // Serverzeile, Kopierfeld
   "pages/public/TournamentDetailPage.jsx": 1, // Partner-Schild „mit …“
+  "pages/public/VereinPage.jsx": 1, // Kacheln des Mitgliederbereichs (#1147), wie in der App
+  "pages/public/profile/OwnProfileParts.jsx": 1, // Zeilen im Kasten „Nur für dich“ (#1149)
 };
 
 function filesIn(dir) {

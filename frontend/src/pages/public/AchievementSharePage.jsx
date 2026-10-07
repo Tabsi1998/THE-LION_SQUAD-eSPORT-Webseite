@@ -47,7 +47,7 @@ export default function AchievementSharePage() {
     <PublicLayout>
       <div className="max-w-4xl mx-auto px-4 md:px-6 py-10 md:py-14">
         <Link to="/achievements" className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white" data-testid="share-back">
-          <ArrowLeft className="w-3 h-3" /> Alle Achievements
+          <ArrowLeft className="w-3 h-3" /> Alle Erfolge
         </Link>
 
         {state === "loading" && <div className="py-20 text-center font-display tracking-widest text-white/40" data-testid="share-loading">LADE ACHIEVEMENT …</div>}

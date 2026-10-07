@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { CalendarDays, Newspaper, Search, Trophy, UserRound, Users, X } from "lucide-react";
+import { CalendarDays, Clock, Newspaper, Search, Trophy, UserRound, Users, X } from "lucide-react";
+import { clearRecentSearches, forgetSearch, loadRecentSearches, rememberSearch } from "@/lib/recentSearches";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { asInstant, viennaDate } from "@/lib/vienna";
 
@@ -27,9 +28,12 @@ function formatDate(value) {
   return viennaDate(date, { dateStyle: "medium" });
 }
 
+// Die Suche (#1145): dieselbe wie in der App - ab zwei Buchstaben, Treffer nach Art gruppiert. Neu sind die letzten fünf
+// Suchen (im Browser, beim Abmelden gelöscht). Am Handy öffnet die Lupe im Kopf dieselbe Suche.
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [recent, setRecent] = useState(() => loadRecentSearches());
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -40,6 +44,10 @@ export function GlobalSearch() {
   useEffect(() => {
     setOpen(false);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (open) setRecent(loadRecentSearches());
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -89,6 +97,9 @@ export function GlobalSearch() {
   }, [items]);
 
   const close = () => setOpen(false);
+  const remember = () => {
+    if (trimmed.length >= 2) setRecent(rememberSearch(trimmed));
+  };
 
   return (
     <>
@@ -113,6 +124,7 @@ export function GlobalSearch() {
                 ref={inputRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => { if (event.key === "Enter") remember(); }}
                 placeholder="Turniere, Events, News, Spieler, Teams suchen"
                 className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-white/35"
                 data-testid="global-search-input"
@@ -124,6 +136,27 @@ export function GlobalSearch() {
 
             <div className="overflow-y-auto p-3">
               {trimmed.length < 2 ? (
+                <>
+                {recent.length ? (
+                  <section className="mb-3" data-testid="global-search-recent">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/35">Letzte Suchen</span>
+                      <button type="button" onClick={() => { clearRecentSearches(); setRecent([]); }} className="text-[11px] font-bold text-[#29B6E8] hover:underline" data-testid="global-search-recent-clear">Alle löschen</button>
+                    </div>
+                    <div className="space-y-1">
+                      {recent.map((entry) => (
+                        <div key={entry} className="flex items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-3">
+                          <button type="button" onClick={() => setQuery(entry)} className="flex min-h-11 flex-1 items-center gap-2 text-left text-sm text-white/80 hover:text-white" data-testid={`global-search-recent-${entry}`}>
+                            <Clock className="h-3.5 w-3.5 text-white/40" /> {entry}
+                          </button>
+                          <button type="button" onClick={() => setRecent(forgetSearch(entry))} className="p-2 text-white/40 hover:text-white" aria-label={`„${entry}“ aus den letzten Suchen löschen`} data-testid={`global-search-recent-remove-${entry}`}>
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
                 <div className="grid gap-2 sm:grid-cols-5">
                   {QUICK_LINKS.map((link) => {
                     const Icon = KIND_META[link.kind].icon;
@@ -140,6 +173,7 @@ export function GlobalSearch() {
                     );
                   })}
                 </div>
+                </>
               ) : loading ? (
                 <div className="py-12 text-center text-xs font-display uppercase tracking-[0.3em] text-white/35">Suche läuft...</div>
               ) : error ? (
@@ -151,7 +185,7 @@ export function GlobalSearch() {
                       <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.25em] text-white/35">{KIND_META[kind]?.label || "Treffer"}</div>
                       <div className="space-y-1.5">
                         {rows.map((item) => (
-                          <SearchResult key={`${item.kind}:${item.url}`} item={item} onClose={close} />
+                          <SearchResult key={`${item.kind}:${item.url}`} item={item} onClose={() => { remember(); close(); }} />
                         ))}
                       </div>
                     </section>

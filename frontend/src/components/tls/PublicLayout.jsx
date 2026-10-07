@@ -6,7 +6,7 @@ import { takeTransitionShown, transitionPending } from "@/lib/viewTransition";
 import { ChannelIcon } from "@/components/tls/ChannelIcon";
 import { useAuth } from "@/context/AuthContext";
 import { userMenuEntries, userMenuTestId } from "@/pages/user/profile/constants";
-import { useAccountBadges } from "@/hooks/useAccountBadges";
+import { useUnreadChats } from "@/hooks/useChats";
 import { Logo } from "@/components/tls/Logo";
 import { MainNav, MobileNav } from "@/components/tls/MainNav";
 import { NotificationBell } from "@/components/tls/NotificationBell";
@@ -19,13 +19,13 @@ import { GlobalSearch } from "@/components/tls/GlobalSearch";
 import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { SeasonFooterSlot, SeasonMenuSlot, SeasonWidgetSlot } from "@/seasons/SeasonSlots";
 import { DiscordLiveLine, useDiscordNow } from "@/components/tls/DiscordNow";
-import { DecoSwitch } from "@/seasons/DecoSwitch";
+import { GuestDecoSwitch } from "@/seasons/DecoSwitch";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { contactLines, footerButtons, footerColumns } from "@/lib/siteFooter";
 import { StoreButton } from "@/components/tls/StoreButton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, MessageSquare, Smartphone } from "lucide-react";
+import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, Smartphone } from "lucide-react";
 import { UserMenu } from "@/components/tls/UserMenu";
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 
@@ -73,7 +73,8 @@ export function PublicLayout({ children }) {
     return () => window.removeEventListener("scroll", updateScrollTopVisibility);
   }, []);
   const nav = useNavigate();
-  const mobileBadges = useAccountBadges(user?.id, mobileOpen);
+  // Die Zahl am Menü „Community“ (#1148): ungelesene Chats.
+  const unreadChats = useUnreadChats(user?.id);
   const closeMobile = () => setMobileOpen(false);
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
   const clubName = branding?.club_name || "THE LION SQUAD";
@@ -99,24 +100,14 @@ export function PublicLayout({ children }) {
         <div aria-hidden="true" className="tls-header__bg absolute inset-0 backdrop-blur-xl bg-[#0A0A0A]/80 border-b border-white/10" data-testid="site-header-bg" />
         <div className="tls-header__row relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between gap-4" data-testid="site-header-row">
           <div className="flex items-center min-w-0"><span className="tls-header__logo"><Logo size="lg" /></span><SeasonWidgetSlot /></div>
-          <MainNav isClubMember={isClubMember} />
+          <MainNav isClubMember={isClubMember} signedIn={Boolean(user)} badges={{ community: unreadChats }} />
           <div className="flex items-center gap-2">
             <GlobalSearch />
             {user ? (
               <>
                 <NotificationBell />
-                <Link
-                  to="/messages"
-                  data-testid="nav-messages"
-                  aria-label="Nachrichten"
-                  title="Nachrichten"
-                  className="tls-btn tls-btn--quiet hidden md:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-sm"
-                >
-                  <MessageSquare className="w-3.5 h-3.5" />
-                </Link>
-                {/* Benutzermenü statt sechs Knöpfen: Dashboard, Profil,
-                    Nachrichten, Mitgliederbereich, Admin, Abmelden (#282).
-                    Der blaue Admin-Knopf ist auf Wunsch des Betreibers weg. */}
+                {/* Benutzermenü statt sechs Knöpfen (#282): Dashboard, Profil, Einstellungen, Mitgliederbereich, Admin,
+                    Abmelden. Die Chats stehen seit #1148 unter Community - kein zweiter Knopf dafür im Kopf. */}
                 <UserMenu />
               </>
             ) : (
@@ -160,7 +151,7 @@ export function PublicLayout({ children }) {
             className="lg:hidden absolute inset-x-0 top-full border-t border-b border-white/10 bg-[#0A0A0A] shadow-2xl shadow-black/60 max-h-[calc(100vh-4rem)] overflow-y-auto">
             <div className="px-4 py-4 flex flex-col gap-1">
               <SeasonMenuSlot onClose={closeMobile} />
-              <MobileNav isClubMember={isClubMember} onClose={closeMobile} />
+              <MobileNav isClubMember={isClubMember} signedIn={Boolean(user)} onClose={closeMobile} />
               <div className="border-t border-white/10 mt-3 pt-3 space-y-0.5">
                 {user && isClubMember && (
                   <Link to="/members/area" onClick={closeMobile} data-testid="nav-member-area-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#FFD700]">
@@ -174,7 +165,7 @@ export function PublicLayout({ children }) {
                 )}
                 {user ? (
                   <>
-                    {userMenuEntries({ username: user.username, isClubMember, badges: mobileBadges }).map((entry) => (
+                    {userMenuEntries({ username: user.username }).map((entry) => (
                       <Link key={entry.key} to={entry.to} onClick={closeMobile} data-testid={userMenuTestId(entry.key, "-mobile")} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
                         <entry.icon className="w-3.5 h-3.5 inline mr-1.5" /> {entry.label}
                       </Link>
@@ -317,7 +308,9 @@ export function PublicLayout({ children }) {
               <Link to="/privacy" className="hover:text-[#29B6E8] transition" data-testid="footer-privacy">Datenschutz</Link>
               <Link to="/terms" className="hover:text-[#29B6E8] transition">Nutzungsbedingungen</Link>
               <button type="button" onClick={openCookieSettings} className="hover:text-[#29B6E8] transition">Cookies</button>
-              <DecoSwitch />
+              {/* Der Deko-Schalter (#634) steht hier nur für Gäste; Angemeldete stellen ihn unter Einstellungen →
+                  Darstellung ein (#1146) - die Wahl gilt fürs Konto, auch in der App. */}
+              <GuestDecoSwitch />
             </div>
           </div>
         </div>

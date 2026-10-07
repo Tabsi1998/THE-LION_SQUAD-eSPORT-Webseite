@@ -217,7 +217,7 @@ export function SeasonPassScreen({ navigation }: Props) {
           <PointRow icon="timer-outline" label="Fast Lap" detail="Gültige Zeiten, starke Ränge und veröffentlichte Challenges fließen ein." />
           <PointRow icon="calendar-outline" label="Events" detail="Check-ins zählen nur, wenn sie ausdrücklich als Jahreswertung gepflegt sind." />
           <PointRow icon="shield-checkmark-outline" label="Fair und nachvollziehbar" detail={season?.drop_worst ? `${season.drop_worst} schwächste Wertung(en) werden gestrichen.` : "Aktuell zählen alle gepflegten Wertungen."} />
-          <PointRow icon="star-outline" label="Profilpunkte" detail="Achievements erklären dein Profil-Level, werden aber nicht heimlich in die Jahreswertung gemischt." />
+          <PointRow icon="star-outline" label="Profilpunkte" detail="Erfolge erklären dein Profil-Level, werden aber nicht heimlich in die Jahreswertung gemischt." />
         </Card>
       </ScrollView>
     </Screen>

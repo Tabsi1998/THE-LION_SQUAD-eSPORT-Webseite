@@ -17,12 +17,14 @@ import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
 import { useTilt } from "@/hooks/useTilt";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useChatRead } from "@/hooks/useChats";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
 import { Copy, Crown, Edit, Lock, MessageSquare, Plus, Search, Send, Shield, Star, Swords, Trash2, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
 import { AwardBanner } from "@/components/tls/AwardBanner";
 import { viennaDateTime } from "@/lib/vienna";
+import { TeamsPanel } from "@/pages/user/profile/TeamsPanel";
 
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "" };
 
@@ -74,6 +76,15 @@ function TeamList() {
           )}
         </div>
 
+        {/* Community → Teams (#1143): Einladungen, deine Teams und Squads zuerst - wie in der App; „Teams entdecken“
+            darunter. Vorher stand die Verwaltung als Reiter unter /profile. */}
+        {user ? (
+          <div className="mt-10" data-testid="teams-mine">
+            <h2 className="font-heading text-2xl font-black uppercase mb-3">Deine Teams</h2>
+            <TeamsPanel />
+            <h2 className="mt-10 font-heading text-2xl font-black uppercase">Teams entdecken</h2>
+          </div>
+        ) : null}
         <Reveal className="tls-reveal-grid tls-dim-siblings mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
           {list.map((t) => <TeamCard key={t.id} team={t} levelInfo={levels[t.id]} crown={crowns[t.id] || null} />)}
           {list.length === 0 && <div className="col-span-full text-center py-20 text-white/40 font-display tracking-widest">KEINE TEAMS</div>}
@@ -444,6 +455,8 @@ function TeamChat({ team, user }) {
 
   useEffect(() => { load(); }, [load]);
   useLiveRefresh(load, ["teams"], { fallbackMs: 8000 });
+  // Gelesen (#1148): beim Öffnen und bei jeder neuen Nachricht - die Zahl unter Community → Chats geht überall weg.
+  useChatRead("team", team.id, messages, Boolean(user));
 
   useEffect(() => {
     const box = scrollRef.current;

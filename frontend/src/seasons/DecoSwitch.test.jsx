@@ -5,8 +5,10 @@ import userEvent from "@testing-library/user-event";
 
 const seasonState = { ready: true, seasons: [{ key: "halloween", effective: "normal" }], preference: "on", setPreference: vi.fn() };
 vi.mock("./SeasonContext", () => ({ useSeason: () => seasonState }));
+const authState = { user: null };
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 
-const { DecoSwitch } = await import("./DecoSwitch");
+const { DecoSwitch, GuestDecoSwitch } = await import("./DecoSwitch");
 
 test("sichtbar mit Saison, gedrückt ist die eigene Wahl, Klick stellt um", async () => {
   const user = userEvent.setup();
@@ -21,4 +23,17 @@ test("ohne Saison kein Schalter", () => {
   seasonState.seasons = [];
   render(<DecoSwitch />);
   expect(screen.queryByTestId("season-deco-switch")).toBeNull();
+});
+
+// Seit #1146 steht der Schalter im Footer nur für Gäste - Angemeldete stellen die Deko unter Einstellungen → Darstellung ein.
+test("im Footer nur für Gäste", () => {
+  seasonState.seasons = [{ key: "halloween", effective: "normal" }];
+  authState.user = null;
+  const guest = render(<GuestDecoSwitch />);
+  expect(screen.getByTestId("season-deco-switch")).toBeInTheDocument();
+  guest.unmount();
+  authState.user = { id: "u-1", username: "neonfalke" };
+  render(<GuestDecoSwitch />);
+  expect(screen.queryByTestId("season-deco-switch")).toBeNull();
+  authState.user = null;
 });

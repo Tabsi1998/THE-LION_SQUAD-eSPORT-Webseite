@@ -1,58 +1,67 @@
-import { Award, Bell, Crown, Eye, Gamepad2, Gift, Globe, LayoutDashboard, LifeBuoy, Medal, MessageSquare, Receipt, Settings, ShieldAlert, ShieldCheck, User, UserPlus, Users } from "lucide-react";
+import { Bell, Eye, Gamepad2, Globe, Info, LayoutDashboard, Settings, ShieldCheck, Sparkles, User, UserCircle } from "lucide-react";
 
-// Das Benutzermenü (#282, #516): eine Liste für den Kopf am PC und das Handy-Menü - jeder Eintrag
-// genau ein Ziel, Reihenfolge nach Häufigkeit. Strafen und Gewinne erscheinen nur, wenn es welche
-// gibt (Zähler aus useAccountBadges); wer kein Mitglied ist, sieht „Mitglied werden“ statt
-// „Meine Mitgliedschaft“. Rechnungen sind ein Reiter des Profils (#320), der Rest eigene Seiten.
-// Die Profil-Seitenleiste führt diese Liste seit #516 nicht mehr doppelt.
-export function userMenuEntries({ username = "", isClubMember = false, badges = {} } = {}) {
-  const penalties = Number(badges.penalties || 0);
-  const prizes = Number(badges.prizes || 0);
+// Das Benutzermenü (#282, #516, #1150): eine Liste für den Kopf am PC und das Handy-Menü - jedes Thema an genau einem
+// Ort. Nachrichten stehen unter Community → Chats, Benachrichtigungen hinter der Glocke, Rechnungen, Gewinne und Strafen
+// im eigenen Profil („Nur für dich“), „Mitglied werden“ unter Verein, Hilfe & Kontakt im Hauptmenü. Hier bleiben das
+// Dashboard, das eigene Profil und die Einstellungen; Mitgliederbereich, Admin und Abmelden hängt das Menü selbst an.
+export function userMenuEntries({ username = "" } = {}) {
   return [
     { key: "dashboard", to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { key: "profile", to: "/profile", label: "Mein Profil", icon: Settings },
-    { key: "public-profile", to: `/u/${username}`, label: "Öffentliches Profil", icon: Eye },
-    { key: "messages", to: "/messages", label: "Nachrichten", icon: MessageSquare },
-    { key: "notifications", to: "/notifications", label: "Benachrichtigungen", icon: Bell },
-    isClubMember
-      ? { key: "membership", to: "/members/membership", label: "Meine Mitgliedschaft", icon: Crown }
-      : { key: "join", to: "/membership/join", label: "Mitglied werden", icon: UserPlus },
-    { key: "invoices", to: "/profile?tab=invoices", label: "Rechnungen", icon: Receipt },
-    ...(penalties > 0 ? [{ key: "penalties", to: "/my/penalties", label: `Meine Strafen (${penalties})`, icon: ShieldAlert }] : []),
-    ...(prizes > 0 ? [{ key: "prizes", to: "/my/prizes", label: `Gewinne (${prizes})`, icon: Gift }] : []),
-    { key: "help", to: "/contact", label: "Hilfe & Kontakt", icon: LifeBuoy },
+    { key: "profile", to: `/u/${username}`, label: "Mein Profil", icon: UserCircle },
+    { key: "settings", to: "/profile", label: "Einstellungen", icon: Settings },
   ];
 }
 
-// Die vier Einträge im Kopf des Menüs behalten ihre alten Kennungen (Smoke-Tests, Links aus Mails).
-export const USER_MENU_TEST_IDS = { dashboard: "nav-dashboard", profile: "nav-profile", "public-profile": "nav-public-profile", messages: "nav-messages-menu" };
+// Die Einträge im Kopf des Menüs behalten ihre alten Kennungen (Smoke-Tests, Links aus Mails).
+export const USER_MENU_TEST_IDS = { dashboard: "nav-dashboard", profile: "nav-profile" };
 export function userMenuTestId(key, suffix = "") {
   const base = USER_MENU_TEST_IDS[key] || `nav-account-${key}`;
   return suffix ? `${base}${suffix}` : base;
 }
 
-// Privatsphäre und Benachrichtigungen sind seit #257 zwei Reiter; Mails
-// verlinken die Benachrichtigungen mit ?tab=notifications. Die Inbox ist seit
-// #254 die eigene Seite /messages; ?tab=inbox leitet dorthin um.
-export const TABS = [
-  { k: "basic", label: "Grunddaten", icon: User },
-  { k: "gaming", label: "Gaming", icon: Gamepad2 },
-  { k: "socials", label: "Socials", icon: Globe },
-  { k: "teams", label: "Teams", icon: Users },
-  { k: "friends", label: "Freunde", icon: UserPlus },
-  { k: "achievements", label: "Achievements", icon: Medal },
-  // Ehrungen aus der Mitgliederakte (#848) und eigene Teilnahmen (#906): nur für Vereinsmitglieder - eigener Reiter,
-  // keine Auszeichnungen aus Turnieren.
-  { k: "honours", label: "Ehrungen & Teilnahmen", icon: Award, membersOnly: true },
-  // Rechnungen gehören zum Konto, nicht zum Vereinsbereich (#320, Entscheidung vom 23.09.).
-  { k: "invoices", label: "Rechnungen", icon: Receipt },
-  { k: "privacy", label: "Privatsphäre", icon: Eye },
-  // „Benachrichtigungen“ ist die Liste unter /notifications; hier werden sie eingestellt (#516).
-  { k: "notifications", label: "Benachrichtigungen einstellen", icon: Bell },
-  // Sicherheit bündelt seit #258 Passwort, Passkeys, Zwei-Faktor, Google und
-  // die Geräte (vorher eigener Reiter „Sitzungen“; ?tab=sessions landet hier).
-  { k: "security", label: "Sicherheit", icon: ShieldCheck },
+// Einstellungen an einem Ort (#1146): /profile hat dieselben Gruppen in derselben Reihenfolge wie die App - Darstellung,
+// Benachrichtigungen, Sicherheit, Privatsphäre, Konto, Über die App. Was keine Einstellung ist, hat seinen Ort woanders:
+// Teams unter Community → Teams, Freunde unter Community → Spieler, Erfolge, Ehrungen, Rechnungen und Gewinne im eigenen
+// Profil (/u/me). Alte Adressen (?tab=teams …) leiten dorthin weiter (TAB_REDIRECTS).
+export const SETTINGS_GROUPS = [
+  { key: "appearance", label: "Darstellung", tabs: [{ k: "appearance", label: "Saison-Deko und Töne", icon: Sparkles }] },
+  // „Benachrichtigungen“ ist die Liste hinter der Glocke; hier werden sie eingestellt (#516).
+  { key: "notifications", label: "Benachrichtigungen", tabs: [{ k: "notifications", label: "Benachrichtigungen einstellen", icon: Bell }] },
+  // Sicherheit bündelt seit #258 Passwort, Passkeys, Zwei-Faktor, Google und die Geräte (?tab=sessions landet hier).
+  { key: "security", label: "Sicherheit", tabs: [{ k: "security", label: "Sicherheit", icon: ShieldCheck }] },
+  { key: "privacy", label: "Privatsphäre", tabs: [{ k: "privacy", label: "Privatsphäre", icon: Eye }] },
+  { key: "account", label: "Konto", tabs: [
+    { k: "basic", label: "Grunddaten", icon: User },
+    { k: "gaming", label: "Gaming", icon: Gamepad2 },
+    { k: "socials", label: "Socials", icon: Globe },
+  ] },
+  { key: "about", label: "Über die App", tabs: [{ k: "about", label: "App und Rechtliches", icon: Info }] },
 ];
+
+export const TABS = SETTINGS_GROUPS.flatMap((group) => group.tabs.map((tab) => ({ ...tab, group: group.key })));
+
+/** Frühere Reiter von /profile, die keine Einstellungen sind - sie haben einen eigenen Ort (#1150). */
+export function tabRedirect(tab, params, username = "") {
+  const me = username ? `/u/${username}` : "/u/me";
+  switch (tab) {
+    case "teams":
+      return "/teams";
+    case "friends":
+      return "/players";
+    case "achievements":
+      return `${me}?tab=achievements`;
+    case "honours":
+      return `${me}?tab=honours`;
+    case "invoices": {
+      const invoice = params?.get?.("invoice") || "";
+      return `/account/invoices${/^d-\d{1,12}$/.test(invoice) ? `?invoice=${invoice}` : ""}`;
+    }
+    case "inbox":
+      return `/messages${params?.get?.("to") ? `/${params.get("to")}` : ""}`;
+    default:
+      return null;
+  }
+}
 
 export const PLATFORMS = [
   { value: "PC", label: "PC" },

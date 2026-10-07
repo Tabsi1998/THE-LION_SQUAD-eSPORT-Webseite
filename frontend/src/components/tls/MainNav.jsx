@@ -1,5 +1,6 @@
 /**
- * Phase D — Hauptnavigation für die TLS-Vereinsplattform.
+ * Phase D — Hauptnavigation für die TLS-Vereinsplattform. Seit #1143 stehen Chats, Jahreswertung und Erfolge unter
+ * „Community“ - wie der Tab in der App.
  *
  * Strukturiert nach Vereinsidentität (nicht „Arena-only"):
  * Home / Verein / Community / Mitglieder / Events / eSports / Teams / Spieler / News / Sponsoren
@@ -39,46 +40,31 @@ export const NAV_STRUCTURE = [
       { to: "/esports", label: "Übersicht" },
       { to: "/tournaments", label: "Turniere" },
       { to: "/fastlap", label: "Fast Lap" },
-      { to: "/achievements", label: "Achievements" },
-      { to: "/seasons/current", label: "Jahreswertung" },
     ],
   },
+  // Community (#1143): dieselbe Gruppe wie der Tab in der App - Chats (mit Konto), Teams, Spieler und die Bestenlisten
+  // Jahreswertung und Erfolge (ein Name: „Erfolge“, nicht „Achievements“).
   {
     label: "Community",
     children: [
       { to: "/community", label: "Übersicht" },
+      { to: "/messages", label: "Chats", authOnly: true },
       { to: "/servers", label: "Server" },
       { to: "/players", label: "Community-Spieler" },
       { to: "/teams", label: "Teams" },
+      { to: "/seasons/current", label: "Jahreswertung" },
+      { to: "/achievements", label: "Erfolge" },
     ],
   },
   { to: "/contact", label: "Kontakt" },
-];
-
-export const NAV_USER = [
-  {
-    label: "Spieler-Dashboard",
-    children: [
-      { to: "/dashboard", label: "Dashboard" },
-      { to: "/profile", label: "Profil & Einstellungen" },
-      { to: "/profile?tab=teams", label: "Teamverwaltung" },
-      { to: "/profile?tab=achievements", label: "Meine Achievements" },
-      { to: "/u/me", label: "Mein öffentliches Profil" },
-      { to: "/teams", label: "Teams entdecken", divider: true },
-      { to: "/my/prizes", label: "Meine Gewinne" },
-      { to: "/profile?tab=invoices", label: "Meine Rechnungen" },
-      { to: "/membership/apply", label: "Mitgliedschaft beantragen" },
-      { to: "/members/area", label: "Mitgliederbereich", memberOnly: true, divider: true },
-      { to: "/privacy-account", label: "Datenschutz / Daten", divider: true },
-    ],
-  },
 ];
 
 function navTestId(label) {
   return label.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
-const NAV_CACHE_KEY = "tls-public-nav-v2";
+// v3 (#1143): Jahreswertung und Erfolge stehen unter Community - ein altes Menü aus dem Browser zählt nicht mehr.
+const NAV_CACHE_KEY = "tls-public-nav-v3";
 
 const GERMAN_NAV_LABELS = {
   ["Ue" + "bersicht"]: "Übersicht",
@@ -114,12 +100,17 @@ function cachedNavItems() {
   }
 }
 
+/** Was jemand sieht: Mitglieder-Einträge nur für Mitglieder, Einträge mit Konto (Chats) nur angemeldet. */
+export function visibleNavChildren(item, { isClubMember = false, signedIn = false } = {}) {
+  return (item.children || []).filter((c) => (!c.memberOnly || isClubMember) && (!(c.authOnly || c.auth_only) || signedIn));
+}
+
 // --- Desktop Dropdown ---
-function NavDropdown({ item, isClubMember }) {
+function NavDropdown({ item, isClubMember, signedIn, badge = 0 }) {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef(null);
   const loc = useLocation();
-  const visibleChildren = (item.children || []).filter((c) => !c.memberOnly || isClubMember);
+  const visibleChildren = visibleNavChildren(item, { isClubMember, signedIn });
   const ownPath = item.to?.split("?")[0];
   const isOwnActive = ownPath && (loc.pathname === ownPath || loc.pathname.startsWith(ownPath + "/"));
   const isActive = isOwnActive || visibleChildren.some((c) => loc.pathname === c.to.split("?")[0] || loc.pathname.startsWith(c.to.split("?")[0] + "/"));
@@ -140,6 +131,7 @@ function NavDropdown({ item, isClubMember }) {
           }`}
         >
           <span>{item.label}</span>
+          {badge ? <span className="min-w-[16px] h-4 px-1 rounded-full bg-[#FF3B30] text-white text-[9px] leading-4 text-center" data-testid={`nav-${item.label.toLowerCase()}-count`} aria-label={`${badge} ungelesene Chats`}>{badge > 99 ? "99+" : badge}</span> : null}
           <ChevronDown data-testid={`nav-${item.label.toLowerCase()}-chevron`} className={`w-3.5 h-3.5 shrink-0 opacity-80 transition-transform ${open ? "rotate-180" : ""}`} />
         </Link>
       ) : (
@@ -153,6 +145,7 @@ function NavDropdown({ item, isClubMember }) {
           }`}
         >
           <span>{item.label}</span>
+          {badge ? <span className="min-w-[16px] h-4 px-1 rounded-full bg-[#FF3B30] text-white text-[9px] leading-4 text-center" data-testid={`nav-${item.label.toLowerCase()}-count`} aria-label={`${badge} ungelesene Chats`}>{badge > 99 ? "99+" : badge}</span> : null}
           <ChevronDown data-testid={`nav-${item.label.toLowerCase()}-chevron`} className={`w-3.5 h-3.5 shrink-0 opacity-80 transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
       )}
@@ -187,7 +180,7 @@ function NavDropdown({ item, isClubMember }) {
 }
 
 // --- Mobile Accordion Item ---
-function MobileAccordion({ item, isClubMember, onClose }) {
+function MobileAccordion({ item, isClubMember, signedIn, onClose }) {
   const [open, setOpen] = useState(false);
   if (!item.children) {
     return (
@@ -206,7 +199,7 @@ function MobileAccordion({ item, isClubMember, onClose }) {
       </NavLink>
     );
   }
-  const visibleChildren = item.children.filter((c) => !c.memberOnly || isClubMember);
+  const visibleChildren = visibleNavChildren(item, { isClubMember, signedIn });
   return (
     <div>
       <button
@@ -265,13 +258,13 @@ function usePublicNavItems() {
   return items;
 }
 
-export function MainNav({ isClubMember = false }) {
+export function MainNav({ isClubMember = false, signedIn = false, badges = {} }) {
   const items = usePublicNavItems();
   return (
     <nav className="hidden lg:flex items-center gap-0.5">
       {items.map((item) => (
         item.children?.length ? (
-          <NavDropdown key={item.label} item={item} isClubMember={isClubMember} />
+          <NavDropdown key={item.label} item={item} isClubMember={isClubMember} signedIn={signedIn} badge={item.label === "Community" ? Number(badges.community || 0) : 0} />
         ) : (
           <NavLink
             key={item.to}
@@ -292,12 +285,12 @@ export function MainNav({ isClubMember = false }) {
   );
 }
 
-export function MobileNav({ isClubMember = false, onClose }) {
+export function MobileNav({ isClubMember = false, signedIn = false, onClose }) {
   const items = usePublicNavItems();
   return (
     <div className="space-y-0.5">
       {items.map((item) => (
-        <MobileAccordion key={item.to || item.label} item={item} isClubMember={isClubMember} onClose={onClose} />
+        <MobileAccordion key={item.to || item.label} item={item} isClubMember={isClubMember} signedIn={signedIn} onClose={onClose} />
       ))}
     </div>
   );

@@ -6,7 +6,12 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 const apiMock = { get: vi.fn(), post: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (e, f) => f, resolveMediaUrl: (v) => v || "" }));
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: null }) }));
+const authState = { user: null };
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
+vi.mock("@/pages/public/profile/OwnProfileParts", () => ({
+  PrivateBox: () => <div data-testid="profile-private-box">Nur für dich</div>,
+  OwnAchievements: () => <div data-testid="profile-own-achievements">Eigene Erfolge</div>,
+}));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/CookieConsent", () => ({ useCookieConsent: () => ({ hasConsent: () => false, consent: {}, allow: () => {} }) }));
 vi.mock("@/components/tls/LevelAvatarFrame", () => ({ LevelAvatarFrame: ({ children, testId }) => <div data-testid={testId}>{children}</div>, useCrownFor: () => null }));
@@ -177,12 +182,23 @@ test("private Erfolge: Hinweis statt Liste, keine Angehefteten", async () => {
 });
 
 // Ehrungen (#848): eigener Reiter neben den Auszeichnungen - nur, wenn es freigegebene gibt.
-test("Ehrungen: eigener Reiter nur mit freigegebenen Ehrungen", async () => {
+test("Ehrungen: eigener Reiter für Mitglieder (#1149) - ohne freigegebene Ehrungen ein Satz, ohne Mitgliedschaft kein Reiter", async () => {
   mockApi();
   const { unmount } = renderPage();
   await screen.findByRole("heading", { level: 1 });
-  expect(screen.queryByTestId("profile-tab-honours")).toBeNull();
+  fireEvent.click(screen.getByTestId("profile-tab-honours"));
+  expect(screen.getByTestId("public-profile-honours-empty")).toHaveTextContent("Keine Ehrungen freigegeben.");
   unmount();
+
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/users/public/paula") return { data: { ...PROFILE, is_club_member: false } };
+    if (url === "/achievements/user/u1") return { data: ACHIEVEMENTS };
+    return { data: [] };
+  });
+  const second = renderPage();
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByTestId("profile-tab-honours")).toBeNull();
+  second.unmount();
 
   const honour = { kind: "honorary", kind_label: "Ehrenmitgliedschaft", title: "Ehrenmitglied", years: 0, label: "Aufbau der Jugendarbeit", given_on: "2026-05-01" };
   apiMock.get.mockImplementation(async (url) => {
@@ -198,3 +214,56 @@ test("Ehrungen: eigener Reiter nur mit freigegebenen Ehrungen", async () => {
   expect(screen.getByTestId("public-profile-honours")).not.toHaveTextContent("Darf aufs Profil");
 });
 
+
+
+// Ein Profil, ein Aufbau (#1149): dieselben Reiter wie in der App, im eigenen Profil der Kasten „Nur für dich“, das
+// Zahnrad zu den Einstellungen und der Schalter „So sehen dich andere“.
+test("dieselben Reiter in derselben Reihenfolge wie in der App; „Erfolge“ statt „Achievements“", async () => {
+  authState.user = null;
+  mockApi();
+  renderPage();
+  await screen.findByRole("heading", { level: 1 });
+  const tabs = ["overview", "badges", "awards", "references", "teams", "honours"].map((key) => screen.getByTestId(`profile-tab-${key}`).textContent.replace(/ \(\d+\)$/, ""));
+  expect(tabs).toEqual(["Übersicht", "Erfolge", "Auszeichnungen", "Referenzen", "Teams", "Ehrungen"]);
+  expect(screen.getByTestId("profile-stat-badges")).toHaveTextContent("Erfolge");
+  expect(screen.queryByTestId("profile-private-box")).toBeNull();
+  expect(screen.queryByTestId("profile-as-others")).toBeNull();
+  expect(screen.queryByTestId("profile-settings")).toBeNull();
+});
+
+test("eigenes Profil: „Nur für dich“, Zahnrad, eigene Erfolge - und „So sehen dich andere“ zeigt nur das Öffentliche", async () => {
+  authState.user = { id: "u1", username: "paula" };
+  try {
+    mockApi();
+    renderPage();
+    expect(await screen.findByTestId("profile-private-box")).toBeInTheDocument();
+    expect(screen.getByTestId("profile-settings")).toHaveAttribute("href", "/profile");
+    fireEvent.click(screen.getByTestId("profile-tab-badges"));
+    expect(screen.getByTestId("profile-own-achievements")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("profile-as-others-switch"));
+    await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/users/public/paula", { params: { view_as: "public" } }));
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByTestId("profile-private-box")).toBeNull();
+    fireEvent.click(screen.getByTestId("profile-tab-badges"));
+    expect(screen.queryByTestId("profile-own-achievements")).toBeNull();
+  } finally {
+    authState.user = null;
+  }
+});
+
+test("?tab=achievements öffnet die Erfolge - auch die alten Links von /profile", async () => {
+  authState.user = { id: "u1", username: "paula" };
+  try {
+    mockApi();
+    render(
+      <MemoryRouter initialEntries={["/u/paula?tab=achievements"]}>
+        <Routes><Route path="/u/:username" element={<PublicProfilePage />} /></Routes>
+      </MemoryRouter>
+    );
+    expect(await screen.findByTestId("profile-own-achievements")).toBeInTheDocument();
+    expect(screen.getByTestId("profile-tab-badges").className).toMatch(/text-\[#29B6E8\]/);
+  } finally {
+    authState.user = null;
+  }
+});
