@@ -46,7 +46,7 @@ export const INTEGRATIONS = [
   { key: "resend", label: "Resend", guides: ["resend"], tab: "/admin/settings/resend", tabLabel: "API-Key, Absender, Testmail", searchTerms: ["e-mail", "mail", "versand", "api key", "absender", "testmail"] },
   { key: "smtp", label: "SMTP", guides: ["smtp"], tab: "/admin/settings/smtp", tabLabel: "Mailserver, Zugang, Diagnose", searchTerms: ["mailserver", "postausgang", "port", "tls", "e-mail", "diagnose"] },
   { key: "analytics", label: "Analytics & Suchmaschinen", guides: ["analytics", "search_console"], tab: "/admin/settings/seo", tabLabel: "Mess-ID, Bestätigungen, IndexNow", menu: false },
-  { key: "play", label: "Google Play", guides: ["play_store"], tab: "/admin/settings/branding", tabLabel: "Play-Store-Link", menu: false },
+  { key: "play", label: "Google Play", guides: ["play_store"], tab: "/admin/settings/branding", tabLabel: "Play-Store-Link", menu: false, searchTerms: ["app store", "ios", "iphone", "apple", "lionsapp", "app-store-link"] },
   { key: "dolibarr", label: "Dolibarr", guides: ["dolibarr"], tab: "/admin/dolibarr?tab=connection", tabLabel: "Verbindung, Modus, Schreibzugriff", menu: false },
 ];
 

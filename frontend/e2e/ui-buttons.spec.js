@@ -111,11 +111,37 @@ test.describe("Oberfläche, Paket 3: Knöpfe und Schritt-Anzeige", () => {
     if (SHOTS) await strip.screenshot({ path: `${SHOTS}/store-streifen-390.png` });
   });
 
-  test("Download-Knopf: ohne Play-Link steht „bald bei Google Play“", async ({ page }) => {
+  test("Download-Knöpfe: ohne Links ein Hinweis „bald bei Google Play und im App Store“", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await mockServer(page);
     await page.goto("/");
-    await expect(page.getByTestId("footer-play-soon")).toContainText("bald bei Google Play");
+    await expect(page.getByTestId("footer-apps-soon")).toContainText("bald bei Google Play und im App Store");
     await expect(page.getByTestId("footer-play-button")).toHaveCount(0);
+    await expect(page.getByTestId("footer-appstore-button")).toHaveCount(0);
+    await expect(page.getByTestId("footer-play-soon")).toHaveCount(0);
+  });
+
+  test("Download-Knöpfe: Google Play und App Store nebeneinander, gleiche Sprache; fehlt einer, steht dort „bald“", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockServer(page);
+    let links = { play_store_url: "https://play.google.com/store/apps/details?id=at.lionsquad.app", app_store_url: "https://apps.apple.com/at/app/lionsapp/id123456789" };
+    await page.route("**/api/settings/public", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ club_name: "THE LION SQUAD", tagline: "eSports", domain: "lionsquad.at", ...links }) }));
+    await page.goto("/");
+    const apple = page.getByTestId("footer-appstore-button");
+    await apple.scrollIntoViewIfNeeded();
+    await expect(apple).toHaveAttribute("href", links.app_store_url);
+    await expect(apple).toHaveClass(/tls-store--b/);
+    await expect(apple).toContainText("App Store");
+    await expect(page.getByTestId("footer-play-button")).toBeVisible();
+    await expect(page.locator("[data-testid$='-soon']")).toHaveCount(0);
+    await apple.hover();
+    await expect.poll(async () => apple.evaluate((node) => getComputedStyle(node).color)).toBe("rgb(4, 20, 27)");
+    if (SHOTS) await page.getByTestId("footer-cta").screenshot({ path: `${SHOTS}/store-beide-1440.png` });
+
+    links = { play_store_url: "https://play.google.com/store/apps/details?id=at.lionsquad.app" };
+    await page.goto("/");
+    await expect(page.getByTestId("footer-play-button")).toBeVisible();
+    await expect(page.getByTestId("footer-appstore-soon")).toContainText("bald im App Store");
+    await expect(page.getByTestId("footer-appstore-button")).toHaveCount(0);
   });
 });

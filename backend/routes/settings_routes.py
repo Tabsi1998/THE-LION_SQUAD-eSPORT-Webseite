@@ -109,6 +109,8 @@ class BrandingSettings(BaseModel):
     # Play-Store-Link (#425): leer, bis der Eintrag öffentlich ist - erst dann zeigt die Website den
     # offiziellen Badge (Googles Regel: nur mit Link zum erreichbaren Eintrag).
     play_store_url: Optional[str] = None
+    # App-Store-Link (#1084): wie Google Play - leer, bis die LionsAPP für iOS öffentlich ist; bis dahin „bald im App Store“.
+    app_store_url: Optional[str] = None
     twitch_channel: Optional[str] = None
     analytics_provider: Optional[Literal["", "google", "plausible"]] = None
     google_analytics_id: Optional[str] = None
@@ -743,6 +745,7 @@ async def public_settings(response: Response):
         **legal_settings,
         "discord_invite_url": b.get("discord_invite_url") or "https://discord.com/invite/thelionsquadesports",
         "play_store_url": (b.get("play_store_url") or "").strip(),
+        "app_store_url": (b.get("app_store_url") or "").strip(),
         "twitch_channel": b.get("twitch_channel") or "the_lion_squad_esports",
         "whatsapp_channel_url": b.get("whatsapp_channel_url") or "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I",
         "analytics_provider": b.get("analytics_provider") or "",
@@ -938,6 +941,8 @@ async def integrations_overview(me: dict = Depends(require_area("system"))):
         add("dolibarr", "Dolibarr", GROUP_OTHER, "/admin/dolibarr?tab=connection", "active", f"Modus {dolibarr.get('mode')}")
     add("play", "Google Play", GROUP_OTHER, "/admin/settings/branding", "active" if str(branding.get("play_store_url") or "").strip() else "missing",
         "Play-Store-Link gesetzt" if str(branding.get("play_store_url") or "").strip() else "kein Play-Store-Link")
+    add("appstore", "App Store (iOS)", GROUP_OTHER, "/admin/settings/branding", "active" if str(branding.get("app_store_url") or "").strip() else "missing",
+        "App-Store-Link gesetzt" if str(branding.get("app_store_url") or "").strip() else "kein App-Store-Link")
 
     counts = Counter(row["state"] for row in rows)
     return {

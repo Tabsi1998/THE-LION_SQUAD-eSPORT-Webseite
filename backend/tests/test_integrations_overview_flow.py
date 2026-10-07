@@ -67,3 +67,20 @@ async def test_the_overview_tells_active_off_missing_and_unreadable_apart_withou
     player = await flow.add_user(role="player")
     flow.act_as(player)
     assert (await flow.get("/api/settings/integrations/overview")).status_code in (401, 403)
+
+
+@pytest.mark.asyncio
+async def test_app_store_link_like_google_play(flow):
+    """App Store (#1084): Feld unter Auftritt → Branding, öffentlich nur der Link, in der Übersicht wie Google Play."""
+    admin = await flow.add_user(role="superadmin", name="chef")
+    flow.act_as(admin)
+    overview = (await flow.get("/api/settings/integrations/overview")).json()
+    assert {row["key"]: row["state"] for row in overview["items"]}["appstore"] == "missing"
+    saved = await flow.put("/api/settings/branding", json={"app_store_url": " https://apps.apple.com/at/app/lionsapp/id123 "})
+    assert saved.status_code == 200, saved.text
+    flow.act_as(None)
+    public = (await flow.get("/api/settings/public")).json()
+    assert public["app_store_url"] == "https://apps.apple.com/at/app/lionsapp/id123"
+    flow.act_as(admin)
+    rows = {row["key"]: row for row in (await flow.get("/api/settings/integrations/overview")).json()["items"]}
+    assert rows["appstore"]["state"] == "active" and rows["appstore"]["to"] == "/admin/settings/branding"

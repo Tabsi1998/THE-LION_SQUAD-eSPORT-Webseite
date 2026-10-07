@@ -35,6 +35,8 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
         </div>
         {/* Play-Store-Link (#425): erst eintragen, wenn der Eintrag öffentlich ist - dann zeigen Footer und Startseite den offiziellen Badge. */}
         <BrandField label="Play-Store-Link (LionsAPP)" value={brand.play_store_url} onChange={(v) => setBrandField("play_store_url", v)} placeholder="https://play.google.com/store/apps/details?id=at.lionsquad.app" hint="leer lassen, bis die App öffentlich ist" testId="brand-play-store-url" />
+        {/* App-Store-Link (#1084): wie Google Play - ohne Link steht im Footer „bald im App Store“. */}
+        <BrandField label="App-Store-Link (LionsAPP, iOS)" value={brand.app_store_url} onChange={(v) => setBrandField("app_store_url", v)} placeholder="https://apps.apple.com/at/app/lionsapp/id…" hint="leer lassen, bis die App im App Store ist" testId="brand-app-store-url" />
         <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 text-xs text-white/60 flex flex-col md:flex-row md:items-center gap-3" data-testid="brand-favicon-universal">
           <div className="flex-1">
             <div className="font-bold text-white/80 uppercase tracking-wider">Standard-Favicon für hell und dunkel</div>

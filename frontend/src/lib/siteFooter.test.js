@@ -22,10 +22,21 @@ test("Kontaktblock aus den öffentlichen Vereinsdaten - leer bleibt leer", () =>
 });
 
 test("Knopfleiste (#425): Discord nur mit Link, der Play-Badge erst mit Play-Store-Link", () => {
-  expect(footerButtons({})).toEqual({ discord: null, playStoreUrl: null, playSoonLabel: "LionsAPP – bald bei Google Play" });
+  expect(footerButtons({})).toEqual({
+    discord: null, playStoreUrl: null, appStoreUrl: null,
+    playSoonLabel: "LionsAPP – bald bei Google Play", appSoonLabel: "LionsAPP – bald im App Store", bothSoonLabel: "LionsAPP – bald bei Google Play und im App Store",
+  });
   const both = footerButtons({ discord_invite_url: "https://discord.com/invite/lions", play_store_url: "https://play.google.com/store/apps/details?id=at.lionsquad.app" });
   expect(both.discord).toBe("https://discord.com/invite/lions");
   expect(both.playStoreUrl).toBe("https://play.google.com/store/apps/details?id=at.lionsquad.app");
   expect(footerButtons({ play_store_url: "javascript:alert(1)" }).playStoreUrl).toBeNull();
   expect(footerButtons({ play_store_url: "https://example.test/app" }).playStoreUrl).toBeNull();
+});
+
+test("App Store (#1084): Knopf erst mit Link zu apps.apple.com, sonst „bald im App Store“", () => {
+  expect(footerButtons({ app_store_url: "https://apps.apple.com/at/app/lionsapp/id123" }).appStoreUrl).toBe("https://apps.apple.com/at/app/lionsapp/id123");
+  expect(footerButtons({ app_store_url: " https://apps.apple.com/at/app/x/id1 " }).appStoreUrl).toBe("https://apps.apple.com/at/app/x/id1");
+  expect(footerButtons({ app_store_url: "javascript:alert(1)" }).appStoreUrl).toBeNull();
+  expect(footerButtons({ app_store_url: "https://play.google.com/store/apps/details?id=x" }).appStoreUrl).toBeNull();
+  expect(footerButtons({ app_store_url: "https://example.test/ios" }).appStoreUrl).toBeNull();
 });

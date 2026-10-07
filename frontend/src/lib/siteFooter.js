@@ -41,16 +41,23 @@ export function footerColumns(settings = {}, { isMember = false } = {}) {
 }
 
 /**
- * Knopfleiste (#425): Discord als offizieller Knopf, die LionsAPP als eigener Store-Knopf (#1084) - erst, wenn ein
- * Play-Store-Link gepflegt ist (nur mit Link zum öffentlichen Eintrag); vorher ein stiller Chip „bald bei Google Play“.
+ * Knopfleiste (#425): Discord als offizieller Knopf, die LionsAPP als eigene Store-Knöpfe (#1084) für Google Play und
+ * den App Store - je erst, wenn der Link gepflegt ist (nur mit Link zum öffentlichen Eintrag); vorher ein stiller Chip
+ * „bald …“, für beide zusammen einer.
  */
 export function footerButtons(settings = {}) {
   const discord = String(settings?.discord_invite_url || "").trim();
   const play = String(settings?.play_store_url || "").trim();
+  const apple = String(settings?.app_store_url || "").trim();
+  const playStoreUrl = /^https?:\/\/play\.google\.com\//i.test(play) ? play : null;
+  const appStoreUrl = /^https?:\/\/apps\.apple\.com\//i.test(apple) ? apple : null;
   return {
     discord: /^https?:\/\//i.test(discord) ? discord : null,
-    playStoreUrl: /^https?:\/\/play\.google\.com\//i.test(play) ? play : null,
+    playStoreUrl,
+    appStoreUrl,
     playSoonLabel: "LionsAPP – bald bei Google Play",
+    appSoonLabel: "LionsAPP – bald im App Store",
+    bothSoonLabel: "LionsAPP – bald bei Google Play und im App Store",
   };
 }
 
