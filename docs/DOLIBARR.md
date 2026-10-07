@@ -163,6 +163,11 @@ und landet auf `lionsquad.at/karte/pruefen/…` – ohne Anmeldung.
   eingetragener Austritt beendet sie mit dem letzten Tag. „Gültig bis“ zeigt
   das Austrittsdatum, sonst „bezahlt bis“, sonst „solange die Mitgliedschaft
   besteht“.
+- **Als Bild und ohne Netz (#1256):** „Als Bild speichern“ legt die Karte – Logo, Name, Nummer, Art, gültig
+  bis – ins Fotoalbum (am Handy über das Teilen-Menü, am PC als Download). Den Prüfcode hat das Bild bewusst
+  nicht, dort steht „Prüfcode braucht Netz“. Ohne Netz zeigt „Meine Mitgliedschaft“ die zuletzt geladene Karte
+  mit „Stand“, die installierte Website zeigt sie auf der Seite „Keine Verbindung“. Gespeichert wird nur, was
+  auf der Karte steht; Abmelden löscht es. Die App zieht dieselbe Regel im nächsten App-Paket nach.
 - **Wallet:** Apple Wallet und Google Wallet sind vorbereitet (die Karte hat
   ein neutrales Modell mit Feldern, Farben und Barcode), brauchen aber ein
   Apple-Entwicklerkonto mit Pass-Zertifikat bzw. ein Google-Wallet-Issuer-Konto.

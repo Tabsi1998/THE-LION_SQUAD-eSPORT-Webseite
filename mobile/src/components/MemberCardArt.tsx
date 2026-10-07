@@ -70,7 +70,7 @@ export function MemberCardArt({ name, number, since, typeLabel, validUntil, club
           </LinearGradient>
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#tlsCardBg)" />
-        {unit ? <Rect x={6 * unit} y={31 * unit} width={12 * unit} height={9 * unit} rx={1.6 * unit} fill="url(#tlsCardChip)" /> : null}
+        {unit ? <Rect x={6 * unit} y={22 * unit} width={12 * unit} height={9 * unit} rx={1.6 * unit} fill="url(#tlsCardChip)" /> : null}
       </Svg>
       {unit ? (
         <>
