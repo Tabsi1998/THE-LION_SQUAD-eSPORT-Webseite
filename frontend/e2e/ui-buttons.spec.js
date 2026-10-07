@@ -81,7 +81,7 @@ test.describe("Oberfläche, Paket 3: Knöpfe und Schritt-Anzeige", () => {
     await button.scrollIntoViewIfNeeded();
     await expect(button).toHaveAttribute("href", "https://play.google.com/store/apps/details?id=at.lionsquad.app");
     await expect(button).toHaveClass(/tls-store--b/);
-    await expect(page.getByTestId("footer-play-badge")).toBeVisible();
+    await expect(page.getByTestId("footer-play-badge")).toHaveCount(0);
     const look = () => button.evaluate((node) => ({
       fill: getComputedStyle(node, "::before").transform, color: getComputedStyle(node).color,
     }));

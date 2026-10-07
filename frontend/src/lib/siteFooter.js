@@ -40,12 +40,9 @@ export function footerColumns(settings = {}, { isMember = false } = {}) {
   ];
 }
 
-export const PLAY_BADGE_SRC = "/assets/brand/google-play-badge-de.png";
-
 /**
- * Knopfleiste (#425): Discord als offizieller Knopf, Google Play als offizieller Badge - der Badge
- * erst, wenn ein Play-Store-Link gepflegt ist (Googles Regel: nur mit Link zum öffentlichen
- * Eintrag); vorher ein stiller Chip „bald bei Google Play“.
+ * Knopfleiste (#425): Discord als offizieller Knopf, die LionsAPP als eigener Store-Knopf (#1084) - erst, wenn ein
+ * Play-Store-Link gepflegt ist (nur mit Link zum öffentlichen Eintrag); vorher ein stiller Chip „bald bei Google Play“.
  */
 export function footerButtons(settings = {}) {
   const discord = String(settings?.discord_invite_url || "").trim();
