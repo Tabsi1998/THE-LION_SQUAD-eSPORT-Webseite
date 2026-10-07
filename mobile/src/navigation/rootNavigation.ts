@@ -109,14 +109,16 @@ export function openDetail<T extends DetailScreenName>(screen: T, params?: AppSt
 export function openTarget(target: AppTarget) {
   if (target.kind === "tab") {
     // `pop`: liegt im Tab schon etwas über der Übersicht, geht es dorthin zurück, statt eine zweite Übersicht aufzulegen.
-    navigationRef.navigate("Main", { screen: target.tab, params: { screen: target.screen, params: target.params, pop: true } });
+    // Das äußere `pop`: steht Anmelden oder Registrieren darüber, geht es zurück zu den Tabs statt eine zweite Tab-Ebene
+    // aufzulegen.
+    navigationRef.navigate("Main", { screen: target.tab, params: { screen: target.screen, params: target.params, pop: true } }, { pop: true });
     return;
   }
   const rootState = rootStateOf();
   const rootName = rootState?.routes?.[rootState?.index ?? 0]?.name;
   if (rootName && rootName !== "Main") {
     // Über Anmelden oder Registrieren: zurück in die Tabs und dort im aktuellen Tab öffnen.
-    navigationRef.navigate("Main", { screen: currentTab(), params: { screen: target.screen, params: target.params, initial: false } });
+    navigationRef.navigate("Main", { screen: currentTab(), params: { screen: target.screen, params: target.params, initial: false } }, { pop: true });
     return;
   }
   // Ohne Ziel-Tab nimmt der Stapel des aktuellen Tabs den Screen auf (jeder Tab kennt alle Detail-Screens).

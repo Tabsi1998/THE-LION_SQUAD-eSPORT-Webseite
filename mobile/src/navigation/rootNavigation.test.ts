@@ -138,16 +138,16 @@ test("Detail-Screens legen sich über den aktuellen Tab; Übersichten wechseln d
   expect(mockRef.navigate).toHaveBeenLastCalledWith("TeamDetail", { id: "t-1" });
 
   expect(navigateToUrl("/fastlap")).toBe(true);
-  expect(mockRef.navigate).toHaveBeenLastCalledWith("Main", { screen: "EventsTab", params: { screen: "TournamentList", params: { filter: "fastlaps" }, pop: true } });
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("Main", { screen: "EventsTab", params: { screen: "TournamentList", params: { filter: "fastlaps" }, pop: true } }, { pop: true });
   expect(openTab("VereinHub")).toBe(true);
-  expect(mockRef.navigate).toHaveBeenLastCalledWith("Main", { screen: "VereinTab", params: { screen: "VereinHub", params: undefined, pop: true } });
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("Main", { screen: "VereinTab", params: { screen: "VereinHub", params: undefined, pop: true } }, { pop: true });
 });
 
 test("über Anmelden oder Registrieren: zurück in die Tabs und dort im aktuellen Tab öffnen", () => {
   mockRef.ready = true;
   mockRef.root = { index: 1, routes: [{ name: "Main", state: onTab("CommunityTab").routes[0].state }, { name: "Login" }] };
   expect(navigateToUrl("/events/herbst-lan")).toBe(true);
-  expect(mockRef.navigate).toHaveBeenLastCalledWith("Main", { screen: "CommunityTab", params: { screen: "EventDetail", params: { id: "herbst-lan" }, initial: false } });
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("Main", { screen: "CommunityTab", params: { screen: "EventDetail", params: { id: "herbst-lan" }, initial: false } }, { pop: true });
 });
 
 test("Benachrichtigungen: Chats, Teams, Turniere, Gewinne und Freunde - sonst die Glocke", () => {

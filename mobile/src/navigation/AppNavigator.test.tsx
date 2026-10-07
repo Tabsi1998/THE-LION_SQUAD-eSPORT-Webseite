@@ -2,7 +2,7 @@ import React from "react";
 import { Text } from "react-native";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { AppNavigator } from "./AppNavigator";
-import { currentTab, navigateToNotification, navigateToUrl, navigationRef, openTab } from "./rootNavigation";
+import { currentTab, navigateToNotification, navigateToUrl, navigationRef, openSignIn, openTab } from "./rootNavigation";
 import type { LooseNavigation } from "./types";
 
 const nav = navigationRef as unknown as LooseNavigation;
@@ -178,4 +178,25 @@ test("alte Adressen öffnen den neuen Tab: /verein, /messages, /teams, /fastlap"
   expect(navigationRef.getCurrentRoute()).toMatchObject({ name: "CommunityHub", params: { section: "teams" } });
   expect(screen.getAllByText(/^Seite /).length).toBeGreaterThan(0);
   expect(Text).toBeTruthy();
+});
+
+test("über Anmelden: ein Link geht zurück in die Tabs - keine zweite Ebene darunter", async () => {
+  await renderApp();
+  await act(async () => {
+    openSignIn();
+  });
+  expect(current()).toBe("Login");
+  await act(async () => {
+    navigateToUrl("/news/herbst-lan");
+  });
+  expect(current()).toBe("NewsDetail");
+  expect(navigationRef.getRootState()?.routes.map((route) => route.name)).toEqual(["Main"]);
+  await act(async () => {
+    openSignIn();
+  });
+  await act(async () => {
+    navigateToUrl("/verein");
+  });
+  expect([currentTab(), current()]).toEqual(["VereinTab", "VereinHub"]);
+  expect(navigationRef.getRootState()?.routes.map((route) => route.name)).toEqual(["Main"]);
 });
