@@ -1,4 +1,5 @@
 import {
+  withoutSecretParams,
   isGoogleMeasurementId,
   normalizeAnalyticsPayload,
   normalizeGoogleMeasurementId,
@@ -27,4 +28,12 @@ test("normalizes analytics branding payload", () => {
 
 test("normalizes Plausible domains", () => {
   expect(normalizePlausibleDomain("https://www.lionsquad.at/dashboard")).toBe("www.lionsquad.at");
+});
+
+test("Schlüssel in Links gehen nie an die Statistik (#1110)", () => {
+  expect(withoutSecretParams("https://club.example/display/bracket/t1?key=geheim&text_size=large")).toBe("https://club.example/display/bracket/t1?text_size=large");
+  expect(withoutSecretParams("/tournaments/cup?access=abc")).toBe("/tournaments/cup");
+  expect(withoutSecretParams("/display/bracket/t1?key=x&preview=y#oben")).toBe("/display/bracket/t1#oben");
+  expect(withoutSecretParams("/news?page=2")).toBe("/news?page=2");
+  expect(withoutSecretParams("")).toBe("");
 });

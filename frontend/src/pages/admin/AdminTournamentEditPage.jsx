@@ -8,7 +8,7 @@ import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { TournamentFlowStepper } from "@/components/tls/TournamentFlowStepper";
 import { fromDateTimeLocal } from "@/lib/datetime";
 import { toast } from "sonner";
-import { Zap, RefreshCw, Eye, Search } from "lucide-react";
+import { Zap, RefreshCw, Eye, Search, Tv } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
@@ -505,6 +505,8 @@ export default function AdminTournamentEditPage() {
               {t.locked_at && <span className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700] text-[10px] font-bold uppercase tracking-widest rounded-sm">Gesperrt</span>}
               <span className="text-white/60 text-sm">{formatTournamentDisplay(t)}</span>
               <Link to={`/tournaments/${t.slug || t.id}`} target="_blank" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Öffentliche Seite</Link>
+              {/* TV & Beamer (#1110): der Link für den Hallen-Bildschirm, Turnier schon gewählt. */}
+              <Link to={`/admin/tv?view=bracket&target=${encodeURIComponent(t.id)}`} data-testid="tournament-tv-link" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white inline-flex items-center gap-1"><Tv className="w-3 h-3" /> TV-Link</Link>
             </div>
           </div>
           {/* Hier steht nur, was das Turnier weiterschiebt: der nächste Schritt,

@@ -1,0 +1,460 @@
+/* ------------------------------------------------------------------
+   TV & Beamer (#1110-#1114): Größen, Farben und Bewegung aller TV-Seiten an einer Stelle.
+   Die Zahlen setzt TvScreen aus lib/tvType.js (--tv-k-* Schrift, --tv-b-* Abstände, --tv-lh-* Zeilenhöhe);
+   hier wird nur damit gerechnet. Eine Einheit (--tv-u) ist 1 % der Bildhöhe - so wächst alles mit dem Bildschirm,
+   von 1280×720 bis 3840×2160, und clamp() hält eine Untergrenze für sehr kleine Fenster.
+   ------------------------------------------------------------------ */
+
+.tv-screen {
+  --tv-u: min(1vh, 0.75vw);
+  --tv-fs-meta: clamp(10px, calc(var(--tv-u) * var(--tv-k-meta)), 400px);
+  --tv-fs-info: clamp(10px, calc(var(--tv-u) * var(--tv-k-info)), 400px);
+  --tv-fs-name: clamp(12px, calc(var(--tv-u) * var(--tv-k-name)), 400px);
+  --tv-fs-name-min: clamp(12px, calc(var(--tv-u) * var(--tv-k-nameMin)), 400px);
+  --tv-fs-num: clamp(12px, calc(var(--tv-u) * var(--tv-k-num)), 400px);
+  --tv-fs-head: clamp(12px, calc(var(--tv-u) * var(--tv-k-head)), 400px);
+  --tv-fs-title: clamp(16px, calc(var(--tv-u) * var(--tv-k-title)), 600px);
+  --tv-fs-hero: clamp(20px, calc(var(--tv-u) * var(--tv-k-hero)), 800px);
+  --tv-pad-x: calc(var(--tv-u) * var(--tv-b-padX));
+  --tv-pad-y: calc(var(--tv-u) * var(--tv-b-padY));
+  --tv-row-pad-y: calc(var(--tv-u) * var(--tv-b-rowPadY));
+  --tv-gap: calc(var(--tv-u) * var(--tv-b-gap));
+  --tv-col-pad: calc(var(--tv-u) * var(--tv-b-colPad));
+  --tv-avatar: calc(var(--tv-u) * var(--tv-b-avatar));
+  --tv-qr: calc(var(--tv-u) * var(--tv-b-qr));
+  --tv-edge: calc(var(--tv-u) * 2.2);
+
+  /* Farben: im Kontrast-Modus ohne halb durchsichtige Grautöne, mit vollen Farben und dickeren Linien. */
+  --tv-text: #ffffff;
+  --tv-muted: rgba(255, 255, 255, 0.72);
+  --tv-faint: rgba(255, 255, 255, 0.55);
+  --tv-line: rgba(255, 255, 255, 0.12);
+  --tv-line-strong: rgba(255, 255, 255, 0.24);
+  --tv-line-w: 1px;
+  --tv-panel: rgba(10, 10, 10, 0.82);
+  --tv-card: #101010;
+  --tv-bar: rgba(10, 10, 10, 0.9);
+  --tv-accent: #29b6e8;
+  --tv-gold: #ffd700;
+  --tv-green: #00ff88;
+  --tv-red: #ff3b30;
+  --tv-accent-soft: rgba(41, 182, 232, 0.12);
+  --tv-green-soft: rgba(0, 255, 136, 0.06);
+  --tv-gold-soft: rgba(255, 215, 0, 0.08);
+  --tv-red-soft: rgba(255, 59, 48, 0.1);
+  --tv-on-accent: #000000;
+  --tv-hero-opacity: 0.25;
+  --tv-medal-1: #ffd700;
+  --tv-medal-2: #c0c0c0;
+  --tv-medal-3: #cd7f32;
+
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  color: var(--tv-text);
+  background: radial-gradient(ellipse at top, #001a26 0%, #000 60%);
+}
+
+.tv-screen[data-tv-contrast="1"] {
+  --tv-muted: #f2f2f2;
+  --tv-faint: #e6e6e6;
+  --tv-line: rgba(255, 255, 255, 0.7);
+  --tv-line-strong: #ffffff;
+  --tv-line-w: 2px;
+  --tv-panel: #000000;
+  --tv-card: #000000;
+  --tv-bar: #000000;
+  --tv-accent: #6edcff;
+  --tv-gold: #ffe66b;
+  --tv-red: #ff8a80;
+  --tv-accent-soft: #000000;
+  --tv-green-soft: #000000;
+  --tv-gold-soft: #000000;
+  --tv-red-soft: #000000;
+  --tv-hero-opacity: 0;
+  --tv-medal-1: #ffe66b;
+  --tv-medal-2: #e6e6e6;
+  --tv-medal-3: #f0b07a;
+  background: #000000;
+  font-weight: 600;
+}
+
+/* Die Bühne: rückt mit dem sicheren Bereich vom Rand weg und trägt die Pixel-Verschiebung. Ohne sicheren Bereich ragt
+   sie 3 Punkte über den Rand - so bleibt beim Verschieben kein Spalt. */
+.tv-stage {
+  position: absolute;
+  inset: var(--tv-inset-y, 0) var(--tv-inset-x, 0);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tv-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ---------------------------------------------------------------- Schrift */
+.tv-t-meta { font-size: var(--tv-fs-meta); line-height: var(--tv-lh-meta); }
+.tv-t-info { font-size: var(--tv-fs-info); line-height: var(--tv-lh-info); }
+.tv-t-name { font-size: var(--tv-fs-name); line-height: var(--tv-lh-name); overflow-wrap: anywhere; }
+.tv-t-name[data-fit="small"] { font-size: var(--tv-fs-name-min); }
+.tv-t-num { font-size: var(--tv-fs-num); line-height: var(--tv-lh-num); font-variant-numeric: tabular-nums; }
+.tv-t-head { font-size: var(--tv-fs-head); line-height: var(--tv-lh-head); }
+.tv-t-title { font-size: var(--tv-fs-title); line-height: var(--tv-lh-title); overflow-wrap: anywhere; }
+.tv-t-title[data-fit="small"] { font-size: max(var(--tv-fs-head), calc(var(--tv-fs-title) * 0.78)); }
+.tv-t-hero { font-size: var(--tv-fs-hero); line-height: var(--tv-lh-hero); font-variant-numeric: tabular-nums; }
+.tv-kicker { text-transform: uppercase; letter-spacing: 0.2em; font-weight: 700; color: var(--tv-accent); }
+.tv-muted { color: var(--tv-muted); }
+.tv-faint { color: var(--tv-faint); }
+.tv-accent { color: var(--tv-accent); }
+.tv-gold { color: var(--tv-gold); }
+.tv-green { color: var(--tv-green); }
+.tv-red { color: var(--tv-red); }
+.tv-icon { width: 1.05em; height: 1.05em; flex-shrink: 0; }
+.tv-screen[data-tv-contrast="1"] .tv-t-meta,
+.tv-screen[data-tv-contrast="1"] .tv-t-info { font-weight: 700; }
+
+/* ---------------------------------------------------------------- Kopfleiste */
+.tv-header {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  flex-shrink: 0;
+  border-bottom: var(--tv-line-w) solid var(--tv-line);
+  background: rgba(0, 0, 0, 0.35);
+}
+.tv-screen[data-tv-contrast="1"] .tv-header { background: #000000; }
+.tv-header__hero { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: var(--tv-hero-opacity); z-index: 0; }
+.tv-header__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--tv-u) * 2);
+  padding: calc(var(--tv-u) * 1.4) var(--tv-edge);
+}
+.tv-header__brand { display: flex; align-items: center; gap: calc(var(--tv-u) * 1.6); min-width: 0; flex: 1 1 auto; }
+.tv-header__aside { display: flex; align-items: center; gap: calc(var(--tv-u) * 1.2); flex-shrink: 0; }
+.tv-logo { width: calc(var(--tv-u) * 6); height: calc(var(--tv-u) * 6); flex-shrink: 0; object-fit: contain; }
+.tv-live-dot-tv {
+  display: inline-block;
+  width: calc(var(--tv-u) * 0.9);
+  height: calc(var(--tv-u) * 0.9);
+  border-radius: 999px;
+  background: var(--tv-green);
+  flex-shrink: 0;
+}
+
+/* Lichtlauf der Turnierbaum-Kopfleiste: ohne Bewegung ganz weg statt als Streifen stehen zu bleiben. */
+.tv-screen[data-tv-motion="off"] .tls-header-sweep::after { display: none; }
+
+/* ---------------------------------------------------------------- Stand-Zeile */
+.tv-status {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--tv-u) * 1.5);
+  padding: calc(var(--tv-u) * 0.45) var(--tv-edge);
+  border-bottom: var(--tv-line-w) solid var(--tv-line);
+  background: var(--tv-bar);
+  color: var(--tv-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+}
+.tv-status--error { color: var(--tv-red); background: var(--tv-red-soft); border-color: var(--tv-red); }
+.tv-status__time { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.tv-status__retry {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--tv-u) * 0.5);
+  padding: calc(var(--tv-u) * 0.3) calc(var(--tv-u) * 0.8);
+  border: var(--tv-line-w) solid currentColor;
+  border-radius: 2px;
+  color: inherit;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------- Inhalt */
+.tv-main { flex: 1 1 auto; min-height: 0; padding: calc(var(--tv-u) * 1.2) var(--tv-edge); overflow: hidden; }
+.tv-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: var(--tv-line-w) solid var(--tv-line);
+  background: var(--tv-panel);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.tv-panel__head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: calc(var(--tv-u) * 1);
+  padding: var(--tv-pad-y) var(--tv-pad-x);
+  border-bottom: var(--tv-line-w) solid var(--tv-line);
+}
+.tv-panel__body { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: var(--tv-col-pad); display: flex; flex-direction: column; gap: var(--tv-gap); }
+.tv-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: calc(var(--tv-u) * 10);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--tv-faint);
+  border: var(--tv-line-w) dashed var(--tv-line);
+}
+
+/* Turnierbaum: Spalten nebeneinander, so viele wie auf den Bildschirm passen. */
+.tv-board { display: grid; gap: var(--tv-gap); height: 100%; min-height: 0; }
+.tv-board > * { min-width: 0; }
+
+.tv-card {
+  flex-shrink: 0;
+  border: var(--tv-line-w) solid var(--tv-line);
+  background: var(--tv-card);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.tv-card--live { border-color: var(--tv-green); background: var(--tv-green-soft); }
+/* Podium (Fast Lap): das Platz-Schild sitzt halb über der Kante und darf nicht abgeschnitten werden. */
+.tv-podium { overflow: visible; }
+.tv-card--ready { border-color: color-mix(in srgb, var(--tv-accent) 55%, transparent); }
+.tv-card--waiting { border-color: color-mix(in srgb, var(--tv-gold) 55%, transparent); background: var(--tv-gold-soft); }
+.tv-screen[data-tv-contrast="1"] .tv-card--ready { border-color: var(--tv-accent); }
+.tv-screen[data-tv-contrast="1"] .tv-card--waiting { border-color: var(--tv-gold); }
+.tv-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--tv-u) * 0.8);
+  padding: var(--tv-pad-y) var(--tv-pad-x);
+  border-bottom: var(--tv-line-w) solid var(--tv-line);
+}
+.tv-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 calc(var(--tv-u) * 1.2);
+  padding: var(--tv-row-pad-y) var(--tv-pad-x);
+  border-top: var(--tv-line-w) solid var(--tv-line);
+  color: var(--tv-muted);
+}
+.tv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tv-gap);
+  padding: var(--tv-row-pad-y) var(--tv-pad-x);
+}
+.tv-row + .tv-row { border-top: var(--tv-line-w) solid var(--tv-line); }
+.tv-row__who { display: flex; align-items: center; gap: var(--tv-gap); min-width: 0; flex: 1 1 auto; }
+/* Sieger: Akzentfarbe und ein Balken links - der bleibt auch, wenn das Leuchten (tls-winner-row) stillsteht. */
+.tv-row--won {
+  background: var(--tv-accent-soft);
+  border-left: calc(var(--tv-u) * 0.35) solid var(--tv-accent);
+  padding-left: calc(var(--tv-pad-x) - var(--tv-u) * 0.35);
+}
+.tv-row--won .tv-row__name { color: var(--tv-accent); font-weight: 700; }
+.tv-row--pending .tv-row__name { color: var(--tv-faint); font-style: italic; }
+.tv-row__score { flex-shrink: 0; min-width: calc(var(--tv-u) * 3); text-align: right; font-weight: 700; color: var(--tv-muted); }
+.tv-row--won .tv-row__score { color: var(--tv-accent); }
+.tv-avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: var(--tv-avatar);
+  height: var(--tv-avatar);
+  border-radius: 2px;
+  border: var(--tv-line-w) solid var(--tv-line);
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--tv-muted);
+  overflow: hidden;
+}
+.tv-screen[data-tv-contrast="1"] .tv-avatar { background: #000000; }
+.tv-avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* Leere Plätze leise: gestrichelte Kante, kein Kürzel (#1113). */
+.tv-avatar--empty { background: transparent; border-style: dashed; }
+.tv-row--empty { min-height: calc(var(--tv-avatar) + 2 * var(--tv-row-pad-y)); }
+
+/* Kurze Hervorhebung bei frischem Ergebnis: mit Bewegung ein Aufleuchten, ohne Bewegung nur eine goldene Kante. */
+.tv-screen[data-tv-motion="off"] .tls-flash-finished { border-color: var(--tv-gold) !important; }
+
+/* ---------------------------------------------------------------- Schilder und Knöpfe */
+.tv-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--tv-u) * 0.5);
+  padding: calc(var(--tv-u) * 0.35) calc(var(--tv-u) * 0.9);
+  border: var(--tv-line-w) solid currentColor;
+  border-radius: 2px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+  color: var(--tv-muted);
+}
+.tv-pill--accent { color: var(--tv-accent); background: var(--tv-accent-soft); }
+.tv-pill--green { color: var(--tv-green); background: var(--tv-green-soft); }
+.tv-pill--gold { color: var(--tv-gold); background: var(--tv-gold-soft); }
+.tv-pill--red { color: var(--tv-red); background: var(--tv-red-soft); }
+.tv-toggle { display: inline-flex; gap: calc(var(--tv-u) * 0.3); padding: calc(var(--tv-u) * 0.3); border: var(--tv-line-w) solid var(--tv-line); border-radius: 2px; background: var(--tv-panel); }
+.tv-toggle button {
+  padding: calc(var(--tv-u) * 0.35) calc(var(--tv-u) * 1);
+  border-radius: 2px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--tv-muted);
+}
+.tv-toggle button[aria-pressed="true"] { background: var(--tv-accent); color: var(--tv-on-accent); }
+.tv-dots { display: flex; align-items: center; gap: calc(var(--tv-u) * 0.5); }
+.tv-dots span { display: block; height: calc(var(--tv-u) * 0.5); width: calc(var(--tv-u) * 1.2); border-radius: 999px; background: var(--tv-line-strong); transition: width var(--tls-motion-mid) var(--tls-ease); }
+.tv-dots span[data-active="1"] { width: calc(var(--tv-u) * 3.2); background: var(--tv-accent); }
+
+/* ---------------------------------------------------------------- Fußleiste */
+.tv-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--tv-u) * 2);
+  padding: calc(var(--tv-u) * 0.9) var(--tv-edge);
+  border-top: var(--tv-line-w) solid var(--tv-line);
+  background: var(--tv-bar);
+}
+.tv-footer__qr { display: flex; align-items: center; gap: calc(var(--tv-u) * 1.4); min-width: 0; }
+/* Der QR-Code wächst mit dem Bildschirm (#1111). */
+.tv-qr { flex-shrink: 0; background: #ffffff; padding: calc(var(--tv-u) * 0.55); border-radius: 2px; line-height: 0; }
+.tv-qr > span { width: var(--tv-qr) !important; height: var(--tv-qr) !important; }
+.tv-sponsors { flex: 1 1 auto; min-width: 0; max-width: 58%; }
+.tv-sponsor { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; height: calc(var(--tv-u) * 4.6); width: calc(var(--tv-u) * 15); opacity: 0.9; }
+.tv-sponsor--main { height: calc(var(--tv-u) * 5.4); width: calc(var(--tv-u) * 18); }
+.tv-screen[data-tv-contrast="1"] .tv-sponsor { opacity: 1; }
+
+/* ---------------------------------------------------------------- Wach-halten-Hinweis */
+.tv-hint {
+  position: absolute;
+  right: calc(var(--tv-inset-x, 0px) + var(--tv-edge));
+  bottom: calc(var(--tv-inset-y, 0px) + var(--tv-u) * 14);
+  z-index: 5;
+  max-width: calc(var(--tv-u) * 60);
+  padding: calc(var(--tv-u) * 0.6) calc(var(--tv-u) * 1);
+  border: var(--tv-line-w) solid var(--tv-gold);
+  background: #000000;
+  color: var(--tv-gold);
+  border-radius: 2px;
+}
+
+/* ---------------------------------------------------------------- Bewegung reduzieren
+   Eine Stelle für alle Bewegungen auf den TV-Seiten, auch die vorhandenen: Live-Punkt, Lichtlauf, Sieger-Leuchten,
+   Laufband, Folienwechsel, Einblenden der Karten und die Jahreszeiten-Deko. Die Pixel-Verschiebung bleibt - sie
+   springt ohne Gleiten und ist nicht zu sehen. */
+.tv-screen[data-tv-motion="off"] {
+  --tls-motion-fast: 0.01ms;
+  --tls-motion-mid: 0.01ms;
+  --tls-motion-slow: 0.01ms;
+  --tls-motion-on: 0;
+}
+.tv-screen[data-tv-motion="off"] *,
+.tv-screen[data-tv-motion="off"] *::before,
+.tv-screen[data-tv-motion="off"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+/* ---------------------------------------------------------------- Jahreszeiten in der Kopfleiste (#1114)
+   Wenige Teilchen, langsam, hinter Logo und Titel. Jede Spur trägt ihre Ruhelage (--rest) als Grundform - steht die
+   Bewegung, bleibt ein ruhiges Bild mit verteilten Teilchen statt eines Haufens am Rand. */
+.tv-deco { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.tv-deco__track {
+  position: absolute;
+  will-change: transform;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-duration: var(--dur);
+  animation-delay: var(--delay);
+}
+/* Fallen (Schnee, Konfetti, Blüten): die Spur ist so hoch wie die Kopfleiste, das Teilchen sitzt an ihrem unteren Ende. */
+.tv-deco__track--fall { top: 0; height: 100%; left: var(--x); width: 0; transform: translateY(calc(var(--y) * 1% - 100%)); animation-name: tv-deco-fall; }
+/* Steigen (Funken): dieselbe Spur, nach oben. */
+.tv-deco__track--rise { top: 0; height: 100%; left: var(--x); width: 0; transform: translateY(calc(var(--y) * -1%)); animation-name: tv-deco-rise; }
+/* Fliegen (Fledermäuse): die Spur ist so breit wie die Kopfleiste. */
+.tv-deco__track--fly { left: 0; width: 100%; top: calc(12% + var(--y) * 0.6%); height: 0; transform: translateX(var(--x)); animation-name: tv-deco-fly; }
+/* Bleiben (Sterne, Kerzenlicht): fester Platz, nur das Licht ändert sich. */
+.tv-deco__track--stay { left: var(--x); top: calc(15% + var(--y) * 0.7%); width: 0; height: 0; }
+.tv-deco__p { position: absolute; display: block; }
+.tv-deco__track--fall .tv-deco__p, .tv-deco__track--rise .tv-deco__p { bottom: 0; left: 0; }
+.tv-deco__track--fly .tv-deco__p { left: 0; top: 0; transform: translateY(-50%); }
+.tv-deco__track--stay .tv-deco__p { left: 0; top: 0; transform: translate(-50%, -50%); }
+
+@keyframes tv-deco-fall { from { transform: translateY(-100%); } to { transform: translateY(12%); } }
+@keyframes tv-deco-rise { from { transform: translateY(12%); } to { transform: translateY(-100%); } }
+@keyframes tv-deco-fly { from { transform: translateX(-12%); } to { transform: translateX(104%); } }
+@keyframes tv-deco-spin { to { rotate: 360deg; } }
+@keyframes tv-deco-twinkle { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.75; } }
+@keyframes tv-deco-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 calc(var(--tv-u) * -0.8); } }
+@keyframes tv-deco-flicker { 0%, 100% { opacity: 0.45; scale: 1; } 40% { opacity: 0.7; scale: 1.08; } 70% { opacity: 0.5; scale: 0.96; } }
+
+.tv-deco--snow .tv-deco__p {
+  width: calc(var(--tv-u) * 0.55 * var(--s));
+  height: calc(var(--tv-u) * 0.55 * var(--s));
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  translate: calc(var(--drift) * var(--tv-u) * 2) 0;
+}
+.tv-deco--confetti .tv-deco__p, .tv-deco--petals .tv-deco__p {
+  width: calc(var(--tv-u) * 0.5 * var(--s));
+  height: calc(var(--tv-u) * 0.9 * var(--s));
+  rotate: calc(var(--turn) * 1deg);
+  animation: tv-deco-spin calc(var(--dur) * 0.6) linear infinite;
+  opacity: 0.6;
+}
+.tv-deco--confetti .tv-deco__p { background: var(--c); border-radius: 1px; }
+.tv-deco--petals .tv-deco__p { background: var(--c); border-radius: 70% 0 70% 0; opacity: 0.55; }
+.tv-deco--sparks .tv-deco__p {
+  width: calc(var(--tv-u) * 0.35 * var(--s));
+  height: calc(var(--tv-u) * 0.35 * var(--s));
+  border-radius: 999px;
+  background: #ffe28a;
+  box-shadow: 0 0 calc(var(--tv-u) * 0.8) rgba(255, 215, 0, 0.6);
+  opacity: 0.7;
+}
+.tv-deco--bats .tv-deco__p {
+  width: calc(var(--tv-u) * 3 * var(--s));
+  height: calc(var(--tv-u) * 1.4 * var(--s));
+  color: rgba(190, 160, 255, 0.45);
+  animation: tv-deco-bob 3.2s ease-in-out infinite;
+}
+.tv-deco--stars .tv-deco__p {
+  width: calc(var(--tv-u) * 1.2 * var(--s));
+  height: calc(var(--tv-u) * 1.2 * var(--s));
+  color: rgba(255, 226, 138, 0.8);
+  opacity: 0.5;
+  animation: tv-deco-twinkle calc(var(--dur) * 0.3) ease-in-out var(--delay) infinite;
+}
+.tv-deco--candles .tv-deco__p {
+  width: calc(var(--tv-u) * 1.6 * var(--s));
+  height: calc(var(--tv-u) * 1.6 * var(--s));
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 200, 90, 0.75) 0%, rgba(255, 150, 40, 0.25) 45%, transparent 70%);
+  opacity: 0.55;
+  animation: tv-deco-flicker 2.8s ease-in-out var(--delay) infinite;
+}
+.tv-deco svg { width: 100%; height: 100%; display: block; }
+/* Im Kontrast-Modus bleibt die Deko, aber noch leiser - sie darf keinen Text überstrahlen. */
+.tv-screen[data-tv-contrast="1"] .tv-deco { opacity: 0.6; }

@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy } from "lucide-react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { MascotBadge } from "@/components/tls/Logo";
-import { StatusBadge } from "@/components/tls/StatusBadge";
-import { SponsorGrid } from "@/components/tls/SponsorTicker";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
-import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
-import { formatDateTime } from "@/lib/datetime";
+import { TvScreen, useTv, useTvArea } from "@/components/tv/TvScreen";
+import { TvFooter, TvHeader, TvPill, toneFor } from "@/components/tv/TvParts";
+import { statusBadgeLabel } from "@/components/tls/StatusBadge";
+import { describeSlot, finderFor, initials, isMatchDone, plannedText, stationLabel } from "@/lib/slotSource";
+import { bracketCardUnits, bracketColumnHeadUnits, bracketColumnWidths, chunkByUnits, columnsFor, nameFit, tvBox } from "@/lib/tvType";
 import {
   formatBracketSection,
   formatMatchKind,
@@ -17,344 +17,360 @@ import {
   formatScheduleGroupLabel,
 } from "@/lib/tournamentLabels";
 
-const MAX_COLUMNS_PER_VIEW = 4;
-const MAX_DUEL_MATCHES_PER_COLUMN = 4;
-const MAX_HEAT_MATCHES_PER_COLUMN = 4;
-const MAX_LARGE_HEAT_MATCHES_PER_COLUMN = 2;
-const DONE_STATUSES = new Set(["completed", "archived", "forfeit", "bye", "cancelled"]);
+// Turnierbaum-TV: Runden als Spalten, so viele wie auf den Bildschirm passen, je Spalte so viele Spiele, wie bei der
+// gewählten Schrift ohne Abschneiden Platz haben (#1111). Mit Anzeige-Schlüssel im Link läuft die Seite ohne
+// Anmeldung (#1110); leere Plätze sagen im Klartext, wer kommt (#1113).
+
+const LIVE_STATUSES = new Set(["running", "in_progress", "live"]);
+const PAGE_MS = 11000;
+// Bis die Fläche gemessen ist: eine Full-HD-Fläche in Einheiten.
+const DEFAULT_AREA = { w: 172, h: 68 };
 
 export default function BracketTVPage() {
+  return (
+    <TvScreen>
+      <BracketTv />
+    </TvScreen>
+  );
+}
+
+function BracketTv() {
   const { id } = useParams();
+  const [params] = useSearchParams();
+  const displayKey = params.get("key") || "";
+  const { motionOn, textSize } = useTv();
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState(null);
+  const [keyRefused, setKeyRefused] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [viewIndex, setViewIndex] = useState(0);
   const [boardMode, setBoardMode] = useState("active");
+  const [areaRef, measured] = useTvArea();
+  const area = measured || DEFAULT_AREA;
 
   const load = useCallback(async () => {
     try {
-      const { data: br } = await api.get(`/tournaments/${id}/bracket/display`);
+      const { data: br } = await api.get(`/tournaments/${id}/bracket/display`, displayKey ? { params: { key: displayKey } } : undefined);
       setData(br);
       setLoadError(null);
+      setKeyRefused(false);
       setLastUpdated(Date.now());
     } catch (error) {
+      const status = error?.response?.status;
+      // Widerrufen oder falsch: der Bildschirm zeigt nichts mehr vom Turnier, nur wie es weitergeht.
+      if (displayKey && (status === 401 || status === 403)) {
+        setKeyRefused(true);
+        setData(null);
+      }
       setLoadError(error);
     }
-  }, [id]);
+  }, [id, displayKey]);
 
   useEffect(() => {
     load();
   }, [load]);
-  // Die TV-Anzeige läuft stundenlang: ohne Strom alle 15 s nachfragen.
-  useLiveRefresh(load, ["tournaments", "matches", "stations"], { fallbackMs: 15000 });
+  // Die TV-Anzeige läuft stundenlang: ohne Strom alle 15 s nachfragen. „tv“: ein widerrufener Schlüssel wirkt sofort.
+  useLiveRefresh(load, ["tournaments", "matches", "stations", "tv"], { fallbackMs: 15000 });
   const flashMap = useMatchFlash(data);
 
-  const views = useMemo(() => buildTvViews(data, boardMode), [data, boardMode]);
+  // Zuschlag, falls die Rechnung eine Spalte doch zu voll macht (andere Schrift am TV): nie abschneiden (#1111).
+  const [safety, setSafety] = useState(1);
+  const onOverflow = useCallback(() => setSafety((current) => (current < 1.6 ? Math.round((current + 0.08) * 100) / 100 : current)), []);
+  const views = useMemo(() => buildTvViews(data, boardMode, area, textSize, safety), [data, boardMode, area, textSize, safety]);
   useEffect(() => {
     setViewIndex(0);
   }, [data?.tournament?.id, views.length, boardMode]);
   useEffect(() => {
     if (views.length <= 1) return undefined;
-    const iv = setInterval(() => setViewIndex((current) => (current + 1) % views.length), 11000);
+    const iv = setInterval(() => setViewIndex((current) => (current + 1) % views.length), PAGE_MS);
     return () => clearInterval(iv);
   }, [views.length]);
 
-  if (!data) {
+  if (keyRefused) {
     return (
-      <div className="h-screen bg-black text-white flex flex-col">
-        <DisplayStatusBanner error={loadError} label="Turnierbaum" onRetry={load} />
-        <div className="flex-1 flex items-center justify-center font-display tracking-widest text-white/40">
-          {loadError ? "TURNIERBAUM KONNTE NICHT GELADEN WERDEN" : "LADE TURNIERBAUM …"}
+      <div className="tv-page" data-testid="tv-key-refused">
+        <div className="flex-1 flex flex-col items-center justify-center gap-[calc(var(--tv-u)*1.5)] px-[var(--tv-edge)] text-center">
+          <div className="tv-t-head font-heading font-black uppercase">Dieser TV-Link gilt nicht mehr</div>
+          <div className="tv-t-info tv-muted">Im Admin unter eSports → TV &amp; Beamer einen neuen Link erstellen und hier öffnen.</div>
         </div>
       </div>
     );
   }
-  const t = data.tournament;
-  const publicUrl = `${window.location.origin}/tournaments/${t.slug || t.id}/bracket`;
-  const activeView = views[viewIndex % Math.max(views.length, 1)] || { title: "Turnierbaum", columns: [], registrations: [] };
-  const hasMatches = (data.matches_v2?.length || 0) > 0;
+
+  const t = data?.tournament;
+  const activeView = views[viewIndex % Math.max(views.length, 1)] || { title: "Turnierbaum", columns: [], key: "leer" };
+  const hasMatches = (data?.matches_v2?.length || 0) > 0;
+  const publicUrl = t ? `${window.location.origin}/tournaments/${t.slug || t.id}/bracket` : window.location.origin;
 
   return (
-    <div className="h-screen tv-bg text-white flex flex-col overflow-hidden">
-      <header className="tls-header-sweep relative shrink-0 flex items-center justify-between gap-4 px-6 lg:px-8 py-3 lg:py-4 border-b border-white/10 overflow-hidden">
-        <div className="flex items-center gap-4 min-w-0 flex-1">
-          <MascotBadge className="w-12 h-12 shrink-0" />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">
-              <span className="w-2 h-2 rounded-full bg-[#00FF88] tv-live-dot" />
-              THE LION SQUAD · LIVE
-            </div>
-            <h1 className="font-heading text-xl md:text-3xl 2xl:text-4xl font-black uppercase truncate">{t.title}</h1>
-            {hasMatches && <div className="mt-1 text-xs uppercase tracking-[0.25em] text-white/50 truncate">{activeView.title}</div>}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 lg:gap-3 shrink-0">
-          <div className="hidden lg:flex items-center gap-1 border border-white/10 bg-[#0A0A0A]/80 rounded-sm p-1">
-            {[
-              ["active", "Aktuell"],
-              ["upcoming", "Nächste"],
-              ["tree", "Baum"],
-            ].map(([mode, label]) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setBoardMode(mode)}
-                className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-sm ${boardMode === mode ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <StatusBadge status={t.status} size="lg" />
-        </div>
-      </header>
-      <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label="Turnierbaum" onRetry={load} compact />
+    <div className="tv-page" data-testid="bracket-tv">
+      {t ? (
+        <TvHeader
+          className="tls-header-sweep"
+          kicker="THE LION SQUAD · LIVE"
+          live
+          title={t.title}
+          subtitle={hasMatches ? activeView.title : null}
+          aside={(
+            <>
+              <div className="tv-toggle" role="group" aria-label="Ansicht">
+                {[["active", "Aktuell"], ["upcoming", "Nächste"], ["tree", "Baum"]].map(([mode, label]) => (
+                  <button key={mode} type="button" className="tv-t-meta" aria-pressed={boardMode === mode} onClick={() => setBoardMode(mode)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <TvPill tone={toneFor(t.status)} testId={`status-${t.status}`}>{statusBadgeLabel(t.status)}</TvPill>
+            </>
+          )}
+        />
+      ) : null}
+      <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label="Turnierbaum" onRetry={load} />
 
-      <main className="flex-1 min-h-0 p-3 lg:p-4 overflow-hidden">
-        {!hasMatches ? (
-          <div className="h-full border border-white/10 bg-[#0A0A0A]/75 rounded-sm flex items-center justify-center text-white/45 font-display uppercase tracking-[0.25em]">
-            Turnierbaum wurde noch nicht generiert
-          </div>
-        ) : (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeView.key || viewIndex}
-              className="h-full"
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -14 }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
-            >
-              <TvMatchBoard view={activeView} flashMap={flashMap} />
-            </motion.div>
-          </AnimatePresence>
-        )}
+      <main className="tv-main" data-testid="tv-main">
+        <div ref={areaRef} className="h-full min-h-0" data-testid="tv-board-area">
+          {!data ? (
+            <div className="tv-empty tv-t-head font-display">{loadError ? "Turnierbaum konnte nicht geladen werden" : "Lade Turnierbaum …"}</div>
+          ) : !hasMatches ? (
+            <div className="tv-empty tv-t-head font-display">Turnierbaum wurde noch nicht generiert</div>
+          ) : motionOn ? (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeView.key || viewIndex}
+                className="h-full"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -14 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+              >
+                <TvMatchBoard view={activeView} data={data} flashMap={flashMap} onOverflow={onOverflow} />
+              </motion.div>
+            </AnimatePresence>
+          ) : (
+            <div key={activeView.key || viewIndex} className="h-full">
+              <TvMatchBoard view={activeView} data={data} flashMap={flashMap} onOverflow={onOverflow} />
+            </div>
+          )}
+        </div>
       </main>
 
-      <footer className="shrink-0 px-5 lg:px-8 py-2.5 border-t border-white/10 flex items-center justify-between gap-4 bg-[#0A0A0A]/90 backdrop-blur-sm z-10">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="bg-white p-1.5 rounded-sm shrink-0">
-            <BrandedQRCode value={publicUrl} size={82} />
+      <TvFooter qrValue={publicUrl} kicker="Jetzt mitfiebern" text="QR scannen und Turnierbaum öffnen">
+        {views.length > 1 ? (
+          <div className="tv-dots" aria-hidden="true">
+            {views.map((view, index) => <span key={view.key} data-active={index === viewIndex ? "1" : undefined} />)}
           </div>
-          <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">Jetzt mitfiebern</div>
-            <div className="text-sm text-white/70 truncate">QR scannen und Turnierbaum öffnen</div>
-          </div>
-        </div>
-        {views.length > 1 && (
-          <div className="hidden md:flex items-center gap-1.5 shrink-0">
-            {views.map((view, index) => (
-              <button
-                key={view.key}
-                type="button"
-                aria-label={`Ansicht ${index + 1}`}
-                onClick={() => setViewIndex(index)}
-                className={`h-1.5 rounded-full transition-all ${index === viewIndex ? "w-8 bg-[#29B6E8]" : "w-3 bg-white/20"}`}
-              />
-            ))}
-          </div>
-        )}
-        <SponsorGrid max={4} marquee className="flex-1 max-w-[52vw]" />
-      </footer>
+        ) : null}
+      </TvFooter>
     </div>
   );
 }
 
-function TvMatchBoard({ view, flashMap }) {
-  const regMap = useMemo(() => new Map((view.registrations || []).map((reg) => [reg.id, reg])), [view.registrations]);
+function TvMatchBoard({ view, data, flashMap, onOverflow }) {
+  const regMap = useMemo(() => new Map((data?.registrations || []).map((reg) => [reg.id, reg])), [data?.registrations]);
+  const finder = useMemo(() => finderFor(data?.matches_v2 || []), [data?.matches_v2]);
   if (!(view.columns || []).length) {
-    return (
-      <div className="h-full border border-white/10 bg-[#0A0A0A]/75 rounded-sm flex items-center justify-center text-white/45 font-display uppercase tracking-[0.25em]">
-        Keine geplanten offenen Spiele
-      </div>
-    );
+    return <div className="tv-empty tv-t-head font-display">Keine geplanten offenen Spiele</div>;
   }
-
   return (
-    <div className="h-full grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2.5 2xl:gap-3">
+    <div className="tv-board" style={{ gridTemplateColumns: `repeat(${view.columnsPerView || 4}, minmax(0, 1fr))` }} data-testid="tv-board">
       {(view.columns || []).map((column, index) => (
-        <RoundColumn key={column.key} column={column} regMap={regMap} flashMap={flashMap} index={index} />
+        <RoundColumn key={column.key} column={column} regMap={regMap} finder={finder} flashMap={flashMap} index={index} widths={view.widths} onOverflow={onOverflow} />
       ))}
     </div>
   );
 }
 
-function RoundColumn({ column, regMap, flashMap, index = 0 }) {
-  const shown = column.matches.slice(0, column.displayLimit || matchLimitForColumn(column));
-  const hiddenCount = Math.max(0, column.matches.length - shown.length);
+function RoundColumn({ column, regMap, finder, flashMap, index = 0, widths, onOverflow }) {
+  const { motionOn } = useTv();
   const progress = `${column.doneCount}/${column.totalCount}`;
-
+  const bodyRef = useRef(null);
+  // Läuft die Spalte trotz Rechnung über, rechnet der TV mit Zuschlag neu - lieber eine Seite mehr als abgeschnitten.
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    if (body && column.matches.length > 1 && body.scrollHeight > body.clientHeight + 1) onOverflow?.();
+  });
   return (
     <motion.section
-      layout
-      initial={{ opacity: 0, y: 18 }}
+      layout={motionOn}
+      initial={motionOn ? { opacity: 0, y: 18 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay: Math.min(index * 0.08, 0.4), ease: "easeOut" }}
-      className="min-h-0 border border-white/10 bg-[#0A0A0A]/82 rounded-sm overflow-hidden flex flex-col"
+      transition={motionOn ? { duration: 0.45, delay: Math.min(index * 0.08, 0.4), ease: "easeOut" } : { duration: 0 }}
+      className="tv-panel h-full"
+      data-testid="tv-column"
     >
-      <div className="shrink-0 px-3 py-2 border-b border-white/10 bg-white/[0.03] flex items-start justify-between gap-3">
+      <div className="tv-panel__head">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-[0.22em] text-[#29B6E8] font-bold truncate">{column.sectionLabel}</div>
-          <h2 className="font-heading text-lg 2xl:text-xl font-black uppercase leading-none truncate">{column.roundLabel}</h2>
+          <div className="tv-kicker tv-t-meta">{column.sectionLabel}</div>
+          <h2 className="tv-t-head font-heading font-black uppercase">{column.roundLabel}</h2>
         </div>
-        <div className={`shrink-0 border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${column.isFallback ? "border-[#FFD600]/50 text-[#FFD600]" : "border-white/15 text-white/55"}`}>
-          {column.isFallback ? "Fertig" : progress}
-        </div>
+        <TvPill tone={column.isFallback ? "gold" : "muted"}>{column.isFallback ? "Fertig" : progress}</TvPill>
       </div>
-      <div className="flex-1 min-h-0 p-2 flex flex-col gap-1.5 2xl:gap-2 overflow-y-auto tls-hide-scrollbar">
-        <AnimatePresence initial={false}>
-          {shown.map((match, mIndex) => (
-            <TvMatchCard key={match.id} match={match} regMap={regMap} flash={flashMap?.[match.id]} index={mIndex} />
-          ))}
-        </AnimatePresence>
-        {hiddenCount > 0 && (
-          <div className="border border-dashed border-white/15 px-3 py-2 text-center text-[11px] uppercase tracking-[0.18em] text-white/45">
-            + {hiddenCount} weitere Spiele
-          </div>
-        )}
+      <div ref={bodyRef} className="tv-panel__body" data-testid="tv-column-body">
+        {column.matches.map((match, mIndex) => (
+          <TvMatchCard key={match.id} match={match} regMap={regMap} findMatch={finder(match)} flash={flashMap?.[match.id]} index={mIndex} widths={widths} />
+        ))}
       </div>
     </motion.section>
   );
 }
 
-function TvMatchCard({ match, regMap, flash, index = 0 }) {
+function nameOfRegistration(regMap) {
+  return (registrationId) => {
+    const reg = regMap.get(registrationId);
+    const user = reg?.user || {};
+    return reg?.display_name || user.display_name || reg?.ingame_name || "";
+  };
+}
+
+function TvMatchCard({ match, regMap, findMatch, flash, index = 0, widths }) {
+  const { motionOn, scale } = useTv();
   const isV2 = Array.isArray(match.slots);
-  const statusTone = getStatusTone(match.status);
+  const status = String(match.status || "").toLowerCase();
+  const isLive = LIVE_STATUSES.has(status);
+  const tone = isLive ? "live" : ["ready", "scheduled"].includes(status) ? "ready" : ["disputed", "waiting_result"].includes(status) ? "waiting" : "";
   const station = stationLabel(match);
-  const isLive = ["running", "in_progress"].includes(match.status);
-  const flashClass = flash === "finished" ? "tls-flash-finished" : "";
+  const planned = plannedText(match);
+  const nameOf = nameOfRegistration(regMap);
+  const slots = isV2 ? match.slots : [
+    { slot: "A", registration_id: match.participant_a_id },
+    { slot: "B", registration_id: match.participant_b_id },
+  ];
 
   return (
     <motion.article
-      layout
-      initial={{ opacity: 0, scale: 0.94 }}
+      layout={motionOn}
+      initial={motionOn ? { opacity: 0, scale: 0.94 } : false}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ duration: 0.35, delay: Math.min(index * 0.05, 0.25), ease: "easeOut" }}
-      className={`border ${statusTone.border} ${statusTone.bg} rounded-sm overflow-hidden shrink-0 ${flashClass}`}
+      transition={motionOn ? { duration: 0.35, delay: Math.min(index * 0.05, 0.25), ease: "easeOut" } : { duration: 0 }}
+      className={`tv-card ${tone ? `tv-card--${tone}` : ""} ${flash === "finished" ? "tls-flash-finished" : ""}`}
+      data-testid={`tv-match-${match.id}`}
     >
-      <div className="px-2.5 py-1.5 border-b border-white/5 flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-[#29B6E8] font-bold truncate">{match.match_key || matchLabel(match)}</div>
-          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-white/38 truncate">
-            {isLive && <span className="w-1.5 h-1.5 rounded-full bg-[#00FF88] tv-live-dot shrink-0" />}
-            <span className="truncate">{formatMatchKind(match)} · {formatMatchStatus(match.status)}</span>
-          </div>
-        </div>
-        {match.scheduled_at && <div className="shrink-0 text-right text-[10px] text-white/55">{formatDateTime(match.scheduled_at).replace(", ", " ")}</div>}
+      <div className="tv-card__head">
+        <span className="tv-kicker tv-t-meta">{formatMatchKind(match)} {match.match_key || matchLabel(match)}</span>
+        <span className={`tv-t-meta inline-flex items-center gap-[0.5em] ${isLive ? "tv-green" : "tv-muted"}`}>
+          {isLive ? <span className="tv-live-dot-tv tv-live-dot" aria-hidden="true" /> : null}
+          {formatMatchStatus(match.status)}
+        </span>
       </div>
-
-      <div>
-        {isV2 ? (
-          (match.slots || []).map((slot) => {
-            const result = (match.results || []).find((row) => row.registration_id === slot.registration_id);
-            return <ParticipantRow key={slot.slot} participant={participantInfo(slot, regMap)} result={result} position={slot.slot} scoreFlash={flash === "score"} />;
-          })
-        ) : (
-          <>
-            <ParticipantRow
-              participant={legacyParticipantInfo(match.participant_a_id, regMap)}
-              score={match.score_a}
-              isWinner={match.winner_id && match.winner_id === match.participant_a_id}
-              side="A"
-              scoreFlash={flash === "score"}
-            />
-            <ParticipantRow
-              participant={legacyParticipantInfo(match.participant_b_id, regMap)}
-              score={match.score_b}
-              isWinner={match.winner_id && match.winner_id === match.participant_b_id}
-              side="B"
-              scoreFlash={flash === "score"}
-            />
-          </>
-        )}
-      </div>
-
-      {(station || match.duration_minutes) && (
-        <div className="px-2.5 py-1.5 border-t border-white/5 flex items-center justify-between gap-2 text-[10px] uppercase tracking-wider text-white/42">
-          <span className="truncate">{station || "Keine Station"}</span>
-          {match.duration_minutes && <span className="shrink-0">{match.duration_minutes} Min.</span>}
+      {slots.map((slot, slotIndex) => {
+        const info = describeSlot(slot, nameOf, findMatch);
+        const result = isV2
+          ? (match.results || []).find((row) => row.registration_id && row.registration_id === slot.registration_id)
+          : null;
+        const legacyScore = isV2 ? null : slotIndex === 0 ? match.score_a : match.score_b;
+        const won = Boolean(slot.registration_id) && (
+          result?.qualified || (match.winner_id && match.winner_id === slot.registration_id)
+        );
+        const reg = regMap.get(slot.registration_id);
+        const avatar = reg?.user?.avatar_url || reg?.avatar_url || "";
+        return (
+          <SlotRow
+            key={slot.slot ?? slotIndex}
+            info={info}
+            avatar={avatar}
+            won={won}
+            result={result}
+            score={legacyScore}
+            scoreFlash={flash === "score"}
+            fit={nameFit(info.label, widths?.name || 30, scale)}
+          />
+        );
+      })}
+      {(station || planned) ? (
+        <div className="tv-card__foot tv-t-info" data-testid="tv-match-foot">
+          {station ? <span className="tv-accent">{station}</span> : null}
+          {planned ? <span>{planned}</span> : null}
         </div>
-      )}
+      ) : null}
     </motion.article>
   );
 }
 
-function ParticipantRow({ participant, result, score, isWinner, position, side, scoreFlash }) {
+function SlotRow({ info, avatar, won, result, score, scoreFlash, fit }) {
   const rowScore = result?.score ?? result?.points ?? score;
   const rank = result?.rank ? `#${result.rank}` : null;
-  const avatar = participant?.avatar ? resolveMediaUrl(participant.avatar) : null;
-  const label = participant?.label || "Offen";
-  const subtitle = participant?.subtitle;
-  const initial = label.trim().charAt(0).toUpperCase() || side || position || "?";
-  const won = isWinner || result?.qualified;
+  const shown = info.kind === "player" ? (rank || (rowScore != null ? String(rowScore) : "")) : "";
+  const short = info.kind === "player" ? initials(info.label) : "";
+  const classes = [
+    "tv-row",
+    won ? "tv-row--won tls-winner-row" : "",
+    info.kind === "pending" || info.kind === "bye" ? "tv-row--pending" : "",
+    info.kind === "empty" ? "tv-row--empty" : "",
+  ].filter(Boolean).join(" ");
   return (
-    <div className={`flex items-center justify-between gap-2 px-2.5 py-1.5 border-b border-white/5 last:border-b-0 ${won ? "bg-[#29B6E8]/10 tls-winner-row" : ""}`}>
-      <div className="flex items-center gap-2 min-w-0">
-        <div className="relative shrink-0">
-          {avatar ? (
-            <img src={avatar} alt="" className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-sm object-cover border border-white/10 bg-white/5" />
-          ) : (
-            <div className="w-7 h-7 2xl:w-8 2xl:h-8 rounded-sm border border-white/10 bg-white/5 flex items-center justify-center text-[11px] font-bold text-white/60">
-              {initial}
-            </div>
-          )}
-          <span className="absolute -bottom-1 -right-1 w-4 h-4 border border-black/70 bg-[#121212] flex items-center justify-center text-[9px] font-bold text-white/65">
-            {side || position}
+    <div className={classes} data-slot-kind={info.kind}>
+      <div className="tv-row__who">
+        <div className={`tv-avatar tv-t-meta ${short || avatar ? "" : "tv-avatar--empty"}`} aria-hidden="true">
+          {avatar && info.kind === "player" ? <img src={resolveMediaUrl(avatar)} alt="" /> : short}
+        </div>
+        {info.label ? (
+          <span className="tv-t-name tv-row__name inline-flex items-center gap-[0.35em] min-w-0" data-fit={fit.small ? "small" : undefined} data-tv-name="1">
+            {won ? <Trophy className="tv-icon tv-gold" aria-hidden="true" /> : null}
+            <span className="min-w-0">{info.label}</span>
           </span>
-        </div>
-        <div className="min-w-0">
-          <div className={`truncate text-xs 2xl:text-sm leading-tight flex items-center gap-1 ${won ? "text-[#29B6E8] font-semibold" : "text-white/84"}`}>
-            {won && <Trophy className="w-3 h-3 text-[#FFD700] shrink-0" />}
-            <span className="truncate">{label}</span>
-          </div>
-          {subtitle && <div className="truncate text-[10px] uppercase tracking-wider text-white/35">{subtitle}</div>}
-        </div>
+        ) : null}
       </div>
-      <div className="shrink-0 text-right font-display font-bold text-white/75">
-        <span key={rowScore} className={scoreFlash ? "tls-flash-score" : ""}>{rank || (rowScore != null ? rowScore : "—")}</span>
-        {rank && rowScore != null && <div className="text-[10px] font-sans font-normal text-white/45">{rowScore} Pkt.</div>}
-      </div>
+      {shown ? (
+        <div className="tv-row__score tv-t-num font-display">
+          <span key={shown} className={scoreFlash ? "tls-flash-score" : ""}>{shown}</span>
+          {rank && rowScore != null ? <div className="tv-t-meta font-sans font-normal tv-faint">{rowScore} Pkt.</div> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function stationLabel(match) {
-  const station = match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
-  if (!station) return "";
-  return /^station\b/i.test(station) ? station : `Station ${station}`;
-}
-
-function buildTvViews(data, mode = "active") {
+function buildTvViews(data, mode, area, textSize, safety = 1) {
   if (!data) return [];
-  const registrations = data.registrations || [];
+  const box = tvBox(textSize);
+  const columnsPerView = columnsFor(area.w, textSize);
+  const columnWidth = (area.w - (columnsPerView - 1) * box.gap) / columnsPerView;
+  const widths = bracketColumnWidths(columnWidth, textSize);
+  const bodyUnits = area.h - bracketColumnHeadUnits(textSize) - 2 * box.colPad;
+  const regMap = new Map((data.registrations || []).map((reg) => [reg.id, reg]));
+  const nameOf = nameOfRegistration(regMap);
+  const finder = finderFor(data.matches_v2 || []);
+  const cardUnits = (match) => {
+    const findMatch = finder(match);
+    const labels = (Array.isArray(match.slots) ? match.slots : [{}, {}]).map((slot) => describeSlot(slot, nameOf, findMatch).label);
+    return bracketCardUnits({ labels, footer: [stationLabel(match), plannedText(match)] }, widths, textSize) * safety;
+  };
+  const expand = (columns) => columns.flatMap((column) => {
+    const parts = chunkByUnits(column.matches, bodyUnits, cardUnits, box.gap);
+    if (parts.length <= 1) return [column];
+    return parts.map((matches, index) => ({
+      ...column,
+      key: `${column.key}-tv-${index}`,
+      roundLabel: `${column.roundLabel} · ${index + 1}/${parts.length}`,
+      matches,
+    }));
+  });
+  const pagesOf = (columns, keyPrefix, titleOf) => {
+    const pages = chunk(columns, columnsPerView);
+    return pages.map((page, index) => ({
+      key: `${keyPrefix}-${index}`,
+      title: titleOf(index, pages.length),
+      columns: page,
+      columnsPerView,
+      widths,
+    }));
+  };
+
   const columns = buildV2Columns(data);
   if (mode === "tree") {
-    const pages = chunk(expandColumnsForDisplay(columns), MAX_COLUMNS_PER_VIEW);
-    return pages.map((page, index) => ({
-      key: `tv-tree-${index}`,
-      title: pages.length > 1 ? `Ganzer Turnierbaum - Seite ${index + 1}/${pages.length}` : "Ganzer Turnierbaum",
-      columns: page,
-      registrations,
-    }));
+    return pagesOf(expand(columns), "tv-tree", (index, total) => (total > 1 ? `Ganzer Turnierbaum · Seite ${index + 1}/${total}` : "Ganzer Turnierbaum"));
   }
   if (mode === "upcoming") {
-    return buildUpcomingViews(data, registrations);
+    const upcoming = buildUpcomingColumns(data, bodyUnits, cardUnits, box.gap);
+    if (!upcoming.length) return [{ key: "tv-upcoming-empty", title: "Nächste Spiele", columns: [], columnsPerView, widths }];
+    return pagesOf(upcoming, "tv-upcoming", (index, total) => (total > 1 ? `Nächste Spiele · Seite ${index + 1}/${total}` : "Nächste Spiele"));
   }
-
   const activeColumns = columns.filter((column) => !column.isComplete);
-  const displayColumns = expandColumnsForDisplay(
-    activeColumns.length > 0 ? activeColumns : columns.slice(-MAX_COLUMNS_PER_VIEW).map((column) => ({ ...column, isFallback: true }))
+  const displayColumns = expand(
+    activeColumns.length > 0 ? activeColumns : columns.slice(-columnsPerView).map((column) => ({ ...column, isFallback: true }))
   );
   const titlePrefix = activeColumns.length > 0 ? "Aktive Runden" : "Abgeschlossene Runden";
-  const pages = chunk(displayColumns, MAX_COLUMNS_PER_VIEW);
-
-  return pages.map((page, index) => ({
-    key: `tv-board-${index}`,
-    title: pages.length > 1 ? `${titlePrefix} · Seite ${index + 1}/${pages.length}` : titlePrefix,
-    columns: page,
-    registrations,
-  }));
+  return pagesOf(displayColumns, "tv-board", (index, total) => (total > 1 ? `${titlePrefix} · Seite ${index + 1}/${total}` : titlePrefix));
 }
 
 function buildV2Columns(data) {
@@ -399,28 +415,6 @@ function makeColumn(column) {
   };
 }
 
-function expandColumnsForDisplay(columns) {
-  return columns.flatMap((column) => {
-    const limit = matchLimitForColumn(column);
-    if (column.matches.length <= limit) return [{ ...column, displayLimit: limit }];
-    const parts = chunk(column.matches, limit);
-    return parts.map((matches, index) => ({
-      ...column,
-      key: `${column.key}-tv-${index}`,
-      roundLabel: `${column.roundLabel} · ${index + 1}/${parts.length}`,
-      matches,
-      displayLimit: limit,
-    }));
-  });
-}
-
-function matchLimitForColumn(column) {
-  const maxSlots = Math.max(2, ...column.matches.map((match) => (match.slots || []).length || 2));
-  if (maxSlots >= 6) return MAX_LARGE_HEAT_MATCHES_PER_COLUMN;
-  if (maxSlots > 2) return MAX_HEAT_MATCHES_PER_COLUMN;
-  return MAX_DUEL_MATCHES_PER_COLUMN;
-}
-
 function sortColumns(a, b) {
   return (a.stageNumber - b.stageNumber)
     || (sectionOrder(a.section) - sectionOrder(b.section))
@@ -440,14 +434,7 @@ function sectionOrder(section) {
   return 9;
 }
 
-function isMatchDone(match) {
-  if (DONE_STATUSES.has(match.status)) return true;
-  if (match.winner_id) return true;
-  if ((match.results || []).length > 0 && ["completed", "archived"].includes(match.status)) return true;
-  return false;
-}
-
-function buildUpcomingViews(data, registrations) {
+function buildUpcomingColumns(data, bodyUnits, cardUnits, gap) {
   const matches = [...(data.matches_v2 || [])]
     .filter((match) => !isMatchDone(match))
     .sort((a, b) => {
@@ -458,11 +445,7 @@ function buildUpcomingViews(data, registrations) {
         || ((a.round || 0) - (b.round || 0))
         || ((a.order ?? a.match_index ?? 0) - (b.order ?? b.match_index ?? 0));
     });
-  if (!matches.length) {
-    return [{ key: "tv-upcoming-empty", title: "Nächste Spiele", columns: [], registrations }];
-  }
-  const matchChunks = chunk(matches, MAX_DUEL_MATCHES_PER_COLUMN);
-  const columns = matchChunks.map((items, index) => makeColumn({
+  return chunkByUnits(matches, bodyUnits, cardUnits, gap).map((items, index) => makeColumn({
     key: `upcoming-${index}`,
     stageNumber: 1,
     section: "upcoming",
@@ -471,47 +454,12 @@ function buildUpcomingViews(data, registrations) {
     roundLabel: `Nächste Spiele ${index + 1}`,
     matches: items,
   }));
-  const pages = chunk(columns, MAX_COLUMNS_PER_VIEW);
-  return pages.map((page, index) => ({
-    key: `tv-upcoming-${index}`,
-    title: pages.length > 1 ? `Nächste Spiele - Seite ${index + 1}/${pages.length}` : "Nächste Spiele",
-    columns: page,
-    registrations,
-  }));
-}
-
-function participantInfo(slot, regMap) {
-  const reg = regMap.get(slot.registration_id);
-  const user = reg?.user || {};
-  return {
-    label: reg?.display_name || user.display_name || reg?.ingame_name || slot.source?.raw || "Offen",
-    avatar: user.avatar_url || reg?.avatar_url,
-    subtitle: user.username ? `@${user.username}` : (slot.registration_id ? null : "Freier Slot"),
-  };
-}
-
-function legacyParticipantInfo(registrationId, regMap) {
-  const reg = regMap.get(registrationId);
-  const user = reg?.user || {};
-  return {
-    label: reg?.display_name || user.display_name || reg?.ingame_name || (registrationId ? "-" : "Offen"),
-    avatar: user.avatar_url || reg?.avatar_url,
-    subtitle: user.username ? `@${user.username}` : (registrationId ? null : "Freier Slot"),
-  };
 }
 
 function matchLabel(match) {
-  if (Number.isInteger(match.match_index)) return `Spiel ${match.match_index + 1}`;
-  if (match.order != null) return `Spiel ${Number(match.order) + 1}`;
-  return "Spiel";
-}
-
-function getStatusTone(status) {
-  if (["running", "in_progress"].includes(status)) return { border: "border-[#00FF88]/35", bg: "bg-[#00FF88]/5" };
-  if (["ready", "scheduled"].includes(status)) return { border: "border-[#29B6E8]/35", bg: "bg-[#29B6E8]/5" };
-  if (["disputed", "waiting_result"].includes(status)) return { border: "border-[#FFD600]/35", bg: "bg-[#FFD600]/5" };
-  if (DONE_STATUSES.has(status)) return { border: "border-white/10", bg: "bg-white/[0.025]" };
-  return { border: "border-white/10", bg: "bg-[#111111]" };
+  if (Number.isInteger(match.match_index)) return `${match.match_index + 1}`;
+  if (match.order != null) return `${Number(match.order) + 1}`;
+  return "";
 }
 
 function chunk(items, size) {

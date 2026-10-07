@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useInRouterContext, useLocation } from "react-router-dom";
 import { Check, Settings, X } from "lucide-react";
 
 const STORAGE_KEY = "tls_cookie_consent_v1";
@@ -49,7 +49,24 @@ function writeStoredConsent(consent) {
   return payload;
 }
 
+// TV und Beamer (#1110, Entscheidung vom 07.10.2026): Auf den Anzeige-Seiten erscheint kein Cookie-Hinweis - dort
+// klickt niemand. Es läuft dort nur das Nötige (keine Statistik, keine fremden Inhalte), egal was gespeichert ist.
+function isDisplayPath(pathname) {
+  return /^\/display(?:\/|$)/.test(pathname || "");
+}
+
+function RouteWatch({ onPath }) {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    onPath(pathname);
+  }, [onPath, pathname]);
+  return null;
+}
+
 export function CookieConsentProvider({ children }) {
+  const inRouter = useInRouterContext();
+  const [pathname, setPathname] = useState(() => (typeof window === "undefined" ? "" : window.location.pathname));
+  const displayScreen = isDisplayPath(pathname);
   const [stored, setStored] = useState(() => readStoredConsent());
   const [open, setOpen] = useState(() => !readStoredConsent());
   const [draft, setDraft] = useState(() => ({ ...DEFAULT_CONSENT, ...(readStoredConsent() || {}) }));
@@ -82,13 +99,14 @@ export function CookieConsentProvider({ children }) {
     consent: { ...DEFAULT_CONSENT, ...(stored || {}) },
     hasChoice: !!stored,
     openSettings,
-    hasConsent: (key) => key === "essential" || !!stored?.[key],
-  }), [openSettings, stored]);
+    hasConsent: (key) => key === "essential" || (!displayScreen && !!stored?.[key]),
+  }), [displayScreen, openSettings, stored]);
 
   return (
     <CookieConsentContext.Provider value={value}>
       {children}
-      {open && (
+      {inRouter ? <RouteWatch onPath={setPathname} /> : null}
+      {open && !displayScreen && (
         <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-start md:items-center justify-center overflow-y-auto p-3 sm:p-4">
           <div className="w-full max-w-3xl max-h-[calc(100vh-1.5rem)] md:max-h-[calc(100vh-2rem)] overflow-y-auto border border-[#29B6E8]/40 bg-[#050505] rounded-sm shadow-2xl shadow-black/60">
             <div className="p-4 sm:p-5 md:p-7">

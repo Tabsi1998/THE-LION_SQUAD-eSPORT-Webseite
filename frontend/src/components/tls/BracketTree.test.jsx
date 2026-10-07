@@ -64,6 +64,28 @@ describe("BracketTree", () => {
     expect(connectorTargets(2, 4)).toEqual([]);
   });
 
+  it("sagt bei leeren Plätzen späterer Runden im Klartext, wer kommt (#1113) - Setzplätze bleiben leer", () => {
+    const data = knockout();
+    data.matches_v2.push(
+      { id: "m4", section: "WB", round: 3, order: 0, match_key: "GF", status: "pending", slots: [
+        { slot: 1, registration_id: null, status: "pending", source: { type: "rank", flow: "W", match_key: "WF", rank: 1, raw: "W:WF:1" } },
+        { slot: 2, registration_id: null, status: "pending", source: { type: "seed", seed: 5, raw: "5" } },
+      ], results: [] },
+      { id: "m5", section: "BRONZE", round: 3, order: 1, match_key: "P3", status: "pending", slots: [
+        { slot: 1, registration_id: null, status: "pending", source: { type: "rank", flow: "L", match_key: "WA1", rank: 1, raw: "L:WA1:1" } },
+        { slot: 2, registration_id: null, status: "bye", source: { type: "bye", raw: "bye" } },
+      ], results: [] },
+    );
+    render(<BracketTree data={data} />);
+    const final = screen.getByTestId("bracket-match-v2-m4");
+    expect(final).toHaveTextContent("Sieger aus WF");
+    expect(final).not.toHaveTextContent("W:WF:1");
+    expect(final).toHaveTextContent("—");
+    const bronze = screen.getByTestId("bracket-match-v2-m5");
+    expect(bronze).toHaveTextContent("Verlierer aus WA1");
+    expect(bronze).toHaveTextContent("Freilos");
+  });
+
   it("zeigt den Baum mit leeren Setzplätzen, Sieger-Akzent und Uhrzeit", () => {
     render(<BracketTree data={knockout()} />);
     expect(screen.getByTestId("bracket-tree")).toBeInTheDocument();
@@ -137,7 +159,9 @@ const { formatBracketSection, formatRoundName } = await import("@/lib/tournament
 describe("Turniere I", () => {
   it("rechnet Kürzel, Weg und Runden-Kopf", () => {
     expect(initials("Joey Jo-Jo Junior")).toBe("JJ");
-    expect(initials("MrBelt")).toBe("M");
+    // Zusammengeschriebene Namen geben seit #1113 zwei Buchstaben - wie am TV.
+    expect(initials("MrBelt")).toBe("MB");
+    expect(initials("NeonFalke")).toBe("NF");
     expect(initials("c1resa")).toBe("C");
     expect(initials("  ")).toBe("");
     expect(pathState(null, ["a"])).toBe("");

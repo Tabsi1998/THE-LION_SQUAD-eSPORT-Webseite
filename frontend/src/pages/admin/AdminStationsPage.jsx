@@ -8,6 +8,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useAuth } from "@/context/AuthContext";
 import { formatBracketSection, formatDeviceType, formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
 import { formatDateTime } from "@/lib/datetime";
+import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { Plus, Trash2, Link as LinkIcon, X as XIcon, Wand2, Play } from "lucide-react";
 import { toast } from "sonner";
 
@@ -217,11 +218,13 @@ export default function AdminStationsPage() {
   const freeStations = safeArray(list).filter((station) => ["free", "reserved"].includes(station.status) && !station.current_match_id);
   const startableCount = safeArray(matches).filter((m) => ["ready", "scheduled"].includes(m.status)).length;
 
+  // Leere Plätze im Klartext (#1113): „Sieger aus A“ statt „W:A:1“.
+  const findIn = finderFor(safeArray(matches));
   const nameOfMatch = (m) => {
     if (!m) return "—";
     if (m.is_multi_slot || m.slots) {
       const names = safeArray(m.slots)
-        .map((slot) => regById[slot?.registration_id]?.display_name || slot?.source?.raw || "Offen")
+        .map((slot) => regById[slot?.registration_id]?.display_name || sourceLabel(slot?.source, findIn(m)) || "Offen")
         .slice(0, 4);
       return `${m.match_key || "Durchgang"} · ${names.join(" / ")}`;
     }

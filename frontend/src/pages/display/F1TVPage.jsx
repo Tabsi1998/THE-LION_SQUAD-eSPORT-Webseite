@@ -1,26 +1,43 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
-import { MascotBadge } from "@/components/tls/Logo";
-import { SponsorGrid } from "@/components/tls/SponsorTicker";
-import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
-import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { api, resolveMediaUrl } from "@/lib/api";
+import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
+import { TvScreen, useTv, useTvArea } from "@/components/tv/TvScreen";
+import { TvFooter, TvHeader } from "@/components/tv/TvParts";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { charsPerLine, fitItems, TV_LINE, wrapLines } from "@/lib/tvType";
 
-const medalColors = ["#FFD700", "#C0C0C0", "#CD7F32"];
+// Fast-Lap-TV: Podium, Rangliste und Vereins-Referenz. Größen aus tv.css (#1111); die Rangliste zeigt so viele
+// Zeilen, wie ohne Abschneiden Platz haben - nichts liegt mehr unter der Fußleiste.
+
+// Gold, Silber, Bronze - im Kontrast-Modus heller (tv.css), damit auch Bronze 7:1 schafft.
+const medalColors = ["var(--tv-medal-1)", "var(--tv-medal-2)", "var(--tv-medal-3)"];
+const TRACK_MS = 45000;
+const DEFAULT_AREA = { w: 170, h: 60 };
 
 export default function F1TVPage() {
+  return (
+    <TvScreen>
+      <FastLapTv />
+    </TvScreen>
+  );
+}
+
+function FastLapTv() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
+  const { motionOn, scale, box } = useTv();
   const [challenge, setChallenge] = useState(null);
   const [activeTrackIdx, setActiveTrackIdx] = useState(0);
   const [board, setBoard] = useState(null);
   const [challengeError, setChallengeError] = useState(null);
   const [boardError, setBoardError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [listRef, listMeasured, listTrim] = useTvArea(board ? `${board.track?.id || ""}:${(board.entries || []).length}` : "");
+  const listArea = listMeasured || DEFAULT_AREA;
   const trackParam = searchParams.get("track");
 
   const loadChallenge = useCallback(async () => {
@@ -61,17 +78,17 @@ export default function F1TVPage() {
   // Die TV-Anzeige läuft stundenlang: ohne Strom alle 7 s nachfragen.
   useLiveRefresh(fetchLB, ["f1"], { fallbackMs: 7000 });
 
-  // Cycle tracks every 45s if championship AND no manual override via ?track=
+  // Strecken wechseln alle 45 s bei Meisterschaften - außer der Link hält eine Strecke fest (?track=).
   useEffect(() => {
-    if (!challenge?.is_championship || !challenge.tracks?.length) return;
-    if (searchParams.get("track")) return; // manual lock
-    const iv = setInterval(() => setActiveTrackIdx((i) => (i + 1) % challenge.tracks.length), 45000);
+    if (!challenge?.is_championship || !challenge.tracks?.length) return undefined;
+    if (searchParams.get("track")) return undefined;
+    const iv = setInterval(() => setActiveTrackIdx((i) => (i + 1) % challenge.tracks.length), TRACK_MS);
     return () => clearInterval(iv);
   }, [challenge, searchParams]);
 
-  // Arrow key navigation
+  // Pfeiltasten: Strecke vor und zurück
   useEffect(() => {
-    if (!challenge?.tracks?.length) return;
+    if (!challenge?.tracks?.length) return undefined;
     const onKey = (e) => {
       if (e.key === "ArrowRight") setActiveTrackIdx((i) => (i + 1) % challenge.tracks.length);
       else if (e.key === "ArrowLeft") setActiveTrackIdx((i) => (i - 1 + challenge.tracks.length) % challenge.tracks.length);
@@ -80,148 +97,147 @@ export default function F1TVPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [challenge]);
 
+  const entries = useMemo(() => board?.entries || [], [board]);
+  const references = board?.club_reference_entries || [];
+  // Die Rangliste ab Platz 4: so viele Zeilen, wie Platz haben (#1111).
+  const restFit = useMemo(() => {
+    const rest = entries.slice(3);
+    const nameWidth = listArea.w * 0.55 - 2 * box.padX;
+    const rowHeight = (entry) => {
+      const lines = Math.max(1, wrapLines(entry.display_name || "", charsPerLine(nameWidth, scale.name)));
+      return 2 * 0.6 + Math.max(lines * scale.name * TV_LINE.name, scale.num * TV_LINE.num) + 0.35;
+    };
+    const fit = fitItems(rest, listArea.h, rowHeight, 0.5, scale.meta * TV_LINE.meta);
+    // Läuft die Liste am TV trotzdem über (andere Schrift), fallen hinten Zeilen weg - nie abgeschnitten.
+    if (!listTrim) return fit;
+    const shown = fit.shown.slice(0, Math.max(0, fit.shown.length - listTrim));
+    return { shown, hidden: rest.length - shown.length };
+  }, [entries, listArea, box, scale, listTrim]);
+
   if (!challenge) {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col">
+      <div className="tv-page">
         <DisplayStatusBanner error={challengeError} label="Fast-Lap Challenge" onRetry={loadChallenge} />
-        <div className="flex-1 flex items-center justify-center font-display tracking-widest text-white/40">
-          {challengeError ? "FAST-LAP ANSICHT KONNTE NICHT GELADEN WERDEN" : "LADE …"}
+        <div className="tv-main">
+          <div className="tv-empty tv-t-head font-display">{challengeError ? "Fast-Lap-Ansicht konnte nicht geladen werden" : "Lade …"}</div>
         </div>
       </div>
     );
   }
 
   const track = board?.track;
-  const entries = board?.entries || [];
   const top3 = entries.slice(0, 3);
-  const rest = entries.slice(3, 13);
-  const references = board?.club_reference_entries || [];
   const publicUrl = `${window.location.origin}/fastlap/${challenge.slug || challenge.id}`;
+  const trackCount = challenge.tracks?.length || 1;
   const prevTrack = () => challenge.tracks?.length && setActiveTrackIdx((i) => (i - 1 + challenge.tracks.length) % challenge.tracks.length);
   const nextTrack = () => challenge.tracks?.length && setActiveTrackIdx((i) => (i + 1) % challenge.tracks.length);
 
   return (
-    <div className="min-h-screen tv-bg text-white overflow-hidden relative">
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#29B6E8] to-transparent" />
-      <header className="flex items-center justify-between p-8 border-b border-white/5">
-        <div className="flex items-center gap-5">
-          <MascotBadge className="w-16 h-16" />
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">THE LION SQUAD · FAST LAP</div>
-            <h1 className="font-heading text-3xl md:text-5xl font-black uppercase leading-none mt-1">{challenge.title}</h1>
-          </div>
-        </div>
-        <div className="flex items-center justify-end gap-5 min-w-[28vw]">
-          {track?.image_url && (
-            <div className="hidden xl:flex w-52 h-28 border border-[#29B6E8]/25 bg-black/50 rounded-sm overflow-hidden items-center justify-center shrink-0">
-              <img src={resolveMediaUrl(track.image_url)} alt="" className="w-full h-full object-contain" />
+    <div className="tv-page" data-testid="fastlap-tv">
+      <TvHeader
+        kicker="THE LION SQUAD · FAST LAP"
+        title={challenge.title}
+        aside={(
+          <div className="flex items-center gap-[calc(var(--tv-u)*1.6)]">
+            {track?.image_url ? (
+              <div className="w-[calc(var(--tv-u)*16)] h-[calc(var(--tv-u)*8.5)] border border-[color:var(--tv-line)] bg-black/50 rounded-sm overflow-hidden flex items-center justify-center shrink-0">
+                <img src={resolveMediaUrl(track.image_url)} alt="" className="w-full h-full object-contain" />
+              </div>
+            ) : null}
+            <div className="text-right min-w-0">
+              <div className="tv-kicker tv-t-meta tv-faint">Strecke {activeTrackIdx + 1} / {trackCount}</div>
+              <div className="tv-t-title font-heading font-black uppercase tv-accent">{track?.name || activeTrack?.name || "—"}</div>
+              {track?.country ? <div className="tv-t-info tv-muted">{track.country}</div> : null}
+              {trackCount > 1 ? (
+                <div className="mt-[calc(var(--tv-u)*0.6)] flex items-center justify-end gap-[calc(var(--tv-u)*0.6)]">
+                  <button type="button" onClick={prevTrack} data-testid="f1-tv-prev-track" className="tv-pill tv-t-meta" title="Vorherige Strecke (←)" aria-label="Vorherige Strecke">
+                    <ChevronLeft className="tv-icon" />
+                  </button>
+                  <select
+                    value={activeTrackIdx}
+                    onChange={(e) => setActiveTrackIdx(Number(e.target.value))}
+                    data-testid="f1-tv-track-select"
+                    aria-label="Strecke wählen"
+                    className="tv-t-meta bg-black border border-[color:var(--tv-line)] px-[0.6em] py-[0.3em] rounded-sm"
+                  >
+                    {challenge.tracks.map((tr, i) => <option key={tr.id} value={i}>{tr.name}</option>)}
+                  </select>
+                  <button type="button" onClick={nextTrack} data-testid="f1-tv-next-track" className="tv-pill tv-t-meta" title="Nächste Strecke (→)" aria-label="Nächste Strecke">
+                    <ChevronRight className="tv-icon" />
+                  </button>
+                </div>
+              ) : null}
             </div>
-          )}
-          <div className="text-right min-w-0">
-          <div className="text-[11px] uppercase tracking-[0.3em] text-white/50">Strecke {activeTrackIdx + 1} / {challenge.tracks?.length || 1}</div>
-          <div className="font-heading text-3xl md:text-5xl font-black uppercase text-[#29B6E8]">{track?.name || "—"}</div>
-          {track?.country && <div className="text-white/50 text-sm mt-1">{track.country}</div>}
-          {(challenge.tracks?.length || 0) > 1 && (
-            <div className="mt-3 flex items-center justify-end gap-2">
-              <button onClick={prevTrack} data-testid="f1-tv-prev-track" className="p-2 border border-white/10 rounded-sm hover:border-[#29B6E8] hover:text-[#29B6E8] transition" title="Vorherige Strecke (←)">
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <select
-                value={activeTrackIdx}
-                onChange={(e) => setActiveTrackIdx(Number(e.target.value))}
-                data-testid="f1-tv-track-select"
-                className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm min-w-[180px]"
-              >
-                {challenge.tracks.map((tr, i) => <option key={tr.id} value={i}>{tr.name}</option>)}
-              </select>
-              <button onClick={nextTrack} data-testid="f1-tv-next-track" className="p-2 border border-white/10 rounded-sm hover:border-[#29B6E8] hover:text-[#29B6E8] transition" title="Nächste Strecke (→)">
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
           </div>
-        </div>
-      </header>
-      <DisplayStatusBanner error={boardError} lastUpdated={lastUpdated} label="Rangliste" onRetry={loadChallenge} compact />
+        )}
+      />
+      <DisplayStatusBanner error={boardError} lastUpdated={lastUpdated} label="Rangliste" onRetry={loadChallenge} />
 
-      <div className="px-8 py-6">
-        <div className="grid grid-cols-3 gap-6 mb-10">
-          {top3.map((e, i) => (
+      <main className="tv-main flex flex-col gap-[calc(var(--tv-u)*1.4)]">
+        <div className="grid grid-cols-3 gap-[calc(var(--tv-u)*2)] shrink-0 pt-[calc(var(--tv-u)*2.4)]">
+          {top3.map((entry, i) => (
             <motion.div
-              key={e.user_id}
-              initial={{ y: 30, opacity: 0 }}
+              key={entry.user_id}
+              initial={motionOn ? { y: 30, opacity: 0 } : false}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: i * 0.15 }}
-              className="relative border-2 rounded-sm p-6"
-              style={{ borderColor: medalColors[i] + "80", background: "linear-gradient(180deg, rgba(41,182,232,0.05) 0%, transparent 100%)" }}
+              transition={motionOn ? { delay: i * 0.15 } : { duration: 0 }}
+              className="tv-card tv-podium relative px-[calc(var(--tv-u)*2)] pt-[calc(var(--tv-u)*2.6)] pb-[calc(var(--tv-u)*1.4)]"
+              style={{ borderColor: `color-mix(in srgb, ${medalColors[i]} 60%, transparent)`, borderWidth: "max(2px, calc(var(--tv-u) * 0.2))" }}
+              data-testid="tv-podium"
             >
-              <div className="absolute -top-4 left-6 px-3 py-1 font-display font-black text-xl" style={{ backgroundColor: medalColors[i], color: "#000" }}>
+              <div className="absolute top-0 left-[calc(var(--tv-u)*2)] -translate-y-1/2 px-[0.6em] py-[0.15em] tv-t-num font-display font-black" style={{ backgroundColor: medalColors[i], color: "#000" }}>
                 P{i + 1}
               </div>
-              <div className="mt-2 font-heading font-black text-2xl md:text-4xl uppercase tracking-tight leading-tight truncate">{e.display_name}</div>
-              <div className="mt-4 font-display font-bold tabular-nums text-5xl md:text-7xl" style={{ color: medalColors[i] }}>{e.time_str}</div>
-              <div className="mt-2 text-white/50 text-sm">{e.gap_str || "Leader"} · {e.attempts} Versuche</div>
+              <div className="tv-t-name font-heading font-black uppercase" data-tv-name="1" data-fit={(entry.display_name || "").length > 20 ? "small" : undefined}>{entry.display_name}</div>
+              <div className="tv-t-hero font-display font-bold" style={{ color: medalColors[i] }}>{entry.time_str}</div>
+              <div className="tv-t-info tv-muted">{entry.gap_str || "Leader"} · {entry.attempts} Versuche</div>
             </motion.div>
           ))}
           {top3.length === 0 && (
-            <div className="col-span-3 text-center py-10 font-display tracking-widest text-white/30 text-xl">NOCH KEINE ZEITEN</div>
+            <div className="col-span-3 tv-empty tv-t-head font-display">Noch keine Zeiten</div>
           )}
         </div>
 
-        <div className="space-y-2">
-          <AnimatePresence>
-            {rest.map((e, i) => (
+        <div ref={listRef} className="flex-1 min-h-0 overflow-hidden flex flex-col gap-[calc(var(--tv-u)*0.5)]" data-testid="tv-lap-list">
+          {/* Ohne Ausblenden beim Wegfallen: eine Zeile, die gerade ausblendet, belegte noch Platz - die Liste liefe kurz über. */}
+          {restFit.shown.map((entry, i) => (
               <motion.div
-                key={e.user_id}
-                initial={{ x: -20, opacity: 0 }}
+                key={entry.user_id}
+                initial={motionOn ? { x: -20, opacity: 0 } : false}
                 animate={{ x: 0, opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ delay: i * 0.03 }}
-                className="grid grid-cols-12 items-center border border-white/10 rounded-sm px-5 py-3 bg-[#0A0A0A]/60"
+                transition={motionOn ? { delay: i * 0.03 } : { duration: 0 }}
+                className="tv-card grid grid-cols-12 items-center gap-[var(--tv-gap)] px-[calc(var(--tv-u)*1.6)] py-[calc(var(--tv-u)*0.6)]"
+                data-testid="tv-lap-row"
               >
-                <div className="col-span-1 font-display font-bold text-2xl text-[#29B6E8]">{e.rank}</div>
-                <div className="col-span-6 font-heading font-bold text-lg md:text-2xl truncate uppercase">{e.display_name}</div>
-                <div className="col-span-3 text-right font-display font-bold tabular-nums text-xl md:text-3xl text-white">{e.time_str}</div>
-                <div className="col-span-2 text-right text-white/50 text-sm tabular-nums">{e.gap_str}</div>
+                <div className="col-span-1 tv-t-num font-display font-bold tv-accent">{entry.rank}</div>
+                <div className="col-span-7 tv-t-name font-heading font-bold uppercase" data-tv-name="1">{entry.display_name}</div>
+                <div className="col-span-2 text-right tv-t-num font-display font-bold">{entry.time_str}</div>
+                <div className="col-span-2 text-right tv-t-info tv-muted tabular-nums">{entry.gap_str}</div>
               </motion.div>
-            ))}
-          </AnimatePresence>
+          ))}
+          {restFit.hidden > 0 ? <div className="tv-t-meta tv-faint text-center uppercase tracking-[0.18em]">+ {restFit.hidden} weitere Zeiten</div> : null}
         </div>
+
         {references.length > 0 && (
-          <div className="mt-6 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.3em] text-[#FFD700] font-bold">Vereins-Referenz · außer Wertung</div>
-                <div className="text-xs text-white/45 mt-1">Zielzeiten zum Schlagen, nicht Teil der offiziellen Rangliste.</div>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {references.map((e) => (
-                <div key={e.user_id} className="border border-white/10 bg-[#0A0A0A]/60 rounded-sm px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-display font-bold text-[#FFD700]">#{e.rank}</span>
-                    <span className="font-display font-bold tabular-nums text-white text-2xl">{e.time_str}</span>
+          <div className="shrink-0 border border-[color:var(--tv-gold)] bg-[color:var(--tv-gold-soft)] rounded-sm px-[calc(var(--tv-u)*1.6)] py-[calc(var(--tv-u)*1)]" data-testid="tv-references">
+            <div className="tv-kicker tv-t-meta tv-gold">Vereins-Referenz · außer Wertung</div>
+            <div className="tv-t-meta tv-muted">Zielzeiten zum Schlagen, nicht Teil der offiziellen Rangliste.</div>
+            <div className="mt-[calc(var(--tv-u)*0.8)] grid grid-cols-3 gap-[var(--tv-gap)]">
+              {references.slice(0, 3).map((entry) => (
+                <div key={entry.user_id} className="tv-card px-[calc(var(--tv-u)*1.2)] py-[calc(var(--tv-u)*0.6)]">
+                  <div className="flex items-center justify-between gap-[var(--tv-gap)]">
+                    <span className="tv-t-num font-display font-bold tv-gold">#{entry.rank}</span>
+                    <span className="tv-t-num font-display font-bold tabular-nums">{entry.time_str}</span>
                   </div>
-                  <div className="mt-1 font-heading font-bold uppercase truncate">{e.display_name}</div>
+                  <div className="tv-t-name font-heading font-bold uppercase" data-tv-name="1">{entry.display_name}</div>
                 </div>
               ))}
             </div>
           </div>
         )}
-      </div>
+      </main>
 
-      <footer className="absolute bottom-0 left-0 right-0 px-8 py-4 border-t border-white/5 flex items-center justify-between gap-6 bg-[#0A0A0A]/80 backdrop-blur-sm">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="bg-white p-1.5 rounded-sm shrink-0">
-            <BrandedQRCode value={publicUrl} size={92} />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">Join The Race</div>
-            <div className="text-sm text-white/70 truncate">QR scannen und mitfahren</div>
-          </div>
-        </div>
-        <SponsorGrid max={3} marquee className="flex-1 max-w-[54vw]" />
-      </footer>
+      <TvFooter qrValue={publicUrl} kicker="Join The Race" text="QR scannen und mitfahren" sponsorMax={3} />
     </div>
   );
 }

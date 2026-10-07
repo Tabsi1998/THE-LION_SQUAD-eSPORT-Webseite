@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { api } from "@/lib/api";
-import { isGoogleMeasurementId, normalizeGoogleMeasurementId, normalizePlausibleDomain } from "@/lib/analyticsConfig";
+import { isGoogleMeasurementId, normalizeGoogleMeasurementId, normalizePlausibleDomain, withoutSecretParams } from "@/lib/analyticsConfig";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
@@ -182,8 +182,8 @@ export function AnalyticsHead() {
     const gtag = ensureGoogleTag();
     const event = {
       page_title: document.title,
-      page_location: window.location.href,
-      page_path: `${location.pathname}${location.search}`,
+      page_location: withoutSecretParams(window.location.href),
+      page_path: withoutSecretParams(`${location.pathname}${location.search}`),
       send_to: measurementId,
     };
     if (analyticsDebugMode()) event.debug_mode = true;
@@ -196,8 +196,8 @@ export function AnalyticsHead() {
     const domain = normalizePlausibleDomain(settings?.plausible_domain);
     if (!hasConsent("analytics") || provider !== "plausible" || !domain || typeof window === "undefined") return;
     window.plausible = window.plausible || function plausible(){ (window.plausible.q = window.plausible.q || []).push(arguments); };
-    window.plausible("pageview");
-    publishAnalyticsStatus({ state: "page_view_sent", provider: "plausible", domain, page_path: `${location.pathname}${location.search}` });
+    window.plausible("pageview", { u: withoutSecretParams(window.location.href) });
+    publishAnalyticsStatus({ state: "page_view_sent", provider: "plausible", domain, page_path: withoutSecretParams(`${location.pathname}${location.search}`) });
   }, [hasConsent, location.pathname, location.search, settings]);
 
   return null;

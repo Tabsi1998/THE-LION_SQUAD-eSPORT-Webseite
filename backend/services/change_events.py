@@ -43,6 +43,8 @@ PUBLIC_RESOURCES = frozenset({
     "stickers",
     "streams",
     "tournaments",
+    # TV & Beamer (#1110): neue Grundwerte und widerrufene Schlüssel erreichen die Bildschirme ohne Anmeldung.
+    "tv",
 })
 PUBLIC_RESOURCE_ALIASES = {
     "admin/nav": "nav",

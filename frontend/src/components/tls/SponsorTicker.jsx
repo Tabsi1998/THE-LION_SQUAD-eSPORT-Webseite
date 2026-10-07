@@ -111,11 +111,16 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
   );
 }
 
+const STILL_PAGE_MS = 12000;
+
 /**
- * SponsorGrid — static TV/display sponsor strip.
+ * SponsorGrid — die Sponsorenleiste der TV-Seiten. Mehr Sponsoren als Platz: als Laufband - oder, wenn sich am TV
+ * nichts bewegen soll (`still`, #1110), seitenweise ohne Gleiten alle 12 Sekunden die nächsten. Die Größen kommen
+ * aus components/tv/tv.css und wachsen mit dem Bildschirm (#1111).
  */
-export function SponsorGrid({ max = 4, placement = "tv", marquee = false, className = "" }) {
+export function SponsorGrid({ max = 4, placement = "tv", marquee = false, still = false, className = "" }) {
   const [sponsors, setSponsors] = useState([]);
+  const [page, setPage] = useState(0);
   const load = useCallback(async () => {
     try { const { data } = await api.get(`/sponsors?placement=${placement}`); setSponsors(data || []); }
     catch { setSponsors([]); }
@@ -125,12 +130,21 @@ export function SponsorGrid({ max = 4, placement = "tv", marquee = false, classN
   }, [load]);
   useApiInvalidation(load, ["sponsors"]);
   const logoSponsors = uniqueLogoSponsors(sponsors);
+  const pageCount = still ? Math.max(1, Math.ceil(logoSponsors.length / max)) : 1;
+  useEffect(() => {
+    if (pageCount <= 1) return undefined;
+    const timer = setInterval(() => setPage((current) => (current + 1) % pageCount), STILL_PAGE_MS);
+    return () => clearInterval(timer);
+  }, [pageCount]);
   if (!logoSponsors.length) return null;
-  const shouldMarquee = marquee && logoSponsors.length > max;
-  const items = shouldMarquee ? repeatForLoop(logoSponsors, Math.max(10, max * 4)) : logoSponsors.slice(0, max);
+  const shouldMarquee = marquee && !still && logoSponsors.length > max;
+  const pageStart = (page % pageCount) * max;
+  const items = shouldMarquee
+    ? repeatForLoop(logoSponsors, Math.max(10, max * 4))
+    : still ? logoSponsors.slice(pageStart, pageStart + max) : logoSponsors.slice(0, max);
   const speed = marqueeDuration(items.length, 5.5, 72);
   const renderLogo = (s, index, groupIndex = 0, duplicate = false) => (
-    <a key={`${groupIndex}-${sponsorKey(s)}-${index}`} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" tabIndex={duplicate ? -1 : undefined} className={`inline-flex items-center justify-center shrink-0 opacity-80 hover:opacity-100 transition ${s.tier === "main" ? "h-9 w-36 sm:h-10 sm:w-52" : s.tier === "platinum" ? "h-8 w-32 sm:h-9 sm:w-48" : "h-8 w-28 sm:w-44"}`} title={s.name}>
+    <a key={`${groupIndex}-${sponsorKey(s)}-${index}`} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" tabIndex={duplicate ? -1 : undefined} className={`tv-sponsor ${s.tier === "main" ? "tv-sponsor--main" : ""}`} title={s.name}>
       <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-h-full max-w-full w-auto h-auto" />
     </a>
   );
@@ -138,18 +152,19 @@ export function SponsorGrid({ max = 4, placement = "tv", marquee = false, classN
     <div
       className={`min-w-0 ${shouldMarquee ? "relative overflow-hidden" : "flex items-center justify-end"} ${className}`}
       data-testid="sponsor-grid"
+      data-mode={shouldMarquee ? "marquee" : still ? "pages" : "static"}
       style={shouldMarquee ? { maskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)" } : undefined}
     >
       <div
-        className={`flex items-center ${shouldMarquee ? "w-max whitespace-nowrap" : "gap-7"}`}
+        className={`flex items-center ${shouldMarquee ? "w-max whitespace-nowrap" : "gap-[calc(var(--tv-u)*2.4)]"}`}
         style={shouldMarquee ? { animation: `tls-marquee ${speed}s linear infinite` } : undefined}
       >
         {shouldMarquee ? (
           <>
-            <div className="flex shrink-0 items-center gap-7 pr-7">
+            <div className="flex shrink-0 items-center gap-[calc(var(--tv-u)*2.4)] pr-[calc(var(--tv-u)*2.4)]">
               {items.map((s, index) => renderLogo(s, index, 0))}
             </div>
-            <div className="flex shrink-0 items-center gap-7 pr-7" aria-hidden="true">
+            <div className="flex shrink-0 items-center gap-[calc(var(--tv-u)*2.4)] pr-[calc(var(--tv-u)*2.4)]" aria-hidden="true">
               {items.map((s, index) => renderLogo(s, index, 1, true))}
             </div>
           </>
