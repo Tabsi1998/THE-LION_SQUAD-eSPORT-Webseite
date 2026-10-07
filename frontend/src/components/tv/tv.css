@@ -1195,7 +1195,7 @@
 .tv-plan__block span { color: var(--tv-muted); font-variant-numeric: tabular-nums; }
 .tv-plan__block--past { border-color: var(--tv-line); }
 .tv-plan__block--past b, .tv-plan__block--past span { color: var(--tv-faint); }
-.tv-plan__block--live { border-color: var(--tv-accent); background: var(--tv-accent-soft); }
+.tv-plan__block--live { border-color: var(--tv-accent); background: linear-gradient(var(--tv-accent-soft), var(--tv-accent-soft)), var(--tv-card); }
 .tv-plan__block--next { border-color: color-mix(in srgb, var(--tv-gold) 65%, transparent); }
 .tv-plan__block--open { border-right-style: dashed; }
 .tv-screen[data-tv-contrast="1"] .tv-plan__block--next { border-color: var(--tv-gold); }
