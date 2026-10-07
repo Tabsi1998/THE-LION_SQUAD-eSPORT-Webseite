@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0 - 2026-10-07
+
+- Mobile: Neuer Aufbau mit fünf Tabs: Home, Events, Community, Verein und Profil. Oben in jeder Übersicht stehen Suche und Glocke, Einstellungen öffnest du über das Zahnrad im Profil, und Seiten öffnen dort, wo du gerade bist – „Zurück“ führt dorthin zurück (#1143, #1144, #1145, #1146).
+- Mobile: Alle Chats in einer Liste unter Community – Direkt-, Team-, Turnier- und Matchchats, neueste zuerst, mit den ungelesenen Nachrichten. Was du in der App liest, ist auch auf der Website gelesen (#1148).
+- Mobile: Tab „Verein“: Mitglieder sehen oben ihren Mitgliederbereich mit Karte, Versammlungen, Helfen und Dokumenten, alle anderen „Mitglied werden“. Darunter News, Galerie, Referenzen, Sponsoren und Partner (#1147).
+- Mobile: Ein Profil: Dein eigenes Profil sieht aus wie das, was andere sehen, dazu der Kasten „Nur für dich“ mit Rechnungen und Gewinnen und der Schalter „So sehen dich andere“ (#1149).
+- Mobile: Angemeldet bleiben: Ohne Netz bleibt die Sitzung, jedes Gerät hat seine eigene, und „Angemeldet bleiben“ wirkt (#942).
+- Mobile: Mehrtägige Events zeigen jeden Tag mit Datum, Beginn und Ende; „In den Kalender“ trägt alle Tage ein (#884).
+- Mobile: Bewegung wie auf der Website: Karten geben beim Antippen nach, Listen blenden sich ruhig ein (#1100, #1085).
+- Mobile: Saison-Deko an Karten: Antippen oder kurz Halten lässt Schnee abrutschen, das Netz reißen und Fledermäuse flattern; Lichterkette, Osterei, Luftschlange und Wimpel hängen jetzt auch an Karten (#1087–#1094).
+
 ## 1.3.0 - 2026-10-06
 
 - Mobile: Links öffnen die App: Turniere, Events, Matches, Fast Laps, Teams, News, Profile, Galerie, Erfolge, Jahreswertung und Rechnungen gehen aus News, Chat, Laufbanner, Dashboard, Info-Center und von außen (Discord, WhatsApp, Browser) gleich im passenden Bildschirm auf – alles andere wie bisher im Browser (#921).
