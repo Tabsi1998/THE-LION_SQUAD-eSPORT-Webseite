@@ -31,7 +31,8 @@ export type CommunitySection = "chats" | "teams" | "players" | "leaderboards";
 
 /** Die Übersicht je Tab - der erste Screen im Stapel. */
 export type TabRootParamList = {
-  Dashboard: undefined;
+  // `feedback` (#1196): „Wie war …?“ aus der Meldung - Home öffnet dann gleich das Bewerten.
+  Dashboard: { feedback?: string } | undefined;
   TournamentList: { filter?: EventsFilter } | undefined;
   CommunityHub: { section?: CommunitySection } | undefined;
   VereinHub: undefined;

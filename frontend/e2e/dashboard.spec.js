@@ -82,3 +82,38 @@ test("ohne Termine steht der Hinweis mit dem Weg zu den Events", async ({ page }
   await expect(page.getByTestId("dashboard-actions")).toHaveCount(0);
   await expect(page.getByTestId("dashboard-season")).toHaveCount(0);
 });
+
+// Rückmeldung (#1196): „Wie war …?“ steht als Zeile unter den offenen Aktionen und öffnet den Dialog mit Sternen.
+test("die Frage nach dem Turnier öffnet den Dialog; abgeschickt wird mit Sternen", async ({ page }) => {
+  const withFeedback = {
+    ...dashboard,
+    me: { ...dashboard.me, actions: [{ id: "feedback-tournament-t-past", type: "feedback", label: "Wie war der Summer Cup?", detail: "Kurz bewerten – das sieht nur der Verein", target_type: "feedback", target_id: "tournament:t-past", priority: 4 }] },
+  };
+  let sent = null;
+  await page.route("**/api/**", (route) => route.fulfill({ contentType: "application/json", body: "{}" }));
+  await page.route("**/api/sponsors**", (route) => route.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(me) }));
+  await page.route("**/api/notifications/me", (route) => route.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/api/mobile/dashboard", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(withFeedback) }));
+  await page.route("**/api/feedback/open", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({
+    items: [{ kind: "tournament", target_id: "t-past", title: "Summer Cup", question: "Wie war der Summer Cup?", day: "2026-09-01" }],
+    tags: ["Ablauf", "Zeitplan", "Stimmung", "Technik", "Essen"], text_max: 280,
+  }) }));
+  await page.route("**/api/feedback/tournament/t-past", (route) => {
+    sent = route.request().postDataJSON();
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+  await page.goto("/dashboard");
+  const consent = page.getByRole("button", { name: /alle akzeptieren/i });
+  if (await consent.count()) await consent.click();
+
+  await page.getByTestId("dashboard-action-feedback-tournament-t-past").click();
+  const dialog = page.getByTestId("feedback-dialog");
+  await expect(dialog.getByText("Wie war der Summer Cup?")).toBeVisible();
+  await expect(page.getByTestId("feedback-submit")).toBeDisabled();
+  await page.getByTestId("feedback-star-5").click();
+  await page.getByTestId("feedback-tag-Stimmung").click();
+  await page.getByTestId("feedback-submit").click();
+  await expect.poll(() => sent).toEqual({ stars: 5, tags: ["Stimmung"], text: "" });
+  await expect(dialog).toHaveCount(0);
+});

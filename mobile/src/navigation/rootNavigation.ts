@@ -158,6 +158,13 @@ export function targetFromNotification(item: UserNotification): AppTarget | null
   if (tournamentId && kind.includes("tournament_chat")) return detail("TournamentChat", { id: tournamentId, title: "Turnier-Chat" });
   if (tournamentId && kind.includes("tournament")) return detail("TournamentDetail", { id: tournamentId });
 
+  // Rückmeldung (#1196): „Wie war der FC 26 Cup?“ öffnet Home mit dem Bewerten.
+  const feedbackTarget = stringMeta(meta, "target_id");
+  const feedbackKind = stringMeta(meta, "kind");
+  if (kind === "feedback_request" && feedbackTarget && (feedbackKind === "tournament" || feedbackKind === "event")) {
+    return tab("Dashboard", { feedback: `${feedbackKind}:${feedbackTarget}` });
+  }
+
   const requesterId = stringMeta(meta, "requester_username") || stringMeta(meta, "username");
   if (requesterId && kind.includes("friend")) return detail("PublicProfile", { username: requesterId });
   // Freunde stehen in Community → Spieler (#1143).
@@ -174,6 +181,7 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   const [first, second, third] = parts;
   const query = new URLSearchParams(parsed.query);
 
+  if (first === "dashboard" && query.get("bewerten")) return tab("Dashboard", { feedback: query.get("bewerten") });
   if (parsed.root || first === "dashboard") return tab("Dashboard");
   if (first === "matches" && second) return detail("MatchDetail", { id: second });
   if (first === "tournaments" && second) return detail(third === "chat" ? "TournamentChat" : "TournamentDetail", { id: second });

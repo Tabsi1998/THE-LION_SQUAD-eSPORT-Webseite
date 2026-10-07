@@ -541,6 +541,10 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
         )
 
     actions = _dashboard_actions(my_tournaments, my_events, my_matches)
+    if user:
+        # Rückmeldung (#1196): „Wie war …?“ als Zeile unter den offenen Aktionen - Website und App lesen dieselbe Liste.
+        from services.feedback import dashboard_actions as feedback_actions
+        actions = await feedback_actions(db, user, actions)
     return {
         "me": {
             "tournaments": my_tournaments,

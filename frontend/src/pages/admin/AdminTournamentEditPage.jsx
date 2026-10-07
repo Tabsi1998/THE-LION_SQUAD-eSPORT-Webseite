@@ -15,6 +15,7 @@ import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { REGISTRATION_STATUS_OPTIONS, formatRegistrationStatus, formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { LineupMark, useTeamLineups } from "@/components/tls/tournament/LineupMark";
+import { FeedbackReport } from "@/pages/admin/feedback/FeedbackReport";
 import { ParticipantAddForm } from "./tournament/ParticipantAddForm";
 import { TournamentStaffPanel } from "./tournament/StaffPanel";
 import { TournamentStagesPanel } from "./tournament/StagesPanel";
@@ -437,6 +438,8 @@ export default function AdminTournamentEditPage() {
     ["stages", "Matchplan"],
     ...(t.format === "groups" ? [["groups", "Gruppen"]] : []),
     ...(isAdmin ? [["staff", "Team"]] : []),
+    // Rückmeldungen (#1196): erst, wenn das Turnier vorbei ist - ohne Namen.
+    ...(["completed", "results_published", "archived"].includes(t.status) ? [["feedback", "Rückmeldungen"]] : []),
     ["edit", "Bearbeiten"],
   ];
   const activeTab = availableTabs.some(([key]) => key === tab) ? tab : "participants";
@@ -756,6 +759,12 @@ export default function AdminTournamentEditPage() {
           onRebuildFromFormat={rebuildFromFormat}
         />
       )}
+      {activeTab === "feedback" && (
+        <div className="border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="admin-tournament-feedback">
+          <FeedbackReport kind="tournament" targetId={t.id} />
+        </div>
+      )}
+
       {activeTab === "staff" && isAdmin && (
         <TournamentStaffPanel tournamentId={t.id} staff={staff} users={users} onChanged={load} />
       )}

@@ -153,6 +153,8 @@ NOTIFICATION_KIND_CATEGORY = {
     "match_chat_message": "community_messages",
     "match_chat_mention": "community_messages",
     "tournament_checkin": "tournament_updates",
+    # Rückmeldung (#1196): „Wie war der FC 26 Cup?“ am Tag danach - Thema Turnier-Updates, auch bei Events.
+    "feedback_request": "tournament_updates",
     "tournament_chat_message": "community_messages",
     "tournament_chat_mention": "community_messages",
     "team_chat_message": "community_messages",

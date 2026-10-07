@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FeedbackReport } from "@/pages/admin/feedback/FeedbackReport";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -485,6 +486,13 @@ function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges 
         )}
         <PartnerPicker partners={partners} value={form.partner_ids} onChange={(v) => set("partner_ids", v)} testPrefix="event-partner" hint="Das Event erscheint auf der Partnerseite unter „Gemeinsam“, und die Eventseite nennt den Partner." />
       </FormSection>
+
+      {/* Rückmeldungen (#1196): was die Eingecheckten nach dem Event sagen - ohne Namen. */}
+      {!isNew && event?.id ? (
+        <FormSection title="Rückmeldungen" accent={ACCENT}>
+          <FeedbackReport kind="event" targetId={event.id} />
+        </FormSection>
+      ) : null}
     </AdminFormPage>
   );
 }
