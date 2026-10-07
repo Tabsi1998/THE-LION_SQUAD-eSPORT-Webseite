@@ -6,6 +6,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
+import { ListItemFadeIn, useListEntrance } from "../../components/FadeIn";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -78,6 +79,9 @@ export function DashboardScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [offline, setOffline] = useState(false);
+  // Die Listen der Abschnitte blenden gestaffelt ein (#1085) - jede Karte nur beim ersten Erscheinen, nicht bei jedem
+  // Neuladen (Fokus, Live-Änderung, Ziehen).
+  const entrance = useListEntrance();
   const isGuest = isGuestUser(user);
   // Nur Ziele, die nicht ohnehin in der Tab-Leiste stehen. Turniere sind der
   // Events-Tab, News und Jahreswertung haben unten eigene Abschnitte (#212).
@@ -234,25 +238,27 @@ export function DashboardScreen({ navigation }: Props) {
 
         {!isGuest && data.me.matches.length ? (
           <Section title="Meine aktiven Matches">
-            {data.me.matches.slice(0, 6).map((match) => (
-              <MatchOverviewCard
-                key={match.id}
-                match={match}
-                onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id }, initial: false })}
-              />
+            {data.me.matches.slice(0, 6).map((match, index) => (
+              <ListItemFadeIn key={match.id} entrance={entrance} id={`match-${match.id}`} index={index}>
+                <MatchOverviewCard
+                  match={match}
+                  onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id }, initial: false })}
+                />
+              </ListItemFadeIn>
             ))}
           </Section>
         ) : null}
 
         {!isGuest && data.me.staff_matches.length ? (
           <Section title="Turnierleitung · Ergebnisse">
-            {data.me.staff_matches.slice(0, 6).map((match) => (
-              <MatchOverviewCard
-                key={`staff-${match.id}`}
-                match={match}
-                staff
-                onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id }, initial: false })}
-              />
+            {data.me.staff_matches.slice(0, 6).map((match, index) => (
+              <ListItemFadeIn key={`staff-${match.id}`} entrance={entrance} id={`staff-${match.id}`} index={index}>
+                <MatchOverviewCard
+                  match={match}
+                  staff
+                  onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id }, initial: false })}
+                />
+              </ListItemFadeIn>
             ))}
           </Section>
         ) : null}
@@ -265,35 +271,41 @@ export function DashboardScreen({ navigation }: Props) {
 
         {liveItems.length ? (
           <Section title="Heute und Live">
-            {liveItems.map((item) => (
-              <TimelineCard key={`live-${item.kind}-${item.id}`} item={item} perch={`home-live-${item.kind}-${item.id}`} onPress={() => openTimelineItem(item)} />
+            {liveItems.map((item, index) => (
+              <ListItemFadeIn key={`live-${item.kind}-${item.id}`} entrance={entrance} id={`live-${item.kind}-${item.id}`} index={index}>
+                <TimelineCard item={item} perch={`home-live-${item.kind}-${item.id}`} onPress={() => openTimelineItem(item)} />
+              </ListItemFadeIn>
             ))}
           </Section>
         ) : null}
 
         {data.streams.length ? (
           <Section title="Vereinsmitglieder live">
-            {data.streams.slice(0, 3).map((stream) => (
-              <StreamCard key={`${stream.user_id || stream.username}-${stream.twitch_login}`} stream={stream} />
+            {data.streams.slice(0, 3).map((stream, index) => (
+              <ListItemFadeIn key={streamKey(stream)} entrance={entrance} id={`stream-${streamKey(stream)}`} index={index}>
+                <StreamCard stream={stream} />
+              </ListItemFadeIn>
             ))}
           </Section>
         ) : null}
 
         {!isGuest && data.me.actions.length ? (
           <Section title="Offene Aktionen">
-            {data.me.actions.map((action) => (
-              <Pressable key={action.id} onPress={() => openAction(action)} style={({ pressed }) => [pressed && styles.pressed]}>
-                <Card style={styles.actionCard}>
-                  <View style={styles.actionIcon}>
-                    <Ionicons name={iconForAction(action.type)} color={colors.cyan} size={18} />
-                  </View>
-                  <View style={styles.flex}>
-                    <Body style={styles.rowTitle}>{action.label}</Body>
-                    {action.detail ? <Muted>{action.detail}</Muted> : null}
-                  </View>
-                  {action.target_id ? <Ionicons name="chevron-forward" color={colors.muted} size={18} /> : null}
-                </Card>
-              </Pressable>
+            {data.me.actions.map((action, index) => (
+              <ListItemFadeIn key={action.id} entrance={entrance} id={`action-${action.id}`} index={index}>
+                <Pressable onPress={() => openAction(action)} style={({ pressed }) => [pressed && styles.pressed]}>
+                  <Card style={styles.actionCard}>
+                    <View style={styles.actionIcon}>
+                      <Ionicons name={iconForAction(action.type)} color={colors.cyan} size={18} />
+                    </View>
+                    <View style={styles.flex}>
+                      <Body style={styles.rowTitle}>{action.label}</Body>
+                      {action.detail ? <Muted>{action.detail}</Muted> : null}
+                    </View>
+                    {action.target_id ? <Ionicons name="chevron-forward" color={colors.muted} size={18} /> : null}
+                  </Card>
+                </Pressable>
+              </ListItemFadeIn>
             ))}
           </Section>
         ) : null}
@@ -304,8 +316,10 @@ export function DashboardScreen({ navigation }: Props) {
           onAction={() => navigation.navigate("Tournaments")}
         >
           {nextItems.length ? (
-            nextItems.map((item) => (
-              <TimelineCard key={`${item.kind}-${item.id}`} item={item} perch={`home-${item.kind}-${item.id}`} onPress={() => openTimelineItem(item)} />
+            nextItems.map((item, index) => (
+              <ListItemFadeIn key={`${item.kind}-${item.id}`} entrance={entrance} id={`next-${item.kind}-${item.id}`} index={index}>
+                <TimelineCard item={item} perch={`home-${item.kind}-${item.id}`} onPress={() => openTimelineItem(item)} />
+              </ListItemFadeIn>
             ))
           ) : liveItems.length ? (
             <Muted>Alles Weitere steht oben unter „Heute und Live“.</Muted>
@@ -336,12 +350,13 @@ export function DashboardScreen({ navigation }: Props) {
 
         <Section title="News" actionLabel="Alle News" onAction={() => navigation.navigate("More", { screen: "NewsList", initial: false })}>
           {data.news.length ? (
-            data.news.slice(0, 3).map((post) => (
-              <NewsCard
-                key={post.id}
-                post={post}
-                onPress={() => navigation.navigate("More", { screen: "NewsDetail", params: { id: post.slug || post.id }, initial: false })}
-              />
+            data.news.slice(0, 3).map((post, index) => (
+              <ListItemFadeIn key={post.id} entrance={entrance} id={`news-${post.id}`} index={index}>
+                <NewsCard
+                  post={post}
+                  onPress={() => navigation.navigate("More", { screen: "NewsDetail", params: { id: post.slug || post.id }, initial: false })}
+                />
+              </ListItemFadeIn>
             ))
           ) : (
             <EmptyState icon="newspaper-outline" title="Keine News" detail="Aktuelle Website-News werden hier eingeblendet, sobald sie veröffentlicht sind." />
@@ -351,6 +366,10 @@ export function DashboardScreen({ navigation }: Props) {
       </ScrollView>
     </Screen>
   );
+}
+
+function streamKey(stream: LiveStream) {
+  return `${stream.user_id || stream.username}-${stream.twitch_login}`;
 }
 
 function StreamCard({ stream }: { stream: LiveStream }) {

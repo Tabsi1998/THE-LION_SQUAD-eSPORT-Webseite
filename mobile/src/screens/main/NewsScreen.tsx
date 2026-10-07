@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useBranding } from "../../branding/BrandingProvider";
 import { Card } from "../../components/Card";
+import { ListItemFadeIn, useListEntrance } from "../../components/FadeIn";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
@@ -28,6 +29,9 @@ export function NewsScreen({ navigation }: Props) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [scope, setScope] = useState<ScopeFilter>("all");
+  // Die Beiträge blenden gestaffelt ein (#1085): der große oben zuerst, dann die Liste - jeder nur beim ersten
+  // Erscheinen, nicht wieder beim Ziehen, Suchen oder Filtern.
+  const entrance = useListEntrance();
 
   const load = useCallback(async () => {
     setError("");
@@ -165,10 +169,12 @@ export function NewsScreen({ navigation }: Props) {
             ) : null}
 
             {featuredPost ? (
-              <FeaturedNewsCard
-                post={featuredPost}
-                onPress={() => navigation.navigate("NewsDetail", { id: featuredPost.slug || featuredPost.id })}
-              />
+              <ListItemFadeIn key={featuredPost.id} entrance={entrance} id={`news-${featuredPost.id}`} index={0}>
+                <FeaturedNewsCard
+                  post={featuredPost}
+                  onPress={() => navigation.navigate("NewsDetail", { id: featuredPost.slug || featuredPost.id })}
+                />
+              </ListItemFadeIn>
             ) : null}
           </View>
         }
@@ -195,8 +201,10 @@ export function NewsScreen({ navigation }: Props) {
           />
         }
         contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <NewsCard post={item} onPress={() => navigation.navigate("NewsDetail", { id: item.slug || item.id })} />
+        renderItem={({ item, index }) => (
+          <ListItemFadeIn entrance={entrance} id={`news-${item.id}`} index={index + 1}>
+            <NewsCard post={item} onPress={() => navigation.navigate("NewsDetail", { id: item.slug || item.id })} />
+          </ListItemFadeIn>
         )}
       />
     </Screen>

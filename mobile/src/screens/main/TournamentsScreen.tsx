@@ -3,6 +3,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-n
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
+import { ListItemFadeIn, useListEntrance, type ListEntrance } from "../../components/FadeIn";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -66,6 +67,8 @@ export function TournamentsScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [offline, setOffline] = useState(false);
+  // Die Listen blenden gestaffelt ein (#1085) - jede Karte nur beim ersten Erscheinen.
+  const entrance = useListEntrance();
 
   const load = useCallback(async () => {
     setError("");
@@ -237,12 +240,16 @@ export function TournamentsScreen({ navigation }: Props) {
 
         {view === "list" ? (openItems.length && filter === "all" ? (
           <>
-            <HubSection title="Events" items={groupedItems.events} onOpen={open} />
-            <HubSection title="Turniere" items={groupedItems.tournaments} onOpen={open} />
-            <HubSection title="Fast Laps" items={groupedItems.fastlaps} onOpen={open} />
+            <HubSection title="Events" items={groupedItems.events} onOpen={open} entrance={entrance} />
+            <HubSection title="Turniere" items={groupedItems.tournaments} onOpen={open} entrance={entrance} />
+            <HubSection title="Fast Laps" items={groupedItems.fastlaps} onOpen={open} entrance={entrance} />
           </>
         ) : openItems.length ? (
-          openItems.map((item) => <HubContentCard key={`${item.kind}-${item.id}`} item={item} onPress={() => open(item)} />)
+          openItems.map((item, index) => (
+            <ListItemFadeIn key={`${item.kind}-${item.id}`} entrance={entrance} id={`${item.kind}-${item.id}`} index={index}>
+              <HubContentCard item={item} onPress={() => open(item)} />
+            </ListItemFadeIn>
+          ))
         ) : (
           <EmptyState icon="calendar-clear-outline" title="Nichts Offenes" detail={pastItems.length ? "Alles, was hier war, ist vorbei – unten lässt sich Vergangenes einblenden." : "Sobald etwas geplant ist, steht es hier."} />
         )) : null}
@@ -259,7 +266,7 @@ export function TournamentsScreen({ navigation }: Props) {
               <Body style={styles.pastToggleText}>{showPast ? "Vergangene ausblenden" : `Vergangene anzeigen (${pastItems.length})`}</Body>
             </Pressable>
             {showPast ? (
-              <HubSection title="Vergangen" items={pastItems} onOpen={open} />
+              <HubSection title="Vergangen" items={pastItems} onOpen={open} entrance={entrance} />
             ) : null}
           </View>
         ) : null}
@@ -268,12 +275,16 @@ export function TournamentsScreen({ navigation }: Props) {
   );
 }
 
-function HubSection({ title, items, onOpen }: { title: string; items: HubItem[]; onOpen: (item: HubItem) => void }) {
+function HubSection({ title, items, onOpen, entrance }: { title: string; items: HubItem[]; onOpen: (item: HubItem) => void; entrance: ListEntrance }) {
   if (!items.length) return null;
   return (
     <View style={styles.section}>
       <Heading>{title}</Heading>
-      {items.map((item) => <HubContentCard key={`${item.kind}-${item.id}`} item={item} onPress={() => onOpen(item)} />)}
+      {items.map((item, index) => (
+        <ListItemFadeIn key={`${item.kind}-${item.id}`} entrance={entrance} id={`${item.kind}-${item.id}`} index={index}>
+          <HubContentCard item={item} onPress={() => onOpen(item)} />
+        </ListItemFadeIn>
+      ))}
     </View>
   );
 }
