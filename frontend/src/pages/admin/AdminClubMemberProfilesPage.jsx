@@ -293,6 +293,8 @@ function ProfileModal({ entry, profiles = [], onClose, onSaved }) {
           <ImageUpload value={form.photo_url} onChange={(v) => set("photo_url", v)} label="Profilbild" testId="club-member-photo" variant="wide" allowLibrary />
           <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Detail-Cover optional" testId="club-member-cover" variant="wide" allowLibrary />
         </FormGrid>
+        {/* Vorstands-Porträts aus einem Guss (#1332): freigestellte Fotos bekommen den Vereins-Hintergrund dahinter. */}
+        <p className="text-xs text-white/50" data-testid="club-member-photo-hint">Profilbild am schönsten freigestellt (ohne Hintergrund, als PNG) – der Verein legt seinen dahinter. Fotos mit Hintergrund zeigt die Vorstandsseite einheitlich in Vereinsfarben.</p>
         <FormGrid>
           <TextField label="Sortierung" type="number" value={form.order_index} onChange={(v) => set("order_index", v)} />
           <CheckField label="Öffentlich anzeigen" checked={form.is_active} onChange={(v) => set("is_active", v)} accent="#FFD700" className="self-end pb-2" />

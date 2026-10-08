@@ -83,6 +83,7 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/players/neonfalke", detail("PublicProfile", { username: "neonfalke" })],
   ["/profile/neonfalke", detail("PublicProfile", { username: "neonfalke" })],
   ["/account/invoices", detail("MyInvoices", undefined)],
+  ["/account/documents", detail("MyDocuments")],
   ["/profile?tab=invoices&invoice=d-501", detail("MyInvoices", { invoice: "d-501" })],
   ["/me/prizes", detail("MyPrizes")],
   ["/my/prizes", detail("MyPrizes")],

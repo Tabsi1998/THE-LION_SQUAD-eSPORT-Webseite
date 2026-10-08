@@ -8,7 +8,7 @@ import { MemoryRouter } from "react-router-dom";
 
 const apiMock = { get: vi.fn(), post: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler" }));
+vi.mock("@/lib/api", () => ({ API: "https://api.test/api", api: apiMock, formatApiError: (detail) => detail || "Fehler" }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
 vi.mock("@/components/tls/GermanDateField", () => ({
@@ -134,4 +134,43 @@ test("Hilfsfunktionen", () => {
   expect(feeLine({ subscription_required: true, amount: 75, currency: "EUR", period_label: "je Jahr" })).toBe("75,00 € je Jahr");
   expect(splitDisplayName("Amelie Beispiel")).toEqual({ firstname: "Amelie", lastname: "Beispiel" });
   expect(splitDisplayName("amelie")).toEqual({ firstname: "", lastname: "" });
+});
+
+test("der Link „Vereinsstatuten“ führt auf genau die geltenden Statuten - ohne öffentliche auf „Vorstand“ (#1252)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/apply/form") return { data: { coupled: false } };
+    if (url === "/board/statutes") return { data: { available: true, source: "dolibarr", pdf_url: "/api/board/statutes/3/pdf", current: { id: 3 } } };
+    return { data: null };
+  });
+  const { unmount } = render(<MemoryRouter><MembershipApplyPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("apply-statutes-link")).toHaveAttribute("href", "https://api.test/api/board/statutes/3/pdf"));
+  expect(screen.getByTestId("apply-statutes-link")).not.toHaveAttribute("href", "/imprint");
+  unmount();
+
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/apply/form") return { data: { coupled: false } };
+    if (url === "/board/statutes") return { data: { available: false, reason: "members_only" } };
+    return { data: null };
+  });
+  render(<MemoryRouter><MembershipApplyPage /></MemoryRouter>);
+  expect(await screen.findByTestId("apply-statutes-link")).toHaveAttribute("href", "/board#statuten");
+});
+
+test("ohne Kopplung zeigt die Auswahl dieselben Beträge wie „Mitglied werden“ und schickt die Mitgliedsart (#1251)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/apply/form") return { data: { coupled: false, contribution_options: [{ value: "full", label: "Vollmitgliedschaft" }], fees: SETUP.fees, fees_as_of: "2026-10-07T08:00:00Z" } };
+    return { data: null };
+  });
+  apiMock.post.mockResolvedValue({ data: { id: "a1", status: "pending", created_at: "2026-09-23T10:00:00Z" } });
+  render(<MemoryRouter><MembershipApplyPage /></MemoryRouter>);
+  const select = await screen.findByTestId("apply-fee-select");
+  expect(select).toHaveValue("2");
+  expect(select).toHaveTextContent("Ordentliches Mitglied – 50,00 € je Jahr · Eintritt unterm Jahr anteilig");
+  expect(screen.queryByTestId("apply-contribution")).toBeNull();
+  fireEvent.change(select, { target: { value: "3" } });
+  fireEvent.change(screen.getByTestId("apply-motivation"), { target: { value: "Ich möchte den Verein langfristig aktiv unterstützen." } });
+  fireEvent.click(screen.getByTestId("apply-statutes"));
+  fireEvent.click(screen.getByTestId("apply-privacy"));
+  fireEvent.click(screen.getByTestId("apply-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/membership/apply", expect.objectContaining({ type_id: 3, contribution_pref: "full" })));
 });

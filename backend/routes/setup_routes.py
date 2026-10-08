@@ -283,7 +283,7 @@ TOURNAMENT_SITEMAP_PATHS = [
 STATIC_SITEMAP_PATHS = [
     "/", "/about", "/news", "/events", "/calendar", "/esports", "/tournaments", "/fastlap",
     "/teams", "/servers", "/members", "/membership/join",
-    "/sponsors", "/partners", "/contact", "/board", "/values", "/galerie", "/references",
+    "/sponsors", "/partners", "/contact", "/board", "/galerie", "/references",
 ]
 
 

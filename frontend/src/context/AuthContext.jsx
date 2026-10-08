@@ -1,5 +1,6 @@
 import { areasOf, hasArea, isAnyAdmin } from "@/lib/permissions";
 import { clearRecentSearches } from "@/lib/recentSearches";
+import { clearOfflineCard, offlineCardOwner } from "@/lib/memberCardOffline";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { normalizeApiPath } from "@/lib/apiInvalidation";
@@ -31,6 +32,12 @@ export function AuthProvider({ children }) {
     sessionStorage.removeItem("tls.mfa.ticket");
     fetchMe();
   }, [fetchMe]);
+
+  // Ein anderes Konto am selben Browser: die Mitgliedskarte des vorigen geht weg (#1256).
+  useEffect(() => {
+    const owner = offlineCardOwner();
+    if (user?.id && owner && owner !== user.id) clearOfflineCard();
+  }, [user?.id]);
 
   const googleAuthenticate = useCallback(async (credential, options = {}) => {
     setGoogleProcessing(true);
@@ -142,8 +149,9 @@ export function AuthProvider({ children }) {
       await api.post("/auth/logout");
       setMfaTicket("");
       setUser(null);
-      // Die letzten Suchen (#1145) gehen mit dem Konto.
+      // Die letzten Suchen (#1145) und die gespeicherte Mitgliedskarte (#1256) gehen mit dem Konto.
       clearRecentSearches();
+      clearOfflineCard();
       return true;
     } catch (e) {
       const msg = formatApiError(e.response?.data?.detail) || "Logout fehlgeschlagen.";

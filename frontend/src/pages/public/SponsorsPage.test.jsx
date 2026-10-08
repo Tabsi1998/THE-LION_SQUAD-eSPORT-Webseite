@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 // Jahren unten - und ohne Ehemalige gibt es den Abschnitt nicht.
 
 const apiMock = { get: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (value) => value || "" }));
+vi.mock("@/lib/api", () => ({ API: "https://api.test/api", api: apiMock, resolveMediaUrl: (value) => value || "" }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/SmartLogo", () => ({ SmartLogo: ({ alt }) => <img alt={alt} /> }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
@@ -54,4 +54,45 @@ test("Banner aus dem Vereinsmodul oben in der Karte, das Logo darunter - nur wo 
   expect(banner.querySelector("img")).toHaveAttribute("src", "/api/static/uploads/dolibarr-partner-7-banner-dark-abc.jpg");
   expect(screen.getByTestId("sponsor-a")).toContainElement(banner);
   expect(screen.queryByTestId("sponsor-banner-b")).toBeNull();
+});
+
+// Sponsor werden (#1254): mit gepflegten Inhalten Zahlen, Leistungen je Stufe und „Unterlagen anfordern“; ohne bleibt
+// die kleine Karte, die aufs Kontaktformular führt.
+const OFFER = {
+  available: true, intro: "Mit eurer Hilfe bleiben Startgelder niedrig.", tiers: ["gold", "silver", "bronze"], pdf_url: "/api/sponsoring/offer/pdf",
+  numbers: [{ value: "2.400", label: "Besuche im Monat" }, { value: "214", label: "im Discord", counted: true }],
+  benefits: [{ label: "Logo auf TV und Beamer", tiers: ["gold"] }, { label: "Logo im Laufband", tiers: ["gold", "silver", "bronze"] }],
+};
+
+test("mit Inhalten: Zahlen, Leistungen je Stufe (Karten und Tabelle), Unterlagen und Mappe", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/sponsors") return { data: ACTIVE };
+    if (url === "/sponsoring/offer") return { data: OFFER };
+    return { data: [] };
+  });
+  render(<MemoryRouter><SponsorsPage /></MemoryRouter>);
+  const section = await screen.findByTestId("sponsors-offer");
+  expect(section).toHaveAttribute("id", "sponsor-werden");
+  expect(screen.getByTestId("sponsors-offer-numbers")).toHaveTextContent("2.400Besuche im Monat");
+  expect(screen.getByTestId("sponsors-offer-tier-gold")).toHaveTextContent("Logo auf TV und Beamer");
+  expect(screen.getByTestId("sponsors-offer-tier-bronze")).not.toHaveTextContent("Logo auf TV und Beamer");
+  const rows = screen.getByTestId("sponsors-offer-table").querySelectorAll("tbody tr");
+  expect(rows).toHaveLength(2);
+  expect(rows[0].querySelectorAll('[aria-label="ja"]')).toHaveLength(1);
+  expect(rows[1].querySelectorAll('[aria-label="ja"]')).toHaveLength(3);
+  expect(screen.getByTestId("sponsors-offer-contact")).toHaveAttribute("href", `/contact?topic=sponsorship&subject=${encodeURIComponent("Sponsoring: Unterlagen anfordern")}`);
+  expect(screen.getByTestId("sponsors-offer-pdf")).toHaveAttribute("href", "https://api.test/api/sponsoring/offer/pdf");
+  expect(screen.getByTestId("sponsors-become-card")).toHaveAttribute("href", "/sponsors#sponsor-werden");
+});
+
+test("ohne Inhalte bleibt die kleine Karte zum Kontaktformular", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/sponsors") return { data: ACTIVE };
+    if (url === "/sponsoring/offer") return { data: { available: false } };
+    return { data: [] };
+  });
+  render(<MemoryRouter><SponsorsPage /></MemoryRouter>);
+  await screen.findByTestId("sponsor-a");
+  expect(screen.queryByTestId("sponsors-offer")).toBeNull();
+  expect(screen.getByTestId("sponsors-become-card")).toHaveAttribute("href", "/contact");
 });

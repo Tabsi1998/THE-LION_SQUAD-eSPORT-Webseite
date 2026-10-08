@@ -1,4 +1,4 @@
-import { describeSync, feeCard, formatMoney } from "./dolibarr";
+import { describeSync, feeBadge, feeCard, formatMoney } from "./dolibarr";
 
 // Dolibarr (#295): was auf „Meine Mitgliedschaft“ und oben auf der Admin-Seite steht.
 
@@ -47,4 +47,17 @@ test("der letzte Abgleich sagt, was war", () => {
   expect(fine.tone).toBe("ok");
   expect(fine.text).toMatch(/40 gelesen, 3 übernommen · vollständig/);
   expect(describeSync({ last_run_at: "x", last_ok_at: "2026-09-21T10:00:00+00:00", ok: true, applied_live: false, counts: { seen: 40 } }, "preview").text).toMatch(/nichts übernommen \(Vorschau\)/);
+});
+
+// Das Schild oben im Mitgliederbereich (#1336): dieselben Daten wie „Meine Mitgliedschaft“, ohne Verwaltung kein Schild.
+test("Schild zum Beitrag: bezahlt, offen, nicht nötig, ruht - sonst keins", () => {
+  const view = (status) => ({ led_by_dolibarr: true, fee: { status } });
+  expect(feeBadge(view("paid"))).toEqual({ tone: "ok", text: "Beitrag bezahlt" });
+  expect(feeBadge(view("due"))).toEqual({ tone: "warn", text: "Beitrag offen" });
+  expect(feeBadge(view("invoiced"))).toEqual({ tone: "warn", text: "Beitrag offen" });
+  expect(feeBadge(view("not_required"))).toEqual({ tone: "plain", text: "Kein Beitrag nötig" });
+  expect(feeBadge(view("inactive"))).toEqual({ tone: "plain", text: "Beitrag ruht" });
+  expect(feeBadge(view("unbekannt"))).toBeNull();
+  expect(feeBadge({ led_by_dolibarr: false, fee: { status: "paid" } })).toBeNull();
+  expect(feeBadge(null)).toBeNull();
 });

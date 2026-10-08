@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import { clearRecentSearches } from "../lib/recentSearches";
+import { clearOfflineCard } from "../lib/memberCardOffline";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { api, configureAuthBridge, refreshSession } from "../lib/api";
 import { clearAllCache } from "../lib/cache";
@@ -115,6 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearAllCache(),
       // Die letzten Suchen (#1145) gehen mit dem Konto.
       clearRecentSearches(),
+      // Die gespeicherte Mitgliedskarte (#1256) gehört dem abgemeldeten Konto.
+      clearOfflineCard(),
     ]);
   }, [enterGuest]);
 

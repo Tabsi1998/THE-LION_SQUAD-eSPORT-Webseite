@@ -29,6 +29,8 @@ test("Liste mit Kategorie und Kennzeichen; Öffnen ruft den Lader mit Anmeldung"
   const opener = jest.fn().mockResolvedValue(undefined);
   await render(<MemberDocumentsScreen navigation={navigation} route={route} opener={opener} />);
   await waitFor(() => expect(screen.getByTestId("document-d1")).toBeTruthy());
+  // Nur die Vereinsdokumente (#1255) - die eigenen Schreiben stehen im Profil.
+  expect(mockGet).toHaveBeenCalledWith("/documents", { params: { scope: "club" } });
   expect(screen.getByText(/Protokolle · Vorstand/)).toBeTruthy();
   expect(screen.getByText(/20 KB/)).toBeTruthy();
 

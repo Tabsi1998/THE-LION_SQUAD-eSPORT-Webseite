@@ -136,6 +136,16 @@ sich danach filtern (Abrechnung I, #320).
 - Voraussetzung im Modul: `GET /vereine/members/{id}/invoices` und `…/pdf`
   (Vereine ab 0.3). Der Website-Benutzer braucht dafür keine Rechnungsrechte.
 
+## Mitgliedsbeitrag auf „Mitglied werden“ (#1251)
+
+„Mitglied werden“ nennt die Beiträge offen – ohne Anmeldung: alle Mitgliedsarten **für Personen** aus
+*Mitglieder → Mitgliedsarten* mit Betrag, Zeitraum, Aufnahmegebühr und dem Hinweis „anteilig“. Gepflegt wird
+nur in Dolibarr; die Website liest die Liste höchstens einmal je Stunde (dazu der stündliche Abgleich) und zeigt
+dieselben Zahlen in der Auswahl des Antrags – auch, wenn die Anträge nicht nach Dolibarr gehen. Antwortet
+Dolibarr nicht, bleibt der letzte Stand mit Datum stehen; gibt es keinen Stand oder ist die Anbindung aus, steht
+dort „Die Beiträge nennen wir dir im Antrag“. Den Satz, wofür das Geld verwendet wird, und die vier
+Vorteils-Kacheln pflegt der Vorstand unter *Verwaltung → Bewerbungen → Seite „Mitglied werden“*.
+
 ## Mitgliedskarte (App 0.7.0-beta)
 
 Aktive Mitglieder sehen unter **Meine Mitgliedschaft** (Web) und in der LionsAPP
@@ -153,6 +163,12 @@ und landet auf `lionsquad.at/karte/pruefen/…` – ohne Anmeldung.
   eingetragener Austritt beendet sie mit dem letzten Tag. „Gültig bis“ zeigt
   das Austrittsdatum, sonst „bezahlt bis“, sonst „solange die Mitgliedschaft
   besteht“.
+- **Als Bild und ohne Netz (#1256):** „Als Bild speichern“ legt die Karte – Logo, Name, Nummer, Art, gültig
+  bis – ins Fotoalbum (am Handy über das Teilen-Menü, am PC als Download). Den Prüfcode hat das Bild bewusst
+  nicht, dort steht „Prüfcode braucht Netz“. Ohne Netz zeigt „Meine Mitgliedschaft“ die zuletzt geladene Karte
+  mit „Stand“, die installierte Website zeigt sie auf der Seite „Keine Verbindung“. Gespeichert wird nur, was
+  auf der Karte steht; Abmelden löscht es. Die App macht es genauso: ohne Netz die zuletzt geladene Karte mit
+  „Stand“ und „Prüfcode braucht Netz“, gespeichert im sicheren Speicher des Geräts, Abmelden löscht sie.
 - **Wallet:** Apple Wallet und Google Wallet sind vorbereitet (die Karte hat
   ein neutrales Modell mit Feldern, Farben und Barcode), brauchen aber ein
   Apple-Entwicklerkonto mit Pass-Zertifikat bzw. ein Google-Wallet-Issuer-Konto.
@@ -310,6 +326,13 @@ aus Dolibarr und prüft es gegen die Prüfsumme der Vereinsakte – passt es nic
 nicht (Fehler 502). Den Entwurf, an dem der Vorstand arbeitet, kennt die Website nie. Ohne Freigabe
 oder mit einem Modul vor 0.11 bleibt der Hinweis auf den Mitgliederbereich; im Reiter Rechtliches
 steht, was Sache ist.
+
+**Statuten öffentlich zeigen (#1252):** ein eigener Schalter unter *Dolibarr → Funktionen*, ab Werk **an**.
+Mit „Vereinsdaten aus Dolibarr“ zeigt „Vorstand“ nur, was der Verein im Modul freigibt (die Freigabe bleibt
+dort, die Zeile sagt, ob eine Fassung freigegeben ist); ohne Dolibarr das Dokument der Kategorie „Statuten“
+aus *Verwaltung → Dokumente* (angepinnt oder das neueste, nie ein internes) als PDF für alle. Aus: die
+Statuten stehen wie früher nur im Mitgliederbereich. Der Link „Vereinsstatuten“ im Mitgliedsantrag führt
+auf genau diese Fassung.
 
 ## Ehrungen im Profil (Vereine ab 1.8.0, #848)
 
@@ -506,9 +529,13 @@ Protokolle für Mitglieder) verlangt das Vereinsmodul deshalb eine Verbindung je
    Website erzeugen, Fähigkeit „Dokumente“ anhaken. Der Code wird einmal angezeigt, gilt eine
    Stunde und genau einmal – ihn dem Mitglied persönlich geben (nicht in einen offenen Kanal).
 3. Das Mitglied löst den Code auf der Website unter *Meine Mitgliedschaft → Vereinsakte* ein.
-   Ab dann stehen seine Unterlagen unter *Vereinsdokumente* (Web und App) mit dem Hinweis
-   „Vereinsakte“ bzw. „nur für dich“; das PDF holt die Website je Abruf aus Dolibarr, das dabei
-   selbst prüft, ob die Person es sehen darf, und prüft die Datei gegen die Prüfsumme.
+   Ab dann stehen die Unterlagen für Mitglieder (Protokolle, Beschlüsse) unter *Vereinsdokumente*
+   mit dem Hinweis „Vereinsakte“, die Schreiben nur für diese Person (Beitrittsbestätigung,
+   Spendenbestätigung) seit #1255 im eigenen Profil unter *Nur für dich → Deine Unterlagen*
+   (`/account/documents`) - die Vereinsdokumente sind so für alle Mitglieder gleich. Das PDF holt die
+   Website je Abruf aus Dolibarr, das dabei selbst prüft, ob die Person es sehen darf, und prüft die
+   Datei gegen die Prüfsumme. Ältere App-Versionen fragen die Liste ohne Trennung ab und sehen
+   beides weiter unter *Dokumente*.
 
 Die Statutenfassungen stehen für Mitglieder ebenfalls unter *Vereinsdokumente* (Kategorie
 „Statuten“, geltende Fassung angepinnt): öffentlich freigegebene für jedes Mitglied, nur für

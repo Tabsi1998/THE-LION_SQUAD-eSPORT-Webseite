@@ -76,7 +76,7 @@ from routes.seo_render_routes import router as seo_render_router
 from routes.penalty_routes import router as penalty_router, admin_router as penalty_admin_router
 from routes.notification_routes import router as notification_router
 from routes.membership_routes import router as membership_router
-from routes.document_routes import router as document_router
+from routes.document_routes import router as document_router, account_router as account_document_router
 from routes.home_routes import router as home_router
 from routes.calendar_routes import router as calendar_router
 from routes.seasons_routes import router as seasons_router
@@ -87,6 +87,7 @@ from services import discord_embeds
 from routes.prize_routes import router as prize_router
 from routes.setup_routes import router as setup_router, sitemap_router
 from routes.contact_board_routes import contact_router, board_router
+from routes.sponsoring_routes import router as sponsoring_router
 from routes.search_routes import router as search_router
 from routes.settings_routes import settings_router
 from routes.season_routes import season_router
@@ -310,6 +311,7 @@ app.include_router(seo_meta_router)
 app.include_router(seo_render_router)
 app.include_router(membership_router)
 app.include_router(document_router)
+app.include_router(account_document_router)
 app.include_router(home_router)
 app.include_router(calendar_router)
 app.include_router(seasons_router)
@@ -321,6 +323,7 @@ app.include_router(setup_router)
 app.include_router(sitemap_router)
 app.include_router(contact_router)
 app.include_router(board_router)
+app.include_router(sponsoring_router)
 app.include_router(search_router)
 app.include_router(penalty_router)
 app.include_router(penalty_admin_router)

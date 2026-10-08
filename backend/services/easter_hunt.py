@@ -57,7 +57,7 @@ WEB_ROUTES = {
     "/": "Startseite", "/tournaments": "Turniere", "/events": "Events", "/news": "News", "/teams": "Teams",
     "/achievements": "Erfolge", "/about": "Über uns", "/community": "Community", "/players": "Spieler",
     "/calendar": "Kalender", "/sponsors": "Sponsoren", "/references": "Referenzen", "/esports": "eSports",
-    "/board": "Vorstand", "/values": "Werte",
+    "/board": "Vorstand",
 }
 # Die App hat seit #1143 fünf Tabs: Home, Events, Community, Verein, Profil - Fast Laps stehen im Events-Tab.
 APP_ROUTES = {

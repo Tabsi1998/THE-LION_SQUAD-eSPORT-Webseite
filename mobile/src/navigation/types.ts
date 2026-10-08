@@ -75,6 +75,8 @@ export type DetailParamList = {
   // Mitgliederbereich (#340, #1147): oben im Tab Verein, nur für Vereinsmitglieder; der Server prüft jede Antwort.
   MyMembership: undefined;
   MemberDocuments: undefined;
+  // Deine Unterlagen (#1255): die eigenen Schreiben aus der Vereinsakte - aus „Nur für dich“ im Profil.
+  MyDocuments: undefined;
   // Versammlungen und Abstimmungen (#327): aus der Vereinsakte, nur mit Weg dorthin.
   MemberMeetings: undefined;
   // Helferdienste (#331): Schichten aus der Vereinsakte.

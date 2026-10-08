@@ -1,4 +1,4 @@
-import { categoryLabel, documentFileName, documentUrl, documentsDirectory, downloadErrorText, formatFileSize, invoiceFileName } from "./memberDocuments";
+import { categoryLabel, documentFileName, documentsLine, documentUrl, documentsDirectory, downloadErrorText, formatFileSize, invoiceFileName } from "./memberDocuments";
 
 // Vereinsdokumente in der App (#341): private Dateien, klare Fehlertexte.
 
@@ -41,4 +41,13 @@ test("Dokumentarten der Vereinsakte (#324) haben Namen", () => {
   expect(categoryLabel("resolution")).toBe("Beschluss");
   expect(categoryLabel("letter")).toBe("Schreiben");
   expect(categoryLabel("unbekannt")).toBe("Dokument");
+});
+
+// „Deine Unterlagen“ im Profil (#1255): Anzahl und das Datum des neuesten - wie im Web.
+test("Zeile der eigenen Unterlagen", () => {
+  expect(documentsLine([{ id: "a", created_at: "2026-03-02T10:00:00+00:00" }, { id: "b", created_at: "2026-09-01T10:00:00+00:00" }])).toBe("2 Dokumente · neuestes vom 01.09.2026");
+  expect(documentsLine([{ id: "a", created_at: "2026-03-02T10:00:00+00:00" }])).toBe("1 Dokument · neuestes vom 02.03.2026");
+  expect(documentsLine([{ id: "a" }])).toBe("1 Dokument");
+  expect(documentsLine([])).toBe("");
+  expect(documentsLine(null)).toBe("");
 });

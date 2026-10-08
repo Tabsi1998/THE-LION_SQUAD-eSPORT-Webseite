@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, formatRequestError } from "@/lib/api";
+import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, TextAreaField, TextField } from "@/components/tls/FormFields";
+import { ImageUpload } from "@/components/tls/ImageUpload";
 import { SkeletonDetailHeader, SkeletonLines } from "@/components/tls/Skeleton";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, ExternalLink } from "lucide-react";
+import { ArrowDown, ArrowUp, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { DEFAULT_SHOWN, NUMBER_KEYS, NUMBER_LABELS, moveShown, toggleShown } from "@/lib/clubNumbers";
 import { viennaDate } from "@/lib/vienna";
 
 // Über uns pflegen (#406): die Leitbild-Texte der Seite „Über den Verein“ - Hero, Werte, Spiele,
 // Offline, Aufruf - als eigene Seite im Rahmen der Admin-Formulare. Was die Seite sonst zeigt
 // (Zahlen, Spiele, Vorstand, Events, Vereinsdaten aus Dolibarr), steht rechts als Hinweis, damit
-// niemand danach sucht.
+// niemand danach sucht. Seit #1253 dazu: das Vereinsfoto mit Fokuspunkt, der Zeitstrahl und die
+// Werte mit Satz und Beispiel samt den Zielen (früher die feste Seite „Werte & Ziele“).
 
 const ACCENT = "#29B6E8";
 const TEXT_KEYS = ["hero_eyebrow", "hero_title", "hero_text", "values_title", "values_text", "games_title", "games_text", "offline_title", "offline_text", "cta_title", "cta_text", "purpose"];
@@ -21,8 +23,12 @@ const TEXT_KEYS = ["hero_eyebrow", "hero_title", "hero_text", "values_title", "v
 export function textsToForm(texts) {
   const form = {};
   for (const key of TEXT_KEYS) form[key] = texts?.[key] || "";
-  form.pillars = (texts?.pillars || []).join("\n");
   form.offline_items = (texts?.offline_items || []).join("\n");
+  form.values = (texts?.values || []).map((value) => ({ title: value.title || "", text: value.text || "", example: value.example || "" }));
+  form.goals = (texts?.goals || []).join("\n");
+  form.timeline = (texts?.timeline || []).map((entry) => ({ year: entry.year || "", title: entry.title || "", text: entry.text || "", image_url: entry.image_url || "" }));
+  const photo = texts?.club_photo || {};
+  form.club_photo = { url: photo.url || "", focus_x: Number.isFinite(photo.focus_x) ? photo.focus_x : 50, focus_y: Number.isFinite(photo.focus_y) ? photo.focus_y : 50 };
   form.founded_year = texts?.founded_year ? String(texts.founded_year) : "";
   form.founded_on = texts?.founded_on || "";
   form.nonprofit = texts?.nonprofit === true;
@@ -33,14 +39,60 @@ export function textsToForm(texts) {
 export function formToPayload(form) {
   const payload = {};
   for (const key of TEXT_KEYS) payload[key] = form[key] || "";
-  payload.pillars = String(form.pillars || "").split("\n").map((line) => line.trim()).filter(Boolean);
   payload.offline_items = String(form.offline_items || "").split("\n").map((line) => line.trim()).filter(Boolean);
+  payload.values = (form.values || []).map((value) => ({ title: value.title.trim(), text: value.text.trim(), example: value.example.trim() })).filter((value) => value.title);
+  payload.goals = String(form.goals || "").split("\n").map((line) => line.trim()).filter(Boolean);
+  payload.timeline = (form.timeline || []).map((entry) => ({ year: entry.year.trim(), title: entry.title.trim(), text: entry.text.trim(), image_url: entry.image_url || "" })).filter((entry) => entry.year && entry.title);
+  payload.club_photo = form.club_photo?.url ? { url: form.club_photo.url, focus_x: Math.round(form.club_photo.focus_x), focus_y: Math.round(form.club_photo.focus_y) } : null;
   payload.founded_year = /^\d{4}$/.test(String(form.founded_year || "").trim()) ? Number(form.founded_year) : null;
   // Leer löscht den Gründungstag; steht einer da, folgt das Jahr daraus (Server).
   payload.founded_on = /^\d{4}-\d{2}-\d{2}$/.test(String(form.founded_on || "")) ? form.founded_on : "";
   payload.nonprofit = Boolean(form.nonprofit);
   payload.numbers_shown = (form.numbers_shown || []).filter((key) => NUMBER_LABELS[key]);
   return payload;
+}
+
+/** Ein Eintrag einer Liste nach oben (-1) oder unten (+1) schieben. */
+export function moveRow(rows, index, direction) {
+  const list = [...(rows || [])];
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= list.length) return list;
+  [list[index], list[target]] = [list[target], list[index]];
+  return list;
+}
+
+function RowTools({ index, count, onMove, onRemove, label }) {
+  return (
+    <span className="inline-flex gap-1 shrink-0">
+      <button type="button" onClick={() => onMove(index, -1)} disabled={index === 0} aria-label={`${label} nach oben`} className="p-1 border border-white/10 rounded-sm disabled:opacity-30"><ArrowUp className="w-3 h-3" /></button>
+      <button type="button" onClick={() => onMove(index, 1)} disabled={index === count - 1} aria-label={`${label} nach unten`} className="p-1 border border-white/10 rounded-sm disabled:opacity-30"><ArrowDown className="w-3 h-3" /></button>
+      <button type="button" onClick={() => onRemove(index)} aria-label={`${label} entfernen`} className="p-1 border border-[#FF3B30]/30 text-[#FF6B6B] rounded-sm"><Trash2 className="w-3 h-3" /></button>
+    </span>
+  );
+}
+
+/** Das Vereinsfoto (#1253): ein Bild für „Über uns“ (später auch Anmelden und Startseite), Fokuspunkt per Klick ins Bild. */
+function ClubPhotoField({ value, onChange }) {
+  const pick = (event) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    if (!box.width || !box.height) return;
+    onChange({ ...value, focus_x: Math.round(((event.clientX - box.left) / box.width) * 100), focus_y: Math.round(((event.clientY - box.top) / box.height) * 100) });
+  };
+  return (
+    <div className="space-y-3" data-testid="about-club-photo">
+      <ImageUpload value={value.url} onChange={(url) => onChange({ ...value, url })} label="Vereinsfoto" testId="about-club-photo-upload" variant="wide" allowLibrary />
+      <p className="text-xs text-[#FFD700]/80">Nur ein Foto, mit dem alle Abgebildeten einverstanden sind.</p>
+      {value.url ? (
+        <div>
+          <div className="text-xs text-white/55 mb-1">Fokuspunkt: ins Bild klicken – dieser Punkt bleibt beim Zuschneiden immer sichtbar ({value.focus_x} % / {value.focus_y} %).</div>
+          <button type="button" onClick={pick} className="relative block w-full max-w-md overflow-hidden rounded-sm border border-white/10 cursor-crosshair" data-testid="about-club-photo-focus" aria-label="Fokuspunkt setzen">
+            <img src={resolveMediaUrl(value.url)} alt="" className="block w-full h-auto" />
+            <span className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full border-2 border-white bg-[#29B6E8]/70 pointer-events-none" style={{ left: `${value.focus_x}%`, top: `${value.focus_y}%` }} />
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 // Der Verein in Zahlen (#621): Häkchen je Zähler mit dem echten Stand, Reihenfolge per Pfeil.
@@ -87,6 +139,9 @@ export default function AdminAboutPage() {
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const setRow = (key, index, patch) => setForm((f) => ({ ...f, [key]: f[key].map((row, i) => (i === index ? { ...row, ...patch } : row)) }));
+  const moveIn = (key) => (index, direction) => setForm((f) => ({ ...f, [key]: moveRow(f[key], index, direction) }));
+  const removeIn = (key) => (index) => setForm((f) => ({ ...f, [key]: f[key].filter((_, i) => i !== index) }));
 
   useEffect(() => {
     api.get("/home/about/admin").then(({ data }) => { setData(data); setForm(textsToForm(data.texts)); }).catch((err) => toast.error(formatRequestError(err, "Über uns konnte nicht geladen werden.")));
@@ -156,17 +211,51 @@ export default function AdminAboutPage() {
         )}
         actions={<FormActions accent={ACCENT} saving={saving} submitTestId="about-save" cancelTo="/admin" cancelLabel="Zurück" />}
       >
-        <FormSection title="Hero" accent={ACCENT} testId="about-section-hero">
+        <FormSection title="Kopf" accent={ACCENT} testId="about-section-hero" hint="Ein eigener Satz für „Über uns“ – nicht derselbe wie auf der Startseite.">
           <FormGrid>
             <TextField label="Kleine Zeile" value={form.hero_eyebrow} onChange={(v) => set("hero_eyebrow", v)} maxLength={60} testId="about-hero-eyebrow" />
-            <TextAreaField label="Überschrift" value={form.hero_title} onChange={(v) => set("hero_title", v)} rows={2} testId="about-hero-title" hint="Zeilenumbruch = neue Zeile in der Überschrift." />
+            <TextAreaField label="Überschrift" value={form.hero_title} onChange={(v) => set("hero_title", v)} rows={2} testId="about-hero-title" hint="Leer: „Seit <Gründungsjahr> ein Rudel“. Zeilenumbruch = neue Zeile." />
           </FormGrid>
           <TextAreaField label="Text" value={form.hero_text} onChange={(v) => set("hero_text", v)} rows={3} testId="about-hero-text" hint="**fett** hebt hervor, Leerzeile = neuer Absatz." />
         </FormSection>
-        <FormSection title="Was uns ausmacht" accent={ACCENT} testId="about-section-values">
+        <FormSection title="Vereinsfoto" accent={ACCENT} testId="about-section-photo" hint="Steht im Kopf von „Über uns“ – ein Foto für den ganzen Verein.">
+          <ClubPhotoField value={form.club_photo} onChange={(v) => set("club_photo", v)} />
+        </FormSection>
+        <FormSection title="Zeitstrahl: So sind wir gewachsen" accent={ACCENT} testId="about-section-timeline" hint="Je Eintrag Jahr, ein Satz und auf Wunsch ein Bild – Gründung, erste LAN, erster Podestplatz …">
+          <ol className="space-y-3" data-testid="about-timeline-rows">
+            {form.timeline.map((entry, index) => (
+              <li key={index} className="border border-white/10 rounded-sm p-3 space-y-2" data-testid={`about-timeline-row-${index}`}>
+                <div className="flex items-start gap-2">
+                  <div className="grid grid-cols-[6rem_1fr] gap-2 flex-1 min-w-0">
+                    <TextField label="Jahr" value={entry.year} onChange={(v) => setRow("timeline", index, { year: v })} maxLength={20} testId={`about-timeline-year-${index}`} />
+                    <TextField label="Was war" value={entry.title} onChange={(v) => setRow("timeline", index, { title: v })} maxLength={120} testId={`about-timeline-title-${index}`} placeholder="Erste LAN" />
+                  </div>
+                  <RowTools index={index} count={form.timeline.length} onMove={moveIn("timeline")} onRemove={removeIn("timeline")} label={`Eintrag ${index + 1}`} />
+                </div>
+                <TextField label="Satz dazu (optional)" value={entry.text} onChange={(v) => setRow("timeline", index, { text: v })} maxLength={400} testId={`about-timeline-text-${index}`} placeholder="42 Gäste, zwei Turniere." />
+                <ImageUpload value={entry.image_url} onChange={(url) => setRow("timeline", index, { image_url: url })} label="Bild (optional)" testId={`about-timeline-image-${index}`} variant="wide" allowLibrary />
+              </li>
+            ))}
+          </ol>
+          <button type="button" onClick={() => set("timeline", [...form.timeline, { year: "", title: "", text: "", image_url: "" }])} data-testid="about-timeline-add" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white"><Plus className="w-3.5 h-3.5" /> Eintrag</button>
+        </FormSection>
+        <FormSection title="Werte & Ziele" accent={ACCENT} testId="about-section-values" hint="Der Abschnitt „Werte & Ziele“ auf „Über uns“ – die alte Seite /values leitet dorthin.">
           <TextField label="Überschrift" value={form.values_title} onChange={(v) => set("values_title", v)} maxLength={120} testId="about-values-title" />
-          <TextAreaField label="Text" value={form.values_text} onChange={(v) => set("values_text", v)} rows={6} testId="about-values-text" />
-          <TextAreaField label="Werte (eine je Zeile)" value={form.pillars} onChange={(v) => set("pillars", v)} rows={4} testId="about-pillars" hint="Vier Kacheln passen am besten." />
+          <TextAreaField label="Text" value={form.values_text} onChange={(v) => set("values_text", v)} rows={4} testId="about-values-text" />
+          <ol className="space-y-3" data-testid="about-value-rows">
+            {form.values.map((value, index) => (
+              <li key={index} className="border border-white/10 rounded-sm p-3 space-y-2" data-testid={`about-value-row-${index}`}>
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0"><TextField label="Wert" value={value.title} onChange={(v) => setRow("values", index, { title: v })} maxLength={60} testId={`about-value-title-${index}`} placeholder="Fairplay" /></div>
+                  <RowTools index={index} count={form.values.length} onMove={moveIn("values")} onRemove={removeIn("values")} label={`Wert ${index + 1}`} />
+                </div>
+                <TextField label="Ein Satz" value={value.text} onChange={(v) => setRow("values", index, { text: v })} maxLength={400} testId={`about-value-text-${index}`} placeholder="Wir gratulieren auch, wenn wir verlieren." />
+                <TextField label="Beispiel" value={value.example} onChange={(v) => setRow("values", index, { example: v })} maxLength={300} testId={`about-value-example-${index}`} placeholder="Nach jedem Match ein „GG“ – im Spiel und im Chat." />
+              </li>
+            ))}
+          </ol>
+          <button type="button" onClick={() => set("values", [...form.values, { title: "", text: "", example: "" }])} data-testid="about-value-add" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white"><Plus className="w-3.5 h-3.5" /> Wert</button>
+          <TextAreaField label="Unsere Ziele (eines je Zeile)" value={form.goals} onChange={(v) => set("goals", v)} rows={5} testId="about-goals" hint="**fett** hebt den Anfang hervor." />
         </FormSection>
         <FormSection title="Was wir spielen" accent={ACCENT} testId="about-section-games" hint="Die Spiele selbst kommen aus der Spiele-Verwaltung; hier steht nur der Text darüber.">
           <TextField label="Überschrift" value={form.games_title} onChange={(v) => set("games_title", v)} maxLength={120} testId="about-games-title" />

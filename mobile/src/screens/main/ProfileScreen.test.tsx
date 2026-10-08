@@ -55,6 +55,7 @@ function answer(path: string, config?: { params?: Record<string, string> }) {
     "/prizes/me": [{ id: "p1", status: "ready" }],
     "/moderation/me/standing": null,
     "/account/invoices": { summary: { open_count: 1, open_total: 12, overdue_count: 0 }, currency: "EUR" },
+    "/account/documents": { available: true, reason: null, documents: [{ id: "dolibarr-22", title: "Beitrittsbestätigung", personal: true, created_at: "2026-03-02T10:00:00+00:00" }] },
     "/teams/my": [{ id: "t-1", name: "Lions Rocket", tag: "LR" }],
     "/streams/live": [],
     "/achievements/user/u-neon": { awards: [], groups: [], pinned: [] },
@@ -101,6 +102,10 @@ test("eigenes Profil: Kopf mit Zahlen, Kasten „Nur für dich“, Zahnrad - Tip
 
   await fireEvent.press(screen.getByTestId("profile-private-invoices"));
   expect(navigate).toHaveBeenLastCalledWith("MyInvoices", undefined);
+  // Deine Unterlagen (#1255): Anzahl und neuestes Datum, der Tipp öffnet die Liste.
+  expect(screen.getByTestId("profile-private-documents")).toHaveTextContent(/1 Dokument · neuestes vom 02\.03\.2026/);
+  await fireEvent.press(screen.getByTestId("profile-private-documents"));
+  expect(navigate).toHaveBeenLastCalledWith("MyDocuments", undefined);
   await fireEvent.press(screen.getByTestId("profile-private-prizes"));
   expect(navigate).toHaveBeenLastCalledWith("MyPrizes", undefined);
   await fireEvent.press(screen.getByTestId("profile-private-completeness"));

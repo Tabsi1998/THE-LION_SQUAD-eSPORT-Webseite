@@ -571,6 +571,14 @@ class VoteBody(BaseModel):
     option: str
 
 
+@router.get("/area-summary")
+async def member_area_summary(user: dict = Depends(require_club_member())):
+    """Was im Mitgliederbereich offen ist (#1257) - für die Sprungleiste und die Kacheln auf „Verein“ (Web und App)."""
+    from services import member_area
+
+    return await member_area.summary(get_db(), user)
+
+
 @router.get("/me/meetings")
 async def my_meetings(user: dict = Depends(get_current_user)):
     """Sitzungen und Abstimmungen aus der Vereinsakte (#327) - je Teil mit dem Grund, wenn er fehlt."""

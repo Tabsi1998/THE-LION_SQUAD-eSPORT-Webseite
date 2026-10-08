@@ -9,6 +9,7 @@ import { DolibarrSourceBlock, dolibarrLocked, useDolibarrSource } from "@/compon
 import { imageSourceText, shownLogo } from "@/lib/sponsorImages";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { SponsoringOfferPanel } from "@/pages/admin/sponsors/SponsoringOfferPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Trash2, Upload, Pencil } from "lucide-react";
@@ -164,6 +165,9 @@ export default function AdminSponsorsPage() {
       </div>
 
       <DolibarrSourceBlock source={dolibarrSource} onChange={setDolibarrSource} onSynced={load} kind="sponsors" />
+
+      {/* Sponsor werden (#1254): was Interessierte auf der Sponsoren-Seite über die Stufen lesen. */}
+      <SponsoringOfferPanel />
 
       {imageAudit?.summary && (
         <div className="mb-6 border border-white/10 bg-[#0A0A0A] rounded-sm p-4">

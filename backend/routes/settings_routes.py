@@ -102,6 +102,9 @@ class BrandingSettings(BaseModel):
     # Kanäle aus Dolibarr (#326 Teil 4): Footer und Suchmaschinen nehmen die öffentlichen Kanäle des Vereins
     # aus dem Vereinsmodul; stehen dort keine, gilt die Liste von Hand.
     channels_from_dolibarr: Optional[bool] = None
+    # Statuten öffentlich auf „Vorstand“ (#1252): an, solange nicht ausdrücklich aus (Wahl des Betreibers). Mit Dolibarr nur
+    # die Fassung, die der Verein im Modul freigibt; ohne Dolibarr das Statuten-Dokument aus Verwaltung → Dokumente.
+    statutes_public: Optional[bool] = None
     legal_extra: Optional[str] = None
     privacy_extra: Optional[str] = None
     terms_of_use: Optional[str] = None

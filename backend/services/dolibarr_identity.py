@@ -347,6 +347,53 @@ async def documents_for(db, user: dict) -> list[dict]:
     return [dict(doc) for doc in docs]
 
 
+OWN_REASON_TEXTS = {
+    "not_member": "Unterlagen aus der Vereinsakte gibt es für Vereinsmitglieder.",
+    "not_configured": "Der Verein führt die Vereinsakte nicht über die Website.",
+    "not_bound": "Dein Konto ist noch nicht mit deinem Eintrag in der Vereinsakte verbunden.",
+    "no_access": "Deine Unterlagen sind gerade nicht abrufbar – der Vorstand muss den Zugang in der Vereinsakte freigeben.",
+    "unreachable": "Die Vereinsakte antwortet gerade nicht. Bitte später noch einmal versuchen.",
+}
+
+
+def _own(available: bool, reason: str | None = None, documents: list[dict] | None = None) -> dict:
+    return {"available": available, "reason": reason, "text": OWN_REASON_TEXTS.get(reason or "", ""), "documents": documents or []}
+
+
+async def own_documents(db, user: dict) -> dict:
+    """Die eigenen Unterlagen aus der Akte (#1255): Bestätigungen und Schreiben, die nur diese Person betreffen - für den
+    Kasten „Nur für dich“ im Profil. Anders als ``documents_for`` sagt die Antwort, warum es keine gibt (keine Bindung,
+    Akte antwortet nicht) - die Vereinsdokumente für alle stehen weiter unter /api/documents?scope=club."""
+    # Wer Mitglieder-Inhalte sieht, gilt wie dort (#1300): Mitglieder und die Vereinsverwaltung - Moderation allein nicht.
+    from services.visibility import ADMIN_ROLES as MEMBER_CONTENT_ROLES
+
+    if not (user.get("is_club_member") or user.get("role") in MEMBER_CONTENT_ROLES):
+        return _own(False, "not_member")
+    settings = await load_settings(db)
+    if settings.get("mode") != "live":
+        return _own(False, "not_configured")
+    access = await access_for(db, settings, user["id"])
+    if not access:
+        return _own(True, "not_bound")
+    cached = _LIST_CACHE.get(access_key(access))
+    if cached and time.monotonic() - cached[0] < LIST_TTL_SECONDS:
+        return _own(True, None, [dict(doc) for doc in cached[1] if doc.get("personal")])
+    try:
+        client = DolibarrClient(settings)
+        rows = await client.my_documents(access["params"])
+    except DolibarrError as exc:
+        if exc.kind == "forbidden":
+            await forbidden(db, access)
+            # Die Bindung ist widerrufen: über die Mitgliedsnummer geht es vielleicht noch - sonst gibt es keinen Weg.
+            return await own_documents(db, user) if access["mode"] == "subject" else _own(False, "no_access")
+        logger.warning("[dolibarr] Eigene Unterlagen nicht lesbar: %s", exc.kind)
+        return _own(False, "unreachable")
+    await member_call_ok(db, access)
+    docs = [document_view(row) for row in rows if isinstance(row, dict) and row.get("document_id")]
+    docs.sort(key=lambda doc: str(doc.get("created_at") or ""), reverse=True)
+    return _own(True, None, [doc for doc in docs if doc.get("personal")])
+
+
 async def document_pdf(db, user: dict, document_id: int) -> tuple[bytes, dict]:
     """Das PDF einer Fassung: mit Bindung über die Person (das Modul prüft bei jedem Abruf neu, ob sie es
     sehen darf), sonst das öffentliche. Die Bytes müssen zur mitgeschickten Prüfsumme passen."""

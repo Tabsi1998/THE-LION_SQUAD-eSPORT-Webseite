@@ -7,6 +7,7 @@ import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
+import { GamesShelf } from "@/components/tls/GamesShelf";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatDate } from "@/lib/datetime";
@@ -46,6 +47,11 @@ export default function EsportsOverviewPage() {
 
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["tournaments", "f1", "seasons"]);
+  // Was wir spielen (#1333): dasselbe Spiele-Regal wie auf „Über uns“ - ein Klick öffnet die Turniere des Spiels.
+  const [games, setGames] = useState([]);
+  useEffect(() => {
+    api.get("/home/about").then(({ data }) => setGames(Array.isArray(data?.games) ? data.games : [])).catch(() => setGames([]));
+  }, []);
 
   const activities = useMemo(() => {
     const rows = [
@@ -96,6 +102,13 @@ export default function EsportsOverviewPage() {
           <HubLink to="/fastlap" icon={Flag} title="Fast Lap" text="Racing-Challenges mit Strecken und Bestzeiten." />
           <HubLink to="/seasons/current" icon={Medal} title="Jahreswertung" text="Punkte, Podien und Saisonstand." />
         </div>
+
+        {games.length > 0 && (
+          <section className="mt-12" data-testid="esports-games">
+            <SectionHeader eyebrow="Spiele" title="Was wir spielen" action={{ to: "/tournaments", label: "Alle Turniere" }} />
+            <GamesShelf games={games} testIdPrefix="esports-game" />
+          </section>
+        )}
 
         <section className="mt-12">
           <SectionHeader eyebrow="Aktuell" title="Aktive eSports-Aktivitäten" action={{ to: "/tournaments", label: "Alle Turniere" }} />

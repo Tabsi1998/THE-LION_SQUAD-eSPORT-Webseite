@@ -58,7 +58,7 @@ const CALM = new Set([
   "TournamentList", "Tournaments", "TournamentDetail", "TournamentChat", "MatchDetail", "FastLapDetail",
   // Seit #1143: Suche, Gewinne und „Profil bearbeiten“ wie die anderen Konto-Seiten ruhig.
   "TeamChat", "DirectThread", "Notifications", "Search", "Profile", "ProfileEdit", "MyMembership", "MyInvoices", "MyPrizes",
-  "MemberCard", "MemberDocuments", "MemberHelperShifts", "MemberMeetings", "Login", "Register", "GalleryViewer",
+  "MemberCard", "MemberDocuments", "MyDocuments", "MemberHelperShifts", "MemberMeetings", "Login", "Register", "GalleryViewer",
   // Der Adventkalender ist selbst das Bild - die Deko rundherum hält sich zurück.
   "AdventCalendar",
 ]);

@@ -2,8 +2,9 @@ import fs from "fs";
 import path from "path";
 import { APP_TOPICS, TOPIC_SCAN_DIRS } from "./topics";
 
-// Wächter „Jedes Thema an genau einem Ort“ (#1150): kommt irgendwo ein zweiter Weg zu einem der elf Themen dazu, schlägt
-// dieser Test an - und nennt die Datei. Links von außen und Benachrichtigungen (navigation/) führen zum selben Ort.
+// Wächter „Jedes Thema an genau einem Ort“ (#1150): kommt irgendwo ein zweiter Weg zu einem der Themen dazu, schlägt
+// dieser Test an - und nennt die Datei. Links von außen und Benachrichtigungen (navigation/) führen zum selben Ort. Seit
+// #1255 sind es zwölf: die persönlichen Unterlagen stehen im Profil unter „Nur für dich“.
 
 const SRC = path.resolve(__dirname, "..");
 
@@ -20,8 +21,8 @@ function sourceFiles(dir: string): string[] {
 const FILES = TOPIC_SCAN_DIRS.flatMap(sourceFiles);
 const read = (file: string) => fs.readFileSync(path.join(SRC, file), "utf8");
 
-test("die elf Themen: jedes genau ein Ort - kein zweiter Weg im Quelltext", () => {
-  expect(APP_TOPICS).toHaveLength(11);
+test("die zwölf Themen: jedes genau ein Ort - kein zweiter Weg im Quelltext", () => {
+  expect(APP_TOPICS).toHaveLength(12);
   expect(FILES.length).toBeGreaterThan(50);
   for (const topic of APP_TOPICS) {
     const found = FILES.filter((file) => topic.pattern.test(read(file)) && file !== topic.self).sort();
@@ -38,5 +39,5 @@ test("Thema → Ort steht für jedes Thema da, und jedes Ziel ist ein echter Scr
   const screens = new Set([...read("navigation/screenRegistry.ts").matchAll(/^\s{2}(\w+): \w+Screen,\r?$/gm)].map((match) => match[1]));
   expect(screens.size).toBeGreaterThan(30);
   for (const gone of ["MoreHub", "MemberArea", "DirectMessages", "FastLapList", "TeamList"]) expect(screens.has(gone)).toBe(false);
-  for (const kept of ["MyInvoices", "MyMembership", "Gallery", "Settings", "Notifications", "AchievementShowcase"]) expect(screens.has(kept)).toBe(true);
+  for (const kept of ["MyInvoices", "MyDocuments", "MyMembership", "Gallery", "Settings", "Notifications", "AchievementShowcase"]) expect(screens.has(kept)).toBe(true);
 });

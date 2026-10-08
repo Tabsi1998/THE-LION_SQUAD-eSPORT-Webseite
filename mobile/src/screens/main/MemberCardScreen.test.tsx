@@ -1,8 +1,10 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { MemberCardScreen } from "./MemberCardScreen";
+import { clearOfflineCard, loadOfflineCard } from "../../lib/memberCardOffline";
 
-// Mitgliedskarte (#346): Karte mit QR-Code aus dem Prüflink; ohne Mitgliedschaft ein Hinweis.
+// Mitgliedskarte (#346): Karte mit QR-Code aus dem Prüflink; ohne Mitgliedschaft ein Hinweis. Ohne Netz (#1256) die zuletzt
+// geladene Karte mit „Stand“ und „Prüfcode braucht Netz“ - gespeichert nur für dieses Konto, ohne Prüfcode.
 
 const mockGet = jest.fn();
 jest.mock("../../lib/api", () => ({
@@ -10,6 +12,7 @@ jest.mock("../../lib/api", () => ({
   errorMessage: (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback),
 }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
+jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: { id: "u-1" } }) }));
 
 const navigation = { navigate: jest.fn() } as never;
 const route = { key: "card", name: "MemberCard" } as never;
@@ -20,17 +23,20 @@ const card = {
   token_expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(), accent_color: "#FFD700",
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
   mockGet.mockResolvedValue({ data: card });
+  await clearOfflineCard();
 });
 
 test("zeigt Karte, QR-Code und holt auf Tipp einen frischen Code", async () => {
   await render(<MemberCardScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("member-card")).toBeTruthy());
-  expect(screen.getByText("Paula")).toBeTruthy();
-  expect(screen.getByText("TLS-0007")).toBeTruthy();
-  expect(screen.getByText("Ordentliches Mitglied")).toBeTruthy();
+  // Die Karte wie im Web (#1335): Name, Nummer mit Jahr, Art und „gültig bis“ auf der schwarzen Karte, der Prüfcode darunter.
+  expect(screen.getByTestId("member-card-art-name")).toHaveTextContent("Paula");
+  expect(screen.getByText("Nr. TLS-0007 · seit 2024")).toBeTruthy();
+  expect(screen.getByText("Ordentliches Mitglied · gültig bis 31.12.2026")).toBeTruthy();
+  expect(screen.getByTestId("member-card-art-logo").props.style).toEqual(expect.objectContaining({ tintColor: "#FFD700" }));
   expect(screen.getByText("Gültig bis 31.12.2026")).toBeTruthy();
   expect(screen.getByTestId("member-card-qr")).toBeTruthy();
   expect(mockGet).toHaveBeenCalledTimes(1);
@@ -49,4 +55,31 @@ test("ohne aktive Mitgliedschaft keine Karte, sondern ein Hinweis", async () => 
   mockGet.mockResolvedValue({ data: { status: "ended", club_name: "THE LION SQUAD" } });
   await render(<MemberCardScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByText("Mitgliedschaft beendet")).toBeTruthy());
+});
+
+test("ohne Netz: die zuletzt geladene Karte mit „Stand“, statt des Codes „Prüfcode braucht Netz“", async () => {
+  const first = await render(<MemberCardScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("member-card-qr")).toBeTruthy());
+  await waitFor(async () => expect((await loadOfflineCard("u-1"))?.card.name).toBe("Paula"));
+  await first.unmount();
+
+  mockGet.mockRejectedValue(new Error("Keine Verbindung"));
+  await render(<MemberCardScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("member-card-offline")).toBeTruthy());
+  expect(screen.getByTestId("member-card-art-name")).toHaveTextContent("Paula");
+  expect(screen.getByText("Prüfcode braucht Netz")).toBeTruthy();
+  expect(screen.getByTestId("member-card-offline-stand")).toHaveTextContent(/^Stand: \d{2}\.\d{2}\.\d{4}, \d{2}:\d{2}$/);
+  expect(screen.queryByTestId("member-card-qr")).toBeNull();
+
+  // Wieder Netz: der Code ist zurück.
+  mockGet.mockResolvedValue({ data: card });
+  await fireEvent.press(screen.getByTestId("member-card-retry"));
+  await waitFor(() => expect(screen.getByTestId("member-card-qr")).toBeTruthy());
+});
+
+test("ohne Netz und ohne gespeicherte Karte: der Hinweis wie bisher", async () => {
+  mockGet.mockRejectedValue(new Error("Keine Verbindung"));
+  await render(<MemberCardScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Karte nicht verfügbar")).toBeTruthy());
+  expect(screen.queryByTestId("member-card-offline")).toBeNull();
 });

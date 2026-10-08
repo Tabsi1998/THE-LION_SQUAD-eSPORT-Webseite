@@ -8,7 +8,7 @@ Statische Routen in der XML-Sitemap:
 
 | Zweck | Kanonische Route |
 | --- | --- |
-| Start und Verein | `/`, `/about`, `/board`, `/values`, `/contact` |
+| Start und Verein | `/`, `/about`, `/board`, `/contact` |
 | Inhalte | `/news`, `/events`, `/galerie`, `/references` |
 | eSports | `/esports`, `/tournaments`, `/fastlap` |
 | Community und Verein | `/teams`, `/servers`, `/members`, `/membership/join` |
@@ -48,6 +48,7 @@ Diese Routen bleiben erreichbar, damit Menschen sie verwenden und Crawler `noind
 | Alter oder doppelter Pfad | Kanonisches Ziel |
 | --- | --- |
 | `/der-verein`, `/ueber-uns` | `/about` |
+| `/values` (früher „Werte & Ziele“, seit #1253 ein Abschnitt von „Über uns“) | `/about#werte` |
 | `/datenschutzerklaerung`, `/datenschutz` | `/privacy` |
 | `/impressum` | `/imprint` |
 | `/nutzungsbedingungen` | `/terms` |

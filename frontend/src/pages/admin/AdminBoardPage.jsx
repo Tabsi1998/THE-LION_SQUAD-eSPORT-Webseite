@@ -67,6 +67,9 @@ export default function AdminBoardPage() {
           <p className="mt-2 text-white/60 text-sm max-w-xl">
             Aktiviere/deaktiviere Positionen, weise redaktionelle Vereinsmitglieder zu und ergänze eigene Funktionen. Geschlechter-spezifischer Titel (Obmann/Obfrau) wird automatisch aus dem Profil-Geschlecht abgeleitet.
           </p>
+          <p className="mt-2 text-white/50 text-xs max-w-xl" data-testid="board-photo-hint">
+            Die Fotos kommen aus den <Link to="/admin/member-profiles" className="text-[#29B6E8] hover:text-white">Mitgliederprofilen</Link>. Am schönsten freigestellt (ohne Hintergrund) – der Verein legt seinen dahinter; Fotos mit Hintergrund stehen einheitlich in Vereinsfarben. Offene Funktionen zeigt die Vorstandsseite als „Wir suchen …“ mit dem Satz, den du hier je Funktion einträgst.
+          </p>
         </div>
         <button onClick={() => setCreating(true)} data-testid="board-new-btn" className="px-5 py-2.5 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Eigene Position</button>
       </div>
@@ -89,6 +92,7 @@ export default function AdminBoardPage() {
                   <span className="text-white/70">{p.user ? p.user.display_name : p.name_withheld ? "Name nicht freigegeben" : "unbesetzt"}</span>
                   {p.user?.profile_url ? <span className="text-[10px] uppercase tracking-widest text-[#00FF88]">mit Foto und Profil</span> : p.user ? <span className="text-[10px] uppercase tracking-widest text-white/40">nur Name (kein Verzeichnis-Eintrag)</span> : null}
                   {p.represents && <span className="text-[10px] uppercase tracking-widest text-[#FFD700]">vertritt nach außen</span>}
+                  {p.vacant ? <VacancyTextField slug={p.slug} value={p.vacancy_text || ""} onSaved={load} /> : null}
                 </li>
               ))}
             </ul>
@@ -163,6 +167,35 @@ export default function AdminBoardPage() {
   );
 }
 
+// „Wir suchen …“ (#1252): ein Satz zum Aufwand je offener Funktion - auch für Funktionen aus Dolibarr.
+export function vacancyPayload(slug, vacancy, deputy, allowDeputy) {
+  const texts = { [slug]: vacancy || "" };
+  if (allowDeputy) texts[`${slug}-stv`] = deputy || "";
+  return { texts };
+}
+
+function VacancyTextField({ slug, value, onSaved }) {
+  const [text, setText] = useState(value);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setText(value); }, [value]);
+  const save = async () => {
+    setBusy(true);
+    try {
+      await api.put("/board/vacancy-texts", { texts: { [slug]: text } });
+      toast.success("Satz für „Wir suchen …“ gespeichert");
+      onSaved?.();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail) || "Fehler"); }
+    setBusy(false);
+  };
+  return (
+    <span className="basis-full flex flex-col sm:flex-row gap-2" data-testid={`board-vacancy-text-${slug}`}>
+      <input value={text} onChange={(e) => setText(e.target.value)} maxLength={300} placeholder="Wir suchen …: ein Satz zum Aufwand, z. B. „Zwei Stunden im Monat, Einschulung inklusive.“" aria-label={`Satz für die offene Funktion ${slug}`}
+        className="flex-1 bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs" />
+      <button type="button" onClick={save} disabled={busy || text === value} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Speichern</button>
+    </span>
+  );
+}
+
 function BoardForm({ position, onClose, onSaved }) {
   const isNew = !position;
   const [form, setForm] = useState({
@@ -174,14 +207,17 @@ function BoardForm({ position, onClose, onSaved }) {
     is_active: position?.is_active ?? true,
     slug: position?.slug || "",
   });
+  const [vacancy, setVacancy] = useState(position?.vacancy_text || "");
+  const [deputyVacancy, setDeputyVacancy] = useState(position?.deputy_vacancy_text || "");
   const [saving, setSaving] = useState(false);
 
   const save = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      if (isNew) await api.post("/board", form);
-      else await api.patch(`/board/${position.id}`, form);
+      const { data } = isNew ? await api.post("/board", form) : await api.patch(`/board/${position.id}`, form);
+      const slug = data?.slug || position?.slug;
+      if (slug) await api.put("/board/vacancy-texts", vacancyPayload(slug, vacancy, deputyVacancy, form.allow_deputy));
       toast.success("Gespeichert");
       onSaved();
       onClose();
@@ -195,6 +231,8 @@ function BoardForm({ position, onClose, onSaved }) {
       <TextField label="Bezeichnung (männlich)" value={form.title_male} onChange={(v) => setForm({ ...form, title_male: v })} testId="board-title-m" required />
       <TextField label="Bezeichnung (weiblich, optional)" value={form.title_female || ""} onChange={(v) => setForm({ ...form, title_female: v })} testId="board-title-f" />
       <TextAreaField label="Beschreibung (optional)" value={form.description || ""} onChange={(v) => setForm({ ...form, description: v })} testId="board-desc" />
+      <TextField label="Wenn offen: ein Satz zum Aufwand (für „Wir suchen …“)" value={vacancy} onChange={setVacancy} maxLength={300} testId="board-vacancy" placeholder="Zwei Stunden im Monat, Einschulung inklusive." />
+      {form.allow_deputy && <TextField label="Stellvertretung offen: ein Satz zum Aufwand" value={deputyVacancy} onChange={setDeputyVacancy} maxLength={300} testId="board-deputy-vacancy" />}
       <FormGrid>
         <CheckField label="Stellvertreter erlaubt" checked={form.allow_deputy} onChange={(v) => setForm({ ...form, allow_deputy: v })} testId="board-allow-deputy" accent="#FFD700" />
         <CheckField label="Aktiv" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} testId="board-active" accent="#FFD700" />

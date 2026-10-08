@@ -28,7 +28,7 @@ export function SteamPresence({ data }) {
                 {player.avatar_url ? <img src={resolveMediaUrl(player.avatar_url)} alt="" className="w-full h-full object-cover" /> : <Users className="w-4 h-4 text-white/40" />}
               </span>
               <span className="min-w-0">
-                <span className="block font-bold text-white truncate group-hover:text-[#FFD700] transition">{player.display_name || player.username}</span>
+                <span className="block font-bold text-white truncate group-hover:text-[#29B6E8] transition">{player.display_name || player.username}</span>
                 <span className={`block text-xs truncate ${player.state === "playing" ? "text-[#66c0f4]" : "text-white/45"}`}>
                   {player.state === "playing" && <Gamepad2 className="inline w-3 h-3 mr-1 -mt-0.5" />}{player.state_text}
                 </span>
@@ -39,7 +39,7 @@ export function SteamPresence({ data }) {
       )}
       {canJoin && (
         <div className="text-xs text-white/45" data-testid="steam-presence-join">
-          Auch dabei sein: <Link to="/profile?tab=socials" className="text-[#FFD700] hover:underline">Profil → Socials → „Meinen Steam-Status im Mitgliederbereich zeigen“</Link>.
+          Auch dabei sein: <Link to="/profile?tab=socials" className="text-[#29B6E8] hover:underline">Profil → Socials → „Meinen Steam-Status im Mitgliederbereich zeigen“</Link>.
         </div>
       )}
     </div>

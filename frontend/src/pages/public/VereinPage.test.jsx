@@ -27,7 +27,7 @@ function mockApi() {
     if (url.startsWith("/gallery")) return { data: [{ id: "a1", slug: "sommerfest", title: "Sommerfest", cover_url: "" }] };
     if (url === "/references") return { data: [{ id: "r1", title: "Landesmeisterschaft 2026" }] };
     if (url === "/membership/me") return { data: { membership: { member_since: "2023-03-01" } } };
-    if (url === "/documents") return { data: [{ id: "d1" }, { id: "d2" }] };
+    if (url === "/membership/area-summary") return { data: { meetings_open: 1, helping_free: 6, news_new: 1, documents: 2, documents_new: 0 } };
     return { data: [] };
   });
 }
@@ -55,6 +55,12 @@ test("Mitglied: oben der Mitgliederbereich mit sechs Kacheln, internen News und 
     "/members/membership#mitgliedskarte", "/members/membership", "/members/meetings", "/members/helfen", "/members/documents", "/members/benefits", "/members/area",
   ]));
   expect(within(screen.getByTestId("verein-internal-news")).getByText("Neue Vereinsfarben")).toBeInTheDocument();
+  // Dieselben Zahlen wie in der Sprungleiste des Mitgliederbereichs (#1257): ohne Offenes keine Zahl.
+  await waitFor(() => expect(within(area).getByTestId("verein-tile-meetings-note")).toHaveTextContent("1 offen"));
+  expect(within(area).getByTestId("verein-tile-meetings")).toHaveAttribute("aria-label", "Versammlungen, 1 offen");
+  expect(within(area).getByTestId("verein-tile-helping-note")).toHaveTextContent("6 frei");
+  expect(within(area).queryByTestId("verein-tile-documents-note")).toBeNull();
+  expect(within(area).queryByTestId("verein-tile-card-note")).toBeNull();
   expect(screen.queryByTestId("verein-join")).toBeNull();
   // Interne News stehen nur einmal - nicht noch einmal bei den öffentlichen.
   expect(within(screen.getByTestId("verein-news")).queryByText("Neue Vereinsfarben")).toBeNull();

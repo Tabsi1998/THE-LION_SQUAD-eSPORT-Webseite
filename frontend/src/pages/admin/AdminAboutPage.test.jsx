@@ -7,13 +7,21 @@ import { MemoryRouter } from "react-router-dom";
 
 const apiMock = { get: vi.fn(), put: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_err, fallback) => fallback }));
+vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_err, fallback) => fallback, resolveMediaUrl: (value) => value || "" }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
+vi.mock("@/components/tls/ImageUpload", () => ({
+  ImageUpload: ({ value, onChange, testId }) => <input data-testid={testId} value={value || ""} onChange={(e) => onChange(e.target.value)} />,
+}));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-const { default: AdminAboutPage, foundedLabel, textsToForm, formToPayload } = await import("./AdminAboutPage");
+const { default: AdminAboutPage, foundedLabel, moveRow, textsToForm, formToPayload } = await import("./AdminAboutPage");
 
-const TEXTS = { hero_eyebrow: "Der Verein", hero_title: "Ein Rudel.", hero_text: "Text", values_title: "Werte", values_text: "V", pillars: ["Fairplay", "Spaß"], games_title: "Spiele", games_text: "G", offline_title: "Offline", offline_text: "O", offline_items: ["Grillen"], cta_title: "CTA", cta_text: "C", founded_year: 2019, purpose: "Zweck", nonprofit: true };
+const TEXTS = {
+  hero_eyebrow: "Über uns", hero_title: "Ein Rudel.", hero_text: "Text", values_title: "Werte", values_text: "V", games_title: "Spiele", games_text: "G", offline_title: "Offline", offline_text: "O",
+  offline_items: ["Grillen"], cta_title: "CTA", cta_text: "C", founded_year: 2019, purpose: "Zweck", nonprofit: true,
+  values: [{ title: "Fairplay", text: "Wir gratulieren auch.", example: "GG" }], goals: ["**Heimat** schaffen"],
+  timeline: [{ year: "2023", title: "Gründung", text: "Sieben Leute.", image_url: "" }], club_photo: { url: "/api/static/uploads/team.jpg", focus_x: 40, focus_y: 60 },
+};
 
 function mockApi(organization, texts = TEXTS) {
   apiMock.get.mockResolvedValue({ data: { texts, defaults: {}, organization, numbers: { members: 3 }, games: 2, offline_events: 1 } });
@@ -25,18 +33,32 @@ test("lädt die Texte, Speichern schickt Texte, Listen und Rückfallfelder", asy
   mockApi({ source: "manual" });
   render(<MemoryRouter><AdminAboutPage /></MemoryRouter>);
   expect(await screen.findByTestId("about-hero-title")).toHaveValue("Ein Rudel.");
-  expect(screen.getByTestId("about-pillars")).toHaveValue("Fairplay\nSpaß");
+  expect(screen.getByTestId("about-value-title-0")).toHaveValue("Fairplay");
+  expect(screen.getByTestId("about-timeline-year-0")).toHaveValue("2023");
+  expect(screen.getByTestId("about-club-photo-upload")).toHaveValue("/api/static/uploads/team.jpg");
   expect(screen.getByTestId("about-founded-year")).toHaveValue("2019");
   expect(screen.getByTestId("about-founded-year")).not.toBeDisabled();
   expect(screen.getByTestId("about-numbers-picker")).toHaveTextContent("3");
 
   fireEvent.change(screen.getByTestId("about-hero-title"), { target: { value: "Neu" } });
-  fireEvent.change(screen.getByTestId("about-pillars"), { target: { value: "Fairplay\n\n Mut " } });
+  fireEvent.click(screen.getByTestId("about-value-add"));
+  fireEvent.change(screen.getByTestId("about-value-title-1"), { target: { value: " Mut " } });
+  fireEvent.change(screen.getByTestId("about-value-text-1"), { target: { value: "Wir trauen uns was." } });
+  fireEvent.click(screen.getByTestId("about-timeline-add"));
+  fireEvent.change(screen.getByTestId("about-timeline-year-1"), { target: { value: "2024" } });
+  fireEvent.change(screen.getByTestId("about-timeline-title-1"), { target: { value: "Erste LAN" } });
+  fireEvent.click(screen.getByRole("button", { name: "Eintrag 2 nach oben" }));
+  fireEvent.change(screen.getByTestId("about-goals"), { target: { value: "**Heimat** schaffen\n\n Nachwuchs " } });
   fireEvent.submit(screen.getByTestId("about-form"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledTimes(1));
   const [url, payload] = apiMock.put.mock.calls[0];
   expect(url).toBe("/home/about/admin");
-  expect(payload).toEqual(expect.objectContaining({ hero_title: "Neu", pillars: ["Fairplay", "Mut"], offline_items: ["Grillen"], founded_year: 2019, nonprofit: true, purpose: "Zweck", numbers_shown: ["prizes", "tournaments_completed", "members", "years_active"] }));
+  expect(payload).toEqual(expect.objectContaining({ hero_title: "Neu", offline_items: ["Grillen"], founded_year: 2019, nonprofit: true, purpose: "Zweck", numbers_shown: ["prizes", "tournaments_completed", "members", "years_active"] }));
+  expect(payload.values).toEqual([{ title: "Fairplay", text: "Wir gratulieren auch.", example: "GG" }, { title: "Mut", text: "Wir trauen uns was.", example: "" }]);
+  expect(payload.timeline.map((entry) => entry.year)).toEqual(["2024", "2023"]);
+  expect(payload.goals).toEqual(["**Heimat** schaffen", "Nachwuchs"]);
+  expect(payload.club_photo).toEqual({ url: "/api/static/uploads/team.jpg", focus_x: 40, focus_y: 60 });
+  expect(payload).not.toHaveProperty("pillars");
   await waitFor(() => expect(toastMock.success).toHaveBeenCalled());
 });
 
@@ -65,8 +87,13 @@ test("mit Vereinsdaten aus Dolibarr sind Gründung und gemeinnützig gesperrt", 
 });
 
 test("Formular-Umwandlung", () => {
-  const form = textsToForm({ pillars: ["A"], founded_year: null, nonprofit: null });
-  expect(form.pillars).toBe("A");
+  const form = textsToForm({ values: [{ title: "A" }], founded_year: null, nonprofit: null });
+  expect(form.values).toEqual([{ title: "A", text: "", example: "" }]);
+  expect(form.club_photo).toEqual({ url: "", focus_x: 50, focus_y: 50 });
+  expect(formToPayload(form).club_photo).toBeNull();
+  expect(formToPayload({ ...form, timeline: [{ year: "2024", title: "", text: "", image_url: "" }] }).timeline).toEqual([]);
+  expect(moveRow(["a", "b", "c"], 2, -1)).toEqual(["a", "c", "b"]);
+  expect(moveRow(["a"], 0, -1)).toEqual(["a"]);
   expect(form.founded_year).toBe("");
   expect(formToPayload({ ...form, founded_year: "19" }).founded_year).toBeNull();
   expect(formToPayload({ ...form, founded_year: "2019" }).founded_year).toBe(2019);

@@ -5,15 +5,17 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextI
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { SkeletonList } from "../../components/ListState";
+import { MemberCardArt } from "../../components/MemberCardArt";
 import { MemberFileAccounts } from "../../components/MemberFileAccounts";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime } from "../../lib/format";
-import { feeCard, formatMoney, linkPrompt, STATUS_LABELS, TYPE_LABELS, type DolibarrView } from "../../lib/memberArea";
+import { areaCard, feeCard, formatMoney, linkPrompt, STATUS_LABELS, TYPE_LABELS, type AreaCard, type DolibarrView } from "../../lib/memberArea";
 import type { InvoiceList } from "../../lib/memberDocuments";
 import { changedFields, exitLine, fieldLabel, selfRequestLine, validWishedDay, changedWebsiteFields, websiteFieldText, websiteStateLine, type IdentityState, type SelfService, type WebsiteField, type WebsiteProfile } from "../../lib/selfService";
 import type { MoreStackParamList } from "../../navigation/types";
+import { useAuth } from "../../auth/AuthContext";
 import { colors } from "../../theme";
 
 // Meine Mitgliedschaft in der App (#339): Stand aus der Mitgliederverwaltung (Beitrag, Typ,
@@ -30,6 +32,7 @@ type MembershipMe = {
 };
 
 export function MyMembershipScreen({ navigation }: Props) {
+  const { user } = useAuth();
   const [me, setMe] = useState<MembershipMe | null>(null);
   const [invoices, setInvoices] = useState<InvoiceList | null>(null);
   const [loading, setLoading] = useState(true);
@@ -222,6 +225,13 @@ export function MyMembershipScreen({ navigation }: Props) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.gold} />}
       >
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
+
+        {/* Dieselbe Karte wie im Web (#1335): schwarz mit Gold - ein Tipp öffnet sie mit Prüfcode. */}
+        {status === "active" || status === "honorary" ? (
+          <Pressable onPress={() => navigation.navigate("MemberCard")} accessibilityRole="button" accessibilityHint="Öffnet die Mitgliedskarte mit Prüfcode" testID="membership-card-art" style={({ pressed }) => [pressed && styles.pressed]}>
+            <MemberCardArt {...cardProps(areaCard(user, { ...membership, member_status: status }, view))} />
+          </Pressable>
+        ) : null}
 
         <Card style={styles.card} testID="membership-status">
           <View style={styles.rowBetween}>
@@ -613,3 +623,8 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
 });
+
+/** Die Angaben der Karte - dieselben wie oben im Tab „Verein“ (#1336). */
+function cardProps(card: AreaCard | null) {
+  return { name: card?.name || "Mitglied", number: card?.number, since: card?.since, typeLabel: card?.typeLabel, validUntil: card?.validUntil };
+}

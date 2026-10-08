@@ -389,6 +389,14 @@ async def _safe_dolibarr_public():
     except Exception as exc:
         _log_task_failure("dolibarr_public", exc)
     try:
+        # Mitgliedsbeiträge für „Mitglied werden“ (#1251): derselbe Stand wie im Antrag, stündlich nachgelesen.
+        from services.membership_fees import refresh_due as refresh_fees
+        res = await refresh_fees()
+        if res.get("ok"):
+            logger.info(f"[scheduler] membership_fees {res}")
+    except Exception as exc:
+        _log_task_failure("membership_fees", exc)
+    try:
         from services.dolibarr_sponsors import refresh_due as refresh_sponsors
         res = await refresh_sponsors()
         if res.get("ok"):

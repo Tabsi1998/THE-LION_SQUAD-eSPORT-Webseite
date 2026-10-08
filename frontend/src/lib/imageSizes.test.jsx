@@ -10,9 +10,8 @@ import { SizedImage, PROFILE_IMAGE_SIZES } from "@/components/tls/SizedImage";
 // ihrer Zahl und dürfen nur weniger werden.
 
 const root = path.resolve(__dirname, "..");
-const LATER = {
-  "pages/public/AboutPage.jsx": 3, // Über uns - übernimmt den Baustein mit dem Meilenstein „Verein und Mitgliederbereich“
-};
+// „Über uns“ ist mit dem Meilenstein „Verein und Mitgliederbereich“ erledigt - die Liste ist leer.
+const LATER = {};
 
 function filesIn(dir) {
   return readdirSync(dir).flatMap((name) => {

@@ -54,11 +54,33 @@ def _error(exc: DolibarrError) -> HTTPException:
 
 # ---------------------------------------------------------------- Stand (Vereinsverwaltung und System)
 
+async def _statutes_feature(db, branding: dict, facts: dict) -> tuple[bool, str]:
+    """„Statuten öffentlich“ (#1252): an oder aus und - wenn an - was die Vorstandsseite gerade zeigt."""
+    from routes.contact_board_routes import statutes_document
+
+    if branding.get("statutes_public") is False:
+        return False, "aus – die Statuten stehen nur im Mitgliederbereich"
+    if branding.get("legal_from_dolibarr"):
+        statutes = facts.get("statutes") if isinstance(facts.get("statutes"), dict) else None
+        current = (statutes or {}).get("current") or {}
+        if not statutes:
+            return False, "an · aus Dolibarr noch nicht gelesen – es erscheint noch nichts"
+        if statutes.get("state") == "not_published":
+            return False, "an · im Vereinsmodul nicht für die Öffentlichkeit freigegeben – es erscheint nichts"
+        if current:
+            return True, f"an · Fassung {current.get('version')} aus Dolibarr freigegeben"
+        return False, "an · in Dolibarr gilt gerade keine Fassung"
+    doc = await statutes_document(db)
+    if not doc:
+        return False, "an · kein Dokument der Kategorie „Statuten“ unter Verwaltung → Dokumente"
+    return True, f"an · Dokument „{doc.get('title') or 'Statuten'}“ aus Verwaltung → Dokumente"
+
+
 async def _features(db, settings: dict) -> list[dict]:
     """Was Dolibarr auf der Website übernimmt - je Funktion: an oder aus, und wo der Schalter liegt.
     Der Betreiber wollte das an einer Stelle sehen, weil die Schalter über mehrere Seiten verteilt sind."""
     from services import club_facts, dolibarr_sponsors
-    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1, "channels_from_dolibarr": 1}) or {}
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1, "channels_from_dolibarr": 1, "statutes_public": 1}) or {}
     source = await dolibarr_sponsors.load_source_settings(db)
     facts = await club_facts.snapshot(db)
     mode = settings.get("mode") or "off"
@@ -104,6 +126,7 @@ async def _features(db, settings: dict) -> list[dict]:
         participations_state = f"Fehler: {participations_last.get('text') or participations_last.get('error')}"
     else:
         participations_state = f"an · {participations['sent']} gemeldet" + (f", {participations['failed_total']} abgelehnt" if participations["failed_total"] else "")
+    statutes_on, statutes_state = await _statutes_feature(db, branding, facts)
     return [
         {"key": "members", "label": "Mitgliedschaft, Beitrag und Funktionen aus Dolibarr", "enabled": live, "state": mode_state,
          "hint": "Gilt für Konten mit bestätigter Zuordnung (Reiter Zuordnungen und Umstellung).", "where": connection, "where_label": "Verbindung → Modus"},
@@ -114,6 +137,11 @@ async def _features(db, settings: dict) -> list[dict]:
          "state": "an" if branding.get("channels_from_dolibarr") else "aus",
          "hint": "Discord, Instagram, YouTube usw. kommen aus dem Vereinsmodul (Einrichtung → Vereine → Kanäle und Konten) statt aus der Liste unter Einstellungen → Socials.",
          "switch": {"on": bool(branding.get("channels_from_dolibarr"))}, "where": features_tab, "where_label": "Dolibarr → Funktionen"},
+        {"key": "statutes", "label": "Statuten öffentlich auf „Vorstand“", "enabled": statutes_on, "state": statutes_state,
+         "hint": "Die geltende Fassung als PDF für alle – mit „Vereinsdaten aus Dolibarr“ nur, was der Verein im Vereinsmodul für die "
+                 "Öffentlichkeit freigibt (Einrichtung → Statuten), sonst das Dokument der Kategorie „Statuten“ unter Verwaltung → Dokumente. "
+                 "Aus: die Statuten stehen nur im Mitgliederbereich.",
+         "switch": {"on": branding.get("statutes_public") is not False}, "where": features_tab, "where_label": "Dolibarr → Funktionen"},
         {"key": "sponsors", "label": "Sponsoren und Partner aus Dolibarr", "enabled": bool(source.get("from_dolibarr")), "state": "an" if source.get("from_dolibarr") else "aus",
          "hint": "Geschäftspartner in den Kategorien Sponsor und Partner; Unterkategorie = Stufe, Zusatzfelder = Laufzeit. Ehemalige rutschen von selbst nach unten.",
          "switch": {"on": bool(source.get("from_dolibarr"))}, "where": features_tab, "where_label": "Dolibarr → Funktionen"},
@@ -487,11 +515,11 @@ async def update_feature(body: FeatureUpdate, me: dict = Depends(require_area("c
     db = get_db()
     key = body.key
     options = body.options or {}
-    if key in ("club_facts", "channels"):
+    if key in ("club_facts", "channels", "statutes"):
         if body.on is None:
             raise HTTPException(400, "An oder aus fehlt.")
         from routes.settings_routes import BrandingSettings, update_branding
-        field = "legal_from_dolibarr" if key == "club_facts" else "channels_from_dolibarr"
+        field = {"club_facts": "legal_from_dolibarr", "channels": "channels_from_dolibarr", "statutes": "statutes_public"}[key]
         await update_branding(BrandingSettings(**{field: bool(body.on)}), me)
     elif key == "sponsors":
         updates: dict = {}

@@ -1,35 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { API, api } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { FileText, Download, Pin, ArrowLeft, Search, Eye } from "lucide-react";
+import { FileText, ArrowLeft, Search } from "lucide-react";
 import { DocumentViewer } from "@/components/tls/DocumentViewer";
 import { SkeletonList } from "@/components/tls/Skeleton";
+import { CATEGORY_LABELS, DocumentGroup } from "./DocumentRows";
 
-const CATEGORY_LABELS = {
-  statutes: "Statuten", minutes: "Protokolle", form: "Formular",
-  regulations: "Regelwerk", guideline: "Leitlinie", download: "Download",
-  media_kit: "Media Kit", presentation: "Präsentation", template: "Vorlage",
-  other: "Sonstiges",
-  // Dokumentarten der Vereinsakte (#324 Teil 1)
-  resolution: "Beschluss", audit_report: "Prüfbericht", account: "Rechnungsabschluss", payout: "Auszahlung",
-  letter: "Schreiben", ballot: "Abstimmung",
-};
-
-const CATEGORY_COLORS = {
-  statutes: "#FFD700", minutes: "#9F7AEA", form: "#29B6E8",
-  regulations: "#FF3B30", guideline: "#10B981", download: "#29B6E8",
-  media_kit: "#FFD700", presentation: "#9F7AEA", template: "#10B981", other: "#6B7280",
-  resolution: "#9F7AEA", audit_report: "#FF3B30", account: "#10B981", payout: "#10B981", letter: "#29B6E8", ballot: "#FFD700",
-};
-
-function fmtSize(bytes) {
-  if (!bytes) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
+// Vereinsdokumente im Mitgliederbereich: für alle Mitglieder gleich (#1255) - Statuten, Protokolle, Ordnungen. Die
+// eigenen Unterlagen aus der Vereinsakte (Bestätigungen, Schreiben) stehen im Profil unter „Nur für dich“.
 
 export default function MemberDocumentsPage() {
   const [list, setList] = useState([]);
@@ -39,7 +19,7 @@ export default function MemberDocumentsPage() {
   const [loading, setLoading] = useState(true);
   // PDFs öffnen im gemeinsamen Betrachter (#325) statt in einem neuen Tab; alles andere wie bisher.
   const [viewing, setViewing] = useState(null);
-  // Vereinsakte (#324 Teil 1): ohne Bindung ein Hinweis, wo die persönlichen Unterlagen herkommen.
+  // Vereinsakte (#324 Teil 1): ohne Bindung ein Hinweis, wie die eigenen Unterlagen ins Profil kommen.
   const [identity, setIdentity] = useState(null);
   useEffect(() => {
     api.get("/membership/me/identity").then(({ data }) => setIdentity(data && data.available === true ? data : null)).catch(() => setIdentity(null));
@@ -49,8 +29,10 @@ export default function MemberDocumentsPage() {
   useEffect(() => { loadMeta(); }, [loadMeta]);
   const load = useCallback(() => {
     setLoading(true);
-    const url = activeCat ? `/documents?category=${activeCat}` : "/documents";
-    api.get(url).then(({ data }) => setList(data)).catch(() => {}).finally(() => setLoading(false));
+    api.get("/documents", { params: activeCat ? { scope: "club", category: activeCat } : { scope: "club" } })
+      .then(({ data }) => setList(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [activeCat]);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(() => {
@@ -77,9 +59,13 @@ export default function MemberDocumentsPage() {
         <p className="mt-3 text-white/60 max-w-2xl">
           Statuten, Protokolle, Formulare und Vereinsleitlinien - zentral abgelegt, direkt einsehbar und immer aktuell.
         </p>
+        <p className="mt-2 text-sm text-white/55" data-testid="docs-own-hint">
+          Deine eigenen Unterlagen aus der Vereinsakte (Bestätigungen, Schreiben) stehen in deinem Profil unter{" "}
+          <Link to="/account/documents" className="text-[#29B6E8] hover:underline">„Nur für dich“ → Deine Unterlagen</Link>.
+        </p>
         {identity && identity.status !== "bound" && (
           <div className="mt-6 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-4 text-sm text-white/75" data-testid="docs-identity-hint">
-            Deine persönlichen Unterlagen aus der Vereinsakte (Bestätigungen, Beschlüsse, Schreiben) erscheinen hier von selbst, sobald dein Konto deinem Mitgliedseintrag zugeordnet ist (über die bestätigte E-Mail-Adresse oder durch den Vorstand) – oder du löst einen{" "}
+            Dort erscheinen sie von selbst, sobald dein Konto deinem Mitgliedseintrag zugeordnet ist (über die bestätigte E-Mail-Adresse oder durch den Vorstand) – oder du löst einen{" "}
             <Link to="/members/membership" className="text-[#FFD700] hover:underline">Einladungscode unter Meine Mitgliedschaft</Link> ein.
           </div>
         )}
@@ -116,10 +102,10 @@ export default function MemberDocumentsPage() {
         ) : (
           <div className="mt-10 space-y-8">
             {pinned.length > 0 && (
-              <Group label="Angepinnt" docs={pinned} onView={setViewing} />
+              <DocumentGroup label="Angepinnt" docs={pinned} onView={setViewing} />
             )}
             {rest.length > 0 && (
-              <Group label={pinned.length ? "Weitere" : null} docs={rest} onView={setViewing} />
+              <DocumentGroup label={pinned.length ? "Weitere" : null} docs={rest} onView={setViewing} />
             )}
           </div>
         )}
@@ -134,74 +120,5 @@ export default function MemberDocumentsPage() {
         />
       )}
     </PublicLayout>
-  );
-}
-
-function Group({ label, docs, onView }) {
-  return (
-    <div>
-      {label && <div className="text-[11px] uppercase tracking-widest text-white/40 font-bold mb-3">{label}</div>}
-      <div className="space-y-2">
-        {docs.map((d) => <DocRow key={d.id} d={d} onView={onView} />)}
-      </div>
-    </div>
-  );
-}
-
-function DocRow({ d, onView }) {
-  const c = CATEGORY_COLORS[d.category] || "#29B6E8";
-  const isPdf = /pdf$/i.test(d.mime || "") || /\.pdf$/i.test(d.original_filename || "");
-  return (
-    <div data-testid={`doc-row-${d.id}`} className="border border-white/10 hover:border-white/25 rounded-sm bg-[#121212] p-4 flex flex-col sm:flex-row sm:items-center gap-4 transition">
-      <div className="w-12 h-12 shrink-0 rounded-sm flex items-center justify-center" style={{ background: `${c}15`, border: `1px solid ${c}40` }}>
-        <FileText className="w-5 h-5" style={{ color: c }} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: c }}>{CATEGORY_LABELS[d.category] || d.category}</span>
-          {d.source === "dolibarr" && <span className="text-[10px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded-sm border border-white/15 text-white/55" data-testid={`doc-source-${d.id}`}>{d.personal ? "Vereinsakte · nur für dich" : "Vereinsakte"}</span>}
-          {d.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
-        </div>
-        <div className="font-heading font-bold text-white mt-0.5">{d.title}</div>
-        {d.description && <div className="text-xs text-white/55 mt-1 line-clamp-2">{d.description}</div>}
-        <div className="mt-2 flex items-center gap-3 text-[10px] text-white/40 uppercase tracking-wider">
-          {d.original_filename && <span>{d.original_filename}</span>}
-          {d.file_size && <span>{fmtSize(d.file_size)}</span>}
-          {d.view_count > 0 && <span>{d.view_count} Ansichten</span>}
-          {d.allow_download && d.download_count > 0 && <span>{d.download_count} Downloads</span>}
-        </div>
-      </div>
-      {isPdf ? (
-        <button
-          type="button"
-          onClick={() => onView(d)}
-          data-testid={`doc-view-${d.id}`}
-          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 font-bold uppercase tracking-wider text-xs rounded-sm transition"
-        >
-          <Eye className="w-3.5 h-3.5" /> Ansehen
-        </button>
-      ) : (
-        <a
-          href={`${API}/documents/${d.id}/view`}
-          target="_blank"
-          rel="noreferrer"
-          data-testid={`doc-view-${d.id}`}
-          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 font-bold uppercase tracking-wider text-xs rounded-sm transition"
-        >
-          <Eye className="w-3.5 h-3.5" /> Ansehen
-        </a>
-      )}
-      {d.allow_download && (
-        <a
-          href={`${API}/documents/${d.id}/download`}
-          target="_blank"
-          rel="noreferrer"
-          data-testid={`doc-download-${d.id}`}
-          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/60 hover:text-white font-bold uppercase tracking-wider text-xs rounded-sm transition"
-        >
-          <Download className="w-3.5 h-3.5" /> Download
-        </a>
-      )}
-    </div>
   );
 }

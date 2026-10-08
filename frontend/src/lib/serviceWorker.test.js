@@ -50,6 +50,34 @@ describe("production service worker", () => {
     expect(await (await response).text()).toContain("Keine Verbindung");
     expect(runtime.cache.match).not.toHaveBeenCalled();
   });
+  test("offline on a member page shows the stored member card image with its date (#1256)", async () => {
+    const stored = {
+      "/__tls/member-card.json": new Response(JSON.stringify({ saved_at: "2026-10-07T16:05:00.000Z" })),
+      "/__tls/member-card.png": new Response("png", { headers: { "Content-Type": "image/png" } }),
+    };
+    const runtime = worker(vi.fn(async () => { throw new Error("offline"); }));
+    runtime.cache.match.mockImplementation(async (key) => stored[key]?.clone());
+    let response;
+    runtime.handlers.fetch({ request: { url: "https://club.example/members/membership", method: "GET", mode: "navigate" }, respondWith: (result) => { response = result; } });
+    const html = await (await response).text();
+    expect(html).toContain("Keine Verbindung");
+    expect(html).toContain('src="/__tls/member-card.png"');
+    expect(html).toContain("Stand: 7.10.2026");
+    expect(runtime.caches.open).toHaveBeenCalledWith("tls-member-card");
+
+    let image;
+    runtime.handlers.fetch({ request: { url: "https://club.example/__tls/member-card.png", method: "GET", mode: "no-cors", destination: "image" }, respondWith: (result) => { image = result; } });
+    expect(await (await image).text()).toBe("png");
+  });
+  test("offline without a stored card only explains the missing connection", async () => {
+    const runtime = worker(vi.fn(async () => { throw new Error("offline"); }));
+    runtime.cache.match.mockResolvedValue(undefined);
+    let response;
+    runtime.handlers.fetch({ request: { url: "https://club.example/members/area", method: "GET", mode: "navigate" }, respondWith: (result) => { response = result; } });
+    const html = await (await response).text();
+    expect(html).toContain("Keine Verbindung");
+    expect(html).not.toContain("member-card.png");
+  });
   test("activation deletes only obsolete TLS cache versions", async () => {
     const runtime = worker();
     let activation;

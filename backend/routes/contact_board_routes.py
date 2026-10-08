@@ -21,13 +21,15 @@ from services.slug_utils import apply_slug_history, slug_source_for_update, slug
 contact_router = APIRouter(prefix="/api/contact", tags=["contact"])
 
 ContactTopic = Literal[
-    "general", "membership", "tournament", "fastlap",
+    "general", "membership", "volunteer", "tournament", "fastlap",
     "sponsorship", "press", "report_bug", "abuse", "other",
 ]
 
 TOPIC_LABELS = {
     "general": "Allgemeine Anfrage",
     "membership": "Mitgliedschaft",
+    # „Interesse melden“ an einer offenen Vorstandsfunktion (#1252).
+    "volunteer": "Mitarbeit im Verein",
     "tournament": "Turnier-Anfrage",
     "fastlap": "Fast-Lap-Anfrage",
     "sponsorship": "Sponsoring",
@@ -293,14 +295,54 @@ async def board_source():
     return await club_facts.board_source(db, branding)
 
 
+def statutes_switch(branding: dict) -> bool:
+    """„Statuten öffentlich zeigen“ (#1252): an, solange die Verwaltung es nicht ausdrücklich ausschaltet (Wahl des Betreibers)."""
+    return branding.get("statutes_public") is not False
+
+
+async def statutes_document(db) -> dict | None:
+    """Ohne Dolibarr: das Dokument der Kategorie „Statuten“ aus Verwaltung → Dokumente - angepinnt oder das neueste,
+    nie eines, das nur intern (für Admins) ist."""
+    return await db.documents.find_one({"category": "statutes", "visibility": {"$ne": "internal"}}, {"_id": 0},
+                                       sort=[("pinned", -1), ("created_at", -1)])
+
+
 @board_router.get("/statutes")
 async def board_statutes():
-    """Die Statuten aus Dolibarr (#326 Teil 3): geltende und beschlossene Fassungen - nur mit dem Schalter
-    „Vereinsdaten aus Dolibarr“ und nur, wenn der Verein sie im Modul für die Öffentlichkeit freigibt."""
+    """Die geltenden Statuten für alle (#326 Teil 3, #1252): mit „Vereinsdaten aus Dolibarr“ die Fassungen, die der Verein
+    im Modul für die Öffentlichkeit freigibt (die Freigabe bleibt dort), sonst das Statuten-Dokument aus Verwaltung →
+    Dokumente. Ist „Statuten öffentlich zeigen“ aus, bleiben sie im Mitgliederbereich."""
     from services import club_facts
     db = get_db()
-    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1}) or {}
-    return club_facts.statutes_public(await club_facts.snapshot(db), switch_on=bool(branding.get("legal_from_dolibarr")))
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1, "statutes_public": 1}) or {}
+    if not statutes_switch(branding):
+        return {"available": False, "reason": "members_only"}
+    if branding.get("legal_from_dolibarr"):
+        view = club_facts.statutes_public(await club_facts.snapshot(db), switch_on=True)
+        if view.get("available"):
+            current = view.get("current")
+            view.update({"source": "dolibarr", "pdf_url": f"/api/board/statutes/{current['id']}/pdf" if current else None})
+        return view
+    doc = await statutes_document(db)
+    if not doc:
+        return {"available": False, "reason": "no_document"}
+    return {
+        "available": True, "source": "documents", "state": "in_force", "versions": [], "pdf_url": "/api/board/statutes/document",
+        "current": {"id": doc["id"], "title": doc.get("title") or "Statuten", "updated_at": doc.get("updated_at") or doc.get("created_at")},
+    }
+
+
+@board_router.get("/statutes/document")
+async def board_statutes_document():
+    """Ohne Dolibarr: das Statuten-Dokument als PDF für alle - nur mit „Statuten öffentlich zeigen“."""
+    from routes.document_routes import _file_response, _safe_storage_path
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1, "statutes_public": 1}) or {}
+    doc = await statutes_document(db) if statutes_switch(branding) and not branding.get("legal_from_dolibarr") else None
+    path = _safe_storage_path(doc) if doc else None
+    if not path or not path.exists() or not path.is_file():
+        raise HTTPException(404, "Die Statuten sind nicht öffentlich oder noch nicht hinterlegt.")
+    return _file_response(doc, path, "inline")
 
 
 @board_router.get("/statutes/{version_id}/pdf")
@@ -309,7 +351,9 @@ async def board_statutes_pdf(version_id: int):
     from services import club_facts
     from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings
     db = get_db()
-    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1}) or {}
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1, "statutes_public": 1}) or {}
+    if not statutes_switch(branding):
+        raise HTTPException(404, "Diese Statutenfassung gibt es nicht oder sie ist nicht freigegeben.")
     try:
         client = DolibarrClient(await load_settings(db))
         content, row = await club_facts.statutes_pdf(db, branding, version_id, client)
@@ -324,6 +368,75 @@ async def board_statutes_pdf(version_id: int):
                     headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "public, max-age=3600"})
 
 
+# Offene Funktionen (#1252): je Funktion ein Satz zum Aufwand für „Wir suchen …“ - ein Ort für die Posten von Hand und
+# die aus Dolibarr, nach dem Kürzel der Funktion (Stellvertretungen von Hand: „<kürzel>-stv“, wie Dolibarr sie nennt).
+VACANCY_DOC_ID = "board_vacancies"
+VACANCY_TEXT_MAX = 300
+VACANCY_KEYS_MAX = 100
+
+
+async def vacancy_texts(db) -> dict[str, str]:
+    doc = await db.settings.find_one({"id": VACANCY_DOC_ID}, {"_id": 0, "texts": 1}) or {}
+    texts = doc.get("texts") if isinstance(doc.get("texts"), dict) else {}
+    return {str(key): str(value) for key, value in texts.items() if value}
+
+
+class VacancyTextsBody(BaseModel):
+    texts: dict[str, str] = Field(default_factory=dict)
+
+
+@board_router.put("/vacancy-texts")
+async def save_vacancy_texts(body: VacancyTextsBody, me: dict = Depends(require_area("club"))):
+    """Sätze für offene Funktionen speichern; ein leerer Satz löscht ihn."""
+    db = get_db()
+    texts = await vacancy_texts(db)
+    for slug, text in body.texts.items():
+        key = _slugify(slug)
+        clean = " ".join(str(text or "").split())[:VACANCY_TEXT_MAX]
+        if clean:
+            texts[key] = clean
+        else:
+            texts.pop(key, None)
+    if len(texts) > VACANCY_KEYS_MAX:
+        raise HTTPException(400, "Zu viele Funktionen.")
+    await db.settings.update_one({"id": VACANCY_DOC_ID}, {"$set": {"texts": texts, "updated_at": now_utc().isoformat(), "updated_by": me.get("id")},
+                                                          "$setOnInsert": {"id": VACANCY_DOC_ID}}, upsert=True)
+    return {"ok": True, "texts": texts}
+
+
+def _form_of(position: dict, person: dict | None) -> str:
+    """Die Bezeichnung in der Form der Person (#1332): weiblich mit eigener Form, sonst die männliche."""
+    if person and person.get("gender") == "female" and position.get("title_female"):
+        return position["title_female"]
+    return position.get("title_male") or ""
+
+
+def _neutral_title(position: dict) -> str:
+    """Für eine offene Funktion (#1252): „Kassier:in“, wenn die weibliche Form nur „-in“ anhängt, sonst „Obmann/Obfrau“."""
+    male, female = position.get("title_male") or "", position.get("title_female") or ""
+    if not female or female == male:
+        return male
+    if male and female == f"{male}in":
+        return f"{male}:in"
+    return f"{male}/{female}" if male else female
+
+
+async def _decorate_positions(db, positions: list[dict]) -> list[dict]:
+    """Sätze für offene Funktionen und „freigestellt“ an den Fotos (#1252, #1332) - für beide Quellen gleich."""
+    from services import photo_cutout
+
+    texts = await vacancy_texts(db)
+    people = [person for position in positions for person in (position.get("user"), position.get("deputy_user")) if person]
+    flags = await photo_cutout.flags_for(db, [person.get("photo_url") or person.get("avatar_url") for person in people])
+    for person in people:
+        person["photo_cutout"] = bool(flags.get(person.get("photo_url") or person.get("avatar_url") or ""))
+    for position in positions:
+        position["vacancy_text"] = texts.get(position.get("slug") or "", "")
+        if position.get("allow_deputy"):
+            position["deputy_vacancy_text"] = texts.get(f"{position.get('slug')}-stv", "")
+    return positions
+
+
 @board_router.get("")
 async def list_board_positions(active_only: bool = False, manual: bool = False, me=Depends(get_current_user_optional)):
     """Public list. By default returns active+inactive; ?active_only=true filters.
@@ -336,7 +449,7 @@ async def list_board_positions(active_only: bool = False, manual: bool = False, 
         branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1}) or {}
         from_dolibarr = await club_facts.board_positions(db, branding)
         if from_dolibarr is not None:
-            return from_dolibarr
+            return await _decorate_positions(db, from_dolibarr)
     await _ensure_default_board_positions()
     q = {"is_active": True} if active_only else {}
     positions = await db.board_positions.find(q, {"_id": 0}).sort("order_index", 1).to_list(100)
@@ -366,12 +479,11 @@ async def list_board_positions(active_only: bool = False, manual: bool = False, 
             p["deputy_user_id"] = d["id"]
         p["user"] = u
         p["deputy_user"] = d
-        # Resolve display title based on gender
-        if u and u.get("gender") == "female" and p.get("title_female"):
-            p["display_title"] = p["title_female"]
-        else:
-            p["display_title"] = p["title_male"]
-    return positions
+        # Die Bezeichnung in der Form der Person - auch für die Stellvertretung (#1332).
+        p["display_title"] = _form_of(p, u)
+        p["deputy_title"] = _form_of(p, d)
+        p["neutral_title"] = _neutral_title(p)
+    return await _decorate_positions(db, positions)
 
 
 @board_router.post("")
@@ -411,6 +523,11 @@ async def update_position(pid: str, body: BoardPositionUpdate, me: dict = Depend
         if k in updates and updates[k] != existing.get(k):
             updates[since_key] = now_utc().isoformat() if updates[k] else None
     await db.board_positions.update_one({"id": pid}, {"$set": updates})
+    if updates.get("slug") and updates["slug"] != existing.get("slug"):
+        texts = await vacancy_texts(db)
+        moved = {new: texts.pop(old) for old, new in ((existing.get("slug"), updates["slug"]), (f"{existing.get('slug')}-stv", f"{updates['slug']}-stv")) if old in texts}
+        if moved:
+            await db.settings.update_one({"id": VACANCY_DOC_ID}, {"$set": {"texts": {**texts, **moved}}}, upsert=True)
     return await db.board_positions.find_one({"id": pid}, {"_id": 0})
 
 

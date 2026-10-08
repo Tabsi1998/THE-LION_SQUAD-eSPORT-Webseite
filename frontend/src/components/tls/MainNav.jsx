@@ -24,7 +24,6 @@ export const NAV_STRUCTURE = [
     children: [
       { to: "/about", label: "Über uns" },
       { to: "/board", label: "Vorstand" },
-      { to: "/values", label: "Werte & Ziele" },
       { to: "/partners", label: "Partner" },
       { to: "/sponsors", label: "Sponsoren" },
       { to: "/members", label: "Vereinsmitglieder" },
