@@ -37,6 +37,7 @@ import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmen
 import { MessageSticker, StickerButton, StickerPicker } from "../../components/ChatStickers";
 import { MatchReportCard, type ReportPayload, type ReportState } from "../../components/MatchReportCard";
 import { rankingMode } from "../../lib/matchReport";
+import type { ResultEntry } from "../../lib/resultEntry";
 import { countdown, type MatchCall } from "../../lib/matchCall";
 import { asInstant, viennaTime } from "../../lib/vienna";
 import type { CatalogSticker } from "../../lib/stickers";
@@ -85,6 +86,9 @@ type MatchPage = {
   matchday_label?: string;
   participants?: MatchParticipant[];
   report_state?: ReportState;
+  // Ergebnis-Fenster (#1156) und Spieler-Meldung (#1157): Format, Seiten, wohin es weitergeht.
+  report_entry?: ResultEntry | null;
+  result_entry?: ResultEntry | null;
   result_entry_mode?: "staff_only" | "player_confirmed" | "hybrid" | string;
   schedule_proposals?: ScheduleProposal[];
   schedule_mode?: "fixed_by_staff" | "player_proposal" | "hybrid" | string;
@@ -490,6 +494,17 @@ export function MatchDetailScreen({ navigation, route }: Props) {
 
         {page.call ? <MatchCallCard call={page.call} /> : null}
 
+        {/* Nur Turnierleitung (#1157): wer mitspielt, sieht statt eines Melde-Knopfs, wer das Ergebnis einträgt. */}
+        {page.acting_registration_id && !canPlayerReportResult && !canStaffSubmitResult && !finished && page.result_entry_mode === "staff_only" && !page.in_dispute ? (
+          <View style={styles.staffEnters} testID="match-staff-enters">
+            <Ionicons name="flag-outline" color={colors.cyan} size={20} />
+            <View style={styles.flex}>
+              <Body style={styles.strong}>Das Ergebnis trägt die Turnierleitung ein.</Body>
+              <Muted>Du musst nichts melden. Sobald es drin ist, bekommst du eine Benachrichtigung.</Muted>
+            </View>
+          </View>
+        ) : null}
+
         {page.in_dispute ? (
           <View style={styles.disputeNotice} testID="match-in-dispute">
             <Ionicons name="alert-circle-outline" color={colors.live} size={20} />
@@ -504,6 +519,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
               <MatchReportCard
                 participants={participants}
                 match={match}
+                entry={page.report_entry || null}
                 state={page.report_state || null}
                 allowsDraw={Boolean(page.allows_draw)}
                 busy={busy}
@@ -900,6 +916,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,59,48,0.1)",
     borderColor: "rgba(255,59,48,0.4)",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 9,
+    padding: 12,
+  },
+  staffEnters: {
+    alignItems: "center",
+    backgroundColor: "rgba(41,182,232,0.06)",
+    borderColor: "rgba(41,182,232,0.32)",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",

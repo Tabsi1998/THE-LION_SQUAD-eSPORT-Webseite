@@ -48,25 +48,47 @@ beforeEach(() => {
   apiMock.post.mockResolvedValue({ data: { awaiting_confirmation: true } });
 });
 
-test("Spieler melden: Sieger wählen, Spielstand freiwillig - die Platzierungsliste geht an /report", async () => {
+test("Spieler melden (#1157): große Plus/Minus-Knöpfe, Satz vor dem Absenden, die Platzierungsliste geht an /report", async () => {
   renderMatch(PAGE);
   const form = await screen.findByTestId("match-report-form");
-  expect(form).toHaveTextContent("Wer hat gewonnen?");
+  expect(form).toContainElement(screen.getByTestId("result-score"));
+  expect(screen.queryByTestId("result-flag-r1")).toBeNull();
   fireEvent.click(screen.getByTestId("match-report-submit"));
-  expect(await screen.findByTestId("match-report-error")).toHaveTextContent("Bitte wähle, wer gewonnen hat.");
+  expect(await screen.findByTestId("match-report-error")).toHaveTextContent("Gleichstand geht in diesem Spiel nicht");
   expect(apiMock.post).not.toHaveBeenCalled();
 
-  fireEvent.click(screen.getByTestId("match-report-winner-r2"));
-  fireEvent.change(screen.getByTestId("match-report-value-r1"), { target: { value: "1" } });
-  fireEvent.change(screen.getByTestId("match-report-value-r2"), { target: { value: "3" } });
+  fireEvent.click(screen.getByTestId("result-score-r1-plus"));
+  for (let step = 0; step < 3; step += 1) fireEvent.click(screen.getByTestId("result-score-r2-plus"));
+  expect(screen.getByTestId("match-report-sentence")).toHaveTextContent("LunaByte gewinnt 3:1");
   fireEvent.click(screen.getByTestId("match-report-submit"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
   expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/report", {
     results: [{ registration_id: "r2", rank: 1, score: 3 }, { registration_id: "r1", rank: 2, score: 1 }],
-    screenshot_url: null, note: null,
+    screenshot_url: null, note: null, photo_id: null,
   });
   expect(screen.queryByTestId("match-staff-result-form")).toBeNull();
-  expect(screen.queryByTestId("match-inline-score-a")).toBeNull();
+});
+
+test("Foto vom Ergebnis: sofort hochgeladen, die Kennung geht mit der Meldung", async () => {
+  apiMock.post.mockImplementation(async (url) => (url === "/matches/m1/proof-photos" ? { data: { id: "p1", url: "/api/matches/m1/proof-photos/p1", scan_state: "safe" } } : { data: { awaiting_confirmation: true } }));
+  window.URL.createObjectURL = vi.fn(() => "blob:vorschau");
+  window.URL.revokeObjectURL = vi.fn();
+  renderMatch(PAGE);
+  await screen.findByTestId("match-report-form");
+  const file = new File(["bild"], "ergebnis.jpg", { type: "image/jpeg" });
+  fireEvent.change(screen.getByTestId("proof-photo-input"), { target: { files: [file] } });
+  expect(await screen.findByText("Foto angehängt – sehen nur die Gegenseite und die Turnierleitung.")).toBeInTheDocument();
+  expect(apiMock.post.mock.calls[0][0]).toBe("/matches/m1/proof-photos");
+  expect(apiMock.post.mock.calls[0][1]).toBeInstanceOf(FormData);
+  fireEvent.click(screen.getByTestId("result-score-r1-plus"));
+  fireEvent.click(screen.getByTestId("match-report-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/report", expect.objectContaining({ photo_id: "p1" })));
+});
+
+test("Nur Turnierleitung (#1157): kein Melde-Knopf, sondern wer das Ergebnis einträgt", async () => {
+  renderMatch({ ...PAGE, result_entry_mode: "staff_only", event_mode: "local", can_player_report_result: false, can_report_score: false, report_state: null, acting_registration_id: "r1" });
+  expect(await screen.findByTestId("match-staff-enters")).toHaveTextContent("Das Ergebnis trägt die Turnierleitung ein.");
+  expect(screen.queryByTestId("match-report")).toBeNull();
 });
 
 test("nach der eigenen Meldung: „wartet auf die Gegenseite“, ändern geht", async () => {

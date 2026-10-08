@@ -33,6 +33,7 @@ AREA_LABELS = {
     "chat": "Chat-Anhänge (privat)",
     "app-releases": "App-Versionen",
     "quarantine": "Quarantäne der Bildprüfung",
+    "proofs": "Fotos vom Ergebnis (privat)",
     "legacy": "Altlast: direkt unter uploads/ (vor der Trennung public/privat)",
     "other": "sonstige Unterordner",
 }
@@ -41,7 +42,7 @@ ORIGIN_LABELS = {
     "tournaments": "Turniere", "f1_challenges": "Fast Lap", "f1_tracks": "Strecken", "seasons": "Jahreswertung", "teams": "Teams",
     "sponsors": "Sponsoren", "partners": "Partner", "gallery_albums": "Galerie-Alben", "gallery_photos": "Galerie-Fotos",
     "games": "Spiele", "member_benefits": "Mitgliedervorteile", "settings": "Einstellungen (Marke)", "documents": "Vereinsdokumente",
-    "chat_attachments": "Chat-Anhänge", "app_releases": "App-Versionen", "references": "Referenzen", "media_uploads": "Medienverwaltung",
+    "chat_attachments": "Chat-Anhänge", "match_proof_photos": "Fotos vom Ergebnis", "app_releases": "App-Versionen", "references": "Referenzen", "media_uploads": "Medienverwaltung",
     "achievements": "Auszeichnungen", "awards": "Auszeichnungen", "stickers": "Sticker",
 }
 
@@ -66,7 +67,7 @@ def area_of(relative: pathlib.PurePosixPath) -> str:
         return "legacy"
     if parts[0] == "public":
         return "variants" if len(parts) >= 3 and parts[1] == VARIANT_DIR else "public"
-    if parts[0] in ("documents", "chat", "app-releases", "quarantine"):
+    if parts[0] in ("documents", "chat", "app-releases", "quarantine", "proofs"):
         return parts[0]
     return "other"
 

@@ -38,9 +38,10 @@ export function FlagChips({ value, onChange, testID }: { value?: SideFlag | null
   );
 }
 
-type InputProps = { entry: ResultEntry; state: EntryState; onChange: (next: EntryState) => void };
+// `showFlags`: „Nicht erschienen“/„Aufgegeben“ nur für die Turnierleitung - Spieler melden ohne (#1157).
+type InputProps = { entry: ResultEntry; state: EntryState; onChange: (next: EntryState) => void; showFlags?: boolean };
 
-export function ScoreInput({ entry, state, onChange }: InputProps) {
+export function ScoreInput({ entry, state, onChange, showFlags = true }: InputProps) {
   return (
     <View style={styles.stack} testID="result-score">
       {entry.participants.map((side) => (
@@ -51,14 +52,14 @@ export function ScoreInput({ entry, state, onChange }: InputProps) {
               <Stepper label={side.name || "Teilnehmer"} value={state.scores[side.registration_id] || 0} onChange={(next) => onChange({ ...state, scores: { ...state.scores, [side.registration_id]: next } })} testID={`result-score-${side.registration_id}`} />
             )}
           </View>
-          <FlagChips value={state.flags[side.registration_id]} onChange={(flag) => onChange(withFlag(state, side.registration_id, flag, true))} testID={`result-flag-${side.registration_id}`} />
+          {showFlags ? <FlagChips value={state.flags[side.registration_id]} onChange={(flag) => onChange(withFlag(state, side.registration_id, flag, true))} testID={`result-flag-${side.registration_id}`} /> : null}
         </View>
       ))}
     </View>
   );
 }
 
-export function BestOfInput({ entry, state, onChange, onTap }: InputProps & { onTap: (index: number, winner: string) => void }) {
+export function BestOfInput({ entry, state, onChange, onTap, showFlags = true }: InputProps & { onTap: (index: number, winner: string) => void }) {
   const total = Number(entry.best_of || 3);
   const needed = winsNeeded(total);
   const wins: Record<string, number> = Object.fromEntries(entry.participants.map((side) => [side.registration_id, 0]));
@@ -86,7 +87,7 @@ export function BestOfInput({ entry, state, onChange, onTap }: InputProps & { on
           </View>
         );
       })}
-      {entry.participants.map((side) => (
+      {showFlags && entry.participants.map((side) => (
         <View key={side.registration_id} style={styles.flagLine}>
           <Muted numberOfLines={1}>{side.name}</Muted>
           <FlagChips value={state.flags[side.registration_id]} onChange={(flag) => onChange(withFlag(state, side.registration_id, flag, true))} testID={`result-flag-${side.registration_id}`} />
@@ -96,7 +97,7 @@ export function BestOfInput({ entry, state, onChange, onTap }: InputProps & { on
   );
 }
 
-export function WinnerInput({ entry, state, onChange }: InputProps) {
+export function WinnerInput({ entry, state, onChange, showFlags = true }: InputProps) {
   return (
     <View style={styles.stack} testID="result-winner">
       <Muted>Wer hat gewonnen?</Muted>
@@ -110,14 +111,14 @@ export function WinnerInput({ entry, state, onChange }: InputProps) {
           );
         })}
       </View>
-      {entry.participants.map((side) => (
+      {showFlags && entry.participants.map((side) => (
         <FlagChips key={side.registration_id} value={state.flags[side.registration_id]} onChange={(flag) => onChange(withFlag(state, side.registration_id, flag, true))} testID={`result-flag-${side.registration_id}`} />
       ))}
     </View>
   );
 }
 
-export function OrderInput({ entry, state, onChange }: InputProps) {
+export function OrderInput({ entry, state, onChange, showFlags = true }: InputProps) {
   const order = state.order || [];
   const tap = (id: string) => {
     if (state.flags[id]) return;
@@ -138,7 +139,7 @@ export function OrderInput({ entry, state, onChange }: InputProps) {
               <Body style={[styles.name, styles.flex]} numberOfLines={1}>{side.name}</Body>
               {flag ? <Muted style={styles.flagText}>{FLAG_LABELS[flag]}</Muted> : null}
             </Pressable>
-            <FlagChips value={flag} onChange={(next) => onChange(withFlag(state, side.registration_id, next))} testID={`result-flag-${side.registration_id}`} />
+            {showFlags ? <FlagChips value={flag} onChange={(next) => onChange(withFlag(state, side.registration_id, next))} testID={`result-flag-${side.registration_id}`} /> : null}
           </View>
         );
       })}

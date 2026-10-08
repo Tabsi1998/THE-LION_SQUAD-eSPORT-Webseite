@@ -22,6 +22,11 @@ jest.mock("../../components/CommendButton", () => ({ CommendButton: () => null }
 jest.mock("../../components/ChatStickers", () => ({ MessageSticker: () => null, StickerButton: () => null, StickerPicker: () => null }));
 jest.mock("react-native-safe-area-context", () => ({ ...jest.requireActual("react-native-safe-area-context"), useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
+jest.mock("expo-image-picker", () => ({
+  launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: [] })),
+  launchCameraAsync: jest.fn(async () => ({ canceled: true, assets: [] })),
+  requestCameraPermissionsAsync: jest.fn(async () => ({ granted: true })),
+}));
 jest.mock("react-native-keyboard-controller", () => {
   const { View } = jest.requireActual("react-native");
   return { KeyboardAvoidingView: View };
@@ -67,16 +72,18 @@ test("Spieler melden: Sieger wählen, Spielstand freiwillig - die Platzierungsli
   await render(<MatchDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("match-report-form")).toBeTruthy());
   await fireEvent.press(screen.getByTestId("match-report-submit"));
-  expect(screen.getByTestId("match-report-error")).toHaveTextContent("Bitte wähle, wer gewonnen hat.");
+  expect(screen.getByTestId("match-report-error")).toHaveTextContent("Gleichstand geht in diesem Spiel nicht – eine Seite muss gewinnen.");
   expect(mockPost).not.toHaveBeenCalled();
 
-  await fireEvent.press(screen.getByTestId("match-report-winner-r1"));
-  await fireEvent.changeText(screen.getByTestId("match-report-value-r1"), "2");
-  await fireEvent.changeText(screen.getByTestId("match-report-value-r2"), "0");
+  // Große Knöpfe statt Zahlenfeldern (#1157) - der Satz steht vor dem Absenden.
+  await fireEvent.press(screen.getByTestId("result-score-r1-plus"));
+  await fireEvent.press(screen.getByTestId("result-score-r1-plus"));
+  expect(screen.getByTestId("match-report-sentence")).toHaveTextContent("NeonFalke gewinnt 2:0");
+  expect(screen.queryByTestId("result-flag-r1")).toBeNull();
   await fireEvent.press(screen.getByTestId("match-report-submit"));
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/report", {
     results: [{ registration_id: "r1", rank: 1, score: 2 }, { registration_id: "r2", rank: 2, score: 0 }],
-    screenshot_url: null, note: null,
+    screenshot_url: null, note: null, photo_id: null,
   }));
   expect(mockPost.mock.calls.some(([, body]) => body && "score_a" in (body as object))).toBe(false);
 });
@@ -203,4 +210,29 @@ test("Terminvorschlag: Tag und Uhrzeit antippen - an den Server geht die Wiener 
   } finally {
     jest.useRealTimers();
   }
+});
+
+describe("Foto vom Ergebnis und „Nur Turnierleitung“ (#1157)", () => {
+  test("ein Bild aus der Galerie geht sofort hoch, die Kennung geht mit der Meldung", async () => {
+    const picker = jest.requireMock("expo-image-picker") as { launchImageLibraryAsync: jest.Mock };
+    picker.launchImageLibraryAsync.mockResolvedValueOnce({ canceled: false, assets: [{ uri: "file:///ergebnis.jpg", mimeType: "image/jpeg", fileName: "ergebnis.jpg" }] });
+    mockPost.mockImplementation(async (path: string) => (path === "/matches/m1/proof-photos" ? { data: { id: "p1" } } : { data: { awaiting_confirmation: true } }));
+    answer(PAGE);
+    await render(<MatchDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("match-report-form")).toBeTruthy());
+    await fireEvent.press(screen.getByTestId("proof-photo-gallery"));
+    await waitFor(() => expect(screen.getByTestId("proof-photo-state")).toHaveTextContent("Foto angehängt – sehen nur die Gegenseite und die Turnierleitung."));
+    expect(mockPost.mock.calls[0][0]).toBe("/matches/m1/proof-photos");
+    await fireEvent.press(screen.getByTestId("result-score-r2-plus"));
+    await fireEvent.press(screen.getByTestId("match-report-submit"));
+    await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/report", expect.objectContaining({ photo_id: "p1" })));
+  });
+
+  test("bei „Nur Turnierleitung“ kein Melde-Knopf, sondern wer das Ergebnis einträgt", async () => {
+    answer({ ...PAGE, result_entry_mode: "staff_only", can_player_report_result: false, can_report_score: false, report_state: null, acting_registration_id: "r1" });
+    await render(<MatchDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("match-staff-enters")).toBeTruthy());
+    expect(screen.getByText("Das Ergebnis trägt die Turnierleitung ein.")).toBeTruthy();
+    expect(screen.queryByTestId("match-report")).toBeNull();
+  });
 });

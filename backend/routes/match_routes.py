@@ -64,6 +64,7 @@ from services.competition_usage import engine_for_match, record_write
 from services.match_forfeit import apply_forfeit
 from services.match_lead import entry_info
 from services.result_hold import ensure_no_hold, hold_result, undo_result
+from services.match_proofs import claim_proof, visible_proofs
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
 logger = logging.getLogger("tls.match")
@@ -510,12 +511,17 @@ async def _report_view(db, match: dict, acting_reg: dict) -> dict:
     registrations = await _registrations_for_match(match)
     regs_by_id = {reg["id"]: reg for reg in registrations if reg.get("id")}
     own, proposal = state["own"], state["proposal"]
+    # Foto vom Ergebnis (#1157): die eigene Seite sieht ihr Foto, beim Bestätigen das der Gegenseite - erst nach der
+    # Bildprüfung; die Adresse liefert nur an Spieler und Turnierleitung aus.
+    photos = await visible_proofs(db, [(own or {}).get("photo_id"), (proposal or {}).get("photo_id")])
     return {
         "status": state["status"],
         "own_summary": results_summary(own.get("results"), regs_by_id) if own else None,
         "own_at": own.get("at") if own else None,
+        "own_photo": photos.get((own or {}).get("photo_id") or ""),
         "proposal": public_report_results(proposal.get("results")) if proposal else None,
         "proposal_summary": results_summary(proposal.get("results"), regs_by_id) if proposal else None,
+        "proposal_photo": photos.get((proposal or {}).get("photo_id") or ""),
     }
 
 
@@ -563,11 +569,16 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     # Ergebnis-Fenster (#1156, #1370): dieselbe Beschreibung wie in der Ansicht „Turnierleitung“ - Format, Seiten,
     # wohin der Sieger weiterrückt, ein bereitliegendes Ergebnis mit „Rückgängig“. Nur für wer eintragen darf.
     result_entry = None
-    if can_submit_result and match.get("slots"):
+    report_entry_info = None
+    if (can_submit_result or can_player_report) and match.get("slots"):
         stage_matches = await db.matches_v2.find({"stage_id": match.get("stage_id")}, {"_id": 0}).to_list(3000)
         regs_by_id = {reg["id"]: reg for reg in await _registrations_for_match(match) if reg.get("id")}
-        result_entry = entry_info(match, tournament=tournament, stage=stage, stage_matches=stage_matches,
-                                  regs_by_id=regs_by_id, viewer_id=(user or {}).get("id"))
+        info = entry_info(match, tournament=tournament, stage=stage, stage_matches=stage_matches,
+                          regs_by_id=regs_by_id, viewer_id=(user or {}).get("id"))
+        if can_submit_result:
+            result_entry = info
+        # Spieler-Meldung (#1157): dieselben Bausteine - Format, Seiten, wohin es weitergeht. Ohne Internes der Leitung.
+        report_entry_info = {key: value for key, value in info.items() if key not in {"result_note", "hold"}}
     if not await _sees_internal(match, user):
         viewer_id = (user or {}).get("id")
         match = public_match_view(match, viewer_id)
@@ -593,6 +604,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "in_dispute": str(match.get("status") or "") == "disputed",
         "call": call,
         "result_entry": result_entry,
+        "report_entry": report_entry_info if can_player_report else None,
         "can_forfeit": await _can_forfeit_match(match, user),
         "event_mode": policy["event_mode"],
         "result_entry_mode": policy["result_entry_mode"],
@@ -1019,7 +1031,10 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict) -> dict:
         match["idempotent_replay"] = True
         return match
 
-    entry = report_entry(me["id"], my_registration["id"], results, proof_url=body.screenshot_url, note=body.note)
+    # Foto vom Ergebnis (#1157): das eigene, eben hochgeladene Foto dieses Spiels gehört jetzt zur Meldung.
+    photo = await claim_proof(db, body.photo_id, owner_id=me["id"], match_id=match["id"], kind="report")
+    entry = report_entry(me["id"], my_registration["id"], results, proof_url=body.screenshot_url, note=body.note,
+                         photo_id=(photo or {}).get("id"))
     await getattr(db, "matches_v2").update_one(
         {"id": match["id"]},
         {"$push": {"reports": entry}, "$set": {"updated_at": now_utc().isoformat()}},

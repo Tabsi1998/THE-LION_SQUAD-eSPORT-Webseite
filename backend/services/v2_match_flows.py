@@ -72,7 +72,7 @@ def dispute_entry(user_id: str, reason: str) -> dict:
 
 
 def report_entry(user_id: str, registration_id: str | None, results: list[dict],
-                 proof_url: str | None = None, note: str | None = None) -> dict:
+                 proof_url: str | None = None, note: str | None = None, photo_id: str | None = None) -> dict:
     entry = {
         "user_id": user_id,
         "registration_id": registration_id,
@@ -84,6 +84,9 @@ def report_entry(user_id: str, registration_id: str | None, results: list[dict],
         entry["proof_url"] = proof_url.strip()
     if (note or "").strip():
         entry["note"] = note.strip()
+    # Foto vom Ergebnis (#1157): sehen dürfen es die Gegenseite und die Turnierleitung (services/match_proofs).
+    if photo_id:
+        entry["photo_id"] = photo_id
     return entry
 
 

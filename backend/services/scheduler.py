@@ -627,6 +627,18 @@ async def _safe_result_holds():
         _log_task_failure("result_holds", exc)
 
 
+async def _safe_proof_photo_retention():
+    """Fotos vom Ergebnis (#1157): nie verwendete nach 24 Stunden, sonst 30 Tage nach dem Hochladen weg."""
+    try:
+        from database import get_db
+        from services.match_proofs import purge
+        removed = await purge(get_db())
+        if removed:
+            logger.info(f"[scheduler] proof_photo_retention removed={removed}")
+    except Exception as exc:
+        _log_task_failure("proof_photo_retention", exc)
+
+
 async def _safe_media_scan():
     try:
         from services.media_scan import process_pending
@@ -908,6 +920,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("chat_attachment_cleanup", _safe_chat_attachment_cleanup), IntervalTrigger(hours=1), id="chat_attachment_cleanup",
                   max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("proof_photo_retention", _safe_proof_photo_retention, lease_seconds=300.0), IntervalTrigger(hours=1),
+                  id="proof_photo_retention", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("ops_retention", _safe_ops_retention, lease_seconds=600.0), IntervalTrigger(hours=24), id="ops_retention", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("ops_checks", _safe_ops_checks), IntervalTrigger(minutes=5), id="ops_checks",
                   max_instances=1, coalesce=True)

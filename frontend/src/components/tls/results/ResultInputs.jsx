@@ -43,7 +43,7 @@ export function FlagChips({ value = null, onChange, testId }) {
 }
 
 /** 1 gegen 1: je Seite Name, Plus/Minus und darunter die beiden Wörter. */
-export function ScoreInput({ entry, state, onChange }) {
+export function ScoreInput({ entry, state, onChange, showFlags = true }) {
   return (
     <div className="space-y-3" data-testid="result-score">
       {(entry.participants || []).map((side) => (
@@ -61,9 +61,11 @@ export function ScoreInput({ entry, state, onChange }) {
               />
             )}
           </div>
-          <div className="mt-2">
-            <FlagChips value={state.flags[side.registration_id] || null} onChange={(flag) => onChange(withFlag(state, side.registration_id, flag, true))} testId={`result-flag-${side.registration_id}`} />
-          </div>
+          {showFlags ? (
+            <div className="mt-2">
+              <FlagChips value={state.flags[side.registration_id] || null} onChange={(flag) => onChange(withFlag(state, side.registration_id, flag, true))} testId={`result-flag-${side.registration_id}`} />
+            </div>
+          ) : null}
         </div>
       ))}
     </div>
@@ -80,7 +82,7 @@ export function withFlag(state, id, flag, exclusive = false) {
 }
 
 /** Best-of: je Spiel den Sieger antippen. Nach der Entscheidung sind die übrigen Spiele aus. */
-export function BestOfInput({ entry, state, onTap, onChange }) {
+export function BestOfInput({ entry, state, onTap, onChange, showFlags = true }) {
   const sides = entry.participants || [];
   const total = Number(entry.best_of || 3);
   const needed = winsNeeded(total);
@@ -117,20 +119,20 @@ export function BestOfInput({ entry, state, onTap, onChange }) {
           </div>
         );
       })}
-      <div className="grid grid-cols-2 gap-2 pt-1">
+      {showFlags ? <div className="grid grid-cols-2 gap-2 pt-1">
         {sides.map((side) => (
           <div key={side.registration_id}>
             <div className="text-[11px] text-white/45 truncate mb-1">{side.name}</div>
             <FlagChips value={state.flags[side.registration_id] || null} onChange={(flag) => onChange(withFlag(state, side.registration_id, flag, true))} testId={`result-flag-${side.registration_id}`} />
           </div>
         ))}
-      </div>
+      </div> : null}
     </div>
   );
 }
 
 /** Zeitduell: antippen, wer gewonnen hat. */
-export function WinnerInput({ entry, state, onChange }) {
+export function WinnerInput({ entry, state, onChange, showFlags = true }) {
   return (
     <div className="space-y-3" data-testid="result-winner">
       <p className="text-sm text-white/60">Wer hat gewonnen?</p>
@@ -144,17 +146,17 @@ export function WinnerInput({ entry, state, onChange }) {
           );
         })}
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      {showFlags ? <div className="grid grid-cols-2 gap-2">
         {(entry.participants || []).map((side) => (
           <FlagChips key={side.registration_id} value={state.flags[side.registration_id] || null} onChange={(flag) => onChange(withFlag(state, side.registration_id, flag, true))} testId={`result-flag-${side.registration_id}`} />
         ))}
-      </div>
+      </div> : null}
     </div>
   );
 }
 
 /** Durchgang per Zielreihenfolge: antippen, wie sie ins Ziel kamen; noch ein Tipp nimmt es heraus. */
-export function OrderInput({ entry, state, onChange }) {
+export function OrderInput({ entry, state, onChange, showFlags = true }) {
   const order = state.order || [];
   const tap = (id) => {
     if (state.flags[id]) return;
@@ -173,9 +175,11 @@ export function OrderInput({ entry, state, onChange }) {
               <span className="min-w-0 flex-1 font-heading font-bold uppercase truncate">{side.name}</span>
               {flag ? <span className="text-[11px] font-bold uppercase tracking-wider text-[#FF6B60]">{FLAG_LABELS[flag]}</span> : null}
             </button>
-            <div className="mt-1 pl-11">
-              <FlagChips value={flag || null} onChange={(next) => onChange(withFlag(state, side.registration_id, next))} testId={`result-flag-${side.registration_id}`} />
-            </div>
+            {showFlags ? (
+              <div className="mt-1 pl-11">
+                <FlagChips value={flag || null} onChange={(next) => onChange(withFlag(state, side.registration_id, next))} testId={`result-flag-${side.registration_id}`} />
+              </div>
+            ) : null}
           </div>
         );
       })}

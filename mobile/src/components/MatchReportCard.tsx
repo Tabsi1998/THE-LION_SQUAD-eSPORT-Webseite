@@ -1,16 +1,18 @@
-import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { REPORT_STATE_TEXT, duelResults, heatResults, rankingMode, type ReportEntry } from "../lib/matchReport";
+import { REPORT_STATE_TEXT, rankingMode, type ReportEntry } from "../lib/matchReport";
+import { initialState, inputKind, resultSentence, resultsFor, tapGame, type ResultEntry } from "../lib/resultEntry";
 import { colors } from "../theme";
 import { Button } from "./Button";
 import { FormInput } from "./FormInput";
 import { Body, Muted } from "./Text";
+import { BestOfInput, OrderInput, ScoreInput, WinnerInput } from "./results/ResultInputs";
+import { ProofPhotoPicker, type ProofPhoto } from "./results/ProofPhotoPicker";
 
-// Ergebnis melden (#1132): wie auf der Website (frontend/src/components/tls/tournament/MatchReportForm.jsx). Wer selbst
-// im Spiel steht und melden darf, meldet hier - im Duell, wer gewonnen hat, sonst die Plätze, freiwillig mit Spielstand,
-// Beweis-Link und Notiz. Hat die Gegenseite schon gemeldet, genügt „Ja, stimmt“. Weichen die Meldungen ab, entscheidet
-// die Turnierleitung.
+// Ergebnis melden (#1132, #1157): wie auf der Website (frontend/src/components/tls/tournament/MatchReportForm.jsx) -
+// dieselben großen Knöpfe wie das Ergebnis-Fenster der Turnierleitung: Plus/Minus je Seite, bei Best-of je Spiel den
+// Sieger antippen, bei Durchgängen die Zielreihenfolge. Dazu auf Wunsch ein Foto vom Ergebnis (Kamera oder Galerie).
+// Vor dem Absenden steht der Satz in Worten. Hat die Gegenseite schon gemeldet, genügt „Ja, stimmt“.
 
 export type ReportState = {
   status?: "open" | "waiting" | "confirm" | "conflict" | "agreed" | string;
@@ -20,46 +22,57 @@ export type ReportState = {
 } | null;
 
 type Side = { registration_id?: string | null; display_name?: string | null };
-export type ReportPayload = { results: ReportEntry[]; screenshot_url: string | null; note: string | null };
+export type ReportPayload = { results: Array<Record<string, unknown>>; screenshot_url: string | null; note: string | null; photo_id?: string | null };
 
-function valueLabel(mode: string) {
-  if (mode === "time") return "Zeit in ms";
-  return mode === "lower_score" ? "Score" : "Punkte";
+function fallbackEntry(participants: Side[], match: { id?: string; settings?: Record<string, unknown> | null } | null | undefined, allowsDraw: boolean): ResultEntry {
+  const sides = participants.filter((side) => side.registration_id);
+  return {
+    id: String(match?.id || ""),
+    kind: sides.length === 2 ? "duel" : "heat",
+    best_of: 1,
+    ranking_mode: rankingMode(match),
+    allows_draw: allowsDraw,
+    participants: sides.map((side) => ({ registration_id: String(side.registration_id), name: side.display_name || "Teilnehmer" })),
+    advance: {},
+  };
 }
 
-export function MatchReportCard({ participants, match, state, allowsDraw = false, busy = false, onReport }: {
+export function MatchReportCard({ participants, match, entry: serverEntry = null, state, allowsDraw = false, busy = false, onReport }: {
   participants: Side[];
-  match: { settings?: Record<string, unknown> | null } | null | undefined;
+  match: { id?: string; settings?: Record<string, unknown> | null } | null | undefined;
+  entry?: ResultEntry | null;
   state: ReportState;
   allowsDraw?: boolean;
   busy?: boolean;
   onReport: (payload: ReportPayload) => Promise<boolean>;
 }) {
   const status = state?.status || "open";
-  const mode = rankingMode(match);
-  const sides = useMemo(() => participants.filter((side) => side.registration_id) as Array<Side & { registration_id: string }>, [participants]);
-  const isDuel = sides.length === 2;
+  const entry = useMemo(() => serverEntry || fallbackEntry(participants, match, allowsDraw), [serverEntry, participants, match, allowsDraw]);
+  const kind = inputKind(entry, "order");
   const [editing, setEditing] = useState(status === "open");
-  const [winner, setWinner] = useState("");
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [rows, setRows] = useState(() => sides.map((side, index) => ({ registration_id: side.registration_id, rank: String(index + 1), value: "" })));
-  const [proofUrl, setProofUrl] = useState("");
+  const [form, setForm] = useState(() => initialState({ ...entry, result: [] }));
+  const [photo, setPhoto] = useState<ProofPhoto>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const outcome = resultsFor(entry, kind, form);
+  const sentence = outcome.results ? resultSentence({ ...entry, advance: {} }, outcome.results) : "";
 
   // Ein neuer Stand vom Server schließt das Formular - außer, es ist noch nichts gemeldet.
   useEffect(() => { setEditing(status === "open"); }, [status]);
 
   const submit = async () => {
-    const outcome = isDuel ? duelResults({ sides: sides.map((side) => side.registration_id), winner, values, mode }) : heatResults(rows, mode);
     if (outcome.error !== undefined) {
       setError(outcome.error);
       return;
     }
+    if (photo?.status === "uploading") {
+      setError("Das Foto wird noch hochgeladen – einen Moment.");
+      return;
+    }
     setError("");
-    const done = await onReport({ results: outcome.results, screenshot_url: proofUrl.trim() || null, note: note.trim() || null });
+    const done = await onReport({ results: outcome.results, screenshot_url: null, note: note.trim() || null, photo_id: photo?.status === "ready" ? photo.id : null });
     if (done) {
-      setProofUrl("");
+      setPhoto(null);
       setNote("");
     }
   };
@@ -87,38 +100,17 @@ export function MatchReportCard({ participants, match, state, allowsDraw = false
 
       {editing ? (
         <View style={styles.stack} testID="match-report-form">
-          {isDuel ? (
-            <>
-              <Muted style={styles.label}>Wer hat gewonnen?</Muted>
-              <View style={styles.row}>
-                {sides.map((side) => (
-                  <Choice key={side.registration_id} label={side.display_name || "Teilnehmer"} active={winner === side.registration_id} onPress={() => setWinner(side.registration_id)} testID={`match-report-winner-${side.registration_id}`} />
-                ))}
-                {allowsDraw ? <Choice label="Unentschieden" active={winner === "draw"} onPress={() => setWinner("draw")} testID="match-report-draw" /> : null}
-              </View>
-              <Muted style={styles.label}>Spielstand (freiwillig)</Muted>
-              {sides.map((side) => (
-                <FormInput
-                  key={side.registration_id}
-                  label={`${valueLabel(mode)} ${side.display_name || "Teilnehmer"}`}
-                  value={values[side.registration_id] || ""}
-                  keyboardType="numeric"
-                  onChangeText={(value) => setValues((current) => ({ ...current, [side.registration_id]: value }))}
-                  testID={`match-report-value-${side.registration_id}`}
-                />
-              ))}
-            </>
-          ) : (
-            rows.map((row, index) => (
-              <View key={row.registration_id} style={styles.heatRow}>
-                <Body style={[styles.strong, styles.flex]} numberOfLines={1}>{sides.find((side) => side.registration_id === row.registration_id)?.display_name || "Teilnehmer"}</Body>
-                <FormInput label="Platz" value={row.rank} keyboardType="number-pad" style={styles.small} onChangeText={(value) => setRows((current) => current.map((item, i) => (i === index ? { ...item, rank: value } : item)))} testID={`match-report-rank-${row.registration_id}`} />
-                <FormInput label={valueLabel(mode)} value={row.value} keyboardType="numeric" style={styles.small} onChangeText={(value) => setRows((current) => current.map((item, i) => (i === index ? { ...item, value } : item)))} />
-              </View>
-            ))
-          )}
-          <FormInput label="Beweis-Link (freiwillig)" value={proofUrl} onChangeText={setProofUrl} placeholder="https://..." />
-          <FormInput label="Notiz für die Turnierleitung (freiwillig)" value={note} onChangeText={setNote} />
+          {kind === "score" ? <ScoreInput entry={entry} state={form} onChange={setForm} showFlags={false} /> : null}
+          {kind === "bestof" ? (
+            <BestOfInput entry={entry} state={form} onChange={setForm} showFlags={false} onTap={(index, winner) => setForm((current) => ({ ...current, games: tapGame(current.games, index, winner, { sides: current.sides, bestOf: entry.best_of }) }))} />
+          ) : null}
+          {kind === "winner" ? <WinnerInput entry={entry} state={form} onChange={setForm} showFlags={false} /> : null}
+          {kind === "order" ? <OrderInput entry={entry} state={form} onChange={setForm} showFlags={false} /> : null}
+          {entry.id ? <ProofPhotoPicker matchId={entry.id} value={photo} onChange={setPhoto} /> : null}
+          <FormInput label="Notiz für die Turnierleitung (freiwillig)" value={note} onChangeText={setNote} testID="match-report-note" />
+          <View style={[styles.sentence, !sentence && styles.sentenceEmpty]}>
+            <Body style={styles.strong} testID="match-report-sentence">{sentence || outcome.error}</Body>
+          </View>
           {error ? <Muted style={styles.error} testID="match-report-error">{error}</Muted> : null}
           <Button label={busy ? "Meldet ..." : "Ergebnis melden"} onPress={() => { void submit(); }} disabled={busy} testID="match-report-submit" />
           <Muted>Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Weicht es ab, entscheidet die Turnierleitung.</Muted>
@@ -128,52 +120,10 @@ export function MatchReportCard({ participants, match, state, allowsDraw = false
   );
 }
 
-function Choice({ label, active, onPress, testID }: { label: string; active: boolean; onPress: () => void; testID?: string }) {
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: active }} testID={testID} style={[styles.choice, active && styles.choiceActive]}>
-      {active ? <Ionicons name="checkmark" size={16} color={colors.cyan} /> : null}
-      <Muted style={[styles.choiceText, active && styles.choiceTextActive]}>{label}</Muted>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  choice: {
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderColor: colors.border,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 6,
-    minHeight: 44,
-    paddingHorizontal: 12,
-  },
-  choiceActive: {
-    backgroundColor: "rgba(41,182,232,0.16)",
-    borderColor: "rgba(41,182,232,0.55)",
-  },
-  choiceText: {
-    fontWeight: "900",
-  },
-  choiceTextActive: {
-    color: colors.cyan,
-  },
   error: {
     color: colors.live,
     fontWeight: "800",
-  },
-  flex: {
-    flex: 1,
-    minWidth: 0,
-  },
-  heatRow: {
-    alignItems: "flex-end",
-    flexDirection: "row",
-    gap: 8,
-  },
-  label: {
-    fontWeight: "900",
   },
   link: {
     color: colors.cyan,
@@ -185,9 +135,8 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
-  small: {
-    minWidth: 72,
-  },
+  sentence: { backgroundColor: "rgba(41,182,232,0.1)", borderColor: "rgba(41,182,232,0.35)", borderRadius: 8, borderWidth: 1, padding: 12 },
+  sentenceEmpty: { backgroundColor: "rgba(255,255,255,0.04)", borderColor: colors.border },
   stack: {
     gap: 10,
   },

@@ -17,6 +17,8 @@ PRIVATE_CHAT_DIR = UPLOAD_DIR / "chat"
 APP_RELEASE_DIR = UPLOAD_DIR / "app-releases"
 # Bildprüfung (#415): entfernte Originale - nur die Moderation sieht sie, nach 90 Tagen weg.
 QUARANTINE_DIR = UPLOAD_DIR / "quarantine"
+# Fotos vom Ergebnis (#1157, #1158): nie öffentlich, nur über /api/matches/{id}/proof-photos für Spieler und Turnierleitung.
+PROOF_DIR = UPLOAD_DIR / "proofs"
 
 
 def ensure_directory(path: Path) -> Path:
@@ -25,5 +27,5 @@ def ensure_directory(path: Path) -> Path:
 
 
 def ensure_storage_directories() -> None:
-    for path in (UPLOAD_DIR, PUBLIC_UPLOAD_DIR, PRIVATE_DOC_DIR, PRIVATE_CHAT_DIR, APP_RELEASE_DIR, QUARANTINE_DIR):
+    for path in (UPLOAD_DIR, PUBLIC_UPLOAD_DIR, PRIVATE_DOC_DIR, PRIVATE_CHAT_DIR, APP_RELEASE_DIR, QUARANTINE_DIR, PROOF_DIR):
         ensure_directory(path)

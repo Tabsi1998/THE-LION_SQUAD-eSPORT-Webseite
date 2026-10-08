@@ -287,6 +287,8 @@ export default function MatchPage() {
   const canSubmitV2Result = Boolean(!isCompleted && canStaffSubmit && v2Rows.length);
   // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - der Server sagt, bis wann.
   const canDispute = Boolean(data.can_dispute);
+  // Nur Turnierleitung (#1157): wer mitspielt, sieht statt eines Melde-Knopfs, wer das Ergebnis einträgt.
+  const showStaffEnters = Boolean(data.acting_registration_id && !canPlayerReport && !canStaffSubmit && !finished && data.result_entry_mode === "staff_only" && !data.in_dispute);
   const hasOtherResultActions = Boolean(canPlayerReport || canSubmitV2Result);
   const hasResultActions = Boolean(hasOtherResultActions || canDispute || (!isCompleted && data.can_forfeit));
   const reports = Array.isArray(match.reports) ? match.reports : [];
@@ -398,6 +400,17 @@ export default function MatchPage() {
           </div>
           )}
 
+          {/* Nur Turnierleitung (#1157): Spieler sehen keinen Melde-Knopf, sondern wer das Ergebnis einträgt. */}
+          {showStaffEnters ? (
+            <div className="mt-5 flex items-start gap-3 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 px-4 py-3" data-testid="match-staff-enters">
+              <Flag className="mt-0.5 w-4 h-4 shrink-0 text-[#29B6E8]" />
+              <div>
+                <p className="text-sm font-bold text-white">Das Ergebnis trägt die Turnierleitung ein.</p>
+                <p className="mt-0.5 text-xs text-white/55">Du musst nichts melden. Sobald es drin ist, bekommst du eine Benachrichtigung.</p>
+              </div>
+            </div>
+          ) : null}
+
           {data.in_dispute && (
             <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#FFD2CF]" data-testid="match-in-dispute">
               <strong>In Klärung</strong> – zu diesem Spiel liegt ein Dispute vor. Die Turnierleitung prüft und entscheidet.
@@ -410,6 +423,7 @@ export default function MatchPage() {
                 <MatchReportForm
                   participants={participants}
                   match={match}
+                  entry={data.report_entry}
                   state={data.report_state}
                   allowsDraw={Boolean(data.allows_draw)}
                   busy={busy}
@@ -491,7 +505,7 @@ export default function MatchPage() {
             <Link to={`/login?next=/matches/${id}`} className="tls-btn tls-btn--secondary mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
               Login zum Ergebnis melden
             </Link>
-          ) : (
+          ) : showStaffEnters ? null : (
             <p className="mt-4 text-sm text-white/50">{isCompleted ? "Dieses Match ist abgeschlossen." : resultModeLabels[data.result_entry_mode] || "Ergebnis wird durch die Turnierleitung gepflegt."}</p>
           )}
           {canStaffSubmit && !isCompleted && reports.length > 0 && <p className="mt-3 text-xs text-white/45" data-testid="match-report-count">{reports.length} Ergebnismeldung{reports.length === 1 ? "" : "en"} der Spieler vorhanden.</p>}

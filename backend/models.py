@@ -773,6 +773,8 @@ class MatchScoreReport(BaseModel):
     results: Optional[List["MatchV2ResultEntry"]] = None
     screenshot_url: Optional[str] = None
     note: Optional[str] = None
+    # Foto vom Ergebnis (#1157): vorher über /matches/{id}/proof-photos hochgeladen.
+    photo_id: Optional[str] = None
 
 
 class MatchV2ResultEntry(BaseModel):
