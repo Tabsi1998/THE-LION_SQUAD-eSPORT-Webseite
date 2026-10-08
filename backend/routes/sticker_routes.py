@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from auth import get_current_user, require_admin, require_area
+from auth import get_current_user, require_area
 from database import get_db
 from models import new_id, now_utc
 from services.stickers import (

@@ -129,13 +129,13 @@ def cleanup(admin):
     for tid in _created_tournaments:
         try:
             admin.delete(f"{BASE}/api/tournaments/{tid}")
-        except Exception:
-            pass
+        except requests.RequestException:
+            pass  # Aufräumen nach dem Lauf: antwortet der Server nicht, bleibt der Testrest liegen
     for eid in _created_entries:
         try:
             admin.delete(f"{BASE}/api/seasons/v2/entry/{eid}")
-        except Exception:
-            pass
+        except requests.RequestException:
+            pass  # wie oben
 
 
 def _mk_tournament(admin, game_id, extra=None):
@@ -534,12 +534,11 @@ class TestResultsPublishedHook:
         # Create tournament
         t = _mk_tournament(admin, any_game["id"])
         # Register admin as participant (need at least one user)
-        uid = admin.user["id"]
         reg = admin.post(f"{BASE}/api/tournaments/{t['id']}/register", json={"platform_id": "admin"})
         # admin might not be registerable on draft, try setting status first
         if reg.status_code != 200:
             admin.post(f"{BASE}/api/tournaments/{t['id']}/status", json={"status": "registration_open"})
-            reg = admin.post(f"{BASE}/api/tournaments/{t['id']}/register", json={"platform_id": "admin"})
+            admin.post(f"{BASE}/api/tournaments/{t['id']}/register", json={"platform_id": "admin"})
         # Get points BEFORE
         before = admin.get(f"{BASE}/api/seasons/v2/me").json()
         before_count = len(before.get("entries", []))

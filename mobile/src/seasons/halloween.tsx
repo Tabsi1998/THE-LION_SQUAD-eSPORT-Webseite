@@ -8,7 +8,7 @@ import { CatOnEdge, Fog } from "./atmosphere";
 import { FlyingBatShape, HangingBatShape as HangingBatArt } from "./batArt";
 import { flightPath, keyframes, nextFlightDelaySeconds, planFlock, type FlightPath } from "./bats";
 import { approachPath, awayMs, flightDurationMs, hopPath, inView, rotationFrames, temperamentFor, type Temperament } from "./batLife";
-import { endFlight, fleePath, requestHop, startFlight, subscribeFlightEnd, subscribeFlights, subscribeHops, type Flight as PerchFlightData } from "./flights";
+import { endFlight, fleePath, startFlight, subscribeFlightEnd, subscribeFlights, subscribeHops, type Flight as PerchFlightData } from "./flights";
 import { capabilities, scaleForScreen, type Capabilities } from "./intensity";
 import { getMotionScheduler, releaseMotion, requestMotion, type MotionToken } from "./motion";
 import { assign, assignWebs, assignmentsFor, choosePerches, chooseWebPerches, clearAssignment, perchSnapshot, perchesFor, placementFor, subscribePerches, perchPoint, type Perch, type PerchAssignment } from "./perches";
@@ -51,7 +51,6 @@ export const THREAD_SOFT = "rgba(170,225,240,0.42)";
 export const EYES = "#9be7ff";
 export const RIM = "rgba(170,225,240,0.28)";
 const BODY = "#1a1520";
-const INK = "#0b0a0f";
 /** Höhe der Tab-Leiste ohne den unteren Sicherheitsrand (AppNavigator). */
 export const TAB_BAR = 62;
 export const GHOST_COOLDOWN_MS = 60000;

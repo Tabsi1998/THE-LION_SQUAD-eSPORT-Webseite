@@ -31,4 +31,3 @@ FINDS = [
 
 GROUPS_E: list[dict] = [group for group, _tiers in FINDS]
 TIERS_E: list[dict] = [t for _group, tiers in FINDS for t in tiers]
-CONDITION_KEYS_E: tuple[str, ...] = tuple(sorted({group["condition_key"] for group in GROUPS_E if group["condition_key"]}))

@@ -1,6 +1,5 @@
 """Phase 5 Tests: Badge System, Public Profiles, Sponsors CRUD, Upload, F1 Rename."""
 import os
-import io
 import base64
 import uuid
 import pytest
@@ -212,7 +211,7 @@ class TestBadgeTriggers:
         first_count = codes1.count("first_tournament")
         assert first_count == 1
         # Try register again — should be rejected (already registered)
-        r2 = requests.post(f"{BASE_URL}/api/tournaments/{tid}/register", headers=h)
+        requests.post(f"{BASE_URL}/api/tournaments/{tid}/register", headers=h)
         # Re-check
         r3 = requests.get(f"{BASE_URL}/api/users/public/{username}")
         codes2 = [b["code"] for b in r3.json().get("badges", [])]

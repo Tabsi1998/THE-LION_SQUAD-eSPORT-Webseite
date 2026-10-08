@@ -80,7 +80,7 @@ async def game_holders(db, user_ids: list[str], games: dict[str, dict], parents:
 async def targets(db, guild_ids: list[str], main_id: str = "") -> list[tuple[str, dict | None]]:
     """Wo abgeglichen wird: Hauptserver und jeder eingeschaltete Unterserver, auf dem der Bot ist. Ohne Verzeichnis
     (allererster Start) wie früher nur der Hauptserver - der eingetragene oder der erste."""
-    from services.discord_guilds import COLLECTION
+    from services.discord_guild_store import COLLECTION
 
     rows = {row["guild_id"]: row for row in await db[COLLECTION].find({}, {"_id": 0, "channel_list": 0}).to_list(500)}
     if not rows:
@@ -99,7 +99,7 @@ async def scope_games(db, row: dict | None, games: dict[str, dict], parents: dic
     der Spiele, die dort zu Hause sind (eigene und geerbte)."""
     if row is None or row.get("role") == "main":
         return {game_id for game_id, game in games.items() if not game.get("parent_game_id")}
-    from services.discord_guilds import games_by_guild
+    from services.discord_guild_store import games_by_guild
 
     return {top_game(game["id"], parents) for game in (await games_by_guild(db)).get(str(row["guild_id"])) or []}
 
@@ -118,7 +118,7 @@ def member_plan(current: set, wanted: set, available: set) -> tuple[set, set]:
 
 
 async def record(db, guild_id: str, result: dict) -> None:
-    from services.discord_guilds import COLLECTION
+    from services.discord_guild_store import COLLECTION
 
     state = {"at": now_utc().isoformat(), "changes": int(result.get("changes") or 0), "errors": int(result.get("errors") or 0),
              "missing": list(result.get("missing") or []), "missing_games": list(result.get("missing_games") or []),

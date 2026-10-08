@@ -25,8 +25,8 @@ er sofort (``note_membership``) - daraus zählt der Erfolg „Überall dabei“ 
 from __future__ import annotations
 
 from models import new_id, now_utc
+from services.discord_guild_store import COLLECTION, GAME_FIELDS, _usable, guild_for_game
 
-COLLECTION = "discord_guilds"
 ROLES = ("main", "sub")
 # Was der Bot je Server darf - Schlüssel wie in discord.py, Name wie im Discord-Menü, wofür.
 PERMISSIONS = (
@@ -345,29 +345,6 @@ async def send_test(db, guild_id: str, *, confirmed: bool = False) -> dict:
 # ---------------------------------------------------------------- Spiel → Server (#626)
 
 MEMBERSHIP_TTL_SECONDS = 300
-GAME_FIELDS = {"_id": 0, "id": 1, "name": 1, "display_name": 1, "short_name": 1, "slug": 1, "discord_guild_id": 1, "parent_game_id": 1, "kind": 1}
-
-
-def _usable(row: dict | None) -> bool:
-    return bool(row) and bool(row.get("enabled")) and not row.get("left_at")
-
-
-async def guild_for_game(db, game: dict | None) -> dict | None:
-    """Der Server eines Spiels (#626): eigenes Feld → Hauptspiel → Hauptserver. Ausgeschaltete oder verlassene Server
-    zählen nicht - dann gilt die nächste Stufe. ``inherited_from``: None (eigenes Feld), die ID des Hauptspiels oder „main“."""
-    visited: set = set()
-    current = game
-    while current and current.get("id") not in visited:
-        visited.add(current.get("id"))
-        guild_id = str(current.get("discord_guild_id") or "")
-        if guild_id:
-            row = await db[COLLECTION].find_one({"guild_id": guild_id}, {"_id": 0, "channel_list": 0})
-            if _usable(row):
-                return {**row, "inherited_from": None if current is game else current.get("id")}
-        parent_id = current.get("parent_game_id")
-        current = await db.games.find_one({"id": parent_id}, GAME_FIELDS) if parent_id else None
-    main = await db[COLLECTION].find_one({"role": "main"}, {"_id": 0, "channel_list": 0})
-    return {**main, "inherited_from": "main"} if main else None
 
 
 async def public_server(db, row: dict | None) -> dict:
@@ -380,24 +357,6 @@ async def public_server(db, row: dict | None) -> dict:
         invite = str(branding.get("discord_invite_url") or "").strip() or None
     return {"available": True, "guild_id": row["guild_id"], "name": row.get("name"), "icon_url": row.get("icon_url"),
             "member_count": row.get("member_count"), "invite_url": invite, "main": row.get("role") == "main"}
-
-
-async def games_by_guild(db) -> dict[str, list[dict]]:
-    """Die umgekehrte Sicht für den Reiter „Server“: je Server die Spiele - eigene und geerbte (Editionen)."""
-    games = await db.games.find({}, GAME_FIELDS).to_list(500)
-    by_id = {game["id"]: game for game in games}
-    out: dict[str, list[dict]] = {}
-    for game in games:
-        own = str(game.get("discord_guild_id") or "")
-        inherited = False
-        if not own and game.get("parent_game_id"):
-            own = str((by_id.get(game["parent_game_id"]) or {}).get("discord_guild_id") or "")
-            inherited = bool(own)
-        if own:
-            out.setdefault(own, []).append({"id": game["id"], "name": game.get("display_name") or game.get("name"), "slug": game.get("slug"), "inherited": inherited})
-    for rows in out.values():
-        rows.sort(key=lambda row: (row["inherited"], str(row["name"] or "").lower()))
-    return out
 
 
 def _fresh(entry: dict | None, current) -> bool:
@@ -415,7 +374,7 @@ async def own_status(db, user_id: str, guild_ids: list[str], *, now=None) -> dic
     Beitritt und Austritt meldet der Bot sofort (``note_membership``). Unbekannt (Bot offline) bleibt None und wird
     nicht gemerkt. Ohne verknüpftes Discord gibt es keinen Status."""
     from services.discord_bot import bot
-    from services.discord_dm import discord_link_id
+    from services.discord_dm_basics import discord_link_id
 
     discord_id = await discord_link_id(db, user_id)
     if not discord_id or not guild_ids:
@@ -489,7 +448,7 @@ async def greet_linked(db, user_id: str, discord_id: str) -> dict:
     einmal je Discord-Konto. Steht wie jede Direktnachricht im Discord-Log (ohne Inhalt zum erneuten Senden)."""
     from discord_service import REASON_TEXTS, build_embed, resolve_buttons
     from services.discord_bot import bot, bot_settings
-    from services.discord_dm import DM_TARGET
+    from services.discord_dm_basics import DM_TARGET
 
     person = await db.users.find_one({"id": user_id}, {"_id": 0, "discord_servers_greeted_for": 1}) or {}
     if str(person.get("discord_servers_greeted_for") or "") == str(discord_id):

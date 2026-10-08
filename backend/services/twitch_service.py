@@ -93,7 +93,7 @@ async def _get_app_token(creds: dict) -> tuple[str | None, str]:
             if exp > datetime.now(timezone.utc):
                 return decrypt_secret(cached["access_token"]), ""
         except Exception:
-            pass
+            logger.debug("[twitch] gespeicherter Token unbrauchbar - es wird ein neuer geholt", exc_info=True)
     async with httpx.AsyncClient(timeout=10) as cli:
         r = await cli.post(TWITCH_TOKEN_URL, params={
             "client_id": creds["client_id"],
@@ -302,22 +302,20 @@ async def fetch_live_streams() -> dict:
     return await record_poll("ok", checked=len(by_login), live=len(seen_logins))
 
 
-_running = False
+# Immer nur eine Abfrage zugleich: Läuft die vorige noch, kehrt der nächste Aufruf sofort zurück.
+_poll_lock = asyncio.Lock()
 
 
 async def twitch_poll_loop(interval_seconds: int = 60):
     """APScheduler-friendly entrypoint — call once, it self-throttles."""
-    global _running
-    if _running:
+    if _poll_lock.locked():
         return
-    _running = True
-    try:
-        await fetch_live_streams()
-    except Exception as e:
-        logger.warning("[twitch] poll failed: %s", e)
+    async with _poll_lock:
         try:
-            await record_poll("error", detail=type(e).__name__)
-        except Exception:  # noqa: BLE001 - die Datenbank selbst ist weg
-            pass
-    finally:
-        _running = False
+            await fetch_live_streams()
+        except Exception as e:
+            logger.warning("[twitch] poll failed: %s", e)
+            try:
+                await record_poll("error", detail=type(e).__name__)
+            except Exception:  # noqa: BLE001 - die Datenbank selbst ist weg
+                pass

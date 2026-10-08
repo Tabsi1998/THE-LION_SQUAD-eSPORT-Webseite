@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-import auth
 from auth import LAST_ACTIVE_TOUCH_MINUTES, create_access_token, get_current_user, touch_session_activity
 
 
@@ -27,7 +26,7 @@ def fake_db(session: dict | None, user: dict | None):
 def test_a_normal_call_touches_the_session_only_when_the_stand_is_older_than_an_hour(secret, monkeypatch):
     token = create_access_token("user-1", "paula@club-mail.at", "player", "jti-1", "fam-1")
     db = fake_db({"revoked": False, "expires_at": datetime.now(timezone.utc) + timedelta(days=1)}, {"id": "user-1", "role": "player", "is_active": True})
-    monkeypatch.setattr(auth, "get_db", lambda: db)
+    monkeypatch.setattr("auth.get_db", lambda: db)
     request = SimpleNamespace(cookies={}, headers={"Authorization": f"Bearer {token}"})
 
     user = asyncio.run(get_current_user(request))

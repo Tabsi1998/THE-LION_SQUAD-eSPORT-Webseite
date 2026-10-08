@@ -1,5 +1,6 @@
 """Turnier-Chat mit Erwähnungen.
 """
+import logging
 import re
 from fastapi import HTTPException, Depends
 from pydantic import BaseModel, Field
@@ -11,6 +12,7 @@ from models import now_utc, new_id
 from services.user_notifications import create_user_notification
 from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments
 from services import word_filter
+from services.log_safe import log_safe
 from routes.tournament_common import (
     TOURNAMENT_MUTATION_LOCKED_DETAIL,
     _get_visible_tournament,
@@ -216,7 +218,7 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
         from badges import evaluate_user_progress
         await evaluate_user_progress(me["id"])
     except Exception:
-        pass
+        logging.getLogger("tls.tournament").warning("[achievements] Turnierchat-Nachricht in %s nicht ausgewertet", log_safe(tid), exc_info=True)
     doc.pop("_id", None)
     doc = word_filter.public_moderation(doc)
     doc["author"] = {

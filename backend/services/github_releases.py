@@ -161,7 +161,7 @@ async def sync(db, *, force: bool = False, limit: int = 10) -> dict:
                 try:
                     detail = str((response.json() or {}).get("message") or "")
                 except ValueError:
-                    pass
+                    pass  # keine JSON-Antwort: dann bleibt es beim HTTP-Status ohne Text
                 reason = f"GitHub antwortet HTTP {response.status_code}" + (f": {detail}" if detail else "")
                 await _record(db, github_last_error=reason)
                 return {"error": reason, "imported": [], "errors": [reason]}

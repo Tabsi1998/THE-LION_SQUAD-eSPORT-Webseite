@@ -5,12 +5,10 @@ from services.competition_standings import (
     placement_rows_for_structure,
     placements_for_structure,
     registration_badge_match_progress,
-    round_robin_standings,
     registration_match_summary,
     registration_tournament_achievement_progress,
     stage_standings,
     standings_for_structure,
-    swiss_standings,
 )
 
 

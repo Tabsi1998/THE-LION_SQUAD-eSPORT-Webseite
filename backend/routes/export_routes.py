@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import io
 
 from database import get_db
-from auth import require_role, get_optional_user, require_area
+from auth import get_optional_user, require_area
 from services.visibility import user_can_see
 from services.access_links import validate_access_link
 from services.competition_read import load_competition_read_model, observe_structure_read

@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse
 from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
-from auth import require_admin, get_optional_user, require_area
+from auth import get_optional_user, require_area
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
 from services.sponsor_utils import dedupe_public_sponsors, public_sponsor_view
@@ -1384,7 +1384,7 @@ async def get_partner_page(slug: str, user: dict | None = Depends(get_optional_u
     view["twitch"] = await partner_pages.twitch_status(doc.get("twitch_channel")) if doc.get("twitch_channel") else None
     view["discord"] = await partner_pages.discord_widget(doc.get("discord_guild_id")) if doc.get("discord_guild_id") else None
     view["news"] = await _partner_news(db, doc, user)
-    view["shared"] = await partner_pages.shared_for_partner(db, doc["id"], user=user)
+    view["shared"] = await partner_pages.shared_for_partner(db, doc["id"], user=user, enrich_references=_enrich_references)
     view["redirected"] = from_history
     return view
 

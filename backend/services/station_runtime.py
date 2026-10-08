@@ -1,6 +1,7 @@
 """Runtime helpers for station-driven tournament operation."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -10,6 +11,9 @@ from services.match_audience import match_player_users
 from services.station_labels import station_text
 from services.notification_preferences import send_user_template
 from services.user_notifications import build_public_url, create_user_notification
+from services.log_safe import log_safe
+
+logger = logging.getLogger("tls.stations")
 
 
 def station_label(station: dict) -> str:
@@ -120,7 +124,7 @@ async def notify_match_started(db, match: dict, station: dict, collection_name: 
                 },
             )
         except Exception:
-            pass
+            logger.warning("[stations] Mail zum Spielstart an %s fehlgeschlagen", log_safe(user.get("id")), exc_info=True)
     return sent
 
 

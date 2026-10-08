@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 from database import get_db
-from auth import require_admin, require_club_admin, get_current_user, get_optional_user, require_any_admin, require_area
+from auth import require_club_admin, get_current_user, get_optional_user, require_any_admin, require_area
 from models import new_id, now_utc
 from services.competition_read import count_matches_by_status
 from services.user_notifications import create_user_notification
@@ -738,7 +738,7 @@ def _upload_status() -> dict:
             try:
                 (path / ".tls-write-test").unlink(missing_ok=True)
             except Exception:
-                pass
+                logger.debug("upload directory probe cleanup failed for %s", label, exc_info=True)
         exists = path.exists() and path.is_dir()
         writable = os.access(path, os.W_OK) if exists else False
         write_test = exists and not error

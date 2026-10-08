@@ -4,11 +4,11 @@ from datetime import datetime, timezone
 import pathlib
 import sys
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from models import MatchDispute, MatchScheduleProposalCreate, MatchScoreReport, MatchUpdate, MatchV2Update
+from models import MatchDispute, MatchScheduleProposalCreate, MatchV2Update
 import routes.match_routes as match_routes
 
 

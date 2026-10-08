@@ -19,8 +19,8 @@ def _load_backend_url():
             for line in f:
                 if line.startswith("REACT_APP_BACKEND_URL="):
                     return line.split("=", 1)[1].strip().rstrip("/")
-    except Exception:
-        pass
+    except (OSError, UnicodeDecodeError):
+        pass  # keine lesbare .env im Container: dann gilt die lokale Adresse unten
     return "http://localhost:8001"
 
 BASE_URL = _load_backend_url()
@@ -392,7 +392,6 @@ class TestLevelAndAchievements:
         # Level may be on user object or a separate endpoint
         me = r.json()
         # Try /api/users/{id}/public or similar
-        uid = me["id"]
         pub = requests.get(f"{BASE_URL}/api/users/public/{me.get('username','admin')}", timeout=15)
         # Just check no 500
         assert pub.status_code in (200, 404), f"{pub.status_code}: {pub.text[:200]}"

@@ -80,7 +80,6 @@ class TestBrandingTwitch:
     def test_branding_accepts_twitch_fields(self, admin_headers):
         r = requests.get(f"{API}/settings/branding", headers=admin_headers, timeout=10)
         assert r.status_code == 200, r.text
-        original = r.json()
         # PATCH-set fields with empty/test values (don't expose real creds)
         r2 = requests.put(f"{API}/settings/branding",
                           headers=admin_headers,

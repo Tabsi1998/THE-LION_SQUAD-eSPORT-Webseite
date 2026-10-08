@@ -137,8 +137,6 @@ async def main():
         sender_email = ask("Absender-E-Mail", "noreply@lionsquad.at")
     else:
         resend_key = None
-        sender_name = club_name
-        sender_email = None
         print(f"{DIM}  → Kannst du später im Adminbereich unter Einstellungen → E-Mail hinterlegen.{RESET}")
 
     print(f"\n{BOLD}[4/6]{RESET} Rechtliches")

@@ -16,9 +16,9 @@ import logging
 
 from database import get_db
 from models import new_id, now_utc
+from services.discord_dm_basics import DM_TARGET, discord_link_id
 
 logger = logging.getLogger("tls-arena.discord.dm")
-DM_TARGET = "dm"
 # Moderation bleibt in App und Web - nie als Direktnachricht in einem fremden Dienst.
 # Rechnungen (#841) nennen Beträge - die gehören nicht in einen fremden Dienst, auch nicht als Direktnachricht.
 EXCLUDED_KINDS = {"moderation", "invoice_ready"}
@@ -86,12 +86,6 @@ def dm_content(notification: dict, category: str | None, name: str = "") -> dict
         body = PRIVATE_BODY_TEXT
     return {"title": str(notification.get("title") or "LION")[:256], "description": body[:1000],
             "url": str(notification.get("url") or ""), "color": COLORS.get(kind, 0x29B6E8)}
-
-
-async def discord_link_id(db, user_id: str) -> str:
-    """Die Discord-Kennung des verknüpften Kontos - oder leer."""
-    link = await db.platform_links.find_one({"user_id": user_id, "platform": "discord"}, {"_id": 0, "external_id": 1})
-    return str((link or {}).get("external_id") or "")
 
 
 async def dm_state(db, user: dict) -> dict:

@@ -37,9 +37,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 from database import get_db
-from auth import get_optional_user, get_current_user, require_admin, require_area
+from auth import get_optional_user, get_current_user, require_area
 from badges import (
-    award_achievement, can_award_tier_to_user, list_groups_for_user, list_user_awards,
+    list_groups_for_user, list_user_awards,
     evaluate_user_progress, trigger_negative_incident, on_season_completed,
     NEGATIVE_INCIDENTS,
 )

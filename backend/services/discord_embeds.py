@@ -202,7 +202,7 @@ def content_hash(rendered: dict) -> str:
 
 async def server_games(db, guild_id: str) -> tuple[set[str], str]:
     """Die Spiele eines Unterservers (#628) - eigene und geerbte Editionen - und ihre Namen für die Überschrift."""
-    from services.discord_guilds import games_by_guild
+    from services.discord_guild_store import games_by_guild
 
     games = (await games_by_guild(db)).get(str(guild_id)) or []
     names = [str(game.get("name") or "") for game in games if not game.get("inherited") and game.get("name")]
@@ -280,7 +280,7 @@ async def _config(db) -> tuple[dict, dict]:
 async def _save(db, kind: str, patch: dict, unset: tuple[str, ...] = (), *, guild_id: str | None = None) -> None:
     """Zustand einer Einbettung schreiben - am Hauptserver unter ``settings.discord.embeds``, sonst am Server-Eintrag (#628)."""
     if guild_id:
-        from services.discord_guilds import COLLECTION
+        from services.discord_guild_store import COLLECTION
 
         op: dict = {"$set": {f"embeds.{kind}.{key}": value for key, value in patch.items()}}
         if unset:
@@ -315,7 +315,7 @@ async def refresh(db, kind: str, *, force: bool = False, now: datetime | None = 
     scope = ""
     main = not guild_id
     if guild_id:
-        from services.discord_guilds import COLLECTION
+        from services.discord_guild_store import COLLECTION
 
         row = await db[COLLECTION].find_one({"guild_id": str(guild_id)}, {"_id": 0, "guild_id": 1, "role": 1, "enabled": 1, "left_at": 1, "embeds": 1})
         if not row or row.get("role") == "main":
@@ -436,7 +436,7 @@ async def retire(db) -> dict:
 async def _targets(db, kinds: list[str], embeds: dict) -> list[tuple[str, str | None]]:
     """Welche Nachrichten ein Lauf anfasst: je Art der Hauptserver (wenn an) und jeder eingeschaltete Unterserver,
     auf dem diese Art an ist (#628)."""
-    from services.discord_guilds import COLLECTION
+    from services.discord_guild_store import COLLECTION
 
     subs = await db[COLLECTION].find({"role": "sub", "enabled": True, "left_at": None}, {"_id": 0, "guild_id": 1, "embeds": 1}).to_list(200)
     targets: list[tuple[str, str | None]] = []

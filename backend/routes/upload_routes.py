@@ -14,7 +14,7 @@ from io import BytesIO
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
 from PIL import Image, ImageChops, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, Field
-from auth import require_admin, get_current_user, require_area
+from auth import get_current_user, require_area
 from database import get_db
 from models import new_id, now_utc
 from services.image_variants import schedule_variants

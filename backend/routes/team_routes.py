@@ -1,4 +1,5 @@
 """Team routes."""
+import logging
 import re
 import secrets
 from typing import Optional, Literal
@@ -6,15 +7,17 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from database import get_db
 from services import moderation_standing
-from auth import get_current_user, get_optional_user, require_admin
+from auth import get_current_user, get_optional_user
 from models import TeamCreate, TeamUpdate, now_utc, new_id
 from services.notification_preferences import send_user_template
 from services.user_notifications import build_public_url, create_user_notification
 from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments
 from services.query_filters import safe_regex
 from services import word_filter
+from services.log_safe import log_safe
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
+logger = logging.getLogger("tls.teams")
 
 
 def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
@@ -118,7 +121,7 @@ async def _add_team_member(db, team_id: str, user_id: str, role: str = "member")
         from badges import on_team_joined
         await on_team_joined(user_id, team_id)
     except Exception:
-        pass
+        logger.warning("[achievements] Beitritt von %s zu Team %s nicht ausgewertet", log_safe(user_id), log_safe(team_id), exc_info=True)
 
 
 async def _hydrate_invite(invite: dict) -> dict:
@@ -440,7 +443,7 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
         from badges import evaluate_user_progress
         await evaluate_user_progress(me["id"])
     except Exception:
-        pass
+        logger.warning("[achievements] Teamchat-Nachricht in %s nicht ausgewertet", log_safe(team_id), exc_info=True)
     message.pop("_id", None)
     enriched = await _enrich_team_chat([word_filter.public_moderation(message)])
     return enriched[0]
@@ -640,7 +643,7 @@ async def create_team(body: TeamCreate, me: dict = Depends(get_current_user)):
         from badges import on_team_created
         await on_team_created(me["id"], team_id)
     except Exception:
-        pass
+        logger.warning("[achievements] Neues Team %s nicht ausgewertet", log_safe(team_id), exc_info=True)
     return doc
 
 
@@ -692,7 +695,7 @@ async def join_team(team_id: str, body: dict, me: dict = Depends(get_current_use
         from badges import on_team_joined
         await on_team_joined(me["id"], team_id)
     except Exception:
-        pass
+        logger.warning("[achievements] Beitritt zu Team %s nicht ausgewertet", log_safe(team_id), exc_info=True)
     return {"ok": True}
 
 

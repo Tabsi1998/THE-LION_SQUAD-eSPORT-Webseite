@@ -5,7 +5,7 @@ Status flow: pending  → ready → picked_up
                               → expired (after deadline reached)
 """
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional
 
 from database import get_db
@@ -314,8 +314,8 @@ async def mark_ready(pickup_id: str, actor_id: str) -> Optional[dict]:
             deadline_str = ""
             try:
                 deadline_str = datetime.fromisoformat(p.get("pickup_deadline")).strftime("%d.%m.%Y")
-            except Exception:
-                pass
+            except (TypeError, ValueError):
+                pass  # keine oder unlesbare Abholfrist: dann nennt die Mail keine
             await send_user_template(
                 u, "prize_ready",
                 display_name=u.get("display_name", ""),

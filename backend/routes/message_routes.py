@@ -1,4 +1,5 @@
 """Direct user-to-user messaging routes."""
+import logging
 import re
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -16,8 +17,10 @@ from services.user_notifications import build_public_url, create_user_notificati
 from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments
 from services.stickers import sticker_for_message
 from services import word_filter
+from services.log_safe import log_safe
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
+logger = logging.getLogger("tls.messages")
 
 DM_PRIVACY_LABELS = {
     "everyone": "Alle eingeloggten Benutzer",
@@ -343,6 +346,6 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
         from badges import evaluate_user_progress
         await evaluate_user_progress(me["id"])
     except Exception:
-        pass
+        logger.warning("[achievements] Nachricht von %s nicht ausgewertet", log_safe(me["id"]), exc_info=True)
     doc.pop("_id", None)
     return _public_message(doc, {me["id"]: me, recipient["id"]: recipient})

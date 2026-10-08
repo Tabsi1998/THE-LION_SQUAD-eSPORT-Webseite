@@ -25,7 +25,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel
 
 from database import get_db
-from auth import require_admin, get_current_user, require_area
+from auth import get_current_user, require_area
 from models import now_utc
 from services.media_formats import PUBLIC_IMAGE_EXTS, PUBLIC_MEDIA_EXTS, PUBLIC_ORIGINAL_EXTS, PUBLIC_VIDEO_EXTS
 

@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from typing import Literal
 
-from auth import get_current_user, require_role, require_area
+from auth import get_current_user, require_area
 from database import get_db
 from models import new_id, now_utc
 from services.rate_limit import enforce_rate_limit

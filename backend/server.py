@@ -164,12 +164,12 @@ async def lifespan(app: FastAPI):
         from services.discord_bot import bot as discord_bot
         await discord_bot.stop()
     except Exception:
-        pass
+        logger.warning("[shutdown] Discord-Bot nicht sauber gestoppt", exc_info=True)
     try:
         from services.scheduler import stop_scheduler
         stop_scheduler()
     except Exception:
-        pass
+        logger.warning("[shutdown] Planer nicht sauber gestoppt", exc_info=True)
     await close_client()
 
 

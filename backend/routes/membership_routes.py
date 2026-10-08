@@ -1,10 +1,12 @@
 """Membership routes — admin can mark users as official club members."""
+import logging
+
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from datetime import date
 from database import get_db
-from auth import get_current_user, require_club_admin, get_optional_user, require_area, require_club_member
+from auth import get_current_user, get_optional_user, require_area, require_club_member
 from services.levels import level_view
 from services.membership_service import (
     upsert_membership, get_membership, get_user_with_membership,
@@ -24,8 +26,10 @@ from services.dolibarr_policy import MAX_STATE_AGE_HOURS, club_today
 from services.dolibarr_sync import try_auto_link
 from services import dolibarr_helper_shifts, dolibarr_identity, dolibarr_meetings, dolibarr_self_service
 from services.rate_limit import enforce_rate_limit
+from services.log_safe import log_safe
 
 router = APIRouter(prefix="/api/membership", tags=["membership"])
+logger = logging.getLogger("tls.membership")
 
 
 class ClubMemberProfileCreate(BaseModel):
@@ -808,7 +812,7 @@ async def update_user_membership(
             from badges import evaluate_membership_badges
             await evaluate_membership_badges(user_id)
         except Exception:
-            pass
+            logger.warning("[achievements] Mitglieder-Erfolge für %s nicht ausgewertet", log_safe(user_id), exc_info=True)
     elif new_status == "blocked":
         await send_user_template(
             user,

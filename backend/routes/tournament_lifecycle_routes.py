@@ -18,6 +18,7 @@ from services.competition_standings import placement_rows_for_structure
 from services.competition_versions import persist_competition_versions
 from services.tv_display import ROUND_SPONSOR_MAX, pause_until_value, round_sponsor_rows
 from models import now_utc
+from services.log_safe import log_safe
 from routes.tournament_common import (
     _apply_match_plan,
     _audit_tournament_action,
@@ -426,7 +427,8 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0, "user_id": 1, "team_id": 1}).to_list(2000)
             await request_evaluation(await _participant_user_ids(db, regs), f"tournament_{status}")
         except Exception:
-            pass
+            import logging
+            logging.getLogger("tls.tournament").warning("[achievements] Auswertung nach Turnierabschluss %s fehlgeschlagen", log_safe(tid), exc_info=True)
 
     # Discord (#572): die Meldung in den Thread des Turniers, danach das Bracket (#571) - dieselbe Stelle wie
     # Formular, Zeitplan und Station; nur öffentlich, nie mit „Ohne Discord“.

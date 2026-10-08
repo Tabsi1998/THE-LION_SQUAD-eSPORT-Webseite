@@ -1,7 +1,7 @@
 """Pydantic v2 models for THE LION SQUAD eSports."""
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator, model_validator
 from typing import Optional, List, Literal, Any, Dict
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone
 import uuid
 
 MIN_PASSWORD_LENGTH = 10

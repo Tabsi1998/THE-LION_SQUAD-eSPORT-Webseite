@@ -11,7 +11,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import membership_invitations as invitations  # noqa: E402
 from services.notification_preferences import preference_key  # noqa: E402
 
 

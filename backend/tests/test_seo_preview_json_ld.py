@@ -10,7 +10,7 @@ from fastapi import HTTPException
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import routes.seo_render_routes as seo_render_routes
+from routes import seo_render_routes
 from routes.seo_render_routes import render_preview_html, resolve_meta, resolve_slug_redirect
 
 
@@ -146,7 +146,7 @@ class _DbWithPublicDocs:
 
 
 def test_seo_preview_redirects_legacy_public_routes(monkeypatch):
-    monkeypatch.setattr(seo_render_routes, "get_db", lambda: _DbWithSeason())
+    monkeypatch.setattr(seo_render_routes, "get_db", _DbWithSeason)
     request = SimpleNamespace(
         headers={},
         url=SimpleNamespace(scheme="https", netloc="lionsquad.at"),
@@ -158,7 +158,7 @@ def test_seo_preview_redirects_legacy_public_routes(monkeypatch):
 
 
 def test_seo_preview_unknown_path_returns_404(monkeypatch):
-    monkeypatch.setattr(seo_render_routes, "get_db", lambda: _Db())
+    monkeypatch.setattr(seo_render_routes, "get_db", _Db)
     request = SimpleNamespace(
         headers={},
         url=SimpleNamespace(scheme="https", netloc="lionsquad.at"),
@@ -171,7 +171,7 @@ def test_seo_preview_unknown_path_returns_404(monkeypatch):
 
 
 def test_seo_preview_known_static_path_still_resolves(monkeypatch):
-    monkeypatch.setattr(seo_render_routes, "get_db", lambda: _Db())
+    monkeypatch.setattr(seo_render_routes, "get_db", _Db)
     request = SimpleNamespace(
         headers={},
         url=SimpleNamespace(scheme="https", netloc="lionsquad.at"),
@@ -245,7 +245,7 @@ def test_seo_preview_resolves_key_public_route_types(monkeypatch):
 
 
 def test_seo_preview_legal_and_players_are_noindex(monkeypatch):
-    monkeypatch.setattr(seo_render_routes, "get_db", lambda: _Db())
+    monkeypatch.setattr(seo_render_routes, "get_db", _Db)
     request = SimpleNamespace(
         headers={},
         url=SimpleNamespace(scheme="https", netloc="lionsquad.at"),

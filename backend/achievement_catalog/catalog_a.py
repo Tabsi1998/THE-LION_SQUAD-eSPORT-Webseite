@@ -144,4 +144,3 @@ TOURNAMENT = [
 
 GROUPS_A: list[dict] = [group for group, _tiers in MATCH + TOURNAMENT]
 TIERS_A: list[dict] = [t for _group, tiers in MATCH + TOURNAMENT for t in tiers]
-CONDITION_KEYS_A: tuple[str, ...] = tuple(sorted({group["condition_key"] for group in GROUPS_A}))

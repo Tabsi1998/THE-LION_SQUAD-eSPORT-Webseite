@@ -226,6 +226,7 @@ class TestNegativePrivacy:
             if tiers:
                 return tiers[0]["code"]
         pytest.skip("no tiers under negative groups")
+        return None  # nie erreicht - pytest.skip bricht hier ab
 
     def test_negative_award_hidden_from_public_profile(self, admin_headers, admin_id, negative_tier_code):
         # Award negative tier to admin

@@ -2,7 +2,6 @@
 PDF exports (F1 leaderboard + championship), public settings (discord/twitch), Discord triggers."""
 import time
 import pytest
-import requests
 from conftest import BASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD
 
 

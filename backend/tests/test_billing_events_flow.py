@@ -114,7 +114,6 @@ async def test_registration_freezes_the_price_and_files_an_order(flow):
     dearer = {**OFFER, "positions": [{**OFFER["positions"][0], "amount": "25"}, OFFER["positions"][1]]}
     assert (await flow.put(f"/api/events/{event['id']}", json={"billing": dearer})).status_code == 200
     assert (await flow.db.events.find_one({"id": event["id"]}))["billing"]["version"] == 2
-    view = (await flow.get(f"/api/events/{event['slug']}")).json()
     flow.act_as(paula)
     own = (await flow.get(f"/api/events/{event['slug']}")).json()["own_registration"]
     assert own["price"]["total_cents"] == 5500

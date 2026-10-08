@@ -404,7 +404,7 @@ async def test_wetter_in_der_app_ein_und_aus(flow):
     assert next(s for s in res.json()["seasons"] if s["key"] == "weather")["channels"] == ["web"]
     stored = await flow.db.settings.find_one({"id": seasons.SETTINGS_ID}, {"_id": 0})
     assert stored["seasons"]["weather"]["channels_known"] == ["web", "app"]
-    res = await flow.put("/api/settings/seasons", json={"seasons": {"weather": {"channels": ["web", "app"]}}})
+    await flow.put("/api/settings/seasons", json={"seasons": {"weather": {"channels": ["web", "app"]}}})
     flow.act_as(None)
     public = (await flow.get("/api/seasonal/active")).json()
     assert next(s for s in public["seasons"] if s["key"] == "weather")["channels"] == ["web", "app"]

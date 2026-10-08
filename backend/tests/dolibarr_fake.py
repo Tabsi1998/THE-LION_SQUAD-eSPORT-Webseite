@@ -47,7 +47,8 @@ def validate(value, schema: dict, where: str = "$") -> None:
     """Der Teil von OpenAPI 3.0, den der Vertrag benutzt."""
     if "$ref" in schema:
         name = schema["$ref"].rsplit("/", 1)[-1]
-        return validate(value, OPENAPI["components"]["schemas"][name], where)
+        validate(value, OPENAPI["components"]["schemas"][name], where)
+        return
     if value is None:
         if schema.get("nullable"):
             return None
