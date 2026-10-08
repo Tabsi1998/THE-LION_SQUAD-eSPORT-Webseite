@@ -22,7 +22,7 @@ jest.mock("./screenRegistry", () => {
     DETAIL_SCREENS: names(["TournamentDetail", "EventDetail", "FastLapDetail", "MatchDetail", "TournamentChat", "TeamDetail", "TeamChat", "PublicProfile",
       "DirectThread", "NewsList", "NewsDetail", "Gallery", "GalleryAlbum", "GalleryViewer", "Notifications", "Search", "SeasonPass", "AchievementShowcase",
       "AdventCalendar", "EasterHunt", "MyInvoices", "MyPrizes", "MyMembership", "MemberDocuments", "MemberMeetings", "MemberHelperShifts", "MemberCard",
-      "Admission", "InfoCenter", "Settings", "ProfileEdit"]),
+      "Admission", "InfoCenter", "ClubAbout", "YearReview", "Settings", "ProfileEdit"]),
   };
 });
 const mockAuth = { user: { id: "u-1", username: "neonfalke", display_name: "NeonFalke", role: "player" } as Record<string, unknown> | null, loading: false };

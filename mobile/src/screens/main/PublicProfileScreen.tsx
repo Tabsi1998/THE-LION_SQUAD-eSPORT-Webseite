@@ -26,7 +26,7 @@ import type { AppStackParamList, ProfileTabKey } from "../../navigation/types";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { colors } from "../../theme";
 import type { LiveStream, PersonalReferenceItem } from "../../types";
-import { ReferenceCard } from "./profile/parts";
+import { RecordCard, ReferenceWithPath } from "./profile/TournamentPath";
 
 type Props = NativeStackScreenProps<AppStackParamList, "PublicProfile">;
 
@@ -388,6 +388,14 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
               {shown.bio ? <Body>{shown.bio}</Body> : <Muted>Keine Bio freigegeben.</Muted>}
             </Card>
 
+            {/* Bilanz gegen Gegner (#1193): die fünf häufigsten - für andere nur Gegner mit öffentlichem Profil. */}
+            <RecordCard
+              username={shown.username}
+              publicView={!ownMode}
+              onOpenUser={(name) => navigation.navigate("PublicProfile" as never, { username: name } as never)}
+              onOpenTeam={(id) => navigation.navigate("TeamDetail" as never, { id } as never)}
+            />
+
             {/* Angeheftete Erfolge (#619) zuerst, wie im Web - „Alle ansehen“ führt in den Reiter. */}
             {!achievements.achievements_hidden ? <PinnedAwardsCard pinned={achievements.pinned || []} onShowAll={() => setTab("achievements")} /> : null}
 
@@ -435,7 +443,7 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
         {activeTab === "references" ? (ownMode ? own?.references : (
           references.length ? (
             <View style={styles.list} testID="public-profile-references">
-              {references.map((item) => <ReferenceCard key={item.id} item={item} onOpen={openReference} />)}
+              {references.map((item) => <ReferenceWithPath key={item.id} item={item} username={shown.username} publicView onOpen={openReference} />)}
             </View>
           ) : (shown.tournaments || []).length || (shown.f1_bests || []).length ? (
             <>

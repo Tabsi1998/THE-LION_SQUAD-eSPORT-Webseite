@@ -158,6 +158,13 @@ export function targetFromNotification(item: UserNotification): AppTarget | null
   if (tournamentId && kind.includes("tournament_chat")) return detail("TournamentChat", { id: tournamentId, title: "Turnier-Chat" });
   if (tournamentId && kind.includes("tournament")) return detail("TournamentDetail", { id: tournamentId });
 
+  // Rückmeldung (#1196): „Wie war der FC 26 Cup?“ öffnet Home mit dem Bewerten.
+  const feedbackTarget = stringMeta(meta, "target_id");
+  const feedbackKind = stringMeta(meta, "kind");
+  if (kind === "feedback_request" && feedbackTarget && (feedbackKind === "tournament" || feedbackKind === "event")) {
+    return tab("Dashboard", { feedback: `${feedbackKind}:${feedbackTarget}` });
+  }
+
   const requesterId = stringMeta(meta, "requester_username") || stringMeta(meta, "username");
   if (requesterId && kind.includes("friend")) return detail("PublicProfile", { username: requesterId });
   // Freunde stehen in Community → Spieler (#1143).
@@ -174,6 +181,7 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   const [first, second, third] = parts;
   const query = new URLSearchParams(parsed.query);
 
+  if (first === "dashboard" && query.get("bewerten")) return tab("Dashboard", { feedback: query.get("bewerten") });
   if (parsed.root || first === "dashboard") return tab("Dashboard");
   if (first === "matches" && second) return detail("MatchDetail", { id: second });
   if (first === "tournaments" && second) return detail(third === "chat" ? "TournamentChat" : "TournamentDetail", { id: second });
@@ -181,7 +189,8 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   if ((first === "fastlap" || first === "fastlaps") && second) return detail("FastLapDetail", { id: second });
   if (first === "f1" && second === "challenges" && third) return detail("FastLapDetail", { id: third });
   if (first === "f1" && second) return detail("FastLapDetail", { id: second });
-  if (first === "teams" && second) return detail("TeamDetail", { id: second });
+  // Einladungs-Link (#1191): der Schlüssel geht mit, die Team-Seite zeigt dann „Beitreten“.
+  if (first === "teams" && second) return detail("TeamDetail", query.get("einladung") ? { id: second, invite: query.get("einladung") } : { id: second });
   if (first === "news" && second) return detail("NewsDetail", { id: second });
   if ((first === "galerie" || first === "gallery") && second) return detail("GalleryAlbum", { id: second });
   if (first === "messages" && second) return detail("DirectThread", { userId: second });
@@ -192,6 +201,8 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   if (first === "profile") return profileTarget(query);
   if (first === "account" && second === "invoices") return detail("MyInvoices", invoiceParams(query));
   if ((first === "me" || first === "my") && second === "prizes") return detail("MyPrizes");
+  // Helfer-Aufruf (#1197): /members/helfen?event=5 öffnet die Helferdienste mit dieser Veranstaltung oben.
+  if (first === "members" && second === "helfen" && Number(query.get("event"))) return detail("MemberHelperShifts", { event: Number(query.get("event")) });
   if (first === "members" && second) return memberTarget(second);
   if (first === "seasons") return detail("SeasonPass");
   if (second) return null;
@@ -237,6 +248,14 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
     // Ostereiersuche (#647): Korb, Hinweise, Preise - auch aus Benachrichtigungen (Gewinn, voller Korb).
     case "ostern":
       return detail("EasterHunt");
+    // Jahresrückblick (#1195): die Meldung „Dein Jahr ist da“ führt hierher.
+    case "dein-jahr":
+      return detail("YearReview");
+    // Über uns, Vorstand, Werte (#1024): kurz in der App.
+    case "about":
+    case "board":
+    case "values":
+      return detail("ClubAbout");
     case "sponsors":
       return detail("InfoCenter", { section: "sponsors" });
     case "partners":

@@ -77,6 +77,14 @@ OPTIONAL_EMAIL_PREFERENCES = {
         "description": "Interne Events und News, die nur Mitglieder sehen.",
         "default": True,
     },
+    # Helferdienste (#1197): Aufruf des Vorstands für offene Schichten und die Erinnerung am Vortag - nur Mitglieder
+    # bekommen das; eine Mail dafür gibt es nicht.
+    "helper_shifts": {
+        "label": "Helferdienste",
+        "description": "Nur für Vereinsmitglieder: Aufrufe für offene Helferschichten und die Erinnerung am Vortag.",
+        "default": True,
+        "channels": ["in_app", "push", "discord"],
+    },
 }
 
 DELIVERY_CHANNEL_PREFERENCES = {
@@ -148,9 +156,13 @@ NOTIFICATION_KIND_CATEGORY = {
     "match_reminder": "match_reminders",
     "match_station": "match_reminders",
     "match_result": "match_reminders",
+    # Team am Spieltag (#1192): „Bist du schon da?“ vom Kapitän - wie eine Spiel-Erinnerung.
+    "team_presence_nudge": "match_reminders",
     "match_chat_message": "community_messages",
     "match_chat_mention": "community_messages",
     "tournament_checkin": "tournament_updates",
+    # Rückmeldung (#1196): „Wie war der FC 26 Cup?“ am Tag danach - Thema Turnier-Updates, auch bei Events.
+    "feedback_request": "tournament_updates",
     "tournament_chat_message": "community_messages",
     "tournament_chat_mention": "community_messages",
     "team_chat_message": "community_messages",
@@ -169,6 +181,8 @@ NOTIFICATION_KIND_CATEGORY = {
     # Erfolge II (#622): Prestige und Rücknahme stehen im Postfach unter „Erfolge“.
     "prestige": "achievements",
     "achievement_revoked": "achievements",
+    # Jahresrückblick (#1195): „Dein Jahr ist da“ einmal im Dezember - unter „Erfolge“.
+    "year_review": "achievements",
     "news_mention": "news_events",
     # Interne Inhalte nur an Berechtigte (#342): Mitglieder bzw. Vorstand.
     "news_member": "club_internal",
@@ -177,6 +191,9 @@ NOTIFICATION_KIND_CATEGORY = {
     "event_board": "club_internal",
     # Abstimmung offen (#844): einmal je Abstimmung, nur mit offenem Stimmrecht.
     "ballot_open": "club_internal",
+    # Helferdienste (#1197): Aufruf und Erinnerung am Vortag - eigenes Thema, abschaltbar.
+    "helper_call": "helper_shifts",
+    "helper_reminder": "helper_shifts",
     "membership_update": "membership_updates",
     "invoice_ready": "billing_updates",
 }

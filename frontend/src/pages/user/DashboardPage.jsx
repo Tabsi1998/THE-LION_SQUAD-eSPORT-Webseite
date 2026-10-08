@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { missingLabels } from "@/lib/profileCompleteness";
 import { useAuth } from "@/context/AuthContext";
@@ -12,9 +12,11 @@ import { AchievementsTile } from "@/components/tls/AchievementsTile";
 import { bundleNotifications } from "@/lib/notifications";
 import { dashboardActions, formatVienna, registrationLabel, seasonLine, splitHomeTimeline, timelineItems } from "@/lib/dashboard";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { Trophy, Bell, Crown, Gift, AlertTriangle, UserCheck, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, Settings } from "lucide-react";
+import { Trophy, Bell, Crown, Gift, AlertTriangle, UserCheck, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, Settings, Star } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
 import { stationText } from "@/lib/tournamentLabels";
+import { FeedbackDialog } from "@/components/tls/FeedbackDialog";
+import { YearReviewBanner } from "@/components/tls/YearReviewBanner";
 
 // Das Dashboard ist die persönliche Startseite, wie die App-Startseite seit
 // #237 (#256): Kopf, offene Aktionen, nächste Termine, Jahreswertung,
@@ -101,6 +103,17 @@ export default function DashboardPage() {
   const [openPrizes, setOpenPrizes] = useState(0);
   const [completeness, setCompleteness] = useState(null);
   const [penaltyCount, setPenaltyCount] = useState(0);
+  // Rückmeldung (#1196): „Wie war …?“ als Zeile unter den offenen Aktionen; die Meldung führt mit ?bewerten=… hierher.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [feedbackTarget, setFeedbackTarget] = useState(() => searchParams.get("bewerten") || null);
+  const closeFeedback = useCallback(() => {
+    setFeedbackTarget(null);
+    if (searchParams.get("bewerten")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("bewerten");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const load = useCallback(async () => {
     const [home, n, p, c, pen] = await Promise.allSettled([
@@ -173,6 +186,8 @@ export default function DashboardPage() {
         </div>
 
         <AdventHint />
+        {/* Jahresrückblick (#1195): ab Mitte Dezember, nur mit Aktivität im Jahr. */}
+        <YearReviewBanner />
 
         {completeness && completeness.score < 100 && (
           <div className="mb-8 border border-[#A855F7]/30 bg-gradient-to-r from-[#A855F7]/10 via-transparent to-transparent rounded-sm p-5 flex items-center gap-4" data-testid="profile-completeness-banner">
@@ -208,6 +223,18 @@ export default function DashboardPage() {
                 <div className="border border-white/5 rounded-sm bg-[#0F0F10] overflow-hidden">
                   {actions.map((action) => {
                     const Icon = actionIcon(action.type);
+                    if (action.type === "feedback") {
+                      return (
+                        <button key={action.id} type="button" onClick={() => setFeedbackTarget(action.target_id)} data-testid={`dashboard-action-${action.id}`} className="w-full text-left flex items-center gap-3 px-3 py-3 border-b border-white/5 last:border-b-0 hover:bg-white/[0.03] transition">
+                          <span className="w-9 h-9 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700] inline-flex items-center justify-center shrink-0"><Star className="w-4 h-4" /></span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block font-bold text-sm text-white">{action.label}</span>
+                            {action.detail ? <span className="block text-xs text-white/50 truncate">{action.detail}</span> : null}
+                          </span>
+                          <ChevronRight className="w-4 h-4 text-white/30 shrink-0" />
+                        </button>
+                      );
+                    }
                     return (
                       <Link key={action.id} to={action.href || "/dashboard"} data-testid={`dashboard-action-${action.id}`} className="flex items-center gap-3 px-3 py-3 border-b border-white/5 last:border-b-0 hover:bg-white/[0.03] transition">
                         <span className="w-9 h-9 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700] inline-flex items-center justify-center shrink-0"><Icon className="w-4 h-4" /></span>
@@ -325,6 +352,7 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+      {feedbackTarget ? <FeedbackDialog target={feedbackTarget} onClose={closeFeedback} onDone={() => { closeFeedback(); load().catch(() => {}); }} /> : null}
     </PublicLayout>
   );
 }

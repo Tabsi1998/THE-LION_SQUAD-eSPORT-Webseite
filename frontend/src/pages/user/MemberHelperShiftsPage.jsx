@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useAuth } from "@/context/AuthContext";
+import { HelperCallPanel } from "@/pages/user/helper/HelperCallPanel";
 import { ArrowLeft, Calendar, CheckCircle2, HandHelping, MapPin, Users } from "lucide-react";
 
 // Helferdienste (#331): Veranstaltungen mit Schichten aus der Vereinsakte (Vereine 1.4). Plätze, Bestätigung und
@@ -32,9 +34,10 @@ function MineBadge({ shift }) {
   );
 }
 
-function EventCard({ event, busy, onRequest, onWithdraw }) {
+function EventCard({ event, busy, onRequest, onWithdraw, highlight = false }) {
+  // Helfer-Aufruf (#1197): die Meldung führt mit ?event=… hierher - diese Veranstaltung steht oben und leuchtet.
   return (
-    <div className={`border rounded-sm bg-[#121212] p-5 ${event.upcoming ? "border-[#FFD700]/40" : "border-white/10"}`} data-testid={`helper-event-${event.id}`}>
+    <div className={`border rounded-sm bg-[#121212] p-5 ${event.upcoming ? "border-[#FFD700]/40" : "border-white/10"} ${highlight ? "ring-2 ring-[#FFD700]/70" : ""}`} data-testid={`helper-event-${event.id}`} data-highlight={highlight ? "true" : undefined}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">{event.visibility_label} · {event.status_label}</div>
@@ -82,6 +85,9 @@ function EventCard({ event, busy, onRequest, onWithdraw }) {
 
 export default function MemberHelperShiftsPage() {
   const confirm = useConfirm();
+  const { can } = useAuth();
+  const [searchParams] = useSearchParams();
+  const wanted = Number(searchParams.get("event") || 0);
   const [view, setView] = useState(null);
   const [busy, setBusy] = useState("");
   const load = useCallback(() => {
@@ -126,7 +132,8 @@ export default function MemberHelperShiftsPage() {
   };
 
   const events = view?.events || [];
-  const upcoming = events.filter((e) => e.upcoming);
+  // Aus dem Helfer-Aufruf: die genannte Veranstaltung zuerst.
+  const upcoming = events.filter((e) => e.upcoming).sort((a, b) => Number(b.id === wanted) - Number(a.id === wanted));
   const rest = events.filter((e) => !e.upcoming);
 
   return (
@@ -136,6 +143,8 @@ export default function MemberHelperShiftsPage() {
         <span className="block mt-4 text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Mitgliederbereich</span>
         <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Helferdienste</h1>
         <p className="mt-2 text-sm text-white/60 max-w-2xl">Wo der Verein Hände braucht: Schichten mit Plätzen, dein Stand je Dienst. Angefragt heißt: der Vorstand bestätigt. Gezählt wird, was der Verein als geleistet bestätigt.</p>
+
+        {can("club") ? <HelperCallPanel /> : null}
 
         {view === null ? <p className="mt-8 text-sm text-white/45" data-testid="helper-shifts-loading">Wird geladen …</p> : null}
 
@@ -151,7 +160,7 @@ export default function MemberHelperShiftsPage() {
             {view.my_count ? <p className="mt-6 text-sm text-white/70" data-testid="helper-shifts-mine">Du bist bei {view.my_count === 1 ? "einem Dienst" : `${view.my_count} Diensten`} eingetragen.</p> : null}
             {!events.length ? <p className="mt-6 text-sm text-white/45" data-testid="helper-shifts-empty">Derzeit keine Veranstaltung mit Helferdiensten.</p> : null}
             <div className="mt-4 space-y-4">
-              {upcoming.map((event) => <EventCard key={event.id} event={event} busy={busy} onRequest={request} onWithdraw={withdraw} />)}
+              {upcoming.map((event) => <EventCard key={event.id} event={event} busy={busy} onRequest={request} onWithdraw={withdraw} highlight={event.id === wanted} />)}
               {rest.map((event) => <EventCard key={event.id} event={event} busy={busy} onRequest={request} onWithdraw={withdraw} />)}
             </div>
           </>

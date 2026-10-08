@@ -19,15 +19,9 @@ def _registration_name(reg: dict | None, fallback: str = "Offen") -> str:
 
 
 async def _participant_user_ids(db, registrations: list[dict]) -> set[str]:
-    user_ids = {reg.get("user_id") for reg in registrations if reg.get("user_id")}
-    team_ids = list({reg.get("team_id") for reg in registrations if reg.get("team_id")})
-    if team_ids:
-        members = await db.team_members.find(
-            {"team_id": {"$in": team_ids}},
-            {"_id": 0, "user_id": 1},
-        ).to_list(200)
-        user_ids.update(member.get("user_id") for member in members if member.get("user_id"))
-    return {user_id for user_id in user_ids if user_id}
+    """Team am Spieltag (#1192): Teams bekommen Ergebnisse für die Aufgestellten, ohne Aufstellung alle Mitglieder."""
+    from services.team_lineup import registration_recipients
+    return await registration_recipients(db, registrations)
 
 
 def _canonical_match(match: dict, collection_name: str) -> dict:

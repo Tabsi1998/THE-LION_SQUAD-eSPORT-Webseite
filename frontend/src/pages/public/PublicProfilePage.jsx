@@ -20,6 +20,7 @@ import { SeasonHighlightCard } from "@/components/tls/SeasonHighlightCard";
 import { AwardBanner } from "@/components/tls/AwardBanner";
 import { HonourCard, HonoursPanel } from "@/pages/user/profile/HonoursPanel";
 import { OwnAchievements, PrivateBox } from "@/pages/public/profile/OwnProfileParts";
+import { RecordCard, ReferenceWithPath } from "@/pages/public/profile/TournamentPath";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -788,6 +789,8 @@ export default function PublicProfilePage() {
               {showTwitchChannel && <TwitchChannelCard channel={twitchChannel} url={twitchUrl} stats={s} />}
               {(accounts.socials.length > 0 || accounts.games.length > 0) && <AccountsCard groups={accounts} />}
               <AboutCard profile={profile} joinedDate={joinedDate} />
+              {/* Bilanz gegen Gegner (#1193): die fünf häufigsten - öffentlich nur Gegner mit öffentlichem Profil. */}
+              <RecordCard username={profile.username} publicView={!ownMode} />
               <SetupCard profile={profile} />
               {teams.length > 0 && <TeamsCard teams={teams} />}
             </aside>
@@ -908,7 +911,12 @@ export default function PublicProfilePage() {
                   </div>
                 )}
                 <div className="grid gap-3" data-testid="public-profile-references">
-                  {filteredReferences.map((item) => <ReferenceRow key={item.id} item={item} expanded />)}
+                  {/* Turnierweg (#1193): jedes Turnier lässt sich aufklappen. */}
+                  {filteredReferences.map((item) => (
+                    <ReferenceWithPath key={item.id} item={item} username={profile.username} own={ownMode} publicView={!ownMode}>
+                      <ReferenceRow item={item} expanded />
+                    </ReferenceWithPath>
+                  ))}
                 </div>
               </section>
             ) : <EmptyState text="Keine öffentlichen Referenzen." />}

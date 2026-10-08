@@ -100,12 +100,14 @@ export function socialIcon(platform?: string | null): keyof typeof Ionicons.glyp
   return SOCIAL_ICONS[String(platform || "").toLowerCase()] || "link-outline";
 }
 
-type ClubRow = { key: string; title: string; icon: keyof typeof Ionicons.glyphMap; screen: "NewsList" | "Gallery" | "InfoCenter" | "AdventCalendar"; params?: { section: "references" | "sponsors" | "partners" } };
+type ClubRow = { key: string; title: string; icon: keyof typeof Ionicons.glyphMap; screen: "NewsList" | "Gallery" | "InfoCenter" | "AdventCalendar" | "ClubAbout"; params?: { section: "references" | "sponsors" | "partners" } };
 
 /** „Vom Verein“ - für alle gleich; der Adventkalender steht nur da, solange er läuft. */
 export function clubRows(advent: boolean): ClubRow[] {
   return [
     ...(advent ? [{ key: "advent", title: "Adventkalender", icon: "calendar-outline" as const, screen: "AdventCalendar" as const }] : []),
+    // Über uns (#1024): ein paar Sätze, Vorstand, Werte und Kontakt - für Gäste, Eltern und Neue.
+    { key: "about", title: "Über uns, Vorstand, Kontakt", icon: "information-circle-outline", screen: "ClubAbout" },
     { key: "news", title: "News", icon: "newspaper-outline", screen: "NewsList" },
     { key: "gallery", title: "Galerie", icon: "images-outline", screen: "Gallery" },
     { key: "references", title: "Referenzen", icon: "medal-outline", screen: "InfoCenter", params: { section: "references" } },

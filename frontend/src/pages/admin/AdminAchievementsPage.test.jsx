@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-// Erfolge im Admin (E10, #620): acht Reiter an einem Ort. Die API ist eine Attrappe; geprüft wird, was die
+// Erfolge im Admin (E10, #620): neun Reiter an einem Ort (der Jahresrückblick kam mit #1195). Die API ist eine Attrappe; geprüft wird, was die
 // Reiter zeigen und was sie an den Server schicken.
 
-const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
+const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => (typeof detail === "string" ? detail : ""), resolveMediaUrl: (url) => url }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
@@ -63,6 +63,8 @@ const STATS = {
   ],
 };
 
+const YEAR_REVIEW = { start: "12-15", end: "01-31", start_label: "15.12.", end_label: "31.1.", open: false, year: 2026, from_label: "15.12.2026", until_label: "31.1.2027", notified: 0 };
+
 let board = true;
 function routeGet(url) {
   const path = url.split("?")[0];
@@ -88,6 +90,7 @@ function routeGet(url) {
     "/admin/achievements/negative/awards": [],
     "/admin/achievements/incident-types": [{ key: "afk", tier_code: "neg_afk" }],
     "/admin/achievements/stats": STATS,
+    "/admin/year-review": YEAR_REVIEW,
   };
   if (!(path in table)) return Promise.reject(new Error(`unerwartet: ${url}`));
   return Promise.resolve({ data: table[path] });
@@ -107,15 +110,16 @@ beforeEach(() => {
   apiMock.get.mockReset().mockImplementation(routeGet);
   apiMock.post.mockReset().mockResolvedValue({ data: {} });
   apiMock.patch.mockReset().mockResolvedValue({ data: {} });
+  apiMock.put.mockReset().mockResolvedValue({ data: { ...YEAR_REVIEW, start: "12-01", start_label: "1.12.", from_label: "1.12.2026" } });
   apiMock.delete.mockReset().mockResolvedValue({ data: { ok: true } });
   Object.values(toastMock).forEach((fn) => fn.mockReset());
 });
 
 describe("Reiter", () => {
-  it("hat genau die acht Reiter mit Namen und öffnet den per ?tab= gewünschten", async () => {
+  it("hat genau die neun Reiter mit Namen und öffnet den per ?tab= gewünschten", async () => {
     renderAt("xp");
-    expect(TABS.map((t) => t.label)).toEqual(["Übersicht", "Katalog", "Vergeben", "Saison", "XP", "Vorschau", "Negativ & Vorfälle", "Statistik"]);
-    expect(screen.getAllByRole("tab")).toHaveLength(8);
+    expect(TABS.map((t) => t.label)).toEqual(["Übersicht", "Katalog", "Vergeben", "Saison", "Jahresrückblick", "XP", "Vorschau", "Negativ & Vorfälle", "Statistik"]);
+    expect(screen.getAllByRole("tab")).toHaveLength(9);
     expect(screen.getByTestId("ach-tab-xp")).toHaveAttribute("aria-selected", "true");
     expect(await screen.findByTestId("xp-empty")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("ach-tab-stats"));
@@ -316,5 +320,19 @@ describe("Statistik", () => {
     fireEvent.change(screen.getByTestId("stats-category"), { target: { value: "season" } });
     expect(screen.queryByTestId("stats-row-matches_played_4")).toBeNull();
     expect(screen.getByTestId("stats-row-season_top10_1")).toHaveTextContent("Saisonspitze");
+  });
+});
+
+describe("Jahresrückblick", () => {
+  it("zeigt den Zeitraum, speichert Start und Ende und führt zur Vorschau", async () => {
+    renderAt("year");
+    expect(await screen.findByTestId("year-review-window")).toHaveTextContent("Nächster Rückblick: 2026 – zu sehen vom 15.12.2026 bis 31.1.2027. Die Meldung geht am Starttag raus.");
+    expect(screen.getByTestId("year-review-start")).toHaveValue("15.12.");
+    fireEvent.change(screen.getByTestId("year-review-start"), { target: { value: "1.12." } });
+    fireEvent.click(screen.getByTestId("year-review-save"));
+    await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/year-review", { start: "1.12.", end: "31.1." }));
+    expect(await screen.findByTestId("year-review-window")).toHaveTextContent("vom 1.12.2026 bis 31.1.2027");
+    expect(toastMock.success).toHaveBeenCalledWith("Zeitraum gespeichert.");
+    expect(screen.getByTestId("year-review-preview")).toHaveAttribute("href", "/dein-jahr?vorschau=1");
   });
 });

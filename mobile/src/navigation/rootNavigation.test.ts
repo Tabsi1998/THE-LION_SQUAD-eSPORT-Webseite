@@ -73,6 +73,8 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/f1/challenges/monza", detail("FastLapDetail", { id: "monza" })],
   ["/f1/monza", detail("FastLapDetail", { id: "monza" })],
   ["/teams/t-1", detail("TeamDetail", { id: "t-1" })],
+  // Einladungs-Link (#1191): der Schlüssel geht mit zur Team-Seite.
+  ["https://lionsquad.at/teams/t-1?einladung=AbC123", detail("TeamDetail", { id: "t-1", invite: "AbC123" })],
   ["/news/herbst-lan-plan", detail("NewsDetail", { id: "herbst-lan-plan" })],
   ["/galerie/sommerfest", detail("GalleryAlbum", { id: "sommerfest" })],
   ["/messages/u-9", detail("DirectThread", { userId: "u-9" })],
@@ -92,6 +94,8 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/members/documents", detail("MemberDocuments")],
   ["/members/meetings", detail("MemberMeetings")],
   ["/members/helfen", detail("MemberHelperShifts")],
+  // Helfer-Aufruf (#1197): die Veranstaltung aus der Meldung steht oben.
+  ["/members/helfen?event=5", detail("MemberHelperShifts", { event: 5 })],
   ["/members/benefits", detail("InfoCenter", { section: "benefits" })],
   ["/notifications", detail("Notifications")],
   ["/achievements", detail("AchievementShowcase")],
@@ -114,7 +118,11 @@ test("jede bekannte Adresse hat ihren Ort - Übersichten wechseln den Tab, alles
   expect(targetFromUrl("https://lionsquad.at/news/saisonstart")).toEqual(detail("NewsDetail", { id: "saisonstart" }));
   expect(targetFromUrl("https://start.gg/tournaments/t-1")).toBeNull();
   // Seiten ohne Screen in der App öffnen sich im Browser.
-  for (const url of ["/servers", "/about", "/membership/join", "/privacy", "/imprint", "/privacy-account", "", null, undefined]) {
+  // Über uns (#1024) hat jetzt einen Screen - der Rest bleibt auf der Website.
+  expect(targetFromUrl("/about")).toEqual(detail("ClubAbout"));
+  // Jahresrückblick (#1195).
+  expect(targetFromUrl("https://lionsquad.at/dein-jahr")).toEqual(detail("YearReview"));
+  for (const url of ["/servers", "/membership/join", "/privacy", "/imprint", "/privacy-account", "", null, undefined]) {
     expect([url, targetFromUrl(url)]).toEqual([url, null]);
   }
 });

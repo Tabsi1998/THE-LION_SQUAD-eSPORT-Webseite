@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -7,11 +6,17 @@ import { Card } from "../../components/Card";
 import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
-import { Body, Heading, Muted, Title } from "../../components/Text";
+import { TeamSchedule } from "../../components/team/TeamSchedule";
+import { TeamHeader, type TeamHeaderData } from "../../components/team/TeamHeader";
+import { TeamInviteCard, TeamJoinInvite } from "../../components/team/TeamInvite";
+import { TeamDissolve } from "../../components/team/TeamDissolve";
+import { Body, Heading, Muted } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
-import { formatDate, formatStatus } from "../../lib/format";
+import { formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
+import { memberRole as faceRole, ROLE_LABELS, type TeamOverview } from "../../lib/teamPage";
+import { AUTO_COLOR, TEAM_COLORS } from "../../lib/teamColors";
 import { openSignIn } from "../../navigation/rootNavigation";
 import type { TeamStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -27,6 +32,7 @@ type TeamForm = {
   logo_url: string;
   banner_url: string;
   discord_link: string;
+  color: string;
 };
 type SquadForm = {
   id?: string;
@@ -42,6 +48,9 @@ const emptySquad: SquadForm = { name: "", description: "", game_id: "", status: 
 export function TeamDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [team, setTeam] = useState<Team | undefined>();
+  // Termine und letzte Spiele (#1191) aus den Team-Anmeldungen; Einladungs-Link mit QR-Code für Kapitäne.
+  const [overview, setOverview] = useState<TeamOverview | null>(null);
+  const inviteToken = route.params.invite || "";
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -49,7 +58,11 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   const [message, setMessage] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [editOpen, setEditOpen] = useState(false);
-  const [teamForm, setTeamForm] = useState<TeamForm>({ name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "" });
+  // Oben „Einladen“ und „Bearbeiten“ (#1274); der Link mit QR-Code öffnet sich auf Tippen.
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [teamForm, setTeamForm] = useState<TeamForm>({ name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "", color: AUTO_COLOR });
+  // Team-Level für die Kopfzeile (#1347): „Level 9“ und die kleine goldene Krone des punktebesten Teams.
+  const [level, setLevel] = useState<{ level?: number; crown?: string | null } | null>(null);
   const [squadForm, setSquadForm] = useState<SquadForm | null>(null);
   const [inviteQuery, setInviteQuery] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -59,8 +72,12 @@ export function TeamDetailScreen({ navigation, route }: Props) {
     try {
       const { data } = await api.get<Team>(`/teams/${route.params.id}`);
       const squads = await api.get<TeamSquad[]>(`/teams/${route.params.id}/squads`).catch(() => ({ data: [] as TeamSquad[] }));
+      const plan = await api.get<TeamOverview>(`/teams/${route.params.id}/overview`).catch(() => ({ data: null }));
+      const levelInfo = await api.get<{ level?: number; crown?: string | null }>(`/teams/${route.params.id}/level`).catch(() => ({ data: null }));
+      setLevel(levelInfo.data && typeof levelInfo.data.level === "number" ? levelInfo.data : null);
       const nextTeam = { ...data, squads: Array.isArray(squads.data) ? squads.data : [] };
       setTeam(nextTeam);
+      setOverview(plan.data && Array.isArray(plan.data.upcoming) ? plan.data : null);
       setTeamForm({
         name: nextTeam.name || "",
         tag: nextTeam.tag || "",
@@ -68,6 +85,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
         logo_url: nextTeam.logo_url || "",
         banner_url: nextTeam.banner_url || "",
         discord_link: nextTeam.discord_link || "",
+        color: nextTeam.color || AUTO_COLOR,
       });
     } catch (err) {
       setError(errorMessage(err, "Teamdetail konnte nicht geladen werden."));
@@ -107,7 +125,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   const stats = useMemo(() => ({
     members: team?.member_count ?? team?.member_ids?.length ?? members.length,
     squads: team?.squad_count ?? squads.length,
-    role: isLeader ? "Leader" : canManage ? "Co-Leader" : isMember ? "Mitglied" : "Besucher",
+    role: isLeader ? "Kapitän" : canManage ? "Co-Kapitän" : isMember ? "Spieler" : "Besucher",
   }), [canManage, isLeader, isMember, members.length, squads.length, team?.member_count, team?.member_ids?.length, team?.squad_count]);
 
   const openProfile = useCallback((username?: string | null) => {
@@ -156,6 +174,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
         logo_url: teamForm.logo_url.trim() || null,
         banner_url: teamForm.banner_url.trim() || null,
         discord_link: teamForm.discord_link.trim() || null,
+        color: teamForm.color || AUTO_COLOR,
       });
       setEditOpen(false);
     }, "Team gespeichert.");
@@ -171,14 +190,14 @@ export function TeamDetailScreen({ navigation, route }: Props) {
 
   const setRole = useCallback((member: TeamMember, role: "member" | "co_leader") => {
     if (!team) return;
-    showActionResult(() => api.post(`/teams/${team.id}/members/${member.id}/role`, { role }), role === "co_leader" ? "Co-Leader gesetzt." : "Rolle zurückgesetzt.");
+    showActionResult(() => api.post(`/teams/${team.id}/members/${member.id}/role`, { role }), role === "co_leader" ? "Ist jetzt Co-Kapitän." : "Ist wieder Spieler.");
   }, [showActionResult, team]);
 
   const transferLeader = useCallback((member: TeamMember) => {
     if (!team) return;
-    Alert.alert("Leadership übertragen?", `${member.display_name || member.username || "Dieses Mitglied"} wird neuer Team-Leader.`, [
+    Alert.alert("Kapitän übergeben?", `${member.display_name || member.username || "Dieses Mitglied"} wird Kapitän. Du bist danach Co-Kapitän.`, [
       { text: "Abbrechen", style: "cancel" },
-      { text: "Übertragen", onPress: () => showActionResult(() => api.post(`/teams/${team.id}/transfer-leader`, { new_leader_id: member.id }), "Leadership übertragen.") },
+      { text: "Übergeben", onPress: () => showActionResult(() => api.post(`/teams/${team.id}/transfer-leader`, { new_leader_id: member.id }), "Kapitän übergeben.") },
     ]);
   }, [showActionResult, team]);
 
@@ -233,6 +252,28 @@ export function TeamDetailScreen({ navigation, route }: Props) {
     );
   }
 
+  // Aufgelöst (#1274): zurück dorthin, woher man kam - die Team-Seite gibt es nicht mehr.
+  const dissolved = () => {
+    setEditOpen(false);
+    if (typeof (navigation as { canGoBack?: () => boolean }).canGoBack === "function" && navigation.canGoBack()) navigation.goBack();
+    else navigation.navigate("CommunityHub", { section: "teams" });
+  };
+
+  const joinedByLink = () => {
+    navigation.setParams({ invite: undefined });
+    setMessage("Du bist dem Team beigetreten.");
+    load();
+  };
+
+  if (!team && inviteToken) {
+    // Ein privates Team zeigt sich nur mit gültigem Einladungs-Link - dann gleich mit „Beitreten“.
+    return (
+      <Screen>
+        <TeamJoinInvite teamId={route.params.id} token={inviteToken} signedIn={Boolean(user && !isGuestUser(user))} onSignIn={() => openSignIn()} onJoined={joinedByLink} />
+      </Screen>
+    );
+  }
+
   if (!team) {
     return (
       <Screen>
@@ -247,38 +288,54 @@ export function TeamDetailScreen({ navigation, route }: Props) {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
       >
-        <View style={styles.hero}>
-          <MediaImage
-            uri={team.banner_url}
-            style={styles.banner}
-            fallback={<Ionicons name="people-outline" color={colors.cyan} size={42} />}
-          />
-          <View style={styles.heroInner}>
-            <MediaImage
-              uri={team.logo_url}
-              style={styles.logo}
-              fallback={<Body style={styles.logoText}>{(team.tag || team.name).slice(0, 2).toUpperCase()}</Body>}
-            />
-            <View style={styles.heroText}>
-              <Muted>{team.tag ? `[${team.tag}]` : "Team"}</Muted>
-              <Title>{team.name}</Title>
-              {team.description ? <Body>{team.description}</Body> : <Muted>Keine Beschreibung hinterlegt.</Muted>}
-              <View style={styles.wrap}>
-                <Pill label={stats.role} tone={canManage ? "success" : "cyan"} />
-                {canManage ? <Pill label="Verwaltung" tone="success" /> : null}
+        <TeamHeader
+          team={team}
+          header={(overview?.header || null) as TeamHeaderData | null}
+          level={level?.level ?? null}
+          crown={level?.crown ?? null}
+          userId={user?.id}
+          onOpenProfile={openProfile}
+          actions={canManage ? (
+            <>
+              <View style={styles.headerAction}>
+                <Button label={inviteOpen ? "Einladen schließen" : "Einladen"} onPress={() => setInviteOpen((open) => !open)} testID="team-invite-open" />
               </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.statGrid}>
-          <TeamStat icon="people-outline" label="Mitglieder" value={stats.members} />
-          <TeamStat icon="layers-outline" label="Squads" value={stats.squads} tone="gold" />
-          <TeamStat icon="chatbubbles-outline" label="Chat" value={team.chat_preview?.length || 0} />
-        </View>
+              <View style={styles.headerAction}>
+                <Button label={editOpen ? "Fertig" : "Bearbeiten"} variant="secondary" onPress={() => setEditOpen((open) => !open)} testID="team-edit-open" />
+              </View>
+            </>
+          ) : null}
+        />
 
         {message ? <Muted style={styles.success}>{message}</Muted> : null}
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
+
+        {editOpen && canManage ? (
+          <Card style={styles.card}>
+            <Heading>Basisdaten bearbeiten</Heading>
+            <Field label="Name" value={teamForm.name} onChangeText={(value) => setTeamForm((current) => ({ ...current, name: value }))} />
+            <Field label="Tag" value={teamForm.tag} onChangeText={(value) => setTeamForm((current) => ({ ...current, tag: value.toUpperCase().slice(0, 8) }))} />
+            <Field label="Beschreibung" value={teamForm.description} multiline onChangeText={(value) => setTeamForm((current) => ({ ...current, description: value }))} />
+            <Field label="Logo URL" value={teamForm.logo_url} onChangeText={(value) => setTeamForm((current) => ({ ...current, logo_url: value }))} />
+            <Field label="Banner URL" value={teamForm.banner_url} onChangeText={(value) => setTeamForm((current) => ({ ...current, banner_url: value }))} />
+            <Field label="Discord-Link" value={teamForm.discord_link} onChangeText={(value) => setTeamForm((current) => ({ ...current, discord_link: value }))} />
+            <ColorPicker value={teamForm.color} onChange={(color) => setTeamForm((current) => ({ ...current, color }))} />
+            <Button label={busy ? "Speichert ..." : "Team speichern"} disabled={busy || !teamForm.name.trim() || !teamForm.tag.trim()} onPress={saveTeam} />
+            {isLeader || isClubAdmin(user) ? <TeamDissolve team={team} onDissolved={dissolved} /> : null}
+          </Card>
+        ) : null}
+
+        {canManage && inviteOpen ? <TeamInviteCard teamId={team.id} teamName={team.name} joinCode={team.join_code} /> : null}
+
+        {inviteToken && !isMember ? (
+          <TeamJoinInvite teamId={team.id} token={inviteToken} signedIn={Boolean(user && !isGuestUser(user))} onSignIn={() => openSignIn()} onJoined={joinedByLink} />
+        ) : null}
+
+        <TeamSchedule
+          overview={overview}
+          onOpenTournament={(id) => navigation.navigate("TournamentDetail", { id })}
+          onOpenMatch={(id) => navigation.navigate("MatchDetail", { id })}
+        />
 
         <Card style={styles.card}>
           <View style={styles.cardTop}>
@@ -296,31 +353,10 @@ export function TeamDetailScreen({ navigation, route }: Props) {
               <Button label="Team-Chat öffnen" onPress={() => navigation.navigate("TeamChat", { id: team.id, title: `${team.tag || team.name} Chat` })} />
             )}
             {team.discord_link ? <Button label="Discord öffnen" variant="secondary" onPress={() => Linking.openURL(normalizeLink(team.discord_link)).catch(() => setError("Discord-Link konnte nicht geöffnet werden."))} /> : null}
-            {canManage ? <Button label={editOpen ? "Bearbeitung schließen" : "Team bearbeiten"} variant="secondary" onPress={() => setEditOpen((open) => !open)} /> : null}
             {isMember && !isLeader ? <Button label="Team verlassen" variant="danger" disabled={busy} onPress={leave} /> : null}
           </View>
         </Card>
 
-        {editOpen && canManage ? (
-          <Card style={styles.card}>
-            <Heading>Basisdaten bearbeiten</Heading>
-            <Field label="Name" value={teamForm.name} onChangeText={(value) => setTeamForm((current) => ({ ...current, name: value }))} />
-            <Field label="Tag" value={teamForm.tag} onChangeText={(value) => setTeamForm((current) => ({ ...current, tag: value.toUpperCase().slice(0, 8) }))} />
-            <Field label="Beschreibung" value={teamForm.description} multiline onChangeText={(value) => setTeamForm((current) => ({ ...current, description: value }))} />
-            <Field label="Logo URL" value={teamForm.logo_url} onChangeText={(value) => setTeamForm((current) => ({ ...current, logo_url: value }))} />
-            <Field label="Banner URL" value={teamForm.banner_url} onChangeText={(value) => setTeamForm((current) => ({ ...current, banner_url: value }))} />
-            <Field label="Discord-Link" value={teamForm.discord_link} onChangeText={(value) => setTeamForm((current) => ({ ...current, discord_link: value }))} />
-            <Button label={busy ? "Speichert ..." : "Team speichern"} disabled={busy || !teamForm.name.trim() || !teamForm.tag.trim()} onPress={saveTeam} />
-          </Card>
-        ) : null}
-
-        {canManage && team.join_code ? (
-          <Card style={[styles.card, styles.manageCard]}>
-            <Heading>Join-Code</Heading>
-            <Muted>Mit diesem Code können Spieler dem Team direkt beitreten.</Muted>
-            <Body style={styles.joinCode}>{team.join_code}</Body>
-          </Card>
-        ) : null}
 
         {!isMember && user && !isGuestUser(user) ? (
           <Card style={styles.card}>
@@ -331,9 +367,9 @@ export function TeamDetailScreen({ navigation, route }: Props) {
           </Card>
         ) : null}
 
-        <Card style={styles.card}>
+        {canManage ? <Card style={styles.card} testID="team-manage-members">
           <View style={styles.cardTop}>
-            <Heading>Mitglieder</Heading>
+            <Heading>Mitglieder verwalten</Heading>
             <Pill label={`${members.length || stats.members}`} />
           </View>
           {members.length ? members.map((member) => (
@@ -351,7 +387,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
               user={user}
             />
           )) : <Muted>Mitglieder werden angezeigt, sobald das Team sie freigibt.</Muted>}
-        </Card>
+        </Card> : null}
 
         <Card style={styles.card}>
           <View style={styles.cardTop}>
@@ -469,19 +505,19 @@ function MemberRow({
           {member.username ? <Muted>@{member.username}</Muted> : null}
         </Pressable>
         <View style={styles.wrap}>
-          <Pill label={roleLabel(role)} tone={role === "leader" ? "gold" : role === "co_leader" ? "success" : "default"} />
+          <Pill label={ROLE_LABELS[faceRole(team, member)]} tone={role === "leader" ? "gold" : role === "co_leader" ? "success" : "default"} />
           {isSelf ? <Pill label="Du" /> : null}
         </View>
         {canRole || canKick ? (
           <View style={styles.memberActions}>
             {canRole ? (
               <Pressable disabled={busy} onPress={() => onRole(member, role === "co_leader" ? "member" : "co_leader")} style={styles.memberAction}>
-                <Muted style={styles.smallActionText}>{role === "co_leader" ? "Mitglied" : "Co-Leader"}</Muted>
+                <Muted style={styles.smallActionText}>{role === "co_leader" ? "Spieler" : "Co-Kapitän"}</Muted>
               </Pressable>
             ) : null}
             {canRole ? (
               <Pressable disabled={busy} onPress={() => onTransfer(member)} style={styles.memberAction}>
-                <Muted style={styles.smallActionText}>Leader</Muted>
+                <Muted style={styles.smallActionText}>Kapitän</Muted>
               </Pressable>
             ) : null}
             {canKick ? (
@@ -521,6 +557,36 @@ function SquadRow({ canManage, onDelete, onEdit, squad }: { canManage: boolean; 
   );
 }
 
+function ColorPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
+  return (
+    <View style={styles.field} testID="team-color-picker">
+      <Muted style={styles.fieldLabel}>Team-Farbe</Muted>
+      <View style={styles.wrap}>
+        <Pressable
+          onPress={() => onChange(AUTO_COLOR)}
+          accessibilityRole="radio"
+          accessibilityState={{ selected: value === AUTO_COLOR }}
+          style={[styles.option, value === AUTO_COLOR && styles.optionActive]}
+          testID="team-color-auto"
+        >
+          <Muted style={value === AUTO_COLOR && styles.optionTextActive}>Automatisch (Spiel)</Muted>
+        </Pressable>
+        {TEAM_COLORS.map((color) => (
+          <Pressable
+            key={color.key}
+            onPress={() => onChange(color.key)}
+            accessibilityRole="radio"
+            accessibilityLabel={color.label}
+            accessibilityState={{ selected: value === color.key }}
+            style={[styles.swatch, { backgroundColor: color.hex }, value === color.key && styles.swatchActive]}
+            testID={`team-color-${color.key}`}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function Field({ label, value, onChangeText, multiline = false }: { label: string; value?: string; onChangeText: (value: string) => void; multiline?: boolean }) {
   return (
     <View style={styles.field}>
@@ -546,32 +612,20 @@ function Pill({ label, tone = "default" }: { label: string; tone?: "default" | "
   );
 }
 
-function TeamStat({ icon, label, value, tone = "cyan" }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: number | string; tone?: "cyan" | "gold" }) {
-  return (
-    <Card style={styles.stat}>
-      <Ionicons name={icon} color={tone === "gold" ? colors.gold : colors.cyan} size={18} />
-      <Body style={[styles.statValue, tone === "gold" && styles.textGold]}>{String(value)}</Body>
-      <Muted>{label}</Muted>
-    </Card>
-  );
-}
-
 function memberRole(team: Team, member: TeamMember) {
   if (team.leader_id === member.id || team.leader?.id === member.id) return "leader";
   if (team.co_leader_ids?.includes(member.id) || member.role === "co_leader") return "co_leader";
   return "member";
 }
 
-function roleLabel(role: string) {
-  if (role === "leader") return "Leader";
-  if (role === "co_leader") return "Co-Leader";
-  return "Mitglied";
-}
-
 function normalizeLink(url?: string | null) {
   const value = String(url || "").trim();
   if (!value) return "";
   return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+}
+
+function isClubAdmin(user?: User | null) {
+  return ["club_admin", "superadmin"].includes(String(user?.role || ""));
 }
 
 function isAdmin(user?: User | null) {
@@ -584,60 +638,11 @@ const styles = StyleSheet.create({
     padding: 18,
     paddingBottom: 34,
   },
-  hero: {
-    borderColor: colors.border,
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  banner: {
-    borderWidth: 0,
-    height: 150,
-    width: "100%",
-  },
-  heroInner: {
-    alignItems: "flex-end",
-    backgroundColor: "rgba(10,10,10,0.92)",
-    flexDirection: "row",
-    gap: 12,
-    marginTop: -34,
-    padding: 14,
-  },
-  logo: {
-    borderColor: colors.cyan,
-    borderRadius: 12,
-    borderWidth: 2,
-    height: 70,
-    width: 70,
-  },
-  logoText: {
-    color: colors.cyan,
-    fontSize: 21,
-    fontWeight: "900",
-  },
-  heroText: {
-    flex: 1,
-    gap: 5,
-  },
-  statGrid: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  stat: {
-    flex: 1,
-    gap: 3,
-    minHeight: 88,
-  },
-  statValue: {
-    color: colors.cyan,
-    fontSize: 20,
-    fontWeight: "900",
-  },
   card: {
     gap: 12,
   },
-  manageCard: {
-    borderColor: "rgba(255,215,0,0.3)",
+  headerAction: {
+    flex: 1,
   },
   cardTop: {
     alignItems: "flex-start",
@@ -667,17 +672,6 @@ const styles = StyleSheet.create({
   },
   inputMulti: {
     minHeight: 92,
-  },
-  joinCode: {
-    backgroundColor: colors.black,
-    borderColor: "rgba(255,215,0,0.28)",
-    borderRadius: 8,
-    borderWidth: 1,
-    color: colors.gold,
-    fontSize: 20,
-    fontWeight: "900",
-    letterSpacing: 0,
-    padding: 12,
   },
   memberRow: {
     alignItems: "flex-start",
@@ -777,6 +771,16 @@ const styles = StyleSheet.create({
   optionTextActive: {
     color: colors.cyan,
     fontWeight: "900",
+  },
+  swatch: {
+    borderColor: "transparent",
+    borderRadius: 7,
+    borderWidth: 2,
+    height: 34,
+    width: 34,
+  },
+  swatchActive: {
+    borderColor: colors.white,
   },
   memberChip: {
     backgroundColor: "rgba(255,255,255,0.045)",

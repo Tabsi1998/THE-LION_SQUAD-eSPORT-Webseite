@@ -95,6 +95,7 @@ const ImprintPage = lazy(() => import("@/pages/public/LegalPages").then((m) => (
 const TermsPage = lazy(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.TermsPage })));
 
 const DashboardPage = lazy(() => import("@/pages/user/DashboardPage"));
+const YearReviewPage = lazy(() => import("@/pages/user/YearReviewPage"));
 const ProfilePage = lazy(() => import("@/pages/user/ProfilePage"));
 const MessagesPage = lazy(() => import("@/pages/user/MessagesPage"));
 const NotificationsPage = lazy(() => import("@/pages/user/NotificationsPage"));
@@ -163,6 +164,7 @@ const ReferenceDetailPage = lazy(() => import("@/pages/public/ReferencesPage").t
 const PlayersPage = lazy(() => import("@/pages/public/PlayersPage"));
 const AchievementsShowcasePage = lazy(() => import("@/pages/public/AchievementsShowcasePage"));
 const AchievementSharePage = lazy(() => import("@/pages/public/AchievementSharePage"));
+const ResultSharePage = lazy(() => import("@/pages/public/ResultSharePage"));
 const CommunityPage = lazy(() => import("@/pages/public/CommunityPage"));
 const ServersPage = lazy(() => import("@/pages/public/ServersPage"));
 const MembersDirectoryPage = lazy(() => import("@/pages/public/MembersDirectoryPage"));
@@ -262,6 +264,7 @@ function App() {
           <Route path="/tournaments/:slug/bracket" element={<TournamentBracketPage />} />
           <Route path="/tournaments/:slug/matches" element={<TournamentSchedulePage />} />
           <Route path="/tournaments/:slug/standings" element={<TournamentStandingsPage />} />
+          <Route path="/tournaments/:slug/ergebnis/:username" element={<ResultSharePage />} />
           <Route path="/matches/:id" element={<MatchPage />} />
           <Route path="/f1" element={<FastLapLegacyRedirect />} />
           <Route path="/f1/:slug" element={<FastLapLegacyRedirect />} />
@@ -286,6 +289,7 @@ function App() {
 
           {/* User */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+          <Route path="/dein-jahr" element={<ProtectedRoute><YearReviewPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
           <Route path="/messages/:userId" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />

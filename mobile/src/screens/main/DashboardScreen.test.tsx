@@ -31,9 +31,10 @@ jest.mock("@react-navigation/native", () => {
 });
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 jest.mock("../../components/MediaImage", () => ({ MediaImage: () => null }));
-jest.mock("../../seasons/anchors", () => ({ SeasonPerch: () => null }));
+jest.mock("../../seasons/anchors", () => ({ SeasonPerch: () => null, useSeasonOverlay: () => null }));
 jest.mock("../../seasons/SeasonStage", () => ({ SeasonBackdropSlot: () => null, SeasonEdgeSlot: () => null, SeasonWidgetSlot: () => null }));
 jest.mock("../../advent/entry", () => ({ AdventHint: () => null }));
+jest.mock("../../components/YearReviewCard", () => ({ YearReviewCard: () => null }));
 jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: jest.fn() }));
 jest.mock("../../lib/openLink", () => ({ openLink: jest.fn() }));
 
@@ -171,4 +172,22 @@ test("wird die Spalte schmaler, bleibt das Verkleinern - wird sie breiter, begin
   // Der Kranz verschwindet wieder: mehr Platz, volle Größe.
   await width(205);
   expect(title()).toHaveStyle({ fontSize: 30 });
+});
+
+// Rückmeldung (#1196): „Wie war …?“ steht unter den offenen Aktionen und öffnet das Bewerten.
+test("die Frage nach dem Turnier öffnet das Bewerten", async () => {
+  jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(true);
+  dashboard = {
+    me: { tournaments: [], events: [], matches: [], staff_matches: [], actions: [{ id: "feedback-tournament-t-old", type: "feedback", label: "Wie war der Herbst-Cup?", detail: "Kurz bewerten – das sieht nur der Verein", target_type: "feedback", target_id: "tournament:t-old" }] },
+    public: { tournaments: [], events: [] }, news: [], streams: [], season: null, stats: { open_actions: 1 },
+  };
+  mockGet.mockImplementation((path: string) => Promise.resolve({ data: path === "/feedback/open"
+    ? { items: [{ kind: "tournament", target_id: "t-old", title: "Herbst-Cup", question: "Wie war der Herbst-Cup?", day: "2026-10-17" }], tags: ["Ablauf"], text_max: 280 }
+    : path === "/mobile/dashboard" ? dashboard : {} }));
+  await render(<DashboardScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Wie war der Herbst-Cup?")).toBeTruthy());
+  expect(screen.queryByTestId("feedback-sheet")).toBeNull();
+  await fireEvent.press(screen.getByText("Wie war der Herbst-Cup?"));
+  await waitFor(() => expect(screen.getByTestId("feedback-sheet")).toBeTruthy());
+  await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/feedback/open"));
 });

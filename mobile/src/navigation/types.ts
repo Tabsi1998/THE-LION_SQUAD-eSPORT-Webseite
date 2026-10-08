@@ -31,7 +31,8 @@ export type CommunitySection = "chats" | "teams" | "players" | "leaderboards";
 
 /** Die Übersicht je Tab - der erste Screen im Stapel. */
 export type TabRootParamList = {
-  Dashboard: undefined;
+  // `feedback` (#1196): „Wie war …?“ aus der Meldung - Home öffnet dann gleich das Bewerten.
+  Dashboard: { feedback?: string } | undefined;
   TournamentList: { filter?: EventsFilter } | undefined;
   CommunityHub: { section?: CommunitySection } | undefined;
   VereinHub: undefined;
@@ -45,7 +46,8 @@ export type DetailParamList = {
   FastLapDetail: { id: string };
   MatchDetail: { id: string };
   TournamentChat: { id: string; title?: string };
-  TeamDetail: { id: string };
+  // `invite` (#1191): der Schlüssel aus einem Einladungs-Link (/teams/<id>?einladung=…) - oben steht dann „Beitreten“.
+  TeamDetail: { id: string; invite?: string };
   TeamChat: { id: string; title?: string };
   PublicProfile: { username: string };
   DirectThread: { userId: string; title?: string };
@@ -76,11 +78,16 @@ export type DetailParamList = {
   // Versammlungen und Abstimmungen (#327): aus der Vereinsakte, nur mit Weg dorthin.
   MemberMeetings: undefined;
   // Helferdienste (#331): Schichten aus der Vereinsakte.
-  MemberHelperShifts: undefined;
+  // `event` (#1197): aus dem Helfer-Aufruf - diese Veranstaltung steht oben und leuchtet.
+  MemberHelperShifts: { event?: number } | undefined;
   MemberCard: undefined;
   // Einlass bei der Generalversammlung (#845): nur für den Vorstand (Bereich „Verein“).
   Admission: undefined;
   InfoCenter: { section?: "sponsors" | "partners" | "events" | "benefits" | "references" | "profiles" } | undefined;
+  // Über uns, Vorstand, Werte, Kontakt (#1024): kurz in der App, lange Seiten bleiben auf der Website.
+  ClubAbout: undefined;
+  // Jahresrückblick „Dein Jahr bei LION“ (#1195): ab Mitte Dezember; Vorschau für die Verwaltung.
+  YearReview: { preview?: boolean } | undefined;
   // Einstellungen an einem Ort (#1146): Zahnrad oben im Profil.
   Settings: undefined;
   ProfileEdit: undefined;

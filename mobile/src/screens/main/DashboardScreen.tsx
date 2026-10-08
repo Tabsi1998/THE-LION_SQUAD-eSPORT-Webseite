@@ -23,6 +23,8 @@ import { seasonLine, splitHomeTimeline, type HomeItem } from "../../lib/dashboar
 import { displayName, formatDate, formatEventType, formatNewsCategory, formatStatus, placeParts } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import { openSignIn, openTab } from "../../navigation/rootNavigation";
+import { FeedbackSheet } from "../../components/FeedbackSheet";
+import { YearReviewCard } from "../../components/YearReviewCard";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { AppStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -70,7 +72,7 @@ function normalizeDashboard(payload?: Partial<MobileDashboardData> | null): Mobi
   };
 }
 
-export function DashboardScreen({ navigation }: Props) {
+export function DashboardScreen({ navigation, route }: Props) {
   const { user, refreshMe } = useAuth();
   const { clubName } = useBranding();
   const [data, setData] = useState<MobileDashboardData>(emptyDashboard);
@@ -80,6 +82,15 @@ export function DashboardScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [offline, setOffline] = useState(false);
+  // Rückmeldung (#1196): „Wie war …?“ aus den offenen Aktionen oder aus der Meldung (Parameter `feedback`).
+  const [feedbackTarget, setFeedbackTarget] = useState<string | null>(null);
+  const [feedbackThanks, setFeedbackThanks] = useState("");
+  const routeFeedback = route?.params?.feedback || "";
+  useEffect(() => {
+    if (!routeFeedback) return;
+    setFeedbackTarget(routeFeedback);
+    navigation.setParams({ feedback: undefined });
+  }, [navigation, routeFeedback]);
   // Die Listen der Abschnitte blenden gestaffelt ein (#1085) - jede Karte nur beim ersten Erscheinen, nicht bei jedem
   // Neuladen (Fokus, Live-Änderung, Ziehen).
   const entrance = useListEntrance();
@@ -142,6 +153,11 @@ export function DashboardScreen({ navigation }: Props) {
   }, [navigation]);
 
   const openAction = useCallback((action: DashboardAction) => {
+    if (action.target_type === "feedback" && action.target_id) {
+      setFeedbackThanks("");
+      setFeedbackTarget(action.target_id);
+      return;
+    }
     if (action.target_type === "tournament" && action.target_id) {
       openTournament(action.target_id);
       return;
@@ -219,6 +235,8 @@ export function DashboardScreen({ navigation }: Props) {
 
         {/* Adventkalender (#641): der Weg zu den Türchen - nur solange der Kalender läuft; Zurück führt zu Home (#1144). */}
         <AdventHint onOpen={() => navigation.navigate("AdventCalendar")} />
+        {/* Jahresrückblick (#1195): ab Mitte Dezember, nur mit Aktivität im Jahr. */}
+        {!isGuest ? <YearReviewCard onOpen={() => navigation.navigate("YearReview")} /> : null}
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
         {offline && !error ? <OfflineNotice /> : null}
@@ -284,6 +302,7 @@ export function DashboardScreen({ navigation }: Props) {
           </Section>
         ) : null}
 
+        {feedbackThanks ? <Muted style={styles.feedbackThanks} testID="feedback-thanks">{feedbackThanks}</Muted> : null}
         {!isGuest && data.me.actions.length ? (
           <Section title="Offene Aktionen">
             {data.me.actions.map((action, index) => (
@@ -359,6 +378,13 @@ export function DashboardScreen({ navigation }: Props) {
         </Section>
 
       </ScrollView>
+      {feedbackTarget ? (
+        <FeedbackSheet
+          target={feedbackTarget}
+          onClose={() => setFeedbackTarget(null)}
+          onDone={(text) => { setFeedbackTarget(null); setFeedbackThanks(text); void load(); }}
+        />
+      ) : null}
     </Screen>
   );
 }
@@ -575,6 +601,7 @@ function Badge({ label, tone = "cyan" }: { label: string; tone?: "cyan" | "gold"
 }
 
 function iconForAction(type: string) {
+  if (type === "feedback") return "star-outline";
   if (type.includes("checkin")) return "checkbox-outline";
   if (type.includes("match")) return "game-controller-outline";
   if (type.includes("pending")) return "time-outline";
@@ -582,6 +609,10 @@ function iconForAction(type: string) {
 }
 
 const styles = StyleSheet.create({
+  feedbackThanks: {
+    color: colors.success,
+    fontWeight: "800",
+  },
   content: {
     gap: 18,
     padding: 18,

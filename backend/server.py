@@ -22,6 +22,13 @@ from routes.user_routes import router as user_router
 from routes.award_routes import router as award_router
 from routes.honour_routes import router as honour_router
 from routes.team_routes import router as team_router
+from routes.team_page_routes import router as team_page_router
+from routes.team_day_routes import router as team_day_router
+from routes.feedback_routes import router as feedback_router, admin_router as feedback_admin_router
+from routes.helper_call_routes import router as helper_call_router
+from routes.share_routes import router as share_router
+from routes.year_review_routes import admin_router as year_review_admin_router, router as year_review_router
+from routes.profile_record_routes import router as profile_record_router
 from routes.team_level_routes import router as team_level_router
 from routes.message_routes import router as message_router
 from routes.chat_routes import router as chat_router
@@ -239,6 +246,15 @@ app.include_router(award_router)
 app.include_router(honour_router)
 app.include_router(team_level_router)
 app.include_router(team_router)
+app.include_router(team_page_router)
+app.include_router(team_day_router)
+app.include_router(feedback_router)
+app.include_router(feedback_admin_router)
+app.include_router(helper_call_router)
+app.include_router(share_router)
+app.include_router(year_review_router)
+app.include_router(year_review_admin_router)
+app.include_router(profile_record_router)
 app.include_router(message_router)
 app.include_router(chat_router)
 app.include_router(friend_router)

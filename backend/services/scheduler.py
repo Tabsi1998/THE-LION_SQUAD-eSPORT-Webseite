@@ -182,6 +182,42 @@ async def _safe_achievement_recap():
         _log_task_failure("achievement_recap", exc)
 
 
+async def _safe_feedback_requests():
+    """Rückmeldung (#1196): am Tag nach Turnier oder Event einmal fragen - nur, wer dabei war."""
+    try:
+        from database import get_db
+        from services.feedback import send_requests
+        res = await send_requests(get_db())
+        if res.get("sent"):
+            logger.info(f"[scheduler] feedback_requests {res}")
+    except Exception as exc:
+        _log_task_failure("feedback_requests", exc)
+
+
+async def _safe_helper_reminders():
+    """Helferdienste (#1197): am Vortag erinnern - nur Bestätigte, je Dienst einmal."""
+    try:
+        from database import get_db
+        from services.helper_calls import send_reminders
+        res = await send_reminders(get_db())
+        if res.get("sent"):
+            logger.info(f"[scheduler] helper_reminders {res}")
+    except Exception as exc:
+        _log_task_failure("helper_reminders", exc)
+
+
+async def _safe_year_review_notices():
+    """Jahresrückblick (#1195): im Zeitraum einmal je Person und Jahr „Dein Jahr ist da“ - nur mit Aktivität."""
+    try:
+        from database import get_db
+        from services.year_review import send_notices
+        res = await send_notices(get_db())
+        if res.get("sent"):
+            logger.info(f"[scheduler] year_review_notices {res}")
+    except Exception as exc:
+        _log_task_failure("year_review_notices", exc)
+
+
 async def _safe_prize_expiry():
     try:
         from services.prize_service import expire_overdue
@@ -860,6 +896,13 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("media_scan_purge", _safe_media_scan_purge, lease_seconds=300.0), IntervalTrigger(hours=24), id="media_scan_purge",
                   max_instances=1, coalesce=True)
+    # Community, Teams und Rückblicke (Meilenstein 69): tägliche Fragen und Erinnerungen in Wiener Zeit.
+    sched.add_job(_single_replica("feedback_requests", _safe_feedback_requests, lease_seconds=600.0), CronTrigger(hour=10, minute=5, timezone="Europe/Vienna"),
+                  id="feedback_requests", max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("helper_reminders", _safe_helper_reminders, lease_seconds=900.0), CronTrigger(hour=17, minute=0, timezone="Europe/Vienna"),
+                  id="helper_reminders", max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("year_review_notices", _safe_year_review_notices, lease_seconds=900.0), CronTrigger(hour=10, minute=15, timezone="Europe/Vienna"),
+                  id="year_review_notices", max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched
     logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · f1_prize_reminders 5m · birthday 6h · twitch 90s · game_server_sync 60s · mobile_push_receipts 5m)")

@@ -229,6 +229,8 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         return await news_meta(db, slug, meta, origin)
     if first == "events" and slug:
         return await event_meta(db, slug, meta, origin)
+    if first == "tournaments" and slug and len(parts) > 3 and parts[2].lower() == "ergebnis":
+        return await result_share_meta(db, slug, unquote(parts[3]), meta, origin)
     if first == "tournaments" and slug:
         suffix = parts[2].lower() if len(parts) > 2 else ""
         return await tournament_meta(db, slug, suffix, meta, origin)
@@ -642,6 +644,32 @@ async def achievement_share_meta(db, award_id: str, base: dict, origin: str) -> 
     meta["robots"] = "noindex, follow"
     meta["json_ld"] = webpage_json_ld(meta)
     return add_breadcrumbs(meta, origin, [("Achievements", "/achievements")], payload["name"])
+
+
+async def result_share_meta(db, tournament: str, username: str, base: dict, origin: str) -> dict:
+    """Ergebnis teilen (#1194): die Teilen-Seite eines Turnier-Ergebnisses - die Vorschau ist das breite Bild."""
+    from services.result_share import headline, share_payload, share_text
+    payload = await share_payload(db, tournament, username)
+    if not payload:
+        raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    canonical = f"{origin}{payload['path']}"
+    person = payload.get("team_name") or payload["user"]["display_name"]
+    meta = {
+        **base,
+        "title": f"{headline(payload)} · {person} · {base['site_name']}",
+        "description": seo_description(
+            share_text(payload),
+            prefix=f"{person}: {headline(payload)}",
+            details=[payload.get("event_name"), payload.get("date"), " · ".join(payload.get("chips") or [])[:160] or None],
+        ),
+        "image": f"{origin}{payload['image_paths']['wide']}",
+        "type": "article",
+    }
+    meta["url"] = canonical
+    meta["canonical"] = canonical
+    meta["robots"] = "noindex, follow"
+    meta["json_ld"] = webpage_json_ld(meta)
+    return add_breadcrumbs(meta, origin, [("Turniere", "/tournaments"), (payload["tournament"]["title"], f"/tournaments/{payload['tournament']['slug']}")], "Ergebnis")
 
 
 async def reference_meta(db, rid: str, base: dict, origin: str) -> dict:

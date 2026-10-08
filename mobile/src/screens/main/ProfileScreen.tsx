@@ -28,7 +28,8 @@ import type { PersonalReferenceData, PersonalReferenceItem, PrizePickup, Team } 
 import { prizeCounts } from "./MyPrizesScreen";
 import { ProfileView, type PublicProfilePayload } from "./PublicProfileScreen";
 import { SettingsGroups } from "./SettingsScreen";
-import { profileStyles, ReferenceCard, Stat, WEB_BASE_URL, type ModerationStanding } from "./profile/parts";
+import { profileStyles, Stat, WEB_BASE_URL, type ModerationStanding } from "./profile/parts";
+import { ReferenceWithPath } from "./profile/TournamentPath";
 
 // Das eigene Profil (#1149): derselbe Aufbau wie das, was andere sehen (Kopf mit Level und Zahlenleiste, Reiter Übersicht,
 // Erfolge, Auszeichnungen, Referenzen, Teams, für Mitglieder Ehrungen). Was nur dich angeht, steht im Kasten „Nur für
@@ -240,7 +241,8 @@ function OwnProfile() {
           <Stat label="Siege" value={String(references.stats.wins)} />
         </View>
       </Card>
-      {references.items.length ? references.items.map((item) => <ReferenceCard key={item.id} item={item} onOpen={openReference} />) : (
+      {/* Turnierweg (#1193): jedes Turnier lässt sich aufklappen - mit „Bild teilen“ (#1194). */}
+      {references.items.length ? references.items.map((item) => <ReferenceWithPath key={item.id} item={item} username={user?.username} own onOpen={openReference} />) : (
         <EmptyState icon="ribbon-outline" title="Noch keine Referenzen" detail="Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier." />
       )}
     </View>
