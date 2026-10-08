@@ -411,6 +411,14 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             import logging
             logging.getLogger("tls.tournament").warning(f"results_published hook: {exc}")
 
+    # „Turnier beendet“ (#1133): einmal je Turnier und Person, beim ersten der beiden Abschluss-Status.
+    if prev != status and status in ("completed", "results_published") and prev not in ("completed", "results_published"):
+        try:
+            from services.registration_notifications import notify_tournament_finished
+            await notify_tournament_finished(db, {**t, "id": tid})
+        except Exception:  # noqa: BLE001 - eine Nachricht hält keinen Statuswechsel auf
+            pass
+
     # Turnierabschluss: alle Angemeldeten neu auswerten (#301) - nicht erst beim Profilbesuch.
     if prev != status and status in ("completed", "results_published"):
         try:

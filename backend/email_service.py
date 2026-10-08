@@ -188,44 +188,32 @@ def tpl_user_invite(display_name: str, invite_url: str, invited_by: str = "") ->
     )
 
 
-def tpl_registration_received(tournament_title: str, url: str) -> tuple[str, str]:
+# Turnier-Anmeldung (#1133): eingegangen (wartet auf Freigabe oder Warteliste), bestätigt (auch beim Nachrücken) und
+# abgelehnt. `detail` ist ein fertiger Satz aus services/registration_notifications - etwa der Check-in-Hinweis.
+def tpl_registration_received(tournament_title: str, url: str, detail: str = "") -> tuple[str, str]:
     return f"Anmeldung eingegangen: {tournament_title}", _wrap(
         "Anmeldung eingegangen",
-        f"<p>Deine Anmeldung für <strong>{tournament_title}</strong> ist bei uns eingegangen. Du erhältst eine weitere E-Mail, sobald dein Platz bestätigt wird.</p>",
+        f"<p>Deine Anmeldung für <strong>{tournament_title}</strong> ist bei uns eingegangen.</p>"
+        + (f"<p>{html_lib.escape(detail)}</p>" if detail else ""),
         "Turnier ansehen", url,
     )
 
 
-def tpl_registration_approved(tournament_title: str, url: str) -> tuple[str, str]:
+def tpl_registration_approved(tournament_title: str, url: str, detail: str = "") -> tuple[str, str]:
     return f"Du bist dabei: {tournament_title}", _wrap(
         "Anmeldung bestätigt",
-        f"<p>Dein Platz im Turnier <strong>{tournament_title}</strong> wurde bestätigt. Bereite dich vor und vergiss den Check-in nicht.</p>",
+        f"<p>Dein Platz im Turnier <strong>{tournament_title}</strong> ist bestätigt.</p>"
+        + (f"<p>{html_lib.escape(detail)}</p>" if detail else ""),
         "Zum Turnier", url,
     )
 
 
-def tpl_registration_rejected(tournament_title: str, reason: str = "") -> tuple[str, str]:
+def tpl_registration_rejected(tournament_title: str, reason: str = "", url: str = "") -> tuple[str, str]:
     return f"Anmeldung abgelehnt: {tournament_title}", _wrap(
         "Anmeldung abgelehnt",
-        f"<p>Leider wurde deine Anmeldung für <strong>{tournament_title}</strong> nicht akzeptiert.</p>"
-        + (f"<p><em>Grund: {reason}</em></p>" if reason else ""),
-    )
-
-
-def tpl_checkin_opens_soon(tournament_title: str, when: str, url: str) -> tuple[str, str]:
-    return f"Check-in startet bald: {tournament_title}", _wrap(
-        "Check-in startet bald",
-        f"<p>Der Check-in für <strong>{tournament_title}</strong> startet um <strong>{when}</strong>. Bitte halte dich bereit und checke rechtzeitig ein.</p>",
-        "Zum Turnier", url,
-    )
-
-
-def tpl_checkin_reminder(tournament_title: str, url: str, until: str = "") -> tuple[str, str]:
-    deadline = f" Der Check-in endet um <strong>{until}</strong>." if until else ""
-    return f"Check-in offen: {tournament_title}", _wrap(
-        "Check-in ist offen",
-        f"<p>Der Check-in für <strong>{tournament_title}</strong> ist jetzt geöffnet.{deadline} Bitte bestätige deine Teilnahme rechtzeitig, sonst rückt die Warteliste nach.</p>",
-        "Jetzt einchecken", url,
+        f"<p>Leider hat die Turnierleitung deine Anmeldung für <strong>{tournament_title}</strong> abgelehnt.</p>"
+        + (f"<p><em>Grund: {html_lib.escape(reason)}</em></p>" if reason else ""),
+        "Zum Turnier" if url else None, url or None,
     )
 
 
@@ -239,7 +227,7 @@ def tpl_checkin_closes_soon(tournament_title: str, when: str, url: str) -> tuple
 
 
 def _station_hint(station: str = "") -> str:
-    return f"<p>Station: <strong>{station}</strong></p>" if station else ""
+    return f"<p>Station: <strong>{html_lib.escape(station)}</strong></p>" if station else ""
 
 
 def tpl_match_reminder(tournament_title: str, opponent: str, when: str, url: str, station: str = "") -> tuple[str, str]:
@@ -286,54 +274,17 @@ def tpl_dispute_resolved(tournament_title: str, decision: str, url: str) -> tupl
 def tpl_tournament_finished(tournament_title: str, url: str) -> tuple[str, str]:
     return f"Turnier beendet: {tournament_title}", _wrap(
         "Das Turnier ist zu Ende",
-        f"<p>Herzlichen Glückwunsch an alle Teilnehmer. Das Turnier <strong>{tournament_title}</strong> ist offiziell beendet. Die finalen Ergebnisse sind jetzt online.</p>",
+        f"<p>Danke fürs Mitspielen! Das Turnier <strong>{tournament_title}</strong> ist beendet. Platzierungen und Ergebnisse stehen auf der Turnierseite.</p>",
         "Ergebnisse ansehen", url,
     )
 
 
-# ---------- Phase 8: Match-Reminder (mit Lead-Time) ----------
-def tpl_match_lead_24h(tournament_title: str, opponent: str, when: str, url: str, station: str = "") -> tuple[str, str]:
-    return f"In 24h: {tournament_title}", _wrap(
-        "Match in 24 Stunden",
-        f"<p>Morgen um <strong>{when}</strong> startet dein nächstes Match im Turnier <strong>{tournament_title}</strong> gegen <strong>{opponent}</strong>.</p>"
-        + _station_hint(station)
-        + "<p>Plane deinen Tag, lade dein Setup und sei rechtzeitig bereit.</p>",
-        "Zum Match Hub", url,
-    )
-
-
-def tpl_match_lead_2h(tournament_title: str, opponent: str, when: str, url: str, station: str = "") -> tuple[str, str]:
-    return f"In 2h: {tournament_title}", _wrap(
-        "Match in 2 Stunden",
-        f"<p>In <strong>2 Stunden</strong> ist dein Match im Turnier <strong>{tournament_title}</strong> gegen <strong>{opponent}</strong>. Startzeit: <strong>{when}</strong>.</p>"
-        + _station_hint(station),
-        "Zum Match Hub", url,
-    )
-
-
-def tpl_match_lead_30m(tournament_title: str, opponent: str, when: str, url: str, station: str = "") -> tuple[str, str]:
-    return f"In 30 Minuten: {tournament_title}", _wrap(
-        "Match in 30 Minuten",
-        f"<p>Achtung Löwe — dein Match gegen <strong>{opponent}</strong> startet in <strong>30 Minuten</strong> ({when}).</p>"
-        + _station_hint(station)
-        + "<p>Letzter Check: Setup, Verbindung, Voice-Chat.</p>",
-        "Match öffnen", url,
-    )
-
-
+# Erinnerung vor dem Spiel: nur noch 10 Minuten vorher (#1133) - die Vorlauf-Mails 24 Stunden, 2 Stunden, 30 und 5 Minuten
+# vorher sind weggefallen; dafür gibt es Push und die Nachricht in App und Website.
 def tpl_match_lead_10m(tournament_title: str, opponent: str, when: str, url: str, station: str = "") -> tuple[str, str]:
     return f"Jetzt gleich: {tournament_title}", _wrap(
         "Match startet in 10 Minuten",
-        f"<p>Dein Match gegen <strong>{opponent}</strong> ({tournament_title}) startet in <strong>10 Minuten</strong>. Sei bereit!</p>"
-        + _station_hint(station),
-        "Match öffnen", url,
-    )
-
-
-def tpl_match_lead_5m(tournament_title: str, opponent: str, when: str, url: str, station: str = "") -> tuple[str, str]:
-    return f"In 5 Minuten: {tournament_title}", _wrap(
-        "Match startet in 5 Minuten",
-        f"<p>Dein Match gegen <strong>{opponent}</strong> startet um <strong>{when}</strong>. Bitte jetzt bereit machen.</p>"
+        f"<p>Dein Match gegen <strong>{html_lib.escape(opponent)}</strong> ({tournament_title}) startet in <strong>10 Minuten</strong>. Sei bereit!</p>"
         + _station_hint(station),
         "Match öffnen", url,
     )
@@ -593,8 +544,6 @@ async def send_template(
         "registration_received": tpl_registration_received,
         "registration_approved": tpl_registration_approved,
         "registration_rejected": tpl_registration_rejected,
-        "checkin_opens_soon": tpl_checkin_opens_soon,
-        "checkin_reminder": tpl_checkin_reminder,
         "checkin_closes_soon": tpl_checkin_closes_soon,
         "match_reminder": tpl_match_reminder,
         "score_reported": tpl_score_reported,
@@ -602,11 +551,7 @@ async def send_template(
         "dispute_resolved": tpl_dispute_resolved,
         "tournament_finished": tpl_tournament_finished,
         "test": tpl_test,
-        "match_lead_24h": tpl_match_lead_24h,
-        "match_lead_2h": tpl_match_lead_2h,
-        "match_lead_30m": tpl_match_lead_30m,
         "match_lead_10m": tpl_match_lead_10m,
-        "match_lead_5m": tpl_match_lead_5m,
         "prize_ready": tpl_prize_ready,
         "prize_picked_up": tpl_prize_picked_up,
         "prize_expired": tpl_prize_expired,

@@ -1,9 +1,11 @@
-"""Operational tournament reminder jobs.
+"""Check-in-Erinnerungen rund um das Check-in-Fenster eines Turniers.
 
-Queues check-in mails around the configured check-in window:
-- 10 minutes before check-in opens
-- when check-in opens
-- 10 minutes before check-in closes for users still not checked in
+- 10 Minuten bevor der Check-in öffnet und wenn er öffnet: Postfach und Push,
+- 10 Minuten bevor er schließt, für alle noch nicht Eingecheckten: Postfach, Push und - wenn erlaubt - die Mail
+  „Check-in endet bald“.
+
+Die Mails „Check-in öffnet bald“ und „Check-in offen“ sind weggefallen (Entscheidung zu #1133): dafür gibt es Push
+und die Nachricht in App und Website.
 """
 from __future__ import annotations
 
@@ -23,7 +25,7 @@ logger = logging.getLogger("tls.tournament_reminders")
 
 @dataclass(frozen=True)
 class ReminderSpec:
-    template_key: str
+    mail_template: str | None
     label: str
     field: str
     lead_minutes: int
@@ -31,11 +33,10 @@ class ReminderSpec:
 
 
 CHECKIN_REMINDERS = [
-    ReminderSpec("checkin_opens_soon", "opens_10m", "check_in_from", 10, 3),
-    ReminderSpec("checkin_reminder", "open_now", "check_in_from", 0, 3),
+    ReminderSpec(None, "opens_10m", "check_in_from", 10, 3),
+    ReminderSpec(None, "open_now", "check_in_from", 0, 3),
     ReminderSpec("checkin_closes_soon", "closes_10m", "check_in_until", 10, 3),
 ]
-EMAIL_CHECKIN_REMINDER_LABELS = {"closes_10m"}
 
 
 def _parse_dt(value: Any) -> datetime | None:
@@ -118,23 +119,16 @@ async def schedule_checkin_reminders(now: datetime | None = None) -> dict:
             target_iso = target.isoformat()
             for user in users:
                 dedupe_key = f"tournament_checkin:{tournament['id']}:{spec.label}:{target_iso}:{user['id']}"
-                kwargs = {
-                    "tournament_title": tournament.get("title") or "Turnier",
-                    "url": url,
-                    "dedupe_key": dedupe_key,
-                    "mail_meta": {
-                        "kind": "tournament_checkin",
-                        "tournament_id": tournament["id"],
-                        "user_id": user["id"],
-                        "reminder": spec.label,
-                    },
-                }
-                if spec.template_key == "checkin_reminder":
-                    kwargs["until"] = _format_de_time(tournament.get("check_in_until"))
-                else:
-                    kwargs["when"] = _format_de_time(target)
-                if spec.label in EMAIL_CHECKIN_REMINDER_LABELS:
-                    result = await send_user_template(user, spec.template_key, **kwargs)
+                if spec.mail_template:
+                    result = await send_user_template(
+                        user, spec.mail_template,
+                        tournament_title=tournament.get("title") or "Turnier",
+                        when=_format_de_time(target),
+                        url=url,
+                        dedupe_key=dedupe_key,
+                        mail_meta={"kind": "tournament_checkin", "tournament_id": tournament["id"], "user_id": user["id"],
+                                   "reminder": spec.label},
+                    )
                     if result.get("ok") and not result.get("skipped") and not result.get("deduped"):
                         queued += 1
                 existing_notification = await db.notifications.find_one(

@@ -31,14 +31,14 @@ def test_default_operational_mails_are_enabled():
     assert prefs["prize_updates"] is True
     assert prefs["birthday_greetings"] is True
     assert email_allowed(user, "match_lead_10m") is True
-    assert email_allowed(user, "match_lead_5m") is True
+    assert email_allowed(user, "score_reported") is True
     assert email_allowed(user, "checkin_closes_soon") is True
     assert email_allowed(user, "birthday_greeting") is True
 
 
 def test_user_can_disable_optional_match_mails():
     user = {"notification_preferences": {"match_reminders": False}}
-    assert email_allowed(user, "match_lead_30m") is False
+    assert email_allowed(user, "match_lead_10m") is False
     assert email_allowed(user, "password_reset") is True
 
 
@@ -73,7 +73,7 @@ def test_each_topic_can_be_disabled_per_channel():
             "in_app:news_events": True,
         },
     }
-    assert email_allowed(user, "match_lead_30m") is False
+    assert email_allowed(user, "match_lead_10m") is False
     assert push_allowed(user, "match_reminder") is True
     assert notification_allowed(user, "match_reminder") is False
     assert email_allowed(user, "newsletter_news", "news_events") is False

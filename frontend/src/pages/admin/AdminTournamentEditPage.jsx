@@ -185,8 +185,21 @@ export default function AdminTournamentEditPage() {
     }
   };
   const setRegStatus = async (rid, status) => {
+    // Absage mit Grund (#1133): die Person bekommt eine Nachricht - der Grund steht nur darin, nicht an der Anmeldung.
+    let reason = null;
+    if (status === "rejected") {
+      const answer = await prompt({
+        title: "Anmeldung ablehnen",
+        description: "Die Person bekommt eine Nachricht. Ein Grund ist freiwillig und steht nur in dieser Nachricht.",
+        placeholder: "z. B. Team nicht vollständig",
+        confirmLabel: "Ablehnen",
+        tone: "danger",
+      });
+      if (answer === false || answer === null || answer === undefined) return;
+      reason = String(answer).trim() || null;
+    }
     try {
-      const { data } = await api.patch(`/tournaments/${id}/registrations/${rid}`, { status });
+      const { data } = await api.patch(`/tournaments/${id}/registrations/${rid}`, reason ? { status, status_reason: reason } : { status });
       if (data?.auto_bracket_update?.preview === false && data.auto_bracket_update?.ok !== false) {
         await autoAssignStations({ silent: true, reload: false });
       }
