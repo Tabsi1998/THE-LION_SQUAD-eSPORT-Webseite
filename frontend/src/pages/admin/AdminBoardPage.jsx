@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { ChevronDown, Crown, Plus } from "lucide-react";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
 import { CLUB_ACCESS, boardSentence, clearSentence, postTitle } from "@/lib/boardRights";
+import { isDeputyPosition } from "@/lib/boardSeats";
 
 // Vorstand (#1355): Posten als Liste mit „Besetzen“ bzw. „Ändern“. Besetzt wird über die Personensuche, nur mit
 // Vereinsmitgliedern; vorher sagt ein Satz, welche Rechte der Posten bringt, und eine Rückfrage bestätigt es. Führt
@@ -142,7 +143,7 @@ export default function AdminBoardPage() {
                   <span className="font-bold">{p.display_title}</span>
                   <span className="text-white/70">{p.user ? p.user.display_name : p.name_withheld ? "Name nicht freigegeben" : "unbesetzt"}</span>
                   {p.represents && <span className="text-[10px] uppercase tracking-widest text-[#FFD700]">vertritt nach außen</span>}
-                  {p.vacant ? <VacancyTextField slug={p.slug} value={p.vacancy_text || ""} onSaved={load} /> : null}
+                  {p.vacant && !isDeputyPosition(p) ? <VacancyTextField slug={p.slug} value={p.vacancy_text || ""} onSaved={load} /> : null}
                 </li>
               ))}
             </ul>
@@ -216,11 +217,10 @@ export default function AdminBoardPage() {
   );
 }
 
-// „Wir suchen …“ (#1252): ein Satz zum Aufwand je offener Funktion - auch für Funktionen aus Dolibarr.
-export function vacancyPayload(slug, vacancy, deputy, allowDeputy) {
-  const texts = { [slug]: vacancy || "" };
-  if (allowDeputy) texts[`${slug}-stv`] = deputy || "";
-  return { texts };
+// „Wir suchen …“ (#1252): ein Satz zum Aufwand je offener Funktion - auch für Funktionen aus Dolibarr. Offene
+// Stellvertretungen werden nicht gesucht und erscheinen gar nicht (Fabian, 08.10.2026) - dafür gibt es keinen Satz.
+export function vacancyPayload(slug, vacancy) {
+  return { texts: { [slug]: vacancy || "" } };
 }
 
 function VacancyTextField({ slug, value, onSaved }) {
@@ -297,7 +297,6 @@ function BoardForm({ position, onClose, onSaved }) {
     slug: position?.slug || "",
   });
   const [vacancy, setVacancy] = useState(position?.vacancy_text || "");
-  const [deputyVacancy, setDeputyVacancy] = useState(position?.deputy_vacancy_text || "");
   const [saving, setSaving] = useState(false);
 
   const save = async (e) => {
@@ -306,7 +305,7 @@ function BoardForm({ position, onClose, onSaved }) {
     try {
       const { data } = isNew ? await api.post("/board", form) : await api.patch(`/board/${position.id}`, form);
       const slug = data?.slug || position?.slug;
-      if (slug) await api.put("/board/vacancy-texts", vacancyPayload(slug, vacancy, deputyVacancy, form.allow_deputy));
+      if (slug) await api.put("/board/vacancy-texts", vacancyPayload(slug, vacancy));
       toast.success("Gespeichert");
       onSaved();
       onClose();
@@ -321,7 +320,6 @@ function BoardForm({ position, onClose, onSaved }) {
       <TextField label="Bezeichnung (weiblich, optional)" value={form.title_female || ""} onChange={(v) => setForm({ ...form, title_female: v })} testId="board-title-f" />
       <TextAreaField label="Beschreibung (optional)" value={form.description || ""} onChange={(v) => setForm({ ...form, description: v })} testId="board-desc" />
       <TextField label="Wenn offen: ein Satz zum Aufwand (für „Wir suchen …“)" value={vacancy} onChange={setVacancy} maxLength={300} testId="board-vacancy" placeholder="Zwei Stunden im Monat, Einschulung inklusive." />
-      {form.allow_deputy && <TextField label="Stellvertretung offen: ein Satz zum Aufwand" value={deputyVacancy} onChange={setDeputyVacancy} maxLength={300} testId="board-deputy-vacancy" />}
       <FormGrid>
         <CheckField label="Vertretung erlaubt" checked={form.allow_deputy} onChange={(v) => setForm({ ...form, allow_deputy: v })} testId="board-allow-deputy" accent="#FFD700" />
         <CheckField label="Aktiv" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} testId="board-active" accent="#FFD700" />
