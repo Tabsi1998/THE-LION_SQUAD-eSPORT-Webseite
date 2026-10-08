@@ -150,6 +150,8 @@ TEMPLATE_CATEGORY = {
 NOTIFICATION_KIND_CATEGORY = {
     "match_reminder": "match_reminders",
     "match_station": "match_reminders",
+    # Aufruf beim Reservieren der Station (#1137): „Du bist dran“.
+    "match_call": "match_reminders",
     "match_result": "match_reminders",
     # Team am Spieltag (#1192): „Bist du schon da?“ vom Kapitän - wie eine Spiel-Erinnerung.
     "team_presence_nudge": "match_reminders",

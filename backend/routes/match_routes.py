@@ -38,6 +38,8 @@ from services import word_filter
 from services.station_labels import attach_station_info
 from match_rules import match_allows_draw
 from services.match_audience import acting_registration, player_user_ids
+# Solange ein Spiel einen dieser Zustände hat, darf ein Aufruf (#1122) stehen bleiben.
+from services.match_calls import CALL_OPEN_STATUSES, call_view
 from services.match_disputes import CLOSED_DETAIL as DISPUTE_CLOSED_DETAIL, dispute_window
 from services.match_notifications import notify_dispute_opened, notify_report_conflict, notify_result_reported, results_summary
 from services.tournament_rules import match_policy, players_can_report, schedule_proposals_enabled
@@ -62,8 +64,6 @@ router = APIRouter(prefix="/api/matches", tags=["matches"])
 logger = logging.getLogger("tls.match")
 # Turnierleitung über alle Turniere; Helfer nur über ihren Einsatz (has_tournament_staff_permission).
 STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
-# Solange ein Spiel einen dieser Zustände hat, darf ein Aufruf (#1122) stehen bleiben.
-CALL_OPEN_STATUSES = {"pending", "preview", "ready", "scheduled"}
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 STAFF_MENTION_HANDLES = {"leitung", "turnierleitung", "orga", "organizer", "staff", "admin", "referee", "schiri", "scorekeeper"}
 USER_PUBLIC_PROJECTION = {
@@ -551,6 +551,8 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     # Dispute (#1134): jeder Teilnehmer in jedem Modus - vor dem Ergebnis immer, danach bis 30 Minuten nach dem
     # Ergebnis oder bis das nächste Spiel des Siegers beginnt. Website und App zeigen genau das.
     window = await dispute_window(db, match) if acting_reg else {"open": False, "until": None}
+    # Aufruf (#1137): aufgerufen um, antreten bis, Station - für den Countdown auf der Matchseite (wie am TV).
+    call = await call_view(db, match)
     if not await _sees_internal(match, user):
         viewer_id = (user or {}).get("id")
         match = public_match_view(match, viewer_id)
@@ -574,6 +576,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "can_dispute": bool(acting_reg and window["open"]),
         "dispute_until": window["until"],
         "in_dispute": str(match.get("status") or "") == "disputed",
+        "call": call,
         "can_forfeit": await _can_forfeit_match(match, user),
         "event_mode": policy["event_mode"],
         "result_entry_mode": policy["result_entry_mode"],

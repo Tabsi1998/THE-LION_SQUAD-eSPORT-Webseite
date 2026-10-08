@@ -10,6 +10,7 @@ from services.tournament_permissions import (
     is_global_tournament_admin,
     require_tournament_staff_permission,
 )
+from services.match_calls import notify_match_called
 from services.station_runtime import notify_match_started
 from services.competition_read import find_match_source, load_competition_read_model
 
@@ -220,6 +221,13 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
             await status_written(db, match["tournament_id"], before.get("status"))
         started_match = {**match, **match_updates}
         await notify_match_started(db, started_match, station, collection_name)
+    else:
+        # Der Aufruf (#1137): „Du bist dran“ an alle Spieler des Spiels - einmal je Aufruf; dieselbe Reservierung noch
+        # einmal gespeichert behält „aufgerufen um“ und schickt nichts Neues.
+        try:
+            await notify_match_called(db, {**match, **match_updates}, station, match_updates["called_at"])
+        except Exception:  # noqa: BLE001 - eine Nachricht hält keine Reservierung auf
+            pass
 
 
 @router.post("/bulk")

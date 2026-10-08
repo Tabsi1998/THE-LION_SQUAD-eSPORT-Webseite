@@ -22,6 +22,7 @@ import { finishedMatchText, formatMatchKind, formatMatchStatus, isByeSlot, isMat
 import { matchIsOver } from "@/lib/afterEnd";
 import { rankingMode } from "@/lib/matchReport";
 import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
+import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 
 const scheduleLabels = {
   proposed: "Terminvorschlag offen",
@@ -350,6 +351,8 @@ export default function MatchPage() {
             </div>
           )}
         </div>
+
+        {data.call && <MatchCallBox call={data.call} />}
 
         {actionError && <div className="mt-5"><AuthFormAlert id="match-action-error">{actionError}</AuthFormAlert></div>}
 

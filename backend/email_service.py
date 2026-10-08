@@ -241,11 +241,13 @@ def _station_hint(station: str = "") -> str:
 
 
 def tpl_match_reminder(tournament_title: str, opponent: str, when: str, url: str, station: str = "") -> tuple[str, str]:
-    return f"Match startet bald: {tournament_title}", _wrap(
-        "Dein Match startet bald",
-        f"<p>Dein nächstes Match im Turnier <strong>{tournament_title}</strong> gegen <strong>{opponent}</strong> startet um <strong>{when}</strong>.</p>"
-        + _station_hint(station),
-        "Zum Match Hub", url,
+    # Geht raus, wenn die Turnierleitung das Spiel an der Station startet (#1137) - es geht also jetzt los.
+    return f"Match startet jetzt: {tournament_title}", _wrap(
+        "Dein Match startet jetzt",
+        f"<p>Dein Match im Turnier <strong>{tournament_title}</strong> ({html_lib.escape(opponent)}) startet jetzt.</p>"
+        + _station_hint(station)
+        + f"<p>Gestartet: {when}</p>",
+        "Zum Match", url,
     )
 
 

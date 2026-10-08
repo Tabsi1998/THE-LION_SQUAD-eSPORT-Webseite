@@ -142,3 +142,18 @@ test("in Klärung: der Hinweis steht oben, ohne Recht kein Dispute-Feld", async 
   await waitFor(() => expect(screen.getByTestId("match-in-dispute")).toBeTruthy());
   expect(screen.queryByTestId("match-dispute")).toBeNull();
 });
+
+// Aufruf (#1137): Station reserviert - die Matchseite zeigt, wohin es geht und wie lange noch (wie am TV).
+test("aufgerufen: Station und Countdown bis „antreten bis“", async () => {
+  jest.useFakeTimers({ now: new Date("2026-10-10T12:30:00Z"), doNotFake: ["nextTick", "setImmediate"] });
+  try {
+    answer({ ...PAGE, call: { called_at: "2026-10-10T12:29:00Z", report_by: "2026-10-10T12:31:30Z", station_text: "Station 3 · Switch 2" } });
+    await render(<MatchDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("match-call")).toBeTruthy());
+    expect(screen.getByTestId("match-call-station")).toHaveTextContent("Bitte jetzt zu Station 3 · Switch 2");
+    expect(screen.getByText("Antreten bis 14:31")).toBeTruthy();
+    expect(screen.getByTestId("match-call-countdown")).toHaveTextContent("noch1:30");
+  } finally {
+    jest.useRealTimers();
+  }
+});

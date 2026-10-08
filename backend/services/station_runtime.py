@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from models import now_utc
 from services.match_audience import match_player_users
+from services.station_labels import station_text
 from services.notification_preferences import send_user_template
 from services.user_notifications import build_public_url, create_user_notification
 
@@ -69,7 +70,8 @@ async def notify_match_started(db, match: dict, station: dict, collection_name: 
     ) or {}
     path = f"/matches/{match.get('id')}"
     absolute_url = await build_public_url(path)
-    station_name = station_label(station)
+    # Die Station im Klartext („Station 3 · Switch 2“, #1220) - nie die internen Notizen der Station.
+    station_name = station_text(station.get("name") or station.get("label"), station.get("device_type")) or "der Station"
     match_name = await match_label(db, match)
     when = format_de_datetime(match.get("started_at") or match.get("scheduled_at"))
     sent = 0

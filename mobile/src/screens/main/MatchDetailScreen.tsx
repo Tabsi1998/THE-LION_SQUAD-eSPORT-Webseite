@@ -34,6 +34,8 @@ import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmen
 import { MessageSticker, StickerButton, StickerPicker } from "../../components/ChatStickers";
 import { MatchReportCard, type ReportPayload, type ReportState } from "../../components/MatchReportCard";
 import { rankingMode } from "../../lib/matchReport";
+import { countdown, type MatchCall } from "../../lib/matchCall";
+import { asInstant, viennaTime } from "../../lib/vienna";
 import type { CatalogSticker } from "../../lib/stickers";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 
@@ -63,6 +65,7 @@ type MatchPage = {
   acting_registration_id?: string | null;
   allows_draw?: boolean;
   can_act?: boolean;
+  call?: MatchCall;
   can_dispute?: boolean;
   dispute_until?: string | null;
   in_dispute?: boolean;
@@ -463,6 +466,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           )) : <Muted>Noch keine Teilnehmer zugewiesen.</Muted>}
         </Card>
 
+        {page.call ? <MatchCallCard call={page.call} /> : null}
+
         {page.in_dispute ? (
           <View style={styles.disputeNotice} testID="match-in-dispute">
             <Ionicons name="alert-circle-outline" color={colors.live} size={20} />
@@ -617,6 +622,37 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
+  );
+}
+
+// Aufruf (#1137): wohin und wie lange noch - derselbe Countdown wie am TV; das Ende rechnet der Server.
+function MatchCallCard({ call }: { call: NonNullable<MatchCall> }) {
+  const dueAt = call.report_by ? asInstant(call.report_by).getTime() : null;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (dueAt === null) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [dueAt]);
+  const left = countdown(dueAt, now);
+  return (
+    <View style={styles.callCard} accessibilityRole="alert" testID="match-call">
+      <View style={styles.flex}>
+        <Muted style={styles.callEyebrow}>Aufgerufen</Muted>
+        <Heading testID="match-call-station">Bitte jetzt zu {call.station_text || "deiner Station"}</Heading>
+        {call.report_by ? <Muted>Antreten bis {viennaTime(call.report_by, { hour: "2-digit", minute: "2-digit" })}</Muted> : null}
+      </View>
+      {left.seconds !== null ? (
+        <View style={styles.callClock} testID="match-call-countdown">
+          {left.done ? <Body style={styles.callGo}>Jetzt geht es los</Body> : (
+            <>
+              <Muted>noch</Muted>
+              <Title style={styles.callTime}>{left.text}</Title>
+            </>
+          )}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -836,6 +872,32 @@ const styles = StyleSheet.create({
   },
   error: {
     color: colors.live,
+  },
+  callCard: {
+    alignItems: "center",
+    backgroundColor: "rgba(240,180,41,0.12)",
+    borderColor: "rgba(240,180,41,0.5)",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+  },
+  callClock: {
+    alignItems: "flex-end",
+  },
+  callEyebrow: {
+    color: colors.gold,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
+  callGo: {
+    color: colors.gold,
+    fontWeight: "900",
+  },
+  callTime: {
+    fontVariant: ["tabular-nums"],
   },
   disputeNotice: {
     alignItems: "center",
