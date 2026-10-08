@@ -2,6 +2,7 @@ import React from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
 import { colors, radius } from "../theme";
 import { PRESS_SCALE } from "../lib/motion";
+import { useRoomProbe } from "../seasons/useRoom";
 
 export function Button({
   label,
@@ -16,8 +17,11 @@ export function Button({
   disabled?: boolean;
   testID?: string;
 }) {
+  // Knöpfe melden sich für die Platzprüfung der Saison-Deko (#1295): nichts hängt oder sitzt über ihnen.
+  const probe = useRoomProbe("control");
   return (
     <Pressable
+      ref={probe?.ref}
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}

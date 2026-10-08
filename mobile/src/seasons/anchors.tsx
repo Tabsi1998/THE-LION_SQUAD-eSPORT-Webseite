@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { NavigationRouteContext } from "@react-navigation/native";
 import { FlyingBatShape, HangingBatShape, SHAPE_HEIGHT, SittingBatShape } from "./batArt";
@@ -14,6 +14,8 @@ import { CornerWeb } from "./cornerWeb";
 import { HuntEggView, useEggTumbles } from "./easterHunt/HuntEgg";
 import { useHuntSpots } from "./easterHunt/store";
 import { anyOverlayOpen, setOverlay, setQuietZone, subscribeQuiet } from "./quiet";
+import { batBox, forgetBlocked, type RoomRect } from "./room";
+import { useRoomCheck } from "./useRoom";
 import { useCardLift } from "./useCardLift";
 
 // Anker in der App (A1, #715): eine Karte, die einen Platz anbietet, legt `SeasonPerch` als unsichtbare Ebene über
@@ -26,6 +28,8 @@ import { useCardLift } from "./useCardLift";
 // flattert kurz auf und landet wieder, ein Ei der Suche purzelt hervor - nur an genau dieser Karte. Variante B
 // (#1091-#1094): an einigen Karten hängt dazu Deko der laufenden Saison (cardDeco.tsx) - Lichterkette, Osterei,
 // Luftschlange, Wimpelkette - und reagiert genauso nur hier.
+// Platz (#1295): jede Deko prüft nach dem Zuteilen ihren Kasten (room.ts) - über Überschriften, Augenbrauen, Text,
+// Knöpfen oder einer fremden Karte bleibt sie unsichtbar, und die Saison wählt eine andere Ecke oder Karte.
 
 /** Der Name des Screens, auf dem die Komponente liegt - ohne Navigation „Dashboard“. */
 export function useRouteNameSafe(): string {
@@ -95,7 +99,7 @@ function measurePerch(perchId: string, fallback: () => Promise<PerchRect | null>
  * Suche (#647). `id` muss je Screen eindeutig und über Renders stabil sein (Karten-ID, nicht Index). `clip`: die
  * Karte schneidet ab, was über ihren Rand ragt - Eier liegen dann innen in der Ecke, Fledermäuse gar nicht.
  */
-export function SeasonPerch({ id, kind = "card", timeScale = 1, clip = false }: { id: string; kind?: PerchKind; timeScale?: number; clip?: boolean }) {
+export function SeasonPerch({ id, kind = "card", timeScale = 1, clip = false, bottomControl = false }: { id: string; kind?: PerchKind; timeScale?: number; clip?: boolean; bottomControl?: boolean }) {
   const screen = useRouteNameSafe();
   const ref = useRef<View>(null);
   const [assignment, setAssignment] = useState<PerchAssignment | null>(() => perchSnapshot().assignments[id] || null);
@@ -112,7 +116,7 @@ export function SeasonPerch({ id, kind = "card", timeScale = 1, clip = false }: 
       setDeco(state.deco[id] || null);
     });
     const stopQuiet = subscribeQuiet((state) => setCovered(state.overlays.length > 0));
-    registerPerch({ id, screen, kind, clip, measure: () => measureNode(ref.current) });
+    registerPerch({ id, screen, kind, clip, bottomControl, measure: () => measureNode(ref.current) });
     setAssignment(perchSnapshot().assignments[id] || null);
     setWeb(perchSnapshot().webs[id] || null);
     setDeco(perchSnapshot().deco[id] || null);
@@ -120,8 +124,9 @@ export function SeasonPerch({ id, kind = "card", timeScale = 1, clip = false }: 
       stop();
       stopQuiet();
       unregisterPerch(id);
+      forgetBlocked(id);
     };
-  }, [id, screen, kind, clip]);
+  }, [id, screen, kind, clip, bottomControl]);
   return (
     <View ref={ref} collapsable={false} pointerEvents="box-none" style={StyleSheet.absoluteFill} testID={`season-perch-${id}`}>
       {deco && !covered ? <CardDeco perchId={id} deco={deco} /> : null}
@@ -155,6 +160,10 @@ export function PerchBat({ perchId, screen, assignment, measure, landed = false,
   const size = assignment.size;
   const shapeHeight = size * (sitting ? SHAPE_HEIGHT.sit : SHAPE_HEIGHT.hang);
   const temperament = (assignment.temperament || "sleepy") as Temperament;
+  // Platz (#1295): sitzend über der Ecke, hängend unter der Kante - liegt dort Schrift (etwa „VOM VEREIN“ über der Karte)
+  // oder eine andere Karte, bleibt sie unsichtbar und zieht an eine freie Ecke oder Karte.
+  const boxes = useCallback((card: RoomRect) => [batBox(card, assignment.corner, size, shapeHeight)], [assignment.corner, size, shapeHeight]);
+  const roomy = useRoomCheck(perchId, `bat:${assignment.corner}`, boxes, () => clearAssignment(perchId));
   // Landung: Einfedern, bei echter Landung nach einem Flug eine leichte Haptik.
   useEffect(() => {
     settle.setValue(0);
@@ -262,8 +271,8 @@ export function PerchBat({ perchId, screen, assignment, measure, landed = false,
   const wingWidth = size * 1.7;
   const wingHeight = wingWidth * 0.55;
   return (
-    <Animated.View style={[styles.bat, position, { opacity: Animated.multiply(settleOpacity, liftOpacity), transform: [{ translateY: Animated.add(translateY, flutterY) }, { scale }, { rotate }] }]} testID={`season-perch-bat-${perchId}`} data-phase={phase} data-flutter={fluttering ? "1" : undefined}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Fledermaus verscheuchen" onPress={onPress} onTouchStart={() => claimCardTouch(perchId)} hitSlop={6} testID="halloween-bat-perched" accessibilityState={{ busy: phase === "takeoff" }} disabled={phase === "gone" || phase === "takeoff"}>
+    <Animated.View pointerEvents={roomy ? "auto" : "none"} style={[styles.bat, position, { opacity: roomy ? Animated.multiply(settleOpacity, liftOpacity) : 0, transform: [{ translateY: Animated.add(translateY, flutterY) }, { scale }, { rotate }] }]} testID={`season-perch-bat-${perchId}`} data-phase={phase} data-flutter={fluttering ? "1" : undefined} data-room={roomy ? "1" : "0"}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Fledermaus verscheuchen" onPress={onPress} onTouchStart={() => claimCardTouch(perchId)} hitSlop={6} testID="halloween-bat-perched" accessibilityState={{ busy: phase === "takeoff" }} disabled={!roomy || phase === "gone" || phase === "takeoff"}>
         <Animated.View style={{ opacity: folded }}>
           {sitting ? <SittingBatShape size={size} /> : <HangingBatShape size={size} />}
         </Animated.View>

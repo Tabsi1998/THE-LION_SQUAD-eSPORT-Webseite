@@ -13,7 +13,8 @@ import { CarnivalCorners, CarnivalGreeting, ConfettiSky, PartyHatTabIcon, PartyH
 import { ChristmasBackdrop, ChristmasCorners, ChristmasEdge, ChristmasGreeting } from "./christmas";
 import { EasterBackdrop, EasterCorners, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon } from "./easter";
 import { HuntStage, HuntWidget } from "./easterHunt";
-import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
+import { HalloweenBackdrop, HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
+import { setRoomProbe } from "./room";
 import { FireworksSky, NewYearGreeting, NewYearWidget } from "./newYear";
 import { NikolausGreeting, NikolausShelf, NikolausTabIcon, NikolausWidget } from "./nikolaus";
 import { SnowSky, SnowflakeWidget } from "./snow";
@@ -51,7 +52,8 @@ type SeasonModule = {
 };
 
 export const SEASON_MODULES: Record<string, SeasonModule> = {
-  halloween: { Corners: HalloweenCorners, Sky: HalloweenBats, Widget: HalloweenWidget, TabIcon: ({ size }) => <Pumpkin size={size + 4} face="grin" /> },
+  // Das große Netz liegt hinter dem Inhalt (Backdrop, #1295) - der Titel des Screens steht darüber.
+  halloween: { Corners: HalloweenCorners, Backdrop: HalloweenBackdrop, Sky: HalloweenBats, Widget: HalloweenWidget, TabIcon: ({ size }) => <Pumpkin size={size + 4} face="grin" /> },
   // Adventkranz (S6, W1, S11 #642): der Kranz im Dashboard-Kopf, derselbe wie neben dem Logo der Website.
   advent: { Widget: AdventWidget },
   // Adventkalender (#641, #852): sein eigener Screen unter „Mehr“ - und klein unter dem Kranz das Türchen des Tages.
@@ -85,6 +87,12 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   // das goldene Löwenei mit dem Stand im Dashboard-Kopf, der Korb unter „Mehr“.
   easter_hunt: { Corners: HuntStage, Widget: HuntWidget },
 };
+
+/**
+ * Saisonen, die Deko an Karten, Ecken oder Kanten hängen (#1295): solange eine läuft, melden sich Schrift, Knöpfe und
+ * Karten für die Platzprüfung (room.ts) - sonst kostet das nichts.
+ */
+export const ROOM_SEASONS = new Set(["halloween", "christmas", "club_birthday", "carnival", "easter", "easter_hunt"]);
 
 /** Saisonen mit eigenem Screen statt Deko-Modul: der Adventkalender (#641). */
 export const SCREEN_SEASONS = new Set(["advent_calendar"]);
@@ -122,6 +130,11 @@ export function SeasonStage() {
   const { reducedMotion, toast } = useSeason();
   const insets = useSafeAreaInsets();
   const screen = useCurrentScreen();
+  const probing = mounted.some(({ season }) => ROOM_SEASONS.has(season.key));
+  useEffect(() => {
+    setRoomProbe(probing);
+  }, [probing]);
+  useEffect(() => () => setRoomProbe(false), []);
   if (!mounted.length && !toast) return null;
   return (
     // box-none: die Buehne selbst nimmt keine Beruehrung, aber Fledermaeuse und Graeber der Saison duerfen (#665).

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { REST_MS, createRest } from "../cardLift";
+import { HANG_BAND } from "../room";
 import { easeDegrees } from "../frames";
 import { useScreenFocused } from "../screenFocus";
 import { useSeason } from "../SeasonProvider";
@@ -105,6 +106,7 @@ export function CardGarland({ perchId, year }: { perchId: string; year: number }
 }
 
 const styles = StyleSheet.create({
-  edge: { position: "absolute", left: 0, right: 0, bottom: 0, height: EDGE_GARLAND.band },
+  // An einer Karte (#1295): das Band beginnt 10 Punkte über der Unterkante und hängt über sie hinaus.
+  edge: { position: "absolute", left: 0, right: 0, bottom: HANG_BAND - EDGE_GARLAND.band, height: EDGE_GARLAND.band },
   pennant: { position: "absolute" },
 });

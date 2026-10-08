@@ -16,7 +16,7 @@ jest.mock("@react-navigation/native", () => ({
 const mockSeasonState: Record<string, unknown> = { reducedMotion: false, showToast: jest.fn(), toast: null };
 jest.mock("./SeasonProvider", () => ({ useSeason: () => mockSeasonState }));
 
-const { HalloweenCorners, screenLayout, setYearSalt } = require("./halloween");
+const { HalloweenBackdrop, HalloweenCorners, screenLayout, setYearSalt } = require("./halloween");
 const { capabilities } = require("./intensity");
 const { Card } = require("../components/Card");
 const { SeasonStage } = require("./SeasonStage");
@@ -33,10 +33,20 @@ setYearSalt("abnahme");
 const MOVING = ["halloween-bat-perched", "halloween-bat-hanging", "halloween-grave", /halloween-spider-/, "halloween-rappel", "halloween-crawler", "halloween-bat-flying"];
 const PASSIVE = ["halloween-fog", "halloween-corner-web"];
 
+// Das große Netz liegt hinter dem Inhalt (#1295, Backdrop), die Ecken-Ebene darüber - im Screen liegen beide zugleich.
+function HalloweenScreen(props: { season: never; screen: string }) {
+  return (
+    <>
+      <HalloweenBackdrop {...props} />
+      <HalloweenCorners {...props} />
+    </>
+  );
+}
+
 const halloween = {
   key: "halloween",
   label: "Halloween",
-  Corners: HalloweenCorners,
+  Corners: HalloweenScreen,
   Card,
   setScreen: (name: string) => {
     mockRoute.name = name;

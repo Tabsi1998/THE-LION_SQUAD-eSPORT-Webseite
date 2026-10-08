@@ -14,7 +14,7 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 const mockSeasonState: Record<string, unknown> = { reducedMotion: false, showToast: jest.fn(), toast: null };
 jest.mock("./SeasonProvider", () => ({ useSeason: () => mockSeasonState }));
 
-const { HalloweenWidget, HalloweenCorners, HalloweenBats, OrbWeb, RappelSpider, pumpkinCounts, screenLayout, setYearSalt, GHOST_COOLDOWN_MS } = require("./halloween");
+const { HalloweenWidget, HalloweenBackdrop, HalloweenCorners, HalloweenBats, OrbWeb, RappelSpider, pumpkinCounts, screenLayout, setYearSalt, GHOST_COOLDOWN_MS } = require("./halloween");
 // Festes Jahres-Salz (C4): die Anordnung je Screen hängt sonst vom Kalenderjahr ab.
 setYearSalt("abnahme");
 const { buildPlan, stepDurationMs, webRadius } = require("./webPlan");
@@ -138,7 +138,8 @@ test("Ecken: Netz immer, Spinne am Faden und Gräber nur mit Bewegung; dezent ze
   }) as string;
   expect(name).toBeTruthy();
   const layout = screenLayout(name, "normal");
-  await render(<HalloweenCorners season={season({ effective: "subtle" })} screen={name} />);
+  // Das große Netz liegt seit #1295 hinter dem Inhalt (Backdrop) - im Screen zusammen mit der Ecken-Ebene.
+  await render(<><HalloweenBackdrop season={season({ effective: "subtle" })} screen={name} /><HalloweenCorners season={season({ effective: "subtle" })} screen={name} /></>);
   expect(screen.getByTestId("halloween-corners")).toBeTruthy();
   expect(screen.getByTestId("halloween-web-built")).toBeTruthy();
   expect(screen.queryByTestId(`halloween-spider-${layout.spider.side}`)).toBeNull();
@@ -230,7 +231,7 @@ test("Bewegung reduzieren: keine Spinne, keine Fledermäuse, Netz gleich fertig"
   mockSeasonState.reducedMotion = true;
   const name = SCREENS.find((candidate) => screenLayout(candidate, "full").web.build && screenLayout(candidate, "full").hangingBats.length > 0) as string;
   const layout = screenLayout(name, "full");
-  await render(<HalloweenCorners season={season({ effective: "full" })} screen={name} />);
+  await render(<><HalloweenBackdrop season={season({ effective: "full" })} screen={name} /><HalloweenCorners season={season({ effective: "full" })} screen={name} /></>);
   expect(screen.queryByTestId(`halloween-spider-${layout.spider.side}`)).toBeNull();
   expect(screen.queryByTestId("halloween-web-building")).toBeNull();
   expect(screen.getByTestId("halloween-web-built")).toBeTruthy();

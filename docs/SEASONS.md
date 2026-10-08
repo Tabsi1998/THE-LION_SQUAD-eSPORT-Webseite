@@ -64,6 +64,16 @@ den Store, Flüge über `flights.ts`.
 **Kennzeichnen statt raten**: Eine neue Kachel oder Karte bekommt `data-season-anchor="card"` (Web) oder
 `perch` (App). Was nie Deko tragen darf, wird Ruhezone (Abschnitt 3).
 
+**Platzprüfung in der App (#1295)** (`room.ts`, `useRoom.ts`): Die App hat keine Sonde wie das Web, darum melden sich
+Schrift (`components/Text.tsx`, je Zeile über `onTextLayout`), Knöpfe (`Button`) und Karten (`Card`) selbst an - nur
+solange eine Saison mit Deko an Inhalt läuft (`ROOM_SEASONS` in `SeasonStage.tsx`, sonst kostet es nichts). Jede Deko
+an einer Karte prüft kurz nach dem Zuteilen ihren Kasten (`useRoomCheck`, bis dahin unsichtbar): Netz in der oberen
+Innenecke, Fledermaus über der Ecke oder unter der Kante, Kette und Wimpel im Band an der Unterkante, Ei und Luftschlange
+über der Oberkante. Liegt dort Schrift (Überschrift, Augenbraue, Gruppentitel über der Karte), ein Knopf oder eine
+fremde Karte, wird die Karte für diese Deko gesperrt (`markBlocked`), und die Saison nimmt die andere Ecke oder die
+nächste passende Karte. Endet eine Karte mit einem Knopf (`endsWithControl`: Knopf, Zeilen zum Antippen, Kacheln),
+hängt dort nie eine Kette oder ein Wimpel. Ohne Messung (Tests) gilt der Platz als frei - wie im Web ohne Sonde.
+
 ## 3. Ruhezonen und Bedienung (C2)
 
 Deko darf nie wichtiger sein als Bedienung. Zentral, nicht je Saison:
@@ -74,12 +84,15 @@ Deko darf nie wichtiger sein als Bedienung. Zentral, nicht je Saison:
   sofort aus: `data-yield="1"`), `watchOverlays` beobachtet die Seite. Brackets (`BracketTree`) und Formulare sind
   damit automatisch tabu.
 - **App** (`quiet.ts`): `setOverlay(id, open)` (Sheets, Modals, Sticker- und Anhangs-Auswahl, Registrierung),
-  `setQuietZone(id, rect)` über `useSeasonQuietZone(ref)`; `pointInQuiet`/`rectInQuiet` (8 px Rand).
+  `setQuietZone(id, rect)` über `useSeasonQuietZone(ref)`; `pointInQuiet`/`rectInQuiet` (8 px Rand). Schrift, Knöpfe
+  und Karten sperren zusätzlich über die Platzprüfung (Abschnitt 2, #1295). Das große Netz in der Ecke liegt seit #1295
+  hinter dem Inhalt (`HalloweenBackdrop` im `Screen`) - der Titel steht darüber; die Spinne in der Nabe bleibt über ein
+  Tippfeld der Bühne erreichbar, wenn die Nabe frei liegt.
 - **Zeiger**: Saisonebenen sind `pointer-events: none` bzw. `box-none`; nur ausdrücklich interaktive Figuren
   (Fledermaus, Spinne in der Nabe, Katze, Kürbis, Sammelobjekte) nehmen Klick oder Berührung.
 - **Stapel**: Die Bühne liegt unter Dialogen und Dropdowns des Projekts (Z-Index-Stack respektieren), nie darüber.
 - Tests: `quiet.test.js`, `perches.test.js`, `webCorners.test.js`, `anchors.test.js`; App `quiet.test.ts`,
-  `anchors.test.tsx`, `acceptance.test.tsx`.
+  `anchors.test.tsx`, `acceptance.test.tsx`, `room.test.ts`, `roomPlacement.test.tsx`.
 
 ## 4. Bewegungsbudget (C3)
 
@@ -436,10 +449,12 @@ App `cardDeco.tsx`):
 - Wie viele: so viele wie die Ecken der Seiten- bzw. Screen-Klasse (Web je Fensterhöhe, App je Screen), höchstens vier
   von zehn Karten, mindestens eine; „dezent“ eine; Handys (Web) und kleine Bildschirme (App) keine. Gewählt wird aus dem
   Seed (Saison, Jahr, Seite bzw. Screen) mit Abstand, nie zwei an einer Karte; wer schon Deko trägt, behält sie.
-- Wo: Lichterkette und Wimpel im unteren Innenabstand (das Band beginnt 16 px über der Unterkante, wie an der
-  Begrüßungskarte), Ei und Luftschlange auf der Oberkante (das Ende der Luftschlange hängt außen neben der Ecke). Nie über
-  Schrift, Bild oder Bedienung, nie über einer anderen Karte, nie über den Rand der Seite – das Web prüft mit der Sonde
-  (`boxFree`, `bandGaps`); unter geöffneten Dialogen weicht die Deko aus.
+- Wo: Lichterkette und Wimpel im unteren Innenabstand (im Web beginnt das Band 16 px über der Unterkante, wie an der
+  Begrüßungskarte; in der App seit #1295 10 Punkte darüber - unter den 14 Punkten Innenabstand der Karten, die Lämpchen
+  hängen über die Kante), Ei und Luftschlange auf der Oberkante (das Ende der Luftschlange hängt außen neben der Ecke).
+  Nie über Schrift, Bild oder Bedienung, nie über einer anderen Karte, nie über den Rand der Seite – das Web prüft mit der
+  Sonde (`boxFree`, `bandGaps`), die App mit der Platzprüfung (Abschnitt 2); unter geöffneten Dialogen weicht die Deko
+  aus. Nie unter einem Knopf oder in einer Zeile mit Knopf (#1295).
 - Ostern: keine Eier an Karten, solange die Eiersuche läuft; am Karfreitag rührt sich nichts.
 - Parität: dieselbe Rechnung in Web und App, Fingerabdrücke `3121181676` (Kette), `277106003` (Ei), `1678939084`
   (Luftschlange), `2695102931` (Wimpel). Die Keyframes im Web folgen denselben Stützstellen (die Vitest-Tests lesen das
