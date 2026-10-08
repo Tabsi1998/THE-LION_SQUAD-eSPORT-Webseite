@@ -91,4 +91,3 @@ TEAM = [
 
 GROUPS_B: list[dict] = [group for group, _tiers in FASTLAP + SEASON + TEAM]
 TIERS_B: list[dict] = [t for _group, tiers in FASTLAP + SEASON + TEAM for t in tiers]
-CONDITION_KEYS_B: tuple[str, ...] = tuple(sorted({group["condition_key"] for group in GROUPS_B}))

@@ -739,14 +739,13 @@ async def test_mastodon_registers_per_instance_and_bluesky_runs_par_with_dpop(fl
     session = await flow.db.platform_link_sessions.find_one({"platform": "bluesky"}, {"_id": 0})
     assert session["data"]["issuer"] == "https://auth.lionsquad-test.at" and session["data"]["dpop_nonce"] == "server-nonce-2"
     assert "BEGIN PRIVATE KEY" not in session["data"]["dpop_key"]   # verschlüsselt abgelegt
-    state = session["nonce"]
     signed = next(row for row in fake.calls if row[1] == "https://auth.lionsquad-test.at/oauth/par")[2]["state"]
     assert state_of(f"x?state={signed}") == signed
     flow.act_as(None)
     wrong_issuer = target(await flow.get(f"/api/platform-links/bluesky/callback?code=gut&iss=https://anderer.lionsquad-test.at&state={signed}"))
     assert wrong_issuer["link_error"] == "invalid"   # und die Sitzung ist verbraucht
     flow.act_as(paula)
-    start = (await flow.post("/api/me/platform-links/bluesky/start", json={"input": "paula.lionsquad-test.at"})).json()["url"]
+    await flow.post("/api/me/platform-links/bluesky/start", json={"input": "paula.lionsquad-test.at"})
     signed = next(row for row in reversed(fake.calls) if row[1] == "https://auth.lionsquad-test.at/oauth/par")[2]["state"]
     flow.act_as(None)
     landed = target(await flow.get(f"/api/platform-links/bluesky/callback?code=gut&iss=https://auth.lionsquad-test.at/&state={signed}"))

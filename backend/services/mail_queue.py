@@ -157,8 +157,6 @@ def _deliverability_sync(cfg: dict) -> dict:
     if envelope_domain != from_domain:
         env_spf = [r for r in _dns_txt(envelope_domain) if r.lower().startswith("v=spf1")]
         add(bool(env_spf), "SPF für Envelope-Domain", env_spf[0] if env_spf else f"Kein SPF TXT für {envelope_domain} gefunden.")
-    else:
-        env_spf = spf_records
 
     dmarc_records = [r for r in _dns_txt(f"_dmarc.{from_domain}") if r.lower().startswith("v=dmarc1")]
     add(bool(dmarc_records), "DMARC für From-Domain", dmarc_records[0] if dmarc_records else f"Kein DMARC TXT für _dmarc.{from_domain} gefunden.")

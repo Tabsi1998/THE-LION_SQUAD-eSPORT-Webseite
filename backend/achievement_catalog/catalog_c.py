@@ -134,4 +134,3 @@ PROFILE = [
 
 GROUPS_C: list[dict] = [group for group, _tiers in COMMUNITY + CREATOR + PROFILE]
 TIERS_C: list[dict] = [t for _group, tiers in COMMUNITY + CREATOR + PROFILE for t in tiers]
-CONDITION_KEYS_C: tuple[str, ...] = tuple(sorted({group["condition_key"] for group in GROUPS_C if group["condition_key"]}))

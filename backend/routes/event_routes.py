@@ -368,7 +368,6 @@ async def _apply_event_checkin_rewards(event: dict, registration: dict) -> None:
     user_id = registration.get("user_id")
     if not user_id:
         return
-    db = get_db()
     try:
         from services.season_service import award_points
 

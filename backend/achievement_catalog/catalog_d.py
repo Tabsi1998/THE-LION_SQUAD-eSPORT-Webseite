@@ -107,4 +107,3 @@ for _club_group, _club_tiers in CLUB:
 
 GROUPS_D: list[dict] = [group for group, _tiers in CLUB + SPECIAL + HIDDEN]
 TIERS_D: list[dict] = [t for _group, tiers in CLUB + SPECIAL + HIDDEN for t in tiers]
-CONDITION_KEYS_D: tuple[str, ...] = tuple(sorted({group["condition_key"] for group in GROUPS_D if group["condition_key"]}))

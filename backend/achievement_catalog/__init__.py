@@ -14,14 +14,14 @@ from .materials import (  # noqa: F401
     material_name, material_points, material_rank, tier,
 )
 from .migration_map import GROUP_MAPPING  # noqa: F401
-from .catalog_a import CONDITION_KEYS_A, GROUPS_A, REDEFINED, REPLACED, TIERS_A  # noqa: F401
-from .catalog_b import CONDITION_KEYS_B, GROUPS_B, TIERS_B  # noqa: F401
+from .catalog_a import GROUPS_A, REDEFINED, REPLACED, TIERS_A  # noqa: F401
+from .catalog_b import GROUPS_B, TIERS_B  # noqa: F401
 from .catalog_b import REDEFINED as REDEFINED_B, REPLACED as REPLACED_B  # noqa: F401
-from .catalog_c import CONDITION_KEYS_C, GROUPS_C, TIERS_C  # noqa: F401
+from .catalog_c import GROUPS_C, TIERS_C  # noqa: F401
 from .catalog_c import REDEFINED as REDEFINED_C, REPLACED as REPLACED_C  # noqa: F401
-from .catalog_d import CONDITION_KEYS_D, GROUPS_D, TIERS_D  # noqa: F401
+from .catalog_d import GROUPS_D, TIERS_D  # noqa: F401
 from .catalog_d import REDEFINED as REDEFINED_D, REPLACED as REPLACED_D  # noqa: F401
-from .catalog_e import CONDITION_KEYS_E, GROUPS_E, TIERS_E  # noqa: F401
+from .catalog_e import GROUPS_E, TIERS_E  # noqa: F401
 
 # Zähler aus services/achievement_counters.py (#616): alle live, die Prüfung verlangt bekannte Schlüssel.
 COUNTER_KEYS_V2 = (

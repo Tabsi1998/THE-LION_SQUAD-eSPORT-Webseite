@@ -527,8 +527,6 @@ async def list_public_users(
     users = await cursor.to_list(safe_limit)
     if not users:
         return {"items": [], "total": total, "limit": safe_limit, "offset": safe_offset} if paged else []
-    if not paged:
-        total = len(users)
     user_ids = [u["id"] for u in users]
     # Memberships for is_club_member flag
     memberships = {m["user_id"]: m for m in await db.memberships.find(
@@ -801,11 +799,6 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
             ch = chall_docs.get(entry["challenge_id"])
             if tr:
                 # Check if this user is currently P1 on this track
-                better = await db.f1_lap_times.count_documents({
-                    "track_id": tid, "is_invalid": {"$ne": True},
-                    "user_id": {"$ne": user_id},
-                })
-                # Count how many distinct users beat this time on this track
                 is_p1 = True
                 other_best = await db.f1_lap_times.find(
                     {"track_id": tid, "is_invalid": {"$ne": True}, "user_id": {"$ne": user_id}},

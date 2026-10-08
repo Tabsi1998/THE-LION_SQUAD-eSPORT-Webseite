@@ -302,22 +302,20 @@ async def fetch_live_streams() -> dict:
     return await record_poll("ok", checked=len(by_login), live=len(seen_logins))
 
 
-_running = False
+# Immer nur eine Abfrage zugleich: Läuft die vorige noch, kehrt der nächste Aufruf sofort zurück.
+_poll_lock = asyncio.Lock()
 
 
 async def twitch_poll_loop(interval_seconds: int = 60):
     """APScheduler-friendly entrypoint — call once, it self-throttles."""
-    global _running
-    if _running:
+    if _poll_lock.locked():
         return
-    _running = True
-    try:
-        await fetch_live_streams()
-    except Exception as e:
-        logger.warning("[twitch] poll failed: %s", e)
+    async with _poll_lock:
         try:
-            await record_poll("error", detail=type(e).__name__)
-        except Exception:  # noqa: BLE001 - die Datenbank selbst ist weg
-            pass
-    finally:
-        _running = False
+            await fetch_live_streams()
+        except Exception as e:
+            logger.warning("[twitch] poll failed: %s", e)
+            try:
+                await record_poll("error", detail=type(e).__name__)
+            except Exception:  # noqa: BLE001 - die Datenbank selbst ist weg
+                pass
