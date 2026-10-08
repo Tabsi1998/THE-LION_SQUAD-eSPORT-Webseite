@@ -65,6 +65,8 @@ async function readJson(response) {
 
 async function accessToken(account, { fetch = globalThis.fetch, now } = {}) {
   const body = new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: assertion(account, now) });
+  // Die Adresse für den Zugangstoken steht im JSON-Schlüssel des Dienstkontos („token_uri“, so liefert Google die
+  // Datei aus). Die Datei liegt nur beim Betreiber, außerhalb des Repos (#1408).
   const response = await fetch(account.tokenUri, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: body.toString() });
   const data = await readJson(response);
   if (!response.ok || !data.access_token) {
@@ -81,6 +83,8 @@ function client({ token, packageName, fetch = globalThis.fetch }) {
   async function call(method, url, { body, contentType = "application/json" } = {}) {
     const headers = { Authorization: `Bearer ${token}` };
     if (body !== undefined) headers["Content-Type"] = contentType;
+    // Hier gehen das App-Bundle und die R8-Zuordnung als Datei an die Play-API - dafür ist dieses Skript da. Paketname
+    // und Build-Nummer in der Adresse stammen aus app.json, die Versionshinweise aus dem CHANGELOG (#1408).
     const response = await fetch(url, { method, headers, body: body !== undefined && contentType === "application/json" ? JSON.stringify(body) : body });
     const data = await readJson(response);
     if (!response.ok) {

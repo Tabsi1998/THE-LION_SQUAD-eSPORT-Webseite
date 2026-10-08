@@ -51,9 +51,23 @@ function fail(message) {
   throw new ReleaseAbort(message);
 }
 
+// Ein Wert für die Windows-Befehlszeile: in Anführungszeichen, sobald Leerzeichen oder Sonderzeichen darin stehen.
+// Windows-Programme lesen \" als Anführungszeichen im Wert (#1408) - darum werden Backslashes direkt vor einem
+// Anführungszeichen und ganz am Ende verdoppelt. Alle anderen Backslashes bleiben, wie sie sind: Pfade ändern sich nicht.
 function quote(value) {
   const text = String(value);
-  return /[\s"&|<>^()]/.test(text) ? `"${text.replace(/"/g, '\\"')}"` : text;
+  if (!/[\s"&|<>^()]/.test(text)) return text;
+  return `"${text.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, "$1$1")}"`;
+}
+
+/** Der Inhalt einer Datei, "" wenn es sie nicht gibt - gleich gelesen statt vorher nachgesehen (#1408). */
+function readIfPresent(file) {
+  try {
+    return fs.readFileSync(file, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT" || error.code === "ENOTDIR") return "";
+    throw error;
+  }
 }
 
 /** Startet ein Programm. Unter Windows über die Shell, damit .cmd und .bat laufen. */
@@ -119,7 +133,8 @@ function loadConfig() {
     googleServices: inReleaseDir(pick("LIONSAPP_GOOGLE_SERVICES", "googleServicesFile", "google-services.json")),
     javaHome: pick("LIONSAPP_JAVA_HOME", "javaHome", process.env.JAVA_HOME || ""),
     androidHome: pick("LIONSAPP_ANDROID_HOME", "androidHome", process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || ""),
-    buildDir: path.resolve(pick("LIONSAPP_BUILD_DIR", "buildDir", isWindows ? "C:/lsb" : path.join(os.tmpdir(), "lionsapp-build"))),
+    // Ohne Windows ein eigener Ordner im Benutzerverzeichnis (#1408) - nicht im gemeinsamen Temp-Ordner des Rechners.
+    buildDir: path.resolve(pick("LIONSAPP_BUILD_DIR", "buildDir", isWindows ? "C:/lsb" : path.join(os.homedir(), ".lionsapp-build"))),
     // Update aus der App (#250): die APK nach dem Veröffentlichen an den Vereinsserver schicken.
     uploadUrl: String(pick("LIONSAPP_UPLOAD_URL", "uploadUrl", "")).replace(/\/+$/, ""),
     uploadToken: pick("LIONSAPP_UPLOAD_TOKEN", "uploadToken", ""),
@@ -148,6 +163,8 @@ async function uploadToServer({ config, apkPath, apk, version, versionCode, chan
   form.append("notes", notes);
   form.append("set_current", "true");
   try {
+    // Die APK geht als Datei an den Vereinsserver - dafür ist dieser Schritt da (#250). Adresse und Token stammen aus
+    // signing.json bzw. den Umgebungsvariablen des Betreibers (#1408).
     const response = await fetch(`${config.uploadUrl}/api/admin/app-releases`, {
       method: "POST",
       headers: { "X-Release-Token": config.uploadToken },
@@ -372,7 +389,7 @@ function prepareBuildTree(buildDir, head) {
   const buildMobile = path.join(buildDir, "mobile");
   const lockHash = crypto.createHash("sha256").update(fs.readFileSync(path.join(buildMobile, "package-lock.json"))).digest("hex");
   const stamp = path.join(buildMobile, "node_modules", ".lionsapp-lock-hash");
-  if (!fs.existsSync(stamp) || fs.readFileSync(stamp, "utf8").trim() !== lockHash) {
+  if (readIfPresent(stamp).trim() !== lockHash) {
     run("npm", ["ci"], { cwd: buildMobile });
     fs.writeFileSync(stamp, `${lockHash}\n`);
   }
@@ -548,7 +565,12 @@ async function main() {
   return uploaded;
 }
 
-main().catch((error) => {
-  console.error(error instanceof ReleaseAbort ? `\nAbgebrochen: ${error.message}` : error);
-  process.exitCode = 1;
-});
+module.exports = { quote, readIfPresent };
+
+// Gebaut und veröffentlicht wird nur beim Aufruf als Skript - die Tests laden die Datei, um einzelne Teile zu prüfen.
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error instanceof ReleaseAbort ? `\nAbgebrochen: ${error.message}` : error);
+    process.exitCode = 1;
+  });
+}
