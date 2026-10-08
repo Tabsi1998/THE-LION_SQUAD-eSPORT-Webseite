@@ -53,7 +53,8 @@ test("Vorsitz groß, Stellvertretungen klein, offene Funktionen als Einladung, n
   expect(within(core).getByTestId("board-position-kassier")).toHaveTextContent("KassierinMira Muster MiraMaus");
   expect(plain(within(core).getByTestId("board-vacancy-schriftfuehrer"))).toBe("Wir suchenSchriftführer/SchriftführerinZwei Stunden im Monat.Interesse melden");
   const deputies = screen.getByTestId("board-deputies");
-  expect(plain(within(deputies).getByTestId("board-vacancy-obmann-stv"))).toContain("Stellvertretung Obmann/ObfrauEinmal im Monat Sitzung.");
+  // Offene Stellvertretung wird nicht gesucht - sie erscheint gar nicht (08.10.2026).
+  expect(within(deputies).queryByTestId("board-vacancy-obmann-stv")).not.toBeInTheDocument();
   expect(within(deputies).getByTestId("board-position-kassier-stv")).toHaveTextContent("StellvertretungKassierinSina Muster SternNebel");
   expect(plain(screen.getByTestId("board-special"))).toContain("Jugendreferent:inName nicht freigegeben");
   expect(screen.queryByTestId("board-vacancy-jugend")).not.toBeInTheDocument();
@@ -101,6 +102,17 @@ test("noch keine Fassung in Kraft: ehrlicher Satz statt leerem Kasten", async ()
   expect(screen.getByTestId("board-statutes-archive")).toHaveTextContent("Fassung 3 gilt ab 01.01.2027");
 });
 
+test("Funktionen aus Dolibarr: besetzte Stellvertretung bei den Stellvertretungen, offene gar nicht", () => {
+  const fromDolibarr = [
+    { id: "d1", slug: "stellvertretung-obmann", neutral_title: "Stellvertretung Obmann", display_title: "Stellvertretung Obmann", user: { gamertag: "Nebelkatze", real_name: "Nora Beispiel" } },
+    { id: "d2", slug: "stellvertretung-kassier-in", neutral_title: "Stellvertretung Kassier:in", display_title: "Stellvertretung Kassier:in", user: null, vacancy_text: "Hilft beim Kassieren." },
+    { id: "d3", slug: "jugendreferent-in", neutral_title: "Jugendreferent:in", display_title: "Jugendreferent:in", user: null, vacancy_text: "Ein Abend im Monat." },
+  ];
+  const sections = boardSections(fromDolibarr);
+  expect(sections.deputies.map((seat) => [seat.slug, seat.vacant])).toEqual([["stellvertretung-obmann", false]]);
+  expect(sections.rest.map((seat) => [seat.slug, seat.vacant])).toEqual([["jugendreferent-in", true]]);
+});
+
 test("statuteLine, formatDay und die Abschnitte", () => {
   expect(formatDay("2026-04-20")).toBe("20.04.2026");
   expect(formatDay("")).toBe("");
@@ -108,7 +120,7 @@ test("statuteLine, formatDay und die Abschnitte", () => {
   expect(statuteLine(null)).toBe("");
   const sections = boardSections(BOARD);
   expect(sections.core.map((seat) => [seat.slug, seat.vacant])).toEqual([["obmann", false], ["kassier", false], ["schriftfuehrer", true]]);
-  expect(sections.deputies.map((seat) => [seat.slug, seat.vacant])).toEqual([["obmann-stv", true], ["kassier-stv", false]]);
+  expect(sections.deputies.map((seat) => [seat.slug, seat.vacant])).toEqual([["kassier-stv", false]]);
   expect(sections.rest.map((seat) => [seat.slug, seat.vacant, seat.withheld])).toEqual([["jugend", false, true]]);
   expect(boardSections("kaputt")).toEqual({ core: [], deputies: [], rest: [] });
 });

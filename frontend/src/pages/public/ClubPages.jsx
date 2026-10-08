@@ -17,24 +17,30 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { FileText } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
 import { statutesHref } from "@/lib/statutes";
+import { isDeputyPosition } from "@/lib/boardSeats";
 
 const CORE = ["obmann", "kassier", "schriftfuehrer"];
 
-/** Was auf „Vorstand“ steht: Vorsitz (groß), Stellvertretungen und weitere Funktionen (kleiner) - offene als Einladung. */
+/** Was auf „Vorstand“ steht: Vorsitz (groß), Stellvertretungen und weitere Funktionen (kleiner).
+ * Offene Funktionen erscheinen als Einladung („Wir suchen …“) - offene Stellvertretungen gar nicht (Fabian, 08.10.2026). */
 export function boardSections(positions) {
   const list = Array.isArray(positions) ? positions : [];
   const core = CORE.map((slug) => list.find((p) => p.slug === slug)).filter(Boolean);
   const rest = list.filter((p) => !CORE.includes(p.slug));
-  const deputies = core.filter((p) => p.allow_deputy).map((p) => ({
-    key: `${p.id}-stv`, slug: `${p.slug}-stv`, person: p.deputy_user || null, title: p.deputy_user ? (p.deputy_title || p.display_title) : (p.neutral_title || p.title_male),
-    label: "Stellvertretung", vacant: !p.deputy_user, text: p.deputy_vacancy_text || "",
-  }));
   const entry = (p) => ({
     key: p.id, slug: p.slug, person: p.user || null, title: p.user ? p.display_title : (p.neutral_title || p.display_title || p.title_male),
     label: "", withheld: Boolean(p.name_withheld), vacant: !p.user && !p.name_withheld, text: p.vacancy_text || "",
     since: p.since ? viennaDate(p.since, { month: "long", year: "numeric" }) : "",
   });
-  return { core: core.map(entry), deputies, rest: rest.map(entry) };
+  // Stellvertretung an Obmann, Kassier, Schriftführer („Vertretung erlaubt“) - nur, wenn jemand eingetragen ist.
+  const coreDeputies = core.filter((p) => p.allow_deputy && p.deputy_user).map((p) => ({
+    key: `${p.id}-stv`, slug: `${p.slug}-stv`, person: p.deputy_user, title: p.deputy_title || p.display_title,
+    label: "Stellvertretung", vacant: false, text: "",
+  }));
+  // Stellvertretungen als eigene Funktion (aus Dolibarr): besetzte zu den Stellvertretungen, offene fallen weg.
+  const deputyPositions = rest.filter((p) => isDeputyPosition(p) && (p.user || p.name_withheld)).map(entry);
+  const others = rest.filter((p) => !isDeputyPosition(p)).map(entry);
+  return { core: core.map(entry), deputies: [...coreDeputies, ...deputyPositions], rest: others };
 }
 
 function Seat({ seat, size }) {
