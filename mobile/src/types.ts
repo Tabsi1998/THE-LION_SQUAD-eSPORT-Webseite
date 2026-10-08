@@ -149,7 +149,6 @@ export type Team = {
   color?: string | null;
   members?: Array<{ id: string; name?: string; username?: string; display_name?: string; role?: string; avatar_url?: string | null; achievements?: string[] }>;
   squads?: TeamSquad[];
-  chat_preview?: Array<{ author: string; message: string; time: string }>;
 };
 
 export type TeamSquad = {

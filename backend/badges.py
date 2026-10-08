@@ -595,21 +595,23 @@ async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True
     if light:
         query["condition_key"] = {"$in": sorted(only_keys)}
     tiers = await db.achievements.find(query, {"_id": 0}).to_list(2000)
-    for t in tiers:
-        if t["code"] in earned_codes:
-            continue
-        if t.get("member_only") and not active_member:
-            continue
-        ck = t.get("condition_key")
-        target = t.get("progress_target") or 0
-        if not ck or not target:
-            continue
-        if only_keys is not None and ck not in only_keys:
-            continue
-        if counters.get(ck, 0) >= target:
-            ok = await award_achievement(user_id, t["code"], {"auto_progress": True, "current": counters.get(ck), "target": target})
-            if ok:
-                new_count += 1
+    # Mehrere Stufen auf einmal (#1296): eine Meldung „Level X erreicht“ mit dem erreichten Level, nicht eine je Aufstieg.
+    async with xp.collected_level_ups():
+        for t in tiers:
+            if t["code"] in earned_codes:
+                continue
+            if t.get("member_only") and not active_member:
+                continue
+            ck = t.get("condition_key")
+            target = t.get("progress_target") or 0
+            if not ck or not target:
+                continue
+            if only_keys is not None and ck not in only_keys:
+                continue
+            if counters.get(ck, 0) >= target:
+                ok = await award_achievement(user_id, t["code"], {"auto_progress": True, "current": counters.get(ck), "target": target})
+                if ok:
+                    new_count += 1
     return new_count
 
 

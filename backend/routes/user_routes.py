@@ -883,6 +883,10 @@ async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
     # Sprinter (#615): wann das Profil zum ersten Mal vollständig war.
     from services.member_activity import note_profile_completion
     await note_profile_completion(db, me["id"])
+    # Erfolge rund ums Profil (Vollständigkeit, Bild und Banner, Konten) prüft die Warteschlange gleich danach - der
+    # Lese-Abruf der Vollständigkeit vergibt seit #1296 nichts mehr.
+    from services.achievement_queue import request_evaluation
+    await request_evaluation([me["id"]], "profile_update", sources={"profile"})
     u = await db.users.find_one({"id": me["id"]}, PRIVATE_AUTH_FIELDS)
     await _attach_membership(u)
     return u

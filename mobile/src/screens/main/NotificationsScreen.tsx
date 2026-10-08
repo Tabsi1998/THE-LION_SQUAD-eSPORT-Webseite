@@ -8,6 +8,7 @@ import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { formatDateTime } from "../../lib/format";
+import { notificationKindLabel } from "../../lib/notificationKinds";
 import type { MoreStackParamList } from "../../navigation/types";
 import { useNotifications } from "../../notifications/NotificationContext";
 import { colors } from "../../theme";
@@ -95,7 +96,7 @@ export function NotificationsScreen({ navigation }: Props) {
               </View>
               {item.body ? <Body>{item.body}</Body> : null}
               <View style={styles.meta}>
-                {item.kind ? <Muted style={styles.kind}>{item.kind}</Muted> : null}
+                {item.kind ? <Muted style={styles.kind}>{notificationKindLabel(item.kind, item.meta)}</Muted> : null}
                 {item.created_at ? <Muted>{formatDateTime(item.created_at)}</Muted> : null}
                 <Muted style={styles.openHint}>Öffnen</Muted>
               </View>
@@ -232,10 +233,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
+  // Die Art in Worten, normal geschrieben (#1296).
   kind: {
     color: colors.cyan,
-    fontWeight: "900",
-    textTransform: "uppercase",
+    fontWeight: "800",
   },
   openHint: {
     color: colors.gold,

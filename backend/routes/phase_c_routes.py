@@ -38,8 +38,9 @@ async def my_profile_completeness(me: dict = Depends(get_current_user)):
         ok = (isinstance(v, list) and len(v) > 0) or (isinstance(v, bool)) or (v not in (None, "", 0))
         if not ok:
             missing.append(key)
-    # Trigger any auto-award on profile_completeness tier
-    await evaluate_user_progress(me["id"])
+    # Ein Abruf zum Lesen vergibt nichts (#1296): hier lief früher die ganze Auswertung - gleichzeitig geladene Erfolge
+    # zeigten dann kurz den alten Stand (Level 5 statt 9). Ausgewertet wird beim Speichern des Profils (Warteschlange),
+    # im Profil von App und Web vor dem Laden der Erfolge und alle 15 Minuten für alle, die gerade aktiv sind.
     return {"score": score, "missing": missing, "fields_total": len(PROFILE_FIELDS)}
 
 

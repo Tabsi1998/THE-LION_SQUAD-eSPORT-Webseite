@@ -413,7 +413,8 @@ function Tile({ icon, label, onPress, testID, note = "" }: { icon: keyof typeof 
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={note ? `${label}, ${note}` : label} testID={testID} style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
       <Ionicons name={icon} color={colors.gold} size={22} />
-      <Body style={styles.tileLabel} numberOfLines={1}>{label}</Body>
+      {/* Große Schrift (#1296): ein langes Wort wird kleiner statt „Mitgliedsch…“. */}
+      <Body style={styles.tileLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Body>
       {note ? <Muted style={styles.tileNote} testID={testID ? `${testID}-note` : undefined}>{note}</Muted> : null}
     </Pressable>
   );

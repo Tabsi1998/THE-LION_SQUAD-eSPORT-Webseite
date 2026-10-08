@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight, FileText, Gift, Receipt, ShieldAlert, UserCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -106,8 +106,18 @@ export function OwnAchievements() {
   const [achData, setAchData] = useState(null);
   const [completeness, setCompleteness] = useState(null);
   const [evaluating, setEvaluating] = useState(false);
+  const evaluated = useRef(false);
   const load = useCallback(async () => {
-    const [achievements, profileCompleteness] = await Promise.allSettled([api.get("/achievements/me"), api.get("/users/me/profile-completeness")]);
+    // Erst auswerten, dann die Erfolge laden (#1296, wie in der App): der Abruf der Vollständigkeit vergibt nichts mehr,
+    // sonst stand kurz der alte Stand da. Einmal je Öffnen; die Vollständigkeit lädt daneben.
+    const afterEvaluation = (async () => {
+      if (!evaluated.current) {
+        evaluated.current = true;
+        await api.post("/achievements/evaluate").catch(() => null);
+      }
+      return api.get("/achievements/me");
+    })();
+    const [achievements, profileCompleteness] = await Promise.allSettled([afterEvaluation, api.get("/users/me/profile-completeness")]);
     setAchData(achievements.status === "fulfilled" ? achievements.value.data : { groups: [], awards: [] });
     if (profileCompleteness.status === "fulfilled") setCompleteness(profileCompleteness.value.data);
   }, []);

@@ -88,9 +88,19 @@ function OwnProfile() {
   const scrollRef = useRef<ScrollView>(null);
   useTabScrollToTop(scrollRef);
 
+  const evaluatedRef = useRef(false);
   const load = useCallback(async () => {
+    // Erst auswerten, dann die Erfolge laden (#1296): nach dem Anmelden zeigten Kopf und Reiter „Erfolge“ kurz den alten
+    // Stand (Level 5 statt 9), weil die Auswertung gleichzeitig lief. Einmal je Öffnen, der Rest lädt daneben.
+    const achievementsAfterEvaluation = (async () => {
+      if (!evaluatedRef.current) {
+        evaluatedRef.current = true;
+        await api.post("/achievements/evaluate").catch(() => null);
+      }
+      return api.get<AchievementsMe>("/achievements/me");
+    })();
     const [achievementResult, completenessResult, referenceResult, awardResult, prizeResult, standingResult, invoiceResult, teamResult, documentResult] = await Promise.all([
-      api.get<AchievementsMe>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } as AchievementsMe })),
+      achievementsAfterEvaluation.catch(() => ({ data: { groups: [], awards: [] } as AchievementsMe })),
       api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
       api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: EMPTY_REFERENCES })),
       api.get<{ awards: Award[]; featured_award_id?: string | null }>("/me/awards").catch(() => ({ data: { awards: [] } })),

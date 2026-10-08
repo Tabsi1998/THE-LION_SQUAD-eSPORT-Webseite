@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { useReduceMotion } from "./FadeIn";
-import { formatStatus } from "../lib/format";
+import { formatStatus, upperDe } from "../lib/format";
 import { colors } from "../theme";
 import { Muted } from "./Text";
 
@@ -39,9 +39,10 @@ export function StatusBadge({
   const text = [statusLabel, prefix && `${prefix} ${remaining}`].filter(Boolean).join(" · ");
   const tone = toneForStatus(`${text} ${status || ""} ${phaseState(phase)}`);
   return (
-    <View style={[styles.badge, toneStyles[tone].badge, style]}>
+    <View style={[styles.badge, toneStyles[tone].badge, style]} accessible accessibilityLabel={text}>
       {phaseState(phase) === "live" ? <LiveDot color={toneStyles[tone].text.color} /> : null}
-      <Muted style={[styles.text, toneStyles[tone].text]}>{text}</Muted>
+      {/* Großbuchstaben im Text selbst (#1296): so misst Android die Zeile richtig - kein Abschneiden auf dem Tablet. */}
+      <Muted style={[styles.text, toneStyles[tone].text]} textBreakStrategy="simple">{upperDe(text)}</Muted>
     </View>
   );
 }
@@ -186,6 +187,5 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 11,
     fontWeight: "900",
-    textTransform: "uppercase",
   },
 });

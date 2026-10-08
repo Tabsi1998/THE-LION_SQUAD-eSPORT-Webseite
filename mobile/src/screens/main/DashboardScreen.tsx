@@ -20,7 +20,7 @@ import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { API_BASE_URL } from "../../config";
 import { compareByNearestDate } from "../../lib/contentSort";
 import { seasonLine, splitHomeTimeline, type HomeItem } from "../../lib/dashboard";
-import { displayName, formatEventType, formatNewsCategory, formatStatus, formatWhen, placeParts } from "../../lib/format";
+import { displayName, formatEventType, formatNewsCategory, formatStatus, formatWhen, placeParts, upperDe } from "../../lib/format";
 import { stationText } from "../../lib/matchText";
 import { isGuestUser } from "../../live";
 import { openSignIn, openTab } from "../../navigation/rootNavigation";
@@ -468,10 +468,10 @@ function Section({ title, actionLabel, onAction, children }: { title: string; ac
   return (
     <View style={styles.section}>
       <View style={styles.sectionHead}>
-        <Heading>{title}</Heading>
+        <Heading style={styles.sectionTitle} accessibilityRole="header">{title}</Heading>
         {actionLabel && onAction ? (
-          <Pressable onPress={onAction} hitSlop={10}>
-            <Muted style={styles.sectionAction}>{actionLabel}</Muted>
+          <Pressable onPress={onAction} hitSlop={10} accessibilityRole="button" accessibilityLabel={actionLabel} style={styles.sectionActionTap}>
+            <Muted style={styles.sectionAction} textBreakStrategy="simple">{upperDe(actionLabel)}</Muted>
           </Pressable>
         ) : null}
       </View>
@@ -754,15 +754,24 @@ const styles = StyleSheet.create({
   section: {
     gap: 10,
   },
+  // Große Schrift (#1296): der Titel bricht um, „Alle“ behält Abstand und seinen Platz rechts.
   sectionHead: {
     alignItems: "center",
     flexDirection: "row",
+    gap: 12,
     justifyContent: "space-between",
+  },
+  sectionTitle: {
+    flexShrink: 1,
+  },
+  sectionActionTap: {
+    flexShrink: 0,
+    justifyContent: "center",
+    minHeight: 44,
   },
   sectionAction: {
     color: colors.cyan,
     fontWeight: "900",
-    textTransform: "uppercase",
   },
   matchCard: {
     alignItems: "center",

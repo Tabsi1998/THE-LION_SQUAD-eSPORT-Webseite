@@ -180,7 +180,6 @@ function InviteCard({ invite, onAccept, onDecline }: { invite: TeamInvite; onAcc
 }
 
 function TeamCard({ team, onPress, onChat }: { team: Team; onPress: () => void; onChat?: () => void }) {
-  const lastMessage = team.chat_preview?.length ? team.chat_preview[team.chat_preview.length - 1] : null;
   return (
     <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [pressed && styles.pressed]}>
       <Card style={styles.card} perch={`team-${team.id}`}>
@@ -211,9 +210,8 @@ function TeamCard({ team, onPress, onChat }: { team: Team; onPress: () => void; 
             <Ionicons name="chevron-forward" color={colors.cyan} size={18} />
           )}
         </View>
-        {onChat && lastMessage ? (
-          <Muted numberOfLines={1}>{lastMessage.author}: {lastMessage.message}</Muted>
-        ) : team.description ? (
+        {/* Die letzte Chat-Nachricht stand hier nie: `chat_preview` schickt der Server nicht (#1296). */}
+        {team.description ? (
           <Muted numberOfLines={2}>{team.description}</Muted>
         ) : null}
       </Card>

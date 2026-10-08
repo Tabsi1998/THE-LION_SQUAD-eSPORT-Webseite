@@ -164,3 +164,21 @@ test("fremdes privates Profil: nur der Hinweis", async () => {
   await render(<PublicProfileScreen navigation={navigation} route={{ key: "p", name: "PublicProfile", params: { username: "kiwikomet" } } as never} />);
   await waitFor(() => expect(screen.getByText("Profil nicht sichtbar")).toBeTruthy());
 });
+
+test("erst auswerten, dann die Erfolge laden - einmal je Öffnen, die anderen Abrufe laufen daneben (#1296)", async () => {
+  const { api } = require("../../lib/api");
+  const order: string[] = [];
+  (api.post as jest.Mock).mockImplementation(async (path: string) => {
+    order.push(`post ${path}`);
+    return { data: { newly_awarded: 4 } };
+  });
+  mockGet.mockImplementation((path: string, config?: { params?: Record<string, string> }) => {
+    order.push(`get ${path}`);
+    return answer(path, config);
+  });
+  await renderOwn();
+  await waitFor(() => expect(order).toContain("get /achievements/me"));
+  expect(order.indexOf("post /achievements/evaluate")).toBeGreaterThanOrEqual(0);
+  expect(order.indexOf("post /achievements/evaluate")).toBeLessThan(order.indexOf("get /achievements/me"));
+  expect(order.filter((entry) => entry === "post /achievements/evaluate")).toHaveLength(1);
+});

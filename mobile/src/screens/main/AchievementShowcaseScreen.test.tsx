@@ -13,7 +13,8 @@ jest.mock("../../auth/AuthContext", () => ({ useAuth: () => mockAuth }));
 jest.mock("../../live", () => ({ isGuestUser: (user: Record<string, unknown> | null) => !user || user.user_type === "guest" }));
 jest.mock("../../realtime/LiveChangesProvider", () => ({ useLiveRefresh: () => {} }));
 const mockRootNavigate = jest.fn();
-jest.mock("../../navigation/rootNavigation", () => ({ openTab: (...args: unknown[]) => mockRootNavigate(...args) }));
+const mockTab = { current: "HomeTab" };
+jest.mock("../../navigation/rootNavigation", () => ({ openTab: (...args: unknown[]) => mockRootNavigate(...args), currentTab: () => mockTab.current }));
 jest.mock("@expo/vector-icons", () => {
   const { Text } = require("react-native");
   return { Ionicons: ({ name }: { name: string }) => <Text>{`icon:${name}`}</Text> };
@@ -154,4 +155,17 @@ test("angemeldet: der eigene Fortschritt im Katalog, die eigenen Punkte und der 
   expect((await screen.findByTestId("achievement-badge-matches_played")).props.accessibilityLabel).toBe("Holz I");
   await fireEvent.press(screen.getByTestId("my-achievement-summary"));
   expect(mockRootNavigate).toHaveBeenCalledWith("Profile", { tab: "achievements" });
+});
+
+test("im Tab Profil legt sich die eigene Übersicht obendrauf - „Zurück“ führt wieder zur Ruhmeshalle (#1296)", async () => {
+  mockAuth.user = { id: "u1", username: "anna" };
+  mockTab.current = "ProfileTab";
+  const push = jest.fn();
+  mockRootNavigate.mockClear();
+  mockApi({ groups: GROUPS, hidden: { total: 13, earned: 0 } });
+  await render(<AchievementShowcaseScreen navigation={{ navigate, push } as never} route={route} />);
+  await fireEvent.press(await screen.findByTestId("my-achievement-summary"));
+  expect(push).toHaveBeenCalledWith("Profile", { tab: "achievements" });
+  expect(mockRootNavigate).not.toHaveBeenCalled();
+  mockTab.current = "HomeTab";
 });

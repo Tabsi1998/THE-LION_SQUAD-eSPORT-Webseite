@@ -27,7 +27,7 @@ function answer(path: string, mine: unknown[], all: unknown[]) {
 }
 
 test("eigene Teams mit Chat, weitere darunter, keine Squads bei 0", async () => {
-  const lions = { id: "t1", name: "Lions", tag: "TLS", member_count: 12, squad_count: 0, chat_preview: [{ author: "bob", message: "gg", time: "" }] };
+  const lions = { id: "t1", name: "Lions", tag: "TLS", member_count: 12, squad_count: 0, description: "Rocket League am Freitag" };
   const other = { id: "t2", name: "Andere", member_count: 3, squad_count: 2 };
   mockGet.mockImplementation((path: string) => answer(path, [lions], [lions, other]));
 
@@ -39,7 +39,8 @@ test("eigene Teams mit Chat, weitere darunter, keine Squads bei 0", async () => 
   expect(screen.getByText("12 Mitglieder")).toBeTruthy();
   expect(screen.getByText("3 Mitglieder · 2 Squads")).toBeTruthy();
   expect(screen.queryByText("0 Squads")).toBeNull();
-  expect(screen.getByText("bob: gg")).toBeTruthy();
+  // Eine letzte Chat-Nachricht schickt der Server nicht (#1296) - dort steht die Beschreibung des Teams.
+  expect(screen.getByText("Rocket League am Freitag")).toBeTruthy();
 
   await fireEvent.press(screen.getByLabelText("Lions: Chat öffnen"));
   expect(navigate).toHaveBeenCalledWith("TeamChat", { id: "t1", title: "TLS Chat" });

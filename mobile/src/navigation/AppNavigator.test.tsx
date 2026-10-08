@@ -67,7 +67,8 @@ beforeEach(() => {
 
 test("fünf Tabs in dieser Reihenfolge: Home · Events · Community · Verein · Profil - die Zahl an Community zählt ungelesene Chats", async () => {
   await renderApp();
-  const labels = ["Home", "Events", "Community", "Verein", "Profil"];
+  // Die Namen stehen in Großbuchstaben im Text selbst (#1296: so misst Android richtig, kein „COMMUNI…“).
+  const labels = ["HOME", "EVENTS", "COMMUNITY", "VEREIN", "PROFIL"];
   for (const label of labels) expect(screen.getByText(label)).toBeTruthy();
   for (const id of ["tab-home", "tab-events", "tab-community", "tab-verein", "tab-profile"]) expect(screen.getByTestId(id)).toBeTruthy();
   expect(screen.queryByText("Mehr")).toBeNull();
@@ -80,7 +81,7 @@ test("als Gast dieselben fünf Tabs - ohne Zahl", async () => {
   mockAuth.user = null;
   mockUnread.value = 0;
   await renderApp();
-  for (const label of ["Home", "Events", "Community", "Verein", "Profil"]) expect(screen.getByText(label)).toBeTruthy();
+  for (const label of ["HOME", "EVENTS", "COMMUNITY", "VEREIN", "PROFIL"]) expect(screen.getByText(label)).toBeTruthy();
   expect(screen.queryByText("3")).toBeNull();
 });
 
