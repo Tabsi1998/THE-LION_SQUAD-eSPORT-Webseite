@@ -3,7 +3,9 @@ Backend, die Crawler-Vorschau liefert denselben vollständigen Text, die Startse
 JavaScript - und die Datenschutzerklärung nennt jede eingerichtete Verbindung von selbst, bei Google mit
 dem verlangten Hinweis auf die API Services User Data Policy."""
 import pathlib
+import re
 import sys
+from urllib.parse import urlparse
 
 import pytest
 import pytest_asyncio
@@ -111,7 +113,8 @@ async def test_configured_services_appear_with_googles_limited_use_notice_and_th
     home = (await flow.get("/api/seo/preview", params={"path": "/"})).text
     assert "ohne Konto und ohne Anmeldung erreichbar" in home and "<h1>THE LION SQUAD</h1>" in home
     assert '<a href="/privacy">Datenschutzerklärung</a>' in home and '<a href="/terms">Nutzungsbedingungen</a>' in home
-    assert "play.google.com" in home
+    # Ein Link, dessen Adresse wirklich zu Google Play führt - nicht nur irgendwo der Name im Text (#1408).
+    assert any(urlparse(href).hostname == "play.google.com" for href in re.findall(r'href="([^"]*)"', home))
 
     imprint_html = (await flow.get("/api/seo/preview", params={"path": "/imprint"})).text
     assert "<dt>ZVR-Zahl</dt><dd>123456789</dd>" in imprint_html and "Teststraße 1<br />6410 Testdorf" in imprint_html
