@@ -67,9 +67,12 @@ test("Event-Seite: Zeitraum, Tageskarten, Tag des Turniers und Kalender je Tag",
   await expect(page.getByTestId("event-day-3")).toContainText("Finaltag mit Siegerehrung");
   await expect(page.getByTestId("embed-event-day")).toHaveText("Tag 2/3");
 
-  await expect(page.getByTestId("add-to-calendar-days").locator("li")).toHaveCount(3);
+  // Ein Knopf „In den Kalender“ (#1272): alle Tage als Datei, ein Tag mit Google.
+  await page.getByTestId("add-to-calendar-button").click();
   await expect(page.getByTestId("add-to-calendar-ics")).toHaveAttribute("href", "/api/calendar/events/lan-wochenende.ics");
-  const google = await page.getByTestId("add-to-calendar-google-2").getAttribute("href");
+  await page.getByTestId("add-to-calendar-scope-2").click();
+  await expect(page.getByTestId("add-to-calendar-ics")).toHaveAttribute("href", "/api/calendar/events/lan-wochenende.ics?day=2");
+  const google = await page.getByTestId("add-to-calendar-google").getAttribute("href");
   expect(decodeURIComponent(google.replace(/\+/g, " "))).toContain("LAN-Wochenende – Tag 2/3");
 
   await noHorizontalOverflow(page);

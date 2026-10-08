@@ -100,3 +100,17 @@ test("ohne Vorstandsposten kein Aufruf-Knopf", async () => {
   expect(screen.queryByTestId("helper-call-card")).toBeNull();
   expect(mockGet).not.toHaveBeenCalledWith("/membership/helper-calls");
 });
+
+test("In den Kalender (#1272): Knopf an der eigenen Schicht, nach „Ich helfe“ einmal die Frage", async () => {
+  const ask = jest.fn(async () => undefined);
+  await render(<MemberHelperShiftsScreen navigation={navigation} route={route} confirmShift={async () => true} askCalendar={ask} />);
+  await waitFor(() => expect(screen.getByTestId("shift-53-calendar")).toBeTruthy());
+  expect(screen.queryByTestId("shift-51-calendar")).toBeNull();
+
+  await fireEvent.press(screen.getByTestId("shift-51-request"));
+  await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
+  const asked = (ask.mock.calls[0] as unknown[])[0] as { title: string; start: string; end: string };
+  expect(asked.title).toBe("Helferschicht: Dienst 51 · Sommerfest 2026");
+  expect(asked.start).toBe("2026-10-10T12:00:00.000Z");
+  expect(asked.end).toBe("2026-10-10T14:00:00.000Z");
+});

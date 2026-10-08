@@ -118,13 +118,14 @@ test("Mehrtägig (#884): Zeitraum und Jetzt-Satz im Kopf, je Tag eine Karte, Tur
   expect(screen.getByTestId("event-day-3")).toHaveTextContent("Finaltag");
   expect(screen.getByTestId("embed-event-day")).toHaveTextContent("Tag 2/3");
 
-  // Kalender: Google und Outlook je Tag mit „Tag n/3“ im Titel, eine ICS-Datei mit allen Tagen.
-  expect(screen.getByTestId("add-to-calendar-days").querySelectorAll("li")).toHaveLength(3);
-  const google = decodeURIComponent(screen.getByTestId("add-to-calendar-google-3").getAttribute("href").replace(/\+/g, " "));
-  expect(google).toContain("Vereinsausflug – Tag 3/3 · Finaltag");
-  expect(google).toContain("20261018T080000Z/20261018T140000Z");
+  // Kalender (#1272): ein Knopf; im Menü die Datei mit allen Tagen, je Tag Google und Outlook mit „Tag n/3“.
+  fireEvent.click(screen.getByTestId("add-to-calendar-button"));
   expect(screen.getByTestId("add-to-calendar-ics")).toHaveTextContent("allen 3 Tagen");
   expect(screen.getByTestId("add-to-calendar-ics").getAttribute("href")).toBe("/api/calendar/events/ausflug.ics");
+  fireEvent.click(screen.getByTestId("add-to-calendar-scope-3"));
+  const google = decodeURIComponent(screen.getByTestId("add-to-calendar-google").getAttribute("href").replace(/\+/g, " "));
+  expect(google).toContain("Vereinsausflug – Tag 3/3 · Finaltag");
+  expect(google).toContain("20261018T080000Z/20261018T140000Z");
 });
 
 // Turnier-Karte am Event (#1220): Baum, wenn es einen gibt; bei Fehler „Baum gerade nicht ladbar“; ohne Baum nichts;
@@ -216,7 +217,7 @@ test("beendetes Event: Satz mit den Turnieren, kein Kalender, kein Live, kein Di
   const over = await screen.findByTestId("event-over");
   expect(over).toHaveTextContent("Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:");
   expect(over.querySelector("a")).toHaveAttribute("href", "/tournaments/sommer-cup");
-  expect(screen.queryByTestId("add-to-calendar-ics")).toBeNull();
+  expect(screen.queryByTestId("add-to-calendar-button")).toBeNull();
   expect(screen.queryByTestId("event-live-links")).toBeNull();
   expect(screen.queryByText("Live verfolgen")).toBeNull();
   expect(screen.queryByTestId("event-display-link")).toBeNull();
@@ -236,7 +237,7 @@ test("laufendes Event: Gäste sehen „Live verfolgen“ ohne „Display“, die
   expect(await screen.findByTestId("event-live-links")).toHaveTextContent("Live verfolgen");
   expect(screen.queryByTestId("event-display-link")).toBeNull();
   expect(screen.queryByTestId("event-over")).toBeNull();
-  expect(screen.getByTestId("add-to-calendar-ics")).toBeInTheDocument();
+  expect(screen.getByTestId("add-to-calendar-button")).toBeInTheDocument();
   unmount();
 
   authState.user = { id: "u9", role: "tournament_admin", areas: ["tournaments", "moderation"] };

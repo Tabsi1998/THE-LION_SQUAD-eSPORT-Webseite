@@ -7,6 +7,8 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useAuth } from "@/context/AuthContext";
 import { HelperCallPanel } from "@/pages/user/helper/HelperCallPanel";
+import { AddToCalendar } from "@/components/tls/AddToCalendar";
+import { calendarAskDue, rememberCalendarAsked, shiftCalendarItem } from "@/lib/clubCalendar";
 import { ArrowLeft, Calendar, CheckCircle2, HandHelping, MapPin, Users } from "lucide-react";
 
 // Helferdienste (#331): Veranstaltungen mit Schichten aus der Vereinsakte (Vereine 1.4). Plätze, Bestätigung und
@@ -34,7 +36,7 @@ function MineBadge({ shift }) {
   );
 }
 
-function EventCard({ event, busy, onRequest, onWithdraw, highlight = false }) {
+function EventCard({ event, busy, onRequest, onWithdraw, highlight = false, askFor = "", onAskDone }) {
   // Helfer-Aufruf (#1197): die Meldung führt mit ?event=… hierher - diese Veranstaltung steht oben und leuchtet.
   return (
     <div className={`border rounded-sm bg-[#121212] p-5 ${event.upcoming ? "border-[#FFD700]/40" : "border-white/10"} ${highlight ? "ring-2 ring-[#FFD700]/70" : ""}`} data-testid={`helper-event-${event.id}`} data-highlight={highlight ? "true" : undefined}>
@@ -75,10 +77,28 @@ function EventCard({ event, busy, onRequest, onWithdraw, highlight = false }) {
               </button>
             ) : null}
             {shift.mine === "confirmed" ? <span className="text-[11px] text-white/45">Absagen bitte beim Vorstand.</span> : null}
+            <ShiftCalendar event={event} shift={shift} ask={askFor === `shift-${event.id}-${shift.id}`} onAskDone={onAskDone} />
           </div>
         ))}
         {!event.shifts.length ? <p className="text-xs text-white/45">Für diese Veranstaltung sind keine Helferdienste ausgeschrieben.</p> : null}
       </div>
+    </div>
+  );
+}
+
+// Die eigene Schicht in den Kalender (#1272): ein Knopf an jeder kommenden eigenen Schicht; nach dem „Ich helfe“
+// fragt die Seite einmal „Im Kalender eintragen?“. Die Datei kommt vom Server und nennt niemanden sonst.
+function ShiftCalendar({ event, shift, ask, onAskDone }) {
+  const mine = ["requested", "confirmed"].includes(shift.mine);
+  const item = mine && event.upcoming ? shiftCalendarItem(event, shift) : null;
+  if (!item) return null;
+  const testId = `shift-${shift.id}-calendar`;
+  if (!ask) return <AddToCalendar item={item} testId={testId} />;
+  return (
+    <div className="basis-full border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-3 flex flex-wrap items-center gap-3" data-testid={`shift-${shift.id}-calendar-ask`}>
+      <span className="text-sm text-white/85 font-bold">Im Kalender eintragen?</span>
+      <AddToCalendar item={item} testId={testId} />
+      <button type="button" onClick={onAskDone} className="text-xs text-white/55 hover:text-white underline-offset-4 hover:underline" data-testid={`shift-${shift.id}-calendar-ask-no`}>Nein danke</button>
     </div>
   );
 }
@@ -90,6 +110,7 @@ export default function MemberHelperShiftsPage() {
   const wanted = Number(searchParams.get("event") || 0);
   const [view, setView] = useState(null);
   const [busy, setBusy] = useState("");
+  const [askFor, setAskFor] = useState("");
   const load = useCallback(() => {
     api.get("/membership/me/helper-shifts")
       .then(({ data }) => setView(data && typeof data === "object" ? data : { available: false, reason: "error", text: "Konnte nicht geladen werden.", events: [] }))
@@ -109,6 +130,11 @@ export default function MemberHelperShiftsPage() {
     try {
       await api.put(`/membership/me/events/${event.id}/shifts/${shift.id}`);
       toast.success("Angefragt – der Vorstand bestätigt.");
+      const key = `shift-${event.id}-${shift.id}`;
+      if (calendarAskDue(key)) {
+        rememberCalendarAsked(key);
+        setAskFor(key);
+      }
       load();
     } catch (err) {
       toast.error(formatApiError(err?.response?.data?.detail) || "Das hat nicht geklappt.");
@@ -160,7 +186,7 @@ export default function MemberHelperShiftsPage() {
             {view.my_count ? <p className="mt-6 text-sm text-white/70" data-testid="helper-shifts-mine">Du bist bei {view.my_count === 1 ? "einem Dienst" : `${view.my_count} Diensten`} eingetragen.</p> : null}
             {!events.length ? <p className="mt-6 text-sm text-white/45" data-testid="helper-shifts-empty">Derzeit keine Veranstaltung mit Helferdiensten.</p> : null}
             <div className="mt-4 space-y-4">
-              {upcoming.map((event) => <EventCard key={event.id} event={event} busy={busy} onRequest={request} onWithdraw={withdraw} highlight={event.id === wanted} />)}
+              {upcoming.map((event) => <EventCard key={event.id} event={event} busy={busy} onRequest={request} onWithdraw={withdraw} highlight={event.id === wanted} askFor={askFor} onAskDone={() => setAskFor("")} />)}
               {rest.map((event) => <EventCard key={event.id} event={event} busy={busy} onRequest={request} onWithdraw={withdraw} />)}
             </div>
           </>

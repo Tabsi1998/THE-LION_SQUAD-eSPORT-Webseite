@@ -28,7 +28,10 @@ test("Outlook-Link und die ICS vom Server (#580)", () => {
   expect(outlookCalendarUrl({ ...item, start: null })).toBe("");
   expect(serverIcsPath({ ...item, slug: "weihnachtsfeier" })).toBe("/api/calendar/events/weihnachtsfeier.ics");
   expect(serverIcsPath({ id: "t1", kind: "tournament" })).toBe("/api/calendar/tournaments/t1.ics");
-  expect(serverIcsPath({ id: "f1", kind: "fastlap" })).toBe("");
+  // Fast Laps haben seit #1272 ihre Datei vom Server; ein Tag eines Events mit ?day=.
+  expect(serverIcsPath({ id: "f1", kind: "fastlap" })).toBe("/api/calendar/fastlaps/f1.ics");
+  expect(serverIcsPath({ id: "e1", kind: "event" }, { day: 2 })).toBe("/api/calendar/events/e1.ics?day=2");
+  expect(serverIcsPath({ id: "t1", kind: "tournament" }, { day: 2 })).toBe("/api/calendar/tournaments/t1.ics");
   expect(serverIcsPath({ kind: "event" })).toBe("");
 });
 

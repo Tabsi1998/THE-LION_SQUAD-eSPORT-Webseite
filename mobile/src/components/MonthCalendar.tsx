@@ -9,8 +9,8 @@ import { viennaDay } from "../lib/vienna";
 // Monatsansicht (#216): Punkte je Tag in der Farbe der Art, ein Ring um Tage mit eigener
 // Anmeldung. Der Tag antippen zeigt seine Termine darunter - das macht der Aufrufer.
 
-export const KIND_COLORS: Record<CalendarKind, string> = { event: colors.cyan, tournament: colors.gold, fastlap: colors.live };
-export const KIND_LABELS: Record<CalendarKind, string> = { event: "Event", tournament: "Turnier", fastlap: "Fast Lap" };
+export const KIND_COLORS: Record<CalendarKind, string> = { event: colors.cyan, tournament: colors.gold, fastlap: colors.live, club: colors.gold };
+export const KIND_LABELS: Record<CalendarKind, string> = { event: "Event", tournament: "Turnier", fastlap: "Fast Lap", club: "Verein" };
 
 export function MonthCalendar({ year, month, items, selected, onSelect, onShift, today = new Date() }: {
   year: number;
@@ -65,7 +65,7 @@ export function MonthCalendar({ year, month, items, selected, onSelect, onShift,
         </View>
       ))}
       <View style={styles.legend}>
-        {(Object.keys(KIND_LABELS) as CalendarKind[]).map((kind) => (
+        {(Object.keys(KIND_LABELS) as CalendarKind[]).filter((kind) => kind !== "club" || items.some((item) => item.kind === "club")).map((kind) => (
           <View key={kind} style={styles.legendItem}>
             <View style={[styles.dot, { backgroundColor: KIND_COLORS[kind] }]} />
             <Muted>{KIND_LABELS[kind]}</Muted>

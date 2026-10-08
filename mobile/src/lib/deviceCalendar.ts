@@ -1,6 +1,6 @@
 import { Linking, Platform } from "react-native";
 import * as Calendar from "expo-calendar";
-import { calendarWindow, googleCalendarUrl, type CalendarItem } from "./calendar";
+import { allDayRange, calendarWindow, googleCalendarUrl, type CalendarItem } from "./calendar";
 
 // „In meinen Kalender“ (#216): erst beim Antippen um die Berechtigung fragen; verweigert oder
 // ohne beschreibbaren Kalender öffnet sich Google Kalender mit dem vorausgefüllten Termin.
@@ -24,10 +24,13 @@ export async function addToDeviceCalendar(item: CalendarItem): Promise<AddResult
     if (permission.granted) {
       const calendarId = await writableCalendarId();
       if (calendarId) {
+        // Ein ganzer Tag (#1272, Versammlung ohne Uhrzeit) steht als Tag im Kalender, nicht um Mitternacht.
+        const allDay = allDayRange(item);
         const eventId = await Calendar.createEventAsync(calendarId, {
           title: item.title,
-          startDate: window.start,
-          endDate: window.end,
+          startDate: allDay ? new Date(`${allDay.from}T00:00:00Z`) : window.start,
+          endDate: allDay ? new Date(`${allDay.to}T00:00:00Z`) : window.end,
+          allDay: Boolean(allDay),
           location: item.location || undefined,
           notes: [item.detail, item.url].filter(Boolean).join("\n") || undefined,
           url: Platform.OS === "ios" ? item.url || undefined : undefined,

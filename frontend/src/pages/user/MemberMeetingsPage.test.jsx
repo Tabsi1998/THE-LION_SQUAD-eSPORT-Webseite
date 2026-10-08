@@ -114,3 +114,23 @@ test("ohne Weg zur Akte steht der Grund, mit Bindung ohne Fähigkeit der Grund j
   await waitFor(() => expect(screen.getByTestId("ballots-reason")).toHaveTextContent("Abstimmungen noch nicht"));
   expect(screen.getByTestId("meetings-empty")).toBeInTheDocument();
 });
+
+test("In den Kalender (#1272): Knopf an der kommenden Versammlung, nach der Zusage einmal die Frage", async () => {
+  window.localStorage.removeItem("tls-calendar-asked");
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={["/members/meetings?meeting=7"]}><MemberMeetingsPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("meeting-7-calendar-button")).toBeInTheDocument());
+  expect(screen.getByTestId("meeting-7").className).toContain("ring-2");
+  await user.click(screen.getByTestId("meeting-7-calendar-button"));
+  expect(screen.getByTestId("meeting-7-calendar-ics")).toHaveAttribute("href", "/api/calendar/meetings/7.ics");
+  await user.click(screen.getByTestId("meeting-7-calendar-button"));
+
+  await user.click(screen.getByTestId("meeting-7-respond-yes"));
+  await waitFor(() => expect(screen.getByTestId("meeting-7-calendar-ask")).toHaveTextContent("Im Kalender eintragen?"));
+  await user.click(screen.getByTestId("meeting-7-calendar-ask-no"));
+  expect(screen.queryByTestId("meeting-7-calendar-ask")).toBeNull();
+  // Ein zweites Mal fragt die Seite nicht.
+  await user.click(screen.getByTestId("meeting-7-respond-yes"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledTimes(2));
+  expect(screen.queryByTestId("meeting-7-calendar-ask")).toBeNull();
+});

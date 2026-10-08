@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { AddToCalendar } from "@/components/tls/AddToCalendar";
+import { calendarAskDue, meetingCalendarItem, rememberCalendarAsked } from "@/lib/clubCalendar";
 import { ArrowLeft, Calendar, CheckCircle2, FileText, MapPin, Send, Vote, Video } from "lucide-react";
 
 // Versammlungen und Abstimmungen (#327): alles kommt aus der Vereinsakte (Vereine 1.4) - Einladung,
@@ -27,10 +29,12 @@ export function meetingWhen(meeting) {
 
 const RESPONSES = [["yes", "Ich komme"], ["maybe", "Vielleicht"], ["no", "Ich komme nicht"]];
 
-function MeetingCard({ meeting, busy, onRespond, onMotion }) {
+function MeetingCard({ meeting, busy, onRespond, onMotion, askCalendar = false, onAskDone, highlight = false }) {
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const id = meeting.id;
+  // Ein Knopf „In den Kalender“ (#1272) an jeder kommenden Versammlung; nach der Zusage fragt die Seite einmal.
+  const calendarItem = meeting.upcoming ? meetingCalendarItem(meeting) : null;
   const submit = async (event) => {
     event.preventDefault();
     const ok = await onMotion(meeting, title, text);
@@ -40,7 +44,7 @@ function MeetingCard({ meeting, busy, onRespond, onMotion }) {
     }
   };
   return (
-    <div className={`border rounded-sm bg-[#121212] p-5 ${meeting.upcoming ? "border-[#FFD700]/40" : "border-white/10"}`} data-testid={`meeting-${id}`}>
+    <div id={`meeting-${id}`} className={`border rounded-sm bg-[#121212] p-5 scroll-mt-24 ${meeting.upcoming ? "border-[#FFD700]/40" : "border-white/10"} ${highlight ? "ring-2 ring-[#FFD700]/70" : ""}`} data-testid={`meeting-${id}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">{meeting.kind_label}</div>
@@ -87,6 +91,18 @@ function MeetingCard({ meeting, busy, onRespond, onMotion }) {
         )) : null}
       </div>
       <p className="mt-1 text-xs text-white/40">Zu- oder Absage ist keine Anwesenheit und keine Stimme – die Anwesenheitsliste führt der Verein in der Versammlung.</p>
+
+      {calendarItem ? (
+        askCalendar ? (
+          <div className="mt-4 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-3 flex flex-wrap items-center gap-3" data-testid={`meeting-${id}-calendar-ask`}>
+            <span className="text-sm text-white/85 font-bold">Im Kalender eintragen?</span>
+            <AddToCalendar item={calendarItem} testId={`meeting-${id}-calendar`} />
+            <button type="button" onClick={onAskDone} className="text-xs text-white/55 hover:text-white underline-offset-4 hover:underline" data-testid={`meeting-${id}-calendar-ask-no`}>Nein danke</button>
+          </div>
+        ) : (
+          <AddToCalendar item={calendarItem} className="mt-4" testId={`meeting-${id}-calendar`} />
+        )
+      ) : null}
 
       {(meeting.can_motion || meeting.motions.length) ? (
         <div className="mt-5 border-t border-white/10 pt-4">
@@ -202,6 +218,10 @@ export default function MemberMeetingsPage() {
   const confirm = useConfirm();
   const [view, setView] = useState(null);
   const [busy, setBusy] = useState("");
+  // Aus dem Kalender (#1190) kommt man mit ?meeting=<id> - diese Versammlung steht oben und ist markiert.
+  const [searchParams] = useSearchParams();
+  const wanted = Number(searchParams.get("meeting") || 0);
+  const [askFor, setAskFor] = useState(0);
   const load = useCallback(() => {
     api.get("/membership/me/meetings")
       .then(({ data }) => setView(data && typeof data === "object" ? data : { available: false, reason: "error", text: "Konnte nicht geladen werden.", meetings: [], ballots: [] }))
@@ -215,6 +235,12 @@ export default function MemberMeetingsPage() {
     try {
       await api.put(`/membership/me/meetings/${meeting.id}/response`, { response });
       toast.success(response === "yes" ? "Zugesagt." : response === "no" ? "Abgesagt." : "Als „vielleicht“ vermerkt.");
+      // Nach der Zusage einmal „Im Kalender eintragen?“ (#1272) - je Versammlung und Gerät nur ein Mal.
+      const key = `meeting-${meeting.id}`;
+      if (response === "yes" && calendarAskDue(key)) {
+        rememberCalendarAsked(key);
+        setAskFor(meeting.id);
+      }
       load();
     } catch (err) {
       toast.error(formatApiError(err?.response?.data?.detail) || "Das hat nicht geklappt.");
@@ -258,7 +284,7 @@ export default function MemberMeetingsPage() {
 
   const meetings = view?.meetings || [];
   const ballots = view?.ballots || [];
-  const upcoming = meetings.filter((m) => m.upcoming);
+  const upcoming = meetings.filter((m) => m.upcoming).sort((a, b) => Number(b.id === wanted) - Number(a.id === wanted));
   const past = meetings.filter((m) => !m.upcoming);
   const openBallots = ballots.filter((b) => b.status === "open" || b.status === "released");
   const doneBallots = ballots.filter((b) => !(b.status === "open" || b.status === "released"));
@@ -294,8 +320,8 @@ export default function MemberMeetingsPage() {
             {view.meetings_reason ? <p className="mt-2 text-sm text-white/60" data-testid="meetings-reason">{view.meetings_text}</p> : null}
             {!view.meetings_reason && !meetings.length ? <p className="mt-2 text-sm text-white/45" data-testid="meetings-empty">Keine Einladung – sobald der Verein dich zu einer Versammlung einlädt, steht sie hier.</p> : null}
             <div className="mt-3 space-y-4">
-              {upcoming.map((meeting) => <MeetingCard key={meeting.id} meeting={meeting} busy={busy} onRespond={respond} onMotion={motion} />)}
-              {past.map((meeting) => <MeetingCard key={meeting.id} meeting={meeting} busy={busy} onRespond={respond} onMotion={motion} />)}
+              {upcoming.map((meeting) => <MeetingCard key={meeting.id} meeting={meeting} busy={busy} onRespond={respond} onMotion={motion} askCalendar={askFor === meeting.id} onAskDone={() => setAskFor(0)} highlight={meeting.id === wanted} />)}
+              {past.map((meeting) => <MeetingCard key={meeting.id} meeting={meeting} busy={busy} onRespond={respond} onMotion={motion} highlight={meeting.id === wanted} />)}
             </div>
           </>
         ) : null}

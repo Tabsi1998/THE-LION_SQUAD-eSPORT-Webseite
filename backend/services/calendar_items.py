@@ -16,7 +16,7 @@ from services import event_days
 from services.public_phase import derive_public_phase
 from services.visibility import lead_can_see
 
-KIND_LABELS = {"event": "Event", "tournament": "Turnier", "fastlap": "Fast Lap"}
+KIND_LABELS = {"event": "Event", "tournament": "Turnier", "fastlap": "Fast Lap", "club": "Verein"}
 ACTIVE_EVENT_REGISTRATION = ("registered", "checked_in", "waitlist")
 INACTIVE_TOURNAMENT_REGISTRATION = ("cancelled", "rejected", "withdrawn", "no_show")
 FINISHED = {"completed", "results_published", "archived", "cancelled"}
@@ -105,6 +105,11 @@ def tournament_item(doc: dict, *, mine: bool = False) -> dict | None:
                  start=doc.get("start_date"), end=doc.get("end_date"), location=doc.get("game_name"), mine=mine)
 
 
+def fastlap_item(doc: dict, *, mine: bool = False) -> dict | None:
+    return _item("fastlap", doc, title=doc.get("title") or "Fast Lap", path=f"/fastlap/{doc.get('slug') or doc.get('id')}",
+                 start=doc.get("start_date"), end=doc.get("end_date"), mine=mine)
+
+
 def vienna(value, *, with_time: bool = True) -> str:
     """Zeit so, wie sie im Verein gilt - mit „Uhr“."""
     dt = _dt(value)
@@ -164,8 +169,7 @@ async def collect(db, user: dict | None) -> list[dict]:
     for c in fastlaps:
         if not await lead_can_see(user, c.get("visibility")):
             continue
-        item = _item("fastlap", c, title=c.get("title") or "Fast Lap", path=f"/fastlap/{c.get('slug') or c.get('id')}",
-                     start=c.get("start_date"), end=c.get("end_date"))
+        item = fastlap_item(c)
         if item:
             items.append(item)
     items.sort(key=lambda item: (item["start"], item["kind"], item["title"]))
@@ -199,14 +203,26 @@ def _fold(line: str) -> list[str]:
     return [out[0]] + [f" {rest}" for rest in out[1:]]
 
 
+def _all_day_lines(item: dict) -> list[str] | None:
+    """Ein ganzer Tag (#1272): eine Versammlung ohne Uhrzeit steht als Tag im Kalender, nicht um Mitternacht."""
+    try:
+        day = datetime.strptime(str(item.get("day") or "")[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+    return [f"DTSTART;VALUE=DATE:{day.strftime('%Y%m%d')}", f"DTEND;VALUE=DATE:{(day + timedelta(days=1)).strftime('%Y%m%d')}"]
+
+
 def _vevent(item: dict, *, origin: str, now: datetime, alarm_minutes: int | None = None, extra_detail: str | None = None) -> list[str]:
     """Ein VEVENT - Feed und Einzeltermin (#580) bauen ihn gleich; der Einzeltermin trägt die Erinnerung."""
-    start = _dt(item.get("start"))
-    if not start:
-        return []
-    end = _dt(item.get("end"))
-    if not end or end <= start:
-        end = start + DEFAULT_DURATION
+    window = _all_day_lines(item) if item.get("all_day") else None
+    if not window:
+        start = _dt(item.get("start"))
+        if not start:
+            return []
+        end = _dt(item.get("end"))
+        if not end or end <= start:
+            end = start + DEFAULT_DURATION
+        window = [f"DTSTART:{_stamp(start)}", f"DTEND:{_stamp(end)}"]
     detail = [KIND_LABELS.get(item["kind"], item["kind"])]
     if item.get("phase", {}) and item["phase"].get("label"):
         detail.append(item["phase"]["label"])
@@ -216,8 +232,7 @@ def _vevent(item: dict, *, origin: str, now: datetime, alarm_minutes: int | None
         "BEGIN:VEVENT",
         f"UID:{item['kind']}-{item['id']}@lionsquad.at",
         f"DTSTAMP:{_stamp(now)}",
-        f"DTSTART:{_stamp(start)}",
-        f"DTEND:{_stamp(end)}",
+        *window,
         f"SUMMARY:{_ics_text(item['title'])}",
         f"DESCRIPTION:{_ics_text(' · '.join(detail))}",
         f"URL:{origin}{item['path']}",
@@ -226,7 +241,7 @@ def _vevent(item: dict, *, origin: str, now: datetime, alarm_minutes: int | None
         lines.append(f"LOCATION:{_ics_text(item['location'])}")
     if item.get("status") == "cancelled":
         lines.append("STATUS:CANCELLED")
-    if alarm_minutes:
+    if alarm_minutes and not item.get("all_day"):
         lines += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{_ics_text(item['title'])}", f"TRIGGER:-PT{int(alarm_minutes)}M", "END:VALARM"]
     lines.append("END:VEVENT")
     return lines
