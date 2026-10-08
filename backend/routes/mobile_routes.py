@@ -44,6 +44,8 @@ class MobilePushTokenCreate(BaseModel):
     token: str = Field(min_length=20, max_length=300)
     platform: str | None = Field(default=None, max_length=40)
     device_name: str | None = Field(default=None, max_length=120)
+    # Welche Android-Kanäle die App angelegt hat (#1138) - ab 2 die fünf Themen-Kanäle.
+    channels: int | None = Field(default=None, ge=1, le=99)
 
 
 class MobileClientLogCreate(BaseModel):
@@ -811,6 +813,8 @@ async def register_mobile_push_token(body: MobilePushTokenCreate, user: dict = D
         raise HTTPException(status_code=400, detail="Ungültiger Expo Push Token")
     db = get_db()
     now = now_utc().isoformat()
+    # Die Kanäle des Geräts (#1138): eine ältere App meldet nichts und bekommt weiter die zwei alten Kanäle.
+    channel_set = {"channel_set": body.channels} if body.channels else {}
     await db.mobile_push_tokens.update_one(
         {"token": token},
         {
@@ -821,6 +825,7 @@ async def register_mobile_push_token(body: MobilePushTokenCreate, user: dict = D
                 "device_name": body.device_name,
                 "enabled": True,
                 "updated_at": now,
+                **channel_set,
             },
             "$setOnInsert": {"created_at": now},
         },
