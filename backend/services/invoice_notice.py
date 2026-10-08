@@ -70,7 +70,7 @@ async def mark_due(db, order_id: str, previous_status: str | None, state: dict) 
 
 async def send_due(db, order_id: str, state: dict | None = None) -> bool:
     """Eine vorgemerkte Meldung schicken, sobald alles passt. `True`, wenn sie jetzt rausging."""
-    from services.dolibarr_billing import booking_facts, source_label
+    from services.billing_facts import booking_facts, source_label
     from services.notification_preferences import send_user_template
     from services.user_notifications import build_public_url, create_user_notification
 

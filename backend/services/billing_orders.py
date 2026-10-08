@@ -36,6 +36,7 @@ from datetime import timedelta
 
 from database import get_db
 from models import new_id, now_utc
+from services.billing_amounts import credited_cents, paid_cents, refunded_cents
 
 logger = logging.getLogger("tls.billing")
 
@@ -62,7 +63,6 @@ PAYMENT_STATE_LABELS = {
     "credited": "gutgeschrieben",
     "abandoned": "aufgegeben",
 }
-SETTLED_STATES = ("paid", "credited", "abandoned")
 MAX_REFUND_REFERENCE = 120
 MAX_REASON = 500
 
@@ -92,27 +92,6 @@ async def create_order(db, *, kind: str, source_id: str, registration_id: str, u
     await db.billing_orders.insert_one(order)
     order.pop("_id", None)
     return order
-
-
-def paid_cents(order: dict, payments: list[dict] | None = None) -> int:
-    """Was laut Dolibarr an Geld gekommen ist: die Summe der gebuchten Zahlungen. Eine Gutschrift
-    ist keine Zahlung. Kennt die Website die Zahlungen nicht (Recht fehlt), gilt Summe minus Rest."""
-    payments = order.get("payments") if payments is None else payments
-    if payments is not None:
-        return sum(int(row.get("amount_cents") or 0) for row in payments)
-    total = int(order.get("total_cents") or 0)
-    remaining = order.get("remaining_cents")
-    if remaining is None:
-        return total if order.get("paid") else 0
-    return max(0, total - int(remaining))
-
-
-def refunded_cents(order: dict) -> int:
-    return sum(int(row.get("amount_cents") or 0) for row in order.get("refunds") or [])
-
-
-def credited_cents(order: dict) -> int:
-    return sum(int(row.get("total_cents") or 0) for row in order.get("credit_notes") or [])
 
 
 async def cancel_orders_for(db, *, kind: str, registration_id: str, reason: str) -> int:

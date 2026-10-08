@@ -13,7 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import billing_orders, dolibarr_billing, dolibarr_client  # noqa: E402
+from services import billing_facts, billing_orders, dolibarr_billing, dolibarr_client  # noqa: E402
 from services.secret_store import encrypt_secret  # noqa: E402
 
 
@@ -65,7 +65,7 @@ async def paid_event(flow, admin, **extra):
 
 def event_day(event: dict) -> str:
     """Der Tag der Feier, wie er auf dem Beleg steht - der Termin liegt dreißig Tage nach dem Lauf des Tests."""
-    return dolibarr_billing._club_date(event["start_date"])
+    return billing_facts._club_date(event["start_date"])
 
 
 async def book(flow, user, event, companions=0):
