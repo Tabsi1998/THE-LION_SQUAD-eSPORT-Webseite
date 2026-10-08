@@ -166,7 +166,7 @@ export default function MembershipApplyPage() {
   };
 
   const status = existing?.status;
-  const showForm = !existing || renew || !["pending", "submitting", "approved", "rejected", "failed", "withdrawn"].includes(status) || (renew && ["rejected", "failed", "withdrawn"].includes(status));
+  const showForm = !existing || renew || !["pending", "submitting", "approved", "rejected", "failed", "withdrawn"].includes(status);
 
   return (
     <PublicLayout>

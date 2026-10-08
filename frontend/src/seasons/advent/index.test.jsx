@@ -90,10 +90,10 @@ test("Anzünden: am Sonntag der zweiten Kerze brennt sie beim ersten Aufruf an, 
   });
   expect(screen.getAllByTestId("advent-flame")[1].className.baseVal).not.toContain("tls-advent__fire--calm");
   unmount();
-  render(<Widget season={advent({}, { candles: 2, days_to_christmas: 18 })} now={sunday} storage={storage} />);
+  const secondVisit = render(<Widget season={advent({}, { candles: 2, days_to_christmas: 18 })} now={sunday} storage={storage} />);
   expect(screen.queryByTestId("advent-match")).toBeNull();
   screen.getAllByTestId("advent-flame").forEach((flame) => expect(flame.className.baseVal).not.toContain("lighting"));
-  unmount;
+  secondVisit.unmount();
   render(<Widget season={advent({}, { candles: 2, days_to_christmas: 17 })} now={new Date(2026, 11, 7, 10)} storage={memory()} />);
   expect(screen.queryByTestId("advent-match")).toBeNull();
 });
