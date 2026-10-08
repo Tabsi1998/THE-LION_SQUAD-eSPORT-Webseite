@@ -7,7 +7,7 @@ from __future__ import annotations
 from models import new_id, now_utc
 from services import billing_orders, pricing
 from services.access_links import record_access_link_use
-from services.permissions import is_tournament_lead
+from services.permissions import is_confirmed_tournament_lead
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
 
@@ -80,7 +80,7 @@ async def summary(db, event: dict, exclude_registration_id: str | None = None) -
 
 async def ensure_can_register(db, event: dict, me: dict, *, has_access: bool = False, register_access: dict | None = None) -> None:
     """Die Prüfungen vor der Anmeldung - Website und Discord stellen dieselben Fragen in derselben Reihenfolge."""
-    if event.get("status") == "draft" and not is_tournament_lead(me) and not has_access:
+    if event.get("status") == "draft" and not is_confirmed_tournament_lead(me) and not has_access:
         raise RegistrationError(404, "Event nicht gefunden")
     if not has_access and not await user_can_see(me, event.get("visibility") or "public"):
         raise RegistrationError(403, "Event ist nicht sichtbar")

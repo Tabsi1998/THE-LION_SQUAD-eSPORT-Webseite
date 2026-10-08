@@ -359,9 +359,9 @@ async def mention_search(
     query: dict = {"is_active": True, "is_banned": {"$ne": True}}
     scope_key = (scope or "").strip().lower()
     # Turnierleitung (Rolle oder Freigabe, #1350) findet in Teams und Turnieren alle Beteiligten.
-    from services.permissions import is_tournament_lead
+    from services.permissions import is_confirmed_tournament_lead
 
-    staff = is_tournament_lead(me)
+    staff = is_confirmed_tournament_lead(me)
 
     if scope_key == "team":
         team = await db.teams.find_one({"id": scope_id}, {"_id": 0, "member_ids": 1, "leader_id": 1, "co_leader_ids": 1})

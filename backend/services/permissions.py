@@ -97,6 +97,20 @@ def is_tournament_lead(user: dict | None) -> bool:
     return holds_area(user, "tournaments")
 
 
+def is_confirmed_tournament_lead(user: dict | None) -> bool:
+    """Turnierleitung über alle Turniere für die angemeldete Person einer Anfrage: wie jeder Adminbereich nur mit
+    bestätigter Zwei-Faktor-Anmeldung (#291, docs/ROLLEN.md). Für Konten aus der Datenbank - Empfänger einer
+    Nachricht, Filter - gilt ``is_tournament_lead``: die Bestätigung gehört zur Anmeldung, nicht zum Konto.
+    Helfer-Einsätze je Turnier brauchen sie nicht (``services.tournament_permissions``)."""
+    return is_tournament_lead(user) and not needs_mfa(user)
+
+
+def lead_without_second_factor(user: dict | None) -> bool:
+    """Turnierleitung über alle Turniere, aber noch ohne bestätigte Zwei-Faktor-Anmeldung - sie bekommt den Hinweis
+    auf die Zwei-Faktor-Anmeldung statt „keine Berechtigung“."""
+    return is_tournament_lead(user) and needs_mfa(user)
+
+
 def tournament_lead_filter() -> dict:
     """Dieselbe Regel als Datenbank-Abfrage: alle Konten mit dem Bereich Turnierleitung (Rolle oder Freigabe)."""
     roles = sorted(role for role, areas in ROLE_AREAS.items() if "tournaments" in areas)

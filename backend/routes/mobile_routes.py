@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from auth import get_current_user, get_optional_user
 from database import get_db
-from services.permissions import is_tournament_lead
+from services.permissions import is_confirmed_tournament_lead
 from models import new_id, now_utc
 from services.match_audience import acting_registration_ids
 from services.tournament_rules import self_checkin_allowed, tournament_event_mode
@@ -237,7 +237,7 @@ async def _team_ids_for_user(user_id: str) -> list[str]:
 
 async def _visible_tournament(tournament: dict, user: dict | None, participant_ids: set[str] | None = None) -> bool:
     participant_ids = participant_ids or set()
-    is_staff = is_tournament_lead(user)
+    is_staff = is_confirmed_tournament_lead(user)
     if tournament.get("status") == "draft" and not is_staff:
         return False
     if tournament.get("id") in participant_ids:
@@ -249,7 +249,7 @@ async def _visible_tournament(tournament: dict, user: dict | None, participant_i
 
 async def _visible_event(event: dict, user: dict | None, registered_ids: set[str] | None = None) -> bool:
     registered_ids = registered_ids or set()
-    is_staff = is_tournament_lead(user)
+    is_staff = is_confirmed_tournament_lead(user)
     if event.get("status") == "draft" and not is_staff:
         return False
     if event.get("id") in registered_ids:

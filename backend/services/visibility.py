@@ -64,12 +64,13 @@ async def user_can_see(user: dict | None, visibility: str | None) -> bool:
 
 async def lead_can_see(user: dict | None, visibility: str | None) -> bool:
     """Für Events, Turniere und Fast Laps: die Turnierleitung (Rolle oder Freigabe) legt sie an, checkt ein und wertet
-    aus - sie sieht sie auch mit „Nur Mitglieder“, so wie ihre Verwaltungsseiten sie brauchen. Für News, Galerie,
-    Dokumente und alles andere gilt ``user_can_see`` (#1350)."""
+    aus - sie sieht sie auch mit „Nur Mitglieder“, so wie ihre Verwaltungsseiten sie brauchen - wie jeder Adminbereich
+    nur mit bestätigter Zwei-Faktor-Anmeldung (#291). Für News, Galerie, Dokumente und alles andere gilt
+    ``user_can_see`` (#1350)."""
     if (visibility or "public") == "members":
-        from services.permissions import is_tournament_lead
+        from services.permissions import is_confirmed_tournament_lead
 
-        if is_tournament_lead(user):
+        if is_confirmed_tournament_lead(user):
             return True
     return await user_can_see(user, visibility)
 

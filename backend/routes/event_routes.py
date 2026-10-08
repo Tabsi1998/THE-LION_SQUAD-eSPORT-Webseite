@@ -19,8 +19,8 @@ from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import billing_orders, event_days, event_locations, event_registration, pricing
 from services.event_registration import RegistrationError
-from services.permissions import areas_for, user_has_area
-from services.permissions import is_tournament_lead
+from services.permissions import areas_for, needs_mfa, user_has_area
+from services.permissions import is_confirmed_tournament_lead
 from models import EventCreate, EventUpdate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -44,7 +44,7 @@ async def _lead_can_see(user: dict | None, visibility: str) -> bool:
 
 async def _filter_related(items: list[dict], user: dict | None, kind: str, access: str | None = None) -> list[dict]:
     out: list[dict] = []
-    is_staff = is_tournament_lead(user)
+    is_staff = is_confirmed_tournament_lead(user)
     db = get_db()
     target_type = "fastlap" if kind == "fastlap" else kind
     for item in items:
@@ -410,8 +410,9 @@ async def _attach_event_registration_view(event: dict, user: dict | None) -> Non
     App liest `participant_view` und `can_check_in`, statt Rollen selbst zu deuten.
     """
     db = get_db()
-    is_staff = is_tournament_lead(user)
-    areas = await areas_for(user) if user else set()
+    is_staff = is_confirmed_tournament_lead(user)
+    # Adminbereiche zählen hier wie überall nur mit bestätigter Zwei-Faktor-Anmeldung (#291).
+    areas = await areas_for(user) if user and not needs_mfa(user) else set()
     manages = is_staff or bool(areas & {"tournaments", "club"})
     sees_price = is_staff or "finance" in areas
     event["own_registration"] = None
@@ -503,7 +504,7 @@ async def list_events(
     user: dict | None = Depends(get_optional_user),
 ):
     db = get_db()
-    is_admin = is_tournament_lead(user)
+    is_admin = is_confirmed_tournament_lead(user)
     q: dict = {}
     if status:
         if status == "draft" and not (include_drafts and is_admin):
@@ -601,7 +602,7 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     event, was_old_slug = await _find_event(slug_or_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
-    is_admin = is_tournament_lead(user)
+    is_admin = is_confirmed_tournament_lead(user)
     access_link = await validate_access_link(db, access, "event", event["id"], user, "view")
     has_access = bool(access_link)
     if event.get("status") == "draft" and not (is_admin or has_access):

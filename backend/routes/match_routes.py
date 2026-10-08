@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from database import get_db
-from services.permissions import is_tournament_lead, tournament_lead_filter
+from services.permissions import is_confirmed_tournament_lead, is_tournament_lead, tournament_lead_filter
 from services import moderation_standing
 from auth import get_current_user, get_optional_user
 from services.visibility import lead_can_see
@@ -84,8 +84,9 @@ async def _ensure_match_tournament_unlocked(db, match: dict) -> None:
 
 
 def _is_staff(user: dict | None) -> bool:
-    # Bereich Turnierleitung aus Rolle oder Freigabe (#1350).
-    return is_tournament_lead(user)
+    # Bereich Turnierleitung aus Rolle oder Freigabe (#1350) - für die angemeldete Person nur mit bestätigter
+    # Zwei-Faktor-Anmeldung (#291). Empfänger von Erwähnungen (unten) prüft is_tournament_lead am Konto.
+    return is_confirmed_tournament_lead(user)
 
 
 async def _sees_internal(match: dict, user: dict | None) -> bool:

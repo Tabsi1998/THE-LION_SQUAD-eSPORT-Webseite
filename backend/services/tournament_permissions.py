@@ -2,12 +2,13 @@
 from fastapi import HTTPException
 
 from database import get_db
-from services.permissions import is_tournament_lead
+from services.permissions import MFA_MESSAGE, is_confirmed_tournament_lead, lead_without_second_factor
 
 # Turnierrechte für alle Turniere: wer den Bereich Turnierleitung hat - über die Rolle (Turnierleitung,
 # Club-Admin, Superadmin) oder eine Freigabe (#1350). Moderatoren moderieren; in einem einzelnen Turnier
 # bekommen sie genau die Rechte eines Helfer-Einsatzes (tournament_staff_assignments) - wie jede andere
-# Person auch. Die Rollenlisten bleiben nur als Auskunft für ältere Aufrufer.
+# Person auch. Die Rechte über alle Turniere gelten wie jeder Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung
+# (#291); Helfer-Einsätze brauchen sie nicht. Die Rollenlisten bleiben nur als Auskunft für ältere Aufrufer.
 GLOBAL_TOURNAMENT_STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 GLOBAL_TOURNAMENT_ADMIN_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
@@ -21,11 +22,11 @@ PARTICIPANT_STAFF_ROLES = {"organizer", "referee", "scorekeeper"}
 
 
 def is_global_tournament_staff(user: dict | None) -> bool:
-    return is_tournament_lead(user)
+    return is_confirmed_tournament_lead(user)
 
 
 def is_global_tournament_admin(user: dict | None) -> bool:
-    return is_tournament_lead(user)
+    return is_confirmed_tournament_lead(user)
 
 
 async def assigned_tournament_ids(user: dict | None) -> list[str]:
@@ -141,4 +142,6 @@ async def require_tournament_staff_permission(
 ) -> None:
     if await has_tournament_staff_permission(user, tournament_id, allowed_roles, scope, scope_id):
         return
+    if lead_without_second_factor(user):
+        raise HTTPException(status_code=403, detail=MFA_MESSAGE)
     raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
