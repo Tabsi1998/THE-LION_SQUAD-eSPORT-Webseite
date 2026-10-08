@@ -97,7 +97,7 @@ from routes.dsgvo_routes import dsgvo_router
 from routes.export_routes import pdf_router
 from routes.audit_routes import audit_router
 from services.image_variants import resolve_variant as resolve_image_variant
-from services import ops_monitor
+from services import ops_monitor, share_image_cache
 from services.change_events import (
     change_event_stream,
     publish_api_change,
@@ -447,9 +447,14 @@ async def security_headers(request, call_next):
     # Abfrage (#632) setzt ihre Cache-Regel selbst: eine Minute öffentlich, Vorschau ohne Cache. „Discord jetzt“ (#854)
     # steht im Footer jeder Seite und ist für alle gleich (nur Zahlen) - eine Minute öffentlich.
     if request.url.path.startswith("/api/") and not request.url.path.startswith(("/api/stickers/files/", "/api/seasonal/", "/api/home/discord")):
-        response.headers["Cache-Control"] = "no-store"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+        if response.status_code == 200 and share_image_cache.is_public_share_image(request.url.path):
+            # Teilen-Bilder (#1412): öffentlich und für alle gleich - fünf Minuten zwischenspeicherbar. Genau diese
+            # Pfade und nur bei Erfolg; alles andere bleibt no-store, auch das private Bild des Jahresrückblicks.
+            response.headers["Cache-Control"] = share_image_cache.CACHE_CONTROL
+        else:
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
     return response
 
 

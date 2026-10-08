@@ -101,6 +101,57 @@ expect_nonce_csp() {
   }
 }
 
+header_value() {
+  local headers="$1"
+  local name="$2"
+  printf '%s\n' "$headers" | awk -v name="$name" 'BEGIN { IGNORECASE=1 } index(tolower($0), tolower(name) ":") == 1 { sub(/^[^:]+:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }'
+}
+
+visitor_headers() {
+  local path="$1"
+  local visitor="$2"
+  curl --silent --show-error --head --header "Host: lionsquad.at" --header "X-Forwarded-For: ${visitor}" "${base_url}${path}"
+}
+
+status_of() {
+  printf '%s\n' "$1" | awk 'NR == 1 { print $2 }'
+}
+
+# Teilen-Bilder (#1412): nur die öffentlichen Bilder bekommen von nginx kein "no-store" (das Backend erlaubt dort
+# fünf Minuten) und haben eine Bremse je Besucher. Der Besucher ist die letzte Adresse in X-Forwarded-For, weil die
+# Verbindung hier aus einem Docker-Netz kommt wie von einem Proxy. Alles andere unter /api: no-store, keine Bremse.
+# Ohne Backend antwortet nginx sonst mit 502 - hier zählen nur die Kopfzeilen und die 429.
+expect_share_image_rules() {
+  local headers limited=""
+  headers="$(visitor_headers "/api/achievements/share/route-contract.png" "203.0.113.7")"
+  test "$(status_of "$headers")" != "429" && test -z "$(header_value "$headers" "Cache-Control")" \
+    && test "$(header_value "$headers" "X-Content-Type-Options")" = "nosniff" || {
+    printf 'Expected the share image without the nginx no-store but with the security headers.\n%s\n' "$headers" >&2
+    return 1
+  }
+  for _ in {1..60}; do
+    headers="$(visitor_headers "/api/share/result/cup/neonfalke/story.png" "203.0.113.7")"
+    if test "$(status_of "$headers")" = "429"; then
+      limited="yes"
+      break
+    fi
+  done
+  test -n "$limited" || {
+    printf 'Expected 429 after a burst of share-image requests from one visitor.\n%s\n' "$headers" >&2
+    return 1
+  }
+  headers="$(visitor_headers "/api/share/result/cup/neonfalke/wide.png" "198.51.100.7, 203.0.113.8")"
+  test "$(status_of "$headers")" != "429" || {
+    printf 'A second visitor must keep a limit of its own.\n%s\n' "$headers" >&2
+    return 1
+  }
+  headers="$(visitor_headers "/api/year-review/me/card.png" "203.0.113.7")"
+  test "$(status_of "$headers")" != "429" && test "$(header_value "$headers" "Cache-Control")" = "no-store" || {
+    printf 'Expected the private year-review image without a limit and with no-store.\n%s\n' "$headers" >&2
+    return 1
+  }
+}
+
 for path in / /about /esports /tournaments /fastlap /galerie /players; do
   expect_status "$path" 200
 done
@@ -140,5 +191,6 @@ done
 
 expect_redirect "/esports?view=live" "https://lionsquad.at/esports?view=live" "www.lionsquad.at" "308"
 expect_nonce_csp
+expect_share_image_rules
 
 printf 'Public route contract passed.\n'

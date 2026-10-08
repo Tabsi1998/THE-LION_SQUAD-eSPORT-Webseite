@@ -171,13 +171,17 @@ async def shared_award(award_id: str):
 
 @router.get("/share/{award_id}.png")
 async def shared_award_card(award_id: str):
-    """Die Teilen-Karte (#619): 1200×630 als PNG, serverseitig gezeichnet (Pillow, ohne Browser)."""
+    """Die Teilen-Karte (#619): 1200×630 als PNG, serverseitig gezeichnet (Pillow, ohne Browser). Gleiche Daten,
+    gleiches Bild (#1412): gezeichnet wird beim ersten Abruf und sobald sich etwas geändert hat; fünf Minuten
+    zwischenspeicherbar (services/share_image_cache)."""
     from fastapi.responses import Response
     from services.achievement_share import render_card, share_payload
+    from services.share_image_cache import share_images
     payload = await share_payload(get_db(), award_id)
     if not payload:
         raise HTTPException(404, "Dieser Erfolg ist nicht öffentlich.")
-    return Response(content=render_card(payload), media_type="image/png",
+    png = share_images.get_or_draw(("achievement", award_id), payload, lambda: render_card(payload))
+    return Response(content=png, media_type="image/png",
                     headers={"Content-Disposition": f'inline; filename="achievement-{award_id}.png"'})
 
 
