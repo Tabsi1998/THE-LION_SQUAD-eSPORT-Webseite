@@ -28,7 +28,7 @@ test("die drei Vereinsschriften kommen vom eigenen Server und sind nach dem Lade
     const url = new URL(request.url());
     const type = request.resourceType();
     if (type === "font") fontFiles.push(url.pathname);
-    if ((type === "font" || type === "stylesheet" || /fonts\.(googleapis|gstatic)\.com/.test(url.hostname)) && !OWN_HOSTS.has(url.hostname)) {
+    if ((type === "font" || type === "stylesheet" || /^fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)) && !OWN_HOSTS.has(url.hostname)) {
       foreign.push(request.url());
     }
   });

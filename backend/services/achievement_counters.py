@@ -29,6 +29,12 @@ SIGNALS = "user_signals"
 STALE_SECONDS = 600
 LOGO_CLICKS_FOR_TAMER = 20
 
+
+def _log_safe(value, limit: int = 120) -> str:
+    """Werte ins Protokoll nur ohne Zeilenumbrüche - sonst ließe sich eine falsche Protokollzeile einschleusen."""
+    return str(value or "").replace("\r", " ").replace("\n", " ")[:limit]
+
+
 # Quellen: wer ein Ereignis auslöst, nennt sie - danach richtet sich, welche Zähler neu gerechnet werden.
 SOURCES = ("match", "tournament", "fastlap", "season", "team", "event", "community", "discord", "chat", "profile",
            "club", "achievement", "xp", "signal", "stream", "friend")
@@ -773,7 +779,7 @@ async def compute(user_id: str, keys: set[str] | None = None, legacy: bool = Tru
         try:
             values[key] = int(await item.compute(ctx) or 0)
         except Exception:  # noqa: BLE001 - ein kaputter Zähler hält die anderen nicht auf
-            logger.warning("[achievements] counter %s failed for %s", key, user_id, exc_info=True)
+            logger.warning("[achievements] counter %s failed for %s", key, _log_safe(user_id), exc_info=True)
     return values
 
 

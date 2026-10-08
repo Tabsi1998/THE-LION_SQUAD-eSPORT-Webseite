@@ -85,17 +85,16 @@ def test_all_widths_come_from_a_single_reading(bild, monkeypatch):
     Vorher hieß jede Breite ein eigenes Öffnen - unter Windows hielt das die
     Datei fest, während die Bildprüfung sie in die Quarantäne verschieben wollte.
     """
-    import services.image_variants as variants
-
+    # Das Modul liest Bilder über dasselbe PIL-Modul wie dieser Test - Image.open hier zu zählen reicht.
     quelle = bild(width=2400, height=1600)
     geoeffnet = []
-    original = variants.Image.open
+    original = Image.open
 
     def zaehlen(*args, **kwargs):
         geoeffnet.append(args[0])
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(variants.Image, "open", zaehlen)
+    monkeypatch.setattr(Image, "open", zaehlen)
     fertig = build_all_variants(quelle)
 
     assert [pfad.name for pfad in fertig] == [f"foto-{breite}.webp" for breite in VARIANT_WIDTHS]
