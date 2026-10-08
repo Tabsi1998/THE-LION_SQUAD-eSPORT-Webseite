@@ -35,6 +35,7 @@ import {
   Monitor, Music, Newspaper, Pizza, Radio, Star, Trophy, UserPlus, Users, Wifi, XCircle,
 } from "lucide-react";
 import { viennaDate, viennaDateTime, viennaTime } from "@/lib/vienna";
+import { ShareButton } from "@/components/tls/ShareButton";
 
 // Die Event-Seite als Startpunkt (#1183) mit Kopf und Bild (#1273) und Fakten-Kasten (#1346). Feste Reihenfolge, gleich in
 // der App (EventDetailScreen): 1. Dein Event, 2. Was läuft beim Event, 3. Live verfolgen, 4. Fotos, 5. News, 6. Infos
@@ -240,6 +241,8 @@ function EventHeader({ e }) {
               <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]" data-testid="event-kind">{eventKindLabel(e.event_type)}</span>
               <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status || "draft"} size="md" />
               {chip && <span className={`text-[11px] font-bold ${e.visibility === "members" ? "text-[#FFD700]" : "text-white/60"}`} data-testid="event-visibility">{chip}</span>}
+              {/* Teilen (#1154): oben rechts; interne Events öffnen sich nur für Mitglieder. */}
+              <ShareButton kind="event" id={e.slug || e.id} title={e.name} start={e.start_date} end={e.end_date} className="ml-auto" />
             </div>
             <h1 className="mt-3 font-heading text-4xl md:text-5xl xl:text-6xl font-black uppercase leading-tight break-words">{e.name}</h1>
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/70 min-w-0">

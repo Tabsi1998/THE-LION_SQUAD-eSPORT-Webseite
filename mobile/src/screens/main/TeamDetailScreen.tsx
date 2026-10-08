@@ -22,6 +22,8 @@ import type { TeamStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 import type { Team, TeamSquad, User } from "../../types";
 import { ImagePickField } from "../../components/ImagePickField";
+import { useShareHeader } from "../../components/HeaderActions";
+import { sharePage } from "../../lib/share";
 
 type Props = NativeStackScreenProps<TeamStackParamList, "TeamDetail">;
 type Candidate = { id: string; username?: string; display_name?: string; avatar_url?: string | null; has_pending_invite?: boolean };
@@ -49,6 +51,9 @@ const emptySquad: SquadForm = { name: "", description: "", game_id: "", status: 
 export function TeamDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [team, setTeam] = useState<Team | undefined>();
+  // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
+  const share = useMemo(() => (team ? () => { void sharePage({ kind: "team", id: String(team.id), title: team.tag ? `${team.name} [${team.tag}]` : team.name, detail: "Team" }); } : null), [team]);
+  useShareHeader(navigation, share);
   // Termine und letzte Spiele (#1191) aus den Team-Anmeldungen; Einladungs-Link mit QR-Code für Kapitäne.
   const [overview, setOverview] = useState<TeamOverview | null>(null);
   const inviteToken = route.params.invite || "";

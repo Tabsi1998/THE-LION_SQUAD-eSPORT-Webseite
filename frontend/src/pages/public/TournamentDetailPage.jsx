@@ -37,6 +37,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { GameDiscordTile } from "@/components/tls/DiscordServerTile";
 import { viennaDateTime } from "@/lib/vienna";
+import { ShareButton } from "@/components/tls/ShareButton";
 
 export default function TournamentDetailPage() {
   const { slug } = useParams();
@@ -239,7 +240,11 @@ export default function TournamentDetailPage() {
               </Link>
             ))}
           </div>
-          <h1 data-testid="tournament-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{t.title}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 data-testid="tournament-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight min-w-0 break-words">{t.title}</h1>
+            {/* Teilen (#1154): oben rechts neben dem Titel. */}
+            <ShareButton kind="tournament" id={t.slug || t.id} title={t.title} start={t.start_date} end={t.end_date} className="shrink-0 mt-1" />
+          </div>
           {t.description && <div className="mt-4 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(t.description) }} />}
 
           <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">

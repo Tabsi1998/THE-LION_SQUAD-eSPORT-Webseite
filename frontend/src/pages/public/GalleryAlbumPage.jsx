@@ -25,6 +25,7 @@ import {
 } from "@/lib/galleryMedia";
 import { ArrowLeft, X, ChevronLeft, ChevronRight, Calendar, Play, Film, ExternalLink, Layers, Download } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
+import { ShareButton } from "@/components/tls/ShareButton";
 
 function dimensionKey(item) {
   return item?.id || galleryMediaUrl(item) || item?.image_url || "";
@@ -151,9 +152,13 @@ export default function GalleryAlbumPage() {
           ]}
           className="mb-3"
         />
-        <Link to="/galerie" data-testid="album-back" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
-          <ArrowLeft className="w-3.5 h-3.5" /> Alle Alben
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link to="/galerie" data-testid="album-back" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
+            <ArrowLeft className="w-3.5 h-3.5" /> Alle Alben
+          </Link>
+          {/* Teilen (#1154): Mitglieder-Alben öffnen sich nur für Mitglieder. */}
+          <ShareButton kind="album" id={a.slug || a.id} title={a.title} detail="Galerie" />
+        </div>
         <h1 className="mt-6 font-heading text-3xl md:text-5xl font-black uppercase">{a.title}</h1>
         <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/60">
           {a.taken_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {viennaDate(a.taken_at, { dateStyle: "long" })}</span>}

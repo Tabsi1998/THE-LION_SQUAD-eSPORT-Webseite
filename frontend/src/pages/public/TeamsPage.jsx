@@ -34,6 +34,7 @@ import { inviteTokenFrom, memberRole, ROLE_LABELS } from "@/lib/teamPage";
 import { AUTO_COLOR, TEAM_COLORS } from "@/lib/teamColors";
 import { PublicErrorState } from "@/components/tls/PublicEmptyState";
 import { problemKind } from "@/lib/loadProblem";
+import { ShareButton } from "@/components/tls/ShareButton";
 
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "", color: AUTO_COLOR };
 
@@ -322,12 +323,18 @@ function TeamDetail({ id }) {
         header={overview?.header}
         levelInfo={levelInfo}
         userId={user?.id}
-        actions={canEdit ? (
+        actions={(
           <>
-            <button type="button" onClick={() => setInviteOpen(true)} data-testid="team-invite-open" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><UserPlus className="w-3.5 h-3.5" /> Einladen</button>
-            <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
+            {canEdit ? (
+              <>
+                <button type="button" onClick={() => setInviteOpen(true)} data-testid="team-invite-open" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><UserPlus className="w-3.5 h-3.5" /> Einladen</button>
+                <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
+              </>
+            ) : null}
+            {/* Teilen (#1154): für alle, auch Gäste. */}
+            <ShareButton kind="team" id={team.id} title={team.tag ? `${team.name} [${team.tag}]` : team.name} detail="Team" />
           </>
-        ) : null}
+        )}
       >
         {team.featured_award && (
           <div className="mt-5 w-full max-w-xl text-left" data-testid="team-featured-award">

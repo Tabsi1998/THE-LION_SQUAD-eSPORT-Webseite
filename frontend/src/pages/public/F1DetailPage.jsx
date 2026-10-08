@@ -21,6 +21,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
+import { ShareButton } from "@/components/tls/ShareButton";
 
 const PUBLIC_RESULT_STATUSES = new Set(["completed", "results_published", "archived"]);
 
@@ -104,7 +105,11 @@ export default function F1DetailPage() {
             <PhaseBadge phase={challenge.public_phase} status={challenge.status} size="lg" />
             {challenge.is_championship && <span className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 px-2 py-1 rounded-sm">Championship</span>}
           </div>
-          <h1 data-testid="f1-challenge-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{challenge.title}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 data-testid="f1-challenge-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight min-w-0 break-words">{challenge.title}</h1>
+            {/* Teilen (#1154): oben rechts neben dem Titel. */}
+            <ShareButton kind="fastlap" id={challenge.slug || challenge.id} title={challenge.title} detail="Fast Lap" start={challenge.start_date} end={challenge.end_date} className="shrink-0 mt-1" />
+          </div>
           {challenge.description && <div className="mt-3 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(challenge.description) }} />}
           {challenge.event && (
             <Link to={`/events/${challenge.event.slug || challenge.event.id}`} className="tls-btn tls-btn--secondary mt-4 inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">

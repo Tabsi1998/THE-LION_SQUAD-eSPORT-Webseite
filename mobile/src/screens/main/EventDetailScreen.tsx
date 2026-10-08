@@ -31,6 +31,8 @@ import { openSignIn } from "../../navigation/rootNavigation";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors, kindColors, radius } from "../../theme";
 import type { ClubEvent, EventRegistration, F1Challenge, NewsPost, Tournament } from "../../types";
+import { useShareHeader } from "../../components/HeaderActions";
+import { sharePage } from "../../lib/share";
 
 // Einzahl und Mehrzahl (#1223): „1 Platz“, „2 Plätze“, „1 Begleitperson“, „2 Begleitpersonen“.
 function placesLabel(count: number): string {
@@ -65,6 +67,9 @@ type EventDetail = ClubEvent & {
 export function EventDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [event, setEvent] = useState<EventDetail | null>(null);
+  // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
+  const share = useMemo(() => (event ? () => { void sharePage({ kind: "event", id: String(event.slug || event.id), title: event.title || event.name || "Event", start: (event.start_date || event.date) as string, end: event.end_date }); } : null), [event]);
+  useShareHeader(navigation, share);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);

@@ -27,6 +27,8 @@ import type { TournamentStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 import type { Team, Tournament, User } from "../../types";
 import { useSeasonOverlay } from "../../seasons/anchors";
+import { useShareHeader } from "../../components/HeaderActions";
+import { sharePage } from "../../lib/share";
 
 const TOURNAMENT_LIVE_RESOURCES = ["tournaments", "matches", "matches-v2", "teams"];
 
@@ -62,6 +64,9 @@ const CLOSED_MATCH_STATUSES = new Set(["completed", "forfeit", "closed"]);
 export function TournamentDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [tournament, setTournament] = useState<Tournament | undefined>();
+  // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
+  const share = useMemo(() => (tournament ? () => { void sharePage({ kind: "tournament", id: String(tournament.slug || tournament.id), title: tournament.title, start: tournament.start_date, end: tournament.end_date }); } : null), [tournament]);
+  useShareHeader(navigation, share);
   const [bracket, setBracket] = useState<BracketPayload>({});
   const [standings, setStandings] = useState<any[]>([]);
   const [myTeams, setMyTeams] = useState<Team[]>([]);

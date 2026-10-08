@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { Card } from "../../components/Card";
@@ -18,12 +18,17 @@ import { isGuestUser } from "../../live";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 import type { NewsPost } from "../../types";
+import { useShareHeader } from "../../components/HeaderActions";
+import { sharePage } from "../../lib/share";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "NewsDetail">;
 export function NewsDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const readerId = user?.id && !isGuestUser(user) ? user.id : null;
   const [post, setPost] = useState<NewsPost | null>(null);
+  // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
+  const share = useMemo(() => (post ? () => { void sharePage({ kind: "news", id: String(post.slug || post.id), title: post.title }); } : null), [post]);
+  useShareHeader(navigation, share);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.

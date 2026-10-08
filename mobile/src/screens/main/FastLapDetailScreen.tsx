@@ -16,12 +16,17 @@ import { getRegistrationState, hasOnlineRegistration } from "../../lib/registrat
 import { colors, radius } from "../../theme";
 import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload, PublicUser } from "../../types";
 import { Button } from "../../components/Button";
+import { useShareHeader } from "../../components/HeaderActions";
+import { sharePage } from "../../lib/share";
 
-type Props = { route: { params: { id: string } } };
+type Props = { route: { params: { id: string } }; navigation?: { setOptions?: (options: { headerRight?: () => React.ReactNode }) => void } };
 
-export function FastLapDetailScreen({ route }: Props) {
+export function FastLapDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [challenge, setChallenge] = useState<F1Challenge | null>(null);
+  // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
+  const share = useMemo(() => (challenge ? () => { void sharePage({ kind: "fastlap", id: String(challenge.slug || challenge.id), title: challenge.title, detail: "Fast Lap", start: challenge.start_date, end: challenge.end_date }); } : null), [challenge]);
+  useShareHeader(navigation, share);
   const [leaderboard, setLeaderboard] = useState<F1LeaderboardPayload | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

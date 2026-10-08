@@ -12,6 +12,8 @@ import { formatDate } from "../../lib/format";
 import { albumCountLabel, groupBySection, mediaType, posterUrl, sizedUpload, type GalleryAlbum, type GalleryItem } from "../../lib/gallery";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
+import { useShareHeader } from "../../components/HeaderActions";
+import { sharePage } from "../../lib/share";
 
 // Album (#236): Raster aus 400-px-Kacheln, drei je Zeile; Abschnitte wie im Web. Antippen
 // öffnet die Großansicht an dieser Stelle.
@@ -23,6 +25,9 @@ export function GalleryAlbumScreen({ navigation, route }: Props) {
   const { id } = route.params;
   const { width } = useWindowDimensions();
   const [album, setAlbum] = useState<GalleryAlbum | null>(null);
+  // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
+  const share = useMemo(() => (album ? () => { void sharePage({ kind: "album", id: String(album.slug || album.id), title: album.title, detail: "Galerie" }); } : null), [album]);
+  useShareHeader(navigation, share);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
