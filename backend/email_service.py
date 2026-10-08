@@ -251,11 +251,16 @@ def tpl_match_reminder(tournament_title: str, opponent: str, when: str, url: str
     )
 
 
-def tpl_score_reported(tournament_title: str, url: str) -> tuple[str, str]:
+def tpl_score_reported(tournament_title: str, url: str, summary: str = "") -> tuple[str, str]:
+    # Ergebnis melden (#1132): die Gegenseite hat gemeldet - bestätigen oder anders melden.
+    reported = f"<p>Gemeldet: <strong>{html_lib.escape(summary)}</strong></p>" if summary else ""
     return f"Ergebnis gemeldet: {tournament_title}", _wrap(
-        "Ergebnis wurde gemeldet",
-        "<p>Ein Spielergebnis wurde gemeldet. Bitte bestätige oder widersprich es zeitnah.</p>",
-        "Match öffnen", url,
+        "Bitte bestätige das Ergebnis",
+        f"<p>Die Gegenseite hat für dein Spiel im Turnier <strong>{tournament_title}</strong> ein Ergebnis gemeldet.</p>"
+        + reported
+        + "<p>Stimmt es, bestätige es auf der Matchseite. Stimmt es nicht, melde dein Ergebnis – dann entscheidet die "
+        "Turnierleitung.</p>",
+        "Zum Match", url,
     )
 
 

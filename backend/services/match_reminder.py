@@ -10,6 +10,7 @@ from database import get_db
 from models import now_utc
 from services.competition_read import load_scheduled_matches
 from services.match_audience import match_player_users, playing_ids, registrations_for_match, teams_by_id, users_for
+from services.tournament_rules import uses_actual_start_notifications
 from services.user_notifications import build_public_url, create_user_notification
 
 logger = logging.getLogger("tls.match_reminders")
@@ -20,14 +21,9 @@ LEAD_TIMES = [
 EMAIL_LEAD_LABELS = {"10m"}
 
 
-def _uses_actual_start_notifications(tournament: dict) -> bool:
-    event_mode = tournament.get("event_mode") or (
-        "local" if tournament.get("location") and not tournament.get("stream_link") else "online"
-    )
-    schedule_mode = tournament.get("schedule_mode") or (
-        "fixed_by_staff" if event_mode == "local" else "player_proposal"
-    )
-    return event_mode == "local" and schedule_mode == "fixed_by_staff"
+# Vor Ort mit festen Zeiten: kein Hinweis vorher, der Aufruf beim Reservieren und der Start sagen es (Regel an einer
+# Stelle: services/tournament_rules).
+_uses_actual_start_notifications = uses_actual_start_notifications
 
 
 async def _participants_for_match(match: dict) -> list[dict]:
@@ -112,8 +108,8 @@ async def schedule_match_reminders() -> dict:
                 "slug": 1,
                 "event_mode": 1,
                 "schedule_mode": 1,
-                "location": 1,
-                "stream_link": 1,
+                "is_online": 1,
+                "is_hybrid": 1,
             },
         ) or {}
         if _uses_actual_start_notifications(t):

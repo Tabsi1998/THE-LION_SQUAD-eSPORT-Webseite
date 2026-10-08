@@ -19,7 +19,8 @@ def test_v2_online_matches_keep_player_schedule_by_default():
     policy = _match_policy({"id": "m1"}, {"id": "t1", "event_mode": "online"}, None)
 
     assert policy["event_mode"] == "online"
-    assert policy["result_entry_mode"] == "staff_only"
+    # Entscheidung B zu #1132: online melden ohne eigene Angabe die Spieler selbst, die Gegenseite bestätigt.
+    assert policy["result_entry_mode"] == "player_confirmed"
     assert policy["schedule_mode"] == "player_proposal"
     assert _schedule_proposals_enabled(policy)
 

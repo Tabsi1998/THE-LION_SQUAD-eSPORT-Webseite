@@ -26,6 +26,9 @@ ALL = set(areas.AREAS)
         ("frontend/src/components/achievements/motifs/play.jsx", {"frontend", "mobile", "container"}),
         ("frontend/src/components/achievements/materials.js", {"frontend", "mobile", "container"}),
         ("frontend/src/components/achievements/Badge.jsx", {"frontend", "container"}),
+        # Gemeinsame Testfälle von Website und App (#1132, #1140) prüft auch der App-Job.
+        ("frontend/src/lib/matchReport.cases.json", {"frontend", "mobile", "container"}),
+        ("frontend/src/lib/matchReport.js", {"frontend", "container"}),
         ("scripts/check-secrets.py", {"backend"}),
         # Beide Skripte ruft der Frontend-Job auf.
         ("scripts/check-public-routes.sh", {"backend", "frontend"}),

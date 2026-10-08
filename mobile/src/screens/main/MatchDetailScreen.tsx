@@ -32,6 +32,8 @@ import { colors } from "../../theme";
 import type { ChatMessage, Tournament } from "../../types";
 import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmentDrafts } from "../../components/ChatAttachments";
 import { MessageSticker, StickerButton, StickerPicker } from "../../components/ChatStickers";
+import { MatchReportCard, type ReportPayload, type ReportState } from "../../components/MatchReportCard";
+import { rankingMode } from "../../lib/matchReport";
 import type { CatalogSticker } from "../../lib/stickers";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 
@@ -59,6 +61,7 @@ type ScheduleProposal = {
 
 type MatchPage = {
   acting_registration_id?: string | null;
+  allows_draw?: boolean;
   can_act?: boolean;
   can_dispute?: boolean;
   can_forfeit?: boolean;
@@ -73,6 +76,7 @@ type MatchPage = {
   match?: any;
   matchday_label?: string;
   participants?: MatchParticipant[];
+  report_state?: ReportState;
   result_entry_mode?: "staff_only" | "player_confirmed" | "hybrid" | string;
   schedule_proposals?: ScheduleProposal[];
   schedule_mode?: "fixed_by_staff" | "player_proposal" | "hybrid" | string;
@@ -111,8 +115,6 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const [counterAt, setCounterAt] = useState("");
   const [decisionNote, setDecisionNote] = useState("");
   const [message, setMessage] = useState("");
-  const [scoreA, setScoreA] = useState("");
-  const [scoreB, setScoreB] = useState("");
   const [proofUrl, setProofUrl] = useState("");
   const [resultNote, setResultNote] = useState("");
   const [disputeReason, setDisputeReason] = useState("");
@@ -142,14 +144,10 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       }
       if (preserveDrafts) {
         setProposalAt((current) => current || formatDateInput(match.scheduled_at));
-        setScoreA((current) => current || String(match.score_a ?? 0));
-        setScoreB((current) => current || String(match.score_b ?? 0));
         setForfeitWinnerId((current) => current || firstRegistrationId(nextPage?.participants));
         setV2Rows((current) => current.length ? current : buildV2Rows(nextPage));
       } else {
         setProposalAt(formatDateInput(match.scheduled_at));
-        setScoreA(String(match.score_a ?? 0));
-        setScoreB(String(match.score_b ?? 0));
         setForfeitWinnerId(firstRegistrationId(nextPage?.participants));
         setV2Rows(buildV2Rows(nextPage));
       }
@@ -167,8 +165,6 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setCounterAt("");
     setDecisionNote("");
     setMessage("");
-    setScoreA("");
-    setScoreB("");
     setProofUrl("");
     setResultNote("");
     setDisputeReason("");
@@ -200,10 +196,11 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const isCompleted = ["completed", "forfeit"].includes(String(match.status));
   const duelParticipants = participants.slice(0, 2);
   const canUseChat = Boolean(page?.can_act);
-  const canPlayerReportResult = Boolean(page?.can_player_report_result ?? page?.can_report_score);
+  // Ergebnis (#1132): Spieler melden über das Meldeformular (/report), die Turnierleitung trägt über /result ein. Wer
+  // beides dürfte, bekommt das Formular der Turnierleitung.
   const canStaffSubmitResult = Boolean(page?.can_staff_submit_result ?? page?.can_submit_result);
-  const canSubmitLegacyResult = Boolean(!isV2 && !isCompleted && duelParticipants.length >= 2 && (canPlayerReportResult || canStaffSubmitResult));
-  const canSubmitV2Result = Boolean(isV2 && !isCompleted && canStaffSubmitResult && v2Rows.length);
+  const canPlayerReportResult = Boolean((page?.can_player_report_result ?? page?.can_report_score) && !canStaffSubmitResult && !isCompleted);
+  const canSubmitV2Result = Boolean(!isCompleted && canStaffSubmitResult && v2Rows.length);
   const canProposeSchedule = Boolean(page?.can_propose_schedule);
   const canManageSchedule = Boolean(page?.can_manage_schedule);
   const hasScheduleProposals = pendingProposals.length > 0;
@@ -212,7 +209,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const eventModeLabel = formatEventMode(page?.event_mode);
   const resultModeLabel = formatResultEntryMode(page?.result_entry_mode);
   const scheduleModeLabel = formatScheduleMode(page?.schedule_mode);
-  const hasResultActions = Boolean(canSubmitLegacyResult || canSubmitV2Result || (!isCompleted && page?.can_dispute) || (!isCompleted && page?.can_forfeit));
+  const hasResultActions = Boolean(canPlayerReportResult || canSubmitV2Result || (!isCompleted && page?.can_dispute) || (!isCompleted && page?.can_forfeit));
   const showFlowNotice = Boolean(!hasResultActions && (page?.result_entry_mode || page?.schedule_mode));
 
   const propose = useCallback(async () => {
@@ -301,40 +298,24 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     });
   }, []);
 
-  const submitLegacyResult = useCallback(async () => {
-    if (!canSubmitLegacyResult || busy) return;
-    const a = Math.max(0, Number.parseInt(scoreA || "0", 10) || 0);
-    const b = Math.max(0, Number.parseInt(scoreB || "0", 10) || 0);
-    const winnerId = a > b ? duelParticipants[0]?.registration_id : b > a ? duelParticipants[1]?.registration_id : null;
+  // Ergebnis melden (#1132): die Platzierungsliste an /report - der Server vergleicht die Meldungen beider Seiten.
+  const submitReport = useCallback(async (payload: ReportPayload) => {
+    if (!canPlayerReportResult || busy) return false;
     setBusy(true);
     setError("");
     setSuccess("");
     try {
-      if (canStaffSubmitResult) {
-        await api.patch(`/matches/${route.params.id}`, {
-          score_a: a,
-          score_b: b,
-          status: winnerId ? "completed" : "waiting_result",
-          winner_id: winnerId,
-        });
-      } else {
-        await api.post(`/matches/${route.params.id}/report`, {
-          score_a: a,
-          score_b: b,
-          screenshot_url: proofUrl.trim() || null,
-          note: resultNote.trim() || null,
-        });
-      }
-      setProofUrl("");
-      setResultNote("");
+      const { data } = await api.post<{ awaiting_confirmation?: boolean }>(`/matches/${route.params.id}/report`, payload);
       await refreshAfterResult();
-      setSuccess(canStaffSubmitResult ? "Ergebnis gespeichert und Matchstand aktualisiert." : "Ergebnis gemeldet und Matchstand aktualisiert.");
+      setSuccess(data?.awaiting_confirmation === false ? "Ergebnis bestätigt – das Spiel ist entschieden." : "Ergebnis gemeldet.");
+      return true;
     } catch (err) {
       setError(errorMessage(err, "Ergebnis konnte nicht gemeldet werden."));
+      return false;
     } finally {
       setBusy(false);
     }
-  }, [busy, canStaffSubmitResult, canSubmitLegacyResult, duelParticipants, proofUrl, refreshAfterResult, resultNote, route.params.id, scoreA, scoreB]);
+  }, [busy, canPlayerReportResult, refreshAfterResult, route.params.id]);
 
   const submitV2Result = useCallback(async () => {
     if (!canSubmitV2Result || busy) return;
@@ -357,9 +338,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       setProofUrl("");
       setResultNote("");
       await refreshAfterResult();
-      setSuccess("Heat-Ergebnis gespeichert und Matchstand aktualisiert.");
+      setSuccess("Ergebnis gespeichert und Matchstand aktualisiert.");
     } catch (err) {
-      setError(errorMessage(err, "Heat-Ergebnis konnte nicht gespeichert werden."));
+      setError(errorMessage(err, "Ergebnis konnte nicht gespeichert werden."));
     } finally {
       setBusy(false);
     }
@@ -479,17 +460,16 @@ export function MatchDetailScreen({ navigation, route }: Props) {
 
         {hasResultActions ? (
           <Card style={styles.card}>
-            <Heading>Ergebnis eintragen</Heading>
-            {canSubmitLegacyResult ? (
-              <>
-                <View style={styles.scoreRow}>
-                  <FormInput label={duelParticipants[0]?.display_name || "Spieler A"} value={scoreA} keyboardType="number-pad" onChangeText={setScoreA} />
-                  <FormInput label={duelParticipants[1]?.display_name || "Spieler B"} value={scoreB} keyboardType="number-pad" onChangeText={setScoreB} />
-                </View>
-                <FormInput label="Nachweis-Link optional" value={proofUrl} onChangeText={setProofUrl} placeholder="https://..." />
-                <FormInput label="Notiz optional" value={resultNote} onChangeText={setResultNote} placeholder="Kommentar zum Ergebnis" />
-                <Button label={busy ? "Speichert ..." : canStaffSubmitResult ? "Ergebnis speichern" : "Ergebnis melden"} onPress={submitLegacyResult} disabled={busy} />
-              </>
+            <Heading>{canPlayerReportResult ? "Ergebnis melden" : canSubmitV2Result ? "Ergebnis eintragen" : "Ergebnis"}</Heading>
+            {canPlayerReportResult ? (
+              <MatchReportCard
+                participants={participants}
+                match={match}
+                state={page.report_state || null}
+                allowsDraw={Boolean(page.allows_draw)}
+                busy={busy}
+                onReport={submitReport}
+              />
             ) : null}
             {canSubmitV2Result ? (
               <>
@@ -513,7 +493,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                 ))}
                 <FormInput label="Nachweis-Link optional" value={proofUrl} onChangeText={setProofUrl} placeholder="https://..." />
                 <FormInput label="Notiz optional" value={resultNote} onChangeText={setResultNote} placeholder="Kommentar zum Heat" />
-                <Button label={busy ? "Speichert ..." : "Heat-Ergebnis speichern"} onPress={submitV2Result} disabled={busy} />
+                <Button label={busy ? "Speichert ..." : "Ergebnis speichern"} onPress={submitV2Result} disabled={busy} testID="match-staff-result-submit" />
               </>
             ) : null}
             {page.can_dispute ? (
@@ -717,13 +697,6 @@ function buildV2Rows(page?: MatchPage | null): V2ResultRow[] {
         time_ms: existing?.time_ms != null ? String(existing.time_ms) : "",
       };
     });
-}
-
-function rankingMode(match: any) {
-  const raw = String(match?.settings?.calculation || match?.settings?.score_type || "points").toLowerCase().replace(/[-\s]/g, "_");
-  if (["time", "time_ms", "fastest", "fastest_lap", "lowest_time", "best_time"].includes(raw)) return "time";
-  if (["lower_score", "lowest_score", "low_score", "strokes", "penalty_points"].includes(raw)) return "lower_score";
-  return "higher_score";
 }
 
 function firstRegistrationId(participants?: MatchParticipant[]) {
@@ -939,9 +912,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 10,
     padding: 10,
-  },
-  scoreRow: {
-    gap: 10,
   },
   slot: {
     alignItems: "center",

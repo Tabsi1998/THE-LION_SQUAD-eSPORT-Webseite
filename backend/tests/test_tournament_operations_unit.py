@@ -115,10 +115,12 @@ def test_local_staff_schedule_notifies_only_on_actual_station_start():
         "event_mode": "online",
         "schedule_mode": "fixed_by_staff",
     }) is False
+    # Ohne Angabe gilt online - wie im Admin und am Server (#1132); der Ort allein macht kein Vor-Ort-Turnier.
+    assert _uses_actual_start_notifications({"event_mode": "local"}) is True
     assert _uses_actual_start_notifications({
         "location": "Vereinsheim",
         "stream_link": None,
-    }) is True
+    }) is False
 
 
 def test_manual_live_start_does_not_change_status_before_hard_preflight(monkeypatch):

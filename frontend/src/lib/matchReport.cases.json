@@ -1,0 +1,87 @@
+{
+  "_hinweis": "Ergebnis melden (#1132): dieselben Fälle prüfen frontend/src/lib/matchReport.test.js und mobile/src/lib/matchReport.test.ts.",
+  "duel": [
+    {
+      "name": "Sieger ohne Spielstand",
+      "input": { "sides": ["a", "b"], "winner": "b", "values": {}, "mode": "higher_score" },
+      "results": [{ "registration_id": "b", "rank": 1 }, { "registration_id": "a", "rank": 2 }]
+    },
+    {
+      "name": "Sieger mit Spielstand",
+      "input": { "sides": ["a", "b"], "winner": "a", "values": { "a": "3", "b": "1" }, "mode": "higher_score" },
+      "results": [{ "registration_id": "a", "rank": 1, "score": 3 }, { "registration_id": "b", "rank": 2, "score": 1 }]
+    },
+    {
+      "name": "Unentschieden teilt Platz 1",
+      "input": { "sides": ["a", "b"], "winner": "draw", "values": { "a": "2", "b": "2" }, "mode": "higher_score" },
+      "results": [{ "registration_id": "a", "rank": 1, "score": 2 }, { "registration_id": "b", "rank": 1, "score": 2 }]
+    },
+    {
+      "name": "niedrigster Score gewinnt",
+      "input": { "sides": ["a", "b"], "winner": "b", "values": { "a": "72", "b": "68" }, "mode": "lower_score" },
+      "results": [{ "registration_id": "b", "rank": 1, "score": 68 }, { "registration_id": "a", "rank": 2, "score": 72 }]
+    },
+    {
+      "name": "schnellste Zeit gewinnt",
+      "input": { "sides": ["a", "b"], "winner": "b", "values": { "a": "61000", "b": "59500" }, "mode": "time" },
+      "results": [{ "registration_id": "b", "rank": 1, "time_ms": 59500 }, { "registration_id": "a", "rank": 2, "time_ms": 61000 }]
+    },
+    {
+      "name": "Komma als Dezimalzeichen",
+      "input": { "sides": ["a", "b"], "winner": "a", "values": { "a": "2,5", "b": "1" }, "mode": "higher_score" },
+      "results": [{ "registration_id": "a", "rank": 1, "score": 2.5 }, { "registration_id": "b", "rank": 2, "score": 1 }]
+    },
+    {
+      "name": "Spielstand widerspricht dem Sieger",
+      "input": { "sides": ["a", "b"], "winner": "a", "values": { "a": "1", "b": "3" }, "mode": "higher_score" },
+      "error": "Der Spielstand passt nicht zum Sieger."
+    },
+    {
+      "name": "Unentschieden mit ungleichem Stand",
+      "input": { "sides": ["a", "b"], "winner": "draw", "values": { "a": "3", "b": "1" }, "mode": "higher_score" },
+      "error": "Der Spielstand passt nicht zum Sieger."
+    },
+    {
+      "name": "Spielstand nur für eine Seite",
+      "input": { "sides": ["a", "b"], "winner": "a", "values": { "a": "3" }, "mode": "higher_score" },
+      "error": "Bitte den Spielstand für beide Seiten eintragen – oder für keine."
+    },
+    {
+      "name": "kein Sieger gewählt",
+      "input": { "sides": ["a", "b"], "winner": "", "values": {}, "mode": "higher_score" },
+      "error": "Bitte wähle, wer gewonnen hat."
+    },
+    {
+      "name": "keine Zahl",
+      "input": { "sides": ["a", "b"], "winner": "a", "values": { "a": "drei", "b": "1" }, "mode": "higher_score" },
+      "error": "Beim Spielstand bitte nur Zahlen eintragen."
+    },
+    {
+      "name": "Gegner steht noch nicht fest",
+      "input": { "sides": ["a"], "winner": "a", "values": {}, "mode": "higher_score" },
+      "error": "Für dieses Spiel stehen noch nicht beide Seiten fest."
+    }
+  ],
+  "heat": [
+    {
+      "name": "Plätze ohne Punkte",
+      "input": { "rows": [{ "registration_id": "a", "rank": "2", "value": "" }, { "registration_id": "b", "rank": "1", "value": "" }, { "registration_id": "c", "rank": "3", "value": "" }], "mode": "higher_score" },
+      "results": [{ "registration_id": "b", "rank": 1 }, { "registration_id": "a", "rank": 2 }, { "registration_id": "c", "rank": 3 }]
+    },
+    {
+      "name": "Plätze mit Zeiten",
+      "input": { "rows": [{ "registration_id": "a", "rank": "1", "value": "90500" }, { "registration_id": "b", "rank": "2", "value": "91200" }], "mode": "time" },
+      "results": [{ "registration_id": "a", "rank": 1, "time_ms": 90500 }, { "registration_id": "b", "rank": 2, "time_ms": 91200 }]
+    },
+    {
+      "name": "Platz doppelt",
+      "input": { "rows": [{ "registration_id": "a", "rank": "1", "value": "" }, { "registration_id": "b", "rank": "1", "value": "" }, { "registration_id": "c", "rank": "3", "value": "" }], "mode": "higher_score" },
+      "error": "Platz 1 ist doppelt vergeben."
+    },
+    {
+      "name": "Platz außerhalb",
+      "input": { "rows": [{ "registration_id": "a", "rank": "1", "value": "" }, { "registration_id": "b", "rank": "5", "value": "" }], "mode": "higher_score" },
+      "error": "Bitte für jeden einen Platz von 1 bis 2 eintragen."
+    }
+  ]
+}

@@ -13,6 +13,7 @@ from database import get_db
 from services.visibility import user_can_see
 from services.station_labels import attach_station_info
 from services.tournament_permissions import READ_STAFF_ROLES, has_tournament_staff_permission
+from services.tournament_rules import tournament_modes
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.competition_engine import GRAPH, preferred_engine
 from services.competition_formats import find_format_capability
@@ -226,9 +227,9 @@ def _planning_report(
     tournament = tournament or {}
     warnings: list[dict] = []
     errors: list[dict] = []
-    event_mode = tournament.get("event_mode") or ("local" if tournament.get("location") and not tournament.get("stream_link") else "online")
-    result_entry_mode = tournament.get("result_entry_mode") or ("staff_only" if event_mode == "local" else "player_confirmed")
-    schedule_mode = tournament.get("schedule_mode") or ("fixed_by_staff" if event_mode == "local" else "player_proposal")
+    # Dieselbe Regel wie am Server und im Admin (#1132): ohne Angabe melden online die Spieler selbst.
+    modes = tournament_modes(tournament)
+    event_mode, result_entry_mode, schedule_mode = modes["event_mode"], modes["result_entry_mode"], modes["schedule_mode"]
     if event_mode == "local" and result_entry_mode != "staff_only":
         warnings.append({
             "type": "rule_mode_conflict",
