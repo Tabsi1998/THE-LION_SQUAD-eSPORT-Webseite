@@ -3,6 +3,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { Copy, Link2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { viennaDate } from "@/lib/vienna";
+import { PersonPicker } from "@/components/tls/PersonPicker";
 
 const TARGET_LABELS = {
   event: "Event",
@@ -36,13 +37,13 @@ async function copyText(value) {
 
 export function AccessLinksPanel({ targetType, targetId, allowRegister = false, collapsible = false }) {
   const [links, setLinks] = useState([]);
-  const [users, setUsers] = useState([]);
   const [busy, setBusy] = useState(false);
   const [includeRegister, setIncludeRegister] = useState(allowRegister);
   const [note, setNote] = useState("");
   const [expiresInDays, setExpiresInDays] = useState("");
   const [maxUses, setMaxUses] = useState("");
-  const [userId, setUserId] = useState("");
+  // Gebundene Person (#1354): aus der Personensuche - die Adresse für den Link holt der Server selbst aus dem Konto.
+  const [person, setPerson] = useState(null);
   const [email, setEmail] = useState("");
   const [notifyUser, setNotifyUser] = useState(false);
   const [createdUrl, setCreatedUrl] = useState("");
@@ -60,12 +61,6 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
     load().catch(() => setLinks([]));
   }, [load]);
 
-  useEffect(() => {
-    api.get("/users")
-      .then(({ data }) => setUsers((data || []).filter((user) => user?.id)))
-      .catch(() => setUsers([]));
-  }, []);
-
   const create = async () => {
     setBusy(true);
     try {
@@ -79,10 +74,10 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
         grants,
         expires_at: expiresAt,
         max_uses: max > 0 ? max : null,
-        user_id: userId || null,
-        email: email.trim() || null,
+        user_id: person?.id || null,
+        email: person ? null : email.trim() || null,
         note: note.trim() || null,
-        notify_user: notifyUser && !!userId,
+        notify_user: notifyUser && !!person,
       });
       const url = data.absolute_url || absoluteUrl(data.url);
       setCreatedUrl(url);
@@ -229,38 +224,23 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
       </div>
 
       <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 items-end">
-        <label className="block">
-          <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">User optional</span>
-          <select
-            value={userId}
-            onChange={(event) => {
-              const nextUserId = event.target.value;
-              setUserId(nextUserId);
-              const selected = users.find((user) => user.id === nextUserId);
-              if (selected?.email) setEmail(selected.email);
-            }}
-            className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm"
-          >
-            <option value="">nicht gebunden</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.display_name || user.username || user.email} {user.email ? `(${user.email})` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">E-Mail optional</span>
-          <input
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="name@example.com"
-            className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm"
-          />
-        </label>
+        <PersonPicker purpose="access_links" value={person} onChange={setPerson} label="Person (optional)" placeholder="Name tippen …" testId={`access-link-person-${targetType}`} />
+        {person ? (
+          <div className="text-xs text-white/50 pb-2">Der Link gilt nur für dieses Konto; die Adresse kommt aus dem Konto.</div>
+        ) : (
+          <label className="block">
+            <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">E-Mail optional (ohne Konto)</span>
+            <input
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="name@example.com"
+              className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm"
+            />
+          </label>
+        )}
         <label className="inline-flex items-center gap-2 text-xs text-white/70 pb-2">
-          <input type="checkbox" checked={notifyUser} disabled={!userId} onChange={(event) => setNotifyUser(event.target.checked)} className="accent-[#FFD700] disabled:opacity-40" />
-          User benachrichtigen
+          <input type="checkbox" checked={notifyUser} disabled={!person} onChange={(event) => setNotifyUser(event.target.checked)} className="accent-[#FFD700] disabled:opacity-40" />
+          Person benachrichtigen
         </label>
       </div>
 

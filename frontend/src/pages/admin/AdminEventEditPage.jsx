@@ -41,19 +41,25 @@ export default function AdminEventEditPage() {
   const [missing, setMissing] = useState(false);
   const [meta, setMeta] = useState({ types: [], statuses: [], visibilities: [] });
   const [sponsors, setSponsors] = useState([]);
+  const [sponsorsError, setSponsorsError] = useState("");
   const [tournaments, setTournaments] = useState([]);
   const [f1Challenges, setF1Challenges] = useState([]);
   const [partners, setPartners] = useState([]);
 
   useEffect(() => {
     api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {});
+    // Event-Sponsoren (#1354): eine eigene kleine Auswahl (Name und Logo) für alle, die Events bearbeiten - nicht mehr
+    // die Sponsorenliste der Redaktion. Jede Liste lädt für sich; fehlt ein Recht, steht dort ein Satz.
     Promise.allSettled([
-      api.get("/sponsors/admin"),
+      api.get("/admin/choices/sponsors"),
       api.get("/tournaments?include_drafts=true"),
       api.get("/f1/challenges?include_drafts=true"),
       api.get("/partners"),
     ]).then(([s, t, f, p]) => {
-      if (s.status === "fulfilled") setSponsors(s.value.data || []);
+      if (s.status === "fulfilled") setSponsors(Array.isArray(s.value.data) ? s.value.data : []);
+      else setSponsorsError(s.reason?.response?.status === 403
+        ? "Dafür fehlt dir das Recht, Event-Sponsoren zu wählen – die gewählten bleiben erhalten."
+        : "Die Event-Sponsoren lassen sich gerade nicht laden – die gewählten bleiben erhalten.");
       if (t.status === "fulfilled") setTournaments(t.value.data || []);
       if (f.status === "fulfilled") setF1Challenges(f.value.data || []);
       if (p.status === "fulfilled") setPartners(Array.isArray(p.value.data) ? p.value.data : []);
@@ -98,12 +104,12 @@ export default function AdminEventEditPage() {
   }
   return (
     <AdminLayout>
-      <EventForm key={event.id || "new"} event={event} meta={meta} sponsors={sponsors} tournaments={tournaments} f1Challenges={f1Challenges} partners={partners} onDone={() => navigate("/admin/events")} />
+      <EventForm key={event.id || "new"} event={event} meta={meta} sponsors={sponsors} sponsorsError={sponsorsError} tournaments={tournaments} f1Challenges={f1Challenges} partners={partners} onDone={() => navigate("/admin/events")} />
     </AdminLayout>
   );
 }
 
-function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges = [], partners = [], onDone }) {
+function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments = [], f1Challenges = [], partners = [], onDone }) {
   const isNew = !event?.id;
   // Kosten und Abrechnung (#315, #322): eigener Zustand, nur für den Bereich Finanzen sichtbar
   // und nur dann Teil des Speicherns - der Server lehnt es sonst mit 403 ab.
@@ -467,8 +473,11 @@ function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges 
           <CheckField label="Event von uns" checked={form.owned_by_club} onChange={(v) => set("owned_by_club", v)} accent={ACCENT} />
           <CheckField label="Sponsoren beim Event anzeigen" checked={form.show_sponsors} onChange={(v) => set("show_sponsors", v)} disabled={!form.owned_by_club} accent={ACCENT} />
         </FormGrid>
+        {form.owned_by_club && form.show_sponsors && sponsorsError && (
+          <p className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A] text-sm text-white/55" data-testid="event-sponsors-error">{sponsorsError}</p>
+        )}
         {form.owned_by_club && form.show_sponsors && eventSponsorOptions.length > 0 && (
-          <div className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A]">
+          <div className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A]" data-testid="event-sponsors">
             <div className="text-[11px] uppercase tracking-widest font-bold text-white/60 mb-3">Event-Sponsoren</div>
             <FormGrid cols={3}>
               {eventSponsorOptions.map((s) => (

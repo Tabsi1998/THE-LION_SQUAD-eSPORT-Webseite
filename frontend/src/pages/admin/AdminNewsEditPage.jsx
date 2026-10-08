@@ -97,8 +97,11 @@ function NewsForm({ post, meta, onDone }) {
   const [tournaments, setTournaments] = useState([]);
   const [events, setEvents] = useState([]);
   const [f1Challenges, setF1Challenges] = useState([]);
-  const [users, setUsers] = useState([]);
+  // Markierte Personen (#1354): Treffer kommen aus der Erwähnungs-Suche (Name, Benutzername, Bild - öffentliche
+  // Profile), nicht aus der ganzen Kontoliste. Bekannte Namen für die Schilder: aus dem Beitrag und aus dieser Sitzung.
+  const [knownUsers, setKnownUsers] = useState(() => Object.fromEntries((post.mentioned_users || []).map((user) => [user.id, user])));
   const [userQuery, setUserQuery] = useState("");
+  const [userHits, setUserHits] = useState([]);
   const [linkedT, setLinkedT] = useState(post.linked_tournament_ids || []);
   const [linkedE, setLinkedE] = useState(post.linked_event_ids || []);
   const [linkedF, setLinkedF] = useState(post.linked_f1_challenge_ids || []);
@@ -110,14 +113,27 @@ function NewsForm({ post, meta, onDone }) {
       api.get("/tournaments?include_drafts=true"),
       api.get("/events?include_drafts=true"),
       api.get("/f1/challenges?include_drafts=true"),
-      api.get("/users"),
-    ]).then(([t, e, f, u]) => {
+    ]).then(([t, e, f]) => {
       if (t.status === "fulfilled") setTournaments(t.value.data || []);
       if (e.status === "fulfilled") setEvents(e.value.data || []);
       if (f.status === "fulfilled") setF1Challenges(f.value.data || []);
-      if (u.status === "fulfilled") setUsers(u.value.data || []);
     });
   }, []);
+
+  useEffect(() => {
+    const needle = userQuery.trim();
+    if (needle.length < 2) {
+      setUserHits([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api.get("/users/mention-search", { params: { q: needle } })
+        .then(({ data }) => { if (!cancelled) setUserHits(Array.isArray(data) ? data : []); })
+        .catch(() => { if (!cancelled) setUserHits([]); });
+    }, 200);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [userQuery]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const insertEmbed = (kind, item) => {
@@ -135,6 +151,7 @@ function NewsForm({ post, meta, onDone }) {
       return { ...f, content: `${prefix}${prefix ? "\n\n" : ""}${mention}` };
     });
     setMentionedUserIds((ids) => (ids.includes(user.id) ? ids : [...ids, user.id]));
+    setKnownUsers((current) => ({ ...current, [user.id]: user }));
     setUserQuery("");
   };
   const removeMention = (userId) => setMentionedUserIds((ids) => ids.filter((id) => id !== userId));
@@ -188,15 +205,8 @@ function NewsForm({ post, meta, onDone }) {
     setSaving(false);
   };
 
-  const selectedUsers = mentionedUserIds.map((id) => users.find((user) => user.id === id)).filter(Boolean);
-  const userNeedle = userQuery.trim().toLowerCase();
-  const userMatches = userNeedle.length >= 2
-    ? users
-      .filter((user) => user.is_active !== false && user.is_banned !== true && user.privacy_public_profile !== false)
-      .filter((user) => !mentionedUserIds.includes(user.id))
-      .filter((user) => `${user.username || ""} ${user.display_name || ""} ${user.email || ""}`.toLowerCase().includes(userNeedle))
-      .slice(0, 8)
-    : [];
+  const selectedUsers = mentionedUserIds.map((id) => knownUsers[id]).filter(Boolean);
+  const userMatches = userHits.filter((user) => !mentionedUserIds.includes(user.id)).slice(0, 8);
   const plannedDate = form.published && form.published_at ? new Date(form.published_at) : null;
   const plannedDetail = plannedDate && !Number.isNaN(plannedDate.getTime()) && plannedDate.getTime() > Date.now()
     ? `Dieser Beitrag ist geplant und wird ${formatTimeUntil(plannedDate)} öffentlich angezeigt.`

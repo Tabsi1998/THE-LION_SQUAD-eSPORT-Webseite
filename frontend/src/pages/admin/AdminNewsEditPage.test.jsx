@@ -84,3 +84,21 @@ test("unbekannte Kennung: Hinweis mit Weg zurück", async () => {
   renderAt("/admin/news/gibt-es-nicht");
   expect(await screen.findByTestId("news-missing")).toHaveTextContent("Beitrag nicht gefunden");
 });
+
+// Personen markieren (#1354): die Treffer kommen aus der Erwähnungs-Suche, nicht aus der ganzen Kontoliste; schon
+// markierte Personen stehen mit Namen da, weil die Admin-Liste sie mitliefert.
+test("Personen markieren über die Suche – die ganze Kontoliste wird nie geladen", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url === "/admin/news") return { data: [{ ...POSTS[0], mentioned_user_ids: ["u-1"], mentioned_users: [{ id: "u-1", username: "erika", display_name: "Erika Beispiel" }] }] };
+    if (url === "/users/mention-search") return { data: [{ id: "u-2", username: "max", display_name: "Max Muster" }] };
+    return { data: [] };
+  });
+  renderAt("/admin/news/n1");
+  expect(await screen.findByText("Erika Beispiel")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("news-mention-search"), { target: { value: "max" } });
+  fireEvent.click(await screen.findByRole("button", { name: /Max Muster/ }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Max Muster entfernen" })).toBeInTheDocument());
+  expect(apiMock.get.mock.calls.map(([url]) => url)).not.toContain("/users");
+  expect(apiMock.get).toHaveBeenCalledWith("/users/mention-search", { params: { q: "max" } });
+});

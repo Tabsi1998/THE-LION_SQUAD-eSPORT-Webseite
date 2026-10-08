@@ -389,3 +389,41 @@ test("Anmeldung im Discord (#885): Vorgabe an, Abwahl geht beim Speichern mit", 
   await user.click(screen.getByTestId("tr-edit-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ discord_registration: false })));
 });
+
+// Personensuche (#1354): Helfer, Teams und Personen laden je für sich. Die ganze Kontoliste (/users) lädt die Seite nie;
+// fehlt das Recht für eine Liste, steht dort ein Satz und der Rest geht weiter.
+test("Team-Turnier: fehlt das Recht für die Teams, steht ein Satz – Helfer laden trotzdem, /users nie", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path === "/admin/choices/teams") return Promise.reject({ response: { status: 403, data: { detail: "fehlt" } } });
+    if (path.includes("/staff")) return Promise.resolve({ data: [{ id: "s-1", role: "referee", scope: "tournament", is_active: true, user: { display_name: "Pia Pokal", username: "pia.pokal" } }] });
+    if (path.includes("/tournaments/t-1") && !path.includes("/", 15)) return Promise.resolve({ data: { ...TOURNAMENT, team_mode: "team" } });
+    return Promise.resolve(routeFor(path));
+  });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect(await screen.findByTestId("participant-add-teams-error")).toHaveTextContent("Dafür fehlt dir das Recht: Teams dieses Turniers.");
+  await user.click(screen.getByTestId("admin-tr-tab-staff"));
+  expect(await screen.findByText("Pia Pokal")).toBeInTheDocument();
+  expect(screen.getByText("@pia.pokal")).toBeInTheDocument();
+  expect(apiMock.get.mock.calls.map(([url]) => String(url))).not.toContain("/users");
+});
+
+test("Teilnehmer über die Personensuche: die Anmeldung geht mit der Kennung des Kontos", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path === "/admin/people/search") return Promise.resolve({ data: [{ id: "u-9", name: "Erika Beispiel", context: "Mitglied" }] });
+    if (path === "/admin/choices/teams") return Promise.resolve({ data: [] });
+    return Promise.resolve(routeFor(path));
+  });
+  apiMock.post.mockResolvedValue({ data: { id: "r-1" } });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.type(screen.getByTestId("participant-add-user-search"), "eri");
+  await user.click(await screen.findByTestId("participant-add-user-option-u-9"));
+  expect(screen.getByTestId("participant-add-user-selected")).toHaveTextContent("Erika Beispiel");
+  await user.click(screen.getByTestId("participant-add-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/registrations", expect.objectContaining({ user_id: "u-9" })));
+});

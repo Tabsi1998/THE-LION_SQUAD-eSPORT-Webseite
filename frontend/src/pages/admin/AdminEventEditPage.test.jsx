@@ -222,3 +222,29 @@ test("Anmeldung im Discord: Vorgabe an, Hinweis bei externem Link, Abwahl geht m
   const [, patch] = apiMock.patch.mock.calls[0];
   expect(patch.discord_registration).toBe(false);
 });
+
+// Event-Sponsoren (#1354): eine eigene kleine Auswahl für alle, die Events bearbeiten - nicht die Sponsorenliste der
+// Redaktion. Fehlt das Recht, steht ein Satz statt eines leeren Kastens.
+test("Event-Sponsoren kommen aus der eigenen Auswahl – nie aus der Sponsorenliste der Redaktion", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/meta") return { data: META };
+    if (url.startsWith("/events?")) return { data: EVENTS };
+    if (url === "/admin/choices/sponsors") return { data: [{ id: "sp-1", name: "Pixelbäckerei", logo_url: null, show_on_events: true }] };
+    return { data: [] };
+  });
+  renderAt("/admin/events/ev-1");
+  expect(await screen.findByTestId("event-sponsors")).toHaveTextContent("Pixelbäckerei");
+  expect(apiMock.get.mock.calls.map(([url]) => url)).not.toContain("/sponsors/admin");
+});
+
+test("fehlt das Recht für Event-Sponsoren, steht ein Satz – das Formular bleibt bedienbar", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/meta") return { data: META };
+    if (url.startsWith("/events?")) return { data: EVENTS };
+    if (url === "/admin/choices/sponsors") throw { response: { status: 403, data: { detail: "fehlt" } } };
+    return { data: [] };
+  });
+  renderAt("/admin/events/ev-1");
+  expect(await screen.findByTestId("event-sponsors-error")).toHaveTextContent("Dafür fehlt dir das Recht, Event-Sponsoren zu wählen");
+  expect(screen.getByTestId("event-name")).toHaveValue("Halloween Night");
+});
