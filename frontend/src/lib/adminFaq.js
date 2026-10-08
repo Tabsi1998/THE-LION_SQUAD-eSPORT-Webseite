@@ -78,7 +78,7 @@ export const FAQ_TOPICS = [
       { key: "smtp", q: "Kann ich mein eigenes Postfach statt Resend nehmen?", a: "Ja, über SMTP (Host, Port, Benutzer, Passwort). Es gilt immer nur ein Weg – der aktive steht unter Status.", to: "/admin/settings/smtp", label: "Verbindungen → SMTP", guide: "smtp" },
       { key: "newsletter", q: "Wie schicke ich einen Newsletter an die Mitglieder?", a: "E-Mail → Newsletter: Empfängerkreis, Betreff, Text; nur Konten mit Einwilligung bekommen ihn.", to: "/admin/settings/newsletter", label: "E-Mail → Newsletter" },
       { key: "mail_templates", q: "Kann ich die Texte der Mails ändern, die die Website verschickt?", a: "System → E-Mail-Vorlagen: jede Mail mit Zweck, Empfänger und Variablen; Betreff und Text ändern, Vorschau mit Beispieldaten, Testmail an dich, Zurücksetzen auf den Standard.", to: "/admin/email-templates", label: "System → E-Mail-Vorlagen" },
-      { key: "mail_queue", q: "Eine Mail ist nicht angekommen – wo sehe ich, was passiert ist?", a: "E-Mail → Mail-Queue (wartend, fehlgeschlagen) und Betrieb & Logs → Ereignisse, Quelle „E-Mail“ (jede Mail mit Status). Fehlgeschlagene lassen sich neu einreihen.", to: "/admin/settings/mail-queue", label: "E-Mail → Mail-Queue" },
+      { key: "mail_queue", q: "Eine Mail ist nicht angekommen – wo sehe ich, was passiert ist?", a: "E-Mail → Mail-Queue (wartet, fehlgeschlagen, gesendet) und Betrieb & Logs → Ereignisse, Quelle „E-Mail“ (jede Mail mit Stand). Eine fehlgeschlagene Mail lässt sich dort nochmal versuchen; eine gesendete geht nie ein zweites Mal hinaus.", to: "/admin/settings/mail-queue", label: "E-Mail → Mail-Queue" },
     ],
   },
   {

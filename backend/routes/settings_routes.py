@@ -1345,15 +1345,32 @@ async def smtp_deliverability(me: dict = Depends(require_club_admin())):
     return await run_smtp_deliverability()
 
 
+# Stände der Mail-Warteschlange (#1361). „Nochmal versuchen“ gibt es nur bei fehlgeschlagenen Mails - alles andere ist
+# unterwegs, schon draußen oder bewusst ausgelassen; ein zweiter Versand würde die Person die Mail zweimal bekommen lassen.
+MAIL_JOB_STATES = ("pending", "sending", "sent", "failed", "skipped")
+MAIL_RETRY_REFUSALS = {
+    "sent": "Diese Mail ist schon gesendet – ein zweites Mal geht sie nicht hinaus.",
+    "pending": "Diese Mail wartet schon auf den Versand.",
+    "sending": "Diese Mail wird gerade gesendet.",
+    "skipped": "Diese Mail wurde übersprungen, weil der Versand aus war. Nochmal versuchen geht nur bei fehlgeschlagenen Mails.",
+}
+
+
 @settings_router.get("/mail-queue")
 async def list_mail_queue(status: Optional[str] = None, limit: int = 100,
                           me: dict = Depends(require_club_admin())):
+    from services.mail_catalog import CATALOG
     db = get_db()
     q = {}
-    if status:
+    if status in MAIL_JOB_STATES:
         q["status"] = status
     safe_limit = max(1, min(int(limit or 100), 500))
-    jobs = await db.mail_jobs.find(q, {"_id": 0, "html": 0}).sort("created_at", -1).to_list(safe_limit)
+    jobs = await db.mail_jobs.find(q, {"_id": 0, "html": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    # Die Vorlage mit ihrem deutschen Namen aus dem Mail-Katalog - keine Kennungen in der Liste.
+    for job in jobs:
+        name = (CATALOG.get(str(job.get("template_key") or "")) or {}).get("name")
+        if name:
+            job["template_label"] = name
     return jobs
 
 
@@ -1389,9 +1406,11 @@ async def cleanup_mail_queue(days: int = 30, me: dict = Depends(require_club_adm
 
 @settings_router.post("/mail-queue/{job_id}/retry")
 async def retry_mail_job(job_id: str, me: dict = Depends(require_club_admin())):
+    """Eine fehlgeschlagene Mail nochmal versuchen (#1361). Der Stand wird im selben Schritt geprüft und gesetzt, damit
+    zwei schnelle Klicks oder ein gleichzeitiger Versand keine zweite Mail auslösen."""
     db = get_db()
     res = await db.mail_jobs.update_one(
-        {"id": job_id},
+        {"id": job_id, "status": "failed"},
         {"$set": {
             "status": "pending",
             "attempts": 0,
@@ -1401,7 +1420,10 @@ async def retry_mail_job(job_id: str, me: dict = Depends(require_club_admin())):
         }},
     )
     if res.matched_count == 0:
-        raise HTTPException(404, "Job nicht gefunden")
+        job = await db.mail_jobs.find_one({"id": job_id}, {"_id": 0, "status": 1})
+        if not job:
+            raise HTTPException(404, "Diese Mail gibt es nicht mehr.")
+        raise HTTPException(409, MAIL_RETRY_REFUSALS.get(job.get("status"), "Nochmal versuchen geht nur bei fehlgeschlagenen Mails."))
     return {"ok": True}
 
 
@@ -1410,7 +1432,7 @@ async def delete_mail_job(job_id: str, me: dict = Depends(require_club_admin()))
     db = get_db()
     res = await db.mail_jobs.delete_one({"id": job_id})
     if res.deleted_count == 0:
-        raise HTTPException(404, "Job nicht gefunden")
+        raise HTTPException(404, "Diese Mail gibt es nicht mehr.")
     return {"ok": True}
 
 

@@ -446,21 +446,21 @@ export default function AdminSettingsPage() {
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const processQueueNow = async () => {
-    try { const { data } = await api.post("/settings/mail-queue/process"); toast.success(`Queue verarbeitet: ${data.sent}/${data.processed} gesendet${data.recovered ? `, ${data.recovered} wiederhergestellt` : ""}`); load(); }
+    try { const { data } = await api.post("/settings/mail-queue/process"); toast.success(`Warteschlange abgearbeitet: ${data.sent || 0} von ${data.processed || 0} gesendet${data.recovered ? `, ${data.recovered} hängende neu angestoßen` : ""}.`); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const recoverQueue = async () => {
-    try { const { data } = await api.post("/settings/mail-queue/recover"); toast.success(`${data.recovered || 0} hängende Jobs wiederhergestellt.`); load(); }
+    try { const { data } = await api.post("/settings/mail-queue/recover"); toast.success(data.recovered ? `${data.recovered} hängende ${data.recovered === 1 ? "Mail" : "Mails"} neu angestoßen.` : "Keine Mail hängt."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const retryFailedQueue = async () => {
     if (!await confirm({
-      title: "Fehlgeschlagene Mails neu einreihen?",
-      description: "Alle fehlgeschlagenen Mail-Jobs werden auf pending gesetzt und beim nächsten Queue-Lauf erneut versucht.",
-      confirmLabel: "Neu einreihen",
+      title: "Alle fehlgeschlagenen Mails nochmal versuchen?",
+      description: "Alle fehlgeschlagenen Mails gehen zurück in die Warteschlange und werden beim nächsten Lauf neu versucht. Gesendete Mails bleiben, wie sie sind.",
+      confirmLabel: "Nochmal versuchen",
       tone: "info",
     })) return;
-    try { const { data } = await api.post("/settings/mail-queue/retry-failed"); toast.success(`${data.queued || 0} Jobs neu eingereiht.`); load(); }
+    try { const { data } = await api.post("/settings/mail-queue/retry-failed"); toast.success(data.queued ? `${data.queued} ${data.queued === 1 ? "Mail ist" : "Mails sind"} wieder in der Warteschlange.` : "Keine fehlgeschlagene Mail da."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const cleanupQueue = async () => {
@@ -470,20 +470,23 @@ export default function AdminSettingsPage() {
       confirmLabel: "Aufräumen",
       tone: "info",
     })) return;
-    try { const { data } = await api.delete("/settings/mail-queue/cleanup?days=30"); toast.success(`${data.deleted || 0} alte Jobs gelöscht.`); load(); }
+    try { const { data } = await api.delete("/settings/mail-queue/cleanup?days=30"); toast.success(`${data.deleted || 0} alte Einträge gelöscht.`); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
+  // #1361: „Nochmal versuchen“ gibt es nur bei fehlgeschlagenen Mails; der Server lehnt alles andere mit einem Satz ab.
   const retryJob = async (id) => {
-    try { await api.post(`/settings/mail-queue/${id}/retry`); toast.success("Job neu eingereiht."); load(); }
-    catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    try { await api.post(`/settings/mail-queue/${id}/retry`); toast.success("Die Mail ist wieder in der Warteschlange."); load(); }
+    catch (e) { toast.error(formatApiError(e.response?.data?.detail)); load(); }
   };
-  const deleteJob = async (id) => {
+  const deleteJob = async (job) => {
     if (!await confirm({
-      title: "Mail-Job löschen?",
-      description: "Der Queue-Eintrag wird entfernt und nicht mehr versendet.",
+      title: "Mail aus der Warteschlange löschen?",
+      description: job?.status === "pending"
+        ? "Die Mail wartet noch auf den Versand – gelöscht geht sie nicht mehr hinaus."
+        : "Der Eintrag verschwindet aus der Warteschlange. Eine gesendete Mail bleibt gesendet.",
       confirmLabel: "Löschen",
     })) return;
-    try { await api.delete(`/settings/mail-queue/${id}`); toast.success("Job gelöscht."); load(); }
+    try { await api.delete(`/settings/mail-queue/${job.id}`); toast.success("Gelöscht."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
 
