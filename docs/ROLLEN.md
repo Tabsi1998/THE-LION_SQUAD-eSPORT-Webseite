@@ -94,6 +94,15 @@ Die Liste ist nur zum Lesen: Name, Konto-Art, Rolle als Wort, Bereiche als Schil
   Grund. Die Person bekommt den Grund per Mail („Konto gesperrt“); er steht auch im Protokoll.
 - Zum Mitgliedsantrag eingeladen wird auf „Bewerbungen“ (#1356); das Blatt zeigt nur den Stand („eingeladen am …“).
 
+## Bewerbungen (#1356)
+
+Oben steht „+ Zum Antrag einladen“ mit der Personensuche (nur Konten ohne Mitgliedschaft; wer schon eingeladen ist,
+steht mit „ist schon eingeladen – offen seit …“ da). Einladen darf nur die Vereinsverwaltung; ein Mitglied bekommt
+einen Hinweis statt einer Einladung, eine zweite Einladung ist die bestehende. Jeder Stand steht als Satz mit dem
+nächsten Schritt („Wartet auf Dolibarr – dort annehmen oder ablehnen, hier erscheint es von selbst“, „Offen – annehmen
+oder ablehnen“, „Aufgenommen am …“); Annehmen und Ablehnen gibt es nur, wo die Website entscheidet – Anträge über
+Dolibarr öffnet „In Dolibarr öffnen“.
+
 ## Mitglieder-Inhalte (#1350)
 
 Inhalte mit der Sichtbarkeit „Nur Mitglieder“ – News, Events, Galerie, Dokumente wie Protokolle, Spielserver,
