@@ -52,8 +52,9 @@ test("die drei Vereinsschriften kommen vom eigenen Server und sind nach dem Lade
       heading: getComputedStyle(document.querySelector("h1")).fontFamily,
       body: getComputedStyle(document.body).fontFamily,
       digits: ["600 40px Rajdhani", "700 40px Rajdhani"].map((font) => [width(font, "1111"), width(font, "8888"), width(font, "0000")]),
-      // Gegenprobe, dass wirklich Rajdhani misst: die Ersatzschrift hätte andere Breiten.
-      fallback: width("700 40px Arial", "8888"),
+      // Gegenprobe, dass wirklich Rajdhani misst: Rajdhani ist schmal geschnitten, jede Ersatzschrift setzt dasselbe
+      // Wort deutlich breiter. Ziffern taugen dafür nicht - unter Linux ist „8888“ in der Ersatzschrift fast gleich breit.
+      word: ["700 40px Rajdhani", "700 40px sans-serif"].map((font) => width(font, "Wettkampf Rangliste")),
     };
   }, CUTS);
 
@@ -65,7 +66,8 @@ test("die drei Vereinsschriften kommen vom eigenen Server und sind nach dem Lade
     expect(Math.abs(ones - eights)).toBeLessThan(0.5);
     expect(Math.abs(zeros - eights)).toBeLessThan(0.5);
   }
-  expect(Math.abs(state.digits[1][1] - state.fallback)).toBeGreaterThan(1);
+  const [rajdhaniWord, fallbackWord] = state.word;
+  expect(fallbackWord - rajdhaniWord).toBeGreaterThan(fallbackWord * 0.1);
   expect(fontFiles.length).toBeGreaterThan(0);
   for (const file of fontFiles) expect(file).toMatch(/^\/fonts\/[a-z0-9-]+\.woff2$/);
   expect(foreign).toEqual([]);
