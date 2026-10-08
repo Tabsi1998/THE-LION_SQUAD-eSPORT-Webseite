@@ -15,6 +15,9 @@ vi.mock("@/components/tls/MarkdownEditor", () => ({ MarkdownEditor: ({ testId })
 vi.mock("@/components/tls/SeoPreviewPanel", () => ({ SeoPreviewPanel: () => <div data-testid="seo-preview" /> }));
 vi.mock("@/components/tls/RichContent", () => ({ appendEmbedToken: (text) => text }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
+// Verteilen (#1359): der Kasten fragt vor dem Senden nach.
+const confirmMock = vi.fn(async () => true);
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 
 const AdminNewsEditPage = (await import("./AdminNewsEditPage")).default;
 
@@ -101,4 +104,42 @@ test("Personen markieren über die Suche – die ganze Kontoliste wird nie gelad
   await waitFor(() => expect(screen.getByRole("button", { name: "Max Muster entfernen" })).toBeInTheDocument());
   expect(apiMock.get.mock.calls.map(([url]) => url)).not.toContain("/users");
   expect(apiMock.get).toHaveBeenCalledWith("/users/mention-search", { params: { q: "max" } });
+});
+
+// Verteilen (#1359): der Kasten im Editor nennt nur die Zahl der Empfänger und sendet nach einer Rückfrage.
+const BOX = { kind: "news", source_id: "n1", title: "Cup abgesagt", visibility: "public", state: "ready", recipients: 214, sent_at: null, sent_count: 0,
+  can_send: true, can_resend: true, announcement: "Keine eigene Meldung – öffentliche Beiträge gehen über Newsletter und Discord." };
+
+function mockWithBox(box) {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url === "/admin/news") return { data: POSTS };
+    if (url === "/settings/newsletter/state") {
+      if (box instanceof Error) throw box;
+      return { data: box };
+    }
+    return { data: [] };
+  });
+}
+
+test("Verteilen: nicht gesendet – „Jetzt senden“ mit Rückfrage, danach „gesendet am … an …“", async () => {
+  mockWithBox(BOX);
+  apiMock.post.mockResolvedValue({ data: { ok: true, queued: 214 } });
+  renderAt("/admin/news/n1");
+  expect(await screen.findByTestId("distribute-newsletter-line")).toHaveTextContent("Noch nicht verschickt – geht an 214 Personen mit Newsletter-Zustimmung.");
+  expect(screen.getByTestId("distribute-box")).toContainElement(screen.getByTestId("discord-preview"));
+  mockWithBox({ ...BOX, state: "sent", sent_at: "2026-10-12T16:00:00+00:00", sent_count: 214 });
+  fireEvent.click(screen.getByTestId("distribute-send"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/newsletter/send", { kind: "news", id: "n1", force: false }));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Newsletter jetzt senden?", description: expect.stringContaining("214 Personen") }));
+  expect(await screen.findByTestId("distribute-newsletter-line")).toHaveTextContent("Gesendet am 12.10.2026");
+  expect(screen.getByTestId("distribute-newsletter-line")).toHaveTextContent("an 214 Personen.");
+  expect(screen.getByTestId("distribute-resend")).toBeInTheDocument();
+});
+
+test("Verteilen: ohne Recht steht ein Satz statt des Knopfs", async () => {
+  mockWithBox(Object.assign(new Error("verboten"), { response: { status: 403 } }));
+  renderAt("/admin/news/n1");
+  expect(await screen.findByTestId("distribute-error")).toHaveTextContent("Den Newsletter verschickt die Redaktion");
+  expect(screen.queryByTestId("distribute-send")).toBeNull();
 });

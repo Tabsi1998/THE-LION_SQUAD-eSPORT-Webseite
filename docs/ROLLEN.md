@@ -103,6 +103,15 @@ nächsten Schritt („Wartet auf Dolibarr – dort annehmen oder ablehnen, hier 
 oder ablehnen“, „Aufgenommen am …“); Annehmen und Ablehnen gibt es nur, wo die Website entscheidet – Anträge über
 Dolibarr öffnet „In Dolibarr öffnen“.
 
+## Newsletter am Beitrag (#1359)
+
+Der Kasten „Verteilen“ im News- und Event-Editor zeigt, was hinausgeht: den Newsletter mit der Zahl der Empfänger (nie
+Namen oder Adressen) und „Jetzt senden“ bzw. „gesendet am … an …“, die Meldung an Mitglieder oder Vorstand und die
+Discord-Vorschau. Den Newsletter einer **News** schicken Redaktion und System, den eines **Events** auch, wer das Event
+bearbeiten darf (Turnierleitung; Entscheidung vom 07.10.2026). **Ein zweites Mal** senden nur Redaktion und System, immer
+mit Rückfrage. Entwürfe und „Nur intern“ gehen nicht als Newsletter hinaus und gelten nicht als gesendet. Unter
+E-Mail → Newsletter steht für System nur noch der Verlauf.
+
 ## Mitglieder-Inhalte (#1350)
 
 Inhalte mit der Sichtbarkeit „Nur Mitglieder“ – News, Events, Galerie, Dokumente wie Protokolle, Spielserver,

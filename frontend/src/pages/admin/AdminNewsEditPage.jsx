@@ -6,6 +6,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { DiscordPreview } from "@/components/tls/DiscordPreview";
+import { DistributeBox } from "@/components/tls/DistributeBox";
 import { SharePreviewToggle } from "@/components/tls/SharePreviewToggle";
 import { EditorialChecklist } from "@/components/tls/EditorialChecklist";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -234,7 +235,7 @@ function NewsForm({ post, meta, onDone }) {
     { label: "Sichtbarkeit", done: Boolean(form.visibility && form.published), description: seoIsIndexable ? "Öffentlich indexierbar." : "Entwurf, privat oder noindex." },
     { label: "Embeds", done: linkedContentCount > 0 || hasEmbedToken, tone: linkedContentCount > 0 || hasEmbedToken ? undefined : "note", description: linkedContentCount > 0 || hasEmbedToken ? `${linkedContentCount || 1} Verknüpfung(en) erkannt.` : "Optional: Turnier, Event, Fast-Lap oder Personen verknüpfen." },
     { label: "SEO", done: Boolean(form.slug && form.excerpt && form.banner_url), description: "Titel, Teaser, Canonical und Social Preview prüfen." },
-    { label: "Newsletter/Discord", done: newsletterDone, tone: newsletterDone ? undefined : "note", description: newsletterDone ? "Newsletter wurde bereits versendet." : "Nach dem Speichern Versand und Discord-Post kontrollieren." },
+    { label: "Newsletter/Discord", done: newsletterDone, tone: newsletterDone ? undefined : "note", description: newsletterDone ? "Newsletter wurde bereits versendet." : "Steht im Kasten „Verteilen“ – mit Empfängerzahl und „Jetzt senden“." },
   ];
 
   return (
@@ -255,7 +256,9 @@ function NewsForm({ post, meta, onDone }) {
             <CheckField label="Veröffentlicht" checked={form.published} onChange={(v) => set("published", v)} testId="news-published" />
             <CheckField label="Anpinnen" hint="Bleibt oben in der News-Liste und auf der Startseite." checked={form.pinned} onChange={(v) => set("pinned", v)} testId="news-pinned" accent="#FFD700" />
           </FormSection>
-          <DiscordPreview kind="news" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
+          <DistributeBox kind="news" itemId={post.id} title={post.title}>
+            <DiscordPreview kind="news" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
+          </DistributeBox>
           <SharePreviewToggle visibility={form.visibility} checked={form.share_preview} onChange={(value) => set("share_preview", value)} />
         </>
       )}

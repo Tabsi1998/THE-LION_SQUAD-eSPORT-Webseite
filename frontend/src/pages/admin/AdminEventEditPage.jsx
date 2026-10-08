@@ -7,6 +7,7 @@ import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/
 import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { DiscordPreview } from "@/components/tls/DiscordPreview";
+import { DistributeBox } from "@/components/tls/DistributeBox";
 import { SharePreviewToggle } from "@/components/tls/SharePreviewToggle";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
@@ -331,7 +332,9 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
             <EventDaysSection value={daysForm} onChange={changeDays} locations={locationsForm} startDate={form.start_date} endDate={form.end_date} accent={ACCENT} />
             <TextField label="Max. Teilnehmer" type="number" value={form.max_participants} onChange={(v) => set("max_participants", v)} testId="event-max-participants" />
           </FormSection>
-          <DiscordPreview kind="event" item={usesDays ? { ...form, days: formToDays(daysForm) } : form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
+          <DistributeBox kind="event" itemId={event?.id} title={event?.name}>
+            <DiscordPreview kind="event" item={usesDays ? { ...form, days: formToDays(daysForm) } : form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
+          </DistributeBox>
           <SharePreviewToggle visibility={form.visibility} checked={form.share_preview} onChange={(value) => set("share_preview", value)} />
           {!isNew && (
             <AccessLinksPanel targetType="event" targetId={event.id} allowRegister={form.has_registration} />
