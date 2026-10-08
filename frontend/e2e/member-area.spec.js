@@ -213,7 +213,7 @@ test.describe("Handy (390 px)", () => {
     await expect(page.getByTestId("member-area-answer")).toHaveText("Deine Antwort: zugesagt");
     expect(answers).toEqual(["yes"]);
     await expect(page.getByTestId("member-area-jump-versammlung")).toHaveText("Versammlung");
-    await expect(page).toHaveURL(/\/members\/area$/);
+    await expect(page).toHaveURL(/^https?:\/\/[^/]+\/members\/area$/);
   });
 
   test("die Leiste bleibt beim Scrollen unter dem Kopf stehen; ein Tipp springt zum Abschnitt", async ({ page }) => {
@@ -228,6 +228,6 @@ test.describe("Handy (390 px)", () => {
     const barBox = await box(bar);
     const header = await box(page.getByTestId("site-header"));
     expect(Math.abs(barBox.y - (header.y + header.height))).toBeLessThanOrEqual(1);
-    await expect(page).toHaveURL(/#dokumente$/);
+    await expect(page).toHaveURL(/^https?:\/\/[^/]+\/members\/area#dokumente$/);
   });
 });

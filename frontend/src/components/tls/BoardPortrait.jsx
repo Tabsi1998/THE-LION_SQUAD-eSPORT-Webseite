@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Gamepad2, User as UserIcon } from "lucide-react";
-import { resolveMediaUrl } from "@/lib/api";
+import { SizedImage } from "@/components/tls/SizedImage";
 
 // Vorstands-Porträts aus einem Guss (#1332): alle im selben Hochformat (3 : 4, Kopf und Schultern). Ist das Foto
 // freigestellt (beim Hochladen erkannt, `photo_cutout`), legt die Website den Vereins-Hintergrund mit Löwe dahinter;
@@ -8,6 +8,12 @@ import { resolveMediaUrl } from "@/lib/api";
 // Name groß und der Spielername klein mit Controller - ist kein echter Name freigegeben, steht der Spielername groß.
 // Klein (rund, 64 px) für Ansprechpartner auf „Über uns“ und im Mitgliederbereich. Der Löwe und die Schrift-Stufen
 // kommen später aus dem Stil-System (Meilenstein 84); bis dahin der Löwe als leises Bild im Hintergrund (CSS).
+// Die Bilder kommen in passender Größe (#1227): groß höchstens 280 px breit, klein rund 64 px - der Browser bekommt nur
+// die Fassungen angeboten, die dazu passen. Lädt ein Foto nicht, steht der leere Hintergrund mit Löwe da.
+
+// Wie breit ein Porträt gezeigt wird: am Handy zwei je Reihe, ab Tablet höchstens 280 bzw. 220 px.
+export const PORTRAIT_SIZES = { lg: "(min-width: 640px) 280px, 50vw", sm: "(min-width: 640px) 220px, 50vw" };
+export const AVATAR_SIZE = 64;
 
 /** Name groß und klein: echter Name groß, Spielername klein - ohne echten Namen der Spielername groß. */
 export function personNames(person) {
@@ -32,12 +38,16 @@ export function softBreaks(text) {
   return String(text || "").replace(/([/:])(?=\S)/g, "$1\u200B");
 }
 
-/** Das Bild: freigestellt auf dem Vereins-Hintergrund, sonst im Duoton; ohne Foto der leere Hintergrund mit Löwe. */
-export function PortraitImage({ photo, cutout, round = false, className = "", testId }) {
+/**
+ * Das Bild: freigestellt auf dem Vereins-Hintergrund, sonst im Duoton; ohne Foto der leere Hintergrund mit Löwe.
+ * `size`: rund in festen Pixeln (Ansprechpartner); sonst `sizes` - wie breit das Hochformat gezeigt wird.
+ */
+export function PortraitImage({ photo, cutout, round = false, size, sizes = PORTRAIT_SIZES.lg, className = "", testId }) {
   const club = Boolean(cutout) || !photo;
+  const empty = <UserIcon className="tls-portrait__empty" aria-hidden="true" />;
   return (
     <span className={`tls-portrait ${club ? "tls-portrait--club" : "tls-portrait--duo"} ${round ? "tls-portrait--round" : ""} ${className}`} data-testid={testId} data-look={!photo ? "empty" : club ? "club" : "duotone"}>
-      {photo ? <img src={resolveMediaUrl(photo)} alt="" loading="lazy" className="tls-portrait__img" /> : <UserIcon className="tls-portrait__empty" aria-hidden="true" />}
+      {photo ? (size ? <SizedImage src={photo} size={size} alt="" className="tls-portrait__img" fallback={empty} /> : <SizedImage src={photo} sizes={sizes} alt="" className="tls-portrait__img" fallback={empty} />) : empty}
     </span>
   );
 }
@@ -65,7 +75,7 @@ export function BoardPortrait({ person, title, label = "", withheld = false, siz
   return (
     <Wrapper {...(target ? { to: target } : {})} data-testid={testId} data-season-anchor="card"
       className={`tls-card group flex flex-col min-w-0 w-full border border-white/10 rounded-sm bg-[#101214] overflow-hidden ${size === "lg" ? "max-w-[280px]" : "max-w-[220px]"}`}>
-      <PortraitImage photo={photo} cutout={person?.photo_cutout} className="w-full tls-card__media" testId={testId ? `${testId}-image` : undefined} />
+      <PortraitImage photo={photo} cutout={person?.photo_cutout} sizes={PORTRAIT_SIZES[size] || PORTRAIT_SIZES.lg} className="w-full tls-card__media" testId={testId ? `${testId}-image` : undefined} />
       <span className={`flex flex-col gap-1 ${size === "lg" ? "p-4" : "p-3"}`}>
         <RoleLine label={role.label} word={role.word} />
         {person ? (
@@ -111,7 +121,7 @@ export function BoardAvatar({ contact, testId, quiet = false }) {
   const Wrapper = contact.profileUrl ? Link : "div";
   return (
     <Wrapper {...(contact.profileUrl ? { to: contact.profileUrl } : {})} data-testid={testId} className="group flex items-center gap-3 min-w-0">
-      <PortraitImage photo={contact.avatar} cutout={contact.cutout} round className="w-16 h-16 shrink-0" />
+      <PortraitImage photo={contact.avatar} cutout={contact.cutout} round size={AVATAR_SIZE} className="w-16 h-16 shrink-0" />
       <span className="min-w-0 flex flex-col gap-0.5">
         <RoleLine label={role.label} word={role.word} quiet={quiet} />
         <span className="font-bold text-white leading-tight break-words group-hover:text-[#29B6E8] transition">{contact.name}</span>

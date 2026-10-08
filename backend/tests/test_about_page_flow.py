@@ -136,9 +136,12 @@ async def test_story_timeline_values_goals_and_club_photo_are_saved_in_order(flo
 
     # Fehlende Pflichtangaben, Fokus außerhalb 0-100: abgelehnt; ein leeres Foto löscht es.
     flow.act_as(editor)
-    assert (await flow.put("/api/home/about/admin", json={"timeline": [{"year": "", "title": "x"}]})).status_code == 422
-    assert (await flow.put("/api/home/about/admin", json={"club_photo": {"url": "/api/static/uploads/a.jpg", "focus_x": 140}})).status_code == 422
-    assert (await flow.put("/api/home/about/admin", json={"club_photo": None})).json()["texts"]["club_photo"] is None
+    reply = await flow.put("/api/home/about/admin", json={"timeline": [{"year": "", "title": "x"}]})
+    assert reply.status_code == 422
+    reply = await flow.put("/api/home/about/admin", json={"club_photo": {"url": "/api/static/uploads/a.jpg", "focus_x": 140}})
+    assert reply.status_code == 422
+    reply = await flow.put("/api/home/about/admin", json={"club_photo": None})
+    assert reply.json()["texts"]["club_photo"] is None
 
 
 @pytest.mark.asyncio

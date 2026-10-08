@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { API, api, formatApiError, formatMemberSince, resolveMediaUrl } from "@/lib/api";
+import { API, api, formatApiError, formatMemberSince } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { MemberCardArt } from "@/components/tls/MemberCardArt";
 import { BoardAvatar } from "@/components/tls/BoardPortrait";
+import { SizedImage } from "@/components/tls/SizedImage";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { feeBadge } from "@/lib/dolibarr";
 import { motionAllowed } from "@/lib/motion";
@@ -287,7 +288,7 @@ export default function MemberAreaPage() {
                       {benefits.slice(0, 3).map((benefit) => (
                         <div key={benefit.id} className="flex items-start gap-4 p-3 border border-white/10 rounded-sm hover:border-white/25 transition">
                           <div className="w-10 h-10 rounded-sm bg-[#0A0A0A] border border-white/15 flex items-center justify-center shrink-0 overflow-hidden">
-                            {benefit.image_url ? <img src={resolveMediaUrl(benefit.image_url)} alt="" className="w-full h-full object-cover" /> : <Gift className="w-4 h-4 text-white/55" aria-hidden="true" />}
+                            <SizedImage src={benefit.image_url} size={40} alt="" fallback={<Gift className="w-4 h-4 text-white/55" aria-hidden="true" />} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-bold text-white break-words">{benefit.title}</div>

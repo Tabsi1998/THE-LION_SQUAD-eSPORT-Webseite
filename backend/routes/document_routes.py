@@ -8,7 +8,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
-from auth import get_current_user, get_optional_user, require_club_admin, require_area
+from auth import get_current_user, get_optional_user, require_area
 from database import get_db
 from models import DocumentCreate, DocumentUpdate, new_id, now_utc
 from services import dolibarr_identity

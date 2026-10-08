@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { boardContacts } from "@/lib/memberArea";
 import { formatDate } from "@/lib/datetime";
@@ -97,7 +97,8 @@ export default function AboutPage() {
           </div>
           {photo ? (
             <figure className="relative overflow-hidden rounded-sm border border-white/10 aspect-[4/3] bg-[#0F1418]" data-testid="about-photo">
-              <img src={resolveMediaUrl(photo.url)} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: `${photo.focus_x ?? 50}% ${photo.focus_y ?? 50}%` }} />
+              {/* Das Vereinsfoto steht oben - es lädt sofort, in der Breite der halben Seite (am Handy der ganzen). */}
+              <LazyImg src={photo.url} alt="" priority sizes="(min-width: 1152px) 528px, (min-width: 1024px) 46vw, 100vw" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: `${photo.focus_x ?? 50}% ${photo.focus_y ?? 50}%` }} />
             </figure>
           ) : null}
         </div>
@@ -204,7 +205,7 @@ export default function AboutPage() {
             <Reveal className="tls-reveal-grid mt-5 grid grid-cols-2 md:grid-cols-3 gap-3">
               {offlineEvents.map((event) => (
                 <Link key={event.id} to={`/events/${event.slug || event.id}`} data-testid={`about-offline-event-${event.id}`} className="tls-card tls-reveal-item group relative overflow-hidden rounded-sm border border-white/10 bg-[#111] aspect-[16/10]">
-                  <LazyImg src={event.banner_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-[1.02] transition duration-500" />
+                  <LazyImg src={event.banner_url} alt="" sizes="(min-width: 1152px) 355px, (min-width: 768px) 33vw, 50vw" className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-[1.02] transition duration-500" />
                   <span className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/90 to-transparent">
                     <span className="block text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{formatDate(event.start_date)}</span>
                     <span className="block font-heading font-black uppercase text-sm leading-tight break-words">{event.name}</span>
@@ -283,7 +284,7 @@ export function Timeline({ entries }) {
             <li key={`${entry.year}-${index}`} className="tls-timeline__item" data-side={index % 2 ? "right" : "left"} data-testid={`about-timeline-${index}`}>
               <span className="tls-timeline__dot" aria-hidden="true" />
               <div className="tls-timeline__card border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-                {entry.image_url ? <LazyImg src={entry.image_url} alt="" className="w-full h-36 sm:h-44 object-cover" /> : null}
+                {entry.image_url ? <LazyImg src={entry.image_url} alt="" sizes="(min-width: 1024px) 516px, calc(100vw - 64px)" className="w-full h-36 sm:h-44 object-cover" /> : null}
                 <div className="p-4">
                   <span className="inline-flex rounded-sm bg-[#29B6E8]/15 px-2 py-0.5 text-xs font-black tabular-nums text-[#29B6E8]">{entry.year}</span>
                   <div className="mt-2 font-heading text-lg font-black uppercase leading-tight break-words">{entry.title}</div>

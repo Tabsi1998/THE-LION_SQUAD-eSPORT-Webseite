@@ -66,7 +66,8 @@ async def test_content_editors_save_tiers_benefits_and_numbers_counted_by_the_si
 
     # Nur die Redaktion darf schreiben.
     flow.act_as(await flow.add_user(role="player"))
-    assert (await flow.put("/api/sponsoring/offer/admin", json={"intro": "x"})).status_code == 403
+    reply = await flow.put("/api/sponsoring/offer/admin", json={"intro": "x"})
+    assert reply.status_code == 403
     assert (await flow.get("/api/sponsoring/offer/admin")).status_code == 403
 
 
@@ -74,7 +75,8 @@ async def test_content_editors_save_tiers_benefits_and_numbers_counted_by_the_si
 async def test_the_sponsoring_pdf_is_a_real_pdf_for_everyone(flow):
     editor = await flow.add_user(role="club_admin", name="redaktion")
     flow.act_as(editor)
-    assert (await flow.post("/api/sponsoring/offer/pdf", files={"file": ("mappe.pdf", b"kein pdf", "application/pdf")})).status_code == 400
+    reply = await flow.post("/api/sponsoring/offer/pdf", files={"file": ("mappe.pdf", b"kein pdf", "application/pdf")})
+    assert reply.status_code == 400
     uploaded = await flow.post("/api/sponsoring/offer/pdf", files={"file": ("Mappe 2026.pdf", b"%PDF-1.7 mappe", "application/pdf")})
     assert uploaded.status_code == 200, uploaded.text
     first_key = uploaded.json()["pdf_key"]
@@ -90,6 +92,7 @@ async def test_the_sponsoring_pdf_is_a_real_pdf_for_everyone(flow):
     flow.act_as(editor)
     replaced = (await flow.post("/api/sponsoring/offer/pdf", files={"file": ("neu.pdf", b"%PDF-1.7 neu", "application/pdf")})).json()
     assert not (flow.docs / first_key).exists() and (flow.docs / replaced["pdf_key"]).exists()
-    assert (await flow.delete("/api/sponsoring/offer/pdf")).json()["pdf_key"] == ""
+    reply = await flow.delete("/api/sponsoring/offer/pdf")
+    assert reply.json()["pdf_key"] == ""
     flow.act_as(None)
     assert (await flow.get("/api/sponsoring/offer/pdf")).status_code == 404

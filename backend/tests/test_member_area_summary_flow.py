@@ -114,14 +114,16 @@ async def test_summary_counts_what_is_open_for_each_member(flow, fake):
     assert "Beitragsbestätigung Mira" in {doc["title"] for doc in mixed}, "ohne scope wie bisher (ältere App-Versionen)"
 
     # Zusage in der Karte: danach ist nichts mehr offen; eine offene Abstimmung zählt mit.
-    assert (await flow.put("/api/membership/me/meetings/7/response", json={"response": "yes"})).status_code == 200
+    reply = await flow.put("/api/membership/me/meetings/7/response", json={"response": "yes"})
+    assert reply.status_code == 200
     fake.set_ballot_status(3, "open")
     summary = (await flow.get("/api/membership/area-summary")).json()
     assert summary["meetings_open"] == 1 and summary["ballots_open"] == 1
     assert summary["next_meeting"]["response"] == "yes" and summary["next_meeting"]["response_label"] == "zugesagt"
 
     # Einen Dienst übernommen: frei zählt, was die Person noch übernehmen kann - der eigene Dienst nicht mehr.
-    assert (await flow.put("/api/membership/me/events/5/shifts/52")).status_code == 200
+    reply = await flow.put("/api/membership/me/events/5/shifts/52")
+    assert reply.status_code == 200
     summary = (await flow.get("/api/membership/area-summary")).json()
     assert summary["helping_free"] == 2 and summary["helping_mine"] == 1
 

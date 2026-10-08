@@ -1,12 +1,15 @@
 import { Link } from "react-router-dom";
 import { Check } from "lucide-react";
-import { resolveMediaUrl } from "@/lib/api";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { PlatformIcon } from "@/lib/platformBrand";
 
 // „Was wir spielen“ als Spiele-Regal (#1333): Wettkampf-Spiele (mit Turnieren oder Teilnahmen) als hohe Cover-Karten
 // mit Verlauf, Kürzel-Schild, vollem Namen (zwei Zeilen erlaubt, nie „…“) und „3 Turniere“; ein Klick öffnet die Turniere
 // des Spiels. Spiele „nur zum Spaß“ als kleine Chips darunter. Der Discord des Spiels steht als kleiner Link unter der
 // Karte - kein Knopf in der Karte. Die Spiel-Plakette des Stil-Systems (#1317) ersetzt das Kürzel-Schild später.
+// Die Cover kommen in Kartenbreite (#1227): am Handy 42 % der Breite, am Tablet ein Viertel, am PC höchstens 200 px.
+
+export const COVER_SIZES = "(min-width: 1024px) 200px, (min-width: 640px) 25vw, 42vw";
 
 /** „3 Turniere“, „1 Turnier · 16 Teilnahmen“ - Einzahl, wenn es genau eins ist. */
 export function gameCountLine(game) {
@@ -69,7 +72,7 @@ export function GamesShelf({ games, joined = {}, testIdPrefix = "games-shelf", f
             return (
               <li key={game.id} className="shrink-0 w-[42vw] max-w-[220px] sm:w-auto snap-start flex flex-col gap-2 min-w-0">
                 <Link to={gameTarget(game)} data-testid={`${testIdPrefix}-${game.id}`} data-season-anchor="card" className="tls-card group relative block aspect-[3/4] overflow-hidden rounded-sm border border-white/10 bg-[#141416]">
-                  {cover ? <img src={resolveMediaUrl(cover)} alt="" loading="lazy" className="tls-card__media absolute inset-0 h-full w-full object-cover" /> : null}
+                  {cover ? <LazyImg src={cover} alt="" sizes={COVER_SIZES} className="tls-card__media absolute inset-0 h-full w-full object-cover" /> : null}
                   <span className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0A0A0A]/30 to-[#0A0A0A]/95" />
                   <span className="absolute inset-x-3 bottom-3 flex flex-col gap-1.5">
                     <Plaque game={game} />

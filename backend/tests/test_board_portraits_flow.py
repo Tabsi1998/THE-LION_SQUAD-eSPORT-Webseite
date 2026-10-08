@@ -90,8 +90,10 @@ async def test_board_marks_cutout_photos_genders_titles_and_carries_vacancy_text
     flow.act_as(admin)
     board = (await flow.get("/api/board?manual=true")).json()
     ids = {p["slug"]: p["id"] for p in board}
-    assert (await flow.patch(f"/api/board/{ids['obmann']}", json={"user_id": "cp-leo"})).status_code == 200
-    assert (await flow.patch(f"/api/board/{ids['kassier']}", json={"user_id": "cp-mira", "deputy_user_id": "cp-sina"})).status_code == 200
+    reply = await flow.patch(f"/api/board/{ids['obmann']}", json={"user_id": "cp-leo"})
+    assert reply.status_code == 200
+    reply = await flow.patch(f"/api/board/{ids['kassier']}", json={"user_id": "cp-mira", "deputy_user_id": "cp-sina"})
+    assert reply.status_code == 200
     saved = await flow.put("/api/board/vacancy-texts", json={"texts": {"schriftfuehrer": "  Zwei Stunden im Monat,\n Einschulung inklusive. ", "obmann-stv": "Einmal im Monat Sitzung."}})
     assert saved.status_code == 200 and saved.json()["texts"]["schriftfuehrer"] == "Zwei Stunden im Monat, Einschulung inklusive."
 
@@ -108,9 +110,11 @@ async def test_board_marks_cutout_photos_genders_titles_and_carries_vacancy_text
 
     # Ein leerer Satz löscht; nur die Vereinsverwaltung darf schreiben.
     flow.act_as(admin)
-    assert (await flow.put("/api/board/vacancy-texts", json={"texts": {"obmann-stv": " "}})).json()["texts"] == {"schriftfuehrer": "Zwei Stunden im Monat, Einschulung inklusive."}
+    reply = await flow.put("/api/board/vacancy-texts", json={"texts": {"obmann-stv": " "}})
+    assert reply.json()["texts"] == {"schriftfuehrer": "Zwei Stunden im Monat, Einschulung inklusive."}
     flow.act_as(await flow.add_user(role="player"))
-    assert (await flow.put("/api/board/vacancy-texts", json={"texts": {"obmann": "x"}})).status_code == 403
+    reply = await flow.put("/api/board/vacancy-texts", json={"texts": {"obmann": "x"}})
+    assert reply.status_code == 403
 
 
 async def connect(flow):
@@ -128,7 +132,8 @@ async def test_dolibarr_board_withholds_names_and_uses_the_form_of_the_person(fl
         {"code": "jugend", "label": "Jugendreferent:in", "board": True, "represents": False, "auditor": False, "holders": []},
     ]
     settings = await load_settings(flow.db)
-    assert (await club_facts.refresh(flow.db, settings, DolibarrClient(settings)))["ok"] is True
+    reply = await club_facts.refresh(flow.db, settings, DolibarrClient(settings))
+    assert reply["ok"] is True
     await flow.db.settings.update_one({"id": "branding"}, {"$set": {"id": "branding", "legal_from_dolibarr": True}}, upsert=True)
     olga = await flow.add_user(role="player", name="olga")
     await flow.db.memberships.insert_one({"id": "m-olga", "user_id": olga["id"], "member_status": "active", "source": "dolibarr", "dolibarr": {"functions": [{"code": "obmann", "label": "Obmann/Obfrau"}]}})
@@ -185,7 +190,8 @@ async def test_statutes_are_public_by_default_from_documents_or_only_what_doliba
     flow.act_as(await flow.add_user(role="superadmin", name="admin"))
     rows = {row["key"]: row for row in (await flow.get("/api/admin/dolibarr/status")).json()["features"]}
     assert rows["statutes"]["switch"] == {"on": True} and rows["statutes"]["enabled"] is False and "nicht für die Öffentlichkeit freigegeben" in rows["statutes"]["state"]
-    assert (await flow.put("/api/admin/dolibarr/features", json={"key": "statutes", "on": False})).status_code == 200
+    reply = await flow.put("/api/admin/dolibarr/features", json={"key": "statutes", "on": False})
+    assert reply.status_code == 200
     assert (await flow.db.settings.find_one({"id": "branding"}))["statutes_public"] is False
 
 

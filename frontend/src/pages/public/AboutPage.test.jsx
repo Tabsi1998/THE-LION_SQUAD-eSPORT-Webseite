@@ -8,7 +8,7 @@ import { MemoryRouter } from "react-router-dom";
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (value) => value || "" }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
-vi.mock("@/components/tls/LazyImg", () => ({ LazyImg: ({ alt }) => <img alt={alt} /> }));
+vi.mock("@/components/tls/LazyImg", () => ({ LazyImg: ({ alt, style, sizes }) => <img alt={alt} style={style} sizes={sizes} /> }));
 vi.mock("@/hooks/useCountUp", () => ({ useCountUp: (value) => [value, { current: null }] }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 let authState = null;

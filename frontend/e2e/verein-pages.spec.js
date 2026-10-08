@@ -56,7 +56,7 @@ const BOARD = [
 const STATUTES = { available: true, source: "dolibarr", state: "in_force", current: { id: 3, version: 2, decided_on: "2025-11-20", valid_from: "2026-01-01", state: "in_force" }, versions: [{ id: 3, version: 2, decided_on: "2025-11-20", valid_from: "2026-01-01", state: "in_force" }], pdf_url: "/api/board/statutes/3/pdf" };
 
 const reference = (id, placement, day) => ({ id, title: `Cup ${id}`, tournament_name: `Cup ${id}`, placement, best_placement: placement, start_date: day, season: day.slice(0, 4),
-  game: { id: "g-mk", name: "Mario Kart 8 Deluxe", short_name: "MK8" }, entries: [{ kind: "solo", placement, participant_count: 12, lineup_members: [] }] });
+  game: { id: "g-mk", name: "Mario Kart 8 Deluxe", short_name: "MK8" }, entries: [{ id: `${id}-solo`, kind: "solo", placement, participant_count: 12, lineup_members: [] }] });
 const REFERENCES = {
   summary: { total: 7, podiums: 7, games: 1, gold: 3, silver: 2, bronze: 2, seasons: ["2026", "2025"] },
   items: [reference("r1", 1, "2026-05-01"), reference("r2", 2, "2026-04-01"), reference("r3", 3, "2026-03-01"), reference("r4", 1, "2025-11-01"),
@@ -160,7 +160,7 @@ for (const width of [390, 768, 1440, 2560]) {
       const vacancy = page.getByTestId("board-vacancy-jugendreferent");
       await expect(vacancy).toContainText("Zwei Stunden im Monat");
       expect((await box(vacancy)).width).toBeLessThanOrEqual(280.5);
-      await expect(page.getByTestId("board-vacancy-jugendreferent-contact")).toHaveAttribute("href", /\/contact\?topic=volunteer/);
+      await expect(page.getByTestId("board-vacancy-jugendreferent-contact")).toHaveAttribute("href", /^\/contact\?topic=volunteer(&|$)/);
       await expect(page.getByTestId("board-statutes-current")).toBeVisible();
       await noSideScroll(page);
     });
@@ -219,7 +219,7 @@ for (const width of [390, 768, 1440, 2560]) {
 test("/values führt zu den Werten auf „Über uns“", async ({ page }) => {
   await mockServer(page);
   await page.goto("/values");
-  await expect(page).toHaveURL(/\/about#werte$/);
+  await expect(page).toHaveURL(/^https?:\/\/[^/]+\/about#werte$/);
   await expect(page.getByTestId("about-values")).toBeInViewport();
 });
 

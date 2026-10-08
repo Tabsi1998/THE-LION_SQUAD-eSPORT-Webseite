@@ -100,7 +100,8 @@ async def test_join_page_texts_and_the_purpose_sentence(flow, fake):
     flow.act_as(None)
     assert (await flow.get("/api/membership/fees")).json()["purpose"] == "Der Beitrag zahlt Hallenmiete und Technik."
     flow.act_as(await flow.add_user(role="player"))
-    assert (await flow.put("/api/membership/join-page", json={"fee_purpose": "x"})).status_code == 403
+    reply = await flow.put("/api/membership/join-page", json={"fee_purpose": "x"})
+    assert reply.status_code == 403
 
 
 @pytest.mark.asyncio
