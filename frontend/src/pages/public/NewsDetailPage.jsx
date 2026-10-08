@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { newsCategoryLabel } from "@/lib/newsCategories";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { LazyImg } from "@/components/tls/LazyImg";
+import { SizedImage } from "@/components/tls/SizedImage";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
@@ -139,7 +141,7 @@ export default function NewsDetailPage() {
             {post.video_url && <VideoEmbed url={post.video_url} title={post.title} className="mt-8" />}
             {post.banner_url && !post.video_url && (
               <div className="mt-8 rounded-sm overflow-hidden border border-white/10 bg-[#0A0A0A]">
-                <img src={resolveMediaUrl(post.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-auto max-h-[38rem] object-cover" />
+                <LazyImg src={post.banner_url} alt="" priority sizes="(min-width: 1024px) 70vw, 100vw" className="w-full h-auto max-h-[38rem] object-cover" />
               </div>
             )}
             <RichContent
@@ -190,7 +192,7 @@ export default function NewsDetailPage() {
                   {post.mentioned_users.map((user) => (
                     <Link key={user.id} to={`/u/${user.username}`} className="inline-flex items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 bg-[#0A0A0A] rounded-sm px-3 py-2 transition">
                       <span className="w-9 h-9 rounded-sm bg-[#121212] border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
-                        {user.avatar_url ? <img src={resolveMediaUrl(user.avatar_url)} alt="" className="w-full h-full object-cover" /> : <Users className="w-4 h-4 text-white/35" />}
+                        {user.avatar_url ? <SizedImage src={user.avatar_url} size={36} alt="" className="w-full h-full" /> : <Users className="w-4 h-4 text-white/35" />}
                       </span>
                       <span className="min-w-0">
                         <span className="block text-sm font-bold truncate">{user.display_name || user.username}</span>
@@ -212,7 +214,7 @@ export default function NewsDetailPage() {
                   {others.map((item) => (
                     <Link key={item.id || item.slug} to={`/news/${item.slug}`} data-testid={`news-more-${item.slug}`} className="flex items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm p-2 transition group">
                       <span className="w-16 h-12 shrink-0 rounded-sm overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center">
-                        {item.banner_url ? <img src={resolveMediaUrl(item.banner_url)} alt="" loading="lazy" className="w-full h-full object-cover" /> : <Newspaper className="w-4 h-4 text-white/30" />}
+                        {item.banner_url ? <SizedImage src={item.banner_url} width={64} height={48} alt="" className="w-full h-full" /> : <Newspaper className="w-4 h-4 text-white/30" />}
                       </span>
                       <span className="min-w-0">
                         <span className="block text-sm font-bold leading-snug line-clamp-2 group-hover:text-[#29B6E8] transition">{item.title}</span>

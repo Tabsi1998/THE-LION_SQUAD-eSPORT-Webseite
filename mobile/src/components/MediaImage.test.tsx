@@ -23,7 +23,11 @@ afterEach(() => {
 });
 
 test("die kleinste Fassung, die die Fläche in Gerätepixeln füllt", () => {
-  expect(widthForLayout(100, 3)).toBe(400);
+  // #1227: kleine Flächen bekommen 160 oder 320 statt mindestens 400.
+  expect(widthForLayout(40, 3)).toBe(160);
+  expect(widthForLayout(48, 2)).toBe(160);
+  expect(widthForLayout(100, 3)).toBe(320);
+  expect(widthForLayout(96, 3.5)).toBe(400);
   expect(widthForLayout(200, 2)).toBe(400);
   expect(widthForLayout(300, 2)).toBe(800);
   expect(widthForLayout(400, 3)).toBe(1600);

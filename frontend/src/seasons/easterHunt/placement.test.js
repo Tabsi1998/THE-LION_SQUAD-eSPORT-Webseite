@@ -115,6 +115,32 @@ test("was die Leiste unten für immer verdeckt, ist belegt", () => {
   }
 });
 
+test("sind alle Ecken der Fußzeile belegt, liegt das Ei in der Ecke eines Blocks darin (#1228)", () => {
+  mount();
+  const foot = document.getElementById("foot");
+  foot.innerHTML = `<button id="cta-l">Dabei sein</button><button id="cta-r">Zur App</button><div id="col"><button id="col-link">Verein</button></div>`;
+  // Oben links und rechts steht etwas (wie die lange erste Zeile am Handy), unten verdeckt die Leiste.
+  box(document.getElementById("cta-l"), { left: 0, right: 200, top: 650, bottom: 700 });
+  box(document.getElementById("cta-r"), { left: 1000, right: 1200, top: 650, bottom: 700 });
+  box(document.getElementById("col"), { left: 600, right: 900, top: 655, bottom: 760 });
+  box(document.getElementById("col-link"), { left: 600, right: 700, top: 700, bottom: 724 });
+  const bar = document.createElement("nav");
+  bar.style.position = "fixed";
+  document.body.appendChild(bar);
+  box(bar, { left: 0, right: 1280, top: 736, bottom: 800 });
+  document.elementsFromPoint = () => [bar];
+  Object.defineProperty(document.documentElement, "scrollHeight", { configurable: true, value: 790 });
+  try {
+    const place = placeEgg({ spot: { kind: "footer", index: 0, place: "bottom-left" } }, { win, probe });
+    expect(place).toMatchObject({ kind: "footer", fallback: true, side: "tr" });
+    expect(place.key).toMatch(/^footer-block:/);
+    expect(place.x).toBe(900 - 6 - EGG_SIZE / 2);
+  } finally {
+    delete document.elementsFromPoint;
+    delete document.documentElement.scrollHeight;
+  }
+});
+
 test("die Sonde schaut durch die eigenen Eier hindurch", () => {
   const card = document.createElement("a");
   const layer = document.createElement("div");

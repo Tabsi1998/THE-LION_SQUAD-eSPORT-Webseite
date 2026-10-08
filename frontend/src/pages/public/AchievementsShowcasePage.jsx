@@ -1,23 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Trophy, Crown, Medal, Sparkles, Target, Flame, CircleHelp, Gem, ArrowDownWideNarrow, Layers } from "lucide-react";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { Trophy, Crown, Medal, Sparkles, Target, Flame, CircleHelp, Gem, ArrowDownWideNarrow, Layers, ChevronDown } from "lucide-react";
+import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { AchievementGroupsView, formatPercent } from "@/components/tls/AchievementGroups";
+import { AchievementCategoryGroups, CATEGORY_META, formatPercent } from "@/components/tls/AchievementGroups";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
 import { Badge } from "@/components/achievements/Badge";
 import { LevelAvatarFrame, useCrownFor } from "@/components/tls/LevelAvatarFrame";
 import { SkeletonTable } from "@/components/tls/Skeleton";
+import { SizedImage } from "@/components/tls/SizedImage";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useAuth } from "@/context/AuthContext";
 import { viennaDate } from "@/lib/vienna";
 
-// Der Schaukasten (#619): Erfolg der Woche, Kategorien mit dem Fortschritt der Community, das Laufband der
-// neuesten Freischaltungen, Ranglisten nach Punkten oder Level (je Kategorie und Zeitraum) und der Katalog
-// mit Seltenheit je Gruppe - wahlweise nach Kategorie oder nach Seltenheit sortiert. Angemeldet zeigt der Katalog
-// den eigenen Fortschritt (E13: wie in der App), als Gast den öffentlichen Katalog.
+// Der Schaukasten (#619): Erfolg der Woche, Laufband der neuesten Freischaltungen, Kategorien mit Fortschritt und
+// Ranglisten nach Punkten oder Level (je Kategorie und Zeitraum).
+// Kürzer und leichter (#1229): die Kategorien stehen zugeklappt als je eine Zeile mit Fortschritt - angemeldet der
+// eigene („12 von 40 · 30 %“), als Gast der der Community. Erst das Aufklappen holt die Gruppen der Kategorie vom
+// Server und zeichnet ihre Abzeichen; mehrere dürfen gleichzeitig offen sein. Die Bestenliste zeigt Podest und
+// Plätze 4 bis 10, „Alle anzeigen“ lädt weiter. Vorher waren es am Handy über 30 Bildschirme und 10 MB.
 
 const RANK_STYLES = {
   1: { color: "#FFD700", ring: "border-[#FFD700]", label: "1" },
@@ -25,10 +28,19 @@ const RANK_STYLES = {
   3: { color: "#CD7F32", ring: "border-[#CD7F32]", label: "3" },
 };
 
+// Die Bestenliste: erst die besten zehn, „Alle anzeigen“ holt bis zu 100 (mehr gibt der Server nicht her).
+export const BOARD_TOP = 10;
+export const BOARD_ALL = 100;
+
 /** „1 Erfolg“, „3 Erfolge“. */
 export function erfolge(count) {
   const n = Number(count || 0);
   return `${n} ${n === 1 ? "Erfolg" : "Erfolge"}`;
+}
+
+function zahlwort(count, one, many) {
+  const n = Number(count || 0);
+  return `${n} ${n === 1 ? one : many}`;
 }
 
 export const PERIODS = [
@@ -38,49 +50,87 @@ export const PERIODS = [
   { key: "month", label: "Dieser Monat" },
 ];
 
+/** Die Zeilen der Kategorien: alles aus der Übersicht außer Negativ - das bekommt nur, wer selbst etwas davon hat. */
+export function categoryRows(overview, mine) {
+  const rows = (overview?.categories || []).filter((category) => category.key !== "negative");
+  if (Number(mine?.negative || 0) > 0) {
+    const meta = CATEGORY_META.negative;
+    rows.push({ key: "negative", label: meta.label, icon: meta.icon, accent: meta.accent, groups: 0, tiers: 0, negative: true });
+  }
+  return rows;
+}
+
 export default function AchievementsShowcasePage() {
-  const [groups, setGroups] = useState([]);
   const [overview, setOverview] = useState(null);
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [leaderboard, setLeaderboard] = useState([]);
   const [boardLoading, setBoardLoading] = useState(false);
   const [board, setBoard] = useState({ by: "points", category: "", period: "all" });
-  const [sortBy, setSortBy] = useState("category");
-  const [categoryFilter, setCategoryFilter] = useState(null);
+  const [showAll, setShowAll] = useState(false);
+  // Reihenfolge je offener Kategorie: Katalog oder die seltensten zuerst.
+  const [sortBy, setSortBy] = useState({});
+  const [open, setOpen] = useState(() => new Set());
+  const [catalog, setCatalog] = useState({});
   const { user, isClubMember } = useAuth();
+  const userId = user?.id || null;
+  const openRef = useRef(open);
+  openRef.current = open;
 
   useDocumentTitle(
     "Erfolge",
     "Alle Erfolge, Abzeichen und Bestenliste von THE LION SQUAD eSports – schalte Erfolge frei und klettere im Ranking.",
   );
 
-  const load = () => {
-    const calls = [
-      api.get("/achievements/groups"),
-      api.get("/achievements/overview").catch(() => null),
-    ];
-    if (user) calls.push(api.get("/achievements/me").catch(() => null));
-    Promise.allSettled(calls).then(([g, ov, mine]) => {
-      if (g.status === "fulfilled") setGroups(g.value.data || []);
-      if (ov.status === "fulfilled" && ov.value) setOverview(ov.value.data || null);
-      if (mine && mine.status === "fulfilled" && mine.value) setMe(mine.value.data || null);
-      else if (!user) setMe(null);
-      setLoading(false);
-    });
-  };
+  // Die Übersicht hängt am Konto (eigener Stand, gefundene Geheimnisse) - nach dem Anmelden neu.
+  const loadOverview = useCallback(() => {
+    api.get("/achievements/overview")
+      .then(({ data }) => setOverview(data || null))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-  useApiInvalidation(load, ["achievements", "badges", "users"]);
+    loadOverview();
+  }, [loadOverview, userId]);
+
+  // Die Gruppen einer Kategorie - angemeldet mit dem eigenen Fortschritt.
+  const fetchCategory = useCallback((key) => {
+    setCatalog((current) => ({ ...current, [key]: { status: "loading", groups: current[key]?.groups || [] } }));
+    const params = { category: key };
+    if (userId) params.mine = true;
+    return api.get("/achievements/groups", { params })
+      .then(({ data }) => setCatalog((current) => ({ ...current, [key]: { status: "ready", groups: Array.isArray(data) ? data : [] } })))
+      .catch(() => setCatalog((current) => ({ ...current, [key]: { status: "error", groups: [] } })));
+  }, [userId]);
+
+  // Anderes Konto: offene Kategorien mit dem neuen Stand nachladen, geschlossene vergessen.
+  useEffect(() => {
+    setCatalog({});
+    for (const key of openRef.current) fetchCategory(key);
+  }, [fetchCategory]);
+
+  useApiInvalidation(() => {
+    loadOverview();
+    for (const key of openRef.current) fetchCategory(key);
+  }, ["achievements", "badges", "users"]);
+
+  const toggleCategory = (key) => {
+    const opening = !open.has(key);
+    setOpen((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    const known = catalog[key];
+    if (opening && (!known || known.status === "error")) fetchCategory(key);
+  };
 
   // Die Rangliste lädt getrennt, weil ihre Schalter (Punkte oder Level, Kategorie, Zeitraum) sie neu holen.
   useEffect(() => {
     let alive = true;
     setBoardLoading(true);
-    const params = { limit: 24, by: board.by };
+    const params = { limit: showAll ? BOARD_ALL : BOARD_TOP, by: board.by };
     if (board.by === "points") {
       if (board.category) params.category = board.category;
       if (board.period !== "all") params.period = board.period;
@@ -90,59 +140,38 @@ export default function AchievementsShowcasePage() {
       .catch(() => { if (alive) setLeaderboard([]); })
       .finally(() => { if (alive) setBoardLoading(false); });
     return () => { alive = false; };
-  }, [board]);
+  }, [board, showAll]);
 
+  // Die Zahlen oben aus der Übersicht - ohne den ganzen Katalog zu laden. Geheim zählt nicht mit (wie bisher).
   const stats = useMemo(() => {
     let tierCount = 0;
     let pointsTotal = 0;
-    const categories = new Set();
-    for (const group of groups) {
-      if (group.is_negative) continue;
-      categories.add(group.category);
-      for (const tier of group.tiers || []) {
-        tierCount += 1;
-        pointsTotal += Number(tier.points || 0);
-      }
+    let categoryCount = 0;
+    for (const category of overview?.categories || []) {
+      if (category.hidden || category.key === "negative") continue;
+      tierCount += Number(category.tiers || 0);
+      pointsTotal += Number(category.points || 0);
+      if (Number(category.groups || 0) > 0) categoryCount += 1;
     }
-    return { tierCount, pointsTotal, categoryCount: categories.size };
-  }, [groups]);
+    return { tierCount, pointsTotal, categoryCount };
+  }, [overview]);
 
-  const myStats = useMemo(() => {
-    if (!me?.groups) return null;
-    let count = 0;
-    let points = 0;
-    for (const group of me.groups) {
-      if (group.is_negative) continue;
-      for (const tier of group.tiers || []) {
-        if (tier.earned) {
-          count += 1;
-          points += Number(tier.points || 0);
-        }
-      }
-    }
-    return { count, points };
-  }, [me]);
-
-  const categories = useMemo(() => (overview?.categories || []).filter((c) => c.key !== "negative"), [overview]);
-  const hidden = me?.hidden || overview?.hidden || null;
+  const mine = userId ? overview?.mine || null : null;
+  const rows = useMemo(() => categoryRows(overview, mine), [overview, mine]);
+  const leaderboardCategories = (overview?.categories || []).filter((c) => c.key !== "negative" && c.key !== "hidden");
+  const hidden = overview?.hidden || null;
   const podium = leaderboard.slice(0, 3);
   const rest = leaderboard.slice(3);
   const byLevel = board.by === "level";
-
-  const pickCategory = (key) => {
-    setCategoryFilter((current) => (current === key ? null : key));
-    if (typeof document !== "undefined") {
-      document.getElementById("achievements-catalog")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-    }
-  };
+  const canShowAll = !showAll && leaderboard.length >= BOARD_TOP;
 
   return (
     <PublicLayout>
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-white/10">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#0d2b38_0%,#000_65%)]" />
-        <div className="tls-scanline relative max-w-6xl mx-auto px-4 md:px-6 py-14 md:py-20">
-          <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-8 items-start">
+        <div className="tls-scanline relative max-w-6xl mx-auto px-4 md:px-6 pt-6 pb-7 sm:py-14 md:py-20">
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-5 sm:gap-8 items-start">
             <motion.div
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
@@ -151,23 +180,23 @@ export default function AchievementsShowcasePage() {
               <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.4em] text-[#29B6E8]">
                 <Sparkles className="w-4 h-4" /> Ruhmeshalle
               </div>
-              <h1 className="font-heading text-4xl md:text-6xl font-black uppercase mt-3 leading-none">
+              <h1 className="font-heading text-4xl md:text-6xl font-black uppercase mt-2 sm:mt-3 leading-none">
                 Achieve<span className="text-[#FFD700]">ments</span>
               </h1>
-              <p className="mt-4 max-w-2xl text-white/60 md:text-lg">
+              <p className="mt-4 max-w-2xl text-sm sm:text-base md:text-lg text-white/60">
                 Spiele Matches, gewinne Turniere, fahre Bestzeiten und engagiere dich im Verein –
-                jede Aktion bringt dich weiter. Schalte Abzeichen frei und klettere in der Bestenliste.
+                jede Aktion bringt dich weiter.<span className="hidden sm:inline"> Schalte Abzeichen frei und klettere in der Bestenliste.</span>
               </p>
             </motion.div>
             <WeekTile week={overview?.week} loading={loading} />
           </div>
 
-          <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3" data-testid="achievements-stats">
+          <div className="mt-6 sm:mt-8 grid grid-cols-4 gap-2 sm:gap-3" data-testid="achievements-stats">
             <StatCard icon={Trophy} label="Erfolge" value={stats.tierCount} accent="#FFD700" />
             <StatCard icon={Target} label="Punkte zu holen" value={stats.pointsTotal} accent="#29B6E8" />
             <StatCard icon={Flame} label="Kategorien" value={stats.categoryCount} accent="#00FF88" />
-            {myStats ? (
-              <StatCard icon={Crown} label="Deine Punkte" value={myStats.points} accent="#A855F7" testId="my-points" />
+            {mine ? (
+              <StatCard icon={Crown} label="Deine Punkte" value={mine.points || 0} accent="#A855F7" testId="my-points" />
             ) : (
               <Link to="/register" className="group">
                 <StatCard icon={Crown} label="Jetzt mitmachen" value="→" accent="#A855F7" />
@@ -175,9 +204,9 @@ export default function AchievementsShowcasePage() {
             )}
           </div>
 
-          {myStats && (
+          {mine && (
             <div className="mt-4 text-sm text-white/60" data-testid="my-achievement-summary">
-              Du hast bereits <span className="text-[#FFD700] font-bold">{myStats.count}</span> Erfolge
+              Du hast bereits <span className="text-[#FFD700] font-bold">{mine.count || 0}</span> Erfolge
               freigeschaltet · <Link to="/u/me?tab=achievements" className="text-[#29B6E8] hover:underline">Meine Erfolge ansehen</Link>
             </div>
           )}
@@ -186,42 +215,79 @@ export default function AchievementsShowcasePage() {
 
       <UnlockTicker items={overview?.recent || []} />
 
-      <div className="max-w-6xl mx-auto px-4 md:px-6 py-10 md:py-14 space-y-14">
-        {/* Kategorien mit dem Fortschritt der Community */}
-        {categories.length > 0 && (
-          <section data-testid="achievements-categories">
-            <div className="flex items-baseline justify-between gap-3 mb-6 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-[#00FF88]" />
-                <h2 className="font-heading text-2xl md:text-3xl font-bold uppercase">Kategorien</h2>
-              </div>
-              <span className="text-[10px] uppercase tracking-widest text-white/40">
-                Fortschritt der Community · {overview?.rarity?.base ?? 0} Konten
-              </span>
+      <div className="max-w-6xl mx-auto px-4 md:px-6 pt-6 pb-8 sm:py-10 md:py-14 space-y-8 sm:space-y-12">
+        {/* Kategorien: zugeklappt, je eine Zeile mit Fortschritt - Aufklappen lädt die Abzeichen */}
+        <section data-testid="achievements-categories" id="achievements-catalog">
+          <div className="flex items-center gap-2 mb-2">
+            <Layers className="w-5 h-5 text-[#00FF88]" />
+            <h2 className="font-heading text-2xl md:text-3xl font-bold uppercase">Kategorien</h2>
+          </div>
+          <p className="mb-2 sm:mb-4 text-[10px] uppercase tracking-widest text-white/40" data-testid="categories-caption">
+            {mine ? "Dein Fortschritt je Kategorie" : `Fortschritt der Community · ${overview?.rarity?.base ?? 0} Konten`}
+            <span className="hidden sm:inline"> · antippen zeigt die Abzeichen</span>
+          </p>
+          {loading && rows.length === 0 ? (
+            <SkeletonTable rows={4} columns={2} label="Lade Kategorien" />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 md:gap-3">
+              {rows.map((category) => {
+                const entry = catalog[category.key];
+                return (
+                  <CategoryRow
+                    key={category.key}
+                    category={category}
+                    own={mine ? Number(mine.categories?.[category.key] || 0) : null}
+                    negativeCount={Number(mine?.negative || 0)}
+                    hidden={hidden}
+                    open={open.has(category.key)}
+                    onToggle={() => toggleCategory(category.key)}
+                  >
+                    {!entry || entry.status === "loading" ? (
+                      <div className="py-6 text-center text-sm text-white/45" data-testid={`category-loading-${category.key}`}>Lade Abzeichen …</div>
+                    ) : entry.status === "error" ? (
+                      <div className="py-4 flex flex-wrap items-center justify-center gap-3 text-sm text-white/55" data-testid={`category-error-${category.key}`}>
+                        Die Abzeichen ließen sich nicht laden.
+                        <button type="button" onClick={() => fetchCategory(category.key)} className="tls-btn tls-btn--quiet text-[10px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-sm">
+                          Nochmal
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        {entry.groups.length > 1 && category.key !== "negative" && (
+                          <div className="mb-3 flex justify-end">
+                            <Toggle
+                              value={sortBy[category.key] || "category"}
+                              onChange={(value) => setSortBy((current) => ({ ...current, [category.key]: value }))}
+                              options={[{ key: "category", label: "Katalog", icon: Layers }, { key: "rarity", label: "Seltenste zuerst", icon: ArrowDownWideNarrow }]}
+                              testId={`catalog-sort-${category.key}`}
+                            />
+                          </div>
+                        )}
+                        <AchievementCategoryGroups
+                          category={category.key}
+                          groups={entry.groups}
+                          rarity={overview?.rarity || null}
+                          sortBy={sortBy[category.key] || "category"}
+                          hidden={hidden}
+                          clubTeaser={!isClubMember}
+                        />
+                      </>
+                    )}
+                  </CategoryRow>
+                );
+              })}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {categories.map((cat, index) => (
-                <CategoryTile
-                  key={cat.key}
-                  category={cat}
-                  hidden={cat.key === "hidden" ? hidden : null}
-                  active={categoryFilter === cat.key}
-                  index={index}
-                  onPick={() => pickCategory(cat.key)}
-                />
-              ))}
-            </div>
-          </section>
-        )}
+          )}
+        </section>
 
-        {/* Leaderboard */}
+        {/* Bestenliste: Podest und Plätze 4 bis 10, „Alle anzeigen“ lädt weiter */}
         <section data-testid="achievements-leaderboard">
-          <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+          <div className="flex items-center justify-between gap-3 mb-3 sm:mb-6 flex-wrap">
             <div className="flex items-center gap-2">
               <Medal className="w-5 h-5 text-[#FFD700]" />
               <h2 className="font-heading text-2xl md:text-3xl font-bold uppercase">Bestenliste</h2>
             </div>
-            <div className="flex items-center gap-2 flex-wrap" data-testid="leaderboard-controls">
+            <div className="flex max-w-full items-center gap-2 flex-nowrap overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0" data-testid="leaderboard-controls">
               <Toggle
                 value={board.by}
                 onChange={(by) => setBoard((b) => ({ ...b, by }))}
@@ -233,12 +299,12 @@ export default function AchievementsShowcasePage() {
                   <select
                     value={board.category}
                     onChange={(event) => setBoard((b) => ({ ...b, category: event.target.value }))}
-                    className="bg-[#0A0A0A] border border-white/15 rounded-sm px-2 py-1.5 text-xs uppercase tracking-widest text-white/80"
+                    className="shrink-0 bg-[#0A0A0A] border border-white/15 rounded-sm px-2 py-1.5 text-xs uppercase tracking-widest text-white/80"
                     aria-label="Kategorie"
                     data-testid="leaderboard-category"
                   >
                     <option value="">Alle Kategorien</option>
-                    {categories.filter((c) => c.key !== "hidden").map((c) => (
+                    {leaderboardCategories.map((c) => (
                       <option key={c.key} value={c.key}>{c.label}</option>
                     ))}
                   </select>
@@ -263,20 +329,20 @@ export default function AchievementsShowcasePage() {
             </div>
           ) : (
             <>
-              {/* Podium */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              {/* Podest - am Handy drei schmale Karten nebeneinander, damit die Seite kurz bleibt */}
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
                 {podium.map((entry, index) => (
                   <PodiumCard key={entry.user_id} entry={entry} index={index} byLevel={byLevel} />
                 ))}
               </div>
-              {/* Rest */}
+              {/* Plätze ab 4 */}
               {rest.length > 0 && (
                 <div className="border border-white/10 rounded-sm overflow-hidden divide-y divide-white/5">
                   {rest.map((entry, index) => (
                     <motion.div
                       key={entry.user_id}
                       data-testid={`leaderboard-row-${entry.rank}`}
-                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.02]"
+                      className="flex items-center gap-3 px-3 sm:px-4 py-1.5 sm:py-2.5 hover:bg-white/[0.02]"
                       initial={{ opacity: 0, x: -12 }}
                       whileInView={{ opacity: 1, x: 0 }}
                       viewport={{ once: true }}
@@ -297,47 +363,23 @@ export default function AchievementsShowcasePage() {
                   ))}
                 </div>
               )}
-            </>
-          )}
-        </section>
-
-        {/* Trophy wall */}
-        <section data-testid="achievements-catalog" id="achievements-catalog">
-          <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-[#29B6E8]" />
-              <h2 className="font-heading text-2xl md:text-3xl font-bold uppercase">Alle Erfolge</h2>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {categoryFilter && (
-                <button
-                  type="button"
-                  onClick={() => setCategoryFilter(null)}
-                  className="tls-btn tls-btn--quiet text-[10px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-sm"
-                  data-testid="catalog-filter-clear"
-                >
-                  Nur {categories.find((c) => c.key === categoryFilter)?.label || categoryFilter} · alle zeigen
-                </button>
+              {canShowAll && (
+                <div className="mt-3 sm:mt-4 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAll(true)}
+                    disabled={boardLoading}
+                    className="tls-btn tls-btn--secondary w-full sm:w-auto px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-sm"
+                    data-testid="leaderboard-show-all"
+                  >
+                    Alle anzeigen
+                  </button>
+                </div>
               )}
-              <Toggle
-                value={sortBy}
-                onChange={setSortBy}
-                options={[{ key: "category", label: "Nach Kategorie", icon: Layers }, { key: "rarity", label: "Nach Seltenheit", icon: ArrowDownWideNarrow }]}
-                testId="catalog-sort"
-              />
-            </div>
-          </div>
-          {loading && groups.length === 0 ? (
-            <div className="text-white/40 py-10 text-center">Lade Erfolge …</div>
-          ) : (
-            <AchievementGroupsView
-              groups={me?.groups || groups}
-              rarity={overview?.rarity || null}
-              sortBy={sortBy}
-              hidden={hidden}
-              clubTeaser={!isClubMember}
-              categoryFilter={categoryFilter}
-            />
+              {showAll && boardLoading && (
+                <div className="mt-4 text-center text-xs text-white/45" data-testid="leaderboard-loading-more">Lädt weitere Plätze …</div>
+              )}
+            </>
           )}
         </section>
       </div>
@@ -345,9 +387,82 @@ export default function AchievementsShowcasePage() {
   );
 }
 
+// Eine Kategorie als Zeile (#1229): Name, Fortschritt und ein dünner Balken; aufgeklappt nimmt sie am Tablet und
+// am PC die ganze Breite, darunter die Gruppen.
+function CategoryRow({ category, own, negativeCount = 0, hidden, open, onToggle, children }) {
+  const meta = CATEGORY_META[category.key] || {};
+  const accent = category.accent || meta.accent || "#29B6E8";
+  const isHidden = category.key === "hidden";
+  const isNegative = category.key === "negative";
+  const total = Number(category.tiers || 0);
+  const panelId = `achievement-category-panel-${category.key}`;
+  let summary;
+  let percent;
+  if (isNegative) {
+    summary = `${negativeCount} gefunden`;
+    percent = 100;
+  } else if (isHidden) {
+    const found = Number(hidden?.earned || 0);
+    const all = Number(hidden?.total || category.groups || 0);
+    summary = `${found} von ${all} gefunden`;
+    percent = all ? (100 * found) / all : 0;
+  } else if (own != null) {
+    percent = total ? (100 * own) / total : 0;
+    summary = `${own} von ${total} · ${formatPercent(Math.round(percent))}`;
+  } else {
+    percent = Math.max(0, Math.min(100, Number(category.community_percent || 0)));
+    summary = `${formatPercent(percent)} · ${zahlwort(category.groups, "Gruppe", "Gruppen")}`;
+  }
+  const detail = isNegative
+    ? "Nur für dich sichtbar"
+    : isHidden
+      ? "Zeigen sich erst, wenn du sie gefunden hast"
+      : [
+        zahlwort(category.groups, "Gruppe", "Gruppen"),
+        zahlwort(total, "Stufe", "Stufen"),
+        own == null && category.holders != null ? `${zahlwort(category.holders, "Person", "Personen")} dabei` : null,
+      ].filter(Boolean).join(" · ");
+  return (
+    <div className={`-mt-px first:mt-0 md:mt-0 border rounded-sm bg-[#0F0F10] transition-colors ${open ? "relative z-10 md:col-span-2 border-white/25" : "border-white/10 hover:border-white/25"}`} data-testid={`category-row-${category.key}`}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="w-full text-left px-3.5 py-2 md:px-4 md:py-3 flex items-center gap-3"
+        style={{ boxShadow: `inset 2px 0 0 ${accent}` }}
+        data-testid={`category-toggle-${category.key}`}
+      >
+        {isHidden
+          ? <CircleHelp className="w-4 h-4 shrink-0" style={{ color: accent }} />
+          : <AchievementIcon name={category.icon || meta.icon} fallback="trophy" className="w-4 h-4 shrink-0" style={{ color: accent }} />}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="font-heading font-bold uppercase text-sm md:text-base truncate">{category.label}</span>
+            <span className="font-display font-bold text-sm tabular-nums shrink-0" style={{ color: accent }} data-testid={`category-progress-${category.key}`}>{summary}</span>
+          </div>
+          <div className="mt-1.5 h-1 bg-white/5 rounded-sm overflow-hidden" aria-hidden="true">
+            <div className="h-full" style={{ width: `${Math.max(0, Math.min(100, percent))}%`, backgroundColor: accent }} />
+          </div>
+          <div className="mt-1 hidden md:flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/40" data-testid={`category-detail-${category.key}`}>
+            <span className="truncate">{detail}</span>
+            {category.member_only && <span className="ml-auto shrink-0 text-[#FFD700]/80">Mitglieder</span>}
+          </div>
+        </div>
+        <ChevronDown className={`w-4 h-4 shrink-0 text-white/40 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+      {open && (
+        <div id={panelId} className="border-t border-white/10 p-3 md:p-4" data-testid={`category-panel-${category.key}`}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Toggle({ value, onChange, options, testId }) {
   return (
-    <div className="inline-flex border border-white/15 rounded-sm overflow-hidden" role="group" data-testid={testId}>
+    <div className="inline-flex shrink-0 border border-white/15 rounded-sm overflow-hidden" role="group" data-testid={testId}>
       {options.map((option) => {
         const Icon = option.icon;
         const active = option.key === value;
@@ -357,7 +472,7 @@ function Toggle({ value, onChange, options, testId }) {
             type="button"
             onClick={() => onChange(option.key)}
             aria-pressed={active}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest transition ${active ? "bg-[#29B6E8]/15 text-[#29B6E8]" : "text-white/55 hover:text-white"}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 whitespace-nowrap text-[10px] font-bold uppercase tracking-widest transition ${active ? "bg-[#29B6E8]/15 text-[#29B6E8]" : "text-white/55 hover:text-white"}`}
             data-testid={`${testId}-${option.key}`}
           >
             {Icon && <Icon className="w-3 h-3" />}
@@ -376,7 +491,7 @@ function WeekTile({ week, loading }) {
   return (
     <motion.aside
       data-testid="achievement-of-week"
-      className="relative border rounded-sm bg-[#0A0A0A]/80 p-5 overflow-hidden"
+      className="relative border rounded-sm bg-[#0A0A0A]/80 p-4 sm:p-5 overflow-hidden"
       style={{ borderColor: `${color}55`, boxShadow: `inset 0 0 0 1px ${color}14, 0 0 32px ${color}10` }}
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
@@ -387,7 +502,7 @@ function WeekTile({ week, loading }) {
         <Gem className="w-3.5 h-3.5" /> Erfolg der Woche
       </div>
       {award ? (
-        <div className="mt-3 flex items-start gap-4">
+        <div className="mt-2 sm:mt-3 flex items-start gap-4">
           <Badge material={award.material} level={award.level} rank={award.rank} art={award.art} icon={award.icon} size="xl" animate title={award.name} testId="week-award-badge" />
           <div className="min-w-0 flex-1">
             <div className="font-heading text-lg md:text-xl font-black uppercase leading-tight truncate" data-testid="week-award-name">{award.name}</div>
@@ -412,55 +527,8 @@ function WeekTile({ week, loading }) {
           {loading ? "Wird geladen …" : "Vergangene Woche gab es keine Freischaltung auf einem öffentlichen Profil – die nächste Kachel gehört dir."}
         </div>
       )}
-      {week?.week_key && <div className="mt-3 text-[9px] uppercase tracking-widest text-white/30">Kalenderwoche {String(week.week_key).split("-W")[1]} · montags 08:00 neu</div>}
+      {week?.week_key && <div className="mt-2 sm:mt-3 text-[9px] uppercase tracking-widest text-white/30">Kalenderwoche {String(week.week_key).split("-W")[1]} · montags 08:00 neu</div>}
     </motion.aside>
-  );
-}
-
-function CategoryTile({ category, hidden, active, index, onPick }) {
-  const isHidden = category.key === "hidden";
-  const percent = Math.max(0, Math.min(100, Number(category.community_percent || 0)));
-  return (
-    <motion.button
-      type="button"
-      onClick={onPick}
-      aria-pressed={active}
-      data-testid={`category-tile-${category.key}`}
-      className={`text-left border rounded-sm bg-[#0F0F10] p-4 transition ${active ? "border-white/40" : "border-white/10 hover:border-white/25"}`}
-      style={{ boxShadow: `inset 0 0 0 1px ${category.accent}${active ? "44" : "14"}` }}
-      initial={{ opacity: 0, y: 12 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ delay: Math.min(index * 0.04, 0.4) }}
-      whileHover={{ y: -3 }}
-    >
-      <div className="flex items-center gap-2">
-        {isHidden
-          ? <CircleHelp className="w-4 h-4" style={{ color: category.accent }} />
-          : <AchievementIcon name={category.icon} fallback="trophy" className="w-4 h-4" style={{ color: category.accent }} />}
-        <span className="font-heading font-bold uppercase text-sm md:text-base truncate">{category.label}</span>
-        {category.member_only && <span className="ml-auto text-[9px] uppercase tracking-widest text-[#FFD700]/80 shrink-0">Mitglieder</span>}
-      </div>
-      {isHidden ? (
-        <div className="mt-3 font-display text-xl font-black tabular-nums" style={{ color: category.accent }} data-testid="category-hidden-count">
-          {hidden ? `${hidden.earned} von ${hidden.total}` : `${category.groups}`}
-          <span className="block text-[10px] uppercase tracking-widest text-white/45 font-bold mt-0.5">gefunden</span>
-        </div>
-      ) : (
-        <>
-          <div className="mt-3 flex items-baseline justify-between gap-2">
-            <span className="font-display text-xl font-black tabular-nums" style={{ color: category.accent }}>{formatPercent(percent)}</span>
-            <span className="text-[10px] uppercase tracking-widest text-white/45">{category.groups} Gruppen · {category.tiers} Stufen</span>
-          </div>
-          <div className="mt-2 h-1.5 bg-white/5 rounded-sm overflow-hidden">
-            <motion.div className="h-full" style={{ backgroundColor: category.accent }} initial={{ width: 0 }} whileInView={{ width: `${percent}%` }} viewport={{ once: true }} transition={{ duration: 0.9, ease: "easeOut" }} />
-          </div>
-          <div className="mt-1.5 text-[10px] uppercase tracking-widest text-white/40 tabular-nums">
-            {category.holders === 1 ? "eine Person dabei" : `${category.holders} Personen dabei`}
-          </div>
-        </>
-      )}
-    </motion.button>
   );
 }
 
@@ -504,12 +572,12 @@ function StatCard({ icon: Icon, label, value, accent, testId }) {
   return (
     <div
       data-testid={testId}
-      className="border border-white/10 rounded-sm bg-[#0A0A0A]/70 p-4 transition-all hover:border-white/25"
+      className="h-full min-w-0 border border-white/10 rounded-sm bg-[#0A0A0A]/70 p-2.5 sm:p-4 transition-all hover:border-white/25"
       style={{ boxShadow: `inset 0 0 0 1px ${accent}12` }}
     >
-      <Icon className="w-5 h-5 mb-2" style={{ color: accent }} />
-      <div className="font-display text-2xl md:text-3xl font-black tabular-nums">{value}</div>
-      <div className="text-[10px] uppercase tracking-widest text-white/45 mt-1">{label}</div>
+      <Icon className="w-4 h-4 sm:w-5 sm:h-5 mb-1 sm:mb-2" style={{ color: accent }} />
+      <div className="font-display text-lg sm:text-2xl md:text-3xl font-black tabular-nums truncate">{value}</div>
+      <div className="text-[9px] sm:text-[10px] uppercase tracking-wider sm:tracking-widest text-white/45 mt-0.5 sm:mt-1 leading-tight">{label}</div>
     </div>
   );
 }
@@ -529,22 +597,22 @@ function PodiumCard({ entry, index, byLevel = false }) {
   return (
     <motion.div
       data-testid={`podium-${entry.rank}`}
-      className={`relative border rounded-sm bg-[#0F0F10] p-5 text-center ${isFirst ? "sm:-mt-2" : ""}`}
+      className={`relative min-w-0 border rounded-sm bg-[#0F0F10] px-2 py-3 sm:p-5 text-center ${isFirst ? "sm:-mt-2" : ""}`}
       style={{ borderColor: style.color + "55", boxShadow: `0 0 0 1px ${style.color}18, 0 0 26px ${style.color}12` }}
       initial={{ opacity: 0, y: 22 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.12, type: "spring", stiffness: 200, damping: 18 }}
     >
       <div
-        className="mx-auto w-9 h-9 rounded-full border-2 flex items-center justify-center font-display font-black mb-3"
+        className="absolute left-1.5 top-1.5 w-6 h-6 text-xs sm:static sm:mx-auto sm:w-9 sm:h-9 sm:text-base rounded-full border-2 flex items-center justify-center font-display font-black sm:mb-3"
         style={{ borderColor: style.color, color: style.color }}
       >
         {entry.rank}
       </div>
-      <div className={`mx-auto mb-3 flex justify-center ${crown ? "pt-4" : ""}`}>
-        <LevelAvatarFrame level={level} crown={crown} compact className="w-16 h-16">
+      <div className={`mx-auto mb-2 sm:mb-3 flex justify-center ${crown ? "pt-4" : ""}`}>
+        <LevelAvatarFrame level={level} crown={crown} compact className="w-12 h-12 sm:w-16 sm:h-16">
           {entry.avatar_url ? (
-            <img src={resolveMediaUrl(entry.avatar_url)} alt="" className="w-full h-full object-cover" />
+            <SizedImage src={entry.avatar_url} sizes="(min-width: 640px) 64px, 48px" widths={[160, 320]} alt="" className="w-full h-full" />
           ) : (
             <div className="w-full h-full flex items-center justify-center font-bold text-white/60">
               {(entry.display_name || "?").trim().charAt(0).toUpperCase()}
@@ -554,29 +622,29 @@ function PodiumCard({ entry, index, byLevel = false }) {
       </div>
       <Link
         to={entry.username ? `/u/${entry.username}` : "#"}
-        className="block font-heading font-bold uppercase truncate hover:text-[#29B6E8]"
+        className="block font-heading font-bold uppercase truncate text-xs sm:text-base hover:text-[#29B6E8]"
       >
         {entry.display_name}
         {Number(entry.prestige || 0) > 0 && <span className="ml-1 text-[#FFD700]" title={`Prestige ${entry.prestige}`}>{"★".repeat(Math.min(5, Number(entry.prestige)))}</span>}
       </Link>
-      <div className="mt-2 font-display text-2xl font-black tabular-nums" style={{ color: style.color }}>
+      <div className="mt-1 sm:mt-2 font-display text-lg sm:text-2xl font-black tabular-nums" style={{ color: style.color }}>
         {byLevel ? `Level ${entry.level}` : entry.points}
       </div>
-      <div className="text-[10px] uppercase tracking-widest text-white/55">{byLevel ? (entry.title || `${entry.xp || 0} XP`) : erfolge(entry.count)}</div>
+      <div className="text-[10px] uppercase tracking-wider sm:tracking-widest text-white/55 truncate">{byLevel ? (entry.title || `${entry.xp || 0} XP`) : erfolge(entry.count)}</div>
     </motion.div>
   );
 }
 
+// Profilbilder in passender Größe (#1227): 28 oder 36 Pixel bekommen die 160er Fassung statt des Originals.
 function Avatar({ entry, size = 10, ring = "border-white/15", center = false }) {
   const dim = `${size * 4}px`;
-  const src = entry.avatar_url ? resolveMediaUrl(entry.avatar_url) : null;
   const initial = (entry.display_name || "?").trim().charAt(0).toUpperCase();
-  return src ? (
-    <img
-      src={src}
+  return entry.avatar_url ? (
+    <SizedImage
+      src={entry.avatar_url}
+      size={size * 4}
       alt=""
-      className={`rounded-sm object-cover border ${ring} ${center ? "mx-auto" : ""}`}
-      style={{ width: dim, height: dim }}
+      className={`rounded-sm border ${ring} ${center ? "mx-auto" : ""}`}
     />
   ) : (
     <div

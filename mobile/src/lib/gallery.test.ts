@@ -14,6 +14,7 @@ test("Medienart und Adressen: Bild, Video, Einbettung", () => {
 
 test("nur eigene Uploads bekommen eine Breite", () => {
   expect(sizedUpload("/api/static/uploads/foto.webp", 400)).toBe("/api/static/uploads/foto.webp?w=400");
+  expect(sizedUpload("/api/static/uploads/avatar.png", 160)).toBe("/api/static/uploads/avatar.png?w=160");
   expect(sizedUpload("/api/static/uploads/foto.webp?v=3#x", 1600)).toBe("/api/static/uploads/foto.webp?v=3&w=1600#x");
   expect(sizedUpload("https://cdn.example.test/foto.jpg", 400)).toBe("https://cdn.example.test/foto.jpg");
   expect(sizedUpload("/api/static/uploads/clip.mp4", 400)).toBe("/api/static/uploads/clip.mp4");

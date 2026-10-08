@@ -96,7 +96,7 @@ export default function HomePage() {
                 <div aria-hidden="true" className="tls-hero-drift absolute -inset-20 pointer-events-none" data-testid="home-hero-drift">
                   <div ref={glowRef} className="absolute inset-0 opacity-20 tls-hero-glow" data-testid="home-hero-glow" />
                 </div>
-                <MascotBadge className="relative w-64 h-64 md:w-80 md:h-80 drop-shadow-[0_0_40px_rgba(41,182,232,0.3)]" />
+                <MascotBadge sizes="(min-width: 768px) 320px, 256px" className="relative w-64 h-64 md:w-80 md:h-80 drop-shadow-[0_0_40px_rgba(41,182,232,0.3)]" />
               </div>
             </div>
           </div>
@@ -340,7 +340,7 @@ function BoardTeaser({ contacts }) {
             className="tls-card tls-card--gold group tls-reveal-item flex items-center gap-4 border border-white/10 rounded-sm bg-[#111] p-4 min-w-0">
             {contact.avatar ? (
               <span className="w-16 h-16 md:w-20 md:h-20 rounded-sm overflow-hidden shrink-0">
-                <LazyImg src={contact.avatar} alt="" className="w-full h-full object-cover tls-card__media" />
+                <LazyImg src={contact.avatar} alt="" sizes="(min-width: 768px) 80px, 64px" className="w-full h-full object-cover tls-card__media" />
               </span>
             ) : (
               <span className="w-16 h-16 md:w-20 md:h-20 rounded-sm bg-[#FFD700]/15 text-[#FFD700] font-heading font-black text-2xl inline-flex items-center justify-center shrink-0">{(contact.name || "?").slice(0, 1).toUpperCase()}</span>

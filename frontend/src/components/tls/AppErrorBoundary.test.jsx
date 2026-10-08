@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 
@@ -19,7 +19,10 @@ vi.mock("@/components/tls/PublicLayout", () => ({
   },
 }));
 const report = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/clientLog", () => ({ reportCaughtError: report }));
+vi.mock("@/lib/clientLog", async (importOriginal) => ({ ...(await importOriginal()), reportCaughtError: report }));
+// #1230: wer die technischen Angaben sieht, hängt am Konto - Gast, Spieler oder Admin.
+const auth = vi.hoisted(() => ({ current: null }));
+vi.mock("@/context/AuthContext", () => ({ useOptionalAuth: () => auth.current }));
 
 function Broken() {
   throw new Error("list.filter is not a function");
@@ -32,10 +35,15 @@ function show(path, child = <Broken />) {
 describe("AppErrorBoundary", () => {
   beforeEach(() => {
     layout.broken = false;
-    report.mockClear();
+    auth.current = null;
+    report.mockReset();
+    report.mockResolvedValue(null);
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
 
   it("zeigt bei einem Seitenfehler den Hinweis zwischen Kopf und Footer und meldet den Fehler", () => {
     show("/news");
@@ -66,5 +74,47 @@ describe("AppErrorBoundary", () => {
     expect(screen.getByText("Alles gut")).toBeInTheDocument();
     expect(screen.queryByTestId("page-error")).toBeNull();
     expect(report).not.toHaveBeenCalled();
+  });
+
+  it("zeigt Gästen und Spielern keinen Programmierer-Text, auch keine zugeklappten Angaben", async () => {
+    show("/news");
+    expect(screen.getByTestId("page-error")).not.toHaveTextContent("list.filter");
+    expect(screen.queryByTestId("page-error-details")).toBeNull();
+    auth.current = { user: { id: "u1", role: "player" }, isAdmin: false, can: () => false };
+    show("/news");
+    expect(screen.queryByTestId("page-error-details")).toBeNull();
+    await act(async () => {});
+  });
+
+  it("zeigt Admins die technischen Angaben zugeklappt, mit Kennung, Seite und Uhrzeit zum Kopieren", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-07T10:15:30Z"));
+    auth.current = { user: { id: "a1", role: "superadmin" }, isAdmin: true, can: (area) => area === "system" };
+    report.mockResolvedValue("log-4711");
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(window.navigator, "clipboard", { configurable: true, value: { writeText } });
+    show("/news");
+    const details = screen.getByTestId("page-error-details");
+    expect(details).not.toHaveAttribute("open");
+    expect(within(details).getByText("Technische Angaben (für Admins)")).toBeInTheDocument();
+    await act(async () => {});
+    const text = screen.getByTestId("page-error-technical");
+    expect(text).toHaveTextContent("Fehler: Error: list.filter is not a function");
+    expect(text).toHaveTextContent("Seite: /");
+    expect(text).toHaveTextContent("Uhrzeit: 7.10.2026, 12:15:30");
+    expect(text).toHaveTextContent("Kennung: log-4711");
+    expect(screen.getByTestId("page-error-log-link")).toHaveAttribute("href", "/admin/ops?tab=app&q=log-4711");
+    await act(async () => { fireEvent.click(screen.getByTestId("page-error-copy")); });
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("Kennung: log-4711"));
+    expect(screen.getByTestId("page-error-copied")).toHaveTextContent("Kopiert");
+  });
+
+  it("nennt ohne Bereich System keinen Weg zu Betrieb & Logs und sagt, wenn die Meldung nicht ankam", async () => {
+    auth.current = { user: { id: "t1", role: "tournament_admin" }, isAdmin: true, can: () => false };
+    report.mockResolvedValue(null);
+    show("/news");
+    await act(async () => {});
+    expect(screen.getByTestId("page-error-technical")).toHaveTextContent("Kennung: nicht gemeldet");
+    expect(screen.queryByTestId("page-error-log-link")).toBeNull();
   });
 });

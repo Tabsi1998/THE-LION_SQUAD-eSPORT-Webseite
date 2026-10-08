@@ -24,10 +24,13 @@ from PIL import Image, ImageOps
 logger = logging.getLogger(__name__)
 
 # Passend zu den Kacheln der Oberfläche: Vorschau im Raster, mittlere Ansicht,
-# und eine Fassung für grosse Bildschirme.
-VARIANT_WIDTHS: tuple[int, ...] = (400, 800, 1600)
+# und eine Fassung für grosse Bildschirme. Seit #1227 dazu zwei kleine für
+# Profilbilder, Logos und kleine Kacheln (24 bis 96 Pixel, auf scharfen
+# Bildschirmen das Doppelte bis Dreifache) - vorher bekam ein 40-Pixel-Bild
+# mindestens die 400er Fassung.
+VARIANT_WIDTHS: tuple[int, ...] = (160, 320, 400, 800, 1600)
 VARIANT_DIR_NAME = "variants"
-VARIANT_QUALITY = {400: 78, 800: 80, 1600: 82}
+VARIANT_QUALITY = {160: 80, 320: 80, 400: 78, 800: 80, 1600: 82}
 RESIZABLE_SUFFIXES = frozenset({".webp", ".jpg", ".jpeg", ".png"})
 
 
@@ -55,6 +58,44 @@ def variant_path(source: Path, width: int) -> Path:
     return source.parent / VARIANT_DIR_NAME / f"{source.stem}-{width}.webp"
 
 
+def _read_upright(source: Path) -> "Image.Image | None":
+    """The picture, decoded once and turned as its EXIF says; None when it should stay as it is.
+
+    The file is closed again right after reading (#1227): with five widths the
+    upload used to open and decode the same file five times, and while it was
+    open a moderation step could not move it into quarantine on Windows.
+    """
+    try:
+        with Image.open(source) as image:
+            if getattr(image, "is_animated", False):
+                # Animierte Sticker (#239): eine kleinere Fassung wäre ein Standbild - es kommt das Original.
+                return None
+            upright = ImageOps.exif_transpose(image)
+            upright.load()
+            return upright
+    except (OSError, ValueError, Image.DecompressionBombError) as exc:
+        logger.warning("[media] reading %s for variants failed: %s", source.name, exc)
+        return None
+
+
+def _write_variant(image: "Image.Image", source: Path, width: int) -> Path | None:
+    """One variant from an already decoded picture; None when it would not be smaller."""
+    if image.width <= width:
+        return None
+    target = variant_path(source, width)
+    copy = image.copy()
+    copy.thumbnail((width, width * 4), Image.Resampling.LANCZOS)
+    if copy.mode not in ("RGB", "RGBA"):
+        copy = copy.convert("RGBA" if "A" in copy.getbands() else "RGB")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        copy.save(target, format="WEBP", quality=VARIANT_QUALITY.get(width, 80), method=6)
+    except (OSError, ValueError) as exc:
+        logger.warning("[media] variant %s@%s failed: %s", source.name, width, exc)
+        return None
+    return target
+
+
 def build_variant(source: Path, width: int) -> Path | None:
     """Write the variant and return its path; None when it makes no sense.
 
@@ -67,24 +108,8 @@ def build_variant(source: Path, width: int) -> Path | None:
     target = variant_path(source, width)
     if target.exists():
         return target
-    try:
-        with Image.open(source) as image:
-            if getattr(image, "is_animated", False):
-                # Animierte Sticker (#239): eine kleinere Fassung wäre ein Standbild - es kommt das Original.
-                return None
-            image = ImageOps.exif_transpose(image)
-            if image.width <= width:
-                return None
-            copy = image.copy()
-            copy.thumbnail((width, width * 4), Image.Resampling.LANCZOS)
-            if copy.mode not in ("RGB", "RGBA"):
-                copy = copy.convert("RGBA" if "A" in copy.getbands() else "RGB")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            copy.save(target, format="WEBP", quality=VARIANT_QUALITY.get(width, 80), method=6)
-        return target
-    except (OSError, ValueError, Image.DecompressionBombError) as exc:
-        logger.warning("[media] variant %s@%s failed: %s", source.name, width, exc)
-        return None
+    image = _read_upright(source)
+    return _write_variant(image, source, width) if image is not None else None
 
 
 def build_all_variants(source: Path) -> list[Path]:
@@ -93,13 +118,24 @@ def build_all_variants(source: Path) -> list[Path]:
     Since nginx serves uploads straight from disk (#232), a variant that does
     not exist yet is the one request per width that still goes through the
     API process. Building them right after the upload keeps the first album
-    view as fast as the second.
+    view as fast as the second. The picture is read once for all widths.
     """
+    if not is_resizable(source):
+        return []
     built = []
+    image = None
     for width in VARIANT_WIDTHS:
-        target = build_variant(source, width)
-        if target is not None:
+        target = variant_path(source, width)
+        if target.exists():
             built.append(target)
+            continue
+        if image is None:
+            image = _read_upright(source)
+            if image is None:
+                break
+        written = _write_variant(image, source, width)
+        if written is not None:
+            built.append(written)
     return built
 
 

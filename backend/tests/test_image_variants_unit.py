@@ -53,6 +53,18 @@ def test_a_width_between_two_offers_is_not_silently_upgraded():
     assert normalize_width(799) is None
 
 
+def test_the_small_widths_for_profile_pictures_and_logos(bild):
+    """#1227: 160 und 320 gibt es dazu - alles dazwischen bleibt abgelehnt."""
+    assert normalize_width(160) == 160 and normalize_width(320) == 320
+    for wert in (150, 161, 240, 319, 321):
+        assert normalize_width(wert) is None
+    quelle = bild(width=1200, height=1200)
+    klein = build_variant(quelle, 160)
+    with Image.open(klein) as im:
+        assert im.size == (160, 160)
+    assert klein.stat().st_size < quelle.stat().st_size
+
+
 # ---------------------------------------------------------------- Erzeugen
 
 # Seit nginx die Uploads von der Platte liefert (#232), entstehen die Fassungen
@@ -63,8 +75,30 @@ def test_all_smaller_widths_are_built_after_an_upload(bild):
 
     fertig = build_all_variants(quelle)
 
-    assert [pfad.name for pfad in fertig] == ["foto-400.webp", "foto-800.webp"]
+    assert [pfad.name for pfad in fertig] == ["foto-160.webp", "foto-320.webp", "foto-400.webp", "foto-800.webp"]
     assert not variant_path(quelle, 1600).exists()
+
+
+def test_all_widths_come_from_a_single_reading(bild, monkeypatch):
+    """#1227: fünf Breiten, aber das Bild wird nur einmal geöffnet und dekodiert.
+
+    Vorher hieß jede Breite ein eigenes Öffnen - unter Windows hielt das die
+    Datei fest, während die Bildprüfung sie in die Quarantäne verschieben wollte.
+    """
+    # Das Modul liest Bilder über dasselbe PIL-Modul wie dieser Test - Image.open hier zu zählen reicht.
+    quelle = bild(width=2400, height=1600)
+    geoeffnet = []
+    original = Image.open
+
+    def zaehlen(*args, **kwargs):
+        geoeffnet.append(args[0])
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(Image, "open", zaehlen)
+    fertig = build_all_variants(quelle)
+
+    assert [pfad.name for pfad in fertig] == [f"foto-{breite}.webp" for breite in VARIANT_WIDTHS]
+    assert len(geoeffnet) == 1
 
 
 def test_scheduling_outside_the_event_loop_builds_right_away(bild):
@@ -151,9 +185,10 @@ def test_a_missing_file_is_answered_with_none(tmp_path):
 
 def test_only_widths_below_the_original_are_worth_offering():
     """Sonst laedt ein Browser dieselbe Datei unter zwei Namen."""
-    assert srcset_widths(900) == [400, 800]
-    assert srcset_widths(300) == []
-    assert srcset_widths(4096) == [400, 800, 1600]
+    assert srcset_widths(900) == [160, 320, 400, 800]
+    assert srcset_widths(300) == [160]
+    assert srcset_widths(120) == []
+    assert srcset_widths(4096) == [160, 320, 400, 800, 1600]
     assert srcset_widths(None) == list(VARIANT_WIDTHS)
 
 
