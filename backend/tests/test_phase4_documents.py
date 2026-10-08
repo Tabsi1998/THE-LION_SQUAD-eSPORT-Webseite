@@ -1,7 +1,6 @@
 """Phase 4 backend tests — Vereinsdokumente + Downloads + members news + membership history."""
 import io
 import os
-import time
 import uuid
 import pytest
 import requests

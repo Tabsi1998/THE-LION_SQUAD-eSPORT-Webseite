@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from database import get_db
-from auth import get_current_user, get_optional_user, require_club_admin, require_super, hash_token, require_area
+from auth import get_current_user, get_optional_user, require_super, hash_token, require_area
 from email_service import send_template
 from services.competition_privacy import registration_match_snapshot
 from services.competition_standings import registration_match_summary

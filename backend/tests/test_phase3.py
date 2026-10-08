@@ -1,5 +1,4 @@
 """Phase 3 tests: Featured season, Discord settings, sponsors seed."""
-import pytest
 
 
 # ---- Sponsors seed ----

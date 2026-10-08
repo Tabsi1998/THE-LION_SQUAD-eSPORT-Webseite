@@ -5,7 +5,7 @@ import asyncio
 import ssl
 import smtplib
 import ipaddress
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from typing import Optional
 from email.utils import parseaddr
 

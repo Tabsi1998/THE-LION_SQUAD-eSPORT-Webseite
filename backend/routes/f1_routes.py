@@ -3,11 +3,11 @@ import io
 import csv
 from datetime import datetime
 from urllib.parse import quote, urlencode
-from fastapi import APIRouter, HTTPException, Depends, Response
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse, StreamingResponse
 from database import get_db
 from services.permissions import is_tournament_lead
-from auth import get_current_user, require_admin, require_role, get_optional_user, require_area
+from auth import get_current_user, require_admin, get_optional_user, require_area
 from services.visibility import user_can_see
 from services.visibility import lead_can_see
 from services.access_links import public_access_link_payload, touch_access_link, validate_access_link

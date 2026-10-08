@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Literal
 
 from database import get_db
-from auth import get_current_user, require_club_admin, require_area
+from auth import get_current_user, require_area
 from models import now_utc, new_id
 from badges import compute_profile_completeness, PROFILE_FIELDS, evaluate_user_progress
 from services import dolibarr_applications, membership_fees, membership_invitations

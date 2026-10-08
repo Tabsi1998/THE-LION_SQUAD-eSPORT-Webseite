@@ -18,7 +18,7 @@ from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode import qr
 from reportlab.graphics.shapes import Drawing
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak,
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
 )
 from PIL import Image
 

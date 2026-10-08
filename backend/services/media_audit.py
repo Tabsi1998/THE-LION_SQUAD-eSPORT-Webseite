@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 from database import get_db
 from models import now_utc
-from services.media_formats import PUBLIC_IMAGE_EXTS, PUBLIC_MEDIA_EXTS, PUBLIC_VIDEO_EXTS
+from services.media_formats import PUBLIC_MEDIA_EXTS
 
 
 UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))

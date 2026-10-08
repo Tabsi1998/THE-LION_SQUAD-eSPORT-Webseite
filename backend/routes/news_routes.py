@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse
 from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
-from auth import require_admin, get_optional_user, require_area
+from auth import get_optional_user, require_area
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
 from services.sponsor_utils import dedupe_public_sponsors, public_sponsor_view

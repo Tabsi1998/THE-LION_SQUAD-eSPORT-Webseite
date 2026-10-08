@@ -2,7 +2,6 @@
 
 Run with: pytest backend/tests/test_phase_8_9_10.py -v
 """
-import time
 
 # Note: admin_client fixture comes from conftest.py
 

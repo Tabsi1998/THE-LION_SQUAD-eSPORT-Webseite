@@ -1,6 +1,5 @@
 """Phase 5 Tests: Badge System, Public Profiles, Sponsors CRUD, Upload, F1 Rename."""
 import os
-import io
 import base64
 import uuid
 import pytest

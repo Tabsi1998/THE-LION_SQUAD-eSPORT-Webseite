@@ -5,7 +5,7 @@ Status flow: pending  → ready → picked_up
                               → expired (after deadline reached)
 """
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional
 
 from database import get_db

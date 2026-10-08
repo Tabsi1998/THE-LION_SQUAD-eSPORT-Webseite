@@ -4,7 +4,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from datetime import date
 from database import get_db
-from auth import get_current_user, require_club_admin, get_optional_user, require_area, require_club_member
+from auth import get_current_user, get_optional_user, require_area, require_club_member
 from services.levels import level_view
 from services.membership_service import (
     upsert_membership, get_membership, get_user_with_membership,

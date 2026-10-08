@@ -10,7 +10,7 @@ from fastapi import HTTPException
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import routes.seo_render_routes as seo_render_routes
+from routes import seo_render_routes
 from routes.seo_render_routes import render_preview_html, resolve_meta, resolve_slug_redirect
 
 

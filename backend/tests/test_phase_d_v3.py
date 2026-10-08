@@ -7,7 +7,6 @@ Covers:
 - /api/board CRUD incl. defaults + assignable-users
 """
 import os
-import time
 import requests
 import pytest
 from dotenv import load_dotenv

@@ -9,10 +9,10 @@ from html import escape
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, Literal, List
+from typing import Optional, Literal
 
 from database import get_db
-from auth import require_club_admin, get_optional_user as get_current_user_optional, require_area
+from auth import get_optional_user as get_current_user_optional, require_area
 from models import now_utc, new_id
 from services.rate_limit import enforce_rate_limit
 from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug

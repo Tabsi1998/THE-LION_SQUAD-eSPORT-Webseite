@@ -11,7 +11,6 @@ Covers:
 - Email logs templates: membership_activated/deactivated/blocked
 """
 import os
-import time
 import uuid
 import pytest
 import requests

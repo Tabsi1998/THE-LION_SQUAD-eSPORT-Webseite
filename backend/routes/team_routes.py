@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from database import get_db
 from services import moderation_standing
-from auth import get_current_user, get_optional_user, require_admin
+from auth import get_current_user, get_optional_user
 from models import TeamCreate, TeamUpdate, now_utc, new_id
 from services.notification_preferences import send_user_template
 from services.user_notifications import build_public_url, create_user_notification

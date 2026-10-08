@@ -22,7 +22,7 @@ from pymongo.errors import DuplicateKeyError
 from database import get_db
 from models import now_utc, new_id
 from achievement_catalog import (
-    ACHIEVEMENT_GROUPS, ACHIEVEMENT_TIERS, GROUP_BY_CODE, TIER_BY_CODE,
+    ACHIEVEMENT_GROUPS, ACHIEVEMENT_TIERS, TIER_BY_CODE,
     CONDITION_KEY_STATUS, apply_category_overrides, annotate_tier, material_color, material_name,
 )
 from services.membership_service import get_membership, is_active_member

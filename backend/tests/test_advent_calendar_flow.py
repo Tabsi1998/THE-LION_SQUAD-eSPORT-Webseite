@@ -4,7 +4,7 @@ Verwaltung pflegt, kopiert, sieht Zahlen und eine Vorschau - und „Alle Türche
 import json
 import pathlib
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio

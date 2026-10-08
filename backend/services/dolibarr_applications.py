@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
-from models import new_id, now_utc
+from models import now_utc
 from services.dolibarr_client import DolibarrClient, DolibarrError
 
 logger = logging.getLogger("tls.dolibarr.applications")

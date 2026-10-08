@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import bcrypt
 
 from database import get_db
-from auth import require_admin, require_super, get_current_user, require_any_admin
+from auth import require_super, require_any_admin
 from models import MIN_PASSWORD_LENGTH, now_utc, new_id
 from services.public_site_settings import build_public_legal_settings
 from services.secret_store import encrypt_secret

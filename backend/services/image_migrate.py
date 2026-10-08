@@ -163,9 +163,7 @@ async def migrate_all() -> dict:
 
 # CLI entrypoint
 if __name__ == "__main__":
-    import sys
     from dotenv import load_dotenv
     load_dotenv("/app/backend/.env")
-    import logging
     logging.basicConfig(level=logging.INFO)
     print(asyncio.run(migrate_all()))
