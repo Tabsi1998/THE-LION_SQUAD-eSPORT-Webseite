@@ -7,7 +7,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
-import { ErrorState, SkeletonList } from "../../components/ListState";
+import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -115,6 +115,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [success, setSuccess] = useState("");
   const [proposalAt, setProposalAt] = useState("");
   const [proposalNote, setProposalNote] = useState("");
@@ -126,6 +128,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
 
   const lastReadChat = useRef<string | null>(null);
   const load = useCallback(async (options?: { preserveDrafts?: boolean }) => {
+    setProblem(null);
     const preserveDrafts = options?.preserveDrafts !== false;
     setError("");
     try {
@@ -151,6 +154,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       }
     } catch (err) {
       setError(errorMessage(err, "Match konnte nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -350,7 +354,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   if (!page) {
     return (
       <Screen>
-        <ErrorState title="Match nicht gefunden" detail={error || "Dieses Match ist nicht sichtbar oder wurde entfernt."} />
+        <ErrorState title="Match nicht gefunden" detail={error || "Dieses Match ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }

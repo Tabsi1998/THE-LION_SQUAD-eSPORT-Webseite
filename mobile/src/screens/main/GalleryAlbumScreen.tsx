@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
-import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -26,8 +26,11 @@ export function GalleryAlbumScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
 
   const load = useCallback(async () => {
+    setProblem(null);
     setError("");
     try {
       const response = await api.get<GalleryAlbum>(`/gallery/${encodeURIComponent(id)}`);
@@ -35,6 +38,7 @@ export function GalleryAlbumScreen({ navigation, route }: Props) {
       navigation.setOptions({ title: response.data?.title || "Album" });
     } catch (err) {
       setError(errorMessage(err, "Das Album konnte nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -53,7 +57,7 @@ export function GalleryAlbumScreen({ navigation, route }: Props) {
   };
 
   if (loading) return <Screen><SkeletonList count={3} hasImage /></Screen>;
-  if (!album) return <Screen><ErrorState title="Album nicht gefunden" detail={error || "Dieses Album ist nicht sichtbar oder wurde entfernt."} /></Screen>;
+  if (!album) return <Screen><ErrorState title="Album nicht gefunden" detail={error || "Dieses Album ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} /></Screen>;
 
   return (
     <Screen padded={false}>

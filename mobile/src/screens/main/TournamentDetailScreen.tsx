@@ -6,7 +6,7 @@ import { tournamentIsOver } from "../../lib/afterEnd";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
-import { ErrorState, SkeletonList } from "../../components/ListState";
+import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -70,9 +70,12 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const guest = isGuestUser(user);
 
   const load = useCallback(async () => {
+    setProblem(null);
     setError("");
     try {
       const [detailResult, bracketResult, standingsResult, registrationsResult, teamsResult] = await Promise.all([
@@ -88,6 +91,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
       setMyTeams(Array.isArray(teamsResult.data) ? teamsResult.data : []);
     } catch (err) {
       setError(errorMessage(err, "Turnierdetail konnte nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
     }
@@ -241,7 +245,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   if (!tournament) {
     return (
       <Screen>
-        <ErrorState title="Turnierdetail nicht verfügbar" detail={error || "Das Turnier konnte nicht geladen werden."} />
+        <ErrorState title="Turnierdetail nicht verfügbar" detail={error || "Das Turnier konnte nicht geladen werden."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }

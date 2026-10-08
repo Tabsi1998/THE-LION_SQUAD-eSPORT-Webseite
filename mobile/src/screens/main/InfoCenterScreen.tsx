@@ -7,7 +7,7 @@ import { Card } from "../../components/Card";
 import { platformColor, platformIcon } from "../../components/LinkedAccounts";
 import { API_BASE_URL } from "../../config";
 import { ContentCard } from "../../components/ContentCard";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
@@ -77,6 +77,9 @@ export function InfoCenterScreen({ navigation, route }: Props) {
   const [referenceSummary, setReferenceSummary] = useState<ReferenceSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Was beim letzten Laden nicht kam (#1001, #1152): der Bereich behält seinen letzten Stand; ohne Stand zeigt er den
+  // Fehler mit „Nochmal versuchen“ statt „Keine Sponsoren“.
+  const [failed, setFailed] = useState<Partial<Record<SectionKey, LoadProblem>>>({});
   const active = useMemo(() => sections.find((item) => item.key === section) || sections[0], [section]);
   const fixedSection = Boolean(route.params?.section);
 
@@ -86,24 +89,34 @@ export function InfoCenterScreen({ navigation, route }: Props) {
 
   const loadLive = useCallback(async () => {
     try {
-      const [liveSponsors, livePartners, liveEvents, liveProfiles, liveBenefits, liveReferences] = await Promise.all([
-        api.get<any[]>("/sponsors").catch(() => ({ data: [] })),
-        api.get<any[]>("/partners").catch(() => ({ data: [] })),
-        api.get<any[]>("/events").catch(() => ({ data: [] })),
-        api.get<any[]>("/users/public-list").catch(() => ({ data: [] })),
-        api.get<any[]>("/membership/benefits").catch(() => ({ data: [] })),
-        api.get<Reference[] | { items?: Reference[]; summary?: ReferenceSummary }>("/references").catch(() => ({ data: [] as Reference[] })),
+      const [liveSponsors, livePartners, liveEvents, liveProfiles, liveBenefits, liveReferences] = await Promise.allSettled([
+        api.get<any[]>("/sponsors"),
+        api.get<any[]>("/partners"),
+        api.get<any[]>("/events"),
+        api.get<any[]>("/users/public-list"),
+        api.get<any[]>("/membership/benefits"),
+        api.get<Reference[] | { items?: Reference[]; summary?: ReferenceSummary }>("/references"),
       ]);
-      setSponsors(Array.isArray(liveSponsors.data) ? liveSponsors.data : []);
-      setPartners(Array.isArray(livePartners.data) ? livePartners.data : []);
-      setEvents(Array.isArray(liveEvents.data) ? liveEvents.data : []);
-      setProfiles(Array.isArray(liveProfiles.data) ? liveProfiles.data : []);
-      setBenefits(Array.isArray(liveBenefits.data) ? liveBenefits.data : []);
-      // Der Server liefert { items, summary }; die Liste war leer, solange die
-      // App ein Array erwartete (#252). Ein Array bleibt für ältere Server erlaubt.
-      const referenceData = liveReferences.data;
-      setReferences(Array.isArray(referenceData) ? referenceData : referenceData?.items ?? []);
-      setReferenceSummary(Array.isArray(referenceData) ? null : referenceData?.summary ?? null);
+      const problems: Partial<Record<SectionKey, LoadProblem>> = {};
+      const list = <T,>(key: SectionKey, result: PromiseSettledResult<{ data: T[] }>, set: (items: T[]) => void) => {
+        if (result.status === "fulfilled") set(Array.isArray(result.value.data) ? result.value.data : []);
+        else problems[key] = loadProblem(result.reason);
+      };
+      list("sponsors", liveSponsors, setSponsors);
+      list("partners", livePartners, setPartners);
+      list("events", liveEvents, setEvents);
+      list("profiles", liveProfiles, setProfiles);
+      list("benefits", liveBenefits, setBenefits);
+      if (liveReferences.status === "fulfilled") {
+        // Der Server liefert { items, summary }; die Liste war leer, solange die
+        // App ein Array erwartete (#252). Ein Array bleibt für ältere Server erlaubt.
+        const referenceData = liveReferences.value.data;
+        setReferences(Array.isArray(referenceData) ? referenceData : referenceData?.items ?? []);
+        setReferenceSummary(Array.isArray(referenceData) ? null : referenceData?.summary ?? null);
+      } else {
+        problems.references = loadProblem(liveReferences.reason);
+      }
+      setFailed(problems);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -134,6 +147,8 @@ export function InfoCenterScreen({ navigation, route }: Props) {
 
         {loading ? (
           <SkeletonList count={4} hasImage={false} />
+        ) : failed[section] && !sectionHasData(section, { sponsors, partners, events, profiles, benefits, references }) ? (
+          <ErrorState problem={failed[section]} title={`${active.label} nicht gefunden`} onRetry={() => { void loadLive(); }} testID="info-center-error" />
         ) : (
           <>
             {section === "sponsors" ? <Sponsors items={sponsors} /> : null}
@@ -147,6 +162,11 @@ export function InfoCenterScreen({ navigation, route }: Props) {
       </ScrollView>
     </Screen>
   );
+}
+
+/** Hat der Bereich schon einen Stand? Dann bleibt er stehen, auch wenn das Nachladen scheiterte. */
+function sectionHasData(section: SectionKey, data: Record<string, unknown[]>): boolean {
+  return Array.isArray(data[section]) && data[section].length > 0;
 }
 
 // Stufen wie auf der Webseite: Hauptsponsor volle Breite, Bronze zu viert, Logos

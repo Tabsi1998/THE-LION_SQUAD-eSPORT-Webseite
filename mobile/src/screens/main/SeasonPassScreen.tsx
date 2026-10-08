@@ -3,7 +3,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
-import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -12,6 +12,7 @@ import { api, errorMessage } from "../../lib/api";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 import { viennaDate } from "../../lib/vienna";
+import { openTab } from "../../navigation/rootNavigation";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "SeasonPass">;
 
@@ -66,8 +67,11 @@ export function SeasonPassScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
 
   const load = useCallback(async () => {
+    setProblem(null);
     setError("");
     try {
       const { data: featured } = await api.get<JahreswertungData>("/seasons/active/featured");
@@ -86,6 +90,7 @@ export function SeasonPassScreen({ navigation }: Props) {
       });
     } catch (err) {
       setError(errorMessage(err, "Jahreswertung konnte nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -120,7 +125,7 @@ export function SeasonPassScreen({ navigation }: Props) {
   if (!data && error) {
     return (
       <Screen>
-        <ErrorState title="Jahreswertung nicht verfügbar" detail={error} />
+        <ErrorState title="Jahreswertung nicht verfügbar" detail={error} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }
@@ -206,7 +211,7 @@ export function SeasonPassScreen({ navigation }: Props) {
 
         {leaderboard.length === 0 ? (
           <Card style={styles.card}>
-            <EmptyState icon="podium-outline" title="Noch keine Einträge" detail="Sobald Wertungen freigegeben sind, erscheint hier die Jahresrangliste." tone="gold" />
+            <EmptyState icon="podium-outline" title="Noch keine Einträge" detail="Sobald das erste Turnier gewertet ist, steht hier die Jahresrangliste." tone="gold" action={{ label: "Turniere ansehen", onPress: () => openTab("TournamentList", { filter: "tournaments" }), testID: "season-pass-empty-tournaments" }} />
           </Card>
         ) : null}
 

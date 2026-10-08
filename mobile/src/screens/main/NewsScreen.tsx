@@ -5,12 +5,12 @@ import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput,
 import { useBranding } from "../../branding/BrandingProvider";
 import { Card } from "../../components/Card";
 import { ListItemFadeIn, useListEntrance } from "../../components/FadeIn";
-import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted, Title } from "../../components/Text";
-import { api, errorMessage, responseFromCache } from "../../lib/api";
+import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatNewsCategory } from "../../lib/format";
 import { applyScope, internalLabel, type ScopeFilter } from "../../lib/memberArea";
 import type { MoreStackParamList } from "../../navigation/types";
@@ -25,7 +25,6 @@ export function NewsScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [offline, setOffline] = useState(false);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [scope, setScope] = useState<ScopeFilter>("all");
@@ -38,7 +37,6 @@ export function NewsScreen({ navigation }: Props) {
     try {
       const response = await api.get<NewsPost[]>("/news", { params: { sort: "latest" } });
       setItems(Array.isArray(response.data) ? response.data : []);
-      setOffline(responseFromCache(response));
     } catch (err) {
       setError(errorMessage(err, "News konnten nicht geladen werden."));
     } finally {
@@ -115,7 +113,6 @@ export function NewsScreen({ navigation }: Props) {
             ) : (
               <Muted>Aktuelle Ankündigungen, Updates und Vereinsnews.</Muted>
             )}
-            {offline && !error ? <OfflineNotice detail="News werden aus gespeicherten Daten angezeigt." /> : null}
 
             <View style={styles.searchRow}>
               <Ionicons name="search-outline" color={colors.muted} size={16} style={styles.searchIcon} />

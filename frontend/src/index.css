@@ -2849,6 +2849,19 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 }
 .tls-steps[data-compact] .tls-steps__item[data-state="current"] .tls-steps__count { display: inline; }
 
+/* Ohne Netz (#1152, wie in der App): die schmale Leiste unter dem Kopf - Gold auf dunklem Gold, der Inhalt bleibt. */
+.tls-offline-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  background: rgba(255, 215, 0, 0.1);
+  border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+  color: #FFD700;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* Knöpfe (#1082): eine Sprache für die ganze Seite. Der wichtige Knopf ist blau mit einem Lichtlauf und einem Pfeil,
    der 3 px fährt; der zweitrangige ein Rahmen in Blau; der leise für Nebensachen. Größe, Form und Anzeige bleiben an
    der Stelle (ein `hidden md:inline-flex` bleibt versteckt), nur Farbe, Hover und Übergang kommen von hier. Der

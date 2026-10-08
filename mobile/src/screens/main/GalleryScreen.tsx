@@ -2,12 +2,12 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
-import { EmptyState, ErrorState, OfflineNotice, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted } from "../../components/Text";
-import { api, errorMessage, resolveMediaUrl, responseFromCache } from "../../lib/api";
+import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import { albumCountLabel, sizedUpload, type GalleryAlbum } from "../../lib/gallery";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
@@ -25,17 +25,19 @@ export function GalleryScreen({ navigation }: Props) {
   const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [offline, setOffline] = useState(false);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
 
   const load = useCallback(async () => {
+    setProblem(null);
     setError("");
     try {
       const response = await api.get<GalleryAlbum[]>("/gallery", { params: { compact: true, limit: 80 } });
       setAlbums(Array.isArray(response.data) ? response.data : []);
-      setOffline(responseFromCache(response));
     } catch (err) {
       setError(errorMessage(err, "Die Galerie konnte nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -49,7 +51,7 @@ export function GalleryScreen({ navigation }: Props) {
     return <Screen><SkeletonList count={4} hasImage /></Screen>;
   }
   if (error && !albums.length) {
-    return <Screen><ErrorState title="Galerie nicht erreichbar" detail={error} /></Screen>;
+    return <Screen><ErrorState title="Galerie nicht erreichbar" detail={error} problem={problem} onRetry={() => { void load(); }} /></Screen>;
   }
 
   return (
@@ -59,7 +61,6 @@ export function GalleryScreen({ navigation }: Props) {
           <Heading>Galerie</Heading>
           <Muted>Bilder und Videos von Events, Turnieren und dem Vereinsleben.</Muted>
         </View>
-        {offline ? <OfflineNotice detail="Die Alben kommen aus gespeicherten Daten." /> : null}
         {albums.length ? albums.map((album) => (
           <Pressable
             key={album.id}

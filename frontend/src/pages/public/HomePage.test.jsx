@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Startseite lebendiger (#224): Countdown zum nächsten Termin, Live-Zahlen in der Karte, und
@@ -144,4 +144,17 @@ test("das Licht folgt dem Zeiger höchstens 28 × 20 Pixel und kehrt zur Mitte z
   expect(glowOffset({ x: 1720, y: 850 }, center, viewport)).toEqual({ x: 28, y: 20 });
   expect(glowOffset({ x: 0, y: 0 }, center, viewport)).toEqual({ x: -28, y: -18 });
   expect(glowOffset({ x: 1360, y: 400 }, center, viewport)).toEqual({ x: 14, y: 0 });
+});
+
+test("/home/state scheitert: Fehler mit „Nochmal versuchen“ statt ewiger Platzhalter, danach die Seite (#983, #1152)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/home/state") throw new Error("Network Error");
+    return { data: [] };
+  });
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+  const error = await screen.findByTestId("public-error-state");
+  expect(error).toHaveAttribute("data-kind", "offline");
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/home/state" ? stateWith(false) : [] }));
+  fireEvent.click(screen.getByTestId("public-error-retry"));
+  await waitFor(() => expect(screen.queryByTestId("public-error-state")).toBeNull());
 });

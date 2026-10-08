@@ -7,7 +7,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View, type LayoutCha
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { ListItemFadeIn, useListEntrance } from "../../components/FadeIn";
-import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { TabHeader, useTabScrollToTop } from "../../components/TabHeader";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -16,7 +16,7 @@ import { AdventHint } from "../../advent/entry";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { useBranding } from "../../branding/BrandingProvider";
-import { api, errorMessage, responseFromCache } from "../../lib/api";
+import { api, errorMessage } from "../../lib/api";
 import { API_BASE_URL } from "../../config";
 import { compareByNearestDate } from "../../lib/contentSort";
 import { seasonLine, splitHomeTimeline, type HomeItem } from "../../lib/dashboard";
@@ -84,7 +84,6 @@ export function DashboardScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [offline, setOffline] = useState(false);
   // Rückmeldung (#1196): „Wie war …?“ aus den offenen Aktionen oder aus der Meldung (Parameter `feedback`).
   const [feedbackTarget, setFeedbackTarget] = useState<string | null>(null);
   const [feedbackThanks, setFeedbackThanks] = useState("");
@@ -112,7 +111,6 @@ export function DashboardScreen({ navigation, route }: Props) {
       const nextData = normalizeDashboard(response.data);
       nextData.me.matches = nextData.me.matches.filter((match: any) => OPEN_MATCH_STATUSES.has(String(match.status || "")));
       setData(nextData);
-      setOffline(responseFromCache(response));
       if (!isGuest) {
         await refreshMe().catch(() => {});
         api.get<{ open: boolean; note?: string }>("/membership/invitation/me").then((r) => setInvitation(r.data?.open ? r.data : null)).catch(() => setInvitation(null));
@@ -240,7 +238,6 @@ export function DashboardScreen({ navigation, route }: Props) {
         {!isGuest ? <YearReviewCard onOpen={() => navigation.navigate("YearReview")} /> : null}
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
-        {offline && !error ? <OfflineNotice /> : null}
 
         {/* Eine Null als Kennzahl sagt nichts: "Aktionen" nur, wenn es welche gibt (#248). */}
         <View style={styles.grid}>
@@ -347,7 +344,12 @@ export function DashboardScreen({ navigation, route }: Props) {
           ) : liveItems.length ? (
             <Muted>Alles Weitere steht oben unter „Heute und Live“.</Muted>
           ) : (
-            <EmptyState icon="calendar-outline" title={isGuest ? "Noch keine Termine" : "Keine anstehenden Termine"} detail={isGuest ? "Sobald Website-Termine veröffentlicht sind, stehen sie hier." : "Sobald du dich für ein Turnier oder Event anmeldest, steht es hier. Vergangene Termine findest du im Profil unter Referenzen."} />
+            <EmptyState
+              icon="calendar-outline"
+              title={isGuest ? "Noch keine Termine" : "Keine anstehenden Termine"}
+              detail={isGuest ? "Sobald Termine veröffentlicht sind, stehen sie hier." : "Sobald du dich für ein Turnier oder Event anmeldest, steht es hier. Vergangene Termine findest du im Profil unter Referenzen."}
+              action={isGuest ? null : { label: "Termine ansehen", onPress: () => openTab("TournamentList"), testID: "dashboard-empty-events" }}
+            />
           )}
         </Section>
 

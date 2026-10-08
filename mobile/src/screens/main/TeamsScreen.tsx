@@ -2,12 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { useTabScrollToTop } from "../../components/TabHeader";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
+import { openLink } from "../../lib/openLink";
+import { WEB_BASE_URL } from "../../lib/siteUrls";
 import { chatTitle, splitTeams, teamMembers, teamMeta, teamSquads } from "../../lib/teams";
 import { colors, radius } from "../../theme";
 import type { Team, TeamInvite } from "../../types";
@@ -29,24 +31,24 @@ export function TeamsSection({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
 
   const load = useCallback(async () => {
     setError("");
-    try {
-      const [mine, all, inviteResult] = await Promise.all([
-        api.get<Team[]>("/teams/my").catch(() => ({ data: [] })),
-        api.get<Team[]>("/teams").catch(() => ({ data: [] })),
-        api.get<TeamInvite[]>("/teams/invites/my").catch(() => ({ data: [] })),
-      ]);
-      setMyTeams(Array.isArray(mine.data) ? mine.data : []);
-      setAllTeams(Array.isArray(all.data) ? all.data : []);
-      setInvites(Array.isArray(inviteResult.data) ? inviteResult.data : []);
-    } catch (err) {
-      setError(errorMessage(err, "Teams konnten nicht geladen werden."));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    // Ein Ladefehler ist kein „Noch kein Team“ (#1001, #1152): was fehlschlägt, behält seinen letzten Stand, und ohne
+    // jeden Stand zeigt der Screen den Fehler mit „Nochmal versuchen“.
+    const [mine, all, inviteResult] = await Promise.allSettled([
+      api.get<Team[]>("/teams/my"),
+      api.get<Team[]>("/teams"),
+      api.get<TeamInvite[]>("/teams/invites/my"),
+    ]);
+    if (mine.status === "fulfilled") setMyTeams(Array.isArray(mine.value.data) ? mine.value.data : []);
+    if (all.status === "fulfilled") setAllTeams(Array.isArray(all.value.data) ? all.value.data : []);
+    if (inviteResult.status === "fulfilled") setInvites(Array.isArray(inviteResult.value.data) ? inviteResult.value.data : []);
+    const failed = [all, mine].find((result): result is PromiseRejectedResult => result.status === "rejected");
+    setProblem(failed ? loadProblem(failed.reason) : null);
+    setLoading(false);
+    setRefreshing(false);
   }, []);
 
   useEffect(() => {
@@ -127,13 +129,17 @@ export function TeamsSection({ navigation }: Props) {
             ) : null}
           </View>
         }
-        ListEmptyComponent={
+        ListEmptyComponent={problem ? (
+          <ErrorState problem={problem} title="Teams nicht gefunden" onRetry={() => { void load(); }} testID="teams-error" />
+        ) : (
           <EmptyState
             icon="people-outline"
             title="Noch kein Team"
-            detail="Einem Team trittst du über eine Einladung oder einen Join-Code bei. Öffentliche Teams erscheinen hier, sobald es welche gibt."
+            detail="Einem Team trittst du über eine Einladung oder einen Join-Code bei - oder du gründest selbst eins."
+            action={{ label: "Team gründen", onPress: () => { openLink(`${WEB_BASE_URL}/teams`); }, testID: "teams-empty-create" }}
+            testID="teams-empty"
           />
-        }
+        )}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
         contentContainerStyle={styles.list}
         renderItem={({ item }) =>

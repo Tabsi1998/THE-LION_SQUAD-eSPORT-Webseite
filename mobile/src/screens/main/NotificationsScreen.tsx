@@ -81,7 +81,7 @@ export function NotificationsScreen({ navigation }: Props) {
           <EmptyState
             icon="notifications-outline"
             title="Keine Benachrichtigungen"
-            detail="Erinnerungen, Mentions, Nachrichten und Match-Updates erscheinen hier."
+            detail="Erinnerungen, Erwähnungen, Nachrichten und Match-Updates erscheinen hier. Was ankommt, stellst du im Profil am Zahnrad ein."
           />
         ) : null}
         {!loading && items.length > 0 && !visibleItems.length ? (

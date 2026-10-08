@@ -11,6 +11,7 @@ import type { AppStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { PrizePickup } from "../../types";
 import { PrizeCard, profileStyles, Stat } from "./profile/parts";
+import { openTab } from "../../navigation/rootNavigation";
 
 // Meine Gewinne (#1149): früher ein Reiter im Profil, jetzt hinter „Nur für dich“ - Preise aus Turnieren und Fast-Lap-
 // Challenges, sobald sie für dein Konto oder Team hinterlegt sind. Ein Tipp öffnet das Turnier oder die Fast Lap.
@@ -62,7 +63,7 @@ export function MyPrizesScreen({ navigation }: Props) {
         </Card>
         {loading ? <SkeletonList count={3} hasImage={false} /> : null}
         {!loading && !prizes.length ? (
-          <EmptyState icon="trophy-outline" title="Noch keine Gewinne" detail="Sobald ein Preis für dich oder dein Team eingetragen wird, erscheint er hier." tone="gold" />
+          <EmptyState icon="trophy-outline" title="Noch keine Gewinne" detail="Sobald ein Preis für dich oder dein Team eingetragen wird, erscheint er hier." tone="gold" action={{ label: "Turniere ansehen", onPress: () => openTab("TournamentList", { filter: "tournaments" }), testID: "prizes-empty-tournaments" }} />
         ) : null}
         {prizes.map((item) => <PrizeCard key={item.id} item={item} onOpen={open} />)}
       </ScrollView>

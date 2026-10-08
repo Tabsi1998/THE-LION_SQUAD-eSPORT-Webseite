@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
-import { ErrorState, SkeletonList } from "../../components/ListState";
+import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
@@ -26,8 +26,11 @@ export function NewsDetailScreen({ navigation, route }: Props) {
   const [post, setPost] = useState<NewsPost | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
 
   const load = useCallback(async () => {
+    setProblem(null);
     setError("");
     try {
       const { data } = await api.get<NewsPost>(`/news/${route.params.id}`);
@@ -36,6 +39,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
       if (data?.id && readerId) api.post(`/news/${data.id}/read`).catch(() => undefined);
     } catch (err) {
       setError(errorMessage(err, "News-Beitrag konnte nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
     }
@@ -80,7 +84,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
   if (!post) {
     return (
       <Screen>
-        <ErrorState title="Beitrag nicht gefunden" detail={error || "Dieser Beitrag ist nicht sichtbar oder wurde entfernt."} />
+        <ErrorState title="Beitrag nicht gefunden" detail={error || "Dieser Beitrag ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }

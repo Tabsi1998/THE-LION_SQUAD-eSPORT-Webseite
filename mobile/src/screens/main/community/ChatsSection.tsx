@@ -57,7 +57,7 @@ export function ChatsSection({ navigation, guest }: { navigation: Navigation; gu
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await reload(); setRefreshing(false); }} tintColor={colors.cyan} />}
       ListHeaderComponent={error ? <Muted style={styles.error}>{error}</Muted> : null}
       ListEmptyComponent={loading ? <SkeletonList count={4} hasImage={false} /> : (
-        <EmptyState icon="chatbubbles-outline" title="Noch keine Chats" detail="Schreib jemandem über „Neue Nachricht“ oder aus seinem Profil. Team- und Turnier-Chats erscheinen hier von selbst." />
+        <EmptyState icon="chatbubbles-outline" title="Noch keine Chats" detail="Schreib jemandem oder öffne ein Profil. Team- und Turnier-Chats erscheinen hier von selbst." action={{ label: "Neue Nachricht", onPress: () => setComposing(true), testID: "chats-empty-new" }} />
       )}
       ItemSeparatorComponent={() => <View style={styles.separator} />}
       renderItem={({ item }) => <ChatRow item={item} onPress={() => open(item)} />}

@@ -4,7 +4,7 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, Vi
 import { AddToCalendarButton } from "../../components/AddToCalendarButton";
 import { challengeIsOver } from "../../lib/afterEnd";
 import { Card } from "../../components/Card";
-import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -27,6 +27,8 @@ export function FastLapDetailScreen({ route }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [managerUsers, setManagerUsers] = useState<PublicUser[]>([]);
   const [managerSearch, setManagerSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -43,6 +45,7 @@ export function FastLapDetailScreen({ route }: Props) {
   const activeTrack = tracks.find((track) => track.id === activeTrackId) || leaderboard?.track || tracks[0] || null;
 
   const load = useCallback(async (trackId?: string | null) => {
+    setProblem(null);
     setError("");
     try {
       const challengeResult = await api.get<F1Challenge>(`/f1/challenges/${route.params.id}`);
@@ -63,6 +66,7 @@ export function FastLapDetailScreen({ route }: Props) {
       }
     } catch (err) {
       setError(errorMessage(err, "Fast-Lap Zeiten konnten nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -138,7 +142,7 @@ export function FastLapDetailScreen({ route }: Props) {
   if (!challenge) {
     return (
       <Screen>
-        <ErrorState title="Challenge nicht gefunden" detail={error || "Diese Challenge ist nicht sichtbar oder wurde entfernt."} />
+        <ErrorState title="Challenge nicht gefunden" detail={error || "Diese Challenge ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }

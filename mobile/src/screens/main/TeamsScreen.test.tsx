@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { TeamsSection } from "./TeamsScreen";
 
 // Teamliste: eigene Teams mit Chat-Knopf, weitere Teams darunter, Squads nur
@@ -58,4 +58,40 @@ test("ohne Teams erklärt die Seite, wie man in ein Team kommt", async () => {
   await waitFor(() => expect(screen.getByText("Noch kein Team")).toBeTruthy());
   expect(screen.getByText(/Einladung oder einen Join-Code/)).toBeTruthy();
   expect(screen.queryByText("Mitglieder")).toBeNull();
+});
+
+test("Ladefehler ist kein „Noch kein Team“: ohne Netz der Fehler mit „Nochmal versuchen“, danach die Liste (#1001, #1152)", async () => {
+  const offline = Object.assign(new Error("Network Error"), { isAxiosError: true, code: "ERR_NETWORK" });
+  mockGet.mockImplementation(() => Promise.reject(offline));
+  await render(<TeamsSection navigation={navigation} />);
+  await waitFor(() => expect(screen.getByTestId("teams-error")).toBeTruthy());
+  expect(screen.queryByText("Noch kein Team")).toBeNull();
+  const lions = { id: "t1", name: "Lions", tag: "TLS", member_count: 12, squad_count: 0 };
+  mockGet.mockImplementation((path: string) => answer(path, [lions], [lions]));
+  await fireEvent.press(screen.getByTestId("teams-error-retry"));
+  await waitFor(() => expect(screen.getByText("Meine Teams")).toBeTruthy());
+  expect(screen.queryByTestId("teams-error")).toBeNull();
+});
+
+test("wirklich leer: „Noch kein Team“ mit dem nächsten Schritt", async () => {
+  mockGet.mockImplementation((path: string) => answer(path, [], []));
+  await render(<TeamsSection navigation={navigation} />);
+  await waitFor(() => expect(screen.getByTestId("teams-empty")).toBeTruthy());
+  expect(screen.getByTestId("teams-empty-create")).toBeTruthy();
+});
+
+test("ein Fehler beim Nachladen nimmt die Teams nicht weg", async () => {
+  const lions = { id: "t1", name: "Lions", tag: "TLS", member_count: 12, squad_count: 0 };
+  mockGet.mockImplementation((path: string) => answer(path, [lions], [lions]));
+  await render(<TeamsSection navigation={navigation} />);
+  await waitFor(() => expect(screen.getByText("Meine Teams")).toBeTruthy());
+  mockGet.mockClear();
+  mockGet.mockImplementation(() => Promise.reject(Object.assign(new Error("boom"), { isAxiosError: true, response: { status: 500, data: {} } })));
+  const [list] = screen.container.queryAll((node) => Boolean(node.props.refreshControl));
+  await act(async () => {
+    await list.props.refreshControl.props.onRefresh();
+  });
+  await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/teams"));
+  expect(screen.getByText("Meine Teams")).toBeTruthy();
+  expect(screen.getByText("Lions")).toBeTruthy();
 });

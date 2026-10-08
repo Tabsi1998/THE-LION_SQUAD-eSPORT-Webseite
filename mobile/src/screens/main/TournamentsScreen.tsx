@@ -4,14 +4,14 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { ListItemFadeIn, useListEntrance, type ListEntrance } from "../../components/FadeIn";
-import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { TabHeader, useTabScrollToTop } from "../../components/TabHeader";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { MonthCalendar } from "../../components/MonthCalendar";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted } from "../../components/Text";
-import { api, errorMessage, responseFromCache } from "../../lib/api";
+import { api, errorMessage } from "../../lib/api";
 import { initialMonth, itemsByDay, parseDay, shiftMonth, type CalendarItem } from "../../lib/calendar";
 import { compareByNearestDate } from "../../lib/contentSort";
 import { splitOpenAndPast } from "../../lib/dashboard";
@@ -73,7 +73,6 @@ export function TournamentsScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [offline, setOffline] = useState(false);
   // Die Listen blenden gestaffelt ein (#1085) - jede Karte nur beim ersten Erscheinen.
   const entrance = useListEntrance();
 
@@ -94,7 +93,6 @@ export function TournamentsScreen({ navigation, route }: Props) {
       setEvents(Array.isArray(eventResult.data) ? eventResult.data : []);
       setTournaments(Array.isArray(tournamentResult.data) ? tournamentResult.data : []);
       setFastlaps(Array.isArray(fastLapResult.data) ? fastLapResult.data : []);
-      setOffline([eventResult, tournamentResult, fastLapResult].some(responseFromCache));
     } catch (err) {
       setError(errorMessage(err, "Events konnten nicht geladen werden."));
     } finally {
@@ -207,7 +205,6 @@ export function TournamentsScreen({ navigation, route }: Props) {
         <TabHeader title="Events" testID="events-header">
           {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Was ansteht: Events, Turniere und Fast Laps.</Muted>}
         </TabHeader>
-        {offline && !error ? <OfflineNotice detail="Events, Turniere und Fast-Laps werden aus gespeicherten Daten angezeigt." /> : null}
 
         {/* Die Filterzeilen rücken mit eigenem Abstand zusammen: ein negativer Rand am Inhalt der waagrechten Liste schnitt
             die Oberkante der Knöpfe ab (Geräteprobe vor 1.4.0). */}

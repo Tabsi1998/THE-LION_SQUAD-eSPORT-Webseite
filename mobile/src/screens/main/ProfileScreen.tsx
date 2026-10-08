@@ -9,7 +9,7 @@ import { AwardCard } from "../../components/AwardCard";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { HonoursCard } from "../../components/Honours";
-import { EmptyState } from "../../components/ListState";
+import { EmptyState, PartialLoadNotice, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { HeaderButton, TabHeader, useTabScrollToTop } from "../../components/TabHeader";
@@ -85,6 +85,7 @@ function OwnProfile() {
   const [ownDocuments, setOwnDocuments] = useState<MemberDocument[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [message, setMessage] = useState("");
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   useTabScrollToTop(scrollRef);
 
@@ -99,27 +100,35 @@ function OwnProfile() {
       }
       return api.get<AchievementsMe>("/achievements/me");
     })();
+    // Ein Fehlschlag ist kein „nichts da“ (#1001, #1152): der Bereich behält seinen letzten Stand (null = nicht gekommen),
+    // und oben steht „Nicht alles geladen“ mit „Nochmal versuchen“.
+    let firstProblem: LoadProblem | null = null;
+    const keep = <T,>(promise: Promise<{ data: T }>) => promise.catch((error: unknown) => {
+      firstProblem = firstProblem || loadProblem(error);
+      return null;
+    });
     const [achievementResult, completenessResult, referenceResult, awardResult, prizeResult, standingResult, invoiceResult, teamResult, documentResult] = await Promise.all([
-      achievementsAfterEvaluation.catch(() => ({ data: { groups: [], awards: [] } as AchievementsMe })),
-      api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
-      api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: EMPTY_REFERENCES })),
-      api.get<{ awards: Award[]; featured_award_id?: string | null }>("/me/awards").catch(() => ({ data: { awards: [] } })),
-      api.get<PrizePickup[]>("/prizes/me").catch(() => ({ data: [] as PrizePickup[] })),
-      api.get<ModerationStanding>("/moderation/me/standing").catch(() => ({ data: null })),
-      api.get<{ summary?: InvoiceSummary; currency?: string }>("/account/invoices").catch(() => ({ data: { summary: null } as { summary?: InvoiceSummary; currency?: string } })),
-      api.get<Team[]>("/teams/my").catch(() => ({ data: [] as Team[] })),
-      api.get<OwnDocuments>("/account/documents").catch(() => ({ data: null as OwnDocuments | null })),
+      keep(achievementsAfterEvaluation),
+      keep(api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness")),
+      keep(api.get<PersonalReferenceData>("/mobile/profile/references")),
+      keep(api.get<{ awards: Award[]; featured_award_id?: string | null }>("/me/awards")),
+      keep(api.get<PrizePickup[]>("/prizes/me")),
+      keep(api.get<ModerationStanding>("/moderation/me/standing")),
+      keep(api.get<{ summary?: InvoiceSummary; currency?: string }>("/account/invoices")),
+      keep(api.get<Team[]>("/teams/my")),
+      keep(api.get<OwnDocuments>("/account/documents")),
     ]);
-    setAchievements(achievementResult.data || { groups: [], awards: [] });
-    setCompleteness(completenessResult.data || {});
-    setReferences(referenceResult.data || EMPTY_REFERENCES);
-    setAwards(awardResult.data || { awards: [] });
-    setPrizes(Array.isArray(prizeResult.data) ? prizeResult.data : []);
-    setStanding((standingResult.data as ModerationStanding | null) || null);
-    setInvoices({ summary: invoiceResult.data?.summary || null, currency: invoiceResult.data?.currency });
-    setTeams(Array.isArray(teamResult.data) ? teamResult.data : []);
+    if (achievementResult) setAchievements(achievementResult.data || { groups: [], awards: [] });
+    if (completenessResult) setCompleteness(completenessResult.data || {});
+    if (referenceResult) setReferences(referenceResult.data || EMPTY_REFERENCES);
+    if (awardResult) setAwards(awardResult.data || { awards: [] });
+    if (prizeResult) setPrizes(Array.isArray(prizeResult.data) ? prizeResult.data : []);
+    if (standingResult) setStanding((standingResult.data as ModerationStanding | null) || null);
+    if (invoiceResult) setInvoices({ summary: invoiceResult.data?.summary || null, currency: invoiceResult.data?.currency });
+    if (teamResult) setTeams(Array.isArray(teamResult.data) ? teamResult.data : []);
     // Die Zeile „Deine Unterlagen“ steht nur da, wenn die Vereinsakte eigene Schreiben liefert.
-    setOwnDocuments(documentResult.data?.available && Array.isArray(documentResult.data.documents) ? documentResult.data.documents : []);
+    if (documentResult) setOwnDocuments(documentResult.data?.available && Array.isArray(documentResult.data.documents) ? documentResult.data.documents : []);
+    setProblem(firstProblem);
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -173,6 +182,7 @@ function OwnProfile() {
   const privateBox = (
     <Card style={styles.privateBox} testID="profile-private-box">
       <Muted style={styles.privateTitle}>Nur für dich</Muted>
+      {problem ? <PartialLoadNotice problem={problem} onRetry={() => { void refresh(); }} testID="profile-partial-load" /> : null}
       <PrivateRow
         icon="receipt-outline"
         title="Rechnungen"

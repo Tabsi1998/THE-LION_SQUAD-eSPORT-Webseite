@@ -6,6 +6,7 @@ import { Logo } from "@/components/tls/Logo";
 import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
+import { OfflineBar } from "@/components/tls/OfflineBar";
 
 // Sidebar-Gruppen (#408, #512): Verein (Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen,
 // Kontakt-Inbox), Mitglieder (mit Dolibarr - die Seite nennt sich Mitgliederverwaltung), Finanzen,
@@ -487,6 +488,7 @@ export function AdminLayout({ children }) {
           <Logo size="sm" />
           <div className="w-9" />
         </div>
+        <OfflineBar />
         <main id="main-content" tabIndex={-1} className="p-4 md:p-8 max-w-[1800px]">{children}</main>
       </div>
     </div>

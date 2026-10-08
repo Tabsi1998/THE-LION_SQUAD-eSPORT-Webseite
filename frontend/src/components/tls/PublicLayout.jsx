@@ -28,6 +28,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, Smartphone } from "lucide-react";
 import { UserMenu } from "@/components/tls/UserMenu";
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import { OfflineBar } from "@/components/tls/OfflineBar";
 
 export function PublicLayout({ children }) {
   const { user, logout, isAdmin, isClubMember } = useAuth();
@@ -200,6 +201,8 @@ export function PublicLayout({ children }) {
         </AnimatePresence>
         </MotionConfig>
       </header>
+      {/* Ohne Netz (#1152): „Offline · Stand 14:05“ - der Inhalt darunter bleibt stehen. */}
+      <OfflineBar />
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="below_nav" />
       {/* Einladung zum Verein (#507): nur für angemeldete Konten, die noch nicht Mitglied sind. */}
       {user && !isClubMember ? <InvitationBanner pathname={location.pathname} /> : null}

@@ -79,7 +79,13 @@ export async function clearAllCache(): Promise<void> {
 }
 
 export async function getStaleCache<T>(cacheKey: string, url: string): Promise<T | null> {
+  const entry = await getStaleEntry<T>(cacheKey, url);
+  return entry ? entry.data : null;
+}
+
+/** Der gespeicherte Eintrag samt Zeit (#1152: „Offline · Stand 14:05“ zeigt, wie alt die gezeigten Daten sind). */
+export async function getStaleEntry<T>(cacheKey: string, url: string): Promise<CacheEntry<T> | null> {
   if (!shouldCache(url)) return null;
   const entry = memoryCache.get(cacheKey);
-  return entry ? entry.data as T : null;
+  return entry ? (entry as CacheEntry<T>) : null;
 }

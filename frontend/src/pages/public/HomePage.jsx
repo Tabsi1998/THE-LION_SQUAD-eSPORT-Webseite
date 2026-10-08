@@ -23,6 +23,8 @@ import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
 import { eventSortTime, scheduleLine } from "@/lib/eventDays";
+import { PublicErrorState } from "@/components/tls/PublicEmptyState";
+import { problemKind } from "@/lib/loadProblem";
 
 const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
 
@@ -42,8 +44,14 @@ export default function HomePage() {
   const [heroRef, glowRef] = useHeroGlow();
   useDocumentTitle("Startseite", HOME_DESCRIPTION);
 
+  // Ein Fehler bei /home/state beendet das Laden (#983, #1152): ohne Stand Fehler mit „Nochmal versuchen“ statt ewiger
+  // Platzhalter; ein Fehler beim Nachladen lässt den letzten Stand stehen.
+  const [problem, setProblem] = useState(null);
   const load = useCallback(() => {
-    api.get("/home/state").then(({ data }) => setState(data)).catch(() => {});
+    api.get("/home/state").then(({ data }) => {
+      setState(data);
+      setProblem(null);
+    }).catch((error) => setProblem(problemKind(error)));
   }, []);
 
   useEffect(() => {
@@ -110,7 +118,12 @@ export default function HomePage() {
       {/* Sponsoren groß (#968). Die Partner stehen als kleineres Band im Footer direkt unter den Sponsoren. */}
       <SponsorTicker placement="home" spotlight />
 
-      {!state && (
+      {!state && problem && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <PublicErrorState kind={problem === "offline" ? "offline" : "error"} title={problem === "offline" ? "Ohne Netz" : "Die Startseite konnte nicht laden"} onRetry={load} />
+        </div>
+      )}
+      {!state && !problem && (
         <section className="border-b border-white/10 bg-[#080808]/35">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12 space-y-8">
             <SkeletonDetailHeader label="Lade Startseite" />

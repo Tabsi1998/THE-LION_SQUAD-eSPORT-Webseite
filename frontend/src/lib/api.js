@@ -1,5 +1,6 @@
 import axios from "axios";
 import { emitApiInvalidation } from "./apiInvalidation";
+import { noteFresh, noteOffline } from "./network";
 import { asInstant, viennaDate } from "@/lib/vienna";
 
 const configuredBackendUrl = (import.meta.env.VITE_BACKEND_URL || "").trim().replace(/\/+$/, "");
@@ -118,6 +119,8 @@ let refreshPromise = null;
 function attachResponseInterceptors(client) {
   client.interceptors.response.use(
     (response) => {
+      // Eine echte Antwort: das Netz ist da (#1152, Offline-Leiste).
+      noteFresh();
       const method = (response.config?.method || "get").toUpperCase();
       if (UNSAFE_METHODS.has(method) && response.status < 400 && !response.config?.skipInvalidation) {
         emitApiInvalidation({
@@ -130,6 +133,8 @@ function attachResponseInterceptors(client) {
       return response;
     },
     async (error) => {
+      // Kein Netz: der Abruf kam ohne Antwort zurück (abgebrochene Abrufe zählen nicht).
+      if (!error.response && error.code !== "ERR_CANCELED" && !axios.isCancel(error)) noteOffline();
       const original = error.config;
       const url = original?.url || "";
       const authRequest = url.includes("/auth/login") || url.includes("/auth/register") || url.includes("/auth/refresh") || url.includes("/auth/passkeys/");

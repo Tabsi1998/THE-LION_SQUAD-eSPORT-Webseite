@@ -7,7 +7,7 @@ import { Card } from "../../components/Card";
 import { HonourList, type Honour } from "../../components/Honours";
 import { FriendButton } from "../../components/FriendButton";
 import type { Relationship } from "../../lib/friends";
-import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { AccountsCard, accountGroups, type LinkedAccount } from "../../components/LinkedAccounts";
 import { ReportSheet, type ReportDraft } from "../../components/ReportSheet";
@@ -162,6 +162,8 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const ownMode = Boolean(own) && !asOthers;
 
   useEffect(() => {
@@ -169,6 +171,7 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
   }, [own?.initialTab]);
 
   const load = useCallback(async () => {
+    setProblem(null);
     setError("");
     try {
       const { data } = await api.get<PublicProfilePayload>(`/users/public/${username}`, asOthers ? { params: { view_as: "public" } } : undefined);
@@ -186,6 +189,7 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
     } catch (err) {
       setProfile(null);
       setError(errorMessage(err, "Profil konnte nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -301,7 +305,7 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
           {own ? (
             <EmptyState icon="lock-closed-outline" title="Dein Profil ist privat" detail="Andere sehen dein Profil nicht. Öffentlich stellst du es in den Einstellungen unter Privatsphäre." />
           ) : (
-            <ErrorState title="Profil nicht sichtbar" detail={error || "Dieses Profil ist privat oder wurde entfernt."} />
+            <ErrorState title="Profil nicht sichtbar" detail={error || "Dieses Profil ist privat oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
           )}
         </ScrollView>
       </Screen>
