@@ -118,15 +118,9 @@ def _match_line(match: dict, own_ids: set[str], names: dict[str, str]) -> dict |
     if len(participants) <= 2 and match.get("match_type", "duel") != "ffa":
         opponent = others[0] if others else None
         theirs = results.get(opponent) or {}
-        outcome = mine.get("outcome")
-        if outcome == "winner":
-            result = "win"
-        elif outcome == "draw" or (theirs.get("outcome") == "draw"):
-            result = "draw"
-        elif outcome in {"loser", "forfeit", "dnf"} or theirs.get("outcome") == "winner":
-            result = "loss"
-        else:
-            result = None
+        # Dieselbe Regel wie im Turnierweg (#1194): ein Unentschieden sind zwei Plätze 1, kein Sieg für beide.
+        from services.tournament_path import _outcome
+        result = _outcome(mine, theirs)
         own_score, other_score = mine.get("score"), theirs.get("score")
         score = f"{own_score}:{other_score}" if own_score is not None and other_score is not None else None
         return {

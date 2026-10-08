@@ -163,6 +163,7 @@ const ReferenceDetailPage = lazy(() => import("@/pages/public/ReferencesPage").t
 const PlayersPage = lazy(() => import("@/pages/public/PlayersPage"));
 const AchievementsShowcasePage = lazy(() => import("@/pages/public/AchievementsShowcasePage"));
 const AchievementSharePage = lazy(() => import("@/pages/public/AchievementSharePage"));
+const ResultSharePage = lazy(() => import("@/pages/public/ResultSharePage"));
 const CommunityPage = lazy(() => import("@/pages/public/CommunityPage"));
 const ServersPage = lazy(() => import("@/pages/public/ServersPage"));
 const MembersDirectoryPage = lazy(() => import("@/pages/public/MembersDirectoryPage"));
@@ -262,6 +263,7 @@ function App() {
           <Route path="/tournaments/:slug/bracket" element={<TournamentBracketPage />} />
           <Route path="/tournaments/:slug/matches" element={<TournamentSchedulePage />} />
           <Route path="/tournaments/:slug/standings" element={<TournamentStandingsPage />} />
+          <Route path="/tournaments/:slug/ergebnis/:username" element={<ResultSharePage />} />
           <Route path="/matches/:id" element={<MatchPage />} />
           <Route path="/f1" element={<FastLapLegacyRedirect />} />
           <Route path="/f1/:slug" element={<FastLapLegacyRedirect />} />

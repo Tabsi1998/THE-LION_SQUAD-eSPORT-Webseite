@@ -7,37 +7,18 @@ Besucher nicht, also gehört sie auch auf keine Karte).
 """
 from __future__ import annotations
 
-import io
 import logging
-import os
-from datetime import datetime, timezone
-from functools import lru_cache
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter
 
 from achievement_catalog import MATERIALS, category_v2
+from services import share_image
 from services.achievement_visibility import _group_is_member_only, achievements_public, rarity
 
 logger = logging.getLogger("tls.achievements.share")
 
-WIDTH, HEIGHT = 1200, 630
-BACKGROUND = (10, 10, 10)
-FONT_CANDIDATES = (
-    os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "fonts", "DejaVuSans-Bold.ttf"),
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
-    "C:/Windows/Fonts/segoeuib.ttf",
-    "C:/Windows/Fonts/arialbd.ttf",
-    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
-)
-FONT_REGULAR_CANDIDATES = (
-    os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "fonts", "DejaVuSans.ttf"),
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-    "C:/Windows/Fonts/segoeui.ttf",
-    "C:/Windows/Fonts/arial.ttf",
-    "/System/Library/Fonts/Supplemental/Arial.ttf",
-)
+WIDTH, HEIGHT = share_image.WIDE
+BACKGROUND = share_image.BACKGROUND
 ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 9: "?"}  # Rang 8 (Legendär) = gezeichneter Stern
 
 
@@ -82,92 +63,16 @@ async def share_payload(db, award_id: str) -> dict | None:
 
 
 # ------------------------------------------------------------------ Zeichnen
-
-@lru_cache(maxsize=32)
-def _font(size: int, bold: bool = True) -> ImageFont.ImageFont:
-    for path in (FONT_CANDIDATES if bold else FONT_REGULAR_CANDIDATES):
-        if os.path.exists(path):
-            try:
-                return ImageFont.truetype(path, size)
-            except OSError:
-                continue
-    try:
-        return ImageFont.load_default(size=size)
-    except TypeError:  # sehr altes Pillow
-        return ImageFont.load_default()
-
-
-def _hex(color: str, alpha: int = 255) -> tuple:
-    value = str(color or "#FFD700").strip().lstrip("#")
-    if len(value) != 6 or any(ch not in "0123456789abcdefABCDEF" for ch in value):
-        value = "FFD700"
-    return (int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16), alpha)
-
-
-def _blend(color: tuple, alpha: int, base: tuple = BACKGROUND) -> tuple:
-    """Farbe mit Deckkraft ``alpha`` (0–255) gegen den Grund vormischen - ImageDraw mischt selbst nichts."""
-    a = max(0, min(alpha, 255)) / 255.0
-    return tuple(int(round(base[i] * (1 - a) + color[i] * a)) for i in range(3)) + (255,)
-
-
-def _wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, max_width: int, max_lines: int = 2) -> list[str]:
-    """Text an Wortgrenzen auf höchstens ``max_lines`` Zeilen umbrechen, die letzte mit „…“."""
-    words = str(text or "").split()
-    lines: list[str] = []
-    current = ""
-    for word in words:
-        candidate = f"{current} {word}".strip()
-        if draw.textlength(candidate, font=font) <= max_width or not current:
-            current = candidate
-            continue
-        lines.append(current)
-        current = word
-        if len(lines) == max_lines:
-            break
-    if len(lines) < max_lines and current:
-        lines.append(current)
-    if len(lines) == max_lines and (draw.textlength(lines[-1], font=font) > max_width or " ".join(lines) != " ".join(words)):
-        lines[-1] = _ellipsis(draw, " ".join(words[len(" ".join(lines[:-1]).split()):]), font, max_width)
-    return lines
-
-
-def _star(cx: float, cy: float, outer: float, inner: float, points: int = 5) -> list[tuple[float, float]]:
-    """Ein Stern als Polygon - Schriftarten haben nicht immer ein ★, ein Polygon hat jede."""
-    import math
-    out = []
-    for i in range(points * 2):
-        radius = outer if i % 2 == 0 else inner
-        angle = -math.pi / 2 + i * math.pi / points
-        out.append((cx + radius * math.cos(angle), cy + radius * math.sin(angle)))
-    return out
-
-
-def _fit(draw: ImageDraw.ImageDraw, text: str, size: int, max_width: int, *, bold: bool = True, min_size: int = 22) -> ImageFont.ImageFont:
-    """Schrift so weit verkleinern, dass der Text in die Breite passt."""
-    while size > min_size:
-        font = _font(size, bold)
-        if draw.textlength(text, font=font) <= max_width:
-            return font
-        size -= 2
-    return _font(min_size, bold)
-
-
-def _ellipsis(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, max_width: int) -> str:
-    if draw.textlength(text, font=font) <= max_width:
-        return text
-    while len(text) > 3 and draw.textlength(text + "…", font=font) > max_width:
-        text = text[:-1]
-    return text.rstrip() + "…"
-
-
-def _date_label(value) -> str:
-    try:
-        when = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except (TypeError, ValueError):
-        return ""
-    if when.tzinfo is None:
-        when = when.replace(tzinfo=timezone.utc)
-    return when.strftime("%d.%m.%Y")
+# Die Werkzeuge stehen im gemeinsamen Bild-Baustein (#1194) - Ergebnis-Bild, Jahresrückblick und Vorschaubilder
+# zeichnen mit denselben. Die alten Namen bleiben, damit Turnierbaum-Bild und Tests weiter funktionieren.
+_font = share_image.font
+_hex = share_image.hex_color
+_blend = share_image.blend
+_wrap = share_image.wrap
+_star = share_image.star
+_fit = share_image.fit
+_ellipsis = share_image.ellipsis
+_date_label = share_image.date_label
 
 
 def render_card(payload: dict) -> bytes:
@@ -245,6 +150,4 @@ def render_card(payload: dict) -> bytes:
     rare_font = _font(24, bold=False)
     draw.text((right - draw.textlength(rare_text, font=rare_font), HEIGHT - 92), rare_text, font=rare_font, fill=_blend(color, 220))
 
-    out = io.BytesIO()
-    image.convert("RGB").save(out, format="PNG", optimize=True)
-    return out.getvalue()
+    return share_image.png(image)

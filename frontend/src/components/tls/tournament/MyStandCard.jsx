@@ -5,6 +5,9 @@ import { StepBar, tournamentStep, tournamentSteps } from "@/components/tls/StepB
 import { formatDateTime } from "@/lib/datetime";
 import { formatCents } from "@/lib/pricing";
 import { TeamDayPanel } from "@/components/tls/tournament/TeamDayPanel";
+import { ResultShareButton } from "@/components/tls/ResultShareButton";
+
+const FINISHED = new Set(["completed", "results_published", "archived"]);
 
 // Turnierseite (#401): „Dein Stand“ für Angemeldete - Status, Team, Startgeld und Zahlungsstand,
 // Check-in-Fenster, Weg zum Spielplan; Abmelden als leiser Link am Ende, nicht als roter Knopf vorne.
@@ -48,6 +51,8 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
       </dl>
       {/* Team am Spieltag (#1192): Aufstellung und „Wer ist da“ - nur bei Team-Turnieren. */}
       {isTeamTournament ? <TeamDayPanel tournament={t} /> : null}
+      {/* Ergebnis teilen (#1194): nach dem Turnier ein Bild für Status und Story. */}
+      {FINISHED.has(t.status) && ["approved", "checked_in"].includes(myReg.status) ? <div className="mt-3"><ResultShareButton tournamentId={t.id} /></div> : null}
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {canCheckIn && myReg.status === "approved" && checkinOpen ? (
           <button type="button" onClick={onCheckin} disabled={busy} data-testid="tournament-checkin-btn" className="tls-btn tls-btn--primary px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Jetzt einchecken</button>

@@ -16,6 +16,7 @@ import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime, formatStatus, formatTournamentFormat } from "../../lib/format";
 import { getRegistrationState } from "../../lib/registration";
 import { TeamDayCard } from "../../components/tournament/TeamDayCard";
+import { ResultShareCard } from "../../components/ResultShareCard";
 import { basisLabel, formatCents, ownPriceLine, quoteTotal, startFeeSummary } from "../../lib/startFee";
 import { isGuestUser } from "../../live";
 import { openSignIn } from "../../navigation/rootNavigation";
@@ -374,6 +375,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
             {registered && isTeamTournament && !guest ? <TeamDayCard tournamentId={tournament.id} /> : null}
             {isFinished ? (
               <>
+                {/* Ergebnis teilen (#1194): Bild für Status und Story - der Server sagt, ob es geht. */}
+                {registered && !guest ? <ResultShareCard tournamentId={tournament.id} /> : null}
                 <Card style={styles.card}>
                   <Heading>Finale Rangliste</Heading>
                   {finalStandings.length ? finalStandings.slice(0, 6).map((standing, index) => (
