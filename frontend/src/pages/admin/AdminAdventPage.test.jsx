@@ -7,7 +7,8 @@ import { MemoryRouter } from "react-router-dom";
 const apiMock = { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() };
 const confirm = vi.fn();
 const toast = { success: vi.fn(), error: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (value) => value || "", formatApiError: (detail) => (typeof detail === "string" ? detail : "") }));
+vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (value) => value || "", formatApiError: (detail) => (typeof detail === "string" ? detail : ""),
+  formatRequestError: (_error, fallback) => fallback }));
 vi.mock("sonner", () => ({ toast }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <main>{children}</main> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirm }));
@@ -54,6 +55,8 @@ beforeEach(() => {
   vi.useFakeTimers({ now: new Date(2026, 11, 12, 10), toFake: ["Date"] });
   apiMock.get.mockImplementation((url) => {
     if (url === "/seasonal/advent/admin/options") return Promise.resolve({ data: OPTIONS });
+    // Schalter auf der eigenen Seite (#1360).
+    if (url === "/seasonal/switch/advent_calendar") return Promise.resolve({ data: { key: "advent_calendar", label: "Adventkalender", enabled: true, channels: ["web", "app"], supported_channels: ["web", "app"], mode: "auto", active_now: true, next_start: "2027-12-01T06:00:00+01:00", next_end: "2028-01-06T23:59:59+01:00", seasons_enabled: true } });
     const year = Number(url.split("/")[4]);
     return Promise.resolve({ data: view({ year, years: [2026, 2025], running: year === 2026 }) });
   });
@@ -104,7 +107,9 @@ test("die Seite: Jahr, Kacheln, 24 Tage mit Art, Zahlen und Hinweisen", async ()
 
   expect(screen.getByTestId("advent-admin-problem-6")).toHaveTextContent("Die Einwilligung des Mitglieds ist für dieses Jahr noch nicht bestätigt.");
   expect(screen.getByTestId("advent-admin-day-6")).toHaveTextContent("Übernommen aus 2025");
-  expect(screen.getByRole("link", { name: "Auftritt → Jahreszeiten" })).toHaveAttribute("href", "/admin/settings/jahreszeiten");
+  // Ein- und ausgeschaltet wird oben auf der Seite (#1360) - nicht mehr unter Auftritt → Jahreszeiten.
+  expect(await screen.findByTestId("season-switch-title")).toHaveTextContent("Adventkalender ist an");
+  expect(screen.queryByRole("link", { name: "Auftritt → Jahreszeiten" })).toBeNull();
   expect(screen.getByTestId("advent-admin-open")).toHaveAttribute("href", "/advent");
 });
 

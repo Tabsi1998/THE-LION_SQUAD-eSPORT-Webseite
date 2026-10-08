@@ -16,6 +16,9 @@ export const INTENSITY_LABELS = { subtle: "dezent", normal: "normal", full: "vol
 export const MODE_LABELS = { auto: "automatisch nach Datum", force_on: "jetzt an", force_off: "aus" };
 export const CHANNEL_LABELS = { web: "Website", app: "App" };
 export const TEXT_LABELS = { greeting: "Gruß", farewell: "Abschied am 6. Jänner" };
+// Adventkalender und Ostereiersuche schalten Redaktion und Vereinsverwaltung auf ihrer eigenen Seite (#1360) - hier
+// stehen sie nur zum Lesen, damit das System den Gesamtstand sieht.
+export const MANAGED_ELSEWHERE = { advent_calendar: { to: "/admin/advent", page: "Adventkalender" }, easter_hunt: { to: "/admin/ostern", page: "Ostereiersuche" } };
 
 export function dateText(value, { withTime = true } = {}) {
   if (!value) return "–";
@@ -63,6 +66,22 @@ export function rememberPreview(token, seconds) {
   } catch {
     // Alte Umgebung ohne CustomEvent: der nächste Tab-Wechsel oder das nächste Laden holt die Vorschau.
   }
+}
+
+function ManagedSeasonCard({ season }) {
+  const place = MANAGED_ELSEWHERE[season.key];
+  return (
+    <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={`season-${season.key}`}>
+      <div className="font-heading font-bold uppercase inline-flex items-center gap-2">
+        {season.label}
+        {season.active_now && <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-[#00FF88]/15 text-[#00FF88] tracking-wider">läuft</span>}
+      </div>
+      <p className="mt-1 text-sm text-white/75" data-testid={`season-${season.key}-managed`}>
+        {season.enabled ? "An" : "Aus"} – gepflegt unter <Link to={place.to} className="text-[#29B6E8] hover:underline">{place.page}</Link>.
+      </p>
+      <p className="mt-1 text-xs text-white/50" data-testid={`season-${season.key}-state`}>{stateText(season)}</p>
+    </div>
+  );
 }
 
 function SeasonCard({ season, busy, onSave, onPreview }) {
@@ -258,7 +277,9 @@ export function SeasonsSettings() {
       />
       <div className={`grid gap-4 ${data.enabled ? "" : "opacity-60"}`}>
         {data.seasons.filter((season) => !season.always).map((season) => (
-          <SeasonCard key={season.key} season={season} busy={busy} onSave={(patch, message, after) => save({ seasons: { [season.key]: patch } }, message, after)} onPreview={(at) => preview(season.key, at)} />
+          MANAGED_ELSEWHERE[season.key]
+            ? <ManagedSeasonCard key={season.key} season={season} />
+            : <SeasonCard key={season.key} season={season} busy={busy} onSave={(patch, message, after) => save({ seasons: { [season.key]: patch } }, message, after)} onPreview={(at) => preview(season.key, at)} />
         ))}
       </div>
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3" data-testid="seasons-calendar">

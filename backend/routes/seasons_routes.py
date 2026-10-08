@@ -7,11 +7,14 @@ für die Person, die das Token mitschickt, deshalb dann ohne Cache.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import BaseModel
 
-from auth import get_current_user, get_optional_user
+from auth import get_current_user, get_optional_user, require_area
 from database import get_db
+from models import new_id, now_utc
 from services import club_birthday, founding, nikolaus, seasons, weather
 
 router = APIRouter(prefix="/api/seasonal", tags=["seasonal"])  # /api/seasons gehört den Wettkampf-Saisonen
@@ -168,3 +171,64 @@ async def birthday_sticker(response: Response, preview: str | None = Query(None)
     if not season:
         raise HTTPException(status_code=409, detail="Den Jahres-Sticker gibt es am Vereinsgeburtstag.")
     return await club_birthday.claim_sticker(db, user, season)
+
+
+# ---------------------------------------------------------------- Schalter auf der eigenen Seite (#1360)
+# Wer den Adventkalender oder die Ostereiersuche füllt, schaltet sie auch selbst ein - oben auf der Seite, mit Zeitraum
+# und wo sie erscheint. Nur diese zwei Jahreszeiten; Deko, Wetter und alle anderen bleiben unter Auftritt → Jahreszeiten
+# beim System. Jede Änderung steht im Protokoll.
+SWITCHABLE_SEASONS = {"advent_calendar": "Adventkalender", "easter_hunt": "Ostereiersuche"}
+
+
+class SeasonSwitchBody(BaseModel):
+    enabled: bool | None = None
+    channels: list[Literal["web", "app"]] | None = None
+
+
+def _switchable(key: str) -> None:
+    if key not in SWITCHABLE_SEASONS:
+        raise HTTPException(400, "Hier lassen sich nur Adventkalender und Ostereiersuche schalten – alle anderen Jahreszeiten unter Auftritt → Jahreszeiten.")
+
+
+async def _switch_view(db, key: str) -> dict:
+    stored, founded = await load_context(db)
+    view = seasons.admin_view(stored, founded=founded)
+    row = next((season for season in view["seasons"] if season["key"] == key), {})
+    return {
+        "key": key, "label": SWITCHABLE_SEASONS[key], "enabled": bool(row.get("enabled")), "channels": row.get("channels") or [],
+        "supported_channels": row.get("supported_channels") or list(seasons.CHANNELS), "mode": row.get("mode") or "auto", "until": row.get("until"),
+        "active_now": bool(row.get("active_now")), "next_start": row.get("next_start"), "next_end": row.get("next_end"),
+        "seasons_enabled": bool(view.get("enabled")),
+    }
+
+
+@router.get("/switch/{key}")
+async def season_switch(key: str, me: dict = Depends(require_area("content", "club", "system"))):
+    _switchable(key)
+    return await _switch_view(get_db(), key)
+
+
+@router.put("/switch/{key}")
+async def update_season_switch(key: str, body: SeasonSwitchBody, me: dict = Depends(require_area("content", "club", "system"))):
+    _switchable(key)
+    db = get_db()
+    stored = (await load_context(db))[0]
+    current = seasons.merge_settings(stored)["seasons"][key]
+    cfg = {**current, "texts": dict(current.get("texts") or {})}
+    data = body.model_dump(exclude_unset=True)
+    if data.get("enabled") is not None:
+        cfg["enabled"] = bool(data["enabled"])
+    if data.get("channels") is not None:
+        cfg["channels"] = [channel for channel in seasons.supported_channels(key) if channel in data["channels"]]
+    changed = sorted(name for name in ("enabled", "channels") if cfg.get(name) != current.get(name))
+    if changed:
+        await db.settings.update_one(
+            {"id": seasons.SETTINGS_ID},
+            {"$set": {f"seasons.{key}": {**cfg, "channels_known": list(seasons.supported_channels(key))}, "updated_at": now_utc().isoformat()},
+             "$setOnInsert": {"id": seasons.SETTINGS_ID}},
+            upsert=True,
+        )
+        await db.audit_logs.insert_one({"id": new_id(), "action": "seasons.switch", "actor_id": me["id"], "target_id": key,
+                                        "data": {"changed": changed, "enabled": cfg.get("enabled"), "channels": cfg.get("channels")},
+                                        "created_at": now_utc().isoformat()})
+    return await _switch_view(db, key)

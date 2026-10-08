@@ -112,6 +112,14 @@ bearbeiten darf (Turnierleitung; Entscheidung vom 07.10.2026). **Ein zweites Mal
 mit Rückfrage. Entwürfe und „Nur intern“ gehen nicht als Newsletter hinaus und gelten nicht als gesendet. Unter
 E-Mail → Newsletter steht für System nur noch der Verlauf.
 
+## Adventkalender und Ostereiersuche schalten (#1360)
+
+Wer den Adventkalender oder die Ostereiersuche füllt – **Redaktion und Vereinsverwaltung** (und System) –, schaltet sie
+oben auf der eigenen Seite ein und aus und wählt, wo sie erscheinen (Website, App). Der Server-Weg
+(`PUT /api/seasonal/switch/{key}`) kennt nur diese zwei; jede Änderung steht im Protokoll (`seasons.switch`). Unter
+Auftritt → Jahreszeiten stehen beide nur noch zum Lesen; den Hauptschalter, Deko, Wetter und alle anderen Jahreszeiten
+schaltet weiter System.
+
 ## Mitglieder-Inhalte (#1350)
 
 Inhalte mit der Sichtbarkeit „Nur Mitglieder“ – News, Events, Galerie, Dokumente wie Protokolle, Spielserver,

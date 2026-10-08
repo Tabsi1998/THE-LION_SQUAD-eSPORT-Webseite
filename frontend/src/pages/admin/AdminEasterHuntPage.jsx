@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Download, Egg, Eye, ExternalLink, Shuffle, Trophy } from "lucide-react";
 import { API, api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { SeasonSwitch } from "@/components/tls/SeasonSwitch";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { INPUT_CLASS } from "@/components/tls/FormFields";
 import { rememberPreview } from "@/pages/admin/settings/SeasonsSettings";
@@ -13,7 +14,7 @@ import { asInstant, viennaDate } from "@/lib/vienna";
 // Ostereiersuche pflegen (#646, #757): je Jahr ein Vorschlag mit Saat aus dem Jahr (jedes Jahr andere Seiten, Kanten
 // und Muster), danach jedes Ei von Hand: Seite, Kante, Ecke, Muster, Hinweis. Dazu Preise, Freigabe, die Zahlen und
 // nach Ostermontag die Auswertung (Verlosung unter allen mit vollem Korb und die drei Schnellsten). Ein- und
-// ausgeschaltet wird die Saison unter Auftritt → Jahreszeiten.
+// ausgeschaltet wird die Suche seit #1360 oben auf dieser Seite (an/aus, wo sie erscheint).
 
 const PLACE_LABELS = { "top-left": "oben links", "top-right": "oben rechts", "bottom-left": "unten links", "bottom-right": "unten rechts" };
 const KIND_LABELS = { card: "Karte", image: "Bild", hero: "Löwe", header: "Kopfzeile", footer: "Fußzeile" };
@@ -211,7 +212,7 @@ export default function AdminEasterHuntPage() {
             <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#e9c46a]"><Egg className="h-4 w-4" /> Content</span>
             <h1 className="mt-1 font-heading text-3xl font-black uppercase md:text-4xl">Ostereiersuche</h1>
             <p className="mt-2 max-w-3xl text-sm text-white/60">
-              Versteckte Eier auf der Website und in der App, von Karfreitag bis Ostermontag. Jedes Jahr ein neuer Vorschlag, danach von Hand prüfen. Sobald jemand ein Ei gefunden hat, bleiben die Verstecke. Ein- und ausschalten lässt sich die Suche unter <Link to="/admin/settings/jahreszeiten" className="text-[#29B6E8] hover:underline">Auftritt → Jahreszeiten</Link>.
+              Versteckte Eier auf der Website und in der App, von Karfreitag bis Ostermontag. Jedes Jahr ein neuer Vorschlag, danach von Hand prüfen. Sobald jemand ein Ei gefunden hat, bleiben die Verstecke.
             </p>
           </div>
           <label className="block w-32">
@@ -220,6 +221,7 @@ export default function AdminEasterHuntPage() {
               {years.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
             </select>
           </label>
+          <SeasonSwitch seasonKey="easter_hunt" label="Ostereiersuche" className="w-full xl:w-96" />
         </div>
 
         {failed && <div className="mb-6 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#ffb4ae]" role="alert">{failed}</div>}

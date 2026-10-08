@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 // fest nach dem ersten Fund; Auswertung erst nach Ostermontag und nur nach Rückfrage.
 
 const apiMock = { get: vi.fn(), put: vi.fn(), post: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock, API: "/api", formatApiError: (value) => value }));
+vi.mock("@/lib/api", () => ({ api: apiMock, API: "/api", formatApiError: (value) => value, formatRequestError: (_error, fallback) => fallback }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 const previewMock = vi.fn();
@@ -92,4 +92,16 @@ test("Auswertung nur nach Rückfrage; danach stehen die Gewinner da", async () =
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(expect.stringMatching(/\/draw$/)));
   expect(await screen.findByTestId("easter-admin-draw")).toHaveTextContent("Schnellste:r: Paula");
   expect(screen.getByTestId("easter-admin-draw")).toHaveTextContent("Verlosung: Kai (2 von 2 Losen)");
+});
+
+// #1360: der Ein/Aus-Schalter steht oben auf der Seite - nicht mehr unter Auftritt → Jahreszeiten.
+test("Schalter oben auf der Seite: Ostereiersuche ist aus, mit dem Zeitraum", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/seasonal/switch/easter_hunt"
+    ? { data: { key: "easter_hunt", label: "Ostereiersuche", enabled: false, channels: ["web", "app"], supported_channels: ["web", "app"], mode: "auto", active_now: false,
+      next_start: "2027-03-26T00:00:00+01:00", next_end: "2027-03-29T23:59:59+02:00", seasons_enabled: true } }
+    : { data: BASE }));
+  renderPage();
+  expect(await screen.findByTestId("season-switch-title")).toHaveTextContent("Ostereiersuche ist aus");
+  expect(screen.getByTestId("season-switch-window")).toHaveTextContent("Eingeschaltet zu sehen von 26. März 2027");
+  expect(screen.queryByRole("link", { name: "Auftritt → Jahreszeiten" })).toBeNull();
 });

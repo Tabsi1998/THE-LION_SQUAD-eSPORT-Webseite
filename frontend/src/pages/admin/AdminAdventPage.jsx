@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { AlertTriangle, CalendarHeart, Copy, ExternalLink, Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { SeasonSwitch } from "@/components/tls/SeasonSwitch";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { INPUT_CLASS } from "@/components/tls/FormFields";
 import { KIND_ICONS } from "@/advent/Door";
@@ -14,8 +15,8 @@ import { RafflePanel, drawQuestion } from "./advent/RafflePanel";
 import { dayText, defaultYear, yearOptions } from "./advent/form";
 
 // Adventkalender pflegen (#641): 24 Türchen je Jahr anlegen, ansehen, kopieren - mit den Zahlen je Türchen und
-// der Ziehung bei Gewinnen. Alles zum Kalender steht auf dieser einen Seite; ein- und ausgeschaltet wird er unter
-// Auftritt → Jahreszeiten.
+// der Ziehung bei Gewinnen. Alles zum Kalender steht auf dieser einen Seite - seit #1360 auch der Schalter (an/aus, wo er
+// erscheint) oben auf der Seite.
 
 function errorText(failure, fallback) {
   return formatApiError(failure?.response?.data?.detail) || fallback;
@@ -200,7 +201,7 @@ export default function AdminAdventPage() {
             <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#e9c46a]"><CalendarHeart className="h-4 w-4" /> Content</span>
             <h1 className="mt-1 font-heading text-3xl font-black uppercase md:text-4xl">Adventkalender</h1>
             <p className="mt-2 max-w-3xl text-sm text-white/60">
-              24 Türchen je Jahr. Jedes geht an seinem Tag um {data?.door_hour || 6} Uhr auf und lässt sich bis 6. Jänner nachholen. Ein Tag ohne Eintrag zeigt den Gruß des Löwen; ohne ein einziges Türchen gibt es in dem Jahr keinen Kalender. Ein- und ausschalten lässt er sich unter <Link to="/admin/settings/jahreszeiten" className="text-[#29B6E8] hover:underline">Auftritt → Jahreszeiten</Link>.
+              24 Türchen je Jahr. Jedes geht an seinem Tag um {data?.door_hour || 6} Uhr auf und lässt sich bis 6. Jänner nachholen. Ein Tag ohne Eintrag zeigt den Gruß des Löwen; ohne ein einziges Türchen gibt es in dem Jahr keinen Kalender.
             </p>
           </div>
           <label className="block w-32">
@@ -209,6 +210,7 @@ export default function AdminAdventPage() {
               {years.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
             </select>
           </label>
+          <SeasonSwitch seasonKey="advent_calendar" label="Adventkalender" className="w-full xl:w-96" />
         </div>
 
         {failed && <div className="mb-6 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#ffb4ae]" role="alert" data-testid="advent-admin-error">{failed}</div>}
