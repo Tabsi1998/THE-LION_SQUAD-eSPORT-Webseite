@@ -215,14 +215,16 @@ def tpl_user_invite(display_name: str, invite_url: str, invited_by: str = "") ->
     )
 
 
+@mail_template
 def tpl_account_banned(display_name: str, reason: str, appeal_url: str = "") -> tuple[str, str]:
-    """Konto gesperrt (#1357): die Person erfährt den Grund - derselbe, der im Protokoll steht."""
-    reason_html = html_lib.escape(reason or "").replace("\n", "<br>")
-    contact = (f'<p>Wenn du das für einen Irrtum hältst, schreib dem Verein über das <a href="{html_lib.escape(appeal_url, quote=True)}">Kontaktformular</a>.</p>'
+    """Konto gesperrt (#1357): die Person erfährt den Grund - derselbe, der im Protokoll steht. Die Werte kommen schon
+    als Text geschützt an (mail_template); aus den Zeilen des Grundes werden hier nur noch Umbrüche."""
+    reason_html = (reason or "").replace("\n", "<br>")
+    contact = (f'<p>Wenn du das für einen Irrtum hältst, schreib dem Verein über das <a href="{appeal_url}">Kontaktformular</a>.</p>'
                if appeal_url else "<p>Wenn du das für einen Irrtum hältst, melde dich beim Verein.</p>")
     return "Dein Konto bei THE LION SQUAD ist gesperrt", _wrap(
         "Konto gesperrt",
-        f"<p>Hallo {html_lib.escape(display_name or 'Löwe')},</p>"
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
         "<p>dein Konto auf der Website von <strong>THE LION SQUAD eSports</strong> wurde gesperrt. Anmelden ist damit nicht mehr möglich.</p>"
         f"<p><strong>Grund:</strong> {reason_html}</p>"
         f"{contact}",
