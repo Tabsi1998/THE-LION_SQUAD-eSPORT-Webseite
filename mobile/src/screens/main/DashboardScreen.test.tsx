@@ -191,3 +191,17 @@ test("die Frage nach dem Turnier öffnet das Bewerten", async () => {
   await waitFor(() => expect(screen.getByTestId("feedback-sheet")).toBeTruthy());
   await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/feedback/open"));
 });
+
+// In Klärung (#1134): ein Spiel mit Dispute bleibt unter „Meine aktiven Matches“ - und steht bei der Turnierleitung
+// rot mit „Dispute prüfen“.
+test("Spiele in Klärung bleiben sichtbar - beim Spieler und bei der Turnierleitung", async () => {
+  const disputed = { id: "m-own", status: "disputed", disputed: true, needs_result: true, tournament_title: "Mario Kart Cup" };
+  const staffRow = { id: "m-staff", status: "disputed", disputed: true, needs_result: true, can_submit_result: true, tournament_title: "Smash Cup" };
+  dashboard = { ...dashboard, me: { tournaments: [], events: [], matches: [disputed], staff_matches: [staffRow], actions: [] } };
+  await render(<DashboardScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("match-disputed-m-own")).toBeTruthy());
+  expect(screen.getByText("Wartet auf Entscheidung")).toBeTruthy();
+  expect(screen.getAllByText("In Klärung").length).toBe(2);
+  expect(screen.getByTestId("match-disputed-m-staff")).toBeTruthy();
+  expect(screen.getByText("Dispute prüfen")).toBeTruthy();
+});

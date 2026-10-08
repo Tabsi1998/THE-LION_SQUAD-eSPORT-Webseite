@@ -215,10 +215,10 @@ export default function MatchPage() {
     if (!reason) return failAction("Bitte Grund angeben.");
     await runAction(async () => {
       await api.post(`/matches/${id}/dispute`, { reason });
-      toast.success("Klärfall gemeldet.");
+      toast.success("Dispute gemeldet – die Turnierleitung prüft und entscheidet.");
       setDisputeReason("");
       await load({ preserveDrafts: false });
-    }, "Klärfall konnte nicht gemeldet werden.");
+    }, "Dispute konnte nicht gemeldet werden.");
   };
 
   const submitForfeit = async (e) => {
@@ -284,7 +284,10 @@ export default function MatchPage() {
   const canStaffSubmit = Boolean(data.can_staff_submit_result);
   const canPlayerReport = Boolean(data.can_player_report_result && !canStaffSubmit && !isCompleted);
   const canSubmitV2Result = Boolean(!isCompleted && canStaffSubmit && v2Rows.length);
-  const hasResultActions = Boolean(canPlayerReport || canSubmitV2Result || (!isCompleted && data.can_dispute) || (!isCompleted && data.can_forfeit));
+  // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - der Server sagt, bis wann.
+  const canDispute = Boolean(data.can_dispute);
+  const hasOtherResultActions = Boolean(canPlayerReport || canSubmitV2Result);
+  const hasResultActions = Boolean(hasOtherResultActions || canDispute || (!isCompleted && data.can_forfeit));
   const reports = Array.isArray(match.reports) ? match.reports : [];
   const resultParticipants = isV2 ? participants : duelParticipants;
   const showFixedScheduleNotice = data.schedule_mode === "fixed_by_staff" && !canProposeSchedule;
@@ -392,6 +395,12 @@ export default function MatchPage() {
           </div>
           )}
 
+          {data.in_dispute && (
+            <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#FFD2CF]" data-testid="match-in-dispute">
+              <strong>In Klärung</strong> – zu diesem Spiel liegt ein Dispute vor. Die Turnierleitung prüft und entscheidet.
+            </p>
+          )}
+
           {hasResultActions ? (
             <div className="mt-5 border-t border-white/10 pt-5 space-y-5">
               {canPlayerReport && (
@@ -438,11 +447,15 @@ export default function MatchPage() {
                 </form>
               )}
 
-              {data.can_dispute && !isCompleted && (
-                <form onSubmit={submitDispute} className="border-t border-white/10 pt-5">
+              {canDispute && (
+                <form onSubmit={submitDispute} className={hasOtherResultActions ? "border-t border-white/10 pt-5" : ""} data-testid="match-dispute-form">
                   <Field label="Dispute-Grund">
                     <input value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} className="input" placeholder="Was stimmt nicht?" data-testid="match-dispute-input" />
                   </Field>
+                  <p className="mt-2 text-xs text-white/50" data-testid="match-dispute-hint">
+                    Stimmt etwas nicht? Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet.
+                    {data.dispute_until ? ` Möglich bis ${formatWhen(data.dispute_until)}.` : ""}
+                  </p>
                   <button disabled={busy || !disputeReason.trim()} className="tls-btn tls-btn--danger mt-3 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-dispute-btn">Dispute melden</button>
                 </form>
               )}

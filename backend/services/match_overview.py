@@ -8,10 +8,12 @@ from services.station_labels import attach_station_info
 from services.tournament_permissions import RESULT_STAFF_ROLES, is_global_tournament_staff
 
 
-OPEN_MATCH_STATUSES = {"ready", "scheduled", "in_progress", "waiting_result"}
+# Ein Spiel in Klärung (#1134) bleibt in beiden Listen: bei der Turnierleitung ganz oben, beim Spieler mit „In Klärung“.
+OPEN_MATCH_STATUSES = {"ready", "scheduled", "in_progress", "waiting_result", "disputed"}
 ACTIVE_REGISTRATION_STATUSES = {"registered", "approved", "checked_in"}
 ACTIVE_OPERATION_TOURNAMENT_STATUSES = {"check_in", "live", "paused"}
 MATCH_STATUS_PRIORITY = {
+    "disputed": -1,
     "in_progress": 0,
     "waiting_result": 1,
     "ready": 2,
@@ -151,7 +153,8 @@ async def compact_match_overviews(
             "participant_count": len(participant_ids),
             "is_own_match": bool(own_registration_ids.intersection(participant_ids)),
             "can_submit_result": match.get("id") in result_match_ids,
-            "needs_result": match.get("status") in {"in_progress", "waiting_result"},
+            "needs_result": match.get("status") in {"in_progress", "waiting_result", "disputed"},
+            "disputed": match.get("status") == "disputed",
         })
     return summaries
 

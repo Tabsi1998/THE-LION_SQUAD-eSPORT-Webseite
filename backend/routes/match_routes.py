@@ -38,7 +38,8 @@ from services import word_filter
 from services.station_labels import attach_station_info
 from match_rules import match_allows_draw
 from services.match_audience import acting_registration, player_user_ids
-from services.match_notifications import notify_report_conflict, notify_result_reported, results_summary
+from services.match_disputes import CLOSED_DETAIL as DISPUTE_CLOSED_DETAIL, dispute_window
+from services.match_notifications import notify_dispute_opened, notify_report_conflict, notify_result_reported, results_summary
 from services.tournament_rules import match_policy, players_can_report, schedule_proposals_enabled
 from services.user_notifications import create_user_notification
 from services.v2_result_submission import submit_v2_result
@@ -484,6 +485,11 @@ async def _match_participants(match: dict, user: dict | None) -> list[dict]:
     return participants
 
 
+def _log_safe(value, limit: int = 120) -> str:
+    """Werte aus Anfragen ins Protokoll nur ohne Zeilenumbrüche und gekürzt."""
+    return str(value or "").replace("\r", " ").replace("\n", " ")[:limit]
+
+
 def _accepts_reports(match: dict) -> bool:
     """Nimmt das Spiel noch Meldungen an? Nicht, wenn es entschieden, abgesagt oder in Klärung ist - und nicht,
     solange keine zwei Seiten feststehen."""
@@ -542,6 +548,9 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     report_view = None
     if acting_reg and _players_can_report(policy):
         report_view = await _report_view(db, match, acting_reg)
+    # Dispute (#1134): jeder Teilnehmer in jedem Modus - vor dem Ergebnis immer, danach bis 30 Minuten nach dem
+    # Ergebnis oder bis das nächste Spiel des Siegers beginnt. Website und App zeigen genau das.
+    window = await dispute_window(db, match) if acting_reg else {"open": False, "until": None}
     if not await _sees_internal(match, user):
         viewer_id = (user or {}).get("id")
         match = public_match_view(match, viewer_id)
@@ -562,7 +571,9 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "can_staff_submit_result": can_submit_result,
         "can_propose_schedule": can_propose_schedule,
         "can_manage_schedule": can_propose_schedule,
-        "can_dispute": bool(user and (_is_staff(user) or (acting_reg and _players_can_report(policy)))),
+        "can_dispute": bool(acting_reg and window["open"]),
+        "dispute_until": window["until"],
+        "in_dispute": str(match.get("status") or "") == "disputed",
         "can_forfeit": await _can_forfeit_match(match, user),
         "event_mode": policy["event_mode"],
         "result_entry_mode": policy["result_entry_mode"],
@@ -981,7 +992,7 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict) -> dict:
             else:
                 await notify_result_reported(db, stored, entry, me.get("id"))
         except Exception as exc:  # noqa: BLE001 - eine Nachricht hält keine Meldung auf
-            logger.warning("Report notification failed for match=%s type=%s", match.get("id"), type(exc).__name__)
+            logger.warning("Report notification failed for match=%s type=%s", _log_safe(match.get("id")), type(exc).__name__)
         stored["idempotent_replay"] = False
         stored["awaiting_confirmation"] = True
         stored["report_status"] = "conflict" if conflict else "waiting"
@@ -1029,21 +1040,34 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
     # sonst kann ein Turnier im Graph-System nicht vollstaendig gespielt werden.
     m, collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, m)
-    if not _is_staff(me) and not await _acting_registration_for_match(m, me):
+    acting_reg = await _acting_registration_for_match(m, me)
+    if not _is_staff(me) and not acting_reg:
         raise HTTPException(status_code=403, detail="Nicht Teilnehmer dieses Matches")
     reason = body.reason.strip()
     if is_duplicate_dispute(m, me["id"], reason):
         m.pop("_id", None)
         m["idempotent_replay"] = True
         return m
+    if not reason:
+        raise HTTPException(status_code=422, detail="Bitte einen Grund angeben.")
+    # Wer bis wann (#1134): vor dem Ergebnis immer, danach 30 Minuten - und nur, bis das nächste Spiel des Siegers
+    # beginnt. Die Turnierleitung korrigiert ohnehin direkt.
+    if acting_reg and not (await dispute_window(db, m))["open"]:
+        raise HTTPException(status_code=409, detail=DISPUTE_CLOSED_DETAIL)
+    entry = {**dispute_entry(me["id"], reason), **({"registration_id": acting_reg["id"]} if acting_reg else {})}
     await getattr(db, collection).update_one({"id": match_id}, {
-        "$push": {"disputes": dispute_entry(me["id"], reason)},
+        "$push": {"disputes": entry},
         "$set": {"status": "disputed", "updated_at": now_utc().isoformat()},
     })
     await _audit_match_action(db, "match.dispute.open", m, me.get("id"), {
         "reason_length": len((body.reason or "").strip()),
     })
     m = await getattr(db, collection).find_one({"id": match_id}, {"_id": 0})
+    # Die Turnierleitung erfährt sofort davon, die anderen Spieler des Spiels auch (#1134) - niemand sonst.
+    try:
+        await notify_dispute_opened(db, m, entry, me.get("id"), (acting_reg or {}).get("id"))
+    except Exception as exc:  # noqa: BLE001 - eine Nachricht hält keinen Dispute auf
+        logger.warning("Dispute notification failed for match=%s type=%s", _log_safe(match_id), type(exc).__name__)
     # Phase B v4.1: trigger negative achievement for the user who disputed
     try:
         from badges import on_dispute_opened

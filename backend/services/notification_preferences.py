@@ -161,6 +161,8 @@ NOTIFICATION_KIND_CATEGORY = {
     # Ergebnis melden (#1132): „bitte bestätigen“ an die Gegenseite; Streitfälle für die Turnierleitung.
     "match_report": "match_reminders",
     "match_attention": "tournament_updates",
+    # Dispute (#1134): „Dispute zu deinem Spiel“ an die Spieler; entschieden kommt als Ergebnis (match_result).
+    "match_dispute": "match_reminders",
     "match_chat_message": "community_messages",
     "match_chat_mention": "community_messages",
     "tournament_checkin": "tournament_updates",

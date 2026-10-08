@@ -265,9 +265,11 @@ def tpl_score_reported(tournament_title: str, url: str, summary: str = "") -> tu
 
 
 def tpl_dispute_opened(tournament_title: str, url: str) -> tuple[str, str]:
-    return f"Dispute eröffnet: {tournament_title}", _wrap(
-        "Dispute eröffnet",
-        "<p>Ein Dispute wurde zu einem deiner Matches eröffnet. Ein Admin wird sich darum kümmern.</p>",
+    # Dispute (#1134): an die Spieler des Spiels - die Turnierleitung hat schon Bescheid.
+    return f"Dispute zu deinem Spiel: {tournament_title}", _wrap(
+        "Dispute gemeldet",
+        f"<p>Zu einem deiner Spiele im Turnier <strong>{tournament_title}</strong> wurde ein Dispute gemeldet.</p>"
+        "<p>Die Turnierleitung prüft und entscheidet. Du bekommst Bescheid, sobald die Entscheidung feststeht.</p>",
         "Zum Match", url,
     )
 
@@ -275,7 +277,8 @@ def tpl_dispute_opened(tournament_title: str, url: str) -> tuple[str, str]:
 def tpl_dispute_resolved(tournament_title: str, decision: str, url: str) -> tuple[str, str]:
     return f"Dispute entschieden: {tournament_title}", _wrap(
         "Dispute entschieden",
-        f"<p>Die Admin-Entscheidung liegt vor:</p><p><strong>{decision}</strong></p>",
+        "<p>Die Turnierleitung hat den Dispute zu deinem Spiel entschieden:</p>"
+        f"<p><strong>{html_lib.escape(decision or '')}</strong></p>",
         "Match ansehen", url,
     )
 

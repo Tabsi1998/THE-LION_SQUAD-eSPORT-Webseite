@@ -139,7 +139,7 @@ const STATUS_LABELS: Record<string, string> = {
   countered: "Gegenvorschlag",
   declined: "Abgelehnt",
   deleted: "Gelöscht",
-  disputed: "Klärung nötig",
+  disputed: "In Klärung",
   draft: "Entwurf",
   escalated: "Turnierleitung nötig",
   finished: "Beendet",

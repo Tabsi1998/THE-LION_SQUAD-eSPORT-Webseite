@@ -109,3 +109,26 @@ test("ohne Recht kein Formular; die Turnierleitung trägt über /result ein", as
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/result", expect.objectContaining({ results: expect.any(Array) })));
   expect(apiMock.post.mock.calls.some(([url]) => url === "/matches/m1/report")).toBe(false);
 });
+
+// Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - bis zur Frist vom Server.
+test("Dispute auch nach dem Ergebnis: mit Frist; in Klärung steht der Hinweis für alle", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-05-23T16:10:00Z"));
+  const done = {
+    ...PAGE, result_entry_mode: "staff_only", can_player_report_result: false, report_state: null,
+    match: { ...PAGE.match, status: "completed", winner_id: "r1", results: [{ registration_id: "r1", rank: 1 }, { registration_id: "r2", rank: 2 }] },
+    can_dispute: true, dispute_until: "2026-05-23T16:30:00Z",
+  };
+  apiMock.post.mockResolvedValue({ data: {} });
+  const { unmount } = renderMatch(done);
+  expect(await screen.findByTestId("match-dispute-hint")).toHaveTextContent("Möglich bis heute 18:30.");
+  fireEvent.change(screen.getByTestId("match-dispute-input"), { target: { value: "Falscher Spielstand" } });
+  fireEvent.click(screen.getByTestId("match-dispute-btn"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/dispute", { reason: "Falscher Spielstand" }));
+  unmount();
+
+  renderMatch({ ...done, can_dispute: false, in_dispute: true, match: { ...done.match, status: "disputed" } });
+  expect(await screen.findByTestId("match-in-dispute")).toHaveTextContent("In Klärung – zu diesem Spiel liegt ein Dispute vor.");
+  expect(screen.queryByTestId("match-dispute-form")).toBeNull();
+  vi.useRealTimers();
+});

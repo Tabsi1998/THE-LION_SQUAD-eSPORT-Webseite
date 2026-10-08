@@ -64,6 +64,8 @@ type MatchPage = {
   allows_draw?: boolean;
   can_act?: boolean;
   can_dispute?: boolean;
+  dispute_until?: string | null;
+  in_dispute?: boolean;
   can_forfeit?: boolean;
   can_manage_schedule?: boolean;
   can_player_report_result?: boolean;
@@ -209,7 +211,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const eventModeLabel = formatEventMode(page?.event_mode);
   const resultModeLabel = formatResultEntryMode(page?.result_entry_mode);
   const scheduleModeLabel = formatScheduleMode(page?.schedule_mode);
-  const hasResultActions = Boolean(canPlayerReportResult || canSubmitV2Result || (!isCompleted && page?.can_dispute) || (!isCompleted && page?.can_forfeit));
+  // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - der Server sagt, bis wann.
+  const canDispute = Boolean(page?.can_dispute);
+  const hasResultActions = Boolean(canPlayerReportResult || canSubmitV2Result || canDispute || (!isCompleted && page?.can_forfeit));
   const showFlowNotice = Boolean(!hasResultActions && (page?.result_entry_mode || page?.schedule_mode));
 
   const propose = useCallback(async () => {
@@ -355,6 +359,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       await api.post(`/matches/${route.params.id}/dispute`, { reason });
       setDisputeReason("");
       await load({ preserveDrafts: false });
+      setSuccess("Dispute gemeldet – die Turnierleitung prüft und entscheidet.");
     } catch (err) {
       setError(errorMessage(err, "Dispute konnte nicht gemeldet werden."));
     } finally {
@@ -458,6 +463,13 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           )) : <Muted>Noch keine Teilnehmer zugewiesen.</Muted>}
         </Card>
 
+        {page.in_dispute ? (
+          <View style={styles.disputeNotice} testID="match-in-dispute">
+            <Ionicons name="alert-circle-outline" color={colors.live} size={20} />
+            <Body style={styles.flex}>In Klärung – zu diesem Spiel liegt ein Dispute vor. Die Turnierleitung prüft und entscheidet.</Body>
+          </View>
+        ) : null}
+
         {hasResultActions ? (
           <Card style={styles.card}>
             <Heading>{canPlayerReportResult ? "Ergebnis melden" : canSubmitV2Result ? "Ergebnis eintragen" : "Ergebnis"}</Heading>
@@ -496,13 +508,17 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                 <Button label={busy ? "Speichert ..." : "Ergebnis speichern"} onPress={submitV2Result} disabled={busy} testID="match-staff-result-submit" />
               </>
             ) : null}
-            {page.can_dispute ? (
-              <>
-                <FormInput label="Dispute-Grund" value={disputeReason} onChangeText={setDisputeReason} placeholder="Was stimmt nicht?" />
-                <Button label="Dispute melden" variant="secondary" onPress={submitDispute} disabled={busy || !disputeReason.trim()} />
-              </>
+            {canDispute ? (
+              <View style={styles.stack} testID="match-dispute">
+                <FormInput label="Dispute-Grund" value={disputeReason} onChangeText={setDisputeReason} placeholder="Was stimmt nicht?" testID="match-dispute-input" />
+                <Muted testID="match-dispute-hint">
+                  Stimmt etwas nicht? Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet.
+                  {page.dispute_until ? ` Möglich bis ${formatDateTime(page.dispute_until)}.` : ""}
+                </Muted>
+                <Button label="Dispute melden" variant="secondary" onPress={submitDispute} disabled={busy || !disputeReason.trim()} testID="match-dispute-submit" />
+              </View>
             ) : null}
-            {page.can_forfeit && duelParticipants.length >= 2 ? (
+            {page.can_forfeit && !isCompleted && duelParticipants.length >= 2 ? (
               <>
                 <Muted style={styles.warning}>Staff-Aktion: Forfeit setzt einen Gewinner und wertet den Gegner als Forfeit.</Muted>
                 <View style={styles.buttonRow}>
@@ -820,6 +836,16 @@ const styles = StyleSheet.create({
   },
   error: {
     color: colors.live,
+  },
+  disputeNotice: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,59,48,0.1)",
+    borderColor: "rgba(255,59,48,0.4)",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 9,
+    padding: 12,
   },
   successNotice: {
     alignItems: "center",

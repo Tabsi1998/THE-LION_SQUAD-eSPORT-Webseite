@@ -13,6 +13,11 @@ from services.user_notifications import build_public_url, create_user_notificati
 logger = logging.getLogger("tls.match_notifications")
 
 
+def _log_safe(value, limit: int = 120) -> str:
+    """Werte ins Protokoll nur ohne Zeilenumbrüche und gekürzt."""
+    return str(value or "").replace("\r", " ").replace("\n", " ")[:limit]
+
+
 def _registration_name(reg: dict | None, fallback: str = "Offen") -> str:
     if not reg:
         return fallback
@@ -87,7 +92,8 @@ def _result_summary(match: dict, regs_by_id: dict[str, dict]) -> str:
     return _ranking_result_summary(match, regs_by_id)
 
 
-async def notify_match_result_confirmed(db, match: dict, collection_name: str = "matches_v2", force: bool = False) -> int:
+async def notify_match_result_confirmed(db, match: dict, collection_name: str = "matches_v2", force: bool = False,
+                                        dispute_resolved: bool = False) -> int:
     """Create in-app notifications for all users involved in a confirmed match result."""
     source_match = match
     match = _canonical_match(source_match, collection_name)
@@ -115,12 +121,20 @@ async def notify_match_result_confirmed(db, match: dict, collection_name: str = 
     ) or {}
     title = "Ergebnis korrigiert" if force else "Ergebnis bestätigt"
     tournament_title = tournament.get("title") or "Turnier"
-    body = f"{tournament_title}: {_result_summary(match, regs_by_id)}"
+    summary = _result_summary(match, regs_by_id)
+    body = f"{tournament_title}: {summary}"
+    if dispute_resolved:
+        # Dispute entschieden (#1134): dieselbe Nachricht für alle Spieler - mit Bezug zum Dispute. Wie beim Eröffnen
+        # erfährt es das ganze Team, auch wer neben der Aufstellung steht (#1136).
+        title = "Dispute entschieden"
+        body = f"{tournament_title}: Die Turnierleitung hat den Dispute entschieden. {summary}"
+        user_ids = user_ids | await player_user_ids(db, registrations)
     meta = {
         "match_id": match.get("id"),
         "tournament_id": match.get("tournament_id"),
         "collection": collection_name,
         "force": bool(force),
+        **({"dispute_resolved": True} if dispute_resolved else {}),
     }
     result_token = (
         (source_match.get("result_meta") or {}).get("report_id")
@@ -140,6 +154,17 @@ async def notify_match_result_confirmed(db, match: dict, collection_name: str = 
             meta=meta,
         )
         sent += 1
+    if dispute_resolved:
+        absolute_url = await build_public_url(f"/matches/{match.get('id')}")
+        for user in await users_for(db, user_ids):
+            try:
+                await send_user_template(
+                    user, "dispute_resolved", tournament_title=tournament_title, decision=summary, url=absolute_url,
+                    dedupe_key=f"{meta.get('dedupe_key') or match.get('id')}:{user['id']}:dispute-mail",
+                    mail_meta={"kind": "dispute_resolved", "match_id": match.get("id"), "user_id": user["id"]},
+                )
+            except Exception as exc:  # noqa: BLE001 - eine Mail hält keine Entscheidung auf
+                logger.warning("Dispute mail failed for match=%s type=%s", _log_safe(match.get("id")), type(exc).__name__)
     return sent
 
 
@@ -237,7 +262,7 @@ async def notify_result_reported(db, match: dict, report: dict, actor_id: str | 
                 mail_meta={"kind": "score_reported", "match_id": match.get("id"), "user_id": user["id"]},
             )
         except Exception as exc:  # noqa: BLE001 - eine Mail hält keine Meldung auf
-            logger.warning("Score report mail failed for match=%s type=%s", match.get("id"), type(exc).__name__)
+            logger.warning("Score report mail failed for match=%s type=%s", _log_safe(match.get("id")), type(exc).__name__)
     return sent
 
 
@@ -274,4 +299,58 @@ async def notify_report_conflict(db, match: dict, actor_registration_id: str | N
                   "tournament_id": match.get("tournament_id")},
         ):
             sent += 1
+    return sent
+
+
+# ---------------------------------------------------------------- Dispute (#1134)
+
+def _short(text: str, limit: int = 120) -> str:
+    text = " ".join((text or "").split())
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+async def notify_dispute_opened(db, match: dict, dispute: dict, actor_id: str | None,
+                                actor_registration_id: str | None) -> int:
+    """Ein Dispute ist da (#1134): die Turnierleitung mit Ergebnis-Recht für dieses Spiel bekommt sofort Bescheid -
+    mit dem Grund, den nur sie sieht. Alle anderen Spieler des Spiels (#1136: bei Teams jedes Mitglied) erfahren, dass
+    geprüft wird - ohne den Grund, im Postfach, per Push und, wenn sie es zulassen, per Mail. Niemand sonst."""
+    tournament, registrations, regs_by_id = await _match_context(db, match)
+    tournament_title = tournament.get("title") or "Turnier"
+    title_text = match_title(match, regs_by_id)
+    who = _name(regs_by_id.get(actor_registration_id), "Eine Seite") if actor_registration_id else "Die Turnierleitung"
+    path = f"/matches/{match.get('id')}"
+    dedupe = f"match-dispute:{match.get('id')}:{dispute.get('at')}"
+    sent = 0
+    for user_id in sorted(await result_staff_user_ids(db, match) - {actor_id}):
+        if await create_user_notification(
+            user_id,
+            "Dispute: bitte prüfen",
+            f"{tournament_title} · {title_text}: {who} widerspricht – „{_short(dispute.get('reason') or '')}“ "
+            "Bitte prüfen und entscheiden.",
+            url=path,
+            kind="match_attention",
+            meta={"category": "tournament_updates", "dedupe_key": dedupe, "match_id": match.get("id"),
+                  "tournament_id": match.get("tournament_id"), "reason": "dispute"},
+        ):
+            sent += 1
+    absolute_url = await build_public_url(path)
+    for user in await users_for(db, await player_user_ids(db, registrations) - {actor_id}):
+        if await create_user_notification(
+            user["id"],
+            "Dispute zu deinem Spiel",
+            f"{tournament_title} · {title_text}: Es wurde ein Dispute gemeldet. Die Turnierleitung prüft und entscheidet.",
+            url=path,
+            kind="match_dispute",
+            meta={"category": "match_reminders", "dedupe_key": dedupe, "match_id": match.get("id"),
+                  "tournament_id": match.get("tournament_id")},
+        ):
+            sent += 1
+        try:
+            await send_user_template(
+                user, "dispute_opened", tournament_title=tournament_title, url=absolute_url,
+                dedupe_key=f"{dedupe}:{user['id']}:mail",
+                mail_meta={"kind": "dispute_opened", "match_id": match.get("id"), "user_id": user["id"]},
+            )
+        except Exception as exc:  # noqa: BLE001 - eine Mail hält keinen Dispute auf
+            logger.warning("Dispute mail failed for match=%s type=%s", _log_safe(match.get("id")), type(exc).__name__)
     return sent

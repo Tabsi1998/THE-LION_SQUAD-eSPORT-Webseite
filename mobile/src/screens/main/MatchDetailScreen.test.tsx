@@ -116,3 +116,29 @@ test("ohne Recht kein Formular; die Turnierleitung speichert über /result", asy
   await fireEvent.press(screen.getByTestId("match-staff-result-submit"));
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/result", expect.objectContaining({ results: expect.any(Array) })));
 });
+
+// Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - bis zur Frist vom Server.
+test("Dispute auch nach dem Ergebnis: mit Frist, der Grund geht an /dispute", async () => {
+  const done = {
+    ...PAGE, result_entry_mode: "staff_only", can_player_report_result: false, report_state: null,
+    match: { ...PAGE.match, status: "completed", results: [{ registration_id: "r1", rank: 1 }, { registration_id: "r2", rank: 2 }] },
+    can_dispute: true, dispute_until: "2026-05-23T16:30:00Z",
+  };
+  mockPost.mockResolvedValue({ data: {} });
+  answer(done);
+  await render(<MatchDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("match-dispute")).toBeTruthy());
+  expect(screen.getByTestId("match-dispute-hint")).toHaveTextContent(
+    "Stimmt etwas nicht? Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet. Möglich bis 23.05.2026, 18:30.",
+  );
+  await fireEvent.changeText(screen.getByTestId("match-dispute-input"), "Falscher Spielstand");
+  await fireEvent.press(screen.getByTestId("match-dispute-submit"));
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/dispute", { reason: "Falscher Spielstand" }));
+});
+
+test("in Klärung: der Hinweis steht oben, ohne Recht kein Dispute-Feld", async () => {
+  answer({ ...PAGE, can_player_report_result: false, report_state: null, match: { ...PAGE.match, status: "disputed" }, in_dispute: true, can_dispute: false });
+  await render(<MatchDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("match-in-dispute")).toBeTruthy());
+  expect(screen.queryByTestId("match-dispute")).toBeNull();
+});

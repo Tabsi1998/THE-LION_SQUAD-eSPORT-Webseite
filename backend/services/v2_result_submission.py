@@ -72,7 +72,19 @@ async def _upsert_result_audit(
     )
 
 
-async def _finish_result_side_effects(db, match: dict, force: bool) -> None:
+async def _close_disputes(db, match: dict, actor_id: str, now_iso: str) -> None:
+    """Die Turnierleitung hat ein Ergebnis zu einem Spiel in Klärung eingetragen - damit ist der Dispute entschieden
+    (#1134). Jeder offene Dispute bekommt „entschieden am/von“, das Spiel ebenso."""
+    disputes = [
+        {**row, "resolved_at": row.get("resolved_at") or now_iso, "resolved_by": row.get("resolved_by") or actor_id}
+        for row in match.get("disputes") or [] if isinstance(row, dict)
+    ]
+    await db.matches_v2.update_one({"id": match["id"]}, {"$set": {
+        "disputes": disputes, "dispute_resolved_at": now_iso, "dispute_resolved_by": actor_id,
+    }})
+
+
+async def _finish_result_side_effects(db, match: dict, force: bool, dispute_resolved: bool = False) -> None:
     # Bracket im Discord (#571): jedes bestätigte Ergebnis merkt das Turnier für die nächste Bearbeitung vor.
     try:
         from services.discord_bracket import request_refresh
@@ -80,7 +92,7 @@ async def _finish_result_side_effects(db, match: dict, force: bool) -> None:
     except Exception:  # noqa: BLE001
         pass
     try:
-        await notify_match_result_confirmed(db, match, "matches_v2", force=force)
+        await notify_match_result_confirmed(db, match, "matches_v2", force=force, dispute_resolved=dispute_resolved)
     except Exception as exc:
         logger.warning(
             "Result notification failed for match=%s type=%s",
@@ -189,8 +201,11 @@ async def submit_v2_result(
         force=force,
         created_at=now_iso,
     )
+    dispute_resolved = match.get("status") == "disputed"
+    if dispute_resolved:
+        await _close_disputes(db, match, actor_id, now_iso)
     updated = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
-    await _finish_result_side_effects(db, updated, force)
+    await _finish_result_side_effects(db, updated, force, dispute_resolved=dispute_resolved)
     return {
         "ok": True,
         "match": updated,

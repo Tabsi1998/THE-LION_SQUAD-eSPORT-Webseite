@@ -50,7 +50,8 @@ const emptyDashboard: MobileDashboardData = {
   stats: { my_tournaments: 0, my_events: 0, open_matches: 0, staff_matches: 0, open_actions: 0, news: 0, public_tournaments: 0, public_events: 0, live_streams: 0 },
 };
 const WEB_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
-const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiting_result"]);
+// Ein Spiel in Klärung (#1134) bleibt sichtbar - beim Spieler als „In Klärung“, bei der Turnierleitung ganz oben.
+const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiting_result", "disputed"]);
 
 function normalizeDashboard(payload?: Partial<MobileDashboardData> | null): MobileDashboardData {
   return {
@@ -530,17 +531,25 @@ function MatchOverviewCard({ match, onPress, staff = false }: { match: Match; on
     match.round_name || (match.round ? `Runde ${match.round}` : null),
     match.station_label ? `Station ${match.station_label}` : null,
   ].filter(Boolean).join(" · ");
-  const action = staff && match.can_submit_result
-    ? "Ergebnis erfassen"
-    : match.needs_result
-      ? "Ergebnis öffnen"
-      : "Match öffnen";
+  // In Klärung (#1134): bei der Turnierleitung rot und ganz oben, beim Spieler „Wartet auf Entscheidung“.
+  const disputed = Boolean(match.disputed || match.status === "disputed");
+  const action = disputed
+    ? (staff ? "Dispute prüfen" : "Wartet auf Entscheidung")
+    : staff && match.can_submit_result
+      ? "Ergebnis erfassen"
+      : match.needs_result
+        ? "Ergebnis öffnen"
+        : "Match öffnen";
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
-      <Card style={[styles.matchCard, match.needs_result && styles.matchCardUrgent]}>
+    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]} testID={disputed ? `match-disputed-${match.id}` : undefined}>
+      <Card style={[styles.matchCard, match.needs_result && styles.matchCardUrgent, disputed && styles.matchCardDisputed]}>
         <View style={styles.matchIcon}>
-          <Ionicons name={match.needs_result ? "create-outline" : "game-controller-outline"} color={match.needs_result ? colors.gold : colors.cyan} size={20} />
+          <Ionicons
+            name={disputed ? "alert-circle-outline" : match.needs_result ? "create-outline" : "game-controller-outline"}
+            color={disputed ? colors.live : match.needs_result ? colors.gold : colors.cyan}
+            size={20}
+          />
         </View>
         <View style={styles.flex}>
           <View style={styles.rowTop}>
@@ -743,6 +752,9 @@ const styles = StyleSheet.create({
   },
   matchCardUrgent: {
     borderColor: "rgba(240,180,41,0.48)",
+  },
+  matchCardDisputed: {
+    borderColor: "rgba(255,59,48,0.55)",
   },
   matchIcon: {
     alignItems: "center",

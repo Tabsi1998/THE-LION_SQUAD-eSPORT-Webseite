@@ -188,6 +188,8 @@ export type Match = {
   is_own_match?: boolean;
   can_submit_result?: boolean;
   needs_result?: boolean;
+  // In Klärung (#1134): ein Dispute liegt vor - die Turnierleitung entscheidet.
+  disputed?: boolean;
 };
 
 export type Achievement = {
