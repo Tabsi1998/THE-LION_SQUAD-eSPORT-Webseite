@@ -75,6 +75,8 @@ const TournamentBracketPage = lazy(() => import("@/pages/public/TournamentBracke
 const TournamentStandingsPage = lazy(() => import("@/pages/public/TournamentStandingsPage"));
 const TournamentSchedulePage = lazy(() => import("@/pages/public/TournamentSchedulePage"));
 const MatchPage = lazy(() => import("@/pages/public/MatchPage"));
+// Turnierleitung am Handy (#1156): Ergebnisse eintragen, was fehlt, Streitfälle - nur für die Turnierleitung des Turniers.
+const TournamentLeadPage = lazy(() => import("@/pages/public/TournamentLeadPage"));
 const EsportsOverviewPage = lazy(() => import("@/pages/public/EsportsOverviewPage"));
 const F1ListPage = lazy(() => import("@/pages/public/F1ListPage"));
 const F1DetailPage = lazy(() => import("@/pages/public/F1DetailPage"));
@@ -265,6 +267,7 @@ function App() {
           <Route path="/tournaments/:slug/bracket" element={<TournamentBracketPage />} />
           <Route path="/tournaments/:slug/matches" element={<TournamentSchedulePage />} />
           <Route path="/tournaments/:slug/standings" element={<TournamentStandingsPage />} />
+          <Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} />
           <Route path="/tournaments/:slug/ergebnis/:username" element={<ResultSharePage />} />
           <Route path="/matches/:id" element={<MatchPage />} />
           <Route path="/f1" element={<FastLapLegacyRedirect />} />

@@ -67,6 +67,8 @@ export type Tournament = {
   id: string;
   title: string;
   slug: string;
+  // Darf diese Person hier Ergebnisse eintragen (Turnierleitung oder Helfer mit Ergebnis-Recht)? Der Server sagt es.
+  can_manage_results?: boolean;
   status?: string;
   game_name?: string;
   game?: {

@@ -615,6 +615,18 @@ async def _safe_chat_attachment_cleanup():
         _log_task_failure("chat_attachment_cleanup", exc)
 
 
+async def _safe_result_holds():
+    """Ergebnisse mit „Rückgängig“ (#1156): veröffentlicht, was der Zeitgeber im Server verpasst hat (Neustart)."""
+    try:
+        from database import get_db
+        from services.result_hold import publish_due_holds
+        published = await publish_due_holds(get_db())
+        if published:
+            logger.info(f"[scheduler] result_holds published={published}")
+    except Exception as exc:
+        _log_task_failure("result_holds", exc)
+
+
 async def _safe_media_scan():
     try:
         from services.media_scan import process_pending
@@ -898,6 +910,9 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("ops_retention", _safe_ops_retention, lease_seconds=600.0), IntervalTrigger(hours=24), id="ops_retention", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("ops_checks", _safe_ops_checks), IntervalTrigger(minutes=5), id="ops_checks",
+                  max_instances=1, coalesce=True)
+    # Ergebnisse mit „Rückgängig“ (#1156): nach 10 Sekunden veröffentlichen, auch nach einem Neustart.
+    sched.add_job(_single_replica("result_holds", _safe_result_holds, lease_seconds=60.0), IntervalTrigger(seconds=5), id="result_holds",
                   max_instances=1, coalesce=True)
     # Bildprüfung (#415): Sammler für alles, was die sofortige Prüfung nach dem Upload nicht erwischt hat.
     sched.add_job(_single_replica("media_scan", _safe_media_scan, lease_seconds=120.0), IntervalTrigger(seconds=20), id="media_scan",

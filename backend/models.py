@@ -790,6 +790,14 @@ class MatchV2ResultSubmit(BaseModel):
     results: List[MatchV2ResultEntry] = Field(min_length=1)
     proof_url: Optional[str] = None
     note: Optional[str] = None
+    # Ergebnis-Fenster (#1156, #1370): 10 Sekunden „Rückgängig“, erst danach geht es raus; Korrektur nur mit Grund.
+    hold: bool = False
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class MatchResultUndo(BaseModel):
+    # Das „Rückgängig“ nennt den Eintrag, den es zurücknehmen will - nur der letzte eines Spiels zählt.
+    hold_id: Optional[str] = None
 
 
 MatchScoreReport.model_rebuild()

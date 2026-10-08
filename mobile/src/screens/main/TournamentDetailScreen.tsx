@@ -380,6 +380,14 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 location: tournament.event?.location || null, detail: [tournament.game?.display_name || tournament.game?.name, formatTournamentFormat(tournament.format)].filter(Boolean).join(" · ") || null,
                 url: tournament.slug ? `https://lionsquad.at/tournaments/${tournament.slug}` : null,
               } : null} />
+              {/* Turnierleitung am Handy (#1156): nur wer in diesem Turnier Ergebnisse eintragen darf (der Server sagt es). */}
+              {tournament.can_manage_results && !guest ? (
+                <Button
+                  label="Turnierleitung öffnen"
+                  onPress={() => navigation.navigate("TournamentLead", { id: tournament.slug || tournament.id })}
+                  testID="tournament-lead-open"
+                />
+              ) : null}
               {/* Den Turnier-Chat gibt es mit Konto (#918) - Gäste finden „Anmelden oder registrieren“ oben bei der Teilnahme. */}
               {tournament.show_chat && !guest ? (
                 <Button

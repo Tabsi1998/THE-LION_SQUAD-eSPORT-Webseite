@@ -36,6 +36,7 @@ import { TeamChatScreen } from "../screens/main/TeamChatScreen";
 import { TeamDetailScreen } from "../screens/main/TeamDetailScreen";
 import { TournamentChatScreen } from "../screens/main/TournamentChatScreen";
 import { TournamentDetailScreen } from "../screens/main/TournamentDetailScreen";
+import { TournamentLeadScreen } from "../screens/main/TournamentLeadScreen";
 import { TournamentsScreen } from "../screens/main/TournamentsScreen";
 import { VereinScreen } from "../screens/main/VereinScreen";
 import type { DetailScreenName, TabRootParamList } from "./types";
@@ -59,6 +60,7 @@ export const DETAIL_SCREENS: Record<DetailScreenName, Screen> = {
   EventDetail: EventDetailScreen,
   FastLapDetail: FastLapDetailScreen,
   MatchDetail: MatchDetailScreen,
+  TournamentLead: TournamentLeadScreen,
   TournamentChat: TournamentChatScreen,
   TeamDetail: TeamDetailScreen,
   TeamChat: TeamChatScreen,

@@ -265,7 +265,15 @@ export function DashboardScreen({ navigation, route }: Props) {
         ) : null}
 
         {!isGuest && data.me.staff_matches.length ? (
-          <Section title="Turnierleitung · Ergebnisse">
+          <Section
+            title="Turnierleitung · Ergebnisse"
+            // Turnierleitung am Handy (#1156): die ganze Liste eines Turniers - zuerst, was fehlt.
+            actionLabel={leadTarget(data.me.staff_matches) ? "Alle offenen" : undefined}
+            onAction={() => {
+              const target = leadTarget(data.me.staff_matches);
+              if (target) navigation.navigate("TournamentLead", { id: target });
+            }}
+          >
             {data.me.staff_matches.slice(0, 6).map((match, index) => (
               <ListItemFadeIn key={`staff-${match.id}`} entrance={entrance} id={`staff-${match.id}`} index={index}>
                 <MatchOverviewCard
@@ -448,6 +456,12 @@ function eventToTimeline(event: ClubEvent): TimelineItem {
     targetId: event.slug || event.id,
     registrationStatus: event.own_registration?.status,
   };
+}
+
+/** Das Turnier der offenen Spiele für die Ansicht „Turnierleitung“ - das erste in der Liste (dort fehlt am meisten). */
+function leadTarget(matches: Match[]) {
+  const first = matches.find((match) => match.tournament_slug || match.tournament_id);
+  return first ? String(first.tournament_slug || first.tournament_id) : "";
 }
 
 function Section({ title, actionLabel, onAction, children }: { title: string; actionLabel?: string; onAction?: () => void; children: React.ReactNode }) {

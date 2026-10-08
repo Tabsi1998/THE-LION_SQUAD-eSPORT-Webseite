@@ -68,6 +68,9 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/matches/m-1", detail("MatchDetail", { id: "m-1" })],
   ["/tournaments/herbst-cup", detail("TournamentDetail", { id: "herbst-cup" })],
   ["/tournaments/herbst-cup/chat", detail("TournamentChat", { id: "herbst-cup" })],
+  // Turnierleitung am Handy (#1156, #1160): die Ansicht der Turnierleitung, mit Spiel oder Fall.
+  ["/tournaments/herbst-cup/leitung", detail("TournamentLead", { id: "herbst-cup" })],
+  ["/tournaments/herbst-cup/leitung?spiel=m-1&fall=rm-m-1", detail("TournamentLead", { id: "herbst-cup", spiel: "m-1", fall: "rm-m-1" })],
   ["/events/herbst-lan", detail("EventDetail", { id: "herbst-lan" })],
   ["/fastlap/monza", detail("FastLapDetail", { id: "monza" })],
   ["/f1/challenges/monza", detail("FastLapDetail", { id: "monza" })],

@@ -21,6 +21,7 @@ from models import (
     MatchChatCreate,
     MatchScheduleProposalCreate,
     MatchScheduleProposalDecision,
+    MatchResultUndo,
     MatchV2ResultSubmit,
     MatchUpdate,
     MatchScoreReport,
@@ -60,6 +61,9 @@ from services.v2_match_flows import (
     validate_forfeit_note,
 )
 from services.competition_usage import engine_for_match, record_write
+from services.match_forfeit import apply_forfeit
+from services.match_lead import entry_info
+from services.result_hold import ensure_no_hold, hold_result, undo_result
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
 logger = logging.getLogger("tls.match")
@@ -556,6 +560,14 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     window = await dispute_window(db, match) if acting_reg else {"open": False, "until": None}
     # Aufruf (#1137): aufgerufen um, antreten bis, Station - für den Countdown auf der Matchseite (wie am TV).
     call = await call_view(db, match)
+    # Ergebnis-Fenster (#1156, #1370): dieselbe Beschreibung wie in der Ansicht „Turnierleitung“ - Format, Seiten,
+    # wohin der Sieger weiterrückt, ein bereitliegendes Ergebnis mit „Rückgängig“. Nur für wer eintragen darf.
+    result_entry = None
+    if can_submit_result and match.get("slots"):
+        stage_matches = await db.matches_v2.find({"stage_id": match.get("stage_id")}, {"_id": 0}).to_list(3000)
+        regs_by_id = {reg["id"]: reg for reg in await _registrations_for_match(match) if reg.get("id")}
+        result_entry = entry_info(match, tournament=tournament, stage=stage, stage_matches=stage_matches,
+                                  regs_by_id=regs_by_id, viewer_id=(user or {}).get("id"))
     if not await _sees_internal(match, user):
         viewer_id = (user or {}).get("id")
         match = public_match_view(match, viewer_id)
@@ -580,6 +592,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "dispute_until": window["until"],
         "in_dispute": str(match.get("status") or "") == "disputed",
         "call": call,
+        "result_entry": result_entry,
         "can_forfeit": await _can_forfeit_match(match, user),
         "event_mode": policy["event_mode"],
         "result_entry_mode": policy["result_entry_mode"],
@@ -878,16 +891,42 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
             await _ensure_match_tournament_unlocked(db, match)
             await ensure_tournament_accepts_results(db, match["tournament_id"])
             await _require_result_permission(me, match)
+            raw_results = [entry.model_dump() for entry in body.results]
+            if body.hold:
+                # Ergebnis-Fenster (#1156): 10 Sekunden „Rückgängig“, erst danach Baum, TV und Nachrichten.
+                return await hold_result(db, match, raw_results, actor=me, note=body.note, proof_url=body.proof_url,
+                                         force=force, reason=body.reason)
+            ensure_no_hold(match)
             return await submit_v2_result(
                 db,
                 match,
-                [entry.model_dump() for entry in body.results],
+                raw_results,
                 actor_id=me["id"],
                 proof_url=body.proof_url,
                 note=body.note,
                 force=force,
                 audit_action="match.result.submit",
+                reason=body.reason,
             )
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
+    except MatchV2ResultError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@router.post("/{match_id}/result/undo")
+async def undo_match_result(match_id: str, body: MatchResultUndo | None = None, me: dict = Depends(get_current_user)):
+    """„Rückgängig“ (#1156): nur der letzte Eintrag eines Spiels, nur mit Ergebnis-Recht, mit Protokoll. Liegt das
+    Ergebnis noch bereit, fällt es weg; ist es schon draußen, nimmt der Server auch das Weiterrücken zurück - oder sagt,
+    warum es nicht mehr geht."""
+    db = get_db()
+    match, _collection = await _find_match_any(match_id)
+    await _ensure_match_tournament_unlocked(db, match)
+    await _require_result_permission(me, match)
+    try:
+        async with mutation_lock(db, tournament_write_resource(match["tournament_id"])):
+            match, _collection = await _find_match_any(match_id)
+            return await undo_result(db, match, actor_id=me["id"], hold_id=(body.hold_id if body else None))
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
     except MatchV2ResultError as exc:
@@ -962,6 +1001,8 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict) -> dict:
     if not my_registration:
         raise HTTPException(status_code=403, detail="Nicht Teilnehmer dieses Matches")
     status = str(match.get("status") or "")
+    if isinstance(match.get("pending_result"), dict):
+        raise HTTPException(status_code=409, detail="Die Turnierleitung trägt gerade das Ergebnis ein.")
     if status == "disputed":
         raise HTTPException(status_code=409, detail="Dieses Spiel ist in Klärung – die Turnierleitung entscheidet.")
     if status in REPORT_CLOSED_STATUSES:
@@ -1103,54 +1144,12 @@ async def _forfeit_v2(db, match: dict, body: dict, me: dict, force: bool) -> dic
                     "lässt sich der Aufgebende nicht aus dem Sieger ableiten."
                 )
             forfeiting = others[0]
-        results = results_for_forfeit(match, forfeiting)
+        results_for_forfeit(match, forfeiting)
+        ensure_no_hold(match)
     except MatchV2ResultError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-
-    outcome = await submit_v2_result(
-        db,
-        match,
-        results,
-        actor_id=me["id"],
-        proof_url=None,
-        note=note,
-        force=force,
-        audit_action="match.forfeit",
-    )
-    updated = outcome.get("match") or match
-    await getattr(db, "matches_v2").update_one({"id": match["id"]}, {"$set": {
-        "status": "forfeit",
-        "forfeit_registration_id": forfeiting,
-        "admin_decision_note": note,
-        "admin_decision_by": me["id"],
-        "admin_decision_at": now_utc().isoformat(),
-        "updated_at": now_utc().isoformat(),
-    }})
-    result = await getattr(db, "matches_v2").find_one({"id": match["id"]}, {"_id": 0}) or updated
-    result["idempotent_replay"] = bool(outcome.get("idempotent_replay"))
-    await _record_walkover_incident(db, match, forfeiting, me)
-    return result
-
-
-async def _record_walkover_incident(db, match: dict, forfeiting_registration_id: str, me: dict) -> None:
-    """Note the walkover against the participant who gave up.
-
-    Came from the classic path and would have quietly disappeared with it. A
-    walkover is a sanction, so it belongs in the record the affected member can
-    see under their penalties.
-    """
-    try:
-        from badges import trigger_negative_incident
-
-        registration = await db.tournament_registrations.find_one(
-            {"id": forfeiting_registration_id}, {"_id": 0, "user_id": 1})
-        if registration and registration.get("user_id"):
-            await trigger_negative_incident(
-                registration["user_id"], "no_show",
-                {"match_id": match["id"], "reason": "forfeit"}, awarded_by=me["id"])
-    except Exception as exc:
-        logger.warning("Walkover incident failed for match=%s type=%s",
-                       match.get("id"), type(exc).__name__)
+        raise HTTPException(status_code=exc.status_code if exc.status_code == 409 else 422, detail=str(exc))
+    # Die Wertung samt Eintrag „nicht erschienen“ (walkover) - derselbe Weg wie das Ergebnis-Fenster (#1156).
+    return await apply_forfeit(db, match, forfeiting, note=note, actor_id=me["id"], force=force)
 
 
 @router.post("/{match_id}/forfeit")

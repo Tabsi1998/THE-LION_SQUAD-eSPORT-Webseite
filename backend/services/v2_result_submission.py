@@ -48,6 +48,8 @@ async def _upsert_result_audit(
     advanced_match_ids: list[str],
     force: bool,
     created_at: str,
+    reason: str | None = None,
+    hold_id: str | None = None,
 ) -> None:
     # Gegenstueck zur Messung im klassischen Pfad: hier laeuft die Graph-Engine.
     await record_write(GRAPH, audit_action, tournament_id=match.get("tournament_id"))
@@ -65,6 +67,9 @@ async def _upsert_result_audit(
                 "advanced_matches": advanced_match_ids,
                 "force": force,
                 "report_id": report_id,
+                # Korrektur mit Grund (#1156) und ob das Ergebnis erst nach „Rückgängig“ rausging.
+                **({"reason": reason} if reason else {}),
+                **({"held": True, "hold_id": hold_id} if hold_id else {}),
             },
             "created_at": created_at,
         }},
@@ -119,8 +124,13 @@ async def submit_v2_result(
     note: str | None,
     force: bool,
     audit_action: str,
+    reason: str | None = None,
+    hold_id: str | None = None,
 ) -> dict:
-    """Persist one v2 result while the caller owns the tournament write lease."""
+    """Persist one v2 result while the caller owns the tournament write lease.
+
+    ``reason``: warum die Turnierleitung ein fertiges Ergebnis korrigiert (#1156) - steht am Ergebnis und im Protokoll.
+    ``hold_id``: das Ergebnis lag 10 Sekunden für „Rückgängig“ bereit (services/result_hold) - unter dieser Kennung."""
     if is_v2_result_replay(match, raw_results, proof_url=proof_url, note=note):
         meta = match.get("result_meta") or {}
         report_id = meta.get("report_id")
@@ -165,6 +175,10 @@ async def submit_v2_result(
     application["match_set"]["result_meta"].update({
         "report_id": report_id,
         "advanced_match_ids": advanced_match_ids,
+        # Für „Rückgängig“ (#1156): in welchem Stand das Spiel vor dem Ergebnis war.
+        "previous_status": match.get("status"),
+        **({"hold_id": hold_id} if hold_id else {}),
+        **({"correction_reason": reason.strip()} if (reason or "").strip() else {}),
     })
 
     await db.match_reports_v2.update_one(
@@ -200,6 +214,8 @@ async def submit_v2_result(
         advanced_match_ids=advanced_match_ids,
         force=force,
         created_at=now_iso,
+        reason=(reason or "").strip() or None,
+        hold_id=hold_id,
     )
     dispute_resolved = match.get("status") == "disputed"
     if dispute_resolved:

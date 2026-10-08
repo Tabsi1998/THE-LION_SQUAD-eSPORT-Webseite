@@ -295,7 +295,8 @@ export default function TournamentDetailPage() {
               {primaryKey !== "schedule" && <Link to={subPage("matches")} data-testid="tournament-schedule-link" className="text-white/70 hover:text-[#29B6E8]">Spielplan</Link>}
               {primaryKey !== "standings" && <Link to={subPage("standings")} data-testid="tournament-standings-link" className="text-white/70 hover:text-[#29B6E8]">Rangliste</Link>}
               {t.stream_link && <a href={t.stream_link} target="_blank" rel="noreferrer" data-testid="tournament-stream-link" className="inline-flex items-center gap-1 text-[#FF3B30] hover:text-white"><Radio className="w-3.5 h-3.5" /> Stream</a>}
-              {t.can_manage_results && <Link to={`/admin/tournaments/${t.id}?tab=stages`} data-testid="tournament-result-entry-link" className="inline-flex items-center gap-1 text-[#FFD700] hover:text-white"><ExternalLink className="w-3.5 h-3.5" /> Ergebnisse eintragen</Link>}
+              {/* Turnierleitung am Handy (#1156): die Live-Werkzeuge - Ergebnisse, was fehlt, Streitfälle. */}
+              {t.can_manage_results && <Link to={`/tournaments/${t.slug || t.id}/leitung`} data-testid="tournament-result-entry-link" className="inline-flex items-center gap-1 text-[#FFD700] hover:text-white"><ExternalLink className="w-3.5 h-3.5" /> Turnierleitung</Link>}
             </div>
           </div>
           {!registerModal && actionError && <div className="mt-4 max-w-3xl"><AuthFormAlert id="tournament-action-error">{actionError}</AuthFormAlert></div>}

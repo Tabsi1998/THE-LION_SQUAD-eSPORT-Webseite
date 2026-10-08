@@ -184,6 +184,10 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   if (first === "dashboard" && query.get("bewerten")) return tab("Dashboard", { feedback: query.get("bewerten") });
   if (parsed.root || first === "dashboard") return tab("Dashboard");
   if (first === "matches" && second) return detail("MatchDetail", { id: second });
+  // Turnierleitung (#1156, #1160): /tournaments/<slug>/leitung?spiel=…&fall=… öffnet die Ansicht der Turnierleitung.
+  if (first === "tournaments" && second && third === "leitung") {
+    return detail("TournamentLead", { id: second, ...(query.get("spiel") ? { spiel: query.get("spiel") } : {}), ...(query.get("fall") ? { fall: query.get("fall") } : {}) });
+  }
   if (first === "tournaments" && second) return detail(third === "chat" ? "TournamentChat" : "TournamentDetail", { id: second });
   if (first === "events" && second) return detail("EventDetail", { id: second });
   if ((first === "fastlap" || first === "fastlaps") && second) return detail("FastLapDetail", { id: second });
