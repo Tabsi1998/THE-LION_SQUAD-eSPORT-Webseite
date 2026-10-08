@@ -188,6 +188,20 @@ def tpl_user_invite(display_name: str, invite_url: str, invited_by: str = "") ->
     )
 
 
+def tpl_account_banned(display_name: str, reason: str, appeal_url: str = "") -> tuple[str, str]:
+    """Konto gesperrt (#1357): die Person erfährt den Grund - derselbe, der im Protokoll steht."""
+    reason_html = html_lib.escape(reason or "").replace("\n", "<br>")
+    contact = (f'<p>Wenn du das für einen Irrtum hältst, schreib dem Verein über das <a href="{html_lib.escape(appeal_url, quote=True)}">Kontaktformular</a>.</p>'
+               if appeal_url else "<p>Wenn du das für einen Irrtum hältst, melde dich beim Verein.</p>")
+    return "Dein Konto bei THE LION SQUAD ist gesperrt", _wrap(
+        "Konto gesperrt",
+        f"<p>Hallo {html_lib.escape(display_name or 'Löwe')},</p>"
+        "<p>dein Konto auf der Website von <strong>THE LION SQUAD eSports</strong> wurde gesperrt. Anmelden ist damit nicht mehr möglich.</p>"
+        f"<p><strong>Grund:</strong> {reason_html}</p>"
+        f"{contact}",
+    )
+
+
 # Turnier-Anmeldung (#1133): eingegangen (wartet auf Freigabe oder Warteliste), bestätigt (auch beim Nachrücken) und
 # abgelehnt. `detail` ist ein fertiger Satz aus services/registration_notifications - etwa der Check-in-Hinweis.
 def tpl_registration_received(tournament_title: str, url: str, detail: str = "") -> tuple[str, str]:
@@ -553,6 +567,7 @@ async def send_template(
         "email_verification": tpl_email_verification,
         "password_reset": tpl_password_reset,
         "user_invite": tpl_user_invite,
+        "account_banned": tpl_account_banned,
         "registration_received": tpl_registration_received,
         "registration_approved": tpl_registration_approved,
         "registration_rejected": tpl_registration_rejected,
