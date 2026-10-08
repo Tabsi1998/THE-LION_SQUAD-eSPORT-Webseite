@@ -9,7 +9,7 @@ Jede Ereignisart hat eine Regel, einstellbar unter Verbindungen → Discord → 
 - ``main_only`` (Vorgabe ohne Spielbezug und für alles Private): nur der Hauptserver.
 
 Spielbezug: Turnier → Spiel, Live-Stream → Turnier → Spiel, Fast-Lap-Challenge → Spiel; Events und News, sobald
-sie ein Spiel tragen. Der Spielserver kommt aus ``discord_guilds.guild_for_game`` (eigener Server, der des
+sie ein Spiel tragen. Der Spielserver kommt aus ``discord_guild_store.guild_for_game`` (eigener Server, der des
 Hauptspiels, sonst der Hauptserver). Ist er aus, verlassen oder ohne Kanal für das Ziel, geht die Meldung voll an
 den Hauptserver - Server → Server in derselben Sichtbarkeit, nie privat → öffentlich. Scheitert bei „+ Querverweis“
 der Versand am Spielserver, geht die Meldung ebenfalls voll an den Hauptserver statt eines Verweises ins Leere.
@@ -53,7 +53,7 @@ async def game_of(db, item: dict | None) -> dict | None:
     game_id = (item or {}).get("game_id")
     if not game_id:
         return None
-    from services.discord_guilds import GAME_FIELDS
+    from services.discord_guild_store import GAME_FIELDS
 
     return await db.games.find_one({"id": game_id}, GAME_FIELDS)
 
@@ -62,7 +62,7 @@ async def plan(db, cfg: dict, event_key: str, item: dict | None, target: str) ->
     """Wohin diese Meldung geht. ``game``: der Spielserver (Eintrag), der sie voll bekommt, oder None; ``main``:
     "full", "crossref" oder None; ``reason``: warum es beim Hauptserver bleibt."""
     from discord_service import PRIVATE_TARGETS, resolve_target
-    from services.discord_guilds import guild_for_game
+    from services.discord_guild_store import guild_for_game
 
     rule = rule_for(cfg, event_key)
     out = {"rule": rule, "game": None, "main": "full", "game_name": None, "reason": None}
@@ -124,7 +124,7 @@ def preview_text(rule: str, target_label: str, example: dict | None) -> str:
 
 async def routing_example(db) -> dict | None:
     """Ein Spiel mit eigenem, eingeschaltetem Server - für die Vorschau „geht an: …“."""
-    from services.discord_guilds import GAME_FIELDS, guild_for_game
+    from services.discord_guild_store import GAME_FIELDS, guild_for_game
 
     async for game in db.games.find({"discord_guild_id": {"$nin": [None, ""]}}, GAME_FIELDS):
         row = await guild_for_game(db, game)

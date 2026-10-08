@@ -27,10 +27,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta
 
 from models import now_utc
+from services.bracket_common import DONE, LIVE, TABLE_STAGE_TYPES, VIENNA, _dt, _safe_int, _score, round_label, section_label
 
 logger = logging.getLogger("tls.discord.bracket")
 
@@ -43,13 +43,7 @@ MAX_FIELDS = 12
 FIELD_LIMIT = 1000
 TOTAL_LIMIT = 5500
 TOP_TABLE = 8
-DONE = {"completed", "forfeit"}
-LIVE = {"live", "in_progress", "running"}
-TABLE_STAGE_TYPES = {"round_robin_groups", "round_robin", "league", "swiss"}
 FINAL_STATUSES = {"completed", "results_published", "archived"}
-SECTION_LABELS = {"wb": "Winner Bracket", "winner": "Winner Bracket", "main": "", "lb": "Loser Bracket", "loser": "Loser Bracket",
-                  "gf": "Grand Final", "grand_final": "Grand Final", "final": "Finale", "bronze": "Spiel um Platz 3"}
-VIENNA = ZoneInfo("Europe/Vienna")
 _dirty: dict[str, bool] = {}   # Turnier-ID → letzte Fassung („Endstand“) gewünscht
 
 
@@ -60,51 +54,6 @@ def request_refresh(tournament_id: str, *, final: bool = False) -> None:
 
 def pending() -> dict[str, bool]:
     return dict(_dirty)
-
-
-def _dt(value) -> datetime | None:
-    if not value:
-        return None
-    try:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
-
-
-def _safe_int(value, default: int = 0) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def section_label(section) -> str:
-    key = str(section or "").strip()
-    if not key:
-        return ""
-    if key.lower() in SECTION_LABELS:
-        return SECTION_LABELS[key.lower()]
-    if key.lower().startswith("group_"):
-        return f"Gruppe {key[6:].upper()}"
-    return key
-
-
-def round_label(match: dict) -> str:
-    name = str(match.get("round_name") or "").strip()
-    if name:
-        return name.replace("Round ", "Runde ").replace("Bronze Match", "Spiel um Platz 3")
-    number = _safe_int(match.get("round"))
-    return f"Runde {number}" if number else "Runde"
-
-
-def _score(result: dict | None):
-    if not result:
-        return None
-    for key in ("score", "points"):
-        if result.get(key) is not None:
-            return result[key]
-    return None
 
 
 def match_line(match: dict, names: dict[str, str]) -> str:

@@ -47,7 +47,7 @@ def names_of(registrations: list[dict]) -> dict[str, str]:
 def bracket_sections(matches: list[dict], stages: list[dict]) -> list[dict]:
     """Die K.-o.-Abschnitte in Reihenfolge der Phasen: ``[{"label", "rounds": [[Partie, …], …]}]`` - ohne
     Tabellenphasen und Vorschauen, je Runde nach ``order`` sortiert."""
-    from services.discord_bracket import TABLE_STAGE_TYPES, _safe_int, section_label
+    from services.bracket_common import TABLE_STAGE_TYPES, _safe_int, section_label
 
     stages_by_id = {stage.get("id"): stage for stage in stages if stage.get("id")}
     table_ids = {stage_id for stage_id, stage in stages_by_id.items() if str(stage.get("stage_type") or "") in TABLE_STAGE_TYPES}
@@ -92,7 +92,7 @@ def positions(counts: list[int]) -> list[list[float]]:
 
 def _slots(match: dict, names: dict[str, str]) -> list[dict]:
     """Beide Zeilen einer Karte: Name, Ergebnis, ob Sieger, ob leer - wie ``match_line`` in der Einbettung."""
-    from services.discord_bracket import DONE, _safe_int, _score
+    from services.bracket_common import DONE, _safe_int, _score
 
     slots = sorted(match.get("slots") or [], key=lambda slot: _safe_int(slot.get("position"), 999))[:2]
     while len(slots) < 2:
@@ -115,7 +115,7 @@ def _slots(match: dict, names: dict[str, str]) -> list[dict]:
 
 def _note(match: dict) -> str:
     """Die kleine Zeile unter der Karte: kampflos, live oder der Termin (Wiener Zeit)."""
-    from services.discord_bracket import LIVE, VIENNA, _dt
+    from services.bracket_common import LIVE, VIENNA, _dt
 
     status = str(match.get("status") or "").lower()
     if status == "forfeit":
@@ -138,7 +138,7 @@ def render(tournament: dict, matches: list[dict], stages: list[dict], registrati
            now: datetime | None = None) -> bytes | None:
     """Das Bracket als PNG - oder None (keine K.-o.-Phase, zu groß)."""
     from services.achievement_share import _ellipsis, _font
-    from services.discord_bracket import VIENNA, round_label
+    from services.bracket_common import VIENNA, round_label
 
     sections = bracket_sections(matches, stages)
     if not sections or any(len(round_matches) > MAX_ROUND_MATCHES for section in sections for round_matches in section["rounds"]):
@@ -183,7 +183,7 @@ def render(tournament: dict, matches: list[dict], stages: list[dict], registrati
 
 def _card(draw: ImageDraw.ImageDraw, match: dict, names: dict[str, str], x: float, y: float, *, fonts: tuple) -> None:
     from services.achievement_share import _ellipsis
-    from services.discord_bracket import DONE, LIVE
+    from services.bracket_common import DONE, LIVE
 
     name_font, name_bold, small = fonts
     status = str(match.get("status") or "").lower()

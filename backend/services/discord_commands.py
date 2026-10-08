@@ -202,7 +202,7 @@ async def server_scope(db, guild_id=None, *, game: str | None = None, everything
     """Welche Spiele eine Antwort zeigt (#630): am Hauptserver alles, auf einem eingeschalteten Spielserver nur seine Spiele
     (eigene und geerbte, wie im Reiter „Server“). ``spiel`` überschreibt das (samt Editionen), ``alle`` zeigt alles.
     ``games`` None heißt: kein Filter."""
-    from services.discord_guilds import COLLECTION, games_by_guild
+    from services.discord_guild_store import COLLECTION, games_by_guild
 
     if game:
         picked = await find_game(db, game)
@@ -272,7 +272,7 @@ async def answer_naechstes_event(db, guild_id=None, spiel: str | None = None, al
 async def server_status_lines(db, guild_id=None) -> list[str]:
     """Für ``/status`` (#630): welcher Server das ist, seine Spiele, Kanalziele und die letzte Aktualisierung der Einbettungen."""
     from discord_service import _get_discord_config
-    from services.discord_guilds import COLLECTION, games_by_guild
+    from services.discord_guild_store import COLLECTION, games_by_guild
 
     row = await db[COLLECTION].find_one({"guild_id": str(guild_id or "")}, {"_id": 0}) if guild_id else None
     if not row:

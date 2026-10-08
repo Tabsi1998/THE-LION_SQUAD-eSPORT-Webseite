@@ -779,7 +779,7 @@ class BotRunner:
         client, tree = self._client, self._tree
         if client is None or tree is None or not self.connected:
             return {"ok": False, "reason": "bot_offline", "registered": [], "removed": [], "errors": []}
-        from services.discord_guilds import COLLECTION
+        from services.discord_guild_store import COLLECTION
 
         db = get_db()
         fields = {"_id": 0, "guild_id": 1, "role": 1, "enabled": 1, "left_at": 1, "commands_at": 1}

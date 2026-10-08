@@ -179,7 +179,7 @@ async def targets(db, doc: dict) -> tuple[bool, dict | None]:
     """Wohin der Termin gehört (#628): an den Server des Spiels, wenn es einen eigenen gibt - und am Hauptserver,
     solange dieser Server „Termine auch am Hauptserver“ nicht ausgeschaltet hat. Ohne eigenen Server und für alles,
     was nicht öffentlich ist, nur der Hauptserver."""
-    from services.discord_guilds import GAME_FIELDS, guild_for_game
+    from services.discord_guild_store import GAME_FIELDS, guild_for_game
 
     if not doc.get("game_id") or (doc.get("visibility") or "public") != "public":
         return True, None
@@ -332,7 +332,7 @@ async def scheduled_status(db) -> dict:
                     by_guild[guild_id] = by_guild.get(guild_id, 0) + 1
     cfg["by_guild"] = by_guild
     # Je eingeschaltetem Unterserver: Name, wie viele Termine dort stehen, ob sie auch am Hauptserver stehen.
-    from services.discord_guilds import COLLECTION
+    from services.discord_guild_store import COLLECTION
 
     rows = await db[COLLECTION].find({"role": "sub", "enabled": True, "left_at": None}, {"_id": 0, "guild_id": 1, "name": 1, "mirror_events": 1}).to_list(200)
     cfg["servers"] = [{"guild_id": row["guild_id"], "name": row.get("name") or row["guild_id"], "active": by_guild.get(row["guild_id"], 0),

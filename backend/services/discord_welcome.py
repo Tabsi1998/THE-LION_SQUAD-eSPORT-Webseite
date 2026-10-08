@@ -100,7 +100,7 @@ async def send_test(db, admin: dict, text: str | None = None) -> dict:
     """„An mich senden“: die Nachricht als Direktnachricht an das eigene verknüpfte Konto - zählt nicht, merkt nichts."""
     from discord_service import REASON_TEXTS
     from services.discord_bot import bot
-    from services.discord_dm import discord_link_id
+    from services.discord_dm_basics import discord_link_id
 
     discord_id = await discord_link_id(db, admin["id"])
     if not discord_id:

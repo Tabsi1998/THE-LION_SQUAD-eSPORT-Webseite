@@ -7,7 +7,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from auth import require_club_admin
 from database import get_db
-from services import discord_guilds
+from services import discord_guild_store, discord_guilds
 
 router = APIRouter(prefix="/api/settings/discord/guilds", tags=["discord-guilds"])
 
@@ -20,7 +20,7 @@ async def list_discord_guilds(me: dict = Depends(require_club_admin())):
     state = await read_state(db)
     guilds = await discord_guilds.list_guilds(db)
     # Umgekehrte Sicht (#626): welche Spiele auf diesem Server zu Hause sind - eigene und geerbte.
-    games = await discord_guilds.games_by_guild(db)
+    games = await discord_guild_store.games_by_guild(db)
     for row in guilds:
         row["games"] = games.get(row["guild_id"], [])
     return {"guilds": guilds, "connected": bot.connected_guild_ids() is not None,
