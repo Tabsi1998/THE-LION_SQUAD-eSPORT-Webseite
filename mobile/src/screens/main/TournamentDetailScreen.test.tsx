@@ -139,3 +139,32 @@ test("keine „Engine“-Kennzahl; abmelden ist ein leiser Link", async () => {
   expect(screen.getByTestId("tournament-unregister")).toHaveTextContent("Vom Turnier abmelden");
   expect(screen.queryByText("Abmeldung ist für diese Anmeldung aktuell nicht möglich.")).toBeNull();
 });
+
+// Klartext statt Kürzel (#1140): ein leerer Platz zeigt „Sieger aus A“ statt „W:A:1“, ein Setzplatz vor dem Start
+// „noch offen“ statt der nackten Zahl, und statt „Zeit noch offen“ steht „geplant ca. 15:20 · 30 Minuten“.
+test("leere Plätze im Klartext, geplante Zeit mit Dauer", async () => {
+  jest.useFakeTimers({ now: new Date("2026-10-10T08:00:00Z"), doNotFake: ["nextTick", "setImmediate"] });
+  try {
+    const matches = [
+      { id: "m-a", match_key: "A", stage_id: "s1", status: "completed", slots: [{ slot: 1 }, { slot: 2 }], settings: { match_size: 2, qualifiers_per_match: 1 } },
+      { id: "m-f", match_key: "F", stage_id: "s1", status: "scheduled", scheduled_at: "2026-10-10T13:20:00Z", duration_minutes: 30,
+        slots: [{ slot: 1, status: "pending", source: { raw: "W:A:1" } }, { slot: 2, status: "preview", source: { type: "seed", seed: 7, raw: "7" } }] },
+    ];
+    mockGet.mockImplementation((path: string) => {
+      if (path === "/tournaments/cup") return Promise.resolve({ data: { ...TOURNAMENT, event_gate: null, status: "live" } });
+      if (path.endsWith("/bracket")) return Promise.resolve({ data: { matches_v2: matches, registrations: [] } });
+      return Promise.resolve({ data: [] });
+    });
+    await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("match-card-m-f")).toBeTruthy());
+    const card = screen.getByTestId("match-card-m-f");
+    expect(card).toHaveTextContent(/Sieger aus A/);
+    expect(card).toHaveTextContent(/noch offen/);
+    expect(card).toHaveTextContent(/geplant ca\. 15:20 · 30 Minuten/);
+    expect(card).not.toHaveTextContent(/W:A:1/);
+    expect(screen.queryByText("7")).toBeNull();
+    expect(screen.queryByText("Zeit noch offen")).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
+});

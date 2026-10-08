@@ -1,5 +1,6 @@
 // Klartext statt Platzhalter (#1113): Sieger, Verlierer, Platz, Setzplatz, Freilos - und die Kürzel.
 import { absoluteRank, describeSlot, finderFor, initials, normalizeSource, plannedText, sourceLabel, stationLabel } from "./slotSource";
+import sharedCases from "./slotSource.cases.json";
 
 const duel = (key, extra = {}) => ({ id: key, match_key: key, stage_id: "s1", slots: [{}, {}], settings: { match_size: 2, qualifiers_per_match: 1 }, ...extra });
 const heat = (key, size = 4, qualifiers = 2) => ({ id: key, match_key: key, stage_id: "s1", slots: Array.from({ length: size }, () => ({})), settings: { match_size: size, qualifiers_per_match: qualifiers } });
@@ -77,4 +78,18 @@ test("Zeit und Dauer im Klartext, Station mit Wort", () => {
   expect(stationLabel({ station_label: "1" })).toBe("Station 1");
   expect(stationLabel({ station_name: "Station B" })).toBe("Station B");
   expect(stationLabel({})).toBe("");
+});
+
+// Dieselben Fälle prüft die App (#1140, mobile/src/lib/slotSource.test.ts) - beide lesen slotSource.cases.json.
+describe("gemeinsame Fälle mit der App", () => {
+  const nameOf = (id) => ({ r1: "NeonFalke" }[id] || "");
+  test.each(sharedCases.sourceLabel)("Herkunft: $name", ({ set, stage, source, text }) => {
+    expect(sourceLabel(source, finderFor(sharedCases.matchSets[set])({ stage_id: stage }))).toBe(text);
+  });
+  test.each(sharedCases.describeSlot)("Platz: $name", ({ set, slot, result }) => {
+    expect(describeSlot(slot, nameOf, finderFor(sharedCases.matchSets[set])({ stage_id: "s1" }))).toEqual(result);
+  });
+  test.each(sharedCases.plannedText)("Zeit: $name", ({ match, now, text }) => {
+    expect(plannedText(match, new Date(now))).toBe(text);
+  });
 });

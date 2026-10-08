@@ -13,7 +13,9 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
-import { formatDate, formatDateTime, formatStatus, formatTournamentFormat } from "../../lib/format";
+import { formatDate, formatDateTime, formatStatus, formatTournamentFormat, formatWhen } from "../../lib/format";
+import { stationText } from "../../lib/matchText";
+import { describeSlot, finderFor, isMatchDone, plannedText } from "../../lib/slotSource";
 import { getRegistrationState } from "../../lib/registration";
 import { TeamDayCard } from "../../components/tournament/TeamDayCard";
 import { ResultShareCard } from "../../components/ResultShareCard";
@@ -139,6 +141,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     return map;
   }, [registrations]);
   const allMatches = bracket.matches_v2 || [];
+  const matchFinder = useMemo(() => finderFor(allMatches), [allMatches]);
   const upcomingMatches = useMemo(() => {
     const open = allMatches.filter((match) => OPEN_MATCH_STATUSES.has(String(match.status || "")));
     if (!ownRegistration?.id) return open.slice(0, 5);
@@ -255,6 +258,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   ].filter(Boolean);
 
   return (
+    <MatchFinderContext.Provider value={matchFinder}>
     <Screen padded={false}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
@@ -481,6 +485,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
         onSubmit={register}
       />
     </Screen>
+    </MatchFinderContext.Provider>
   );
 }
 
@@ -771,19 +776,32 @@ function StandingRow({ standing, index }: { standing: any; index: number }) {
   );
 }
 
+// Spiel-Kürzel gelten je Phase (#1140): die Karte sucht das Herkunftsspiel eines leeren Platzes über diese Suche.
+const MatchFinderContext = React.createContext(finderFor([]));
+
 function MatchCard({ match, regMap, compact = false, onPress }: { match: any; regMap: Map<string, any>; compact?: boolean; onPress?: () => void }) {
+  const finder = React.useContext(MatchFinderContext);
+  const findMatch = finder(match);
+  const nameOf = (registrationId: string) => participantLabel(regMap.get(registrationId));
+  // Klartext statt Kürzel (#1140): Name, „Freilos“, „Sieger aus A“ - ein Setzplatz vor dem Start „noch offen“.
+  const label = (slot: any) => {
+    const view = describeSlot(slot, nameOf, findMatch);
+    return view.label || (view.kind === "player" ? "Teilnehmer" : "noch offen");
+  };
   const rows = match.slots?.length
     ? match.slots.map((slot: any) => {
-        const reg = regMap.get(slot.registration_id);
         const result = (match.results || []).find((item: any) => item.registration_id === slot.registration_id);
-        return { id: slot.slot || slot.registration_id, label: participantLabel(reg) || slot.source?.raw || "Offen", score: result?.score ?? result?.points, rank: result?.rank, winner: result?.rank === 1 || result?.qualified };
+        return { id: slot.slot || slot.registration_id, label: label(slot), score: result?.score ?? result?.points, rank: result?.rank, winner: result?.rank === 1 || result?.qualified };
       })
     : [
-        { id: "a", label: participantLabel(regMap.get(match.participant_a_id)) || "Offen", score: match.score_a, winner: match.winner_id && match.winner_id === match.participant_a_id },
-        { id: "b", label: participantLabel(regMap.get(match.participant_b_id)) || "Offen", score: match.score_b, winner: match.winner_id && match.winner_id === match.participant_b_id },
+        { id: "a", label: label({ registration_id: match.participant_a_id }), score: match.score_a, winner: match.winner_id && match.winner_id === match.participant_a_id },
+        { id: "b", label: label({ registration_id: match.participant_b_id }), score: match.score_b, winner: match.winner_id && match.winner_id === match.participant_b_id },
       ];
+  // „geplant ca. 15:20 · 30 Minuten“ statt „Zeit noch offen“ (#1140); ein fertiges Spiel nennt, wann es war.
+  const when = plannedText(match) || (isMatchDone(match) && match.scheduled_at ? formatWhen(match.scheduled_at) : "");
+  const station = stationText(match);
   const content = (
-    <View style={[styles.matchCard, compact && styles.matchCardCompact]}>
+    <View style={[styles.matchCard, compact && styles.matchCardCompact]} testID={`match-card-${match.id}`}>
       <View style={styles.matchHead}>
         <Muted style={styles.matchKey}>{match.match_key || match.round_name || "Match"}</Muted>
         <Muted style={styles.status}>{formatStatus(match.status)}</Muted>
@@ -795,8 +813,8 @@ function MatchCard({ match, regMap, compact = false, onPress }: { match: any; re
         </View>
       ))}
       <View style={styles.matchMeta}>
-        {match.scheduled_at ? <Muted>{formatDateTime(match.scheduled_at)}</Muted> : <Muted>Zeit noch offen</Muted>}
-        {match.station_label || match.station_name ? <Muted style={styles.textCyan}>{match.station_label || match.station_name}</Muted> : null}
+        <Muted>{when || "Zeit noch offen"}</Muted>
+        {station ? <Muted style={styles.textCyan}>{station}</Muted> : null}
       </View>
     </View>
   );
