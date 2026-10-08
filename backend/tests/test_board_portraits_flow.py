@@ -72,7 +72,8 @@ async def test_upload_recognises_cutout_portraits(flow):
     # Ein JPG hat keine Deckkraft-Ebene - nie freigestellt.
     buffer = io.BytesIO()
     Image.new("RGB", (40, 40), (0, 0, 0)).save(buffer, format="JPEG")
-    assert photo_cutout.is_cutout(Image.open(io.BytesIO(buffer.getvalue()))) is False
+    jpg = Image.open(io.BytesIO(buffer.getvalue()))
+    assert photo_cutout.is_cutout(jpg) is False
 
 
 @pytest.mark.asyncio

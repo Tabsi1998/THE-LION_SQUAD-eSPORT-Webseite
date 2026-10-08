@@ -100,7 +100,8 @@ async def test_texts_are_editable_by_content_and_dolibarr_wins_for_founding_and_
 
     # Nur die Redaktion (Bereich Content) darf schreiben.
     flow.act_as(await flow.add_user(role="player"))
-    assert (await flow.put("/api/home/about/admin", json={"hero_title": "x"})).status_code == 403
+    changed = await flow.put("/api/home/about/admin", json={"hero_title": "x"})
+    assert changed.status_code == 403
     assert (await flow.get("/api/home/about/admin")).status_code == 403
 
 
