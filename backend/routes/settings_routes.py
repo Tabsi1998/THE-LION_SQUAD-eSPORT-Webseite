@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import httpx
 
 from database import get_db
-from auth import require_admin, require_club_admin, require_super, get_current_user, get_optional_user, require_area
+from auth import require_club_admin, require_super, get_current_user, get_optional_user, require_area
 from services.public_site_settings import PUBLIC_LEGAL_SOURCE_FIELDS, build_public_legal_settings
 from services.auth_settings import is_google_client_id, load_auth_settings
 from services.rate_limit import enforce_rate_limit
