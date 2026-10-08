@@ -13,6 +13,7 @@ from auth import get_current_user, get_optional_user
 from database import get_db
 from models import new_id, now_utc
 from services import achievement_counters as counters
+from services.log_safe import log_safe
 from services.rate_limit import enforce_rate_limit
 
 router = APIRouter(tags=["achievement-signals"])
@@ -62,7 +63,7 @@ async def post_signals(body: SignalBatch, request: Request, me: dict = Depends(g
             from badges import evaluate_user_progress
             newly = int(await evaluate_user_progress(me["id"], {"signal"}, legacy=False) or 0)
         except Exception:  # noqa: BLE001 - die Zählung steht; ausgewertet wird dann über die Warteschlange
-            logger.warning("[achievements] signal evaluation failed for %s", me["id"], exc_info=True)
+            logger.warning("[achievements] signal evaluation failed for %s", log_safe(me["id"]), exc_info=True)
             from services.achievement_queue import request_evaluation
             await request_evaluation([me["id"]], f"signals:{','.join(accepted)}"[:120], sources={"signal"})
     return {"results": results, "accepted": sum(1 for row in results if row.get("accepted")), "newly_awarded": newly}
