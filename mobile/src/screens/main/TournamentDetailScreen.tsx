@@ -13,7 +13,9 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
-import { formatDate, formatDateTime, formatStatus, formatTournamentFormat } from "../../lib/format";
+import { formatDate, formatDateTime, formatStatus, formatTournamentFormat, formatWhen } from "../../lib/format";
+import { stationText } from "../../lib/matchText";
+import { describeSlot, finderFor, isMatchDone, plannedText } from "../../lib/slotSource";
 import { getRegistrationState } from "../../lib/registration";
 import { TeamDayCard } from "../../components/tournament/TeamDayCard";
 import { ResultShareCard } from "../../components/ResultShareCard";
@@ -120,7 +122,13 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const eventGate = tournament?.event_gate || null;
   const eventBlocked = Boolean(eventGate && !isTeamTournament && !eventGate.registered);
   const canSelfRegister = Boolean(!guest && !registered && registration.canRegister && !clubMemberBlocked && !eventBlocked);
-  const canCheckIn = Boolean(canManageOwnRegistration && ownRegistration?.status === "approved" && tournament?.status === "check_in");
+  // Vor Ort checkt die Turnierleitung ein (#1135) - wie im Web: kein Knopf, sondern der Hinweis mit dem Zeitfenster.
+  const staffOnlyCheckIn = String(tournament?.event_mode || "online") === "local";
+  const canCheckIn = Boolean(!staffOnlyCheckIn && canManageOwnRegistration && ownRegistration?.status === "approved" && tournament?.status === "check_in");
+  const checkInWindow = [
+    tournament?.check_in_from ? `ab ${formatDateTime(tournament.check_in_from)}` : "",
+    tournament?.check_in_until ? `bis ${formatDateTime(tournament.check_in_until)}` : "",
+  ].filter(Boolean).join(" ");
   const canSelfUnregister = Boolean(
     registered &&
       canManageOwnRegistration &&
@@ -133,6 +141,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     return map;
   }, [registrations]);
   const allMatches = bracket.matches_v2 || [];
+  const matchFinder = useMemo(() => finderFor(allMatches), [allMatches]);
   const upcomingMatches = useMemo(() => {
     const open = allMatches.filter((match) => OPEN_MATCH_STATUSES.has(String(match.status || "")));
     if (!ownRegistration?.id) return open.slice(0, 5);
@@ -249,6 +258,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   ].filter(Boolean);
 
   return (
+    <MatchFinderContext.Provider value={matchFinder}>
     <Screen padded={false}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
@@ -325,12 +335,21 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                     {!ownRegistration?.price && tournament.offer && ownRegistration?.user_id === user?.id && ["pending", "waitlist"].includes(String(ownRegistration?.status || "")) ? (
                       <Muted>Bezahlt wird erst, wenn deine Teilnahme bestätigt ist.</Muted>
                     ) : null}
-                    {canCheckIn ? <Button label={busy ? "Check-in läuft ..." : "Jetzt einchecken"} onPress={checkIn} disabled={busy} /> : null}
+                    {canCheckIn ? <Button label={busy ? "Check-in läuft ..." : "Jetzt einchecken"} onPress={checkIn} disabled={busy} testID="tournament-checkin" /> : null}
+                    {staffOnlyCheckIn && (tournament.check_in_from || tournament.check_in_until) && ["approved", "checked_in"].includes(String(ownRegistration?.status || "")) ? (
+                      <Muted style={styles.checkInHint} testID="tournament-checkin-local">
+                        {ownRegistration?.status === "checked_in"
+                          ? "Eingecheckt – die Turnierleitung hat dich vor Ort eingetragen."
+                          : `Check-in vor Ort bei der Turnierleitung${checkInWindow ? ` · ${checkInWindow}` : ""}`}
+                      </Muted>
+                    ) : null}
+                    {/* „Vom Turnier abmelden“ als leiser Link (#1139) - wie im Web, nicht als zweiter großer Knopf. Ist es
+                        nicht mehr möglich, steht dazu kein eigener Satz mehr. */}
                     {canSelfUnregister ? (
-                      <Button label={busy ? "Wird abgemeldet ..." : "Vom Turnier abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
-                    ) : (
-                      <Muted>Abmeldung ist für diese Anmeldung aktuell nicht möglich.</Muted>
-                    )}
+                      <Pressable onPress={unregister} disabled={busy} hitSlop={10} accessibilityRole="button" testID="tournament-unregister" style={styles.quietLink}>
+                        <Muted style={styles.quietLinkText}>{busy ? "Wird abgemeldet ..." : "Vom Turnier abmelden"}</Muted>
+                      </Pressable>
+                    ) : null}
                   </>
                 ) : eventBlocked && eventGate && registration.canRegister && !clubMemberBlocked ? (
                   <Button label="Zuerst beim Event anmelden" onPress={() => navigation.navigate("EventDetail", { id: eventGate.event.slug || eventGate.event.id })} testID="tournament-event-first" />
@@ -350,7 +369,6 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
               <View style={styles.statGrid}>
                 <Stat label="Matches" value={String(allMatches.length)} />
                 <Stat label="Spieler" value={String(registrations.length || tournament.participant_count || 0)} tone="gold" />
-                <Stat label="Engine" value={bracket.engine || "—"} />
               </View>
               <Info label="Event" value={tournament.event?.name || "-"} />
               <Info label="Ort" value={tournament.event?.location || "-"} />
@@ -467,6 +485,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
         onSubmit={register}
       />
     </Screen>
+    </MatchFinderContext.Provider>
   );
 }
 
@@ -757,19 +776,32 @@ function StandingRow({ standing, index }: { standing: any; index: number }) {
   );
 }
 
+// Spiel-Kürzel gelten je Phase (#1140): die Karte sucht das Herkunftsspiel eines leeren Platzes über diese Suche.
+const MatchFinderContext = React.createContext(finderFor([]));
+
 function MatchCard({ match, regMap, compact = false, onPress }: { match: any; regMap: Map<string, any>; compact?: boolean; onPress?: () => void }) {
+  const finder = React.useContext(MatchFinderContext);
+  const findMatch = finder(match);
+  const nameOf = (registrationId: string) => participantLabel(regMap.get(registrationId));
+  // Klartext statt Kürzel (#1140): Name, „Freilos“, „Sieger aus A“ - ein Setzplatz vor dem Start „noch offen“.
+  const label = (slot: any) => {
+    const view = describeSlot(slot, nameOf, findMatch);
+    return view.label || (view.kind === "player" ? "Teilnehmer" : "noch offen");
+  };
   const rows = match.slots?.length
     ? match.slots.map((slot: any) => {
-        const reg = regMap.get(slot.registration_id);
         const result = (match.results || []).find((item: any) => item.registration_id === slot.registration_id);
-        return { id: slot.slot || slot.registration_id, label: participantLabel(reg) || slot.source?.raw || "Offen", score: result?.score ?? result?.points, rank: result?.rank, winner: result?.rank === 1 || result?.qualified };
+        return { id: slot.slot || slot.registration_id, label: label(slot), score: result?.score ?? result?.points, rank: result?.rank, winner: result?.rank === 1 || result?.qualified };
       })
     : [
-        { id: "a", label: participantLabel(regMap.get(match.participant_a_id)) || "Offen", score: match.score_a, winner: match.winner_id && match.winner_id === match.participant_a_id },
-        { id: "b", label: participantLabel(regMap.get(match.participant_b_id)) || "Offen", score: match.score_b, winner: match.winner_id && match.winner_id === match.participant_b_id },
+        { id: "a", label: label({ registration_id: match.participant_a_id }), score: match.score_a, winner: match.winner_id && match.winner_id === match.participant_a_id },
+        { id: "b", label: label({ registration_id: match.participant_b_id }), score: match.score_b, winner: match.winner_id && match.winner_id === match.participant_b_id },
       ];
+  // „geplant ca. 15:20 · 30 Minuten“ statt „Zeit noch offen“ (#1140); ein fertiges Spiel nennt, wann es war.
+  const when = plannedText(match) || (isMatchDone(match) && match.scheduled_at ? formatWhen(match.scheduled_at) : "");
+  const station = stationText(match);
   const content = (
-    <View style={[styles.matchCard, compact && styles.matchCardCompact]}>
+    <View style={[styles.matchCard, compact && styles.matchCardCompact]} testID={`match-card-${match.id}`}>
       <View style={styles.matchHead}>
         <Muted style={styles.matchKey}>{match.match_key || match.round_name || "Match"}</Muted>
         <Muted style={styles.status}>{formatStatus(match.status)}</Muted>
@@ -781,8 +813,8 @@ function MatchCard({ match, regMap, compact = false, onPress }: { match: any; re
         </View>
       ))}
       <View style={styles.matchMeta}>
-        {match.scheduled_at ? <Muted>{formatDateTime(match.scheduled_at)}</Muted> : <Muted>Zeit noch offen</Muted>}
-        {match.station_label || match.station_name ? <Muted style={styles.textCyan}>{match.station_label || match.station_name}</Muted> : null}
+        <Muted>{when || "Zeit noch offen"}</Muted>
+        {station ? <Muted style={styles.textCyan}>{station}</Muted> : null}
       </View>
     </View>
   );
@@ -886,6 +918,22 @@ function Bullet({ text, accent }: { text: string; accent?: boolean }) {
 }
 
 const styles = StyleSheet.create({
+  quietLink: {
+    alignSelf: "flex-start",
+    paddingVertical: 4,
+  },
+  quietLinkText: {
+    textDecorationLine: "underline",
+  },
+  checkInHint: {
+    backgroundColor: "rgba(41,182,232,0.08)",
+    borderColor: "rgba(41,182,232,0.35)",
+    borderRadius: 8,
+    borderWidth: 1,
+    color: colors.white,
+    fontWeight: "800",
+    padding: 10,
+  },
   content: {
     gap: 14,
     padding: 18,

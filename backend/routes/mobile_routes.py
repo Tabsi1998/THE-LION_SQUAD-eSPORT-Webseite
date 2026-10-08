@@ -14,6 +14,8 @@ from pydantic import BaseModel, Field
 from auth import get_current_user, get_optional_user
 from database import get_db
 from models import new_id, now_utc
+from services.match_audience import acting_registration_ids
+from services.tournament_rules import self_checkin_allowed, tournament_event_mode
 from services.match_overview import operational_match_overviews, own_match_overviews
 from services.profile_references import personal_profile_references
 from services import event_days
@@ -42,6 +44,8 @@ class MobilePushTokenCreate(BaseModel):
     token: str = Field(min_length=20, max_length=300)
     platform: str | None = Field(default=None, max_length=40)
     device_name: str | None = Field(default=None, max_length=120)
+    # Welche Android-Kanäle die App angelegt hat (#1138) - ab 2 die fünf Themen-Kanäle.
+    channels: int | None = Field(default=None, ge=1, le=99)
 
 
 class MobileClientLogCreate(BaseModel):
@@ -199,6 +203,9 @@ def _public_user_registration(registration: dict | None) -> dict | None:
         "display_name": registration.get("display_name") or registration.get("ingame_name"),
         "ingame_name": registration.get("ingame_name"),
         "team_id": registration.get("team_id"),
+        # Darf diese Person für die Anmeldung handeln - einchecken, melden (#1136)? Wer angemeldet hat, bei Teams dazu
+        # Teamleitung und Co-Leitung. Ein einfaches Mitglied sieht das Turnier, bekommt aber keine Aufgabe dafür.
+        "can_act": bool(registration.get("can_act")),
         "created_at": registration.get("created_at"),
         "updated_at": registration.get("updated_at"),
     }
@@ -288,6 +295,9 @@ async def _compact_tournament(tournament: dict, user: dict | None, registration:
         "registration_open_until": tournament.get("registration_open_until"),
         "check_in_from": tournament.get("check_in_from"),
         "check_in_until": tournament.get("check_in_until"),
+        # Vor Ort checkt die Turnierleitung ein (#1135) - Startseite und App fragen dieselbe Regel wie der Server.
+        "event_mode": tournament_event_mode(tournament),
+        "self_checkin": self_checkin_allowed(tournament),
         "max_participants": tournament.get("max_participants"),
         "participant_count": participant_count,
         "game_name": tournament.get("game_name"),
@@ -431,31 +441,39 @@ async def _my_event_registrations(user: dict) -> list[dict]:
     ).sort("created_at", -1).to_list(200)
 
 
+def _vienna_time(value) -> str:
+    """„18:30“ in Wiener Zeit - an einem anderen Tag mit Datum („Sa 14.11. 18:30“)."""
+    moment = _parse_dt(value)
+    if not moment:
+        return ""
+    local = moment.astimezone(LOCAL_TZ)
+    if local.date() == now_utc().astimezone(LOCAL_TZ).date():
+        return local.strftime("%H:%M")
+    weekday = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")[local.weekday()]
+    return f"{weekday} {local.strftime('%d.%m. %H:%M')}"
+
+
 def _dashboard_actions(tournaments: list[dict], events: list[dict], matches: list[dict]) -> list[dict]:
     actions = []
     for tournament in tournaments:
         reg = tournament.get("my_registration") or {}
         phase = tournament.get("public_phase") or {}
-        if phase.get("state") == "check_in" and reg.get("status") in {"approved", "registered"}:
+        # Einchecken ist eine Aufgabe der Verantwortlichen (#1136) - nur sie sehen „Turnier Check-in offen“. Vor Ort
+        # checkt die Turnierleitung ein (#1135): dort steht statt der Aufforderung der Hinweis, sich zu melden.
+        if phase.get("state") == "check_in" and reg.get("status") in {"approved", "registered"} and reg.get("can_act"):
+            on_site = tournament.get("self_checkin") is False
+            until = _vienna_time(tournament.get("check_in_until"))
             actions.append({
                 "id": f"tournament-checkin-{tournament.get('id')}",
-                "type": "tournament_checkin",
-                "label": "Turnier Check-in offen",
-                "detail": tournament.get("title"),
+                "type": "tournament_checkin_onsite" if on_site else "tournament_checkin",
+                "label": "Check-in vor Ort" if on_site else "Turnier Check-in offen",
+                "detail": (f"{tournament.get('title')} · bei der Turnierleitung melden" + (f", bis {until}" if until else ""))
+                if on_site else tournament.get("title"),
                 "target_type": "tournament",
                 "target_id": tournament.get("slug") or tournament.get("id"),
                 "priority": 10,
             })
-        if reg.get("status") == "pending":
-            actions.append({
-                "id": f"tournament-pending-{tournament.get('id')}",
-                "type": "registration_pending",
-                "label": "Anmeldung wartet auf Freigabe",
-                "detail": tournament.get("title"),
-                "target_type": "tournament",
-                "target_id": tournament.get("slug") or tournament.get("id"),
-                "priority": 3,
-            })
+        # „Anmeldung wartet auf Freigabe“ ist keine Aufgabe (#1139) - den Stand zeigt der Termin selbst.
 
     for event in events:
         reg = event.get("own_registration") or {}
@@ -471,15 +489,21 @@ def _dashboard_actions(tournaments: list[dict], events: list[dict], matches: lis
                 "priority": 8,
             })
 
-    for match in matches[:4]:
+    # Matches stehen schon unter „Meine aktiven Matches“ (#1139) - eine Aktion gibt es nur, wenn etwas zu tun ist:
+    # das Ergebnis melden oder das der Gegenseite bestätigen (#1132).
+    for match in matches:
+        task = match.get("report_task")
+        if task not in {"report", "confirm"}:
+            continue
+        detail = " · ".join(part for part in (match.get("tournament_title"), f"gegen {match['opponent_name']}" if match.get("opponent_name") else "") if part)
         actions.append({
-            "id": f"match-{match.get('id')}",
-            "type": "match_open",
-            "label": "Match offen",
-            "detail": match.get("tournament_title") or match.get("round_name") or "Turniermatch",
+            "id": f"match-{task}-{match.get('id')}",
+            "type": f"match_{task}",
+            "label": "Ergebnis bestätigen" if task == "confirm" else "Ergebnis melden",
+            "detail": detail or "Turniermatch",
             "target_type": "match",
             "target_id": match.get("id"),
-            "priority": 7,
+            "priority": 9 if task == "confirm" else 7,
         })
     actions.sort(key=lambda item: int(item.get("priority") or 0), reverse=True)
     return actions[:8]
@@ -504,6 +528,8 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
     day_start = _start_of_local_day(now_utc())
     if user:
         tournament_regs = await _my_tournament_registrations(user)
+        acting_ids = await acting_registration_ids(db, tournament_regs, user.get("id"))
+        tournament_regs = [{**reg, "can_act": reg.get("id") in acting_ids} for reg in tournament_regs]
         tournament_ids = list({reg.get("tournament_id") for reg in tournament_regs if reg.get("tournament_id")})
         tournament_by_id = {
             tournament["id"]: tournament
@@ -784,6 +810,8 @@ async def register_mobile_push_token(body: MobilePushTokenCreate, user: dict = D
         raise HTTPException(status_code=400, detail="Ungültiger Expo Push Token")
     db = get_db()
     now = now_utc().isoformat()
+    # Die Kanäle des Geräts (#1138): eine ältere App meldet nichts und bekommt weiter die zwei alten Kanäle.
+    channel_set = {"channel_set": body.channels} if body.channels else {}
     await db.mobile_push_tokens.update_one(
         {"token": token},
         {
@@ -794,6 +822,7 @@ async def register_mobile_push_token(body: MobilePushTokenCreate, user: dict = D
                 "device_name": body.device_name,
                 "enabled": True,
                 "updated_at": now,
+                **channel_set,
             },
             "$setOnInsert": {"created_at": now},
         },

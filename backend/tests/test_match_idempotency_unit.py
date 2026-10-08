@@ -45,7 +45,7 @@ def test_dispute_exact_replay_skips_write_audit_and_badge(monkeypatch):
 
     monkeypatch.setattr(match_routes, "get_db", lambda: db)
     monkeypatch.setattr(match_routes, "_ensure_match_tournament_unlocked", AsyncMock())
-    monkeypatch.setattr(match_routes, "_user_registration_for_match", AsyncMock(return_value={"id": "reg-1"}))
+    monkeypatch.setattr(match_routes, "_acting_registration_for_match", AsyncMock(return_value={"id": "reg-1"}))
     monkeypatch.setattr(match_routes, "_audit_match_action", audit)
 
     result = asyncio.run(match_routes.dispute(

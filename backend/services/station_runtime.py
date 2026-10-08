@@ -5,8 +5,9 @@ from datetime import datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from match_rules import participant_source_ids
 from models import now_utc
+from services.match_audience import match_player_users
+from services.station_labels import station_text
 from services.notification_preferences import send_user_template
 from services.user_notifications import build_public_url, create_user_notification
 
@@ -54,20 +55,9 @@ async def match_label(db, match: dict) -> str:
 
 
 async def _participant_users(db, match: dict) -> list[dict]:
-    reg_ids = participant_source_ids(match)
-    if not reg_ids:
-        return []
-    regs = await db.tournament_registrations.find({"id": {"$in": reg_ids}}, {"_id": 0, "user_id": 1, "team_id": 1, "lineup": 1}).to_list(64)
-    # Aufruf an der Station (#1192): bei Teams die Aufgestellten, ohne Aufstellung alle Mitglieder - nicht nur, wer
-    # das Team angemeldet hat.
-    from services.team_lineup import registration_recipients
-    user_ids = sorted(await registration_recipients(db, regs))
-    if not user_ids:
-        return []
-    return await db.users.find(
-        {"id": {"$in": user_ids}, "is_banned": {"$ne": True}},
-        {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1},
-    ).to_list(64)
+    # Spiel-Hinweis (#1136, #1192): wer antritt - bei Teams die Aufgestellten, ohne Aufstellung jedes Mitglied, auch wenn
+    # die Turnierleitung nur das Team angemeldet hat.
+    return await match_player_users(db, match)
 
 
 async def notify_match_started(db, match: dict, station: dict, collection_name: str) -> int:
@@ -80,7 +70,8 @@ async def notify_match_started(db, match: dict, station: dict, collection_name: 
     ) or {}
     path = f"/matches/{match.get('id')}"
     absolute_url = await build_public_url(path)
-    station_name = station_label(station)
+    # Die Station im Klartext („Station 3 · Switch 2“, #1220) - nie die internen Notizen der Station.
+    station_name = station_text(station.get("name") or station.get("label"), station.get("device_type")) or "der Station"
     match_name = await match_label(db, match)
     when = format_de_datetime(match.get("started_at") or match.get("scheduled_at"))
     sent = 0

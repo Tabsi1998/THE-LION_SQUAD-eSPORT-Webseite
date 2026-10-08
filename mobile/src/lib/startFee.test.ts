@@ -27,9 +27,11 @@ test("Satz am Turnier: Solo nur die Summe, Team mit Teamgröße", () => {
 });
 
 test("eigener Preis: eingefroren, storniert oder bezahlt", () => {
-  expect(ownPriceLine({ total_cents: 1000, billing_status: "pending" })).toBe("Dein Startgeld: 10,00 € · die Rechnung kommt in dein Konto");
+  expect(ownPriceLine({ total_cents: 1000, billing_status: "pending" })).toBe("Dein Startgeld: 10,00 € · die Rechnung kommt in dein Konto unter „Meine Rechnungen“");
   expect(ownPriceLine({ total_cents: 1000, billing_status: "cancelled" })).toContain("storniert");
   expect(ownPriceLine({ total_cents: 1000, billing_status: "paid", invoice_ref: "FA2609-0007" })).toBe("Dein Startgeld: 10,00 € · Rechnung FA2609-0007 bezahlt – danke!");
-  expect(ownPriceLine({ total_cents: 1000, billing_status: "invoiced", invoice_ref: "FA2609-0007", invoice_status: "validated" })).toContain("offen");
+  // „Meine Rechnungen“ wie im Web (#1139) - „Meine Mitgliedschaft“ gibt es nur für Vereinsmitglieder.
+  expect(ownPriceLine({ total_cents: 1000, billing_status: "invoiced", invoice_ref: "FA2609-0007", invoice_status: "validated" }))
+    .toBe("Dein Startgeld: 10,00 € · Rechnung FA2609-0007 offen – unter „Meine Rechnungen“");
   expect(ownPriceLine(null)).toBe("");
 });

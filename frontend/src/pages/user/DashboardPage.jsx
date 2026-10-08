@@ -24,7 +24,8 @@ import { YearReviewBanner } from "@/components/tls/YearReviewBanner";
 // Die Daten kommen aus /api/mobile/dashboard - derselbe Endpunkt wie in der
 // App, damit beide dieselbe Logik haben (_still_relevant, Wiener Zeit).
 
-const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiting_result"]);
+// Ein Spiel in Klärung (#1134) bleibt sichtbar - beim Spieler als „In Klärung“, bei der Turnierleitung ganz oben.
+const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiting_result", "disputed"]);
 
 function DashboardAvatar({ user, isClubMember }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -365,16 +366,24 @@ function DashboardMatchCard({ match, staff = false, testId }) {
     stationText(match),
   ].filter(Boolean);
   const attention = Boolean(match.needs_result);
-  const action = staff && match.can_submit_result
-    ? "Ergebnis erfassen"
-    : attention
-      ? "Ergebnis öffnen"
-      : "Match öffnen";
+  // In Klärung (#1134): bei der Turnierleitung rot und ganz oben, beim Spieler „Wartet auf Entscheidung“.
+  const disputed = Boolean(match.disputed || match.status === "disputed");
+  const action = disputed
+    ? (staff ? "Dispute prüfen" : "Wartet auf Entscheidung")
+    : staff && match.can_submit_result
+      ? "Ergebnis erfassen"
+      : attention
+        ? "Ergebnis öffnen"
+        : "Match öffnen";
+  const tone = disputed
+    ? "border-[#FF3B30]/50 bg-[#FF3B30]/5 hover:border-[#FF3B30]"
+    : attention ? "border-[#FFD700]/45 bg-[#FFD700]/5 hover:border-[#FFD700]" : "border-white/10 hover:border-[#29B6E8]/60";
   return (
     <Link
       to={`/matches/${match.id}`}
       data-testid={testId}
-      className={`block border rounded-sm p-3 transition ${attention ? "border-[#FFD700]/45 bg-[#FFD700]/5 hover:border-[#FFD700]" : "border-white/10 hover:border-[#29B6E8]/60"}`}
+      data-disputed={disputed ? "1" : undefined}
+      className={`block border rounded-sm p-3 transition ${tone}`}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm text-white font-bold">{match.tournament_title || "Turniermatch"}</div>
@@ -382,7 +391,7 @@ function DashboardMatchCard({ match, staff = false, testId }) {
       </div>
       {details.length > 0 && <div className="text-xs text-white/50 mt-1">{details.join(" · ")}</div>}
       {match.scheduled_at && <div className="text-xs text-white/45 mt-1">{viennaDateTime(match.scheduled_at)}</div>}
-      <div className={`mt-2 text-[10px] font-bold uppercase tracking-wider ${attention ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{action}</div>
+      <div className={`mt-2 text-[10px] font-bold uppercase tracking-wider ${disputed ? "text-[#FF6B60]" : attention ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{action}</div>
     </Link>
   );
 }

@@ -9,6 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { effectiveRuleModes } from "@/lib/tournamentRulePresets";
 import { gameLabel } from "@/lib/gameLabels";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
 import { sortByNearestDate } from "@/lib/contentSort";
@@ -238,9 +239,8 @@ export default function AdminTournamentsPage() {
 }
 
 function RulePills({ tournament }) {
-  const eventMode = tournament.event_mode || (tournament.is_hybrid ? "hybrid" : tournament.is_online ? "online" : "online");
-  const resultMode = tournament.result_entry_mode || (eventMode === "local" ? "staff_only" : "player_confirmed");
-  const scheduleMode = tournament.schedule_mode || (eventMode === "local" ? "fixed_by_staff" : "player_proposal");
+  // Dieselbe Regel wie Server und Planungs-Warnung (#1132) - an einer Stelle: effectiveRuleModes.
+  const { event_mode: eventMode, result_entry_mode: resultMode, schedule_mode: scheduleMode } = effectiveRuleModes(tournament);
   return (
     <div className="flex flex-wrap gap-1.5">
       <RulePill label={EVENT_MODE_LABELS[eventMode] || eventMode} tone={eventMode === "local" ? "gold" : eventMode === "hybrid" ? "purple" : "cyan"} />

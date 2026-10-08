@@ -26,9 +26,9 @@ export const STREAM_PLATFORM_OPTIONS = [["", "—"], ["twitch", "Twitch"], ["you
 
 export const EVENT_MODE_OPTIONS = [["online", "Online"], ["local", "Vor Ort"], ["hybrid", "Hybrid"]];
 
-export const RESULT_ENTRY_MODE_OPTIONS = [["", "Automatisch passend"], ["staff_only", "Nur Turnierleitung"], ["player_confirmed", "Beide Parteien melden"], ["hybrid", "Hybrid"]];
+export const RESULT_ENTRY_MODE_OPTIONS = [["", "Automatisch (online melden Spieler, vor Ort die Turnierleitung)"], ["staff_only", "Nur Turnierleitung"], ["player_confirmed", "Beide Parteien melden"], ["hybrid", "Hybrid"]];
 
-export const SCHEDULE_MODE_OPTIONS = [["", "Automatisch passend"], ["fixed_by_staff", "Fix durch Turnierleitung"], ["player_proposal", "Teilnehmer schlagen vor"], ["hybrid", "Hybrid"]];
+export const SCHEDULE_MODE_OPTIONS = [["", "Automatisch (online abstimmen, vor Ort fix)"], ["fixed_by_staff", "Fix durch Turnierleitung"], ["player_proposal", "Teilnehmer schlagen vor"], ["hybrid", "Hybrid"]];
 
 export const TOURNAMENT_SEASON_WEIGHT_OPTIONS = [
   ["3", "Major - grosses Turnier (x3.00)"],

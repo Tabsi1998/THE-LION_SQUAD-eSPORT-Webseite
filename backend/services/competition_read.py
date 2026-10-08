@@ -123,6 +123,16 @@ async def load_matches_by_query(
     return adapt_stage_matches(stage)
 
 
+async def load_match_reports(db, match_ids: list[str]) -> dict[str, list[dict]]:
+    """Die Ergebnis-Meldungen der Spieler je Spiel (#1132) - sie gehören nicht in die allgemeine Spielform, weil die
+    öffentlichen Ansichten sie nicht zeigen. Die Startseite braucht sie für „Ergebnis bestätigen“."""
+    ids = sorted({match_id for match_id in match_ids if match_id})
+    if not ids:
+        return {}
+    rows = await db.matches_v2.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "reports": 1}).to_list(len(ids) + 10)
+    return {row["id"]: list(row.get("reports") or []) for row in rows if row.get("id")}
+
+
 async def count_matches_by_status(db, statuses: set[str]) -> int:
     """Count operational matches for dashboard surfaces."""
 

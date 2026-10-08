@@ -18,6 +18,8 @@ from services.match_v2_results import MatchV2ResultError
 
 
 FORFEIT_NOTE_MIN_LENGTH = 5
+# Ein Spiel in diesen Zuständen nimmt keine Meldungen mehr an: entschieden, abgesagt oder in Klärung (#1132).
+REPORT_CLOSED_STATUSES = {"completed", "forfeit", "cancelled", "disputed", "bye", "archived"}
 
 
 def filled_slots(match: dict) -> list[dict]:
@@ -69,21 +71,104 @@ def dispute_entry(user_id: str, reason: str) -> dict:
     return {"user_id": user_id, "reason": (reason or "").strip(), "at": now_utc().isoformat()}
 
 
-def report_entry(user_id: str, registration_id: str | None, results: list[dict]) -> dict:
-    return {
+def report_entry(user_id: str, registration_id: str | None, results: list[dict],
+                 proof_url: str | None = None, note: str | None = None) -> dict:
+    entry = {
         "user_id": user_id,
         "registration_id": registration_id,
         "results": results,
         "at": now_utc().isoformat(),
     }
+    # Beweis-Link und Notiz der Meldung sieht nur, wer gemeldet hat, und die Turnierleitung (match_public_view).
+    if (proof_url or "").strip():
+        entry["proof_url"] = proof_url.strip()
+    if (note or "").strip():
+        entry["note"] = note.strip()
+    return entry
+
+
+# Was von einer Meldung zählt und was die Gegenseite davon sieht: Plätze und Spielstand - keine Notiz, kein Link.
+REPORT_RESULT_FIELDS = ("registration_id", "rank", "score", "points", "time_ms", "dnf", "forfeit")
+
+
+def _number(value) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _ranking_signature(results: list[dict]) -> tuple:
-    """Compare two reports by who finished where, ignoring order and extras."""
+    """Zwei Meldungen sind gleich, wenn dieselben Teilnehmer auf denselben Plätzen stehen - und, wo einer gemeldet
+    ist, mit demselben Spielstand (#1132: „melden beide Seiten dasselbe“). Reihenfolge und Notizen zählen nicht."""
     return tuple(sorted(
-        (str(entry.get("registration_id") or ""), int(entry.get("rank") or 0))
+        (
+            str(entry.get("registration_id") or ""),
+            int(entry.get("rank") or 0),
+            _number(entry.get("score")),
+            _number(entry.get("points")),
+            _number(entry.get("time_ms")),
+            bool(entry.get("dnf")),
+            bool(entry.get("forfeit")),
+        )
         for entry in results or []
     ))
+
+
+def public_report_results(results: list[dict] | None) -> list[dict]:
+    """Eine Meldung so, wie die Gegenseite sie zum Bestätigen sieht: Plätze und Spielstand."""
+    rows = []
+    for entry in results or []:
+        row = {"registration_id": entry.get("registration_id"), "rank": entry.get("rank")}
+        for key in ("score", "points", "time_ms"):
+            if entry.get(key) is not None:
+                row[key] = entry[key]
+        for key in ("dnf", "forfeit"):
+            if entry.get(key):
+                row[key] = True
+        rows.append(row)
+    return rows
+
+
+def latest_reports(reports: list[dict] | None) -> dict[str, dict]:
+    """Je meldender Seite die letzte Meldung - wer sich korrigiert, dessen letzte zählt."""
+    latest: dict[str, dict] = {}
+    for report in reports or []:
+        key = report.get("registration_id") or report.get("user_id")
+        if key:
+            latest[key] = report
+    return latest
+
+
+def reports_conflict(reports: list[dict] | None) -> bool:
+    """Zwei Seiten haben gemeldet, und die Meldungen passen nicht zusammen."""
+    latest = latest_reports(reports)
+    return len(latest) >= 2 and len({_ranking_signature(item.get("results")) for item in latest.values()}) > 1
+
+
+def report_state(reports: list[dict] | None, registration_id: str | None) -> dict:
+    """Wo die Meldungen für eine Seite stehen (#1132):
+
+    - ``open``: noch niemand hat gemeldet,
+    - ``waiting``: die eigene Meldung ist da, die Gegenseite fehlt noch,
+    - ``confirm``: die Gegenseite hat gemeldet, die eigene fehlt - bitte bestätigen oder anders melden,
+    - ``conflict``: beide haben gemeldet, aber verschieden - die Turnierleitung entscheidet.
+    """
+    latest = latest_reports(reports)
+    mine = latest.get(registration_id) if registration_id else None
+    others = [item for key, item in latest.items() if key != registration_id]
+    if mine and others:
+        own = _ranking_signature(mine.get("results"))
+        status = "conflict" if any(_ranking_signature(item.get("results")) != own for item in others) else "agreed"
+    elif mine:
+        status = "waiting"
+    elif others:
+        status = "confirm"
+    else:
+        status = "open"
+    return {"status": status, "own": mine, "proposal": others[-1] if others and not mine else None}
 
 
 def is_duplicate_report(match: dict, user_id: str, results: list[dict]) -> bool:

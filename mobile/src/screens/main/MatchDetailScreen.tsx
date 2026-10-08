@@ -20,18 +20,25 @@ import { invalidateCache } from "../../lib/cache";
 import {
   continuesMessageGroup,
   formatChatTime,
-  formatDate,
   formatDateTime,
   formatEventMode,
   formatResultEntryMode,
   formatScheduleMode,
   formatStatus,
+  formatWhen,
 } from "../../lib/format";
+import { finishedMatchText, formatMatchKind, isMatchFinished, matchHeadline, slotName, stationText } from "../../lib/matchText";
+import { viennaWall, wallToIso } from "../../lib/dateChoice";
+import { DateTimeChooser } from "../../components/DateTimeChooser";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ChatMessage, Tournament } from "../../types";
 import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmentDrafts } from "../../components/ChatAttachments";
 import { MessageSticker, StickerButton, StickerPicker } from "../../components/ChatStickers";
+import { MatchReportCard, type ReportPayload, type ReportState } from "../../components/MatchReportCard";
+import { rankingMode } from "../../lib/matchReport";
+import { countdown, type MatchCall } from "../../lib/matchCall";
+import { asInstant, viennaTime } from "../../lib/vienna";
 import type { CatalogSticker } from "../../lib/stickers";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 
@@ -59,8 +66,12 @@ type ScheduleProposal = {
 
 type MatchPage = {
   acting_registration_id?: string | null;
+  allows_draw?: boolean;
   can_act?: boolean;
+  call?: MatchCall;
   can_dispute?: boolean;
+  dispute_until?: string | null;
+  in_dispute?: boolean;
   can_forfeit?: boolean;
   can_manage_schedule?: boolean;
   can_player_report_result?: boolean;
@@ -73,6 +84,7 @@ type MatchPage = {
   match?: any;
   matchday_label?: string;
   participants?: MatchParticipant[];
+  report_state?: ReportState;
   result_entry_mode?: "staff_only" | "player_confirmed" | "hybrid" | string;
   schedule_proposals?: ScheduleProposal[];
   schedule_mode?: "fixed_by_staff" | "player_proposal" | "hybrid" | string;
@@ -89,12 +101,13 @@ type V2ResultRow = {
   time_ms: string;
 };
 
+// Dieselben Wörter wie auf der Website (#1139, MatchPage.jsx).
 const scheduleLabels: Record<string, string> = {
   accepted: "Termin bestätigt",
   countered: "Gegenvorschlag",
-  declined: "Abgelehnt",
+  declined: "Vorschlag abgelehnt",
   escalated: "Turnierleitung nötig",
-  proposed: "Vorschlag offen",
+  proposed: "Terminvorschlag offen",
 };
 
 export function MatchDetailScreen({ navigation, route }: Props) {
@@ -111,8 +124,6 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const [counterAt, setCounterAt] = useState("");
   const [decisionNote, setDecisionNote] = useState("");
   const [message, setMessage] = useState("");
-  const [scoreA, setScoreA] = useState("");
-  const [scoreB, setScoreB] = useState("");
   const [proofUrl, setProofUrl] = useState("");
   const [resultNote, setResultNote] = useState("");
   const [disputeReason, setDisputeReason] = useState("");
@@ -141,15 +152,11 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         void markChatRead("match", route.params.id);
       }
       if (preserveDrafts) {
-        setProposalAt((current) => current || formatDateInput(match.scheduled_at));
-        setScoreA((current) => current || String(match.score_a ?? 0));
-        setScoreB((current) => current || String(match.score_b ?? 0));
+        setProposalAt((current) => current || viennaWall(match.scheduled_at));
         setForfeitWinnerId((current) => current || firstRegistrationId(nextPage?.participants));
         setV2Rows((current) => current.length ? current : buildV2Rows(nextPage));
       } else {
-        setProposalAt(formatDateInput(match.scheduled_at));
-        setScoreA(String(match.score_a ?? 0));
-        setScoreB(String(match.score_b ?? 0));
+        setProposalAt(viennaWall(match.scheduled_at));
         setForfeitWinnerId(firstRegistrationId(nextPage?.participants));
         setV2Rows(buildV2Rows(nextPage));
       }
@@ -167,8 +174,6 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setCounterAt("");
     setDecisionNote("");
     setMessage("");
-    setScoreA("");
-    setScoreB("");
     setProofUrl("");
     setResultNote("");
     setDisputeReason("");
@@ -200,25 +205,32 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const isCompleted = ["completed", "forfeit"].includes(String(match.status));
   const duelParticipants = participants.slice(0, 2);
   const canUseChat = Boolean(page?.can_act);
-  const canPlayerReportResult = Boolean(page?.can_player_report_result ?? page?.can_report_score);
+  // Ergebnis (#1132): Spieler melden über das Meldeformular (/report), die Turnierleitung trägt über /result ein. Wer
+  // beides dürfte, bekommt das Formular der Turnierleitung.
   const canStaffSubmitResult = Boolean(page?.can_staff_submit_result ?? page?.can_submit_result);
-  const canSubmitLegacyResult = Boolean(!isV2 && !isCompleted && duelParticipants.length >= 2 && (canPlayerReportResult || canStaffSubmitResult));
-  const canSubmitV2Result = Boolean(isV2 && !isCompleted && canStaffSubmitResult && v2Rows.length);
+  const canPlayerReportResult = Boolean((page?.can_player_report_result ?? page?.can_report_score) && !canStaffSubmitResult && !isCompleted);
+  const canSubmitV2Result = Boolean(!isCompleted && canStaffSubmitResult && v2Rows.length);
   const canProposeSchedule = Boolean(page?.can_propose_schedule);
   const canManageSchedule = Boolean(page?.can_manage_schedule);
   const hasScheduleProposals = pendingProposals.length > 0;
-  const showScheduleCard = Boolean(canProposeSchedule || hasScheduleProposals || match.scheduled_at || stationLabel(match) || page?.schedule_mode === "fixed_by_staff");
-  const scheduleStatus = match.schedule_status || match.status;
+  // Klartext wie auf der Website (#1139): fertig heißt „Beendet“ mit Ergebnis, die Station steht einmal im Klartext.
+  const finished = isMatchFinished(match);
+  const station = stationText(match);
+  // Nach dem Ende gibt es keine Terminabstimmung mehr (wie im Web, #1221).
+  const showScheduleCard = Boolean(!finished && (canProposeSchedule || hasScheduleProposals || match.scheduled_at || station || page?.schedule_mode === "fixed_by_staff"));
   const eventModeLabel = formatEventMode(page?.event_mode);
   const resultModeLabel = formatResultEntryMode(page?.result_entry_mode);
   const scheduleModeLabel = formatScheduleMode(page?.schedule_mode);
-  const hasResultActions = Boolean(canSubmitLegacyResult || canSubmitV2Result || (!isCompleted && page?.can_dispute) || (!isCompleted && page?.can_forfeit));
+  // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - der Server sagt, bis wann.
+  const canDispute = Boolean(page?.can_dispute);
+  const hasResultActions = Boolean(canPlayerReportResult || canSubmitV2Result || canDispute || (!isCompleted && page?.can_forfeit));
   const showFlowNotice = Boolean(!hasResultActions && (page?.result_entry_mode || page?.schedule_mode));
 
   const propose = useCallback(async () => {
-    const scheduledAt = parseDateInput(proposalAt);
+    // Datum und Uhrzeit zum Antippen (#1139) - als Wiener Uhr gewählt, als Zeitpunkt an den Server.
+    const scheduledAt = wallToIso(proposalAt);
     if (!scheduledAt || busy) {
-      setError("Bitte Datum und Uhrzeit im Format JJJJ-MM-TT HH:mm eingeben.");
+      setError("Bitte Tag und Uhrzeit wählen.");
       return;
     }
     setBusy(true);
@@ -238,9 +250,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     if (busy) return;
     const payload: { action: string; note?: string | null; scheduled_at?: string } = { action, note: decisionNote.trim() || null };
     if (action === "counter") {
-      const scheduledAt = parseDateInput(counterAt);
+      const scheduledAt = wallToIso(counterAt || viennaWall(proposal.scheduled_at));
       if (!scheduledAt) {
-        setError("Bitte für den Gegenvorschlag Datum und Uhrzeit eingeben.");
+        setError("Bitte für den Gegenvorschlag Tag und Uhrzeit wählen.");
         return;
       }
       payload.scheduled_at = scheduledAt;
@@ -301,40 +313,24 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     });
   }, []);
 
-  const submitLegacyResult = useCallback(async () => {
-    if (!canSubmitLegacyResult || busy) return;
-    const a = Math.max(0, Number.parseInt(scoreA || "0", 10) || 0);
-    const b = Math.max(0, Number.parseInt(scoreB || "0", 10) || 0);
-    const winnerId = a > b ? duelParticipants[0]?.registration_id : b > a ? duelParticipants[1]?.registration_id : null;
+  // Ergebnis melden (#1132): die Platzierungsliste an /report - der Server vergleicht die Meldungen beider Seiten.
+  const submitReport = useCallback(async (payload: ReportPayload) => {
+    if (!canPlayerReportResult || busy) return false;
     setBusy(true);
     setError("");
     setSuccess("");
     try {
-      if (canStaffSubmitResult) {
-        await api.patch(`/matches/${route.params.id}`, {
-          score_a: a,
-          score_b: b,
-          status: winnerId ? "completed" : "waiting_result",
-          winner_id: winnerId,
-        });
-      } else {
-        await api.post(`/matches/${route.params.id}/report`, {
-          score_a: a,
-          score_b: b,
-          screenshot_url: proofUrl.trim() || null,
-          note: resultNote.trim() || null,
-        });
-      }
-      setProofUrl("");
-      setResultNote("");
+      const { data } = await api.post<{ awaiting_confirmation?: boolean }>(`/matches/${route.params.id}/report`, payload);
       await refreshAfterResult();
-      setSuccess(canStaffSubmitResult ? "Ergebnis gespeichert und Matchstand aktualisiert." : "Ergebnis gemeldet und Matchstand aktualisiert.");
+      setSuccess(data?.awaiting_confirmation === false ? "Ergebnis bestätigt – das Spiel ist entschieden." : "Ergebnis gemeldet.");
+      return true;
     } catch (err) {
       setError(errorMessage(err, "Ergebnis konnte nicht gemeldet werden."));
+      return false;
     } finally {
       setBusy(false);
     }
-  }, [busy, canStaffSubmitResult, canSubmitLegacyResult, duelParticipants, proofUrl, refreshAfterResult, resultNote, route.params.id, scoreA, scoreB]);
+  }, [busy, canPlayerReportResult, refreshAfterResult, route.params.id]);
 
   const submitV2Result = useCallback(async () => {
     if (!canSubmitV2Result || busy) return;
@@ -357,9 +353,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       setProofUrl("");
       setResultNote("");
       await refreshAfterResult();
-      setSuccess("Heat-Ergebnis gespeichert und Matchstand aktualisiert.");
+      setSuccess("Ergebnis gespeichert und Matchstand aktualisiert.");
     } catch (err) {
-      setError(errorMessage(err, "Heat-Ergebnis konnte nicht gespeichert werden."));
+      setError(errorMessage(err, "Ergebnis konnte nicht gespeichert werden."));
     } finally {
       setBusy(false);
     }
@@ -374,6 +370,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       await api.post(`/matches/${route.params.id}/dispute`, { reason });
       setDisputeReason("");
       await load({ preserveDrafts: false });
+      setSuccess("Dispute gemeldet – die Turnierleitung prüft und entscheidet.");
     } catch (err) {
       setError(errorMessage(err, "Dispute konnte nicht gemeldet werden."));
     } finally {
@@ -432,23 +429,37 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load({ preserveDrafts: false }); }} tintColor={colors.cyan} />}
       >
+        {/* Kopf im Klartext wie auf der Website (#1139, #1220): Runde und Namen statt „Match A“, das Kürzel nur klein.
+            Vor dem Spiel der Termin, danach „Beendet“ mit dem Ergebnis; die Station genau einmal. */}
         <View style={styles.header}>
           <Muted>{page.matchday_label || match.round_name || "Match"}</Muted>
-          <Title>{match.match_key ? `Match ${match.match_key}` : matchLabel(participants)}</Title>
+          <Title testID="match-headline">{matchHeadline(participants, match)}</Title>
+          <Muted testID="match-key">{`${formatMatchKind(match)} ${match.match_key || ""}`.trim()}</Muted>
           {page.tournament ? (
             <Pressable onPress={() => navigation.navigate("TournamentDetail", { id: page.tournament?.slug || page.tournament?.id || match.tournament_id })} hitSlop={10}>
               <Muted style={styles.link}>{page.tournament.title}</Muted>
             </Pressable>
           ) : null}
-          <View style={styles.pillRow}>
-            <Pill label={scheduleLabels[String(scheduleStatus)] || formatStatus(scheduleStatus)} accent="gold" />
-            {eventModeLabel ? <Pill label={eventModeLabel} accent="cyan" /> : null}
-            {resultModeLabel ? <Pill label={resultModeLabel} /> : null}
-            {scheduleModeLabel ? <Pill label={scheduleModeLabel} /> : null}
-            <Pill label={formatDateTime(match.scheduled_at)} />
-            {stationLabel(match) ? <Pill label={`Station ${stationLabel(match)}`} accent="cyan" /> : null}
-            {match.duration_minutes ? <Pill label={`${match.duration_minutes} Min.`} /> : null}
-          </View>
+          {finished ? (
+            <View style={styles.finishedBox} testID="match-finished">
+              <View style={styles.pillRow}>
+                <Pill label="Beendet" />
+                {match.scheduled_at ? <Muted>{formatWhen(match.scheduled_at)}</Muted> : null}
+              </View>
+              <Body style={styles.strong} testID="match-outcome">{finishedMatchText(participants, match)}</Body>
+              {station ? <Muted style={styles.textCyan} testID="match-station">{station}</Muted> : null}
+            </View>
+          ) : (
+            <View style={styles.pillRow}>
+              <Pill label={scheduleHeadline(match)} accent="gold" />
+              {eventModeLabel ? <Pill label={eventModeLabel} accent="cyan" /> : null}
+              {resultModeLabel ? <Pill label={resultModeLabel} /> : null}
+              {scheduleModeLabel ? <Pill label={scheduleModeLabel} /> : null}
+              <Pill label={formatWhen(match.scheduled_at, { fallback: "Noch kein Termin" })} />
+              {station ? <Pill label={station} accent="cyan" /> : null}
+              {match.duration_minutes ? <Pill label={`${match.duration_minutes} Min.`} /> : null}
+            </View>
+          )}
           {/* GG (#616): nach dem Ende lobt eine Seite die andere - wie auf der Matchseite im Web. */}
           {isV2 ? <CommendButton matchId={route.params.id} completed={String(match.status) === "completed"} enabled={Boolean(user) && !isGuestUser(user)} /> : null}
         </View>
@@ -469,7 +480,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                 <Body style={styles.slotText}>{participant.slot || "-"}</Body>
               </View>
               <View style={styles.flex}>
-                <Body style={styles.strong}>{participant.display_name || "Offen"}</Body>
+                <Body style={styles.strong}>{slotName(participant.display_name, participant, match)}</Body>
                 {participant.team ? <Muted>{participant.team.tag ? `[${participant.team.tag}] ` : ""}{participant.team.name}</Muted> : null}
                 {participant.status ? <Muted>{formatStatus(participant.status)}</Muted> : null}
               </View>
@@ -477,23 +488,31 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           )) : <Muted>Noch keine Teilnehmer zugewiesen.</Muted>}
         </Card>
 
+        {page.call ? <MatchCallCard call={page.call} /> : null}
+
+        {page.in_dispute ? (
+          <View style={styles.disputeNotice} testID="match-in-dispute">
+            <Ionicons name="alert-circle-outline" color={colors.live} size={20} />
+            <Body style={styles.flex}>In Klärung – zu diesem Spiel liegt ein Dispute vor. Die Turnierleitung prüft und entscheidet.</Body>
+          </View>
+        ) : null}
+
         {hasResultActions ? (
           <Card style={styles.card}>
-            <Heading>Ergebnis eintragen</Heading>
-            {canSubmitLegacyResult ? (
-              <>
-                <View style={styles.scoreRow}>
-                  <FormInput label={duelParticipants[0]?.display_name || "Spieler A"} value={scoreA} keyboardType="number-pad" onChangeText={setScoreA} />
-                  <FormInput label={duelParticipants[1]?.display_name || "Spieler B"} value={scoreB} keyboardType="number-pad" onChangeText={setScoreB} />
-                </View>
-                <FormInput label="Nachweis-Link optional" value={proofUrl} onChangeText={setProofUrl} placeholder="https://..." />
-                <FormInput label="Notiz optional" value={resultNote} onChangeText={setResultNote} placeholder="Kommentar zum Ergebnis" />
-                <Button label={busy ? "Speichert ..." : canStaffSubmitResult ? "Ergebnis speichern" : "Ergebnis melden"} onPress={submitLegacyResult} disabled={busy} />
-              </>
+            <Heading>{canPlayerReportResult ? "Ergebnis melden" : canSubmitV2Result ? "Ergebnis eintragen" : "Ergebnis"}</Heading>
+            {canPlayerReportResult ? (
+              <MatchReportCard
+                participants={participants}
+                match={match}
+                state={page.report_state || null}
+                allowsDraw={Boolean(page.allows_draw)}
+                busy={busy}
+                onReport={submitReport}
+              />
             ) : null}
             {canSubmitV2Result ? (
               <>
-                <Muted>{v2Mode === "time" ? "Zeit erfassen. Schnellste Zeit gewinnt automatisch." : v2Mode === "lower_score" ? "Score erfassen. Niedrigster Score gewinnt automatisch." : "Punkte erfassen. Hoechste Punkte gewinnen automatisch."}</Muted>
+                <Muted>{v2Mode === "time" ? "Zeit erfassen. Schnellste Zeit gewinnt automatisch." : v2Mode === "lower_score" ? "Score erfassen. Niedrigster Score gewinnt automatisch." : "Punkte erfassen. Höchste Punkte gewinnen automatisch."}</Muted>
                 {v2Rows.map((row, index) => (
                   <View key={row.registration_id} style={styles.v2Row}>
                     <View style={styles.flex}>
@@ -513,16 +532,20 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                 ))}
                 <FormInput label="Nachweis-Link optional" value={proofUrl} onChangeText={setProofUrl} placeholder="https://..." />
                 <FormInput label="Notiz optional" value={resultNote} onChangeText={setResultNote} placeholder="Kommentar zum Heat" />
-                <Button label={busy ? "Speichert ..." : "Heat-Ergebnis speichern"} onPress={submitV2Result} disabled={busy} />
+                <Button label={busy ? "Speichert ..." : "Ergebnis speichern"} onPress={submitV2Result} disabled={busy} testID="match-staff-result-submit" />
               </>
             ) : null}
-            {page.can_dispute ? (
-              <>
-                <FormInput label="Dispute-Grund" value={disputeReason} onChangeText={setDisputeReason} placeholder="Was stimmt nicht?" />
-                <Button label="Dispute melden" variant="secondary" onPress={submitDispute} disabled={busy || !disputeReason.trim()} />
-              </>
+            {canDispute ? (
+              <View style={styles.stack} testID="match-dispute">
+                <FormInput label="Dispute-Grund" value={disputeReason} onChangeText={setDisputeReason} placeholder="Was stimmt nicht?" testID="match-dispute-input" />
+                <Muted testID="match-dispute-hint">
+                  Stimmt etwas nicht? Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet.
+                  {page.dispute_until ? ` Möglich bis ${formatDateTime(page.dispute_until)}.` : ""}
+                </Muted>
+                <Button label="Dispute melden" variant="secondary" onPress={submitDispute} disabled={busy || !disputeReason.trim()} testID="match-dispute-submit" />
+              </View>
             ) : null}
-            {page.can_forfeit && duelParticipants.length >= 2 ? (
+            {page.can_forfeit && !isCompleted && duelParticipants.length >= 2 ? (
               <>
                 <Muted style={styles.warning}>Staff-Aktion: Forfeit setzt einen Gewinner und wertet den Gegner als Forfeit.</Muted>
                 <View style={styles.buttonRow}>
@@ -546,10 +569,10 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         {showScheduleCard ? (
         <Card style={styles.card}>
           <Heading>{canProposeSchedule || hasScheduleProposals ? "Terminabstimmung" : "Termin"}</Heading>
-          <Muted>{formatDateTime(match.scheduled_at)}{stationLabel(match) ? ` · Station ${stationLabel(match)}` : ""}</Muted>
+          <Muted>{formatWhen(match.scheduled_at, { fallback: "Noch kein Termin" })}{station ? ` · ${station}` : ""}</Muted>
           {canProposeSchedule ? (
             <>
-              <FormInput label="Vorschlag" value={proposalAt} onChangeText={setProposalAt} placeholder="2026-05-19 20:00" />
+              <DateTimeChooser label="Vorschlag" value={proposalAt || viennaWall(match.scheduled_at)} onChange={setProposalAt} testID="match-proposal-at" />
               <FormInput label="Notiz optional" value={proposalNote} onChangeText={setProposalNote} placeholder="z.B. nach 20:00 Uhr möglich" />
               <Button label={busy ? "Sendet ..." : "Termin vorschlagen"} onPress={propose} disabled={busy} />
             </>
@@ -562,7 +585,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
             <View style={styles.stack}>
               {pendingProposals.map((proposal) => (
                 <View key={proposal.id} style={styles.proposal}>
-                  <Body style={styles.strong}>{formatDateTime(proposal.scheduled_at)}</Body>
+                  <Body style={styles.strong}>{formatWhen(proposal.scheduled_at, { fallback: "ohne Zeit" })}</Body>
                   <Muted>{proposal.actor?.display_name || proposal.actor?.username || "Teilnehmer"}{proposal.note ? ` · ${proposal.note}` : ""}</Muted>
                   {canManageSchedule && canDecideScheduleProposal(page, proposal) ? (
                     <>
@@ -570,7 +593,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                         <Button label="Annehmen" onPress={() => decide(proposal, "accept")} disabled={busy} />
                         <Button label="Ablehnen" variant="secondary" onPress={() => decide(proposal, "decline")} disabled={busy} />
                       </View>
-                      <FormInput label="Gegenvorschlag" value={counterAt} onChangeText={setCounterAt} placeholder="2026-05-19 21:00" />
+                      <DateTimeChooser label="Gegenvorschlag" value={counterAt || viennaWall(proposal.scheduled_at)} onChange={setCounterAt} testID={`match-counter-at-${proposal.id}`} />
                       <FormInput label="Antwort optional" value={decisionNote} onChangeText={setDecisionNote} placeholder="Grund oder Hinweis" />
                       <Button label="Gegenvorschlag senden" variant="secondary" onPress={() => decide(proposal, "counter")} disabled={busy} />
                     </>
@@ -621,6 +644,37 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
+  );
+}
+
+// Aufruf (#1137): wohin und wie lange noch - derselbe Countdown wie am TV; das Ende rechnet der Server.
+function MatchCallCard({ call }: { call: NonNullable<MatchCall> }) {
+  const dueAt = call.report_by ? asInstant(call.report_by).getTime() : null;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (dueAt === null) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [dueAt]);
+  const left = countdown(dueAt, now);
+  return (
+    <View style={styles.callCard} accessibilityRole="alert" testID="match-call">
+      <View style={styles.flex}>
+        <Muted style={styles.callEyebrow}>Aufgerufen</Muted>
+        <Heading testID="match-call-station">Bitte jetzt zu {call.station_text || "deiner Station"}</Heading>
+        {call.report_by ? <Muted>Antreten bis {viennaTime(call.report_by, { hour: "2-digit", minute: "2-digit" })}</Muted> : null}
+      </View>
+      {left.seconds !== null ? (
+        <View style={styles.callClock} testID="match-call-countdown">
+          {left.done ? <Body style={styles.callGo}>Jetzt geht es los</Body> : (
+            <>
+              <Muted>noch</Muted>
+              <Title style={styles.callTime}>{left.text}</Title>
+            </>
+          )}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -719,49 +773,17 @@ function buildV2Rows(page?: MatchPage | null): V2ResultRow[] {
     });
 }
 
-function rankingMode(match: any) {
-  const raw = String(match?.settings?.calculation || match?.settings?.score_type || "points").toLowerCase().replace(/[-\s]/g, "_");
-  if (["time", "time_ms", "fastest", "fastest_lap", "lowest_time", "best_time"].includes(raw)) return "time";
-  if (["lower_score", "lowest_score", "low_score", "strokes", "penalty_points"].includes(raw)) return "lower_score";
-  return "higher_score";
-}
-
 function firstRegistrationId(participants?: MatchParticipant[]) {
   return (participants || []).find((participant) => participant.registration_id)?.registration_id || "";
 }
 
-function formatDateInput(value?: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (number: number) => String(number).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
+// Ein laufendes Spiel nennt im Kopf seinen Zustand statt des Termins (wie scheduleHeadline der Website, #1220).
+const LIVE_MATCH_STATUSES = new Set(["in_progress", "running", "waiting_result", "disputed"]);
 
-function parseDateInput(value: string) {
-  const cleaned = value.trim().replace("T", " ");
-  if (!cleaned) return null;
-  const isoLike = cleaned.match(/^(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2})$/);
-  const deLike = cleaned.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})$/);
-  if (!isoLike && !deLike) {
-    const parsed = new Date(cleaned).getTime();
-    return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
-  }
-  const [, first, second, third, hour, minute] = isoLike || deLike || [];
-  const year = isoLike ? first : third;
-  const month = isoLike ? second : second;
-  const day = isoLike ? third : first;
-  const date = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function stationLabel(match: any) {
-  return match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
-}
-
-function matchLabel(participants: MatchParticipant[]) {
-  const names = participants.map((participant) => participant.display_name).filter(Boolean);
-  return names.length ? names.join(" vs. ") : "Match";
+function scheduleHeadline(match: { status?: string | null; schedule_status?: string | null; scheduled_at?: string | null }) {
+  if (LIVE_MATCH_STATUSES.has(String(match.status))) return formatStatus(match.status);
+  if (match.schedule_status && scheduleLabels[match.schedule_status]) return scheduleLabels[match.schedule_status];
+  return match.scheduled_at ? "Termin steht" : "Noch offen";
 }
 
 function participantNameByRegistration(participants: MatchParticipant[], registrationId: string) {
@@ -848,6 +870,42 @@ const styles = StyleSheet.create({
   error: {
     color: colors.live,
   },
+  callCard: {
+    alignItems: "center",
+    backgroundColor: "rgba(240,180,41,0.12)",
+    borderColor: "rgba(240,180,41,0.5)",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+  },
+  callClock: {
+    alignItems: "flex-end",
+  },
+  callEyebrow: {
+    color: colors.gold,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
+  callGo: {
+    color: colors.gold,
+    fontWeight: "900",
+  },
+  callTime: {
+    fontVariant: ["tabular-nums"],
+  },
+  disputeNotice: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,59,48,0.1)",
+    borderColor: "rgba(255,59,48,0.4)",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 9,
+    padding: 12,
+  },
   successNotice: {
     alignItems: "center",
     backgroundColor: "rgba(0,255,136,0.08)",
@@ -866,6 +924,14 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
     minWidth: 0,
+  },
+  finishedBox: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 6,
+    padding: 12,
   },
   flagRow: {
     flexDirection: "row",
@@ -939,9 +1005,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 10,
     padding: 10,
-  },
-  scoreRow: {
-    gap: 10,
   },
   slot: {
     alignItems: "center",

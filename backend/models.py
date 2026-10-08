@@ -690,6 +690,8 @@ class RegistrationUpdate(BaseModel):
     status: Optional[Literal["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"]] = None
     seed: Optional[int] = None
     ingame_name: Optional[str] = None
+    # Grund einer Absage (#1133): steht nur in der Nachricht an die Person, nicht an der Anmeldung.
+    status_reason: Optional[str] = Field(default=None, max_length=300)
 
 
 class RegistrationAdminCreate(BaseModel):

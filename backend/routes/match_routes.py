@@ -31,19 +31,30 @@ from services.competition_read import canonical_match_for_source, find_match_sou
 from services.match_overview import operational_match_overviews, own_match_overviews
 from services.match_public_view import public_match_view, public_tournament_view
 from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
-from services.match_v2_results import MatchV2ResultError
+from services.match_v2_results import MatchV2ResultError, normalize_v2_results
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from services.rate_limit import enforce_rate_limit
 from services import word_filter
 from services.station_labels import attach_station_info
+from match_rules import match_allows_draw
+from services.match_audience import acting_registration, player_user_ids
+# Solange ein Spiel einen dieser Zustände hat, darf ein Aufruf (#1122) stehen bleiben.
+from services.match_calls import CALL_OPEN_STATUSES, call_view
+from services.match_disputes import CLOSED_DETAIL as DISPUTE_CLOSED_DETAIL, dispute_window
+from services.match_notifications import notify_dispute_opened, notify_report_conflict, notify_result_reported, results_summary
+from services.tournament_rules import match_policy, players_can_report, schedule_proposals_enabled
 from services.user_notifications import create_user_notification
 from services.v2_result_submission import submit_v2_result
 from services.v2_match_flows import (
+    REPORT_CLOSED_STATUSES,
     dispute_entry,
     is_duplicate_dispute,
     is_duplicate_report,
+    public_report_results,
     report_consensus,
     report_entry,
+    report_state,
+    reports_conflict,
     results_for_forfeit,
     validate_forfeit_note,
 )
@@ -53,11 +64,6 @@ router = APIRouter(prefix="/api/matches", tags=["matches"])
 logger = logging.getLogger("tls.match")
 # Turnierleitung über alle Turniere; Helfer nur über ihren Einsatz (has_tournament_staff_permission).
 STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
-EVENT_MODES = {"local", "online", "hybrid"}
-RESULT_ENTRY_MODES = {"staff_only", "player_confirmed", "hybrid"}
-SCHEDULE_MODES = {"fixed_by_staff", "player_proposal", "hybrid"}
-# Solange ein Spiel einen dieser Zustände hat, darf ein Aufruf (#1122) stehen bleiben.
-CALL_OPEN_STATUSES = {"pending", "preview", "ready", "scheduled"}
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 STAFF_MENTION_HANDLES = {"leitung", "turnierleitung", "orga", "organizer", "staff", "admin", "referee", "schiri", "scorekeeper"}
 USER_PUBLIC_PROJECTION = {
@@ -87,82 +93,11 @@ async def _sees_internal(match: dict, user: dict | None) -> bool:
     return _is_staff(user) or await has_tournament_staff_permission(user, match.get("tournament_id"), READ_STAFF_ROLES)
 
 
-def _mode_value(value: object, allowed: set[str]) -> str | None:
-    text = str(value or "").strip().lower()
-    return text if text in allowed else None
-
-
-def _first_mode(allowed: set[str], *values: object) -> str | None:
-    for value in values:
-        normalized = _mode_value(value, allowed)
-        if normalized:
-            return normalized
-    return None
-
-
-def _match_settings(match: dict | None) -> dict:
-    settings = (match or {}).get("settings")
-    return settings if isinstance(settings, dict) else {}
-
-
-def _stage_settings(stage: dict | None) -> dict:
-    settings = (stage or {}).get("settings")
-    return settings if isinstance(settings, dict) else {}
-
-
-def _legacy_event_mode(tournament: dict | None) -> str | None:
-    if (tournament or {}).get("is_hybrid") is True:
-        return "hybrid"
-    if (tournament or {}).get("is_online") is True:
-        return "online"
-    return None
-
-
-def _match_policy(match: dict, tournament: dict | None = None, stage: dict | None = None) -> dict:
-    match_settings = _match_settings(match)
-    stage_settings = _stage_settings(stage)
-    event_mode = _first_mode(
-        EVENT_MODES,
-        match.get("event_mode"),
-        match_settings.get("event_mode"),
-        stage_settings.get("event_mode"),
-        (stage or {}).get("event_mode"),
-        (tournament or {}).get("event_mode"),
-        _legacy_event_mode(tournament),
-    ) or "online"
-    result_entry_mode = _first_mode(
-        RESULT_ENTRY_MODES,
-        match.get("result_entry_mode"),
-        match_settings.get("result_entry_mode"),
-        stage_settings.get("result_entry_mode"),
-        (stage or {}).get("result_entry_mode"),
-        (tournament or {}).get("result_entry_mode"),
-    )
-    if not result_entry_mode:
-        result_entry_mode = "staff_only"
-    schedule_mode = _first_mode(
-        SCHEDULE_MODES,
-        match.get("schedule_mode"),
-        match_settings.get("schedule_mode"),
-        stage_settings.get("schedule_mode"),
-        (stage or {}).get("schedule_mode"),
-        (tournament or {}).get("schedule_mode"),
-    )
-    if not schedule_mode:
-        schedule_mode = "fixed_by_staff" if event_mode == "local" else "player_proposal"
-    return {
-        "event_mode": event_mode,
-        "result_entry_mode": result_entry_mode,
-        "schedule_mode": schedule_mode,
-    }
-
-
-def _players_can_report(policy: dict) -> bool:
-    return policy.get("result_entry_mode") in {"player_confirmed", "hybrid"}
-
-
-def _schedule_proposals_enabled(policy: dict) -> bool:
-    return policy.get("schedule_mode") in {"player_proposal", "hybrid"}
+# Die Regeln stehen an einer Stelle (services/tournament_rules, #1132): ohne Angabe melden online und hybrid die
+# Spieler selbst, vor Ort trägt die Turnierleitung ein - Admin-Anzeige und Planungs-Warnung rechnen gleich.
+_match_policy = match_policy
+_players_can_report = players_can_report
+_schedule_proposals_enabled = schedule_proposals_enabled
 
 
 async def _audit_match_action(db, action: str, match: dict, actor_id: str | None, data: dict | None = None) -> None:
@@ -248,20 +183,8 @@ def _match_label(match: dict) -> str:
 
 
 async def _match_participant_user_ids(db, match: dict) -> set[str]:
-    regs = await _registrations_for_match(match)
-    user_ids = {reg.get("user_id") for reg in regs if reg.get("user_id")}
-    team_ids = {reg.get("team_id") for reg in regs if reg.get("team_id")}
-    if team_ids:
-        teams = await db.teams.find(
-            {"id": {"$in": list(team_ids)}},
-            {"_id": 0, "member_ids": 1, "leader_id": 1, "co_leader_ids": 1},
-        ).to_list(100)
-        for team in teams:
-            if team.get("leader_id"):
-                user_ids.add(team.get("leader_id"))
-            user_ids.update(team.get("co_leader_ids") or [])
-            user_ids.update(team.get("member_ids") or [])
-    return {user_id for user_id in user_ids if user_id}
+    # Matchchat und Spiel-Hinweise (#1136): alle Spieler - bei Teams jedes Mitglied samt Leitung.
+    return await player_user_ids(db, await _registrations_for_match(match))
 
 
 def _staff_assignment_matches_match(assignment: dict, match: dict) -> bool:
@@ -405,27 +328,11 @@ async def _user_registration_for_match(match: dict, user: dict | None) -> dict |
 
 
 async def _acting_registration_for_match(match: dict, user: dict | None) -> dict | None:
+    """Die Anmeldung, für die diese Person im Spiel handelt (#1136): die eigene, sonst die ihres Teams als Teamleitung
+    oder Co-Leitung. Damit melden, bestätigen, widersprechen und planen dieselben Leute, die auch einchecken."""
     if not user:
         return None
-    direct = await _user_registration_for_match(match, user)
-    if direct:
-        return direct
-    regs = await _registrations_for_match(match)
-    team_ids = list({r.get("team_id") for r in regs if r.get("team_id")})
-    if not team_ids:
-        return None
-    teams = await get_db().teams.find(
-        {
-            "id": {"$in": team_ids},
-            "$or": [
-                {"leader_id": user["id"]},
-                {"co_leader_ids": user["id"]},
-            ],
-        },
-        {"_id": 0, "id": 1},
-    ).to_list(64)
-    captain_team_ids = {team["id"] for team in teams}
-    return next((reg for reg in regs if reg.get("team_id") in captain_team_ids), None)
+    return await acting_registration(get_db(), await _registrations_for_match(match), user.get("id"))
 
 
 async def _can_act_for_match(match: dict, user: dict | None) -> bool:
@@ -578,6 +485,33 @@ async def _match_participants(match: dict, user: dict | None) -> list[dict]:
     return participants
 
 
+def _log_safe(value, limit: int = 120) -> str:
+    """Werte aus Anfragen ins Protokoll nur ohne Zeilenumbrüche und gekürzt."""
+    return str(value or "").replace("\r", " ").replace("\n", " ")[:limit]
+
+
+def _accepts_reports(match: dict) -> bool:
+    """Nimmt das Spiel noch Meldungen an? Nicht, wenn es entschieden, abgesagt oder in Klärung ist - und nicht,
+    solange keine zwei Seiten feststehen."""
+    if str(match.get("status") or "") in REPORT_CLOSED_STATUSES:
+        return False
+    return len(_registration_ids_for_match(match)) >= 2
+
+
+async def _report_view(db, match: dict, acting_reg: dict) -> dict:
+    state = report_state(match.get("reports") or [], acting_reg.get("id"))
+    registrations = await _registrations_for_match(match)
+    regs_by_id = {reg["id"]: reg for reg in registrations if reg.get("id")}
+    own, proposal = state["own"], state["proposal"]
+    return {
+        "status": state["status"],
+        "own_summary": results_summary(own.get("results"), regs_by_id) if own else None,
+        "own_at": own.get("at") if own else None,
+        "proposal": public_report_results(proposal.get("results")) if proposal else None,
+        "proposal_summary": results_summary(proposal.get("results"), regs_by_id) if proposal else None,
+    }
+
+
 async def _match_page_payload(match: dict, collection: str, user: dict | None = None) -> dict:
     db = get_db()
     match = await _refresh_schedule_escalation(match, collection)
@@ -597,10 +531,9 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         proposal["actor"] = actors.get(proposal.get("actor_user_id"))
         proposal.pop("match_collection", None)
     acting_reg = await _acting_registration_for_match(match, user)
-    direct_reg = await _user_registration_for_match(match, user)
     policy = _match_policy(match, tournament, stage)
     can_submit_result = await _can_submit_result_for_match(match, user)
-    can_player_report = bool(direct_reg and _players_can_report(policy))
+    can_player_report = bool(acting_reg and _players_can_report(policy) and _accepts_reports(match))
     can_propose_schedule = bool(user and await _can_act_for_match(match, user) and _schedule_proposals_enabled(policy))
     round_number = match.get("matchday_number") or match.get("round")
     league_like = (tournament or {}).get("format") in {"league", "round_robin"} or (stage or {}).get("stage_type") in {"league", "round_robin_groups", "ffa_league"}
@@ -609,6 +542,17 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         prefix = "Spieltag" if league_like else "Runde"
         matchday_label = f"{prefix} {round_number}" if round_number else "Match"
     canonical_match = await canonical_match_for_source(db, match, collection)
+    # Ergebnis melden (#1132): wo die Meldungen für die eigene Seite stehen - aus dem vollen Datensatz, bevor die
+    # öffentliche Sicht die Meldungen der Gegenseite auf Zeit und Seite kürzt. Zum Bestätigen sieht die eigene Seite
+    # Plätze und Spielstand der Gegenseite, nie ihre Notiz oder ihren Beweis-Link.
+    report_view = None
+    if acting_reg and _players_can_report(policy):
+        report_view = await _report_view(db, match, acting_reg)
+    # Dispute (#1134): jeder Teilnehmer in jedem Modus - vor dem Ergebnis immer, danach bis 30 Minuten nach dem
+    # Ergebnis oder bis das nächste Spiel des Siegers beginnt. Website und App zeigen genau das.
+    window = await dispute_window(db, match) if acting_reg else {"open": False, "until": None}
+    # Aufruf (#1137): aufgerufen um, antreten bis, Station - für den Countdown auf der Matchseite (wie am TV).
+    call = await call_view(db, match)
     if not await _sees_internal(match, user):
         viewer_id = (user or {}).get("id")
         match = public_match_view(match, viewer_id)
@@ -623,11 +567,16 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "can_act": bool(user and await _can_act_for_match(match, user)),
         "can_report_score": can_player_report,
         "can_player_report_result": can_player_report,
+        "report_state": report_view,
+        "allows_draw": match_allows_draw(match),
         "can_submit_result": can_submit_result,
         "can_staff_submit_result": can_submit_result,
         "can_propose_schedule": can_propose_schedule,
         "can_manage_schedule": can_propose_schedule,
-        "can_dispute": bool(user and (_is_staff(user) or (direct_reg and _players_can_report(policy)))),
+        "can_dispute": bool(acting_reg and window["open"]),
+        "dispute_until": window["until"],
+        "in_dispute": str(match.get("status") or "") == "disputed",
+        "call": call,
         "can_forfeit": await _can_forfeit_match(match, user),
         "event_mode": policy["event_mode"],
         "result_entry_mode": policy["result_entry_mode"],
@@ -1006,17 +955,27 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict) -> dict:
             status_code=422,
             detail="Für dieses Match wird eine Platzierungsliste gemeldet, keine zwei Punktstände.",
         )
-    my_registration = await _user_registration_for_match(match, me)
+    my_registration = await _acting_registration_for_match(match, me)
     if not my_registration:
         raise HTTPException(status_code=403, detail="Nicht Teilnehmer dieses Matches")
+    status = str(match.get("status") or "")
+    if status == "disputed":
+        raise HTTPException(status_code=409, detail="Dieses Spiel ist in Klärung – die Turnierleitung entscheidet.")
+    if status in REPORT_CLOSED_STATUSES:
+        raise HTTPException(status_code=409, detail="Dieses Spiel ist schon entschieden.")
 
-    results = [entry.model_dump(exclude_none=True) for entry in body.results]
+    # Jede Meldung wird geprüft wie ein Ergebnis der Turnierleitung: alle Teilnehmer genau einmal, Plätze passend
+    # zum Spielstand. So vergleicht der Server zwei Meldungen inhaltlich - nicht nur ihre Schreibweise.
+    try:
+        results = public_report_results(normalize_v2_results(match, [entry.model_dump(exclude_none=True) for entry in body.results]))
+    except MatchV2ResultError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     if is_duplicate_report(match, me["id"], results):
         match.pop("_id", None)
         match["idempotent_replay"] = True
         return match
 
-    entry = report_entry(me["id"], my_registration["id"], results)
+    entry = report_entry(me["id"], my_registration["id"], results, proof_url=body.screenshot_url, note=body.note)
     await getattr(db, "matches_v2").update_one(
         {"id": match["id"]},
         {"$push": {"reports": entry}, "$set": {"updated_at": now_utc().isoformat()}},
@@ -1028,8 +987,18 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict) -> dict:
     stored = await getattr(db, "matches_v2").find_one({"id": match["id"]}, {"_id": 0}) or match
     agreed = report_consensus(stored.get("reports") or [])
     if not agreed:
+        conflict = reports_conflict(stored.get("reports") or [])
+        # Wer gemeldet hat, sieht auf der Seite, wie es weitergeht; die anderen bekommen eine Nachricht (#1132).
+        try:
+            if conflict:
+                await notify_report_conflict(db, stored, my_registration["id"], me.get("id"))
+            else:
+                await notify_result_reported(db, stored, entry, me.get("id"))
+        except Exception as exc:  # noqa: BLE001 - eine Nachricht hält keine Meldung auf
+            logger.warning("Report notification failed for match=%s type=%s", _log_safe(match.get("id")), type(exc).__name__)
         stored["idempotent_replay"] = False
         stored["awaiting_confirmation"] = True
+        stored["report_status"] = "conflict" if conflict else "waiting"
         return stored
 
     try:
@@ -1074,21 +1043,34 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
     # sonst kann ein Turnier im Graph-System nicht vollstaendig gespielt werden.
     m, collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, m)
-    if not _is_staff(me) and not await _user_registration_for_match(m, me):
+    acting_reg = await _acting_registration_for_match(m, me)
+    if not _is_staff(me) and not acting_reg:
         raise HTTPException(status_code=403, detail="Nicht Teilnehmer dieses Matches")
     reason = body.reason.strip()
     if is_duplicate_dispute(m, me["id"], reason):
         m.pop("_id", None)
         m["idempotent_replay"] = True
         return m
+    if not reason:
+        raise HTTPException(status_code=422, detail="Bitte einen Grund angeben.")
+    # Wer bis wann (#1134): vor dem Ergebnis immer, danach 30 Minuten - und nur, bis das nächste Spiel des Siegers
+    # beginnt. Die Turnierleitung korrigiert ohnehin direkt.
+    if acting_reg and not (await dispute_window(db, m))["open"]:
+        raise HTTPException(status_code=409, detail=DISPUTE_CLOSED_DETAIL)
+    entry = {**dispute_entry(me["id"], reason), **({"registration_id": acting_reg["id"]} if acting_reg else {})}
     await getattr(db, collection).update_one({"id": match_id}, {
-        "$push": {"disputes": dispute_entry(me["id"], reason)},
+        "$push": {"disputes": entry},
         "$set": {"status": "disputed", "updated_at": now_utc().isoformat()},
     })
     await _audit_match_action(db, "match.dispute.open", m, me.get("id"), {
         "reason_length": len((body.reason or "").strip()),
     })
     m = await getattr(db, collection).find_one({"id": match_id}, {"_id": 0})
+    # Die Turnierleitung erfährt sofort davon, die anderen Spieler des Spiels auch (#1134) - niemand sonst.
+    try:
+        await notify_dispute_opened(db, m, entry, me.get("id"), (acting_reg or {}).get("id"))
+    except Exception as exc:  # noqa: BLE001 - eine Nachricht hält keinen Dispute auf
+        logger.warning("Dispute notification failed for match=%s type=%s", _log_safe(match_id), type(exc).__name__)
     # Phase B v4.1: trigger negative achievement for the user who disputed
     try:
         from badges import on_dispute_opened

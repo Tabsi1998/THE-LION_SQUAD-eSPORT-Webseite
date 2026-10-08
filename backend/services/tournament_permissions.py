@@ -9,7 +9,9 @@ from database import get_db
 GLOBAL_TOURNAMENT_STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 GLOBAL_TOURNAMENT_ADMIN_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
-RESULT_STAFF_ROLES = {"organizer", "referee", "scorekeeper"}
+# Ergebnisse eintragen: Organisation, Schiedsrichter, Ergebnisdienst - und die Station-Crew (Entscheidung des Betreibers
+# zu #1139: alles steht im Protokoll, die Turnierleitung kann korrigieren).
+RESULT_STAFF_ROLES = {"organizer", "referee", "scorekeeper", "station_manager"}
 CHECKIN_STAFF_ROLES = {"organizer", "referee", "scorekeeper", "station_manager"}
 READ_STAFF_ROLES = {"organizer", "referee", "scorekeeper", "station_manager", "stream_operator"}
 STRUCTURE_STAFF_ROLES = {"organizer", "referee"}
@@ -96,6 +98,33 @@ async def has_match_result_permission(user: dict | None, match: dict) -> bool:
         ):
             return True
     return False
+
+
+def _assignment_covers_match(assignment: dict, match: dict) -> bool:
+    scope = assignment.get("scope") or "tournament"
+    scope_id = assignment.get("scope_id")
+    if scope == "tournament" or not scope_id:
+        return True
+    field = {"match": "id", "stage": "stage_id", "group": "group_id", "station": "station_id"}.get(scope)
+    return bool(field and match.get(field) == scope_id)
+
+
+async def result_staff_user_ids(db, match: dict) -> set[str]:
+    """Wer für dieses Spiel Ergebnisse eintragen darf - und deshalb von Streitfällen erfährt (#1132, #1134): die
+    Turnierleitung über alle Turniere und die Helfer mit Ergebnis-Recht, deren Einsatz das Spiel umfasst (ganzes
+    Turnier, Phase, Gruppe, Station oder genau dieses Spiel). Dieselbe Regel wie ``has_match_result_permission``."""
+    users = await db.users.find(
+        {"role": {"$in": sorted(GLOBAL_TOURNAMENT_STAFF_ROLES)}, "is_active": {"$ne": False}, "is_banned": {"$ne": True}},
+        {"_id": 0, "id": 1},
+    ).to_list(200)
+    ids = {row["id"] for row in users if row.get("id")}
+    if match.get("tournament_id"):
+        assignments = await db.tournament_staff_assignments.find(
+            {"tournament_id": match["tournament_id"], "is_active": {"$ne": False}, "role": {"$in": sorted(RESULT_STAFF_ROLES)}},
+            {"_id": 0, "user_id": 1, "scope": 1, "scope_id": 1},
+        ).to_list(500)
+        ids.update(row["user_id"] for row in assignments if row.get("user_id") and _assignment_covers_match(row, match))
+    return ids
 
 
 async def require_tournament_staff_permission(

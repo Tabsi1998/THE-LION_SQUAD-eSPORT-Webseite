@@ -120,16 +120,11 @@ TEMPLATE_CATEGORY = {
     "registration_received": "tournament_updates",
     "registration_approved": "tournament_updates",
     "registration_rejected": "tournament_updates",
-    "checkin_opens_soon": "tournament_updates",
-    "checkin_reminder": "tournament_updates",
     "checkin_closes_soon": "tournament_updates",
+    "checkin_closes_soon_on_site": "tournament_updates",
     "tournament_finished": "tournament_updates",
     "match_reminder": "match_reminders",
-    "match_lead_24h": "match_reminders",
-    "match_lead_2h": "match_reminders",
-    "match_lead_30m": "match_reminders",
     "match_lead_10m": "match_reminders",
-    "match_lead_5m": "match_reminders",
     "score_reported": "match_reminders",
     "dispute_opened": "match_reminders",
     "dispute_resolved": "match_reminders",
@@ -155,9 +150,19 @@ TEMPLATE_CATEGORY = {
 NOTIFICATION_KIND_CATEGORY = {
     "match_reminder": "match_reminders",
     "match_station": "match_reminders",
+    # Aufruf beim Reservieren der Station (#1137): „Du bist dran“.
+    "match_call": "match_reminders",
     "match_result": "match_reminders",
     # Team am Spieltag (#1192): „Bist du schon da?“ vom Kapitän - wie eine Spiel-Erinnerung.
     "team_presence_nudge": "match_reminders",
+    # Ergebnis melden (#1132): „bitte bestätigen“ an die Gegenseite; Streitfälle für die Turnierleitung.
+    "match_report": "match_reminders",
+    "match_attention": "tournament_updates",
+    # Dispute (#1134): „Dispute zu deinem Spiel“ an die Spieler; entschieden kommt als Ergebnis (match_result).
+    "match_dispute": "match_reminders",
+    # Turnier-Anmeldung (#1133): eingegangen, bestätigt, abgelehnt, nachgerückt - und „Turnier beendet“.
+    "tournament_registration": "tournament_updates",
+    "tournament_finished": "tournament_updates",
     "match_chat_message": "community_messages",
     "match_chat_mention": "community_messages",
     "tournament_checkin": "tournament_updates",

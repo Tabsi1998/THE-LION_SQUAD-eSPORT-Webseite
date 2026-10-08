@@ -1,0 +1,51 @@
+{
+  "_hinweis": "Klartext statt Platzhalter (#1113, #1140): dieselben Fälle prüfen frontend/src/lib/slotSource.test.js und mobile/src/lib/slotSource.test.ts.",
+  "matchSets": {
+    "duels": [
+      { "id": "A", "match_key": "A", "stage_id": "s1", "slots": [{}, {}], "settings": { "match_size": 2, "qualifiers_per_match": 1 } },
+      { "id": "E", "match_key": "E", "stage_id": "s1", "slots": [{}, {}], "settings": { "match_size": 2, "qualifiers_per_match": 1 } }
+    ],
+    "heats": [
+      { "id": "A", "match_key": "A", "stage_id": "s1", "slots": [{}, {}, {}, {}], "settings": { "match_size": 4, "qualifiers_per_match": 2 } },
+      { "id": "E", "match_key": "E", "stage_id": "s1", "slots": [{}, {}, {}, {}, {}, {}, {}, {}], "settings": { "match_size": 8, "qualifiers_per_match": 2 } }
+    ],
+    "phases": [
+      { "id": "p1-A", "match_key": "A", "stage_id": "phase-1", "slots": [{}, {}], "settings": { "match_size": 2, "qualifiers_per_match": 1 } },
+      { "id": "p2-A", "match_key": "A", "stage_id": "phase-2", "slots": [{}, {}, {}, {}], "settings": { "match_size": 4, "qualifiers_per_match": 2 } }
+    ],
+    "none": []
+  },
+  "sourceLabel": [
+    { "name": "Sieger im Duell", "set": "duels", "stage": "s1", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 1, "raw": "W:A:1" }, "text": "Sieger aus A" },
+    { "name": "Verlierer im Duell (L)", "set": "duels", "stage": "s1", "source": { "type": "rank", "flow": "L", "match_key": "A", "rank": 1, "raw": "L:A:1" }, "text": "Verlierer aus A" },
+    { "name": "Verlierer im Duell (R:2)", "set": "duels", "stage": "s1", "source": { "type": "rank", "flow": "R", "match_key": "A", "rank": 2, "raw": "R:A:2" }, "text": "Verlierer aus A" },
+    { "name": "Spiel um Platz 3, Herkunft unbekannt", "set": "none", "stage": "s1", "source": { "type": "rank", "flow": "L", "match_key": "Z", "rank": 1, "raw": "L:Z:1" }, "text": "Verlierer aus Z" },
+    { "name": "Sieger im Durchgang", "set": "heats", "stage": "s1", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 1, "raw": "W:A:1" }, "text": "Sieger aus A" },
+    { "name": "Platz 2 im Durchgang", "set": "heats", "stage": "s1", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 2, "raw": "W:A:2" }, "text": "Platz 2 aus A" },
+    { "name": "L zählt ab den Weiterkommern", "set": "heats", "stage": "s1", "source": { "type": "rank", "flow": "L", "match_key": "A", "rank": 1, "raw": "L:A:1" }, "text": "Platz 3 aus A" },
+    { "name": "älteres Schema mit absolutem Platz", "set": "heats", "stage": "s1", "source": { "type": "rank", "flow": "L", "match_key": "A", "rank": 3, "raw": "L:A:3" }, "text": "Platz 3 aus A" },
+    { "name": "großer Durchgang", "set": "heats", "stage": "s1", "source": { "type": "rank", "flow": "L", "match_key": "E", "rank": 3, "raw": "L:E:3" }, "text": "Platz 5 aus E" },
+    { "name": "Setzplatz bleibt leer", "set": "none", "stage": "s1", "source": { "type": "seed", "seed": 3, "raw": "3" }, "text": "" },
+    { "name": "Freilos", "set": "none", "stage": "s1", "source": { "type": "bye", "raw": "bye" }, "text": "Freilos" },
+    { "name": "direkte Herkunft bleibt leer", "set": "none", "stage": "s1", "source": { "type": "direct", "raw": "swiss" }, "text": "" },
+    { "name": "nichts", "set": "none", "stage": "s1", "source": null, "text": "" },
+    { "name": "ältere Daten: nur der Text W:A:1", "set": "none", "stage": "s1", "source": { "raw": "W:A:1" }, "text": "Sieger aus A" },
+    { "name": "ältere Daten: nackte Setzplatz-Zahl", "set": "none", "stage": "s1", "source": { "raw": "7" }, "text": "" },
+    { "name": "ältere Daten: Strich heißt Freilos", "set": "none", "stage": "s1", "source": { "raw": "-" }, "text": "Freilos" },
+    { "name": "ältere Daten: unbekanntes Kürzel", "set": "none", "stage": "s1", "source": { "raw": "WA2" }, "text": "" },
+    { "name": "Kürzel gelten je Phase (Phase 2)", "set": "phases", "stage": "phase-2", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 2, "raw": "W:A:2" }, "text": "Platz 2 aus A" },
+    { "name": "Kürzel gelten je Phase (Phase 1)", "set": "phases", "stage": "phase-1", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 2, "raw": "W:A:2" }, "text": "Verlierer aus A" }
+  ],
+  "describeSlot": [
+    { "name": "Anmeldung", "set": "duels", "slot": { "registration_id": "r1" }, "result": { "kind": "player", "label": "NeonFalke" } },
+    { "name": "Freilos", "set": "duels", "slot": { "status": "bye", "source": { "type": "seed", "seed": 8 } }, "result": { "kind": "bye", "label": "Freilos" } },
+    { "name": "Sieger aus A", "set": "duels", "slot": { "status": "pending", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 1, "raw": "W:A:1" } }, "result": { "kind": "pending", "label": "Sieger aus A" } },
+    { "name": "Setzplatz vor dem Start", "set": "duels", "slot": { "status": "preview", "source": { "type": "seed", "seed": 2 } }, "result": { "kind": "empty", "label": "" } }
+  ],
+  "plannedText": [
+    { "name": "heute mit Dauer", "now": "2026-10-10T08:00:00Z", "match": { "scheduled_at": "2026-10-10T14:20:00+02:00", "duration_minutes": 30 }, "text": "geplant ca. 14:20 · 30 Minuten" },
+    { "name": "anderer Tag mit Datum", "now": "2026-10-10T08:00:00Z", "match": { "scheduled_at": "2026-10-11T14:20:00+02:00", "duration_minutes": 30 }, "text": "geplant ca. 11.10. 14:20 · 30 Minuten" },
+    { "name": "nur Dauer", "now": "2026-10-10T08:00:00Z", "match": { "settings": { "duration_minutes": 20 } }, "text": "20 Minuten" },
+    { "name": "fertig: nichts", "now": "2026-10-10T08:00:00Z", "match": { "status": "completed", "scheduled_at": "2026-10-10T14:20:00+02:00", "duration_minutes": 30 }, "text": "" }
+  ]
+}

@@ -19,8 +19,11 @@ export const RULE_PRESETS = [
   },
 ];
 
+// „Automatisch“ (#1132, Entscheidung B): online und hybrid melden die Spieler selbst, die Gegenseite bestätigt; vor Ort
+// trägt die Turnierleitung ein. Dieselbe Regel rechnet der Server (backend/services/tournament_rules.py) - Admin-Liste,
+// Planungs-Warnung und Matchseite sagen damit dasselbe. Ältere Turniere kennen nur die Schalter „online“ und „hybrid“.
 export function effectiveRuleModes(source = {}) {
-  const eventMode = source.event_mode || "online";
+  const eventMode = source.event_mode || (source.is_hybrid === true ? "hybrid" : "online");
   return {
     event_mode: eventMode,
     result_entry_mode: source.result_entry_mode || (eventMode === "local" ? "staff_only" : "player_confirmed"),

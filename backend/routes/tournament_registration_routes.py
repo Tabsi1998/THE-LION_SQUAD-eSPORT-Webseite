@@ -1,11 +1,16 @@
 """Anmeldungen, Teilnehmerverwaltung und Check-in.
 """
+import logging
+
 from fastapi import HTTPException, Depends
 from datetime import datetime, timezone
 from pymongo.errors import DuplicateKeyError
 from database import get_db
 from auth import get_current_user, get_optional_user
 from services.access_links import record_access_link_use, validate_access_link
+from services.match_audience import responsible_registration
+from services.registration_notifications import notify_registration_status
+from services.tournament_rules import self_checkin_allowed
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     PARTICIPANT_STAFF_ROLES,
@@ -40,6 +45,27 @@ from routes.tournament_router import router
 
 
 REGISTRATION_CHECKIN_STATUSES = {"approved", "checked_in", "no_show"}
+logger = logging.getLogger("tls.tournament_registration")
+
+
+def _log_safe(value, limit: int = 120) -> str:
+    """Werte aus Anfragen ins Protokoll nur ohne Zeilenumbrüche und gekürzt."""
+    return str(value or "").replace("\r", " ").replace("\n", " ")[:limit]
+
+
+async def _notify_registration(db, tid: str, registration: dict, status: str, *, previous: str | None = None,
+                               reason: str | None = None, actor_id: str | None = None) -> None:
+    """Anmeldung eingegangen, bestätigt, abgelehnt oder nachgerückt (#1133): Nachricht an die Verantwortlichen der
+    Anmeldung. Eine Nachricht hält nie eine Anmeldung auf."""
+    try:
+        tournament = await db.tournaments.find_one(
+            {"id": tid},
+            {"_id": 0, "id": 1, "slug": 1, "title": 1, "event_mode": 1, "is_online": 1, "is_hybrid": 1, "check_in_from": 1},
+        )
+        if tournament:
+            await notify_registration_status(db, tournament, registration, status, previous=previous, reason=reason, actor_id=actor_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Registration notification failed for tournament=%s type=%s", _log_safe(tid), type(exc).__name__)
 
 
 BRACKET_REFRESH_LOCKED_STATUSES = {"check_in", "live", "paused", "completed", "results_published", "archived", "cancelled"}
@@ -455,6 +481,9 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
             reg["price_snapshot"], reg["billing_status"] = snapshot, "pending"
     reg.pop("_id", None)
     reg.pop("identity_key", None)
+    # Bestätigung (#1133): „Du bist dabei“ oder „Du stehst auf der Warteliste“ - im Postfach und, wenn erlaubt, per Mail;
+    # bei Teams auch an Teamleitung und Co-Leitung.
+    await _notify_registration(db, tid, reg, reg["status"], actor_id=me.get("id"))
     reg["auto_bracket_update"] = auto_bracket_update
     reg["idempotent_replay"] = False
     # Badge trigger
@@ -643,6 +672,9 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
     )
     reg.pop("_id", None)
     reg.pop("identity_key", None)
+    if reg.get("user_id") or reg.get("team_id"):
+        # Von der Turnierleitung eingetragen (#1133): die Person (bei Teams die Teamleitung) erfährt, dass sie dabei ist.
+        await _notify_registration(db, tid, reg, reg["status"], actor_id=me.get("id"))
     return {
         "registration": reg,
         "replacement": replacement,
@@ -662,14 +694,19 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    # Der Grund einer Absage geht nur in die Nachricht an die Person (#1133), nicht an die Anmeldung.
+    status_reason = updates.pop("status_reason", None)
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
     if not reg:
         raise HTTPException(status_code=404, detail="Anmeldung nicht gefunden")
     if updates and all(reg.get(key) == value for key, value in updates.items()):
         return {**reg, "idempotent_replay": True}
+    previous_status = reg.get("status")
     updates["updated_at"] = now_utc().isoformat()
     await db.tournament_registrations.update_one({"id": reg_id, "tournament_id": tid}, {"$set": updates})
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
+    if updates.get("status") and updates["status"] != previous_status:
+        await _notify_registration(db, tid, reg, updates["status"], previous=previous_status, reason=status_reason, actor_id=me.get("id"))
     if updates.get("status") in {"approved", "checked_in", "rejected", "waitlist", "no_show"}:
         tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
         if tournament:
@@ -787,28 +824,8 @@ async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_curr
 
 
 async def _find_self_registration(db, tid: str, user_id: str) -> dict | None:
-    reg = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": user_id})
-    if not reg:
-        team_ids = [
-            row.get("team_id")
-            for row in await db.team_members.find({"user_id": user_id}, {"_id": 0, "team_id": 1}).to_list(100)
-            if row.get("team_id")
-        ]
-        if team_ids:
-            teams = await db.teams.find(
-                {
-                    "id": {"$in": team_ids},
-                    "$or": [{"leader_id": user_id}, {"co_leader_ids": user_id}],
-                },
-                {"_id": 0, "id": 1},
-            ).to_list(100)
-            manageable_team_ids = [team["id"] for team in teams]
-            if manageable_team_ids:
-                reg = await db.tournament_registrations.find_one({
-                    "tournament_id": tid,
-                    "team_id": {"$in": manageable_team_ids},
-                })
-    return reg
+    # Einchecken dürfen die Verantwortlichen der Anmeldung (#1136) - dieselbe Regel wie Melden und Dispute.
+    return await responsible_registration(db, tid, user_id)
 
 
 @router.post("/{tid}/checkin")
@@ -816,7 +833,8 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
-    if (tournament.get("event_mode") or "online") == "local":
+    # Eine Prüfung für alle Stellen (#1135): Knopf, Startseite, Erinnerungen, Mail und Discord fragen dieselbe Regel.
+    if not self_checkin_allowed(tournament):
         raise HTTPException(status_code=403, detail="Bei Vor-Ort-Turnieren macht die Turnierleitung den Check-in.")
     try:
         async with mutation_lock(db, tournament_write_resource(tid)):

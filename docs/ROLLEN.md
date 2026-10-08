@@ -47,7 +47,10 @@ Freigaben bleiben davon unberührt. Anleitung: `docs/DOLIBARR.md`.
 **Pro Turnier:** Unabhängig von der Rolle kann eine Person je Turnier zugewiesen werden
 (Turnierseite → Staff: organizer, referee, scorekeeper, station_manager, stream_operator).
 Ein `organizer` darf in seinem Turnier alles – Struktur, Ergebnisse, Check-in, Stationen und die
-Gewinne dieses Turniers (#288). Das braucht keinen Bereich und keine Zwei-Faktor-Anmeldung.
+Gewinne dieses Turniers (#288). Ergebnisse eintragen dürfen außerdem `referee`, `scorekeeper` und die Station-Crew
+(`station_manager`, Entscheidung zu #1139 – alles steht im Protokoll, die Turnierleitung kann korrigieren); sie alle
+bekommen Dispute und abweichende Ergebnis-Meldungen ihres Bereichs sofort gemeldet (#1132, #1134). Das braucht
+keinen Bereich und keine Zwei-Faktor-Anmeldung.
 Dasselbe gilt je Fast Lap (Challenge → Staff). Turnierrechte, Fast-Lap-Zeiten, Events und Exporte
 kommen nur aus der Turnierleitung, Club-Admin, Superadmin oder einem solchen Einsatz – auch für
 Moderatoren.

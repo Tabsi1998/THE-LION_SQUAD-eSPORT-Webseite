@@ -11,7 +11,8 @@ Fabian wollte beides (Einstellung „Team am Spieltag: beides“, keine Nutzer-E
   und kann Fehlende anstupsen - eine Meldung, höchstens alle 10 Minuten je Team.
 
 Wer welche Nachricht bekommt (#1136): Aufruf und Spiel-Meldungen gehen an die Aufgestellten, ohne Aufstellung an
-alle Mitglieder - ``registration_recipients`` ist die eine Stelle dafür (Ergebnis, Erinnerung, Aufruf an der Station).
+alle Mitglieder (Ergebnis, Erinnerung, Aufruf an der Station). Die Regel steht an einer Stelle in
+``services.match_audience`` (``playing_ids``); ``registration_recipients`` reicht sie nur weiter.
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from zoneinfo import ZoneInfo
 from fastapi import HTTPException
 
 from models import now_utc
+from services.match_audience import playing_user_ids
 
 VIENNA = ZoneInfo("Europe/Vienna")
 NUDGE_MINUTES = 10
@@ -113,25 +115,8 @@ def validate_lineup(team: dict, tournament: dict, starters: list[str]) -> tuple[
 
 async def registration_recipients(db, registrations: list[dict]) -> set[str]:
     """Wer zu einer Anmeldung Spiel-Meldungen bekommt (#1192, #1136): Einzel die Person; Team die Aufgestellten,
-    ohne Aufstellung alle Mitglieder (aus dem Team und der Mitgliederliste)."""
-    user_ids: set[str] = set()
-    team_ids = sorted({reg.get("team_id") for reg in registrations if reg.get("team_id") and not reg.get("lineup")})
-    members_by_team: dict[str, set[str]] = {tid: set() for tid in team_ids}
-    if team_ids:
-        for team in await db.teams.find({"id": {"$in": team_ids}}, {"_id": 0, "id": 1, "member_ids": 1}).to_list(len(team_ids)):
-            members_by_team[team["id"]].update(uid for uid in team.get("member_ids") or [] if uid)
-        for row in await db.team_members.find({"team_id": {"$in": team_ids}}, {"_id": 0, "team_id": 1, "user_id": 1}).to_list(2000):
-            if row.get("user_id"):
-                members_by_team.setdefault(row["team_id"], set()).add(row["user_id"])
-    for reg in registrations:
-        if reg.get("team_id"):
-            if reg.get("lineup"):
-                user_ids.update(uid for uid in reg["lineup"] if uid)
-            else:
-                user_ids.update(members_by_team.get(reg["team_id"], set()))
-        elif reg.get("user_id"):
-            user_ids.add(reg["user_id"])
-    return {uid for uid in user_ids if uid}
+    ohne Aufstellung alle Mitglieder samt Leitung (aus dem Team und der Mitgliederliste)."""
+    return await playing_user_ids(db, registrations)
 
 
 def minutes_until(moment: str, now: datetime | None = None) -> int:

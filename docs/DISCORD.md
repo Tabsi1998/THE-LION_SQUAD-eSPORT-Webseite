@@ -88,6 +88,9 @@ Gemeldet wird nur, was ab dann veröffentlicht wird (und nichts, was älter als
 - Alles Weitere steht im Thread, kurz und ohne Wiederholung: Check-in offen (mit Frist), jetzt
   live, Streams von Teilnehmern, das Bracket (angepinnt, nach jedem Ergebnis bearbeitet),
   beendet, Ergebnisse veröffentlicht. Der Kanal zeigt je Turnier genau eine Meldung.
+- **Vor-Ort-Turniere (#1135):** Die Turnierleitung checkt ein – der Thread sagt „Check-in vor Ort: Bitte bis …
+  bei der Turnierleitung melden“, Titel „Check-in vor Ort“, Knopf „Zum Turnier“ statt „Zum Check-in“
+  (`tournament_rules.self_checkin_allowed`, dieselbe Prüfung wie App, Startseite, Erinnerungen und Mail).
 - **Bracket als Bild (#575):** `services/bracket_image.py` zeichnet mit Pillow (ohne Browser) jede K.-o.-Phase:
   Abschnitte (Winner, Loser, Grand Final), Runden als Spalten, Karten mit Namen und Ergebnis, Linien im Baum.
   `discord_bracket.build_with_image` baut Einbettung und Bild aus denselben Daten; das PNG hängt als

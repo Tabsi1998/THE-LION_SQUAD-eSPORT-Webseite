@@ -69,7 +69,7 @@ export const MATCH_STATUS_LABELS = {
   waiting_result: "Wartet auf Ergebnis",
   completed: "Beendet",
   archived: "Archiviert",
-  disputed: "Klärung nötig",
+  disputed: "In Klärung",
   forfeit: "Wertung",
   bye: "Freilos",
   no_show: "Nicht erschienen",

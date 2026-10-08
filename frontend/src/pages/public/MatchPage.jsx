@@ -20,6 +20,9 @@ import { viennaDateTime } from "@/lib/vienna";
 import { formatWhen } from "@/lib/datetime";
 import { finishedMatchText, formatMatchKind, formatMatchStatus, isByeSlot, isMatchFinished, matchHeadline, slotName, stationText } from "@/lib/tournamentLabels";
 import { matchIsOver } from "@/lib/afterEnd";
+import { rankingMode } from "@/lib/matchReport";
+import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
+import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 
 const scheduleLabels = {
   proposed: "Terminvorschlag offen",
@@ -85,8 +88,6 @@ export default function MatchPage() {
   const [counterAt, setCounterAt] = useState("");
   const [decisionNote, setDecisionNote] = useState("");
   const [message, setMessage] = useState("");
-  const [scoreA, setScoreA] = useState("");
-  const [scoreB, setScoreB] = useState("");
   const [proofUrl, setProofUrl] = useState("");
   const [reportNote, setReportNote] = useState("");
   const [disputeReason, setDisputeReason] = useState("");
@@ -106,14 +107,10 @@ export default function MatchPage() {
     const nextMatch = page.match || {};
     if (preserveDrafts) {
       setProposalAt((current) => current || toLocalInput(nextMatch.scheduled_at));
-      setScoreA((current) => current || String(nextMatch.score_a ?? 0));
-      setScoreB((current) => current || String(nextMatch.score_b ?? 0));
       setForfeitWinnerId((current) => current || firstRegistrationId(page.participants));
       setV2Rows((current) => current.length ? current : buildV2Rows(page));
     } else {
       setProposalAt(toLocalInput(nextMatch.scheduled_at));
-      setScoreA(String(nextMatch.score_a ?? 0));
-      setScoreB(String(nextMatch.score_b ?? 0));
       setForfeitWinnerId(firstRegistrationId(page.participants));
       setV2Rows(buildV2Rows(page));
     }
@@ -184,34 +181,12 @@ export default function MatchPage() {
     }, "Terminentscheidung konnte nicht gespeichert werden.");
   };
 
-  const submitLegacyResult = async (e) => {
-    e.preventDefault();
-    await runAction(async () => {
-      const score_a = Math.max(0, Number.parseInt(scoreA || "0", 10) || 0);
-      const score_b = Math.max(0, Number.parseInt(scoreB || "0", 10) || 0);
-      if (data?.can_staff_submit_result) {
-        const winner_id = score_a > score_b ? duelParticipants[0]?.registration_id : score_b > score_a ? duelParticipants[1]?.registration_id : null;
-        await api.patch(`/matches/${id}`, {
-          score_a,
-          score_b,
-          status: winner_id ? "completed" : "waiting_result",
-          winner_id,
-        });
-        toast.success("Ergebnis gespeichert.");
-      } else {
-        await api.post(`/matches/${id}/report`, {
-          score_a,
-          score_b,
-          screenshot_url: proofUrl.trim() || null,
-          note: reportNote.trim() || null,
-        });
-        toast.success("Ergebnis gemeldet.");
-      }
-      setProofUrl("");
-      setReportNote("");
-      await load({ preserveDrafts: false });
-    }, "Ergebnis konnte nicht gespeichert werden.");
-  };
+  // Ergebnis melden (#1132): die Platzierungsliste an /report - der Server vergleicht die Meldungen beider Seiten.
+  const submitReport = async (payload) => runAction(async () => {
+    const { data: answer } = await api.post(`/matches/${id}/report`, payload);
+    toast.success(answer?.awaiting_confirmation === false ? "Ergebnis bestätigt – das Spiel ist entschieden." : "Ergebnis gemeldet.");
+    await load({ preserveDrafts: false });
+  }, "Ergebnis konnte nicht gemeldet werden.");
 
   const submitV2Result = async (e) => {
     e.preventDefault();
@@ -228,11 +203,11 @@ export default function MatchPage() {
           time_ms: numberOrNull(row.time_ms),
         })),
       });
-      toast.success("Heat-Ergebnis gespeichert.");
+      toast.success("Ergebnis gespeichert.");
       setProofUrl("");
       setReportNote("");
       await load({ preserveDrafts: false });
-    }, "Heat-Ergebnis konnte nicht gespeichert werden.");
+    }, "Ergebnis konnte nicht gespeichert werden.");
   };
 
   const submitDispute = async (e) => {
@@ -241,10 +216,10 @@ export default function MatchPage() {
     if (!reason) return failAction("Bitte Grund angeben.");
     await runAction(async () => {
       await api.post(`/matches/${id}/dispute`, { reason });
-      toast.success("Klärfall gemeldet.");
+      toast.success("Dispute gemeldet – die Turnierleitung prüft und entscheidet.");
       setDisputeReason("");
       await load({ preserveDrafts: false });
-    }, "Klärfall konnte nicht gemeldet werden.");
+    }, "Dispute konnte nicht gemeldet werden.");
   };
 
   const submitForfeit = async (e) => {
@@ -305,10 +280,15 @@ export default function MatchPage() {
   // wenn darin etwas steht.
   const over = matchIsOver(match);
   const showChat = !over || (Boolean(data.can_act) && chat.length > 0);
-  const canReportScore = Boolean(data.can_player_report_result || data.can_report_score);
-  const canSubmitLegacyResult = Boolean(!isV2 && duelParticipants.length >= 2 && !isCompleted && (canReportScore || data.can_staff_submit_result || data.can_submit_result));
-  const canSubmitV2Result = Boolean(isV2 && !isCompleted && data.can_staff_submit_result && v2Rows.length);
-  const hasResultActions = Boolean(canSubmitLegacyResult || canSubmitV2Result || (!isCompleted && data.can_dispute) || (!isCompleted && data.can_forfeit));
+  // Ergebnis (#1132): Spieler melden über das Meldeformular, die Turnierleitung trägt über /result ein. Wer beides
+  // dürfte, bekommt das Formular der Turnierleitung.
+  const canStaffSubmit = Boolean(data.can_staff_submit_result);
+  const canPlayerReport = Boolean(data.can_player_report_result && !canStaffSubmit && !isCompleted);
+  const canSubmitV2Result = Boolean(!isCompleted && canStaffSubmit && v2Rows.length);
+  // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - der Server sagt, bis wann.
+  const canDispute = Boolean(data.can_dispute);
+  const hasOtherResultActions = Boolean(canPlayerReport || canSubmitV2Result);
+  const hasResultActions = Boolean(hasOtherResultActions || canDispute || (!isCompleted && data.can_forfeit));
   const reports = Array.isArray(match.reports) ? match.reports : [];
   const resultParticipants = isV2 ? participants : duelParticipants;
   const showFixedScheduleNotice = data.schedule_mode === "fixed_by_staff" && !canProposeSchedule;
@@ -372,6 +352,8 @@ export default function MatchPage() {
           )}
         </div>
 
+        {data.call && <MatchCallBox call={data.call} />}
+
         {actionError && <div className="mt-5"><AuthFormAlert id="match-action-error">{actionError}</AuthFormAlert></div>}
 
         <div className="mt-8 border border-[#29B6E8]/35 bg-[#0F1D23] rounded-sm p-5" data-testid="match-result-card">
@@ -416,28 +398,27 @@ export default function MatchPage() {
           </div>
           )}
 
+          {data.in_dispute && (
+            <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#FFD2CF]" data-testid="match-in-dispute">
+              <strong>In Klärung</strong> – zu diesem Spiel liegt ein Dispute vor. Die Turnierleitung prüft und entscheidet.
+            </p>
+          )}
+
           {hasResultActions ? (
             <div className="mt-5 border-t border-white/10 pt-5 space-y-5">
-              {canSubmitLegacyResult && (
-            <form onSubmit={submitLegacyResult}>
-              <div className="grid sm:grid-cols-[1fr_1fr] gap-3">
-                <Field label={`${duelParticipants[0]?.display_name || "Seite A"} Punkte`}>
-                  <input type="number" min="0" value={scoreA} onChange={(e) => setScoreA(e.target.value)} className="input text-center font-display text-2xl font-bold" data-testid="match-inline-score-a" />
-                </Field>
-                <Field label={`${duelParticipants[1]?.display_name || "Seite B"} Punkte`}>
-                  <input type="number" min="0" value={scoreB} onChange={(e) => setScoreB(e.target.value)} className="input text-center font-display text-2xl font-bold" data-testid="match-inline-score-b" />
-                </Field>
-              </div>
-              <div className="mt-3 grid sm:grid-cols-2 gap-3">
-                <input type="url" value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} className="input" placeholder="Screenshot-/Beweis-Link optional" />
-                <input value={reportNote} onChange={(e) => setReportNote(e.target.value)} className="input" placeholder="Notiz optional" />
-              </div>
-              <button disabled={busy} className="tls-btn tls-btn--primary mt-4 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-inline-report-btn">{data.can_staff_submit_result ? "Ergebnis speichern" : "Ergebnis melden"}</button>
-            </form>
+              {canPlayerReport && (
+                <MatchReportForm
+                  participants={participants}
+                  match={match}
+                  state={data.report_state}
+                  allowsDraw={Boolean(data.allows_draw)}
+                  busy={busy}
+                  onReport={submitReport}
+                />
               )}
 
               {canSubmitV2Result && (
-                <form onSubmit={submitV2Result} className="space-y-4">
+                <form onSubmit={submitV2Result} className="space-y-4" data-testid="match-staff-result-form">
                   <p className="text-sm text-white/55">{v2Mode === "time" ? "Zeit erfassen. Schnellste Zeit gewinnt automatisch." : v2Mode === "lower_score" ? "Score erfassen. Niedrigster Score gewinnt automatisch." : "Punkte erfassen. Höchste Punkte gewinnen automatisch."}</p>
                   <div className="grid gap-3" data-testid="match-v2-result-form">
                     {v2Rows.map((row, index) => (
@@ -465,15 +446,19 @@ export default function MatchPage() {
                     <input type="url" value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} className="input" placeholder="Screenshot-/Beweis-Link optional" />
                     <input value={reportNote} onChange={(e) => setReportNote(e.target.value)} className="input" placeholder="Notiz optional" />
                   </div>
-                  <button disabled={busy} className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-v2-submit-btn">Heat-Ergebnis speichern</button>
+                  <button disabled={busy} className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-v2-submit-btn">Ergebnis speichern</button>
                 </form>
               )}
 
-              {data.can_dispute && !isCompleted && (
-                <form onSubmit={submitDispute} className="border-t border-white/10 pt-5">
+              {canDispute && (
+                <form onSubmit={submitDispute} className={hasOtherResultActions ? "border-t border-white/10 pt-5" : ""} data-testid="match-dispute-form">
                   <Field label="Dispute-Grund">
                     <input value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} className="input" placeholder="Was stimmt nicht?" data-testid="match-dispute-input" />
                   </Field>
+                  <p className="mt-2 text-xs text-white/50" data-testid="match-dispute-hint">
+                    Stimmt etwas nicht? Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet.
+                    {data.dispute_until ? ` Möglich bis ${formatWhen(data.dispute_until)}.` : ""}
+                  </p>
                   <button disabled={busy || !disputeReason.trim()} className="tls-btn tls-btn--danger mt-3 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-dispute-btn">Dispute melden</button>
                 </form>
               )}
@@ -509,7 +494,7 @@ export default function MatchPage() {
           ) : (
             <p className="mt-4 text-sm text-white/50">{isCompleted ? "Dieses Match ist abgeschlossen." : resultModeLabels[data.result_entry_mode] || "Ergebnis wird durch die Turnierleitung gepflegt."}</p>
           )}
-          {reports.length > 0 && <p className="mt-3 text-xs text-white/45">{reports.length} Ergebnismeldung{reports.length === 1 ? "" : "en"} vorhanden.</p>}
+          {canStaffSubmit && !isCompleted && reports.length > 0 && <p className="mt-3 text-xs text-white/45" data-testid="match-report-count">{reports.length} Ergebnismeldung{reports.length === 1 ? "" : "en"} der Spieler vorhanden.</p>}
         </div>
 
         {/* Nach dem Ende (#1221): Ergebnis und Verlauf - keine Terminabstimmung mehr; der Matchchat bleibt für
@@ -688,13 +673,6 @@ function buildV2Rows(page) {
         time_ms: existing?.time_ms != null ? String(existing.time_ms) : "",
       };
     });
-}
-
-function rankingMode(match) {
-  const raw = String(match?.settings?.calculation || match?.settings?.score_type || "points").toLowerCase().replace(/[-\s]/g, "_");
-  if (["time", "time_ms", "fastest", "fastest_lap", "lowest_time", "best_time"].includes(raw)) return "time";
-  if (["lower_score", "lowest_score", "low_score", "strokes", "penalty_points"].includes(raw)) return "lower_score";
-  return "higher_score";
 }
 
 function firstRegistrationId(participants) {

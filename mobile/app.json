@@ -414,7 +414,10 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#29B6E8"
+          "color": "#29B6E8",
+          "sounds": [
+            "./assets/sounds/lion_call_gong.wav"
+          ]
         }
       ],
       "expo-video",

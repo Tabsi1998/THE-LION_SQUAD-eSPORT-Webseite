@@ -3,15 +3,20 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from services.competition_read import load_matches_by_query
+from services.competition_read import load_match_reports, load_matches_by_query
+from services.match_audience import acting_registration_ids as acting_ids_for
 from services.station_labels import attach_station_info
 from services.tournament_permissions import RESULT_STAFF_ROLES, is_global_tournament_staff
+from services.tournament_rules import match_policy, players_can_report
+from services.v2_match_flows import REPORT_CLOSED_STATUSES, report_state
 
 
-OPEN_MATCH_STATUSES = {"ready", "scheduled", "in_progress", "waiting_result"}
+# Ein Spiel in Klärung (#1134) bleibt in beiden Listen: bei der Turnierleitung ganz oben, beim Spieler mit „In Klärung“.
+OPEN_MATCH_STATUSES = {"ready", "scheduled", "in_progress", "waiting_result", "disputed"}
 ACTIVE_REGISTRATION_STATUSES = {"registered", "approved", "checked_in"}
 ACTIVE_OPERATION_TOURNAMENT_STATUSES = {"check_in", "live", "paused"}
 MATCH_STATUS_PRIORITY = {
+    "disputed": -1,
     "in_progress": 0,
     "waiting_result": 1,
     "ready": 2,
@@ -67,7 +72,7 @@ async def _active_registrations_for_user(db, user: dict) -> list[dict]:
         identity_query = {"$or": [{"user_id": user["id"]}, {"team_id": {"$in": team_ids}}]}
     return await db.tournament_registrations.find(
         {**identity_query, "status": {"$in": sorted(ACTIVE_REGISTRATION_STATUSES)}},
-        {"_id": 0, "id": 1, "tournament_id": 1},
+        {"_id": 0, "id": 1, "tournament_id": 1, "user_id": 1, "team_id": 1},
     ).to_list(250)
 
 
@@ -87,21 +92,58 @@ def _registration_label(registration: dict | None, team_map: dict[str, dict]) ->
     return str(team.get("name") or team.get("tag") or "")
 
 
+def _report_task(match: dict, policy: dict, acting_ids: set[str], now: datetime) -> str | None:
+    """Was für die eigene Seite beim Ergebnis zu tun ist (#1139, #1132): „confirm“, wenn die Gegenseite gemeldet hat und
+    die eigene Meldung fehlt; „report“, wenn das Spiel läuft oder seine Zeit da ist und noch niemand gemeldet hat."""
+    if not players_can_report(policy) or str(match.get("status") or "") in REPORT_CLOSED_STATUSES:
+        return None
+    mine = [rid for rid in match_registration_ids(match) if rid in acting_ids]
+    if not mine or len(match_registration_ids(match)) < 2:
+        return None
+    state = report_state(match.get("reports") or [], mine[0])["status"]
+    if state == "confirm":
+        return "confirm"
+    if state != "open":
+        return None
+    scheduled = None
+    if match.get("scheduled_at"):
+        try:
+            scheduled = datetime.fromisoformat(str(match["scheduled_at"]).replace("Z", "+00:00"))
+            scheduled = scheduled if scheduled.tzinfo else scheduled.replace(tzinfo=timezone.utc)
+        except ValueError:
+            scheduled = None
+    if match.get("status") in {"in_progress", "waiting_result"} or (scheduled and scheduled <= now):
+        return "report"
+    return None
+
+
 async def compact_match_overviews(
     db,
     matches: list[dict],
     own_registration_ids: set[str] | None = None,
     result_match_ids: set[str] | None = None,
+    acting_registration_ids: set[str] | None = None,
 ) -> list[dict]:
     own_registration_ids = own_registration_ids or set()
     result_match_ids = result_match_ids or set()
+    acting_registration_ids = acting_registration_ids or set()
     await attach_station_info(db, matches)
     tournament_ids = list({match.get("tournament_id") for match in matches if match.get("tournament_id")})
     registration_ids = list({rid for match in matches for rid in match_registration_ids(match)})
     tournaments = await db.tournaments.find(
         {"id": {"$in": tournament_ids}},
-        {"_id": 0, "id": 1, "title": 1, "slug": 1},
+        {"_id": 0, "id": 1, "title": 1, "slug": 1, "event_mode": 1, "result_entry_mode": 1, "schedule_mode": 1,
+         "is_online": 1, "is_hybrid": 1},
     ).to_list(max(100, len(tournament_ids))) if tournament_ids else []
+    stage_ids = list({match.get("stage_id") for match in matches if match.get("stage_id")})
+    stages = {
+        row["id"]: row
+        for row in await db.tournament_stages.find(
+            {"id": {"$in": stage_ids}}, {"_id": 0, "id": 1, "settings": 1, "event_mode": 1, "result_entry_mode": 1, "schedule_mode": 1},
+        ).to_list(max(100, len(stage_ids)))
+    } if stage_ids and acting_registration_ids else {}
+    reports = await load_match_reports(db, [match.get("id") for match in matches]) if acting_registration_ids else {}
+    now = datetime.now(timezone.utc)
     registrations = await db.tournament_registrations.find(
         {"id": {"$in": registration_ids}},
         {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_id": 1},
@@ -151,7 +193,12 @@ async def compact_match_overviews(
             "participant_count": len(participant_ids),
             "is_own_match": bool(own_registration_ids.intersection(participant_ids)),
             "can_submit_result": match.get("id") in result_match_ids,
-            "needs_result": match.get("status") in {"in_progress", "waiting_result"},
+            "needs_result": match.get("status") in {"in_progress", "waiting_result", "disputed"},
+            "disputed": match.get("status") == "disputed",
+            # Eine echte Aufgabe für die Startseite (#1139): „Ergebnis melden“ oder „Ergebnis bestätigen“.
+            "report_task": _report_task({**match, "reports": reports.get(match.get("id") or "", [])},
+                                        match_policy(match, tournament, stages.get(match.get("stage_id") or "")),
+                                        acting_registration_ids, now) if acting_registration_ids else None,
         })
     return summaries
 
@@ -170,7 +217,9 @@ async def own_match_overviews(db, user: dict, limit: int = 12) -> tuple[list[dic
         "status": {"$in": sorted(OPEN_MATCH_STATUSES)},
     }
     matches = sorted(await _matches_for_query(db, query), key=match_overview_sort_key)[:limit]
-    return await compact_match_overviews(db, matches, registration_ids), registrations
+    # Ergebnis melden oder bestätigen ist eine Aufgabe der Verantwortlichen (#1136) - nur sie bekommen sie angezeigt.
+    acting = await acting_ids_for(db, registrations, user.get("id"))
+    return await compact_match_overviews(db, matches, registration_ids, acting_registration_ids=acting), registrations
 
 
 def _assignment_matches(assignment: dict, match: dict) -> bool:

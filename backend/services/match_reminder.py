@@ -7,9 +7,10 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from database import get_db
-from match_rules import participant_source_ids
 from models import now_utc
 from services.competition_read import load_scheduled_matches
+from services.match_audience import match_player_users, playing_ids, registrations_for_match, teams_by_id, users_for
+from services.tournament_rules import uses_actual_start_notifications
 from services.user_notifications import build_public_url, create_user_notification
 
 logger = logging.getLogger("tls.match_reminders")
@@ -20,51 +21,45 @@ LEAD_TIMES = [
 EMAIL_LEAD_LABELS = {"10m"}
 
 
-def _uses_actual_start_notifications(tournament: dict) -> bool:
-    event_mode = tournament.get("event_mode") or (
-        "local" if tournament.get("location") and not tournament.get("stream_link") else "online"
-    )
-    schedule_mode = tournament.get("schedule_mode") or (
-        "fixed_by_staff" if event_mode == "local" else "player_proposal"
-    )
-    return event_mode == "local" and schedule_mode == "fixed_by_staff"
+# Vor Ort mit festen Zeiten: kein Hinweis vorher, der Aufruf beim Reservieren und der Start sagen es (Regel an einer
+# Stelle: services/tournament_rules).
+_uses_actual_start_notifications = uses_actual_start_notifications
 
 
 async def _participants_for_match(match: dict) -> list[dict]:
-    """Resolve match participant registration ids to user objects."""
-    db = get_db()
-    out: list[dict] = []
-    seen_user_ids: set[str] = set()
+    """Wer im Spiel antritt, als Konten - bei Teams die Aufgestellten, ohne Aufstellung jedes Mitglied (#1136, #1192)."""
+    return await match_player_users(get_db(), match)
 
-    def add_user(user: dict | None) -> None:
-        if not user or not user.get("id") or user["id"] in seen_user_ids:
-            return
-        seen_user_ids.add(user["id"])
-        out.append(user)
 
-    for raw in participant_source_ids(match):
-        # Try direct user
-        u = await db.users.find_one({"id": raw}, {"id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1})
-        if u:
-            add_user(u)
-            continue
-        # Try via registration - Teams (#1192): die Aufgestellten, ohne Aufstellung alle Mitglieder.
-        reg = await db.tournament_registrations.find_one({"id": raw}, {"_id": 0})
-        if reg and reg.get("team_id"):
-            from services.team_lineup import registration_recipients
-            uids = sorted(await registration_recipients(db, [reg]))
-            if uids:
-                users = await db.users.find(
-                    {"id": {"$in": uids}},
-                    {"id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1},
-                ).to_list(20)
-                for team_user in users:
-                    add_user(team_user)
-        elif reg and reg.get("user_id"):
-            u2 = await db.users.find_one({"id": reg["user_id"]}, {"id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1})
-            if u2:
-                add_user(u2)
+async def _recipients_with_opponents(db, match: dict) -> list[tuple[dict, str]]:
+    """Jeder Spieler mit dem Namen der Gegenseite: bei Teams bekommen die Aufgestellten die Erinnerung, ohne
+    Aufstellung jedes Mitglied (#1136, #1192). Der Gegner ist die andere Anmeldung - nie die eigenen Mitspieler."""
+    registrations = await registrations_for_match(db, match)
+    if not registrations:
+        return [(user, "TBD") for user in await _participants_for_match(match)]
+    teams = await teams_by_id(db, registrations)
+    out: list[tuple[dict, str]] = []
+    seen: set[str] = set()
+    for reg in registrations:
+        others = [_registration_name(other) for other in registrations if other.get("id") != reg.get("id")]
+        opponent = _opponent_names([name for name in others if name])
+        for user in await users_for(db, playing_ids(reg, teams.get(reg.get("team_id") or ""))):
+            if user.get("id") and user["id"] not in seen:
+                seen.add(user["id"])
+                out.append((user, opponent))
     return out
+
+
+def _registration_name(registration: dict) -> str:
+    return registration.get("display_name") or registration.get("ingame_name") or registration.get("team_name") or ""
+
+
+def _opponent_names(names: list[str]) -> str:
+    if not names:
+        return "TBD"
+    if len(names) <= 3:
+        return ", ".join(names)
+    return f"{len(names)} Gegner"
 
 
 async def _station_label(match: dict) -> str:
@@ -81,18 +76,6 @@ async def _station_label(match: dict) -> str:
     if station.get("notes"):
         parts.append(station["notes"])
     return " - ".join(parts)
-
-
-def _opponent_label(participants: list[dict], user: dict) -> str:
-    others = [p.get("display_name") or p.get("username") for p in participants if p.get("id") != user.get("id")]
-    others = [name for name in others if name]
-    if not others:
-        return "TBD"
-    if len(others) == 1:
-        return others[0]
-    if len(others) <= 3:
-        return ", ".join(others)
-    return f"{len(others)} Gegner"
 
 
 async def schedule_match_reminders() -> dict:
@@ -125,8 +108,8 @@ async def schedule_match_reminders() -> dict:
                 "slug": 1,
                 "event_mode": 1,
                 "schedule_mode": 1,
-                "location": 1,
-                "stream_link": 1,
+                "is_online": 1,
+                "is_hybrid": 1,
             },
         ) or {}
         if _uses_actual_start_notifications(t):
@@ -137,11 +120,10 @@ async def schedule_match_reminders() -> dict:
         when_str = scheduled.astimezone(ZoneInfo("Europe/Vienna")).strftime("%d.%m. %H:%M Uhr")
         station = await _station_label(m)
 
-        participants = await _participants_for_match(m)
+        participants = await _recipients_with_opponents(db, m)
         if len(participants) < 1:
             continue
-        for p in participants:
-            opp_name = _opponent_label(participants, p)
+        for p, opp_name in participants:
             for tpl_key, label, lead_min, window in LEAD_TIMES:
                 # Match this lead time? (within ±window)
                 if abs(diff_min - lead_min) > window:

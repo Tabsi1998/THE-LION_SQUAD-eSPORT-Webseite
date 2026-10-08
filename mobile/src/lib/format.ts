@@ -1,4 +1,4 @@
-import { asInstant, dayBefore, viennaDate, viennaDateTime, viennaDay, viennaTime } from "./vienna";
+import { asInstant, dayBefore, dayNoon, viennaDate, viennaDateTime, viennaDay, viennaTime } from "./vienna";
 export function displayName(user?: { display_name?: string | null; username?: string } | null) {
   return user?.display_name || user?.username || "Spieler";
 }
@@ -25,6 +25,29 @@ export function formatDateTime(value?: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Wann etwas ist - ganz und kurz, wie auf der Website (frontend/src/lib/datetime.js → formatWhen, #1220): „Sa 23. Mai ·
+ * 18:00“, heute „heute 18:00“, morgen „morgen 18:00“; das Jahr nur, wenn es nicht das laufende ist. Wiener Zeit.
+ */
+export function formatWhen(value?: string | null, { now = new Date(), fallback = "" }: { now?: Date; fallback?: string } = {}) {
+  if (value == null || value === "") return fallback;
+  const day = viennaDay(value);
+  if (!day) return fallback;
+  const time = viennaTime(value, { hour: "2-digit", minute: "2-digit" });
+  const today = viennaDay(now);
+  if (day === today) return `heute ${time}`;
+  if (day === new Date(dayNoon(today).getTime() + DAY_MS).toISOString().slice(0, 10)) return `morgen ${time}`;
+  const [year, , date] = day.split("-").map(Number);
+  const noon = dayNoon(day);
+  const weekday = WEEKDAYS[noon.getUTCDay()];
+  const monthName = viennaDate(noon, { month: "long" });
+  const yearPart = today.slice(0, 4) === String(year) ? "" : ` ${year}`;
+  return `${weekday} ${date}. ${monthName}${yearPart} · ${time}`;
 }
 
 export function formatStatus(value?: string | null) {
@@ -139,7 +162,7 @@ const STATUS_LABELS: Record<string, string> = {
   countered: "Gegenvorschlag",
   declined: "Abgelehnt",
   deleted: "Gelöscht",
-  disputed: "Klärung nötig",
+  disputed: "In Klärung",
   draft: "Entwurf",
   escalated: "Turnierleitung nötig",
   finished: "Beendet",

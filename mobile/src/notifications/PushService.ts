@@ -18,6 +18,7 @@ import { Platform } from "react-native";
 import Constants from "expo-constants";
 import { api } from "../lib/api";
 import type { UserNotification } from "../types";
+import { PUSH_CHANNELS, PUSH_CHANNEL_SET, RETIRED_CHANNEL_IDS } from "./channels";
 
 // Graceful import – falls expo-notifications nicht installiert ist
 // Installieren mit: npx expo install expo-notifications expo-device
@@ -92,6 +93,31 @@ export async function consumeInitialPushNotification(): Promise<UserNotification
   }
 }
 
+/**
+ * Android-Kanäle (#1138): legt jeden Kanal aus PUSH_CHANNELS an und löscht die alten. Android ändert Ton und
+ * Wichtigkeit eines bestehenden Kanals nicht - die Werte gelten also genau beim ersten Anlegen.
+ */
+export async function setupAndroidChannels(): Promise<void> {
+  if (!Notifications || Platform.OS !== "android") return;
+  for (const channel of PUSH_CHANNELS) {
+    await Notifications.setNotificationChannelAsync(channel.id, {
+      name: channel.name,
+      description: channel.description,
+      importance: Notifications.AndroidImportance[channel.importance],
+      vibrationPattern: channel.vibrationPattern,
+      lightColor: channel.lightColor,
+      sound: channel.sound,
+    });
+  }
+  for (const id of RETIRED_CHANNEL_IDS) {
+    try {
+      await Notifications.deleteNotificationChannelAsync?.(id);
+    } catch {
+      // Ein Kanal, den es nicht gibt, ist auch gelöscht.
+    }
+  }
+}
+
 /** Fragt Push-Permission an und registriert den Token beim Backend */
 export async function registerPushToken(): Promise<string | null> {
   if (!Notifications || !Device) return null;
@@ -117,23 +143,9 @@ export async function registerPushToken(): Promise<string | null> {
       return null;
     }
 
-    // Android: Notification Channel erstellen
+    // Android: die Kanäle anlegen (#1138) - je Thema einer, die alten zwei weg.
     if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "THE LION SQUAD",
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#29B6E8",
-        sound: "default",
-      });
-
-      await Notifications.setNotificationChannelAsync("tournaments", {
-        name: "Turniere & Events",
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#FFD700",
-        sound: "default",
-      });
+      await setupAndroidChannels();
     }
 
     // Expo Push Token holen
@@ -144,10 +156,11 @@ export async function registerPushToken(): Promise<string | null> {
     const token = tokenData.data;
     console.info(`[PushService] Push-Token: ${token.slice(0, 30)}...`);
 
-    // Token beim Backend registrieren
+    // Token beim Backend registrieren - mit dem Stand der Kanäle, damit der Server die neuen Kennungen schickt.
     await api.post("/mobile/push-token", {
       token,
       platform: Platform.OS,
+      channels: PUSH_CHANNEL_SET,
     });
 
     return token;

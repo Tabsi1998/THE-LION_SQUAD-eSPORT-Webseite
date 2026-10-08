@@ -22,11 +22,88 @@ def _is_expo_token(token: str | None) -> bool:
     return value.startswith("ExponentPushToken[") or value.startswith("ExpoPushToken[")
 
 
+# Android-Kanäle (#1138): jede Benachrichtigungsart in genau einem Kanal - die Liste steht hier und nur hier. Die App
+# legt dieselben Kanäle an (mobile/src/notifications/channels.ts). Aufteilung des Betreibers vom 07.10.2026:
+# lion_calls „Aufrufe & Spielstart“ (wichtig, mit Gong), lion_tournaments „Turniere & Events“, lion_chats „Chats“,
+# lion_club „Verein“, lion_achievements „Erfolge“.
+FALLBACK_CHANNEL = "lion_club"
+PUSH_CHANNELS = {
+    # Aufruf, „Match startet jetzt“, Erinnerung vor dem Spiel; für die Turnierleitung „Braucht Aufmerksamkeit“.
+    "match_call": "lion_calls",
+    "match_station": "lion_calls",
+    "match_reminder": "lion_calls",
+    "match_attention": "lion_calls",
+    # Team am Spieltag (#1192): „Bist du schon da?“ vom Kapitän - ein Ruf zum Antreten.
+    "team_presence_nudge": "lion_calls",
+    # Check-in, Ergebnisse, Turnier-Updates, Gewinne, Event-Hinweise, „Wie war …?“ nach Turnier oder Event.
+    "tournament_checkin": "lion_tournaments",
+    "tournament_registration": "lion_tournaments",
+    "tournament_finished": "lion_tournaments",
+    "match_result": "lion_tournaments",
+    "match_report": "lion_tournaments",
+    "match_dispute": "lion_tournaments",
+    "prize_pending": "lion_tournaments",
+    "f1_prize": "lion_tournaments",
+    "f1_prize_reminder": "lion_tournaments",
+    "event_member": "lion_tournaments",
+    "event_board": "lion_tournaments",
+    "access_link_invite": "lion_tournaments",
+    "feedback_request": "lion_tournaments",
+    # Direkt-, Team-, Turnier- und Match-Chat, Erwähnungen, Freundschafts- und Team-Einladungen.
+    "direct_message": "lion_chats",
+    "team_chat_message": "lion_chats",
+    "team_chat_mention": "lion_chats",
+    "tournament_chat_message": "lion_chats",
+    "tournament_chat_mention": "lion_chats",
+    "match_chat_message": "lion_chats",
+    "match_chat_mention": "lion_chats",
+    "news_mention": "lion_chats",
+    "friend_request": "lion_chats",
+    "friend_accept": "lion_chats",
+    "team_invite": "lion_chats",
+    "team_invite_accepted": "lion_chats",
+    "team_role_changed": "lion_chats",
+    "team_leader_transferred": "lion_chats",
+    # Vereinsintern, News, Mitgliedschaft, Rechnungen, Helferdienste.
+    "news_member": "lion_club",
+    "news_board": "lion_club",
+    "ballot_open": "lion_club",
+    "membership_update": "lion_club",
+    "membership_invited": "lion_club",
+    "invoice_ready": "lion_club",
+    "moderation": "lion_club",
+    "admin_push_test": "lion_club",
+    "helper_call": "lion_club",
+    "helper_reminder": "lion_club",
+    # Erfolge, Level, Kronen, Jahresrückblick.
+    "achievement": "lion_achievements",
+    "achievement_revoked": "lion_achievements",
+    "prestige": "lion_achievements",
+    "level": "lion_achievements",
+    "crown_gained": "lion_achievements",
+    "crown_lost": "lion_achievements",
+    "crown_changed": "lion_achievements",
+    "year_review": "lion_achievements",
+}
+# Ab diesem Stand legt die App die Kanäle oben an (sie meldet ihn beim Registrieren des Geräts mit).
+PUSH_CHANNEL_SET = 2
+
+
 def _channel_for_kind(kind: str | None) -> str:
+    """Der Kanal einer Benachrichtigungsart. Eine unbekannte Art landet bei „Verein“ - ein Test hält die Liste voll."""
+    return PUSH_CHANNELS.get(str(kind or "").lower(), FALLBACK_CHANNEL)
+
+
+def _legacy_channel_for_kind(kind: str | None) -> str:
+    """Die zwei Kanäle der App bis Version 1.4 - für Geräte, die noch nicht aktualisiert sind."""
     value = str(kind or "").lower()
     if value.startswith(("tournament", "match", "station", "f1", "prize")):
         return "tournaments"
     return "default"
+
+
+def channel_for_device(kind: str | None, channel_set: int | None) -> str:
+    return _channel_for_kind(kind) if int(channel_set or 0) >= PUSH_CHANNEL_SET else _legacy_channel_for_kind(kind)
 
 
 def _log_safe(value: Any, limit: int = 240) -> str:
@@ -41,11 +118,13 @@ async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int
     db = get_db()
     tokens = await db.mobile_push_tokens.find(
         {"user_id": user_id, "enabled": {"$ne": False}},
-        {"_id": 0, "token": 1},
+        {"_id": 0, "token": 1, "channel_set": 1},
     ).to_list(20)
-    push_tokens = [row.get("token") for row in tokens if _is_expo_token(row.get("token"))]
+    valid = [row for row in tokens if _is_expo_token(row.get("token"))]
+    push_tokens = [row.get("token") for row in valid]
     if not push_tokens:
         return 0
+    channel_sets = {row.get("token"): row.get("channel_set") for row in valid}
 
     title = str(notification.get("title") or "LionsAPP")[:120]
     body = str(notification.get("body") or "")[:180]
@@ -54,7 +133,8 @@ async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int
         {
             "to": token,
             "sound": "default",
-            "channelId": _channel_for_kind(kind),
+            # Je Gerät der passende Kanal (#1138): neue App - neue Kanäle, alte App - die zwei alten.
+            "channelId": channel_for_device(kind, channel_sets.get(token)),
             "priority": "high",
             "title": title,
             "body": body,

@@ -81,6 +81,7 @@ class FakeDb:
         self.teams = FakeCollection()
         self.stations = FakeCollection()
         self.tournament_staff_assignments = FakeCollection(assignments)
+        self.tournament_stages = FakeCollection()
 
 
 def test_live_match_sorts_before_later_scheduled_match():
@@ -104,6 +105,8 @@ def test_own_overview_only_returns_open_user_matches_with_opponent():
     assert rows[0]["needs_result"] is True
     assert rows[0]["is_own_match"] is True
     assert rows[0]["opponent_name"] == "Opponent"
+    # Online ohne eigene Angabe melden die Spieler (#1132): das laufende Spiel ist eine Aufgabe für die Startseite (#1139).
+    assert rows[0]["report_task"] == "report"
     assert [row["id"] for row in registrations] == ["r-own"]
 
 
