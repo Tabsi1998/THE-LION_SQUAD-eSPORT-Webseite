@@ -25,7 +25,8 @@ from models import now_utc
 SETTINGS_ID = "discord_design"
 VIENNA = ZoneInfo("Europe/Vienna")
 PLACEHOLDER_RE = re.compile(r"\{([a-z_]+)\}")
-OPTIONAL_RE = re.compile(r"\[\[(.+?)\]\]", re.S)
+# Leerraum und Trennpunkte am Stück (#1408): ein Lauf mit zwei oder mehr Punkten wird zu einem „ · “.
+DOT_RUN_RE = re.compile(r"[\s·]+")
 COLOR_RE = re.compile(r"^#?([0-9a-fA-F]{6})$")
 MASS_MENTION_RE = re.compile(r"@(everyone|here)\b")
 LIMITS = {"content": 2000, "title": 256, "description": 4096, "field_name": 256, "field_value": 1024, "fields": 25,
@@ -323,11 +324,25 @@ def escape_markdown(value: str) -> str:
     return MASS_MENTION_RE.sub(lambda match: "@​" + match.group(1), text)
 
 
+def _optional_parts(text: str, keep) -> str:
+    r"""Teile in ``[[ … ]]`` (#1408): ``keep(inhalt)`` sagt, was an ihrer Stelle steht. Ein Teil reicht von „[[“ bis
+    zum nächsten „]]“ mit mindestens einem Zeichen dazwischen - wie früher ``re.sub(r"\[\[(.+?)\]\]", …, flags=re.S)``,
+    nur in einem Durchgang: ein langer Text voller „[[“ ohne „]]“ brauchte vorher quadratisch lange."""
+    parts, pos = [], 0
+    while (start := text.find("[[", pos)) >= 0:
+        end = text.find("]]", start + 3)
+        if end < 0:  # kein „]]“ mehr dahinter - dann auch hinter keinem späteren „[[“
+            break
+        parts.append(text[pos:start] + keep(text[start + 2:end]))
+        pos = end + 2
+    parts.append(text[pos:])
+    return "".join(parts)
+
+
 def fill(text, values: dict, kinds: dict, *, escape: bool) -> str:
     """Platzhalter ersetzen. Unbekannte und leere Werte werden zu nichts; ein Teil in ``[[ … ]]`` fällt ganz weg,
     sobald einer seiner Platzhalter leer ist."""
-    def optional(match):
-        inner = match.group(1)
+    def optional(inner):
         return "" if any(not str(values.get(name) or "").strip() for name in PLACEHOLDER_RE.findall(inner)) else inner
 
     def replace(match):
@@ -337,17 +352,43 @@ def fill(text, values: dict, kinds: dict, *, escape: bool) -> str:
             return ""
         value = str(value)
         return escape_markdown(value) if escape and kinds.get(name, "text") == "text" else value
-    return PLACEHOLDER_RE.sub(replace, OPTIONAL_RE.sub(optional, str(text or "")))
+    return PLACEHOLDER_RE.sub(replace, _optional_parts(str(text or ""), optional))
+
+
+def _without_empty_links(line: str) -> str:
+    r"""Leere Links „[](…)“ fallen weg, jeweils bis zur nächsten „)“ (#1408) - wie früher
+    ``re.sub(r"\[\]\([^)]*\)", "", line)``, nur in einem Durchgang."""
+    parts, pos = [], 0
+    while (start := line.find("[](", pos)) >= 0:
+        end = line.find(")", start + 3)
+        if end < 0:  # keine „)“ mehr dahinter - dann auch hinter keinem späteren „[](“
+            break
+        parts.append(line[pos:start])
+        pos = end + 1
+    parts.append(line[pos:])
+    return "".join(parts)
+
+
+def _without_edge_dots(line: str) -> str:
+    r"""Ein Trennpunkt ganz vorne und einer ganz hinten fallen samt Leerraum weg (#1408) - wie früher
+    ``re.sub(r"^\s*·\s*|\s*·\s*$", "", line)``, nur ohne das Rückwärtssuchen in langem Leerraum."""
+    head = line.lstrip()
+    if head.startswith("·"):
+        line = head[1:].lstrip()
+    tail = line.rstrip()
+    if tail.endswith("·"):
+        line = tail[:-1].rstrip()
+    return line
 
 
 def tidy(text: str) -> str:
     """Was nach leeren Platzhaltern übrig bleibt: leere Links, Trennpunkte am Rand oder doppelt, leere Fettung."""
     lines = []
     for line in str(text or "").split("\n"):
-        line = re.sub(r"\[\]\([^)]*\)", "", line)
+        line = _without_empty_links(line)
         line = line.replace("****", "")
-        line = re.sub(r"(\s*·\s*){2,}", " · ", line)
-        line = re.sub(r"^\s*·\s*|\s*·\s*$", "", line)
+        line = DOT_RUN_RE.sub(lambda run: " · " if run.group().count("·") >= 2 else run.group(), line)
+        line = _without_edge_dots(line)
         line = re.sub(r"\s{2,}", " ", line).strip()
         lines.append(line)
     return "\n".join(lines).strip()
