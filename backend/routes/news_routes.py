@@ -1384,7 +1384,7 @@ async def get_partner_page(slug: str, user: dict | None = Depends(get_optional_u
     view["twitch"] = await partner_pages.twitch_status(doc.get("twitch_channel")) if doc.get("twitch_channel") else None
     view["discord"] = await partner_pages.discord_widget(doc.get("discord_guild_id")) if doc.get("discord_guild_id") else None
     view["news"] = await _partner_news(db, doc, user)
-    view["shared"] = await partner_pages.shared_for_partner(db, doc["id"], user=user)
+    view["shared"] = await partner_pages.shared_for_partner(db, doc["id"], user=user, enrich_references=_enrich_references)
     view["redirected"] = from_history
     return view
 

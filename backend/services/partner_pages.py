@@ -394,11 +394,15 @@ def _reference_summary_for_partner(ref: dict, partner_id: str) -> dict:
     }
 
 
-async def shared_for_partner(db, partner_id: str, *, user: dict | None) -> dict:
+async def shared_for_partner(db, partner_id: str, *, user: dict | None, enrich_references) -> dict:
     """Events, Turniere und Referenzen mit diesem Partner - nur, was die Person sehen darf; Entwürfe nie.
     Referenzen (echte Teilnahmen des Vereins, #469 Teil 3) gehören per Haken zum Partner - oder weil er
-    als Veranstalter eingetragen ist, ganz ohne Haken."""
-    from services.visibility import user_can_see
+    als Veranstalter eingetragen ist, ganz ohne Haken.
+
+    ``enrich_references`` bereitet Referenzen so auf wie die Referenzliste der Website (``_enrich_references`` in
+    routes/news_routes.py). Die Route reicht es herein, statt dass dieses Modul die Route importiert - sonst
+    importierten sich beide gegenseitig (Import-Zyklus, #1408)."""
+    from services.visibility import filter_visible, user_can_see
 
     events = []
     event_rows = await db.events.find(
@@ -425,9 +429,7 @@ async def shared_for_partner(db, partner_id: str, *, user: dict | None) -> dict:
     ref_query: dict = {"is_active": {"$ne": False}, "$or": [{"partner_ids": partner_id}]}
     if len(name) >= 3:
         ref_query["$or"].append({"organizer": {"$regex": re.escape(name), "$options": "i"}})
-    from routes.news_routes import _enrich_references, _filter_visible
-
     ref_rows = await db.references.find(ref_query, {"_id": 0}).to_list(200)
-    ref_rows = await _enrich_references(await _filter_visible(ref_rows, user))
+    ref_rows = await enrich_references(await filter_visible(ref_rows, user))
     references = sorted((_reference_summary_for_partner(ref, partner_id) for ref in ref_rows), key=lambda r: str(r.get("start_date") or ""), reverse=True)
     return {"events": events, "tournaments": tournaments, "references": references}
