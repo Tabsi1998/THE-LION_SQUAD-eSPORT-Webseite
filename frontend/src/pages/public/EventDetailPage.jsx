@@ -16,7 +16,13 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
-import { formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { formatRoundName, formatTournamentDisplay, slotName } from "@/lib/tournamentLabels";
+import { finderFor, sourceLabel } from "@/lib/slotSource";
+import { formatWhen } from "@/lib/datetime";
+import { eventIsOver, photosComingWindow } from "@/lib/afterEnd";
+import { countText, ownSeatsSentence, seatsLabel } from "@/lib/eventSeats";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { hasArea } from "@/lib/permissions";
 import { gameLabel } from "@/lib/gameLabels";
 import { eventTypeLabel, normalizeEventType } from "@/lib/eventTypes";
 import { formatCents, offerSummary, previewQuote } from "@/lib/pricing";
@@ -155,6 +161,8 @@ export default function EventDetailPage() {
   const eventSponsors = uniqueLogoSponsors(e.sponsors || []);
   const organizerName = e.organizer_name || (e.owned_by_club ? "THE LION SQUAD - eSports" : "");
   const liveUrl = `/events/${e.slug || e.id}/live${accessSuffix(accessToken)}`;
+  const over = eventIsOver(e);
+  const photosComing = Boolean(e.photos_coming) && (e.albums || []).every((album) => album.is_empty) && photosComingWindow(e);
 
   return (
     <PublicLayout>
@@ -189,19 +197,39 @@ export default function EventDetailPage() {
               ) : <span className="inline-flex items-center gap-2">{organizerName}</span>
             )}
           </div>
-          <AddToCalendar className="mt-6" days={e.schedule?.multi_day ? e.schedule.days : null} item={{
-            id: e.id, slug: e.slug, kind: "event", title: e.name, start: e.start_date, end: e.end_date,
-            location: [e.location, fullAddress(e)].filter(Boolean).join(", ") || null,
-            detail: eventKindLabel(e.event_type), url: typeof window !== "undefined" && e.slug ? `${window.location.origin}/events/${e.slug}` : null,
-          }} />
-          {(e.tournaments?.length || e.f1_challenges?.length) && (
-            <div className="mt-7 flex flex-wrap gap-3">
+          {/* Nach dem Ende (#1221): kein Kalender, kein „Live verfolgen“, kein „Display“ - stattdessen der Satz, wo die
+              Ergebnisse stehen (bis der Rückblick kommt). „Display“ sehen auch vorher nur Konten mit dem Bereich Turniere. */}
+          {over && e.status !== "cancelled" && (
+            <div className="mt-6 max-w-3xl border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3" data-testid="event-over">
+              <div className="text-sm text-white/85">{e.tournaments?.length ? "Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:" : "Das Event ist vorbei."}</div>
+              {!!e.tournaments?.length && (
+                <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+                  {e.tournaments.map((t) => (
+                    <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex items-center gap-1.5 text-sm font-bold text-[#FFD700] hover:text-white">
+                      <Trophy className="w-3.5 h-3.5" /> {t.title}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {!over && (
+            <AddToCalendar className="mt-6" days={e.schedule?.multi_day ? e.schedule.days : null} item={{
+              id: e.id, slug: e.slug, kind: "event", title: e.name, start: e.start_date, end: e.end_date,
+              location: [e.location, fullAddress(e)].filter(Boolean).join(", ") || null,
+              detail: eventKindLabel(e.event_type), url: typeof window !== "undefined" && e.slug ? `${window.location.origin}/events/${e.slug}` : null,
+            }} />
+          )}
+          {!over && Boolean(e.tournaments?.length || e.f1_challenges?.length) && (
+            <div className="mt-7 flex flex-wrap gap-3" data-testid="event-live-links">
               <Link to={liveUrl} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
                 <Radio className="w-4 h-4" /> Live verfolgen
               </Link>
-              <Link to={`/display/event/${e.id}`} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
-                <ExternalLink className="w-4 h-4" /> Display
-              </Link>
+              {hasArea(user, "tournaments") && (
+                <Link to={`/display/event/${e.id}`} data-testid="event-display-link" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
+                  <ExternalLink className="w-4 h-4" /> Display
+                </Link>
+              )}
             </div>
           )}
         </div>
@@ -286,19 +314,31 @@ export default function EventDetailPage() {
           </div>
         )}
 
-        {!!e.albums?.length && (
-          <div>
+        {/* Leere Alben (#1224): Besucher sehen nur Alben mit Fotos; ist eines angelegt, aber noch leer, steht bis 14 Tage
+            nach dem Event „Fotos folgen in den nächsten Tagen“. Die Verwaltung sieht leere Alben mit Hinweis. */}
+        {(!!e.albums?.length || photosComing) && (
+          <div data-testid="event-gallery">
             <h2 className="font-heading text-2xl font-black uppercase mb-5 inline-flex items-center gap-2"><ImageIcon className="w-5 h-5 text-[#29B6E8]" /> Galerie</h2>
+            {photosComing && (
+              <div className="mb-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-4 py-3 text-sm text-white/80" data-testid="event-photos-coming">
+                Fotos folgen in den nächsten Tagen.
+              </div>
+            )}
+            {!!e.albums?.length && (
             <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
               {e.albums.map((a) => (
                 <Link key={a.id} to={`/galerie/${a.slug}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
                   <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
                     {a.cover_url ? <img src={resolveMediaUrl(a.cover_url)} alt={a.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-8 h-8 text-white/15" /></div>}
                   </div>
-                  <div className="p-4"><div className="font-heading font-bold">{a.title}</div></div>
+                  <div className="p-4">
+                    <div className="font-heading font-bold">{a.title}</div>
+                    {a.is_empty && <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]" data-testid={`event-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
+                  </div>
                 </Link>
               ))}
             </div>
+            )}
           </div>
         )}
 
@@ -364,6 +404,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
   const offer = event.offer;
   const quote = offer ? previewQuote(offer, { seats: 1 + Number(companionCount || 0), selected: selectedPositions }) : null;
   const { submitting: saving, submitOnce } = useSubmissionGuard();
+  const confirm = useConfirm();
   const [actionError, setActionError] = useState("");
   const summary = event.registration_summary || {};
   const own = event.own_registration;
@@ -404,8 +445,18 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
     }
   };
 
+  // Stornieren (#1223): ein leiser Link mit Rückfrage - nur, solange der Server es erlaubt (bis zum Beginn, nicht nach
+  // dem Check-in). Der Server prüft beim Stornieren selbst noch einmal.
   const cancel = async () => {
     setActionError("");
+    const ok = await confirm({
+      title: "Event-Anmeldung stornieren?",
+      description: own?.price ? "Deine Anmeldung und dein Kostenbeitrag werden storniert, dein Platz wird frei." : "Deine Anmeldung wird storniert, dein Platz wird frei.",
+      confirmLabel: "Stornieren",
+      cancelLabel: "Behalten",
+      tone: "danger",
+    });
+    if (!ok) return;
     const attempt = await submitOnce(async () => {
       await api.delete(`/events/${event.id}/registrations/me`);
       toast.success("Anmeldung storniert.");
@@ -429,7 +480,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
         <MiniStat label="Begleitp." value={summary.companion_count || 0} />
       </div>
       {!!summary.waitlist_count && (
-        <div className="mt-2 text-xs text-[#FFD700]">{summary.waitlist_count} Anmeldung(en) auf der Warteliste.</div>
+        <div className="mt-2 text-xs text-[#FFD700]">{countText(summary.waitlist_count, "Anmeldung", "Anmeldungen")} auf der Warteliste.</div>
       )}
       {offer && (
         <div className="mt-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 text-sm" data-testid="event-offer">
@@ -452,15 +503,16 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
           Anmelden <ExternalLink className="w-3.5 h-3.5" />
         </a>
       ) : activeOwn ? (
-        <div className="mt-5 border border-[#10B981]/30 bg-[#10B981]/10 rounded-sm p-4">
-          <div className="inline-flex items-center gap-2 text-[#10B981] text-sm font-bold uppercase tracking-wider">
-            <CheckCircle className="w-4 h-4" /> {EVENT_REGISTRATION_LABELS[own.status] || own.status}
+        // Die eigene Anmeldung (#1223): „Du bist dabei“ (oder Warteliste) mit Plätzen in Einzahl und Mehrzahl; „Stornieren“
+        // als leiser Link - am Handy unter dem Kasten, ab 640 px rechts im Kasten.
+        <div className="mt-5 relative" data-testid="event-own-registration">
+        <div className={`border border-[#10B981]/30 bg-[#10B981]/10 rounded-sm p-4 ${own.can_cancel ? "sm:pr-32" : ""}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 text-[#10B981] text-sm font-bold uppercase tracking-wider" data-testid="event-own-status">
+              <CheckCircle className="w-4 h-4" /> {own.status === "waitlist" ? EVENT_REGISTRATION_LABELS.waitlist : "Du bist dabei"}
+            </span>
           </div>
-          <div className="mt-2 text-sm text-white/65">
-            {own.status === "waitlist"
-              ? `Du stehst mit ${own.seat_count || 1} Platz/Plätzen auf der Warteliste${own.companion_count ? `, davon ${own.companion_count} Begleitperson(en)` : ""}.`
-              : `${own.seat_count || 1} Platz/Plätze reserviert${own.companion_count ? `, davon ${own.companion_count} Begleitperson(en)` : ""}.`}
-          </div>
+          <div className="mt-2 text-sm text-white/65" data-testid="event-own-seats">{ownSeatsSentence(own)}</div>
           {own.price && (
             <div className="mt-2 text-sm" data-testid="event-own-price">
               <span className="text-white/65">Dein Kostenbeitrag: </span>
@@ -475,9 +527,13 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
             </div>
           )}
           {own.status === "waitlist" && offer && <div className="mt-1 text-xs text-white/45">Bezahlt wird erst, wenn du nachrückst.</div>}
-          <button type="button" disabled={saving} onClick={cancel} className="tls-btn tls-btn--danger mt-4 inline-flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
+        </div>
+        {own.can_cancel && (
+          <button type="button" disabled={saving} onClick={cancel} data-testid="event-cancel-link"
+            className="mt-2 sm:mt-0 sm:absolute sm:top-4 sm:right-4 inline-flex items-center gap-1.5 text-xs font-bold text-white/55 underline-offset-4 hover:text-[#FF6B6B] hover:underline disabled:opacity-50">
             <XCircle className="w-3.5 h-3.5" /> Stornieren
           </button>
+        )}
         </div>
       ) : !registrationOpen && !hasRegisterAccess ? (
         <div className="mt-5 border border-white/10 rounded-sm p-4 text-sm text-white/55">Die Anmeldung ist aktuell nicht offen.</div>
@@ -528,7 +584,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
             {event.registrations.slice(0, 12).map((registration) => (
               <div key={registration.id} className="flex items-center justify-between gap-3 text-sm border border-white/5 bg-black/15 rounded-sm px-3 py-2">
                 <span className="truncate">{registration.display_name || "Teilnehmer"}</span>
-                <span className="text-xs text-white/45 shrink-0">{registration.seat_count || 1} Platz/Plätze</span>
+                <span className="text-xs text-white/45 shrink-0">{seatsLabel(registration)}</span>
               </div>
             ))}
           </div>
@@ -551,30 +607,48 @@ function accessSuffix(accessToken) {
   return accessToken ? `?access=${encodeURIComponent(accessToken)}` : "";
 }
 
+// Turnier-Karte am Event (#1220): mit Ergebnissen die ersten drei Plätze, sonst die Baum-Vorschau, wenn es einen Baum
+// gibt. Kann der Baum nicht geladen werden, steht das da; Liga und Durchgänge haben keinen Baum - dort steht nichts statt
+// „noch nicht generiert“.
+const FINISHED_TOURNAMENT_STATES = new Set(["completed", "results_published", "archived"]);
+const NO_TREE_FORMATS = new Set(["league", "round_robin", "swiss", "ffa", "battle_royale", "time_trial", "grand_prix"]);
+
+export function tournamentEmbedMode(tournament) {
+  if (FINISHED_TOURNAMENT_STATES.has(tournament?.status) || FINISHED_TOURNAMENT_STATES.has(tournament?.public_phase?.state)) return "podium";
+  return NO_TREE_FORMATS.has(tournament?.format) ? "none" : "tree";
+}
+
 function EventTournamentEmbed({ tournament, accessToken = "" }) {
-  const [bracket, setBracket] = useState(null);
-  const [loaded, setLoaded] = useState(false);
+  const mode = tournamentEmbedMode(tournament);
+  const [state, setState] = useState({ loaded: false, failed: false, data: null });
 
   useEffect(() => {
+    if (mode === "none") return undefined;
     let active = true;
-    api.get(`/tournaments/${tournament.id}/bracket`, { params: tournament.access_link && accessToken ? { access: accessToken } : undefined })
-      .then(({ data }) => { if (active) setBracket(data); })
-      .catch(() => { if (active) setBracket(null); })
-      .finally(() => { if (active) setLoaded(true); });
+    setState({ loaded: false, failed: false, data: null });
+    const path = mode === "podium" ? `/tournaments/${tournament.id}/standings` : `/tournaments/${tournament.id}/bracket`;
+    api.get(path, { params: tournament.access_link && accessToken ? { access: accessToken } : undefined })
+      .then(({ data }) => { if (active) setState({ loaded: true, failed: false, data }); })
+      .catch(() => { if (active) setState({ loaded: true, failed: true, data: null }); });
     return () => { active = false; };
-  }, [tournament.id, tournament.access_link, accessToken]);
+  }, [mode, tournament.id, tournament.access_link, accessToken]);
 
-  const matches = (bracket?.matches || []).slice(0, 4);
-  const regMap = new Map((bracket?.registrations || []).map((r) => [r.id, r]));
+  const base = `/tournaments/${tournament.slug || tournament.id}`;
+  const suffix = tournament.access_link ? accessSuffix(accessToken) : "";
+  const podium = mode === "podium" && Array.isArray(state.data)
+    ? state.data.filter((row) => Number(row.rank) >= 1 && Number(row.rank) <= 3).sort((a, b) => Number(a.rank) - Number(b.rank)).slice(0, 3)
+    : [];
+  const treeMatches = mode === "tree" ? previewMatches(state.data) : [];
+  const showLower = mode !== "none" && (!state.loaded || state.failed || podium.length > 0 || treeMatches.length > 0);
 
   return (
-    <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden min-w-0">
-      <Link to={`/tournaments/${tournament.slug || tournament.id}${tournament.access_link ? accessSuffix(accessToken) : ""}`} className="block p-5 hover:bg-white/[0.03] transition">
+    <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden min-w-0" data-testid={`event-tournament-${tournament.id}`}>
+      <Link to={`${base}${suffix}`} className="block p-5 hover:bg-white/[0.03] transition">
         <div className="flex flex-wrap items-center gap-2">
           <Trophy className="w-4 h-4 text-[#FFD700]" />
           <PhaseBadge phase={tournament.public_phase} status={tournament.status} />
           {tournament.event_day && <span className="text-[10px] font-bold uppercase tracking-widest text-[#9F7AEA]" data-testid="embed-event-day">Tag {tournament.event_day.index}/{tournament.event_day.count}</span>}
-          {tournament.start_date && <span className="text-xs text-white/45">{viennaDateTime(tournament.start_date, { dateStyle: "medium", timeStyle: "short" })}</span>}
+          {tournament.start_date && <span className="text-xs text-white/45">{formatWhen(tournament.start_date)}</span>}
         </div>
         <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#FFD700] transition break-words">{tournament.title}</h3>
         <div className="mt-2 flex flex-wrap gap-3 text-xs text-white/55">
@@ -583,32 +657,62 @@ function EventTournamentEmbed({ tournament, accessToken = "" }) {
           {Number.isFinite(tournament.participant_count) && <span>{tournament.participant_count}/{tournament.max_participants} Teilnehmer</span>}
         </div>
       </Link>
-      <div className="border-t border-white/10 p-5">
-        <div className="flex items-center justify-between gap-3 mb-3 min-w-0">
-          <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">Turnierbaum-Vorschau</div>
-          <Link to={`/tournaments/${tournament.slug || tournament.id}/bracket`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">Öffnen</Link>
-        </div>
-        {!loaded ? (
-          <div className="text-sm text-white/40 py-4">Lade Turnierbaum…</div>
-        ) : matches.length ? (
-          <div className="space-y-2">
-            {matches.map((match) => (
-              <div key={match.id} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
-                <div className="text-[10px] uppercase tracking-widest text-white/35">{match.round_name || `Runde ${match.round}`}</div>
-                <div className="mt-1 text-sm text-white/75 flex items-center justify-between gap-3 min-w-0">
-                  <span className="truncate">{registrationName(regMap, match.participant_a_id)}</span>
-                  <span className="text-white/30">vs</span>
-                  <span className="truncate text-right">{registrationName(regMap, match.participant_b_id)}</span>
-                </div>
-              </div>
-            ))}
+      {showLower && (
+        <div className="border-t border-white/10 p-5" data-testid={`event-tournament-${mode}`}>
+          <div className="flex items-center justify-between gap-3 mb-3 min-w-0">
+            <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">{mode === "podium" ? "Die ersten drei Plätze" : "Turnierbaum-Vorschau"}</div>
+            <Link to={`${base}/${mode === "podium" ? "standings" : "bracket"}${suffix}`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">{mode === "podium" ? "Rangliste" : "Öffnen"}</Link>
           </div>
-        ) : (
-          <div className="text-sm text-white/45 border border-dashed border-white/10 rounded-sm p-4">Turnierbaum wurde noch nicht generiert.</div>
-        )}
-      </div>
+          {!state.loaded ? (
+            <div className="text-sm text-white/40 py-4">{mode === "podium" ? "Lade Ergebnisse…" : "Lade Turnierbaum…"}</div>
+          ) : state.failed ? (
+            <div className="text-sm text-white/45 border border-dashed border-white/10 rounded-sm p-4" data-testid="event-tournament-failed">{mode === "podium" ? "Ergebnisse gerade nicht ladbar." : "Baum gerade nicht ladbar."}</div>
+          ) : mode === "podium" ? (
+            <ol className="space-y-2">
+              {podium.map((row) => (
+                <li key={`${row.rank}-${row.registration_id || row.display_name}`} className="flex items-center gap-3 border border-white/10 bg-black/20 rounded-sm px-3 py-2 min-w-0">
+                  <span className={`font-display font-black w-7 shrink-0 ${Number(row.rank) === 1 ? "text-[#FFD700]" : Number(row.rank) === 2 ? "text-white/75" : "text-[#CD7F32]"}`}>#{row.rank}</span>
+                  <span className="truncate text-sm text-white/85">{row.display_name || row.ingame_name || row.user?.display_name || "Teilnehmer"}</span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="space-y-2">
+              {treeMatches.map((match) => (
+                <div key={match.id} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-widest text-white/35">{formatRoundName(match.round_name, match.round)}</div>
+                  <div className="mt-1 text-sm text-white/75 flex items-center justify-between gap-3 min-w-0">
+                    <span className="truncate">{match.labels[0]}</span>
+                    <span className="text-white/30">vs</span>
+                    <span className="truncate text-right">{match.labels[1]}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
+}
+
+/** Die ersten vier Spiele des Baums mit Namen - „Freilos“ und „noch offen“ statt leerer Plätze (#1220). */
+export function previewMatches(bracket) {
+  const registrations = new Map((bracket?.registrations || []).map((registration) => [registration.id, registration]));
+  const matches = (bracket?.matches_v2 || []).filter((match) => (match.slots || []).length >= 2);
+  const finder = finderFor(matches);
+  return matches
+    .slice()
+    .sort((a, b) => (Number(a.round) || 0) - (Number(b.round) || 0) || (Number(a.order ?? a.match_index) || 0) - (Number(b.order ?? b.match_index) || 0))
+    .slice(0, 4)
+    .map((match) => ({
+      ...match,
+      labels: (match.slots || []).slice(0, 2).map((slot) => {
+        const registration = registrations.get(slot.registration_id);
+        const name = registration?.display_name || registration?.user?.display_name || registration?.ingame_name || "";
+        return name || sourceLabel(slot.source, finder(match)) || slotName("", slot, match);
+      }),
+    }));
 }
 
 function EventFastLapEmbed({ challenge, accessToken = "" }) {
@@ -663,10 +767,4 @@ function EventFastLapEmbed({ challenge, accessToken = "" }) {
       </div>
     </div>
   );
-}
-
-function registrationName(regMap, id) {
-  const reg = regMap.get(id);
-  if (!id) return "Offen";
-  return reg?.display_name || reg?.user?.display_name || reg?.ingame_name || "Offen";
 }

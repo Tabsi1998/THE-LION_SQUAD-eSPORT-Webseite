@@ -47,3 +47,10 @@ test("Initialen", () => {
   expect(memberInitials({ display_name: "Paula Beispiel" })).toBe("PB");
   expect(memberInitials({ gamertag: "tabsi" })).toBe("TA");
 });
+
+// Lange Überschriften (#1218): „Vereinsmitglieder“ trennt am Handy mit Bindestrich statt mitten im Wort.
+test("die Überschrift trägt eine weiche Trennstelle", async () => {
+  render(<MemoryRouter><MembersDirectoryPage /></MemoryRouter>);
+  await screen.findByTestId("member-card-paula");
+  expect(screen.getByTestId("members-heading").textContent).toBe("Vereins\u00ADmitglieder");
+});

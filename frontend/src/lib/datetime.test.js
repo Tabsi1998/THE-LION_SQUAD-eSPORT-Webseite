@@ -1,6 +1,7 @@
 import {
   formatDate,
   formatDateTime,
+  formatWhen,
   fromDateTimeLocal,
   getRegistrationState,
   hasOnlineRegistration,
@@ -124,5 +125,44 @@ describe("Online-Anmeldung", () => {
     expect(hasOnlineRegistration({ online_registration_enabled: true, registration_enabled: true })).toBe(false);
     expect(hasOnlineRegistration({ online_registration_enabled: false, registration_enabled: true, registration_open_from: "x" })).toBe(false);
     expect(hasOnlineRegistration(null)).toBe(false);
+  });
+});
+
+// Wann (#1220, Wahl des Betreibers): „Sa 23. Mai · 18:00“, „heute 18:00“, „morgen 18:00“ - Jahr nur, wenn es nicht das
+// laufende ist. Gerechnet in Wiener Zeit; die Uhr steht in diesen Tests fest.
+describe("formatWhen", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-20T10:00:00Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  test("Wochentag, Tag, Monat ausgeschrieben und Uhrzeit - ohne Jahr im laufenden Jahr", () => {
+    expect(formatWhen("2026-05-23T16:00:00Z")).toBe("Sa 23. Mai · 18:00");
+    expect(formatWhen("2026-01-04T18:30:00Z")).toBe("So 4. Jänner · 19:30");
+  });
+
+  test("heute und morgen in Wiener Tagen - auch kurz vor und nach Mitternacht", () => {
+    expect(formatWhen("2026-05-20T16:00:00Z")).toBe("heute 18:00");
+    expect(formatWhen("2026-05-21T16:00:00Z")).toBe("morgen 18:00");
+    // 21:59 UTC am 20.5. ist in Wien 23:59 - noch heute; 22:01 UTC ist schon der 21.5. in Wien, also morgen.
+    expect(formatWhen("2026-05-20T21:59:00Z")).toBe("heute 23:59");
+    expect(formatWhen("2026-05-20T22:01:00Z")).toBe("morgen 00:01");
+    expect(formatWhen("2026-05-22T08:00:00Z")).toBe("Fr 22. Mai · 10:00");
+    expect(formatWhen("2026-05-19T08:00:00Z")).toBe("Di 19. Mai · 10:00");
+  });
+
+  test("ein anderes Jahr steht dabei, ein fester Bezugszeitpunkt geht vor", () => {
+    expect(formatWhen("2025-05-23T16:00:00Z")).toBe("Fr 23. Mai 2025 · 18:00");
+    expect(formatWhen("2027-01-01T11:00:00Z")).toBe("Fr 1. Jänner 2027 · 12:00");
+    expect(formatWhen("2026-12-31T22:30:00Z", { now: new Date("2026-12-31T12:00:00Z") })).toBe("heute 23:30");
+    expect(formatWhen("2026-12-31T23:30:00Z", { now: new Date("2026-12-31T12:00:00Z") })).toBe("morgen 00:30");
+    expect(formatWhen("2027-01-02T12:00:00Z", { now: new Date("2026-12-31T12:00:00Z") })).toBe("Sa 2. Jänner 2027 · 13:00");
+  });
+
+  test("ohne gültigen Wert kommt der Platzhalter", () => {
+    expect(formatWhen(null)).toBe("");
+    expect(formatWhen("", { fallback: "Termin offen" })).toBe("Termin offen");
+    expect(formatWhen("kein datum", { fallback: "Termin offen" })).toBe("Termin offen");
   });
 });

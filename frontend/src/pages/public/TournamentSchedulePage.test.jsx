@@ -60,3 +60,34 @@ test("frisches Ergebnis: Kennzeichen an der Karte und Hinweis mit dem Ergebnis",
   expect(screen.getByTestId("schedule-match-m2")).not.toHaveAttribute("data-changed");
   expect(toastMock).toHaveBeenCalledWith("Ergebnis eingetragen: Team A 2 : Team B 1", expect.objectContaining({ id: "result-m1" }));
 });
+
+// Klartext im Spielplan (#1220): Freilos heißt Freilos, leere Plätze „noch offen“, Station einmal, Datum kurz und ganz.
+test("Spielplan: Freilos, noch offene Plätze, Station im Klartext und Datum", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-05-20T10:00:00Z"));
+  try {
+    mockApi({
+      tournament, registrations, matches: [],
+      matches_v2: [
+        { id: "m1", match_key: "A1", round: 1, match_type: "duel", status: "completed", winner_id: "r1", scheduled_at: "2026-05-23T16:00:00Z",
+          station_label: "Station A - switch2", station_text: "Station A · Switch 2",
+          slots: [{ slot: 1, registration_id: "r1", status: "filled" }, { slot: 2, status: "bye" }], results: [{ registration_id: "r1", rank: 1 }] },
+        { id: "m2", match_key: "B1", round: 2, match_type: "duel", status: "scheduled", slots: [{ slot: 1, status: "pending" }, { slot: 2, status: "pending" }], results: [] },
+      ],
+    });
+    render(
+      <MemoryRouter initialEntries={["/tournaments/cup/matches"]}>
+        <Routes><Route path="/tournaments/:slug/matches" element={<TournamentSchedulePage />} /></Routes>
+      </MemoryRouter>,
+    );
+    const bye = await screen.findByTestId("schedule-match-m1");
+    expect(bye).toHaveTextContent("Team A vs. Freilos");
+    expect(screen.getByTestId("schedule-station-m1")).toHaveTextContent("Station A · Switch 2");
+    expect(bye).not.toHaveTextContent("Station Station");
+    expect(screen.getByTestId("schedule-when-m1")).toHaveTextContent("Sa 23. Mai · 18:00");
+    expect(screen.getByTestId("schedule-match-m2")).toHaveTextContent("noch offen vs. noch offen");
+    expect(screen.getByTestId("schedule-when-m2")).toHaveTextContent("Termin offen");
+  } finally {
+    vi.useRealTimers();
+  }
+});

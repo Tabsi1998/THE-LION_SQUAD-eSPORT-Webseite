@@ -34,6 +34,8 @@ class UserRegister(BaseModel):
     accept_privacy: bool = Field(..., description="Must be explicitly true")
     accept_terms: bool = Field(..., description="Must be explicitly true")
     newsletter_consent: bool = False  # explicitly opt-in, not auto-checked
+    # Wohin es nach der Mail-Bestätigung geht (#1225) - der Server prüft es (services/return_path.py).
+    next: Optional[str] = Field(default=None, max_length=2048)
 
 
 class UserLogin(BaseModel):

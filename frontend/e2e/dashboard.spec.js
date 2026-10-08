@@ -40,7 +40,7 @@ test("das Dashboard zeigt einen kommenden Termin, keinen vergangenen, Aktionen u
   await page.route("**/api/prizes/me/open-count", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ count: 1 }) }));
   await page.route("**/api/mobile/dashboard", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(dashboard) }));
   await page.goto("/dashboard");
-  const consent = page.getByRole("button", { name: /alle akzeptieren/i });
+  const consent = page.getByRole("button", { name: /alle erlauben/i });
   if (await consent.count()) await consent.click();
 
   const dates = page.getByTestId("dashboard-timeline");
@@ -73,7 +73,7 @@ test("ohne Termine steht der Hinweis mit dem Weg zu den Events", async ({ page }
   await page.route("**/api/notifications/me", (route) => route.fulfill({ contentType: "application/json", body: "[]" }));
   await page.route("**/api/mobile/dashboard", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ me: { tournaments: [], events: [], matches: [], staff_matches: [], actions: [] }, season: null, stats: {} }) }));
   await page.goto("/dashboard");
-  const consent = page.getByRole("button", { name: /alle akzeptieren/i });
+  const consent = page.getByRole("button", { name: /alle erlauben/i });
   if (await consent.count()) await consent.click();
 
   const dates = page.getByTestId("dashboard-timeline");

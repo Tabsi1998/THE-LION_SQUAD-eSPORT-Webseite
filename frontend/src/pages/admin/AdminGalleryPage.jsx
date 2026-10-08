@@ -81,6 +81,8 @@ export default function AdminGalleryPage() {
                   <div className="font-heading font-black uppercase truncate">{a.title}</div>
                   <span className="text-[10px] uppercase tracking-widest text-white/40">{albumMediaCount(a)} Medien</span>
                 </div>
+                {/* Leere Alben (#1224) sehen Besucher nicht - sie erscheinen von selbst, sobald Medien da sind. */}
+                {albumMediaCount(a) === 0 && <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]" data-testid={`admin-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
                 <div className="text-[10px] uppercase tracking-widest text-[#29B6E8]/80 mt-1">
                   {a.visibility} · {a.published ? "live" : "entwurf"}{a.section_count ? ` · ${a.section_count} Abschnitte` : ""}{a.video_count ? ` · ${a.video_count} Videos` : ""}
                 </div>

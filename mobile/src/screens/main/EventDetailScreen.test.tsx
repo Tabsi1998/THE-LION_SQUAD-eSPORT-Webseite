@@ -24,7 +24,14 @@ const mockOpenSignIn = jest.fn();
 jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: (...args: unknown[]) => mockOpenSignIn(...args) }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 jest.mock("../../components/MediaImage", () => ({ MediaImage: () => null }));
-jest.mock("../../components/AddToCalendarButton", () => ({ AddToCalendarButton: () => null }));
+// Der Kalender-Knopf als Marke: da, wenn die Seite ihm einen Termin gibt (#1221).
+jest.mock("../../components/AddToCalendarButton", () => ({
+  AddToCalendarButton: ({ item, items }: { item?: unknown; items?: unknown[] | null }) => {
+    const { createElement } = jest.requireActual("react");
+    const { Text } = jest.requireActual("react-native");
+    return item || items?.length ? createElement(Text, { testID: "add-to-calendar" }, "In meinen Kalender") : null;
+  },
+}));
 jest.mock("../../components/RichText", () => ({ RichText: () => null }));
 
 const navigate = jest.fn();
@@ -169,4 +176,34 @@ test("mehrtägig: Zeitraum im Kopf und je Tag ein Eintrag mit Stand", async () =
   expect(screen.getByTestId("event-day-1")).toHaveTextContent(/Tag 1\/3.*Vorbei.*Fr 16\.10\. · 18:00–23:00.*Einlass 17:00.*Warm-up/s);
   expect(screen.getByTestId("event-day-2")).toHaveTextContent(/Läuft.*Vereinsheim/s);
   expect(screen.getByTestId("event-day-3")).toHaveTextContent(/Als Nächstes.*Finaltag/s);
+});
+
+// Nach dem Ende (#1221): kein Kalender-Knopf an einem Event, dessen letzter Tag vorbei ist.
+test("Kalender-Knopf nur vor dem Ende des Events", async () => {
+  mockGet.mockResolvedValue({ data: { ...EVENT, visibility: "public" } });
+  const view = await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("add-to-calendar")).toBeTruthy());
+  await view.unmount();
+  mockGet.mockResolvedValue({ data: { ...EVENT, visibility: "public", status: "scheduled", start_date: "2026-06-20T08:00:00Z", end_date: "2026-06-21T18:00:00Z" } });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Vereinsabend")).toBeTruthy());
+  expect(screen.queryByTestId("add-to-calendar")).toBeNull();
+});
+
+// Abmelden (#1223): nur, solange der Server es erlaubt (`can_cancel`) - nach dem Beginn oder dem Check-in nicht mehr.
+// Plätze in Einzahl und Mehrzahl.
+test("„Vom Event abmelden“ nur mit can_cancel", async () => {
+  const own = { id: "r1", status: "registered", seat_count: 2, companion_count: 1 };
+  mockGet.mockResolvedValue({ data: { ...EVENT, offer: null, own_registration: { ...own, can_cancel: true } } });
+  const view = await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("event-unregister")).toBeTruthy());
+  expect(screen.getByTestId("event-own-seats")).toHaveTextContent("Angemeldet · 2 Plätze, davon 1 Begleitperson");
+  await view.unmount();
+
+  mockGet.mockResolvedValue({ data: { ...EVENT, offer: null, own_registration: { ...own, status: "checked_in", seat_count: 1, companion_count: 0, can_cancel: false } } });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("event-own-seats")).toBeTruthy());
+  expect(screen.getByTestId("event-own-seats")).toHaveTextContent("Eingecheckt · 1 Platz");
+  expect(screen.queryByTestId("event-unregister")).toBeNull();
+  expect(screen.queryByText("Vom Event abmelden")).toBeNull();
 });

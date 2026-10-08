@@ -125,7 +125,7 @@ async function checkPage(page, path, viewport, testInfo, config) {
   await page.setViewportSize(viewport);
   await page.goto(path);
   await page.waitForLoadState("networkidle");
-  const consent = page.getByRole("button", { name: /alle ablehnen/i }).first();
+  const consent = page.getByRole("button", { name: /nur nötiges/i }).first();
   if (await consent.count()) await consent.click().catch(() => {});
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.season || ""), { timeout: 15000 }).toContain(config.seasonKey);
   await page.waitForTimeout(config.settleMs || SETTLE_MS);

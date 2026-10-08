@@ -5,6 +5,7 @@ import { Logo } from "@/components/tls/Logo";
 import { AuthFormAlert, AuthTextField } from "@/components/tls/AuthFormFields";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
+import { DEFAULT_RETURN_PATH, nextQuery, safeNextPath } from "@/lib/returnPath";
 
 export default function EmailVerificationPage() {
   useDocumentTitle("E-Mail bestätigen", "E-Mail-Adresse für den Community-Account bestätigen.", { robots: "noindex, nofollow" });
@@ -15,13 +16,16 @@ export default function EmailVerificationPage() {
   const [email, setEmail] = useState(location.state?.email || params.get("email") || "");
   const [status, setStatus] = useState(token ? "checking" : params.get("sent") === "1" ? "sent" : "idle");
   const [message, setMessage] = useState("");
+  // Ziel nach der Bestätigung (#1225): der Server merkt es sich beim Registrieren; der Link trägt es zusätzlich mit.
+  const [next, setNext] = useState(() => safeNextPath(params.get("next")));
   const handled = useRef(false);
 
   useEffect(() => {
     if (!token || handled.current) return;
     handled.current = true;
     api.post("/auth/verify-email", { token })
-      .then(() => {
+      .then(({ data }) => {
+        if (data?.next) setNext(safeNextPath(data.next));
         setStatus("success");
         setMessage("Deine E-Mail-Adresse ist bestätigt. Du kannst dich jetzt anmelden.");
       })
@@ -66,7 +70,13 @@ export default function EmailVerificationPage() {
             </button>
           </form>
         )}
-        <div className="mt-6 text-sm text-center"><Link to="/login" className="text-white/50 hover:text-[#29B6E8]">Zum Login</Link></div>
+        {status === "success" ? (
+          <Link to={`/login${nextQuery(next)}`} className="tls-btn tls-btn--primary mt-6 w-full inline-flex justify-center py-3 font-bold uppercase tracking-wider rounded-sm" data-testid="verify-continue">
+            {next !== DEFAULT_RETURN_PATH ? "Einloggen und weiter" : "Zum Login"}
+          </Link>
+        ) : (
+          <div className="mt-6 text-sm text-center"><Link to={`/login${nextQuery(next)}`} className="text-white/50 hover:text-[#29B6E8]">Zum Login</Link></div>
+        )}
       </div>
     </div>
   );

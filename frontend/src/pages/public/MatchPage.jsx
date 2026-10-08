@@ -17,6 +17,9 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { CommendButton } from "@/components/tls/CommendButton";
 import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { finishedMatchText, formatMatchKind, formatMatchStatus, isByeSlot, isMatchFinished, matchHeadline, slotName, stationText } from "@/lib/tournamentLabels";
+import { matchIsOver } from "@/lib/afterEnd";
 
 const scheduleLabels = {
   proposed: "Terminvorschlag offen",
@@ -48,8 +51,14 @@ function formatDateTime(value) {
   return viennaDateTime(value, { dateStyle: "medium", timeStyle: "short" });
 }
 
-function stationLabel(match) {
-  return match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
+// Ein laufendes Spiel nennt im Kopf seinen Zustand statt des Termins.
+const LIVE_MATCH_STATUSES = new Set(["in_progress", "running", "waiting_result", "disputed"]);
+
+/** Was im Terminkasten groß steht (#1220): „Noch offen“ nur vor dem Spiel ohne Termin. */
+function scheduleHeadline(match) {
+  if (LIVE_MATCH_STATUSES.has(String(match.status))) return formatMatchStatus(match.status);
+  if (scheduleLabels[match.schedule_status]) return scheduleLabels[match.schedule_status];
+  return match.scheduled_at ? "Termin steht" : "Noch offen";
 }
 
 function toLocalInput(value) {
@@ -122,11 +131,13 @@ export default function MatchPage() {
       document.removeEventListener("visibilitychange", refreshVisible);
     };
   }, [load]);
-  useLiveRefresh(load, ["matches", "matches-v2", "tournaments"], { fallbackMs: 10000 });
+  // Ein fertiges Match ändert sich nicht mehr - die Live-Aktualisierung hört dann auf (#1221).
+  useLiveRefresh(load, ["matches", "matches-v2", "tournaments"], { fallbackMs: 10000, enabled: !matchIsOver(data?.match) });
   // Match-Chat gelesen (#1148) - nur für die, die mitschreiben dürfen.
   useChatRead("match", id, chat, Boolean(user && data?.can_act));
 
-  const title = data?.tournament?.title ? `${data.matchday_label} - ${data.tournament.title}` : "Match";
+  const headline = data ? matchHeadline(data.participants || [], data.match || {}) : "Match";
+  const title = data?.tournament?.title ? `${data.matchday_label} · ${headline} - ${data.tournament.title}` : "Match";
   const description = data?.tournament?.title
     ? `Matchseite für ${data.tournament.title} mit Terminabstimmung, Matchchat und Ergebnisstatus.`
     : "Matchseite mit Terminabstimmung, Matchchat und Ergebnisstatus.";
@@ -286,6 +297,14 @@ export default function MatchPage() {
   const isV2 = data.collection === "matches_v2" || Boolean(match.slots?.length);
   const v2Mode = rankingMode(match);
   const isCompleted = ["completed", "forfeit"].includes(String(match.status));
+  // Klartext (#1220): ein fertiges Spiel zeigt „Beendet“ mit Ergebnis statt des Terminstatus; Freilos heißt Freilos.
+  const finished = isMatchFinished(match);
+  const isBye = participants.some((participant) => isByeSlot(participant, match));
+  const station = stationText(match);
+  // Nach dem Ende (#1221): Ergebnis und Verlauf. Den Chat sehen dann nur noch Teilnehmer und Turnierleitung, und nur,
+  // wenn darin etwas steht.
+  const over = matchIsOver(match);
+  const showChat = !over || (Boolean(data.can_act) && chat.length > 0);
   const canReportScore = Boolean(data.can_player_report_result || data.can_report_score);
   const canSubmitLegacyResult = Boolean(!isV2 && duelParticipants.length >= 2 && !isCompleted && (canReportScore || data.can_staff_submit_result || data.can_submit_result));
   const canSubmitV2Result = Boolean(isV2 && !isCompleted && data.can_staff_submit_result && v2Rows.length);
@@ -313,25 +332,44 @@ export default function MatchPage() {
           ]}
           className="mb-5"
         />
+        {/* Kopf (#1220): Runde und Namen statt „Match A“ - der Schlüssel steht nur noch klein. Rechts der Zustand:
+            vor dem Spiel der Termin, danach „Beendet“ mit dem Ergebnis. */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">{data.matchday_label}</div>
-            <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Match {match.match_key || match.id}</h1>
-            {data.tournament && <Link to={`/tournaments/${data.tournament.slug || data.tournament.id}`} className="mt-2 inline-flex text-sm text-white/55 hover:text-[#29B6E8]">{data.tournament.title}</Link>}
-          </div>
-          <div className="border border-white/10 bg-[#121212] rounded-sm px-4 py-3 min-w-[16rem]">
-            <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Terminstatus</div>
-            <div className="mt-1 font-heading font-black uppercase text-[#FFD700]">{scheduleLabels[match.schedule_status] || "Noch offen"}</div>
-            <div className="mt-1 text-sm text-white/65">{formatDateTime(match.scheduled_at)}</div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {eventModeLabels[data.event_mode] && <Pill>{eventModeLabels[data.event_mode]}</Pill>}
-              {resultModeLabels[data.result_entry_mode] && <Pill>{resultModeLabels[data.result_entry_mode]}</Pill>}
-              {scheduleModeLabels[data.schedule_mode] && <Pill>{scheduleModeLabels[data.schedule_mode]}</Pill>}
+            <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase [overflow-wrap:anywhere]" data-testid="match-headline">{headline}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/55">
+              <span className="text-[11px] uppercase tracking-widest text-white/40" data-testid="match-key">{formatMatchKind(match)} {match.match_key || ""}</span>
+              {data.tournament && (
+                <>
+                  <span aria-hidden="true" className="text-white/25">·</span>
+                  <Link to={`/tournaments/${data.tournament.slug || data.tournament.id}`} className="hover:text-[#29B6E8]">{data.tournament.title}</Link>
+                </>
+              )}
             </div>
-            {stationLabel(match) && (
-              <div className="mt-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">Station {stationLabel(match)}</div>
-            )}
           </div>
+          {finished ? (
+            <div className="border border-white/10 bg-[#121212] rounded-sm px-4 py-3 w-full sm:w-auto sm:min-w-[16rem] sm:max-w-sm" data-testid="match-finished">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="rounded-sm border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/80">Beendet</span>
+                {match.scheduled_at && <span className="text-sm text-white/65" data-testid="match-when">{formatWhen(match.scheduled_at)}</span>}
+              </div>
+              <div className="mt-2 font-heading font-black text-white" data-testid="match-outcome">{finishedMatchText(participants, match)}</div>
+              {station && <div className="mt-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]" data-testid="match-station">{station}</div>}
+            </div>
+          ) : (
+            <div className="border border-white/10 bg-[#121212] rounded-sm px-4 py-3 w-full sm:w-auto sm:min-w-[16rem]" data-testid="match-schedule">
+              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Terminstatus</div>
+              <div className="mt-1 font-heading font-black uppercase text-[#FFD700]">{scheduleHeadline(match)}</div>
+              <div className="mt-1 text-sm text-white/65" data-testid="match-when">{match.scheduled_at ? formatWhen(match.scheduled_at) : "Noch kein Termin"}</div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {eventModeLabels[data.event_mode] && <Pill>{eventModeLabels[data.event_mode]}</Pill>}
+                {resultModeLabels[data.result_entry_mode] && <Pill>{resultModeLabels[data.result_entry_mode]}</Pill>}
+                {scheduleModeLabels[data.schedule_mode] && <Pill>{scheduleModeLabels[data.schedule_mode]}</Pill>}
+              </div>
+              {station && <div className="mt-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8]" data-testid="match-station">{station}</div>}
+            </div>
+          )}
         </div>
 
         {actionError && <div className="mt-5"><AuthFormAlert id="match-action-error">{actionError}</AuthFormAlert></div>}
@@ -340,35 +378,43 @@ export default function MatchPage() {
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Ergebnis</h2>
-              <p className="mt-1 text-sm text-white/55">Der Matchstand aktualisiert sich automatisch.</p>
+              {!over && <p className="mt-1 text-sm text-white/55">Der Matchstand aktualisiert sich automatisch.</p>}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {/* GG (#616): eine Seite lobt die andere - einmal je Match, nur nach dem Ende. */}
               {user && isV2 ? <CommendButton matchId={id} completed={String(match.status) === "completed"} /> : null}
-              <div className="inline-flex items-center gap-2 rounded-sm border border-[#29B6E8]/25 bg-[#29B6E8]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]">
-                <RefreshCw className="w-3.5 h-3.5" /> Live-Refresh
-              </div>
+              {/* Nach dem Ende (#1221) aktualisiert sich nichts mehr - der Hinweis fällt weg. */}
+              {!over && (
+                <div className="inline-flex items-center gap-2 rounded-sm border border-[#29B6E8]/25 bg-[#29B6E8]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]" data-testid="match-live-refresh">
+                  <RefreshCw className="w-3.5 h-3.5" /> Live-Refresh
+                </div>
+              )}
             </div>
           </div>
 
+          {isBye && finished ? (
+            <p className="mt-5 text-sm text-white/65" data-testid="match-bye-line">Ein Freilos wird nicht gespielt – es zählt als Sieg für {slotName(participants.find((participant) => participant.registration_id)?.display_name, {}, match)}.</p>
+          ) : (
           <div className={`mt-5 grid gap-3 items-stretch ${isV2 ? "sm:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-[1fr_auto_1fr]"}`}>
             {isV2 ? (
               resultParticipants.map((participant, index) => (
                 <ResultSide
                   key={participant.registration_id || participant.slot || `result-${index}`}
                   participant={participant}
+                  match={match}
                   score={v2ResultDisplay(match, participant, v2Mode)}
                   isWinner={v2ResultRank(match, participant) === 1}
                 />
               ))
             ) : (
               <>
-                <ResultSide participant={duelParticipants[0]} score={match.score_a} isWinner={match.winner_id && match.winner_id === duelParticipants[0]?.registration_id} />
+                <ResultSide participant={duelParticipants[0]} match={match} score={match.score_a} isWinner={match.winner_id && match.winner_id === duelParticipants[0]?.registration_id} />
                 <div className="hidden md:flex items-center justify-center font-display text-3xl text-white/35">:</div>
-                <ResultSide participant={duelParticipants[1]} score={match.score_b} isWinner={match.winner_id && match.winner_id === duelParticipants[1]?.registration_id} />
+                <ResultSide participant={duelParticipants[1]} match={match} score={match.score_b} isWinner={match.winner_id && match.winner_id === duelParticipants[1]?.registration_id} />
               </>
             )}
           </div>
+          )}
 
           {hasResultActions ? (
             <div className="mt-5 border-t border-white/10 pt-5 space-y-5">
@@ -466,7 +512,9 @@ export default function MatchPage() {
           {reports.length > 0 && <p className="mt-3 text-xs text-white/45">{reports.length} Ergebnismeldung{reports.length === 1 ? "" : "en"} vorhanden.</p>}
         </div>
 
-        <div className="mt-6 grid lg:grid-cols-[minmax(0,1fr)_24rem] gap-6">
+        {/* Nach dem Ende (#1221): Ergebnis und Verlauf - keine Terminabstimmung mehr; der Matchchat bleibt für
+            Teilnehmer und Turnierleitung zum Nachlesen, ein leerer Chat verschwindet. */}
+        <div className={`mt-6 grid gap-6 ${showChat ? "lg:grid-cols-[minmax(0,1fr)_24rem]" : ""}`}>
           <div className="space-y-6">
             <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
               <h2 className="font-heading text-xl font-black uppercase">Teilnehmer</h2>
@@ -474,14 +522,15 @@ export default function MatchPage() {
                 {participants.map((p, index) => (
                   <div key={p.registration_id || p.slot || `participant-${index}`} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
                     <div className="text-[10px] uppercase tracking-widest text-white/35">Slot {p.slot}</div>
-                    <div className="mt-1 font-heading text-lg font-bold uppercase">{p.display_name || "Offen"}</div>
+                    <div className="mt-1 font-heading text-lg font-bold uppercase">{slotName(p.display_name, p, match)}</div>
                     {p.team && <div className="mt-1 text-xs text-[#29B6E8]">[{p.team.tag}] {p.team.name}</div>}
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
+            {!over && (
+            <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="match-scheduling">
               <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung</h2>
               {canProposeSchedule ? (
                 <form onSubmit={propose} className="mt-4 grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
@@ -527,9 +576,11 @@ export default function MatchPage() {
                 {!latestProposal && (data.schedule_proposals || []).length === 0 && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
               </div>
             </div>
+            )}
           </div>
 
-          <aside className="border border-white/10 bg-[#121212] rounded-sm p-5 h-fit">
+          {showChat && (
+          <aside className="border border-white/10 bg-[#121212] rounded-sm p-5 h-fit" data-testid="match-chat">
             <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><MessageSquare className="w-5 h-5 text-[#29B6E8]" /> Matchchat</h2>
             <div className="mt-4 space-y-3 max-h-[28rem] overflow-y-auto pr-1">
               {chat.map((m) => (
@@ -543,7 +594,9 @@ export default function MatchPage() {
               ))}
               {chat.length === 0 && <div className="text-sm text-white/40">Noch keine Nachrichten.</div>}
             </div>
-            {canUseChat ? (
+            {over ? (
+              <p className="mt-4 text-xs text-white/45" data-testid="match-chat-closed">Das Match ist beendet – der Chat bleibt zum Nachlesen.</p>
+            ) : canUseChat ? (
               <form onSubmit={sendMessage} className="mt-4 space-y-2">
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={addStaffMention} className="tls-btn tls-btn--secondary px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">@leitung</button>
@@ -571,6 +624,7 @@ export default function MatchPage() {
               <p className="mt-4 text-xs text-white/45">Schreiben können Teilnehmer, Team-Captains und Turnierleitung.</p>
             )}
           </aside>
+          )}
         </div>
       </section>
     </PublicLayout>
@@ -581,11 +635,11 @@ function Pill({ children }) {
   return <span className="rounded-sm border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/60">{children}</span>;
 }
 
-function ResultSide({ participant, score, isWinner }) {
+function ResultSide({ participant, match, score, isWinner }) {
   return (
     <div className={`border rounded-sm bg-[#0A0A0A] p-4 ${isWinner ? "border-[#29B6E8]/70 shadow-[0_0_18px_rgba(41,182,232,0.18)]" : "border-white/10"}`}>
       <div className="text-[10px] uppercase tracking-widest text-white/35">Slot {participant?.slot || "-"}</div>
-      <div className="mt-1 font-heading text-lg font-bold uppercase truncate">{participant?.display_name || "Offen"}</div>
+      <div className="mt-1 font-heading text-lg font-bold uppercase truncate">{slotName(participant?.display_name, participant, match)}</div>
       {participant?.team && <div className="mt-1 text-xs text-[#29B6E8] truncate">[{participant.team.tag}] {participant.team.name}</div>}
       <div className={`mt-3 font-display text-5xl font-bold ${isWinner ? "text-[#29B6E8]" : "text-white/75"}`}>{score ?? 0}</div>
     </div>

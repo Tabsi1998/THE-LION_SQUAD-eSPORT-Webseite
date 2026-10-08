@@ -113,7 +113,7 @@ export function ClubMemberProfilesAdminContent() {
       <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Öffentliche Seite</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Vereinsmitglieder</h1>
+          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Vereins&shy;mitglieder</h1>
           <p className="text-sm text-white/60 mt-1 max-w-3xl">
             Redaktionelle Mitgliederübersicht mit festen Profilen, großen Bildern, Bio, Games und Plattformen. Funktionen wie Obmann/Kassier kommen automatisch aus dem Vorstand.
             Ein Profil ist kein Konto und keine Mitgliedschaft: „Profil erstellen“ legt nur das Vereinsprofil an – das Website-Konto verknüpfst du im Profil unter „Konto“ (optional).

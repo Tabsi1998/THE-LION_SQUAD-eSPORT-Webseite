@@ -50,7 +50,7 @@ export default function MembersDirectoryPage() {
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-10 min-w-0">
           <div className="min-w-0">
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">DAS RUDEL</span>
-            <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2 break-words">Vereinsmitglieder</h1>
+            <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2" data-testid="members-heading">Vereins&shy;mitglieder</h1>
             <p className="mt-3 text-white/60 max-w-2xl">
               Eingetragene Mitglieder von THE LION SQUAD — eSports, die hier stehen wollen: Jedes aktive Mitglied entscheidet selbst, ob es im Verzeichnis erscheint, und pflegt seinen Eintrag unter „Meine Mitgliedschaft“.
             </p>

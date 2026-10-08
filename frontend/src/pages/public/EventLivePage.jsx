@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { Activity, CalendarClock, CheckCircle2, Flag, MapPin, Monitor, Radio, RotateCw, Trophy, Users } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -7,14 +7,15 @@ import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { api } from "@/lib/api";
-import { formatDateTime } from "@/lib/datetime";
+import { formatDateTime, formatWhen } from "@/lib/datetime";
 import { sortByNearestDate } from "@/lib/contentSort";
-import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
+import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel, slotName, stationText } from "@/lib/tournamentLabels";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { seoTextPreview } from "@/lib/textPreview";
 import { viennaTime } from "@/lib/vienna";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
+import { eventIsOver } from "@/lib/afterEnd";
 
 const ACTIVE_MATCH_STATUSES = new Set(["in_progress", "running", "waiting_result", "disputed"]);
 const NEXT_MATCH_STATUSES = new Set(["ready", "scheduled", "pending", "preview"]);
@@ -25,9 +26,9 @@ function accessParams(accessToken) {
   return accessToken ? { params: { access: accessToken } } : undefined;
 }
 
+// Station im Klartext (#1220): der fertige Text vom Server, sonst der Name aus der Stationsliste - nie eine Kennung.
 function stationLabel(match, stationMap) {
-  const station = stationMap.get(match.station_id);
-  return match.station_label || match.station_name || match.station?.name || station?.name || match.station_id || "";
+  return stationText(match) || stationMap.get(match.station_id)?.name || "";
 }
 
 function parseTime(value) {
@@ -44,11 +45,12 @@ function participantLabel(registration) {
   return registration?.display_name || registration?.ingame_name || registration?.user?.display_name || registration?.user?.username || "Offen";
 }
 
-// Leere Plätze späterer Runden im Klartext (#1113): „Sieger aus A“ statt „Offen“.
-function slotLabel(slot, registrationMap, findMatch) {
+// Leere Plätze späterer Runden im Klartext (#1113): „Sieger aus A“; ein Platz ohne Gegner heißt „Freilos“, ein
+// Setzplatz vor der Auslosung „noch offen“ (#1220).
+function slotLabel(slot, registrationMap, findMatch, match) {
   const registration = registrationMap.get(slot.registration_id);
   if (registration) return participantLabel(registration);
-  return sourceLabel(slot.source, findMatch) || "Offen";
+  return sourceLabel(slot.source, findMatch) || slotName("", slot, match);
 }
 
 function resultLine(match, registrationMap) {
@@ -78,7 +80,7 @@ function normalizeBracketRows(payload) {
   const v2Rows = (payload?.matches_v2 || []).map((match) => ({
     ...match,
     tournament,
-    labels: (match.slots || []).map((slot) => slotLabel(slot, registrationMap, finder(match))).filter(Boolean),
+    labels: (match.slots || []).map((slot) => slotLabel(slot, registrationMap, finder(match), match)).filter(Boolean),
     groupLabel: formatScheduleGroupLabel(match, tournament),
     resultText: resultLine(match, registrationMap),
     source: "v2",
@@ -101,11 +103,18 @@ export default function EventLivePage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
+  // Nach dem Ende (#1221) gibt es nichts mehr live zu verfolgen: die Adresse führt auf die Event-Seite.
+  const [ended, setEnded] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get(`/events/${slug}`, accessParams(accessToken));
+      if (eventIsOver(data)) {
+        setEvent(data);
+        setEnded(true);
+        return;
+      }
       const tournaments = sortByNearestDate(data?.tournaments || []);
       const bracketResponses = await Promise.allSettled(
         tournaments.map((tournament) => api.get(`/tournaments/${tournament.id}/bracket`, accessParams(accessToken)))
@@ -137,7 +146,7 @@ export default function EventLivePage() {
   useEffect(() => {
     load();
   }, [load]);
-  useLiveRefresh(load, ["events", "tournaments", "matches", "matches-v2", "stations", "f1"], { fallbackMs: 20000 });
+  useLiveRefresh(load, ["events", "tournaments", "matches", "matches-v2", "stations", "f1"], { fallbackMs: 20000, enabled: !ended });
 
   const stationMap = useMemo(() => new Map(stations.map((station) => [station.id, station])), [stations]);
   const liveMatches = useMemo(() => matches.filter((match) => ACTIVE_MATCH_STATUSES.has(match.status)).sort((a, b) => a.sortTime - b.sortTime), [matches]);
@@ -160,6 +169,10 @@ export default function EventLivePage() {
     image: event?.banner_url,
     canonical: event?.slug ? `${window.location.origin}/events/${event.slug}/live` : undefined,
   });
+
+  if (ended && event) {
+    return <Navigate to={`/events/${event.slug || event.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} replace />;
+  }
 
   if (loading && !event) {
     return <PublicLayout><PublicLoadingState label="Lade Event-Live" /></PublicLayout>;
@@ -293,7 +306,7 @@ function MatchCard({ match, stationMap, featured = false }) {
         <span className="shrink-0 rounded-sm border border-[#29B6E8]/35 px-2 py-1 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{formatMatchStatus(match.schedule_status || match.status)}</span>
       </div>
       <div className="mt-4 flex flex-wrap gap-3 text-xs text-white/55">
-        <span className="inline-flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5" />{formatDateTime(match.scheduled_at, { fallback: "Termin offen" })}</span>
+        <span className="inline-flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5" />{formatWhen(match.scheduled_at, { fallback: "Termin offen" })}</span>
         {station && <span className="inline-flex items-center gap-1.5 text-[#FFD700]"><Monitor className="w-3.5 h-3.5" />{station}</span>}
         <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{formatMatchKind(match)}</span>
       </div>

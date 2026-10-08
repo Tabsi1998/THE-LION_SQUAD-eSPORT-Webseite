@@ -215,14 +215,17 @@ export function PublicLayout({ children }) {
       <footer className="relative border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip pb-16 lg:pb-0">
         <SeasonFooterSlot />
         <div className="border-b border-white/5 bg-[#0D0D0E]" data-testid="footer-cta">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 min-w-0">
-            <div className="min-w-0">
+          {/* Satz und Knöpfe (#1219): bis 1023 px untereinander - oben der Satz in voller Breite, darunter die Knöpfe,
+              die bei Platzmangel umbrechen. Ab 1024 px nebeneinander; der Satz behält mindestens 18rem, die Knopfleiste
+              bricht um, statt den Satz zu einer Wortsäule zu drücken. */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 min-w-0">
+            <div className="min-w-0 lg:flex-1 lg:min-w-[18rem]" data-testid="footer-cta-text">
               <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Dabei sein</div>
               <div className="mt-1 text-sm text-white/65">Auf Discord ist das Rudel jeden Tag da — mit der LionsAPP hast du Termine, Turniere und Chat am Handy.</div>
             </div>
             {/* Knopfleiste (#425): Discord als offizieller Knopf; die LionsAPP als eigene Store-Knöpfe (#1084) für Google
                 Play und den App Store, je erst mit Link - sonst „bald …“ (für beide zusammen ein Chip). */}
-            <div className="flex flex-wrap items-center gap-3 shrink-0" data-testid="footer-buttons">
+            <div className="flex flex-wrap items-center gap-3 min-w-0 lg:justify-end" data-testid="footer-buttons">
               <DiscordLiveLine discord={discordNow} />
               {discordHref && (
                 <a href={discordHref} target="_blank" rel="noreferrer" data-testid="footer-discord-button" className="inline-flex items-center gap-2 rounded-md bg-[#5865F2] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#4752C4] transition">

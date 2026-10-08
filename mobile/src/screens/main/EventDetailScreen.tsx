@@ -20,6 +20,7 @@ import type { ContentTarget } from "../../lib/contentLinks";
 import { openLink } from "../../lib/openLink";
 import { companionChangeHint, eventBasisLabel, eventOfferSummary, formatCents, ownEventPriceLine, quoteTotal } from "../../lib/eventPrice";
 import { eventDayItems, scheduleLine } from "../../lib/eventDays";
+import { eventIsOver } from "../../lib/afterEnd";
 import { formatDateTime, formatStatus, placeParts } from "../../lib/format";
 import { internalLabel } from "../../lib/memberArea";
 import { getRegistrationState } from "../../lib/registration";
@@ -28,6 +29,15 @@ import { openSignIn } from "../../navigation/rootNavigation";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ClubEvent, EventRegistration, F1Challenge, NewsPost, Tournament } from "../../types";
+
+// Einzahl und Mehrzahl (#1223): „1 Platz“, „2 Plätze“, „1 Begleitperson“, „2 Begleitpersonen“.
+function placesLabel(count: number): string {
+  return `${count} ${count === 1 ? "Platz" : "Plätze"}`;
+}
+
+function companionsLabel(count: number): string {
+  return `${count} ${count === 1 ? "Begleitperson" : "Begleitpersonen"}`;
+}
 
 type Props = NativeStackScreenProps<TournamentStackParamList, "EventDetail">;
 
@@ -234,7 +244,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
-        {event.start_date || event.date ? (
+        {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
+        {(event.start_date || event.date) && !eventIsOver(event) ? (
           <AddToCalendarButton items={eventDayItems(event)} item={{
             id: event.id, kind: "event", title: event.title || event.name || "Event", start: (event.start_date || event.date) as string, end: event.end_date,
             location: placeParts(event.location, event.city).join(", ") || null, detail: event.event_type || event.type || null,
@@ -313,10 +324,10 @@ export function EventDetailScreen({ navigation, route }: Props) {
               <Button label="Extern anmelden" onPress={openExternalRegistration} />
             ) : registered ? (
               <>
-                <Muted style={styles.success}>
+                <Muted style={styles.success} testID="event-own-seats">
                   {formatStatus(event.own_registration?.status)}
-                  {event.own_registration?.seat_count ? ` · ${event.own_registration.seat_count} Platz/Plätze` : ""}
-                  {event.own_registration?.companion_count ? ` · ${event.own_registration.companion_count} Begleitp.` : ""}
+                  {event.own_registration?.seat_count ? ` · ${placesLabel(event.own_registration.seat_count)}` : ""}
+                  {event.own_registration?.companion_count ? `, davon ${companionsLabel(event.own_registration.companion_count)}` : ""}
                 </Muted>
                 {event.own_registration?.price ? (
                   <View style={styles.feeBox} testID="event-own-price">
@@ -327,7 +338,11 @@ export function EventDetailScreen({ navigation, route }: Props) {
                 ) : event.own_registration?.status === "waitlist" && offer ? (
                   <Muted>Bezahlt wird erst, wenn du nachrückst – dann gilt der Preis von diesem Tag.</Muted>
                 ) : null}
-                <Button label={busy ? "Wird abgemeldet ..." : "Vom Event abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
+                {/* Abmelden nur, solange der Server es erlaubt (#1223) - bis zum Beginn, nicht nach dem Check-in. Ein älterer
+                    Server ohne das Feld verhält sich wie bisher. */}
+                {event.own_registration?.can_cancel !== false ? (
+                  <Button label={busy ? "Wird abgemeldet ..." : "Vom Event abmelden"} variant="secondary" onPress={unregister} disabled={busy} testID="event-unregister" />
+                ) : null}
               </>
             ) : guest ? (
               // Gast zuerst (#918): der Weg zum Konto gleich hier - nach der Anmeldung geht es zurück zu diesem Event.

@@ -74,3 +74,21 @@ test("ohne Teilnahmen kein leerer Block; ohne eigenen Eintrag zählt der erste",
   expect(memberEntry({ ...TEAM_CUP, member_entry: TEAM_CUP.entries[1] }).id).toBe("e2");
   expect(memberEntry(TEAM_CUP).id).toBe("e1");
 });
+
+// Lange Namen (#1218): höchstens zwei Zeilen, ein Name ab 16 Zeichen eine Schriftstufe kleiner, der ganze Name bleibt lesbar.
+test("ein Name mit 24 Zeichen kommt eine Stufe kleiner, ein kurzer Name nicht", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...PROFILE, gamertag: "NachtfalkeDerSuperliga24", references: [], reference_stats: {} } });
+  const { unmount } = renderProfile();
+  const long = await screen.findByTestId("member-head-name");
+  expect(long).toHaveTextContent("NachtfalkeDerSuperliga24");
+  expect(long).toHaveAttribute("title", "NachtfalkeDerSuperliga24");
+  expect(long.className).toContain("tls-head-name tls-head-name--long");
+  expect(long.className).toContain("text-4xl md:text-6xl");
+  unmount();
+  apiMock.get.mockResolvedValue({ data: { ...PROFILE, references: [], reference_stats: {} } });
+  renderProfile();
+  const short = await screen.findByTestId("member-head-name");
+  expect(short.className).toContain("tls-head-name");
+  expect(short.className).not.toContain("tls-head-name--long");
+  expect(short.className).toContain("text-5xl md:text-7xl");
+});

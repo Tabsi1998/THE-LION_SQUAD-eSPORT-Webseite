@@ -62,6 +62,16 @@ export default function GalleryPage() {
   );
 }
 
+/** „48 Fotos · 3 Videos“, „1 Foto“ - leer „0 Fotos“. */
+export function albumMediaLabel(album) {
+  const photos = Number(album?.photo_count ?? album?.media_count ?? 0) || 0;
+  const videos = Number(album?.video_count || 0) || 0;
+  const parts = [];
+  if (photos || !videos) parts.push(`${photos} ${photos === 1 ? "Foto" : "Fotos"}`);
+  if (videos) parts.push(`${videos} ${videos === 1 ? "Video" : "Videos"}`);
+  return parts.join(" · ");
+}
+
 function AlbumCard({ a }) {
   return (
     <Link
@@ -80,8 +90,8 @@ function AlbumCard({ a }) {
             <Crown className="w-3 h-3" /> Mitglieder
           </span>
         )}
-        <span className="absolute bottom-2 right-2 text-[10px] uppercase tracking-widest font-bold text-white bg-black/60 px-2 py-1 rounded-sm">
-          {a.media_count ?? a.photo_count ?? 0} Medien
+        <span className="absolute bottom-2 right-2 text-[10px] uppercase tracking-widest font-bold text-white bg-black/60 px-2 py-1 rounded-sm" data-testid={`album-count-${a.slug}`}>
+          {albumMediaLabel(a)}
         </span>
         {!!a.video_count && (
           <span className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-white bg-[#9F7AEA]/80 px-2 py-1 rounded-sm">
@@ -96,6 +106,8 @@ function AlbumCard({ a }) {
       </div>
       <div className="p-4">
         <div className="tls-card__title font-heading font-black uppercase">{a.title}</div>
+        {/* Leere Alben (#1224) sieht nur, wer Inhalte pflegt - mit diesem Hinweis. */}
+        {a.is_empty && <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]" data-testid={`album-empty-${a.slug}`}>leer – für Besucher unsichtbar</div>}
         {a.taken_at && <div className="text-xs text-white/45 mt-1">{viennaDate(a.taken_at)}</div>}
         {a.description && <div className="text-xs text-white/55 mt-2 line-clamp-2">{a.description}</div>}
       </div>

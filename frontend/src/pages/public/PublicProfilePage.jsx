@@ -25,6 +25,7 @@ import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameLabel } from "@/lib/gameLabels";
 import { seoTextPreview } from "@/lib/textPreview";
+import { headNameClass, isLongHeadName } from "@/lib/headName";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   Trophy, Flag, Medal, Shield, Calendar,
@@ -391,7 +392,7 @@ export default function PublicProfilePage() {
     return (
       <PublicLayout>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 space-y-6" data-testid="profile-own-private">
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">{user.display_name || user.username}</h1>
+          <h1 className={`font-heading text-3xl md:text-4xl font-black uppercase ${headNameClass(user.display_name || user.username)}`}>{user.display_name || user.username}</h1>
           <div className="flex items-center justify-between gap-4 border border-white/10 bg-[#121212] rounded-sm px-4 py-3" data-testid="profile-as-others">
             <span><span className="block font-bold text-sm">So sehen dich andere</span><span className="block text-xs text-white/50">{asOthers ? "Nur, was deine Privatsphäre allen zeigt." : "Aus: du siehst auch „Nur für dich“."}</span></span>
             <AsOthersSwitch on={asOthers} onChange={setAsOthers} />
@@ -565,7 +566,9 @@ export default function PublicProfilePage() {
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Leichtes 3D (#1078): Bild und Name neigen sich mit der Maus um höchstens 3 Grad - nur hier, nur am PC. */}
-          <div ref={tiltRef} className="tls-tilt relative -mt-14 sm:-mt-16 lg:-mt-20 flex flex-col md:flex-row md:items-end gap-4 md:gap-6" data-testid="profile-tilt">
+          {/* Am Tablet (bis 1279 px) stehen die Knöpfe in einer eigenen Zeile unter Bild und Name - sonst bliebe für den
+              Namen nur ein schmaler Streifen mit einem Buchstaben je Zeile (#1218). */}
+          <div ref={tiltRef} className="tls-tilt relative -mt-14 sm:-mt-16 lg:-mt-20 flex flex-col md:flex-row md:flex-wrap xl:flex-nowrap md:items-end gap-4 md:gap-6" data-testid="profile-tilt">
             <div className="tls-tilt__deep shrink-0">
               <LevelAvatarFrame level={level.level} crown={crown} className="w-28 h-28 sm:w-32 sm:h-32 lg:w-40 lg:h-40" testId="profile-avatar-frame">
                 {profile.avatar_url ? (
@@ -582,7 +585,8 @@ export default function PublicProfilePage() {
                 <span>THE LION SQUAD · Spieler</span>
                 {isPrivate && <span className="inline-flex items-center gap-1 text-white/40"><Lock className="w-3 h-3" /> Privat</span>}
               </div>
-              <h1 className="mt-1 font-heading text-3xl sm:text-4xl lg:text-5xl font-black uppercase leading-none tracking-tight break-words">
+              {/* Langer Name (#1218): höchstens zwei Zeilen, eine Stufe kleiner, erst dann „…“. */}
+              <h1 className={`mt-1 font-heading ${isLongHeadName(displayName) ? "text-2xl sm:text-3xl lg:text-4xl" : "text-3xl sm:text-4xl lg:text-5xl"} font-black uppercase tracking-tight ${headNameClass(displayName)}`} title={displayName} data-testid="profile-head-name">
                 {displayName}
               </h1>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-white/55" data-testid="profile-identity">
@@ -602,7 +606,7 @@ export default function PublicProfilePage() {
                 {joinedDate && <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />Dabei seit {viennaDate(joinedDate, { month: "long", year: "numeric" })}</span>}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 md:pb-1 md:justify-end shrink-0" data-testid="profile-actions">
+            <div className="flex flex-wrap gap-2 md:pb-1 md:basis-full xl:basis-auto xl:justify-end shrink-0" data-testid="profile-actions">
               {!isOwnProfile && (
                 <>
                   <button
@@ -1147,7 +1151,7 @@ function AboutCard({ profile, joinedDate }) {
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="public-profile-info">
       <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2">
-        <Info className="w-4 h-4 text-[#29B6E8]" /> Über {profile.display_name || profile.username}
+        <Info className="w-4 h-4 text-[#29B6E8] shrink-0" /> <span className="min-w-0 [overflow-wrap:anywhere]">Über {profile.display_name || profile.username}</span>
       </h2>
       <dl className="mt-3 space-y-2">
         {rows.map((row) => (

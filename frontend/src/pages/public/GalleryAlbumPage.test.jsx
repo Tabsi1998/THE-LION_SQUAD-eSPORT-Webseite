@@ -87,3 +87,16 @@ test("die Bühne fliegt zurück in die Kachel und schließt erst danach", async 
   expect(screen.queryByTestId("gallery-lightbox")).not.toBeInTheDocument();
   expect(screen.getByTestId("gallery-photo-0")).toHaveFocus();
 });
+
+// Leeres Album (#1224): ein direkter Link zeigt „Hier kommen bald Fotos“ statt „0 Medien – Noch keine Medien“.
+test("leeres Album: ein freundlicher Satz statt „0 Medien“", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...album, photos: [] } });
+  render(
+    <MemoryRouter initialEntries={["/galerie/lan-2026"]}>
+      <Routes><Route path="/galerie/:slug" element={<GalleryAlbumPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByTestId("album-empty")).toHaveTextContent("Hier kommen bald Fotos.");
+  expect(screen.queryByText(/0 Medien/)).toBeNull();
+  expect(screen.queryByText("Noch keine Medien.")).toBeNull();
+});

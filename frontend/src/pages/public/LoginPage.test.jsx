@@ -111,3 +111,44 @@ test("kann der Browser Passkeys vorschlagen, startet das im Hintergrund und ende
   expect(stop).toHaveBeenCalled();
   await waitFor(() => expect(passkeys.signInWithPasskey).toHaveBeenCalledWith({ remember: true }));
 });
+
+// Ziel nach dem Anmelden (#1225): „Registrieren“ nimmt das Ziel mit, oben steht, wofür man sich anmeldet, und ein Ziel
+// auf einer fremden Adresse führt zum Dashboard.
+function renderAt(entry) {
+  return render(
+    <MemoryRouter initialEntries={[entry]}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/dashboard" element={<div>dashboard</div>} />
+        <Route path="/tournaments/:slug" element={<div>turnierseite</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
+test("vom Turnier: Satz mit dem Turnier, „Registrieren“ trägt das Ziel", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/auth/passkeys/status") return { data: { enabled: false } };
+    if (url === "/tournaments/mk-cup") return { data: { id: "t1", title: "Mario Kart Cup" } };
+    return { data: [] };
+  });
+  renderAt("/login?next=%2Ftournaments%2Fmk-cup");
+  expect(await screen.findByTestId("login-purpose")).toHaveTextContent("Melde dich an, um dich für „Mario Kart Cup“ anzumelden.");
+  expect(screen.getByTestId("login-register-link")).toHaveAttribute("href", "/register?next=%2Ftournaments%2Fmk-cup");
+});
+
+test("ohne Ziel kein Satz, „Registrieren“ ohne Anhang", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/auth/passkeys/status" ? { data: { enabled: false } } : { data: [] }));
+  renderAt("/login");
+  expect(screen.getByTestId("login-register-link")).toHaveAttribute("href", "/register");
+  expect(screen.queryByTestId("login-purpose")).toBeNull();
+});
+
+test("ein fremdes Ziel führt nach dem Anmelden zum Dashboard", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation(async (url) => (url === "/auth/passkeys/status" ? { data: { enabled: false } } : { data: [] }));
+  renderAt("/login?next=https%3A%2F%2Ffremd.example%2Fx");
+  expect(screen.queryByTestId("login-purpose")).toBeNull();
+  await fillAndSubmit(user);
+  await waitFor(() => expect(screen.getByText("dashboard")).toBeInTheDocument());
+});

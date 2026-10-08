@@ -73,7 +73,7 @@ export default function MemberDocumentsPage() {
           <ArrowLeft className="w-3.5 h-3.5" /> Mitgliederbereich
         </Link>
         <span className="mt-6 text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700] block">EXKLUSIV</span>
-        <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">Vereinsdokumente</h1>
+        <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">Vereins&shy;dokumente</h1>
         <p className="mt-3 text-white/60 max-w-2xl">
           Statuten, Protokolle, Formulare und Vereinsleitlinien - zentral abgelegt, direkt einsehbar und immer aktuell.
         </p>

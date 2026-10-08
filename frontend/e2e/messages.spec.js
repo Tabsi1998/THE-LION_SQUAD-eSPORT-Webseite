@@ -30,7 +30,7 @@ function message(index) {
 const all = Array.from({ length: TOTAL }, (_, i) => message(i + 1));
 
 async function acceptCookies(page) {
-  const button = page.getByRole("button", { name: /alle akzeptieren/i });
+  const button = page.getByRole("button", { name: /alle erlauben/i });
   if (await button.count()) await button.click();
 }
 

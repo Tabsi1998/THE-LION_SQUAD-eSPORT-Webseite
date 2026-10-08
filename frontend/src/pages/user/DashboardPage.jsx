@@ -14,6 +14,7 @@ import { dashboardActions, formatVienna, registrationLabel, seasonLine, splitHom
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { Trophy, Bell, Crown, Gift, AlertTriangle, UserCheck, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, Settings } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
+import { stationText } from "@/lib/tournamentLabels";
 
 // Das Dashboard ist die persönliche Startseite, wie die App-Startseite seit
 // #237 (#256): Kopf, offene Aktionen, nächste Termine, Jahreswertung,
@@ -332,7 +333,8 @@ function DashboardMatchCard({ match, staff = false, testId }) {
   const details = [
     match.opponent_name || (match.participant_names || []).join(" · "),
     match.round_name || (match.round ? `Runde ${match.round}` : ""),
-    match.station_label ? `Station ${match.station_label}` : "",
+    // Station im Klartext (#1220) - nie doppelt „Station“.
+    stationText(match),
   ].filter(Boolean);
   const attention = Boolean(match.needs_result);
   const action = staff && match.can_submit_result

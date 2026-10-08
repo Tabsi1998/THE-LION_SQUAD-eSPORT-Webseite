@@ -48,6 +48,8 @@ async function noHorizontalOverflow(page) {
 }
 
 test("Event-Seite: Zeitraum, Tageskarten, Tag des Turniers und Kalender je Tag", async ({ page }, testInfo) => {
+  // Der Kalender-Knopf fällt nach dem letzten Tag weg (#1221) - die Uhr steht deshalb auf Tag 2.
+  await page.clock.setFixedTime(new Date("2026-10-17T10:00:00+00:00"));
   await mockChrome(page);
   await page.route("**/api/auth/me", (route) => route.fulfill({ status: 401, ...json({ detail: "anonym" }) }));
   await page.route("**/api/events/lan-wochenende", (route) => route.fulfill(json(EVENT)));

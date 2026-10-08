@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Link, useInRouterContext, useLocation } from "react-router-dom";
-import { Check, Settings, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 
 const STORAGE_KEY = "tls_cookie_consent_v1";
-const MAX_AGE_DAYS = 30;
+// Die Wahl gilt sechs Monate (#1226). Eine ältere, gespeicherte Wahl gilt bis zu ihrem eigenen Ablauf (expires_at).
+export const MAX_AGE_DAYS = 180;
 const DEFAULT_CONSENT = {
   essential: true,
   external_media: false,
@@ -11,6 +12,7 @@ const DEFAULT_CONSENT = {
   meta: false,
   tiktok: false,
 };
+const ALL_OPTIONAL = { external_media: true, analytics: true, meta: true, tiktok: true };
 
 const CookieConsentContext = createContext({
   consent: DEFAULT_CONSENT,
@@ -44,7 +46,11 @@ function writeStoredConsent(consent) {
     saved_at: now,
     expires_at: now + MAX_AGE_DAYS * 24 * 60 * 60 * 1000,
   };
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    // Ohne Speicher (privates Fenster) gilt die Wahl für diesen Besuch.
+  }
   window.dispatchEvent(new CustomEvent("tls-cookie-consent-changed", { detail: payload }));
   return payload;
 }
@@ -63,17 +69,27 @@ function RouteWatch({ onPath }) {
   return null;
 }
 
+const OPTIONAL_ROWS = [
+  { key: "external_media", title: "Externe Medien", text: "Google Maps, Twitch, YouTube oder ähnliche Einbettungen direkt auf der Seite." },
+  { key: "analytics", title: "Statistik", text: "Reichweitenmessung und technische Auswertung, sofern solche Tools eingebunden werden." },
+  { key: "meta", title: "Meta", text: "Facebook-/Instagram-Pixel, Meta-Embeds oder Meta-Marketing-Dienste, falls aktiv eingebunden." },
+  { key: "tiktok", title: "TikTok", text: "TikTok-Pixel, TikTok-Embeds oder TikTok-Marketing-Dienste, falls aktiv eingebunden." },
+];
+
 export function CookieConsentProvider({ children }) {
   const inRouter = useInRouterContext();
   const [pathname, setPathname] = useState(() => (typeof window === "undefined" ? "" : window.location.pathname));
   const displayScreen = isDisplayPath(pathname);
   const [stored, setStored] = useState(() => readStoredConsent());
   const [open, setOpen] = useState(() => !readStoredConsent());
+  const [details, setDetails] = useState(false);
   const [draft, setDraft] = useState(() => ({ ...DEFAULT_CONSENT, ...(readStoredConsent() || {}) }));
 
   const openSettings = useCallback(() => {
     const current = readStoredConsent();
     setDraft({ ...DEFAULT_CONSENT, ...(current || {}) });
+    // Aus „Cookie-Einstellungen“ in der Fußzeile geht es gleich zu den Schaltern.
+    setDetails(Boolean(current));
     setOpen(true);
   }, []);
 
@@ -92,6 +108,7 @@ export function CookieConsentProvider({ children }) {
     const payload = writeStoredConsent(next);
     setStored(payload);
     setDraft(payload);
+    setDetails(false);
     setOpen(false);
   }, []);
 
@@ -107,96 +124,86 @@ export function CookieConsentProvider({ children }) {
       {children}
       {inRouter ? <RouteWatch onPath={setPathname} /> : null}
       {open && !displayScreen && (
-        <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-start md:items-center justify-center overflow-y-auto p-3 sm:p-4">
-          <div className="w-full max-w-3xl max-h-[calc(100vh-1.5rem)] md:max-h-[calc(100vh-2rem)] overflow-y-auto border border-[#29B6E8]/40 bg-[#050505] rounded-sm shadow-2xl shadow-black/60">
-            <div className="p-4 sm:p-5 md:p-7">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#29B6E8]">Datenschutz</div>
-                  <h2 className="mt-2 font-heading text-xl sm:text-3xl md:text-4xl font-black uppercase">Cookie-Einstellungen</h2>
-                </div>
-                {stored && (
-                  <button type="button" onClick={() => setOpen(false)} className="text-white/45 hover:text-white"><X className="w-5 h-5" /></button>
-                )}
+        // Cookie-Hinweis als schmales Blatt am unteren Rand (#1226, Variante A): keine Unschärfe, kein Fenster über der
+        // Seite - der Inhalt dahinter bleibt lesbar, scrollbar und klickbar. Am Handy liegt das Blatt über der unteren
+        // Leiste (.tls-cookie-sheet in index.css), ab 640 px mittig und höchstens 720 px breit.
+        <div className="tls-cookie-sheet fixed inset-x-0 bottom-0 z-[80] flex justify-center p-2 sm:p-4 pointer-events-none" data-testid="cookie-sheet">
+          <section
+            role="dialog"
+            aria-modal="false"
+            aria-labelledby="cookie-sheet-title"
+            className={`pointer-events-auto w-full sm:max-w-[720px] ${details ? "max-h-[70vh]" : "max-h-[33vh]"} overflow-y-auto border border-[#29B6E8]/40 bg-[#050505] rounded-sm shadow-2xl shadow-black/60 p-4 sm:p-5`}
+            data-details={details ? "true" : "false"}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 id="cookie-sheet-title" className="font-heading text-sm sm:text-base font-black uppercase">Cookies und eingebettete Inhalte</h2>
+                <p className="mt-1 text-xs sm:text-sm text-white/70">
+                  Nötiges ist immer an. Karten, Videos und Statistik nur, wenn du willst. Mehr in der <Link to="/privacy" className="text-[#29B6E8] underline underline-offset-2 hover:text-white">Datenschutzerklärung</Link>.
+                </p>
               </div>
-              <p className="mt-3 md:mt-4 text-sm md:text-base text-white/70 leading-relaxed">
-                Wir verwenden notwendige Speicherungen für Login, Sicherheit und deine Cookie-Auswahl. Optionale Dienste wie eingebettete Karten, Streams, Statistik oder Social-/Marketing-Dienste aktivieren wir erst nach deiner Zustimmung. Du kannst die Auswahl jederzeit im Footer ändern.
-              </p>
-              <div className="mt-4 md:mt-6 divide-y divide-white/10 border-y border-white/10">
-                <ConsentRow title="Essentiell" text="Login, CSRF-Schutz, Warenkorb-/Formularstatus und diese Einwilligungsinfo." locked checked />
-                <details className="group">
-                  <summary className="cursor-pointer list-none py-3 md:py-4 flex items-center justify-between gap-4">
-                    <div>
-                      <div className="font-heading font-black uppercase text-base md:text-lg">Optionale Dienste</div>
-                      <div className="mt-1 text-xs text-white/50 max-w-xl">Externe Medien, Statistik und Social-/Marketing-Dienste einzeln einstellen.</div>
-                    </div>
-                    <span className="rounded-sm border border-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/55 group-open:text-white">Einblenden</span>
-                  </summary>
-                  <div className="divide-y divide-white/10 border-t border-white/10">
-                <ConsentRow
-                  title="Externe Medien"
-                  text="Google Maps, Twitch, YouTube oder ähnliche Einbettungen direkt auf der Seite."
-                  checked={draft.external_media}
-                  onChange={(v) => setDraft((cur) => ({ ...cur, external_media: v }))}
-                />
-                <ConsentRow
-                  title="Statistik"
-                  text="Reichweitenmessung und technische Auswertung, sofern solche Tools eingebunden werden."
-                  checked={draft.analytics}
-                  onChange={(v) => setDraft((cur) => ({ ...cur, analytics: v }))}
-                />
-                <ConsentRow
-                  title="Meta"
-                  text="Facebook-/Instagram-Pixel, Meta-Embeds oder Meta-Marketing-Dienste, falls aktiv eingebunden."
-                  checked={draft.meta}
-                  onChange={(v) => setDraft((cur) => ({ ...cur, meta: v }))}
-                />
-                <ConsentRow
-                  title="TikTok"
-                  text="TikTok-Pixel, TikTok-Embeds oder TikTok-Marketing-Dienste, falls aktiv eingebunden."
-                  checked={draft.tiktok}
-                  onChange={(v) => setDraft((cur) => ({ ...cur, tiktok: v }))}
-                />
-                  </div>
-                </details>
-              </div>
-              <div className="mt-4 md:mt-6 grid gap-2 sm:grid-cols-3">
-                <button type="button" onClick={() => save(DEFAULT_CONSENT)} className="tls-btn tls-btn--quiet px-4 py-3 font-bold uppercase tracking-wider rounded-sm text-xs">
-                  Alle ablehnen
-                </button>
-                <button type="button" onClick={() => save(draft)} className="tls-btn tls-btn--secondary px-4 py-3 font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center justify-center gap-2">
-                  <Settings className="w-4 h-4" /> Auswahl speichern
-                </button>
-                <button type="button" onClick={() => save({ external_media: true, analytics: true, meta: true, tiktok: true })} className="tls-btn tls-btn--primary px-4 py-3 font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center justify-center gap-2">
-                  <Check className="w-4 h-4" /> Alle akzeptieren
-                </button>
-              </div>
-              <div className="mt-4 text-xs text-white/45">
-                Details findest du in der <Link to="/privacy" className="text-[#29B6E8] hover:underline">Datenschutzerklärung</Link>. Speicherung der Auswahl: {MAX_AGE_DAYS} Tage.
-              </div>
+              {stored && (
+                <button type="button" onClick={() => setOpen(false)} aria-label="Schließen" className="shrink-0 text-white/45 hover:text-white"><X className="w-5 h-5" /></button>
+              )}
             </div>
-          </div>
+            {/* Zwei gleich große, gleich gestaltete Knöpfe - niemand wird zu einem der beiden gedrängt. */}
+            <div className="mt-3 grid grid-cols-2 gap-2" data-testid="cookie-choices">
+              <button type="button" onClick={() => save(DEFAULT_CONSENT)} data-testid="cookie-essential-only" className="tls-btn tls-btn--secondary w-full px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider">
+                Nur Nötiges
+              </button>
+              <button type="button" onClick={() => save(ALL_OPTIONAL)} data-testid="cookie-allow-all" className="tls-btn tls-btn--secondary w-full px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider">
+                Alle erlauben
+              </button>
+            </div>
+            <button type="button" onClick={() => setDetails((value) => !value)} aria-expanded={details} aria-controls="cookie-sheet-details" data-testid="cookie-details-toggle"
+              className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-white/65 hover:text-white underline-offset-4 hover:underline">
+              Einzeln wählen <ChevronDown className={`w-3.5 h-3.5 transition-transform ${details ? "rotate-180" : ""}`} />
+            </button>
+            {details && (
+              <div id="cookie-sheet-details" className="mt-2 divide-y divide-white/10 border-y border-white/10" data-testid="cookie-details">
+                <ConsentRow title="Essentiell" text="Login, CSRF-Schutz, Formularstatus und diese Einwilligungsinfo." locked checked />
+                {OPTIONAL_ROWS.map((row) => (
+                  <ConsentRow
+                    key={row.key}
+                    title={row.title}
+                    text={row.text}
+                    checked={Boolean(draft[row.key])}
+                    onChange={(checked) => setDraft((current) => ({ ...current, [row.key]: checked }))}
+                  />
+                ))}
+                <div className="py-3">
+                  <button type="button" onClick={() => save(draft)} data-testid="cookie-save-selection" className="tls-btn tls-btn--quiet w-full px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider">
+                    Auswahl speichern
+                  </button>
+                </div>
+              </div>
+            )}
+            <p className="mt-2 text-[11px] text-white/60">Deine Wahl gilt sechs Monate. Ändern kannst du sie jederzeit über „Cookie-Einstellungen“ in der Fußzeile.</p>
+          </section>
         </div>
       )}
     </CookieConsentContext.Provider>
   );
 }
 
+// Ein Schalter mit Namen für Vorleseprogramme (#1226): „Externe Medien erlauben“, Rolle „switch“.
 function ConsentRow({ title, text, checked, locked = false, onChange }) {
   return (
-    <div className="py-3 md:py-4 flex items-center justify-between gap-4 md:gap-5">
-      <div>
-        <div className="font-heading font-black uppercase text-base md:text-lg">{title}</div>
-        <div className="mt-1 text-xs text-white/50 max-w-xl">{text}</div>
+    <div className="py-3 flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <div className="font-heading font-black uppercase text-sm">{title}</div>
+        <div className="mt-0.5 text-xs text-white/50">{text}</div>
       </div>
       <button
         type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={locked ? `${title} – immer an` : `${title} erlauben`}
         disabled={locked}
-        aria-pressed={checked}
         onClick={() => onChange?.(!checked)}
-        className={`relative w-14 h-8 rounded-full border transition shrink-0 ${checked ? "bg-[#29B6E8] border-[#29B6E8]" : "bg-white/20 border-white/20"} ${locked ? "opacity-80 cursor-not-allowed" : "hover:border-white/50"}`}
+        className={`relative w-12 h-7 rounded-full border transition shrink-0 ${checked ? "bg-[#29B6E8] border-[#29B6E8]" : "bg-white/20 border-white/20"} ${locked ? "opacity-80 cursor-not-allowed" : "hover:border-white/50"}`}
       >
-        <span className={`absolute top-1 h-6 w-6 rounded-full bg-white transition ${checked ? "left-7" : "left-1"}`} />
+        <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${checked ? "left-6" : "left-1"}`} />
       </button>
     </div>
   );

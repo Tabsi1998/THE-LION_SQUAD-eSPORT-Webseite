@@ -31,7 +31,7 @@ export default function NotificationsPage() {
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
           <div>
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Mein Bereich</span>
-            <h1 className="mt-2 font-heading text-3xl md:text-4xl font-black uppercase flex items-center gap-3"><Bell className="w-6 h-6 text-[#29B6E8]" /> Benachrichtigungen</h1>
+            <h1 className="mt-2 font-heading text-3xl md:text-4xl font-black uppercase flex items-center gap-3"><Bell className="w-6 h-6 text-[#29B6E8] shrink-0" /> <span className="min-w-0">Benachrichti&shy;gungen</span></h1>
             <p className="mt-1 text-sm text-white/50">{unread} ungelesen · {read} gelesen. Ein Klick öffnet das Ziel und markiert als gelesen.</p>
           </div>
           <div className="flex items-center gap-2">

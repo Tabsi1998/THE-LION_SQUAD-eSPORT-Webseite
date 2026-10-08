@@ -59,6 +59,8 @@ export type EventRegistration = {
   email?: string | null;
   price?: TournamentPrice | null;
   created_at?: string | null;
+  // Ob die eigene Anmeldung noch zurückgezogen werden kann (#1223): bis zum Beginn, nicht nach dem Check-in.
+  can_cancel?: boolean;
 };
 
 export type Tournament = {

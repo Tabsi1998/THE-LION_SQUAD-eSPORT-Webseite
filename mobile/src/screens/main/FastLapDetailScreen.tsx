@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { AddToCalendarButton } from "../../components/AddToCalendarButton";
+import { challengeIsOver } from "../../lib/afterEnd";
 import { Card } from "../../components/Card";
 import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
@@ -179,7 +180,8 @@ export function FastLapDetailScreen({ route }: Props) {
             <Stat icon="people-outline" label="Fahrer" value={participantCount} tone="gold" />
             <Stat icon="timer-outline" label="Zeiten" value={leaderboard?.entries.length || 0} />
           </View>
-          <AddToCalendarButton item={challenge.start_date ? {
+          {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
+          <AddToCalendarButton item={challenge.start_date && !challengeIsOver(challenge) ? {
             id: challenge.id, kind: "fastlap", title: challenge.title, start: challenge.start_date, end: challenge.end_date,
             detail: [challenge.vehicle, challenge.platform].filter(Boolean).join(" · ") || null,
             url: challenge.slug ? `https://lionsquad.at/fastlap/${challenge.slug}` : null,

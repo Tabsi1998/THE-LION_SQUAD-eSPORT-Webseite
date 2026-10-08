@@ -22,7 +22,8 @@ import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
 import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
 import { ChatMessageSticker, ChatStickerButton, ChatStickerPicker } from "@/components/tls/ChatStickers";
-import { formatDateTime, getRegistrationState } from "@/lib/datetime";
+import { formatWhen, getRegistrationState } from "@/lib/datetime";
+import { tournamentIsOver } from "@/lib/afterEnd";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
 import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels";
@@ -242,7 +243,8 @@ export default function TournamentDetailPage() {
           {t.description && <div className="mt-4 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(t.description) }} />}
 
           <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
-            <InfoTile icon={Calendar} label="Start" value={formatDateTime(t.start_date)} />
+            {/* Datum ganz (#1220): „Sa 23. Mai · 21:00“, ohne Abschneiden. */}
+            <InfoTile icon={Calendar} label="Start" value={formatWhen(t.start_date, { fallback: "—" })} wrap testId="tournament-start-tile" />
             <InfoTile icon={Users} label={isTeamTournament ? "Teams" : "Teilnehmer"} value={`${t.participant_count}/${t.max_participants}`} />
             <InfoTile icon={Gamepad2} label="Plattform" value={t.platform || "—"} />
             {/* Format ganz (#401): kein Abschneiden, dazu der Tooltip mit Modus und Best-of */}
@@ -307,7 +309,8 @@ export default function TournamentDetailPage() {
         <div className="lg:col-span-2 space-y-8">
           <MyStandCard tournament={t} registration={myReg} team={myRegTeam} isTeamTournament={isTeamTournament} canCheckIn={false} staffOnlyCheckIn={staffOnlyCheckIn}
             canUnregister={canSelfUnregister} onUnregister={handleUnregister} busy={loading} scheduleTo={subPage("matches")} />
-          <TournamentTimeline tournament={t} calendarItem={calendarItem} />
+          {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
+          <TournamentTimeline tournament={t} calendarItem={tournamentIsOver(t) ? null : calendarItem} />
           {t.rules && (
             <section>
               <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-[#29B6E8]" /> Regeln</h2>
@@ -340,7 +343,7 @@ export default function TournamentDetailPage() {
                   <Link key={c.id} to={`/fastlap/${c.slug || c.id}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] p-4">
                     <PhaseBadge phase={c.public_phase} status={c.status} />
                     <div className="mt-2 font-heading font-bold">{c.title}</div>
-                    {c.start_date && <div className="mt-1 text-xs text-white/50">{formatDateTime(c.start_date)}</div>}
+                    {c.start_date && <div className="mt-1 text-xs text-white/50">{formatWhen(c.start_date)}</div>}
                   </Link>
                 ))}
               </div>

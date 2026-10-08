@@ -135,8 +135,9 @@ async def own_choices(db, discord_user_id, typed: str = "", limit: int = 25) -> 
     regs = await db.event_registrations.find({"user_id": user["id"], "status": {"$in": ["registered", "waitlist", "checked_in"]}},
                                              {"_id": 0, "event_id": 1, "status": 1}).to_list(200)
     events = {event["id"]: event for event in await db.events.find({"id": {"$in": [reg["event_id"] for reg in regs]}, "status": {"$nin": ["completed", "archived", "cancelled"]}}, {"_id": 0}).to_list(200)}
+    # Nur, was sich noch zurückziehen lässt (#1223): nicht nach dem Check-in, nicht nach dem Beginn.
     rows = [{"name": f"📅 {events[reg['event_id']].get('name') or 'Event'} · {EVENT_STATUS_TEXT.get(reg['status'], reg['status'])}"[:100], "value": f"event:{reg['event_id']}"}
-            for reg in regs if reg["event_id"] in events]
+            for reg in regs if reg["event_id"] in events and event_registration.can_cancel(events[reg["event_id"]], reg)]
     needle = (typed or "").strip().lower()
     if needle:
         rows = [row for row in rows if needle in row["name"].lower()]
@@ -170,8 +171,9 @@ async def event_summary(db, user: dict, event: dict, then: str | None = None) ->
         return answer(exc.detail + ".", buttons=link) if not exc.detail.endswith(".") else answer(exc.detail, buttons=link)
     existing = await event_registration.existing_registration(db, event, user)
     if existing and existing.get("status") not in {"cancelled", "no_show"}:
+        withdraw_button = [{"label": "Abmelden", "custom_id": custom_id("unreg", "event", event["id"]), "style": "danger"}] if event_registration.can_cancel(event, existing) else []
         return answer(f"Du bist bei „{name}“ schon {EVENT_STATUS_TEXT.get(existing['status'], existing['status'])}.",
-                      buttons=[{"label": "Abmelden", "custom_id": custom_id("unreg", "event", event["id"]), "style": "danger"}, *link])
+                      buttons=[*withdraw_button, *link])
     try:
         quote = pricing.quote(event.get("billing") or {}, seats=1)
     except pricing.PricingError as exc:
@@ -397,6 +399,9 @@ async def answer_abmelden(db, discord_user_id, wanted: str | None = None) -> dic
     existing = await event_registration.existing_registration(db, event, user)
     if not existing or existing.get("status") in {"cancelled", "no_show"}:
         return answer(f"Du bist bei „{event.get('name') or 'Event'}“ nicht angemeldet.")
+    blocked = event_registration.cancel_block_reason(event, existing)
+    if blocked:
+        return answer(blocked, buttons=[{"label": "Auf der Website", "url": _event_url(event)}])
     text = f"Du bist bei „{event.get('name') or 'Event'}“ {EVENT_STATUS_TEXT.get(existing['status'], existing['status'])}."
     if existing.get("price_snapshot"):
         text += " Eine schon gestellte Rechnung regelt der Verein wie bei einer Abmeldung auf der Website."
@@ -415,7 +420,9 @@ async def withdraw(db, discord_user_id, kind: str, item_id: str) -> dict:
         return answer("Dieses Event gibt es nicht mehr.")
     try:
         await event_registration.cancel(db, event, user, via="discord")
-    except RegistrationError:
+    except RegistrationError as exc:
+        if exc.status != 404:
+            return answer(exc.detail, buttons=[{"label": "Zum Event", "url": _event_url(event)}])
         return answer(f"Du warst bei „{event.get('name') or 'Event'}“ nicht angemeldet.")
     return answer(f"Du bist von „{event.get('name') or 'Event'}“ abgemeldet.", buttons=[{"label": "Zum Event", "url": _event_url(event)}])
 
