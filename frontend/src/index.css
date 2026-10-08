@@ -89,6 +89,11 @@ img, video, canvas, svg {
     hyphens: auto;
     hyphenate-limit-chars: 10 4 4;
   }
+  /* Große Schrift (#1155, 200 %): ein Wort, das auch mit Trennung nicht in die Zeile passt, bricht notfalls ohne
+     Zeichen um, statt seine Spalte breiter zu machen als den Bildschirm (dann schnitte der Rand es ab). */
+  h1, h2, h3 {
+    overflow-wrap: anywhere;
+  }
 }
 /* Am Handy wird die große Schrift so klein, dass ein Wort mit 14 Buchstaben bei 360 px in die Zeile passt -
    ab etwa 460 px Breite bleibt sie so groß wie vorher. */
@@ -2848,6 +2853,24 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   bottom: 0;
 }
 .tls-steps[data-compact] .tls-steps__item[data-state="current"] .tls-steps__count { display: inline; }
+
+/* Tippfläche (#1155): mindestens 44 × 44 px am Handy, ohne das Aussehen zu ändern - eine unsichtbare Fläche um die
+   Mitte. Für kleine Symbol-Knöpfe, Schalter und Textlinks außerhalb von Fließtext. In der Komponenten-Ebene, damit
+   `absolute` oder `fixed` am selben Element weiter gelten. */
+@layer components {
+  .tls-hit {
+    position: relative;
+  }
+  .tls-hit::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
 
 /* Ohne Netz (#1152, wie in der App): die schmale Leiste unter dem Kopf - Gold auf dunklem Gold, der Inhalt bleibt. */
 .tls-offline-bar {

@@ -290,7 +290,7 @@ function OwnProfile() {
         <Pressable key={team.id} onPress={() => go("TeamDetail", { id: team.id })} accessibilityRole="button" style={({ pressed }) => [styles.teamRow, pressed && styles.pressed]} testID={`profile-team-${team.id}`}>
           <MediaImage uri={team.logo_url} style={styles.teamLogo} fallback={<Body style={styles.teamInitials}>{(team.tag || team.name || "?").slice(0, 2).toUpperCase()}</Body>} />
           <View style={styles.flex}>
-            <Body style={profileStyles.strong} numberOfLines={1}>{team.name}</Body>
+            <Body style={profileStyles.strong}>{team.name}</Body>
             <Muted>{team.tag ? `[${team.tag}]` : "Team"}</Muted>
           </View>
           <Ionicons name="chevron-forward" color={colors.muted} size={16} />

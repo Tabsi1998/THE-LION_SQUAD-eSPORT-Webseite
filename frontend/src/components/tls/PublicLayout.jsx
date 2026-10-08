@@ -131,7 +131,7 @@ export function PublicLayout({ children }) {
             )}
             <button
               data-testid="nav-mobile-toggle"
-              className="lg:hidden p-2 text-white"
+              className="tls-hit lg:hidden p-2 text-white"
               onClick={() => setMobileOpen((v) => !v)}
               aria-label={mobileOpen ? "Menü schließen" : "Menü öffnen"}
               aria-expanded={mobileOpen}

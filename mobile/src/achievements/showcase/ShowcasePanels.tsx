@@ -47,14 +47,14 @@ export function WeekCard({ week, loading, onOpenUser, onOpenCard }: { week?: Wee
           <Badge material={award.material} level={award.level} rank={award.rank} art={award.art} icon={award.icon} size={72} testID="week-award-badge" />
           <View style={styles.flex}>
             <Text style={styles.weekName} numberOfLines={2} testID="week-award-name">{award.name}</Text>
-            <Text style={styles.muted} numberOfLines={1}>{award.group_name} · <Text style={{ color }}>{award.material_name}</Text></Text>
+            <Text style={styles.muted} numberOfLines={2}>{award.group_name} · <Text style={{ color }}>{award.material_name}</Text></Text>
             <Text style={styles.weekRarity} testID="week-award-rarity">
               Nur <Text style={styles.strong}>{formatPercent(award.percent)}</Text> haben das · {award.holders === 1 ? "eine Person" : `${Number(award.holders || 0)} Personen`}
             </Text>
             {award.user?.username ? (
               <Pressable onPress={() => onOpenUser(String(award.user?.username))} style={styles.userRow} accessibilityRole="button" testID="week-award-user">
                 <Avatar user={award.user} size={26} />
-                <Text style={styles.userName} numberOfLines={1}>{award.user.display_name || "Spieler"}</Text>
+                <Text style={styles.userName}>{award.user.display_name || "Spieler"}</Text>
                 {award.earned_at ? <Text style={styles.muted}>{formatDate(award.earned_at)}</Text> : null}
               </Pressable>
             ) : null}
@@ -80,7 +80,7 @@ function StatTile({ icon, label, value, color, testID }: { icon: React.Component
     <View style={[styles.statTile, { borderColor: `${color}26` }]} testID={testID}>
       <Ionicons name={icon} size={18} color={color} />
       <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{value}</Text>
-      <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
+      <Text style={styles.statLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Text>
     </View>
   );
 }
@@ -233,10 +233,10 @@ export function Leaderboard({ board, onBoard, entries, loading, categories, onOp
                 >
                   <View style={[styles.rankCircle, { borderColor: color }]}><Text style={[styles.rankText, { color }]}>{entry.rank}</Text></View>
                   <Avatar user={entry} size={44} />
-                  <Text style={styles.podiumName} numberOfLines={1}>{entry.display_name}</Text>
+                  <Text style={styles.podiumName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>{entry.display_name}</Text>
                   {Number(entry.prestige || 0) > 0 ? <Text style={styles.stars}>{prestigeStars(entry.prestige)}</Text> : null}
-                  <Text style={[styles.podiumValue, { color }]} numberOfLines={1}>{byLevel ? `Level ${entry.level}` : Number(entry.points || 0).toLocaleString("de-DE")}</Text>
-                  <Text style={styles.podiumMeta} numberOfLines={1}>{byLevel ? entry.title || `${Number(entry.xp || 0).toLocaleString("de-DE")} XP` : erfolge(entry.count)}</Text>
+                  <Text style={[styles.podiumValue, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{byLevel ? `Level ${entry.level}` : Number(entry.points || 0).toLocaleString("de-DE")}</Text>
+                  <Text style={styles.podiumMeta} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{byLevel ? entry.title || `${Number(entry.xp || 0).toLocaleString("de-DE")} XP` : erfolge(entry.count)}</Text>
                 </Pressable>
               );
             })}
@@ -253,11 +253,11 @@ export function Leaderboard({ board, onBoard, entries, loading, categories, onOp
                 >
                   <Text style={styles.restRank}>{entry.rank}</Text>
                   <Avatar user={entry} size={30} />
-                  <Text style={styles.restName} numberOfLines={1}>
+                  <Text style={styles.restName}>
                     {entry.display_name}
                     {Number(entry.prestige || 0) > 0 ? <Text style={styles.stars}> {prestigeStars(entry.prestige)}</Text> : null}
                   </Text>
-                  <Text style={styles.restMeta} numberOfLines={1}>{byLevel ? entry.title || `Level ${entry.level}` : erfolge(entry.count)}</Text>
+                  <Text style={styles.restMeta} numberOfLines={2}>{byLevel ? entry.title || `Level ${entry.level}` : erfolge(entry.count)}</Text>
                   <Text style={styles.restValue}>{byLevel ? `Lv ${entry.level}` : Number(entry.points || 0).toLocaleString("de-DE")}</Text>
                 </Pressable>
               ))}

@@ -106,7 +106,7 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
                           title={level.d}
                           onClick={() => setVisibilityGroup(group, level.k)}
                           data-testid={`profile-vis-group-${group.k}-${level.k}`}
-                          className={`min-h-9 px-3 rounded-sm border text-[11px] font-bold uppercase tracking-wider transition ${active ? "border-[#29B6E8]/55 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white hover:border-white/25"}`}
+                          className={`min-h-11 px-3 rounded-sm border text-[11px] font-bold uppercase tracking-wider transition ${active ? "border-[#29B6E8]/55 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white hover:border-white/25"}`}
                         >
                           {level.l}
                         </button>

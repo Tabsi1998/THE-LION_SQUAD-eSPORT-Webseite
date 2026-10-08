@@ -160,7 +160,7 @@ export function RecordCard({ username, publicView = false, onOpenUser, onOpenTea
               <Muted style={styles.avatarText}>{String(row.tag || row.name || "?").slice(0, 2).toUpperCase()}</Muted>
             </View>
             <View style={styles.flex}>
-              <Body style={styles.recordName} numberOfLines={1}>{row.name}</Body>
+              <Body style={styles.recordName}>{row.name}</Body>
               <View style={styles.bar}>
                 <View style={[styles.barWins, { width: `${(row.wins / games) * 100}%` }]} />
                 <View style={[styles.barDraws, { width: `${((row.draws || 0) / games) * 100}%` }]} />

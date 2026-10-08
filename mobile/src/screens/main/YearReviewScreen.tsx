@@ -91,7 +91,7 @@ function PageBody({ page, review, token }: { page: YearReviewPage; review: YearR
           <Heading>{review.events.count === 1 ? "Event besucht" : "Events besucht"}</Heading>
           {(review.events.items || []).map((item) => (
             <View key={`${item.name}-${item.date}`} style={styles.listRow}>
-              <Body style={styles.listName} numberOfLines={1}>{item.name}</Body>
+              <Body style={styles.listName}>{item.name}</Body>
               {item.date ? <Muted>{item.date}</Muted> : null}
             </View>
           ))}
@@ -116,7 +116,7 @@ function PageBody({ page, review, token }: { page: YearReviewPage; review: YearR
           {(review.achievements.top || []).map((row) => (
             <View key={row.name} style={styles.listRow}>
               <View style={[styles.dot, { backgroundColor: row.material_color || colors.gold }]} />
-              <Body style={styles.listName} numberOfLines={1}>{row.name}</Body>
+              <Body style={styles.listName}>{row.name}</Body>
               {row.material_name ? <Muted>{row.material_name}</Muted> : null}
             </View>
           ))}

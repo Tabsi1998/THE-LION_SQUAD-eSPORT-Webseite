@@ -47,9 +47,9 @@ export function PinnedAwardsCard({ pinned, onShowAll }: { pinned: PinnedAward[];
           <View key={award.code} style={[styles.pinnedRow, { borderColor: `${color}55` }]} testID={`profile-pinned-${award.code}`}>
             <Badge material={award.material} level={award.level} rank={award.rank} art={award.art} icon={award.icon || award.group_icon} size={44} />
             <View style={styles.flex}>
-              <Text style={[styles.kicker, { color }]} numberOfLines={1}>{materialName(award)}</Text>
-              <Text style={styles.name} numberOfLines={1}>{award.name}</Text>
-              {award.group_name ? <Text style={styles.muted} numberOfLines={1}>{award.group_name}</Text> : null}
+              <Text style={[styles.kicker, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{materialName(award)}</Text>
+              <Text style={styles.name}>{award.name}</Text>
+              {award.group_name ? <Text style={styles.muted} numberOfLines={2}>{award.group_name}</Text> : null}
             </View>
           </View>
         );

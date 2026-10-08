@@ -198,5 +198,5 @@ const styles = StyleSheet.create({
   contact: { alignItems: "center", borderColor: colors.border, borderRadius: radius.lg, borderWidth: 1, flexDirection: "row", gap: 12, padding: 10 },
   contactIcon: { alignItems: "center", backgroundColor: "rgba(41,182,232,0.1)", borderRadius: radius.lg, height: 36, justifyContent: "center", width: 36 },
   join: { borderColor: "rgba(255,215,0,0.35)" },
-  webRow: { alignItems: "center", borderTopColor: colors.border, borderTopWidth: 1, flexDirection: "row", gap: 12, minHeight: 44, paddingTop: 8 },
+  webRow: { alignItems: "center", borderTopColor: colors.border, borderTopWidth: 1, flexDirection: "row", gap: 12, minHeight: 48, paddingTop: 8 },
 });

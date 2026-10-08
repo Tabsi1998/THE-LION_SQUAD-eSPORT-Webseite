@@ -33,8 +33,8 @@ export function TeamSchedule({ overview, onOpenTournament, onOpenMatch }: {
               <View style={[styles.icon, styles.iconGold]}><Ionicons name="trophy-outline" size={18} color={colors.gold} /></View>
               <View style={styles.main}>
                 <Muted style={styles.kicker}>TURNIER</Muted>
-                <Body style={styles.title} numberOfLines={1}>{row.tournament.title || "Turnier"}</Body>
-                {upcomingLine(row) ? <Muted numberOfLines={1}>{upcomingLine(row)}</Muted> : null}
+                <Body style={styles.title}>{row.tournament.title || "Turnier"}</Body>
+                {upcomingLine(row) ? <Muted numberOfLines={2}>{upcomingLine(row)}</Muted> : null}
                 <View style={styles.statusPill}><Muted style={styles.statusText}>{String(row.status_label || "Angemeldet").toUpperCase()}</Muted></View>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.muted} />
@@ -55,8 +55,8 @@ export function TeamSchedule({ overview, onOpenTournament, onOpenMatch }: {
             >
               <View style={[styles.icon, toneStyle(row)]}><Ionicons name="trophy-outline" size={16} color={row.outcome === "win" ? colors.cyan : colors.muted} /></View>
               <View style={styles.main}>
-                <Body style={[styles.title, row.outcome === "loss" && styles.dim]} numberOfLines={1}>{recentLine(row)}</Body>
-                <Muted numberOfLines={1}>{[row.tournament?.title, row.round_label].filter(Boolean).join(" · ")}</Muted>
+                <Body style={[styles.title, row.outcome === "loss" && styles.dim]}>{recentLine(row)}</Body>
+                <Muted numberOfLines={2}>{[row.tournament?.title, row.round_label].filter(Boolean).join(" · ")}</Muted>
               </View>
               <View style={[styles.outcomePill, toneStyle(row)]}>
                 <Muted style={[styles.outcomeText, row.outcome === "win" && styles.winText]} testID={`team-recent-outcome-${row.match_id}`}>{outcomeLabel(row).toUpperCase()}</Muted>

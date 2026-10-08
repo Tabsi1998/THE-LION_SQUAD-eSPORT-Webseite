@@ -194,7 +194,7 @@ function TeamCard({ team, onPress, onChat }: { team: Team; onPress: () => void; 
           />
           <View style={styles.teamText}>
             <View style={styles.titleRow}>
-              <Body style={styles.title} numberOfLines={1}>{team.name}</Body>
+              <Body style={styles.title}>{team.name}</Body>
               {team.tag ? <Pill label={team.tag} /> : null}
             </View>
             <Muted>{teamMeta(team)}</Muted>

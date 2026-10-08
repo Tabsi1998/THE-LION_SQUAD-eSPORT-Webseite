@@ -129,7 +129,7 @@ export function NotificationBell() {
         type="button"
         onClick={() => setOpen((value) => !value)}
         data-testid="notification-bell"
-        className={`relative w-10 h-10 inline-flex items-center justify-center border rounded-sm transition ${
+        className={`tls-hit relative w-10 h-10 inline-flex items-center justify-center border rounded-sm transition ${
           unread ? "border-[#29B6E8]/50 text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/70 hover:text-white hover:border-white/25"
         }`}
         aria-label="Benachrichtigungen"

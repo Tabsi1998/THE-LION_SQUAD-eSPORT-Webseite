@@ -127,7 +127,7 @@ function StatCard({
         <Ionicons name={icon} color={accent} size={18} />
       </View>
       <Muted>{label}</Muted>
-      <Heading numberOfLines={compact ? 2 : 1} style={[styles.statValue, compact && styles.statValueCompact]}>
+      <Heading numberOfLines={compact ? 2 : 1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.statValue, compact && styles.statValueCompact]}>
         {value}
       </Heading>
     </Card>
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     flex: 1,
     justifyContent: "center",
-    minHeight: 38,
+    minHeight: 48,
   },
   filterButtonActive: {
     backgroundColor: colors.cyan,

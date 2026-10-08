@@ -222,7 +222,7 @@ export function Stat({ label, value, tone = "cyan" }: { label: string; value: st
     <View style={profileStyles.stat}>
       {/* Ein Wert bleibt eine Zeile: "Superadmin" brach vorher als "Superad/min" (#247). */}
       <Body style={[profileStyles.statValue, tone === "gold" && profileStyles.gold]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{value}</Body>
-      <Muted numberOfLines={1}>{label}</Muted>
+      <Muted numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Muted>
     </View>
   );
 }

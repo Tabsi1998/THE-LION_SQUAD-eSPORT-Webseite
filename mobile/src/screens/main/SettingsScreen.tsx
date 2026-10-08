@@ -299,7 +299,7 @@ function SessionsCard() {
         <View key={session.id} style={styles.session}>
           <Ionicons name={session.client === "mobile" ? "phone-portrait-outline" : "desktop-outline"} color={session.current ? colors.cyan : colors.muted} size={18} />
           <View style={styles.flex}>
-            <Body numberOfLines={1}>{session.device || (session.client === "mobile" ? "App" : "Browser")}{session.current ? " · dieses Gerät" : ""}</Body>
+            <Body>{session.device || (session.client === "mobile" ? "App" : "Browser")}{session.current ? " · dieses Gerät" : ""}</Body>
             {session.last_active ? <Muted>Zuletzt {formatDateTime(session.last_active)}</Muted> : null}
           </View>
           {!session.current ? (
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 6,
-    minHeight: 40,
+    minHeight: 48,
   },
   expandText: {
     color: colors.cyan,

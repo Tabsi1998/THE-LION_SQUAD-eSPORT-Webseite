@@ -538,9 +538,10 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
   return (
     <div>
       {label && <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>}
-      <div className={variant === "wide" ? "" : "flex items-start gap-3"}>
+      {/* Mit großer Schrift stehen die Knöpfe unter dem Bild statt daneben (#1155). */}
+      <div className={variant === "wide" ? "" : "flex flex-wrap items-start gap-3"}>
         <ImagePreviewBox value={value} previewClass={previewClass} onClear={() => onChange("")} testId={testId} />
-        <div className={variant === "wide" ? "mt-2" : "flex-1 space-y-2"}>
+        <div className={variant === "wide" ? "mt-2" : "flex-1 basis-40 space-y-2"}>
           <input
             ref={fileRef}
             type="file"
@@ -554,7 +555,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
             data-testid={`${testId}-btn`}
-            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 disabled:opacity-50"
+            className="w-full inline-flex min-h-11 items-center justify-center gap-2 px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 disabled:opacity-50"
           >
             <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : value ? "Ändern" : "Bild hochladen"}
           </button>
@@ -563,7 +564,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
               type="button"
               onClick={openLibrary}
               data-testid={`${testId}-library`}
-              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-white/5"
+              className="w-full inline-flex min-h-11 items-center justify-center gap-2 px-3 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-white/5"
             >
               Medien wählen
             </button>
@@ -575,7 +576,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                 target="_blank"
                 rel="noopener noreferrer"
                 data-testid={`${testId}-open`}
-                className="inline-flex items-center px-3 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-white/5"
+                className="inline-flex min-h-11 items-center px-3 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-white/5"
               >
                 Ansehen
               </a>
@@ -583,7 +584,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                 type="button"
                 onClick={() => onChange("")}
                 data-testid={`${testId}-remove`}
-                className="inline-flex items-center px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10"
+                className="inline-flex min-h-11 items-center px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10"
               >
                 Entfernen
               </button>
@@ -686,7 +687,8 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                     key={mode}
                     type="button"
                     onClick={() => setEditor((cur) => ({ ...cur, cropMode: mode, cropX: 0, cropY: 0, zoom: 1 }))}
-                    className={`inline-flex items-center gap-2 px-3 py-2 border rounded-sm text-xs font-bold uppercase tracking-wider ${editor.cropMode === mode ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/60 hover:text-white"}`}
+                    aria-pressed={editor.cropMode === mode}
+                    className={`inline-flex min-h-11 items-center gap-2 px-3 py-2 border rounded-sm text-xs font-bold uppercase tracking-wider ${editor.cropMode === mode ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/60 hover:text-white"}`}
                   >
                     <Crop className="w-3.5 h-3.5" /> {text}
                   </button>

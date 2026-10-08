@@ -30,7 +30,7 @@ export function ProfileSwitch({ label, checked, onCheckedChange, disabled = fals
       onClick={() => onCheckedChange(!on)}
       data-testid={testId}
       data-state={on ? "checked" : "unchecked"}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] disabled:cursor-not-allowed ${on ? "bg-[#29B6E8]" : "bg-white/20"} ${className}`}
+      className={`tls-hit relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] disabled:cursor-not-allowed ${on ? "bg-[#29B6E8]" : "bg-white/20"} ${className}`}
     >
       <span
         aria-hidden="true"

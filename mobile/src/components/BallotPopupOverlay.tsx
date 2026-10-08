@@ -127,7 +127,7 @@ export function BallotPopupOverlay() {
       {!ballot && waiting.length ? (
         <Pressable style={styles.band} onPress={() => setLater((current) => current.filter((id) => id !== waiting[0].id))} testID="ballot-band" accessibilityRole="button">
           <Ionicons name="checkbox-outline" size={16} color={colors.cyan} />
-          <Text style={styles.bandText} numberOfLines={1}>Abstimmung offen: {waiting[0].question} – jetzt abstimmen</Text>
+          <Text style={styles.bandText} numberOfLines={2}>Abstimmung offen: {waiting[0].question} – jetzt abstimmen</Text>
         </Pressable>
       ) : null}
     </>

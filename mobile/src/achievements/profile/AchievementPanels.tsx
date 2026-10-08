@@ -87,7 +87,7 @@ export function LevelHeader({ level, earnedPercent, evaluating, onEvaluate, onLe
       {lvl.level ? (
         <View style={styles.xpBlock} testID="achievement-level-xp">
           <View style={styles.xpLabels}>
-            <Text style={[styles.xpTitle, { color: PURPLE }]} numberOfLines={1}>{atMax ? "Höchstes Level" : `Bis Level ${Number(lvl.level) + 1}`}</Text>
+            <Text style={[styles.xpTitle, { color: PURPLE }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{atMax ? "Höchstes Level" : `Bis Level ${Number(lvl.level) + 1}`}</Text>
             <Text style={styles.xpCount}>
               {atMax ? `${xp.toLocaleString("de-DE")} XP` : `${xp.toLocaleString("de-DE")} / ${next.toLocaleString("de-DE")} XP`}
             </Text>
@@ -199,7 +199,7 @@ function StatTile({ icon, label, value, color, testID }: { icon: React.Component
     <View style={styles.statTile} testID={testID}>
       <View style={styles.statHead}>
         <Ionicons name={icon} size={12} color={color} />
-        <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
+        <Text style={styles.statLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Text>
       </View>
       <Text style={[styles.statValue, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{value}</Text>
     </View>
@@ -247,7 +247,7 @@ export function NextUpPanel({ items, canOpen, onOpen }: { items: NextUpItem[]; c
               <View style={styles.headRow}>
                 <Badge material={tier.material} level={tier.level} rank={tier.rank} art={tier.art} icon={tier.icon || tier.group_icon} earned={false} percent={percent} size={48} />
                 <View style={styles.flex}>
-                  <Text style={[styles.kicker, { color: accent }]} numberOfLines={1}>{tier.group_name}</Text>
+                  <Text style={[styles.kicker, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{tier.group_name}</Text>
                   <Text style={styles.name} numberOfLines={2}>{tier.name}</Text>
                   <View style={styles.chipRow}>
                     <MaterialChip tier={tier} />
@@ -308,9 +308,9 @@ export function PinnedPanel({ pinned, codes, busy, onChange }: { pinned: PinnedA
           <View key={code} style={[styles.pinnedRow, { borderColor: `${color}55` }]} testID={`pinned-award-${code}`}>
             <Badge material={award.material} level={award.level} rank={award.rank} art={award.art} icon={award.icon || award.group_icon} size={40} />
             <View style={styles.flex}>
-              <Text style={[styles.kicker, { color }]} numberOfLines={1}>{materialName(award)}</Text>
-              <Text style={styles.name} numberOfLines={1}>{award.name}</Text>
-              {award.group_name ? <Text style={styles.muted} numberOfLines={1}>{award.group_name}</Text> : null}
+              <Text style={[styles.kicker, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{materialName(award)}</Text>
+              <Text style={styles.name}>{award.name}</Text>
+              {award.group_name ? <Text style={styles.muted} numberOfLines={2}>{award.group_name}</Text> : null}
             </View>
             <View style={styles.pinTools}>
               <Pressable onPress={() => move(code, -1)} disabled={busy || index === 0} hitSlop={6} style={[styles.iconButton, (busy || index === 0) && styles.dim]} accessibilityRole="button" accessibilityLabel={`${award.name} nach vorn`} testID={`pinned-up-${code}`}>

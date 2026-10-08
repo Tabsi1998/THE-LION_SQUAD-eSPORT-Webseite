@@ -92,7 +92,7 @@ export function TeamHeader({ team, header, level, crown, userId, onOpenProfile, 
                   />
                   {mine ? <YouCorners /> : null}
                 </View>
-                <Muted style={styles.faceName} numberOfLines={1}>{name}</Muted>
+                <Muted style={styles.faceName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>{name}</Muted>
                 <Muted style={[styles.faceRole, face.role !== "player" && styles.faceRoleLead]} testID={`team-face-role-${face.id}`}>{face.roleLabel.toUpperCase()}</Muted>
               </Pressable>
             );

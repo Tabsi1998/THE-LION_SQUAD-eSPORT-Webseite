@@ -24,9 +24,10 @@ export function Breadcrumbs({ items = [], className = "" }) {
                   {item.label}
                 </span>
               ) : (
+                // Am Handy ist jeder Link mindestens 44 px hoch (#1155) - auch wenn ein langer Titel in mehrere Zeilen bricht.
                 <Link
                   to={item.to}
-                  className="px-1 py-0.5 hover:text-[#29B6E8] transition inline-flex items-center gap-1"
+                  className="tls-hit min-h-11 sm:min-h-0 px-1 py-0.5 hover:text-[#29B6E8] transition inline-flex items-center gap-1"
                 >
                   {idx === 0 && <Home className="w-3 h-3" />}
                   {item.label}

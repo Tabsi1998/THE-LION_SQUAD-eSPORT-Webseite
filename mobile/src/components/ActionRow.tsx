@@ -25,6 +25,9 @@ export function ActionTile({
     <Pressable
       disabled={isDisabled}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: isDisabled }}
       style={({ pressed }) => [styles.tile, tone === "danger" && styles.dangerSurface, isDisabled && styles.disabled, pressed && styles.pressed]}
     >
       <Ionicons name={icon} color={color} size={18} />
@@ -51,10 +54,14 @@ export function ActionRow({
 }) {
   const isDisabled = disabled || !onPress;
   const color = tone === "danger" ? colors.live : colors.cyan;
+  // Vorlesen (#1155): eine Zeile ist ein Knopf mit einem Satz - „Mitgliedsausweis, zeigt den QR-Code“.
   return (
     <Pressable
       disabled={isDisabled}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={detail ? `${label}, ${detail}` : label}
+      accessibilityState={{ disabled: isDisabled }}
       style={({ pressed }) => [styles.row, tone === "danger" && styles.dangerSurface, isDisabled && styles.disabled, pressed && styles.pressed]}
     >
       <View style={[styles.rowIcon, tone === "danger" && styles.dangerIcon]}>
@@ -97,6 +104,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
+    minHeight: 48,
     padding: 12,
   },
   rowIcon: {

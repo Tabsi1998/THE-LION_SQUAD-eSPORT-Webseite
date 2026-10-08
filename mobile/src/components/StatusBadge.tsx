@@ -35,7 +35,7 @@ export function StatusBadge({
 
   const remaining = targetMs ? formatRemaining(targetMs - now) : "";
   const prefix = remaining ? countdownPrefix(phaseCountdownKind(phase)) : "";
-  const statusLabel = formatStatus(label || phaseLabel(phase) || status);
+  const statusLabel = statusText({ label, phase, status });
   const text = [statusLabel, prefix && `${prefix} ${remaining}`].filter(Boolean).join(" · ");
   const tone = toneForStatus(`${text} ${status || ""} ${phaseState(phase)}`);
   return (
@@ -71,6 +71,11 @@ function LiveDot({ color }: { color: string }) {
       <View style={[styles.dot, { backgroundColor: color }]} />
     </View>
   );
+}
+
+/** Der Zustand in Worten, wie ihn der Chip zeigt (ohne Countdown) - auch für den Satz einer Karte (#1155). */
+export function statusText({ label, phase, status }: { label?: string | null; phase?: PhaseLike | string | null; status?: string | null }): string {
+  return formatStatus(label || phaseLabel(phase) || status);
 }
 
 function phaseLabel(phase?: PhaseLike | string | null) {

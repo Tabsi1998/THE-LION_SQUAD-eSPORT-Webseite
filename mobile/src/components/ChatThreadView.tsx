@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cyan,
     borderRadius: radius.lg,
     justifyContent: "center",
-    minHeight: 44,
+    minHeight: 48,
     paddingHorizontal: 14,
   },
   sendText: {

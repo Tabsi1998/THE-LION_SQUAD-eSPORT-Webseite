@@ -145,7 +145,7 @@ export function SearchScreen({ navigation }: Props) {
                   <View key={entry} style={styles.recentRow}>
                     <Pressable onPress={() => setQuery(entry)} accessibilityRole="button" style={({ pressed }) => [styles.recentMain, pressed && styles.pressed]} testID={`search-recent-${entry}`}>
                       <Ionicons name="time-outline" color={colors.muted} size={16} />
-                      <Body style={styles.recentText} numberOfLines={1}>{entry}</Body>
+                      <Body style={styles.recentText}>{entry}</Body>
                     </Pressable>
                     <Pressable onPress={() => remove(entry)} accessibilityRole="button" accessibilityLabel={`„${entry}“ aus den letzten Suchen löschen`} hitSlop={8} testID={`search-recent-remove-${entry}`}>
                       <Ionicons name="close" color={colors.muted} size={16} />
@@ -176,7 +176,7 @@ export function SearchScreen({ navigation }: Props) {
                   </View>
                   <View style={styles.resultText}>
                     <Highlighted text={item.title} query={trimmed} />
-                    {item.subtitle || item.date ? <Muted numberOfLines={1}>{[item.subtitle, item.date ? formatDate(item.date) : ""].filter(Boolean).join(" · ")}</Muted> : null}
+                    {item.subtitle || item.date ? <Muted numberOfLines={2}>{[item.subtitle, item.date ? formatDate(item.date) : ""].filter(Boolean).join(" · ")}</Muted> : null}
                   </View>
                 </Pressable>
               ))}
@@ -193,9 +193,9 @@ export function SearchScreen({ navigation }: Props) {
 /** Der Titel, das Gesuchte darin hervorgehoben. */
 function Highlighted({ text, query }: { text: string; query: string }) {
   const index = text.toLowerCase().indexOf(query.toLowerCase());
-  if (!query || index < 0) return <Body style={styles.resultTitle} numberOfLines={1}>{text}</Body>;
+  if (!query || index < 0) return <Body style={styles.resultTitle}>{text}</Body>;
   return (
-    <Body style={styles.resultTitle} numberOfLines={1}>
+    <Body style={styles.resultTitle}>
       {text.slice(0, index)}
       <Body style={[styles.resultTitle, styles.match]}>{text.slice(index, index + query.length)}</Body>
       {text.slice(index + query.length)}

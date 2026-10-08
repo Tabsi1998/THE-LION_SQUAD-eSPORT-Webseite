@@ -110,10 +110,10 @@ export function LinkedAccountsCard({ accounts, testID = "linked-accounts", title
               </View>
               <View style={styles.flex}>
                 <View style={styles.nameRow}>
-                  <Body style={styles.strong} numberOfLines={1}>{accountTitle(account)}</Body>
+                  <Body style={styles.strong}>{accountTitle(account)}</Body>
                   <Ionicons name="checkmark-circle" color={VERIFIED_COLOR} size={16} />
                 </View>
-                <Muted numberOfLines={1}>{accountDetail(account)}</Muted>
+                <Muted numberOfLines={2}>{accountDetail(account)}</Muted>
               </View>
               {account.url ? <Ionicons name="open-outline" color={colors.muted} size={17} /> : null}
             </Pressable>
@@ -338,14 +338,14 @@ function AccountRow({ entry }: { entry: AccountEntry }) {
       </View>
       <View style={styles.flex}>
         <View style={styles.nameRow}>
-          <Body style={styles.strong} numberOfLines={1}>{entry.title}</Body>
+          <Body style={styles.strong}>{entry.title}</Body>
           {entry.verified ? (
             <View testID={`profile-account-${entry.platform}-verified`} accessibilityLabel="verifiziert">
               <Ionicons name="checkmark-circle" color={VERIFIED_COLOR} size={16} />
             </View>
           ) : null}
         </View>
-        <Muted numberOfLines={1}>{entry.detail}</Muted>
+        <Muted numberOfLines={2}>{entry.detail}</Muted>
       </View>
       {entry.url ? <Ionicons name="open-outline" color={colors.muted} size={17} /> : null}
     </Pressable>
@@ -440,14 +440,14 @@ export function PlatformLinkRows({ links, available, onLink, onUnlink, disabled 
             </View>
             <View style={styles.flex}>
               <View style={styles.nameRow}>
-                <Body style={styles.strong} numberOfLines={1}>{label}</Body>
+                <Body style={styles.strong}>{label}</Body>
                 {link ? (
                   <View testID={`profile-link-${platform}-verified`} accessibilityLabel="verifiziert">
                     <Ionicons name="checkmark-circle" color={VERIFIED_COLOR} size={16} />
                   </View>
                 ) : null}
               </View>
-              <Muted numberOfLines={1}>
+              <Muted numberOfLines={2}>
                 {link ? `verknüpft als ${accountTitle(link)}${link.linked_at ? ` · seit ${formatDate(link.linked_at)}` : ""}`
                   : available[platform] ? "nicht verknüpft – einmal im Browser anmelden" : "auf der Website noch nicht eingerichtet"}
               </Muted>

@@ -48,9 +48,9 @@ function TierRow({ tier, index, active, onPick }: { tier: CeremonyTier; index: n
       >
         <Badge material={look.key} rank={tier.rank} art={tier.art || tier.group_art} icon={tier.group_icon || tier.icon} size={40} />
         <View style={styles.tierText}>
-          <Text style={[styles.tierLevel, { color: look.rim }]} numberOfLines={1}>{materialName(tier)}{tier.group_name ? ` · ${tier.group_name}` : ""}</Text>
-          <Text style={styles.tierName} numberOfLines={1}>{tier.name}</Text>
-          {tier.description ? <Text style={styles.tierDescription} numberOfLines={1}>{tier.description}</Text> : null}
+          <Text style={[styles.tierLevel, { color: look.rim }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{materialName(tier)}{tier.group_name ? ` · ${tier.group_name}` : ""}</Text>
+          <Text style={styles.tierName}>{tier.name}</Text>
+          {tier.description ? <Text style={styles.tierDescription} numberOfLines={2}>{tier.description}</Text> : null}
         </View>
         <Text style={[styles.points, { color: look.rim }]}>+{tier.points || 0}</Text>
       </Pressable>

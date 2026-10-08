@@ -338,7 +338,7 @@ function SummaryTile({ label, value, tone = "cyan" }: { label: string; value: nu
   return (
     <View style={styles.summaryTile}>
       <Body style={[styles.summaryValue, tone === "gold" && styles.summaryValueGold]}>{value}</Body>
-      <Muted style={styles.summaryLabel} numberOfLines={1}>{label}</Muted>
+      <Muted style={styles.summaryLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Muted>
     </View>
   );
 }
@@ -364,7 +364,7 @@ function ReferenceCard({ item }: { item: Reference }) {
         <View style={styles.refTop}>
           <View style={[styles.refRank, placement === 1 && styles.refRankGold, placement === 2 && styles.refRankSilver, placement === 3 && styles.refRankBronze]}>
             <Body style={[styles.refRankText, !placed && styles.refRankTextSmall]} numberOfLines={1} adjustsFontSizeToFit>{placementText}</Body>
-            <Muted style={styles.refRankLabel} numberOfLines={1}>
+            <Muted style={styles.refRankLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
               {item.teams_count ? `${item.teams_count} Teams` : item.participants_count ? `${item.participants_count} Teilnehmer` : "Platz"}
             </Muted>
           </View>

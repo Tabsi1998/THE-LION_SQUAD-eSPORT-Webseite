@@ -3,11 +3,12 @@ import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { PRESS_SCALE } from "../lib/motion";
 import { formatDate } from "../lib/format";
+import { viennaDate, viennaTime } from "../lib/vienna";
 import { internalLabel } from "../lib/memberArea";
 import { colors, kindColors, radius } from "../theme";
 import { Body, Muted } from "./Text";
 import { MediaImage } from "./MediaImage";
-import { StatusBadge } from "./StatusBadge";
+import { StatusBadge, statusText } from "./StatusBadge";
 import { SeasonPerch } from "../seasons/anchors";
 import { cardLiftTouch } from "../seasons/cardLift";
 
@@ -81,12 +82,30 @@ export function ContentCard({
     </>
   );
 
-  if (!onPress) return <View style={styles.card} {...cardLiftTouch(perch)}>{content}</View>;
+  // Vorlesen (#1155): die Karte klingt wie ein Satz - „Turnier, FC 26 Cup, Samstag, 23. Mai, 18:00 Uhr, Anmeldung offen“ -
+  // statt Stück für Stück.
+  const sentence = cardSentence({ kind, title, date, phase, label, status, secondaryLabel, internal });
+  if (!onPress) return <View style={styles.card} accessible accessibilityLabel={sentence} {...cardLiftTouch(perch)}>{content}</View>;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" testID="content-card" style={({ pressed }) => [styles.card, pressed && styles.pressed]} {...cardLiftTouch(perch)}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={sentence} testID="content-card" style={({ pressed }) => [styles.card, pressed && styles.pressed]} {...cardLiftTouch(perch)}>
       {content}
     </Pressable>
   );
+}
+
+/** Das Datum zum Vorlesen: „Samstag, 23. Mai, 18:00 Uhr“ (ohne Uhrzeit, wenn es Mitternacht ist). */
+export function spokenWhen(value?: string | null): string {
+  if (!value) return "";
+  const day = viennaDate(value, { weekday: "long", day: "numeric", month: "long" });
+  const time = viennaTime(value, { hour: "2-digit", minute: "2-digit" });
+  return time && time !== "00:00" ? `${day}, ${time} Uhr` : day;
+}
+
+/** Eine Karte als ein Satz (#1155): Art, Titel, Datum, Zustand, eigener Zustand, intern. */
+export function cardSentence({ kind, title, date, phase, label, status, secondaryLabel, internal }: { kind: ContentCardKind; title?: string | null; date?: string | null; phase?: { label?: string | null; state?: string | null } | string | null; label?: string | null; status?: string | null; secondaryLabel?: string | null; internal?: string | null }): string {
+  // Wie die Karte selbst: ein Zustand nur, wenn einer da ist (der Chip steht sonst nicht).
+  const state = label || phase || status ? statusText({ label, phase, status }) : "";
+  return [labelForKind(kind), title, spokenWhen(date), state, secondaryLabel, internal].map((part) => String(part || "").trim()).filter(Boolean).join(", ");
 }
 
 function labelForKind(kind: ContentCardKind) {

@@ -249,7 +249,7 @@ export function VereinScreen({ navigation }: Props) {
                   <Pressable key={post.id} onPress={() => open("NewsDetail", { id: post.slug || post.id })} accessibilityRole="button" style={({ pressed }) => [styles.newsRow, pressed && styles.pressed]}>
                     <Ionicons name="newspaper-outline" color={colors.gold} size={16} />
                     <View style={styles.flex}>
-                      <Body style={styles.strong} numberOfLines={1}>{post.title}</Body>
+                      <Body style={styles.strong}>{post.title}</Body>
                       <Muted>{formatDate(post.published_at || post.created_at)}</Muted>
                     </View>
                     <Ionicons name="chevron-forward" color={colors.gold} size={14} />
@@ -296,7 +296,7 @@ export function VereinScreen({ navigation }: Props) {
             {(discordVoice.voice || []).map((channel) => (
               <View key={channel.name} style={styles.voiceRow} testID={`member-area-discord-voice-${channel.name}`}>
                 <Ionicons name="volume-high" color="#5865F2" size={16} />
-                <Body style={styles.flex} numberOfLines={1}>{channel.name}</Body>
+                <Body style={styles.flex}>{channel.name}</Body>
                 <Body style={styles.strong}>{channel.count}</Body>
               </View>
             ))}
@@ -348,7 +348,7 @@ export function VereinScreen({ navigation }: Props) {
               <View key={server.guild_id} style={styles.contact} testID={`member-area-discord-server-${server.guild_id}`}>
                 <MediaImage uri={server.icon_url || undefined} style={styles.serverIcon} fallback={<Ionicons name="logo-discord" color="#5865F2" size={18} />} />
                 <View style={styles.flex}>
-                  <Body style={styles.strong} numberOfLines={1}>{server.name}</Body>
+                  <Body style={styles.strong}>{server.name}</Body>
                   {discordServerLine(server) ? <Muted>{discordServerLine(server)}</Muted> : null}
                 </View>
                 {server.member === true ? (

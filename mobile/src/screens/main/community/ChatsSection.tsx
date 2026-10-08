@@ -91,8 +91,8 @@ function ChatRow({ item, onPress }: { item: ChatItem; onPress: () => void }) {
         )}
       </View>
       <View style={styles.main}>
-        <Body style={[styles.title, unread ? styles.titleUnread : null]} numberOfLines={1}>{item.title}</Body>
-        <Muted numberOfLines={1}>{preview}</Muted>
+        <Body style={[styles.title, unread ? styles.titleUnread : null]}>{item.title}</Body>
+        <Muted numberOfLines={2}>{preview}</Muted>
       </View>
       <View style={styles.side}>
         <Muted style={[styles.time, unread ? styles.timeUnread : null]}>{chatTime(item.updated_at)}</Muted>
@@ -150,7 +150,7 @@ function NewMessage({ onPick, onClose }: { onPick: (userId: string, title: strin
         return (
           <Pressable key={person.id} disabled={person.can_message === false} onPress={() => onPick(person.id, name)} accessibilityRole="button" style={({ pressed }) => [styles.person, pressed && styles.pressed]} testID={`chats-compose-${person.id}`}>
             <Body style={styles.title}>{name}</Body>
-            <Muted numberOfLines={1}>{person.can_message === false ? person.message_hint || "Nimmt gerade keine Nachrichten an." : `@${person.username || ""}`}</Muted>
+            <Muted numberOfLines={2}>{person.can_message === false ? person.message_hint || "Nimmt gerade keine Nachrichten an." : `@${person.username || ""}`}</Muted>
           </Pressable>
         );
       })}

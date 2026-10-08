@@ -586,7 +586,7 @@ function BarStat({ label, value, tone }: { label: string; value: unknown; tone?:
   return (
     <View style={styles.barStat}>
       <Body style={[styles.barValue, tone === "gold" && styles.gold]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{String(value ?? 0)}</Body>
-      <Muted style={styles.barLabel} numberOfLines={1}>{label}</Muted>
+      <Muted style={styles.barLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Muted>
     </View>
   );
 }
