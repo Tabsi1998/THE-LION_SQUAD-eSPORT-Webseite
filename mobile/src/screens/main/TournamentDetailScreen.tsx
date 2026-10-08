@@ -6,7 +6,7 @@ import { tournamentIsOver } from "../../lib/afterEnd";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
-import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
+import { ErrorState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { StatusBadge } from "../../components/StatusBadge";

@@ -582,15 +582,6 @@ function InfoGrid({ title, rows }: { title: string; rows: Array<[string, unknown
   );
 }
 
-function Stat({ label, value, tone = "cyan" }: { label: string; value: unknown; tone?: "cyan" | "gold" }) {
-  return (
-    <View style={styles.stat}>
-      <Body style={[styles.statValue, tone === "gold" && styles.gold]}>{String(value ?? 0)}</Body>
-      <Muted>{label}</Muted>
-    </View>
-  );
-}
-
 /** Eine Zahl der Zahlenleiste im Profilkopf (#1149). */
 function BarStat({ label, value, tone }: { label: string; value: unknown; tone?: "gold" }) {
   return (
@@ -620,23 +611,6 @@ function Pill({ label, tone = "default" }: { label: string; tone?: "default" | "
 
 function cleanHandle(value?: string | null) {
   return String(value || "").trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?/i, "").replace(/^twitch\.tv\//i, "").split(/[/?#]/)[0];
-}
-
-function externalUrl(value?: string | null) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-}
-
-function socialUrl(platform?: string | null, value?: string | null) {
-  const kind = String(platform || "").toLowerCase();
-  const handle = cleanHandle(value);
-  if (!handle) return "";
-  if (kind.includes("youtube")) return `https://www.youtube.com/@${handle}`;
-  if (kind.includes("instagram")) return `https://www.instagram.com/${handle}`;
-  if (kind === "x" || kind.includes("twitter")) return `https://x.com/${handle}`;
-  if (kind.includes("twitch")) return `https://www.twitch.tv/${handle}`;
-  return /^https?:\/\//i.test(String(value || "")) ? externalUrl(value) : "";
 }
 
 function listValue(value?: string[] | string | null) {
@@ -784,19 +758,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-  },
-  stat: {
-    backgroundColor: "rgba(255,255,255,0.045)",
-    borderColor: colors.border,
-    borderRadius: 8,
-    borderWidth: 1,
-    minWidth: "30%",
-    padding: 10,
-  },
-  statValue: {
-    color: colors.cyan,
-    fontSize: 20,
-    fontWeight: "900",
   },
   infoGrid: {
     flexDirection: "row",

@@ -1,5 +1,5 @@
 import React from "react";
-import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { act, render, screen } from "@testing-library/react-native";
 import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 
