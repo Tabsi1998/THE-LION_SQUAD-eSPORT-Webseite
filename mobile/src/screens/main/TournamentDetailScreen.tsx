@@ -339,11 +339,13 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                           : `Check-in vor Ort bei der Turnierleitung${checkInWindow ? ` · ${checkInWindow}` : ""}`}
                       </Muted>
                     ) : null}
+                    {/* „Vom Turnier abmelden“ als leiser Link (#1139) - wie im Web, nicht als zweiter großer Knopf. Ist es
+                        nicht mehr möglich, steht dazu kein eigener Satz mehr. */}
                     {canSelfUnregister ? (
-                      <Button label={busy ? "Wird abgemeldet ..." : "Vom Turnier abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
-                    ) : (
-                      <Muted>Abmeldung ist für diese Anmeldung aktuell nicht möglich.</Muted>
-                    )}
+                      <Pressable onPress={unregister} disabled={busy} hitSlop={10} accessibilityRole="button" testID="tournament-unregister" style={styles.quietLink}>
+                        <Muted style={styles.quietLinkText}>{busy ? "Wird abgemeldet ..." : "Vom Turnier abmelden"}</Muted>
+                      </Pressable>
+                    ) : null}
                   </>
                 ) : eventBlocked && eventGate && registration.canRegister && !clubMemberBlocked ? (
                   <Button label="Zuerst beim Event anmelden" onPress={() => navigation.navigate("EventDetail", { id: eventGate.event.slug || eventGate.event.id })} testID="tournament-event-first" />
@@ -363,7 +365,6 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
               <View style={styles.statGrid}>
                 <Stat label="Matches" value={String(allMatches.length)} />
                 <Stat label="Spieler" value={String(registrations.length || tournament.participant_count || 0)} tone="gold" />
-                <Stat label="Engine" value={bracket.engine || "—"} />
               </View>
               <Info label="Event" value={tournament.event?.name || "-"} />
               <Info label="Ort" value={tournament.event?.location || "-"} />
@@ -899,6 +900,13 @@ function Bullet({ text, accent }: { text: string; accent?: boolean }) {
 }
 
 const styles = StyleSheet.create({
+  quietLink: {
+    alignSelf: "flex-start",
+    paddingVertical: 4,
+  },
+  quietLinkText: {
+    textDecorationLine: "underline",
+  },
   checkInHint: {
     backgroundColor: "rgba(41,182,232,0.08)",
     borderColor: "rgba(41,182,232,0.35)",

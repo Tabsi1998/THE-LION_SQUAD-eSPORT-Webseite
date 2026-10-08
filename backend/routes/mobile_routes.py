@@ -473,16 +473,7 @@ def _dashboard_actions(tournaments: list[dict], events: list[dict], matches: lis
                 "target_id": tournament.get("slug") or tournament.get("id"),
                 "priority": 10,
             })
-        if reg.get("status") == "pending":
-            actions.append({
-                "id": f"tournament-pending-{tournament.get('id')}",
-                "type": "registration_pending",
-                "label": "Anmeldung wartet auf Freigabe",
-                "detail": tournament.get("title"),
-                "target_type": "tournament",
-                "target_id": tournament.get("slug") or tournament.get("id"),
-                "priority": 3,
-            })
+        # „Anmeldung wartet auf Freigabe“ ist keine Aufgabe (#1139) - den Stand zeigt der Termin selbst.
 
     for event in events:
         reg = event.get("own_registration") or {}
@@ -498,15 +489,21 @@ def _dashboard_actions(tournaments: list[dict], events: list[dict], matches: lis
                 "priority": 8,
             })
 
-    for match in matches[:4]:
+    # Matches stehen schon unter „Meine aktiven Matches“ (#1139) - eine Aktion gibt es nur, wenn etwas zu tun ist:
+    # das Ergebnis melden oder das der Gegenseite bestätigen (#1132).
+    for match in matches:
+        task = match.get("report_task")
+        if task not in {"report", "confirm"}:
+            continue
+        detail = " · ".join(part for part in (match.get("tournament_title"), f"gegen {match['opponent_name']}" if match.get("opponent_name") else "") if part)
         actions.append({
-            "id": f"match-{match.get('id')}",
-            "type": "match_open",
-            "label": "Match offen",
-            "detail": match.get("tournament_title") or match.get("round_name") or "Turniermatch",
+            "id": f"match-{task}-{match.get('id')}",
+            "type": f"match_{task}",
+            "label": "Ergebnis bestätigen" if task == "confirm" else "Ergebnis melden",
+            "detail": detail or "Turniermatch",
             "target_type": "match",
             "target_id": match.get("id"),
-            "priority": 7,
+            "priority": 9 if task == "confirm" else 7,
         })
     actions.sort(key=lambda item: int(item.get("priority") or 0), reverse=True)
     return actions[:8]

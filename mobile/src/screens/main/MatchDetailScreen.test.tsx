@@ -157,3 +157,50 @@ test("aufgerufen: Station und Countdown bis „antreten bis“", async () => {
     jest.useRealTimers();
   }
 });
+
+// Klartext wie auf der Website (#1139): Namen statt „Match A“, „Beendet“ mit Ergebnis, Freilos heißt Freilos.
+test("fertiges Spiel: Überschrift mit Namen, „Beendet“ mit Ergebnis, Station im Klartext, keine Terminabstimmung", async () => {
+  answer({
+    ...PAGE, can_player_report_result: false, report_state: null, can_propose_schedule: true,
+    match: { ...PAGE.match, status: "completed", winner_id: "r2", results: [{ registration_id: "r1", rank: 2, score: 1 }, { registration_id: "r2", rank: 1, score: 3 }],
+      station_text: "Station A · Switch 2", station_label: "Station A - switch2" },
+  });
+  await render(<MatchDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("match-headline")).toBeTruthy());
+  expect(screen.getByTestId("match-headline")).toHaveTextContent("NeonFalke gegen LunaByte");
+  expect(screen.getByTestId("match-key")).toHaveTextContent("Spiel A");
+  expect(screen.getByTestId("match-outcome")).toHaveTextContent("LunaByte gewinnt 3:1.");
+  expect(screen.getByTestId("match-station")).toHaveTextContent("Station A · Switch 2");
+  expect(screen.queryByText(/Station Station/)).toBeNull();
+  expect(screen.queryByTestId("match-proposal-at")).toBeNull();
+});
+
+test("Freilos statt „Offen“; die Turnierleitung liest „Höchste Punkte“", async () => {
+  answer({
+    ...PAGE, can_player_report_result: false, report_state: null, can_staff_submit_result: true, can_submit_result: true,
+    participants: [NEON, { slot: 2, status: "bye", registration_id: null, display_name: null }],
+  });
+  await render(<MatchDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("match-headline")).toHaveTextContent("NeonFalke gegen Freilos"));
+  expect(screen.queryByText("Offen")).toBeNull();
+  expect(screen.getByText("Punkte erfassen. Höchste Punkte gewinnen automatisch.")).toBeTruthy();
+});
+
+// Terminvorschlag zum Antippen (#1139) in Wiener Zeit (#960): Tag wählen, Uhrzeit in Viertelstunden.
+test("Terminvorschlag: Tag und Uhrzeit antippen - an den Server geht die Wiener Uhrzeit", async () => {
+  jest.useFakeTimers({ now: new Date("2026-05-19T08:00:00Z"), doNotFake: ["nextTick", "setImmediate"] });
+  try {
+    mockPost.mockResolvedValue({ data: {} });
+    answer({ ...PAGE, can_player_report_result: false, report_state: null, can_propose_schedule: true, can_manage_schedule: true,
+      match: { ...PAGE.match, scheduled_at: null } });
+    await render(<MatchDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("match-proposal-at")).toBeTruthy());
+    await fireEvent.press(screen.getByTestId("match-proposal-at-day-2026-05-21"));
+    for (let step = 0; step < 4; step += 1) await fireEvent.press(screen.getByTestId("match-proposal-at-later"));
+    expect(screen.getByTestId("match-proposal-at-time")).toHaveTextContent("11:00");
+    await fireEvent.press(screen.getByText("Termin vorschlagen"));
+    await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/schedule-proposals", { scheduled_at: "2026-05-21T09:00:00.000Z", note: null }));
+  } finally {
+    jest.useRealTimers();
+  }
+});

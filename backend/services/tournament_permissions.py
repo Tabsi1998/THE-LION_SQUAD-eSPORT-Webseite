@@ -9,7 +9,9 @@ from database import get_db
 GLOBAL_TOURNAMENT_STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 GLOBAL_TOURNAMENT_ADMIN_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
-RESULT_STAFF_ROLES = {"organizer", "referee", "scorekeeper"}
+# Ergebnisse eintragen: Organisation, Schiedsrichter, Ergebnisdienst - und die Station-Crew (Entscheidung des Betreibers
+# zu #1139: alles steht im Protokoll, die Turnierleitung kann korrigieren).
+RESULT_STAFF_ROLES = {"organizer", "referee", "scorekeeper", "station_manager"}
 CHECKIN_STAFF_ROLES = {"organizer", "referee", "scorekeeper", "station_manager"}
 READ_STAFF_ROLES = {"organizer", "referee", "scorekeeper", "station_manager", "stream_operator"}
 STRUCTURE_STAFF_ROLES = {"organizer", "referee"}

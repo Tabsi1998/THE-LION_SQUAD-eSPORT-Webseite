@@ -188,11 +188,15 @@ export type Match = {
   match_key?: string | null;
   station_id?: string | null;
   station_label?: string | null;
+  // Station im Klartext vom Server (#1220): „Station 3 · Switch 2“.
+  station_text?: string | null;
   is_own_match?: boolean;
   can_submit_result?: boolean;
   needs_result?: boolean;
   // In Klärung (#1134): ein Dispute liegt vor - die Turnierleitung entscheidet.
   disputed?: boolean;
+  // Was für die eigene Seite zu tun ist (#1139): Ergebnis melden oder bestätigen.
+  report_task?: "report" | "confirm" | null;
 };
 
 export type Achievement = {

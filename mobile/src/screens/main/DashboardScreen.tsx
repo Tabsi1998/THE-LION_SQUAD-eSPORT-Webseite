@@ -20,7 +20,8 @@ import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { API_BASE_URL } from "../../config";
 import { compareByNearestDate } from "../../lib/contentSort";
 import { seasonLine, splitHomeTimeline, type HomeItem } from "../../lib/dashboard";
-import { displayName, formatDate, formatEventType, formatNewsCategory, formatStatus, placeParts } from "../../lib/format";
+import { displayName, formatEventType, formatNewsCategory, formatStatus, formatWhen, placeParts } from "../../lib/format";
+import { stationText } from "../../lib/matchText";
 import { isGuestUser } from "../../live";
 import { openSignIn, openTab } from "../../navigation/rootNavigation";
 import { FeedbackSheet } from "../../components/FeedbackSheet";
@@ -529,7 +530,8 @@ function MatchOverviewCard({ match, onPress, staff = false }: { match: Match; on
   const detail = [
     match.opponent_name || match.participant_names?.join(" · "),
     match.round_name || (match.round ? `Runde ${match.round}` : null),
-    match.station_label ? `Station ${match.station_label}` : null,
+    // Station im Klartext (#1220, #1139): „Station 3 · Switch 2“ - nie doppelt „Station“.
+    stationText(match),
   ].filter(Boolean).join(" · ");
   // In Klärung (#1134): bei der Turnierleitung rot und ganz oben, beim Spieler „Wartet auf Entscheidung“.
   const disputed = Boolean(match.disputed || match.status === "disputed");
@@ -557,7 +559,8 @@ function MatchOverviewCard({ match, onPress, staff = false }: { match: Match; on
             <Badge label={formatStatus(match.status)} tone={match.needs_result ? "gold" : "cyan"} />
           </View>
           {detail ? <Muted numberOfLines={2}>{detail}</Muted> : null}
-          <Muted>{formatDate(match.scheduled_at)}</Muted>
+          {/* Datum und Uhrzeit (#1139): „heute 18:00“, „Sa 23. Mai · 18:00“ - wie auf der Website. */}
+          <Muted testID={`match-when-${match.id}`}>{formatWhen(match.scheduled_at, { fallback: "Termin noch offen" })}</Muted>
           <Muted style={match.needs_result ? styles.matchActionUrgent : styles.matchAction}>{action}</Muted>
         </View>
         <Ionicons name="chevron-forward" color={colors.muted} size={18} />
@@ -611,7 +614,10 @@ function Badge({ label, tone = "cyan" }: { label: string; tone?: "cyan" | "gold"
 
 function iconForAction(type: string) {
   if (type === "feedback") return "star-outline";
+  if (type.includes("checkin_onsite")) return "location-outline";
   if (type.includes("checkin")) return "checkbox-outline";
+  if (type === "match_confirm") return "checkmark-done-outline";
+  if (type === "match_report") return "create-outline";
   if (type.includes("match")) return "game-controller-outline";
   if (type.includes("pending")) return "time-outline";
   return "alert-circle-outline";

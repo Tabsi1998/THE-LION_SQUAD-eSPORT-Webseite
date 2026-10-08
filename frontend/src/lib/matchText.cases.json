@@ -1,0 +1,32 @@
+{
+  "_hinweis": "Klartext auf der Matchseite (#1220, #1139): dieselben Fälle prüfen frontend/src/lib/tournamentLabels.matchText.test.js und mobile/src/lib/matchText.test.ts.",
+  "headline": [
+    { "participants": [{ "registration_id": "r1", "display_name": "NeonFalke" }, { "registration_id": "r2", "display_name": "LunaByte" }], "match": { "status": "completed" }, "text": "NeonFalke gegen LunaByte" },
+    { "participants": [{ "registration_id": "r1", "display_name": "NeonFalke" }, { "slot": 2, "status": "bye" }], "match": { "status": "completed", "winner_id": "r1" }, "text": "NeonFalke gegen Freilos" },
+    { "participants": [{ "status": "pending" }, { "status": "pending" }], "match": { "status": "scheduled" }, "text": "noch offen gegen noch offen" },
+    { "participants": [{ "registration_id": "r1", "display_name": "NeonFalke" }, { "registration_id": "r2", "display_name": "LunaByte" }, { "registration_id": "r3", "display_name": "KiwiKomet" }], "match": { "match_type": "ffa" }, "text": "Heat mit 3 Plätzen" },
+    { "participants": [], "match": {}, "text": "Spiel" }
+  ],
+  "finished": [
+    { "participants": [{ "registration_id": "r1", "display_name": "NeonFalke" }, { "status": "bye" }], "match": { "status": "completed", "winner_id": "r1" }, "text": "Freilos – NeonFalke kommt kampflos weiter." },
+    { "participants": [{ "registration_id": "r1", "display_name": "NeonFalke" }, { "registration_id": "r2", "display_name": "LunaByte" }], "match": { "status": "completed", "winner_id": "r2", "results": [{ "registration_id": "r1", "score": 1 }, { "registration_id": "r2", "score": 3 }] }, "text": "LunaByte gewinnt 3:1." },
+    { "participants": [{ "registration_id": "r1", "display_name": "NeonFalke" }, { "registration_id": "r2", "display_name": "LunaByte" }], "match": { "status": "completed", "winner_id": "r1", "score_a": 2, "score_b": 0 }, "text": "NeonFalke gewinnt 2:0." },
+    { "participants": [{ "registration_id": "r1", "display_name": "NeonFalke" }, { "registration_id": "r2", "display_name": "LunaByte" }], "match": { "status": "forfeit", "winner_id": "r1" }, "text": "NeonFalke gewinnt durch Wertung." },
+    { "participants": [{ "registration_id": "r1", "display_name": "NeonFalke" }, { "registration_id": "r2", "display_name": "LunaByte" }], "match": { "status": "completed", "score_a": 2, "score_b": 2 }, "text": "Unentschieden 2:2." },
+    { "participants": [{ "registration_id": "r1", "display_name": "NeonFalke" }, { "registration_id": "r2", "display_name": "LunaByte" }, { "registration_id": "r3", "display_name": "KiwiKomet" }], "match": { "status": "completed", "results": [{ "registration_id": "r3", "rank": 1 }] }, "text": "Sieger: KiwiKomet" }
+  ],
+  "station": [
+    { "match": { "station_text": "Station A · Switch 2", "station_label": "Station A - switch2" }, "text": "Station A · Switch 2" },
+    { "match": { "station_text": "", "station_label": "f3c2" }, "text": "" },
+    { "match": { "station_label": "Station A - switch2" }, "text": "Station A · Switch 2" },
+    { "match": { "station_label": "B - pc" }, "text": "Station B · PC" },
+    { "match": { "station_name": "Switch 2 Station 1 - switch2" }, "text": "Switch 2 Station 1" },
+    { "match": {}, "text": "" }
+  ],
+  "slot": [
+    { "name": "NeonFalke", "slot": { "status": "filled" }, "match": {}, "text": "NeonFalke" },
+    { "name": "", "slot": { "status": "bye" }, "match": {}, "text": "Freilos" },
+    { "name": null, "slot": { "status": "pending" }, "match": { "status": "scheduled" }, "text": "noch offen" },
+    { "name": null, "slot": { "registration_id": null, "status": "pending" }, "match": { "status": "completed", "winner_id": "r1" }, "text": "Freilos" }
+  ]
+}

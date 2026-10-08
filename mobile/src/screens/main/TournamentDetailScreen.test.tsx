@@ -129,3 +129,13 @@ test("vor Ort: kein Check-in-Knopf, sondern „Check-in vor Ort bei der Turnierl
   await waitFor(() => expect(screen.getByTestId("tournament-checkin")).toBeTruthy());
   expect(screen.queryByTestId("tournament-checkin-local")).toBeNull();
 });
+
+// Kleinigkeiten (#1139): keine Kennzahl „Engine“, „Vom Turnier abmelden“ als leiser Link.
+test("keine „Engine“-Kennzahl; abmelden ist ein leiser Link", async () => {
+  answer({ ...TOURNAMENT, event_gate: null, my_registration: { id: "reg-1", status: "approved", user_id: "u-1" } });
+  await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("tournament-unregister")).toBeTruthy());
+  expect(screen.queryByText("Engine")).toBeNull();
+  expect(screen.getByTestId("tournament-unregister")).toHaveTextContent("Vom Turnier abmelden");
+  expect(screen.queryByText("Abmeldung ist für diese Anmeldung aktuell nicht möglich.")).toBeNull();
+});

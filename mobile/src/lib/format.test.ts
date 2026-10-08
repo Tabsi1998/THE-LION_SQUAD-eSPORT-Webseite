@@ -7,6 +7,7 @@ import {
   formatNewsCategory,
   formatRole,
   formatTournamentFormat,
+  formatWhen,
   normalizeEventType,
   placeParts,
 } from "./format";
@@ -118,4 +119,16 @@ describe("Nachrichten gruppieren", () => {
     expect(continuesMessageGroup({ user_id: "u-1" }, { user_id: "u-1", created_at: at(1) })).toBe(false);
     expect(continuesMessageGroup(null, { user_id: "u-1", created_at: at(1) })).toBe(false);
   });
+});
+
+// Wann etwas ist (#1139): dieselbe Schreibweise wie die Website (frontend/src/lib/datetime.test.js → formatWhen).
+test("formatWhen: heute, morgen, Wochentag mit Monat, Jahr nur außerhalb des laufenden - in Wiener Zeit", () => {
+  const now = new Date("2026-05-20T10:00:00Z");
+  expect(formatWhen("2026-05-23T16:00:00Z", { now })).toBe("Sa 23. Mai · 18:00");
+  expect(formatWhen("2026-01-04T18:30:00Z", { now })).toBe("So 4. Jänner · 19:30");
+  expect(formatWhen("2026-05-20T16:00:00Z", { now })).toBe("heute 18:00");
+  expect(formatWhen("2026-05-21T16:00:00Z", { now })).toBe("morgen 18:00");
+  expect(formatWhen("2026-05-20T22:01:00Z", { now })).toBe("morgen 00:01");
+  expect(formatWhen("2025-05-23T16:00:00Z", { now })).toBe("Fr 23. Mai 2025 · 18:00");
+  expect(formatWhen(null, { now, fallback: "Noch kein Termin" })).toBe("Noch kein Termin");
 });

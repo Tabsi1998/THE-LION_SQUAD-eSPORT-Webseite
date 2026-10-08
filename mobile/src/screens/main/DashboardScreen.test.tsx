@@ -205,3 +205,14 @@ test("Spiele in Klärung bleiben sichtbar - beim Spieler und bei der Turnierleit
   expect(screen.getByTestId("match-disputed-m-staff")).toBeTruthy();
   expect(screen.getByText("Dispute prüfen")).toBeTruthy();
 });
+
+// Kleinigkeiten (#1139): die Match-Karte zeigt Datum und Uhrzeit, die Station im Klartext.
+test("Match-Karte mit Datum und Uhrzeit und Station im Klartext", async () => {
+  const match = { id: "m-when", status: "scheduled", scheduled_at: "2030-03-02T17:00:00Z", tournament_title: "Mario Kart Cup",
+    opponent_name: "LunaByte", station_text: "Station 3 · Switch 2", station_label: "3 - switch2" };
+  dashboard = { ...dashboard, me: { tournaments: [], events: [], matches: [match], staff_matches: [], actions: [] } };
+  await render(<DashboardScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("match-when-m-when")).toBeTruthy());
+  expect(screen.getByTestId("match-when-m-when")).toHaveTextContent("Sa 2. März 2030 · 18:00");
+  expect(screen.getByText("LunaByte · Station 3 · Switch 2")).toBeTruthy();
+});

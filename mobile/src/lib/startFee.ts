@@ -43,6 +43,7 @@ export function ownPriceLine(price: TournamentPrice | null | undefined): string 
   const amount = formatCents(price.total_cents, price.currency || "EUR");
   if (price.billing_status === "cancelled") return `Dein Startgeld: ${amount} · storniert`;
   if (price.billing_status === "paid") return `Dein Startgeld: ${amount} · Rechnung ${price.invoice_ref || ""} bezahlt – danke!`.replace("  ", " ");
-  if (price.invoice_ref && price.invoice_status !== "draft") return `Dein Startgeld: ${amount} · Rechnung ${price.invoice_ref} offen – unter „Meine Mitgliedschaft“`;
-  return `Dein Startgeld: ${amount} · die Rechnung kommt in dein Konto`;
+  // Rechnungen liegen für alle unter „Meine Rechnungen“ (#1139) - „Meine Mitgliedschaft“ gibt es nur für Vereinsmitglieder.
+  if (price.invoice_ref && price.invoice_status !== "draft") return `Dein Startgeld: ${amount} · Rechnung ${price.invoice_ref} offen – unter „Meine Rechnungen“`;
+  return `Dein Startgeld: ${amount} · die Rechnung kommt in dein Konto unter „Meine Rechnungen“`;
 }

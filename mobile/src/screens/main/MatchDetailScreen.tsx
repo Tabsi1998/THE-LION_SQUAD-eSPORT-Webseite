@@ -20,13 +20,16 @@ import { invalidateCache } from "../../lib/cache";
 import {
   continuesMessageGroup,
   formatChatTime,
-  formatDate,
   formatDateTime,
   formatEventMode,
   formatResultEntryMode,
   formatScheduleMode,
   formatStatus,
+  formatWhen,
 } from "../../lib/format";
+import { finishedMatchText, formatMatchKind, isMatchFinished, matchHeadline, slotName, stationText } from "../../lib/matchText";
+import { viennaWall, wallToIso } from "../../lib/dateChoice";
+import { DateTimeChooser } from "../../components/DateTimeChooser";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ChatMessage, Tournament } from "../../types";
@@ -98,12 +101,13 @@ type V2ResultRow = {
   time_ms: string;
 };
 
+// Dieselben Wörter wie auf der Website (#1139, MatchPage.jsx).
 const scheduleLabels: Record<string, string> = {
   accepted: "Termin bestätigt",
   countered: "Gegenvorschlag",
-  declined: "Abgelehnt",
+  declined: "Vorschlag abgelehnt",
   escalated: "Turnierleitung nötig",
-  proposed: "Vorschlag offen",
+  proposed: "Terminvorschlag offen",
 };
 
 export function MatchDetailScreen({ navigation, route }: Props) {
@@ -148,11 +152,11 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         void markChatRead("match", route.params.id);
       }
       if (preserveDrafts) {
-        setProposalAt((current) => current || formatDateInput(match.scheduled_at));
+        setProposalAt((current) => current || viennaWall(match.scheduled_at));
         setForfeitWinnerId((current) => current || firstRegistrationId(nextPage?.participants));
         setV2Rows((current) => current.length ? current : buildV2Rows(nextPage));
       } else {
-        setProposalAt(formatDateInput(match.scheduled_at));
+        setProposalAt(viennaWall(match.scheduled_at));
         setForfeitWinnerId(firstRegistrationId(nextPage?.participants));
         setV2Rows(buildV2Rows(nextPage));
       }
@@ -209,8 +213,11 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const canProposeSchedule = Boolean(page?.can_propose_schedule);
   const canManageSchedule = Boolean(page?.can_manage_schedule);
   const hasScheduleProposals = pendingProposals.length > 0;
-  const showScheduleCard = Boolean(canProposeSchedule || hasScheduleProposals || match.scheduled_at || stationLabel(match) || page?.schedule_mode === "fixed_by_staff");
-  const scheduleStatus = match.schedule_status || match.status;
+  // Klartext wie auf der Website (#1139): fertig heißt „Beendet“ mit Ergebnis, die Station steht einmal im Klartext.
+  const finished = isMatchFinished(match);
+  const station = stationText(match);
+  // Nach dem Ende gibt es keine Terminabstimmung mehr (wie im Web, #1221).
+  const showScheduleCard = Boolean(!finished && (canProposeSchedule || hasScheduleProposals || match.scheduled_at || station || page?.schedule_mode === "fixed_by_staff"));
   const eventModeLabel = formatEventMode(page?.event_mode);
   const resultModeLabel = formatResultEntryMode(page?.result_entry_mode);
   const scheduleModeLabel = formatScheduleMode(page?.schedule_mode);
@@ -220,9 +227,10 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const showFlowNotice = Boolean(!hasResultActions && (page?.result_entry_mode || page?.schedule_mode));
 
   const propose = useCallback(async () => {
-    const scheduledAt = parseDateInput(proposalAt);
+    // Datum und Uhrzeit zum Antippen (#1139) - als Wiener Uhr gewählt, als Zeitpunkt an den Server.
+    const scheduledAt = wallToIso(proposalAt);
     if (!scheduledAt || busy) {
-      setError("Bitte Datum und Uhrzeit im Format JJJJ-MM-TT HH:mm eingeben.");
+      setError("Bitte Tag und Uhrzeit wählen.");
       return;
     }
     setBusy(true);
@@ -242,9 +250,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     if (busy) return;
     const payload: { action: string; note?: string | null; scheduled_at?: string } = { action, note: decisionNote.trim() || null };
     if (action === "counter") {
-      const scheduledAt = parseDateInput(counterAt);
+      const scheduledAt = wallToIso(counterAt || viennaWall(proposal.scheduled_at));
       if (!scheduledAt) {
-        setError("Bitte für den Gegenvorschlag Datum und Uhrzeit eingeben.");
+        setError("Bitte für den Gegenvorschlag Tag und Uhrzeit wählen.");
         return;
       }
       payload.scheduled_at = scheduledAt;
@@ -421,23 +429,37 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load({ preserveDrafts: false }); }} tintColor={colors.cyan} />}
       >
+        {/* Kopf im Klartext wie auf der Website (#1139, #1220): Runde und Namen statt „Match A“, das Kürzel nur klein.
+            Vor dem Spiel der Termin, danach „Beendet“ mit dem Ergebnis; die Station genau einmal. */}
         <View style={styles.header}>
           <Muted>{page.matchday_label || match.round_name || "Match"}</Muted>
-          <Title>{match.match_key ? `Match ${match.match_key}` : matchLabel(participants)}</Title>
+          <Title testID="match-headline">{matchHeadline(participants, match)}</Title>
+          <Muted testID="match-key">{`${formatMatchKind(match)} ${match.match_key || ""}`.trim()}</Muted>
           {page.tournament ? (
             <Pressable onPress={() => navigation.navigate("TournamentDetail", { id: page.tournament?.slug || page.tournament?.id || match.tournament_id })} hitSlop={10}>
               <Muted style={styles.link}>{page.tournament.title}</Muted>
             </Pressable>
           ) : null}
-          <View style={styles.pillRow}>
-            <Pill label={scheduleLabels[String(scheduleStatus)] || formatStatus(scheduleStatus)} accent="gold" />
-            {eventModeLabel ? <Pill label={eventModeLabel} accent="cyan" /> : null}
-            {resultModeLabel ? <Pill label={resultModeLabel} /> : null}
-            {scheduleModeLabel ? <Pill label={scheduleModeLabel} /> : null}
-            <Pill label={formatDateTime(match.scheduled_at)} />
-            {stationLabel(match) ? <Pill label={`Station ${stationLabel(match)}`} accent="cyan" /> : null}
-            {match.duration_minutes ? <Pill label={`${match.duration_minutes} Min.`} /> : null}
-          </View>
+          {finished ? (
+            <View style={styles.finishedBox} testID="match-finished">
+              <View style={styles.pillRow}>
+                <Pill label="Beendet" />
+                {match.scheduled_at ? <Muted>{formatWhen(match.scheduled_at)}</Muted> : null}
+              </View>
+              <Body style={styles.strong} testID="match-outcome">{finishedMatchText(participants, match)}</Body>
+              {station ? <Muted style={styles.textCyan} testID="match-station">{station}</Muted> : null}
+            </View>
+          ) : (
+            <View style={styles.pillRow}>
+              <Pill label={scheduleHeadline(match)} accent="gold" />
+              {eventModeLabel ? <Pill label={eventModeLabel} accent="cyan" /> : null}
+              {resultModeLabel ? <Pill label={resultModeLabel} /> : null}
+              {scheduleModeLabel ? <Pill label={scheduleModeLabel} /> : null}
+              <Pill label={formatWhen(match.scheduled_at, { fallback: "Noch kein Termin" })} />
+              {station ? <Pill label={station} accent="cyan" /> : null}
+              {match.duration_minutes ? <Pill label={`${match.duration_minutes} Min.`} /> : null}
+            </View>
+          )}
           {/* GG (#616): nach dem Ende lobt eine Seite die andere - wie auf der Matchseite im Web. */}
           {isV2 ? <CommendButton matchId={route.params.id} completed={String(match.status) === "completed"} enabled={Boolean(user) && !isGuestUser(user)} /> : null}
         </View>
@@ -458,7 +480,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                 <Body style={styles.slotText}>{participant.slot || "-"}</Body>
               </View>
               <View style={styles.flex}>
-                <Body style={styles.strong}>{participant.display_name || "Offen"}</Body>
+                <Body style={styles.strong}>{slotName(participant.display_name, participant, match)}</Body>
                 {participant.team ? <Muted>{participant.team.tag ? `[${participant.team.tag}] ` : ""}{participant.team.name}</Muted> : null}
                 {participant.status ? <Muted>{formatStatus(participant.status)}</Muted> : null}
               </View>
@@ -490,7 +512,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
             ) : null}
             {canSubmitV2Result ? (
               <>
-                <Muted>{v2Mode === "time" ? "Zeit erfassen. Schnellste Zeit gewinnt automatisch." : v2Mode === "lower_score" ? "Score erfassen. Niedrigster Score gewinnt automatisch." : "Punkte erfassen. Hoechste Punkte gewinnen automatisch."}</Muted>
+                <Muted>{v2Mode === "time" ? "Zeit erfassen. Schnellste Zeit gewinnt automatisch." : v2Mode === "lower_score" ? "Score erfassen. Niedrigster Score gewinnt automatisch." : "Punkte erfassen. Höchste Punkte gewinnen automatisch."}</Muted>
                 {v2Rows.map((row, index) => (
                   <View key={row.registration_id} style={styles.v2Row}>
                     <View style={styles.flex}>
@@ -547,10 +569,10 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         {showScheduleCard ? (
         <Card style={styles.card}>
           <Heading>{canProposeSchedule || hasScheduleProposals ? "Terminabstimmung" : "Termin"}</Heading>
-          <Muted>{formatDateTime(match.scheduled_at)}{stationLabel(match) ? ` · Station ${stationLabel(match)}` : ""}</Muted>
+          <Muted>{formatWhen(match.scheduled_at, { fallback: "Noch kein Termin" })}{station ? ` · ${station}` : ""}</Muted>
           {canProposeSchedule ? (
             <>
-              <FormInput label="Vorschlag" value={proposalAt} onChangeText={setProposalAt} placeholder="2026-05-19 20:00" />
+              <DateTimeChooser label="Vorschlag" value={proposalAt || viennaWall(match.scheduled_at)} onChange={setProposalAt} testID="match-proposal-at" />
               <FormInput label="Notiz optional" value={proposalNote} onChangeText={setProposalNote} placeholder="z.B. nach 20:00 Uhr möglich" />
               <Button label={busy ? "Sendet ..." : "Termin vorschlagen"} onPress={propose} disabled={busy} />
             </>
@@ -563,7 +585,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
             <View style={styles.stack}>
               {pendingProposals.map((proposal) => (
                 <View key={proposal.id} style={styles.proposal}>
-                  <Body style={styles.strong}>{formatDateTime(proposal.scheduled_at)}</Body>
+                  <Body style={styles.strong}>{formatWhen(proposal.scheduled_at, { fallback: "ohne Zeit" })}</Body>
                   <Muted>{proposal.actor?.display_name || proposal.actor?.username || "Teilnehmer"}{proposal.note ? ` · ${proposal.note}` : ""}</Muted>
                   {canManageSchedule && canDecideScheduleProposal(page, proposal) ? (
                     <>
@@ -571,7 +593,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                         <Button label="Annehmen" onPress={() => decide(proposal, "accept")} disabled={busy} />
                         <Button label="Ablehnen" variant="secondary" onPress={() => decide(proposal, "decline")} disabled={busy} />
                       </View>
-                      <FormInput label="Gegenvorschlag" value={counterAt} onChangeText={setCounterAt} placeholder="2026-05-19 21:00" />
+                      <DateTimeChooser label="Gegenvorschlag" value={counterAt || viennaWall(proposal.scheduled_at)} onChange={setCounterAt} testID={`match-counter-at-${proposal.id}`} />
                       <FormInput label="Antwort optional" value={decisionNote} onChangeText={setDecisionNote} placeholder="Grund oder Hinweis" />
                       <Button label="Gegenvorschlag senden" variant="secondary" onPress={() => decide(proposal, "counter")} disabled={busy} />
                     </>
@@ -755,38 +777,13 @@ function firstRegistrationId(participants?: MatchParticipant[]) {
   return (participants || []).find((participant) => participant.registration_id)?.registration_id || "";
 }
 
-function formatDateInput(value?: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (number: number) => String(number).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
+// Ein laufendes Spiel nennt im Kopf seinen Zustand statt des Termins (wie scheduleHeadline der Website, #1220).
+const LIVE_MATCH_STATUSES = new Set(["in_progress", "running", "waiting_result", "disputed"]);
 
-function parseDateInput(value: string) {
-  const cleaned = value.trim().replace("T", " ");
-  if (!cleaned) return null;
-  const isoLike = cleaned.match(/^(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2})$/);
-  const deLike = cleaned.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})$/);
-  if (!isoLike && !deLike) {
-    const parsed = new Date(cleaned).getTime();
-    return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
-  }
-  const [, first, second, third, hour, minute] = isoLike || deLike || [];
-  const year = isoLike ? first : third;
-  const month = isoLike ? second : second;
-  const day = isoLike ? third : first;
-  const date = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function stationLabel(match: any) {
-  return match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
-}
-
-function matchLabel(participants: MatchParticipant[]) {
-  const names = participants.map((participant) => participant.display_name).filter(Boolean);
-  return names.length ? names.join(" vs. ") : "Match";
+function scheduleHeadline(match: { status?: string | null; schedule_status?: string | null; scheduled_at?: string | null }) {
+  if (LIVE_MATCH_STATUSES.has(String(match.status))) return formatStatus(match.status);
+  if (match.schedule_status && scheduleLabels[match.schedule_status]) return scheduleLabels[match.schedule_status];
+  return match.scheduled_at ? "Termin steht" : "Noch offen";
 }
 
 function participantNameByRegistration(participants: MatchParticipant[], registrationId: string) {
@@ -927,6 +924,14 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
     minWidth: 0,
+  },
+  finishedBox: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 6,
+    padding: 12,
   },
   flagRow: {
     flexDirection: "row",
