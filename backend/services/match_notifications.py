@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from match_rules import participant_source_ids
 from services.competition_snapshot import adapt_stage_matches
+from services.match_audience import playing_user_ids
 from services.user_notifications import create_user_notification
 
 
@@ -19,9 +20,9 @@ def _registration_name(reg: dict | None, fallback: str = "Offen") -> str:
 
 
 async def _participant_user_ids(db, registrations: list[dict]) -> set[str]:
-    """Team am Spieltag (#1192): Teams bekommen Ergebnisse für die Aufgestellten, ohne Aufstellung alle Mitglieder."""
-    from services.team_lineup import registration_recipients
-    return await registration_recipients(db, registrations)
+    # Ergebnis (#1136, #1192): wer im Spiel antritt - bei Teams die Aufgestellten, ohne Aufstellung jedes Mitglied
+    # samt Leitung.
+    return await playing_user_ids(db, registrations)
 
 
 def _canonical_match(match: dict, collection_name: str) -> dict:

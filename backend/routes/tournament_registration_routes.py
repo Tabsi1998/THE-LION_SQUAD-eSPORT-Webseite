@@ -6,6 +6,7 @@ from pymongo.errors import DuplicateKeyError
 from database import get_db
 from auth import get_current_user, get_optional_user
 from services.access_links import record_access_link_use, validate_access_link
+from services.match_audience import responsible_registration
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     PARTICIPANT_STAFF_ROLES,
@@ -787,28 +788,8 @@ async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_curr
 
 
 async def _find_self_registration(db, tid: str, user_id: str) -> dict | None:
-    reg = await db.tournament_registrations.find_one({"tournament_id": tid, "user_id": user_id})
-    if not reg:
-        team_ids = [
-            row.get("team_id")
-            for row in await db.team_members.find({"user_id": user_id}, {"_id": 0, "team_id": 1}).to_list(100)
-            if row.get("team_id")
-        ]
-        if team_ids:
-            teams = await db.teams.find(
-                {
-                    "id": {"$in": team_ids},
-                    "$or": [{"leader_id": user_id}, {"co_leader_ids": user_id}],
-                },
-                {"_id": 0, "id": 1},
-            ).to_list(100)
-            manageable_team_ids = [team["id"] for team in teams]
-            if manageable_team_ids:
-                reg = await db.tournament_registrations.find_one({
-                    "tournament_id": tid,
-                    "team_id": {"$in": manageable_team_ids},
-                })
-    return reg
+    # Einchecken dürfen die Verantwortlichen der Anmeldung (#1136) - dieselbe Regel wie Melden und Dispute.
+    return await responsible_registration(db, tid, user_id)
 
 
 @router.post("/{tid}/checkin")

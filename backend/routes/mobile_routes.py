@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user, get_optional_user
 from database import get_db
 from models import new_id, now_utc
+from services.match_audience import acting_registration_ids
 from services.match_overview import operational_match_overviews, own_match_overviews
 from services.profile_references import personal_profile_references
 from services import event_days
@@ -199,6 +200,9 @@ def _public_user_registration(registration: dict | None) -> dict | None:
         "display_name": registration.get("display_name") or registration.get("ingame_name"),
         "ingame_name": registration.get("ingame_name"),
         "team_id": registration.get("team_id"),
+        # Darf diese Person für die Anmeldung handeln - einchecken, melden (#1136)? Wer angemeldet hat, bei Teams dazu
+        # Teamleitung und Co-Leitung. Ein einfaches Mitglied sieht das Turnier, bekommt aber keine Aufgabe dafür.
+        "can_act": bool(registration.get("can_act")),
         "created_at": registration.get("created_at"),
         "updated_at": registration.get("updated_at"),
     }
@@ -436,7 +440,8 @@ def _dashboard_actions(tournaments: list[dict], events: list[dict], matches: lis
     for tournament in tournaments:
         reg = tournament.get("my_registration") or {}
         phase = tournament.get("public_phase") or {}
-        if phase.get("state") == "check_in" and reg.get("status") in {"approved", "registered"}:
+        # Einchecken ist eine Aufgabe der Verantwortlichen (#1136) - nur sie sehen „Turnier Check-in offen“.
+        if phase.get("state") == "check_in" and reg.get("status") in {"approved", "registered"} and reg.get("can_act"):
             actions.append({
                 "id": f"tournament-checkin-{tournament.get('id')}",
                 "type": "tournament_checkin",
@@ -504,6 +509,8 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
     day_start = _start_of_local_day(now_utc())
     if user:
         tournament_regs = await _my_tournament_registrations(user)
+        acting_ids = await acting_registration_ids(db, tournament_regs, user.get("id"))
+        tournament_regs = [{**reg, "can_act": reg.get("id") in acting_ids} for reg in tournament_regs]
         tournament_ids = list({reg.get("tournament_id") for reg in tournament_regs if reg.get("tournament_id")})
         tournament_by_id = {
             tournament["id"]: tournament

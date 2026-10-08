@@ -14,6 +14,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from database import get_db
+from services.match_audience import responsible_user_ids, users_for
 from services.notification_preferences import _site_base_url, send_user_template
 from services.user_notifications import create_user_notification
 
@@ -74,18 +75,16 @@ def due_checkin_reminders(tournament: dict, now: datetime) -> list[tuple[Reminde
 
 
 async def _unchecked_registration_users(tournament_id: str) -> list[dict]:
+    """Wer noch einchecken muss: die Verantwortlichen jeder bestätigten Anmeldung (#1136) - wer angemeldet hat, bei
+    Teams dazu Teamleitung und Co-Leitung; ein Team ohne anmeldende Person über seine Teamleitung."""
     db = get_db()
     regs = await db.tournament_registrations.find(
-        {"tournament_id": tournament_id, "status": "approved", "user_id": {"$nin": [None, ""]}},
-        {"_id": 0, "user_id": 1},
+        {"tournament_id": tournament_id, "status": "approved"},
+        {"_id": 0, "id": 1, "user_id": 1, "team_id": 1},
     ).to_list(5000)
-    user_ids = list({reg["user_id"] for reg in regs if reg.get("user_id")})
-    if not user_ids:
+    if not regs:
         return []
-    return await db.users.find(
-        {"id": {"$in": user_ids}, "is_banned": {"$ne": True}},
-        {"_id": 0, "id": 1, "email": 1, "username": 1, "display_name": 1, "notification_preferences": 1, "newsletter_consent": 1},
-    ).to_list(5000)
+    return await users_for(db, await responsible_user_ids(db, regs))
 
 
 async def schedule_checkin_reminders(now: datetime | None = None) -> dict:

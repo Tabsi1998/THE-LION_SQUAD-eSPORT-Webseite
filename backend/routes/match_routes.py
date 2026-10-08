@@ -36,6 +36,7 @@ from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_w
 from services.rate_limit import enforce_rate_limit
 from services import word_filter
 from services.station_labels import attach_station_info
+from services.match_audience import acting_registration, player_user_ids
 from services.user_notifications import create_user_notification
 from services.v2_result_submission import submit_v2_result
 from services.v2_match_flows import (
@@ -248,20 +249,8 @@ def _match_label(match: dict) -> str:
 
 
 async def _match_participant_user_ids(db, match: dict) -> set[str]:
-    regs = await _registrations_for_match(match)
-    user_ids = {reg.get("user_id") for reg in regs if reg.get("user_id")}
-    team_ids = {reg.get("team_id") for reg in regs if reg.get("team_id")}
-    if team_ids:
-        teams = await db.teams.find(
-            {"id": {"$in": list(team_ids)}},
-            {"_id": 0, "member_ids": 1, "leader_id": 1, "co_leader_ids": 1},
-        ).to_list(100)
-        for team in teams:
-            if team.get("leader_id"):
-                user_ids.add(team.get("leader_id"))
-            user_ids.update(team.get("co_leader_ids") or [])
-            user_ids.update(team.get("member_ids") or [])
-    return {user_id for user_id in user_ids if user_id}
+    # Matchchat und Spiel-Hinweise (#1136): alle Spieler - bei Teams jedes Mitglied samt Leitung.
+    return await player_user_ids(db, await _registrations_for_match(match))
 
 
 def _staff_assignment_matches_match(assignment: dict, match: dict) -> bool:
@@ -405,27 +394,11 @@ async def _user_registration_for_match(match: dict, user: dict | None) -> dict |
 
 
 async def _acting_registration_for_match(match: dict, user: dict | None) -> dict | None:
+    """Die Anmeldung, für die diese Person im Spiel handelt (#1136): die eigene, sonst die ihres Teams als Teamleitung
+    oder Co-Leitung. Damit melden, bestätigen, widersprechen und planen dieselben Leute, die auch einchecken."""
     if not user:
         return None
-    direct = await _user_registration_for_match(match, user)
-    if direct:
-        return direct
-    regs = await _registrations_for_match(match)
-    team_ids = list({r.get("team_id") for r in regs if r.get("team_id")})
-    if not team_ids:
-        return None
-    teams = await get_db().teams.find(
-        {
-            "id": {"$in": team_ids},
-            "$or": [
-                {"leader_id": user["id"]},
-                {"co_leader_ids": user["id"]},
-            ],
-        },
-        {"_id": 0, "id": 1},
-    ).to_list(64)
-    captain_team_ids = {team["id"] for team in teams}
-    return next((reg for reg in regs if reg.get("team_id") in captain_team_ids), None)
+    return await acting_registration(get_db(), await _registrations_for_match(match), user.get("id"))
 
 
 async def _can_act_for_match(match: dict, user: dict | None) -> bool:
@@ -597,10 +570,9 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         proposal["actor"] = actors.get(proposal.get("actor_user_id"))
         proposal.pop("match_collection", None)
     acting_reg = await _acting_registration_for_match(match, user)
-    direct_reg = await _user_registration_for_match(match, user)
     policy = _match_policy(match, tournament, stage)
     can_submit_result = await _can_submit_result_for_match(match, user)
-    can_player_report = bool(direct_reg and _players_can_report(policy))
+    can_player_report = bool(acting_reg and _players_can_report(policy))
     can_propose_schedule = bool(user and await _can_act_for_match(match, user) and _schedule_proposals_enabled(policy))
     round_number = match.get("matchday_number") or match.get("round")
     league_like = (tournament or {}).get("format") in {"league", "round_robin"} or (stage or {}).get("stage_type") in {"league", "round_robin_groups", "ffa_league"}
@@ -627,7 +599,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "can_staff_submit_result": can_submit_result,
         "can_propose_schedule": can_propose_schedule,
         "can_manage_schedule": can_propose_schedule,
-        "can_dispute": bool(user and (_is_staff(user) or (direct_reg and _players_can_report(policy)))),
+        "can_dispute": bool(user and (_is_staff(user) or (acting_reg and _players_can_report(policy)))),
         "can_forfeit": await _can_forfeit_match(match, user),
         "event_mode": policy["event_mode"],
         "result_entry_mode": policy["result_entry_mode"],
@@ -1006,7 +978,7 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict) -> dict:
             status_code=422,
             detail="Für dieses Match wird eine Platzierungsliste gemeldet, keine zwei Punktstände.",
         )
-    my_registration = await _user_registration_for_match(match, me)
+    my_registration = await _acting_registration_for_match(match, me)
     if not my_registration:
         raise HTTPException(status_code=403, detail="Nicht Teilnehmer dieses Matches")
 
@@ -1074,7 +1046,7 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
     # sonst kann ein Turnier im Graph-System nicht vollstaendig gespielt werden.
     m, collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, m)
-    if not _is_staff(me) and not await _user_registration_for_match(m, me):
+    if not _is_staff(me) and not await _acting_registration_for_match(m, me):
         raise HTTPException(status_code=403, detail="Nicht Teilnehmer dieses Matches")
     reason = body.reason.strip()
     if is_duplicate_dispute(m, me["id"], reason):
