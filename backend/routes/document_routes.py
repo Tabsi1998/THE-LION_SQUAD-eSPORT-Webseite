@@ -8,7 +8,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
-from auth import get_optional_user, require_club_admin, require_area
+from auth import get_current_user, get_optional_user, require_club_admin, require_area
 from database import get_db
 from models import DocumentCreate, DocumentUpdate, new_id, now_utc
 from services import dolibarr_identity
@@ -161,6 +161,17 @@ async def list_documents(
     if scope == "club":
         return await club_documents_for(db, user, category)
     return await _visible_documents(db, user, category)
+
+
+# Die eigenen Unterlagen (#1255) gehören zum Konto - wie /api/account/invoices: Profil → „Nur für dich“.
+account_router = APIRouter(prefix="/api/account/documents", tags=["documents"])
+
+
+@account_router.get("")
+async def my_documents(user: dict = Depends(get_current_user)):
+    """Nur die eigenen Unterlagen aus der Vereinsakte, neueste zuerst - Öffnen und Laden wie bei den Vereinsdokumenten
+    (/api/documents/{id}/view, …/download; die prüfen bei jedem Abruf neu, ob die Person sie sehen darf)."""
+    return await dolibarr_identity.own_documents(get_db(), user)
 
 
 def _module_filename(disposition_header: str | None, fallback: str) -> str:

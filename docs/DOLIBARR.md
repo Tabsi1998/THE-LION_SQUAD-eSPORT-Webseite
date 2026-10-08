@@ -528,9 +528,13 @@ Protokolle für Mitglieder) verlangt das Vereinsmodul deshalb eine Verbindung je
    Website erzeugen, Fähigkeit „Dokumente“ anhaken. Der Code wird einmal angezeigt, gilt eine
    Stunde und genau einmal – ihn dem Mitglied persönlich geben (nicht in einen offenen Kanal).
 3. Das Mitglied löst den Code auf der Website unter *Meine Mitgliedschaft → Vereinsakte* ein.
-   Ab dann stehen seine Unterlagen unter *Vereinsdokumente* (Web und App) mit dem Hinweis
-   „Vereinsakte“ bzw. „nur für dich“; das PDF holt die Website je Abruf aus Dolibarr, das dabei
-   selbst prüft, ob die Person es sehen darf, und prüft die Datei gegen die Prüfsumme.
+   Ab dann stehen die Unterlagen für Mitglieder (Protokolle, Beschlüsse) unter *Vereinsdokumente*
+   mit dem Hinweis „Vereinsakte“, die Schreiben nur für diese Person (Beitrittsbestätigung,
+   Spendenbestätigung) seit #1255 im eigenen Profil unter *Nur für dich → Deine Unterlagen*
+   (`/account/documents`) - die Vereinsdokumente sind so für alle Mitglieder gleich. Das PDF holt die
+   Website je Abruf aus Dolibarr, das dabei selbst prüft, ob die Person es sehen darf, und prüft die
+   Datei gegen die Prüfsumme. Ältere App-Versionen fragen die Liste ohne Trennung ab und sehen
+   beides weiter unter *Dokumente*.
 
 Die Statutenfassungen stehen für Mitglieder ebenfalls unter *Vereinsdokumente* (Kategorie
 „Statuten“, geltende Fassung angepinnt): öffentlich freigegebene für jedes Mitglied, nur für

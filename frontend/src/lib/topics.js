@@ -4,6 +4,8 @@
 
 export const WEB_TOPICS = [
   { topic: "Rechnungen", place: "Mein Profil → Nur für dich", path: "/account/invoices", menu: null },
+  // #1255: die eigenen Schreiben aus der Vereinsakte - nicht mehr zwischen den Vereinsdokumenten.
+  { topic: "Persönliche Unterlagen", place: "Mein Profil → Nur für dich", path: "/account/documents", menu: null },
   { topic: "Nachrichten", place: "Community → Chats", path: "/messages", menu: "Community" },
   { topic: "Benachrichtigungen", place: "die Glocke", path: "/notifications", menu: null },
   { topic: "Meine Mitgliedschaft", place: "Mitgliederbereich", path: "/members/membership", menu: null },

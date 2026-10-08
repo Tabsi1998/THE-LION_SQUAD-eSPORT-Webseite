@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, Gift, Receipt, ShieldAlert, UserCircle } from "lucide-react";
+import { ChevronRight, FileText, Gift, Receipt, ShieldAlert, UserCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { missingLabels } from "@/lib/profileCompleteness";
@@ -9,9 +9,20 @@ import { enqueueCeremony } from "@/components/achievements/ceremony/queue";
 import { describePackage } from "@/components/achievements/ceremony/select";
 import { AchievementsTab } from "@/pages/user/profile/AchievementsTab";
 import { achievementInsights } from "@/pages/user/profile/form";
+import { viennaDate } from "@/lib/vienna";
 
-// Was nur das eigene Profil zeigt (#1149): der Kasten „Nur für dich“ (Rechnungen, Gewinne, Strafen, was im Profil noch
-// fehlt) und die eigenen Erfolge mit Fortschritt. Mit „So sehen dich andere“ ist beides weg.
+// Was nur das eigene Profil zeigt (#1149): der Kasten „Nur für dich“ (Rechnungen, eigene Unterlagen aus der Vereinsakte,
+// Gewinne, Strafen, was im Profil noch fehlt) und die eigenen Erfolge mit Fortschritt. Mit „So sehen dich andere“ ist
+// beides weg.
+
+/** „2 Dokumente · neuestes vom 01.09.2026“ - für die Zeile „Deine Unterlagen“ (#1255). */
+export function documentsLine(documents) {
+  const list = Array.isArray(documents) ? documents : [];
+  if (!list.length) return "";
+  const newest = list.map((doc) => doc?.created_at || doc?.updated_at || "").filter(Boolean).sort().at(-1);
+  const count = list.length === 1 ? "1 Dokument" : `${list.length} Dokumente`;
+  return newest ? `${count} · neuestes vom ${viennaDate(newest, { day: "2-digit", month: "2-digit", year: "numeric" })}` : count;
+}
 
 function money(amount, currency = "EUR") {
   if (amount === null || amount === undefined) return "";
@@ -36,7 +47,7 @@ function Row({ to, icon: Icon, title, detail, tone = "gold", testId }) {
 }
 
 export function PrivateBox() {
-  const [state, setState] = useState({ invoices: null, prizes: 0, penalties: 0, completeness: null });
+  const [state, setState] = useState({ invoices: null, documents: [], prizes: 0, penalties: 0, completeness: null });
   useEffect(() => {
     let cancelled = false;
     Promise.allSettled([
@@ -44,10 +55,14 @@ export function PrivateBox() {
       api.get("/prizes/me"),
       api.get("/moderation/me/standing"),
       api.get("/users/me/profile-completeness"),
-    ]).then(([invoices, prizes, standing, completeness]) => {
+      api.get("/account/documents"),
+    ]).then(([invoices, prizes, standing, completeness, documents]) => {
       if (cancelled) return;
+      const own = documents.status === "fulfilled" ? documents.value.data : null;
       setState({
         invoices: invoices.status === "fulfilled" ? invoices.value.data || null : null,
+        // Eigene Unterlagen (#1255): die Zeile steht nur da, wenn es welche gibt - wie die Akte sie liefert.
+        documents: own?.available && Array.isArray(own.documents) ? own.documents : [],
         prizes: prizes.status === "fulfilled" ? countOpenPrizes(prizes.value.data) : 0,
         penalties: standing.status === "fulfilled" ? countPenalties(standing.value.data) : 0,
         completeness: completeness.status === "fulfilled" ? completeness.value.data || null : null,
@@ -70,6 +85,9 @@ export function PrivateBox() {
         detail={summary.open_count ? `${summary.open_count} offen · ${money(summary.open_total, state.invoices?.currency)}${summary.overdue_count ? ` · ${summary.overdue_count} überfällig` : ""}` : "Keine offenen Rechnungen"}
         testId="profile-private-invoices"
       />
+      {state.documents.length ? (
+        <Row to="/account/documents" icon={FileText} title="Deine Unterlagen" detail={documentsLine(state.documents)} testId="profile-private-documents" />
+      ) : null}
       <Row to="/my/prizes" icon={Gift} title="Gewinne" detail={state.prizes ? `${state.prizes} offen oder bereit zum Abholen` : "Keine offenen Gewinne"} testId="profile-private-prizes" />
       {state.penalties ? <Row to="/my/penalties" icon={ShieldAlert} title="Moderation" detail={`${state.penalties} Treffer – Details und Einspruch`} tone="danger" testId="profile-private-penalties" /> : null}
       <Row

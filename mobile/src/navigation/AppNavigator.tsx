@@ -219,6 +219,7 @@ export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptio
   MyPrizes: { title: "Meine Gewinne", ...gold },
   MyMembership: { title: "Meine Mitgliedschaft", ...gold },
   MemberDocuments: { title: "Dokumente", ...gold },
+  MyDocuments: { title: "Deine Unterlagen", ...gold },
   MemberMeetings: { title: "Versammlungen", ...gold },
   MemberHelperShifts: { title: "Helferdienste", ...gold },
   MemberCard: { title: "Mitgliedskarte", ...gold },

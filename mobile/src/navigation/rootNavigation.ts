@@ -191,6 +191,7 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   if (first === "profile" && second) return detail("PublicProfile", { username: second });
   if (first === "profile") return profileTarget(query);
   if (first === "account" && second === "invoices") return detail("MyInvoices", invoiceParams(query));
+  if (first === "account" && second === "documents") return detail("MyDocuments");
   if ((first === "me" || first === "my") && second === "prizes") return detail("MyPrizes");
   if (first === "members" && second) return memberTarget(second);
   if (first === "seasons") return detail("SeasonPass");

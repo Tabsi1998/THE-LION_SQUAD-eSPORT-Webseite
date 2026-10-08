@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import { API_BASE_URL } from "../config";
 import { registerCacheClearer } from "./cache";
+import { formatDate } from "./format";
 
 // Vereinsdokumente in der App (#341). Die Dateien sind nicht öffentlich: Jeder Abruf trägt
 // die Anmeldung, die Datei landet nur im privaten Cache der App (kein Downloads-Ordner, keine
@@ -29,6 +30,18 @@ export type MemberDocument = {
   // Prüfsumme der Fassung (#849) - Name im Cache und „If-None-Match“.
   checksum?: string | null;
 };
+
+/** Die eigenen Unterlagen aus der Vereinsakte (#1255, /account/documents) - mit Grund, wenn es keine gibt. */
+export type OwnDocuments = { available: boolean; reason?: string | null; text?: string; documents: MemberDocument[] };
+
+/** „2 Dokumente · neuestes vom 01.09.2026“ - für die Zeile „Deine Unterlagen“ im Profil, wie im Web. */
+export function documentsLine(documents: MemberDocument[] | null | undefined): string {
+  const list = Array.isArray(documents) ? documents : [];
+  if (!list.length) return "";
+  const newest = list.map((doc) => doc.created_at || doc.updated_at || "").filter(Boolean).sort().pop();
+  const count = list.length === 1 ? "1 Dokument" : `${list.length} Dokumente`;
+  return newest ? `${count} · neuestes vom ${formatDate(newest)}` : count;
+}
 
 export const CATEGORY_LABELS: Record<string, string> = {
   statutes: "Statuten", minutes: "Protokolle", form: "Formular", regulations: "Regelwerk", guideline: "Leitlinie",

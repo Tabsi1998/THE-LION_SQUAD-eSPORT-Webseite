@@ -15,6 +15,7 @@ import { InfoCenterScreen } from "../screens/main/InfoCenterScreen";
 import { MatchDetailScreen } from "../screens/main/MatchDetailScreen";
 import { MemberCardScreen } from "../screens/main/MemberCardScreen";
 import { MemberDocumentsScreen } from "../screens/main/MemberDocumentsScreen";
+import { MyDocumentsScreen } from "../screens/main/MyDocumentsScreen";
 import { MemberHelperShiftsScreen } from "../screens/main/MemberHelperShiftsScreen";
 import { MemberMeetingsScreen } from "../screens/main/MemberMeetingsScreen";
 import { MyInvoicesScreen } from "../screens/main/MyInvoicesScreen";
@@ -76,6 +77,7 @@ export const DETAIL_SCREENS: Record<DetailScreenName, Screen> = {
   MyPrizes: MyPrizesScreen,
   MyMembership: MyMembershipScreen,
   MemberDocuments: MemberDocumentsScreen,
+  MyDocuments: MyDocumentsScreen,
   MemberMeetings: MemberMeetingsScreen,
   MemberHelperShifts: MemberHelperShiftsScreen,
   MemberCard: MemberCardScreen,

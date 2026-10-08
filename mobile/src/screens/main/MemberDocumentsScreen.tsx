@@ -15,6 +15,8 @@ import { colors } from "../../theme";
 
 // Vereinsdokumente (#341): Liste vom Server (schon nach Rechten gefiltert), Öffnen lädt die
 // Datei mit Anmeldung in den privaten Cache und übergibt sie an den PDF-Betrachter des Geräts.
+// Seit #1255 nur die Vereinsdokumente (für alle Mitglieder gleich) - die eigenen Schreiben aus der
+// Vereinsakte stehen im Profil unter „Nur für dich“ → „Deine Unterlagen“.
 
 type Props = NativeStackScreenProps<MoreStackParamList, "MemberDocuments"> & { opener?: OpenDocument };
 
@@ -31,7 +33,7 @@ export function MemberDocumentsScreen({ opener = openDocument }: Props) {
   const load = useCallback(async () => {
     setError("");
     try {
-      const { data } = await api.get<MemberDocument[]>("/documents");
+      const { data } = await api.get<MemberDocument[]>("/documents", { params: { scope: "club" } });
       setDocs(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(errorMessage(err, "Dokumente konnten nicht geladen werden."));
@@ -80,7 +82,7 @@ export function MemberDocumentsScreen({ opener = openDocument }: Props) {
       >
         <View style={styles.header}>
           <Heading>Vereinsdokumente</Heading>
-          <Muted>{error || "Statuten, Protokolle, Formulare – nur für Mitglieder. Geöffnete Dateien bleiben nur in der App und werden beim Abmelden gelöscht."}</Muted>
+          <Muted>{error || "Statuten, Protokolle, Formulare – nur für Mitglieder. Deine eigenen Schreiben stehen im Profil unter „Nur für dich“. Geöffnete Dateien bleiben nur in der App und werden beim Abmelden gelöscht."}</Muted>
         </View>
 
         {categories.length > 2 ? <SegmentedTabs items={categories} value={category} onChange={setCategory} /> : null}

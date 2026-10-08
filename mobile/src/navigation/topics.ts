@@ -17,6 +17,8 @@ export type Topic = {
 
 export const APP_TOPICS: Topic[] = [
   { topic: "Rechnungen", place: "Profil → Nur für dich", pattern: /"MyInvoices"/, files: ["screens/main/ProfileScreen.tsx"], self: "screens/main/MyInvoicesScreen.tsx" },
+  // #1255: die eigenen Schreiben aus der Vereinsakte - nicht mehr zwischen den Vereinsdokumenten.
+  { topic: "Persönliche Unterlagen", place: "Profil → Nur für dich", pattern: /"MyDocuments"/, files: ["screens/main/ProfileScreen.tsx"], self: "screens/main/MyDocumentsScreen.tsx" },
   { topic: "Nachrichten", place: "Community → Chats", pattern: /section: "chats"|"DirectMessages"/, files: [] },
   { topic: "Benachrichtigungen", place: "die Glocke", pattern: /"Notifications"/, files: ["components/TabHeader.tsx", "notifications/NotificationContext.tsx"], self: "screens/main/NotificationsScreen.tsx" },
   { topic: "Meine Mitgliedschaft", place: "Verein → Mitgliederbereich", pattern: /"MyMembership"/, files: ["screens/main/VereinScreen.tsx"], self: "screens/main/MyMembershipScreen.tsx" },

@@ -19,6 +19,7 @@ import { api } from "../../lib/api";
 import { sortAwards, type Award } from "../../lib/awards";
 import { formatDate } from "../../lib/format";
 import { formatMoney } from "../../lib/memberArea";
+import { documentsLine, type MemberDocument, type OwnDocuments } from "../../lib/memberDocuments";
 import { missingLabels } from "../../lib/profileCompleteness";
 import { isGuestUser } from "../../live";
 import { navigateToUrl, openSignIn, openTab, targetFromUrl } from "../../navigation/rootNavigation";
@@ -32,7 +33,8 @@ import { profileStyles, ReferenceCard, Stat, WEB_BASE_URL, type ModerationStandi
 
 // Das eigene Profil (#1149): derselbe Aufbau wie das, was andere sehen (Kopf mit Level und Zahlenleiste, Reiter Übersicht,
 // Erfolge, Auszeichnungen, Referenzen, Teams, für Mitglieder Ehrungen). Was nur dich angeht, steht im Kasten „Nur für
-// dich“: Rechnungen, Gewinne zum Abholen, was im Profil noch fehlt. Der Schalter „So sehen dich andere“ blendet ihn aus.
+// dich“: Rechnungen, deine Unterlagen aus der Vereinsakte (#1255), Gewinne zum Abholen, was im Profil noch fehlt. Der
+// Schalter „So sehen dich andere“ blendet ihn aus.
 // Oben rechts das Zahnrad zu den Einstellungen (#1146). Gäste sehen den Weg zum Konto und darunter Darstellung und
 // „Über die App“.
 
@@ -79,13 +81,14 @@ function OwnProfile() {
   const [standing, setStanding] = useState<ModerationStanding | null>(null);
   const [completeness, setCompleteness] = useState<{ score?: number; missing?: string[] }>({});
   const [invoices, setInvoices] = useState<{ summary: InvoiceSummary; currency?: string }>({ summary: null });
+  const [ownDocuments, setOwnDocuments] = useState<MemberDocument[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [message, setMessage] = useState("");
   const scrollRef = useRef<ScrollView>(null);
   useTabScrollToTop(scrollRef);
 
   const load = useCallback(async () => {
-    const [achievementResult, completenessResult, referenceResult, awardResult, prizeResult, standingResult, invoiceResult, teamResult] = await Promise.all([
+    const [achievementResult, completenessResult, referenceResult, awardResult, prizeResult, standingResult, invoiceResult, teamResult, documentResult] = await Promise.all([
       api.get<AchievementsMe>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } as AchievementsMe })),
       api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
       api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: EMPTY_REFERENCES })),
@@ -94,6 +97,7 @@ function OwnProfile() {
       api.get<ModerationStanding>("/moderation/me/standing").catch(() => ({ data: null })),
       api.get<{ summary?: InvoiceSummary; currency?: string }>("/account/invoices").catch(() => ({ data: { summary: null } as { summary?: InvoiceSummary; currency?: string } })),
       api.get<Team[]>("/teams/my").catch(() => ({ data: [] as Team[] })),
+      api.get<OwnDocuments>("/account/documents").catch(() => ({ data: null as OwnDocuments | null })),
     ]);
     setAchievements(achievementResult.data || { groups: [], awards: [] });
     setCompleteness(completenessResult.data || {});
@@ -103,6 +107,8 @@ function OwnProfile() {
     setStanding((standingResult.data as ModerationStanding | null) || null);
     setInvoices({ summary: invoiceResult.data?.summary || null, currency: invoiceResult.data?.currency });
     setTeams(Array.isArray(teamResult.data) ? teamResult.data : []);
+    // Die Zeile „Deine Unterlagen“ steht nur da, wenn die Vereinsakte eigene Schreiben liefert.
+    setOwnDocuments(documentResult.data?.available && Array.isArray(documentResult.data.documents) ? documentResult.data.documents : []);
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -163,6 +169,15 @@ function OwnProfile() {
         onPress={() => go("MyInvoices")}
         testID="profile-private-invoices"
       />
+      {ownDocuments.length ? (
+        <PrivateRow
+          icon="document-text-outline"
+          title="Deine Unterlagen"
+          detail={documentsLine(ownDocuments)}
+          onPress={() => go("MyDocuments")}
+          testID="profile-private-documents"
+        />
+      ) : null}
       <PrivateRow
         icon="gift-outline"
         title="Gewinne"
