@@ -121,6 +121,7 @@ TEMPLATE_CATEGORY = {
     "registration_approved": "tournament_updates",
     "registration_rejected": "tournament_updates",
     "checkin_closes_soon": "tournament_updates",
+    "checkin_closes_soon_on_site": "tournament_updates",
     "tournament_finished": "tournament_updates",
     "match_reminder": "match_reminders",
     "match_lead_10m": "match_reminders",

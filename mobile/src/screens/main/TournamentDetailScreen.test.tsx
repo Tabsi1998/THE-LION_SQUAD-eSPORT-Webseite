@@ -107,3 +107,25 @@ test("Kalender-Knopf nur, solange das Turnier nicht vorbei ist", async () => {
   await waitFor(() => expect(screen.getByText("LAN-Cup")).toBeTruthy());
   expect(screen.queryByTestId("add-to-calendar")).toBeNull();
 });
+
+// Vor-Ort-Turniere (#1135): die Turnierleitung checkt ein - kein „Jetzt einchecken“, sondern der Hinweis wie im Web.
+test("vor Ort: kein Check-in-Knopf, sondern „Check-in vor Ort bei der Turnierleitung“ mit Zeitfenster; online der Knopf", async () => {
+  const checkIn = {
+    ...TOURNAMENT, event_gate: null, status: "check_in", public_phase: { state: "check_in", label: "Check-in offen" },
+    check_in_from: "2026-11-14T17:00:00Z", check_in_until: "2026-11-14T17:45:00Z",
+    my_registration: { id: "reg-1", status: "approved", user_id: "u-1" },
+  };
+  answer({ ...checkIn, event_mode: "local" });
+  const view = await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("tournament-checkin-local")).toBeTruthy());
+  expect(screen.getByTestId("tournament-checkin-local")).toHaveTextContent(
+    "Check-in vor Ort bei der Turnierleitung · ab 14.11.2026, 18:00 bis 14.11.2026, 18:45",
+  );
+  expect(screen.queryByText("Jetzt einchecken")).toBeNull();
+  await view.unmount();
+
+  answer({ ...checkIn, event_mode: "online" });
+  await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("tournament-checkin")).toBeTruthy());
+  expect(screen.queryByTestId("tournament-checkin-local")).toBeNull();
+});

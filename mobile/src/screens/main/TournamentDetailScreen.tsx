@@ -120,7 +120,13 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const eventGate = tournament?.event_gate || null;
   const eventBlocked = Boolean(eventGate && !isTeamTournament && !eventGate.registered);
   const canSelfRegister = Boolean(!guest && !registered && registration.canRegister && !clubMemberBlocked && !eventBlocked);
-  const canCheckIn = Boolean(canManageOwnRegistration && ownRegistration?.status === "approved" && tournament?.status === "check_in");
+  // Vor Ort checkt die Turnierleitung ein (#1135) - wie im Web: kein Knopf, sondern der Hinweis mit dem Zeitfenster.
+  const staffOnlyCheckIn = String(tournament?.event_mode || "online") === "local";
+  const canCheckIn = Boolean(!staffOnlyCheckIn && canManageOwnRegistration && ownRegistration?.status === "approved" && tournament?.status === "check_in");
+  const checkInWindow = [
+    tournament?.check_in_from ? `ab ${formatDateTime(tournament.check_in_from)}` : "",
+    tournament?.check_in_until ? `bis ${formatDateTime(tournament.check_in_until)}` : "",
+  ].filter(Boolean).join(" ");
   const canSelfUnregister = Boolean(
     registered &&
       canManageOwnRegistration &&
@@ -325,7 +331,14 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                     {!ownRegistration?.price && tournament.offer && ownRegistration?.user_id === user?.id && ["pending", "waitlist"].includes(String(ownRegistration?.status || "")) ? (
                       <Muted>Bezahlt wird erst, wenn deine Teilnahme bestätigt ist.</Muted>
                     ) : null}
-                    {canCheckIn ? <Button label={busy ? "Check-in läuft ..." : "Jetzt einchecken"} onPress={checkIn} disabled={busy} /> : null}
+                    {canCheckIn ? <Button label={busy ? "Check-in läuft ..." : "Jetzt einchecken"} onPress={checkIn} disabled={busy} testID="tournament-checkin" /> : null}
+                    {staffOnlyCheckIn && (tournament.check_in_from || tournament.check_in_until) && ["approved", "checked_in"].includes(String(ownRegistration?.status || "")) ? (
+                      <Muted style={styles.checkInHint} testID="tournament-checkin-local">
+                        {ownRegistration?.status === "checked_in"
+                          ? "Eingecheckt – die Turnierleitung hat dich vor Ort eingetragen."
+                          : `Check-in vor Ort bei der Turnierleitung${checkInWindow ? ` · ${checkInWindow}` : ""}`}
+                      </Muted>
+                    ) : null}
                     {canSelfUnregister ? (
                       <Button label={busy ? "Wird abgemeldet ..." : "Vom Turnier abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
                     ) : (
@@ -886,6 +899,15 @@ function Bullet({ text, accent }: { text: string; accent?: boolean }) {
 }
 
 const styles = StyleSheet.create({
+  checkInHint: {
+    backgroundColor: "rgba(41,182,232,0.08)",
+    borderColor: "rgba(41,182,232,0.35)",
+    borderRadius: 8,
+    borderWidth: 1,
+    color: colors.white,
+    fontWeight: "800",
+    padding: 10,
+  },
   content: {
     gap: 14,
     padding: 18,

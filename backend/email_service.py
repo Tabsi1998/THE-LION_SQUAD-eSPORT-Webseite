@@ -226,6 +226,16 @@ def tpl_checkin_closes_soon(tournament_title: str, when: str, url: str) -> tuple
     )
 
 
+def tpl_checkin_closes_soon_on_site(tournament_title: str, when: str, url: str) -> tuple[str, str]:
+    # Vor Ort (#1135) checkt die Turnierleitung ein - kein Knopf „Jetzt einchecken“.
+    return f"Check-in endet bald: {tournament_title}", _wrap(
+        "Check-in endet bald",
+        f"<p>Du bist für <strong>{tournament_title}</strong> noch nicht eingecheckt.</p>"
+        f"<p>Bitte melde dich bis <strong>{when}</strong> vor Ort bei der Turnierleitung, wenn du mitspielst.</p>",
+        "Zum Turnier", url,
+    )
+
+
 def _station_hint(station: str = "") -> str:
     return f"<p>Station: <strong>{html_lib.escape(station)}</strong></p>" if station else ""
 
@@ -545,6 +555,7 @@ async def send_template(
         "registration_approved": tpl_registration_approved,
         "registration_rejected": tpl_registration_rejected,
         "checkin_closes_soon": tpl_checkin_closes_soon,
+        "checkin_closes_soon_on_site": tpl_checkin_closes_soon_on_site,
         "match_reminder": tpl_match_reminder,
         "score_reported": tpl_score_reported,
         "dispute_opened": tpl_dispute_opened,

@@ -28,6 +28,7 @@ from database import get_db
 from models import now_utc
 
 from services import event_days
+from services.tournament_rules import self_checkin_allowed
 
 logger = logging.getLogger("tls.discord.announce")
 
@@ -330,6 +331,9 @@ def thread_line(tournament: dict, status: str) -> str:
         return f"Die Anmeldung ist offen{f' – bis {until}' if until else ''}."
     if status == "check_in":
         until = vienna(tournament.get("check_in_until"))
+        if not self_checkin_allowed(tournament):
+            # Vor Ort (#1135) checkt die Turnierleitung ein - kein „Jetzt einchecken“.
+            return f"Check-in vor Ort: Bitte{f' bis {until}' if until else ''} bei der Turnierleitung melden."
         return f"Jetzt einchecken{f' – bis {until}' if until else ''}: auf der Turnierseite oder in der App."
     if status == "live":
         return "Das Turnier läuft. Das Bracket steht hier im Thread und wird nach jedem Ergebnis aktualisiert."
@@ -346,7 +350,7 @@ def tournament_buttons(tournament: dict, status: str) -> list[dict]:
     if status == "registration_open":
         return [{"label": "Zur Anmeldung", "url": base}]
     if status == "check_in":
-        return [{"label": "Zum Check-in", "url": base}]
+        return [{"label": "Zum Check-in" if self_checkin_allowed(tournament) else "Zum Turnier", "url": base}]
     return [{"label": "Bracket ansehen", "url": f"{base}/bracket"}]
 
 
@@ -354,6 +358,8 @@ def tournament_message(tournament: dict, status: str, *, game_name: str | None =
     """Die Turnier-Meldung je Statuswechsel - der Statuswechsel und die Vorschau bauen sie hiermit. Im Thread des
     Turniers (#572) kurz: Spiel, Format, Beschreibung und Bild stehen schon in der Ankündigung darüber."""
     spec = TOURNAMENT_STATUS.get(status) or {"label": status, "color": 0x29B6E8}
+    if status == "check_in" and not self_checkin_allowed(tournament):
+        spec = {**spec, "label": "Check-in vor Ort"}
     if in_thread:
         return {"event_key": f"tournament.{status}", "title": f"🏆 {tournament.get('title') or 'Turnier'} · {spec['label']}",
                 "description": thread_line(tournament, status), "color": spec["color"],

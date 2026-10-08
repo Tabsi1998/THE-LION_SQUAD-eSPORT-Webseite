@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 from database import get_db
 from services.match_audience import responsible_user_ids, users_for
 from services.notification_preferences import _site_base_url, send_user_template
+from services.tournament_rules import self_checkin_allowed
 from services.user_notifications import create_user_notification
 
 logger = logging.getLogger("tls.tournament_reminders")
@@ -37,6 +38,8 @@ CHECKIN_REMINDERS = [
     ReminderSpec(None, "open_now", "check_in_from", 0, 3),
     ReminderSpec("checkin_closes_soon", "closes_10m", "check_in_until", 10, 3),
 ]
+# Vor Ort checkt die Turnierleitung ein (#1135): dieselbe Erinnerung mit „vor Ort bei der Turnierleitung melden“.
+ON_SITE_MAIL = {"checkin_closes_soon": "checkin_closes_soon_on_site"}
 
 
 def _parse_dt(value: Any) -> datetime | None:
@@ -73,6 +76,28 @@ def due_checkin_reminders(tournament: dict, now: datetime) -> list[tuple[Reminde
         if abs(diff_minutes - spec.lead_minutes) <= spec.window_minutes:
             due.append((spec, target))
     return due
+
+
+def checkin_reminder_text(tournament: dict, label: str, target: datetime) -> tuple[str, str]:
+    """Titel und Text einer Check-in-Erinnerung. Vor Ort (#1135) checkt die Turnierleitung ein - die Nachricht sagt
+    dann, bis wann man sich dort meldet, statt zum Selbst-Check-in aufzufordern."""
+    title_text = tournament.get("title") or "Turnier"
+    on_site = not self_checkin_allowed(tournament)
+    until = _format_de_time(tournament.get("check_in_until"))
+    if label == "opens_10m":
+        if on_site:
+            return "Check-in startet gleich", f"{title_text}: Check-in vor Ort bei der Turnierleitung ab {_format_de_time(target)}."
+        return "Check-in startet gleich", f"{title_text}: Check-in startet um {_format_de_time(target)}."
+    if label == "open_now":
+        if on_site:
+            body = f"{title_text}: Check-in ist offen."
+            body += f" Bitte bis {until} vor Ort bei der Turnierleitung melden." if until else " Bitte vor Ort bei der Turnierleitung melden."
+            return "Check-in ist offen", body
+        body = f"{title_text}: Check-in ist jetzt offen."
+        return "Check-in ist offen", body + (f" Bitte bis {until} einchecken." if until else "")
+    if on_site:
+        return "Check-in endet bald", f"{title_text}: Bitte bis {_format_de_time(target)} vor Ort bei der Turnierleitung melden."
+    return "Check-in endet bald", f"{title_text}: Check-in endet um {_format_de_time(target)}."
 
 
 async def _unchecked_registration_users(tournament_id: str) -> list[dict]:
@@ -114,14 +139,17 @@ async def schedule_checkin_reminders(now: datetime | None = None) -> dict:
         slug_or_id = tournament.get("slug") or tournament["id"]
         public_path = f"/tournaments/{slug_or_id}"
         url = f"{base_url}{public_path}"
+        on_site = not self_checkin_allowed(tournament)
         for spec, target in due:
             due_count += 1
             target_iso = target.isoformat()
             for user in users:
                 dedupe_key = f"tournament_checkin:{tournament['id']}:{spec.label}:{target_iso}:{user['id']}"
                 if spec.mail_template:
+                    # Vor Ort (#1135): „Bitte bis … vor Ort bei der Turnierleitung melden“ - ohne „Jetzt einchecken“.
+                    template = ON_SITE_MAIL.get(spec.mail_template, spec.mail_template) if on_site else spec.mail_template
                     result = await send_user_template(
-                        user, spec.mail_template,
+                        user, template,
                         tournament_title=tournament.get("title") or "Turnier",
                         when=_format_de_time(target),
                         url=url,
@@ -140,19 +168,7 @@ async def schedule_checkin_reminders(now: datetime | None = None) -> dict:
                     {"_id": 1},
                 )
                 if not existing_notification:
-                    tournament_title = tournament.get("title") or "Turnier"
-                    if spec.label == "opens_10m":
-                        title = "Check-in startet gleich"
-                        body = f"{tournament_title}: Check-in startet um {_format_de_time(target)}."
-                    elif spec.label == "open_now":
-                        title = "Check-in ist offen"
-                        until = _format_de_time(tournament.get("check_in_until"))
-                        body = f"{tournament_title}: Check-in ist jetzt offen."
-                        if until:
-                            body += f" Bitte bis {until} einchecken."
-                    else:
-                        title = "Check-in endet bald"
-                        body = f"{tournament_title}: Check-in endet um {_format_de_time(target)}."
+                    title, body = checkin_reminder_text(tournament, spec.label, target)
                     created = await create_user_notification(
                         user["id"],
                         title=title,

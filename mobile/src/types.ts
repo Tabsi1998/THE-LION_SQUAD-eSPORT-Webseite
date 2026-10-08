@@ -97,6 +97,9 @@ export type Tournament = {
   registration_open_until?: string | null;
   check_in_from?: string | null;
   check_in_until?: string | null;
+  // Vor Ort (#1135) checkt die Turnierleitung ein - kein Knopf „Jetzt einchecken“, sondern der Hinweis.
+  event_mode?: "online" | "local" | "hybrid" | string | null;
+  self_checkin?: boolean;
   is_invite_only?: boolean;
   block_club_member_registration?: boolean;
   /** Turnier nur mit Event-Anmeldung (#875) - `event_gate` sagt, zu welchem Event und ob die ansehende Person dort angemeldet ist. */

@@ -10,6 +10,7 @@ from auth import get_current_user, get_optional_user
 from services.access_links import record_access_link_use, validate_access_link
 from services.match_audience import responsible_registration
 from services.registration_notifications import notify_registration_status
+from services.tournament_rules import self_checkin_allowed
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     PARTICIPANT_STAFF_ROLES,
@@ -832,7 +833,8 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
-    if (tournament.get("event_mode") or "online") == "local":
+    # Eine Prüfung für alle Stellen (#1135): Knopf, Startseite, Erinnerungen, Mail und Discord fragen dieselbe Regel.
+    if not self_checkin_allowed(tournament):
         raise HTTPException(status_code=403, detail="Bei Vor-Ort-Turnieren macht die Turnierleitung den Check-in.")
     try:
         async with mutation_lock(db, tournament_write_resource(tid)):

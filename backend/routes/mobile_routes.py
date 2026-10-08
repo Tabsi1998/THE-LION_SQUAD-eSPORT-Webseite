@@ -15,6 +15,7 @@ from auth import get_current_user, get_optional_user
 from database import get_db
 from models import new_id, now_utc
 from services.match_audience import acting_registration_ids
+from services.tournament_rules import self_checkin_allowed, tournament_event_mode
 from services.match_overview import operational_match_overviews, own_match_overviews
 from services.profile_references import personal_profile_references
 from services import event_days
@@ -292,6 +293,9 @@ async def _compact_tournament(tournament: dict, user: dict | None, registration:
         "registration_open_until": tournament.get("registration_open_until"),
         "check_in_from": tournament.get("check_in_from"),
         "check_in_until": tournament.get("check_in_until"),
+        # Vor Ort checkt die Turnierleitung ein (#1135) - Startseite und App fragen dieselbe Regel wie der Server.
+        "event_mode": tournament_event_mode(tournament),
+        "self_checkin": self_checkin_allowed(tournament),
         "max_participants": tournament.get("max_participants"),
         "participant_count": participant_count,
         "game_name": tournament.get("game_name"),
@@ -435,18 +439,34 @@ async def _my_event_registrations(user: dict) -> list[dict]:
     ).sort("created_at", -1).to_list(200)
 
 
+def _vienna_time(value) -> str:
+    """„18:30“ in Wiener Zeit - an einem anderen Tag mit Datum („Sa 14.11. 18:30“)."""
+    moment = _parse_dt(value)
+    if not moment:
+        return ""
+    local = moment.astimezone(LOCAL_TZ)
+    if local.date() == now_utc().astimezone(LOCAL_TZ).date():
+        return local.strftime("%H:%M")
+    weekday = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")[local.weekday()]
+    return f"{weekday} {local.strftime('%d.%m. %H:%M')}"
+
+
 def _dashboard_actions(tournaments: list[dict], events: list[dict], matches: list[dict]) -> list[dict]:
     actions = []
     for tournament in tournaments:
         reg = tournament.get("my_registration") or {}
         phase = tournament.get("public_phase") or {}
-        # Einchecken ist eine Aufgabe der Verantwortlichen (#1136) - nur sie sehen „Turnier Check-in offen“.
+        # Einchecken ist eine Aufgabe der Verantwortlichen (#1136) - nur sie sehen „Turnier Check-in offen“. Vor Ort
+        # checkt die Turnierleitung ein (#1135): dort steht statt der Aufforderung der Hinweis, sich zu melden.
         if phase.get("state") == "check_in" and reg.get("status") in {"approved", "registered"} and reg.get("can_act"):
+            on_site = tournament.get("self_checkin") is False
+            until = _vienna_time(tournament.get("check_in_until"))
             actions.append({
                 "id": f"tournament-checkin-{tournament.get('id')}",
-                "type": "tournament_checkin",
-                "label": "Turnier Check-in offen",
-                "detail": tournament.get("title"),
+                "type": "tournament_checkin_onsite" if on_site else "tournament_checkin",
+                "label": "Check-in vor Ort" if on_site else "Turnier Check-in offen",
+                "detail": (f"{tournament.get('title')} · bei der Turnierleitung melden" + (f", bis {until}" if until else ""))
+                if on_site else tournament.get("title"),
                 "target_type": "tournament",
                 "target_id": tournament.get("slug") or tournament.get("id"),
                 "priority": 10,
