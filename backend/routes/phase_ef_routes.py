@@ -17,6 +17,7 @@ Endpoints:
   GET  /api/admin/discord/counters                  — list users with counter
 """
 import html as html_lib
+import logging
 import re
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
@@ -27,6 +28,7 @@ from auth import require_area
 from models import now_utc, new_id
 from services.permissions import user_has_area
 from services.stream_visibility import homepage_visibility, reason_text
+from services.log_safe import log_safe
 
 
 # ============= Streams (public + admin) =============
@@ -297,7 +299,7 @@ async def _evaluate_discord_counter(user_id: str):
         from badges import evaluate_user_progress
         await evaluate_user_progress(user_id)
     except Exception:
-        pass
+        logging.getLogger("tls.discord").warning("[achievements] Discord-Zähler von %s nicht ausgewertet", log_safe(user_id), exc_info=True)
 
 
 async def _discord_counter_projection(db, user_id: str):

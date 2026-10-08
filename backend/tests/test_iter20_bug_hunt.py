@@ -19,8 +19,8 @@ def _load_backend_url():
             for line in f:
                 if line.startswith("REACT_APP_BACKEND_URL="):
                     return line.split("=", 1)[1].strip().rstrip("/")
-    except Exception:
-        pass
+    except (OSError, UnicodeDecodeError):
+        pass  # keine lesbare .env im Container: dann gilt die lokale Adresse unten
     return "http://localhost:8001"
 
 BASE_URL = _load_backend_url()

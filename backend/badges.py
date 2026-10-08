@@ -46,7 +46,7 @@ async def seed_badges():
             await db.badges.drop()
             await db.user_badges.drop()
         except Exception:
-            pass
+            logger.warning("[achievements] Alte Sammlungen badges/user_badges nicht gelöscht", exc_info=True)
         await db.settings.update_one(
             {"id": "achievements_v4_migrated"},
             {"$set": {"id": "achievements_v4_migrated", "migrated_at": now_utc().isoformat()}},
@@ -311,7 +311,7 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
                 since = since.replace(tzinfo=timezone.utc)
             membership_days = max((datetime.now(timezone.utc) - since).days, 1)
         except (ValueError, TypeError):
-            pass
+            pass  # unlesbares Beitrittsdatum: dann bleibt es bei 0 Tagen von oben
     p["membership_days"] = membership_days
 
     if "event_registrations" in await db.list_collection_names():

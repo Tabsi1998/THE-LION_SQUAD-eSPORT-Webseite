@@ -472,13 +472,15 @@ class BotRunner:
             try:
                 await client.close()
             except Exception:
-                pass
+                logger.debug("[discord-bot] Verbindung ließ sich beim Stoppen nicht sauber schließen", exc_info=True)
         if task is not None and not task.done():
             task.cancel()
             try:
                 await task
-            except (asyncio.CancelledError, Exception):
-                pass
+            except asyncio.CancelledError:
+                pass  # so gewollt: der Lauf wurde eben abgebrochen
+            except Exception:
+                logger.debug("[discord-bot] Lauf endete beim Stoppen mit einem Fehler", exc_info=True)
 
     async def apply_settings(self) -> bool:
         """Nach einer Änderung im Admin: neu starten oder anhalten."""

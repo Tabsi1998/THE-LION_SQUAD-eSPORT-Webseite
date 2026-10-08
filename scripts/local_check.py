@@ -795,7 +795,7 @@ def write_progress(planned: list, results: list, current, started: str, finished
         temporary.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         os.replace(temporary, STATE / PROGRESS)
     except OSError:
-        pass
+        pass  # the progress file only feeds the dashboard; the check goes on without it
 
 
 def execute(steps: list, context: Context) -> list:
@@ -854,7 +854,7 @@ def main(argv: list | None = None) -> int:
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
-            pass
+            pass  # a stream that cannot be reconfigured keeps its encoding
     parser = argparse.ArgumentParser(description=f"Run every check for {ROOT.name} on this computer.")
     parser.add_argument("--only", help="comma-separated groups: " + ", ".join(GROUPS))
     parser.add_argument("--all", action="store_true", help="include the extra group, which GitHub does not run")
@@ -1427,7 +1427,7 @@ def tear_down(context: Context) -> None:
         try:
             compose(context, "down", "--volumes", "--remove-orphans", check=False, timeout=1200)
         except (StepFailed, StepSkipped):
-            pass
+            pass  # tearing down is cleanup; its failure must not hide the result of the checks
     stop_everything(context)
 
 

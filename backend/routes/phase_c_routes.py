@@ -7,6 +7,7 @@ Endpoints:
   PATCH /api/membership/applications/{id}        — admin approve/reject
 """
 import html
+import logging
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field, field_validator
@@ -18,8 +19,10 @@ from models import now_utc, new_id
 from badges import compute_profile_completeness, PROFILE_FIELDS, evaluate_user_progress
 from services import dolibarr_applications, membership_fees, membership_invitations
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings as load_dolibarr_settings
+from services.log_safe import log_safe
 
 router = APIRouter(prefix="/api", tags=["phase-c"])
+logger = logging.getLogger("tls.membership")
 
 
 def _html(value: object) -> str:
@@ -274,7 +277,7 @@ async def membership_apply(body: ApplyBody, me: dict = Depends(get_current_user)
             if a.get("email"):
                 await enqueue_mail(to=a["email"], subject=subj, html=html)
     except Exception:
-        pass
+        logger.warning("[membership] Mail an den Vorstand zur neuen Bewerbung fehlgeschlagen", exc_info=True)
     doc.pop("_id", None)
     return doc
 
@@ -457,7 +460,7 @@ async def admin_decide_application(app_id: str, body: DecisionBody,
             if email_allowed(u, tpl_key, "membership_updates"):
                 await enqueue_mail(to=u["email"], subject=subj, html=html)
     except Exception:
-        pass
+        logger.warning("[membership] Mail zur Entscheidung über Bewerbung %s fehlgeschlagen", log_safe(app_id), exc_info=True)
 
     await db.audit_logs.insert_one({
         "id": new_id(),

@@ -738,7 +738,7 @@ def _upload_status() -> dict:
             try:
                 (path / ".tls-write-test").unlink(missing_ok=True)
             except Exception:
-                pass
+                logger.debug("upload directory probe cleanup failed for %s", label, exc_info=True)
         exists = path.exists() and path.is_dir()
         writable = os.access(path, os.W_OK) if exists else False
         write_test = exists and not error

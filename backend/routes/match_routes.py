@@ -417,7 +417,7 @@ async def _refresh_schedule_escalation(match: dict, collection: str) -> dict:
             )
             match["schedule_status"] = "escalated"
     except Exception:
-        pass
+        logger.warning("[match] Terminfrist von %s nicht geprüft", _log_safe(match.get("id")), exc_info=True)
     return match
 
 
@@ -845,12 +845,12 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
         try:
             await _notify_match_chat_message(db, match, collection, me, doc)
         except Exception:
-            pass
+            logger.warning("[match] Chat-Benachrichtigung zu %s fehlgeschlagen", _log_safe(match_id), exc_info=True)
     try:
         from badges import evaluate_user_progress
         await evaluate_user_progress(me["id"])
     except Exception:
-        pass
+        logger.warning("[achievements] Chatnachricht in %s nicht ausgewertet", _log_safe(match_id), exc_info=True)
     doc.pop("_id", None)
     doc["author"] = {
         "id": me.get("id"),
@@ -1078,7 +1078,7 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
         from badges import on_dispute_opened
         await on_dispute_opened(me["id"], match_id=match_id)
     except Exception:
-        pass
+        logger.warning("[achievements] Dispute in %s nicht ausgewertet", _log_safe(match_id), exc_info=True)
     m["idempotent_replay"] = False
     return m
 

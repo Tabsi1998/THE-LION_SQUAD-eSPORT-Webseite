@@ -127,7 +127,7 @@ def membership_text(membership: dict | None, base_url: str = "", today: str | No
         try:
             ends = date.fromisoformat(ends).strftime("%d.%m.%Y")
         except ValueError:
-            pass
+            pass  # kein gültiges Datum: dann steht es da, wie Dolibarr es liefert
         return f"Deine Mitgliedschaft ist am {ends} ausgelaufen. Wieder Mitglied werden: {base_url}{APPLY_PATH}"
     return f"Du bist (noch) kein Vereinsmitglied. Mitglied werden: {base_url}{APPLY_PATH}"
 

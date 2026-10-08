@@ -1,4 +1,5 @@
 """Authentication routes."""
+import logging
 import os
 import secrets
 from urllib.parse import quote
@@ -25,8 +26,10 @@ from services.google_identity import GoogleIdentityError, verify_google_credenti
 from services.secret_store import decrypt_secret, encrypt_secret
 from services.totp import generate_recovery_codes, generate_totp_secret, provisioning_uri, verify_totp
 from services.return_path import safe_next_path
+from services.log_safe import log_safe
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+logger = logging.getLogger("tls.auth")
 
 BRUTE_FORCE_MAX = 7
 BRUTE_FORCE_WINDOW_MIN = 15
@@ -1057,7 +1060,7 @@ async def me(request: Request, response: Response, user: dict | None = Depends(g
             from services import xp
             await xp.daily_login_once(user["id"])
         except Exception:
-            pass
+            logger.warning("[xp] Tagesbonus für die Anmeldung von %s nicht vergeben", log_safe(user.get("id")), exc_info=True)
     return user
 
 

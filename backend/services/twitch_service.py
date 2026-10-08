@@ -93,7 +93,7 @@ async def _get_app_token(creds: dict) -> tuple[str | None, str]:
             if exp > datetime.now(timezone.utc):
                 return decrypt_secret(cached["access_token"]), ""
         except Exception:
-            pass
+            logger.debug("[twitch] gespeicherter Token unbrauchbar - es wird ein neuer geholt", exc_info=True)
     async with httpx.AsyncClient(timeout=10) as cli:
         r = await cli.post(TWITCH_TOKEN_URL, params={
             "client_id": creds["client_id"],

@@ -129,13 +129,13 @@ def cleanup(admin):
     for tid in _created_tournaments:
         try:
             admin.delete(f"{BASE}/api/tournaments/{tid}")
-        except Exception:
-            pass
+        except requests.RequestException:
+            pass  # Aufräumen nach dem Lauf: antwortet der Server nicht, bleibt der Testrest liegen
     for eid in _created_entries:
         try:
             admin.delete(f"{BASE}/api/seasons/v2/entry/{eid}")
-        except Exception:
-            pass
+        except requests.RequestException:
+            pass  # wie oben
 
 
 def _mk_tournament(admin, game_id, extra=None):

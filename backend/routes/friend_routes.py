@@ -1,4 +1,6 @@
 """Friendship routes for account-to-account connections."""
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user
@@ -9,8 +11,10 @@ from services.moderation import interaction_is_blocked
 from services.user_notifications import create_user_notification
 
 from services.change_events import publish_user_change
+from services.log_safe import log_safe
 
 router = APIRouter(prefix="/api/friends", tags=["friends"])
+logger = logging.getLogger("tls.friends")
 
 
 def _label(user: dict | None) -> str:
@@ -151,13 +155,13 @@ async def accept_friend(friendship_id: str, me: dict = Depends(get_current_user)
         await xp.grant(me["id"], "friend", friendship_id)
         await xp.grant(row["requester_id"], "friend", friendship_id)
     except Exception:
-        pass
+        logger.warning("[xp] XP für die Freundschaft %s nicht vergeben", log_safe(friendship_id), exc_info=True)
     try:
         from badges import evaluate_user_progress
         await evaluate_user_progress(me["id"], {"community", "friend"})
         await evaluate_user_progress(row["requester_id"], {"community", "friend"})
     except Exception:
-        pass
+        logger.warning("[achievements] Freundschaft %s nicht ausgewertet", log_safe(friendship_id), exc_info=True)
     return {"ok": True}
 
 

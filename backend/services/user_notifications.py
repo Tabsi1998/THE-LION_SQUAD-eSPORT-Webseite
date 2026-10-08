@@ -1,4 +1,5 @@
 """Small helpers for in-app user notifications."""
+import logging
 import os
 from typing import Any
 from datetime import timedelta
@@ -6,6 +7,9 @@ from datetime import timedelta
 from database import get_db
 from models import new_id, now_utc
 from services.notification_preferences import NOTIFICATION_KIND_CATEGORY, discord_allowed, notification_allowed, push_allowed
+from services.log_safe import log_safe
+
+logger = logging.getLogger("tls.notifications")
 
 
 DEFAULT_COOLDOWN_SECONDS = {
@@ -146,7 +150,7 @@ async def create_user_notification(
             {"$set": {"push_sent_count": push_sent_count, "push_sent_at": doc["push_sent_at"]}},
         )
     except Exception:
-        pass
+        logger.warning("[push] Push zur Benachrichtigung %s fehlgeschlagen", log_safe(doc["id"]), exc_info=True)
     # Discord als persönlicher Kanal (#567): Direktnachricht vom Bot - nur mit Opt-in und verknüpftem Konto.
     try:
         discord_sent = 0

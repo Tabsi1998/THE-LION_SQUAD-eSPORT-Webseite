@@ -306,7 +306,7 @@ async def _apply_late_checkin_hooks(db, tid: str, user_id: str) -> None:
                         {"tournament_id": tid, "reason": "late_checkin",
                          "minutes_late": int((now - cutoff_dt).total_seconds() / 60)})
     except Exception:
-        pass
+        logger.warning("[achievements] Später Check-in in %s nicht ausgewertet", _log_safe(tid), exc_info=True)
 
 
 async def _apply_checked_in_badges(user_id: str, tid: str) -> None:
@@ -314,7 +314,7 @@ async def _apply_checked_in_badges(user_id: str, tid: str) -> None:
         from badges import on_checked_in
         await on_checked_in(user_id, tid)
     except Exception:
-        pass
+        logger.warning("[achievements] Check-in in %s nicht ausgewertet", _log_safe(tid), exc_info=True)
 
 
 # --- Registrations ---
@@ -491,7 +491,7 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
         from badges import on_tournament_registered
         await on_tournament_registered(me["id"], tid)
     except Exception:
-        pass
+        logger.warning("[achievements] Anmeldung zu %s nicht ausgewertet", _log_safe(tid), exc_info=True)
     if register_access:
         await record_access_link_use(db, register_access, me)
     return reg

@@ -1,6 +1,7 @@
 """F1 Fast Lap Challenge routes."""
 import io
 import csv
+import logging
 from datetime import datetime
 from urllib.parse import quote, urlencode
 from fastapi import APIRouter, HTTPException, Depends
@@ -13,6 +14,7 @@ from services.visibility import lead_can_see
 from services.access_links import public_access_link_payload, touch_access_link, validate_access_link
 from services.public_phase import derive_public_phase
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
+from services.log_safe import log_safe
 from models import (
     F1ChallengeCreate, F1ChallengeUpdate, F1TrackCreate, F1TrackUpdate,
     F1LapTimeCreate, F1LapTimeUpdate,
@@ -46,6 +48,7 @@ def _max_attempts(challenge: dict) -> int | None:
 
 
 router = APIRouter(prefix="/api/f1", tags=["f1"])
+logger = logging.getLogger("tls.f1")
 # Fast-Lap-Zeiten für alle Challenges: Turnierleitung, Club-Admin, Superadmin; sonst nur mit Einsatz
 # in der Challenge (f1_staff_assignments).
 STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
@@ -545,7 +548,7 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
         try:
             await _award_f1_season_points(c)
         except Exception:
-            pass
+            logger.warning("[f1] Saisonpunkte für %s nicht vergeben", log_safe(cid), exc_info=True)
     prize_status = c.get("status") in {"completed", "results_published", "archived"}
     should_create_prizes = prize_status and (
         existing.get("status") != c.get("status") or "prize_places" in updates
@@ -555,7 +558,7 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
             from services.prize_service import auto_create_for_f1_challenge
             await auto_create_for_f1_challenge(c["id"])
         except Exception:
-            pass
+            logger.warning("[f1] Preise für %s nicht angelegt", log_safe(cid), exc_info=True)
     return c
 
 
@@ -848,14 +851,14 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_curre
                     buttons=message["buttons"],
                 )
         except Exception:
-            pass
+            logger.warning("[f1] Discord-Meldung zur Bestzeit in %s fehlgeschlagen", log_safe(cid), exc_info=True)
     # Badge trigger
     if score_scope != "club_reference":
         try:
             from badges import on_lap_submitted
             await on_lap_submitted(body.user_id, cid, body.track_id, was_new_leader, body.is_invalid)
         except Exception:
-            pass
+            logger.warning("[achievements] Rundenzeit in %s nicht ausgewertet", log_safe(cid), exc_info=True)
     return doc
 
 
