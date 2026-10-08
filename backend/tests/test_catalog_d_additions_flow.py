@@ -73,6 +73,8 @@ async def test_board_days_from_dolibarr_and_from_a_manual_seat(flow):
     admin = await flow.add_user(role="superadmin", name="vorstand")
     flow.act_as(admin)
     await flow.db.board_positions.insert_one({"id": "p1", "slug": "kassier", "title_male": "Kassier", "is_active": True, "order_index": 2})
+    # Besetzt werden Posten nur mit Vereinsmitgliedern (#1355).
+    await flow.db.memberships.insert_one({"user_id": max_["id"], "member_status": "active", "source": "website"})
     assigned = await flow.put("/api/board/p1", json={"user_id": max_["id"]})
     assert assigned.status_code == 200, assigned.text
     seat = await flow.db.board_positions.find_one({"id": "p1"}, {"_id": 0})

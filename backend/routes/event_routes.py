@@ -7,6 +7,7 @@ from urllib.parse import quote, urlencode
 from database import get_db
 from auth import require_admin, get_optional_user, get_current_user
 from services.visibility import user_can_see
+from services.visibility import lead_can_see
 from services.access_links import public_access_link_payload, touch_access_link, validate_access_link
 from services.content_embed_service import resolve_content_embeds
 from services.public_phase import derive_public_phase
@@ -19,6 +20,7 @@ from services.slug_utils import apply_slug_history, find_by_slug_or_history, slu
 from services import billing_orders, event_days, event_locations, event_registration, pricing
 from services.event_registration import RegistrationError
 from services.permissions import areas_for, user_has_area
+from services.permissions import is_tournament_lead
 from models import EventCreate, EventUpdate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -34,9 +36,15 @@ async def _user_can_see(user: dict | None, visibility: str) -> bool:
     return await user_can_see(user, visibility)
 
 
+async def _lead_can_see(user: dict | None, visibility: str) -> bool:
+    """Events, Turniere und Fast Laps sieht die Turnierleitung auch mit „Nur Mitglieder“ (#1350) - sie legt sie an und
+    checkt ein. Alben und News am Event folgen weiter der Regel für Mitglieder-Inhalte."""
+    return await lead_can_see(user, visibility)
+
+
 async def _filter_related(items: list[dict], user: dict | None, kind: str, access: str | None = None) -> list[dict]:
     out: list[dict] = []
-    is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    is_staff = is_tournament_lead(user)
     db = get_db()
     target_type = "fastlap" if kind == "fastlap" else kind
     for item in items:
@@ -46,7 +54,7 @@ async def _filter_related(items: list[dict], user: dict | None, kind: str, acces
             continue
         if kind == "tournament" and item.get("is_public") is False and not (is_staff or has_access):
             continue
-        if has_access or await _user_can_see(user, item.get("visibility") or "public"):
+        if has_access or await _lead_can_see(user, item.get("visibility") or "public"):
             phase_kind = "f1" if kind == "fastlap" else kind
             item["public_phase"] = derive_public_phase(item, phase_kind)
             if access_link:
@@ -403,7 +411,7 @@ async def _attach_event_registration_view(event: dict, user: dict | None) -> Non
     App liest `participant_view` und `can_check_in`, statt Rollen selbst zu deuten.
     """
     db = get_db()
-    is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    is_staff = is_tournament_lead(user)
     areas = await areas_for(user) if user else set()
     manages = is_staff or bool(areas & {"tournaments", "club"})
     sees_price = is_staff or "finance" in areas
@@ -496,7 +504,7 @@ async def list_events(
     user: dict | None = Depends(get_optional_user),
 ):
     db = get_db()
-    is_admin = user and user.get("role") in STAFF_ROLES
+    is_admin = is_tournament_lead(user)
     q: dict = {}
     if status:
         if status == "draft" and not (include_drafts and is_admin):
@@ -533,7 +541,7 @@ async def list_events(
     out = []
     finance = bool(user) and await user_has_area(user, "finance")
     for ev in events:
-        if await _user_can_see(user, ev.get("visibility") or "public"):
+        if await _lead_can_see(user, ev.get("visibility") or "public"):
             # Preisangabe für alle, die Konfiguration mit Dolibarr-Nummern nur für Finanzen (#322).
             offer = ev.pop("billing", None)
             ev["offer"] = pricing.public_offer(offer)
@@ -594,12 +602,12 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     event, was_old_slug = await _find_event(slug_or_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
-    is_admin = user and user.get("role") in STAFF_ROLES
+    is_admin = is_tournament_lead(user)
     access_link = await validate_access_link(db, access, "event", event["id"], user, "view")
     has_access = bool(access_link)
     if event.get("status") == "draft" and not (is_admin or has_access):
         raise HTTPException(404, "Event nicht gefunden.")
-    if not has_access and not await _user_can_see(user, event.get("visibility") or "public"):
+    if not has_access and not await _lead_can_see(user, event.get("visibility") or "public"):
         raise HTTPException(403, "Event ist nicht sichtbar.")
     if was_old_slug and event.get("slug"):
         suffix = f"?{urlencode({'access': access})}" if access else ""

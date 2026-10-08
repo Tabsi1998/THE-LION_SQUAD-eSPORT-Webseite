@@ -6,7 +6,6 @@ import { isGoogleMeasurementId } from "@/lib/analyticsConfig";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useImageUploadBusy } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useAuth } from "@/context/AuthContext";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
@@ -40,11 +39,6 @@ export default function AdminSettingsPage() {
   const [queue, setQueue] = useState([]);
   const [queueStats, setQueueStats] = useState(null);
   const [queueFilter, setQueueFilter] = useState("");
-  const [newsletterSources, setNewsletterSources] = useState({ news: [], events: [] });
-  const [newsletter, setNewsletter] = useState({ kind: "news", id: "", force: false });
-  const [newsletterPreview, setNewsletterPreview] = useState(null);
-  const [loadingNewsletterPreview, setLoadingNewsletterPreview] = useState(false);
-  const [sendingNewsletter, setSendingNewsletter] = useState(false);
   const [brand, setBrand] = useState({
     club_name: "", tagline: "", site_title: "THE LION SQUAD - eSPORTS", site_description: "", primary_color: "#29B6E8",
     logo_url: "", logo_light_url: "", logo_dark_url: "", share_banner_url: "", mascot_url: "", qr_logo_url: "",
@@ -169,24 +163,6 @@ export default function AdminSettingsPage() {
   // alle 15 s nachfragen, sonst nur bei Änderung.
   const liveTab = tab === "queue";
   useLiveRefresh(load, ["settings", "users"], { fallbackMs: liveTab ? 15000 : 0 });
-
-  const loadNewsletterSources = useCallback(async () => {
-    const [newsRes, eventsRes] = await Promise.allSettled([
-      api.get("/admin/news"),
-      api.get("/events?include_drafts=true"),
-    ]);
-    const news = newsRes.status === "fulfilled" && Array.isArray(newsRes.value.data) ? newsRes.value.data : [];
-    const events = eventsRes.status === "fulfilled" && Array.isArray(eventsRes.value.data) ? eventsRes.value.data : [];
-    setNewsletterSources({ news, events });
-    setNewsletter((prev) => {
-      const options = prev.kind === "event" ? events : news;
-      if (prev.id && options.some((item) => item.id === prev.id || item.slug === prev.id)) return prev;
-      return { ...prev, id: options[0]?.id || "" };
-    });
-  }, []);
-
-  useEffect(() => { loadNewsletterSources(); }, [loadNewsletterSources]);
-  useApiInvalidation(loadNewsletterSources, ["news", "events"]);
 
   useEffect(() => {
     if (liveTab) load();
@@ -398,37 +374,6 @@ export default function AdminSettingsPage() {
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
-  const previewNewsletter = async () => {
-    if (!newsletter.id) return toast.error("News oder Event auswählen.");
-    setLoadingNewsletterPreview(true);
-    try {
-      const { data } = await api.post("/settings/newsletter/preview", newsletter);
-      setNewsletterPreview(data);
-      toast.success(`${data.recipients || 0} Empfänger gefunden.`);
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Newsletter-Vorschau fehlgeschlagen."); }
-    finally { setLoadingNewsletterPreview(false); }
-  };
-  const sendNewsletter = async () => {
-    if (!newsletter.id) return toast.error("News oder Event auswählen.");
-    if (!await confirm({
-      title: "Newsletter versenden?",
-      description: newsletter.force
-        ? "Der Newsletter wird erneut eingereiht, auch wenn er bereits versendet wurde."
-        : "Der Newsletter wird an alle passenden Opt-in-Empfänger eingereiht. Bereits versendete Quellen werden geschützt.",
-      confirmLabel: "Versand einreihen",
-      tone: "info",
-    })) return;
-    setSendingNewsletter(true);
-    try {
-      const { data } = await api.post("/settings/newsletter/send", newsletter);
-      setNewsletterPreview((prev) => ({ ...(prev || {}), ...data }));
-      if (data.skipped) toast.error("Newsletter wurde bereits versendet. Für erneuten Versand 'erneut senden' aktivieren.");
-      else toast.success(`${data.queued || 0} Newsletter-Mails eingereiht.`);
-      load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Newsletter-Versand fehlgeschlagen."); }
-    finally { setSendingNewsletter(false); }
-  };
-
   const saveSmtp = async () => {
     if (savingSmtp) return;
     const payload = smtpPayload(smtp);
@@ -501,21 +446,21 @@ export default function AdminSettingsPage() {
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const processQueueNow = async () => {
-    try { const { data } = await api.post("/settings/mail-queue/process"); toast.success(`Queue verarbeitet: ${data.sent}/${data.processed} gesendet${data.recovered ? `, ${data.recovered} wiederhergestellt` : ""}`); load(); }
+    try { const { data } = await api.post("/settings/mail-queue/process"); toast.success(`Warteschlange abgearbeitet: ${data.sent || 0} von ${data.processed || 0} gesendet${data.recovered ? `, ${data.recovered} hängende neu angestoßen` : ""}.`); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const recoverQueue = async () => {
-    try { const { data } = await api.post("/settings/mail-queue/recover"); toast.success(`${data.recovered || 0} hängende Jobs wiederhergestellt.`); load(); }
+    try { const { data } = await api.post("/settings/mail-queue/recover"); toast.success(data.recovered ? `${data.recovered} hängende ${data.recovered === 1 ? "Mail" : "Mails"} neu angestoßen.` : "Keine Mail hängt."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const retryFailedQueue = async () => {
     if (!await confirm({
-      title: "Fehlgeschlagene Mails neu einreihen?",
-      description: "Alle fehlgeschlagenen Mail-Jobs werden auf pending gesetzt und beim nächsten Queue-Lauf erneut versucht.",
-      confirmLabel: "Neu einreihen",
+      title: "Alle fehlgeschlagenen Mails nochmal versuchen?",
+      description: "Alle fehlgeschlagenen Mails gehen zurück in die Warteschlange und werden beim nächsten Lauf neu versucht. Gesendete Mails bleiben, wie sie sind.",
+      confirmLabel: "Nochmal versuchen",
       tone: "info",
     })) return;
-    try { const { data } = await api.post("/settings/mail-queue/retry-failed"); toast.success(`${data.queued || 0} Jobs neu eingereiht.`); load(); }
+    try { const { data } = await api.post("/settings/mail-queue/retry-failed"); toast.success(data.queued ? `${data.queued} ${data.queued === 1 ? "Mail ist" : "Mails sind"} wieder in der Warteschlange.` : "Keine fehlgeschlagene Mail da."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const cleanupQueue = async () => {
@@ -525,20 +470,23 @@ export default function AdminSettingsPage() {
       confirmLabel: "Aufräumen",
       tone: "info",
     })) return;
-    try { const { data } = await api.delete("/settings/mail-queue/cleanup?days=30"); toast.success(`${data.deleted || 0} alte Jobs gelöscht.`); load(); }
+    try { const { data } = await api.delete("/settings/mail-queue/cleanup?days=30"); toast.success(`${data.deleted || 0} alte Einträge gelöscht.`); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
+  // #1361: „Nochmal versuchen“ gibt es nur bei fehlgeschlagenen Mails; der Server lehnt alles andere mit einem Satz ab.
   const retryJob = async (id) => {
-    try { await api.post(`/settings/mail-queue/${id}/retry`); toast.success("Job neu eingereiht."); load(); }
-    catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    try { await api.post(`/settings/mail-queue/${id}/retry`); toast.success("Die Mail ist wieder in der Warteschlange."); load(); }
+    catch (e) { toast.error(formatApiError(e.response?.data?.detail)); load(); }
   };
-  const deleteJob = async (id) => {
+  const deleteJob = async (job) => {
     if (!await confirm({
-      title: "Mail-Job löschen?",
-      description: "Der Queue-Eintrag wird entfernt und nicht mehr versendet.",
+      title: "Mail aus der Warteschlange löschen?",
+      description: job?.status === "pending"
+        ? "Die Mail wartet noch auf den Versand – gelöscht geht sie nicht mehr hinaus."
+        : "Der Eintrag verschwindet aus der Warteschlange. Eine gesendete Mail bleibt gesendet.",
       confirmLabel: "Löschen",
     })) return;
-    try { await api.delete(`/settings/mail-queue/${id}`); toast.success("Job gelöscht."); load(); }
+    try { await api.delete(`/settings/mail-queue/${job.id}`); toast.success("Gelöscht."); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
 
@@ -547,8 +495,6 @@ export default function AdminSettingsPage() {
   const emailNotConfigured = !email.resend_api_key_masked && !mailViaSmtp;
   const filteredQueue = queue.filter((j) => !queueFilter || j.status === queueFilter);
   const queueCounts = queueStats?.counts || {};
-  const newsletterOptions = newsletter.kind === "event" ? newsletterSources.events : newsletterSources.news;
-  const selectedNewsletterSource = newsletterOptions.find((item) => item.id === newsletter.id || item.slug === newsletter.id);
   const publicDomain = (() => {
     const raw = String(brand.domain || "https://lionsquad.at").trim().replace(/\/+$/, "");
     if (!raw) return "https://lionsquad.at";
@@ -600,7 +546,7 @@ export default function AdminSettingsPage() {
 
       {tab === "smtp" && <SmtpSection user={user} smtp={smtp} setSmtp={setSmtp} smtpTestEmail={smtpTestEmail} setSmtpTestEmail={setSmtpTestEmail} smtpDiag={smtpDiag} smtpDeliverability={smtpDeliverability} savingSmtp={savingSmtp} saveSmtp={saveSmtp} clearSmtpSecret={clearSmtpSecret} applySubmissionPreset={applySubmissionPreset} applyLocalIpPreset={applyLocalIpPreset} sendSmtpTest={sendSmtpTest} diagnoseSmtp={diagnoseSmtp} checkDeliverability={checkDeliverability} />}
 
-      {tab === "newsletter" && <NewsletterSection user={user} newsletterSources={newsletterSources} newsletter={newsletter} setNewsletter={setNewsletter} newsletterPreview={newsletterPreview} setNewsletterPreview={setNewsletterPreview} loadingNewsletterPreview={loadingNewsletterPreview} sendingNewsletter={sendingNewsletter} loadNewsletterSources={loadNewsletterSources} previewNewsletter={previewNewsletter} sendNewsletter={sendNewsletter} newsletterOptions={newsletterOptions} selectedNewsletterSource={selectedNewsletterSource} />}
+      {tab === "newsletter" && <NewsletterSection />}
 
       {tab === "queue" && <MailQueueSection queue={queue} queueStats={queueStats} queueFilter={queueFilter} setQueueFilter={setQueueFilter} processQueueNow={processQueueNow} recoverQueue={recoverQueue} retryFailedQueue={retryFailedQueue} cleanupQueue={cleanupQueue} retryJob={retryJob} deleteJob={deleteJob} filteredQueue={filteredQueue} queueCounts={queueCounts} />}
 

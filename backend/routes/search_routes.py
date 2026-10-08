@@ -4,9 +4,11 @@ from fastapi import APIRouter, Depends, Query
 
 from auth import get_optional_user
 from database import get_db
+from services.permissions import is_tournament_lead
 from models import now_utc
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
+from services.visibility import lead_can_see
 from services.query_filters import safe_regex
 
 router = APIRouter(prefix="/api/search", tags=["search"])
@@ -52,11 +54,11 @@ async def _search_tournaments(db, pattern: str, user: dict | None, limit: int) -
         {"_id": 0, "id": 1, "title": 1, "slug": 1, "description": 1, "status": 1, "visibility": 1, "is_public": 1, "start_date": 1, "banner_url": 1},
     ).sort("created_at", -1).to_list(limit * 3)
     out = []
-    is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    is_staff = is_tournament_lead(user)
     for row in rows:
         if not is_staff and (row.get("status") == "draft" or row.get("is_public") is False):
             continue
-        if not await user_can_see(user, row.get("visibility") or "public"):
+        if not await lead_can_see(user, row.get("visibility") or "public"):
             continue
         phase = derive_public_phase(row, "tournament")
         out.append(_result(
@@ -84,11 +86,11 @@ async def _search_events(db, pattern: str, user: dict | None, limit: int) -> lis
         {"_id": 0, "id": 1, "name": 1, "slug": 1, "description": 1, "status": 1, "visibility": 1, "start_date": 1, "banner_url": 1},
     ).sort("start_date", -1).to_list(limit * 3)
     out = []
-    is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    is_staff = is_tournament_lead(user)
     for row in rows:
         if row.get("status") == "draft" and not is_staff:
             continue
-        if not await user_can_see(user, row.get("visibility") or "public"):
+        if not await lead_can_see(user, row.get("visibility") or "public"):
             continue
         phase = derive_public_phase(row, "event")
         out.append(_result(

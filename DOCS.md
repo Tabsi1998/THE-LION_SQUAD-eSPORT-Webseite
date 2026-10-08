@@ -28,7 +28,7 @@ Was die Funktionen können und was ihr dafür einrichtet – zum Durchlesen, ohn
 | [LIVE_TESTS](LIVE_TESTS.md) | Tests auf einem ausgewählten Teststack |
 | [SECURITY](SECURITY.md) | Sicherheitsmodell und Meldung von Schwachstellen |
 | [DATA_PROTECTION](DATA_PROTECTION.md) | Daten, Löschung und Betreiberpflichten |
-| [ROLE_AUDIT](ROLE_AUDIT.md) | Rollen und Berechtigungsprüfung |
+| [ROLLEN](docs/ROLLEN.md) | Rollen, Bereiche und wer was darf |
 | [PUBLIC_ROUTE_INVENTORY](PUBLIC_ROUTE_INVENTORY.md) | Öffentliche Seiten und Routen |
 | [Frontend](frontend/README.md) | Lokale Entwicklung und Build |
 | [PERFORMANCE_BUDGETS](frontend/PERFORMANCE_BUDGETS.md) | Frontend-Leistungsziele |

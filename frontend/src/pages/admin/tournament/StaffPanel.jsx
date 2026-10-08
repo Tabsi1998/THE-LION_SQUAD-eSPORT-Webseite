@@ -1,34 +1,38 @@
-// Turnier-Bearbeitung (#223): Turnier-Staff (Leitung, Ergebnis, Stationen).
+// Turnier-Bearbeitung (#223): Turnier-Staff (Leitung, Ergebnis, Stationen). Personen kommen seit #1354 aus der
+// Personensuche - Name und Bild, keine E-Mail-Adressen.
 import { useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { PersonPicker } from "@/components/tls/PersonPicker";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { STAFF_ROLE_OPTIONS, STAFF_SCOPE_OPTIONS } from "@/lib/tournamentLabels";
 
-export function TournamentStaffPanel({ tournamentId, staff, users, onChanged }) {
-  const [form, setForm] = useState({ user_id: "", role: "scorekeeper", scope: "tournament", scope_id: "", notes: "" });
+export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onChanged }) {
+  const [person, setPerson] = useState(null);
+  const [form, setForm] = useState({ role: "scorekeeper", scope: "tournament", scope_id: "", notes: "" });
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
 
   const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
   const add = async (e) => {
     e.preventDefault();
-    if (!form.user_id) {
-      toast.error("Bitte Nutzer auswählen.");
+    if (!person) {
+      toast.error("Bitte eine Person suchen und wählen.");
       return;
     }
     setSaving(true);
     try {
       await api.post(`/tournaments/${tournamentId}/staff`, {
-        user_id: form.user_id,
+        user_id: person.id,
         role: form.role,
         scope: form.scope,
         scope_id: form.scope === "tournament" ? null : form.scope_id || null,
         notes: form.notes || null,
       });
       toast.success("Zuweisung gespeichert.");
-      setForm({ user_id: "", role: "scorekeeper", scope: "tournament", scope_id: "", notes: "" });
+      setPerson(null);
+      setForm({ role: "scorekeeper", scope: "tournament", scope_id: "", notes: "" });
       onChanged();
     } catch (e2) {
       toast.error(formatRequestError(e2, "Zuweisung konnte nicht gespeichert werden."));
@@ -60,7 +64,6 @@ export function TournamentStaffPanel({ tournamentId, staff, users, onChanged }) 
   };
   const roleLabel = (role) => STAFF_ROLE_OPTIONS.find(([v]) => v === role)?.[1] || role;
   const scopeLabel = (scope) => STAFF_SCOPE_OPTIONS.find(([v]) => v === scope)?.[1] || scope;
-  const userLabel = (u) => `${u.display_name || u.username || u.email || u.id}${u.email ? ` · ${u.email}` : ""}`;
 
   return (
     <div className="grid lg:grid-cols-3 gap-5">
@@ -69,13 +72,7 @@ export function TournamentStaffPanel({ tournamentId, staff, users, onChanged }) 
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Turnier-Team</div>
           <h2 className="font-heading text-lg font-bold mt-1">Zuweisung hinzufügen</h2>
         </div>
-        <label className="block">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Nutzer</div>
-          <select value={form.user_id} onChange={(e) => set("user_id", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-            <option value="">— auswählen —</option>
-            {users.map((u) => <option key={u.id} value={u.id}>{userLabel(u)}</option>)}
-          </select>
-        </label>
+        <PersonPicker purpose="tournament" contextId={tournamentId} value={person} onChange={setPerson} label="Person" testId="tournament-staff-person" />
         <label className="block">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Rolle</div>
           <select value={form.role} onChange={(e) => set("role", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
@@ -103,11 +100,12 @@ export function TournamentStaffPanel({ tournamentId, staff, users, onChanged }) 
         </button>
       </form>
       <div className="lg:col-span-2 border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
+        {staffError ? <div className="px-4 py-10 text-center text-sm text-white/55" data-testid="tournament-staff-error">{staffError}</div> : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[760px]">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
               <tr>
-                <th className="text-left px-4 py-3">Nutzer</th>
+                <th className="text-left px-4 py-3">Person</th>
                 <th className="text-left px-4 py-3">Rolle</th>
                 <th className="text-left px-4 py-3">Bereich</th>
                 <th className="text-left px-4 py-3">Status</th>
@@ -119,7 +117,7 @@ export function TournamentStaffPanel({ tournamentId, staff, users, onChanged }) 
                 <tr key={a.id}>
                   <td className="px-4 py-3">
                     <div className="font-semibold">{a.user?.display_name || a.user?.username || "—"}</div>
-                    <div className="text-xs text-white/40">{a.user?.email || a.user_id}</div>
+                    {a.user?.username && <div className="text-xs text-white/40">@{a.user.username}</div>}
                   </td>
                   <td className="px-4 py-3">{roleLabel(a.role)}</td>
                   <td className="px-4 py-3">
@@ -145,6 +143,7 @@ export function TournamentStaffPanel({ tournamentId, staff, users, onChanged }) 
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   );

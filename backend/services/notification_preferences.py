@@ -211,6 +211,7 @@ REQUIRED_EMAIL_TEMPLATES = {
     "registration",
     "password_reset",
     "user_invite",
+    "account_banned",  # Konto gesperrt mit Grund (#1357) - nicht abbestellbar
     "test",
 }
 

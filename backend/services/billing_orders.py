@@ -187,7 +187,7 @@ async def classify_due(limit: int = 100) -> dict:
             status, note = "waiting_write_access", "Die Mitgliederverwaltung ist nicht angebunden."
             counts["not_connected"] += 1
         elif not can_write or client is None:
-            status, note = "waiting_write_access", "Für Rechnungen fehlt der Schreibzugriff (Einstellungen → Dolibarr → Schreibzugriff einschalten)."
+            status, note = "waiting_write_access", "Für Rechnungen fehlt der Schreibzugriff – Stand und Rechnungsangaben unter Finanzübersicht → Rechnungsangaben."
             counts["waiting_write_access"] += 1
         else:
             from services.dolibarr_billing import process_order

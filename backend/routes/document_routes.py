@@ -19,8 +19,9 @@ from storage import PRIVATE_DOC_DIR, UPLOAD_DIR
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 logger = logging.getLogger("tls.documents")
-# Vereinsdokumente: Mitglieder und diese Rollen; Moderatoren moderieren und sehen sie als Mitglied.
-ADMIN_ROLES = {"tournament_admin", "club_admin", "superadmin"}
+# Vereinsdokumente: Mitglieder und wer die Vereinsverwaltung oder System hat (#1350, services/visibility.py);
+# Moderatoren und die Turnierleitung sehen sie als Mitglied. Gesperrte Downloads öffnen Club-Admin und Superadmin.
+ADMIN_ROLES = {"club_admin", "superadmin"}
 
 
 def _normalise_visibility(value: str | None) -> str:
@@ -38,7 +39,7 @@ async def _user_can_see(user: dict | None, visibility: str | None) -> bool:
     visibility = _normalise_visibility(visibility)
     if visibility == "internal":
         return await user_can_see(user, "internal")   # nach Bereich, wie News und Events
-    return bool(user.get("is_club_member") or _is_admin(user))
+    return await user_can_see(user, "members")
 
 
 def _safe_storage_path(doc: dict) -> pathlib.Path | None:
@@ -134,7 +135,7 @@ async def _visible_documents(db, user: dict | None, category: Optional[str] = No
         if await _user_can_see(user, doc.get("visibility") or "members"):
             out.append(_public_doc(doc, user))
     # Dokumente aus der Vereinsakte (#324 Teil 1): nur für Mitglieder, nie ein Fehler für die Seite.
-    if user and (user.get("is_club_member") or _is_admin(user)):
+    if user and await user_can_see(user, "members"):
         try:
             from_dolibarr = await dolibarr_identity.documents_for(db, user)
         except Exception as exc:  # noqa: BLE001 - die Liste der eigenen Unterlagen darf nie an Dolibarr scheitern
@@ -209,7 +210,7 @@ async def _dolibarr_file_response(dolibarr_id: int, user: dict, disposition: str
 
 async def _dolibarr_file(dolibarr_id: int, user: dict | None, disposition: str, *, statute: bool = False, request: Request | None = None) -> Response:
     """Ein PDF aus der Vereinsakte über denselben Weg wie die eigenen Dateien - Web und App kennen nur den."""
-    if not user or not (user.get("is_club_member") or _is_admin(user)):
+    if not user or not await user_can_see(user, "members"):
         raise HTTPException(403, "Nur für Mitglieder.")
     try:
         if not statute and request is not None:

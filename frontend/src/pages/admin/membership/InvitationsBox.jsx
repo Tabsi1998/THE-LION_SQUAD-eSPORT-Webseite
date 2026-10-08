@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Send, X as XIcon } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { asInstant, viennaDate } from "@/lib/vienna";
 
 // Einladungen zum Mitgliedsantrag (#507): wen der Vorstand eingeladen hat, seit wann, ob der Antrag schon
-// gestellt ist; offene Einladungen lassen sich zurückziehen. Einladen selbst geht bei Alle Benutzer.
+// gestellt ist; offene Einladungen lassen sich zurückziehen. Eingeladen wird seit #1356 oben auf dieser Seite
+// („+ Zum Antrag einladen“) - `reloadKey` lädt die Liste danach neu.
 const STATUS_LABEL = { open: "offen", applied: "Antrag gestellt", withdrawn: "zurückgezogen", expired: "abgelaufen" };
 
 function formatDay(value) {
@@ -14,13 +14,13 @@ function formatDay(value) {
   return Number.isNaN(date.getTime()) ? "" : viennaDate(date);
 }
 
-export function InvitationsBox() {
+export function InvitationsBox({ reloadKey = 0 }) {
   const [rows, setRows] = useState(null);
   const [showAll, setShowAll] = useState(false);
   const load = useCallback(() => {
     api.get(`/admin/membership-invitations${showAll ? "" : "?status=open"}`).then(({ data }) => setRows(Array.isArray(data) ? data : [])).catch(() => setRows([]));
   }, [showAll]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, reloadKey]);
 
   const withdraw = async (row) => {
     try {
@@ -37,14 +37,14 @@ export function InvitationsBox() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="font-heading font-bold uppercase text-sm inline-flex items-center gap-2"><Send className="w-4 h-4 text-[#FFD700]" /> Einladungen zum Antrag</div>
-          <p className="text-xs text-white/45 mt-1">Ein Konto einladen: Mitglieder → Alle Benutzer → „Einladen“. Die Person sieht den Hinweis beim nächsten Besuch und füllt den Antrag direkt aus.</p>
+          <p className="text-xs text-white/45 mt-1">Eingeladen wird oben mit „+ Zum Antrag einladen“. Die Person sieht den Hinweis beim nächsten Besuch und füllt den Antrag direkt aus; nach 30 Tagen läuft eine Einladung ab.</p>
         </div>
         <label className="text-xs inline-flex items-center gap-2 text-white/60">
           <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} data-testid="invitations-show-all" className="accent-[#FFD700]" /> auch erledigte
         </label>
       </div>
       {rows === null ? <div className="text-xs text-white/40 mt-3">Lade …</div> : !rows.length ? (
-        <div className="text-sm text-white/45 mt-3" data-testid="invitations-empty">Keine {showAll ? "" : "offenen "}Einladungen. <Link to="/admin/users" className="text-[#29B6E8] hover:text-white">Zu Alle Benutzer</Link></div>
+        <div className="text-sm text-white/45 mt-3" data-testid="invitations-empty">Keine {showAll ? "" : "offenen "}Einladungen.</div>
       ) : (
         <ul className="divide-y divide-white/5 mt-3 text-sm">
           {rows.map((row) => (

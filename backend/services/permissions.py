@@ -90,6 +90,19 @@ def holds_area(user: dict | None, *areas: str) -> bool:
     return bool(set(areas) & base_areas(user))
 
 
+def is_tournament_lead(user: dict | None) -> bool:
+    """Turnierleitung über alle Turniere, Fast Laps und Stationen (#1350): der Bereich „Turnierleitung“ -
+    aus der Rolle oder einer Freigabe, nicht aus einer Rollenliste. Helfer-Einsätze je Turnier stehen
+    daneben (``services.tournament_permissions``)."""
+    return holds_area(user, "tournaments")
+
+
+def tournament_lead_filter() -> dict:
+    """Dieselbe Regel als Datenbank-Abfrage: alle Konten mit dem Bereich Turnierleitung (Rolle oder Freigabe)."""
+    roles = sorted(role for role, areas in ROLE_AREAS.items() if "tournaments" in areas)
+    return {"$or": [{"role": {"$in": roles}}, {"areas": "tournaments"}]}
+
+
 def area_labels(areas) -> str:
     return ", ".join(AREA_LABELS.get(area, area) for area in AREAS if area in set(areas))
 
@@ -180,11 +193,31 @@ async def board_holder_ids(db, user_ids) -> set[str]:
 
 
 # Sperren (Bannen): Konten mit einer Admin-Rolle oder irgendeinem Bereich - aus Rolle, Freigabe,
-# Vorstandsposten oder Dolibarr-Funktion - sperrt und entsperrt nur der Superadmin.
+# Vorstandsposten oder Dolibarr-Funktion - sperrt und entsperrt nur der Superadmin. Derselbe Schutz gilt
+# für Strikes und Chat-Sperren der Moderation (#1350).
 async def ban_protected(user: dict | None, db=None) -> bool:
     if not user:
         return False
     return str(user.get("role") or "") in ADMIN_ROLES or bool(await areas_for(user, db))
+
+
+SUPERADMIN_BAN_DETAIL = "Superadmin-Konten lassen sich nicht bannen. Zuerst die Rolle ändern."
+MODERATION_PROTECTED_DETAIL = (
+    "Konten mit Adminbereich oder Admin-Rolle bekommen Strikes und Chat-Sperren nur vom Superadmin. "
+    "Den Grund bitte an den Superadmin geben."
+)
+
+
+def is_superadmin(user: dict | None) -> bool:
+    return bool(user) and str(user.get("role") or "") == "superadmin"
+
+
+async def moderation_locked(actor: dict | None, target: dict | None, db=None) -> bool:
+    """Darf ``actor`` gegen ``target`` keine Maßnahme der Moderation setzen oder zurücknehmen? Wahr bei
+    Konten mit Admin-Rolle oder Bereich, außer der Superadmin handelt."""
+    if is_superadmin(actor):
+        return False
+    return await ban_protected(target, db)
 
 
 async def ban_protected_ids(users: list[dict], db=None) -> set[str]:

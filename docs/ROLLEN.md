@@ -1,6 +1,6 @@
 # Rollen und Rechte
 
-Stand: Meilenstein „Web: Rollen und Rechte“ (#287–#292). Quelle der Wahrheit für
+Stand: Meilenstein „Web: Rollen und Rechte“ (#287–#292), Rollen nach Bereichen (#1300), Rollen II (#1350). Quelle der Wahrheit für
 das, was eine Person im Adminbereich darf. Der Code dazu: `backend/services/permissions.py`
 (Bereiche, Rollen, Vorstand), `backend/auth.py` (`require_area`), Web `frontend/src/lib/permissions.js`.
 
@@ -12,10 +12,10 @@ Rechte hängen an Bereichen, nicht an einer Rangfolge. Eine Person kann mehrere 
 | --- | --- | --- |
 | Turnierleitung | `tournaments` | Turniere, Events, Stationen, Fast Lap, Saisons, Spiele, Gewinne, Strafen, Zugangslinks, PDF-Exporte |
 | Redaktion | `content` | News, Galerie, Medien, Sponsoren, Partner, Referenzen, Navigation, Sticker, Achievements, Seiten-Banner, Newsletter, Twitch-Streams |
-| Vereinsverwaltung | `club` | Mitglieder und Mitgliederprofile, Anträge, Dokumente, Vorteile, Vorstand, Kontakt-Inbox, Benutzerliste (bearbeiten, bannen mit Grund – Konten mit Adminbereich oder Admin-Rolle bannt nur der Superadmin), Discord-Zähler |
-| Finanzen | `finance` | Kosten und Abrechnung an Events (später Turnieren), Finanzübersicht mit Rechnungsaufträgen, Freigaben (#322, docs/ABRECHNUNG.md) |
+| Vereinsverwaltung | `club` | Mitglieder und Mitgliederprofile, Anträge, Dokumente, Vorteile, Vorstand, Kontakt-Inbox, Benutzerliste (lesen, bannen mit Grund – Konten mit Adminbereich oder Admin-Rolle bannt nur der Superadmin, Superadmin-Konten niemand), Discord-Zähler |
+| Finanzen | `finance` | Kosten und Abrechnung an Events (später Turnieren), Finanzübersicht mit Rechnungsaufträgen, Freigaben (#322, docs/ABRECHNUNG.md), Rechnungsangaben: Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, „Steuersätze geprüft“, „gleich freigeben“ (#1358) – die übrige Dolibarr-Technik bleibt bei System |
 | System | `system` | Einstellungen (Mail, Branding, Discord, Auth), Game-Server, Betrieb, Logs, Audit, App-Logs, Push-Tests, App-Versionen, E-Mail-Vorlagen, Wartungsläufe für Uploads |
-| Moderation | `moderation` | Moderationsseite: Meldungen, Wortfilter, Bildprüfung, Verwarnungen und Chat-Sperren; Direktnachrichten an jede Person. Keine Turnierrechte – wer zusätzlich als Helfer eingetragen ist, hat dort genau die Rechte des Einsatzes |
+| Moderation | `moderation` | Moderationsseite: Meldungen, Wortfilter, Bildprüfung, Verwarnungen und Chat-Sperren (bei Konten mit Adminbereich nur der Superadmin, siehe unten); Direktnachrichten an jede Person. Keine Turnierrechte – wer zusätzlich als Helfer eingetragen ist, hat dort genau die Rechte des Einsatzes |
 
 ## Wer hat welchen Bereich
 
@@ -28,11 +28,19 @@ Rechte hängen an Bereichen, nicht an einer Rangfolge. Eine Person kann mehrere 
 | Spieler | keiner – außer Freigaben oder Vorstandsposten | – |
 
 **Freigaben:** Der Superadmin kann einer Person einzelne Bereiche geben (Admin → Alle Benutzer):
-Turnierleitung, Redaktion, Vereinsverwaltung. System bleibt an Club-Admin und Superadmin gebunden.
-Jede Freigabe steht im Audit-Log.
+Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen. System bleibt an Club-Admin und Superadmin gebunden.
+Jede Freigabe steht im Audit-Log. Eine Freigabe zählt überall genauso wie die Rolle (#1350): Wer die
+Turnierleitung über eine Freigabe hat, arbeitet in jedem Turnier, jeder Fast Lap, an den Stationen und bei
+den Events wie mit der Rolle (Status, Turnierbaum, Anmeldungen, Check-in, Ergebnisse). Der Server prüft dafür
+den Bereich (`services/permissions.is_tournament_lead`), nicht eine Rollenliste.
 
 **Vorstand:** Wer einen aktiven Vorstandsposten hält oder vertritt (Admin → Vorstand), hat die
-Vereinsverwaltung von selbst. Die Besetzung der Posten ist damit eine Rechtevergabe.
+Vereinsverwaltung von selbst. Die Besetzung der Posten ist damit eine Rechtevergabe – deshalb (#1355): besetzt
+wird über die Personensuche nur mit Vereinsmitgliedern (der Server lehnt andere ab), vorher nennt ein Satz die Rechte
+(„… wird Kassier:in und bekommt damit die Vereinsverwaltung: Mitgliederdaten, Anträge, Dokumente, Benutzer.“), eine
+Rückfrage bestätigt, und jede Besetzung steht im Protokoll (`board.assign`). Kommen die Rechte aus Dolibarr-Funktionen,
+sagt der Satz „Der Posten ist nur für die Anzeige – die Rechte kommen aus Dolibarr.“ Führt Dolibarr den Vorstand,
+lässt sich hier nichts ändern (Server: 409). Besetzen dürfen Vereinsverwaltung und System.
 
 **Vorstand aus Dolibarr (#297):** Ist die Mitgliederverwaltung angebunden (Modus „Live“) und hat der
 Superadmin unter Admin → Dolibarr → Bereiche freigegeben, welche Funktion die Vereinsverwaltung
@@ -52,8 +60,101 @@ Gewinne dieses Turniers (#288). Ergebnisse eintragen dürfen außerdem `referee`
 bekommen Dispute und abweichende Ergebnis-Meldungen ihres Bereichs sofort gemeldet (#1132, #1134). Das braucht
 keinen Bereich und keine Zwei-Faktor-Anmeldung.
 Dasselbe gilt je Fast Lap (Challenge → Staff). Turnierrechte, Fast-Lap-Zeiten, Events und Exporte
-kommen nur aus der Turnierleitung, Club-Admin, Superadmin oder einem solchen Einsatz – auch für
-Moderatoren.
+kommen nur aus dem Bereich Turnierleitung (Rolle oder Freigabe), Club-Admin, Superadmin oder einem solchen
+Einsatz – auch für Moderatoren.
+
+## Bannen, Strikes und Chat-Sperren (#1300, #1350)
+
+1. **Superadmin-Konten lassen sich nicht bannen** – auch nicht von einem anderen Superadmin. Wer gebannt
+   werden soll, verliert zuerst die Rolle; danach gilt der normale Weg. Der Server antwortet: „Superadmin-Konten
+   lassen sich nicht bannen. Zuerst die Rolle ändern.“
+2. **Konten mit Adminbereich oder Admin-Rolle** – aus Rolle, Freigabe, Vorstandsposten oder Dolibarr-Funktion –
+   bannt und entbannt nur der Superadmin. Derselbe Schutz gilt in der Moderation: Strikes, Chat-Sperren
+   (Hinweis, Verwarnung, Sperre), eine Meldung als „berechtigt“ (zählt als Strike), Aufheben, Zurücknehmen und
+   Einsprüche bei solchen Konten setzt nur der Superadmin – bei einem Strike mit Grund, der im Protokoll steht.
+   Die Moderation sieht in „Personen“ statt der Knöpfe den Satz „Konto mit Adminbereich – Strikes und
+   Chat-Sperren setzt und nimmt nur der Superadmin zurück.“, die Benutzerliste den passenden Satz zum Bannen.
+3. Das eigene Konto bannt niemand. Gebannt wird immer mit Grund (mindestens fünf Zeichen); der Grund steht im
+   Protokoll.
+4. **Team-Chats bleiben zu:** Moderatoren öffnen Team-Chats nicht ohne Meldung; gemeldete Nachrichten sehen sie
+   in der Moderation.
+5. Normale Konten sperrt und verwarnt die Moderation wie bisher. Automatische Strikes (Wortfilter, Bildprüfung)
+   kommen vom System, nicht von einer Person.
+
+## Alle Benutzer (#1357)
+
+Die Liste ist nur zum Lesen: Name, Konto-Art, Rolle als Wort, Bereiche als Schilder, gesperrt ja/nein. „Bearbeiten“
+öffnet ein Seitenblatt (am Handy als ganze Seite):
+
+- **Superadmin:** ändert Rolle und Freigaben – erst mit „Speichern“ und einer Rückfrage, die in einem Satz sagt, was die
+  Person bekommt oder verliert („Erika Beispiel bekommt damit Zugriff auf Vereinsverwaltung (Mitgliederdaten, Anträge,
+  Dokumente und Benutzer).“). Unter „Mehr“: „Zugangs-Mail erneut senden“ (mit Rückfrage) und „Konto löschen“ (erst
+  nach Eintippen des Namens).
+- **Club-Admin und Vereinsverwaltung:** sehen Rolle und Bereiche als Text, ohne Auswahl, und sperren Spieler-Konten mit
+  Grund. Die Person bekommt den Grund per Mail („Konto gesperrt“); er steht auch im Protokoll.
+- Zum Mitgliedsantrag eingeladen wird auf „Bewerbungen“ (#1356); das Blatt zeigt nur den Stand („eingeladen am …“).
+
+## Bewerbungen (#1356)
+
+Oben steht „+ Zum Antrag einladen“ mit der Personensuche (nur Konten ohne Mitgliedschaft; wer schon eingeladen ist,
+steht mit „ist schon eingeladen – offen seit …“ da). Einladen darf nur die Vereinsverwaltung; ein Mitglied bekommt
+einen Hinweis statt einer Einladung, eine zweite Einladung ist die bestehende. Jeder Stand steht als Satz mit dem
+nächsten Schritt („Wartet auf Dolibarr – dort annehmen oder ablehnen, hier erscheint es von selbst“, „Offen – annehmen
+oder ablehnen“, „Aufgenommen am …“); Annehmen und Ablehnen gibt es nur, wo die Website entscheidet – Anträge über
+Dolibarr öffnet „In Dolibarr öffnen“.
+
+## Newsletter am Beitrag (#1359)
+
+Der Kasten „Verteilen“ im News- und Event-Editor zeigt, was hinausgeht: den Newsletter mit der Zahl der Empfänger (nie
+Namen oder Adressen) und „Jetzt senden“ bzw. „gesendet am … an …“, die Meldung an Mitglieder oder Vorstand und die
+Discord-Vorschau. Den Newsletter einer **News** schicken Redaktion und System, den eines **Events** auch, wer das Event
+bearbeiten darf (Turnierleitung; Entscheidung vom 07.10.2026). **Ein zweites Mal** senden nur Redaktion und System, immer
+mit Rückfrage. Entwürfe und „Nur intern“ gehen nicht als Newsletter hinaus und gelten nicht als gesendet. Unter
+E-Mail → Newsletter steht für System nur noch der Verlauf.
+
+## Adventkalender und Ostereiersuche schalten (#1360)
+
+Wer den Adventkalender oder die Ostereiersuche füllt – **Redaktion und Vereinsverwaltung** (und System) –, schaltet sie
+oben auf der eigenen Seite ein und aus und wählt, wo sie erscheinen (Website, App). Der Server-Weg
+(`PUT /api/seasonal/switch/{key}`) kennt nur diese zwei; jede Änderung steht im Protokoll (`seasons.switch`). Unter
+Auftritt → Jahreszeiten stehen beide nur noch zum Lesen; den Hauptschalter, Deko, Wetter und alle anderen Jahreszeiten
+schaltet weiter System.
+
+## Mitglieder-Inhalte (#1350)
+
+Inhalte mit der Sichtbarkeit „Nur Mitglieder“ – News, Events, Galerie, Dokumente wie Protokolle, Spielserver,
+Seiten-Banner – und der Mitgliederbereich (Discord-Kanäle, Steam-Status) sehen **aktive Mitglieder und
+Ehrenmitglieder** sowie, wer den Bereich **Vereinsverwaltung oder System** hat (über Rolle, Freigabe,
+Vorstandsposten oder Dolibarr-Funktion). Die Rolle Turnierleitung allein reicht dafür nicht; Moderatoren und die
+Turnierleitung sehen Mitglieder-Inhalte als Mitglied. Code: `services/visibility.sees_member_content`.
+
+Ausnahme mit Grund: **Events, Turniere und Fast Laps** gehören zur Turnierleitung – sie legt sie an, checkt beim
+Einlass ein und wertet aus. Mit dem Bereich Turnierleitung (Rolle oder Freigabe) sieht man sie deshalb auch mit
+„Nur Mitglieder“ (Listen, Event-Seite, Kalender, Suche, App), Alben und News am Event dagegen nur als Mitglied
+oder mit Vereinsverwaltung/System. Code: `services/visibility.lead_can_see`.
+
+In der App fragt die Team-Seite dieselben Rollen wie der Server: Team bearbeiten und Squads dürfen Leitung,
+Co-Leitung, Turnierleitung, Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und
+Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe.
+
+## Personen, Teams und Sponsoren wählen (#1354)
+
+Wo die Verwaltung eine Person wählt, sucht sie nach dem Namen (`GET /api/admin/people/search?purpose=…`). Treffer
+tragen nur Kennung, Name, Bild und eine Zeile Zusammenhang („Mitglied“, „Team Lions Rocket“, „angemeldet“) –
+höchstens zehn, nie E-Mail-Adresse oder Rolle; eine E-Mail-Adresse als Suchbegriff findet nichts. Die volle
+Kontoliste mit E-Mail-Adressen bleibt bei „Alle Benutzer“ (Vereinsverwaltung).
+
+| Zweck | Wo | Wer darf suchen | Wen findet die Suche |
+| --- | --- | --- | --- |
+| `tournament` | Turnier: Teilnehmer hinzufügen, Helfer | Turnierleitung (Rolle oder Freigabe) und Helfer dieses Turniers mit Organisation, Schiedsrichter oder Ergebnisdienst – nicht Stationsleitung oder Stream-Betreuung | aktive Konten |
+| `fastlap` | Fast Lap: Fahrer, Fast-Lap-Team | Turnierleitung und Helfer dieser Fast Lap | aktive Konten (mit „Vereinsmitglied ja/nein“ für die Wertung) |
+| `access_links` | Speziallinks | Turnierleitung | aktive Konten |
+| `board` | Vorstand besetzen | Vereinsverwaltung, System | nur Vereinsmitglieder (und gepflegte Mitgliederprofile ohne Konto) |
+| `invite` | Bewerbungen: zum Antrag einladen | Vereinsverwaltung | Konten ohne aktive Mitgliedschaft, mit „ist schon eingeladen“ |
+
+Teams kommen als kleine Auswahl (`GET /api/admin/choices/teams?tournament_id=…`, wie `tournament`), Event-Sponsoren
+mit dem Haken „Events“ nur mit Name und Logo (`GET /api/admin/choices/sponsors`: Turnierleitung, Redaktion, System).
+Jede Liste lädt für sich: fehlt ein Recht, steht an der Stelle ein Satz, der Rest der Seite geht weiter.
 
 ## Zwei-Faktor und Anmeldung (#348)
 

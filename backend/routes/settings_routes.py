@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import httpx
 
 from database import get_db
-from auth import require_admin, require_club_admin, require_super, get_optional_user, require_area
+from auth import require_club_admin, require_super, get_current_user, get_optional_user, require_area
 from services.public_site_settings import PUBLIC_LEGAL_SOURCE_FIELDS, build_public_legal_settings
 from services.auth_settings import is_google_client_id, load_auth_settings
 from services.rate_limit import enforce_rate_limit
@@ -539,7 +539,7 @@ def _normalize_banner_link(value: str | None) -> str:
     return link_url
 
 
-def _banner_active(doc: dict, user: dict | None) -> bool:
+def _banner_active(doc: dict, user: dict | None, member_view: bool = False) -> bool:
     if not doc.get("enabled", True):
         return False
     if not str(doc.get("text") or "").strip():
@@ -555,13 +555,13 @@ def _banner_active(doc: dict, user: dict | None) -> bool:
     # „Admins“ ist das Admin-Team samt Moderation (wie „Nur Admins“ im Profil); „Vereinsmitglieder“
     # folgt der Regel für Mitglieder-Inhalte (services/visibility.py).
     admin_roles = {"moderator", "tournament_admin", "club_admin", "superadmin"}
-    member_roles = {"tournament_admin", "club_admin", "superadmin"}
     if audience == "all":
         return True
     if audience == "logged_in":
         return bool(user)
     if audience == "members":
-        return bool(user and (user.get("is_club_member") or user.get("role") in member_roles))
+        # ``member_view`` rechnet der Aufrufer einmal je Anfrage aus (Bereiche brauchen die Datenbank).
+        return bool(user and member_view)
     if audience == "admins":
         return bool(user and user.get("role") in admin_roles)
     return False
@@ -982,7 +982,9 @@ async def list_site_banners(response: Response, me: dict | None = Depends(get_op
     # Banner-Manager owns public notice bars from here on.
     all_docs = manual + await _auto_site_banners(db)
     wanted = "app" if channel == "app" else "web"
-    active = [doc for doc in all_docs if _banner_active(doc, me) and wanted in banner_channels(doc)]
+    from services.visibility import sees_member_content
+    member_view = await sees_member_content(me, look_up_membership=False)
+    active = [doc for doc in all_docs if _banner_active(doc, me, member_view) and wanted in banner_channels(doc)]
     stats_rows = await db.site_banner_stats.find({"id": {"$in": [doc["id"] for doc in active if doc.get("id")]}}, {"_id": 0}).to_list(200)
     stats = {row["id"]: row for row in stats_rows}
     items = [_public_banner_doc(doc, stats.get(doc.get("id"))) for doc in active]
@@ -1120,36 +1122,106 @@ async def send_test(body: TestEmailBody, me: dict = Depends(require_club_admin()
     return res
 
 
-@settings_router.post("/newsletter/preview")
-async def newsletter_preview(body: NewsletterTriggerBody, me: dict = Depends(require_area("content"))):
+# Verteilen (#1359): den Newsletter einer News schickt die Redaktion, den eines Events, wer das Event bearbeiten darf
+# (Turnierleitung) - Entscheidung des Betreibers vom 07.10.2026. Ein zweites Mal senden nur Redaktion und System. Der
+# Kasten im Editor bekommt nur die Zahl der Empfänger, nie Namen oder Adressen.
+NEWSLETTER_SEND_AREAS = {"news": {"content", "system"}, "event": {"tournaments", "content", "system"}}
+NEWSLETTER_RESEND_AREAS = {"content", "system"}
+NEWSLETTER_ANNOUNCEMENTS = {
+    "members": "Mitglieder bekommen eine Meldung in der App und in der Glocke – „Nur Mitglieder“.",
+    "internal": "Die Vereinsverwaltung bekommt eine Meldung in der App und in der Glocke – „Nur intern“. Ein Newsletter geht dafür nicht hinaus.",
+}
+NEWSLETTER_NO_ANNOUNCEMENT = "Keine eigene Meldung – öffentliche Beiträge gehen über Newsletter und Discord."
+
+
+async def _newsletter_rights(me: dict, kind: str) -> tuple[bool, bool]:
+    """(senden, ein zweites Mal senden) - nach Bereich, mit Zwei-Faktor wie jeder Adminbereich."""
+    from services.permissions import areas_for, needs_mfa
+
+    if needs_mfa(me):
+        return False, False
+    areas = await areas_for(me)
+    return bool(areas & NEWSLETTER_SEND_AREAS[kind]), bool(areas & NEWSLETTER_RESEND_AREAS)
+
+
+async def _require_newsletter_send(me: dict, kind: str) -> tuple[bool, bool]:
+    from services.permissions import MFA_MESSAGE, missing_area_message, needs_mfa
+
+    rights = await _newsletter_rights(me, kind)
+    if not rights[0]:
+        if needs_mfa(me):
+            raise HTTPException(403, MFA_MESSAGE)
+        raise HTTPException(403, missing_area_message(["content"] if kind == "news" else ["tournaments", "content"]))
+    return rights
+
+
+async def _newsletter_box(item: dict, kind: str, rights: tuple[bool, bool]) -> dict:
+    """Was der Kasten „Verteilen“ zeigt: Stand, Zahl der Empfänger, wer senden darf, welche Meldung rausgeht."""
     from services.notification_preferences import newsletter_recipients
-    item = await _newsletter_source(body.kind, body.id)
+
     visibility = item.get("visibility") or "public"
-    recipients = await newsletter_recipients(visibility)
+    published = item.get("published", True) is not False if kind == "news" else item.get("status") not in {"draft", "archived", "cancelled"}
+    internal = visibility == "internal"
+    recipients = 0 if internal else len(await newsletter_recipients(visibility))
+    sent_at = item.get("newsletter_sent_at")
+    state = "sent" if sent_at else "internal" if internal else "draft" if not published else "ready"
     return {
-        "kind": body.kind,
-        "source_id": item.get("id"),
-        "title": item.get("title") or item.get("name"),
-        "visibility": visibility,
-        "already_sent_at": item.get("newsletter_sent_at"),
-        "already_sent_count": item.get("newsletter_sent_count") or 0,
-        "recipients": len(recipients),
-        "sample": [
-            {
-                "id": u.get("id"),
-                "email": u.get("email"),
-                "display_name": u.get("display_name") or u.get("username"),
-            }
-            for u in recipients[:10]
-        ],
+        "kind": kind, "source_id": item.get("id"), "title": item.get("title") or item.get("name"), "visibility": visibility,
+        "state": state, "recipients": recipients, "sent_at": sent_at, "sent_count": int(item.get("newsletter_sent_count") or 0),
+        "can_send": rights[0], "can_resend": rights[1],
+        "announcement": NEWSLETTER_ANNOUNCEMENTS.get(visibility, NEWSLETTER_NO_ANNOUNCEMENT),
+        "announced_at": item.get("members_notified_at"), "announced_count": int(item.get("members_notified_count") or 0),
+        # Ältere Aufrufer lesen diese Namen.
+        "already_sent_at": sent_at, "already_sent_count": int(item.get("newsletter_sent_count") or 0),
     }
 
 
+@settings_router.get("/newsletter/state")
+async def newsletter_state(kind: Literal["news", "event"], id: str = Query(..., max_length=120), me: dict = Depends(get_current_user)):
+    rights = await _require_newsletter_send(me, kind)
+    item = await _newsletter_source(kind, id)
+    return await _newsletter_box(item, kind, rights)
+
+
+@settings_router.post("/newsletter/preview")
+async def newsletter_preview(body: NewsletterTriggerBody, me: dict = Depends(get_current_user)):
+    rights = await _require_newsletter_send(me, body.kind)
+    item = await _newsletter_source(body.kind, body.id)
+    return await _newsletter_box(item, body.kind, rights)
+
+
+@settings_router.get("/newsletter/history")
+async def newsletter_history(me: dict = Depends(require_club_admin())):
+    """Verlauf für System (#1359): welche News und Events wann an wie viele gingen - ohne Rohwerte, ohne Empfänger."""
+    db = get_db()
+    items = []
+    fields = {"_id": 0, "id": 1, "title": 1, "name": 1, "slug": 1, "visibility": 1, "newsletter_sent_at": 1, "newsletter_sent_count": 1, "newsletter_sent_by": 1}
+    async for post in db.news_posts.find({"newsletter_sent_at": {"$nin": [None, ""]}}, fields).sort("newsletter_sent_at", -1).limit(100):
+        items.append({"kind": "news", **post})
+    async for event in db.events.find({"newsletter_sent_at": {"$nin": [None, ""]}}, fields).sort("newsletter_sent_at", -1).limit(100):
+        items.append({"kind": "event", **event})
+    actor_ids = sorted({row.get("newsletter_sent_by") for row in items if row.get("newsletter_sent_by")})
+    names = {}
+    if actor_ids:
+        async for user in db.users.find({"id": {"$in": actor_ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}):
+            names[user["id"]] = user.get("display_name") or user.get("username")
+    items.sort(key=lambda row: str(row.get("newsletter_sent_at") or ""), reverse=True)
+    return {"items": [{
+        "kind": row["kind"], "id": row.get("id"), "slug": row.get("slug"), "title": row.get("title") or row.get("name"),
+        "visibility": row.get("visibility") or "public", "sent_at": row.get("newsletter_sent_at"),
+        "sent_count": int(row.get("newsletter_sent_count") or 0),
+        "sent_by": names.get(row.get("newsletter_sent_by")) if row.get("newsletter_sent_by") else None,
+    } for row in items[:100]]}
+
+
 @settings_router.post("/newsletter/send")
-async def newsletter_send(body: NewsletterTriggerBody, me: dict = Depends(require_area("content"))):
+async def newsletter_send(body: NewsletterTriggerBody, me: dict = Depends(get_current_user)):
+    rights = await _require_newsletter_send(me, body.kind)
     db = get_db()
     from services.notification_preferences import enqueue_newsletter_for_item
     item = await _newsletter_source(body.kind, body.id)
+    if item.get("newsletter_sent_at") and body.force and not rights[1]:
+        raise HTTPException(403, "Ein zweites Mal senden nur Redaktion und System – der Newsletter ist schon hinausgegangen.")
     if item.get("newsletter_sent_at") and not body.force:
         return {
             "ok": True,
@@ -1161,6 +1233,14 @@ async def newsletter_send(body: NewsletterTriggerBody, me: dict = Depends(requir
         }
     suffix = f":manual:{now_utc().isoformat()}" if body.force else ""
     result = await enqueue_newsletter_for_item(body.kind, item, dedupe_suffix=suffix)
+    # Entwurf oder „Nur intern“ (#1359): nichts ging hinaus - also auch nicht als gesendet merken.
+    blocked = {
+        "not_published": "Der Beitrag ist noch nicht veröffentlicht – der Newsletter geht beim Veröffentlichen von selbst hinaus.",
+        "not_announced": "Das Event ist noch ein Entwurf – der Newsletter geht beim Ankündigen von selbst hinaus.",
+        "internal_visibility": "„Nur intern“ geht nicht als Newsletter hinaus – die Vereinsverwaltung bekommt eine Meldung.",
+    }
+    if result.get("reason") in blocked:
+        raise HTTPException(409, blocked[result["reason"]])
     queued = int(result.get("queued") or 0)
     collection = db.news_posts if body.kind == "news" else db.events
     await collection.update_one(
@@ -1265,15 +1345,32 @@ async def smtp_deliverability(me: dict = Depends(require_club_admin())):
     return await run_smtp_deliverability()
 
 
+# Stände der Mail-Warteschlange (#1361). „Nochmal versuchen“ gibt es nur bei fehlgeschlagenen Mails - alles andere ist
+# unterwegs, schon draußen oder bewusst ausgelassen; ein zweiter Versand würde die Person die Mail zweimal bekommen lassen.
+MAIL_JOB_STATES = ("pending", "sending", "sent", "failed", "skipped")
+MAIL_RETRY_REFUSALS = {
+    "sent": "Diese Mail ist schon gesendet – ein zweites Mal geht sie nicht hinaus.",
+    "pending": "Diese Mail wartet schon auf den Versand.",
+    "sending": "Diese Mail wird gerade gesendet.",
+    "skipped": "Diese Mail wurde übersprungen, weil der Versand aus war. Nochmal versuchen geht nur bei fehlgeschlagenen Mails.",
+}
+
+
 @settings_router.get("/mail-queue")
 async def list_mail_queue(status: Optional[str] = None, limit: int = 100,
                           me: dict = Depends(require_club_admin())):
+    from services.mail_catalog import CATALOG
     db = get_db()
     q = {}
-    if status:
+    if status in MAIL_JOB_STATES:
         q["status"] = status
     safe_limit = max(1, min(int(limit or 100), 500))
-    jobs = await db.mail_jobs.find(q, {"_id": 0, "html": 0}).sort("created_at", -1).to_list(safe_limit)
+    jobs = await db.mail_jobs.find(q, {"_id": 0, "html": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    # Die Vorlage mit ihrem deutschen Namen aus dem Mail-Katalog - keine Kennungen in der Liste.
+    for job in jobs:
+        name = (CATALOG.get(str(job.get("template_key") or "")) or {}).get("name")
+        if name:
+            job["template_label"] = name
     return jobs
 
 
@@ -1309,9 +1406,11 @@ async def cleanup_mail_queue(days: int = 30, me: dict = Depends(require_club_adm
 
 @settings_router.post("/mail-queue/{job_id}/retry")
 async def retry_mail_job(job_id: str, me: dict = Depends(require_club_admin())):
+    """Eine fehlgeschlagene Mail nochmal versuchen (#1361). Der Stand wird im selben Schritt geprüft und gesetzt, damit
+    zwei schnelle Klicks oder ein gleichzeitiger Versand keine zweite Mail auslösen."""
     db = get_db()
     res = await db.mail_jobs.update_one(
-        {"id": job_id},
+        {"id": job_id, "status": "failed"},
         {"$set": {
             "status": "pending",
             "attempts": 0,
@@ -1321,7 +1420,10 @@ async def retry_mail_job(job_id: str, me: dict = Depends(require_club_admin())):
         }},
     )
     if res.matched_count == 0:
-        raise HTTPException(404, "Job nicht gefunden")
+        job = await db.mail_jobs.find_one({"id": job_id}, {"_id": 0, "status": 1})
+        if not job:
+            raise HTTPException(404, "Diese Mail gibt es nicht mehr.")
+        raise HTTPException(409, MAIL_RETRY_REFUSALS.get(job.get("status"), "Nochmal versuchen geht nur bei fehlgeschlagenen Mails."))
     return {"ok": True}
 
 
@@ -1330,7 +1432,7 @@ async def delete_mail_job(job_id: str, me: dict = Depends(require_club_admin()))
     db = get_db()
     res = await db.mail_jobs.delete_one({"id": job_id})
     if res.deleted_count == 0:
-        raise HTTPException(404, "Job nicht gefunden")
+        raise HTTPException(404, "Diese Mail gibt es nicht mehr.")
     return {"ok": True}
 
 

@@ -98,3 +98,38 @@ test("Neue Strecke mit Zielzeit (#613): der Text wird zu Millisekunden, leer hei
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Zielzeit bitte als m:ss.mmm angeben, z. B. 1:32.450."));
   expect(apiMock.post).toHaveBeenCalledTimes(2);
 });
+
+// Personensuche (#1354): der Fahrer kommt aus der Suche, nicht aus der ganzen Kontoliste; fehlt ein Recht für das Team,
+// steht dort ein Satz und das Zeiten-Eintragen geht weiter.
+test("Fahrer über die Personensuche: Zeit geht mit der Kennung, die Kontoliste wird nie geladen", async () => {
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValue({ data: { id: "time-1" } });
+  apiMock.get.mockImplementation(async (url) => {
+    if (String(url).startsWith("/f1/challenges/c-1?")) return { data: { ...CHALLENGE, tracks: [{ id: "tr-1", name: "Spa" }], block_club_member_results: true } };
+    if (url === "/admin/people/search") return { data: [{ id: "u-7", name: "Erika Beispiel", context: "Mitglied", is_club_member: true }] };
+    return { data: [] };
+  });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  fireEvent.change(screen.getByTestId("f1-add-time-user-search"), { target: { value: "eri" } });
+  fireEvent.click(await screen.findByTestId("f1-add-time-user-option-u-7"));
+  // Vereinsmitglied bei gesperrter Wertung: nur Referenzzeit.
+  await waitFor(() => expect(screen.getByTestId("f1-add-time-scope")).toHaveValue("club_reference"));
+  fireEvent.change(screen.getByTestId("f1-add-time-value"), { target: { value: "1:24.587" } });
+  fireEvent.click(screen.getByTestId("f1-add-time-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/f1/challenges/c-1/times", expect.objectContaining({ user_id: "u-7", track_id: "tr-1", score_scope: "club_reference" })));
+  expect(apiMock.get.mock.calls.map(([url]) => url)).not.toContain("/users");
+});
+
+test("fehlt das Recht für das Fast-Lap-Team, steht dort ein Satz – der Rest der Seite geht weiter", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (String(url).startsWith("/f1/challenges/c-1?")) return { data: { ...CHALLENGE, tracks: [{ id: "tr-1", name: "Spa" }] } };
+    if (url === "/f1/challenges/c-1/staff") throw { response: { status: 403, data: { detail: "Keine Fast-Lap-Berechtigung für diese Aktion" } } };
+    return { data: [] };
+  });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  expect(await screen.findByTestId("f1-staff-error")).toHaveTextContent("Dafür fehlt dir das Recht, das Fast-Lap-Team zu sehen.");
+  expect(screen.getByTestId("f1-add-time-value")).toBeInTheDocument();
+  expect(screen.getByTestId("f1-staff-person-search")).toBeInTheDocument();
+});

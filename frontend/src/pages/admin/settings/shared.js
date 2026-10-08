@@ -28,12 +28,14 @@ export const MAIL_TEMPLATE_LABELS = {
   test: "Testmail",
 };
 
+// Stand einer Mail in der Warteschlange (#1361) - in Kacheln, Filter, Tabelle und Karten dieselben Wörter.
+export const QUEUE_STATES = ["pending", "sending", "sent", "failed", "skipped"];
 export const STATUS_LABELS = {
-  pending: "wartet auf Versand",
-  sending: "wird versendet",
-  sent: "gesendet",
-  failed: "fehlgeschlagen",
-  skipped: "übersprungen",
+  pending: "Wartet",
+  sending: "Wird gesendet",
+  sent: "Gesendet",
+  failed: "Fehlgeschlagen",
+  skipped: "Übersprungen",
 };
 
 // Seit #546 ist jede Einstellung eine eigene Seite in der Menüleiste (Verbindungen, E-Mail, Auftritt,
@@ -180,5 +182,62 @@ export function brandPayload(source = {}) {
 }
 
 export function mailTemplateLabel(job) {
-  return MAIL_TEMPLATE_LABELS[job?.template_key] || job?.template_key || "Mail";
+  // Der Server liefert den deutschen Namen aus dem Mail-Katalog mit (#1361); eine Kennung steht nie in der Liste.
+  return job?.template_label || MAIL_TEMPLATE_LABELS[job?.template_key] || "Mail";
+}
+
+// Fehler des Mailservers als Satz (#1361). Die Rohmeldung bleibt nur als Zusatz für System sichtbar.
+const MAIL_ERROR_SENTENCES = [
+  [/versand deaktiviert/i, "Der Mailversand war ausgeschaltet."],
+  [/unterbrochen/i, "Der Versand wurde unterbrochen und neu eingereiht."],
+  [/5\.1\.1|user unknown|unknown user|no such user|mailbox unavailable|does not exist|recipient address rejected|invalid recipient/i, "Postfach unbekannt – die Adresse gibt es beim Empfänger nicht."],
+  [/mailbox full|over quota|quota exceeded|5\.2\.2/i, "Das Postfach des Empfängers ist voll."],
+  [/spam|blocked|blacklist|blocklist|5\.7\.1/i, "Der Server des Empfängers hat die Mail abgelehnt (Spam-Schutz)."],
+  [/rate limit|too many requests|\b429\b/i, "Zu viele Mails auf einmal – der Anbieter bremst gerade."],
+  [/not configured/i, "Der Mailversand ist noch nicht eingerichtet – unter Verbindungen nachsehen."],
+  [/api key|unauthori[sz]ed|authentication|\b535\b|username and password|benutzer oder passwort/i, "Die Anmeldung beim Mail-Anbieter hat nicht geklappt – Zugangsdaten unter Verbindungen prüfen."],
+  [/timed? ?out/i, "Der Mailserver hat nicht rechtzeitig geantwortet."],
+  [/connection refused|could not connect|getaddrinfo|name or service not known|network is unreachable|connection reset/i, "Der Mailserver war nicht erreichbar."],
+  [/invalid.*(address|email)|not a valid email/i, "Die Adresse ist ungültig."],
+];
+
+export function mailErrorSentence(error) {
+  const raw = String(error || "").trim();
+  if (!raw) return "";
+  const hit = MAIL_ERROR_SENTENCES.find(([pattern]) => pattern.test(raw));
+  return hit ? hit[1] : "Der Versand hat nicht geklappt.";
+}
+
+/** Steht die Rohmeldung des Servers schon im Satz? Sonst zeigt die Zeile sie klein darunter. */
+export function mailErrorKnown(error) {
+  const raw = String(error || "").trim();
+  return !raw || MAIL_ERROR_SENTENCES.some(([pattern]) => pattern.test(raw));
+}
+
+// Je Stand nur die passende Aktion (#1361): nochmal versuchen nur bei Fehlgeschlagenem - eine gesendete Mail geht nie
+// ein zweites Mal hinaus. Löschen (unter „Mehr“) überall außer während des Versands, dann ist die Mail schon unterwegs.
+export function queueActions(job) {
+  return { retry: job?.status === "failed", remove: Boolean(job) && job.status !== "sending" };
+}
+
+/** Der Stand als Satz für die Zeile: wann gesendet, wann der nächste Versuch, woran es lag. */
+export function queueDetail(job, when) {
+  const time = (value) => (value ? when(value) : "");
+  const error = mailErrorSentence(job?.last_error);
+  switch (job?.status) {
+    case "sent":
+      return job.sent_at ? `Gesendet am ${time(job.sent_at)}.` : "Gesendet.";
+    case "sending":
+      return "Wird gerade gesendet.";
+    case "failed":
+      return `${error || "Der Versand hat nicht geklappt."}${job.attempts ? ` Aufgegeben nach ${job.attempts} ${job.attempts === 1 ? "Versuch" : "Versuchen"}.` : ""}`;
+    case "skipped":
+      return error || "Übersprungen.";
+    case "pending": {
+      const next = job.next_attempt_at ? `Nächster Versuch ${time(job.next_attempt_at)}.` : "Geht mit dem nächsten Lauf hinaus.";
+      return error ? `${next} Zuletzt: ${error}` : next;
+    }
+    default:
+      return "";
+  }
 }

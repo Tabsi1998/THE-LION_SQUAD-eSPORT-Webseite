@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from auth import get_optional_user, require_club_admin
 from database import get_db
+from services.visibility import sees_member_content
 from models import new_id, now_utc
 from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug
 from services.secret_store import decrypt_secret, encrypt_secret
@@ -46,12 +47,10 @@ def _slugify(value: str) -> str:
     return slugify(value, fallback=f"server-{new_id()[:8]}", max_length=80)
 
 
-def _is_admin(user: dict | None) -> bool:
-    # „Nur Mitglieder“ sehen Mitglieder und die Admin-Rollen mit Bereichen außer Moderation.
-    return bool(user and user.get("role") in {"tournament_admin", "club_admin", "superadmin"})
-
-
-def _can_view(server: dict, user: dict | None) -> bool:
+def _can_view(server: dict, user: dict | None, member_view: bool = False) -> bool:
+    """``member_view``: darf die Person Mitglieder-Inhalte sehen (services/visibility.sees_member_content) -
+    je Aufruf einmal ausgerechnet. Seit #1350 aktive Mitglieder und Vereinsverwaltung/System, nicht die
+    Rolle Turnierleitung allein."""
     if server.get("is_active") is False:
         return False
     visibility = server.get("visibility") or "public"
@@ -62,7 +61,7 @@ def _can_view(server: dict, user: dict | None) -> bool:
     if visibility == "community":
         return bool(user)
     if visibility == "members":
-        return bool(user and (user.get("is_club_member") or _is_admin(user)))
+        return bool(user and member_view)
     return False
 
 
@@ -268,7 +267,8 @@ async def seed_demo_game_servers():
 async def list_game_servers(me: dict | None = Depends(get_optional_user)):
     db = get_db()
     rows = await db.game_servers.find({}, {"_id": 0}).sort([("sort_order", 1), ("name", 1)]).to_list(500)
-    visible = [row for row in rows if _can_view(row, me)]
+    member_view = await sees_member_content(me, look_up_membership=False)
+    visible = [row for row in rows if _can_view(row, me, member_view)]
     game_by_id = await _game_lookup(db, [row.get("game_id") for row in visible if row.get("game_id")])
     items = [_public_doc(row, game_by_id.get(row.get("game_id"))) for row in visible]
     summary = {
@@ -296,7 +296,7 @@ async def get_game_server_access(server_id: str, me: dict | None = Depends(get_o
     server = await db.game_servers.find_one({"id": server_id}, {"_id": 0})
     if not server:
         raise HTTPException(404, "Server nicht gefunden.")
-    if not _can_view(server, me):
+    if not _can_view(server, me, await sees_member_content(me, look_up_membership=False)):
         raise HTTPException(403, "Kein Zugriff auf diesen Server.")
     if not server.get("access_secret") or (server.get("access_secret_kind") or "none") == "none":
         raise HTTPException(404, "Kein Zugang hinterlegt.")

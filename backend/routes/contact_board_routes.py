@@ -286,6 +286,52 @@ async def _normalize_board_assignee(db, assignee_id: str | None) -> str | None:
     return profile["id"] if profile else assignee_id
 
 
+BOARD_FROM_DOLIBARR_DETAIL = "Den Vorstand führt Dolibarr – hier lässt sich nichts ändern. Funktionen und Inhaber pflegst du in Dolibarr."
+BOARD_MEMBERS_ONLY_DETAIL = "Einen Vorstandsposten besetzen nur Vereinsmitglieder – diese Person hat keine aktive Mitgliedschaft."
+
+
+async def _board_led_by_dolibarr(db) -> bool:
+    """Führt Dolibarr den Vorstand (#326 Teil 2)? Dann ist die Liste hier nur zum Lesen (#1355)."""
+    from services import club_facts
+
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1}) or {}
+    return bool((await club_facts.board_source(db, branding)).get("dolibarr"))
+
+
+async def _require_local_board(db) -> None:
+    if await _board_led_by_dolibarr(db):
+        raise HTTPException(409, BOARD_FROM_DOLIBARR_DETAIL)
+
+
+async def _board_candidate(db, assignee_id: str) -> dict:
+    """Wer einen Posten besetzen darf (#1355): Vereinsmitglieder - ein Konto mit aktiver Mitgliedschaft oder ein
+    gepflegtes Mitgliederprofil ohne Konto. Gibt Name und ob ein Konto dahinter steht zurück."""
+    from services.membership_service import get_membership, is_active_member
+
+    profile = await db.club_member_profiles.find_one({"$or": [{"id": assignee_id}, {"user_id": assignee_id}]},
+                                                     {"_id": 0, "id": 1, "user_id": 1, "display_name": 1})
+    user_id = (profile or {}).get("user_id") or (None if profile else assignee_id)
+    if profile and not user_id:
+        return {"name": profile.get("display_name") or "Mitglied", "user_id": None}
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "display_name": 1, "username": 1})
+    if not user:
+        raise HTTPException(404, "Person nicht gefunden.")
+    if not is_active_member(await get_membership(user_id)):
+        raise HTTPException(400, BOARD_MEMBERS_ONLY_DETAIL)
+    return {"name": user.get("display_name") or user.get("username") or "Mitglied", "user_id": user_id}
+
+
+@board_router.get("/admin/state")
+async def board_admin_state(me: dict = Depends(require_area("club", "system"))):
+    """Für die Seite „Vorstand“ (#1355): führt Dolibarr den Vorstand, und kommen die Rechte aus Dolibarr-Funktionen
+    (dann verleiht ein Posten hier nichts)?"""
+    from services.dolibarr_client import load_settings
+    from services.dolibarr_policy import policy_active
+
+    db = get_db()
+    return {"dolibarr_leads": await _board_led_by_dolibarr(db), "rights_from_dolibarr": policy_active(await load_settings(db))}
+
+
 @board_router.get("/source")
 async def board_source():
     """Führt Dolibarr den Vorstand (#326 Teil 2)? Nur Schalter und Stand - keine Personen."""
@@ -489,6 +535,7 @@ async def list_board_positions(active_only: bool = False, manual: bool = False, 
 @board_router.post("")
 async def create_position(body: BoardPositionCreate, me: dict = Depends(require_area("club"))):
     db = get_db()
+    await _require_local_board(db)
     slug = await unique_slug(db.board_positions, body.slug or body.title_male, fallback="position", max_length=80)
     doc = {
         "id": new_id(), "slug": slug, "is_default": False, "user_id": None, "deputy_user_id": None,
@@ -507,6 +554,7 @@ async def update_position(pid: str, body: BoardPositionUpdate, me: dict = Depend
     existing = await db.board_positions.find_one({"id": pid}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Position nicht gefunden.")
+    await _require_local_board(db)
     updates = body.model_dump(exclude_unset=True)
     slug_source = slug_source_for_update(updates, existing, "title_male", fallback="position")
     if slug_source is not None:
@@ -517,6 +565,8 @@ async def update_position(pid: str, body: BoardPositionUpdate, me: dict = Depend
         if k in updates and updates[k] == "":
             updates[k] = None
         elif k in updates and updates[k]:
+            # Nur Vereinsmitglieder (#1355) - der Posten bringt die Vereinsverwaltung.
+            await _board_candidate(db, updates[k])
             updates[k] = await _normalize_board_assignee(db, updates[k])
         # Vorstandsarbeit (#615): seit wann jemand das Amt hat - neu bei jedem Wechsel, weg beim Leeren.
         since_key = "user_since" if k == "user_id" else "deputy_since"
@@ -528,6 +578,15 @@ async def update_position(pid: str, body: BoardPositionUpdate, me: dict = Depend
         moved = {new: texts.pop(old) for old, new in ((existing.get("slug"), updates["slug"]), (f"{existing.get('slug')}-stv", f"{updates['slug']}-stv")) if old in texts}
         if moved:
             await db.settings.update_one({"id": VACANCY_DOC_ID}, {"$set": {"texts": {**texts, **moved}}}, upsert=True)
+    # Eine Besetzung ist eine Rechtevergabe (docs/ROLLEN.md) - jede steht im Protokoll (#1355).
+    for k in ("user_id", "deputy_user_id"):
+        if k in updates and updates[k] != existing.get(k):
+            await db.audit_logs.insert_one({
+                "id": new_id(), "action": "board.assign", "actor_id": me.get("id"), "target_id": pid,
+                "data": {"position": existing.get("slug"), "field": "holder" if k == "user_id" else "deputy",
+                         "from": existing.get(k), "to": updates[k]},
+                "created_at": now_utc().isoformat(),
+            })
     return await db.board_positions.find_one({"id": pid}, {"_id": 0})
 
 
@@ -537,6 +596,7 @@ async def delete_position(pid: str, me: dict = Depends(require_area("club"))):
     p = await db.board_positions.find_one({"id": pid})
     if not p:
         raise HTTPException(404, "Position nicht gefunden.")
+    await _require_local_board(db)
     if p.get("is_default"):
         raise HTTPException(400, "Standard-Positionen können nicht gelöscht werden — deaktivieren stattdessen.")
     await db.board_positions.delete_one({"id": pid})

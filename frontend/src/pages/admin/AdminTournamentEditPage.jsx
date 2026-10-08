@@ -36,11 +36,14 @@ export default function AdminTournamentEditPage() {
   const [tab, setTab] = useState(searchParams.get("tab") || "participants");
   const [groups, setGroups] = useState([]);
   const [staff, setStaff] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [staffError, setStaffError] = useState("");
   const [stages, setStages] = useState([]);
   const [matchesV2, setMatchesV2] = useState([]);
   const [stations, setStations] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [teamsError, setTeamsError] = useState("");
+  // Konto des neuen Teilnehmers (#1354): aus der Personensuche, nicht aus der ganzen Kontoliste.
+  const [participantPerson, setParticipantPerson] = useState(null);
   const [participantQuery, setParticipantQuery] = useState("");
   const [participantStatusFilter, setParticipantStatusFilter] = useState("");
   const [participantForm, setParticipantForm] = useState({
@@ -96,32 +99,29 @@ export default function AdminTournamentEditPage() {
       try { const { data: g } = await api.get(`/tournaments/${id}/groups`); setGroups(g || []); }
       catch { setGroups([]); }
     }
+    // Jede Liste lädt für sich (#1354) - kein gemeinsames Promise.all über Listen mit verschiedenen Rechten. Fehlt ein
+    // Recht, steht an der Stelle ein Satz, und der Rest der Seite geht weiter. Personen sucht die Personensuche selbst.
+    const missing = (failure, what) => (failure?.response?.status === 403
+      ? formatRequestError(failure, `Dafür fehlt dir das Recht: ${what}.`)
+      : `${what} lassen sich gerade nicht laden.`);
     if (isAdmin) {
       try {
-        const [{ data: s }, { data: u }, { data: teamRows }] = await Promise.all([
-          api.get(`/tournaments/${id}/staff`),
-          api.get("/users"),
-          api.get("/teams"),
-        ]);
+        const { data: s } = await api.get(`/tournaments/${id}/staff`);
         setStaff(s || []);
-        setUsers(u || []);
-        setTeams(teamRows || []);
-      } catch {
+        setStaffError("");
+      } catch (failure) {
         setStaff([]);
-        setUsers([]);
-        setTeams([]);
+        setStaffError(missing(failure, "Helfer dieses Turniers"));
       }
-    } else if (isModerator) {
+    }
+    if (isAdmin || isModerator) {
       try {
-        const [{ data: u }, { data: teamRows }] = await Promise.all([
-          api.get(`/tournaments/${id}/assignable-users`),
-          api.get("/teams"),
-        ]);
-        setUsers(u || []);
-        setTeams(teamRows || []);
-      } catch {
-        setUsers([]);
+        const { data: teamRows } = await api.get("/admin/choices/teams", { params: { tournament_id: id } });
+        setTeams(Array.isArray(teamRows) ? teamRows : []);
+        setTeamsError("");
+      } catch (failure) {
         setTeams([]);
+        setTeamsError(missing(failure, "Teams dieses Turniers"));
       }
     }
   }, [id, isAdmin, isModerator]);
@@ -265,7 +265,7 @@ export default function AdminTournamentEditPage() {
     e.preventDefault();
     try {
       const payload = {
-        user_id: participantForm.user_id || null,
+        user_id: participantPerson?.id || null,
         team_id: participantForm.team_id || null,
         display_name: participantForm.display_name || null,
         ingame_name: participantForm.ingame_name || null,
@@ -296,6 +296,7 @@ export default function AdminTournamentEditPage() {
           : "Teilnehmer hinzugefügt.");
       }
       setParticipantForm({ user_id: "", team_id: "", display_name: "", ingame_name: "", discord: "", status: "approved", seed: "", replace_registration_id: "" });
+      setParticipantPerson(null);
       load();
     } catch (err) {
       toast.error(formatRequestError(err, "Teilnehmer konnte nicht hinzugefügt werden."));
@@ -614,8 +615,10 @@ export default function AdminTournamentEditPage() {
           <ParticipantAddForm
             form={participantForm}
             tournament={t}
-            users={users}
+            person={participantPerson}
+            onPerson={setParticipantPerson}
             teams={teams}
+            teamsError={teamsError}
             noShowRegistrations={regs.filter((r) => r.status === "no_show")}
             onChange={setParticipantField}
             onSubmit={addParticipant}
@@ -779,7 +782,7 @@ export default function AdminTournamentEditPage() {
       )}
 
       {activeTab === "staff" && isAdmin && (
-        <TournamentStaffPanel tournamentId={t.id} staff={staff} users={users} onChanged={load} />
+        <TournamentStaffPanel tournamentId={t.id} staff={staff} staffError={staffError} onChanged={load} />
       )}
       {activeTab === "groups" && (
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">

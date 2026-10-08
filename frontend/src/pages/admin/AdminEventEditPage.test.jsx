@@ -22,6 +22,9 @@ vi.mock("@/components/tls/EventLocationsSection", () => ({
 vi.mock("@/components/tls/RichContent", () => ({ appendEmbedToken: (text) => text }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ can: () => false }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
+// Verteilen (#1359): der Kasten fragt vor dem Senden nach.
+const confirmMock = vi.fn(async () => true);
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 
 const AdminEventEditPage = (await import("./AdminEventEditPage")).default;
 const { toast } = await import("sonner");
@@ -221,4 +224,49 @@ test("Anmeldung im Discord: Vorgabe an, Hinweis bei externem Link, Abwahl geht m
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
   const [, patch] = apiMock.patch.mock.calls[0];
   expect(patch.discord_registration).toBe(false);
+});
+
+// Event-Sponsoren (#1354): eine eigene kleine Auswahl für alle, die Events bearbeiten - nicht die Sponsorenliste der
+// Redaktion. Fehlt das Recht, steht ein Satz statt eines leeren Kastens.
+test("Event-Sponsoren kommen aus der eigenen Auswahl – nie aus der Sponsorenliste der Redaktion", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/meta") return { data: META };
+    if (url.startsWith("/events?")) return { data: EVENTS };
+    if (url === "/admin/choices/sponsors") return { data: [{ id: "sp-1", name: "Pixelbäckerei", logo_url: null, show_on_events: true }] };
+    return { data: [] };
+  });
+  renderAt("/admin/events/ev-1");
+  expect(await screen.findByTestId("event-sponsors")).toHaveTextContent("Pixelbäckerei");
+  expect(apiMock.get.mock.calls.map(([url]) => url)).not.toContain("/sponsors/admin");
+});
+
+test("fehlt das Recht für Event-Sponsoren, steht ein Satz – das Formular bleibt bedienbar", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/meta") return { data: META };
+    if (url.startsWith("/events?")) return { data: EVENTS };
+    if (url === "/admin/choices/sponsors") throw { response: { status: 403, data: { detail: "fehlt" } } };
+    return { data: [] };
+  });
+  renderAt("/admin/events/ev-1");
+  expect(await screen.findByTestId("event-sponsors-error")).toHaveTextContent("Dafür fehlt dir das Recht, Event-Sponsoren zu wählen");
+  expect(screen.getByTestId("event-name")).toHaveValue("Halloween Night");
+});
+
+// Verteilen (#1359): die Turnierleitung sendet den Newsletter ihres Events einmal; ein zweites Mal nur Redaktion und System.
+test("Verteilen im Event: gesendet – ein zweites Mal nur Redaktion und System", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/meta") return { data: META };
+    if (url.startsWith("/events?")) return { data: EVENTS };
+    if (url === "/settings/newsletter/state") {
+      return { data: { kind: "event", source_id: "ev-1", title: "Halloween Night", visibility: "members", state: "sent", recipients: 40, sent_at: "2026-10-05T16:02:00+00:00", sent_count: 38,
+        can_send: true, can_resend: false, announcement: "Mitglieder bekommen eine Meldung in der App und in der Glocke – „Nur Mitglieder“." } };
+    }
+    return { data: [] };
+  });
+  renderAt("/admin/events/ev-1");
+  expect(await screen.findByTestId("distribute-newsletter-line")).toHaveTextContent("an 38 Personen.");
+  expect(screen.getByTestId("distribute-resend-locked")).toHaveTextContent("Ein zweites Mal senden nur Redaktion und System.");
+  expect(screen.queryByTestId("distribute-resend")).toBeNull();
+  expect(screen.getByTestId("distribute-announcement")).toHaveTextContent("Mitglieder bekommen eine Meldung");
+  expect(apiMock.get).toHaveBeenCalledWith("/settings/newsletter/state", { params: { kind: "event", id: "ev-1" } });
 });

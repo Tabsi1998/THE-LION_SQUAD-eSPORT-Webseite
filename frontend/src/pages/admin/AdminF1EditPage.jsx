@@ -6,6 +6,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
+import { PersonPicker } from "@/components/tls/PersonPicker";
 import { toast } from "sonner";
 import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -33,13 +34,15 @@ export default function AdminF1EditPage() {
   const { id } = useParams();
   const [challenge, setChallenge] = useState(null);
   const [tracks, setTracks] = useState([]);
-  const [users, setUsers] = useState([]);
+  // Fahrer (#1354): aus der Personensuche - Name, Bild und ob Vereinsmitglied; nicht mehr die ganze Kontoliste.
+  const [driver, setDriver] = useState(null);
   const [staff, setStaff] = useState([]);
+  const [staffError, setStaffError] = useState("");
   const [times, setTimes] = useState([]);
   const [activeTrack, setActiveTrack] = useState(null);
   const [newTrack, setNewTrack] = useState({ name: "", image_url: "", country: "", target_time: "" });
   const [editTrack, setEditTrack] = useState(null);
-  const [newTime, setNewTime] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "", score_scope: "official" });
+  const [newTime, setNewTime] = useState({ time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "", score_scope: "official" });
   const [editTime, setEditTime] = useState(null);
   const confirm = useConfirm();
   const setNewTrackField = (k, v) => setNewTrack((track) => ({ ...track, [k]: v }));
@@ -50,12 +53,18 @@ export default function AdminF1EditPage() {
     setChallenge(c);
     setTracks(c.tracks || []);
     setActiveTrack((current) => (c.tracks || []).some((track) => track.id === current) ? current : c.tracks?.[0]?.id || null);
-    const [{ data: u }, staffResponse] = await Promise.all([
-      api.get("/users"),
-      isAdmin ? api.get(`/f1/challenges/${c.id}/staff`).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
-    ]);
-    setUsers(u);
-    setStaff(staffResponse.data || []);
+    // Jede Liste lädt für sich (#1354): fehlt ein Recht, steht an der Stelle ein Satz und der Rest geht weiter.
+    if (!isAdmin) return;
+    try {
+      const { data: rows } = await api.get(`/f1/challenges/${c.id}/staff`);
+      setStaff(Array.isArray(rows) ? rows : []);
+      setStaffError("");
+    } catch (failure) {
+      setStaff([]);
+      setStaffError(failure?.response?.status === 403
+        ? formatRequestError(failure, "Dafür fehlt dir das Recht, das Fast-Lap-Team zu sehen.")
+        : "Das Fast-Lap-Team lässt sich gerade nicht laden.");
+    }
   }, [id, isAdmin]);
 
   const loadTimes = useCallback(async () => {
@@ -66,11 +75,10 @@ export default function AdminF1EditPage() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadTimes(); }, [loadTimes]);
-  useApiInvalidation(load, ["f1", "users"]);
+  useApiInvalidation(load, ["f1"]);
   useApiInvalidation(loadTimes, ["f1"]);
 
-  const selectedNewTimeUser = users.find((u) => u.id === newTime.user_id);
-  const forceReferenceScope = !!challenge?.block_club_member_results && !!selectedNewTimeUser?.is_club_member;
+  const forceReferenceScope = !!challenge?.block_club_member_results && !!driver?.is_club_member;
 
   useEffect(() => {
     if (forceReferenceScope && newTime.score_scope !== "club_reference") {
@@ -128,6 +136,7 @@ export default function AdminF1EditPage() {
 
   const addTime = async (e) => {
     e.preventDefault();
+    if (!driver) { toast.error("Bitte zuerst den Fahrer suchen und wählen."); return; }
     const ms = parseTimeStr(newTime.time_str);
     if (!ms) { toast.error("Ungültiges Zeitformat (m:ss.SSS)"); return; }
     const pen = Number(newTime.penalty_seconds) || 0;
@@ -137,7 +146,7 @@ export default function AdminF1EditPage() {
     }
     try {
       await api.post(`/f1/challenges/${id}/times`, {
-        user_id: newTime.user_id, track_id: activeTrack,
+        user_id: driver.id, track_id: activeTrack,
         time_ms: ms, penalty_seconds: pen,
         proof_url: newTime.proof_url || null,
         admin_note: newTime.admin_note?.trim() || null,
@@ -225,7 +234,7 @@ export default function AdminF1EditPage() {
 
       {isAdmin && <div className="mb-5"><AccessLinksPanel targetType="fastlap" targetId={challenge.id} /></div>}
       {isAdmin && <ChallengeSettingsForm key={challenge.updated_at || challenge.id} challenge={challenge} onSaved={load} />}
-      {isAdmin && <F1StaffPanel challengeId={challenge.id} staff={staff} users={users} onChanged={load} />}
+      {isAdmin && <F1StaffPanel challengeId={challenge.id} staff={staff} staffError={staffError} onChanged={load} />}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Tracks */}
@@ -277,12 +286,8 @@ export default function AdminF1EditPage() {
           {activeTrack ? (
             <>
               <form onSubmit={addTime} className="flex flex-wrap gap-2 items-end border-b border-white/5 pb-4 mb-4">
-                <div className="flex-1 min-w-[200px]">
-                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Spieler</div>
-                  <select value={newTime.user_id} onChange={(e) => setNewTime({ ...newTime, user_id: e.target.value })} required data-testid="f1-add-time-user" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-                    <option value="">— auswählen —</option>
-                    {users.map((u) => <option key={u.id} value={u.id}>{u.display_name || u.username}</option>)}
-                  </select>
+                <div className="w-full sm:flex-1 sm:min-w-[240px]">
+                  <PersonPicker purpose="fastlap" contextId={challenge.id} value={driver} onChange={setDriver} label="Fahrer" placeholder="Fahrer suchen …" testId="f1-add-time-user" />
                 </div>
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Zeit (m:ss.SSS)</div>

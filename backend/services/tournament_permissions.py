@@ -2,10 +2,12 @@
 from fastapi import HTTPException
 
 from database import get_db
+from services.permissions import is_tournament_lead
 
-# Turnierrechte für alle Turniere: Turnierleitung, Club-Admin und Superadmin. Moderatoren moderieren;
-# in einem einzelnen Turnier bekommen sie genau die Rechte eines Helfer-Einsatzes
-# (tournament_staff_assignments) - wie jede andere Person auch.
+# Turnierrechte für alle Turniere: wer den Bereich Turnierleitung hat - über die Rolle (Turnierleitung,
+# Club-Admin, Superadmin) oder eine Freigabe (#1350). Moderatoren moderieren; in einem einzelnen Turnier
+# bekommen sie genau die Rechte eines Helfer-Einsatzes (tournament_staff_assignments) - wie jede andere
+# Person auch. Die Rollenlisten bleiben nur als Auskunft für ältere Aufrufer.
 GLOBAL_TOURNAMENT_STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 GLOBAL_TOURNAMENT_ADMIN_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
@@ -19,11 +21,11 @@ PARTICIPANT_STAFF_ROLES = {"organizer", "referee", "scorekeeper"}
 
 
 def is_global_tournament_staff(user: dict | None) -> bool:
-    return bool(user and user.get("role") in GLOBAL_TOURNAMENT_STAFF_ROLES)
+    return is_tournament_lead(user)
 
 
 def is_global_tournament_admin(user: dict | None) -> bool:
-    return bool(user and user.get("role") in GLOBAL_TOURNAMENT_ADMIN_ROLES)
+    return is_tournament_lead(user)
 
 
 async def assigned_tournament_ids(user: dict | None) -> list[str]:
@@ -112,9 +114,12 @@ def _assignment_covers_match(assignment: dict, match: dict) -> bool:
 async def result_staff_user_ids(db, match: dict) -> set[str]:
     """Wer für dieses Spiel Ergebnisse eintragen darf - und deshalb von Streitfällen erfährt (#1132, #1134): die
     Turnierleitung über alle Turniere und die Helfer mit Ergebnis-Recht, deren Einsatz das Spiel umfasst (ganzes
-    Turnier, Phase, Gruppe, Station oder genau dieses Spiel). Dieselbe Regel wie ``has_match_result_permission``."""
+    Turnier, Phase, Gruppe, Station oder genau dieses Spiel). Dieselbe Regel wie ``has_match_result_permission`` -
+    die Turnierleitung als Rolle oder als Freigabe (#1350)."""
+    from services.permissions import tournament_lead_filter
+
     users = await db.users.find(
-        {"role": {"$in": sorted(GLOBAL_TOURNAMENT_STAFF_ROLES)}, "is_active": {"$ne": False}, "is_banned": {"$ne": True}},
+        {**tournament_lead_filter(), "is_active": {"$ne": False}, "is_banned": {"$ne": True}},
         {"_id": 0, "id": 1},
     ).to_list(200)
     ids = {row["id"] for row in users if row.get("id")}

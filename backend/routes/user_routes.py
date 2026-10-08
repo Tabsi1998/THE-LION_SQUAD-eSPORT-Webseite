@@ -321,8 +321,16 @@ async def list_users(q: str | None = None, role: str | None = None,
             {"user_id": {"$in": user_ids}}, {"_id": 0}
         ).to_list(2000)
     }
-    from services.permissions import ban_protected_ids
+    from services.permissions import ban_protected_ids, base_areas
     protected = await ban_protected_ids(users, db)
+    # Einladung zum Mitgliedsantrag (#1356/#1357): das Blatt zeigt nur den Stand - eingeladen wird auf „Bewerbungen“.
+    from services import membership_invitations
+    await membership_invitations._expire_open(db, now_utc().isoformat())
+    invitations: dict[str, dict] = {}
+    async for row in db.membership_invitations.find(
+        {"user_id": {"$in": user_ids}}, {"_id": 0, "user_id": 1, "status": 1, "created_at": 1, "applied_at": 1},
+    ).sort("created_at", 1):
+        invitations[row["user_id"]] = {key: row.get(key) for key in ("status", "created_at", "applied_at")}
     for u in users:
         m = members.get(u["id"])
         u["membership"] = m
@@ -330,6 +338,9 @@ async def list_users(q: str | None = None, role: str | None = None,
         u["user_type"] = derived_user_type(u, m)
         # Konten mit Adminbereich oder Admin-Rolle bannt nur der Superadmin - die Liste sagt es vorher.
         u["ban_protected"] = u["id"] in protected
+        # Geschützt ohne Rolle oder Freigabe: der Bereich kommt aus einem Vorstandsposten oder einer Dolibarr-Funktion.
+        u["areas_from_board"] = u["id"] in protected and not base_areas(u)
+        u["membership_invitation"] = invitations.get(u["id"])
     return users
 
 
@@ -347,7 +358,10 @@ async def mention_search(
 
     query: dict = {"is_active": True, "is_banned": {"$ne": True}}
     scope_key = (scope or "").strip().lower()
-    staff = me.get("role") in ("tournament_admin", "club_admin", "superadmin")
+    # Turnierleitung (Rolle oder Freigabe, #1350) findet in Teams und Turnieren alle Beteiligten.
+    from services.permissions import is_tournament_lead
+
+    staff = is_tournament_lead(me)
 
     if scope_key == "team":
         team = await db.teams.find_one({"id": scope_id}, {"_id": 0, "member_ids": 1, "leader_id": 1, "co_leader_ids": 1})
@@ -988,14 +1002,18 @@ class BanBody(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
 
 
-async def _ban_target(db, user_id: str, me: dict) -> dict:
+async def _ban_target(db, user_id: str, me: dict, *, banning: bool = False) -> dict:
     """Wen die Vereinsverwaltung bannen oder entbannen darf: jedes Konto ohne Adminbereich und ohne
-    Admin-Rolle. Alles andere entscheidet der Superadmin."""
-    from services.permissions import ban_protected
+    Admin-Rolle. Alles andere entscheidet der Superadmin. Superadmin-Konten bannt niemand (#1350) -
+    auch kein anderer Superadmin; zuerst wird die Rolle geändert."""
+    from services.permissions import SUPERADMIN_BAN_DETAIL, ban_protected
 
-    target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1, "areas": 1, "is_banned": 1})
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1, "areas": 1, "is_banned": 1,
+                                                       "email": 1, "display_name": 1, "username": 1})
     if not target:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    if banning and target.get("role") == "superadmin":
+        raise HTTPException(status_code=403, detail=SUPERADMIN_BAN_DETAIL)
     if me.get("role") != "superadmin" and await ban_protected(target, db):
         raise HTTPException(status_code=403, detail=BAN_PROTECTED_DETAIL)
     return target
@@ -1006,7 +1024,7 @@ async def ban_user(user_id: str, body: BanBody | None = None, me: dict = Depends
     db = get_db()
     if user_id == me["id"]:
         raise HTTPException(status_code=400, detail="Das eigene Konto lässt sich nicht bannen.")
-    target = await _ban_target(db, user_id, me)
+    target = await _ban_target(db, user_id, me, banning=True)
     reason = ((body.reason if body else None) or "").strip()
     if len(reason) < BAN_REASON_MIN_LENGTH:
         raise HTTPException(status_code=422, detail=f"Bitte einen Grund angeben (mindestens {BAN_REASON_MIN_LENGTH} Zeichen).")
@@ -1016,7 +1034,19 @@ async def ban_user(user_id: str, body: BanBody | None = None, me: dict = Depends
     await db.users.update_one({"id": user_id}, {"$set": {"is_banned": True, "updated_at": now}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.ban", "target_id": user_id,
                                      "actor_id": me["id"], "data": {"reason": reason}, "created_at": now})
-    return {"ok": True}
+    # Die Person erfährt den Grund (#1357) - per Mail, weil sie sich nicht mehr anmelden kann.
+    notified = False
+    if target.get("email"):
+        base = await _frontend_base_url()
+        result = await send_template(
+            "account_banned", target["email"],
+            display_name=target.get("display_name") or target.get("username") or "",
+            reason=reason, appeal_url=f"{base}/contact" if base else "",
+            dedupe_key=f"account_banned:{user_id}:{now}",
+            mail_meta={"kind": "account_banned", "user_id": user_id, "username": target.get("username")},
+        )
+        notified = bool(result and result.get("ok", True) is not False)
+    return {"ok": True, "notified": notified}
 
 
 @router.post("/{user_id}/unban")

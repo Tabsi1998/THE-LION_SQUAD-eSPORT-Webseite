@@ -8,6 +8,7 @@ import { SkeletonTable } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ATTENTION_ORDER, PAYMENT_TONE, csvFilename, formatCents, parseEuro, sourcesFrom, summaryLines, syncLine, toCsv } from "@/lib/billing";
 import { viennaDateTime } from "@/lib/vienna";
+import { InvoiceDetailsTab } from "./finance/InvoiceDetailsTab";
 
 // Finanzübersicht (#322): Rechnungsaufträge nach Status - was fehlt, was wartet, was frei zu
 // geben ist; angelegte Belege mit ihrem Zahlungsstand aus Dolibarr (#321); Prüffälle, die nur die
@@ -52,13 +53,22 @@ function AttentionBar({ counts, labels, active, onPick }) {
   );
 }
 const KIND_LABELS = { "": "Events und Turniere", event: "Events", tournament: "Turniere" };
+// Reiter (#1358): die Übersicht der Aufträge und die Rechnungsangaben, die der Kassier selbst pflegt.
+const FINANCE_TABS = [["overview", "Übersicht"], ["rechnungsangaben", "Rechnungsangaben"]];
 
 export default function AdminFinancePage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [thirdpartyInput, setThirdpartyInput] = useState({});
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get("tab") === "rechnungsangaben" ? "rechnungsangaben" : "overview";
+  const selectTab = (next) => setSearchParams((current) => {
+    const params = new URLSearchParams(current);
+    if (next === "overview") params.delete("tab");
+    else params.set("tab", next);
+    return params;
+  }, { replace: true });
   const [filters, setFilters] = useState(() => ({ kind: "", source: "", q: "", attention: ATTENTION_ORDER.includes(searchParams.get("attention")) ? searchParams.get("attention") : "" }));
   const [knownSources, setKnownSources] = useState([]);
   const [detail, setDetail] = useState(null);
@@ -131,7 +141,7 @@ export default function AdminFinancePage() {
           <h1 className="font-heading text-3xl font-black uppercase inline-flex items-center gap-3"><Wallet className="w-7 h-7 text-[#FFD700]" /> Finanzen</h1>
           <p className="mt-2 text-sm text-white/60 max-w-2xl">Rechnungsaufträge aus kostenpflichtigen Anmeldungen. Jede verbindliche Anmeldung mit Preis wird hier zu einem Auftrag; die Rechnung entsteht in Dolibarr, Zahlungen bucht ihr dort – die Website liest nach und meldet, was nicht zusammenpasst.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        {tab === "overview" && <div className="flex flex-wrap gap-2">
           <button type="button" disabled={!!busy} onClick={() => run("run", () => api.post("/admin/finance/orders/run"), "Aufträge einsortiert.")} className="inline-flex items-center gap-2 px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40" data-testid="finance-run">
             <RefreshCw className="w-3.5 h-3.5" /> Jetzt prüfen
           </button>
@@ -141,13 +151,24 @@ export default function AdminFinancePage() {
           <button type="button" disabled={!data?.invoiced?.length} onClick={downloadCsv} className="inline-flex items-center gap-2 px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40" data-testid="finance-csv">
             <Download className="w-3.5 h-3.5" /> CSV
           </button>
-        </div>
+        </div>}
       </div>
 
-      {error && <div className="mt-6 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 text-sm" data-testid="finance-error">{error}</div>}
-      {!data && !error && <SkeletonTable rows={4} columns={5} className="mt-6" label="Lade Finanzübersicht" />}
+      <div className="mt-5 flex gap-1 border-b border-white/10" role="tablist" data-testid="finance-tabs">
+        {FINANCE_TABS.map(([key, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => selectTab(key)} data-testid={`finance-tab-${key}`}
+            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition ${tab === key ? "border-[#29B6E8] text-[#29B6E8]" : "border-transparent text-white/50 hover:text-white"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
 
-      {data && (
+      {tab === "rechnungsangaben" && <InvoiceDetailsTab onSaved={load} />}
+
+      {tab === "overview" && error && <div className="mt-6 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 text-sm" data-testid="finance-error">{error}</div>}
+      {tab === "overview" && !data && !error && <SkeletonTable rows={4} columns={5} className="mt-6" label="Lade Finanzübersicht" />}
+
+      {tab === "overview" && data && (
         <>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" data-testid="finance-summary">
             <Stat label="Wartet auf Voraussetzungen" value={waiting} tone={waiting ? "text-[#FFD700]" : "text-white"} />
@@ -163,8 +184,8 @@ export default function AdminFinancePage() {
               {data.dolibarr?.write_capable
                 ? "Dolibarr ist angebunden und darf Rechnungen anlegen."
                 : !data.dolibarr?.connected
-                  ? <>Dolibarr ist nicht angebunden – Aufträge bleiben hier stehen. <Link to="/admin/dolibarr" className="text-[#29B6E8] hover:underline">Zur Anbindung</Link></>
-                  : <>Für Rechnungen fehlt der Schreibzugriff (eigener Schlüssel unter <Link to="/admin/dolibarr" className="text-[#29B6E8] hover:underline">Dolibarr → Schreibzugriff</Link>). Aufträge bleiben bis dahin hier stehen.</>}
+                  ? "Dolibarr ist nicht angebunden – Aufträge bleiben hier stehen. Die Anbindung richtet System unter Dolibarr → Verbindung ein."
+                  : "Für Rechnungen fehlt der Schreibzugriff – den schaltet System unter Dolibarr → Funktionen ein. Aufträge bleiben bis dahin hier stehen."}
               {data.dolibarr?.write_capable && data.pdfs?.unconfirmed > 0 && (
                 // Rechnungs-PDF (#840): Belege von vor der Umstellung einmal nachziehen - danach macht es der Abgleich.
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs" data-testid="finance-pdfs">
@@ -190,7 +211,7 @@ export default function AdminFinancePage() {
                 </label>
               )}
               {data.dolibarr?.write_capable && !data.dolibarr?.terms_complete && (
-                <div className="mt-1 text-xs text-[#FFD700]" data-testid="finance-terms-hint">Rechnungskonditionen (Zahlungsziel, Zahlungsart, Bankkonto) fehlen noch – Belege bleiben Entwurf. <Link to="/admin/dolibarr" className="text-[#29B6E8] hover:underline">Unter Dolibarr → Schreibzugriff eintragen</Link>.</div>
+                <div className="mt-1 text-xs text-[#FF9500]" data-testid="finance-terms-hint">Rechnungskonditionen (Zahlungsziel, Zahlungsart, Bankkonto) fehlen noch – Belege bleiben Entwurf. <button type="button" onClick={() => selectTab("rechnungsangaben")} className="text-[#29B6E8] hover:underline" data-testid="finance-terms-hint-link">Unter Rechnungsangaben eintragen</button>.</div>
               )}
             </div>
           </div>

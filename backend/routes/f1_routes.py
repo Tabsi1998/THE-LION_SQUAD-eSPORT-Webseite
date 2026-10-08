@@ -6,8 +6,10 @@ from urllib.parse import quote, urlencode
 from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import RedirectResponse, StreamingResponse
 from database import get_db
+from services.permissions import is_tournament_lead
 from auth import get_current_user, require_admin, require_role, get_optional_user, require_area
 from services.visibility import user_can_see
+from services.visibility import lead_can_see
 from services.access_links import public_access_link_payload, touch_access_link, validate_access_link
 from services.public_phase import derive_public_phase
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
@@ -106,8 +108,8 @@ def _auth_user(user) -> dict | None:
 
 
 def _is_staff(user: dict | None) -> bool:
-    user = _auth_user(user)
-    return bool(user and user.get("role") in STAFF_ROLES)
+    # Bereich Turnierleitung aus Rolle oder Freigabe (#1350): die Freigabe zählt in jeder Fast Lap wie die Rolle.
+    return is_tournament_lead(_auth_user(user))
 
 
 async def _has_f1_staff_permission(
@@ -253,7 +255,7 @@ async def _visible_event_summary(event_id: str, user: dict | None, include_draft
         return None
     if event.get("status") == "draft" and not _is_staff(user):
         return None
-    if not await user_can_see(user, event.get("visibility") or "public"):
+    if not await lead_can_see(user, event.get("visibility") or "public"):
         return None
     return event
 
@@ -326,7 +328,7 @@ async def list_challenges(
     challenges = await db.f1_challenges.find(q, projection).sort("created_at", -1).to_list(fetch_limit)
     visible = []
     for c in challenges:
-        if not await user_can_see(user, c.get("visibility") or "public"):
+        if not await lead_can_see(user, c.get("visibility") or "public"):
             continue
         await _annotate_reference_policy(c, include_counts=True)
         c["public_phase"] = derive_public_phase(c, "f1")

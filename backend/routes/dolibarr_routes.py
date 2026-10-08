@@ -201,15 +201,7 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
         "tax_rates": {profile: tax_rate_for(settings, profile) for profile in DEFAULT_TAX_RATES},
         "tax_confirmed": {"at": settings.get("tax_confirmed_at"), "by": settings.get("tax_confirmed_by_name")} if settings.get("tax_confirmed_at") else None,
         # Konditionen (#370): ohne die drei bleibt jeder Beleg Entwurf.
-        "invoice_terms": {
-            "payment_term_id": settings.get("invoice_payment_term_id") or None,
-            "payment_mode_id": settings.get("invoice_payment_mode_id") or None,
-            "bank_account_id": settings.get("invoice_bank_account_id") or None,
-            "complete": terms_complete(settings),
-            # Sprache der Rechnungs-PDFs (#840) - ohne Angabe käme bei „automatisch“ in Dolibarr ein englisches PDF.
-            "pdf_lang": pdf_lang(settings),
-            "pdf_langs": [{"code": code, "label": label} for code, label in PDF_LANGS.items()],
-        },
+        "invoice_terms": invoice_terms_view(settings),
         "webhook_configured": secret_is_configured(settings.get("webhook_token")),
         "auto_link_verified_email": bool(settings.get("auto_link_verified_email")),
         "applications_enabled": bool(settings.get("applications_enabled")),
@@ -232,6 +224,69 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
             "approved_at": policy.get("approved_at"), "derivable_areas": list(DERIVABLE_AREAS),
         },
     }
+
+
+def invoice_terms_view(settings: dict) -> dict:
+    """Die Rechnungskonditionen (#370) und die Sprache der PDFs (#840) - für Dolibarr → Stand und die Rechnungsangaben
+    der Finanzübersicht (#1358)."""
+    return {
+        "payment_term_id": settings.get("invoice_payment_term_id") or None,
+        "payment_mode_id": settings.get("invoice_payment_mode_id") or None,
+        "bank_account_id": settings.get("invoice_bank_account_id") or None,
+        "complete": terms_complete(settings),
+        # Sprache der Rechnungs-PDFs (#840) - ohne Angabe käme bei „automatisch“ in Dolibarr ein englisches PDF.
+        "pdf_lang": pdf_lang(settings),
+        "pdf_langs": [{"code": code, "label": label} for code, label in PDF_LANGS.items()],
+    }
+
+
+def invoice_details_view(settings: dict) -> dict:
+    """Was der Kassier unter Finanzübersicht → Rechnungsangaben sieht (#1358) - ohne Adresse, Schlüssel oder Modus."""
+    return {
+        "connected": settings.get("mode") != "off",
+        "write_enabled": bool(settings.get("write_enabled")),
+        "write_capable": write_capable(settings),
+        "invoice_auto_validate": bool(settings.get("invoice_auto_validate")),
+        "tax_rates": {profile: tax_rate_for(settings, profile) for profile in DEFAULT_TAX_RATES},
+        "tax_confirmed": {"at": settings.get("tax_confirmed_at"), "by": settings.get("tax_confirmed_by_name")} if settings.get("tax_confirmed_at") else None,
+        "terms": invoice_terms_view(settings),
+    }
+
+
+# Die Felder, die der Kassier selbst pflegt (#1358) - alle anderen Dolibarr-Einstellungen bleiben beim System.
+INVOICE_DETAIL_FIELDS = (*TERM_FIELDS, "invoice_pdf_lang", "tax_confirmed", "invoice_auto_validate")
+
+
+def apply_invoice_updates(data: dict, current: dict, me: dict, updates: dict) -> None:
+    """Rechnungsangaben prüfen und in ``updates`` schreiben - derselbe Weg für System (Verbindung) und Finanzen
+    (Rechnungsangaben). Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, „Steuersätze geprüft“ und „Rechnungen
+    gleich freigeben“."""
+    for key in TERM_FIELDS:
+        if key in data:
+            updates[key] = int(data[key]) if data[key] else None
+    if "invoice_pdf_lang" in data:
+        value = DEFAULT_PDF_LANG if data["invoice_pdf_lang"] is None else data["invoice_pdf_lang"]
+        if value not in PDF_LANGS:
+            raise HTTPException(400, "Diese Sprache gibt es für Rechnungs-PDFs nicht.")
+        updates["invoice_pdf_lang"] = value
+    if "tax_confirmed" in data:
+        if data["tax_confirmed"]:
+            updates["tax_confirmed_at"] = now_utc().isoformat()
+            updates["tax_confirmed_by"] = me["id"]
+            updates["tax_confirmed_by_name"] = str(me.get("display_name") or me.get("username") or "")
+        else:
+            updates["tax_confirmed_at"] = None
+            updates["tax_confirmed_by"] = None
+            updates["tax_confirmed_by_name"] = None
+            # Ohne bestätigte Steuersätze gibt die Website nichts mehr von selbst frei.
+            if current.get("invoice_auto_validate"):
+                updates["invoice_auto_validate"] = False
+    if "invoice_auto_validate" in data:
+        if data["invoice_auto_validate"] and not terms_complete({**current, **updates}):
+            raise HTTPException(400, "Zum automatischen Freigeben braucht es Zahlungsziel, Zahlungsart und Bankkonto (unten eintragen).")
+        if data["invoice_auto_validate"] and not tax_confirmed({**current, **updates}):
+            raise HTTPException(400, "Zum automatischen Freigeben müssen die Steuersätze bestätigt sein (Haken „Steuersätze geprüft“).")
+        updates["invoice_auto_validate"] = bool(data["invoice_auto_validate"])
 
 
 # ---------------------------------------------------------------- Vereinsdaten und Vorstand (#326)
@@ -411,32 +466,7 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
         if updates["participations_enabled"] and not current.get("participations_enabled"):
             # Ab heute meldet der Abgleich; was davor war, holt der Nachzug - kein stiller Schwall in die Akten.
             updates["participations_since"] = dolibarr_participations.current_day().isoformat()
-    for key in TERM_FIELDS:
-        if key in data:
-            updates[key] = int(data[key]) if data[key] else None
-    if "invoice_pdf_lang" in data:
-        value = DEFAULT_PDF_LANG if data["invoice_pdf_lang"] is None else data["invoice_pdf_lang"]
-        if value not in PDF_LANGS:
-            raise HTTPException(400, "Diese Sprache gibt es für Rechnungs-PDFs nicht.")
-        updates["invoice_pdf_lang"] = value
-    if "tax_confirmed" in data:
-        if data["tax_confirmed"]:
-            updates["tax_confirmed_at"] = now_utc().isoformat()
-            updates["tax_confirmed_by"] = me["id"]
-            updates["tax_confirmed_by_name"] = str(me.get("display_name") or me.get("username") or "")
-        else:
-            updates["tax_confirmed_at"] = None
-            updates["tax_confirmed_by"] = None
-            updates["tax_confirmed_by_name"] = None
-            # Ohne bestätigte Steuersätze gibt die Website nichts mehr von selbst frei.
-            if current.get("invoice_auto_validate"):
-                updates["invoice_auto_validate"] = False
-    if "invoice_auto_validate" in data:
-        if data["invoice_auto_validate"] and not terms_complete({**current, **updates}):
-            raise HTTPException(400, "Zum automatischen Freigeben braucht es Zahlungsziel, Zahlungsart und Bankkonto (unten eintragen).")
-        if data["invoice_auto_validate"] and not tax_confirmed({**current, **updates}):
-            raise HTTPException(400, "Zum automatischen Freigeben müssen die Steuersätze bestätigt sein (Haken „Steuersätze geprüft“).")
-        updates["invoice_auto_validate"] = bool(data["invoice_auto_validate"])
+    apply_invoice_updates(data, current, me, updates)
     if "instance" in data:
         updates["instance"] = (data["instance"] or "").strip()
     if "entity" in data and data["entity"]:
@@ -567,14 +597,22 @@ async def participations_backfill(me: dict = Depends(require_area("club", "syste
 
 @admin_router.get("/invoice-options")
 async def invoice_options(me: dict = Depends(require_area("system"))):
+    return await invoice_options_view(get_db())
+
+
+async def invoice_options_view(db) -> dict:
     """Konditionen (#370) zum Auswählen: Zahlungsziele und Zahlungsarten aus den Wörterbüchern,
     Bankkonten aus der Kontenliste. Darf der Website-Benutzer eine Liste nicht lesen, ist sie
-    ``null`` - dann wird die Nummer eingetippt. Vorschlag: 30 Tage, Banküberweisung."""
-    db = get_db()
+    ``null`` - dann wird die Nummer eingetippt. Vorschlag: 30 Tage, Banküberweisung. Auch für die
+    Rechnungsangaben der Finanzübersicht (#1358)."""
     settings = await load_settings(db)
     if settings.get("mode") == "off":
         return {"available": False, "reason": "not_connected", "terms": None, "modes": None, "accounts": None, "suggested": {}}
-    client = DolibarrClient(settings)
+    try:
+        client = DolibarrClient(settings)
+    except DolibarrError as exc:
+        # Ohne Adresse oder Schlüssel gibt es keine Listen - die Seite lässt dann die Nummer eintippen.
+        return {"available": False, "reason": exc.kind, "reason_text": exc.text, "terms": None, "modes": None, "accounts": None, "suggested": {}}
 
     async def view(rows: list[dict] | None, label_keys: tuple[str, ...], german: dict[str, str] | None = None) -> list[dict] | None:
         if rows is None:

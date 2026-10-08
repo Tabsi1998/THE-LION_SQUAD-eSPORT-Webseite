@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 from services import event_days
 from services.public_phase import derive_public_phase
-from services.visibility import user_can_see
+from services.visibility import lead_can_see
 
 KIND_LABELS = {"event": "Event", "tournament": "Turnier", "fastlap": "Fast Lap"}
 ACTIVE_EVENT_REGISTRATION = ("registered", "checked_in", "waitlist")
@@ -143,11 +143,11 @@ async def collect(db, user: dict | None) -> list[dict]:
 
     items: list[dict] = []
     for ev in events:
-        if not await user_can_see(user, ev.get("visibility")):
+        if not await lead_can_see(user, ev.get("visibility")):
             continue
         items.extend(event_items(ev, mine=ev.get("id") in my_events))
     for t in tournaments:
-        if not await user_can_see(user, t.get("visibility")):
+        if not await lead_can_see(user, t.get("visibility")):
             continue
         path = f"/tournaments/{t.get('slug') or t.get('id')}"
         item = tournament_item(t, mine=t.get("id") in my_tournaments)
@@ -162,7 +162,7 @@ async def collect(db, user: dict | None) -> list[dict]:
             if deadline:
                 items.append(deadline)
     for c in fastlaps:
-        if not await user_can_see(user, c.get("visibility")):
+        if not await lead_can_see(user, c.get("visibility")):
             continue
         item = _item("fastlap", c, title=c.get("title") or "Fast Lap", path=f"/fastlap/{c.get('slug') or c.get('id')}",
                      start=c.get("start_date"), end=c.get("end_date"))

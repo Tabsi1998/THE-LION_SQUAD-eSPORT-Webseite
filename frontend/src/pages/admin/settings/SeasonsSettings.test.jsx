@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 
 // Jahreszeiten (#633): Hauptschalter und Saison-Schalter speichern sofort, Texte mit eigenem Knopf,
 // die Vorschau merkt sich das Token nur in dieser Sitzung, der Stand steht in Worten.
@@ -154,4 +155,17 @@ test("Hauptschalter aus: die Wetter-Karte sagt, dass das Wetter auf der Seite au
   apiMock.get.mockResolvedValue({ data: { ...WITH_WEATHER, enabled: false } });
   render(<SeasonsSettings />);
   expect(await screen.findByTestId("seasons-weather-layer")).toHaveTextContent("Das Wetter auf der Seite ist ausgeschaltet.");
+});
+
+// Adventkalender und Ostereiersuche (#1360): hier nur zum Lesen - geschaltet wird auf ihrer eigenen Seite.
+test("Adventkalender und Ostereiersuche stehen nur zum Lesen da, mit dem Weg zur eigenen Seite", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, seasons: [...VIEW.seasons,
+    season({ key: "advent_calendar", label: "Adventkalender", texts: {}, defaults: {} }),
+    season({ key: "easter_hunt", label: "Ostereiersuche", enabled: false, texts: {}, defaults: {} })] } });
+  render(<MemoryRouter><SeasonsSettings /></MemoryRouter>);
+  expect(await screen.findByTestId("season-advent_calendar-managed")).toHaveTextContent("An – gepflegt unter Adventkalender.");
+  expect(screen.getByTestId("season-easter_hunt-managed")).toHaveTextContent("Aus – gepflegt unter Ostereiersuche.");
+  expect(screen.queryByTestId("season-advent_calendar-enabled")).toBeNull();
+  expect(screen.queryByTestId("season-easter_hunt-mode")).toBeNull();
+  expect(screen.getByTestId("season-halloween-enabled")).toBeInTheDocument();
 });

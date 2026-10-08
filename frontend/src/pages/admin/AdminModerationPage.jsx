@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useAuth } from "@/context/AuthContext";
 import { api, formatRequestError } from "@/lib/api";
 import { toast } from "sonner";
 import { Download, Plus, Trash2, Upload } from "lucide-react";
@@ -19,6 +20,9 @@ const SANCTION_ACTIONS = [["notice", "Hinweis"], ["warning", "Verwarnung mit Cha
 const SANCTION_STATUS = { active: "läuft", lifted: "aufgehoben", expired: "abgelaufen", superseded: "durch höhere Stufe ersetzt" };
 const ACTION_LABEL = { hold: "zurückhalten", flag: "nur markieren" };
 const ITEM_STATE_LABEL = { pending: "wartet", flagged: "markiert", released: "freigegeben", rejected: "zurückgewiesen", noted: "gesehen" };
+// Konten mit Admin-Rolle oder Adminbereich (#1350): Strikes und Chat-Sperren setzt und nimmt nur der Superadmin zurück -
+// wie beim Bannen unter „Alle Benutzer“. Statt der Knöpfe steht dieser Satz.
+export const PROTECTED_PERSON_TEXT = "Konto mit Adminbereich – Strikes und Chat-Sperren setzt und nimmt nur der Superadmin zurück.";
 
 export default function AdminModerationPage() {
   // Reiter per ?tab= ansteuerbar - die Einspruch-Benachrichtigung führt direkt zu „Personen“.
@@ -51,6 +55,7 @@ export default function AdminModerationPage() {
 // Personen (#416): wer Treffer oder Maßnahmen hat, mit Historie - Treffer eintragen oder
 // zurücknehmen, Stufe von Hand setzen oder aufheben, Einsprüche entscheiden, CSV für den Vorstand.
 function PeopleTab() {
+  const { isSuperAdmin } = useAuth();
   const [people, setPeople] = useState([]);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -93,6 +98,8 @@ function PeopleTab() {
   };
 
   const active = detail?.active;
+  // Geschützte Konten: Lesen ja, Maßnahmen nur der Superadmin - der Server lehnt es sonst ab.
+  const locked = Boolean(detail?.protected) && !isSuperAdmin;
   return (
     <div className="grid lg:grid-cols-[20rem_minmax(0,1fr)] gap-4">
       <div className="border border-white/10 bg-[#121212] rounded-sm p-3">
@@ -108,6 +115,7 @@ function PeopleTab() {
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-bold text-sm truncate">{row.user.display_name || row.user.username}</span>
                     {row.open_appeal && <span className="text-[10px] font-black uppercase tracking-widest text-[#FFD700]">Einspruch</span>}
+                    {row.protected && !row.open_appeal && <span className="text-[10px] font-bold uppercase tracking-widest text-white/45" data-testid={`people-protected-${row.user.username}`}>Admin-Konto</span>}
                   </div>
                   <div className="text-[11px] text-white/50">{row.active_strikes} Treffer{row.active ? ` · ${row.active.label}` : ""}</div>
                 </button>
@@ -137,7 +145,7 @@ function PeopleTab() {
               <div className="mt-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 text-sm" data-testid="people-appeal">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700]">Einspruch vom {formatMoment(active.appeal.created_at)} · {active.appeal.status === "open" ? "offen" : `entschieden: ${active.appeal.decision === "lift" ? "aufgehoben" : "bleibt"}`}</div>
                 <p className="mt-1 whitespace-pre-wrap text-white/80">{active.appeal.message}</p>
-                {active.appeal.status === "open" && (
+                {active.appeal.status === "open" && !locked && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button type="button" disabled={!!busy} onClick={() => run("appeal", () => api.post(`/moderation/sanctions/${active.id}/appeal-decision`, { decision: "lift", note: note || null }), "Einspruch angenommen – Maßnahme aufgehoben.")} data-testid={`appeal-lift-${active.id}`} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Annehmen und aufheben</button>
                     <button type="button" disabled={!!busy} onClick={() => run("appeal", () => api.post(`/moderation/sanctions/${active.id}/appeal-decision`, { decision: "keep", note: note || null }), "Einspruch abgelehnt – Maßnahme bleibt.")} data-testid={`appeal-keep-${active.id}`} className="px-3 py-1.5 border border-white/20 text-white/80 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Ablehnen</button>
@@ -145,6 +153,10 @@ function PeopleTab() {
                 )}
               </div>
             )}
+            {locked ? (
+              <p className="mt-3 border border-white/10 bg-black/20 rounded-sm p-3 text-sm text-white/60" data-testid="people-locked">{PROTECTED_PERSON_TEXT}</p>
+            ) : (
+            <>
             <div className="mt-3 grid md:grid-cols-2 gap-3">
               <div className="border border-white/10 rounded-sm p-3">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-white/60 mb-2">Treffer eintragen</div>
@@ -166,6 +178,8 @@ function PeopleTab() {
             <div className="mt-3">
               <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Notiz für Aufheben, Zurücknehmen oder Einspruch (optional)" data-testid="people-note" className="w-full bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </div>
+            </>
+            )}
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
@@ -176,7 +190,7 @@ function PeopleTab() {
                   {detail.strikes.map((strike) => (
                     <li key={strike.id} className={`flex items-start justify-between gap-2 ${strike.revoked ? "opacity-50 line-through" : ""}`} data-testid={`people-strike-${strike.id}`}>
                       <span><span className="text-white/45 text-xs">{formatMoment(strike.created_at)}</span> · {strike.source_label}{strike.note ? ` · ${strike.note}` : ""}{strike.revoked && strike.revoke_note ? ` (zurückgenommen: ${strike.revoke_note})` : ""}</span>
-                      {!strike.revoked && <button type="button" disabled={!!busy} onClick={() => run("revoke", () => api.post(`/moderation/strikes/${strike.id}/revoke`, { note: note || null }), "Treffer zurückgenommen.")} data-testid={`strike-revoke-${strike.id}`} className="text-[10px] font-bold uppercase tracking-wider text-white/50 hover:text-[#FF3B30] shrink-0">Zurücknehmen</button>}
+                      {!strike.revoked && !locked && <button type="button" disabled={!!busy} onClick={() => run("revoke", () => api.post(`/moderation/strikes/${strike.id}/revoke`, { note: note || null }), "Treffer zurückgenommen.")} data-testid={`strike-revoke-${strike.id}`} className="text-[10px] font-bold uppercase tracking-wider text-white/50 hover:text-[#FF3B30] shrink-0">Zurücknehmen</button>}
                     </li>
                   ))}
                 </ul>
@@ -189,7 +203,7 @@ function PeopleTab() {
                   {detail.sanctions.map((entry) => (
                     <li key={entry.id} className="flex items-start justify-between gap-2" data-testid={`people-sanction-${entry.id}`}>
                       <span><span className="text-white/45 text-xs">{formatMoment(entry.created_at)}</span> · {entry.label} · {SANCTION_STATUS[entry.status] || entry.status}{entry.automatic ? "" : " · von Hand"}{entry.reason ? ` · ${entry.reason}` : ""}</span>
-                      {entry.status === "active" && <button type="button" disabled={!!busy} onClick={() => run("lift", () => api.post(`/moderation/sanctions/${entry.id}/lift`, { note: note || null }), "Maßnahme aufgehoben.")} data-testid={`sanction-lift-${entry.id}`} className="text-[10px] font-bold uppercase tracking-wider text-[#00FF88] shrink-0">Aufheben</button>}
+                      {entry.status === "active" && !locked && <button type="button" disabled={!!busy} onClick={() => run("lift", () => api.post(`/moderation/sanctions/${entry.id}/lift`, { note: note || null }), "Maßnahme aufgehoben.")} data-testid={`sanction-lift-${entry.id}`} className="text-[10px] font-bold uppercase tracking-wider text-[#00FF88] shrink-0">Aufheben</button>}
                     </li>
                   ))}
                 </ul>
