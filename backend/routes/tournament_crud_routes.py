@@ -7,8 +7,10 @@ from fastapi.responses import RedirectResponse
 from urllib.parse import quote, urlencode
 from pymongo.errors import DuplicateKeyError
 from database import get_db
+from services.permissions import is_tournament_lead
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see
+from services.visibility import lead_can_see
 from services import partner_pages
 from services.access_links import (
     public_access_link_payload,
@@ -37,7 +39,6 @@ from models import TournamentCreate, TournamentUpdate, now_utc, new_id
 from services import pricing, tournament_fees
 from services.permissions import user_has_area
 from routes.tournament_common import (
-    STAFF_ROLES,
     _create_initial_stage_bracket_preview,
     _enrich_game_identity,
     _ensure_tournament_unlocked,
@@ -119,7 +120,7 @@ async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     await partner_pages.attach_partners(db, t)
     if t.get("event_id"):
         e = await db.events.find_one({"id": t["event_id"]}, {"_id": 0, "tournaments": 0, "f1_challenges": 0})
-        if e and e.get("status") != "draft" and await user_can_see(user, e.get("visibility") or "public"):
+        if e and e.get("status") != "draft" and await lead_can_see(user, e.get("visibility") or "public"):
             t["event"] = e
     t["participant_count"] = await db.tournament_registrations.count_documents(
         {"tournament_id": t["id"], "status": {"$in": ["approved", "checked_in"]}})
@@ -133,7 +134,7 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
                            include_drafts: bool = False,
                            user=Depends(get_optional_user)):
     db = get_db()
-    is_admin = user and user.get("role") in STAFF_ROLES
+    is_admin = is_tournament_lead(user)
     assigned_ids = await assigned_tournament_ids(user)
     can_include_drafts = bool(include_drafts and (is_admin or assigned_ids))
     q = {}
@@ -174,7 +175,7 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
                 visible.append(t)
             elif t.get("status") == "draft":
                 continue
-            elif t.get("is_public") is not False and await user_can_see(user, t.get("visibility") or "public"):
+            elif t.get("is_public") is not False and await lead_can_see(user, t.get("visibility") or "public"):
                 visible.append(t)
         tournaments = visible
     finance = bool(user) and await user_has_area(user, "finance")
@@ -193,7 +194,7 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
     t, was_old_slug = await find_by_slug_or_history(db.tournaments, slug_or_id, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    is_admin = user and user.get("role") in STAFF_ROLES
+    is_admin = is_tournament_lead(user)
     is_assigned = await _is_tournament_staff(t["id"], user)
     is_participant = await _user_participates_in_tournament(db, t["id"], user)
     access_link = await validate_access_link(db, access, "tournament", t["id"], user, "view")

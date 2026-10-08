@@ -539,7 +539,7 @@ def _normalize_banner_link(value: str | None) -> str:
     return link_url
 
 
-def _banner_active(doc: dict, user: dict | None) -> bool:
+def _banner_active(doc: dict, user: dict | None, member_view: bool = False) -> bool:
     if not doc.get("enabled", True):
         return False
     if not str(doc.get("text") or "").strip():
@@ -555,13 +555,13 @@ def _banner_active(doc: dict, user: dict | None) -> bool:
     # „Admins“ ist das Admin-Team samt Moderation (wie „Nur Admins“ im Profil); „Vereinsmitglieder“
     # folgt der Regel für Mitglieder-Inhalte (services/visibility.py).
     admin_roles = {"moderator", "tournament_admin", "club_admin", "superadmin"}
-    member_roles = {"tournament_admin", "club_admin", "superadmin"}
     if audience == "all":
         return True
     if audience == "logged_in":
         return bool(user)
     if audience == "members":
-        return bool(user and (user.get("is_club_member") or user.get("role") in member_roles))
+        # ``member_view`` rechnet der Aufrufer einmal je Anfrage aus (Bereiche brauchen die Datenbank).
+        return bool(user and member_view)
     if audience == "admins":
         return bool(user and user.get("role") in admin_roles)
     return False
@@ -982,7 +982,9 @@ async def list_site_banners(response: Response, me: dict | None = Depends(get_op
     # Banner-Manager owns public notice bars from here on.
     all_docs = manual + await _auto_site_banners(db)
     wanted = "app" if channel == "app" else "web"
-    active = [doc for doc in all_docs if _banner_active(doc, me) and wanted in banner_channels(doc)]
+    from services.visibility import sees_member_content
+    member_view = await sees_member_content(me, look_up_membership=False)
+    active = [doc for doc in all_docs if _banner_active(doc, me, member_view) and wanted in banner_channels(doc)]
     stats_rows = await db.site_banner_stats.find({"id": {"$in": [doc["id"] for doc in active if doc.get("id")]}}, {"_id": 0}).to_list(200)
     stats = {row["id"]: row for row in stats_rows}
     items = [_public_banner_doc(doc, stats.get(doc.get("id"))) for doc in active]

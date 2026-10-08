@@ -1,6 +1,6 @@
 # Rollen und Rechte
 
-Stand: Meilenstein „Web: Rollen und Rechte“ (#287–#292). Quelle der Wahrheit für
+Stand: Meilenstein „Web: Rollen und Rechte“ (#287–#292), Rollen nach Bereichen (#1300), Rollen II (#1350). Quelle der Wahrheit für
 das, was eine Person im Adminbereich darf. Der Code dazu: `backend/services/permissions.py`
 (Bereiche, Rollen, Vorstand), `backend/auth.py` (`require_area`), Web `frontend/src/lib/permissions.js`.
 
@@ -12,10 +12,10 @@ Rechte hängen an Bereichen, nicht an einer Rangfolge. Eine Person kann mehrere 
 | --- | --- | --- |
 | Turnierleitung | `tournaments` | Turniere, Events, Stationen, Fast Lap, Saisons, Spiele, Gewinne, Strafen, Zugangslinks, PDF-Exporte |
 | Redaktion | `content` | News, Galerie, Medien, Sponsoren, Partner, Referenzen, Navigation, Sticker, Achievements, Seiten-Banner, Newsletter, Twitch-Streams |
-| Vereinsverwaltung | `club` | Mitglieder und Mitgliederprofile, Anträge, Dokumente, Vorteile, Vorstand, Kontakt-Inbox, Benutzerliste (bearbeiten, bannen mit Grund – Konten mit Adminbereich oder Admin-Rolle bannt nur der Superadmin), Discord-Zähler |
+| Vereinsverwaltung | `club` | Mitglieder und Mitgliederprofile, Anträge, Dokumente, Vorteile, Vorstand, Kontakt-Inbox, Benutzerliste (lesen, bannen mit Grund – Konten mit Adminbereich oder Admin-Rolle bannt nur der Superadmin, Superadmin-Konten niemand), Discord-Zähler |
 | Finanzen | `finance` | Kosten und Abrechnung an Events (später Turnieren), Finanzübersicht mit Rechnungsaufträgen, Freigaben (#322, docs/ABRECHNUNG.md) |
 | System | `system` | Einstellungen (Mail, Branding, Discord, Auth), Game-Server, Betrieb, Logs, Audit, App-Logs, Push-Tests, App-Versionen, E-Mail-Vorlagen, Wartungsläufe für Uploads |
-| Moderation | `moderation` | Moderationsseite: Meldungen, Wortfilter, Bildprüfung, Verwarnungen und Chat-Sperren; Direktnachrichten an jede Person. Keine Turnierrechte – wer zusätzlich als Helfer eingetragen ist, hat dort genau die Rechte des Einsatzes |
+| Moderation | `moderation` | Moderationsseite: Meldungen, Wortfilter, Bildprüfung, Verwarnungen und Chat-Sperren (bei Konten mit Adminbereich nur der Superadmin, siehe unten); Direktnachrichten an jede Person. Keine Turnierrechte – wer zusätzlich als Helfer eingetragen ist, hat dort genau die Rechte des Einsatzes |
 
 ## Wer hat welchen Bereich
 
@@ -28,8 +28,11 @@ Rechte hängen an Bereichen, nicht an einer Rangfolge. Eine Person kann mehrere 
 | Spieler | keiner – außer Freigaben oder Vorstandsposten | – |
 
 **Freigaben:** Der Superadmin kann einer Person einzelne Bereiche geben (Admin → Alle Benutzer):
-Turnierleitung, Redaktion, Vereinsverwaltung. System bleibt an Club-Admin und Superadmin gebunden.
-Jede Freigabe steht im Audit-Log.
+Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen. System bleibt an Club-Admin und Superadmin gebunden.
+Jede Freigabe steht im Audit-Log. Eine Freigabe zählt überall genauso wie die Rolle (#1350): Wer die
+Turnierleitung über eine Freigabe hat, arbeitet in jedem Turnier, jeder Fast Lap, an den Stationen und bei
+den Events wie mit der Rolle (Status, Turnierbaum, Anmeldungen, Check-in, Ergebnisse). Der Server prüft dafür
+den Bereich (`services/permissions.is_tournament_lead`), nicht eine Rollenliste.
 
 **Vorstand:** Wer einen aktiven Vorstandsposten hält oder vertritt (Admin → Vorstand), hat die
 Vereinsverwaltung von selbst. Die Besetzung der Posten ist damit eine Rechtevergabe.
@@ -52,8 +55,43 @@ Gewinne dieses Turniers (#288). Ergebnisse eintragen dürfen außerdem `referee`
 bekommen Dispute und abweichende Ergebnis-Meldungen ihres Bereichs sofort gemeldet (#1132, #1134). Das braucht
 keinen Bereich und keine Zwei-Faktor-Anmeldung.
 Dasselbe gilt je Fast Lap (Challenge → Staff). Turnierrechte, Fast-Lap-Zeiten, Events und Exporte
-kommen nur aus der Turnierleitung, Club-Admin, Superadmin oder einem solchen Einsatz – auch für
-Moderatoren.
+kommen nur aus dem Bereich Turnierleitung (Rolle oder Freigabe), Club-Admin, Superadmin oder einem solchen
+Einsatz – auch für Moderatoren.
+
+## Bannen, Strikes und Chat-Sperren (#1300, #1350)
+
+1. **Superadmin-Konten lassen sich nicht bannen** – auch nicht von einem anderen Superadmin. Wer gebannt
+   werden soll, verliert zuerst die Rolle; danach gilt der normale Weg. Der Server antwortet: „Superadmin-Konten
+   lassen sich nicht bannen. Zuerst die Rolle ändern.“
+2. **Konten mit Adminbereich oder Admin-Rolle** – aus Rolle, Freigabe, Vorstandsposten oder Dolibarr-Funktion –
+   bannt und entbannt nur der Superadmin. Derselbe Schutz gilt in der Moderation: Strikes, Chat-Sperren
+   (Hinweis, Verwarnung, Sperre), eine Meldung als „berechtigt“ (zählt als Strike), Aufheben, Zurücknehmen und
+   Einsprüche bei solchen Konten setzt nur der Superadmin – bei einem Strike mit Grund, der im Protokoll steht.
+   Die Moderation sieht in „Personen“ statt der Knöpfe den Satz „Konto mit Adminbereich – Strikes und
+   Chat-Sperren setzt und nimmt nur der Superadmin zurück.“, die Benutzerliste den passenden Satz zum Bannen.
+3. Das eigene Konto bannt niemand. Gebannt wird immer mit Grund (mindestens fünf Zeichen); der Grund steht im
+   Protokoll.
+4. **Team-Chats bleiben zu:** Moderatoren öffnen Team-Chats nicht ohne Meldung; gemeldete Nachrichten sehen sie
+   in der Moderation.
+5. Normale Konten sperrt und verwarnt die Moderation wie bisher. Automatische Strikes (Wortfilter, Bildprüfung)
+   kommen vom System, nicht von einer Person.
+
+## Mitglieder-Inhalte (#1350)
+
+Inhalte mit der Sichtbarkeit „Nur Mitglieder“ – News, Events, Galerie, Dokumente wie Protokolle, Spielserver,
+Seiten-Banner – und der Mitgliederbereich (Discord-Kanäle, Steam-Status) sehen **aktive Mitglieder und
+Ehrenmitglieder** sowie, wer den Bereich **Vereinsverwaltung oder System** hat (über Rolle, Freigabe,
+Vorstandsposten oder Dolibarr-Funktion). Die Rolle Turnierleitung allein reicht dafür nicht; Moderatoren und die
+Turnierleitung sehen Mitglieder-Inhalte als Mitglied. Code: `services/visibility.sees_member_content`.
+
+Ausnahme mit Grund: **Events, Turniere und Fast Laps** gehören zur Turnierleitung – sie legt sie an, checkt beim
+Einlass ein und wertet aus. Mit dem Bereich Turnierleitung (Rolle oder Freigabe) sieht man sie deshalb auch mit
+„Nur Mitglieder“ (Listen, Event-Seite, Kalender, Suche, App), Alben und News am Event dagegen nur als Mitglied
+oder mit Vereinsverwaltung/System. Code: `services/visibility.lead_can_see`.
+
+In der App fragt die Team-Seite dieselben Rollen wie der Server: Team bearbeiten und Squads dürfen Leitung,
+Co-Leitung, Turnierleitung, Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und
+Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe.
 
 ## Zwei-Faktor und Anmeldung (#348)
 

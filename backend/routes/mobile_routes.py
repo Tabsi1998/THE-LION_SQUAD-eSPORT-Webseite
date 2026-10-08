@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from auth import get_current_user, get_optional_user
 from database import get_db
+from services.permissions import is_tournament_lead
 from models import new_id, now_utc
 from services.match_audience import acting_registration_ids
 from services.tournament_rules import self_checkin_allowed, tournament_event_mode
@@ -21,6 +22,7 @@ from services.profile_references import personal_profile_references
 from services import event_days
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
+from services.visibility import lead_can_see
 from services.app_releases import current_release, next_check_after, public_release, release_file, update_decision, updater_settings
 
 PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=at.lionsquad.app"
@@ -235,24 +237,24 @@ async def _team_ids_for_user(user_id: str) -> list[str]:
 
 async def _visible_tournament(tournament: dict, user: dict | None, participant_ids: set[str] | None = None) -> bool:
     participant_ids = participant_ids or set()
-    is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    is_staff = is_tournament_lead(user)
     if tournament.get("status") == "draft" and not is_staff:
         return False
     if tournament.get("id") in participant_ids:
         return True
     if tournament.get("is_public") is False and not is_staff:
         return False
-    return await user_can_see(user, tournament.get("visibility") or "public")
+    return await lead_can_see(user, tournament.get("visibility") or "public")
 
 
 async def _visible_event(event: dict, user: dict | None, registered_ids: set[str] | None = None) -> bool:
     registered_ids = registered_ids or set()
-    is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    is_staff = is_tournament_lead(user)
     if event.get("status") == "draft" and not is_staff:
         return False
     if event.get("id") in registered_ids:
         return True
-    return await user_can_see(user, event.get("visibility") or "public")
+    return await lead_can_see(user, event.get("visibility") or "public")
 
 
 async def _event_summary(event_id: str | None, user: dict | None) -> dict | None:

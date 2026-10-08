@@ -117,7 +117,12 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   }, [inviteQuery, team?.can_manage, team?.id]);
 
   const isMember = Boolean(user && team && (team.is_member || team.member_ids?.includes(user.id)));
-  const canManage = Boolean(user && team && (team.can_manage || team.leader_id === user.id || team.co_leader_ids?.includes(user.id) || isAdmin(user)));
+  const leadsTeam = Boolean(user && team && (team.leader_id === user.id || team.co_leader_ids?.includes(user.id)));
+  // Dieselben Rollen wie der Server (team_routes.py, #1350): Team bearbeiten und Squads = Leitung, Co-Leitung oder
+  // Turnierleitung/Club-Admin/Superadmin; Mitglieder entfernen = Leitung, Co-Leitung oder Club-Admin/Superadmin.
+  // Moderatoren moderieren und sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe.
+  const canManage = Boolean(user && team && (team.can_manage || leadsTeam || isTeamAdmin(user)));
+  const canRemoveMembers = Boolean(user && team && (leadsTeam || isClubAdmin(user)));
   const isLeader = Boolean(user && team?.leader_id === user.id);
   const members = team?.members || [];
   const squads = team?.squads || [];
@@ -125,8 +130,8 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   const stats = useMemo(() => ({
     members: team?.member_count ?? team?.member_ids?.length ?? members.length,
     squads: team?.squad_count ?? squads.length,
-    role: isLeader ? "Kapitän" : canManage ? "Co-Kapitän" : isMember ? "Spieler" : "Besucher",
-  }), [canManage, isLeader, isMember, members.length, squads.length, team?.member_count, team?.member_ids?.length, team?.squad_count]);
+    role: isLeader ? "Kapitän" : leadsTeam ? "Co-Kapitän" : isMember ? "Spieler" : canManage ? "Verwaltung" : "Besucher",
+  }), [canManage, isLeader, isMember, leadsTeam, members.length, squads.length, team?.member_count, team?.member_ids?.length, team?.squad_count]);
 
   const openProfile = useCallback((username?: string | null) => {
     if (!username) return;
@@ -376,7 +381,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
             <MemberRow
               key={member.id}
               busy={busy}
-              canManage={canManage}
+              canRemoveMembers={canRemoveMembers}
               isLeader={isLeader}
               member={member}
               onKick={kickMember}
@@ -466,7 +471,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
 
 function MemberRow({
   busy,
-  canManage,
+  canRemoveMembers,
   isLeader,
   member,
   onKick,
@@ -477,7 +482,7 @@ function MemberRow({
   user,
 }: {
   busy: boolean;
-  canManage: boolean;
+  canRemoveMembers: boolean;
   isLeader: boolean;
   member: TeamMember;
   onKick: (member: TeamMember) => void;
@@ -491,7 +496,7 @@ function MemberRow({
   const isSelf = member.id === user?.id;
   const isTeamLeader = role === "leader";
   const canRole = isLeader && !isTeamLeader;
-  const canKick = canManage && !isTeamLeader && !isSelf;
+  const canKick = canRemoveMembers && !isTeamLeader && !isSelf;
   return (
     <View style={styles.memberRow}>
       <MediaImage
@@ -624,12 +629,17 @@ function normalizeLink(url?: string | null) {
   return /^https?:\/\//i.test(value) ? value : `https://${value}`;
 }
 
+// Spiegel von TEAM_ADMIN_ROLES und _can_manage_team im Server (#1350): Team bearbeiten und Squads auch mit
+// Turnierleitung; Mitglieder entfernen und Team auflösen nur Club-Admin und Superadmin (neben der Leitung).
+export const TEAM_ADMIN_ROLES = ["tournament_admin", "club_admin", "superadmin"];
+export const TEAM_MEMBER_ADMIN_ROLES = ["club_admin", "superadmin"];
+
 function isClubAdmin(user?: User | null) {
-  return ["club_admin", "superadmin"].includes(String(user?.role || ""));
+  return TEAM_MEMBER_ADMIN_ROLES.includes(String(user?.role || ""));
 }
 
-function isAdmin(user?: User | null) {
-  return ["moderator", "tournament_admin", "club_admin", "superadmin"].includes(String(user?.role || ""));
+function isTeamAdmin(user?: User | null) {
+  return TEAM_ADMIN_ROLES.includes(String(user?.role || ""));
 }
 
 const styles = StyleSheet.create({

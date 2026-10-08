@@ -196,3 +196,38 @@ test("Co-Kapitän bearbeitet, löst aber nicht auf", async () => {
   await waitFor(() => expect(screen.getByTestId("team-color-picker")).toBeTruthy());
   expect(screen.queryByTestId("team-dissolve")).toBeNull();
 });
+
+// Rollen II (#1350): die Team-Seite fragt dieselben Rollen wie der Server - Moderatoren moderieren und sehen auf fremden
+// Team-Seiten keine Verwaltungs-Knöpfe; die Turnierleitung bearbeitet das Team, Mitglieder entfernt nur die Leitung oder der
+// Club-Admin.
+const STRANGER_TEAM = {
+  ...TEAM, leader_id: "u-lead", co_leader_ids: [], member_ids: ["u-lead", "u-2"],
+  members: [{ id: "u-lead", username: "leitung", display_name: "Leitung" }, { id: "u-2", username: "erika", display_name: "Erika Beispiel" }],
+};
+
+test("Moderator auf einer fremden Team-Seite: keine Verwaltungs-Knöpfe", async () => {
+  mockAuth.user = { id: "u-mod", username: "mod", role: "moderator" };
+  serve(STRANGER_TEAM);
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-header")).toBeTruthy());
+  expect(screen.queryByTestId("team-edit-open")).toBeNull();
+  expect(screen.queryByTestId("team-manage-members")).toBeNull();
+  expect(screen.queryByText("Verwaltung aktiv")).toBeNull();
+  expect(screen.queryByText("Entfernen")).toBeNull();
+});
+
+test("Turnierleitung bearbeitet das Team, entfernt aber keine Mitglieder (wie der Server)", async () => {
+  mockAuth.user = { id: "u-ta", username: "turnier", role: "tournament_admin" };
+  serve(STRANGER_TEAM);
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-edit-open")).toBeTruthy());
+  expect(screen.queryByText("Entfernen")).toBeNull();
+});
+
+test("Club-Admin darf Mitglieder entfernen", async () => {
+  mockAuth.user = { id: "u-ca", username: "clubadmin", role: "club_admin" };
+  serve(STRANGER_TEAM);
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-edit-open")).toBeTruthy());
+  expect(screen.getAllByText("Entfernen")).toHaveLength(1);
+});

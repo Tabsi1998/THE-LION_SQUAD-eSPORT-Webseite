@@ -4,6 +4,7 @@ import re
 from fastapi import HTTPException, Depends
 from pydantic import BaseModel, Field
 from database import get_db
+from services.permissions import is_tournament_lead
 from services import moderation_standing
 from auth import get_current_user
 from models import now_utc, new_id
@@ -11,7 +12,6 @@ from services.user_notifications import create_user_notification
 from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments
 from services import word_filter
 from routes.tournament_common import (
-    STAFF_ROLES,
     TOURNAMENT_MUTATION_LOCKED_DETAIL,
     _get_visible_tournament,
     _is_staff,
@@ -102,14 +102,14 @@ async def _notify_tournament_mentions(db, tournament: dict, sender: dict, messag
             "is_banned": {"$ne": True},
             "$or": [{"username": {"$regex": f"^{re.escape(handle)}$", "$options": "i"}} for handle in handles],
         },
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "role": 1},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "role": 1, "areas": 1},
     ).to_list(100)
     allowed_ids = await _tournament_chat_user_ids(db, tournament["id"])
     notified_ids: set[str] = set()
     for member in candidates:
         if member.get("id") == sender.get("id"):
             continue
-        if member.get("id") not in allowed_ids and member.get("role") not in STAFF_ROLES:
+        if member.get("id") not in allowed_ids and not is_tournament_lead(member):
             continue
         await create_user_notification(
             member["id"],

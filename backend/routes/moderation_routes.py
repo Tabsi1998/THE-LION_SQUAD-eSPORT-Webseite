@@ -136,6 +136,21 @@ async def _audit(actor_id: str, action: str, target_id: str | None, data: dict |
     await db.audit_logs.insert_one({"id": new_id(), "action": action, "actor_id": actor_id, "target_id": target_id, "data": data or {}, "created_at": now_utc().isoformat()})
 
 
+async def _measure_target(db, me: dict, user_id: str) -> dict:
+    """Gegen wen die Moderation eine Maßnahme setzt oder zurücknimmt (#1350): Konten mit Admin-Rolle oder einem
+    Bereich (aus Rolle, Freigabe, Vorstandsposten oder Dolibarr-Funktion) nur durch den Superadmin - derselbe
+    Schutz wie beim Bannen. Gibt das Konto zurück, sonst 404 oder 403 mit Grund."""
+    from services.permissions import MODERATION_PROTECTED_DETAIL, ban_protected, is_superadmin
+
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1, "areas": 1})
+    if not target:
+        raise HTTPException(404, "Benutzer nicht gefunden")
+    target["protected"] = await ban_protected(target, db)
+    if target["protected"] and not is_superadmin(me):
+        raise HTTPException(403, MODERATION_PROTECTED_DETAIL)
+    return target
+
+
 async def _word_filter_view(db) -> dict:
     config = await word_filter.load_config(db)
     pending = await db.moderation_items.count_documents({"state": "pending"})
@@ -284,6 +299,9 @@ async def review_report(report_id: str, body: UserReportPatch, me: dict = Depend
     report = await db.user_reports.find_one({"id": report_id}, {"_id": 0})
     if not report:
         raise HTTPException(404, "Meldung nicht gefunden")
+    if body.status == "justified" and report.get("status") != "justified" and report.get("target_user_id"):
+        # „Berechtigt“ zählt als Strike - gegen Admin-Konten entscheidet das der Superadmin (#1350).
+        await _measure_target(db, me, report["target_user_id"])
     now = now_utc().isoformat()
     await db.user_reports.update_one({"id": report_id}, {"$set": {
         "status": body.status, "resolution_note": (body.resolution_note or "").strip() or None,
@@ -363,8 +381,10 @@ async def person_history(user_id: str, me: dict = Depends(require_area("moderati
 @router.post("/people/{user_id}/strikes")
 async def add_manual_strike(user_id: str, body: NoteBody, me: dict = Depends(require_area("moderation"))):
     db = get_db()
-    if not await db.users.find_one({"id": user_id}, {"_id": 1}):
-        raise HTTPException(404, "Benutzer nicht gefunden")
+    target = await _measure_target(db, me, user_id)
+    if target["protected"] and len((body.note or "").strip()) < 3:
+        # Der Superadmin verwarnt ein Admin-Konto nur mit Grund - er steht im Protokoll.
+        raise HTTPException(422, "Bitte einen Grund angeben – er steht im Protokoll.")
     outcome = await moderation_standing.add_strike(db, user_id, source="manual", moderator_id=me["id"], note=body.note)
     await _audit(me["id"], "moderation.strike", user_id, {"strike_id": outcome["strike"]["id"], "note": body.note})
     return {"ok": True, "strike": outcome["strike"], "sanction": outcome["sanction"]}
@@ -373,24 +393,35 @@ async def add_manual_strike(user_id: str, body: NoteBody, me: dict = Depends(req
 @router.post("/people/{user_id}/sanctions")
 async def set_person_sanction(user_id: str, body: SanctionBody, me: dict = Depends(require_area("moderation"))):
     db = get_db()
-    if not await db.users.find_one({"id": user_id}, {"_id": 1}):
-        raise HTTPException(404, "Benutzer nicht gefunden")
+    await _measure_target(db, me, user_id)
     return await moderation_standing.set_sanction(db, user_id, body.action, moderator_id=me["id"], reason=body.reason, chat_hours=body.chat_hours)
 
 
 @router.post("/sanctions/{sanction_id}/lift")
 async def lift_sanction(sanction_id: str, body: NoteBody, me: dict = Depends(require_area("moderation"))):
-    return await moderation_standing.lift_sanction(get_db(), sanction_id, moderator_id=me["id"], note=body.note)
+    db = get_db()
+    sanction = await db.moderation_sanctions.find_one({"id": sanction_id}, {"_id": 0, "user_id": 1})
+    if sanction:
+        await _measure_target(db, me, sanction["user_id"])
+    return await moderation_standing.lift_sanction(db, sanction_id, moderator_id=me["id"], note=body.note)
 
 
 @router.post("/strikes/{strike_id}/revoke")
 async def revoke_strike(strike_id: str, body: NoteBody, me: dict = Depends(require_area("moderation"))):
-    return await moderation_standing.revoke_strike(get_db(), strike_id, moderator_id=me["id"], note=body.note)
+    db = get_db()
+    strike = await db.moderation_strikes.find_one({"id": strike_id}, {"_id": 0, "user_id": 1})
+    if strike:
+        await _measure_target(db, me, strike["user_id"])
+    return await moderation_standing.revoke_strike(db, strike_id, moderator_id=me["id"], note=body.note)
 
 
 @router.post("/sanctions/{sanction_id}/appeal-decision")
 async def decide_appeal(sanction_id: str, body: AppealDecisionBody, me: dict = Depends(require_area("moderation"))):
-    return await moderation_standing.decide_appeal(get_db(), sanction_id, moderator_id=me["id"], decision=body.decision, note=body.note)
+    db = get_db()
+    sanction = await db.moderation_sanctions.find_one({"id": sanction_id}, {"_id": 0, "user_id": 1})
+    if sanction:
+        await _measure_target(db, me, sanction["user_id"])
+    return await moderation_standing.decide_appeal(db, sanction_id, moderator_id=me["id"], decision=body.decision, note=body.note)
 
 
 @router.get("/me/standing")

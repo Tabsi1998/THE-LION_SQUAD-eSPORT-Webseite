@@ -6,6 +6,7 @@ from fastapi import HTTPException, Depends
 from datetime import datetime, timezone
 from pymongo.errors import DuplicateKeyError
 from database import get_db
+from services.permissions import is_tournament_lead
 from auth import get_current_user, get_optional_user
 from services.access_links import record_access_link_use, validate_access_link
 from services.match_audience import responsible_registration
@@ -24,7 +25,6 @@ from models import RegistrationCreate, RegistrationUpdate, RegistrationAdminCrea
 from services import tournament_event_gate, tournament_fees
 from services.query_filters import safe_regex
 from routes.tournament_common import (
-    STAFF_ROLES,
     TOURNAMENT_MUTATION_LOCKED_DETAIL,
     _apply_match_plan,
     _audit_tournament_action,
@@ -91,7 +91,7 @@ def _can_register_team(team: dict, user: dict) -> bool:
     return (
         team.get("leader_id") == user["id"]
         or user["id"] in (team.get("co_leader_ids") or [])
-        or user.get("role") in STAFF_ROLES
+        or is_tournament_lead(user)
     )
 
 

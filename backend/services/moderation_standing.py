@@ -358,9 +358,15 @@ async def decide_appeal(db, sanction_id: str, *, moderator_id: str, decision: st
 
 async def person_history(db, user_id: str) -> dict:
     """Für die Moderation: alles zu einer Person - Meldungen gegen sie, Treffer, Sanktionen, Einsprüche."""
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1, "is_banned": 1})
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1, "is_banned": 1, "areas": 1})
     if not user:
         raise HTTPException(404, "Benutzer nicht gefunden.")
+    from services.permissions import ban_protected
+
+    # Konten mit Admin-Rolle oder Bereich (#1350): Strikes und Chat-Sperren setzt nur der Superadmin - die Seite
+    # zeigt statt der Knöpfe einen Satz. Die Bereiche selbst gehen nicht hinaus.
+    protected = await ban_protected(user, db)
+    user.pop("areas", None)
     settings = await load_settings(db)
     strikes = await db.moderation_strikes.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
     sanctions = await db.moderation_sanctions.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
@@ -369,6 +375,7 @@ async def person_history(db, user_id: str) -> dict:
     cutoff = _cutoff(settings, now_utc())
     return {
         "user": user,
+        "protected": protected,
         "active_strike_count": sum(1 for s in strikes if not s.get("revoked") and (s.get("created_at") or "") >= cutoff),
         "strikes": [_strike_view(s, for_person=False) for s in strikes],
         "sanctions": [_sanction_view(s, for_person=False) for s in sanctions],
@@ -400,11 +407,17 @@ async def people_overview(db) -> list[dict]:
             row["open_appeal"] = True
     if not people:
         return []
-    users = {u["id"]: u for u in await db.users.find({"id": {"$in": list(people)}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1}).to_list(len(people))}
+    found = await db.users.find({"id": {"$in": list(people)}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1, "areas": 1}).to_list(len(people))
+    from services.permissions import ban_protected_ids
+
+    # Welche Konten nur der Superadmin verwarnt (#1350) - Rolle und Bereiche selbst gehen nicht hinaus.
+    protected = await ban_protected_ids(found, db)
+    users = {u["id"]: {key: value for key, value in u.items() if key not in ("role", "areas")} for u in found}
     rows = []
     for user_id, row in people.items():
         user = users.get(user_id) or {"id": user_id, "username": "?", "display_name": "(gelöscht)"}
-        rows.append({**row, "sanctions": row.get("sanctions", 0), "active": row.get("active"), "open_appeal": bool(row.get("open_appeal")), "user": user})
+        rows.append({**row, "sanctions": row.get("sanctions", 0), "active": row.get("active"), "open_appeal": bool(row.get("open_appeal")), "user": user,
+                     "protected": user_id in protected})
     rows.sort(key=lambda r: r["last_event_at"], reverse=True)
     return rows
 

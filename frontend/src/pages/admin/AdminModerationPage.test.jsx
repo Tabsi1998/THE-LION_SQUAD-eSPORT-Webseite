@@ -9,8 +9,11 @@ const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_err, fallback) => fallback }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("sonner", () => ({ toast: toastMock }));
+// Wer gerade moderiert (#1350): Moderator oder Superadmin.
+const authState = { isSuperAdmin: false };
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ isSuperAdmin: authState.isSuperAdmin }) }));
 
-const AdminModerationPage = (await import("./AdminModerationPage")).default;
+const { default: AdminModerationPage, PROTECTED_PERSON_TEXT } = await import("./AdminModerationPage");
 
 const FILTER_OFF = { enabled: false, entries: [], counts: { entries: 0, pending: 0, flagged: 0 } };
 const FILTER_ON = { enabled: true, entries: [{ id: "e1", term: "Scheiße", action: "hold", note: "grob" }], counts: { entries: 1, pending: 1, flagged: 0 } };
@@ -30,13 +33,13 @@ const DETAIL = {
 };
 const LEVELS = { levels: [{ strikes: 1, action: "notice", chat_hours: 0 }, { strikes: 2, action: "warning", chat_hours: 24 }, { strikes: 3, action: "suspension", chat_hours: 0 }], strike_ttl_months: 12 };
 
-function mockApi({ filter = FILTER_OFF, items = ITEMS } = {}) {
+function mockApi({ filter = FILTER_OFF, items = ITEMS, people = PEOPLE, detail = DETAIL } = {}) {
   apiMock.get.mockImplementation(async (url) => {
     if (url.startsWith("/moderation/word-filter")) return { data: filter };
     if (url.startsWith("/moderation/items")) return { data: items };
     if (url.startsWith("/moderation/reports")) return { data: [] };
-    if (url === "/moderation/people") return { data: PEOPLE };
-    if (url.startsWith("/moderation/people/")) return { data: DETAIL };
+    if (url === "/moderation/people") return { data: people };
+    if (url.startsWith("/moderation/people/")) return { data: detail };
     if (url === "/moderation/levels") return { data: LEVELS };
     return { data: [] };
   });
@@ -45,6 +48,7 @@ function mockApi({ filter = FILTER_OFF, items = ITEMS } = {}) {
 beforeEach(() => {
   apiMock.post.mockReset(); apiMock.patch.mockReset(); apiMock.put.mockReset();
   toastMock.success.mockReset();
+  authState.isSuperAdmin = false;
 });
 
 test("Wortfilter: einschalten und einen Eintrag anlegen", async () => {
@@ -126,3 +130,33 @@ test("Stufen: laden, Verfall ändern, speichern", async () => {
   expect(toastMock.success).toHaveBeenCalledWith("Stufen gespeichert.");
 });
 
+// Rollen II (#1350): Konten mit Adminbereich verwarnt und sperrt im Chat nur der Superadmin - die Seite zeigt statt der
+// Knöpfe einen Satz, wie bei „Alle Benutzer“.
+const PROTECTED_PEOPLE = [{ ...PEOPLE[0], protected: true }];
+const PROTECTED_DETAIL = { ...DETAIL, protected: true };
+
+test("Personen: geschütztes Konto zeigt der Moderation den Satz statt der Knöpfe", async () => {
+  mockApi({ people: PROTECTED_PEOPLE, detail: PROTECTED_DETAIL });
+  render(<MemoryRouter initialEntries={["/admin/moderation?tab=people"]}><AdminModerationPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("people-row-paula"));
+  await screen.findByTestId("people-detail");
+  expect(screen.getByTestId("people-locked")).toHaveTextContent(PROTECTED_PERSON_TEXT);
+  for (const testId of ["people-strike-add", "people-sanction-set", "strike-revoke-k1", "sanction-lift-s1", "appeal-lift-s1", "appeal-keep-s1"]) {
+    expect(screen.queryByTestId(testId)).toBeNull();
+  }
+  // Lesen bleibt: Historie, Einspruch und Stand stehen da.
+  expect(screen.getByTestId("people-appeal")).toHaveTextContent("War ein Missverständnis.");
+  expect(screen.getByTestId("people-active")).toHaveTextContent("Verwarnung mit Chat-Sperre");
+});
+
+test("Personen: der Superadmin sieht beim geschützten Konto alle Knöpfe", async () => {
+  authState.isSuperAdmin = true;
+  mockApi({ people: PROTECTED_PEOPLE, detail: PROTECTED_DETAIL });
+  render(<MemoryRouter initialEntries={["/admin/moderation?tab=people"]}><AdminModerationPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("people-row-paula"));
+  await screen.findByTestId("people-detail");
+  expect(screen.queryByTestId("people-locked")).toBeNull();
+  expect(screen.getByTestId("people-strike-add")).toBeInTheDocument();
+  expect(screen.getByTestId("people-sanction-set")).toBeInTheDocument();
+  expect(screen.getByTestId("sanction-lift-s1")).toBeInTheDocument();
+});

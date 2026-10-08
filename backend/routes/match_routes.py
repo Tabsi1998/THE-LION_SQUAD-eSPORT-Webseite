@@ -5,9 +5,10 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from database import get_db
+from services.permissions import is_tournament_lead, tournament_lead_filter
 from services import moderation_standing
 from auth import get_current_user, get_optional_user
-from services.visibility import user_can_see
+from services.visibility import lead_can_see
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     READ_STAFF_ROLES,
@@ -83,7 +84,8 @@ async def _ensure_match_tournament_unlocked(db, match: dict) -> None:
 
 
 def _is_staff(user: dict | None) -> bool:
-    return bool(user and user.get("role") in STAFF_ROLES)
+    # Bereich Turnierleitung aus Rolle oder Freigabe (#1350).
+    return is_tournament_lead(user)
 
 
 async def _sees_internal(match: dict, user: dict | None) -> bool:
@@ -205,7 +207,7 @@ async def _match_staff_user_ids(db, match: dict) -> set[str]:
     tournament_id = match.get("tournament_id")
     user_ids: set[str] = set()
     global_staff = await db.users.find(
-        {"role": {"$in": sorted(STAFF_ROLES)}, "is_active": True, "is_banned": {"$ne": True}},
+        {**tournament_lead_filter(), "is_active": True, "is_banned": {"$ne": True}},
         {"_id": 0, "id": 1},
     ).to_list(200)
     user_ids.update(row.get("id") for row in global_staff if row.get("id"))
@@ -249,13 +251,13 @@ async def _mentioned_match_user_ids(db, match: dict, message: str) -> set[str]:
             "is_banned": {"$ne": True},
             "$or": [{"username": {"$regex": f"^{re.escape(handle)}$", "$options": "i"}} for handle in user_handles],
         },
-        {"_id": 0, "id": 1, "role": 1},
+        {"_id": 0, "id": 1, "role": 1, "areas": 1},
     ).to_list(100)
     allowed_ids = await _match_chat_user_ids(db, match)
     return {
         candidate["id"]
         for candidate in candidates
-        if candidate.get("id") in allowed_ids or candidate.get("role") in STAFF_ROLES
+        if candidate.get("id") in allowed_ids or is_tournament_lead(candidate)
     }
 
 
@@ -377,7 +379,7 @@ async def _assert_match_visible(match: dict, user: dict | None) -> None:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if t.get("status") == "draft" or t.get("is_public") is False:
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
-    if not await user_can_see(user, t.get("visibility") or "public"):
+    if not await lead_can_see(user, t.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Match ist nicht sichtbar")
 
 

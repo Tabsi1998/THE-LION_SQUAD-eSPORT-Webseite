@@ -14,6 +14,7 @@ from services.visibility import user_can_see
 from services.station_labels import attach_station_info
 from services.tournament_permissions import READ_STAFF_ROLES, has_tournament_staff_permission
 from services.tournament_rules import tournament_modes
+from services.permissions import is_tournament_lead
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.competition_engine import GRAPH, preferred_engine
 from services.competition_formats import find_format_capability
@@ -373,7 +374,8 @@ def _stage_defaults_for_tournament_format(tournament: dict, body: TournamentBrac
 
 
 def _is_staff(user: dict | None) -> bool:
-    return bool(user and user.get("role") in STAFF_ROLES)
+    # Bereich Turnierleitung aus Rolle oder Freigabe (#1350) - nicht mehr die Rollenliste STAFF_ROLES.
+    return is_tournament_lead(user)
 
 
 async def _is_tournament_staff(tid: str, user: dict | None, roles: set[str] | None = None) -> bool:

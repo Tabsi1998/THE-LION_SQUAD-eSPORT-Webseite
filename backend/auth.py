@@ -288,9 +288,12 @@ async def get_current_user(request: Request) -> dict:
         user["user_type"] = "club_member"
     elif not user.get("user_type"):
         user["user_type"] = "community_user"
-    # Turnierleitung über alle Turniere oder Helfer in mindestens einem; Moderation allein zählt nicht.
+    # Turnierleitung über alle Turniere (Rolle oder Freigabe, #1350) oder Helfer in mindestens einem;
+    # Moderation allein zählt nicht.
+    from services.permissions import is_tournament_lead
+
     user["is_tournament_staff"] = bool(
-        user.get("role") in {"tournament_admin", "club_admin", "superadmin"}
+        is_tournament_lead(user)
         or await db.tournament_staff_assignments.count_documents({
             "user_id": user["id"],
             "is_active": {"$ne": False},
@@ -335,13 +338,12 @@ def require_role(*allowed_roles: str):
 
 
 def require_club_member():
-    """Active club member only — admins are also allowed."""
+    """Aktive Vereinsmitglieder - und wer den Bereich Vereinsverwaltung oder System hat, wie bei
+    Mitglieder-Inhalten (services/visibility.py, #1350). Die Rolle Turnierleitung allein reicht nicht."""
     async def dep(user: dict = Depends(get_current_user)) -> dict:
-        # Admins always pass - wie bei Mitglieder-Inhalten (services/visibility.py)
-        admin_roles = {"tournament_admin", "club_admin", "superadmin"}
-        if user.get("role") in admin_roles:
-            return user
-        if user.get("is_club_member"):
+        from services.visibility import sees_member_content
+
+        if await sees_member_content(user):
             return user
         raise HTTPException(status_code=403, detail="Nur Vereinsmitglieder.")
     return dep
