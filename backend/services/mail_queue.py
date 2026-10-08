@@ -16,7 +16,7 @@ import dns.reversename
 
 from database import get_db
 from models import new_id, now_utc
-from services.email_delivery import html_to_text, mailbox_domain
+from services.email_delivery import header_text, html_to_text, mailbox_domain
 
 logger = logging.getLogger("tls.mailqueue")
 
@@ -540,7 +540,8 @@ async def enqueue_mail(
     job = {
         "id": new_id(),
         "to": to,
-        "subject": subject,
+        # Jede Mail der Website kommt hier vorbei: der Betreff bleibt eine Zeile - kein Wert hängt eine Kopfzeile an.
+        "subject": header_text(subject),
         "html": html,
         "template_key": template_key,
         "status": "pending",

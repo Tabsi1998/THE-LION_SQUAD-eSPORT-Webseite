@@ -5,12 +5,12 @@ schicken und auf den Standard zurücksetzen. Die Vorlagen aus der Datenbank (Bew
 Moderation) laufen weiter über `render_template` in phase_ef_routes."""
 from __future__ import annotations
 
-import html as html_lib
 import inspect
 from typing import Any
 
 from database import get_db
 from models import now_utc
+from services.email_delivery import fill_placeholders
 
 CATEGORIES = {
     "account": "Konto und Anmeldung",
@@ -114,12 +114,10 @@ def template_vars(key: str, fn: Any | None, db_doc: dict | None) -> list[str]:
     return []
 
 
-def substitute(text: str, values: dict[str, str], escape: bool) -> str:
-    out = text or ""
-    for k, v in values.items():
-        v_str = "" if v is None else str(v)
-        out = out.replace("{{" + k + "}}", html_lib.escape(v_str, quote=True) if escape else v_str.replace("\r", " ").replace("\n", " "))
-    return out
+def substitute(text: str, values: dict[str, Any], escape: bool) -> str:
+    """`{{variable}}` einsetzen: im HTML (escape=True) jeder Wert als Text, im Betreff einzeilig - siehe
+    services/email_delivery. Der Vorlagentext des Admins bleibt, wie er ist."""
+    return fill_placeholders(text, values, as_html=escape)
 
 
 async def apply_override(template_key: str, subject: str, html: str, values: dict[str, Any]) -> tuple[str, str]:

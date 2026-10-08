@@ -5,8 +5,6 @@
 - /api/board: dynamic vorstand positions (defaults seeded, admin can add/disable
   /assign members).
 """
-from html import escape
-
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, Literal
@@ -61,10 +59,6 @@ class ContactSubmit(BaseModel):
         return cleaned
 
 
-def _html(value: object) -> str:
-    return escape(str(value or ""), quote=True)
-
-
 @contact_router.post("/submit")
 async def submit_contact(body: ContactSubmit, request: Request, me=Depends(get_current_user_optional)):
     if not body.accept_privacy:
@@ -96,30 +90,25 @@ async def submit_contact(body: ContactSubmit, request: Request, me=Depends(get_c
     await notify_board("contact.request", f"Thema: {TOPIC_LABELS.get(body.topic, body.topic)}")
     # Auto-reply via mail queue (uses render_template if admin customised it)
     from email_service import _wrap
+    from services.email_delivery import fill_placeholders
     from services.mail_queue import enqueue_mail
     from routes.phase_ef_routes import render_template
-    topic_label = escape(TOPIC_LABELS.get(body.topic, body.topic))
+    topic_label = TOPIC_LABELS.get(body.topic, body.topic)
     first_name = name.split()[0] if name else "dort"
-    safe_name = escape(name)
-    safe_email = escape(email)
-    safe_subject = escape(subject)
-    safe_message = escape(message)
-    safe_message_preview = escape(message[:1000])
-    safe_first_name = escape(first_name)
-    safe_topic_label = escape(topic_label)
+    # Werte nur als {{…}}: render_template und fill_placeholders setzen sie als Text ein, im Betreff einzeilig.
     fallback_user_html = _wrap(
         "Wir haben deine Nachricht erhalten",
-        f"<p>Hallo {safe_first_name},</p>"
-        f"<p>danke für deine Nachricht zum Thema <strong>{safe_topic_label}</strong>. Wir melden uns so bald wie möglich.</p>"
+        "<p>Hallo {{name}},</p>"
+        "<p>danke für deine Nachricht zum Thema <strong>{{topic}}</strong>. Wir melden uns so bald wie möglich.</p>"
         "<p>Falls dein Anliegen dringend ist, findest du uns auch auf Discord.</p>"
         "<hr style='border:0;border-top:1px solid #1F2937;margin:20px 0;'/>"
         "<p style='color:#6B7280;font-size:12px'>Deine Nachricht (Kopie):</p>"
-        f"<blockquote style='margin:8px 0;padding:8px 12px;border-left:3px solid #29B6E8;color:#9CA3AF;font-size:13px'>{safe_message_preview}</blockquote>",
+        "<blockquote style='margin:8px 0;padding:8px 12px;border-left:3px solid #29B6E8;color:#9CA3AF;font-size:13px'>{{message}}</blockquote>",
     )
     user_subj, user_html = await render_template(
         "contact_auto_reply",
-        {"name": first_name, "topic": topic_label},
-        fallback_subject=f"Bestätigung: Wir haben deine Nachricht erhalten — {subject[:80]}",
+        {"name": first_name, "topic": topic_label, "subject": subject[:80], "message": message[:1000]},
+        fallback_subject="Bestätigung: Wir haben deine Nachricht erhalten — {{subject}}",
         fallback_html=fallback_user_html,
     )
     await enqueue_mail(
@@ -136,13 +125,13 @@ async def submit_contact(body: ContactSubmit, request: Request, me=Depends(get_c
         admin = await db.users.find_one({"role": "superadmin"}, {"email": 1, "_id": 0})
         admin_to = admin.get("email") if admin else None
     if admin_to:
-        admin_html = _wrap(
-            f"Neue Nachricht: {safe_topic_label}",
-            f"<p><strong>Name:</strong> {safe_name}<br/><strong>E-Mail:</strong> {safe_email}<br/><strong>Thema:</strong> {safe_topic_label}</p>"
-            f"<p><strong>Betreff:</strong> {safe_subject}</p>"
-            f"<blockquote style='margin:8px 0;padding:8px 12px;border-left:3px solid #29B6E8;color:#D1D5DB'>{safe_message}</blockquote>"
-            f"<p style='color:#6B7280;font-size:12px'>ID: {doc['id']}</p>",
-        )
+        admin_html = fill_placeholders(_wrap(
+            "Neue Nachricht: {{topic}}",
+            "<p><strong>Name:</strong> {{name}}<br/><strong>E-Mail:</strong> {{email}}<br/><strong>Thema:</strong> {{topic}}</p>"
+            "<p><strong>Betreff:</strong> {{subject}}</p>"
+            "<blockquote style='margin:8px 0;padding:8px 12px;border-left:3px solid #29B6E8;color:#D1D5DB'>{{message}}</blockquote>"
+            "<p style='color:#6B7280;font-size:12px'>ID: {{id}}</p>",
+        ), {"topic": topic_label, "name": name, "email": email, "subject": subject, "message": message, "id": doc["id"]}, as_html=True)
         await enqueue_mail(
             to=admin_to,
             subject=f"[TLS Kontakt] {topic_label}: {subject[:60]}",

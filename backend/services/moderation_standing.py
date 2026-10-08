@@ -464,7 +464,9 @@ async def _notify(db, user_id: str, sanction: dict) -> None:
             from routes.phase_ef_routes import render_template
             from services.mail_queue import enqueue_mail
             variables = _mail_vars(user, sanction)
-            subject, html = await render_template(f"moderation_{sanction['action']}", variables, fallback_subject=f"THE LION SQUAD – {label}", fallback_html=f"<p>Hallo {variables['display_name']},</p><p>{label}. Grund: {variables['reason']}</p>")
+            # Name und Grund nur als {{…}} - render_template setzt sie als Text ein.
+            subject, html = await render_template(f"moderation_{sanction['action']}", variables, fallback_subject=f"THE LION SQUAD – {label}",
+                                                  fallback_html="<p>Hallo {{display_name}},</p><p>" + label + ". Grund: {{reason}}</p>")
             await enqueue_mail(to=user["email"], subject=subject, html=html, template_key=f"moderation_{sanction['action']}", meta={"user_id": user_id, "sanction_id": sanction["id"]}, dedupe_key=f"sanction-mail:{sanction['id']}")
         except Exception as exc:  # noqa: BLE001
             logger.warning("[moderation] Mail fehlgeschlagen: %s", exc)
@@ -482,7 +484,8 @@ async def _notify_lifted(db, user_id: str, sanction: dict, note: str | None) -> 
             from routes.phase_ef_routes import render_template
             from services.mail_queue import enqueue_mail
             variables = {**_mail_vars(user, sanction), "note": note or ""}
-            subject, html = await render_template("moderation_lifted", variables, fallback_subject="THE LION SQUAD – Maßnahme aufgehoben", fallback_html=f"<p>Hallo {variables['display_name']},</p><p>die Maßnahme ist aufgehoben.</p>")
+            subject, html = await render_template("moderation_lifted", variables, fallback_subject="THE LION SQUAD – Maßnahme aufgehoben",
+                                                  fallback_html="<p>Hallo {{display_name}},</p><p>die Maßnahme ist aufgehoben.</p>")
             await enqueue_mail(to=user["email"], subject=subject, html=html, template_key="moderation_lifted", meta={"user_id": user_id, "sanction_id": sanction["id"]})
         except Exception as exc:  # noqa: BLE001
             logger.warning("[moderation] Mail fehlgeschlagen: %s", exc)

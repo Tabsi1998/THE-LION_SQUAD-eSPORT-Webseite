@@ -6,7 +6,6 @@ Endpoints:
   GET  /api/membership/applications              — admin queue
   PATCH /api/membership/applications/{id}        — admin approve/reject
 """
-import html
 import logging
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -23,10 +22,6 @@ from services.log_safe import log_safe
 
 router = APIRouter(prefix="/api", tags=["phase-c"])
 logger = logging.getLogger("tls.membership")
-
-
-def _html(value: object) -> str:
-    return html.escape(str(value or ""), quote=True)
 
 
 # -------------- Profile Completeness --------------
@@ -267,11 +262,12 @@ async def membership_apply(body: ApplyBody, me: dict = Depends(get_current_user)
         admins = await db.users.find({"role": {"$in": ["club_admin", "superadmin"]}},
                                       {"_id": 0, "email": 1}).to_list(20)
         applicant_name = me.get("display_name") or me.get("username") or "Spieler"
+        # Werte nur als {{…}} - render_template setzt sie als Text ein.
         subj, html = await render_template(
             "membership_application_admin",
             {"applicant": applicant_name},
             fallback_subject="Neue Mitgliedsbewerbung",
-            fallback_html=f"<p>{_html(applicant_name)} hat eine Mitgliedsbewerbung eingereicht.</p>",
+            fallback_html="<p>{{applicant}} hat eine Mitgliedsbewerbung eingereicht.</p>",
         )
         for a in admins:
             if a.get("email"):
@@ -452,9 +448,9 @@ async def admin_decide_application(app_id: str, body: DecisionBody,
                 tpl_key,
                 {"display_name": display, "note": body.note or ""},
                 fallback_subject=("Mitgliedsbewerbung angenommen 🦁" if body.decision == "approve" else "Mitgliedsbewerbung abgelehnt"),
-                fallback_html=(f"<p>Hallo {_html(display)},</p><p>Deine Bewerbung wurde "
+                fallback_html=("<p>Hallo {{display_name}},</p><p>Deine Bewerbung wurde "
                                f"{'angenommen' if body.decision == 'approve' else 'abgelehnt'}.</p>"
-                               f"<p>{_html(body.note or '')}</p>"),
+                               "<p>{{note}}</p>"),
             )
             from services.notification_preferences import email_allowed
             if email_allowed(u, tpl_key, "membership_updates"):

@@ -2,6 +2,7 @@
 Logs all sends to the email_logs collection. Silent failure if no key configured."""
 import os
 import asyncio
+import functools
 import logging
 import html as html_lib
 from typing import Optional
@@ -10,7 +11,7 @@ from datetime import datetime, timezone
 import resend
 from database import get_db
 from models import new_id
-from services.email_delivery import html_to_text
+from services.email_delivery import header_text, html_to_text, html_value
 from services.secret_store import decrypt_secret
 
 logger = logging.getLogger("tls-arena.email")
@@ -41,6 +42,7 @@ async def send_mail(to: str, subject: str, html: str, template_key: str = "custo
     """Send via Resend. Never raises; always writes an email_log."""
     db = get_db()
     cfg = await _get_email_config()
+    subject = header_text(subject)  # der Betreff bleibt eine Zeile - kein Wert hängt eine Kopfzeile an
     log = {
         "id": new_id(),
         "to": to,
@@ -148,6 +150,26 @@ async def _with_email_sponsors(html: str) -> str:
     return html.replace("</table>\n</td></tr></table></body></html>", sponsor_html + "\n</table>\n</td></tr></table></body></html>", 1)
 
 
+def mail_template(render):
+    """Jede feste Vorlage (tpl_*) läuft hierüber - die eine Stelle, an der eingesetzte Werte geschützt werden.
+
+    Die Vorlage wird mit denselben Werten zweimal gebaut: für den Betreff mit jedem Wert als einzeiligem Text
+    (`header_text`), für das HTML mit jedem Wert als Text (`html_value`). Ein Name mit spitzen Klammern oder einem
+    Link bleibt so in der Mail sichtbarer Text und wird nie zu Formatierung. HTML, das die Vorlage selbst baut
+    (Knopf, Link-Block, Liste), bleibt HTML; ein fertiger HTML-Block als Wert kommt nur als `SafeHtml` durch.
+    Darum ruft eine Vorlage nie selbst html.escape auf - sonst stünde „&amp;amp;“ in der Mail."""
+
+    @functools.wraps(render)
+    def safe_render(*args, **kwargs) -> tuple[str, str]:
+        subject = render(*[header_text(value) for value in args], **{key: header_text(value) for key, value in kwargs.items()})[0]
+        body = render(*[html_value(value) for value in args], **{key: html_value(value) for key, value in kwargs.items()})[1]
+        return header_text(subject), body
+
+    safe_render.is_mail_template = True
+    return safe_render
+
+
+@mail_template
 def tpl_registration(display_name: str) -> tuple[str, str]:
     return "Willkommen in der Community", _wrap(
         "Willkommen in der Community, " + (display_name or "Community-Mitglied"),
@@ -157,6 +179,7 @@ def tpl_registration(display_name: str) -> tuple[str, str]:
     )
 
 
+@mail_template
 def tpl_email_verification(display_name: str, verification_url: str) -> tuple[str, str]:
     return "E-Mail-Adresse bestätigen", _wrap(
         "E-Mail-Adresse bestätigen",
@@ -167,6 +190,7 @@ def tpl_email_verification(display_name: str, verification_url: str) -> tuple[st
     )
 
 
+@mail_template
 def tpl_password_reset(reset_url: str) -> tuple[str, str]:
     return "Passwort zurücksetzen", _wrap(
         "Passwort zurücksetzen",
@@ -176,6 +200,7 @@ def tpl_password_reset(reset_url: str) -> tuple[str, str]:
     )
 
 
+@mail_template
 def tpl_user_invite(display_name: str, invite_url: str, invited_by: str = "") -> tuple[str, str]:
     byline = f"<p>Die Einladung wurde von <strong>{invited_by}</strong> erstellt.</p>" if invited_by else ""
     return "Einladung zu THE LION SQUAD", _wrap(
@@ -204,33 +229,37 @@ def tpl_account_banned(display_name: str, reason: str, appeal_url: str = "") -> 
 
 # Turnier-Anmeldung (#1133): eingegangen (wartet auf Freigabe oder Warteliste), bestätigt (auch beim Nachrücken) und
 # abgelehnt. `detail` ist ein fertiger Satz aus services/registration_notifications - etwa der Check-in-Hinweis.
+@mail_template
 def tpl_registration_received(tournament_title: str, url: str, detail: str = "") -> tuple[str, str]:
     return f"Anmeldung eingegangen: {tournament_title}", _wrap(
         "Anmeldung eingegangen",
         f"<p>Deine Anmeldung für <strong>{tournament_title}</strong> ist bei uns eingegangen.</p>"
-        + (f"<p>{html_lib.escape(detail)}</p>" if detail else ""),
+        + (f"<p>{detail}</p>" if detail else ""),
         "Turnier ansehen", url,
     )
 
 
+@mail_template
 def tpl_registration_approved(tournament_title: str, url: str, detail: str = "") -> tuple[str, str]:
     return f"Du bist dabei: {tournament_title}", _wrap(
         "Anmeldung bestätigt",
         f"<p>Dein Platz im Turnier <strong>{tournament_title}</strong> ist bestätigt.</p>"
-        + (f"<p>{html_lib.escape(detail)}</p>" if detail else ""),
+        + (f"<p>{detail}</p>" if detail else ""),
         "Zum Turnier", url,
     )
 
 
+@mail_template
 def tpl_registration_rejected(tournament_title: str, reason: str = "", url: str = "") -> tuple[str, str]:
     return f"Anmeldung abgelehnt: {tournament_title}", _wrap(
         "Anmeldung abgelehnt",
         f"<p>Leider hat die Turnierleitung deine Anmeldung für <strong>{tournament_title}</strong> abgelehnt.</p>"
-        + (f"<p><em>Grund: {html_lib.escape(reason)}</em></p>" if reason else ""),
+        + (f"<p><em>Grund: {reason}</em></p>" if reason else ""),
         "Zum Turnier" if url else None, url or None,
     )
 
 
+@mail_template
 def tpl_checkin_closes_soon(tournament_title: str, when: str, url: str) -> tuple[str, str]:
     return f"Check-in endet bald: {tournament_title}", _wrap(
         "Check-in endet bald",
@@ -240,6 +269,7 @@ def tpl_checkin_closes_soon(tournament_title: str, when: str, url: str) -> tuple
     )
 
 
+@mail_template
 def tpl_checkin_closes_soon_on_site(tournament_title: str, when: str, url: str) -> tuple[str, str]:
     # Vor Ort (#1135) checkt die Turnierleitung ein - kein Knopf „Jetzt einchecken“.
     return f"Check-in endet bald: {tournament_title}", _wrap(
@@ -251,23 +281,26 @@ def tpl_checkin_closes_soon_on_site(tournament_title: str, when: str, url: str) 
 
 
 def _station_hint(station: str = "") -> str:
-    return f"<p>Station: <strong>{html_lib.escape(station)}</strong></p>" if station else ""
+    # Teil einer Vorlage: `station` kommt schon als Text geschützt an (mail_template).
+    return f"<p>Station: <strong>{station}</strong></p>" if station else ""
 
 
+@mail_template
 def tpl_match_reminder(tournament_title: str, opponent: str, when: str, url: str, station: str = "") -> tuple[str, str]:
     # Geht raus, wenn die Turnierleitung das Spiel an der Station startet (#1137) - es geht also jetzt los.
     return f"Match startet jetzt: {tournament_title}", _wrap(
         "Dein Match startet jetzt",
-        f"<p>Dein Match im Turnier <strong>{tournament_title}</strong> ({html_lib.escape(opponent)}) startet jetzt.</p>"
+        f"<p>Dein Match im Turnier <strong>{tournament_title}</strong> ({opponent}) startet jetzt.</p>"
         + _station_hint(station)
         + f"<p>Gestartet: {when}</p>",
         "Zum Match", url,
     )
 
 
+@mail_template
 def tpl_score_reported(tournament_title: str, url: str, summary: str = "") -> tuple[str, str]:
     # Ergebnis melden (#1132): die Gegenseite hat gemeldet - bestätigen oder anders melden.
-    reported = f"<p>Gemeldet: <strong>{html_lib.escape(summary)}</strong></p>" if summary else ""
+    reported = f"<p>Gemeldet: <strong>{summary}</strong></p>" if summary else ""
     return f"Ergebnis gemeldet: {tournament_title}", _wrap(
         "Bitte bestätige das Ergebnis",
         f"<p>Die Gegenseite hat für dein Spiel im Turnier <strong>{tournament_title}</strong> ein Ergebnis gemeldet.</p>"
@@ -278,6 +311,7 @@ def tpl_score_reported(tournament_title: str, url: str, summary: str = "") -> tu
     )
 
 
+@mail_template
 def tpl_dispute_opened(tournament_title: str, url: str) -> tuple[str, str]:
     # Dispute (#1134): an die Spieler des Spiels - die Turnierleitung hat schon Bescheid.
     return f"Dispute zu deinem Spiel: {tournament_title}", _wrap(
@@ -288,15 +322,17 @@ def tpl_dispute_opened(tournament_title: str, url: str) -> tuple[str, str]:
     )
 
 
+@mail_template
 def tpl_dispute_resolved(tournament_title: str, decision: str, url: str) -> tuple[str, str]:
     return f"Dispute entschieden: {tournament_title}", _wrap(
         "Dispute entschieden",
         "<p>Die Turnierleitung hat den Dispute zu deinem Spiel entschieden:</p>"
-        f"<p><strong>{html_lib.escape(decision or '')}</strong></p>",
+        f"<p><strong>{decision}</strong></p>",
         "Match ansehen", url,
     )
 
 
+@mail_template
 def tpl_tournament_finished(tournament_title: str, url: str) -> tuple[str, str]:
     return f"Turnier beendet: {tournament_title}", _wrap(
         "Das Turnier ist zu Ende",
@@ -307,16 +343,18 @@ def tpl_tournament_finished(tournament_title: str, url: str) -> tuple[str, str]:
 
 # Erinnerung vor dem Spiel: nur noch 10 Minuten vorher (#1133) - die Vorlauf-Mails 24 Stunden, 2 Stunden, 30 und 5 Minuten
 # vorher sind weggefallen; dafür gibt es Push und die Nachricht in App und Website.
+@mail_template
 def tpl_match_lead_10m(tournament_title: str, opponent: str, when: str, url: str, station: str = "") -> tuple[str, str]:
     return f"Jetzt gleich: {tournament_title}", _wrap(
         "Match startet in 10 Minuten",
-        f"<p>Dein Match gegen <strong>{html_lib.escape(opponent)}</strong> ({tournament_title}) startet in <strong>10 Minuten</strong>. Sei bereit!</p>"
+        f"<p>Dein Match gegen <strong>{opponent}</strong> ({tournament_title}) startet in <strong>10 Minuten</strong>. Sei bereit!</p>"
         + _station_hint(station),
         "Match öffnen", url,
     )
 
 
 # ---------- Phase 9: Prize Pickup ----------
+@mail_template
 def tpl_prize_ready(display_name: str, tournament_title: str, place: str, prize_label: str, deadline: str = "") -> tuple[str, str]:
     body = (
         f"<p>Hallo {display_name or 'Löwe'},</p>"
@@ -331,6 +369,7 @@ def tpl_prize_ready(display_name: str, tournament_title: str, place: str, prize_
     )
 
 
+@mail_template
 def tpl_prize_picked_up(display_name: str, tournament_title: str, prize_label: str) -> tuple[str, str]:
     return f"Gewinn übergeben: {tournament_title}", _wrap(
         "Gewinn erfolgreich übergeben",
@@ -339,6 +378,7 @@ def tpl_prize_picked_up(display_name: str, tournament_title: str, prize_label: s
     )
 
 
+@mail_template
 def tpl_prize_expired(display_name: str, tournament_title: str, prize_label: str) -> tuple[str, str]:
     return f"Gewinn verfallen: {tournament_title}", _wrap(
         "Abholfrist abgelaufen",
@@ -349,6 +389,7 @@ def tpl_prize_expired(display_name: str, tournament_title: str, prize_label: str
 
 
 # ---------- Membership templates ----------
+@mail_template
 def tpl_membership_activated(display_name: str, member_number: str = "") -> tuple[str, str]:
     body = (
         f"<p>Hallo {display_name or 'Löwe'},</p>"
@@ -362,6 +403,7 @@ def tpl_membership_activated(display_name: str, member_number: str = "") -> tupl
     )
 
 
+@mail_template
 def tpl_membership_deactivated(display_name: str) -> tuple[str, str]:
     return "Deine Mitgliedschaft wurde deaktiviert", _wrap(
         "Mitgliedschaft deaktiviert",
@@ -371,6 +413,7 @@ def tpl_membership_deactivated(display_name: str) -> tuple[str, str]:
     )
 
 
+@mail_template
 def tpl_membership_blocked(display_name: str) -> tuple[str, str]:
     return "Mitgliedschaftsstatus geändert", _wrap(
         "Mitgliedschaft gesperrt",
@@ -379,6 +422,7 @@ def tpl_membership_blocked(display_name: str) -> tuple[str, str]:
     )
 
 
+@mail_template
 def tpl_newsletter_news(display_name: str, title: str, excerpt: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
     body = f"<p>Hallo {display_name or 'Löwe'},</p><p>es gibt neue Vereinsnews:</p><p><strong>{title}</strong></p>"
     if excerpt:
@@ -388,6 +432,7 @@ def tpl_newsletter_news(display_name: str, title: str, excerpt: str = "", url: s
     return f"Neue Vereinsnews: {title}", _wrap("Neue Vereinsnews", body, "News lesen", url)
 
 
+@mail_template
 def tpl_newsletter_event(display_name: str, title: str, when: str = "", location: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
     facts = ""
     if when:
@@ -400,6 +445,7 @@ def tpl_newsletter_event(display_name: str, title: str, when: str = "", location
     return f"Neues Event: {title}", _wrap("Neues Event", body, "Event ansehen", url)
 
 
+@mail_template
 def tpl_birthday_greeting(display_name: str, preferences_url: str = "") -> tuple[str, str]:
     body = (
         f"<p>Hallo {display_name or 'Löwe'},</p>"
@@ -416,24 +462,25 @@ def tpl_birthday_greeting(display_name: str, preferences_url: str = "") -> tuple
     return "Alles Gute zum Geburtstag", _wrap("Alles Gute zum Geburtstag", body)
 
 
+@mail_template
 def tpl_achievement_recap(display_name: str, week: str, xp_week: str, level: str, level_title: str, unlocked: str = "", next_up: str = "",
                           bonus_hint: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
     """Wochenrückblick (#622): XP der Woche, Level, neue Erfolge, was als Nächstes kommt - nur an die Person selbst.
-    `unlocked` sind Zeilen (je Erfolg eine), damit die Vorlage auch im Admin mit einfachem Text bearbeitbar bleibt."""
-    esc = html_lib.escape
+    `unlocked` sind Zeilen (je Erfolg eine), damit die Vorlage auch im Admin mit einfachem Text bearbeitbar bleibt.
+    Die Werte kommen schon als Text geschützt an (mail_template) - hier also kein html.escape."""
     items = [line.strip() for line in str(unlocked or "").splitlines() if line.strip()]
     body = (
-        f"<p>Hallo {esc(display_name or 'Löwe')},</p>"
-        f"<p>deine Woche bei THE LION SQUAD ({esc(week)}):</p>"
-        f'<p style="font-size:20px;margin:16px 0"><strong>+{esc(xp_week)} XP</strong> · Level {esc(level)}'
-        + (f" – {esc(level_title)}" if level_title else "") + "</p>"
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        f"<p>deine Woche bei THE LION SQUAD ({week}):</p>"
+        f'<p style="font-size:20px;margin:16px 0"><strong>+{xp_week} XP</strong> · Level {level}'
+        + (f" – {level_title}" if level_title else "") + "</p>"
     )
     if items:
-        body += "<p><strong>Neu freigeschaltet:</strong></p><ul>" + "".join(f"<li>{esc(item)}</li>" for item in items) + "</ul>"
+        body += "<p><strong>Neu freigeschaltet:</strong></p><ul>" + "".join(f"<li>{item}</li>" for item in items) + "</ul>"
     if next_up:
-        body += f"<p><strong>Als Nächstes:</strong> {esc(next_up)}</p>"
+        body += f"<p><strong>Als Nächstes:</strong> {next_up}</p>"
     if bonus_hint:
-        body += f'<p style="color:#6b7280">{esc(bonus_hint)}</p>'
+        body += f'<p style="color:#6b7280">{bonus_hint}</p>'
     if preferences_url:
         body += (
             '<p style="font-size:12px;color:#6b7280">'
@@ -442,69 +489,66 @@ def tpl_achievement_recap(display_name: str, week: str, xp_week: str, level: str
     return f"Deine Woche: +{xp_week} XP", _wrap("Deine Woche", body, "Zu deinen Erfolgen", url or None)
 
 
+@mail_template
 def tpl_invoice_ready(display_name: str, source: str, amount: str, due_on: str = "", paid: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
     """„Deine Rechnung ist da“ (#841): Vorgang, Betrag, Zahlungsziel und der Weg zum PDF im Konto. Das PDF hängt nie an
     der Mail - es bleibt hinter der Anmeldung, nur für die Person selbst."""
-    esc = html_lib.escape
     if paid:
         state = " – schon bezahlt, danke!"
     elif due_on:
-        state = f", zahlbar bis <strong>{esc(due_on)}</strong>."
+        state = f", zahlbar bis <strong>{due_on}</strong>."
     else:
         state = "."
     body = (
-        f"<p>Hallo {esc(display_name or 'Löwe')},</p>"
-        f"<p>deine Rechnung zu <strong>{esc(source)}</strong> ist da: <strong>{esc(amount)}</strong>{state}</p>"
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        f"<p>deine Rechnung zu <strong>{source}</strong> ist da: <strong>{amount}</strong>{state}</p>"
         "<p>Das PDF findest du in deinem Konto unter „Rechnungen“ – nach der Anmeldung, nur für dich.</p>"
     )
     if preferences_url:
         body += (
             '<p style="font-size:12px;color:#6b7280">'
-            f'Diese Mails kannst du in deinen <a href="{esc(preferences_url, quote=True)}">E-Mail-Einstellungen</a> abbestellen.</p>'
+            f'Diese Mails kannst du in deinen <a href="{preferences_url}">E-Mail-Einstellungen</a> abbestellen.</p>'
         )
-    subject_source = str(source or "deiner Anmeldung").replace("\r", " ").replace("\n", " ")[:80]
+    subject_source = (source or "deiner Anmeldung")[:80]
     return f"Deine Rechnung zu {subject_source} ist da", _wrap("Deine Rechnung ist da", body, "Rechnung ansehen", url or None)
 
 
+@mail_template
 def tpl_direct_message(display_name: str, sender_name: str, preview: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
-    sender_subject = str(sender_name or "Benutzer").replace("\r", " ").replace("\n", " ")[:80]
-    sender = html_lib.escape(sender_name or "Benutzer")
-    preview_html = html_lib.escape(preview or "")
+    sender = sender_name or "Benutzer"
     body = (
-        f"<p>Hallo {html_lib.escape(display_name or 'Löwe')},</p>"
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
         f"<p><strong>{sender}</strong> hat dir eine Direktnachricht auf der Webseite geschickt.</p>"
     )
-    if preview_html:
-        body += f'<p style="border-left:3px solid {BRAND_CYAN};padding-left:12px;color:#374151">{preview_html}</p>'
+    if preview:
+        body += f'<p style="border-left:3px solid {BRAND_CYAN};padding-left:12px;color:#374151">{preview}</p>'
     if preferences_url:
         body += (
             '<p style="font-size:12px;color:#6b7280">'
-            f'Diese E-Mails kannst du in deinen <a href="{html_lib.escape(preferences_url, quote=True)}">'
+            f'Diese E-Mails kannst du in deinen <a href="{preferences_url}">'
             "Benachrichtigungs-Einstellungen</a> deaktivieren.</p>"
         )
-    return f"Neue Nachricht von {sender_subject}", _wrap(
+    return f"Neue Nachricht von {sender[:80]}", _wrap(
         "Neue Direktnachricht", body, "Nachricht öffnen", url,
     )
 
 
+@mail_template
 def tpl_team_chat_mention(display_name: str, team_name: str, sender_name: str, preview: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
-    team_subject = str(team_name or "Team").replace("\r", " ").replace("\n", " ")[:80]
-    team = html_lib.escape(team_name or "Team")
-    sender = html_lib.escape(sender_name or "Benutzer")
-    preview_html = html_lib.escape(preview or "")
+    team = team_name or "Team"
     body = (
-        f"<p>Hallo {html_lib.escape(display_name or 'Löwe')},</p>"
-        f"<p><strong>{sender}</strong> hat dich im Team-Chat von <strong>{team}</strong> erwähnt.</p>"
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        f"<p><strong>{sender_name or 'Benutzer'}</strong> hat dich im Team-Chat von <strong>{team}</strong> erwähnt.</p>"
     )
-    if preview_html:
-        body += f'<p style="border-left:3px solid {BRAND_CYAN};padding-left:12px;color:#374151">{preview_html}</p>'
+    if preview:
+        body += f'<p style="border-left:3px solid {BRAND_CYAN};padding-left:12px;color:#374151">{preview}</p>'
     if preferences_url:
         body += (
             '<p style="font-size:12px;color:#6b7280">'
-            f'Erwähnungs-Mails kannst du in deinen <a href="{html_lib.escape(preferences_url, quote=True)}">'
+            f'Erwähnungs-Mails kannst du in deinen <a href="{preferences_url}">'
             "Benachrichtigungs-Einstellungen</a> deaktivieren.</p>"
         )
-    return f"Erwähnung im Team-Chat: {team_subject}", _wrap(
+    return f"Erwähnung im Team-Chat: {team[:80]}", _wrap(
         "Du wurdest erwähnt", body, "Team-Chat öffnen", url,
     )
 
@@ -542,6 +586,7 @@ def _wrap(title: str, body_html: str, cta_label: Optional[str] = None, cta_url: 
 </td></tr></table></body></html>"""
 
 
+@mail_template
 def tpl_test(branding: str = "THE LION SQUAD") -> tuple[str, str]:
     return "Testmail von THE LION SQUAD", _wrap(
         "E-Mail-Test",
