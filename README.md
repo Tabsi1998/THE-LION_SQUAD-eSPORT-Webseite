@@ -81,4 +81,7 @@ dokumentieren veröffentlichte Artefakte.
 
 ## Lizenz
 
-Proprietär. Nutzung und Weitergabe nur für THE LION SQUAD bzw. nach Freigabe.
+Alle Rechte vorbehalten – © 2026 IT-Tabelander (Fabian Tabelander). Ohne schriftliche Zustimmung darf der Inhalt
+weder genutzt noch kopiert, verändert, weitergegeben oder selbst betrieben werden; der Verein THE LION SQUAD eSPORT
+betreibt ihn mit Zustimmung. Bestandteile Dritter behalten ihre eigene Lizenz. Alles Weitere steht in
+[LICENSE](LICENSE).
