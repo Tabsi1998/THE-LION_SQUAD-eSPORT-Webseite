@@ -896,7 +896,6 @@ def _draw_centered_wrapped(canvas, text: str, center_x: float, first_baseline_y:
                            max_lines: int = 2, leading_factor: float = 1.18) -> float:
     value = str(text or "").strip()
     size = start_size
-    lines = [value]
     while size > min_size:
         lines = _wrap_to_width(value, max_width, font_name, size, max_lines)
         if len(lines) <= max_lines and all(stringWidth(line, font_name, size) <= max_width for line in lines):

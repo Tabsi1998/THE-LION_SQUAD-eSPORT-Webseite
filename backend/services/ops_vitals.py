@@ -11,6 +11,7 @@ sie mit der In-Memory-Datenbank der Tests dasselbe Ergebnis liefert.
 """
 from __future__ import annotations
 
+import math
 import re
 from datetime import timedelta
 from typing import Any
@@ -62,7 +63,7 @@ def clean_entry(raw: Any) -> dict | None:
         value = float(raw.get("value"))
     except (TypeError, ValueError):
         return None
-    if value != value or value < 0 or value > METRIC_LIMITS[name]:  # NaN, negativ, absurd
+    if math.isnan(value) or value < 0 or value > METRIC_LIMITS[name]:  # NaN, negativ, absurd
         return None
     device = str(raw.get("device") or "desktop").lower()
     if device not in DEVICES:

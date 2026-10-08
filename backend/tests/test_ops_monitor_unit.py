@@ -1,4 +1,5 @@
 """Betriebssicht (#233): was ein Fehler zur Gruppe macht und was nie gespeichert wird."""
+import pytest
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
@@ -65,10 +66,9 @@ def test_a_long_stack_keeps_its_end_where_the_message_is():
             raise KeyError("ganz unten")
         return tief(n - 1)
 
-    try:
+    with pytest.raises(KeyError) as caught:
         tief(400)
-    except KeyError as exc:
-        text = format_stack(exc)
+    text = format_stack(caught.value)
     assert len(text) <= STACK_LIMIT
     assert text.rstrip().endswith("KeyError: 'ganz unten'")
 
