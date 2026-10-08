@@ -90,7 +90,8 @@ async def test_lineup_rights_size_substitutes_and_deadline(flow, clock):
     assert (await flow.get(f"/api/team-day/{tournament['id']}")).json()["can_edit"] is False
     clock["now"] = DAY
     await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"status": "live"}})
-    assert (await flow.delete(f"/api/team-day/{tournament['id']}/lineup")).status_code == 409
+    cleared = await flow.delete(f"/api/team-day/{tournament['id']}/lineup")
+    assert cleared.status_code == 409
 
 
 @pytest.mark.asyncio

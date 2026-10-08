@@ -70,7 +70,8 @@ async def test_board_calls_members_once_a_day_and_the_topic_can_be_switched_off(
     seed(fake)
     board = await bound_member(flow, fake, "vorstand", 10, role="club_admin")
     paula = await bound_member(flow, fake, "paula", 12)
-    quiet = await bound_member(flow, fake, "leise", 13, prefs={"in_app:helper_shifts": False, "push:helper_shifts": False, "discord:helper_shifts": False})
+    # „leise“ hat das Thema ausgeschaltet und darf nichts bekommen.
+    await bound_member(flow, fake, "leise", 13, prefs={"in_app:helper_shifts": False, "push:helper_shifts": False, "discord:helper_shifts": False})
     guest = await flow.add_user(role="player", name="gast")   # kein Mitglied
     fake.confirm_shift(5, 51, 13)
 

@@ -234,7 +234,8 @@ async def test_dissolve_only_with_the_typed_name_and_says_what_happens(flow):
 
     flow.act_as(co)
     assert (await flow.get(f"/api/teams/{team['id']}/dissolve-preview")).status_code == 403, "Co-Kapitäne lösen nicht auf"
-    assert (await flow.delete(f"/api/teams/{team['id']}", params={"confirm": "Lions Rocket"})).status_code == 403
+    by_co = await flow.delete(f"/api/teams/{team['id']}", params={"confirm": "Lions Rocket"})
+    assert by_co.status_code == 403
 
     flow.act_as(captain)
     preview = (await flow.get(f"/api/teams/{team['id']}/dissolve-preview")).json()
@@ -242,8 +243,10 @@ async def test_dissolve_only_with_the_typed_name_and_says_what_happens(flow):
     assert [row["title"] for row in preview["withdraw"]] == ["Herbst-Cup"]
     assert [row["title"] for row in preview["blocked"]] == ["Liga live"] and preview["can_dissolve"] is False
 
-    assert (await flow.delete(f"/api/teams/{team['id']}")).status_code == 400, "ohne Namen nicht"
-    assert (await flow.delete(f"/api/teams/{team['id']}", params={"confirm": "Lions"})).status_code == 400
+    without_name = await flow.delete(f"/api/teams/{team['id']}")
+    assert without_name.status_code == 400, "ohne Namen nicht"
+    wrong_name = await flow.delete(f"/api/teams/{team['id']}", params={"confirm": "Lions"})
+    assert wrong_name.status_code == 400
     blocked = await flow.delete(f"/api/teams/{team['id']}", params={"confirm": "lions  rocket"})
     assert blocked.status_code == 409 and "Liga live" in blocked.json()["detail"]
     assert await flow.db.teams.find_one({"id": team["id"]}), "nichts passiert, solange etwas sperrt"
