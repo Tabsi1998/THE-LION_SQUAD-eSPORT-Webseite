@@ -170,8 +170,10 @@ async def test_katalog_aenderungen_im_protokoll_und_material_nur_zwischen_den_na
     clash = await flow.patch("/api/admin/achievements/tiers/season_opener_2", json={"material": "diamond"})
     assert clash.status_code == 400 and "Nachbarstufen" in clash.json()["detail"]
 
-    assert (await flow.delete("/api/admin/achievements/tiers/lan_helfer_1")).status_code == 200
-    assert (await flow.delete("/api/admin/achievements/groups/lan_helfer")).status_code == 200
+    deleted = await flow.delete("/api/admin/achievements/tiers/lan_helfer_1")
+    assert deleted.status_code == 200
+    deleted = await flow.delete("/api/admin/achievements/groups/lan_helfer")
+    assert deleted.status_code == 200
     types = (await flow.get("/api/admin/achievements/incident-types")).json()
     incident = await flow.post("/api/admin/achievements/trigger-incident", json={"user_id": anna["id"], "incident_type": types[0]["key"], "note": "Testvorfall"})
     assert incident.status_code == 200 and incident.json()["newly_awarded"] is True

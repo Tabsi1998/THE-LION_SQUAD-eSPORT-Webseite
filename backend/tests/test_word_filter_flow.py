@@ -179,4 +179,5 @@ async def test_team_chat_names_and_bio_are_checked_and_the_list_can_be_exported(
     assert (await flow.post("/api/moderation/word-filter/import", json={"entries": [{"term": "", "action": "hold"}]})).status_code == 400
     entry_id = imported.json()["entries"][1]["id"]
     assert (await flow.patch(f"/api/moderation/word-filter/entries/{entry_id}", json={"action": "hold"})).json()["entries"][1]["action"] == "hold"
-    assert len((await flow.client.delete(f"/api/moderation/word-filter/entries/{entry_id}")).json()["entries"]) == 1
+    deleted = await flow.client.delete(f"/api/moderation/word-filter/entries/{entry_id}")
+    assert len(deleted.json()["entries"]) == 1

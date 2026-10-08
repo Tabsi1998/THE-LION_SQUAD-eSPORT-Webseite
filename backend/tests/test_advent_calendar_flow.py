@@ -367,7 +367,8 @@ async def test_verwaltung_prueft_jede_art_und_nur_die_redaktion_darf(flow):
         assert (await flow.get("/api/seasonal/advent/admin/2026")).status_code == status
         assert (await flow.get("/api/seasonal/advent/admin/2026/preview")).status_code == status
         assert (await flow.put("/api/seasonal/advent/admin/2026/1", json={"kind": "text", "title": "x", "body": "y"})).status_code == status
-        assert (await flow.delete("/api/seasonal/advent/admin/2026/1")).status_code == status
+        deleted = await flow.delete("/api/seasonal/advent/admin/2026/1")
+        assert deleted.status_code == status
         assert (await flow.post("/api/seasonal/advent/admin/2027/copy", json={"source_year": 2026})).status_code == status
     assert await flow.db.advent_doors.count_documents({}) == 0
 
@@ -422,8 +423,10 @@ async def test_verwaltung_prueft_jede_art_und_nur_die_redaktion_darf(flow):
     res = await flow.put("/api/seasonal/advent/admin/2026/1", json={"kind": "text", "title": "Neu\x00 gefasst", "body": "Zeile eins\r\nZeile zwei"})
     assert res.json()["id"] == first["id"] and res.json()["created_at"] == first["created_at"] and res.json()["media_url"] is None
     assert res.json()["title"] == "Neu gefasst" and res.json()["body"] == "Zeile eins\nZeile zwei"
-    assert (await flow.delete("/api/seasonal/advent/admin/2026/1")).json() == {"ok": True}
-    assert (await flow.delete("/api/seasonal/advent/admin/2026/1")).status_code == 404
+    deleted = await flow.delete("/api/seasonal/advent/admin/2026/1")
+    assert deleted.json() == {"ok": True}
+    deleted = await flow.delete("/api/seasonal/advent/admin/2026/1")
+    assert deleted.status_code == 404
     actions = [row["action"] async for row in flow.db.audit_logs.find({"entity_id": "advent:2026"}, {"_id": 0})]
     assert actions.count("advent.door.save") == 7 and actions.count("advent.door.delete") == 1
 

@@ -156,8 +156,10 @@ async def test_an_organizer_manages_the_prizes_of_his_tournament_only(flow):
     assert (await flow.get(PRIZES)).status_code == 403, "ohne Turnier-Bezug bleibt es die Turnierleitung"
     assert (await flow.patch(f"{PRIZES}/p-mine", json={"notes": "abgeholt am Stand"})).status_code == 200
     assert (await flow.patch(f"{PRIZES}/p-other", json={"notes": "x"})).status_code == 403
-    assert (await flow.client.delete(f"{PRIZES}/p-other")).status_code == 403
-    assert (await flow.client.delete(f"{PRIZES}/p-mine")).status_code == 200
+    deleted = await flow.client.delete(f"{PRIZES}/p-other")
+    assert deleted.status_code == 403
+    deleted = await flow.client.delete(f"{PRIZES}/p-mine")
+    assert deleted.status_code == 200
 
 
 @pytest.mark.asyncio

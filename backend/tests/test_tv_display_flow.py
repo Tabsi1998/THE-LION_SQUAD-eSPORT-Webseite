@@ -81,7 +81,8 @@ async def test_only_admins_with_the_tournaments_area_may_save(flow):
     for role in ("player", "moderator"):
         flow.act_as(await flow.add_user(role=role))
         assert (await flow.put("/api/tv/settings", json={"contrast": True})).status_code == 403, role
-        assert (await flow.delete("/api/tv/settings")).status_code == 403, role
+        deleted = await flow.delete("/api/tv/settings")
+        assert deleted.status_code == 403, role
     editor = await flow.add_user(role="player", name="Redaktion")
     flow.act_as({**editor, "areas": ["content"]})
     assert (await flow.put("/api/tv/settings", json={"contrast": True})).status_code == 403, "Redaktion ist nicht Turniere"
@@ -222,7 +223,8 @@ async def test_a_revoked_key_opens_nothing_any_more(flow):
     assert (await show_tv(flow, tournament["id"], created["token"])).status_code == 200
 
     flow.act_as(staff)
-    assert (await flow.delete(f"/api/tv/keys/{created['id']}")).status_code == 200
+    deleted = await flow.delete(f"/api/tv/keys/{created['id']}")
+    assert deleted.status_code == 200
     assert (await flow.get("/api/tv/keys")).json() == [], "widerrufene Schlüssel stehen nicht mehr in der Liste"
     flow.act_as(None)
     refused = await show_tv(flow, tournament["id"], created["token"])
@@ -230,7 +232,8 @@ async def test_a_revoked_key_opens_nothing_any_more(flow):
     flow.act_as(staff)
     assert (await show_tv(flow, tournament["id"], created["token"])).status_code == 403, "steht ein Schlüssel im Link, zählt nur er"
     assert (await show_tv(flow, tournament["id"], "erfunden")).status_code == 403
-    assert (await flow.delete("/api/tv/keys/gibt-es-nicht")).status_code == 404
+    deleted = await flow.delete("/api/tv/keys/gibt-es-nicht")
+    assert deleted.status_code == 404
 
 
 def test_a_key_ends_one_week_after_the_end_or_else_the_start():
@@ -334,11 +337,13 @@ async def test_keys_are_listed_without_the_secret_and_only_under_tv(flow):
     # Die allgemeinen Speziallinks können keinen TV-Schlüssel anlegen, und TV & Beamer widerruft keinen anderen Link.
     refused = await flow.post("/api/access-links", json={"target_type": "tournament", "target_id": tournament["id"], "grants": ["display"]})
     assert refused.status_code == 422
-    assert (await flow.delete(f"/api/tv/keys/{view_link.json()['id']}")).status_code == 404
+    deleted = await flow.delete(f"/api/tv/keys/{view_link.json()['id']}")
+    assert deleted.status_code == 404
     assert (await flow.post("/api/tv/keys", json={"tournament_id": "gibt-es-nicht"})).status_code == 404
 
     for role in ("player", "moderator"):
         flow.act_as(await flow.add_user(role=role))
         assert (await flow.get("/api/tv/keys")).status_code == 403, role
         assert (await flow.post("/api/tv/keys", json={"tournament_id": tournament["id"]})).status_code == 403, role
-        assert (await flow.delete(f"/api/tv/keys/{created['id']}")).status_code == 403, role
+        deleted = await flow.delete(f"/api/tv/keys/{created['id']}")
+        assert deleted.status_code == 403, role

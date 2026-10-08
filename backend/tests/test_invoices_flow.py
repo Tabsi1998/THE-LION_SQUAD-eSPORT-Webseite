@@ -212,7 +212,8 @@ async def test_unlinking_and_anonymisation_forget_the_invoice_state(flow, fake):
     assert await flow.db.dolibarr_invoice_cache.count_documents({"user_id": paula["id"]}) == 1
 
     flow.act_as(await flow.add_user(role="club_admin"))
-    assert (await flow.client.delete(f"/api/admin/dolibarr/links/{paula['id']}")).status_code == 200
+    deleted = await flow.client.delete(f"/api/admin/dolibarr/links/{paula['id']}")
+    assert deleted.status_code == 200
     assert await flow.db.dolibarr_invoice_cache.count_documents({"user_id": paula["id"]}) == 0
     flow.act_as(paula)
     assert (await flow.get("/api/account/invoices")).json()["connected"] is False

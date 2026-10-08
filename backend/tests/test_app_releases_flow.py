@@ -129,7 +129,8 @@ async def test_a_newer_upload_becomes_current_and_deleting_removes_the_file(flow
     assert (await flow.db.app_releases.find_one({"build": 64}, {"_id": 0}))["is_current"] is False
 
     assert app_releases.release_path(64).is_file()
-    assert (await flow.client.delete("/api/admin/app-releases/64")).status_code == 200
+    deleted = await flow.client.delete("/api/admin/app-releases/64")
+    assert deleted.status_code == 200
     assert not app_releases.release_path(64).exists()
     assert (await flow.get("/api/mobile/app-download/64")).status_code == 404
 
