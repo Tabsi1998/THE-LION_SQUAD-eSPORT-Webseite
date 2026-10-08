@@ -8,13 +8,14 @@ import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { PartnerTicker } from "@/components/tls/PartnerTicker";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { memberNews } from "@/lib/memberArea";
+import { memberNews, tileNote } from "@/lib/memberArea";
 import { viennaDate } from "@/lib/vienna";
 
 // /verein (#1147): das Ziel des Eintrags „Verein“ in der Handy-Leiste - derselbe Aufbau wie der Tab in der App.
 // Mitglieder sehen oben kurz ihren Mitgliederbereich (mit dem Weg zu /members/area), alle anderen „Mitglied werden“ mit
 // drei Gründen. Darunter für alle: neueste News, Galerie, Über uns, Referenzen, Sponsoren und Partner. Am PC bleibt das
-// Menü „Verein“ mit denselben Seiten. Rechnungen stehen im Profil, interne Termine unter Events (#1150).
+// Menü „Verein“ mit denselben Seiten. Rechnungen stehen im Profil, interne Termine unter Events (#1150). Die Zahlen an den
+// Kacheln („1 offen“, „6 frei“, „2 neu“) sind dieselben wie in der Sprungleiste des Mitgliederbereichs (#1257).
 
 export const MEMBER_TILES = [
   { key: "card", to: "/members/membership#mitgliedskarte", label: "Karte", icon: QrCode },
@@ -52,7 +53,7 @@ export default function VereinPage() {
   const [albums, setAlbums] = useState([]);
   const [references, setReferences] = useState([]);
   const [membership, setMembership] = useState(null);
-  const [docs, setDocs] = useState([]);
+  const [summary, setSummary] = useState(null);
   useDocumentTitle("Verein", "Alles vom Verein an einem Ort: Mitgliederbereich oder Mitglied werden, News, Galerie, Referenzen, Sponsoren und Partner.");
 
   const load = useCallback(async () => {
@@ -67,9 +68,10 @@ export default function VereinPage() {
     const refData = referenceResult.status === "fulfilled" ? referenceResult.value.data : [];
     setReferences((Array.isArray(refData) ? refData : refData?.items || []).slice(0, 3));
     if (member) {
-      const [my, documents] = await Promise.allSettled([api.get("/membership/me"), api.get("/documents")]);
+      const [my, area] = await Promise.allSettled([api.get("/membership/me"), api.get("/membership/area-summary")]);
       setMembership(my.status === "fulfilled" ? my.value.data?.membership || null : null);
-      setDocs(documents.status === "fulfilled" && Array.isArray(documents.value.data) ? documents.value.data : []);
+      const counts = area.status === "fulfilled" ? area.value.data : null;
+      setSummary(counts && typeof counts === "object" && !Array.isArray(counts) ? counts : null);
     }
   }, [member]);
 
@@ -96,13 +98,16 @@ export default function VereinPage() {
             </div>
             {membership?.member_since ? <p className="mt-2 text-sm text-white/60">Mitglied seit {formatMemberSince(membership.member_since, membership.member_since_precision || "day")}</p> : null}
             <div className="mt-4 grid grid-cols-3 md:grid-cols-6 gap-2">
-              {MEMBER_TILES.map((tile) => (
-                <Link key={tile.key} to={tile.to} data-testid={`verein-tile-${tile.key}`} className="relative min-h-20 flex flex-col items-center justify-center gap-2 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/[0.04] px-2 py-3 text-xs font-bold text-white/85 hover:border-[#FFD700]/70 transition">
-                  <tile.icon className="w-5 h-5 text-[#FFD700]" />
-                  {tile.label}
-                  {tile.key === "documents" && docs.length ? <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#FF3B30] text-white text-[10px] leading-[18px] text-center">{docs.length}</span> : null}
-                </Link>
-              ))}
+              {MEMBER_TILES.map((tile) => {
+                const note = tileNote(tile.key, summary);
+                return (
+                  <Link key={tile.key} to={tile.to} data-testid={`verein-tile-${tile.key}`} aria-label={note ? `${tile.label}, ${note}` : undefined} className="relative min-h-20 flex flex-col items-center justify-center gap-1.5 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/[0.04] px-2 py-3 text-xs font-bold text-white/85 hover:border-[#FFD700]/70 transition">
+                    <tile.icon className="w-5 h-5 text-[#FFD700]" aria-hidden="true" />
+                    {tile.label}
+                    {note ? <span className="text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]" data-testid={`verein-tile-${tile.key}-note`}>{note}</span> : null}
+                  </Link>
+                );
+              })}
             </div>
             {internal.length ? (
               <div className="mt-4 border-t border-[#FFD700]/20 pt-3 space-y-1" data-testid="verein-internal-news">

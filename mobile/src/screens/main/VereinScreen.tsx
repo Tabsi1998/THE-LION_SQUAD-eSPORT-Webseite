@@ -7,6 +7,7 @@ import { useAdventEntry } from "../../advent/entry";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { MediaImage } from "../../components/MediaImage";
+import { MemberCardArt } from "../../components/MemberCardArt";
 import { Screen } from "../../components/Screen";
 import { TabHeader, useTabScrollToTop } from "../../components/TabHeader";
 import { Body, Heading, Muted } from "../../components/Text";
@@ -14,8 +15,7 @@ import { API_BASE_URL } from "../../config";
 import { canAdmit } from "../../lib/admission";
 import { api } from "../../lib/api";
 import { formatDate } from "../../lib/format";
-import { boardContacts, memberNews, type BoardContact } from "../../lib/memberArea";
-import type { MemberDocument } from "../../lib/memberDocuments";
+import { areaCard, boardContacts, feeBadge, memberNews, tileNote, type AreaSummary, type BoardContact, type DolibarrView, type FeeBadge } from "../../lib/memberArea";
 import { openLink } from "../../lib/openLink";
 import { isGuestUser } from "../../live";
 import type { AppStackParamList, LooseNavigation } from "../../navigation/types";
@@ -25,8 +25,9 @@ import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { colors } from "../../theme";
 import type { NewsPost } from "../../types";
 
-// Der Tab Verein (#1147): alles vom Verein an einem Ort. Mitglieder sehen oben ihren Mitgliederbereich (Karte,
-// Mitgliedschaft, Versammlungen, Helfen, Dokumente, Vorteile, interne News); alle anderen oben „Mitglied werden“ mit drei
+// Der Tab Verein (#1147): alles vom Verein an einem Ort. Mitglieder sehen oben ihre Mitgliedskarte mit „Hallo“, „Mitglied
+// seit“ und dem Beitragsstand (#1336), darunter die Kacheln (Karte, Mitgliedschaft, Versammlungen, Helfen, Dokumente,
+// Vorteile) mit denselben Zahlen wie im Mitgliederbereich der Website (#1257) und interne News; alle anderen oben „Mitglied werden“ mit drei
 // Gründen. Darunter für alle: News, Galerie, Referenzen, Sponsoren, Partner und „Folge uns“. Der Einlass steht oben, nur
 // für den Vorstand. Rechnungen liegen im Profil („Nur für dich“), interne Termine im Events-Tab (gold markiert) - jedes
 // Thema an genau einem Ort (#1150). Was jemand sehen darf, entscheidet der Server; hier wird nur sortiert und verwiesen.
@@ -36,7 +37,7 @@ type Props = NativeStackScreenProps<AppStackParamList, "VereinHub">;
 // Wer noch nicht Mitglied ist, landet auf der Beitrittsseite der Website (#340).
 export const JOIN_URL = `${API_BASE_URL}/membership/join`;
 
-type Membership = { member_number?: string | null; member_since?: string | null; member_status?: string | null } | null;
+type Membership = { member_number?: string | null; member_since?: string | null; member_status?: string | null; membership_type?: string | null } | null;
 // „Gerade in Steam“ (#584): nur Mitglieder mit verknüpftem Konto und Opt-in, nur der aktuelle Stand.
 type SteamPlayer = { user_id: string; username?: string | null; display_name?: string | null; avatar_url?: string | null; state: "playing" | "online"; state_text: string; game?: string | null };
 type SteamPresence = { available: boolean; stale?: boolean; online_count: number; players: SteamPlayer[]; me?: { linked?: boolean; opted_in?: boolean } };
@@ -127,8 +128,10 @@ export function VereinScreen({ navigation }: Props) {
   const member = Boolean(signedIn && user?.is_club_member);
   const advent = Boolean(useAdventEntry());
   const [membership, setMembership] = useState<Membership>(null);
+  const [erp, setErp] = useState<DolibarrView>(null);
+  // Was offen ist (#1257): dieselbe Antwort wie für die Sprungleiste im Mitgliederbereich der Website.
+  const [summary, setSummary] = useState<AreaSummary>(null);
   const [news, setNews] = useState<NewsPost[]>([]);
-  const [docs, setDocs] = useState<MemberDocument[]>([]);
   const [contacts, setContacts] = useState<BoardContact[]>([]);
   const [discordUrl, setDiscordUrl] = useState("");
   const [socials, setSocials] = useState<SocialLink[]>([]);
@@ -147,19 +150,22 @@ export function VereinScreen({ navigation }: Props) {
       setRefreshing(false);
       return;
     }
-    const [my, liveNews, liveDocs, board, settingsResult, presence, servers, voice] = await Promise.allSettled([
-      api.get<{ membership?: Membership }>("/membership/me"),
+    const [my, liveNews, area, board, settingsResult, presence, servers, voice] = await Promise.allSettled([
+      api.get<{ membership?: Membership; dolibarr?: DolibarrView }>("/membership/me"),
       api.get<NewsPost[]>("/news"),
-      api.get<MemberDocument[]>("/documents"),
+      api.get<AreaSummary>("/membership/area-summary"),
       api.get<unknown[]>("/board", { params: { active_only: true } }),
       settings,
       api.get<SteamPresence>("/membership/steam-presence"),
       api.get<DiscordServers>("/membership/discord-servers"),
       api.get<DiscordVoice>("/membership/discord-voice"),
     ]);
-    if (my.status === "fulfilled") setMembership(my.value.data?.membership || null);
+    if (my.status === "fulfilled") {
+      setMembership(my.value.data?.membership || null);
+      setErp(my.value.data?.dolibarr || null);
+    }
     if (liveNews.status === "fulfilled") setNews(memberNews(Array.isArray(liveNews.value.data) ? liveNews.value.data : []));
-    if (liveDocs.status === "fulfilled") setDocs(Array.isArray(liveDocs.value.data) ? liveDocs.value.data : []);
+    if (area.status === "fulfilled") setSummary(area.value.data && typeof area.value.data === "object" && !Array.isArray(area.value.data) ? area.value.data : null);
     if (board.status === "fulfilled") setContacts(boardContacts(Array.isArray(board.value.data) ? (board.value.data as never[]) : []));
     if (settingsResult.status === "fulfilled") {
       setDiscordUrl(String(settingsResult.value.data?.discord_invite_url || ""));
@@ -178,7 +184,8 @@ export function VereinScreen({ navigation }: Props) {
 
   const open = (screen: keyof AppStackParamList, params?: object) => (navigation as unknown as LooseNavigation).navigate(screen, params);
   const serverList = (discordServers?.servers || []).filter((server) => server.available);
-  const since = membership?.member_since ? new Date(membership.member_since).getFullYear() : null;
+  const card = areaCard(user, membership, erp);
+  const badge = feeBadge(erp);
 
   return (
     <Screen padded={false}>
@@ -207,17 +214,24 @@ export function VereinScreen({ navigation }: Props) {
 
         {member ? (
           <Card style={styles.memberCard} perch="verein-member" testID="verein-member-area">
-            <View style={styles.memberHead}>
+            {/* Dieselbe Karte wie im Web (#1335, #1336): ein Tipp öffnet sie mit Prüfcode. */}
+            {card ? (
+              <Pressable onPress={() => open("MemberCard")} accessibilityRole="button" accessibilityHint="Öffnet die Mitgliedskarte mit Prüfcode" testID="verein-member-card" style={({ pressed }) => [pressed && styles.pressed]}>
+                <MemberCardArt name={card.name} number={card.number} since={card.since} typeLabel={card.typeLabel} validUntil={card.validUntil} testID="verein-member-card-art" />
+              </Pressable>
+            ) : null}
+            <View style={styles.greeting}>
               <Muted style={styles.memberEyebrow}>Mitgliederbereich</Muted>
-              {since ? <View style={styles.sinceChip}><Muted style={styles.sinceText}>Seit {since}</Muted></View> : null}
+              <Heading testID="verein-member-greeting">Hallo, {user?.display_name || user?.username}</Heading>
+              {membership?.member_since ? <Muted testID="verein-member-since">Mitglied seit {formatDate(membership.member_since)}</Muted> : null}
+              {badge ? <FeeBadgeView badge={badge} /> : null}
             </View>
-            {membership?.member_number ? <Muted testID="verein-member-number">Nr. {membership.member_number}{membership.member_since ? ` · Mitglied seit ${formatDate(membership.member_since)}` : ""}</Muted> : null}
             <View style={styles.tiles}>
               <Tile icon="qr-code-outline" label="Karte" onPress={() => open("MemberCard")} testID="member-area-card" />
               <Tile icon="card-outline" label="Mitgliedschaft" onPress={() => open("MyMembership")} testID="member-area-membership" />
-              <Tile icon="people-outline" label="Versammlungen" onPress={() => open("MemberMeetings")} testID="member-area-meetings" />
-              <Tile icon="hand-left-outline" label="Helfen" onPress={() => open("MemberHelperShifts")} testID="member-area-helping" />
-              <Tile icon="document-text-outline" label="Dokumente" count={docs.length} onPress={() => open("MemberDocuments")} testID="member-area-documents" />
+              <Tile icon="people-outline" label="Versammlungen" note={tileNote("meetings", summary)} onPress={() => open("MemberMeetings")} testID="member-area-meetings" />
+              <Tile icon="hand-left-outline" label="Helfen" note={tileNote("helping", summary)} onPress={() => open("MemberHelperShifts")} testID="member-area-helping" />
+              <Tile icon="document-text-outline" label="Dokumente" note={tileNote("documents", summary)} onPress={() => open("MemberDocuments")} testID="member-area-documents" />
               <Tile icon="gift-outline" label="Vorteile" onPress={() => open("InfoCenter", { section: "benefits" })} testID="member-area-benefits" />
             </View>
             {news.length ? (
@@ -370,13 +384,30 @@ function socialList(value?: SocialLink[] | null): SocialLink[] {
   return (Array.isArray(value) ? value : []).filter((link) => link?.enabled !== false && link?.url);
 }
 
-function Tile({ icon, label, onPress, testID, count = 0 }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; testID?: string; count?: number }) {
+function Tile({ icon, label, onPress, testID, note = "" }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; testID?: string; note?: string }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={count ? `${label}, ${count}` : label} testID={testID} style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={note ? `${label}, ${note}` : label} testID={testID} style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
       <Ionicons name={icon} color={colors.gold} size={22} />
       <Body style={styles.tileLabel} numberOfLines={1}>{label}</Body>
-      {count ? <View style={styles.tileCount}><Body style={styles.tileCountText}>{count > 99 ? "99+" : count}</Body></View> : null}
+      {note ? <Muted style={styles.tileNote} testID={testID ? `${testID}-note` : undefined}>{note}</Muted> : null}
     </Pressable>
+  );
+}
+
+const FEE_TONES: Record<FeeBadge["tone"], { color: string; border: string; background: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  ok: { color: colors.success, border: "rgba(0, 255, 136, 0.4)", background: "rgba(0, 255, 136, 0.1)", icon: "checkmark-circle-outline" },
+  warn: { color: "#FF8A80", border: "rgba(255, 59, 48, 0.5)", background: "rgba(255, 59, 48, 0.1)", icon: "alert-circle-outline" },
+  plain: { color: colors.muted, border: colors.border, background: "rgba(255, 255, 255, 0.05)", icon: "remove-circle-outline" },
+};
+
+/** Das Schild „Beitrag bezahlt“ / „Beitrag offen“ (#1336) - dieselben Daten wie „Meine Mitgliedschaft“. */
+function FeeBadgeView({ badge }: { badge: FeeBadge }) {
+  const tone = FEE_TONES[badge.tone];
+  return (
+    <View style={[styles.feeBadge, { borderColor: tone.border, backgroundColor: tone.background }]} testID="verein-member-fee">
+      <Ionicons name={tone.icon} color={tone.color} size={14} />
+      <Muted style={[styles.feeText, { color: tone.color }]}>{badge.text}</Muted>
+    </View>
   );
 }
 
@@ -425,29 +456,31 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 215, 0, 0.45)",
     gap: 12,
   },
-  memberHead: {
+  greeting: {
+    gap: 4,
+  },
+  feeBadge: {
     alignItems: "center",
+    alignSelf: "flex-start",
+    borderRadius: 4,
+    borderWidth: 1,
     flexDirection: "row",
-    justifyContent: "space-between",
+    gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  feeText: {
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
   },
   memberEyebrow: {
     color: colors.gold,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 1.6,
-    textTransform: "uppercase",
-  },
-  sinceChip: {
-    borderColor: "rgba(255, 215, 0, 0.5)",
-    borderRadius: 4,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  sinceText: {
-    color: colors.gold,
-    fontSize: 11,
-    fontWeight: "900",
     textTransform: "uppercase",
   },
   tiles: {
@@ -472,21 +505,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800",
   },
-  tileCount: {
-    alignItems: "center",
-    backgroundColor: colors.live,
-    borderRadius: 9,
-    minWidth: 18,
-    paddingHorizontal: 4,
-    position: "absolute",
-    right: 6,
-    top: 6,
-  },
-  tileCountText: {
-    color: colors.white,
+  tileNote: {
+    color: colors.cyan,
     fontSize: 10,
     fontWeight: "900",
-    lineHeight: 16,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
   },
   memberNews: {
     borderTopColor: "rgba(255, 215, 0, 0.25)",

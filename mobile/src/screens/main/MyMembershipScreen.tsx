@@ -11,7 +11,7 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime } from "../../lib/format";
-import { feeCard, formatMoney, linkPrompt, STATUS_LABELS, TYPE_LABELS, type DolibarrView } from "../../lib/memberArea";
+import { areaCard, feeCard, formatMoney, linkPrompt, STATUS_LABELS, TYPE_LABELS, type AreaCard, type DolibarrView } from "../../lib/memberArea";
 import type { InvoiceList } from "../../lib/memberDocuments";
 import { changedFields, exitLine, fieldLabel, selfRequestLine, validWishedDay, changedWebsiteFields, websiteFieldText, websiteStateLine, type IdentityState, type SelfService, type WebsiteField, type WebsiteProfile } from "../../lib/selfService";
 import type { MoreStackParamList } from "../../navigation/types";
@@ -229,7 +229,7 @@ export function MyMembershipScreen({ navigation }: Props) {
         {/* Dieselbe Karte wie im Web (#1335): schwarz mit Gold - ein Tipp öffnet sie mit Prüfcode. */}
         {status === "active" || status === "honorary" ? (
           <Pressable onPress={() => navigation.navigate("MemberCard")} accessibilityRole="button" accessibilityHint="Öffnet die Mitgliedskarte mit Prüfcode" testID="membership-card-art" style={({ pressed }) => [pressed && styles.pressed]}>
-            <MemberCardArt name={user?.display_name || user?.username || "Mitglied"} number={view?.member_ref || membership?.member_number} since={membership?.member_since} typeLabel={view?.type_label || TYPE_LABELS[String(membership?.membership_type)] || null} validUntil={view?.membership_ends || view?.paid_until || null} />
+            <MemberCardArt {...cardProps(areaCard(user, { ...membership, member_status: status }, view))} />
           </Pressable>
         ) : null}
 
@@ -623,3 +623,8 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
 });
+
+/** Die Angaben der Karte - dieselben wie oben im Tab „Verein“ (#1336). */
+function cardProps(card: AreaCard | null) {
+  return { name: card?.name || "Mitglied", number: card?.number, since: card?.since, typeLabel: card?.typeLabel, validUntil: card?.validUntil };
+}

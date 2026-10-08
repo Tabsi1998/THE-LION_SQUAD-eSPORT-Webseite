@@ -3,8 +3,9 @@ import { Linking } from "react-native";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { clubRows, discordServerLine, socialIcon, VereinScreen } from "./VereinScreen";
 
-// Der Tab Verein (#1147): Mitglieder sehen oben ihren Mitgliederbereich (Karte, Mitgliedschaft, Versammlungen, Helfen,
-// Dokumente, Vorteile, interne News), alle anderen „Mitglied werden“ mit drei Gründen. Darunter für alle News, Galerie,
+// Der Tab Verein (#1147): Mitglieder sehen oben ihre Mitgliedskarte mit Gruß und Beitragsstand (#1336) und ihren
+// Mitgliederbereich (Karte, Mitgliedschaft, Versammlungen, Helfen, Dokumente, Vorteile - mit denselben Zahlen wie die
+// Sprungleiste der Website, #1257 - und interne News), alle anderen „Mitglied werden“ mit drei Gründen. Darunter für alle News, Galerie,
 // Referenzen, Sponsoren, Partner und „Folge uns“. Der Einlass steht oben, nur für den Vorstand. Galerie und Vorteile
 // stehen nur noch einmal, Rechnungen und interne Termine gar nicht (Profil bzw. Events-Tab, #1150).
 
@@ -28,9 +29,12 @@ const navigation = { navigate } as never;
 const route = { key: "verein", name: "VereinHub" } as never;
 
 const responses: Record<string, unknown> = {
-  "/membership/me": { membership: { member_number: "TLS-0007", member_since: "2023-03-01" } },
+  "/membership/me": {
+    membership: { member_number: "TLS-0007", member_since: "2023-03-01", member_status: "active", membership_type: "ordinary" },
+    dolibarr: { led_by_dolibarr: true, type_label: "Ordentliches Mitglied", paid_until: "2026-12-31", fee: { status: "paid" } },
+  },
+  "/membership/area-summary": { meetings_open: 1, ballots_open: 0, helping_free: 6, helping_mine: 0, news_new: 1, documents: 4, documents_new: 2 },
   "/news": [{ id: "n1", slug: "intern", title: "Neue Vereinsfarben", visibility: "members", created_at: "2026-09-20T10:00:00Z" }, { id: "n2", slug: "pub", title: "Für alle", visibility: "public" }],
-  "/documents": [{ id: "d1", title: "Statuten" }, { id: "d2", title: "Protokoll" }],
   "/board": [{ id: "p1", display_title: "Obfrau", user: { display_name: "Obfrau Otti", username: "otti" } }],
   "/settings/public": {
     discord_invite_url: "https://discord.gg/lions",
@@ -56,23 +60,32 @@ beforeEach(() => {
   mockGet.mockImplementation((path: string) => (path in responses ? Promise.resolve({ data: responses[path] }) : Promise.reject(new Error("nope"))));
 });
 
-test("Mitglied: oben der Mitgliederbereich mit sechs Kacheln und internen News - Galerie und Vorteile je einmal", async () => {
+test("Mitglied: oben Karte, Gruß und Beitrag, dann sechs Kacheln mit Zahlen und internen News - Galerie und Vorteile je einmal", async () => {
   await render(<VereinScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByText("Neue Vereinsfarben")).toBeTruthy());
 
   expect(screen.getByTestId("verein-header-title")).toHaveTextContent("Verein");
   expect(screen.getByTestId("verein-member-area")).toBeTruthy();
   expect(screen.queryByTestId("verein-join")).toBeNull();
-  expect(screen.getByText(/Nr\. TLS-0007/)).toBeTruthy();
-  expect(screen.getByText("Seit 2023")).toBeTruthy();
+  // Die Karte wie auf der Website (#1336): Name, Nummer, Art und gültig bis; daneben Gruß, „Mitglied seit“ und Beitrag.
+  expect(screen.getByTestId("verein-member-card-art")).toHaveProp("accessibilityLabel", "Mitgliedskarte NeonFalke, Nr. TLS-0007 · seit 2023, Ordentliches Mitglied · gültig bis 31.12.2026");
+  expect(screen.getByTestId("verein-member-greeting")).toHaveTextContent("Hallo, NeonFalke");
+  expect(screen.getByTestId("verein-member-since")).toHaveTextContent("Mitglied seit 01.03.2023");
+  expect(screen.getByTestId("verein-member-fee")).toHaveTextContent("Beitrag bezahlt");
   expect(screen.queryByText("Für alle")).toBeNull();
-  expect(screen.getByLabelText("Dokumente, 2")).toBeTruthy();
+  // Dieselben Zahlen wie im Mitgliederbereich der Website (#1257); ohne Offenes keine Zahl.
+  expect(screen.getByLabelText("Versammlungen, 1 offen")).toBeTruthy();
+  expect(screen.getByLabelText("Helfen, 6 frei")).toBeTruthy();
+  expect(screen.getByLabelText("Dokumente, 2 neu")).toBeTruthy();
+  expect(screen.getByLabelText("Mitgliedschaft")).toBeTruthy();
+  expect(mockGet).not.toHaveBeenCalledWith("/documents");
   for (const label of ["Galerie", "Vorteile", "News", "Referenzen", "Sponsoren", "Partner"]) expect(screen.getAllByText(label)).toHaveLength(1);
   // Rechnungen (Profil) und interne Termine (Events-Tab) stehen nicht im Verein-Tab.
   expect(screen.queryByText(/Rechnung/)).toBeNull();
   expect(screen.queryByText("Interne Events")).toBeNull();
 
   const taps: Array<[string, unknown[]]> = [
+    ["verein-member-card", ["MemberCard", undefined]],
     ["member-area-card", ["MemberCard", undefined]],
     ["member-area-membership", ["MyMembership", undefined]],
     ["member-area-meetings", ["MemberMeetings", undefined]],
@@ -151,4 +164,18 @@ test("Symbole je Kanal, Unbekanntes als Link; Discord-Server-Zeile", () => {
   expect(discordServerLine({ available: true, guild_id: "9", member_count: 0 })).toBe("");
   expect(discordServerLine({ available: true, guild_id: "9", member_count: 1 })).toBe("1 Mitglied");
   expect(discordServerLine({ available: true, guild_id: "9", member_count: 120, main: true })).toBe("Hauptserver · 120 Mitglieder");
+});
+
+test("Mitglied ohne Mitgliederverwaltung: Gruß ohne Schild; ohne gültige Mitgliedschaft keine Karte", async () => {
+  const original = responses["/membership/me"];
+  responses["/membership/me"] = { membership: { member_since: "2023-03-01", member_status: "pending" } };
+  try {
+    await render(<VereinScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("verein-member-since")).toBeTruthy());
+    expect(screen.getByTestId("verein-member-greeting")).toHaveTextContent("Hallo, NeonFalke");
+    expect(screen.queryByTestId("verein-member-fee")).toBeNull();
+    expect(screen.queryByTestId("verein-member-card")).toBeNull();
+  } finally {
+    responses["/membership/me"] = original;
+  }
 });

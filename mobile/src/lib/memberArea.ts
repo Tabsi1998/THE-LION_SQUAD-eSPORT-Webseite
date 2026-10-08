@@ -155,6 +155,74 @@ export const TYPE_LABELS: Record<string, string> = {
   ordinary: "Ordentlich", supporting: "Unterstützend", honorary: "Ehrenmitglied", youth: "Jugend", guest: "Gast", former: "Ehemalig",
 };
 
+// ---------------------------------------------------------------- Karte oben und Zahlen an den Kacheln (#1336, #1257)
+
+export type FeeBadge = { tone: "ok" | "warn" | "plain"; text: string };
+
+/** Das Schild zum Beitrag (#1336): dieselben Daten wie „Meine Mitgliedschaft“ - ohne Mitgliederverwaltung keins. */
+export function feeBadge(view: DolibarrView): FeeBadge | null {
+  if (!view?.led_by_dolibarr || !view.fee) return null;
+  const status = String(view.fee.status || "");
+  if (status === "paid") return { tone: "ok", text: "Beitrag bezahlt" };
+  if (status === "due" || status === "invoiced") return { tone: "warn", text: "Beitrag offen" };
+  if (status === "not_required") return { tone: "plain", text: "Kein Beitrag nötig" };
+  if (status === "inactive") return { tone: "plain", text: "Beitrag ruht" };
+  return null;
+}
+
+/** Die Art auf der Karte - ausgeschrieben wie auf der Website (Mitgliedskarte, #1335). */
+export const CARD_TYPE_LABELS: Record<string, string> = {
+  ordinary: "Ordentliches Mitglied", supporting: "Unterstützendes Mitglied", honorary: "Ehrenmitglied", youth: "Jugendmitglied", guest: "Gastmitglied",
+};
+
+export type MembershipLike = {
+  member_status?: string | null;
+  member_number?: string | null;
+  member_since?: string | null;
+  membership_type?: string | null;
+} | null | undefined;
+
+export type AreaCard = { name: string; number: string; since: string; typeLabel: string; validUntil: string };
+
+/** Die Karte oben im Tab „Verein“ und auf „Meine Mitgliedschaft“: nur für eine gültige Mitgliedschaft. */
+export function areaCard(user: { display_name?: string | null; username?: string | null } | null | undefined, membership: MembershipLike, view: DolibarrView): AreaCard | null {
+  if (!membership || !["active", "honorary"].includes(String(membership.member_status || ""))) return null;
+  return {
+    name: user?.display_name || user?.username || "Mitglied",
+    number: membership.member_number || view?.member_ref || "",
+    since: membership.member_since || "",
+    typeLabel: view?.type_label || CARD_TYPE_LABELS[String(membership.membership_type || "")] || "Mitglied",
+    validUntil: view?.membership_ends || view?.paid_until || "",
+  };
+}
+
+/** Was im Mitgliederbereich offen ist (/membership/area-summary) - dieselben Zahlen wie im Web. */
+export type AreaSummary = {
+  meetings_open?: number;
+  ballots_open?: number;
+  helping_free?: number;
+  helping_mine?: number;
+  news_new?: number;
+  documents?: number;
+  documents_new?: number;
+} | null;
+
+type SummaryCount = "meetings_open" | "helping_free" | "news_new" | "documents_new";
+const TILE_NOTES: Record<string, [SummaryCount, string]> = {
+  meetings: ["meetings_open", "offen"],
+  helping: ["helping_free", "frei"],
+  news: ["news_new", "neu"],
+  documents: ["documents_new", "neu"],
+};
+
+/** Die Zahl an einer Kachel („1 offen“, „6 frei“, „2 neu“) - ohne Offenes keine. */
+export function tileNote(key: string, summary: AreaSummary): string {
+  const rule = TILE_NOTES[key];
+  if (!rule || !summary) return "";
+  const value = Number(summary[rule[0]]);
+  return Number.isFinite(value) && value > 0 ? `${Math.floor(value)} ${rule[1]}` : "";
+}
+
 /** Ob und wie „Zuordnung anfragen“ angeboten wird. */
 export function linkPrompt(view: DolibarrView): "ask" | "requested" | "conflict" | null {
   if (!view?.connected || view.led_by_dolibarr) return null;

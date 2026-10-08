@@ -93,6 +93,20 @@ export function describeSync(sync, mode) {
   return { tone: "ok", text: `${formatDate(sync.last_ok_at)}: ${counts.seen || 0} gelesen, ${what}${sync.was_full ? " · vollständig" : ""}` };
 }
 
+/**
+ * Das Schild zum Beitrag oben im Mitgliederbereich (#1336): dieselben Daten wie „Meine Mitgliedschaft“, kurz gesagt.
+ * Ohne Mitgliederverwaltung (oder ohne Zuordnung) gibt es kein Schild - die Website rät nicht.
+ */
+export function feeBadge(view) {
+  if (!view?.led_by_dolibarr || !view.fee) return null;
+  const status = view.fee.status;
+  if (status === "paid") return { tone: "ok", text: "Beitrag bezahlt" };
+  if (status === "due" || status === "invoiced") return { tone: "warn", text: "Beitrag offen" };
+  if (status === "not_required") return { tone: "plain", text: "Kein Beitrag nötig" };
+  if (status === "inactive") return { tone: "plain", text: "Beitrag ruht" };
+  return null;
+}
+
 /** Was auf „Meine Mitgliedschaft“ zum Beitrag steht. */
 export function feeCard(view) {
   if (!view?.led_by_dolibarr || !view.fee) return null;

@@ -2523,6 +2523,102 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 }
 .tls-member-card__qr--off svg { width: 6cqw; height: 6cqw; color: #FFD700; }
 
+/* Sprungleiste im Mitgliederbereich (#1257, #1336): am Handy und Tablet eine Zeile zum Wischen, die unter dem Kopf der
+   Website stehen bleibt; am PC (ab 1280 px) links fest. Gold steht nur am Strich unter dem aktiven Eintrag, die Zahl
+   („1 offen“) in Cyan. Der Schatten nach oben deckt den Spalt, wenn der Kopf beim Scrollen kleiner wird. */
+.tls-area-jump {
+  position: sticky;
+  top: 4rem;
+  z-index: 30;
+  margin-inline: -1rem;
+  padding-inline: 1rem;
+  background: var(--tls-black);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -0.5rem 0 0 var(--tls-black);
+}
+@media (min-width: 640px) {
+  .tls-area-jump { margin-inline: -1.5rem; padding-inline: 1.5rem; }
+}
+@media (min-width: 768px) {
+  .tls-area-jump { top: 5rem; box-shadow: 0 -1rem 0 0 var(--tls-black); }
+}
+@media (min-width: 1024px) {
+  .tls-area-jump { margin-inline: -2rem; padding-inline: 2rem; }
+}
+.tls-area-jump__list {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.tls-area-jump__list::-webkit-scrollbar { display: none; }
+.tls-area-jump__item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+  transition: color var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-area-jump__item:hover,
+.tls-area-jump__item:focus-visible,
+.tls-area-jump__item[data-active="1"] { color: var(--tls-white); }
+.tls-area-jump__item::after {
+  content: "";
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--tls-gold);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--tls-motion-mid) var(--tls-ease);
+}
+.tls-area-jump__item[data-active="1"]::after { transform: scaleX(1); }
+.tls-area-jump__count { color: var(--tls-cyan); white-space: pre; }
+@media (min-width: 1280px) {
+  .tls-area-jump {
+    top: 7rem;
+    align-self: start;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+  .tls-area-jump__list { flex-direction: column; align-items: flex-start; gap: 0.25rem; overflow: visible; }
+  .tls-area-jump__item { flex-direction: column; align-items: flex-start; justify-content: center; min-height: 2.75rem; padding: 0.375rem 0.25rem; white-space: normal; }
+  .tls-area-jump__item::after { left: 0.25rem; right: 0.25rem; }
+  .tls-area-jump__count { font-size: 0.6875rem; letter-spacing: 0.06em; }
+  .tls-area-jump__dot { display: none; }
+}
+
+/* Datums-Kachel für Termine im Mitgliederbereich (#1336): Monat in Cyan, Tag groß - ein Ersatz, bis die gemeinsame
+   Datums-Kachel der Bausteine kommt. */
+.tls-date-tile {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 3rem;
+  height: 3.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  background: var(--tls-black);
+}
+.tls-date-tile__month { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--tls-cyan); }
+.tls-date-tile__day { font-size: 1.25rem; font-weight: 900; line-height: 1; color: var(--tls-white); }
+
 /* Nachbarn treten zurück (#1080): fährt die Maus über eine Kachel, werden die anderen leiser. Nur mit Maus. */
 @media (hover: hover) {
   .tls-dim-siblings > * {
@@ -2796,8 +2892,8 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   border: 1px solid rgba(255, 59, 48, 0.5);
   color: #FF6B6B;
 }
-/* Ehre (#1335): wie der wichtige Knopf, nur in Gold mit dunkler Schrift - Mitgliedschaft ist Ehre. Nur auf „Mitglied
-   werden“ und im Mitgliederbereich. */
+/* Ehre (#1335): wie der wichtige Knopf, nur in Gold mit dunkler Schrift - Mitgliedschaft ist Ehre. Nur „Antrag stellen“
+   auf „Mitglied werden“; im Mitgliederbereich steht Gold nur an der Karte und am Strich der Sprungleiste (#1336). */
 .tls-btn--honor {
   background-color: var(--tls-gold);
   color: #1A1400;

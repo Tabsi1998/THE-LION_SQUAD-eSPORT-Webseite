@@ -3,7 +3,7 @@ import path from "node:path";
 
 // Knöpfe (#1082): eine Sprache für alle öffentlichen Seiten - wichtig (blau, Lichtlauf, Pfeil fährt 3 px),
 // zweitrangig (blauer Rahmen), leise (Nebensachen), gefährlich (Löschen, Stornieren, Aufgeben in Rot) und seit #1335
-// Ehre (Gold mit dunkler Schrift - nur „Antrag stellen“ auf „Mitglied werden“ und im Mitgliederbereich).
+// Ehre (Gold mit dunkler Schrift - nur „Antrag stellen“ auf „Mitglied werden“; im Mitgliederbereich kein Gold-Knopf, #1336).
 
 const root = path.resolve(__dirname, "../..");
 const css = readFileSync(path.join(root, "src/index.css"), "utf8").replace(/\r\n/g, "\n");

@@ -1,4 +1,4 @@
-import { applyScope, boardContacts, feeCard, internalLabel, isInternal, linkPrompt, memberEvents, memberNews } from "./memberArea";
+import { applyScope, areaCard, boardContacts, feeBadge, feeCard, internalLabel, isInternal, linkPrompt, memberEvents, memberNews, tileNote } from "./memberArea";
 
 // Mitgliederbereich in der App (#340, #339, #342): dieselbe Auswahl wie im Web.
 
@@ -73,4 +73,36 @@ test("Zuordnung anfragen nur, wenn angebunden und noch nicht geführt", () => {
   expect(linkPrompt({ connected: true, led_by_dolibarr: false })).toBe("ask");
   expect(linkPrompt({ connected: true, led_by_dolibarr: false, link: { status: "requested" } })).toBe("requested");
   expect(linkPrompt({ connected: true, led_by_dolibarr: false, link: { status: "conflict" } })).toBe("conflict");
+});
+
+// Karte oben im Tab „Verein“ (#1336) und die Zahlen an den Kacheln (#1257) - dieselben Regeln wie im Web.
+test("Schild zum Beitrag: bezahlt, offen, nicht nötig, ruht - ohne Mitgliederverwaltung keins", () => {
+  const view = (status: string) => ({ led_by_dolibarr: true, fee: { status } });
+  expect(feeBadge(view("paid"))).toEqual({ tone: "ok", text: "Beitrag bezahlt" });
+  expect(feeBadge(view("invoiced"))).toEqual({ tone: "warn", text: "Beitrag offen" });
+  expect(feeBadge(view("due"))).toEqual({ tone: "warn", text: "Beitrag offen" });
+  expect(feeBadge(view("not_required"))?.text).toBe("Kein Beitrag nötig");
+  expect(feeBadge(view("inactive"))?.text).toBe("Beitrag ruht");
+  expect(feeBadge({ led_by_dolibarr: false, fee: { status: "paid" } })).toBeNull();
+  expect(feeBadge(null)).toBeNull();
+});
+
+test("Karte: nur für eine gültige Mitgliedschaft, Art ausgeschrieben, gültig bis = Austritt, sonst bezahlt bis", () => {
+  const user = { display_name: "NeonFalke", username: "neon" };
+  const membership = { member_status: "active", member_number: "TLS-0007", member_since: "2023-03-01", membership_type: "youth" };
+  expect(areaCard(user, membership, { paid_until: "2026-12-31" })).toEqual({ name: "NeonFalke", number: "TLS-0007", since: "2023-03-01", typeLabel: "Jugendmitglied", validUntil: "2026-12-31" });
+  expect(areaCard(user, membership, { type_label: "Fördermitglied", membership_ends: "2026-11-30", paid_until: "2026-12-31" })).toMatchObject({ typeLabel: "Fördermitglied", validUntil: "2026-11-30" });
+  expect(areaCard(user, { member_status: "honorary" }, { member_ref: "M-12" })).toMatchObject({ number: "M-12", typeLabel: "Mitglied" });
+  expect(areaCard(user, { member_status: "pending" }, null)).toBeNull();
+  expect(areaCard(user, null, null)).toBeNull();
+});
+
+test("Zahlen an den Kacheln: offen, frei, neu - ohne Offenes keine", () => {
+  const summary = { meetings_open: 1, helping_free: 6, news_new: 0, documents_new: 2 };
+  expect(tileNote("meetings", summary)).toBe("1 offen");
+  expect(tileNote("helping", summary)).toBe("6 frei");
+  expect(tileNote("news", summary)).toBe("");
+  expect(tileNote("documents", summary)).toBe("2 neu");
+  expect(tileNote("benefits", summary)).toBe("");
+  expect(tileNote("meetings", null)).toBe("");
 });
