@@ -326,7 +326,7 @@ async def personal_profile_references(user: dict, public_only: bool = False) -> 
                 })
                 break
 
-    items.sort(key=lambda row: _date_key(row), reverse=True)
+    items.sort(key=_date_key, reverse=True)
     wins = len([item for item in items if int(item.get("rank") or 0) == 1])
     podiums = len([item for item in items if 1 <= int(item.get("rank") or 999) <= 3])
     return {

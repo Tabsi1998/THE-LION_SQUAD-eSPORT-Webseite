@@ -29,13 +29,20 @@ WRITE_METHODS = {
 }
 
 
+def _refused(name: str):
+    """Steht statt einer Schreib-Methode bereit: Wer sie aufruft, bricht ab - das Inventar schreibt nie."""
+    def refuse(*_args, **_kwargs):
+        raise RuntimeError(f"Das Inventar darf nicht schreiben (versucht: {name}).")
+    return refuse
+
+
 class ReadOnlyCollection:
     def __init__(self, collection):
         self._collection = collection
 
     def __getattr__(self, name):
         if name in WRITE_METHODS:
-            raise RuntimeError(f"Das Inventar darf nicht schreiben (versucht: {name}).")
+            return _refused(name)
         return getattr(self._collection, name)
 
 
