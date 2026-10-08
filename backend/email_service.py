@@ -12,6 +12,7 @@ import resend
 from database import get_db
 from models import new_id
 from services.email_delivery import header_text, html_to_text, html_value
+from services.log_safe import log_safe, mask_addresses
 from services.secret_store import decrypt_secret
 
 logger = logging.getLogger("tls-arena.email")
@@ -78,7 +79,8 @@ async def send_mail(to: str, subject: str, html: str, template_key: str = "custo
         await db.email_logs.insert_one({**log})
         return {"ok": True, "id": log["message_id"]}
     except Exception as e:
-        logger.error(f"[email] send failed: {e}")
+        # Ins Protokoll ohne Mail-Adressen und in einer Zeile; die volle Meldung steht im Versandprotokoll (Admin).
+        logger.error("[email] send failed: %s", log_safe(mask_addresses(e), 300))
         log["status"] = "failed"
         log["error"] = str(e)[:300]
         await db.email_logs.insert_one({**log})
