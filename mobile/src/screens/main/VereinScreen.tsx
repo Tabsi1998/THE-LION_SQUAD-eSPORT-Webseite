@@ -15,7 +15,10 @@ import { API_BASE_URL } from "../../config";
 import { canAdmit } from "../../lib/admission";
 import { api } from "../../lib/api";
 import { formatDate } from "../../lib/format";
-import { areaCard, boardContacts, feeBadge, memberNews, tileNote, type AreaSummary, type BoardContact, type DolibarrView, type FeeBadge } from "../../lib/memberArea";
+import {
+  areaCard, boardContacts, feeAmount, feeBadge, feesStandLine, memberNews, tileNote,
+  type AreaSummary, type BoardContact, type DolibarrView, type FeeBadge, type PublicFees,
+} from "../../lib/memberArea";
 import { openLink } from "../../lib/openLink";
 import { isGuestUser } from "../../live";
 import type { AppStackParamList, LooseNavigation } from "../../navigation/types";
@@ -132,6 +135,8 @@ export function VereinScreen({ navigation }: Props) {
   // Was offen ist (#1257): dieselbe Antwort wie für die Sprungleiste im Mitgliederbereich der Website.
   const [summary, setSummary] = useState<AreaSummary>(null);
   const [news, setNews] = useState<NewsPost[]>([]);
+  // Beitrag offen (#1251): für alle, die noch nicht Mitglied sind - dieselben Beträge wie auf der Website.
+  const [fees, setFees] = useState<PublicFees>(null);
   const [contacts, setContacts] = useState<BoardContact[]>([]);
   const [discordUrl, setDiscordUrl] = useState("");
   const [socials, setSocials] = useState<SocialLink[]>([]);
@@ -145,8 +150,9 @@ export function VereinScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     const settings = api.get<{ discord_invite_url?: string; social_links?: SocialLink[] }>("/settings/public");
     if (!member) {
-      const result = await settings.catch(() => null);
+      const [result, feeResult] = await Promise.all([settings.catch(() => null), api.get<PublicFees>("/membership/fees").catch(() => null)]);
       setSocials(socialList(result?.data?.social_links));
+      setFees(feeResult?.data && typeof feeResult.data === "object" ? feeResult.data : null);
       setRefreshing(false);
       return;
     }
@@ -263,6 +269,21 @@ export function VereinScreen({ navigation }: Props) {
                 </View>
               </View>
             ))}
+            {fees?.available && fees.fees?.length ? (
+              <View style={styles.fees} testID="verein-join-fees">
+                <Muted style={styles.joinEyebrow}>Beitrag</Muted>
+                {fees.fees.map((fee) => (
+                  <View key={String(fee.id)} style={styles.feeRow} testID={`verein-join-fee-${fee.id}`}>
+                    <View style={styles.flex}>
+                      <Body style={styles.strong}>{fee.label}</Body>
+                      {fee.description ? <Muted>{fee.description}</Muted> : null}
+                    </View>
+                    <Body style={styles.strong}>{feeAmount(fee)}</Body>
+                  </View>
+                ))}
+                {feesStandLine(fees) ? <Muted testID="verein-join-fees-stand">{feesStandLine(fees)}</Muted> : null}
+              </View>
+            ) : null}
             <Button label="Antrag stellen" onPress={() => { openLink(JOIN_URL); }} testID="verein-join-apply" />
           </Card>
         )}
@@ -307,9 +328,11 @@ export function VereinScreen({ navigation }: Props) {
             {contacts.map((contact) => (
               <Pressable key={contact.id} disabled={!contact.username} onPress={() => contact.username && open("PublicProfile", { username: contact.username })} accessibilityRole="button" style={({ pressed }) => [styles.contact, pressed && styles.pressed]}>
                 <MediaImage uri={contact.avatar} style={styles.avatar} fallback={<Ionicons name="person-outline" color={colors.muted} size={18} />} />
+                {/* Wie im Web (#1332): Rolle, Name, darunter der Spielername. */}
                 <View style={styles.flex}>
+                  <Muted style={styles.contactRole}>{contact.title}</Muted>
                   <Body style={styles.strong}>{contact.name}</Body>
-                  <Muted>{contact.title}</Muted>
+                  {contact.gamertag ? <Muted testID={`member-area-contact-${contact.id}-gamertag`}>{contact.gamertag}</Muted> : null}
                 </View>
                 {contact.username ? <Ionicons name="chevron-forward" color={colors.muted} size={16} /> : null}
               </Pressable>
@@ -534,6 +557,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 1.6,
+    textTransform: "uppercase",
+  },
+  fees: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    gap: 8,
+    paddingTop: 10,
+  },
+  feeRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 12,
+  },
+  contactRole: {
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1.2,
     textTransform: "uppercase",
   },
   reason: {

@@ -1,4 +1,4 @@
-import { applyScope, areaCard, boardContacts, feeBadge, feeCard, internalLabel, isInternal, linkPrompt, memberEvents, memberNews, tileNote } from "./memberArea";
+import { applyScope, areaCard, boardContacts, feeAmount, feeBadge, feeCard, feesStandLine, internalLabel, isInternal, linkPrompt, memberEvents, memberNews, tileNote } from "./memberArea";
 
 // Mitgliederbereich in der App (#340, #339, #342): dieselbe Auswahl wie im Web.
 
@@ -38,7 +38,7 @@ test("Filter „Verein“ lässt nur Interne durch, „Alle“ alles", () => {
 
 test("Ansprechpartner: nur besetzte, aktive Posten, höchstens vier", () => {
   const positions = [
-    { id: "p1", display_title: "Obfrau", user: { display_name: "Paula", username: "paula", avatar_url: "/a.png" } },
+    { id: "p1", display_title: "Obfrau", user: { display_name: "Paula", username: "paula", avatar_url: "/a.png", gamertag: "PaulaPlays" } },
     { id: "p2", title_male: "Kassier", user: null },
     { id: "p3", display_title: "Schriftführer", is_active: false, user: { username: "x" } },
     { id: "p4", title_male: "Beirat", user: { gamertag: "Gamer1" } },
@@ -48,8 +48,9 @@ test("Ansprechpartner: nur besetzte, aktive Posten, höchstens vier", () => {
   ];
   const contacts = boardContacts(positions);
   expect(contacts).toHaveLength(4);
-  expect(contacts[0]).toEqual({ id: "p1", title: "Obfrau", name: "Paula", avatar: "/a.png", username: "paula" });
-  expect(contacts[1]).toEqual({ id: "p4", title: "Beirat", name: "Gamer1", avatar: "", username: null });
+  expect(contacts[0]).toEqual({ id: "p1", title: "Obfrau", name: "Paula", avatar: "/a.png", username: "paula", gamertag: "PaulaPlays" });
+  // Der Spielername nur, wenn er anders lautet als der Name (#1332).
+  expect(contacts[1]).toEqual({ id: "p4", title: "Beirat", name: "Gamer1", avatar: "", username: null, gamertag: "" });
 });
 
 test("Beitragskarte sagt dasselbe wie die Website", () => {
@@ -105,4 +106,13 @@ test("Zahlen an den Kacheln: offen, frei, neu - ohne Offenes keine", () => {
   expect(tileNote("documents", summary)).toBe("2 neu");
   expect(tileNote("benefits", summary)).toBe("");
   expect(tileNote("meetings", null)).toBe("");
+});
+
+// Beitrag offen (#1251): dieselben Beträge wie auf „Mitglied werden“ der Website.
+test("Beitrag je Mitgliedsart und der Stand, wenn die Verwaltung nicht antwortet", () => {
+  expect(feeAmount({ id: 2, label: "Ordentlich", amount: 60, currency: "EUR", period_label: "je Jahr", subscription_required: true })).toMatch(/60,00 je Jahr$/);
+  expect(feeAmount({ id: 3, label: "Ehrenmitglied", amount: null, subscription_required: false })).toBe("Ohne Beitrag");
+  expect(feesStandLine({ available: true, stale: true, as_of: "2026-10-07T08:00:00Z", fees: [] })).toBe("Stand 7.10.2026 – die Mitgliederverwaltung antwortet gerade nicht.");
+  expect(feesStandLine({ available: true, stale: false, as_of: "2026-10-07T08:00:00Z", fees: [] })).toBe("");
+  expect(feesStandLine(null)).toBe("");
 });

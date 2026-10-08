@@ -35,7 +35,12 @@ const responses: Record<string, unknown> = {
   },
   "/membership/area-summary": { meetings_open: 1, ballots_open: 0, helping_free: 6, helping_mine: 0, news_new: 1, documents: 4, documents_new: 2 },
   "/news": [{ id: "n1", slug: "intern", title: "Neue Vereinsfarben", visibility: "members", created_at: "2026-09-20T10:00:00Z" }, { id: "n2", slug: "pub", title: "Für alle", visibility: "public" }],
-  "/board": [{ id: "p1", display_title: "Obfrau", user: { display_name: "Obfrau Otti", username: "otti" } }],
+  "/board": [{ id: "p1", display_title: "Obfrau", user: { display_name: "Obfrau Otti", username: "otti", gamertag: "OttiOtter" } }],
+  // Beitrag offen (#1251): für alle, die noch nicht Mitglied sind.
+  "/membership/fees": { available: true, stale: false, as_of: "2026-10-07T08:00:00Z", fees: [
+    { id: 2, label: "Ordentliches Mitglied", description: "Mit Stimmrecht", amount: 60, currency: "EUR", period_label: "je Jahr", subscription_required: true },
+    { id: 9, label: "Ehrenmitglied", amount: null, subscription_required: false },
+  ] },
   "/settings/public": {
     discord_invite_url: "https://discord.gg/lions",
     social_links: [
@@ -106,8 +111,12 @@ test("Mitglied: oben Karte, Gruß und Beitrag, dann sechs Kacheln mit Zahlen und
   // Was im Verein gerade los ist, bleibt im Mitgliederbereich: Discord jetzt, Steam, Ansprechpartner.
   expect(screen.getByTestId("member-area-discord-summary")).toHaveTextContent("42 online · 3 im Voice");
   expect(screen.getByTestId("member-area-steam-summary")).toHaveTextContent("2 Mitglieder gerade in Steam");
+  // Ansprechpartner wie im Web (#1332): Rolle, Name, Spielername.
+  expect(screen.getByTestId("member-area-contact-p1-gamertag")).toHaveTextContent("OttiOtter");
   await fireEvent.press(screen.getByText("Obfrau Otti"));
   expect(navigate).toHaveBeenLastCalledWith("PublicProfile", { username: "otti" });
+  // Mitglieder brauchen den Beitrag nicht mehr - er wird gar nicht erst geladen.
+  expect(mockGet).not.toHaveBeenCalledWith("/membership/fees");
 });
 
 test("ohne Mitgliedschaft: oben „Mitglied werden“ mit drei Gründen, der Antrag öffnet die Website", async () => {
@@ -117,6 +126,11 @@ test("ohne Mitgliedschaft: oben „Mitglied werden“ mit drei Gründen, der Ant
   await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/settings/public"));
   expect(screen.queryByTestId("verein-member-area")).toBeNull();
   for (const reason of ["Mitgliedskarte", "Mitreden", "Interne Events"]) expect(screen.getByText(reason)).toBeTruthy();
+  // Der Beitrag offen (#1251): dieselben Beträge wie auf der Website.
+  await waitFor(() => expect(screen.getByTestId("verein-join-fees")).toBeTruthy());
+  expect(screen.getByTestId("verein-join-fee-2")).toHaveTextContent(/Ordentliches Mitglied.*60,00 je Jahr/);
+  expect(screen.getByTestId("verein-join-fee-9")).toHaveTextContent(/Ehrenmitglied.*Ohne Beitrag/);
+  expect(screen.queryByTestId("verein-join-fees-stand")).toBeNull();
   await fireEvent.press(screen.getByTestId("verein-join-apply"));
   expect(openUrl).toHaveBeenCalledWith(expect.stringMatching(/\/membership\/join$/));
   // Nicht-Mitglieder laden nichts aus dem Mitgliederbereich.

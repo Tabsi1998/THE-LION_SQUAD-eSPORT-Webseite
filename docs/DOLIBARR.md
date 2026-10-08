@@ -167,7 +167,8 @@ und landet auf `lionsquad.at/karte/pruefen/…` – ohne Anmeldung.
   bis – ins Fotoalbum (am Handy über das Teilen-Menü, am PC als Download). Den Prüfcode hat das Bild bewusst
   nicht, dort steht „Prüfcode braucht Netz“. Ohne Netz zeigt „Meine Mitgliedschaft“ die zuletzt geladene Karte
   mit „Stand“, die installierte Website zeigt sie auf der Seite „Keine Verbindung“. Gespeichert wird nur, was
-  auf der Karte steht; Abmelden löscht es. Die App zieht dieselbe Regel im nächsten App-Paket nach.
+  auf der Karte steht; Abmelden löscht es. Die App macht es genauso: ohne Netz die zuletzt geladene Karte mit
+  „Stand“ und „Prüfcode braucht Netz“, gespeichert im sicheren Speicher des Geräts, Abmelden löscht sie.
 - **Wallet:** Apple Wallet und Google Wallet sind vorbereitet (die Karte hat
   ein neutrales Modell mit Feldern, Farben und Barcode), brauchen aber ein
   Apple-Entwicklerkonto mit Pass-Zertifikat bzw. ein Google-Wallet-Issuer-Konto.

@@ -51,19 +51,27 @@ export type BoardPosition = {
   user?: { display_name?: string | null; gamertag?: string | null; username?: string | null; avatar_url?: string | null; photo_url?: string | null; slug?: string | null } | null;
 };
 
-export type BoardContact = { id: string; title: string; name: string; avatar: string; username: string | null };
+export type BoardContact = { id: string; title: string; name: string; avatar: string; username: string | null; gamertag: string };
 
-/** Ansprechpartner: nur besetzte Posten, in der Reihenfolge des Vorstands. */
+/**
+ * Ansprechpartner: nur besetzte Posten, in der Reihenfolge des Vorstands. Wie im Web (#1332): Rolle, Name, darunter der
+ * Spielername - nur, wenn er anders lautet als der Name.
+ */
 export function boardContacts(positions: BoardPosition[] | null | undefined, limit = 4): BoardContact[] {
   return (Array.isArray(positions) ? positions : [])
     .filter((position) => position?.user && position.is_active !== false)
-    .map((position, index) => ({
-      id: position.id || String(index),
-      title: position.display_title || position.title_male || "",
-      name: position.user?.display_name || position.user?.gamertag || position.user?.username || "",
-      avatar: position.user?.avatar_url || position.user?.photo_url || "",
-      username: position.user?.username || null,
-    }))
+    .map((position, index) => {
+      const name = position.user?.display_name || position.user?.gamertag || position.user?.username || "";
+      const gamertag = position.user?.gamertag && position.user.gamertag !== name ? position.user.gamertag : "";
+      return {
+        id: position.id || String(index),
+        title: position.display_title || position.title_male || "",
+        name,
+        avatar: position.user?.avatar_url || position.user?.photo_url || "",
+        username: position.user?.username || null,
+        gamertag,
+      };
+    })
     .slice(0, limit);
 }
 
@@ -154,6 +162,33 @@ export const STATUS_LABELS: Record<string, string> = {
 export const TYPE_LABELS: Record<string, string> = {
   ordinary: "Ordentlich", supporting: "Unterstützend", honorary: "Ehrenmitglied", youth: "Jugend", guest: "Gast", former: "Ehemalig",
 };
+
+// ---------------------------------------------------------------- Beitrag offen (#1251)
+
+export type PublicFee = {
+  id: number | string;
+  label: string;
+  description?: string | null;
+  amount?: number | null;
+  currency?: string;
+  period_label?: string | null;
+  subscription_required?: boolean;
+  admission_fee?: number | null;
+  prorated?: boolean;
+};
+export type PublicFees = { available?: boolean; stale?: boolean; as_of?: string | null; fees?: PublicFee[] } | null;
+
+/** „€ 60,00 je Jahr“ - oder „Ohne Beitrag“; dieselben Beträge wie auf „Mitglied werden“ der Website. */
+export function feeAmount(fee: PublicFee): string {
+  if (!fee?.subscription_required || fee.amount === null || fee.amount === undefined) return "Ohne Beitrag";
+  return `${formatMoney(fee.amount, fee.currency || "EUR")} ${fee.period_label || "je Jahr"}`;
+}
+
+/** „Stand 07.10.2026 – …“ nur, wenn die Mitgliederverwaltung gerade nicht antwortet. */
+export function feesStandLine(fees: PublicFees): string {
+  if (!fees?.available || !fees.stale || !fees.as_of) return "";
+  return `Stand ${formatDay(String(fees.as_of).slice(0, 10))} – die Mitgliederverwaltung antwortet gerade nicht.`;
+}
 
 // ---------------------------------------------------------------- Karte oben und Zahlen an den Kacheln (#1336, #1257)
 

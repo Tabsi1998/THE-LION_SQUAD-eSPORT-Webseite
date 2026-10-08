@@ -230,6 +230,8 @@ describe("Abmelden", () => {
     mockApi.post.mockClear();
     // Die letzten Suchen (#1145) gehen mit dem Konto.
     await SecureStore.setItemAsync("tls.recent-searches", JSON.stringify(["rocket"]));
+    // Die gespeicherte Mitgliedskarte (#1256) auch.
+    await SecureStore.setItemAsync("tls.member-card", JSON.stringify({ user_id: "u-1", saved_at: "2026-10-07T16:05:00Z", card: { name: "Fan" } }));
 
     await act(async () => {
       await result.current.logout();
@@ -241,6 +243,7 @@ describe("Abmelden", () => {
     expect(await SecureStore.getItemAsync(REFRESH_KEY)).toBeNull();
     expect(mockClearAllCache).toHaveBeenCalled();
     expect(await SecureStore.getItemAsync("tls.recent-searches")).toBeNull();
+    expect(await SecureStore.getItemAsync("tls.member-card")).toBeNull();
     expect(isGuestUser(result.current.user)).toBe(true);
   });
 
