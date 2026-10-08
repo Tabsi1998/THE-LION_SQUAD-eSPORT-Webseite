@@ -6,7 +6,6 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useAuth } from "@/context/AuthContext";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { InvoiceTermsPanel } from "@/components/tls/InvoiceTermsPanel";
 import { CAPABILITY_LABELS, DOLIBARR_STATUS_LABELS, LINK_STATUS_LABELS, MODE_HINTS, MODE_LABELS, PREVIEW_STATE_LABELS, describeSync, formatDate, needsManualChoice, splitWithoutAccount } from "@/lib/dolibarr";
 import { Empty, Field, Panel, Tile } from "./dolibarr/parts";
 import { FeaturesTab } from "./dolibarr/FeaturesTab";
@@ -452,26 +451,14 @@ export default function AdminDolibarrPage() {
             <Panel title="Schreibzugriff für Rechnungen">
               <div className="space-y-3 text-sm" data-testid="dolibarr-write">
                 <p className="text-xs text-white/55">Rechnungen und Geschäftspartner legt die Website mit dem Website-Benutzer an, sobald der Haken gesetzt ist und der Modus auf „Live“ steht. Ohne Haken schreibt sie nichts – Rechnungsaufträge bleiben in der Finanzübersicht stehen, nichts geht verloren. Ein eigener Schlüssel für einen zweiten Benutzer ist möglich, aber nicht nötig.</p>
-                <p className="text-xs text-white/60">Ein- und ausgeschaltet wird der Schreibzugriff unter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline" data-testid="dolibarr-write-to-features">Funktionen</button>; hier stehen Steuersätze, Konditionen und der optionale zweite Schlüssel.</p>
-                {/* Steuersätze (#322): kein stiller Automatismus - erst wenn jemand sie geprüft hat, darf die Website Belege von selbst freigeben. */}
-                <div className="border border-white/10 rounded-sm p-3 space-y-2" data-testid="dolibarr-tax">
-                  <div className="text-[11px] uppercase tracking-wider font-bold text-white/70">Steuersätze je Profil</div>
-                  <div className="text-xs text-white/60">
-                    {Object.entries(status?.tax_rates || {}).map(([profile, rate]) => (
-                      <span key={profile} className="inline-block mr-3">{({ none: "ohne Umsatzsteuer", standard: "Normalsatz", reduced: "ermäßigt" })[profile] || profile}: <span className="text-white tabular-nums">{Number(rate).toLocaleString("de-AT")} %</span></span>
-                    ))}
-                  </div>
-                  <label className="inline-flex items-center gap-2">
-                    <input type="checkbox" checked={Boolean(status?.tax_confirmed)} disabled={!!busy} onChange={(e) => saveSettings({ tax_confirmed: e.target.checked }, e.target.checked ? "Steuersätze als geprüft gemerkt." : "Bestätigung der Steuersätze zurückgenommen – Belege bleiben Entwurf.")} data-testid="dolibarr-tax-confirmed" />
-                    Steuersätze geprüft (Kassier oder Steuerberatung)
-                    {status?.tax_confirmed?.at && <span className="text-xs text-white/45"> – {status.tax_confirmed.by || "bestätigt"} am {formatDate(status.tax_confirmed.at)}</span>}
-                  </label>
+                <p className="text-xs text-white/60">Ein- und ausgeschaltet wird der Schreibzugriff unter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline" data-testid="dolibarr-write-to-features">Funktionen</button>; hier stehen die Rechte des Website-Benutzers und der optionale zweite Schlüssel.</p>
+                {/* Rechnungsangaben (#1358): Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, Steuersätze und „gleich freigeben“
+                    pflegt der Kassier selbst - an einer Stelle, in der Finanzübersicht. */}
+                <div className="border border-white/10 rounded-sm p-3 text-xs text-white/65" data-testid="dolibarr-invoice-details-pointer">
+                  Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, „Steuersätze geprüft“ und „Rechnungen gleich freigeben“ pflegt der Kassier unter{" "}
+                  <Link to="/admin/finance?tab=rechnungsangaben" className="text-[#29B6E8] hover:underline">Finanzübersicht → Rechnungsangaben</Link>
+                  {status?.invoice_terms ? <> – Stand: <span className={status.invoice_terms.complete ? "text-[#00FF88]" : "text-[#FF9500]"}>{status.invoice_terms.complete ? "vollständig" : "unvollständig, Belege bleiben Entwurf"}</span></> : null}.
                 </div>
-                <label className="inline-flex items-center gap-2">
-                  <input type="checkbox" checked={Boolean(status?.invoice_auto_validate)} disabled={!!busy || (!status?.invoice_auto_validate && !(status?.invoice_terms?.complete && status?.tax_confirmed))} onChange={(e) => saveSettings({ invoice_auto_validate: e.target.checked }, e.target.checked ? "Rechnungen werden gleich freigegeben." : "Rechnungen bleiben Entwurf zur Prüfung.")} data-testid="dolibarr-invoice-auto-validate" />
-                  Rechnungen gleich freigeben (sonst Entwurf zur Prüfung in Dolibarr){!(status?.invoice_terms?.complete && status?.tax_confirmed) && <span className="text-xs text-[#FFD700]"> – erst mit vollständigen Konditionen und geprüften Steuersätzen</span>}
-                </label>
-                <InvoiceTermsPanel terms={status?.invoice_terms} connected={Boolean(status && status.mode !== "off")} busy={busy} onSave={(payload) => saveSettings(payload, "Rechnungskonditionen gespeichert.")} />
                 <details className="text-xs text-white/55 border border-white/10 rounded-sm p-3">
                   <summary className="cursor-pointer font-bold uppercase tracking-wider text-white/70">Rechte des Website-Benutzers dafür</summary>
                   <ul className="list-disc pl-5 mt-2 space-y-1">

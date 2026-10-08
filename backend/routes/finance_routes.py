@@ -135,6 +135,52 @@ async def finance_settings(body: FinanceSettingsBody, me: dict = Depends(require
     return {"credit_note_draft_on_cancel": on, "dropped": dropped}
 
 
+# ---------------------------------------------------------------- Rechnungsangaben (#1358)
+# Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, „Steuersätze geprüft“ und „Rechnungen gleich freigeben“ pflegt
+# der Kassier selbst - Adresse, Schlüssel, Modus und Webhook bleiben unter Dolibarr → Verbindung beim System.
+
+class InvoiceDetailsBody(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    invoice_payment_term_id: int | None = Field(None, ge=0, le=999999)
+    invoice_payment_mode_id: int | None = Field(None, ge=0, le=999999)
+    invoice_bank_account_id: int | None = Field(None, ge=0, le=999999)
+    invoice_pdf_lang: str | None = Field(None, max_length=10)
+    tax_confirmed: bool | None = None
+    invoice_auto_validate: bool | None = None
+
+
+@router.get("/invoice-details")
+async def invoice_details(me: dict = Depends(require_area("finance", "system"))):
+    from routes.dolibarr_routes import invoice_details_view
+
+    return invoice_details_view(await load_settings(get_db()))
+
+
+@router.put("/invoice-details")
+async def save_invoice_details(body: InvoiceDetailsBody, me: dict = Depends(require_area("finance", "system"))):
+    from routes.dolibarr_routes import apply_invoice_updates, invoice_details_view
+    from services.dolibarr_client import SETTINGS_ID
+
+    db = get_db()
+    current = await load_settings(db)
+    updates: dict = {}
+    apply_invoice_updates(body.model_dump(exclude_unset=True), current, me, updates)
+    changed = sorted(key for key in updates if updates[key] != current.get(key))
+    if changed:
+        await db.settings.update_one({"id": SETTINGS_ID}, {"$set": {"id": SETTINGS_ID, **updates, "updated_at": now_utc().isoformat(), "updated_by": me["id"]}}, upsert=True)
+        await db.audit_logs.insert_one({"id": new_id(), "action": "finance.invoice_details", "actor_id": me["id"], "target_id": SETTINGS_ID,
+                                        "data": {"changed": changed}, "created_at": now_utc().isoformat()})
+    return {"ok": True, "changed": changed, **invoice_details_view(await load_settings(db))}
+
+
+@router.get("/invoice-options")
+async def finance_invoice_options(me: dict = Depends(require_area("finance", "system"))):
+    from routes.dolibarr_routes import invoice_options_view
+
+    return await invoice_options_view(get_db())
+
+
 @router.get("/sources/{kind}/{source_id}")
 async def source_summary(kind: str, source_id: str, me: dict = Depends(require_area("finance"))):
     """Die Zahlen einer Veranstaltung (#322): gebucht, fakturiert, bezahlt, offen, gutgeschrieben, erstattet."""

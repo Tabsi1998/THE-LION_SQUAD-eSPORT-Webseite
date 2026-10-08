@@ -16,7 +16,8 @@ const FIELDS = [
   { key: "bank_account_id", setting: "invoice_bank_account_id", list: "accounts", label: "Bankkonto", hint: "das Girokonto des Vereins" },
 ];
 
-export function InvoiceTermsPanel({ terms, connected, busy, onSave }) {
+// Die Listen holt das Feld je nach Seite: Dolibarr → Verbindung (System) oder Finanzübersicht → Rechnungsangaben (#1358).
+export function InvoiceTermsPanel({ terms, connected, busy, onSave, optionsUrl = "/admin/dolibarr/invoice-options", saveLabel = "Konditionen speichern" }) {
   const [options, setOptions] = useState(null);
   const [draft, setDraft] = useState(() => valuesOf(terms));
   const savedLang = terms?.pdf_lang ?? DEFAULT_LANG;
@@ -25,8 +26,8 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave }) {
   useEffect(() => { setLang(savedLang); }, [savedLang]);
   useEffect(() => {
     if (!connected) { setOptions(null); return; }
-    api.get("/admin/dolibarr/invoice-options").then(({ data }) => setOptions(data)).catch(() => setOptions({ available: false, terms: null, modes: null, accounts: null, suggested: {} }));
-  }, [connected]);
+    api.get(optionsUrl).then(({ data }) => setOptions(data)).catch(() => setOptions({ available: false, terms: null, modes: null, accounts: null, suggested: {} }));
+  }, [connected, optionsUrl]);
 
   const termsDirty = FIELDS.some((field) => String(draft[field.key] || "") !== String(terms?.[field.key] || ""));
   const dirty = termsDirty || lang !== savedLang;
@@ -78,7 +79,7 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave }) {
         <div className="mt-1 text-white/40">Dolibarr erzeugt jedes Rechnungs-PDF gleich beim Freigeben – in dieser Sprache.</div>
       </label>
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={!!busy || !dirty} onClick={save} data-testid="invoice-terms-save" className="tls-btn tls-btn--primary px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Konditionen speichern</button>
+        <button type="button" disabled={!!busy || !dirty} onClick={save} data-testid="invoice-terms-save" className="tls-btn tls-btn--primary px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">{saveLabel}</button>
         {canSuggest && (
           <button type="button" disabled={!!busy} onClick={() => setDraft((current) => Object.fromEntries(FIELDS.map((field) => [field.key, current[field.key] || (suggested[field.key] ? String(suggested[field.key]) : "")])))} data-testid="invoice-terms-suggest" className="px-4 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm text-xs">
             Vorschlag übernehmen (30 Tage, Überweisung{suggested.bank_account_id ? ", Konto" : ""})

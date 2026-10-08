@@ -40,7 +40,7 @@ test("FAQ: Themen mit Fragen, Weg zur Stelle, Suche filtert, keine Anleitung geh
   const user = userEvent.setup();
   render(<MemoryRouter><AdminSetupPage /></MemoryRouter>);
   expect(await screen.findByTestId("setup-topic-dolibarr")).toBeInTheDocument();
-  expect(screen.getByTestId("setup-faq-link-rechnungen")).toHaveAttribute("href", "/admin/dolibarr?tab=connection");
+  expect(screen.getByTestId("setup-faq-link-rechnungen")).toHaveAttribute("href", "/admin/finance?tab=rechnungsangaben");
   expect(screen.getByTestId("setup-faq-discord_bot")).toContainElement(screen.getByTestId("setup-guide-discord_bot"));
   const before = screen.getByTestId("setup-faq-count").textContent;
   await user.type(screen.getByTestId("setup-faq-search"), "webhook");

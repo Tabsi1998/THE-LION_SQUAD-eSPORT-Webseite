@@ -218,3 +218,21 @@ test("ohne Treffer steht „alles in Ordnung“; aus der Tageszentrale kommt der
   expect(apiMock.get).toHaveBeenCalledWith("/admin/finance/overview", { params: { attention: "overdue" } });
   expect(screen.getByTestId("finance-attention-empty")).toHaveTextContent("Kein Beleg in dieser Auswahl.");
 });
+
+// Rechnungsangaben (#1358): der Hinweis „fehlen noch“ führt in den eigenen Reiter - nicht mehr nach Dolibarr.
+test("der Hinweis auf fehlende Konditionen öffnet den Reiter Rechnungsangaben", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/finance/overview") return { data: OVERVIEW };
+    if (url === "/admin/finance/invoice-details") return { data: { connected: true, write_capable: true, tax_rates: {}, tax_confirmed: null, invoice_auto_validate: false, terms: { complete: false, pdf_langs: [] } } };
+    if (url === "/admin/finance/invoice-options") return { data: { available: false, terms: null, modes: null, accounts: null, suggested: {} } };
+    throw new Error(url);
+  });
+  const user = userEvent.setup();
+  render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
+  const hint = await screen.findByTestId("finance-terms-hint");
+  expect(hint).not.toHaveTextContent("Schreibzugriff eintragen");
+  await user.click(screen.getByTestId("finance-terms-hint-link"));
+  expect(await screen.findByTestId("invoice-details")).toBeInTheDocument();
+  expect(screen.getByTestId("finance-tab-rechnungsangaben")).toHaveAttribute("aria-selected", "true");
+  expect(screen.queryByTestId("finance-summary")).toBeNull();
+});

@@ -65,7 +65,7 @@ prüfen“ in der Finanzübersicht läuft sofort statt in zwei Minuten.
    Finanzübersicht.
 
 **Konditionen und Text auf dem Beleg (#370).** Jeder Beleg bekommt beim Anlegen Zahlungsziel,
-Zahlungsart und Bankkonto aus Admin → Dolibarr → „Schreibzugriff“ → Rechnungskonditionen. Die
+Zahlungsart und Bankkonto aus Admin → Finanzübersicht → Rechnungsangaben (seit #1358; pflegt der Kassier). Die
 Listen kommen aus Dolibarr (Vorschlag: 30 Tage, Banküberweisung; das Konto, wenn es nur eines
 gibt). Darf der Website-Benutzer die Konten nicht lesen, tragt ihr die Nummer aus Dolibarr ein
 (Adresszeile des Kontos, „id=…“). **Ohne alle drei bleibt jeder Beleg Entwurf**, auch wenn „gleich
@@ -115,7 +115,7 @@ die Website das PDF gleich nach dem Freigeben erzeugen (`PUT /documents/builddoc
 Vorlage des Belegs). Damit liegt es in Dolibarr am Beleg (mailen aus Dolibarr geht sofort), und
 Mitglieder wie Gäste laden es auf der Website unter „Meine Rechnungen“.
 
-- **Sprache:** Admin → Dolibarr → Rechnungskonditionen → „Sprache der Rechnungs-PDFs“, Vorgabe
+- **Sprache:** Admin → Finanzübersicht → Rechnungsangaben → „Sprache der Rechnungs-PDFs“, Vorgabe
   Deutsch (Österreich). Ohne Angabe nähme Dolibarr die Sprache des Website-Benutzers – steht die
   auf „automatisch“, käme ein englisches PDF heraus.
 - **Entwürfe** bekommen kein PDF; erst der freigegebene Beleg.
@@ -279,14 +279,16 @@ und schreiben. Der Haken „Schreibzugriff einschalten“ ist die Sicherung.
      bei den Rechnungskonditionen – sonst Nummer eintippen).
    - Vereine (Österreich): die vier Rechte des Moduls, darunter „Mitglieder und Geschäftspartner
      verknüpfen und abgleichen“.
-2. Admin → Dolibarr → „Schreibzugriff für Rechnungen“: Haken **Schreibzugriff einschalten**.
-   Der Modus muss auf „Live“ stehen. Ohne Haken schreibt die Website nichts.
-3. Dort **Rechnungskonditionen** eintragen: Zahlungsziel 30 Tage, Zahlungsart Banküberweisung,
-   Bankkonto Girokonto („Vorschlag übernehmen“, Konto prüfen). Fehlt die Kontenliste, dem
-   Website-Benutzer das Recht „Bank: einsehen“ geben oder die Nummer eintippen.
-4. Haken **Rechnungen gleich freigeben** erst setzen, wenn ein paar Entwürfe in Dolibarr geprüft
-   sind und die Zeilen stimmen (Steuer, Leistung, Text). Er geht erst mit vollständigen
-   Konditionen.
+2. Admin → Dolibarr → Funktionen: Schalter **Rechnungen schreiben** an (nur System).
+   Der Modus muss auf „Live“ stehen. Ohne Schalter schreibt die Website nichts.
+3. Der Kassier trägt unter **Admin → Finanzübersicht → Rechnungsangaben** (#1358) ein:
+   Zahlungsziel 30 Tage, Zahlungsart Banküberweisung, Bankkonto Girokonto („Vorschlag
+   übernehmen“, Konto prüfen), die Sprache der PDFs und den Haken „Steuersätze geprüft“. Dafür
+   reicht der Bereich Finanzen; Adresse, Schlüssel und Modus sieht er nicht. Fehlt die
+   Kontenliste, dem Website-Benutzer das Recht „Bank: einsehen“ geben oder die Nummer eintippen.
+4. Haken **Rechnungen gleich freigeben** (ebenfalls unter Rechnungsangaben) erst setzen, wenn ein
+   paar Entwürfe in Dolibarr geprüft sind und die Zeilen stimmen (Steuer, Leistung, Text). Er
+   geht erst mit vollständigen Angaben und geprüften Steuersätzen.
 5. Steuer: Das Steuerprofil je Position („ohne Umsatzsteuer“, „Normalsatz“, „ermäßigt“) ist ein
    Buchhaltungsentscheid. Für einen gemeinnützigen Verein ohne Umsatzsteuerpflicht bleibt es bei
    „ohne Umsatzsteuer“ – im Zweifel den Steuerberater fragen. Mit Steuer rechnet die Website den
