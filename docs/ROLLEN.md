@@ -35,7 +35,12 @@ den Events wie mit der Rolle (Status, Turnierbaum, Anmeldungen, Check-in, Ergebn
 den Bereich (`services/permissions.is_tournament_lead`), nicht eine Rollenliste.
 
 **Vorstand:** Wer einen aktiven Vorstandsposten hält oder vertritt (Admin → Vorstand), hat die
-Vereinsverwaltung von selbst. Die Besetzung der Posten ist damit eine Rechtevergabe.
+Vereinsverwaltung von selbst. Die Besetzung der Posten ist damit eine Rechtevergabe – deshalb (#1355): besetzt
+wird über die Personensuche nur mit Vereinsmitgliedern (der Server lehnt andere ab), vorher nennt ein Satz die Rechte
+(„… wird Kassier:in und bekommt damit die Vereinsverwaltung: Mitgliederdaten, Anträge, Dokumente, Benutzer.“), eine
+Rückfrage bestätigt, und jede Besetzung steht im Protokoll (`board.assign`). Kommen die Rechte aus Dolibarr-Funktionen,
+sagt der Satz „Der Posten ist nur für die Anzeige – die Rechte kommen aus Dolibarr.“ Führt Dolibarr den Vorstand,
+lässt sich hier nichts ändern (Server: 409). Besetzen dürfen Vereinsverwaltung und System.
 
 **Vorstand aus Dolibarr (#297):** Ist die Mitgliederverwaltung angebunden (Modus „Live“) und hat der
 Superadmin unter Admin → Dolibarr → Bereiche freigegeben, welche Funktion die Vereinsverwaltung
