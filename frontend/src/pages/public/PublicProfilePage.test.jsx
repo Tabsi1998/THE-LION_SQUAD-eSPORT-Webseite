@@ -122,6 +122,27 @@ test("Referenzen-Reiter: Filter nach Art, darunter Turnier-Teilnahmen und Fast-L
   expect(screen.getByTestId("public-profile-fastlaps")).toHaveTextContent("Spielberg");
 });
 
+test("Bilanz gegen Gegner in der Übersicht, Turnierweg zum Aufklappen in den Referenzen (#1193)", async () => {
+  mockApi();
+  const base = apiMock.get.getMockImplementation();
+  apiMock.get.mockImplementation(async (url, config) => {
+    if (url === "/profile/paula/record") return { data: { opponents: [{ key: "user:u2", kind: "user", name: "Lena", username: "lena", wins: 2, losses: 1, draws: 0, games: 3 }] } };
+    if (url === "/profile/paula/tournaments/winter-cup/path") {
+      return { data: { steps: [{ kind: "duel", label: "Finale", result: "2:0", outcome: "win", opponent: "Lena" }], final: { rank: 1, participant_count: 16 } } };
+    }
+    return base(url, config);
+  });
+  renderPage();
+  expect(await screen.findByTestId("profile-record")).toHaveTextContent("Lena");
+  // Fremdes Profil: die öffentliche Sicht.
+  expect(apiMock.get).toHaveBeenCalledWith("/profile/paula/record", { params: { view_as: "public" } });
+  fireEvent.click(screen.getByTestId("profile-tab-references"));
+  expect(screen.queryByTestId("reference-path-toggle-ref-fast")).toBeNull();
+  fireEvent.click(screen.getByTestId("reference-path-toggle-ref-win"));
+  expect(await screen.findByTestId("tournament-path-final")).toHaveTextContent("1. Platz von 16");
+  expect(screen.getByTestId("tournament-path-ref-win")).toHaveTextContent("2:0 gegen Lena");
+});
+
 test("läuft der Stream, steht der Player oben in der Übersicht (ohne Zustimmung der Hinweis)", async () => {
   mockApi({ live: [{ twitch_login: "paula_racing", title: "Quali-Runden", viewer_count: 12 }] });
   renderPage();

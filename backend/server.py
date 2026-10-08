@@ -28,6 +28,7 @@ from routes.feedback_routes import router as feedback_router, admin_router as fe
 from routes.helper_call_routes import router as helper_call_router
 from routes.share_routes import router as share_router
 from routes.year_review_routes import admin_router as year_review_admin_router, router as year_review_router
+from routes.profile_record_routes import router as profile_record_router
 from routes.team_level_routes import router as team_level_router
 from routes.message_routes import router as message_router
 from routes.chat_routes import router as chat_router
@@ -253,6 +254,7 @@ app.include_router(helper_call_router)
 app.include_router(share_router)
 app.include_router(year_review_router)
 app.include_router(year_review_admin_router)
+app.include_router(profile_record_router)
 app.include_router(message_router)
 app.include_router(chat_router)
 app.include_router(friend_router)
