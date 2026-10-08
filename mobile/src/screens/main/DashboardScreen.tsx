@@ -24,6 +24,7 @@ import { displayName, formatDate, formatEventType, formatNewsCategory, formatSta
 import { isGuestUser } from "../../live";
 import { openSignIn, openTab } from "../../navigation/rootNavigation";
 import { FeedbackSheet } from "../../components/FeedbackSheet";
+import { YearReviewCard } from "../../components/YearReviewCard";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { AppStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -234,6 +235,8 @@ export function DashboardScreen({ navigation, route }: Props) {
 
         {/* Adventkalender (#641): der Weg zu den Türchen - nur solange der Kalender läuft; Zurück führt zu Home (#1144). */}
         <AdventHint onOpen={() => navigation.navigate("AdventCalendar")} />
+        {/* Jahresrückblick (#1195): ab Mitte Dezember, nur mit Aktivität im Jahr. */}
+        {!isGuest ? <YearReviewCard onOpen={() => navigation.navigate("YearReview")} /> : null}
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
         {offline && !error ? <OfflineNotice /> : null}

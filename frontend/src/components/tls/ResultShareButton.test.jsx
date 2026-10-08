@@ -55,7 +55,7 @@ describe("ResultShareButton", () => {
     const button = await screen.findByTestId("result-share-share");
     expect(button).toHaveTextContent("Ergebnis teilen");
     expect(screen.queryByTestId("result-share-download")).toBeNull();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(OPTIONS.image_paths.story));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(OPTIONS.image_paths.story, { credentials: "include" }));
     await new Promise((resolve) => setTimeout(resolve, 0));
     fireEvent.click(button);
     await waitFor(() => expect(share).toHaveBeenCalled());

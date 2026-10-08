@@ -1,16 +1,17 @@
 /**
- * Erfolge im Admin (E10, #620): alles an einem Ort, in acht Reitern -
- * Übersicht · Katalog · Vergeben · Saison · XP · Vorschau · Negativ und Vorfälle · Statistik.
+ * Erfolge im Admin (E10, #620): alles an einem Ort, in neun Reitern -
+ * Übersicht · Katalog · Vergeben · Saison · Jahresrückblick (#1195) · XP · Vorschau · Negativ und Vorfälle · Statistik.
  * Massenvergabe, Import und XP-Eingriffe nur für Vorstand oder Systemverwaltung (der Server prüft das auch).
  */
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { AlertOctagon, Award, BarChart3, BookOpen, CalendarCheck, Eye, LayoutDashboard, Zap } from "lucide-react";
+import { AlertOctagon, Award, BarChart3, BookOpen, CalendarCheck, Eye, LayoutDashboard, Sparkles, Zap } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { OverviewTab } from "./achievements/OverviewTab";
 import { CatalogTab } from "./achievements/CatalogTab";
 import { AwardTab } from "./achievements/AwardTab";
 import { SeasonTab } from "./achievements/SeasonTab";
+import { YearReviewTab } from "./achievements/YearReviewTab";
 import { XpTab } from "./achievements/XpTab";
 import { PreviewTab } from "./achievements/PreviewTab";
 import { NegativeTab } from "./achievements/NegativeTab";
@@ -24,6 +25,7 @@ export const TABS = [
   { key: "catalog", label: "Katalog", icon: BookOpen },
   { key: "award", label: "Vergeben", icon: Award },
   { key: "season", label: "Saison", icon: CalendarCheck },
+  { key: "year", label: "Jahresrückblick", icon: Sparkles },
   { key: "xp", label: "XP", icon: Zap },
   { key: "preview", label: "Vorschau", icon: Eye },
   { key: "negative", label: "Negativ & Vorfälle", icon: AlertOctagon },
@@ -75,6 +77,7 @@ export default function AdminAchievementsPage() {
         {tab === "catalog" && <CatalogTab board={board} />}
         {tab === "award" && <AwardTab board={board} />}
         {tab === "season" && <SeasonTab />}
+        {tab === "year" && <YearReviewTab />}
         {tab === "xp" && <XpTab board={board} />}
         {tab === "preview" && <PreviewTab />}
         {tab === "negative" && <NegativeTab />}

@@ -34,6 +34,7 @@ jest.mock("../../components/MediaImage", () => ({ MediaImage: () => null }));
 jest.mock("../../seasons/anchors", () => ({ SeasonPerch: () => null, useSeasonOverlay: () => null }));
 jest.mock("../../seasons/SeasonStage", () => ({ SeasonBackdropSlot: () => null, SeasonEdgeSlot: () => null, SeasonWidgetSlot: () => null }));
 jest.mock("../../advent/entry", () => ({ AdventHint: () => null }));
+jest.mock("../../components/YearReviewCard", () => ({ YearReviewCard: () => null }));
 jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: jest.fn() }));
 jest.mock("../../lib/openLink", () => ({ openLink: jest.fn() }));
 

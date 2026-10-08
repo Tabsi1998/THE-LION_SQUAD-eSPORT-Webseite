@@ -16,6 +16,7 @@ import { Trophy, Bell, Crown, Gift, AlertTriangle, UserCheck, CalendarDays, Clip
 import { viennaDateTime } from "@/lib/vienna";
 import { stationText } from "@/lib/tournamentLabels";
 import { FeedbackDialog } from "@/components/tls/FeedbackDialog";
+import { YearReviewBanner } from "@/components/tls/YearReviewBanner";
 
 // Das Dashboard ist die persönliche Startseite, wie die App-Startseite seit
 // #237 (#256): Kopf, offene Aktionen, nächste Termine, Jahreswertung,
@@ -185,6 +186,8 @@ export default function DashboardPage() {
         </div>
 
         <AdventHint />
+        {/* Jahresrückblick (#1195): ab Mitte Dezember, nur mit Aktivität im Jahr. */}
+        <YearReviewBanner />
 
         {completeness && completeness.score < 100 && (
           <div className="mb-8 border border-[#A855F7]/30 bg-gradient-to-r from-[#A855F7]/10 via-transparent to-transparent rounded-sm p-5 flex items-center gap-4" data-testid="profile-completeness-banner">

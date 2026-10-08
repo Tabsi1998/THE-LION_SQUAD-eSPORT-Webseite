@@ -86,6 +86,8 @@ export type DetailParamList = {
   InfoCenter: { section?: "sponsors" | "partners" | "events" | "benefits" | "references" | "profiles" } | undefined;
   // Über uns, Vorstand, Werte, Kontakt (#1024): kurz in der App, lange Seiten bleiben auf der Website.
   ClubAbout: undefined;
+  // Jahresrückblick „Dein Jahr bei LION“ (#1195): ab Mitte Dezember; Vorschau für die Verwaltung.
+  YearReview: { preview?: boolean } | undefined;
   // Einstellungen an einem Ort (#1146): Zahnrad oben im Profil.
   Settings: undefined;
   ProfileEdit: undefined;

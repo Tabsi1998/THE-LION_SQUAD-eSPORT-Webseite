@@ -181,6 +181,8 @@ NOTIFICATION_KIND_CATEGORY = {
     # Erfolge II (#622): Prestige und Rücknahme stehen im Postfach unter „Erfolge“.
     "prestige": "achievements",
     "achievement_revoked": "achievements",
+    # Jahresrückblick (#1195): „Dein Jahr ist da“ einmal im Dezember - unter „Erfolge“.
+    "year_review": "achievements",
     "news_mention": "news_events",
     # Interne Inhalte nur an Berechtigte (#342): Mitglieder bzw. Vorstand.
     "news_member": "club_internal",

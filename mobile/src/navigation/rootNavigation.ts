@@ -248,6 +248,9 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
     // Ostereiersuche (#647): Korb, Hinweise, Preise - auch aus Benachrichtigungen (Gewinn, voller Korb).
     case "ostern":
       return detail("EasterHunt");
+    // Jahresrückblick (#1195): die Meldung „Dein Jahr ist da“ führt hierher.
+    case "dein-jahr":
+      return detail("YearReview");
     // Über uns, Vorstand, Werte (#1024): kurz in der App.
     case "about":
     case "board":

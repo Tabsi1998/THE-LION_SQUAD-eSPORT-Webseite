@@ -95,6 +95,7 @@ const ImprintPage = lazy(() => import("@/pages/public/LegalPages").then((m) => (
 const TermsPage = lazy(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.TermsPage })));
 
 const DashboardPage = lazy(() => import("@/pages/user/DashboardPage"));
+const YearReviewPage = lazy(() => import("@/pages/user/YearReviewPage"));
 const ProfilePage = lazy(() => import("@/pages/user/ProfilePage"));
 const MessagesPage = lazy(() => import("@/pages/user/MessagesPage"));
 const NotificationsPage = lazy(() => import("@/pages/user/NotificationsPage"));
@@ -288,6 +289,7 @@ function App() {
 
           {/* User */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+          <Route path="/dein-jahr" element={<ProtectedRoute><YearReviewPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
           <Route path="/messages/:userId" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />

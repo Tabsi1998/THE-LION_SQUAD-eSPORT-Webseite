@@ -206,6 +206,18 @@ async def _safe_helper_reminders():
         _log_task_failure("helper_reminders", exc)
 
 
+async def _safe_year_review_notices():
+    """Jahresrückblick (#1195): im Zeitraum einmal je Person und Jahr „Dein Jahr ist da“ - nur mit Aktivität."""
+    try:
+        from database import get_db
+        from services.year_review import send_notices
+        res = await send_notices(get_db())
+        if res.get("sent"):
+            logger.info(f"[scheduler] year_review_notices {res}")
+    except Exception as exc:
+        _log_task_failure("year_review_notices", exc)
+
+
 async def _safe_prize_expiry():
     try:
         from services.prize_service import expire_overdue
@@ -889,6 +901,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   id="feedback_requests", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("helper_reminders", _safe_helper_reminders, lease_seconds=900.0), CronTrigger(hour=17, minute=0, timezone="Europe/Vienna"),
                   id="helper_reminders", max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("year_review_notices", _safe_year_review_notices, lease_seconds=900.0), CronTrigger(hour=10, minute=15, timezone="Europe/Vienna"),
+                  id="year_review_notices", max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched
     logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · f1_prize_reminders 5m · birthday 6h · twitch 90s · game_server_sync 60s · mobile_push_receipts 5m)")

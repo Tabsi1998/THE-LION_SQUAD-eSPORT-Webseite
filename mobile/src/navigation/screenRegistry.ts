@@ -3,6 +3,7 @@ import { AchievementShowcaseScreen } from "../screens/main/AchievementShowcaseSc
 import { AdmissionScreen } from "../screens/main/AdmissionScreen";
 import { AdventCalendarScreen } from "../screens/main/AdventCalendarScreen";
 import { ClubAboutScreen } from "../screens/main/ClubAboutScreen";
+import { YearReviewScreen } from "../screens/main/YearReviewScreen";
 import { CommunityScreen } from "../screens/main/CommunityScreen";
 import { DashboardScreen } from "../screens/main/DashboardScreen";
 import { DirectThreadScreen } from "../screens/main/DirectThreadScreen";
@@ -83,6 +84,7 @@ export const DETAIL_SCREENS: Record<DetailScreenName, Screen> = {
   Admission: AdmissionScreen,
   InfoCenter: InfoCenterScreen,
   ClubAbout: ClubAboutScreen,
+  YearReview: YearReviewScreen,
   Settings: SettingsScreen,
   ProfileEdit: ProfileEditScreen,
 };

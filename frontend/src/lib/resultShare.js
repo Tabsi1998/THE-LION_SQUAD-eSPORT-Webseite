@@ -46,7 +46,8 @@ export function resultFileName(path, format = "story") {
 export async function loadResultImage(imageUrl, fileName, fetchImpl = typeof fetch !== "undefined" ? fetch : null) {
   if (!fetchImpl || !imageUrl || typeof File === "undefined") return null;
   try {
-    const response = await fetchImpl(imageUrl);
+    // Mit Anmeldung (der Jahresrückblick ist privat); bei öffentlichen Bildern schadet sie nicht.
+    const response = await fetchImpl(imageUrl, { credentials: "include" });
     if (!response.ok) return null;
     const blob = await response.blob();
     return new File([blob], fileName || "ergebnis.png", { type: "image/png" });

@@ -120,6 +120,8 @@ test("jede bekannte Adresse hat ihren Ort - Übersichten wechseln den Tab, alles
   // Seiten ohne Screen in der App öffnen sich im Browser.
   // Über uns (#1024) hat jetzt einen Screen - der Rest bleibt auf der Website.
   expect(targetFromUrl("/about")).toEqual(detail("ClubAbout"));
+  // Jahresrückblick (#1195).
+  expect(targetFromUrl("https://lionsquad.at/dein-jahr")).toEqual(detail("YearReview"));
   for (const url of ["/servers", "/membership/join", "/privacy", "/imprint", "/privacy-account", "", null, undefined]) {
     expect([url, targetFromUrl(url)]).toEqual([url, null]);
   }
