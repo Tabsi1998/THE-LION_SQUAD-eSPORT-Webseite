@@ -10,7 +10,7 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import { viennaDate } from "../../lib/vienna";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "SeasonPass">;
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
   },
   rankRowHighlight: {
     backgroundColor: "rgba(41,182,232,0.06)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderTopWidth: 0,
     marginTop: 4,
     padding: 10,

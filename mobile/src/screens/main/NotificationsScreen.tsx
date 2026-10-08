@@ -11,7 +11,7 @@ import { formatDateTime } from "../../lib/format";
 import { notificationKindLabel } from "../../lib/notificationKinds";
 import type { MoreStackParamList } from "../../navigation/types";
 import { useNotifications } from "../../notifications/NotificationContext";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "Notifications">;
 type NotificationFilter = "all" | "unread";
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   },
   statIcon: {
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 34,
     justifyContent: "center",
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   filterRow: {
     backgroundColor: colors.cardAlt,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 6,
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   },
   filterButton: {
     alignItems: "center",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     flex: 1,
     justifyContent: "center",
     minHeight: 38,

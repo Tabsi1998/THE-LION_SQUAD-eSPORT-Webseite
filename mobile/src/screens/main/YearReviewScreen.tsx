@@ -21,7 +21,7 @@ import {
   type YearReviewPage,
 } from "../../lib/yearReview";
 import type { AppStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 // Jahresrückblick „Dein Jahr bei LION“ (#1195) - wie im Web: Seiten zum Durchtippen (rechts tippen weiter, links
 // zurück), nur Seiten mit Inhalt, am Ende das Bild zum Teilen. Die Seiten blenden sanft ein; mit „Bewegung
@@ -242,13 +242,13 @@ const styles = StyleSheet.create({
   cyan: { color: colors.cyan },
   text: { color: "rgba(255,255,255,0.78)" },
   tiles: { flexDirection: "row", gap: 8 },
-  tile: { flex: 1, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 8, paddingVertical: 10, paddingHorizontal: 10 },
+  tile: { flex: 1, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(255,255,255,0.04)", borderRadius: radius.lg, paddingVertical: 10, paddingHorizontal: 10 },
   tileValue: { color: colors.cyan, fontSize: 22 },
   tileLabel: { fontSize: 11, textTransform: "uppercase", fontWeight: "700" },
   listRow: { flexDirection: "row", alignItems: "center", gap: 10, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 6 },
   listName: { flex: 1, fontWeight: "700" },
   dot: { width: 12, height: 12, borderRadius: 6 },
-  card: { width: "100%", height: 360, borderRadius: 8 },
+  card: { width: "100%", height: 360, borderRadius: radius.lg },
   error: { color: colors.live },
   nav: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingBottom: 16, paddingTop: 8 },
   navButton: { flex: 1 },

@@ -19,7 +19,7 @@ import {
   type ChatAttachmentDraft,
   type PickedAsset,
 } from "../lib/chatAttachments";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import type { ChatAttachment } from "../types";
 import { AuthorizedImage, type AuthorizedImageState } from "./AuthorizedImage";
 import { Muted } from "./Text";
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   attach: {
     alignItems: "center",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 56,
     justifyContent: "center",
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 160,
     justifyContent: "center",

@@ -17,7 +17,7 @@ import { api } from "../../lib/api";
 import { formatDate, formatMembershipStatus, formatMembershipType, formatRole, placeParts } from "../../lib/format";
 import { groupSponsorsByTier } from "../../lib/sponsors";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { Reference, ReferenceSummary } from "../../types";
 
 // Partnerseiten (#469) liegen im Web; die App zeigt je Partner die Kanäle und den Weg dorthin.
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flex: 1,
     gap: 2,
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   refRank: {
     alignItems: "center",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     justifyContent: "center",
     minHeight: 64,
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
   channelChip: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.25)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 5,
@@ -536,7 +536,7 @@ const styles = StyleSheet.create({
   badge: {
     backgroundColor: "rgba(41, 182, 232, 0.12)",
     borderColor: "rgba(41, 182, 232, 0.3)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   logoBox: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 58,
     width: 76,
   },
@@ -594,7 +594,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255, 255, 255, 0.06)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",
@@ -645,7 +645,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   sponsorBanner: {
-    borderRadius: 4,
+    borderRadius: radius.lg,
     marginBottom: 6,
     overflow: "hidden",
     width: "100%",

@@ -28,8 +28,9 @@ import { FeedbackSheet } from "../../components/FeedbackSheet";
 import { YearReviewCard } from "../../components/YearReviewCard";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { AppStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { ClubEvent, DashboardAction, LiveStream, Match, MobileDashboardData, NewsPost, Tournament } from "../../types";
+import { Button } from "../../components/Button";
 
 // Was das Dashboard zeigt: eigene Matches, Turniere, Events, News, Streams und die Glocke.
 const DASHBOARD_LIVE_RESOURCES = ["tournaments", "matches", "events", "news", "streams", "notifications", "teams", "f1"];
@@ -208,9 +209,7 @@ export function DashboardScreen({ navigation, route }: Props) {
           <Card style={styles.inviteCard} testID="dashboard-invitation">
             <Heading>Einladung zum Verein</Heading>
             <Body>Der Vorstand lädt dich ein, Mitglied zu werden – der Antrag ist für dich freigeschaltet.{invitation.note ? ` „${invitation.note}“` : ""}</Body>
-            <Pressable accessibilityRole="button" onPress={() => openLink(`${WEB_BASE_URL}/membership/apply`)} style={styles.inviteButton} testID="dashboard-invitation-apply">
-              <Body style={styles.inviteButtonText}>Antrag ausfüllen</Body>
-            </Pressable>
+            <Button compact label="Antrag ausfüllen" onPress={() => openLink(`${WEB_BASE_URL}/membership/apply`)} style={styles.inviteButton} testID="dashboard-invitation-apply" />
           </Card>
         ) : null}
         {/* Eine Zeile Begrüßung mit den Pills daneben; der Erklärsatz ist weg (#248). */}
@@ -656,16 +655,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   inviteButton: {
-    marginTop: 10,
     alignSelf: "flex-start",
-    backgroundColor: colors.gold,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 4,
-  },
-  inviteButtonText: {
-    color: "#000",
-    fontWeight: "700",
+    marginTop: 10,
   },
   heroCard: {
     backgroundColor: colors.card,
@@ -681,7 +672,7 @@ const styles = StyleSheet.create({
   heroMark: {
     alignItems: "center",
     backgroundColor: colors.cyan,
-    borderRadius: 10,
+    borderRadius: radius.lg,
     height: 46,
     justifyContent: "center",
     width: 46,
@@ -788,7 +779,7 @@ const styles = StyleSheet.create({
   matchIcon: {
     alignItems: "center",
     backgroundColor: "rgba(41,182,232,0.1)",
-    borderRadius: 9,
+    borderRadius: radius.lg,
     height: 42,
     justifyContent: "center",
     width: 42,
@@ -814,7 +805,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.12)",
     borderColor: "rgba(41, 182, 232, 0.28)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 38,
     justifyContent: "center",
@@ -837,7 +828,7 @@ const styles = StyleSheet.create({
   badge: {
     backgroundColor: "rgba(41, 182, 232, 0.12)",
     borderColor: "rgba(41, 182, 232, 0.28)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -867,7 +858,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(240,180,41,0.12)",
     borderColor: "rgba(240,180,41,0.28)",
-    borderRadius: 10,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 48,
     justifyContent: "center",
@@ -887,7 +878,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,59,48,0.12)",
     borderColor: "rgba(255,59,48,0.32)",
-    borderRadius: 10,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",

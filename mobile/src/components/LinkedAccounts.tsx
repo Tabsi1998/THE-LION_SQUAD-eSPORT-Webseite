@@ -4,7 +4,7 @@ import { Linking, Pressable, StyleSheet, View } from "react-native";
 import { Card } from "./Card";
 import { Body, Heading, Muted } from "./Text";
 import { formatDate } from "../lib/format";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 
 // Verknüpfte Konten (#459, wie im Web #260): jedes per Anmeldung bestätigte Konto mit Rahmen in
 // Plattformfarbe, Anzeigename, Kennung, „seit …“ und der offiziellen Adresse - man sieht, dass es
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   row: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.25)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   icon: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.4)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 2,
     height: 38,
     justifyContent: "center",
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   },
   brand: {
     alignItems: "center",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 6,
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   },
   unlink: {
     borderColor: "rgba(255,255,255,0.15)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 8,

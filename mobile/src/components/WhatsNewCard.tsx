@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Modal, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { whatsNewTitle, type WhatsNew } from "../lib/whatsnew";
 import { Body, Muted, Title } from "./Text";
 import { useSeasonOverlay } from "../seasons/anchors";
+import { Button } from "./Button";
 
 // „Was ist neu“ (#249): eine Karte mit den Punkten der Version, einmal nach
 // dem Update und jederzeit unter Mehr.
@@ -34,9 +35,7 @@ export function WhatsNewCard({ entry, visible, onClose }: Props) {
             ))}
             {!entry.items.length ? <Muted>Keine Änderungen eingetragen.</Muted> : null}
           </ScrollView>
-          <Pressable onPress={onClose} accessibilityRole="button" testID="whats-new-close" style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-            <Body style={styles.buttonText}>Verstanden</Body>
-          </Pressable>
+          <Button label="Verstanden" arrow={false} onPress={onClose} testID="whats-new-close" />
         </View>
       </View>
     </Modal>
@@ -54,7 +53,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderColor: "rgba(41,182,232,0.45)",
-    borderRadius: 12,
+    borderRadius: radius.lg,
     borderWidth: 1,
     maxHeight: "80%",
     padding: 18,
@@ -90,20 +89,5 @@ const styles = StyleSheet.create({
   itemText: {
     flex: 1,
     lineHeight: 21,
-  },
-  button: {
-    alignItems: "center",
-    backgroundColor: colors.cyan,
-    borderRadius: 8,
-    marginTop: 16,
-    paddingVertical: 12,
-  },
-  buttonText: {
-    color: colors.black,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
-  pressed: {
-    opacity: 0.85,
   },
 });

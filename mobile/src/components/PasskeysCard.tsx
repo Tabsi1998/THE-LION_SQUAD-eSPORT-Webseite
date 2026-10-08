@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { errorMessage } from "../lib/api";
 import { formatDate } from "../lib/format";
 import { createPasskey, listPasskeys, passkeyCreateError, passkeysAvailable, passkeysSupported, reconcilePasskeys, removePasskey, silentPasskeyMiss, type PasskeyRow } from "../lib/passkeys";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { Button } from "./Button";
 import { Card } from "./Card";
 import { FormInput } from "./FormInput";
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   },
   remove: {
     borderColor: "rgba(255, 82, 82, 0.4)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 6,

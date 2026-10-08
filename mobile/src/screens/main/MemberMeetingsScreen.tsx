@@ -14,7 +14,7 @@ import { addToDeviceCalendar } from "../../lib/deviceCalendar";
 import type { CalendarItem } from "../../lib/calendar";
 import { formatDate } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 // Versammlungen und Abstimmungen (#327): dieselben Daten wie auf lionsquad.at/members/meetings - alles aus
 // der Vereinsakte (Vereine 1.4). Zu-/Absage, Anträge und Stimmen gehen durch den Server an das Modul; eine
@@ -318,18 +318,18 @@ const styles = StyleSheet.create({
   link: { flexDirection: "row", alignItems: "center", gap: 6 },
   linkText: { color: colors.cyan },
   options: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
-  option: { borderColor: "rgba(255,255,255,0.2)", borderRadius: 6, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
+  option: { borderColor: "rgba(255,255,255,0.2)", borderRadius: radius.lg, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   optionActive: { borderColor: colors.gold, backgroundColor: "rgba(255,215,0,0.12)" },
   optionText: { fontSize: 13, fontWeight: "700" },
   optionActiveText: { color: colors.gold },
   pressed: { opacity: 0.7 },
-  right: { borderColor: "rgba(255,255,255,0.12)", borderRadius: 6, borderWidth: 1, padding: 10, gap: 4 },
+  right: { borderColor: "rgba(255,255,255,0.12)", borderRadius: radius.lg, borderWidth: 1, padding: 10, gap: 4 },
   used: { color: colors.success, fontWeight: "700" },
   result: { borderTopColor: "rgba(255,255,255,0.12)", borderTopWidth: 1, paddingTop: 8, gap: 2 },
   strong: { fontWeight: "700" },
   motions: { gap: 6 },
-  motion: { borderColor: "rgba(255,255,255,0.12)", borderRadius: 6, borderWidth: 1, padding: 8 },
+  motion: { borderColor: "rgba(255,255,255,0.12)", borderRadius: radius.lg, borderWidth: 1, padding: 8 },
   motionForm: { gap: 8 },
-  input: { backgroundColor: colors.black, borderColor: "rgba(255,255,255,0.15)", borderRadius: 6, borderWidth: 1, color: colors.white, paddingHorizontal: 12, paddingVertical: 10 },
+  input: { backgroundColor: colors.black, borderColor: "rgba(255,255,255,0.15)", borderRadius: radius.lg, borderWidth: 1, color: colors.white, paddingHorizontal: 12, paddingVertical: 10 },
   multiline: { minHeight: 72, textAlignVertical: "top" },
 });

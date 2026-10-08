@@ -9,7 +9,8 @@ import { useTabScrollToTop } from "../../../components/TabHeader";
 import { Body, Muted } from "../../../components/Text";
 import { api } from "../../../lib/api";
 import { badgeText, chatTarget, chatTime, type ChatItem } from "../../../lib/chats";
-import { colors } from "../../../theme";
+import { colors, radius } from "../../../theme";
+import { Button } from "../../../components/Button";
 
 // Community → Chats (#1148): Direktnachrichten, Team-, Turnier- und Match-Chats in einer Liste, das Neueste oben, mit der
 // Zahl der Ungelesenen. Ein Tipp öffnet den Chat selbst über dem Tab. „Neue Nachricht“ sucht eine Person.
@@ -65,10 +66,7 @@ export function ChatsSection({ navigation, guest }: { navigation: Navigation; gu
           {composing ? (
             <NewMessage onPick={(userId, title) => { setComposing(false); navigation.navigate("DirectThread" as never, { userId, title } as never); }} onClose={() => setComposing(false)} />
           ) : (
-            <Pressable onPress={() => setComposing(true)} accessibilityRole="button" style={({ pressed }) => [styles.newButton, pressed && styles.pressed]} testID="chats-new">
-              <Ionicons name="add" color={colors.cyan} size={18} />
-              <Body style={styles.newText}>Neue Nachricht</Body>
-            </Pressable>
+            <Button variant="secondary" icon="add" label="Neue Nachricht" onPress={() => setComposing(true)} testID="chats-new" />
           )}
         </View>
       }
@@ -186,7 +184,7 @@ const styles = StyleSheet.create({
   avatar: {
     alignItems: "center",
     backgroundColor: "rgba(41,182,232,0.14)",
-    borderRadius: 10,
+    borderRadius: radius.lg,
     height: 42,
     justifyContent: "center",
     overflow: "hidden",
@@ -242,24 +240,10 @@ const styles = StyleSheet.create({
   footer: {
     paddingTop: 16,
   },
-  newButton: {
-    alignItems: "center",
-    borderColor: "rgba(41,182,232,0.45)",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "center",
-    minHeight: 46,
-  },
-  newText: {
-    color: colors.cyan,
-    fontWeight: "800",
-  },
   compose: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 4,
     padding: 10,

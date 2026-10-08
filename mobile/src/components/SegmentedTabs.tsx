@@ -1,6 +1,6 @@
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { Muted } from "./Text";
 
 type TabItem<T extends string> = {
@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
   tab: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     minHeight: 36,
     paddingHorizontal: 12,

@@ -12,7 +12,7 @@ import { formatDate } from "../../lib/format";
 import { albumCountLabel, sizedUpload, type GalleryAlbum } from "../../lib/gallery";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import { SeasonPerch } from "../../seasons/anchors";
 import { cardLiftTouch } from "../../seasons/cardLift";
 
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   album: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: radius.lg,
     borderWidth: 1,
     overflow: "hidden",
   },

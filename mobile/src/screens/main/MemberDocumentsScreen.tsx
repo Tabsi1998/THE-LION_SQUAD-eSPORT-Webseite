@@ -11,7 +11,7 @@ import { api, errorMessage } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import { categoryLabel, formatFileSize, openDocument, type MemberDocument, type OpenDocument } from "../../lib/memberDocuments";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 // Vereinsdokumente (#341): Liste vom Server (schon nach Rechten gefiltert), Öffnen lädt die
 // Datei mit Anmeldung in den privaten Cache und übergibt sie an den PDF-Betrachter des Geräts.
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,

@@ -25,7 +25,7 @@ import type { AppStackParamList, LooseNavigation } from "../../navigation/types"
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import { SeasonShelfSlot } from "../../seasons/SeasonStage";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { NewsPost } from "../../types";
 
 // Der Tab Verein (#1147): alles vom Verein an einem Ort. Mitglieder sehen oben ihre Mitgliedskarte mit „Hallo“, „Mitglied
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.07)",
     borderColor: "rgba(41, 182, 232, 0.35)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
   admissionIcon: {
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.14)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 40,
     justifyContent: "center",
     width: 40,
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
   feeBadge: {
     alignItems: "center",
     alignSelf: "flex-start",
-    borderRadius: 4,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 6,
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255, 215, 0, 0.05)",
     borderColor: "rgba(255, 215, 0, 0.3)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexBasis: "30%",
     flexGrow: 1,
@@ -590,7 +590,7 @@ const styles = StyleSheet.create({
   reasonIcon: {
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.12)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 36,
     justifyContent: "center",
     width: 36,
@@ -650,7 +650,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 40,
     justifyContent: "center",
@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
   },
   join: {
     backgroundColor: "#5865F2",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -689,7 +689,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(88, 101, 242, 0.1)",
     borderColor: "rgba(88, 101, 242, 0.4)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,

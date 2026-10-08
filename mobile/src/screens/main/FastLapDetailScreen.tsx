@@ -13,8 +13,9 @@ import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime } from "../../lib/format";
 import { getRegistrationState, hasOnlineRegistration } from "../../lib/registration";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload, PublicUser } from "../../types";
+import { Button } from "../../components/Button";
 
 type Props = { route: { params: { id: string } } };
 
@@ -308,9 +309,7 @@ export function FastLapDetailScreen({ route }: Props) {
               <TogglePill label="Disqualifiziert" active={invalidLap} tone="danger" onPress={() => setInvalidLap((current) => !current)} />
             </View>
             {forceReference ? <Muted style={styles.warning}>Vereinsmitglied: laut Challenge-Regel nur als Referenzzeit.</Muted> : null}
-            <Pressable disabled={savingTime || !selectedUserId || !timeInput.trim()} onPress={submitManagedTime} style={[styles.saveButton, (savingTime || !selectedUserId || !timeInput.trim()) && styles.disabled]}>
-              <Body style={styles.saveButtonText}>{savingTime ? "Speichert ..." : "Zeit speichern"}</Body>
-            </Pressable>
+            <Button label={savingTime ? "Speichert ..." : "Zeit speichern"} arrow={false} disabled={!selectedUserId || !timeInput.trim()} busy={savingTime} onPress={submitManagedTime} />
           </Card>
         ) : null}
 
@@ -483,7 +482,7 @@ const styles = StyleSheet.create({
   heroMark: {
     alignItems: "center",
     backgroundColor: colors.gold,
-    borderRadius: 10,
+    borderRadius: radius.lg,
     height: 46,
     justifyContent: "center",
     width: 46,
@@ -526,7 +525,7 @@ const styles = StyleSheet.create({
   tab: {
     backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -564,7 +563,7 @@ const styles = StyleSheet.create({
   trackIcon: {
     alignItems: "center",
     backgroundColor: colors.gold,
-    borderRadius: 9,
+    borderRadius: radius.lg,
     height: 38,
     justifyContent: "center",
     width: 38,
@@ -585,7 +584,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,215,0,0.12)",
     borderColor: "rgba(255,215,0,0.32)",
-    borderRadius: 10,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 48,
     justifyContent: "center",
@@ -602,7 +601,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.white,
     minHeight: 46,
@@ -674,7 +673,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: "rgba(41, 182, 232, 0.12)",
     borderColor: "rgba(41, 182, 232, 0.28)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -694,17 +693,6 @@ const styles = StyleSheet.create({
   noteInput: {
     minHeight: 72,
     textAlignVertical: "top",
-  },
-  saveButton: {
-    alignItems: "center",
-    backgroundColor: colors.cyan,
-    borderRadius: 8,
-    minHeight: 46,
-    justifyContent: "center",
-  },
-  saveButtonText: {
-    color: colors.black,
-    fontWeight: "900",
   },
   togglePill: {
     backgroundColor: "rgba(255,255,255,0.05)",
@@ -731,7 +719,7 @@ const styles = StyleSheet.create({
   userChoice: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     padding: 10,
   },

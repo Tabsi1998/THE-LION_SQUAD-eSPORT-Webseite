@@ -16,7 +16,7 @@ import { api } from "../../lib/api";
 import { badgeText } from "../../lib/chats";
 import { isGuestUser } from "../../live";
 import type { AppStackParamList, CommunitySection } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import { ChatsSection } from "./community/ChatsSection";
 import { TeamsSection } from "./TeamsScreen";
 
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 8,
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   boardIcon: {
     alignItems: "center",
     backgroundColor: "rgba(255,215,0,0.12)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 40,
     justifyContent: "center",
     width: 40,

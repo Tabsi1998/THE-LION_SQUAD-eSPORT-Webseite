@@ -29,7 +29,7 @@ import { getRegistrationState } from "../../lib/registration";
 import { isGuestUser } from "../../live";
 import { openSignIn } from "../../navigation/rootNavigation";
 import type { TournamentStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, kindColors, radius } from "../../theme";
 import type { ClubEvent, EventRegistration, F1Challenge, NewsPost, Tournament } from "../../types";
 
 // Einzahl und Mehrzahl (#1223): „1 Platz“, „2 Plätze“, „1 Begleitperson“, „2 Begleitpersonen“.
@@ -804,7 +804,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   dayTag: {
-    color: "#9F7AEA",
+    color: kindColors.event,
     fontWeight: "800",
   },
   dayTagLive: {
@@ -814,7 +814,7 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.live,
   },
   dayNext: {
-    borderLeftColor: "#9F7AEA",
+    borderLeftColor: kindColors.event,
   },
   dayPast: {
     opacity: 0.6,
@@ -829,7 +829,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: "rgba(41, 182, 232, 0.12)",
     borderColor: "rgba(41, 182, 232, 0.3)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -884,7 +884,7 @@ const styles = StyleSheet.create({
     width: 96,
   },
   logo: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 58,
     width: 90,
   },
@@ -902,7 +902,7 @@ const styles = StyleSheet.create({
     width: 132,
   },
   albumImage: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 84,
     width: 132,
   },
@@ -913,7 +913,7 @@ const styles = StyleSheet.create({
   feeBox: {
     backgroundColor: "rgba(255, 215, 0, 0.06)",
     borderColor: "rgba(255, 215, 0, 0.35)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 8,
     padding: 12,
@@ -933,7 +933,7 @@ const styles = StyleSheet.create({
   },
   optionGroup: {
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 8,
     padding: 12,
@@ -946,7 +946,7 @@ const styles = StyleSheet.create({
   checkbox: {
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 4,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 20,
     width: 20,

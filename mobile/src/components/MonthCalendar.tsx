@@ -2,14 +2,16 @@ import React, { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Body, Muted } from "./Text";
-import { colors } from "../theme";
+import { colors, kindColors, radius } from "../theme";
 import { WEEKDAY_LABELS, itemsByDay, monthLabel, monthMatrix, type CalendarItem, type CalendarKind } from "../lib/calendar";
 import { viennaDay } from "../lib/vienna";
 
 // Monatsansicht (#216): Punkte je Tag in der Farbe der Art, ein Ring um Tage mit eigener
 // Anmeldung. Der Tag antippen zeigt seine Termine darunter - das macht der Aufrufer.
 
-export const KIND_COLORS: Record<CalendarKind, string> = { event: colors.cyan, tournament: colors.gold, fastlap: colors.live, club: colors.gold };
+// Farben je Art (#1151) kommen aus dem Thema - dieselben wie auf den Karten und im Web (Events lila, Turniere gold, Fast Laps
+// blau). Früher waren Events hier blau und Fast Laps rot. Vereinstermine bleiben gold.
+export const KIND_COLORS: Record<CalendarKind, string> = { event: kindColors.event, tournament: kindColors.tournament, fastlap: kindColors.fastlap, club: colors.gold };
 export const KIND_LABELS: Record<CalendarKind, string> = { event: "Event", tournament: "Turnier", fastlap: "Fast Lap", club: "Verein" };
 
 export function MonthCalendar({ year, month, items, selected, onSelect, onShift, today = new Date() }: {
@@ -84,7 +86,7 @@ const styles = StyleSheet.create({
   wrap: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 4,
     padding: 10,
@@ -118,7 +120,7 @@ const styles = StyleSheet.create({
   cell: {
     alignItems: "center",
     borderColor: "transparent",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1.5,
     flex: 1,
     minHeight: 44,
@@ -167,7 +169,7 @@ const styles = StyleSheet.create({
   },
   legendRing: {
     borderColor: colors.gold,
-    borderRadius: 4,
+    borderRadius: radius.lg,
     borderWidth: 1.5,
     height: 10,
     width: 10,

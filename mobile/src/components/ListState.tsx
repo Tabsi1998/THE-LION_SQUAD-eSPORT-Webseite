@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { ActivityIndicator, Animated, StyleSheet, View } from "react-native";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { Body, Muted } from "./Text";
 
 export function LoadingState({ label = "Lade Daten ..." }: { label?: string }) {
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   iconBadge: {
     alignItems: "center",
     backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255, 215, 0, 0.08)",
     borderColor: "rgba(255, 215, 0, 0.24)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   noticeIcon: {
     alignItems: "center",
     backgroundColor: "rgba(255, 215, 0, 0.12)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 36,
     justifyContent: "center",
     width: 36,
@@ -173,7 +173,7 @@ const skeletonStyles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     overflow: "hidden",
   },
   image: {
@@ -187,7 +187,7 @@ const skeletonStyles = StyleSheet.create({
   },
   line: {
     backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderRadius: 4,
+    borderRadius: radius.lg,
     height: 12,
     width: "90%",
   },

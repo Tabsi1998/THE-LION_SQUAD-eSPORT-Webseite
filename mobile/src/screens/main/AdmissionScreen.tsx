@@ -26,7 +26,7 @@ import {
 } from "../../lib/admission";
 import { errorMessage } from "../../lib/api";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 // Einlass bei der Generalversammlung (#845, Entscheidung B): die Kamera liest den QR-Code der Mitgliedskarte, der
 // Server (Vereinsmodul) setzt die Anwesenheit - groß steht, was passiert ist: „Anwesend: <Name>, stimmberechtigt“
@@ -246,22 +246,22 @@ const styles = StyleSheet.create({
   header: { gap: 4 },
   eyebrow: { textTransform: "uppercase", letterSpacing: 2, fontSize: 11, color: colors.cyan },
   meetingRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  meetingChip: { borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 8 },
+  meetingChip: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, paddingHorizontal: 12, paddingVertical: 8 },
   meetingChipActive: { borderColor: colors.cyan, backgroundColor: "rgba(41,182,232,0.12)" },
   meetingChipText: { color: colors.muted, fontSize: 13 },
   meetingChipTextActive: { color: colors.white, fontWeight: "700" },
   meetingTitle: { fontWeight: "700" },
   counts: { marginTop: 4, fontSize: 13 },
-  result: { borderWidth: 1, borderRadius: 4, padding: 18, backgroundColor: "rgba(255,255,255,0.03)", gap: 6 },
+  result: { borderWidth: 1, borderRadius: radius.lg, padding: 18, backgroundColor: "rgba(255,255,255,0.03)", gap: 6 },
   resultHead: { flexDirection: "row", alignItems: "center", gap: 10 },
   resultHeadline: { fontSize: 24, fontWeight: "900", flex: 1 },
   resultDetail: { fontSize: 15 },
-  scanner: { height: 260, borderRadius: 6, overflow: "hidden", backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
+  scanner: { height: 260, borderRadius: radius.lg, overflow: "hidden", backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
   camera: { flex: 1 },
   cameraOff: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, padding: 20 },
   cameraToggle: { position: "absolute", right: 10, top: 10, width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" },
   permissionText: { textAlign: "center" },
-  list: { borderWidth: 1, borderColor: colors.border, borderRadius: 4 },
+  list: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg },
   row: { padding: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", gap: 8 },
   rowHead: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   rowName: { fontWeight: "700" },

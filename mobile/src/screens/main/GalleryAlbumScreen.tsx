@@ -11,7 +11,7 @@ import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import { albumCountLabel, groupBySection, mediaType, posterUrl, sizedUpload, type GalleryAlbum, type GalleryItem } from "../../lib/gallery";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 // Album (#236): Raster aus 400-px-Kacheln, drei je Zeile; Abschnitte wie im Web. Antippen
 // öffnet die Großansicht an dieser Stelle.
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   header: { gap: 6 },
   section: { gap: 8 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: GAP },
-  tile: { backgroundColor: colors.surface, borderRadius: 6, overflow: "hidden" },
+  tile: { backgroundColor: colors.surface, borderRadius: radius.lg, overflow: "hidden" },
   tileImage: { height: "100%", width: "100%" },
   pressed: { opacity: 0.8 },
   playBadge: {

@@ -31,7 +31,7 @@ import { finishedMatchText, formatMatchKind, isMatchFinished, matchHeadline, slo
 import { viennaWall, wallToIso } from "../../lib/dateChoice";
 import { DateTimeChooser } from "../../components/DateTimeChooser";
 import type { TournamentStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { ChatMessage, Tournament } from "../../types";
 import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmentDrafts } from "../../components/ChatAttachments";
 import { MessageSticker, StickerButton, StickerPicker } from "../../components/ChatStickers";
@@ -682,7 +682,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     maxWidth: "92%",
     padding: 10,
@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
   choice: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 9,
@@ -733,7 +733,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(240,180,41,0.12)",
     borderColor: "rgba(240,180,41,0.5)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,59,48,0.1)",
     borderColor: "rgba(255,59,48,0.4)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 9,
@@ -779,7 +779,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(0,255,136,0.08)",
     borderColor: "rgba(0,255,136,0.32)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 9,
@@ -797,7 +797,7 @@ const styles = StyleSheet.create({
   finishedBox: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 6,
     padding: 12,
@@ -814,7 +814,7 @@ const styles = StyleSheet.create({
   mentionChip: {
     backgroundColor: "rgba(41,182,232,0.08)",
     borderColor: "rgba(41,182,232,0.35)",
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -845,7 +845,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 9,
     paddingVertical: 5,
@@ -870,7 +870,7 @@ const styles = StyleSheet.create({
   proposal: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 10,
     padding: 10,
@@ -879,7 +879,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(41,182,232,0.12)",
     borderColor: "rgba(41,182,232,0.3)",
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 38,
     justifyContent: "center",
@@ -935,7 +935,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,

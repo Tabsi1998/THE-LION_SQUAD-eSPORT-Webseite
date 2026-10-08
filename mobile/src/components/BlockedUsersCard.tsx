@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { errorMessage } from "../lib/api";
 import { listBlocked, unblockUser, type BlockedEntry } from "../lib/moderation";
 import { colors } from "../theme";
 import { Card } from "./Card";
 import { Body, Heading, Muted } from "./Text";
+import { Button } from "./Button";
 
 // Blockierte Benutzer (#414): dieselbe Liste wie auf der Website unter Privatsphäre; „Freigeben“
 // hebt die Blockierung auf. Ohne Einträge ein ruhiger Satz statt einer leeren Karte.
@@ -58,9 +59,7 @@ export function BlockedUsersCard({ style }: { style?: object }) {
               <Body style={styles.name}>{entry.user?.display_name || entry.user?.username || "Benutzer"}</Body>
               {entry.user?.username ? <Muted>@{entry.user.username}</Muted> : null}
             </View>
-            <Pressable onPress={() => { void release(entry); }} disabled={Boolean(busy)} accessibilityRole="button" style={({ pressed }) => [styles.release, pressed && styles.pressed]} testID={`blocked-user-release-${id}`}>
-              <Muted style={styles.releaseText}>{busy === id ? "..." : "Freigeben"}</Muted>
-            </Pressable>
+            <Button compact variant="secondary" label="Freigeben" onPress={() => { void release(entry); }} disabled={Boolean(busy) && busy !== id} busy={busy === id} testID={`blocked-user-release-${id}`} />
           </View>
         );
       })}
@@ -82,17 +81,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   name: {
-    fontWeight: "900",
-  },
-  release: {
-    borderColor: "rgba(41, 182, 232, 0.4)",
-    borderRadius: 6,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  releaseText: {
-    color: colors.cyan,
     fontWeight: "900",
   },
   pressed: {

@@ -10,7 +10,7 @@ import { formatDate } from "../../lib/format";
 import { forgetSearch, loadRecentSearches, MIN_SEARCH_LENGTH, rememberSearch, clearRecentSearches } from "../../lib/recentSearches";
 import { openTarget, targetFromUrl } from "../../navigation/rootNavigation";
 import type { AppStackParamList, LooseNavigation } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 // Die Lupe (#1145): dieselbe Suche wie auf der Website (`/api/search`, gleiche Anfrage, gleiche Rechte - Gäste finden
 // Öffentliches, Mitglieder zusätzlich Internes). Ab dem zweiten Buchstaben, Treffer nach Art gruppiert; ein Treffer
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   resultIcon: {
     alignItems: "center",
     backgroundColor: "rgba(41,182,232,0.1)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 38,
     justifyContent: "center",
     overflow: "hidden",

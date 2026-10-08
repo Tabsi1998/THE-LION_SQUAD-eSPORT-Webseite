@@ -14,7 +14,7 @@ import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { formatDate, formatNewsCategory } from "../../lib/format";
 import { applyScope, internalLabel, type ScopeFilter } from "../../lib/memberArea";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { NewsPost } from "../../types";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "NewsList">;
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
   headerIcon: {
     alignItems: "center",
     backgroundColor: colors.cyan,
-    borderRadius: 10,
+    borderRadius: radius.lg,
     height: 44,
     justifyContent: "center",
     width: 44,
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 8,
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
   chip: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 7,
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   image: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 88,
     width: 92,
   },
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   badgePinned: {
     backgroundColor: "rgba(240, 180, 41, 0.14)",
     borderColor: "rgba(240, 180, 41, 0.34)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.gold,
     fontSize: 11,
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
   badgeCategory: {
     backgroundColor: "rgba(41, 182, 232, 0.1)",
     borderColor: "rgba(41, 182, 232, 0.28)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.cyan,
     fontSize: 11,

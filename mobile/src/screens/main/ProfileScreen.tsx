@@ -24,7 +24,7 @@ import { missingLabels } from "../../lib/profileCompleteness";
 import { isGuestUser } from "../../live";
 import { navigateToUrl, openSignIn, openTab, targetFromUrl } from "../../navigation/rootNavigation";
 import type { LooseNavigation, ProfileTabKey } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { PersonalReferenceData, PersonalReferenceItem, PrizePickup, Team } from "../../types";
 import { prizeCounts } from "./MyPrizesScreen";
 import { ProfileView, type PublicProfilePayload } from "./PublicProfileScreen";
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
   privateIcon: {
     alignItems: "center",
     backgroundColor: "rgba(255, 215, 0, 0.12)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 36,
     justifyContent: "center",
     width: 36,
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
   teamLogo: {
     alignItems: "center",
     backgroundColor: "rgba(41,182,232,0.14)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 42,
     justifyContent: "center",
     width: 42,

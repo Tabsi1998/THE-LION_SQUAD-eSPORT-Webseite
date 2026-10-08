@@ -16,7 +16,7 @@ import type { InvoiceList } from "../../lib/memberDocuments";
 import { changedFields, exitLine, fieldLabel, selfRequestLine, validWishedDay, changedWebsiteFields, websiteFieldText, websiteStateLine, type IdentityState, type SelfService, type WebsiteField, type WebsiteProfile } from "../../lib/selfService";
 import type { MoreStackParamList } from "../../navigation/types";
 import { useAuth } from "../../auth/AuthContext";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 // Meine Mitgliedschaft in der App (#339): Stand aus der Mitgliederverwaltung (Beitrag, Typ,
 // Nummer) - und wer noch nicht zugeordnet ist, kann es anfragen. Die Belege selbst stehen unter
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.white,
     fontSize: 15,
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   badge: {
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
   chip: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 4,
+    borderRadius: radius.lg,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
   once: {
     backgroundColor: "rgba(0, 255, 136, 0.1)",
     borderColor: "rgba(0, 255, 136, 0.4)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: "#00FF88",
     padding: 10,

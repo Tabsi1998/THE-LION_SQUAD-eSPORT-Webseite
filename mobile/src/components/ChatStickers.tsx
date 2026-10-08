@@ -4,7 +4,7 @@ import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Tex
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../lib/api";
 import { searchStickers, stickerSource, type CatalogSticker, type StickerPack } from "../lib/stickers";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import type { ChatSticker } from "../types";
 import { Body, Muted } from "./Text";
 import { useSeasonOverlay } from "../seasons/anchors";
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   button: {
     alignItems: "center",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   },
   cell: {
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 72,
     justifyContent: "center",
     padding: 6,
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   },
   packChip: {
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   search: {
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.white,
     flex: 1,

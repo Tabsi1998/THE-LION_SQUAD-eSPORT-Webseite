@@ -24,9 +24,10 @@ import { formatDate, formatStatus } from "../../lib/format";
 import { blockUser, listBlocked, unblockUser } from "../../lib/moderation";
 import type { AppStackParamList, ProfileTabKey } from "../../navigation/types";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { LiveStream, PersonalReferenceItem } from "../../types";
 import { RecordCard, ReferenceWithPath } from "./profile/TournamentPath";
+import { Button } from "../../components/Button";
 
 type Props = NativeStackScreenProps<AppStackParamList, "PublicProfile">;
 
@@ -349,18 +350,12 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
                 {shown.role && shown.role !== "player" ? <Pill label={formatStatus(shown.role)} /> : null}
               </View>
               {!own && shown.can_message ? (
-                <Pressable onPress={() => navigation.navigate("DirectThread" as never, { userId: shown.id, title: display } as never)} style={({ pressed }) => [styles.messageButton, pressed && styles.pressed]}>
-                  <Ionicons name="chatbubble-ellipses-outline" color={colors.black} size={16} />
-                  <Body style={styles.messageButtonText}>Nachricht</Body>
-                </Pressable>
+                <Button compact arrow={false} icon="chatbubble-ellipses-outline" label="Nachricht" onPress={() => navigation.navigate("DirectThread" as never, { userId: shown.id, title: display } as never)} testID="profile-message" />
               ) : null}
               {/* Freund hinzufügen (#240): der Zustand kommt aus der Profil-Antwort und wird live nachgeladen. */}
               {!own && shown.relationship && shown.relationship.status !== "self" ? <FriendButton userId={shown.id} initial={shown.relationship} /> : null}
               {!own && me?.id && shown.id !== me.id ? (
-                <Pressable onPress={openMoreMenu} accessibilityRole="button" accessibilityLabel="Melden oder blockieren" style={({ pressed }) => [styles.moreButton, pressed && styles.pressed]} testID="profile-more">
-                  <Ionicons name="ellipsis-horizontal" color={colors.cyan} size={16} />
-                  <Muted style={styles.moreButtonText}>{blockedByMe ? "Blockiert" : "Mehr"}</Muted>
-                </Pressable>
+                <Button compact variant="secondary" icon="ellipsis-horizontal" label={blockedByMe ? "Blockiert" : "Mehr"} accessibilityLabel="Melden oder blockieren" onPress={openMoreMenu} testID="profile-more" />
               ) : null}
               <ReportSheet draft={report} onClose={() => setReport(null)} onSent={() => Alert.alert("Danke", "Die Moderation sieht sich das an.")} />
             </View>
@@ -629,7 +624,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -647,7 +642,7 @@ const styles = StyleSheet.create({
   },
   levelChip: {
     backgroundColor: colors.gold,
-    borderRadius: 4,
+    borderRadius: radius.lg,
     bottom: -9,
     paddingHorizontal: 6,
     position: "absolute",
@@ -661,7 +656,7 @@ const styles = StyleSheet.create({
   statBar: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -675,7 +670,7 @@ const styles = StyleSheet.create({
   },
   hero: {
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -767,7 +762,7 @@ const styles = StyleSheet.create({
   infoCell: {
     backgroundColor: "rgba(255,255,255,0.045)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexGrow: 1,
     minWidth: "44%",
@@ -784,42 +779,11 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 5,
   },
-  messageButton: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: colors.cyan,
-    borderRadius: 7,
-    flexDirection: "row",
-    gap: 7,
-    marginTop: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  messageButtonText: {
-    color: colors.black,
-    fontWeight: "900",
-  },
-  moreButton: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    borderColor: "rgba(41,182,232,0.4)",
-    borderRadius: 7,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 6,
-    marginTop: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  moreButtonText: {
-    color: colors.cyan,
-    fontWeight: "900",
-  },
   linkIcon: {
     alignItems: "center",
     backgroundColor: "rgba(41,182,232,0.12)",
     borderColor: "rgba(41,182,232,0.3)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 36,
     justifyContent: "center",
@@ -834,14 +798,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   teamLogo: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 48,
     width: 48,
   },
   pill: {
     backgroundColor: "rgba(255,255,255,0.07)",
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -898,7 +862,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(145,70,255,0.14)",
     borderColor: "rgba(145,70,255,0.38)",
-    borderRadius: 10,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",

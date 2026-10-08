@@ -7,7 +7,7 @@ import { Body, Heading, Muted } from "./Text";
 import { api, errorMessage } from "../lib/api";
 import { emptyFriends, friendLabel, friendRequest, normalizeFriends, type FriendRow, type FriendsPayload } from "../lib/friends";
 import { useLiveRefresh } from "../realtime/LiveChangesProvider";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 
 // Freunde (#240) in der Profil-Übersicht: offene Anfragen oben mit Annehmen/Ablehnen, darunter
 // die Liste; gesendete Anfragen lassen sich zurückziehen. Kommt live über den Änderungsstrom.
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   avatar: { backgroundColor: colors.surface, borderRadius: 18, height: 36, overflow: "hidden", width: 36 },
   avatarText: { color: colors.cyan, fontWeight: "900", textAlign: "center" },
   actions: { flexDirection: "row", gap: 6 },
-  action: { alignItems: "center", borderRadius: 8, height: 36, justifyContent: "center", width: 36 },
+  action: { alignItems: "center", borderRadius: radius.lg, height: 36, justifyContent: "center", width: 36 },
   accept: { backgroundColor: colors.gold },
   decline: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
   quiet: { backgroundColor: "transparent" },

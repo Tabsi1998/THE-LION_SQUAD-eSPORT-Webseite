@@ -5,7 +5,7 @@ import { Card } from "../Card";
 import { QrCode } from "../QrCode";
 import { Body, Heading, Muted } from "../Text";
 import { api, errorMessage } from "../../lib/api";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 // Einladungs-Link (#1191): Kapitäne zeigen den QR-Code oder teilen den Link; wer ihn öffnet, landet im Team und tippt
 // nur noch „Beitreten“. Neu erzeugen macht den alten Link ungültig. Der Join-Code bleibt als Rückfall.
@@ -143,11 +143,11 @@ const styles = StyleSheet.create({
   card: { gap: 12 },
   inviteCard: { borderColor: "rgba(41,182,232,0.4)" },
   row: { alignItems: "center", flexDirection: "row", gap: 12 },
-  qrPlaceholder: { backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 8, height: 112, width: 112 },
+  qrPlaceholder: { backgroundColor: "rgba(255,255,255,0.06)", borderRadius: radius.lg, height: 112, width: 112 },
   text: { flex: 1, gap: 4 },
   bold: { fontWeight: "900" },
   kicker: { color: colors.cyan, fontSize: 11, fontWeight: "900", letterSpacing: 1 },
   error: { color: colors.live, fontWeight: "800" },
-  joinCode: { borderColor: "rgba(255,215,0,0.28)", borderRadius: 8, borderWidth: 1, gap: 2, padding: 10 },
+  joinCode: { borderColor: "rgba(255,215,0,0.28)", borderRadius: radius.lg, borderWidth: 1, gap: 2, padding: 10 },
   code: { color: colors.gold, fontSize: 18, fontWeight: "900" },
 });

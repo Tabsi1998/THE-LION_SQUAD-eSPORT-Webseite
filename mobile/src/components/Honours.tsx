@@ -4,7 +4,7 @@ import { StyleSheet, Switch, View } from "react-native";
 import { Card } from "./Card";
 import { Body, Heading, Muted } from "./Text";
 import { api, errorMessage } from "../lib/api";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 
 // Ehrungen aus der Mitgliederakte (#848) - wie im Web: alle eigenen mit dem Hinweis, welche der Verein freigibt;
 // aufs öffentliche Profil nur mit dem eigenen Schalter. HonourList zeigt dieselben Karten auf fremden Profilen.
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   honour: {
     backgroundColor: "rgba(255, 215, 0, 0.06)",
     borderColor: "rgba(255, 215, 0, 0.35)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   year: { fontSize: 11, fontWeight: "800", letterSpacing: 1.2, textTransform: "uppercase" },
   participation: {
     borderColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 2,
     paddingHorizontal: 10,

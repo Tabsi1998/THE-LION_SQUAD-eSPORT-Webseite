@@ -16,7 +16,7 @@ import type { ContentTarget } from "../../lib/contentLinks";
 import { formatDate, placeParts } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { NewsPost } from "../../types";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "NewsDetail">;
@@ -217,14 +217,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
     padding: 10,
   },
   mentionAvatar: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 42,
     width: 42,
   },

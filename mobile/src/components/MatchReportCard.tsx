@@ -5,7 +5,7 @@ import { AuthorizedImage } from "./AuthorizedImage";
 import { Pressable, StyleSheet, View } from "react-native";
 import { REPORT_STATE_TEXT, rankingMode, type ReportEntry } from "../lib/matchReport";
 import { initialState, inputKind, resultSentence, resultsFor, tapGame, type ResultEntry } from "../lib/resultEntry";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { Button } from "./Button";
 import { FormInput } from "./FormInput";
 import { Body, Muted } from "./Text";
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   state: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 6,
     padding: 12,

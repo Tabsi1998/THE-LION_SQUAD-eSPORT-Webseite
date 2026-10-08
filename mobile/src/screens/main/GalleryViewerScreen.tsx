@@ -11,7 +11,7 @@ import { Body, Muted } from "../../components/Text";
 import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
 import { groupBySection, mediaType, mediaUrl, posterUrl, sizedUpload, type GalleryAlbum, type GalleryItem } from "../../lib/gallery";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 // Großansicht (#236): Wischen zwischen Bildern (1600 px), Zoomen mit zwei Fingern, Videos mit
 // dem Player aus dem Chat, Einbettungen öffnen sich draußen. Teilen und Speichern gehen über das
@@ -154,13 +154,13 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
   },
-  caption: { backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 6, padding: 8 },
+  caption: { backgroundColor: "rgba(0,0,0,0.55)", borderRadius: radius.lg, padding: 8 },
   actions: { flexDirection: "row", gap: 10 },
   action: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.6)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 8,

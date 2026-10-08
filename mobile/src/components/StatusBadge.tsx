@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { useReduceMotion } from "./FadeIn";
 import { formatStatus, upperDe } from "../lib/format";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { Muted } from "./Text";
 
 type StatusTone = "default" | "danger" | "gold" | "success" | "cyan";
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   badge: {
     alignItems: "center",
     alignSelf: "flex-start",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 5,

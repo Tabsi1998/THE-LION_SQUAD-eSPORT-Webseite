@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { PRESS_SCALE } from "../lib/motion";
 import { formatDate } from "../lib/format";
 import { internalLabel } from "../lib/memberArea";
-import { colors } from "../theme";
+import { colors, kindColors, radius } from "../theme";
 import { Body, Muted } from "./Text";
 import { MediaImage } from "./MediaImage";
 import { StatusBadge } from "./StatusBadge";
@@ -105,12 +105,13 @@ function iconForKind(kind: ContentCardKind) {
   return "trophy-outline";
 }
 
+/** Farbe je Art (#1151): Event, Turnier und Fast Lap aus dem Thema - wie im Kalender und im Web. */
 function accentForKind(kind: ContentCardKind) {
-  if (kind === "event") return "#9F7AEA";
-  if (kind === "fastlap") return colors.cyan;
+  if (kind === "event") return kindColors.event;
+  if (kind === "fastlap") return kindColors.fastlap;
   if (kind === "news") return colors.cyan;
   if (kind === "team") return colors.success;
-  return colors.gold;
+  return kindColors.tournament;
 }
 
 function stripText(value: string) {
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
@@ -161,7 +162,7 @@ const styles = StyleSheet.create({
   internal: {
     backgroundColor: "rgba(255, 215, 0, 0.14)",
     borderColor: "rgba(255, 215, 0, 0.4)",
-    borderRadius: 4,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.gold,
     fontSize: 10,

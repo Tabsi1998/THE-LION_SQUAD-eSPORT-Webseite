@@ -5,7 +5,7 @@ import { Body } from "./Text";
 import { api, errorMessage } from "../lib/api";
 import { friendButton, friendRequest, type FriendAction, type Relationship } from "../lib/friends";
 import { useLiveRefresh } from "../realtime/LiveChangesProvider";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 
 // Freund hinzufügen (#240) im öffentlichen Profil: Anfrage senden, annehmen, ablehnen,
 // zurückziehen oder Freund entfernen - der Zustand kommt vom Server, nie aus dem Text.
@@ -74,7 +74,7 @@ export function FriendButton({ userId, initial = null }: { userId: string; initi
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
-  button: { alignItems: "center", borderRadius: 7, flexDirection: "row", gap: 7, minHeight: 38, paddingHorizontal: 12, paddingVertical: 8 },
+  button: { alignItems: "center", borderRadius: radius.lg, flexDirection: "row", gap: 7, minHeight: 38, paddingHorizontal: 12, paddingVertical: 8 },
   primary: { backgroundColor: colors.gold },
   primaryText: { color: colors.black, fontWeight: "900" },
   quiet: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },

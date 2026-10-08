@@ -7,7 +7,7 @@ import { MediaImage } from "../MediaImage";
 import { Body, Muted } from "../Text";
 import { faceTone, teamColorHex } from "../../lib/teamColors";
 import { initials, orderedFaces } from "../../lib/teamPage";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { Team } from "../../types";
 
 // Wappen-Kopf der Team-Seite (#1347) - derselbe Kopf wie im Web: Band in der Team-Farbe als dunkler Verlauf mit
@@ -116,15 +116,15 @@ function YouCorners() {
 
 const styles = StyleSheet.create({
   wrap: { alignItems: "center", gap: 6 },
-  band: { borderColor: colors.border, borderRadius: 8, borderWidth: 1, height: 120, overflow: "hidden", width: "100%" },
+  band: { borderColor: colors.border, borderRadius: radius.lg, borderWidth: 1, height: 120, overflow: "hidden", width: "100%" },
   lion: { height: 200, opacity: 0.14, position: "absolute", right: -40, top: -40, width: 200 },
   crestRow: { marginTop: -40 },
-  crest: { backgroundColor: colors.black, borderRadius: 12, borderWidth: 2, height: 72, width: 72 },
+  crest: { backgroundColor: colors.black, borderRadius: radius.lg, borderWidth: 2, height: 72, width: 72 },
   crestText: { fontSize: 20, fontWeight: "900" },
   name: { fontSize: 26, fontWeight: "900", marginTop: 6, textAlign: "center" },
   line: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" },
   tag: { color: colors.white, fontWeight: "900" },
-  plaque: { backgroundColor: "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.15)", borderRadius: 4, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1 },
+  plaque: { backgroundColor: "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.15)", borderRadius: radius.lg, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1 },
   plaqueText: { color: colors.white, fontSize: 12, fontWeight: "800" },
   description: { marginTop: 4, textAlign: "center" },
   actions: { alignSelf: "stretch", flexDirection: "row", gap: 10, marginTop: 8 },

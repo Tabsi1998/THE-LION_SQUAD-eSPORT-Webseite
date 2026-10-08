@@ -3,7 +3,7 @@ import React from "react";
 import { Image, Pressable, StyleSheet, View } from "react-native";
 import { resolveMediaUrl } from "../lib/api";
 import { awardLines, awardTone, type Award } from "../lib/awards";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { Body, Muted } from "./Text";
 
 /**
@@ -50,7 +50,7 @@ export function AwardCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     overflow: "hidden",
     padding: 12,
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   mark: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.4)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   chip: {
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     fontSize: 10,
     fontWeight: "900",

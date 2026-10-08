@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useState } from "react";
-import { Alert, Linking, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Alert, Linking, Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { PLAY_STORE_URL, PLAY_STORE_WEB_URL, channelLabel, installPrompt, releaseChannel, releaseTitle, type AppRelease, type ReleaseChannel } from "../lib/appUpdate";
 import { Body, Muted } from "./Text";
+import { Button } from "./Button";
 
 // Update aus der App (#250): Banner mit „Was ist neu“ und „Später“. Seit der Play-Fassung (#593)
 // kommt jedes Update über Google Play: „Update starten“ öffnet Googles Dialog (#421), sonst die
@@ -77,18 +78,12 @@ export function AppUpdateBanner({ release, mandatory, onLater, onWhatsNew, onSta
       {opening ? <Muted>Play Store wird geöffnet …</Muted> : null}
       {!android ? <Muted>Auf iOS kommt das Update später über TestFlight.</Muted> : null}
       <View style={styles.actions}>
-        <Pressable onPress={onWhatsNew} accessibilityRole="button" testID="app-update-whats-new" style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
-          <Muted style={styles.secondaryText}>Was ist neu</Muted>
-        </Pressable>
+        <Button compact variant="quiet" label="Was ist neu" onPress={onWhatsNew} testID="app-update-whats-new" />
         {android ? (
-          <Pressable onPress={() => { void start(); }} disabled={opening} accessibilityRole="button" testID="app-update-play" style={({ pressed }) => [styles.primary, (pressed || opening) && styles.pressed]}>
-            <Body style={styles.primaryText}>{opening ? "Öffnet …" : onStartPlayUpdate ? "Update starten" : "Play Store öffnen"}</Body>
-          </Pressable>
+          <Button compact label={opening ? "Öffnet …" : onStartPlayUpdate ? "Update starten" : "Play Store öffnen"} onPress={() => { void start(); }} busy={opening} testID="app-update-play" />
         ) : null}
         {!mandatory ? (
-          <Pressable onPress={onLater} disabled={opening} accessibilityRole="button" testID="app-update-later" style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
-            <Muted style={styles.secondaryText}>Später</Muted>
-          </Pressable>
+          <Button compact variant="quiet" label="Später" onPress={onLater} disabled={opening} testID="app-update-later" />
         ) : null}
       </View>
     </View>
@@ -96,7 +91,7 @@ export function AppUpdateBanner({ release, mandatory, onLater, onWhatsNew, onSta
 }
 
 const styles = StyleSheet.create({
-  badge: { alignSelf: "flex-start", borderRadius: 4, borderWidth: 1, marginBottom: 4, paddingHorizontal: 6, paddingVertical: 1 },
+  badge: { alignSelf: "flex-start", borderRadius: radius.lg, borderWidth: 1, marginBottom: 4, paddingHorizontal: 6, paddingVertical: 1 },
   badgeBeta: { backgroundColor: "rgba(255,217,90,0.12)", borderColor: "rgba(255,217,90,0.6)" },
   badgeRelease: { backgroundColor: "rgba(0,255,136,0.10)", borderColor: "rgba(0,255,136,0.5)" },
   badgeText: { fontSize: 10, fontWeight: "700", letterSpacing: 1 },
@@ -105,7 +100,7 @@ const styles = StyleSheet.create({
   banner: {
     backgroundColor: colors.surface,
     borderColor: "rgba(41,182,232,0.5)",
-    borderRadius: 10,
+    borderRadius: radius.lg,
     borderWidth: 1,
     elevation: 10,
     gap: 10,
@@ -134,31 +129,5 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-  },
-  primary: {
-    backgroundColor: colors.cyan,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  primaryText: {
-    color: colors.black,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
-  secondary: {
-    borderColor: "rgba(255,255,255,0.18)",
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  secondaryText: {
-    color: colors.white,
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-  pressed: {
-    opacity: 0.7,
   },
 });

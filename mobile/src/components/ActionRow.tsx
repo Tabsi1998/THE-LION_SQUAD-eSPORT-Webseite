@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { Body, Muted } from "./Text";
 
 type ActionTone = "cyan" | "danger";
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.1)",
     borderColor: "rgba(41, 182, 232, 0.28)",
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexBasis: "23%",
     flexGrow: 1,
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.08)",
     borderColor: "rgba(41, 182, 232, 0.24)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
   rowIcon: {
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.12)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 36,
     justifyContent: "center",
     width: 36,

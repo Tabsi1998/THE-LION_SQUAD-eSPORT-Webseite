@@ -19,7 +19,7 @@ import { memberRole as faceRole, ROLE_LABELS, type TeamOverview } from "../../li
 import { AUTO_COLOR, TEAM_COLORS } from "../../lib/teamColors";
 import { openSignIn } from "../../navigation/rootNavigation";
 import type { TeamStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { Team, TeamSquad, User } from "../../types";
 
 type Props = NativeStackScreenProps<TeamStackParamList, "TeamDetail">;
@@ -397,7 +397,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
         <Card style={styles.card}>
           <View style={styles.cardTop}>
             <Heading>Squads</Heading>
-            {canManage ? <Pressable onPress={() => startSquadEdit()} style={({ pressed }) => [styles.smallAction, pressed && styles.pressed]}><Muted style={styles.smallActionText}>Neu</Muted></Pressable> : null}
+            {canManage ? <Button compact variant="secondary" icon="add" label="Neu" accessibilityLabel="Neuer Squad" onPress={() => startSquadEdit()} /> : null}
           </View>
           {squadForm ? (
             <View style={styles.squadForm}>
@@ -457,9 +457,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
                   <Body style={styles.rowTitle}>{candidate.display_name || candidate.username}</Body>
                   {candidate.username ? <Muted>@{candidate.username}</Muted> : null}
                 </View>
-                <Pressable disabled={busy || candidate.has_pending_invite} onPress={() => invite(candidate)} style={[styles.smallAction, candidate.has_pending_invite && styles.disabled]}>
-                  <Muted style={styles.smallActionText}>{candidate.has_pending_invite ? "Offen" : "Einladen"}</Muted>
-                </Pressable>
+                <Button compact variant="secondary" label={candidate.has_pending_invite ? "Offen" : "Einladen"} disabled={busy || Boolean(candidate.has_pending_invite)} onPress={() => invite(candidate)} />
               </View>
             ))}
           </Card>
@@ -516,19 +514,13 @@ function MemberRow({
         {canRole || canKick ? (
           <View style={styles.memberActions}>
             {canRole ? (
-              <Pressable disabled={busy} onPress={() => onRole(member, role === "co_leader" ? "member" : "co_leader")} style={styles.memberAction}>
-                <Muted style={styles.smallActionText}>{role === "co_leader" ? "Spieler" : "Co-Kapitän"}</Muted>
-              </Pressable>
+              <Button compact variant="secondary" label={role === "co_leader" ? "Spieler" : "Co-Kapitän"} accessibilityLabel={role === "co_leader" ? "Zum Spieler machen" : "Zum Co-Kapitän machen"} disabled={busy} onPress={() => onRole(member, role === "co_leader" ? "member" : "co_leader")} />
             ) : null}
             {canRole ? (
-              <Pressable disabled={busy} onPress={() => onTransfer(member)} style={styles.memberAction}>
-                <Muted style={styles.smallActionText}>Kapitän</Muted>
-              </Pressable>
+              <Button compact variant="secondary" label="Kapitän" accessibilityLabel="Zum Kapitän machen" disabled={busy} onPress={() => onTransfer(member)} />
             ) : null}
             {canKick ? (
-              <Pressable disabled={busy} onPress={() => onKick(member)} style={[styles.memberAction, styles.dangerOutline]}>
-                <Muted style={styles.dangerText}>Entfernen</Muted>
-              </Pressable>
+              <Button compact variant="danger" label="Entfernen" accessibilityLabel="Aus dem Team entfernen" disabled={busy} onPress={() => onKick(member)} />
             ) : null}
           </View>
         ) : null}
@@ -554,8 +546,8 @@ function SquadRow({ canManage, onDelete, onEdit, squad }: { canManage: boolean; 
       </View>
       {canManage ? (
         <View style={styles.squadActions}>
-          <Pressable onPress={() => onEdit(squad)} style={styles.memberAction}><Muted style={styles.smallActionText}>Edit</Muted></Pressable>
-          {squad.id ? <Pressable onPress={() => onDelete(squad)} style={[styles.memberAction, styles.dangerOutline]}><Muted style={styles.dangerText}>Del</Muted></Pressable> : null}
+          <Button compact variant="quiet" label="Bearbeiten" onPress={() => onEdit(squad)} />
+          {squad.id ? <Button compact variant="danger" label="Löschen" accessibilityLabel="Squad löschen" onPress={() => onDelete(squad)} /> : null}
         </View>
       ) : null}
     </View>
@@ -673,7 +665,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.white,
     minHeight: 46,
@@ -701,7 +693,7 @@ const styles = StyleSheet.create({
   },
   avatar: {
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 44,
     width: 44,
@@ -728,29 +720,9 @@ const styles = StyleSheet.create({
     gap: 7,
     paddingTop: 2,
   },
-  memberAction: {
-    backgroundColor: "rgba(41,182,232,0.1)",
-    borderColor: "rgba(41,182,232,0.28)",
-    borderRadius: 7,
-    borderWidth: 1,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-  },
-  smallAction: {
-    backgroundColor: "rgba(41,182,232,0.12)",
-    borderColor: "rgba(41,182,232,0.32)",
-    borderRadius: 7,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  smallActionText: {
-    color: colors.cyan,
-    fontWeight: "900",
-  },
   squadForm: {
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 10,
     padding: 10,
@@ -769,7 +741,7 @@ const styles = StyleSheet.create({
   option: {
     backgroundColor: "rgba(255,255,255,0.045)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -784,7 +756,7 @@ const styles = StyleSheet.create({
   },
   swatch: {
     borderColor: "transparent",
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 2,
     height: 34,
     width: 34,
@@ -795,7 +767,7 @@ const styles = StyleSheet.create({
   memberChip: {
     backgroundColor: "rgba(255,255,255,0.045)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 9,
     paddingVertical: 6,
@@ -807,7 +779,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: "rgba(255,255,255,0.06)",
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -836,14 +808,6 @@ const styles = StyleSheet.create({
   },
   textSuccess: {
     color: colors.success,
-  },
-  dangerOutline: {
-    backgroundColor: "rgba(255,59,48,0.1)",
-    borderColor: "rgba(255,59,48,0.3)",
-  },
-  dangerText: {
-    color: colors.live,
-    fontWeight: "900",
   },
   success: {
     color: colors.success,

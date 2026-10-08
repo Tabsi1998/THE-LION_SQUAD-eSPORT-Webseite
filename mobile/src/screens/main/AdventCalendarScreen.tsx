@@ -16,7 +16,7 @@ import { announceAchievementUnlocked } from "../../lib/achievements";
 import { errorMessage } from "../../lib/api";
 import { openSignIn } from "../../navigation/rootNavigation";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 // Adventkalender in der App (#641, #642): derselbe Kalender wie auf der Website - dasselbe Bild, dieselben Türchen,
 // derselbe Stand. Der Server sagt, was offen ist; ein Tippen öffnet, der Flügel schwingt auf, danach erscheint der
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   eyebrowText: { color: GOLD, fontSize: 11, fontWeight: "800", letterSpacing: 3 },
   title: { color: "#fff6e0", fontFamily: SERIF, fontSize: 32, lineHeight: 38, fontWeight: "600" },
   lead: { color: "rgba(255,255,255,0.66)", fontSize: 14.5, lineHeight: 21 },
-  progress: { gap: 10, padding: 14, borderRadius: 8, borderWidth: 1, borderColor: "rgba(233, 196, 106, 0.25)", backgroundColor: "rgba(255,255,255,0.03)" },
+  progress: { gap: 10, padding: 14, borderRadius: radius.lg, borderWidth: 1, borderColor: "rgba(233, 196, 106, 0.25)", backgroundColor: "rgba(255,255,255,0.03)" },
   progressTop: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 12 },
   progressLabel: { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: "800", letterSpacing: 2.2 },
   progressCount: { color: "#fff6e0", fontSize: 15, fontWeight: "700", fontVariant: ["tabular-nums"] },
@@ -233,13 +233,13 @@ const styles = StyleSheet.create({
   guestText: { color: "rgba(255,255,255,0.62)", fontSize: 13.5, lineHeight: 20 },
   guestLink: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", minHeight: 32 },
   guestLinkText: { color: GOLD, fontSize: 14, fontWeight: "800" },
-  state: { alignItems: "center", gap: 14, padding: 32, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  state: { alignItems: "center", gap: 14, padding: 32, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   stateText: { color: "rgba(255,255,255,0.72)", fontSize: 14.5, lineHeight: 21, textAlign: "center" },
-  retry: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: "rgba(233, 196, 106, 0.4)", backgroundColor: "rgba(255,255,255,0.05)" },
+  retry: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44, paddingHorizontal: 16, borderRadius: radius.lg, borderWidth: 1, borderColor: "rgba(233, 196, 106, 0.4)", backgroundColor: "rgba(255,255,255,0.05)" },
   retryText: { color: "#f4ecdc", fontSize: 12.5, fontWeight: "800", letterSpacing: 0.8 },
   note: { minHeight: 22, color: "#ffd98a", fontSize: 14, lineHeight: 20, textAlign: "center" },
   frame: { padding: 8, borderRadius: 14, backgroundColor: "#120e07", borderWidth: 1, borderColor: "rgba(233, 196, 106, 0.42)" },
-  closed: { height: CLOSED_HEIGHT, borderRadius: 8, overflow: "hidden", backgroundColor: "#0a1230", justifyContent: "flex-end" },
+  closed: { height: CLOSED_HEIGHT, borderRadius: radius.lg, overflow: "hidden", backgroundColor: "#0a1230", justifyContent: "flex-end" },
   closedText: { gap: 8, padding: 20, paddingTop: 36, backgroundColor: "rgba(3, 6, 15, 0.82)" },
   closedTitle: { color: "#fff6e0", fontFamily: SERIF, fontSize: 27, lineHeight: 32, fontWeight: "600" },
   closedLine: { color: "rgba(255,255,255,0.78)", fontSize: 15, lineHeight: 22 },

@@ -3,7 +3,7 @@ import { openLink } from "../lib/openLink";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { isImageUrl, parseContentTarget, type ContentTarget } from "../lib/contentLinks";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import type { ContentEmbed } from "../types";
 import { ContentCard, type ContentCardKind } from "./ContentCard";
 import { MediaImage } from "./MediaImage";
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
   image: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 190,
     width: "100%",
   },
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     backgroundColor: "rgba(41,182,232,0.1)",
     borderColor: "rgba(41,182,232,0.28)",
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 6,

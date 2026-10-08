@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { errorMessage } from "../lib/api";
 import { REPORT_CATEGORIES, detailsValid, sendReport, type ReportDraft } from "../lib/moderation";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { Button } from "./Button";
 import { Heading, Muted } from "./Text";
 import { useSeasonOverlay } from "../seasons/anchors";
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.white,
     minHeight: 96,

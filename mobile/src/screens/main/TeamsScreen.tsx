@@ -9,8 +9,9 @@ import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import { chatTitle, splitTeams, teamMembers, teamMeta, teamSquads } from "../../lib/teams";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { Team, TeamInvite } from "../../types";
+import { Button } from "../../components/Button";
 
 // Teams: eigene zuerst, mit Chat direkt auf der Karte; darunter die weiteren
 // öffentlichen Teams. Vorher zeigte die Liste entweder nur eigene oder nur
@@ -168,12 +169,8 @@ function InviteCard({ invite, onAccept, onDecline }: { invite: TeamInvite; onAcc
         </View>
       </View>
       <View style={styles.inviteActions}>
-        <Pressable onPress={onAccept} accessibilityRole="button" style={({ pressed }) => [styles.acceptButton, pressed && styles.pressed]}>
-          <Body style={styles.acceptText}>Annehmen</Body>
-        </Pressable>
-        <Pressable onPress={onDecline} accessibilityRole="button" style={({ pressed }) => [styles.declineButton, pressed && styles.pressed]}>
-          <Muted style={styles.declineText}>Ablehnen</Muted>
-        </Pressable>
+        <Button compact arrow={false} label="Annehmen" onPress={onAccept} />
+        <Button compact variant="quiet" label="Ablehnen" onPress={onDecline} />
       </View>
     </Card>
   );
@@ -283,37 +280,13 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,215,0,0.32)",
   },
   inviteLogo: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 46,
     width: 46,
   },
   inviteActions: {
     flexDirection: "row",
     gap: 8,
-  },
-  acceptButton: {
-    alignItems: "center",
-    backgroundColor: colors.cyan,
-    borderRadius: 7,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 42,
-  },
-  acceptText: {
-    color: colors.black,
-    fontWeight: "900",
-  },
-  declineButton: {
-    alignItems: "center",
-    borderColor: colors.border,
-    borderRadius: 7,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 42,
-  },
-  declineText: {
-    fontWeight: "900",
   },
   card: {
     gap: 8,
@@ -325,7 +298,7 @@ const styles = StyleSheet.create({
   },
   logoImage: {
     borderColor: "rgba(41,182,232,0.35)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 48,
     width: 48,
@@ -359,7 +332,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: "rgba(41,182,232,0.12)",
     borderColor: "rgba(41,182,232,0.28)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,

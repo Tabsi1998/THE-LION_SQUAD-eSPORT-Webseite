@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 import { api, errorMessage } from "../lib/api";
 import { viennaDateTime } from "../lib/vienna";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { Card } from "./Card";
 import { Body, Muted } from "./Text";
+import { Button } from "./Button";
 
 // Helfer-Aufruf (#1197) für den Vorstand - wie im Web unter /members/helfen: fehlen für ein Event noch Helfer, geht
 // mit einem Knopf eine Meldung an alle Mitglieder. Höchstens ein Aufruf je Event und Tag; bestätigt wird im Vereinsmodul.
@@ -78,16 +79,15 @@ export function HelperCallCard({ confirmCall = defaultConfirmCall }: { confirmCa
             <Muted testID={`helper-call-text-${event.id}`}>{event.text || (event.open_shifts?.length ? `Noch ${event.open_places} freie Plätze.` : "Alle Schichten sind besetzt.")}</Muted>
             {event.last_call_at ? <Muted style={styles.small}>Zuletzt gerufen: {viennaDateTime(event.last_call_at, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</Muted> : null}
           </View>
-          <Pressable
+          <Button
+            compact
+            arrow={false}
+            label={event.called_today ? "Heute gesendet" : "Aufruf senden"}
             onPress={() => send(event)}
-            disabled={!event.can_call || busy === event.id}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !event.can_call }}
-            style={({ pressed }) => [styles.button, !event.can_call && styles.disabled, pressed && styles.pressed]}
+            disabled={!event.can_call}
+            busy={busy === event.id}
             testID={`helper-call-send-${event.id}`}
-          >
-            <Body style={styles.buttonText}>{event.called_today ? "Heute gesendet" : "Aufruf senden"}</Body>
-          </Pressable>
+          />
         </View>
       ))}
       {message ? <Muted style={styles.message}>{message}</Muted> : null}
@@ -99,13 +99,9 @@ const styles = StyleSheet.create({
   card: { borderColor: "rgba(255,215,0,0.4)", gap: 8 },
   head: { alignItems: "center", flexDirection: "row", gap: 6 },
   eyebrow: { color: colors.gold, fontSize: 10, fontWeight: "900", letterSpacing: 1.5 },
-  row: { alignItems: "center", borderColor: "rgba(255,255,255,0.12)", borderRadius: 6, borderWidth: 1, flexDirection: "row", gap: 10, padding: 10 },
+  row: { alignItems: "center", borderColor: "rgba(255,255,255,0.12)", borderRadius: radius.lg, borderWidth: 1, flexDirection: "row", gap: 10, padding: 10 },
   flex: { flex: 1, gap: 2 },
   strong: { fontWeight: "800" },
   small: { fontSize: 11 },
-  button: { backgroundColor: colors.gold, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8 },
-  buttonText: { color: colors.black, fontSize: 13, fontWeight: "800" },
-  disabled: { opacity: 0.4 },
-  pressed: { opacity: 0.7 },
   message: { color: colors.success, fontWeight: "800" },
 });

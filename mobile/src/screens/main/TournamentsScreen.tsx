@@ -19,7 +19,7 @@ import { formatEventType, formatTournamentFormat, placeParts } from "../../lib/f
 import { applyScope, type ScopeFilter } from "../../lib/memberArea";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, kindColors, radius } from "../../theme";
 import type { ClubEvent, F1Challenge, Tournament } from "../../types";
 import { dayNoon, viennaDate } from "../../lib/vienna";
 
@@ -244,9 +244,9 @@ export function TournamentsScreen({ navigation, route }: Props) {
 
         {view === "list" && filter === "all" && openItems.length ? (
           <View style={styles.stats}>
-            <Stat label="Events" value={String(groupedItems.events.length)} />
-            <Stat label="Turniere" value={String(groupedItems.tournaments.length)} tone="gold" />
-            <Stat label="Fast Laps" value={String(groupedItems.fastlaps.length)} />
+            <Stat label="Events" value={String(groupedItems.events.length)} color={kindColors.event} />
+            <Stat label="Turniere" value={String(groupedItems.tournaments.length)} color={kindColors.tournament} />
+            <Stat label="Fast Laps" value={String(groupedItems.fastlaps.length)} color={kindColors.fastlap} />
           </View>
         ) : null}
 
@@ -318,10 +318,11 @@ function HubContentCard({ item, onPress }: { item: HubItem; onPress: () => void 
   );
 }
 
-function Stat({ label, value, tone = "cyan" }: { label: string; value: string; tone?: "cyan" | "gold" }) {
+/** Eine Zahl je Art - in der Farbe ihrer Art (#1151): Events lila, Turniere gold, Fast Laps blau. */
+function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <Card style={styles.stat}>
-      <Body style={[styles.statValue, tone === "gold" && styles.gold]}>{value}</Body>
+      <Body style={[styles.statValue, { color }]}>{value}</Body>
       <Muted>{label}</Muted>
     </Card>
   );
@@ -350,7 +351,7 @@ const styles = StyleSheet.create({
   pastToggle: {
     alignItems: "center",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     minHeight: 42,
     justifyContent: "center",
@@ -370,9 +371,6 @@ const styles = StyleSheet.create({
     color: colors.cyan,
     fontSize: 23,
     fontWeight: "900",
-  },
-  gold: {
-    color: colors.gold,
   },
   section: {
     gap: 10,

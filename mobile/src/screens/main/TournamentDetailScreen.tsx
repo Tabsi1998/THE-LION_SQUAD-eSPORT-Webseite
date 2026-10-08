@@ -24,7 +24,7 @@ import { isGuestUser } from "../../live";
 import { openSignIn } from "../../navigation/rootNavigation";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { Team, Tournament, User } from "../../types";
 import { useSeasonOverlay } from "../../seasons/anchors";
 
@@ -936,7 +936,7 @@ const styles = StyleSheet.create({
   checkInHint: {
     backgroundColor: "rgba(41,182,232,0.08)",
     borderColor: "rgba(41,182,232,0.35)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.white,
     fontWeight: "800",
@@ -950,7 +950,7 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 10,
     padding: 16,
@@ -973,7 +973,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 9,
     paddingVertical: 5,
@@ -1003,7 +1003,7 @@ const styles = StyleSheet.create({
   winnerBox: {
     backgroundColor: colors.black,
     borderColor: "rgba(247,199,68,0.45)",
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 5,
     padding: 12,
@@ -1026,7 +1026,7 @@ const styles = StyleSheet.create({
   podiumCard: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flex: 1,
     gap: 5,
@@ -1052,7 +1052,7 @@ const styles = StyleSheet.create({
   registrationBox: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 8,
     padding: 10,
@@ -1076,7 +1076,7 @@ const styles = StyleSheet.create({
   stat: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flex: 1,
     padding: 10,
@@ -1122,7 +1122,7 @@ const styles = StyleSheet.create({
   placementRow: {
     backgroundColor: "rgba(255,255,255,0.03)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     padding: 10,
   },
@@ -1139,7 +1139,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.06)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 38,
     justifyContent: "center",
@@ -1180,7 +1180,7 @@ const styles = StyleSheet.create({
   matchCard: {
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -1290,7 +1290,7 @@ const styles = StyleSheet.create({
   feeBox: {
     backgroundColor: "rgba(255,215,0,0.06)",
     borderColor: "rgba(255,215,0,0.35)",
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 6,
     padding: 11,
@@ -1315,7 +1315,7 @@ const styles = StyleSheet.create({
   },
   checkbox: {
     borderColor: colors.border,
-    borderRadius: 4,
+    borderRadius: radius.lg,
     borderWidth: 2,
     height: 18,
     marginTop: 2,
@@ -1334,7 +1334,7 @@ const styles = StyleSheet.create({
   modalCard: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     maxHeight: "88%",
     overflow: "hidden",
@@ -1363,7 +1363,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
