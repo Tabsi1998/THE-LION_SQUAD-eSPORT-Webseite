@@ -39,6 +39,7 @@ import jwt
 
 from auth import get_jwt_secret
 from models import new_id, now_utc
+from services.log_safe import log_safe
 from services.secret_store import decrypt_secret, encrypt_secret
 
 logger = logging.getLogger("tls.platform_links")
@@ -774,7 +775,7 @@ async def fetch_identity(platform: str, branding: dict, query: dict, state_paylo
         if platform == "bungie":
             return await _bungie_identity(branding, code)
     except httpx.HTTPError as exc:
-        logger.warning("[platform-links] %s: %s", platform, exc)
+        logger.warning("[platform-links] %s: %s", log_safe(platform), log_safe(exc, 300))
         # Nur die Fehlerart nach außen - die Meldung könnte die Adresse samt Code enthalten.
         raise LinkError("exchange_failed", f"Plattform nicht erreichbar ({type(exc).__name__})")
     raise LinkError("unknown")
@@ -1301,7 +1302,7 @@ async def check_provider(platform: str, branding: dict, *, bot_token: str | None
         elif platform in REDIRECT_HINTS:
             checks.append(_check("redirect", "warn", REDIRECT_HINTS[platform].replace("{redirect}", redirect)))
     except httpx.HTTPError as exc:
-        logger.warning("[platform-links] Prüfung %s: %s", platform, exc)
+        logger.warning("[platform-links] Prüfung %s: %s", log_safe(platform), log_safe(exc, 300))
         checks.append(_check("network", "fail", f"{spec['label']} ist gerade nicht erreichbar ({type(exc).__name__}) – später noch einmal prüfen."))
     return {"platform": platform, "ok": all(c["state"] != "fail" for c in checks), "redirect_uri": redirect, "checks": checks}
 

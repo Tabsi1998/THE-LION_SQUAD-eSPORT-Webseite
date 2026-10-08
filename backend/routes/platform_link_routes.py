@@ -15,6 +15,7 @@ from auth import get_current_user, require_club_admin
 from database import get_db
 from models import new_id, now_utc
 from services import platform_links
+from services.log_safe import log_safe
 from services.platform_links import PLATFORMS, LinkError
 
 router = APIRouter(prefix="/api", tags=["platform-links"])
@@ -113,7 +114,7 @@ async def platform_link_callback(platform: str, request: Request, background: Ba
         link = await platform_links.link_account(db, user_id, platform, identity)
     except LinkError as exc:
         # Im Log steht, woran es lag (Einrichtung, Plattform, Sitzung) - und die Person liest den Grund im Profil.
-        logger.warning("[platform-links] %s: Rückruf fehlgeschlagen - %s (%s)", platform, exc.code, exc)
+        logger.warning("[platform-links] %s: Rückruf fehlgeschlagen - %s (%s)", log_safe(platform), log_safe(exc.code), log_safe(exc, 300))
         detail = str(exc) if exc.code in ("platform_error", "exchange_failed") else None
         return RedirectResponse(platform_links.callback_target(error=exc.code, detail=detail), status_code=302)
     await _audit(db, user_id, "platform_link.linked", platform, {"handle": link.get("handle")})

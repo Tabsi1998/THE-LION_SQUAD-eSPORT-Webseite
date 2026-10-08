@@ -465,7 +465,8 @@ async def test_unlinking_ends_derived_rights_and_hands_the_record_back(flow, fak
     await link(flow, paula, 12, admin=admin)
     await approve(flow, {"kassier": ["club"]})
     flow.act_as(admin)
-    assert (await flow.client.delete(f"/api/admin/dolibarr/links/{paula['id']}")).status_code == 200
+    deleted = await flow.client.delete(f"/api/admin/dolibarr/links/{paula['id']}")
+    assert deleted.status_code == 200
     flow.act_as(paula)
     assert (await flow.get("/api/membership")).status_code == 403
     stored = await membership_of(flow, paula)

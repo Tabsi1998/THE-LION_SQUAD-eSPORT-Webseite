@@ -131,7 +131,8 @@ async def test_helper_shifts_run_through_the_binding(flow, fake):
     # Widerruf der Bindung: zu.
     fake.revoke_identity(paula["id"])
     assert (await flow.get("/api/membership/me/helper-shifts")).json()["reason"] == "not_bound"
-    assert (await flow.delete("/api/membership/me/events/5/shifts/51")).status_code == 403
+    deleted = await flow.delete("/api/membership/me/events/5/shifts/51")
+    assert deleted.status_code == 403
 
 
 @pytest.mark.asyncio

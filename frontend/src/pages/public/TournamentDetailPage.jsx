@@ -179,7 +179,7 @@ export default function TournamentDetailPage() {
   const subPage = (part) => `/tournaments/${t.slug || t.id}/${part}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
   const checkinNow = !!myReg && canCheckIn && myReg.status === "approved" && t.status === "check_in";
   // Die eine Hauptaktion je Phase (#401).
-  let primaryKey = "none";
+  let primaryKey;
   let primaryAction = null;
   const primaryClass = "px-6 py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50";
   if (canSelfRegister && !myReg) {

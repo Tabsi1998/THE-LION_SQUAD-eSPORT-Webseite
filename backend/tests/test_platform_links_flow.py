@@ -430,10 +430,12 @@ async def test_manual_edit_drops_the_check_and_unlink_keeps_the_text(flow, fake)
     flow.act_as(None)
     await flow.get(f"/api/platform-links/twitch/callback?code=gut&state={state}")
     flow.act_as(paula)
-    assert (await flow.client.delete("/api/me/platform-links/twitch")).json() == {"ok": True, "removed": True}
+    deleted = await flow.client.delete("/api/me/platform-links/twitch")
+    assert deleted.json() == {"ok": True, "removed": True}
     user = await flow.db.users.find_one({"id": paula["id"]}, {"_id": 0})
     assert user["twitch_handle"] == "paulaplays" and not user.get("platform_verified")
-    assert (await flow.client.delete("/api/me/platform-links/twitch")).json()["removed"] is False
+    deleted = await flow.client.delete("/api/me/platform-links/twitch")
+    assert deleted.json()["removed"] is False
 
 
 @pytest.mark.asyncio
@@ -766,3 +768,21 @@ async def test_mastodon_registers_per_instance_and_bluesky_runs_par_with_dpop(fl
     for key in ("mastodon", "bluesky"):
         check = (await flow.post(f"/api/settings/platform-links/{key}/check")).json()
         assert check["ok"] is True and "keine" in check["checks"][0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_a_reason_with_line_breaks_stays_one_log_line(flow, fake, caplog):
+    """#1408: Der Grund der Plattform steht in der Rückrufadresse - wer sie selbst aufruft, kann Zeilenumbrüche
+    hineinschreiben. Im Protokoll darf daraus keine zweite, erfundene Zeile werden."""
+    await configure(flow)
+    paula = await person(flow, "paula")
+    flow.act_as(paula)
+    state = state_of((await flow.post("/api/me/platform-links/discord/start")).json()["url"])
+    flow.act_as(None)
+    caplog.set_level("WARNING", logger="tls.platform_links")
+    reason = "kaputt\r\n2026-10-08 12:00:00 WARNING [auth] erfundene Zeile"
+    landed = target(await flow.get("/api/platform-links/discord/callback", params={"error": "redirect_mismatch", "error_description": reason, "state": state}))
+    assert landed["link_error"] == "platform_error"
+    logged = [record.getMessage() for record in caplog.records if "Rückruf fehlgeschlagen" in record.getMessage()]
+    assert len(logged) == 1 and "erfundene Zeile" in logged[0]
+    assert "\r" not in logged[0] and "\n" not in logged[0]

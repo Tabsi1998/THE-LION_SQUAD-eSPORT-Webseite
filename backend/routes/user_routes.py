@@ -14,7 +14,7 @@ from services.competition_standings import registration_match_summary
 from services.membership_service import get_membership, derived_user_type, is_active_member
 from services import xp
 from services.levels import level_view
-from services.profile_references import empty_profile_references, personal_profile_references
+from services.profile_references import personal_profile_references
 from services.visibility import user_can_see
 from services.notification_preferences import (
     DELIVERY_CHANNEL_PREFERENCES,
@@ -703,7 +703,6 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
     tournaments = []
     f1_bests = []
     teams = []
-    references = empty_profile_references()
     awards = []
     stats = {"tournaments": 0, "wins": 0, "top3": 0, "matches_played": 0, "matches_won": 0,
              "fast_laps": 0, "pole_positions": 0, "badges": len(badges), "points": total_points,

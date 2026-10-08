@@ -55,7 +55,8 @@ test("nicht eingerichtet: Feld von Hand mit Hinweis; ohne Anmeldung: Textfeld mi
 // „Gerade in Steam“ (#584): der Schalter nur mit verknüpftem Steam-Konto; er meldet den Wert nach oben.
 test("Steam-Status-Schalter nur mit verknüpftem Steam-Konto", async () => {
   const user = userEvent.setup();
-  expect(renderTab() && screen.queryByTestId("profile-steam-status-row")).toBeNull();
+  renderTab();
+  expect(screen.queryByTestId("profile-steam-status-row")).toBeNull();
   const links = { ...LINKS, links: [...LINKS.links, { platform: "steam", handle: "76561198000000001", display_name: "76561198000000001", linked_at: "2026-09-22T20:00:00Z" }] };
   const props = renderTab({ links, form: { discord_name: "paula", twitch_handle: "", steam_id: "", riot_id: "", psn_id: "", show_steam_status: false } });
   expect(screen.getByTestId("profile-steam-status-row")).toHaveTextContent("nie im Discord");

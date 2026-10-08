@@ -197,7 +197,8 @@ async def test_a_pack_switched_off_is_no_longer_offered_but_old_messages_keep_th
     flow.act_as(admin)
     renamed = await flow.patch(f"/api/stickers/admin/packs/{ESPORTS_PACK}", json={"name": "Umbenannt"})
     assert renamed.status_code == 400
-    assert (await flow.client.delete(f"/api/stickers/admin/packs/{ESPORTS_PACK}")).status_code == 400
+    deleted = await flow.client.delete(f"/api/stickers/admin/packs/{ESPORTS_PACK}")
+    assert deleted.status_code == 400
     switched_off = await flow.patch(f"/api/stickers/admin/packs/{ESPORTS_PACK}", json={"active": False})
     assert switched_off.status_code == 200
     admin_view = (await flow.get("/api/stickers/admin")).json()["packs"]
@@ -229,4 +230,5 @@ async def test_deleting_an_own_pack_removes_its_stickers(flow):
 
     assert deleted.status_code == 200
     assert await flow.db.stickers.count_documents({"pack_id": pack_id}) == 0
-    assert (await flow.client.delete(f"/api/stickers/admin/stickers/{created.json()['id']}")).status_code == 404
+    removal = await flow.client.delete(f"/api/stickers/admin/stickers/{created.json()['id']}")
+    assert removal.status_code == 404

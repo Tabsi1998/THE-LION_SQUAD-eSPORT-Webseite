@@ -91,7 +91,8 @@ async def test_solo_fee_needs_cost_acceptance_and_freezes_on_approval(flow):
 
     # Abmeldung vor dem Beleg: Auftrag zu.
     flow.act_as(paula)
-    assert (await flow.client.delete(f"/api/tournaments/{t['id']}/registrations/{booked.json()['id']}")).status_code == 200
+    deleted = await flow.client.delete(f"/api/tournaments/{t['id']}/registrations/{booked.json()['id']}")
+    assert deleted.status_code == 200
     assert (await flow.db.billing_orders.find_one({"kind": "tournament"}, {"_id": 0}))["status"] == "cancelled"
 
 

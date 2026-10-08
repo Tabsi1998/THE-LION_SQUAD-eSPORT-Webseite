@@ -366,7 +366,8 @@ async def test_ein_tuerchen_mit_teilnehmern_laesst_sich_nicht_umwidmen(flow, mon
     assert changed["kind"] == "text" and changed["raffle_id"] is None and changed["prize"] is None
     assert [row["source_key"] async for row in flow.db.season_raffles.find({}, {"_id": 0})] == ["advent:2026:12"]
     await save(flow, staff, 14)
-    assert (await flow.delete("/api/seasonal/advent/admin/2026/14")).json() == {"ok": True}
+    deleted = await flow.delete("/api/seasonal/advent/admin/2026/14")
+    assert deleted.json() == {"ok": True}
     assert await flow.db.season_raffles.count_documents({}) == 1
 
 

@@ -36,7 +36,8 @@ def fake(monkeypatch):
 
 async def cancel(flow, who, event):
     flow.act_as(who)
-    assert (await flow.client.delete(f"/api/events/{event['id']}/registrations/me")).status_code == 200
+    deleted = await flow.client.delete(f"/api/events/{event['id']}/registrations/me")
+    assert deleted.status_code == 200
 
 
 async def switch(flow, kassier, on):

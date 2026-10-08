@@ -26,8 +26,19 @@ import { asInstant, viennaDate } from "@/lib/vienna";
 
 const WORDS_PER_MINUTE = 200;
 
+// Tags weg, bis keine mehr übrig sind (#1408) - der Wert wird nur verglichen, nie angezeigt.
+function withoutTags(value) {
+  let text = String(value || "");
+  let previous;
+  do {
+    previous = text;
+    text = text.replace(/<[^>]+>/g, "");
+  } while (text !== previous);
+  return text;
+}
+
 function normalizeTitle(value) {
-  return String(value || "").replace(/<[^>]+>/g, "").replace(/[*_`#]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  return withoutTags(value).replace(/[*_`#]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 // Der Editor legt den Titel oft als erste Überschrift in den Text - auf der Seite stünde er dann zweimal.

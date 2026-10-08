@@ -123,7 +123,8 @@ async def test_registration_freezes_the_price_and_files_an_order(flow):
     assert others and all("price" not in r for r in others)
 
     # Storno: Auftrag zu, Snapshot bleibt als Verlauf.
-    assert (await flow.client.delete(f"/api/events/{event['id']}/registrations/me")).status_code == 200
+    deleted = await flow.client.delete(f"/api/events/{event['id']}/registrations/me")
+    assert deleted.status_code == 200
     order = await flow.db.billing_orders.find_one({"registration_id": reg["id"]}, {"_id": 0})
     assert order["status"] == "cancelled"
     reg = await flow.db.event_registrations.find_one({"id": reg["id"]}, {"_id": 0})

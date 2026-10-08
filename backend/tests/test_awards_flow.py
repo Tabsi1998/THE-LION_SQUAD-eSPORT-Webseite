@@ -102,7 +102,8 @@ async def test_public_profile_shows_only_public_awards_and_own_banner_choice(flo
     assert (await flow.post("/api/admin/awards/rebuild")).status_code == 403
 
     flow.act_as(paula)
-    assert (await flow.client.delete("/api/me/awards/feature")).json() == {"ok": True, "featured_award": None}
+    deleted = await flow.client.delete("/api/me/awards/feature")
+    assert deleted.json() == {"ok": True, "featured_award": None}
     assert (await flow.get(f"/api/users/public/{paula['username']}")).json()["featured_award"] is None
 
 
@@ -164,4 +165,5 @@ async def test_team_awards_and_the_team_banner_are_for_the_leadership(flow):
     flow.act_as(stranger)
     assert (await flow.post(f"/api/teams/tm1/awards/{chosen['id']}/feature")).status_code == 403
     flow.act_as(leader)
-    assert (await flow.client.delete("/api/teams/tm1/awards/feature")).json()["featured_award"] is None
+    deleted = await flow.client.delete("/api/teams/tm1/awards/feature")
+    assert deleted.json()["featured_award"] is None

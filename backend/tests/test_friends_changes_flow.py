@@ -57,7 +57,8 @@ async def test_request_accept_and_remove_reach_both_users(flow, published):
     flow.act_as(paula)
     assert (await flow.get(f"/api/friends/status/{max_['id']}")).json()["status"] == "accepted"
 
-    assert (await flow.client.delete(f"/api/friends/{max_['id']}")).status_code == 200
+    deleted = await flow.client.delete(f"/api/friends/{max_['id']}")
+    assert deleted.status_code == 200
     assert published[-1] == (pair, "friends")
     assert (await flow.get(f"/api/friends/status/{max_['id']}")).json()["can_request"] is True
 
@@ -76,5 +77,6 @@ async def test_decline_and_cancel_also_publish(flow, published):
     flow.act_as(paula)
     await flow.post(f"/api/friends/{max_['id']}/request")
     published.clear()
-    assert (await flow.client.delete(f"/api/friends/{max_['id']}")).status_code == 200
+    deleted = await flow.client.delete(f"/api/friends/{max_['id']}")
+    assert deleted.status_code == 200
     assert published == [({paula["id"], max_["id"]}, "friends")]

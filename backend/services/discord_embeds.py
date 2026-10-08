@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 
 from models import now_utc
 from services import discord_design
+from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.discord.embeds")
 
@@ -353,7 +354,7 @@ async def refresh(db, kind: str, *, force: bool = False, now: datetime | None = 
     try:
         rendered = await build(db, kind, current, games=games, scope=scope)
     except Exception as exc:  # noqa: BLE001 - ein Fehler beim Aufbauen darf den Job nicht still anhalten (#883)
-        logger.warning("[discord-embeds] %s: Aufbau fehlgeschlagen: %s", kind, type(exc).__name__)
+        logger.warning("[discord-embeds] %s: Aufbau fehlgeschlagen: %s", log_safe(kind), type(exc).__name__)
         error = f"{REASON_TEXTS['build_failed']} ({type(exc).__name__})."
         await _save(db, kind, {"error": error, "checked_at": current.isoformat()}, guild_id=guild_id)
         return {"ok": False, "reason": "build_failed", "error": error}
@@ -380,7 +381,7 @@ async def refresh(db, kind: str, *, force: bool = False, now: datetime | None = 
                 pinned = await bot.pin_message(channel_id, str(result.get("message_id")))
                 result["pinned"] = bool(pinned.get("ok"))
     except Exception as exc:  # noqa: BLE001 - ein Discord-Fehler darf den Job nicht anhalten
-        logger.warning("[discord-embeds] %s: %s", kind, type(exc).__name__)
+        logger.warning("[discord-embeds] %s: %s", log_safe(kind), type(exc).__name__)
         result = {"ok": False, "reason": "error", "error": type(exc).__name__}
     stamp = current.isoformat()
     if result.get("ok"):

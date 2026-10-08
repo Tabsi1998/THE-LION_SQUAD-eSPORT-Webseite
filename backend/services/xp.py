@@ -220,7 +220,7 @@ async def grant_many(user_ids: list[str], source: str, ref: str, *, amount: int)
     for uid in ids:
         before = states.get(uid) or {}
         prestige = int(before.get("prestige") or 0)
-        bonus = int(round(amount * levels.MEMBER_BONUS)) if uid in members and amount > 0 else 0
+        bonus = int(round(amount * levels.MEMBER_BONUS)) if uid in members else 0
         events.append({"id": new_id(), "user_id": uid, "source": source, "ref": str(ref), "amount": int(amount), "bonus": bonus, "note": None, "day": day, "at": stamp})
         total_before = int(before.get("total") or 0)
         total_after = max(0, total_before + amount + bonus)

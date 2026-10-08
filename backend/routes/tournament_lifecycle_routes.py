@@ -305,8 +305,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     if prev != status and status == "live":
         try:
             fresh_t = {**t, "status": status}
-            if prev != status:
-                auto_generated_bracket = await _finalize_bracket_for_checkin(db, fresh_t, me.get("id"))
+            auto_generated_bracket = await _finalize_bracket_for_checkin(db, fresh_t, me.get("id"))
         except HTTPException as exc:
             auto_generated_bracket = {"ok": False, "reason": "generator_error", "detail": exc.detail}
 

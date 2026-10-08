@@ -49,7 +49,8 @@ def test_karte_ist_ein_png_in_1200_mal_630():
     # Ohne Datum, ohne Beschreibung, mit sehr langem Namen und unbekannter Farbe bleibt die Karte heil.
     long_name = "Ein außerordentlich langer Erfolgsname, der niemals in eine Zeile passen wird, egal wie klein die Schrift"
     png = share.render_card({**payload, "name": long_name, "description": "", "earned_at": None, "material_color": "kaputt", "holders": 0, "rank": 9})
-    assert Image.open(io.BytesIO(png)).size == (1200, 630)
+    picture = Image.open(io.BytesIO(png))
+    assert picture.size == (1200, 630)
     assert share._hex("kaputt") == (255, 215, 0, 255)
     assert share._blend((255, 255, 255, 255), 255) == (255, 255, 255, 255) and share._blend((255, 255, 255, 255), 0) == (10, 10, 10, 255)
     # Die Fläche im Emblem ist dunkel (vorgemischt), das Rangzeichen darauf hell - sonst wäre es unsichtbar.
@@ -85,7 +86,8 @@ async def test_teilen_nur_was_das_profil_oeffentlich_zeigt(flow):
     res = await flow.get(f"/api/achievements/share/{ok_id}.png")
     assert res.status_code == 200 and res.headers["content-type"] == "image/png"
     assert res.headers["content-disposition"].startswith("inline")
-    assert Image.open(io.BytesIO(res.content)).size == (1200, 630)
+    picture = Image.open(io.BytesIO(res.content))
+    assert picture.size == (1200, 630)
 
     assert (await flow.get(f"/api/achievements/award/{neg_id}")).status_code == 404, "Negatives nie"
     assert (await flow.get(f"/api/achievements/share/{neg_id}.png")).status_code == 404

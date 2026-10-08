@@ -74,5 +74,8 @@ test("stripLeadingTitle nimmt nur eine Überschrift weg, die den Titel wiederhol
   expect(stripLeadingTitle("<h1>Mario Kart <em>abgesagt</em></h1><p>Text</p>", "Mario Kart abgesagt")).toBe("<p>Text</p>");
   expect(stripLeadingTitle("# Etwas anderes\n\nText", "Mario Kart abgesagt")).toBe("# Etwas anderes\n\nText");
   expect(stripLeadingTitle("Text ohne Überschrift", "Mario Kart abgesagt")).toBe("Text ohne Überschrift");
+  // Für den Vergleich fallen alle Tags der Überschrift weg, auch verschachtelte; kaputtes Markup bleibt stehen (#1408).
+  expect(stripLeadingTitle("<h2><span><b>Mario <i>Kart</i></b> abgesagt</span></h2><p>Text</p>", "Mario Kart abgesagt")).toBe("<p>Text</p>");
+  expect(stripLeadingTitle("<h2><<b>b>Mario Kart abgesagt</h2><p>Text</p>", "Mario Kart abgesagt")).toBe("<h2><<b>b>Mario Kart abgesagt</h2><p>Text</p>");
   expect(readingMinutes("wort ".repeat(450))).toBe(2);
 });

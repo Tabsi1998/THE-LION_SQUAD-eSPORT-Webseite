@@ -233,7 +233,7 @@ export function createLiveConnection(options: LiveConnectionOptions) {
 
   async function loop(runId: number) {
     while (runId === generation) {
-      let outcome: "closed" | "refreshed" | "failed" = "failed";
+      let outcome: "closed" | "refreshed" | "failed";
       try {
         outcome = await readOnce(runId);
       } catch {

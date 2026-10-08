@@ -29,6 +29,7 @@ from __future__ import annotations
 import logging
 
 from models import new_id, now_utc
+from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.discord.threads")
 
@@ -238,7 +239,7 @@ async def status_changed(db, tournament: dict, prev: str | None, status: str) ->
             outcome = await deliver(db, current, await designed_tournament(db, current, status, game),
                                     in_thread=await designed_tournament(db, current, status, game, in_thread=True))
         except Exception:  # noqa: BLE001
-            logger.warning("[discord-threads] %s: Meldung „%s“ gescheitert", tournament.get("id"), status, exc_info=True)
+            logger.warning("[discord-threads] %s: Meldung „%s“ gescheitert", log_safe(tournament.get("id")), log_safe(status), exc_info=True)
             outcome = {"ok": False, "reason": "error"}
     if status in BRACKET_STATUSES:
         discord_bracket.request_refresh(tournament["id"], final=status in FINAL_STATUSES)

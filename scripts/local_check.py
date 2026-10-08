@@ -10,9 +10,10 @@ bills by the minute. This machine does not, so everything runs unless a group
 is deselected by hand.
 
 Groups:
-    repository  secrets, documentation links, every shell script, the public
-                route contract, no CRLF stored, and Gitleaks over the history
-                and over uncommitted and new files
+    repository  secrets, documentation links, the code-scanning patterns (an
+                assert with an effect, new unused names), every shell script,
+                the public route contract, no CRLF stored, and Gitleaks over
+                the history and over uncommitted and new files
     backend     the CI's Python 3.11 in an environment of its own, a full
                 compile, the CI lint gate, pip-audit, and pytest with the
                 coverage floor
@@ -924,6 +925,16 @@ def doc_links(context: Context) -> str:
     return "every documentation link resolves"
 
 
+def code_patterns(context: Context) -> str:
+    """What GitHub's code scanning turns a pull request red for (#1408), found before the push: an assert with an
+    effect anywhere in the backend, and new unused imports or variables in the Python files changed against
+    origin/main. flake8 comes from the backend environment; while that is not built yet, only the first rule runs."""
+    venv = venv_executable(VENV)
+    completed = repo_script(context, "check-code-patterns.py", *(("--python", venv) if venv.is_file() else ()))
+    lines = completed.stdout.strip().splitlines()
+    return lines[-1] if lines else "no code-scanning patterns"
+
+
 def msys_path(path: Path) -> str:
     """A Windows path as Git Bash writes it: C:/a/b becomes /c/a/b."""
     text = path.resolve().as_posix()
@@ -956,6 +967,7 @@ def repository_steps() -> list:
     return [
         Step("repository", "secrets", "Secrets and removed provider remnants", check_secrets),
         Step("repository", "doc-links", "Every documentation link resolves", doc_links),
+        Step("repository", "code-patterns", "No assert with an effect, no new unused names", code_patterns),
         Step("repository", "shell", "Every shell script parses", shell_scripts),
         Step("repository", "routes", "The public and legacy route contract", public_routes),
         Step("repository", "line-endings", "No CRLF stored for text files", line_endings),

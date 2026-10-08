@@ -22,6 +22,16 @@ function read(file) {
   return fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n");
 }
 
+/** Wie read, aber "" wenn es die Datei noch nicht gibt - gleich gelesen statt vorher nachgesehen (#1408). */
+function readIfPresent(file) {
+  try {
+    return read(file);
+  } catch (error) {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  }
+}
+
 /** Die Elemente eines Fragments in Reihenfolge - Konstanten wie {LION_HEAD} werden eingesetzt. */
 function parseFragment(fragment, constants, where) {
   const parts = [];
@@ -124,7 +134,7 @@ module.exports = { build, OUT };
 
 if (require.main === module) {
   const next = build();
-  const current = fs.existsSync(OUT) ? read(OUT) : "";
+  const current = readIfPresent(OUT);
   if (process.argv.includes("--check")) {
     if (current !== next) {
       console.error("badgeArt.generated.ts passt nicht mehr zum Web – bitte `npm run sync:badge-art` ausführen.");

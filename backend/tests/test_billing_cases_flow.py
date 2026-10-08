@@ -111,7 +111,8 @@ async def test_cancellation_after_invoice_is_a_case_and_refunds_are_tracked_apar
 
     # Paula sagt ab - der Beleg bleibt, die Website löscht und gutschreibt nichts.
     flow.act_as(paula)
-    assert (await flow.client.delete(f"/api/events/{event['id']}/registrations/me")).status_code == 200
+    deleted = await flow.client.delete(f"/api/events/{event['id']}/registrations/me")
+    assert deleted.status_code == 200
     order = await order_of(flow, booked)
     assert order["status"] == "invoiced" and order["booking_state"] == "cancelled" and order["paid_cents_at_cancel"] == 4000
     assert order["invoice_id"] in fake.core_invoices, "kein DELETE, kein Storno in Dolibarr"
@@ -196,7 +197,8 @@ async def test_overpayment_late_payment_mismatch_and_a_vanished_invoice_are_case
     # Zahlung auf eine stornierte Buchung.
     event2, max_, booked2, order2 = await invoiced_booking(flow, fake, kassier, companions=0, name="max")
     flow.act_as(max_)
-    assert (await flow.client.delete(f"/api/events/{event2['id']}/registrations/me")).status_code == 200
+    deleted = await flow.client.delete(f"/api/events/{event2['id']}/registrations/me")
+    assert deleted.status_code == 200
     fake.pay(order2["invoice_id"])
     await billing_orders.sync_due()
     kinds = sorted(c["kind"] for c in await billing_cases.cases_for_order(flow.db, order2["id"]))
@@ -256,7 +258,8 @@ async def test_summary_per_event_and_filters_and_who_may_look(flow, fake):
     paula, max_, gast = await person(flow, "paula"), await person(flow, "max"), await person(flow, "gast")
     b1, b2, _ = await book(flow, paula, event, companions=1), await book(flow, max_, event), await book(flow, gast, event)
     flow.act_as(gast)
-    assert (await flow.client.delete(f"/api/events/{event['id']}/registrations/me")).status_code == 200, "storniert vor dem Beleg"
+    deleted = await flow.client.delete(f"/api/events/{event['id']}/registrations/me")
+    assert deleted.status_code == 200, "storniert vor dem Beleg"
     assert (await billing_orders.classify_due())["invoiced"] == 2
     fake.pay((await order_of(flow, b1))["invoice_id"], 10)
     await billing_orders.sync_due()
