@@ -231,3 +231,23 @@ test("Club-Admin darf Mitglieder entfernen", async () => {
   await waitFor(() => expect(screen.getByTestId("team-edit-open")).toBeTruthy());
   expect(screen.getAllByText("Entfernen")).toHaveLength(1);
 });
+
+test("Logo und Banner vom Handy: nur Kapitän und Co-Kapitän sehen die Bildauswahl, URL-Felder gibt es nicht mehr (#1153)", async () => {
+  mockAuth.user = { id: "u-cap", username: "neonfalke" };
+  serve({ ...CREW, can_manage: true }, { "/teams/t1/invite-link": { url: "https://lionsquad.at/teams/t1?einladung=x1", token: "x1" } });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-edit-open")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("team-edit-open"));
+  expect(screen.getByTestId("team-logo-open")).toBeTruthy();
+  expect(screen.getByTestId("team-banner-open")).toBeTruthy();
+  expect(screen.queryByText("Logo URL")).toBeNull();
+  expect(screen.queryByText("Banner URL")).toBeNull();
+  await screen.unmount();
+
+  mockAuth.user = { id: "u-gast", username: "kiwikomet" };
+  serve({ ...CREW, can_manage: false, is_member: false });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText(CREW.name)).toBeTruthy());
+  expect(screen.queryByTestId("team-edit-open")).toBeNull();
+  expect(screen.queryByTestId("team-logo-open")).toBeNull();
+});

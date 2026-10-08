@@ -620,8 +620,8 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, onDissolved })
         <Field label="Name"><Input value={form.name} onChange={(v) => set("name", v)} required testId="team-name-input" /></Field>
         <Field label="Tag"><Input value={form.tag} onChange={(v) => set("tag", v.toUpperCase().slice(0, 8))} required testId="team-tag" placeholder="TLS" /></Field>
         <Field label="Beschreibung"><textarea value={form.description || ""} onChange={(e) => set("description", e.target.value)} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-        <Field label="Logo"><ImageUpload value={form.logo_url || ""} onChange={(v) => set("logo_url", v)} testId="team-logo" variant="square" allowLibrary /></Field>
-        <Field label="Banner"><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" allowLibrary /></Field>
+        <Field label="Logo"><ImageUpload value={form.logo_url || ""} onChange={(v) => set("logo_url", v)} testId="team-logo" variant="square" crop="square" allowLibrary /></Field>
+        <Field label="Banner"><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" crop="banner" allowLibrary /></Field>
         <Field label="Discord-Link"><Input value={form.discord_link || ""} onChange={(v) => set("discord_link", v)} placeholder="https://discord.gg/..." /></Field>
         {!isNew && <TeamColorPicker value={form.color || AUTO_COLOR} onChange={(v) => set("color", v)} />}
       </form>

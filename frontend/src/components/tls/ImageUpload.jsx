@@ -144,11 +144,23 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function cropAspectForMode(mode) {
+export function cropAspectForMode(mode) {
   if (mode === "square") return 1;
   if (mode === "portrait") return 4 / 5;
   if (mode === "wide") return 16 / 9;
+  // Banner (#1153): dasselbe Breitformat wie in der App (3:1) - Profil- und Team-Banner.
+  if (mode === "banner") return 3;
   return null;
+}
+
+/**
+ * Womit der Zuschnitt beginnt (#1153, wie in der App): Profilbild und Logo quadratisch (das Profilbild mit runder
+ * Vorschau), Banner 3:1; ohne Angabe wie bisher nach `variant`.
+ */
+export function initialCropMode(variant, crop) {
+  if (crop === "round" || crop === "square") return "square";
+  if (crop === "banner") return "banner";
+  return variant === "square" ? "square" : "original";
 }
 
 function calculateCropSourceRect(width, height, editOptions = null) {
@@ -310,10 +322,11 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
  *   label: optional label
  *   testId: data-testid prefix
  *   variant: "square" | "wide" (visual)
+ *   crop: "round" | "square" | "banner" - Zuschnitt wie in der App (#1153): Profilbild rund, Logo quadratisch, Banner 3:1
  *   endpoint: "/uploads/image" (default), "/uploads/logo" or "/uploads/sponsor-logo"
  *   mediaScope: "user" | "admin" | "sponsor" | "branding" | "gallery"; defaults by route
  */
-export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", endpoint = "/uploads/image", maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, allowLibrary = false, mediaScope, libraryEndpoint }) {
+export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", crop, endpoint = "/uploads/image", maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, allowLibrary = false, mediaScope, libraryEndpoint }) {
   const fileRef = useRef(null);
   const cropBoxRef = useRef(null);
   const previewCanvasRef = useRef(null);
@@ -411,7 +424,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
           file,
           url,
           rotation: 0,
-          cropMode: variant === "square" ? "square" : "original",
+          cropMode: initialCropMode(variant, crop),
           cropX: 0,
           cropY: 0,
           zoom: 1,
@@ -617,7 +630,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
             </div>
             <div
               ref={cropBoxRef}
-              className={`relative mx-auto bg-[#171717] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center touch-none select-none w-full ${editor.cropMode === "wide" ? "aspect-video max-w-3xl" : editor.cropMode === "portrait" ? "aspect-[4/5] max-w-[48vh]" : editor.cropMode === "square" ? "aspect-square max-w-[60vh]" : "min-h-[280px] max-h-[55vh] max-w-3xl"}`}
+              className={`relative mx-auto bg-[#171717] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center touch-none select-none w-full ${editor.cropMode === "wide" ? "aspect-video max-w-3xl" : editor.cropMode === "banner" ? "aspect-[3/1] max-w-3xl" : editor.cropMode === "portrait" ? "aspect-[4/5] max-w-[48vh]" : editor.cropMode === "square" ? "aspect-square max-w-[60vh]" : "min-h-[280px] max-h-[55vh] max-w-3xl"}`}
               onPointerDown={(e) => {
                 if (editor.cropMode === "original") return;
                 e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -642,6 +655,10 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                 className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"
                 aria-label="Bildvorschau"
               />
+              {/* Profilbild (#1153): rund wie überall auf der Seite - außerhalb des Kreises abgedunkelt. */}
+              {crop === "round" && editor.cropMode === "square" && (
+                <div aria-hidden="true" data-testid={`${testId}-round-mask`} className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
+              )}
               {(!editorSource || !previewReady) && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/45">
                   <ImageIcon className="w-8 h-8 animate-pulse" />
@@ -663,6 +680,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                   ["square", "1:1"],
                   ["portrait", "4:5"],
                   ["wide", "16:9"],
+                  ["banner", "3:1"],
                 ].map(([mode, text]) => (
                   <button
                     key={mode}

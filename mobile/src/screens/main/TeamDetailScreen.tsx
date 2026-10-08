@@ -21,6 +21,7 @@ import { openSignIn } from "../../navigation/rootNavigation";
 import type { TeamStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 import type { Team, TeamSquad, User } from "../../types";
+import { ImagePickField } from "../../components/ImagePickField";
 
 type Props = NativeStackScreenProps<TeamStackParamList, "TeamDetail">;
 type Candidate = { id: string; username?: string; display_name?: string; avatar_url?: string | null; has_pending_invite?: boolean };
@@ -229,6 +230,13 @@ export function TeamDetailScreen({ navigation, route }: Props) {
     } : { ...emptySquad });
   }, []);
 
+  const saveTeamImage = useCallback(async (key: "logo_url" | "banner_url", url: string) => {
+    if (!team) return;
+    await api.patch(`/teams/${team.id}`, { [key]: url });
+    setTeamForm((current) => ({ ...current, [key]: url }));
+    setTeam((current) => (current ? { ...current, [key]: url } : current));
+  }, [team]);
+
   const saveSquad = useCallback(() => {
     if (!team || !squadForm || !canManage) return;
     const payload = {
@@ -325,8 +333,9 @@ export function TeamDetailScreen({ navigation, route }: Props) {
             <Field label="Name" value={teamForm.name} onChangeText={(value) => setTeamForm((current) => ({ ...current, name: value }))} />
             <Field label="Tag" value={teamForm.tag} onChangeText={(value) => setTeamForm((current) => ({ ...current, tag: value.toUpperCase().slice(0, 8) }))} />
             <Field label="Beschreibung" value={teamForm.description} multiline onChangeText={(value) => setTeamForm((current) => ({ ...current, description: value }))} />
-            <Field label="Logo URL" value={teamForm.logo_url} onChangeText={(value) => setTeamForm((current) => ({ ...current, logo_url: value }))} />
-            <Field label="Banner URL" value={teamForm.banner_url} onChangeText={(value) => setTeamForm((current) => ({ ...current, banner_url: value }))} />
+            {/* Logo und Banner vom Handy (#1153) - nur für Kapitän und Co-Kapitän; gespeichert wird sofort. */}
+            <ImagePickField label="Logo" shape="square" value={teamForm.logo_url} onUploaded={(url) => saveTeamImage("logo_url", url)} fallback={<Body style={styles.logoInitials}>{(team.tag || team.name).slice(0, 2).toUpperCase()}</Body>} testID="team-logo" />
+            <ImagePickField label="Banner" shape="banner" value={teamForm.banner_url} onUploaded={(url) => saveTeamImage("banner_url", url)} testID="team-banner" />
             <Field label="Discord-Link" value={teamForm.discord_link} onChangeText={(value) => setTeamForm((current) => ({ ...current, discord_link: value }))} />
             <ColorPicker value={teamForm.color} onChange={(color) => setTeamForm((current) => ({ ...current, color }))} />
             <Button label={busy ? "Speichert ..." : "Team speichern"} disabled={busy || !teamForm.name.trim() || !teamForm.tag.trim()} onPress={saveTeam} />
@@ -639,6 +648,11 @@ function isTeamAdmin(user?: User | null) {
 }
 
 const styles = StyleSheet.create({
+  logoInitials: {
+    color: colors.cyan,
+    fontSize: 26,
+    fontWeight: "900",
+  },
   content: {
     gap: 14,
     padding: 18,
