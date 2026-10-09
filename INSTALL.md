@@ -93,7 +93,7 @@ password reset, two-factor) is shared by all visitors. The admin shows this unde
 System -> Betrieb & Logs -> Checks -> "Besucher-Adresse".
 
 Cloudflare caps a proxied request at 100 MB regardless of the body size configured in the proxy
-manager; larger uploads need the DNS-only upload host described in `OPERATIONS.md`.
+manager; larger uploads need the DNS-only upload host described in `docs/BETRIEB.md`.
 
 ## 5. First admin and login
 

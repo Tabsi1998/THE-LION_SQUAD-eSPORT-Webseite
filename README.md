@@ -10,11 +10,10 @@ Galerie, Dokumente und Administration.
 
 Offene Arbeit steht in den GitHub-Meilensteinen und -Issues. Passkeys ergänzen
 Passwort und Google; [Einrichtung und Voraussetzungen](CONFIGURATION.md). Zur Website
-gehört die LionsAPP für Android ([App-Anleitung](mobile/README.md)). Der größere
-Turnier-Umbau bleibt ein eigenes Paket nach [COMPETITION_ENGINE.md](COMPETITION_ENGINE.md).
+gehört die LionsAPP für Android ([App-Anleitung](mobile/README.md)).
 
 Grüne Prüfungen sind keine Abnahme des Produktivservers. Dazu gehören ein Praxistest,
-der [Backup-/Restore-Nachweis](BACKUP_RESTORE.md) und die [Release-Freigabe](RELEASE.md).
+der [Backup-/Restore-Nachweis](BACKUP_RESTORE.md) und ein sauberes [Update](UPDATE.md).
 
 ## Betrieb
 
@@ -51,7 +50,7 @@ eigener Google-Login und MFA für Adminfunktionen.
 ## Entwicklung und Prüfungen
 
 Backend: Python 3.11; Frontend: Node 24 und Yarn gemäß Lockfile.
-Anleitungen: [Frontend](frontend/README.md), [Live-/Staging-Tests](LIVE_TESTS.md),
+Anleitungen: [Frontend](frontend/README.md),
 [Leistungsbudgets](frontend/PERFORMANCE_BUDGETS.md).
 
 ```bash
