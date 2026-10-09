@@ -21,7 +21,7 @@ Gesundheitswert auf 100 % bringen.
 3. Unter „APIs & Services → Credentials“ eine OAuth-Client-ID vom Typ „Web application“
    erstellen.
 4. Als autorisierte JavaScript-Quellen exakt `https://lionsquad.at` und – falls genutzt –
-   `https://www.lionsquad.at` bzw. deine Staging-Domain eintragen. Keine Wildcards.
+   `https://www.lionsquad.at` eintragen. Keine Wildcards.
 5. Im Superadminbereich `Einstellungen → Anmeldung` nur die öffentliche Client-ID im Format
    `…apps.googleusercontent.com` eintragen, testen und danach Login/Registrierung/Verknüpfung
    gezielt aktivieren.
@@ -62,7 +62,7 @@ keine an.
 Wer bisher ausschließlich Google nutzt, richtet zunächst über den E-Mail-Passwortreset
 ein Passwort ein. Anmeldung und Einrichtung funktionieren nur auf derselben festen
 Domain. Ein Domainwechsel erfordert die erneute Einrichtung; RP-Daten deshalb nicht
-zwischen Produktion und Staging austauschen. Private Schlüssel oder biometrische
+zwischen Umgebungen austauschen. Private Schlüssel oder biometrische
 Daten werden nicht auf dem Server gespeichert. Öffentliche Schlüssel und einmalige,
 fünf Minuten gültige Challenges liegen in MongoDB; Kontolöschung entfernt sie mit.
 

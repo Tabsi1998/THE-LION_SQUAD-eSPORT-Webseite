@@ -39,7 +39,7 @@ def areas_for(path: str) -> set[str]:
 
     hits: set[str] = set()
     compose = name.startswith("docker-compose") and name.endswith((".yml", ".yaml"))
-    env_example = name in {".env.example", ".env.staging.example"}
+    env_example = name == ".env.example"
 
     if path.startswith(("backend/", "scripts/")) or path in {"install.sh", "update.sh", "frontend/nginx.conf", ".flake8"}:
         hits.add("backend")
@@ -58,7 +58,7 @@ def areas_for(path: str) -> set[str]:
         hits.add("mobile")
     if (path.startswith(("backend/", "frontend/")) or compose or env_example
             or name.startswith("Dockerfile") or name == ".dockerignore"
-            or path in {"scripts/staging-preflight.py", "scripts/check-web-update.py"}):
+            or path == "scripts/check-web-update.py"):
         hits.add("container")
     return hits or set(AREAS)
 

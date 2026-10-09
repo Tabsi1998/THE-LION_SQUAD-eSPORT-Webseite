@@ -10,7 +10,6 @@ Thumbs.db
 docker-compose.override.yml
 .env.*
 !.env.example
-!.env.staging.example
 *.env
 *.pem
 *.key
@@ -55,8 +54,6 @@ out/
 # Local runtime data
 dump.rdb
 backend/uploads/
-test_reports/
-memory/test_credentials.md
 
 # Archives / packages
 *.zip

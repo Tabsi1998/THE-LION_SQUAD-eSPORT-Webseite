@@ -184,5 +184,4 @@ ROLLBACK_CONFIRM="$target" bash scripts/rollback-release.sh "$target"
 
 Hat eine Migration Daten unverträglich geändert: Dienst stoppen, dann den bestätigten Restore aus
 [BACKUP_RESTORE.md](BACKUP_RESTORE.md). Ein Datenbank-Restore ist keine Antwort auf einen reinen
-Frontend-Fehler. Für einen getrennten Teststack liegen `scripts/staging-*.sh` bereit (derzeit nicht
-in Gebrauch).
+Frontend-Fehler.

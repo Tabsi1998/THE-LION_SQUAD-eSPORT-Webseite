@@ -1,6 +1,6 @@
 # Verschlüsseltes Backup und Restore
 
-## Zielauswahl: Produktion und Staging niemals mischen
+## Zielauswahl
 
 Die Skripte bestimmen Datenbank und Upload-Volume aus der aufgelösten Konfiguration
 des **ausgewählten Compose-Projekts**. Es gibt keine globale Suche nach ähnlich benannten
@@ -9,29 +9,8 @@ Werte müssen zur Konfiguration passen, sonst wird vor dem Backup/Restore abgebr
 Benötigt werden Python 3 und Docker Compose mit `config --format json`.
 Die Umgebungswahl folgt den [offiziellen Compose-Variablen](https://docs.docker.com/compose/how-tos/environment-variables/envvars/).
 
-Für Staging im separaten Staging-Checkout eine eigene Shell verwenden:
-
-```bash
-export COMPOSE_PROJECT_NAME=tls-staging
-export COMPOSE_FILE=docker-compose.yml:docker-compose.staging.yml
-export COMPOSE_ENV_FILES=.env.staging
-export COMPOSE_DISABLE_ENV_FILE=true
-export DB_NAME=tls_arena_staging
-export BACKUP_DIR=/opt/tls-arena-staging/backups
-export BACKUP_ENCRYPTION_PASSWORD_FILE=/etc/tls-arena-staging/backup-password
-bash scripts/backup.sh
-```
-
-Die Staging-Passwortdatei vorher separat und geschützt anlegen. `COMPOSE_ENV_FILES`
-erfordert eine Compose-Version, die diese Einstellung unterstützt; vor Verwendung
-mit `docker compose config --format json | python3 scripts/compose-backup-target.py
---db tls_arena_staging --volume tls-staging_uploads_data` prüfen (als eine Zeile).
-Keine aus Produktion geerbten Shell-Secrets übernehmen. Für Restore-Drills dieselbe
-Staging-Shell und Staging-Archive verwenden. Nie Produktions-Timer mit diesen Werten
-überschreiben; Backupverzeichnisse und Offsite-Ziele pro Umgebung getrennt halten.
-
-Die folgenden Beispiele gelten für Produktion im Produktions-Checkout. Nicht in der
-Staging-Shell ausführen. Ein Restore ersetzt Daten und braucht weiterhin die explizite Bestätigung.
+Die Beispiele gelten für den Produktions-Checkout. Ein Restore ersetzt Daten und braucht die
+explizite Bestätigung.
 
 ## Einmalige Vorbereitung
 

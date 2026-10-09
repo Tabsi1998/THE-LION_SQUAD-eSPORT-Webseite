@@ -1246,13 +1246,7 @@ def compose_contract(context: Context) -> str:
     compose(context, "config", "-q", project=False, timeout=900)
     backup_target(context, compose(context, "config", "--format", "json", project=False, timeout=900).stdout,
                   "--db", "tls_arena")
-    staging = compose(context, "--env-file", ".env.staging.example", "-p", "tls-staging",
-                      "-f", "docker-compose.yml", "-f", "docker-compose.staging.yml",
-                      "config", "--format", "json", project=False, check=False, timeout=900)
-    if staging.returncode != 0:
-        raise StepFailed("the staging compose does not parse:\n" + tail(staging))
-    backup_target(context, staging.stdout, "--db", "tls_arena_staging", "--volume", "tls-staging_uploads_data")
-    return "production and staging name the right database and volume"
+    return "the compose file names the right database and volume"
 
 
 def nginx_config(context: Context) -> str:
@@ -1322,8 +1316,6 @@ def container_steps() -> list:
         Step("container", "nginx", "The reverse proxy configuration is valid", nginx_config),
         Step("container", "build", "The hardened images build", compose_build, ("compose-contract",)),
         Step("container", "up", "The stack answers live, ready and health", compose_start, ("build",)),
-        Step("container", "inventory", "The read-only host inventory",
-             stack_script("staging-preflight.py", success="the host inventory is consistent"), ("up",)),
         Step("container", "web-release", "Release marker and cache headers",
              stack_script("check-web-update.py", web, success="the release marker and cache headers are right"),
              ("up",)),

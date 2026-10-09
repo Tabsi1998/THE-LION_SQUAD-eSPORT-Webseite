@@ -40,7 +40,7 @@ die geschützte `.env` bzw. verschlüsselte Einstellungen im Adminbereich.
 | `backend/` | FastAPI, MongoDB, Auth, Fachlogik und Backend-Tests |
 | `frontend/` | React 19, Vite, Tailwind, Nginx und Browser-Tests |
 | `mobile/` | Native Expo-App; Weiterentwicklung derzeit pausiert |
-| `scripts/` | Update-Prüfungen, Backups, Restore und Staging |
+| `scripts/` | Lokaler Check, Update-Prüfungen, Backups und Restore |
 | `.github/workflows/` | CI, Container-Smoke, CodeQL und Android-Builds |
 
 Die Website läuft hinter dem eigenen HTTPS-Reverse-Proxy. API-Pfad: `/api`.

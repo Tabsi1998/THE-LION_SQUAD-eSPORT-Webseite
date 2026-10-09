@@ -35,8 +35,6 @@ ALL = set(areas.AREAS)
         ("scripts/compose-backup-target.py", {"backend", "frontend"}),
         ("scripts/check-web-update.py", {"backend", "container"}),
         ("docker-compose.yml", {"frontend", "container"}),
-        ("docker-compose.staging.yml", {"frontend", "container"}),
-        (".env.staging.example", {"frontend", "container"}),
         ("install.sh", {"backend"}),
         (".flake8", {"backend"}),
         # Dokumentation braucht nur die Linkprüfung im Backend-Job.

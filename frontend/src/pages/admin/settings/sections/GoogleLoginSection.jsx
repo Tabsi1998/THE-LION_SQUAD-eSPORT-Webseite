@@ -40,7 +40,7 @@ export function GoogleLoginSection({ authConfig, setAuthConfig, savingAuth, test
       </div>
       {authSwitches(GOOGLE_SWITCHES)}
       <p className="text-xs text-white/40">
-        Deaktivierte Optionen werden für Web und App serverseitig blockiert. Hinterlege in Google Cloud dieselbe Produktions- und Staging-Origin, die du hier verwendest.
+        Deaktivierte Optionen werden für Web und App serverseitig blockiert. Hinterlege in Google Cloud dieselbe Origin, die du hier verwendest.
       </p>
     </div>
   );
