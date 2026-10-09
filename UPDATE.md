@@ -169,10 +169,20 @@ docker compose down -v
 2. HTML-Caching fuer SPA-Routen deaktivieren.
 3. `./update.sh u` nochmal laufen lassen.
 
-Mehr Details: [OPERATIONS.md](OPERATIONS.md).
+Mehr zu Proxy, Uploads und Live-Updates: [Betrieb](docs/BETRIEB.md).
 
 ## Rollback
 
-Releases bevorzugt per Tag mit `scripts/deploy-release.sh` ausrollen. Der bestätigte Rollback
-steht in [RELEASE.md](RELEASE.md); dadurch bleiben vorheriger Commit, Backup und Prüfablauf
-nachvollziehbar.
+Wer ein Release per Tag ausrollt, nutzt `scripts/deploy-release.sh <tag>`: Es verlangt einen sauberen
+Checkout, merkt sich den vorherigen Commit, legt ein verschlüsseltes Backup an, baut und prüft Backend,
+Frontend und SPA-Routen. Zurück auf den vorherigen Stand, wenn nur der Code kaputt ist:
+
+```bash
+target=$(cat .deploy/previous-release)
+ROLLBACK_CONFIRM="$target" bash scripts/rollback-release.sh "$target"
+```
+
+Hat eine Migration Daten unverträglich geändert: Dienst stoppen, dann den bestätigten Restore aus
+[BACKUP_RESTORE.md](BACKUP_RESTORE.md). Ein Datenbank-Restore ist keine Antwort auf einen reinen
+Frontend-Fehler. Für einen getrennten Teststack liegen `scripts/staging-*.sh` bereit (derzeit nicht
+in Gebrauch).

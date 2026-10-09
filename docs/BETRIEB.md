@@ -38,7 +38,7 @@ So wird es richtig, wenn der Nginx Proxy Manager auf einem anderen Rechner läuf
 
 Gelb ist kein Fehler, wenn an dem Tag wirklich alle im selben Netz waren, etwa am Vereinsabend.
 Cloudflare lässt je Anfrage höchstens 100 MB durch – größere Uploads enden mit 413, egal was im Proxy
-Manager eingestellt ist (Ausweg: der Upload-Host ohne Cloudflare, `OPERATIONS.md`).
+Manager eingestellt ist (Ausweg: der Upload-Host ohne Cloudflare, siehe unten).
 
 ## Alarme (#517)
 
@@ -72,3 +72,98 @@ Ereignis, Route, Fehlerart und Zähler.
 - Alarm-Verlauf: 1 Jahr
 
 Der Job `ops_retention` läuft einmal am Tag.
+
+## Live-Updates (SSE)
+
+Web- und TV-Ansichten bekommen Aktualisierungen über `/api/changes/stream` (Server-Sent Events):
+
+- Am Reverse Proxy für genau diese Route Puffer und Cache aus, lange Lese-/Sendezeiten,
+  `Last-Event-ID` unverändert weiterreichen.
+- Das Backend läuft bewusst mit **einem** Uvicorn-Worker (`backend/docker-entrypoint.py` erzwingt
+  `--workers 1`): Puffer und Abonnenten liegen im Prozess. Mehrere Worker bräuchten zuerst einen
+  gemeinsamen Event-Bus.
+- Gäste bekommen nur geschwärzte Signale, rohe Admin-Pfade nur angemeldetes Personal. Nach einem
+  Neustart fordert ein `reset`-Event einen vollständigen Neuabruf an.
+
+## Uploads und der Upload-Host ohne Cloudflare
+
+Uploads brauchen ein dauerhaftes Docker-Volume, ein beschreibbares Upload-Verzeichnis und ein großes
+Upload-Limit am Reverse Proxy. Richtwerte:
+
+```env
+UPLOAD_DIR=/app/backend/uploads
+MAX_IMAGE_UPLOAD_MB=50
+MAX_VIDEO_UPLOAD_MB=1536
+MAX_ORIGINAL_UPLOAD_MB=1536
+MAX_DOCUMENT_UPLOAD_MB=50
+PROXY_UPLOAD_LIMIT_MB=1700
+PUBLIC_UPLOAD_BACKEND_URL=https://upload.lionsquad.at
+```
+
+Cloudflare lässt je Anfrage höchstens 100 MB durch. Große Uploads laufen deshalb über eine Subdomain
+**ohne** Cloudflare-Proxy (graue Wolke), z. B. `upload.lionsquad.at`, die im Nginx Proxy Manager auf
+denselben Upstream zeigt, mit:
+
+```nginx
+client_max_body_size 2048m;
+client_body_timeout 3600s;
+proxy_connect_timeout 300s;
+proxy_send_timeout 3600s;
+proxy_read_timeout 3600s;
+send_timeout 3600s;
+proxy_request_buffering off;
+proxy_buffering off;
+proxy_max_temp_file_size 0;
+```
+
+Keine aggressive Cache-Regel auf `/api/uploads/*`.
+
+## Suchmaschinen und Search Console
+
+Welche Pfade indexiert, privat, umgeleitet oder entfernt sind, steht in
+[`PUBLIC_ROUTE_INVENTORY.md`](../PUBLIC_ROUTE_INVENTORY.md); `301`/`410` entscheidet das Frontend-Nginx.
+Nach Änderungen an SEO oder Routen:
+
+```bash
+curl -fsS https://lionsquad.at/sitemap.xml | head
+curl -fsS https://lionsquad.at/robots.txt
+curl -I -A "Googlebot" "https://lionsquad.at/u/beispiel"
+```
+
+Danach in der Google Search Console die betroffenen Adressen prüfen („Fehlerbehebung validieren“).
+Sichtbare Suchergebnisse ziehen oft erst nach Tagen nach.
+
+Öffentlichen Inhalt im echten Browser prüfen (Sitemap-Crawl, meldet Platzhalter, kaputte Bilder,
+Browser- und HTTP-Fehler) – manuell nach Deployments, nie als CI-Schritt gegen die Live-Seite:
+
+```bash
+cd frontend
+yarn audit:public
+```
+
+Das interne Nginx setzt je HTML-Antwort eine CSP-Nonce; JSON-LD, SEO-Vorschauen und Cloudflares
+JavaScript-Erkennung nutzen dieselbe Nonce, `script-src` braucht kein `unsafe-inline`.
+
+## Externe Überwachung
+
+Ein Uptime-Dienst prüft mindestens jede Minute `https://lionsquad.at/api/health/live`,
+`/api/health/ready` und `/health` und meldet sich nach zwei bis drei Fehlern in Folge. Dazu
+Speicherplatz (Warnung 80 %, kritisch 90 %), Docker-Neustarts und die Backup-Timer im Blick behalten:
+
+```bash
+docker compose ps
+docker compose logs --since 7d backend | tail -n 200
+systemctl list-timers 'tls-*'
+journalctl -u tls-backup.service --since '7 days ago'
+```
+
+## Wenn etwas passiert ist
+
+1. Auswirkungen begrenzen: betroffene Integration oder Konto sperren.
+2. Zeitpunkte, Logs und betroffene Daten sichern – Logs nie öffentlich teilen.
+3. Zugangsdaten rotieren, Sitzungen widerrufen.
+4. Aus dem Backup nur nach bestandenem Restore-Check wiederherstellen ([`BACKUP_RESTORE.md`](../BACKUP_RESTORE.md)).
+5. Datenschutz einbeziehen, gesetzliche Meldefristen prüfen.
+6. Ursache, Maßnahmen und Nachkontrolle intern festhalten.
+
+Niemals ohne Absicht `docker compose down -v` – das löscht die Volumes.

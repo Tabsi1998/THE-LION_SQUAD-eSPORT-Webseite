@@ -75,4 +75,4 @@ WordPress-/Demo-Familien unter `/elements`, `/product`, `/portfolio`, `/tag`, `/
 
 Die CI startet das produktive Nginx-Image und fuehrt `scripts/check-public-routes.sh` aus. Geprueft werden repraesentative kanonische `200`, alte `301`, entfernte `410`, der kanonische Host und der Crawler-Header. Backend-Tests stellen zusaetzlich sicher, dass die Sitemap kanonische Pfade enthaelt und bekannte Aliase ausschliesst.
 
-Nach dem Deployment werden die oeffentliche Proxy-Grenze und Suchmaschinen wie in `OPERATIONS.md` beschrieben geprueft. Aktionen in Google Search Console und Bing Webmaster Tools bleiben bewusst manuell, weil die Repository-CI keinen Zugriff auf diese Konten hat.
+Nach dem Deployment werden die oeffentliche Proxy-Grenze und Suchmaschinen wie in `docs/BETRIEB.md` beschrieben geprueft. Aktionen in Google Search Console und Bing Webmaster Tools bleiben bewusst manuell, weil die Repository-CI keinen Zugriff auf diese Konten hat.
