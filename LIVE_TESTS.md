@@ -3,7 +3,7 @@
 Dieses Dokument beschreibt Live-Checks gegen einen ausdrücklich ausgewählten Teststack.
 Schreibende Tests ausschließlich auf dem vorbereiteten Staging mit Testkonten ausführen,
 nicht ersatzweise auf Produktion. `staging.example.at` ist ein Platzhalter; die tatsächliche
-Domain und Freigabe werden in [STAGING_ABNAHME.md](STAGING_ABNAHME.md) festgehalten.
+Domain und Freigabe hält der Betreiber im Abnahmeprotokoll fest.
 
 ## Vorher: die Ablauf-Tests
 

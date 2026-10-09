@@ -1,7 +1,7 @@
 # Dokumentation
 
-Einstieg: [README](README.md). Verbindliche Prioritäten und Abnahmen:
-[RESTPLAN](RESTPLAN.md). Die folgenden Unterseiten haben jeweils einen eigenen Zweck.
+Einstieg: [README](README.md). Offene Arbeit steht in den GitHub-Meilensteinen und -Issues.
+Die folgenden Unterseiten haben jeweils einen eigenen Zweck.
 
 ## Handbuch für Betreiber
 
@@ -24,7 +24,6 @@ Was die Funktionen können und was ihr dafür einrichtet – zum Durchlesen, ohn
 
 | Nachweis | Zweck |
 | --- | --- |
-| [STAGING_ABNAHME](STAGING_ABNAHME.md) | Praxistest und Betreiberfreigabe |
 | [LIVE_TESTS](LIVE_TESTS.md) | Tests auf einem ausgewählten Teststack |
 | [SECURITY](SECURITY.md) | Sicherheitsmodell und Meldung von Schwachstellen |
 | [DATA_PROTECTION](DATA_PROTECTION.md) | Daten, Löschung und Betreiberpflichten |
@@ -44,33 +43,20 @@ Das ersetzt keine manuelle Prüfung externer Links oder der fachlichen Abnahme.
 
 | Datei | Zweck |
 | --- | --- |
-| [CLAUDE](CLAUDE.md) | Arbeitsregeln, Kurzkarte, Prüfen, Release, Deployment, letzter Stand – wird bei jedem Sitzungsstart geladen und bleibt deshalb kurz |
-| [HISTORIE](docs/HISTORIE.md) | Nachschlagewerk: was jeder PR gebaut hat und wo es liegt; der Stand-Verlauf bis 5. Oktober 2026 |
-| [STOLPERSTEINE](docs/STOLPERSTEINE.md) | Fallen und ihre Abhilfe, nach Gebiet |
-| [UMBAUPLAN](UMBAUPLAN.md) | Fahrplan in der Sprache des Betreibers und „Was von dir kommen muss“ |
+| [CLAUDE](CLAUDE.md) | Arbeitsregeln, Kurzkarte, Prüfen, Release, Deployment – wird bei jedem Sitzungsstart geladen und bleibt deshalb kurz |
 
-## Turniere und Entwicklungshistorie
+Stand, Verlauf, Stolpersteine und Pläne stehen seit 9.10.2026 nicht mehr im Repository, sondern in den
+privaten Projektnotizen des Betreibers; frühere Fassungen bleiben im Git-Verlauf.
 
-- [UMBAUPLAN](UMBAUPLAN.md): laufender Arbeitsstand des Turnier- und Übersichtlichkeitsumbaus — welcher Block steht, welcher offen ist.
+## Turniere
+
 - [COMPETITION_ENGINE](COMPETITION_ENGINE.md): eigenständiger künftiger Umbau mit Abnahmekriterien.
 - [TOURNAMENT_CUSTOM_BRACKETS](TOURNAMENT_CUSTOM_BRACKETS.md): vorhandene Strukturen und Bedienung.
-- [TOURNAMENT_MIGRATION_DRYRUN](TOURNAMENT_MIGRATION_DRYRUN.md): Bestandsaufnahme vor der Zusammenführung — liest nur, schreibt nichts.
-- [IMPROVEMENT_REPORT](IMPROVEMENT_REPORT.md): Umsetzungshistorie der Plattformhärtung.
-- [TOURNAMENT_ROADMAP](TOURNAMENT_ROADMAP.md) und [APP_BETA_PHASE_PLAN](APP_BETA_PHASE_PLAN.md):
-  historische Planstände; neue Aufgaben entstehen ausschließlich im Restplan.
-- [REPOSITORY_STRATEGY](REPOSITORY_STRATEGY.md): Hintergrund zur Trennung von Quellcode und App-Releases.
 
-Diese Dokumente enthalten weiterhin technische Hintergründe und werden deshalb als
-gekennzeichnete Historie erhalten. Das alte `auth_testing.md` mit überholten Demo-Zahlen
-und unvollständigem MFA-Loginablauf wurde entfernt; aktuelle Tests stehen in
-`backend/tests/`, `frontend/e2e/` und der Live-Test-Anleitung. Die alte, unbenutzte
-Workbox-Service-Worker-Datei wurde ebenfalls entfernt. Die Git-Historie erhält beide.
+## App (LionsAPP)
 
-## Native App – pausiert
-
-[App-Anleitung](mobile/README.md) · [Roadmap](mobile/ROADMAP.md) ·
+[App-Anleitung](mobile/README.md) ·
 [Changelog](mobile/CHANGELOG.md) · [Releases](mobile/RELEASES.md) ·
 [Geräteabnahme](mobile/RELEASE_SMOKE_TEST.md) ·
 [Sicherheit und Verteilung](mobile/SECURITY_AND_DISTRIBUTION.md).
 
-Diese Unterseiten sind kein Auftrag für einen neuen App-Release während der Website-Stabilisierung.

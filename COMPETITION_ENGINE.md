@@ -2,7 +2,7 @@
 
 Stand: 7. September 2026
 
-Einordnung: nachgelagertes Paket R5 aus [RESTPLAN.md](RESTPLAN.md). Sicherheitsupdates,
+Einordnung: nachgelagertes Paket R5 des früheren Restplans. Sicherheitsupdates,
 Staging und Praxistest der heutigen Plattform haben Vorrang. Read-Vertrag, Graphvalidator
 und eingeschränktes Plan/Apply sind implementiert; die Vereinheitlichung aller Schreibwege
 und die Migration realer Bestandswettbewerbe sind ausdrücklich noch offen.

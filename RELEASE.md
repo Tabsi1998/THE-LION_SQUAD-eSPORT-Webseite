@@ -1,7 +1,7 @@
 # Staging, Release und Rollback
 
-Arbeitsreihenfolge: [RESTPLAN.md](RESTPLAN.md). Abnahmeprotokoll mit konkreten
-Klicktests: [STAGING_ABNAHME.md](STAGING_ABNAHME.md). Noch keine Staging-/Go-live-Freigabe.
+Offene Arbeit: GitHub-Meilensteine. Das Abnahmeprotokoll mit den Klicktests führt der Betreiber
+außerhalb des Repositorys.
 
 ## Wenn nur der Produktivserver vorhanden ist
 
@@ -73,7 +73,7 @@ Zusätzlich manuell testen: Registrierung plus E-Mail-Verifikation, Login/MFA, G
 Client, Passwortreset, erneute Zustimmung, Upload, Turnieranmeldung, Moderationsmeldung,
 Admin-Rollen, Testmail und verschlüsseltes Backup samt Restore-Drill.
 
-Die Fälle einzeln in `STAGING_ABNAHME.md` dokumentieren. Schreibende Live-Tests niemals
+Die Fälle einzeln im Abnahmeprotokoll festhalten. Schreibende Live-Tests niemals
 mit dem Produktivziel als Ersatz für fehlendes Staging ausführen.
 
 ## Release erstellen

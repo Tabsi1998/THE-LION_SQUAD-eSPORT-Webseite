@@ -4,19 +4,17 @@ Selbst gehostete Vereins- und eSports-Plattform für THE LION SQUAD: öffentlich
 Website, Mitgliederbereich, Teams, Turniere, Fast Lap, Jahreswertung, Nachrichten,
 Galerie, Dokumente und Administration.
 
-**[Handbuch](docs/handbuch/README.md) · [Dokumentation](DOCS.md) · [Installation](INSTALL.md) · [Updates und Fehlerhilfe](UPDATE.md) · [Restplan](RESTPLAN.md)**
+**[Handbuch](docs/handbuch/README.md) · [Dokumentation](DOCS.md) · [Installation](INSTALL.md) · [Updates und Fehlerhilfe](UPDATE.md)**
 
 ## Stand und nächste Schritte
 
-Der [Restplan](RESTPLAN.md) führt offene Arbeit und Abnahmen verbindlich zusammen.
-Aktuell haben Update-Zuverlässigkeit, Anmeldung und Dashboard Vorrang. Passkeys
-ergänzen Passwort und Google; [Einrichtung und Voraussetzungen](CONFIGURATION.md).
-Die native Android-App ist auf Wunsch pausiert. Der größere Turnier-Umbau bleibt
-ein eigenes Paket nach [COMPETITION_ENGINE.md](COMPETITION_ENGINE.md).
+Offene Arbeit steht in den GitHub-Meilensteinen und -Issues. Passkeys ergänzen
+Passwort und Google; [Einrichtung und Voraussetzungen](CONFIGURATION.md). Zur Website
+gehört die LionsAPP für Android ([App-Anleitung](mobile/README.md)). Der größere
+Turnier-Umbau bleibt ein eigenes Paket nach [COMPETITION_ENGINE.md](COMPETITION_ENGINE.md).
 
-Grüne Prüfungen sind keine Abnahme des Produktivservers. Dazu gehören
-[Praxistest](STAGING_ABNAHME.md), [Backup-/Restore-Nachweis](BACKUP_RESTORE.md) und
-[Release-Freigabe](RELEASE.md).
+Grüne Prüfungen sind keine Abnahme des Produktivservers. Dazu gehören ein Praxistest,
+der [Backup-/Restore-Nachweis](BACKUP_RESTORE.md) und die [Release-Freigabe](RELEASE.md).
 
 ## Betrieb
 

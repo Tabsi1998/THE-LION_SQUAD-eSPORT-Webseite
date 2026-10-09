@@ -2,30 +2,28 @@
 
 Diese Datei lädt **jede** Sitzung und jeder Agent beim Start. Sie bleibt deshalb kurz – höchstens 60 KB,
 das prüft `scripts/check-doc-links.py` – und enthält nur, was man immer braucht: Regeln, Kurzkarte,
-Prüfen, Release, Deployment und den letzten Stand. Alles andere wird bei Bedarf **gesucht** (Abschnitt 0).
+Prüfen, Release und Deployment. Alles andere wird bei Bedarf **gesucht** (Abschnitt 0).
 Die Datei ist frei von Geheimnissen.
 
-Abschnitt 9 altert schnell. Wer einen PR abschließt oder ein Release baut, zieht ihn im Doku-Stand-PR
-nach – **ersetzen, nicht anhängen**; Einzelheiten gehören nach `docs/HISTORIE.md`.
+Stand, Verlauf, Fallen, Pläne und die offenen Schritte des Betreibers stehen **nicht im Repo** (es ist
+öffentlich), sondern in den privaten Projektnotizen des Betreibers (Obsidian-Vault, Projekt „Lionsquad Webseite“; Pfad in den globalen Anweisungen). Abschnitt 9 sagt, welche Notiz was enthält.
 
 ---
 
 ## 0. Sparsam lesen und suchen
 
-Jedes gelesene Zeichen kostet. Die großen Dateien `docs/HISTORIE.md` (rund 340 KB), `UMBAUPLAN.md` (rund
-215 KB) und `mobile/CHANGELOG.md` **nie ganz lesen** – suchen und nur die Fundstelle lesen:
+Jedes gelesene Zeichen kostet. Große Dateien (`mobile/CHANGELOG.md`, die Historie im Vault) **nie ganz
+lesen** – suchen und nur die Fundstelle lesen:
 
 ```bash
-git grep -n -i "stichwort" -- docs/HISTORIE.md | cut -c1-160   # Dateiname, Funktion, "#915" oder "PR #915"
-sed -n '<von>,<bis>p' docs/HISTORIE.md                         # nur diesen Eintrag
+git log --oneline --grep "#915" | head                         # welcher PR, welcher Commit
+gh pr view 915 --json body --jq .body | head -60                 # was er gebaut hat und warum
 ```
 
 | Gesucht | Steht in |
 | --- | --- |
-| Was ein PR gebaut hat, wo der Code liegt, welche Entscheidung dahintersteht | `docs/HISTORIE.md` Teil A (ein Eintrag je PR) |
-| Wann was gemergt wurde, alte Builds, frühere Erledigungen und Funde | `docs/HISTORIE.md` Teil B |
-| Stolpersteine nach Gebiet (Check, Git und GitHub, Web, App, Emulator, Dienste) | `docs/STOLPERSTEINE.md` |
-| Fahrplan in der Sprache des Betreibers, „Was von dir kommen muss“ | `UMBAUPLAN.md` |
+| Was ein PR gebaut hat und warum | PR-Text (`gh pr view N`) und `git log`; bis 9.10.2026 die Notiz „LSW Historie“ im Vault |
+| Stand, Stolpersteine, offene Schritte des Betreibers, Entscheidungen, Marke und Design | Projektnotizen im Vault (Abschnitt 9) |
 | Ein Thema im Ganzen | `docs/DISCORD.md`, `docs/DOLIBARR.md`, `docs/ABRECHNUNG.md`, `docs/SEASONS.md`, `docs/MODERATION.md`, `docs/ROLLEN.md`, `docs/BETRIEB.md`, `docs/PLAY_STORE.md`, `docs/handbuch/` |
 | App: Änderungen je Version, Hergang der Releases, Geräteabnahme | `mobile/CHANGELOG.md`, `mobile/RELEASES.md`, `mobile/RELEASE_SMOKE_TEST.md` |
 
@@ -51,10 +49,8 @@ Betreiber merged, deployt und testet fachlich.
 Node 24), Expo SDK 57 / React Native 0.86 (`mobile/`, npm, Node 20), Docker Compose mit nginx im
 Frontend-Image (Container `tls-mongodb`, `tls-backend`, `tls-frontend`).
 
-**Fahrplan:** `UMBAUPLAN.md` (Blöcke, Meilenstein-Tabelle, „Neu aufgenommen am …“, „Was von dir kommen
-muss“). `RESTPLAN.md` bleibt die übergeordnete Liste. Weitere Doku über `DOCS.md`. Einen Online-Spiegel
-des Plans gibt es nicht mehr (am 5.10.2026 auf Wunsch des Betreibers gelöscht) – der Plan steht nur im
-Repository.
+**Planung:** GitHub-Meilensteine und -Issues sind der Fahrplan. Stand, Verlauf und Hintergrund stehen in
+den privaten Projektnotizen des Betreibers (Obsidian-Vault, Projekt „Lionsquad Webseite“; Pfad in den globalen Anweisungen). Weitere Doku über `DOCS.md`.
 
 ---
 
@@ -125,7 +121,7 @@ Repository.
    oder `backend`. Jedes Issue bekommt sofort einen Meilenstein.
 2. **Ein Zweig je Issue-Paket** ab `main`: `feat/<nr>-<stichwort>`, `fix/<nr>-<stichwort>`,
    `release/<version>-build<N>` für ein App-Paket, `docs/…` für reine Doku. Gearbeitet wird in den **vier
-   Arbeitsordnern** (Haupt-Checkout, `C:\lsb`, `C:\lsc`, `C:\lsd`; Abschnitt 9), je Ordner ein Zweig – keine
+   Arbeitsordnern** (Haupt-Checkout, `C:\lsb`, `C:\lsc`, `C:\lsd`; Details in der Vault-Notiz „LSW Stand“), je Ordner ein Zweig – keine
    weiteren Arbeitsbäume (außer kurz für einen Release-Bau, Abschnitt 7) und kein Zweigwechsel, solange
    `local_check.py` läuft.
 3. **App-Issues werden je Version gesammelt**, in **einem** PR umgesetzt und danach als ein Build
@@ -146,14 +142,12 @@ Repository.
 7. Commit- und PR-Texte auf Deutsch, mit dem Warum. Attribution laut Sitzungs-Hinweis (`Co-Authored-By: …`
    im Commit, das „Generated with Claude Code“-Zeichen im PR-Text). Texte mit „…“ über eine Datei und
    `--body-file`, nie als Heredoc.
-8. **Feature-PRs fassen `CLAUDE.md`, `UMBAUPLAN.md`, `docs/HISTORIE.md` und `docs/STOLPERSTEINE.md` nicht
-   an** – so kollidieren parallele PRs nicht. Diese vier kommen gebündelt in **einem** Doku-Stand-PR nach
-   dem Merge. Themen-Doku (`docs/DISCORD.md`, `CONFIGURATION.md`, `mobile/CHANGELOG.md` …) gehört dagegen
-   in den Feature-PR.
-9. **Der Doku-Stand-PR** schreibt: je gemergtem PR einen Eintrag ans Ende von `docs/HISTORIE.md` Teil A
-   (was, wo, warum – mit Issue- und PR-Nummer); neue Fallen nach `docs/STOLPERSTEINE.md`; in
-   `UMBAUPLAN.md` den Abschnitt „Neu aufgenommen am …“ und die Tabelle „Was von dir kommen muss“ in der
-   Sprache des Betreibers; hier Abschnitt 9 **neu** (höchstens eine Seite).
+8. **Feature-PRs fassen `CLAUDE.md` nicht an** – so kollidieren parallele PRs nicht; Änderungen daran
+   kommen in einen eigenen Doku-PR. Themen-Doku (`docs/DISCORD.md`, `CONFIGURATION.md`,
+   `mobile/CHANGELOG.md` …) gehört dagegen in den Feature-PR.
+9. **Nach jedem Merge** pflegt Claude die Projektnotizen im Vault (kein Repo-Commit): „LSW Stand“
+   ersetzen, neue Fallen in „LSW Entwicklung, Tests und Releases“, Klickschritte für den Betreiber in
+   „LSW Offene Schritte für Fabian“, dauerhafte Entscheidungen in „LSW Entscheidungen“.
 10. **Tempo:** erst committen, dann ein Check; lieber größere PRs; eine Gegenprobe nur bei Bugfixes;
     Hilfsskripte als Dateien im Scratchpad; den nächsten PR beginnen, während CI läuft. Eigene
     Hintergrundprozesse am Ende beenden – nur über den Port oder die genaue PID.
@@ -162,8 +156,7 @@ Repository.
 
 ## 5. Kurzkarte: wo was liegt
 
-Einzelheiten zu jedem Baustein stehen in `docs/HISTORIE.md` Teil A – nach Dateiname oder Issue-Nummer
-suchen.
+Einzelheiten zu jedem Baustein: PR-Text und `git log` (nach Dateiname oder Issue-Nummer suchen).
 
 **Backend** (`backend/`)
 - `server.py` (App, Middleware, Router; Health unter `/api/health`, `/api/health/live`, `/api/health/ready`), `auth.py`
@@ -295,8 +288,8 @@ npm run test:security && npm run test:release && npx expo install --check
 
 ### 6.3 Die wichtigsten Stolpersteine
 
-Alle Fallen mit Hergang und Abhilfe stehen nach Gebiet in `docs/STOLPERSTEINE.md` – vor der Arbeit in
-einem Gebiet dessen Abschnitt lesen. Diese treffen fast jeden PR:
+Alle Fallen mit Hergang und Abhilfe stehen nach Gebiet in der Vault-Notiz „LSW Entwicklung, Tests und
+Releases“ – vor der Arbeit in einem Gebiet dessen Abschnitt lesen. Diese treffen fast jeden PR:
 
 - **Gitleaks** schlägt bei erfundenen Testwerten ab etwa zehn Zeichen an: kurze Werte nehmen
   (`geheim-42`) oder einen Eintrag in `.gitleaks.toml`, an Datei und Wert gebunden. Der Schritt liest jeden
@@ -314,7 +307,7 @@ einem Gebiet dessen Abschnitt lesen. Diese treffen fast jeden PR:
   Code-Fehler; im nächsten App-PR `npx expo install --fix` mit Node 20.
 - **Sicherheitscheck der App** (`npm run audit:ci`): die Ausnahmen in
   `mobile/scripts/security-audit-allowlist.json` haben eine Frist – nach Ablauf wird der Check von selbst
-  rot (nächste Frist: Abschnitt 9).
+  rot (nächste Frist: Vault-Notiz „LSW Stand“).
 - **Metro und Gradle liefern alten Stand:** vor Sichtproben und vor jedem Release die Metro-Caches
   leeren und im Bundle ein Merkmal suchen, bevor man einem Bildschirmfoto traut.
 - **Cloudflare vor lionsquad.at:** höchstens 100 MB je Anfrage – deshalb ist die Release-APK nur für ARM.
@@ -343,7 +336,7 @@ einem Gebiet dessen Abschnitt lesen. Diese treffen fast jeden PR:
   `https://lionsquad.at` muss darin stehen, eine Probe-Adresse (`10.0.2.2`) nicht.
 - Release-Builds laufen mit R8 (`plugins/withReleaseOptimization.js`); die Zuordnung steckt im Bundle und
   liegt zusätzlich als `<aab>.mapping.txt` daneben. Die Release-APK ist nur für ARM – im x86-Emulator
-  startet sie nicht (`docs/STOLPERSTEINE.md`, Abschnitt 5).
+  startet sie nicht (Vault-Notiz „LSW Entwicklung, Tests und Releases“, Abschnitt 5).
 
 ```bash
 cd mobile
@@ -381,47 +374,20 @@ den ausgelieferten Skripten suchen.
 
 ---
 
-## 9. Letzter Stand (7. Oktober 2026, Nacht)
+## 9. Stand und Kontext (außerhalb des Repos)
 
-**Ersetzen, nicht anhängen** – höchstens eine Seite. Was davor war: `docs/HISTORIE.md` Teil B.
+Das Repository ist öffentlich. Alles, was altert oder intern ist, steht deshalb in den privaten Projektnotizen des Betreibers (Obsidian-Vault, Projekt „Lionsquad Webseite“; Pfad in den globalen Anweisungen):
 
-- **`main`** steht nach #1300 (`82660594`). Gemergt am 7.10. nach dem letzten Doku-Stand (#1129): #1128, #1131,
-  #1215 (TV I–III), #1130 (Jahreszeiten IV, Variante B), #1141, #1216, #1294 (Internes nur für die Turnierleitung,
-  Rollen-Daten), #1142, #1214, #1299 (CI), #1217 (App-Aufbau I), #1297 (Geräteprüfung), #1298 (App 1.4.0), #1301
-  (lokaler Check je Ordner), #1300 (Rollen nach Bereichen).
-- **Geschlossen:** Meilensteine 56–60 und 62. **Als Nächstes offen:** 61 „Turniere: Fehler aus der App-Prüfung“
-  (#1132–#1140; #1132 Entscheidung B: online melden Spieler, der Gegner bestätigt; die Antworten zu #1133, #1134,
-  #1137 und #1139 stehen in den Tickets) und #1350 (Rollen II).
-- **App:** Build 90 (1.4.0) ist gebaut (Tag `mobile-v1.4.0-build90`, APK am Vereinsserver); der Betreiber lädt das
-  AAB in den offenen Test – es ersetzt Build 89, der noch bei Google lag. Nachgänge #1295, #1296.
-- **Rollen** seit #1300: Bereich statt Rang (`docs/ROLLEN.md`). Moderatoren nur Moderation; Turnierrechte aus
-  Turnierleitung, Verein/System oder einem Helfer-Einsatz; Bannen mit Grund, Admin-Konten nur durch den Superadmin.
-- **Pläne vom 7.10.** (Auswahl des Betreibers aus den Vorschauen, private Artefakt-Links beim Betreiber): App 61–71
-  (#1132–#1213), Web 72–81 (#1218–#1293), Design 82–84 (#1302–#1349). Das Stil-System (82–84) kommt in einem
-  Fenster, wenn kein anderer Web-Zweig offen ist – es ändert rund 200 Dateien. Der Admin-Plan (alle 56 Ideen) folgt.
-  Grundsätze: Die Website kann alles, was die App kann; Varianten werden Einstellungen mit der Wahl des Betreibers
-  als Vorgabe; jedes Thema an genau einem Ort.
-- **In Arbeit** (je Ordner ein Zweig, Commits nur lokal bis zum Review): Haupt-Checkout `feat/73-tempo` (73),
-  `C:\lsb` `feat/72-web-fehler-1` (72), `C:\lsc` `feat/79-verein` (79), `C:\lsd` `feat/69-community` (69, fällig
-  10.12.). Der erste freie Ordner nimmt Meilenstein 61.
-- **Vier Arbeitsordner** (Freigabe des Betreibers vom 7.10.): Haupt-Checkout, `C:\lsb`, `C:\lsc`, `C:\lsd` –
-  Worktrees desselben Repos, venvs unter `~/.local-ci/<Ordnername>/venv`. Seit #1301 eigene Test-Datenbank
-  (`tls_ci_<ordner>`, im Haupt-Checkout `tls_ci`) und eigenes Compose-Projekt; höchstens zwei lokale Checks
-  gleichzeitig, die Container-Gruppe nur in einem Ordner. Browser-Ports 3105 (Haupt), 3106 (lsb), 3107 (lsc),
-  3108 (lsd); von Hand im Haupt-Checkout `DB_NAME=tls_ci_main`.
-- **Server:** eingespielt bis #1109. Ausstehend: `update.sh` für alles ab #1128; Klickschritte in `UMBAUPLAN.md`
-  „Nach dem Update vom 7.10. (Abend)“.
-- **Offen beim Betreiber:** AAB von Build 90 in den offenen Test; `update.sh`; die Audit-Unterlagen
-  (`C:\GIT\lion-audit-2026-10-06\…`) für die übrigen Tickets in 48 und 52–55 – nichts erfinden; Sammelkanal +
-  „Webhooks verwalten“ (#966); alte Passkeys am Handy; SHA-256-Fingerabdrücke.
-- **Fristen:** am **2.11.2026** laufen die drei Ausnahmen im Sicherheitscheck der App ab (`node-forge`, `braces`,
-  `sprintf-js`; noch ohne Fix). `postcss-selector-parser` (frontend, nur beim Bauen): Fix nur in 7.x, Tailwind 3
-  braucht 6.x – mit dem nächsten Tailwind heben.
-- **Arbeitsweise bei gestapelten PRs seit dem 6.10.:** nach einem Squash-Merge der Basis den nächsten Zweig nicht
-  rebasen (kollidiert mit dem Squash), sondern `git commit-tree <zweig>^{tree} -p origin/main -F msg` und den Zweig
-  darauf setzen (Rezept in `docs/STOLPERSTEINE.md`). Hat `main` inzwischen weitere Merges, stattdessen
-  `git rebase --onto origin/main <alte-basis> <zweig>`. Windows-Checkout ist CRLF: Tests, die Dateien lesen,
-  normalisieren Zeilenenden.
+| Notiz | Inhalt |
+| --- | --- |
+| „LSW Stand“ | aktueller Stand: was gemergt ist, was in Arbeit ist, was beim Betreiber offen ist (ersetzen, nicht anhängen) |
+| „LSW Offene Schritte für Fabian“ | Klickschritte nach Updates und Merges |
+| „LSW Entwicklung, Tests und Releases“ | Stolpersteine nach Gebiet |
+| „LSW Entscheidungen“ | dauerhafte Grundsätze für Produkt, Datenschutz und Zusammenarbeit |
+| „LSW Design und Aussehen“, „Lionsquad Marke und Tonfall“, „Lionsquad Verein und Community“ | Look, Ton, Verein |
+| Ordner „Archiv aus dem Repo“ | frühere Historie, Umbauplan, Restplan und Roadmaps (Stand 9.10.2026) |
+
+Ohne Zugriff auf den Vault: GitHub-Meilensteine, Issues und PR-Texte enthalten den Stand ebenfalls.
 
 ---
 

@@ -10,8 +10,8 @@ from urllib.parse import unquote
 ROOT = Path(__file__).resolve().parents[1]
 IGNORED = {".git", "node_modules", ".pytest_cache", "dist", "test-results", "playwright-report", ".venv", "__pycache__"}
 # CLAUDE.md is read by every Claude session and every agent before the first line of code (#929): what
-# stands there is paid for at every start. Details belong in docs/HISTORIE.md, pitfalls in
-# docs/STOLPERSTEINE.md. Bytes are counted with LF line endings, so Windows and the CI agree.
+# stands there is paid for at every start. State, history and pitfalls live in the operator's private
+# project notes, not in the repository. Bytes are counted with LF line endings, so Windows and the CI agree.
 SIZE_BUDGETS = {"CLAUDE.md": 60_000}
 
 
@@ -24,8 +24,8 @@ def over_budget(root=ROOT, budgets=None):
             continue
         size = len(path.read_bytes().replace(b"\r\n", b"\n"))
         if size > limit:
-            found.append(f"{name}: {size} bytes, the budget is {limit} - move details to docs/HISTORIE.md "
-                         "and replace the last state instead of appending to it")
+            found.append(f"{name}: {size} bytes, the budget is {limit} - move details to the private project notes "
+                         "and keep only rules and the short map here")
     return found
 
 
