@@ -30,6 +30,6 @@ def test_crlf_counts_like_lf_and_a_missing_file_is_no_finding(tmp_path):
 
 
 def test_claude_md_of_this_repository_is_inside_its_budget():
-    hint = "Einzelheiten in die privaten Projektnotizen verschieben, hier nur Regeln und Kurzkarte"
+    hint = "Einzelheiten in die Projektnotizen des Betreibers oder die Themen-Doku verschieben, hier nur das Nötigste für Mitwirkende"
     assert checker.SIZE_BUDGETS == {"CLAUDE.md": 60_000}
     assert checker.over_budget() == [], hint

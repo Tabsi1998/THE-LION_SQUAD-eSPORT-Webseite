@@ -84,3 +84,6 @@ chainlit.md
 
 # Playwright-Reste, falls ein Lauf aus dem falschen Ordner gestartet wurde
 backend/test-results/
+
+# Persönliche Anweisungen für Claude (Verweis auf das Projektwissen des Betreibers) – nie ins Repository
+CLAUDE.local.md

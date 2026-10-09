@@ -51,7 +51,7 @@ Das ersetzt keine manuelle Prüfung externer Links oder der fachlichen Abnahme.
 
 | Datei | Zweck |
 | --- | --- |
-| [CLAUDE](CLAUDE.md) | Arbeitsregeln, Kurzkarte, Prüfen, Release, Deployment – wird bei jedem Sitzungsstart geladen und bleibt deshalb kurz |
+| [CLAUDE](CLAUDE.md) | Kurzanleitung für Mitwirkende: Aufbau, Code-Regeln, Prüfen, Pull Requests – wird bei jedem Sitzungsstart geladen und bleibt deshalb kurz |
 
 Stand, Verlauf, Stolpersteine und Pläne stehen seit 9.10.2026 nicht mehr im Repository, sondern in den
 privaten Projektnotizen des Betreibers; frühere Fassungen bleiben im Git-Verlauf.
