@@ -88,17 +88,38 @@ async def _records(db, user: dict, now: str) -> None:
     await db.access_links.update_many({"$or": bound}, {"$set": {"is_active": False, "email": None, "note": None, "updated_at": now}})
 
 
-async def _still_used(db, filename: str) -> bool:
-    """Ob ein Bild noch irgendwo steht - als Teamlogo etwa gehört es längst dem Team."""
-    ending = re.escape(filename) + "$"
-    for collection, fields in media_audit.TARGETS:
-        if await getattr(db, collection).find_one({"$or": [{field: {"$regex": ending}} for field in fields]}, {"_id": 1}):
-            return True
-    anywhere = re.escape(filename)
-    for collection, fields in media_audit.TEXT_TARGETS:
-        if await getattr(db, collection).find_one({"$or": [{field: {"$regex": anywhere}} for field in fields]}, {"_id": 1}):
+# Persönliche Profile (#1039): Steht eine eigene Datei im Profil einer anderen Person, hält das sie nicht fest - sie geht
+# mit dem Konto, und das andere Profil verliert nur den Eintrag. Einträge des Vereins im Verzeichnis zählen nicht dazu.
+PERSONAL_PLACES = (
+    ("users", {}, ("avatar_url", "banner_url")),
+    ("club_member_profiles", {"source": "member"}, ("photo_url", "cover_url")),
+)
+
+
+async def _still_used(db, filename: str, *, personal: bool = True) -> bool:
+    """Ob ein Bild noch irgendwo steht - als Teamlogo etwa gehört es längst dem Team. ``personal=False`` übergeht die
+    persönlichen Profile anderer Personen."""
+    ending, anywhere = re.escape(filename) + "$", re.escape(filename)
+    places = [(collection, fields, ending) for collection, fields in media_audit.TARGETS + media_audit.USAGE_TARGETS]
+    places += [(collection, fields, anywhere) for collection, fields in media_audit.TEXT_TARGETS + media_audit.USAGE_TEXT_TARGETS]
+    skipped = {} if personal else {collection: base for collection, base, _fields in PERSONAL_PLACES}
+    for collection, fields, pattern in places:
+        query = {"$or": [{field: {"$regex": pattern}} for field in fields]}
+        if collection in skipped:
+            if not skipped[collection]:
+                continue
+            query = {**{key: {"$ne": value} for key, value in skipped[collection].items()}, **query}
+        if await getattr(db, collection).find_one(query, {"_id": 1}):
             return True
     return False
+
+
+async def _release_personal(db, filename: str) -> None:
+    """Die Datei geht: persönliche Profile anderer Personen, die sie eingetragen haben, verlieren nur den Eintrag."""
+    ending = {"$regex": re.escape(filename) + "$"}
+    for collection, base, fields in PERSONAL_PLACES:
+        for field in fields:
+            await getattr(db, collection).update_many({**base, field: ending}, {"$set": {field: None}})
 
 
 def _filename(url: str | None) -> str | None:
@@ -108,15 +129,27 @@ def _filename(url: str | None) -> str | None:
 
 async def _own_images(db, user_id: str, urls: list[str | None]) -> int:
     """Avatar, Banner und alles, was das Konto für sich hochgeladen hat: Datei, kleinere Fassungen, eine Kopie in der
-    Quarantäne der Bildprüfung und die Verwaltungszeilen. Was noch verwendet wird, bleibt."""
-    names = {name for name in (_filename(url) for url in urls) if name}
+    Quarantäne der Bildprüfung und die Verwaltungszeilen. Was noch verwendet wird, bleibt.
+
+    Eigen ist, was das Konto hochgeladen hat (#1039). Eine Datei im eigenen Profil, die einem anderen Konto oder dem
+    Verein gehört, bleibt; eine ältere ohne Verwaltungszeile geht, wenn sie sonst nirgends steht."""
+    owned: set[str] = set()
     async for row in db.media_uploads.find({"owner_id": user_id, "media_scope": "user"}, {"_id": 0, "filename": 1}):
         if _filename(f"/api/static/uploads/{row.get('filename') or ''}"):
-            names.add(row["filename"])
+            owned.add(row["filename"])
+    untracked: set[str] = set()
+    for name in {name for name in (_filename(url) for url in urls) if name} - owned:
+        owners = {row.get("owner_id") async for row in db.media_uploads.find({"filename": name}, {"_id": 0, "owner_id": 1})}
+        if not owners:
+            untracked.add(name)
+        elif owners == {user_id}:
+            owned.add(name)
     removed = 0
-    for name in sorted(names):
-        if await _still_used(db, name):
+    for name in sorted(owned | untracked):
+        if await _still_used(db, name, personal=name in untracked):
             continue
+        if name in owned:
+            await _release_personal(db, name)
         for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
             path = base / name
             try:
