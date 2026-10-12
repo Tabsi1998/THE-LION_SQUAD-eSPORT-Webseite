@@ -35,9 +35,9 @@ Schwarz, Gold, Cyan). Sie gehören zum Auftritt des Vereins und stehen nicht unt
 (1024 × 1024 PNG mit Transparenz) liegen beim Betreiber, im Repository nur die verkleinerten WebP-Fassungen:
 
 - `frontend/public/assets/loewen-rang/` und `mobile/assets/loewen-rang/`: `rang-NN-160|320|640.webp` und
-  `geometry.json` (Mitte `cx`/`cy` und Radius `r` des Lochs als Anteil der Kantenlänge, rund 400 Punkte der
-  Außenkante für Effekte, Prüfsumme `v`).
-- `frontend/src/lib/loewenRangRing.json`: nur Mitte, Radius und Prüfsumme für den Rahmen im Web.
+  `geometry.json` (Mitte `cx`/`cy` und Radius `r` des Lochs als Anteil der Kantenlänge, `box`: wie weit die
+  Grafik reicht, rund 400 Punkte der Außenkante für Effekte, Prüfsumme `v`).
+- `frontend/src/lib/loewenRangRing.json`: Mitte, Radius, `box` und Prüfsumme für den Rahmen im Web.
 
 Neu erzeugen (Pillow mit WebP):
 
@@ -49,3 +49,7 @@ Die Grafiken sind nicht genau mittig gezeichnet (bis 5 % Versatz, der Löwenkopf
 deshalb so skaliert und verschoben, dass der gemessene Ring auf dem runden Foto liegt: Kantenlänge `F = P / r`,
 Versatz `((0,5 − cx) · F, (0,5 − cy) · F)` bei Foto-Radius `P`. Die Prüfsumme hängt als `?v=` an der Bildadresse,
 damit nach einem Austausch kein alter Rahmen aus dem 30-Tage-Cache kommt.
+
+Den Außenabstand rechnet `framePadding` aus `box` und Ring, je Seite: Profil und Karte je Rang genau (niedrige Ränge
+brauchen weniger Platz), Listen einheitlich mit dem Größten über alle Ränge, damit Zeilen gleich hoch bleiben. So
+überdeckt kein Rahmen etwas daneben. In Listen trägt der Rahmen „Level n, Rang Name“ als zugänglichen Namen.

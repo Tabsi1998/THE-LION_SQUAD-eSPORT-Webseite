@@ -10,11 +10,12 @@ Je Rahmen entstehen:
   ``mobile/assets/loewen-rang/``;
 - die Ring-Geometrie: Die Grafiken sind nicht genau mittig gezeichnet (bis 5 % Versatz, der Löwenkopf ragt oben
   ins Loch). Ein Kreis-Fit am Alphakanal misst Mitte (``cx``, ``cy``) und Radius ``r`` des Lochs als Anteil der
-  Kantenlänge. Dazu kommen rund 400 Punkte der Außenkante (``edge``) für die Effekte und ``v``, eine kurze
-  Prüfsumme der Bilder - das Web hängt sie an die Adresse, damit nginx (30 Tage Cache) eine neue Fassung lädt.
+  Kantenlänge, dazu ``box``: wie weit die Grafik reicht (links, oben, rechts, unten). Außerdem rund 400 Punkte der
+  Außenkante (``edge``) für die Effekte und ``v``, eine kurze Prüfsumme der Bilder - das Web hängt sie an die
+  Adresse, damit nginx (30 Tage Cache) eine neue Fassung lädt.
 
-``geometry.json`` (mit Außenkante) liegt neben den Bildern, ``frontend/src/lib/loewenRangRing.json`` (nur Mitte,
-Radius und Prüfsumme) liest der Profilrahmen ohne Netzabruf. Braucht Pillow mit WebP.
+``geometry.json`` (mit Außenkante) liegt neben den Bildern, ``frontend/src/lib/loewenRangRing.json`` (Mitte,
+Radius, Ausdehnung und Prüfsumme) liest der Profilrahmen ohne Netzabruf. Braucht Pillow mit WebP.
 """
 from __future__ import annotations
 
@@ -59,6 +60,14 @@ def circle_fit(points: list[tuple[int, int]]) -> tuple[float, float, float]:
     return cx, cy, sum(math.hypot(x - cx, y - cy) for x, y in points) / n
 
 
+def art_box(image: Image.Image) -> list[float]:
+    """Wie weit die Grafik reicht (Alpha > 24): links, oben, rechts, unten als Anteil der Kantenlänge, nach außen
+    gerundet. Daraus rechnet das Web den Platz, den der Rahmen um das Foto braucht."""
+    w, h = image.size
+    left, top, right, bottom = image.getchannel("A").point(lambda a: 255 if a > 24 else 0).getbbox()
+    return [math.floor(left / w * 1000) / 1000, math.floor(top / h * 1000) / 1000, math.ceil(right / w * 1000) / 1000, math.ceil(bottom / h * 1000) / 1000]
+
+
 def measure(image: Image.Image) -> dict:
     """Loch per Flutfüllung von der Mitte (Alpha < 40), dann Kreis-Fit an dessen Rand; Ausreißer nach innen (der
     Löwenkopf) fliegen in sechs Runden heraus. Außenkante: deckende Pixel neben Transparenz außerhalb des Lochs."""
@@ -95,6 +104,7 @@ def measure(image: Image.Image) -> dict:
         "cx": round(cx / w, 4),
         "cy": round(cy / h, 4),
         "r": round(r / w, 4),
+        "box": art_box(image),
         "edge": [[round(x / w, 3), round(y / h, 3)] for x, y in edge[:EDGE_POINTS]],
     }
 
@@ -133,7 +143,7 @@ def main() -> None:
     text = json.dumps(geometry, separators=(",", ":")) + "\n"
     for folder in (args.web_out, args.app_out):
         (folder / "geometry.json").write_text(text, encoding="utf-8", newline="\n")
-    ring = {key: {k: g[k] for k in ("cx", "cy", "r", "v")} for key, g in geometry.items()}
+    ring = {key: {k: g[k] for k in ("cx", "cy", "r", "box", "v")} for key, g in geometry.items()}
     args.ring_json.write_text(json.dumps(ring, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 

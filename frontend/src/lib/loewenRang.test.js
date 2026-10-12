@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import RING from "./loewenRangRing.json";
-import { FRAME_WIDTHS, RANK_NAMES, frameLayout, frameSources, rankForLevel, rankInfo, ringOf } from "./loewenRang";
+import { FRAME_WIDTHS, LIST_PADDING, RANK_NAMES, frameLayout, framePadding, frameSources, rankForLevel, rankInfo, ringOf } from "./loewenRang";
 
 // Löwen-Rang (#1452, #1454): Rang-Zuordnung wie im Backend, Ausrichtung des Rahmens am gemessenen Ring.
 
@@ -54,6 +54,12 @@ test("12 Rahmen mit Geometrie und drei Bildgrößen", () => {
     expect(Math.abs(ring.cx - 0.5)).toBeLessThan(0.06);
     expect(Math.abs(ring.cy - 0.5)).toBeLessThan(0.06);
     expect(ring.v).toMatch(/^[0-9a-f]{8}$/);
+    const [left, top, right, bottom] = ring.box;
+    expect(left).toBeGreaterThanOrEqual(0);
+    expect(top).toBeGreaterThanOrEqual(0);
+    expect(right).toBeLessThanOrEqual(1);
+    expect(bottom).toBeLessThanOrEqual(1);
+    expect(left < ring.cx - ring.r && right > ring.cx + ring.r && top < ring.cy - ring.r && bottom > ring.cy + ring.r).toBe(true);
     for (const width of FRAME_WIDTHS) {
       expect(existsSync(path.join(process.cwd(), `public/assets/loewen-rang/rang-${key}-${width}.webp`))).toBe(true);
     }
@@ -67,4 +73,29 @@ test("Bildquellen: srcset über drei Breiten, Maske passend zur Größe", () => 
   expect(src.mask).toContain("rang-12-320.webp");
   expect(frameSources("12", 340).mask).toContain("rang-12-640.webp");
   expect(frameSources("01", 60).mask).toContain("rang-01-160.webp");
+});
+
+test("Platz: für alle 12 Ränge liegt die Grafik in der reservierten Box", () => {
+  for (const key of Object.keys(RING)) {
+    const ring = ringOf(key);
+    const D = 100;
+    const { F, ox, oy } = frameLayout(D / 2, ring);
+    const [left, top, right, bottom] = ring.box;
+    // Grafik in Koordinaten um die Fotomitte; die Box reicht vom Foto aus um den Außenabstand je Seite.
+    const art = { left: ox - F / 2 + left * F, top: oy - F / 2 + top * F, right: ox - F / 2 + right * F, bottom: oy - F / 2 + bottom * F };
+    for (const [name, pad] of [["eigener", framePadding(ring)], ["Listen", LIST_PADDING]]) {
+      const [pt, pr, pb, pl] = pad.map((value) => value * D);
+      expect(art.top, `${key} ${name} oben`).toBeGreaterThanOrEqual(-D / 2 - pt - 1e-9);
+      expect(art.right, `${key} ${name} rechts`).toBeLessThanOrEqual(D / 2 + pr + 1e-9);
+      expect(art.bottom, `${key} ${name} unten`).toBeLessThanOrEqual(D / 2 + pb + 1e-9);
+      expect(art.left, `${key} ${name} links`).toBeGreaterThanOrEqual(-D / 2 - pl - 1e-9);
+    }
+    // eng: der eigene Abstand ist nicht größer als nötig (Rundung auf drei Stellen)
+    const own = framePadding(ring).map((value) => value * D);
+    expect(own[0] - (-D / 2 - art.top) < 0.11 || own[0] === 0).toBe(true);
+    expect(own[2] - (art.bottom - D / 2) < 0.11 || own[2] === 0).toBe(true);
+  }
+  // Niedrige Ränge brauchen weniger Platz als hohe - das Profil wächst nicht pauschal.
+  expect(framePadding(ringOf("01"))[1]).toBeLessThan(framePadding(ringOf("12"))[1]);
+  expect(LIST_PADDING.every((value) => value > 0 && value < 0.7)).toBe(true);
 });

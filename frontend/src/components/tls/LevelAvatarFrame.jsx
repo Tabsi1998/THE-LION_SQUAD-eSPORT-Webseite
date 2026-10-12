@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import { FRAME_SIZES, frameLayout, frameSources, rankInfo, ringOf } from "@/lib/loewenRang";
+import { FRAME_SIZES, LIST_PADDING, frameLayout, framePadding, frameSources, rankInfo, ringOf } from "@/lib/loewenRang";
 
 const TLS_BLUE = "#29B6E8";
 // Profil auf dem Handy (unter 640 px): kleineres Foto, sonst ragt der Rahmen über den Bildschirm.
@@ -117,16 +117,27 @@ export function LevelAvatarFrame({ level, prestige = 0, crown = null, size, clas
   const stars = Math.max(0, Math.min(MAX_PRESTIGE, Math.floor(Number(prestige) || 0)));
   const shown = Math.max(1, Math.floor(Number(level) || 1));
   const crownStyle = crown ? CROWN_STYLES[crown] : null;
+  const plate = showBadge && !still;
+  // Außenabstand aus der gemessenen Ausdehnung: Profil und Karte je Rang genau, Listen einheitlich für gleich hohe Zeilen.
+  const [padTop, padRight, padBottom, padLeft] = still ? LIST_PADDING : framePadding(cfg.ring);
+  // In Listen gibt es kein Schild - dort trägt der Rahmen selbst Level und Rang als zugänglichen Namen.
+  const label = `${team ? "Team-Level" : "Level"} ${shown}, Rang ${cfg.name}${stars > 0 ? `, Prestige ${stars}` : ""}`;
   useEffect(() => { setLoaded(false); }, [cfg.key]);
   return (
     <div
-      className={["tls-lvf", `tls-lvf--${variant}`, team ? "tls-lvf--team" : "", className].filter(Boolean).join(" ")}
+      className={["tls-lvf", `tls-lvf--${variant}`, plate ? "tls-lvf--plate" : "", plate && stars > 0 ? "tls-lvf--stars" : "", team ? "tls-lvf--team" : "", className].filter(Boolean).join(" ")}
+      role={still ? "img" : undefined}
+      aria-label={still ? label : undefined}
       style={{
         "--lvf-scale": cfg.scale.toFixed(4),
         "--lvf-ox": cfg.ox.toFixed(4),
         "--lvf-oy": cfg.oy.toFixed(4),
         "--lvf-rc": cfg.color,
         "--lvf-shine": (0.35 + 0.55 * cfg.progress).toFixed(2),
+        "--lvf-pt": padTop,
+        "--lvf-pr": padRight,
+        "--lvf-pb": padBottom,
+        "--lvf-pl": padLeft,
       }}
       data-level={shown}
       data-rank={cfg.rank}
@@ -163,7 +174,7 @@ export function LevelAvatarFrame({ level, prestige = 0, crown = null, size, clas
           <CrownIcon variant={crown} />
         </span>
       )}
-      {showBadge && !still && (
+      {plate && (
         <span className="tls-lvf-plate" data-testid="level-frame-badge">
           {stars > 0 && <span className="tls-lvf-stars" role="img" aria-label={`Prestige ${stars}`}>{"★".repeat(stars)}</span>}
           <span className="tls-lvf-tag">{team ? `TEAM LVL ${shown}` : cfg.max ? "LVL 60 · MAX" : `LVL ${shown}`}</span>

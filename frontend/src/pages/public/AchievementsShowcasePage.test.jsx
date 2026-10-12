@@ -265,11 +265,11 @@ describe("AchievementsShowcasePage (#619, #1229)", () => {
     await waitFor(() => expect(callsTo("/achievements/leaderboard").at(-1)).toEqual({ limit: 10, by: "points", category: "match", period: "season" }));
     expect(screen.getByTestId("leaderboard-period-season")).toHaveAttribute("aria-pressed", "true");
 
-    mockApi({ board: [{ user_id: "u2", username: "ben", display_name: "Ben", level: 12, xp: 4000, prestige: 0, title: "Kämpfer", rank: 1 }] });
+    mockApi({ board: [{ user_id: "u2", username: "ben", display_name: "Ben", level: 12, xp: 4000, prestige: 0, title: "Rudel", rank: 1 }] });
     fireEvent.click(screen.getByTestId("leaderboard-by-level"));
     await waitFor(() => expect(callsTo("/achievements/leaderboard").at(-1)).toEqual({ limit: 10, by: "level" }));
     expect(await screen.findByText("Level 12")).toBeInTheDocument();
-    expect(screen.getByTestId("podium-1")).toHaveTextContent("Kämpfer");
+    expect(screen.getByTestId("podium-1")).toHaveTextContent("Rudel");
     expect(screen.queryByTestId("leaderboard-category")).toBeNull();
   });
 

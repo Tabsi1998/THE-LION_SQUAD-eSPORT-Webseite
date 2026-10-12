@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen } from "@testing-library/react";
 import RING from "@/lib/loewenRangRing.json";
 import { LevelAvatarFrame, levelFrameConfig } from "./LevelAvatarFrame";
@@ -88,4 +90,31 @@ test("Profil: Glanz mit der Maske aus dem Rahmenbild, stärker je Level im Rang"
 
 test("Team-Rahmen sagt TEAM im Schild", () => {
   expect(frame({ level: 3, team: true }).querySelector("[data-testid='level-frame-badge']")).toHaveTextContent("TEAM LVL 3");
+});
+
+test("Listen: Level und Rang als zugänglicher Name, sonst über das Schild", () => {
+  const list = frame({ level: 9, compact: true });
+  expect(list.getAttribute("role")).toBe("img");
+  expect(list.getAttribute("aria-label")).toBe("Level 9, Rang Fährte");
+  expect(frame({ level: 2, compact: true, team: true }, "team").getAttribute("aria-label")).toBe("Team-Level 2, Rang Jungtier");
+  expect(frame({ level: 60, prestige: 2 }, "profil").getAttribute("role")).toBeNull();
+});
+
+test("Außenabstand aus der Geometrie: Profil je Rang, Listen einheitlich", () => {
+  const low = frame({ level: 1 }, "rang1");
+  const high = frame({ level: 42 }, "rang9");
+  expect(Number(low.style.getPropertyValue("--lvf-pr"))).toBeLessThan(Number(high.style.getPropertyValue("--lvf-pr")));
+  const a = frame({ level: 1, compact: true }, "liste1");
+  const b = frame({ level: 42, compact: true }, "liste9");
+  for (const side of ["pt", "pr", "pb", "pl"]) {
+    expect(a.style.getPropertyValue(`--lvf-${side}`)).toBe(b.style.getPropertyValue(`--lvf-${side}`));
+  }
+  expect(high.className).toContain("tls-lvf--plate");
+  expect(frame({ level: 60, prestige: 1 }, "sterne").className).toContain("tls-lvf--stars");
+});
+
+test("Listen: die Krone steht still (CSS)", () => {
+  const css = readFileSync(path.join(process.cwd(), "src/index.css"), "utf8").replace(/\r\n/g, "\n");
+  const rule = css.match(/\.tls-lvf--list \.tls-lvf-crown,\n\.tls-lvf--list \.tls-lvf-crown::before,\n\.tls-lvf--list \.tls-lvf-crown::after,\n\.tls-lvf--list \.tls-lvf-crown-rays \{ animation: none; \}/);
+  expect(rule).not.toBeNull();
 });

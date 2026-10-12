@@ -84,15 +84,15 @@ describe("Ceremony", () => {
     expect(screen.getByTestId("ceremony-first-text")).toHaveTextContent("Das war dein erster Erfolg");
     expect(screen.getByTestId("ceremony-showcase-link")).toHaveAttribute("href", "/achievements");
     unmount();
-    const level = renderPlan({ tiers: [], levelUp: { level: 10, previous: 9, title: "Kämpfer", titleChanged: true, prestige: 1, prestigeGained: false } }, { reduced: true });
+    const level = renderPlan({ tiers: [], levelUp: { level: 10, previous: 9, title: "Rudel", titleChanged: true, prestige: 1, prestigeGained: false } }, { reduced: true });
     expect(screen.getByTestId("achievement-unlock-overlay")).toHaveAttribute("data-sequence", "levelup");
     expect(screen.getByTestId("ceremony-level-number")).toHaveTextContent("10");
-    expect(screen.getByTestId("ceremony-title-banner")).toHaveTextContent("Neuer Titel: Kämpfer");
+    expect(screen.getByTestId("ceremony-title-banner")).toHaveTextContent("Neuer Titel: Rudel");
     expect(screen.queryByTestId("ceremony-prestige-stars")).toBeNull();
     expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Level 10 erreicht");
     level.unmount();
     // Prestige (#617): von 60 zurück auf 1, ein Stern mehr - die Überschrift nennt das Prestige, nicht „Level 1 erreicht“.
-    renderPlan({ tiers: [], levelUp: { level: 1, previous: 60, title: "Rookie", titleChanged: true, prestige: 1, prestigeGained: true } }, { reduced: true });
+    renderPlan({ tiers: [], levelUp: { level: 1, previous: 60, title: "Jungtier", titleChanged: true, prestige: 1, prestigeGained: true } }, { reduced: true });
     expect(screen.getByTestId("ceremony-level-number")).toHaveTextContent("1");
     expect(screen.getByTestId("ceremony-prestige-stars")).toBeInTheDocument();
     expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Prestige");
@@ -100,10 +100,10 @@ describe("Ceremony", () => {
   });
 
   it("Level-Zeremonien glitzern - nur mit „Bewegung reduzieren“ nicht", () => {
-    const { unmount } = renderPlan({ tiers: [], levelUp: { level: 12, previous: 11, title: "Kämpfer" } });
+    const { unmount } = renderPlan({ tiers: [], levelUp: { level: 12, previous: 11, title: "Rudel" } });
     expect(screen.getByTestId("ceremony-particles")).toBeInTheDocument();
     unmount();
-    renderPlan({ tiers: [], levelUp: { level: 12, previous: 11, title: "Kämpfer" } }, { reduced: true });
+    renderPlan({ tiers: [], levelUp: { level: 12, previous: 11, title: "Rudel" } }, { reduced: true });
     expect(screen.queryByTestId("ceremony-particles")).toBeNull();
   });
 
@@ -122,7 +122,7 @@ describe("Ceremony", () => {
 
   it("hängt ein Level-up nach dem Abzeichen an", () => {
     vi.useFakeTimers();
-    const { onClose } = renderPlan({ tiers: [tier("a", "bronze", 3, "match")], levelUp: { level: 4, previous: 3, title: "Rookie" } }, { reduced: true });
+    const { onClose } = renderPlan({ tiers: [tier("a", "bronze", 3, "match")], levelUp: { level: 4, previous: 3, title: "Jungtier" } }, { reduced: true });
     expect(screen.getByTestId("ceremony-stage")).toHaveAttribute("data-phase", "badge");
     act(() => { vi.advanceTimersByTime(4600); });
     expect(screen.getByTestId("ceremony-stage")).toHaveAttribute("data-phase", "level");

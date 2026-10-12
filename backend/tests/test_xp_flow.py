@@ -86,7 +86,7 @@ async def test_tages_login_mit_serie(flow):
 
 @pytest.mark.asyncio
 async def test_level_stand_prestige_und_ruecknahme(flow):
-    user = await flow.add_user(name="Legende")
+    user = await flow.add_user(name="Gipfel")
     flow.act_as(user)
     res = await flow.get("/api/users/me/level")
     assert res.status_code == 200
@@ -154,7 +154,7 @@ async def test_rangliste_nach_level_und_admin_korrektur(flow):
 
 @pytest.mark.asyncio
 async def test_erstberechnung_aus_der_historie_nur_einmal(flow):
-    user = await flow.add_user(name="Veteran")
+    user = await flow.add_user(name="Dauergast")
     await flow.db.users.update_one({"id": user["id"]}, {"$set": {"privacy_public_profile": True}})
     await badges.award_achievement(user["id"], "matches_played_2")  # Eisen, 10 Punkte → 100 XP als Ereignis
     await flow.db.user_xp.delete_many({"user_id": user["id"]})

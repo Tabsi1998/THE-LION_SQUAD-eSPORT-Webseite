@@ -350,20 +350,11 @@ img, video, canvas, svg {
 .tls-account-frame {
   box-shadow: 0 0 0 1px rgba(41,182,232,0.18), 0 0 18px rgba(41,182,232,0.08);
 }
-.tls-account-frame-challenger {
-  box-shadow: 0 0 0 1px rgba(0,255,136,0.20), 0 0 20px rgba(0,255,136,0.10);
-}
 .tls-account-frame-pro {
   box-shadow: 0 0 0 1px rgba(41,182,232,0.28), 0 0 26px rgba(41,182,232,0.16);
 }
-.tls-account-frame-veteran {
-  box-shadow: 0 0 0 1px rgba(168,85,247,0.28), 0 0 30px rgba(168,85,247,0.15);
-}
 .tls-account-frame-elite {
   box-shadow: 0 0 0 1px rgba(255,215,0,0.28), 0 0 34px rgba(255,215,0,0.16), inset 0 0 18px rgba(255,215,0,0.05);
-}
-.tls-account-frame-champion {
-  animation: tls-level-champion 4.6s ease-in-out infinite;
 }
 .tls-account-frame-legendary {
   animation: tls-level-prestige 3.8s ease-in-out infinite;
@@ -371,20 +362,11 @@ img, video, canvas, svg {
 .tls-account-avatar-frame {
   box-shadow: 0 0 0 1px rgba(41,182,232,0.14);
 }
-.tls-account-avatar-frame-challenger {
-  box-shadow: 0 0 0 1px rgba(0,255,136,0.20), 0 0 14px rgba(0,255,136,0.10);
-}
 .tls-account-avatar-frame-pro {
   box-shadow: 0 0 0 1px rgba(41,182,232,0.22), 0 0 18px rgba(41,182,232,0.13);
 }
-.tls-account-avatar-frame-veteran {
-  box-shadow: 0 0 0 1px rgba(168,85,247,0.26), 0 0 18px rgba(168,85,247,0.14);
-}
 .tls-account-avatar-frame-elite {
   box-shadow: 0 0 0 1px rgba(255,215,0,0.26), 0 0 20px rgba(255,215,0,0.14);
-}
-.tls-account-avatar-frame-champion {
-  animation: tls-level-champion 4.6s ease-in-out infinite;
 }
 .tls-account-avatar-frame-legendary {
   animation: tls-level-prestige 3.8s ease-in-out infinite;
@@ -429,28 +411,13 @@ img, video, canvas, svg {
   animation: tls-profile-spark 4.8s ease-in-out infinite;
 }
 
-.tls-profile-aura--challenger {
-  --tls-profile-aura: rgba(0,255,136,0.22);
-  --tls-profile-aura-strong: rgba(0,255,136,0.48);
-}
-
 .tls-profile-aura--pro {
   --tls-profile-aura: rgba(41,182,232,0.30);
   --tls-profile-aura-strong: rgba(41,182,232,0.62);
 }
 
-.tls-profile-aura--veteran {
-  --tls-profile-aura: rgba(168,85,247,0.32);
-  --tls-profile-aura-strong: rgba(168,85,247,0.68);
-}
-
 .tls-profile-aura--elite {
   --tls-profile-aura: rgba(255,215,0,0.36);
-  --tls-profile-aura-strong: rgba(255,215,0,0.78);
-}
-
-.tls-profile-aura--champion {
-  --tls-profile-aura: rgba(255,59,48,0.40);
   --tls-profile-aura-strong: rgba(255,215,0,0.78);
 }
 
@@ -460,24 +427,18 @@ img, video, canvas, svg {
 }
 
 .tls-profile-aura--pro::before,
-.tls-profile-aura--veteran::before,
 .tls-profile-aura--elite::before,
-.tls-profile-aura--champion::before,
 .tls-profile-aura--legendary::before {
   opacity: 0.58;
 }
 
-.tls-profile-aura--challenger::after,
 .tls-profile-aura--pro::after,
-.tls-profile-aura--veteran::after,
 .tls-profile-aura--elite::after,
-.tls-profile-aura--champion::after,
 .tls-profile-aura--legendary::after {
   opacity: 0.34;
 }
 
 .tls-profile-aura--elite::before,
-.tls-profile-aura--champion::before,
 .tls-profile-aura--legendary::before {
   inset: -0.65rem;
   opacity: 0.82;
@@ -485,7 +446,6 @@ img, video, canvas, svg {
   animation-duration: 5.8s;
 }
 
-.tls-profile-aura--champion::after,
 .tls-profile-aura--legendary::after {
   opacity: 0.62;
   animation-duration: 3.4s;
@@ -538,11 +498,6 @@ img, video, canvas, svg {
   78% { transform: translateX(45%); opacity: 0.9; }
 }
 
-@keyframes tls-level-champion {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(255,59,48,0.26), 0 0 28px rgba(255,59,48,0.12), 0 0 0 rgba(255,215,0,0); }
-  50% { box-shadow: 0 0 0 1px rgba(255,59,48,0.52), 0 0 38px rgba(255,59,48,0.20), 0 0 16px rgba(255,215,0,0.12); }
-}
-
 @keyframes tls-level-prestige {
   0%, 100% { box-shadow: 0 0 0 1px rgba(255,215,0,0.30), 0 0 28px rgba(255,215,0,0.14), 0 0 0 rgba(255,59,48,0); }
   50% { box-shadow: 0 0 0 1px rgba(255,215,0,0.58), 0 0 44px rgba(255,215,0,0.24), 0 0 22px rgba(255,59,48,0.14); }
@@ -558,9 +513,7 @@ img, video, canvas, svg {
 }
 @media (prefers-reduced-motion: reduce) {
   .tls-account-frame-legendary,
-  .tls-account-frame-champion,
   .tls-account-avatar-frame-legendary,
-  .tls-account-avatar-frame-champion,
   .tls-account-progress-prestige,
   .tls-profile-aura::before,
   .tls-profile-aura::after,
@@ -1181,23 +1134,31 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 
 /* ===== Löwen-Rang: Profilrahmen (LevelAvatarFrame.jsx, #1454) =====
    Das runde Foto hat den Durchmesser --lvf-d. Die Rahmen-Grafik ist --lvf-scale mal so groß und um --lvf-ox/--lvf-oy
-   (Anteile von --lvf-d) verschoben, damit ihr gemessener Ring genau auf dem Foto liegt. Der Außenabstand hält Platz
-   für die Grafik frei, damit sie nichts daneben überdeckt. Listen: nur das Bild, ohne Bewegung. */
+   (Anteile von --lvf-d) verschoben, damit ihr gemessener Ring genau auf dem Foto liegt. Der Außenabstand
+   --lvf-pt/-pr/-pb/-pl kommt aus der gemessenen Ausdehnung der Grafik (lib/loewenRang.js): Profil und Karte je Rang
+   genau, Listen einheitlich. So überdeckt der Rahmen nichts daneben. Listen: nur das Bild, ohne Bewegung. */
 .tls-lvf {
   --lvf-d: 172px;
   position: relative;
   flex: none;
   width: var(--lvf-d);
   height: var(--lvf-d);
-  margin: calc(var(--lvf-d) * 0.46);
+  --lvf-plate: 0px;
+  margin: calc(var(--lvf-d) * var(--lvf-pt, 0.5)) calc(var(--lvf-d) * var(--lvf-pr, 0.5))
+    calc(var(--lvf-d) * var(--lvf-pb, 0.5) + var(--lvf-plate)) calc(var(--lvf-d) * var(--lvf-pl, 0.5));
   isolation: isolate;
 }
-.tls-lvf--profile { --lvf-d: 128px; margin-bottom: calc(var(--lvf-d) * 0.46 + 34px); }
+.tls-lvf--profile { --lvf-d: 128px; }
 @media (min-width: 640px) {
   .tls-lvf--profile { --lvf-d: 172px; }
 }
-.tls-lvf--card { --lvf-d: 96px; margin-bottom: calc(var(--lvf-d) * 0.46 + 30px); }
-.tls-lvf--list { --lvf-d: 44px; margin: calc(var(--lvf-d) * 0.4); }
+.tls-lvf--card { --lvf-d: 96px; }
+.tls-lvf--list { --lvf-d: 44px; }
+/* Das Schild ragt unter der Grafik heraus (10 px überlappen): Platz für Schild und Rauten, mit Prestige für die Sterne. */
+.tls-lvf--plate { --lvf-plate: 26px; }
+.tls-lvf--card.tls-lvf--plate { --lvf-plate: 21px; }
+.tls-lvf--plate.tls-lvf--stars { --lvf-plate: 41px; }
+.tls-lvf--card.tls-lvf--plate.tls-lvf--stars { --lvf-plate: 35px; }
 .tls-lvf-photo {
   position: absolute;
   inset: 0;
@@ -1252,7 +1213,7 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .tls-lvf-plate {
   position: absolute;
   left: 50%;
-  top: calc(var(--lvf-d) * (0.5 + var(--lvf-oy) + 0.45 * var(--lvf-scale)) - 10px);
+  top: calc(100% + var(--lvf-d) * var(--lvf-pb, 0.5) - 10px);
   z-index: 4;
   display: grid;
   justify-items: center;
@@ -1296,8 +1257,8 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 /* Crowns — rank based (gold/silver/bronze) + obsidian, big & loud */
 .tls-lvf-crown {
   position: absolute;
-  /* über der Oberkante der Rahmen-Grafik (Löwen-Rang, #1454) */
-  top: calc(var(--lvf-d) * -0.45 - 40px);
+  /* sitzt auf der Oberkante der Rahmen-Grafik (Löwen-Rang, #1454) */
+  top: calc(var(--lvf-d) * var(--lvf-pt, 0.5) * -1 - 30px);
   left: 50%;
   z-index: 4;
   width: 96px;
@@ -1374,10 +1335,15 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
   50% { filter: drop-shadow(0 0 22px rgba(41, 182, 232, 1)) drop-shadow(0 0 40px rgba(41, 182, 232, 0.65)); }
 }
 .tls-lvf--list .tls-lvf-crown {
+  top: calc(var(--lvf-d) * var(--lvf-pt, 0.5) * -1 - 8px);
   width: 38px;
   margin-left: -19px;
-  animation-duration: 0.7s, 3s;
 }
+/* Listen bleiben ruhig: die Krone steht still, ohne Schweben, Pulsen und Funkeln. */
+.tls-lvf--list .tls-lvf-crown,
+.tls-lvf--list .tls-lvf-crown::before,
+.tls-lvf--list .tls-lvf-crown::after,
+.tls-lvf--list .tls-lvf-crown-rays { animation: none; }
 .tls-lvf--list .tls-lvf-crown::after { display: none; }
 .tls-lvf--list .tls-lvf-crown-rays { display: none; }
 

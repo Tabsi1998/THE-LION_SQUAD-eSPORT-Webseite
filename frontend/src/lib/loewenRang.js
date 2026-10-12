@@ -61,6 +61,21 @@ export function frameLayout(P, ring) {
   return { F, ox: (0.5 - ring.cx) * F, oy: (0.5 - ring.cy) * F };
 }
 
+/**
+ * Platz, den die Grafik rund um ein Foto mit Durchmesser 1 braucht - [oben, rechts, unten, links], aus der gemessenen
+ * Ausdehnung (`box`) und dem Ring. Mal Foto-Durchmesser ergibt das den Außenabstand, damit der Rahmen nichts daneben
+ * überdeckt. Auf drei Stellen nach oben gerundet.
+ */
+export function framePadding(ring) {
+  const scale = 1 / (2 * ring.r);
+  const [left, top, right, bottom] = ring.box;
+  const up = (value) => Math.max(0, Math.ceil(value * 1000) / 1000);
+  return [(ring.cy - top) * scale - 0.5, (right - ring.cx) * scale - 0.5, (bottom - ring.cy) * scale - 0.5, (ring.cx - left) * scale - 0.5].map(up);
+}
+
+// Listen: ein Wert für alle Ränge (je Seite das Größte), damit Zeilen gleich hoch bleiben.
+export const LIST_PADDING = Object.values(RING).map(framePadding).reduce((max, pad) => max.map((value, i) => Math.max(value, pad[i])), [0, 0, 0, 0]);
+
 /** Die Bilder eines Rahmens: srcset über 160/320/640 und die Fassung für die Glanz-Maske. */
 export function frameSources(key, displayPx = 320) {
   const v = ringOf(key).v;
