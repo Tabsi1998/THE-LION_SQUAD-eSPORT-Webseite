@@ -194,8 +194,9 @@ NOTIFICATION_KIND_CATEGORY = {
     "news_board": "club_internal",
     "event_member": "club_internal",
     "event_board": "club_internal",
-    # Fotos vom Event (#1185): „Die Fotos sind da“ an die Teilnehmer - Mitglieder-Alben unter „Vereinsintern“.
-    "gallery_event": "news_events",
+    # Fotos vom Event (#1185): „Die Fotos sind da“ an die Teilnehmer - wie „Wie war …?“ unter Turnier-Updates,
+    # Mitglieder-Alben unter „Vereinsintern“.
+    "gallery_event": "tournament_updates",
     "gallery_member": "club_internal",
     # Fotos einsenden (#1186): freigegeben oder abgelehnt - an die Person, die eingesandt hat.
     "gallery_submission": "club_internal",

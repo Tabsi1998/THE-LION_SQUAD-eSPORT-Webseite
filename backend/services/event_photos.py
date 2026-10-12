@@ -3,15 +3,23 @@
 **Die Fotos sind da (#1185).** Ein veröffentlichtes Album, das an einem Event hängt, meldet sich genau einmal bei allen,
 die beim Event angemeldet waren: Event-Anmeldungen (angemeldet oder eingecheckt) und die Anmeldungen der Turniere des
 Events - bei Teams jedes Mitglied samt Leitung (``match_audience.player_user_ids``). Wer das Album nicht sehen darf,
-bekommt nichts (Mitglieder-Alben nur an Mitglieder). Thema „News & Events“, bei Mitglieder- und internen Alben
-„Vereinsintern“. Ein Job sieht jede Minute nach (``notify_due``) und wartet, bis zehn Minuten lang kein Foto mehr
-dazugekommen ist - sonst stünde in der Meldung die Zahl vom ersten Bild. Liegt das letzte Foto beim ersten Blick schon
-länger als einen Tag zurück (alte Alben beim Einspielen des Updates), wird das Album still als gemeldet markiert.
+bekommt nichts (Mitglieder-Alben nur an Mitglieder). Thema „Turnier-Updates“ wie „Wie war …?“ (#1196, Entscheidung des
+Betreibers - „News & Events“ ist ohne Newsletter-Zustimmung aus), bei Mitglieder- und internen Alben „Vereinsintern“.
+Ein Job sieht jede Minute nach (``notify_due``) und wartet, bis zehn Minuten lang kein Foto mehr dazugekommen ist -
+sonst stünde in der Meldung die Zahl vom ersten Bild. Liegt das letzte Foto beim ersten Blick schon länger als einen Tag
+zurück (alte Alben beim Einspielen des Updates), wird das Album still als gemeldet markiert.
+
+Genau einmal: Ein Lauf beansprucht das Album, bevor er sendet (``participants_notified_at`` wird atomar gesetzt - ein
+zweiter, überlappender Lauf findet es nicht mehr). Je Album und Person steht vor dem Senden eine Quittung in
+``gallery_album_notices`` mit eindeutigem Index; bricht ein Lauf mittendrin ab, nimmt ein späterer Lauf das Album nach
+``CLAIM_STALE_MINUTES`` wieder auf und überspringt alle, die schon eine Quittung haben.
 
 **Fotos einsenden (#1186).** Mitglieder schicken vom ersten Event-Tag bis sieben Tage nach dem letzten bis zu 20 Bilder
 ins Album des Events - nur mit dem Haken „Die Personen auf den Fotos sind einverstanden“. Jedes Bild geht durch
 denselben Weg wie jeder Bild-Upload (``routes.upload_routes._encode_image_bytes``: nur PNG, JPG oder WebP, Größe und
-Pixel begrenzt, neu gespeichert - EXIF mit GPS-Ort und Kamera fällt weg) und durch die Bildprüfung. Es liegt privat in
+Pixel begrenzt, neu gespeichert - EXIF mit GPS-Ort und Kamera fällt weg) und durch die Bildprüfung. Die Höchstzahl hält
+ein Zähler je Person und Album (``gallery_submission_quota``), der vor dem Hochladen atomar hochzählt und bei einem Fehler
+oder einer Ablehnung wieder zurückzählt - parallele Uploads kommen so nicht darüber. Es liegt privat in
 ``SUBMISSION_DIR`` und ist nur für die einsendende Person und die Freigabe sichtbar. Freigeben oder ablehnen dürfen
 Redaktion und Vereinsverwaltung (der Vorstand hat sie von selbst) in Admin → Galerie. Freigegeben wird das Bild ein
 normales Galerie-Foto, auf Wunsch mit „Foto: Name“; abgelehnt wird die Datei sofort gelöscht. Die einsendende Person
@@ -40,8 +48,9 @@ SETTLE_MINUTES = 10
 MAX_AGE_HOURS = 24
 PUBLIC_KIND = "gallery_event"
 MEMBER_KIND = "gallery_member"
-PUBLIC_CATEGORY = "news_events"
+PUBLIC_CATEGORY = "tournament_updates"
 MEMBER_CATEGORY = "club_internal"
+CLAIM_STALE_MINUTES = 30
 EVENT_REGISTRATION_STATUSES = ("registered", "checked_in")
 TOURNAMENT_REGISTRATION_STATUSES = ("approved", "checked_in")
 
@@ -114,8 +123,45 @@ async def _media_counts(db, album_id: str) -> tuple[int, int, str | None]:
     return len(items) - videos, videos, newest
 
 
+async def ensure_indexes(db) -> None:
+    """Eindeutige Schlüssel, auf denen „genau einmal“ und die Höchstzahl ruhen (auch von database.py aufgerufen)."""
+    await db.gallery_album_notices.create_index([("album_id", 1), ("user_id", 1)], unique=True)
+    await db.gallery_submission_quota.create_index([("album_id", 1), ("owner_id", 1)], unique=True)
+
+
+def _is_duplicate(exc: Exception) -> bool:
+    return type(exc).__name__ == "DuplicateKeyError" or getattr(exc, "code", None) == 11000
+
+
 async def _mark_notified(db, album_id: str, count: int) -> None:
-    await db.gallery_albums.update_one({"id": album_id}, {"$set": {"participants_notified_at": now_utc().isoformat(), "participants_notified_count": count}})
+    await db.gallery_albums.update_one({"id": album_id}, {"$set": {
+        "participants_notified_at": now_utc().isoformat(), "participants_notified_count": count, "participants_notify_state": "done"}})
+
+
+async def _claim(db, album_id: str, current: datetime) -> bool:
+    """Das Album für diesen Lauf beanspruchen - atomar, bevor gesendet wird. Ein liegengebliebener Anspruch (Lauf
+    abgebrochen) gilt nach ``CLAIM_STALE_MINUTES`` als frei; die Quittungen verhindern dann doppelte Meldungen."""
+    stale = (current - timedelta(minutes=CLAIM_STALE_MINUTES)).isoformat()
+    claimed = await db.gallery_albums.find_one_and_update(
+        {"id": album_id, "$or": [
+            {"participants_notified_at": {"$exists": False}},
+            {"participants_notify_state": "sending", "participants_notified_at": {"$lt": stale}},
+        ]},
+        {"$set": {"participants_notified_at": current.isoformat(), "participants_notify_state": "sending"}},
+        projection={"_id": 0, "id": 1},
+    )
+    return bool(claimed)
+
+
+async def _receipt(db, album_id: str, user_id: str) -> bool:
+    """Die Quittung je Album und Person - nur wer sie als Erster schreibt, sendet."""
+    try:
+        await db.gallery_album_notices.insert_one({"album_id": album_id, "user_id": user_id, "created_at": now_utc().isoformat()})
+    except Exception as exc:  # noqa: BLE001 - nur der doppelte Schlüssel heißt „schon gemeldet“
+        if _is_duplicate(exc):
+            return False
+        raise
+    return True
 
 
 async def notify_album(db, album: dict, event: dict, photos: int, videos: int) -> int:
@@ -132,6 +178,8 @@ async def notify_album(db, album: dict, event: dict, photos: int, videos: int) -
     sent = 0
     for user in users:
         if not await user_can_see(user, visibility):
+            continue
+        if not await _receipt(db, album["id"], user["id"]):
             continue
         created = await create_user_notification(
             user["id"], f"Die Fotos sind da: {count_label(photos, videos)}",
@@ -154,8 +202,12 @@ async def notify_due(*, now: datetime | None = None, limit: int = 1000) -> dict:
     settle = (current - timedelta(minutes=SETTLE_MINUTES)).isoformat()
     too_old = (current - timedelta(hours=MAX_AGE_HOURS)).isoformat()
     # Leere Alben bleiben ungemeldet in der Liste, bis Fotos kommen - deshalb großzügig statt der ersten 50.
+    stale = (current - timedelta(minutes=CLAIM_STALE_MINUTES)).isoformat()
     albums = await db.gallery_albums.find(
-        {"published": True, "event_id": {"$nin": [None, ""]}, "participants_notified_at": {"$exists": False}}, {"_id": 0},
+        {"published": True, "event_id": {"$nin": [None, ""]}, "$or": [
+            {"participants_notified_at": {"$exists": False}},
+            {"participants_notify_state": "sending", "participants_notified_at": {"$lt": stale}},
+        ]}, {"_id": 0},
     ).to_list(limit)
     done = 0
     sent = 0
@@ -172,6 +224,8 @@ async def notify_due(*, now: datetime | None = None, limit: int = 1000) -> dict:
         if not event or event.get("status") in CLOSED_EVENT_STATUSES:
             await _mark_notified(db, album["id"], 0)
             continue
+        if not await _claim(db, album["id"], current):
+            continue  # ein anderer Lauf ist schon dran
         count = await notify_album(db, album, event, photos, videos)
         await _mark_notified(db, album["id"], count)
         done += 1
@@ -207,8 +261,29 @@ async def may_submit(user: dict | None) -> bool:
 
 
 async def _used(db, album_id: str, user_id: str) -> tuple[int, int]:
-    rows = await db.gallery_submissions.find({"album_id": album_id, "owner_id": user_id}, {"_id": 0, "status": 1}).to_list(500)
-    return len(rows), sum(1 for row in rows if row.get("status") == "pending")
+    quota = await db.gallery_submission_quota.find_one({"album_id": album_id, "owner_id": user_id}, {"_id": 0, "count": 1}) or {}
+    pending = await db.gallery_submissions.count_documents({"album_id": album_id, "owner_id": user_id, "status": "pending"})
+    return int(quota.get("count") or 0), pending
+
+
+async def _take_slot(db, album_id: str, user_id: str) -> bool:
+    """Einen der 20 Plätze atomar nehmen - erst den Zähler anlegen (eindeutig je Person und Album), dann nur hochzählen,
+    solange er unter der Höchstzahl liegt."""
+    key = {"album_id": album_id, "owner_id": user_id}
+    try:
+        await db.gallery_submission_quota.update_one(key, {"$setOnInsert": {**key, "count": 0}}, upsert=True)
+    except Exception as exc:  # noqa: BLE001 - zwei gleichzeitige erste Uploads: der Zähler steht schon da
+        if not _is_duplicate(exc):
+            raise
+    taken = await db.gallery_submission_quota.find_one_and_update(
+        {**key, "count": {"$lt": MAX_PER_PERSON}}, {"$inc": {"count": 1}}, projection={"_id": 0, "count": 1},
+    )
+    return bool(taken)
+
+
+async def _give_back(db, album_id: str, user_id: str, count: int = 1) -> None:
+    await db.gallery_submission_quota.update_one(
+        {"album_id": album_id, "owner_id": user_id, "count": {"$gte": count}}, {"$inc": {"count": -count}})
 
 
 async def submission_info(db, album: dict, user: dict | None) -> dict | None:
@@ -280,20 +355,24 @@ async def store_submission(db, album: dict, user: dict, file: UploadFile, *, con
         raise HTTPException(status_code=409, detail="Einsenden geht vom ersten Event-Tag bis eine Woche nach dem Event.")
     if not consent:
         raise HTTPException(status_code=400, detail="Bitte bestätige, dass die Personen auf den Fotos einverstanden sind.")
-    used, _ = await _used(db, album["id"], user["id"])
-    if used >= MAX_PER_PERSON:
+    if not await _take_slot(db, album["id"], user["id"]):
         raise HTTPException(status_code=409, detail=f"Du hast schon {MAX_PER_PERSON} Fotos zu diesem Album geschickt.")
-    data = await _read_upload_limited(file, MAX_SUBMISSION_MB * 1024 * 1024, MAX_SUBMISSION_MB)
-    suffix = pathlib.Path(file.filename or "").suffix.lower()
-    encoded = _encode_image_bytes(data, file.content_type or "", suffix, file.filename or "foto")
-    key = f"{uuid.uuid4().hex}{encoded['ext']}"
-    path = SUBMISSION_DIR / key
     try:
-        ensure_directory(SUBMISSION_DIR)
-        path.write_bytes(encoded["data"])
-    except OSError as exc:
-        logger.error("[event_photos] could not write %s: %s", key, type(exc).__name__)
-        raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar.")
+        data = await _read_upload_limited(file, MAX_SUBMISSION_MB * 1024 * 1024, MAX_SUBMISSION_MB)
+        suffix = pathlib.Path(file.filename or "").suffix.lower()
+        encoded = _encode_image_bytes(data, file.content_type or "", suffix, file.filename or "foto")
+        key = f"{uuid.uuid4().hex}{encoded['ext']}"
+        path = SUBMISSION_DIR / key
+        try:
+            ensure_directory(SUBMISSION_DIR)
+            path.write_bytes(encoded["data"])
+        except OSError as exc:
+            logger.error("[event_photos] could not write %s: %s", key, type(exc).__name__)
+            raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar.")
+    except BaseException:
+        # Nicht angenommen (kein Bild, zu groß, Speicher): der Platz gehört wieder der Person.
+        await _give_back(db, album["id"], user["id"])
+        raise
     now = now_utc().isoformat()
     doc = {
         "id": new_id(),
@@ -458,6 +537,7 @@ async def decide(db, ids: list[str], *, approve: bool, actor: dict, reason: str 
         else:
             _remove_files(row)
             await db.gallery_submissions.delete_one({"id": row["id"]})
+            await _give_back(db, row["album_id"], row["owner_id"])
         key = (row["owner_id"], row["album_id"])
         groups[key] = groups.get(key, 0) + 1
     for (owner_id, album_id), count in groups.items():
@@ -478,7 +558,20 @@ async def delete_for_album(db, album_id: str) -> int:
     for row in rows:
         _remove_files(row)
     await db.gallery_submissions.delete_many({"album_id": album_id})
+    await db.gallery_submission_quota.delete_many({"album_id": album_id})
+    await db.gallery_album_notices.delete_many({"album_id": album_id})
     return len(rows)
+
+
+EXPORT_FIELDS = ("id", "album_id", "event_id", "status", "credit", "consent_at", "scan_state", "mime", "size", "width",
+                 "height", "photo_id", "created_at", "updated_at", "decided_at")
+
+
+async def export_for_user(db, user_id: str) -> list[dict]:
+    """DSGVO-Auskunft: die eigenen Einsendungen mit Einwilligung und Stand - nur Angaben, nie die Datei oder ihr Ablageort.
+    Abgelehnte stehen nicht darin: sie sind samt Datei gelöscht."""
+    rows = await db.gallery_submissions.find({"owner_id": user_id}, {"_id": 0}).sort("created_at", 1).to_list(5000)
+    return [{key: row.get(key) for key in EXPORT_FIELDS} for row in rows]
 
 
 async def delete_for_user(db, user_id: str) -> int:
@@ -487,5 +580,7 @@ async def delete_for_user(db, user_id: str) -> int:
     for row in rows:
         _remove_files(row)
     await db.gallery_submissions.delete_many({"owner_id": user_id})
+    await db.gallery_submission_quota.delete_many({"owner_id": user_id})
+    await db.gallery_album_notices.delete_many({"user_id": user_id})
     await db.gallery_photos.update_many({"submitted_by": user_id}, {"$set": {"credit": None}})
     return len(rows)

@@ -135,7 +135,8 @@ Vereinsverwaltung (also auch der Vorstand) – an einem Ort, Admin → Galerie; 
 dort nur die Einsendungen, nicht die Alben-Verwaltung. Freigeben geht erst, wenn die Bildprüfung nichts gefunden hat;
 abgelehnte Bilder werden gleich gelöscht. Jede Entscheidung steht im Protokoll (`gallery.submission_approve`,
 `gallery.submission_reject`). **„Die Fotos sind da“** geht einmal je Album an die Angemeldeten des Events (Event und
-Turniere, Teams mit allen Mitgliedern) – bei Mitglieder-Alben nur an Mitglieder. Code: `services/event_photos.py`.
+Turniere, Teams mit allen Mitgliedern) unter „Turnier-Updates“ – bei Mitglieder-Alben nur an Mitglieder, unter
+„Vereinsintern“. Code: `services/event_photos.py`.
 
 ## Mitglieder-Inhalte (#1350)
 

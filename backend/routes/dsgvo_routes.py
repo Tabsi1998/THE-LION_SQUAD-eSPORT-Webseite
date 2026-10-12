@@ -12,6 +12,8 @@ dsgvo_router = APIRouter(prefix="/api/dsgvo", tags=["dsgvo"])
 
 
 async def _user_data_export(db, user_id: str) -> dict:
+    from services.event_photos import export_for_user as export_gallery_submissions
+
     user = await db.users.find_one(
         {"id": user_id},
         {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0,
@@ -87,6 +89,8 @@ async def _user_data_export(db, user_id: str) -> dict:
         "meeting_admissions_recorded": [{key: row.get(key) for key in ("meeting_id", "state", "updated_at")}
                                         for row in await rows(db.meeting_admissions, {"by": user_id})],
         "uploads": await rows(db.media_uploads, {"owner_id": user_id}),
+        # Eingesandte Galerie-Fotos (#1186): Album, Stand, „Foto: Name“ gewünscht und wann eingewilligt - ohne Datei.
+        "gallery_submissions": await export_gallery_submissions(db, user_id),
     }
 
 

@@ -9,6 +9,7 @@ Geprüft mit echten Routen und erfundenen Konten:
 - Freigabe nur durch Redaktion oder Vereinsverwaltung; erst nach der Bildprüfung; freigegeben mit „Foto: Name“ (oder
   ohne), abgelehnt ist die Datei weg; die einsendende Person bekommt Bescheid.
 """
+import asyncio
 import io
 import pathlib
 import sys
@@ -31,6 +32,8 @@ async def flow(tmp_path, monkeypatch):
     monkeypatch.setattr(event_photos, "SUBMISSION_DIR", tmp_path / "submissions")
     monkeypatch.setattr(event_photos, "PUBLIC_DIR", tmp_path / "public")
     flow, shutdown = make_flow()
+    # Die eindeutigen Schlüssel für „genau einmal“ und die Höchstzahl - wie beim Start der Anwendung.
+    await event_photos.ensure_indexes(flow.db)
     try:
         yield flow
     finally:
@@ -123,7 +126,7 @@ async def test_participants_hear_once_when_the_photos_are_online(flow):
         assert len(rows) == 1, person["display_name"]
         assert rows[0]["title"] == "Die Fotos sind da: 3 Bilder"
         assert rows[0]["url"] == f"/galerie/{album['slug']}"
-        assert rows[0]["kind"] == "gallery_event" and rows[0]["meta"]["category"] == "news_events"
+        assert rows[0]["kind"] == "gallery_event" and rows[0]["meta"]["category"] == "tournament_updates"
     for person in (cancelled, outsider):
         assert await notices(flow, person) == []
 
@@ -249,6 +252,8 @@ async def test_member_submits_privately_without_exif_and_only_with_consent(flow)
     flow.act_as(anna)
     broken = await submit(flow, album, content=b"kein bild", name="notiz.txt")
     assert broken.status_code == 400
+    info_after = (await flow.get(f"/api/gallery/{album['slug']}")).json()["photo_submission"]
+    assert info_after["used"] == 1, "ein abgewiesenes Bild kostet keinen Platz"
 
 
 @pytest.mark.asyncio
@@ -393,3 +398,92 @@ async def test_account_erasure_and_album_deletion_take_the_submissions_along(flo
     deleted = await flow.delete(f"/api/gallery/{album['id']}")
     assert deleted.status_code == 200
     assert await flow.db.gallery_submissions.find_one({"id": third["id"]}) is None
+
+
+# ---------- Nach der Codex-Prüfung: parallel, überlappend, Auskunft ----------
+
+@pytest.mark.asyncio
+async def test_parallel_uploads_never_exceed_the_limit(flow, monkeypatch):
+    monkeypatch.setattr(event_photos, "MAX_PER_PERSON", 3)
+    event = await make_event(flow)
+    album = await make_album(flow, event)
+    anna = await member(flow, "Anna")
+    flow.act_as(anna)
+    responses = await asyncio.gather(*(submit(flow, album) for _ in range(7)))
+    codes = sorted(response.status_code for response in responses)
+    assert codes == [200, 200, 200, 409, 409, 409, 409], codes
+    assert await flow.db.gallery_submissions.count_documents({"owner_id": anna["id"]}) == 3
+    quota = await flow.db.gallery_submission_quota.find_one({"album_id": album["id"], "owner_id": anna["id"]})
+    assert quota["count"] == 3
+
+    # Eine Ablehnung gibt den Platz zurück - danach geht genau eines wieder.
+    first = next(response.json() for response in responses if response.status_code == 200)
+    flow.act_as(await board(flow))
+    rejected = await flow.post("/api/admin/gallery-submissions/decide", json={"ids": [first["id"]], "action": "reject"})
+    assert rejected.status_code == 200
+    flow.act_as(anna)
+    again = await asyncio.gather(submit(flow, album), submit(flow, album))
+    assert sorted(response.status_code for response in again) == [200, 409]
+
+
+@pytest.mark.asyncio
+async def test_overlapping_runs_send_exactly_one_notice_per_person(flow):
+    event = await make_event(flow)
+    album = await make_album(flow, event)
+    await add_photos(flow, album, 4)
+    people = [await guest(flow, f"Dabei {index}") for index in range(3)]
+    for person in people:
+        await flow.db.event_registrations.insert_one({"id": new_id(), "event_id": event["id"], "user_id": person["id"], "status": "registered"})
+
+    results = await asyncio.gather(event_photos.notify_due(), event_photos.notify_due(), event_photos.notify_due())
+    assert sum(result["sent"] for result in results) == 3
+    for person in people:
+        assert len(await notices(flow, person)) == 1, person["display_name"]
+    stored = await flow.db.gallery_albums.find_one({"id": album["id"]})
+    assert stored["participants_notify_state"] == "done" and stored["participants_notified_count"] == 3
+
+
+@pytest.mark.asyncio
+async def test_an_aborted_run_is_picked_up_without_doubles(flow):
+    event = await make_event(flow)
+    album = await make_album(flow, event)
+    await add_photos(flow, album, 2)
+    told, missed = await guest(flow, "Schon gemeldet"), await guest(flow, "Noch offen")
+    for person in (told, missed):
+        await flow.db.event_registrations.insert_one({"id": new_id(), "event_id": event["id"], "user_id": person["id"], "status": "registered"})
+    # Ein Lauf hat das Album vor 40 Minuten beansprucht, die erste Person gemeldet und ist dann abgebrochen.
+    await flow.db.gallery_albums.update_one({"id": album["id"]}, {"$set": {
+        "participants_notified_at": iso(timedelta(minutes=-40)), "participants_notify_state": "sending"}})
+    await flow.db.gallery_album_notices.insert_one({"album_id": album["id"], "user_id": told["id"], "created_at": iso(timedelta(minutes=-40))})
+
+    # Solange der Anspruch frisch ist, lässt ein zweiter Lauf das Album in Ruhe.
+    await flow.db.gallery_albums.update_one({"id": album["id"]}, {"$set": {"participants_notified_at": iso(timedelta(minutes=-5))}})
+    fresh = await event_photos.notify_due()
+    assert fresh["sent"] == 0
+    await flow.db.gallery_albums.update_one({"id": album["id"]}, {"$set": {"participants_notified_at": iso(timedelta(minutes=-40))}})
+
+    result = await event_photos.notify_due()
+    assert result["sent"] == 1
+    assert await notices(flow, told) == [], "die Quittung verhindert die zweite Meldung"
+    assert len(await notices(flow, missed)) == 1
+    duplicate = await event_photos.notify_album(flow.db, album, event, 2, 0)
+    assert duplicate == 0, "direkt noch einmal: niemand bekommt es doppelt"
+
+
+@pytest.mark.asyncio
+async def test_data_export_lists_own_submissions_with_consent_but_no_file(flow):
+    event = await make_event(flow)
+    album = await make_album(flow, event)
+    anna = await member(flow, "Anna")
+    flow.act_as(anna)
+    sent = (await submit(flow, album, credit=False)).json()
+    flow.act_as(await member(flow, "Bert"))
+    await submit(flow, album)
+
+    flow.act_as(anna)
+    export = (await flow.get("/api/dsgvo/export-my-data")).json()
+    rows = export["gallery_submissions"]
+    assert [row["id"] for row in rows] == [sent["id"]], "nur die eigenen"
+    row = rows[0]
+    assert row["consent_at"] and row["status"] == "pending" and row["credit"] is False and row["album_id"] == album["id"]
+    assert "storage_key" not in row and "data" not in row, "keine Datei, kein Ablageort"

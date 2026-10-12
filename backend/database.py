@@ -234,6 +234,9 @@ async def init_indexes():
     await db.gallery_submissions.create_index("id", unique=True)
     await db.gallery_submissions.create_index([("album_id", 1), ("owner_id", 1)])
     await db.gallery_submissions.create_index("status")
+    # Fotos vom Event (#1185, #1186): Quittung je Album und Person, Zähler je Person und Album - beide eindeutig.
+    from services.event_photos import ensure_indexes as ensure_event_photo_indexes
+    await ensure_event_photo_indexes(db)
     # News indexes for category / pinning
     await db.news_posts.create_index("category")
     await db.news_posts.create_index([("pinned", -1), ("created_at", -1)])
