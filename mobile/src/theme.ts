@@ -29,6 +29,8 @@ export const kindColors = {
   event: "#9F7AEA",
   tournament: "#FFD700",
   fastlap: "#29B6E8",
+  // Versammlungen und eigene Helferschichten im Kalender (#1190) - grün, nur für Mitglieder.
+  club: "#10B981",
 };
 
 // Die vier Knöpfe wie im Web (#1082, #1151; frontend/src/index.css `tls-btn--…`): wichtig (blau gefüllt, mit Pfeil),

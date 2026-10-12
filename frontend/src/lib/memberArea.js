@@ -1,9 +1,6 @@
-import { formatVienna } from "@/lib/dashboard";
 import { asInstant } from "@/lib/vienna";
 
-// Interne Events für den Mitgliederbereich (#283): aus der Event-Liste nur
-// die, die Mitglieder oder der Vorstand sehen, und nur die, die noch
-// anstehen – nach Datum sortiert.
+// Was nur Mitglieder oder der Vorstand sehen (#283, #284).
 const MEMBER_LEVELS = new Set(["members", "internal"]);
 
 // Die Sprungleiste des Mitgliederbereichs (#1257, #1336) statt der Zeile aus neun kleinen Verweisen (#364): fünf
@@ -90,32 +87,6 @@ export function areaCard(user, me) {
     typeLabel: erp.type_label || CARD_TYPES[membership.membership_type] || "Mitglied",
     validUntil: erp.membership_ends || erp.paid_until || "",
   };
-}
-
-function toTime(value) {
-  if (!value) return null;
-  const ms = new Date(value).getTime();
-  return Number.isNaN(ms) ? null : ms;
-}
-
-export function memberEvents(events, now = new Date()) {
-  const cutoff = now.getTime();
-  return (Array.isArray(events) ? events : [])
-    .filter((event) => MEMBER_LEVELS.has(event?.visibility))
-    .filter((event) => {
-      const start = toTime(event.start_date);
-      const end = toTime(event.end_date) ?? start;
-      return start === null || end === null || end >= cutoff;
-    })
-    .sort((a, b) => (toTime(a.start_date) ?? Infinity) - (toTime(b.start_date) ?? Infinity));
-}
-
-export function eventDateLine(event) {
-  const start = formatVienna(event?.start_date);
-  if (!start) return "Termin folgt";
-  const end = event?.end_date ? formatVienna(event.end_date, { withTime: false }) : "";
-  const startDay = formatVienna(event.start_date, { withTime: false });
-  return end && end !== startDay ? `${start} – ${end}` : start;
 }
 
 // Interne News: nur, was Mitglieder oder der Vorstand sehen (#284).

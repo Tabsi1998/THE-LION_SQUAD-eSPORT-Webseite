@@ -1,4 +1,7 @@
-import { dayKey, dayLabel, feedUrls, filterKinds, initialMonth, itemsByDay, monthMatrix, shiftMonth, upcomingItems } from "./calendar";
+import {
+  agenda, currentMonth, dayKey, dayLabel, feedUrls, filterKinds, itemsByDay, mergeEventDays, monthMatrix, nextAfter, preferredView, shiftMonth,
+  spanLabel, splitSpans, startPhrase, upcomingItems, weekBars,
+} from "./calendar";
 
 // Kalender auf der Website (#402): Raster ab Montag, Termine je Tag, Abo-Adressen - dieselbe
 // Rechnung wie in der App.
@@ -39,22 +42,92 @@ test("ein Termin steht am Wiener Tag und der Tag heißt, wie er im Raster steht"
   expect(map.get("2027-01-01")?.map((item) => item.id)).toEqual(["silvester"]);
   expect(dayLabel("2026-10-04")).toBe("Sonntag, 4. Oktober");
   expect(dayLabel("2027-01-01")).toBe("Freitag, 1. Jänner");
-  // Halb eins am Neujahrstag in Wien: der Kalender geht im Jänner auf, auch wenn es in UTC noch Dezember ist.
-  expect(initialMonth([{ id: "neujahr", kind: "event", title: "Neujahr", start: "2026-12-31T23:30:00Z" }], new Date("2026-12-01T12:00:00Z"))).toEqual({ year: 2027, month: 0 });
+  // Halb eins am Neujahrstag in Wien: der Kalender steht im Jänner, auch wenn es in UTC noch Dezember ist.
+  expect(currentMonth(new Date("2026-12-31T23:30:00Z"))).toEqual({ year: 2027, month: 0 });
 });
 
-test("der Kalender öffnet beim nächsten Termin; „als Nächstes“ zeigt Laufendes und Kommendes", () => {
+test("der Kalender öffnet im aktuellen Monat (#1271); „als Nächstes“ zeigt Laufendes und Kommendes", () => {
   const now = new Date("2026-09-22T12:00:00+02:00");
   const items = [
     { id: "a", kind: "event", title: "A", start: "2026-11-05T18:00:00+01:00" },
     { id: "b", kind: "event", title: "B", start: "2026-08-01T18:00:00+02:00" },
     { id: "c", kind: "fastlap", title: "C", start: "2026-09-01T12:00:00+02:00", end: "2026-09-30T12:00:00+02:00" },
   ];
-  expect(initialMonth(items, now)).toEqual({ year: 2026, month: 10 });
-  expect(initialMonth([items[1]], now)).toEqual({ year: 2026, month: 8 });
+  expect(currentMonth(now)).toEqual({ year: 2026, month: 8 });
   expect(upcomingItems(items, now).map((item) => item.id)).toEqual(["c", "a"]);
   expect(upcomingItems(items, now, 1).map((item) => item.id)).toEqual(["c"]);
   expect(filterKinds(items, ["fastlap"]).map((item) => item.id)).toEqual(["c"]);
+});
+
+// Eine viertägige Messe, wie der Server sie liefert: ein Eintrag je Tag mit Name und Kennung des Events (#884, #1271).
+const MESSE = [11, 12, 13, 14].map((day, index) => ({
+  id: `e-messe-tag-${index + 1}`, kind: "event", title: `Gaming-Messe – Tag ${index + 1}/4`, marker: "event_day", event_id: "e-messe", event_name: "Gaming-Messe",
+  start: `2027-03-${day}T09:00:00+01:00`, end: `2027-03-${day}T18:00:00+01:00`, path: "/events/messe", mine: index === 2,
+}));
+
+test("die Tage eines Events werden eine Zeile: Name, erster Beginn, letztes Ende", () => {
+  const cup = { id: "t-cup", kind: "tournament", title: "Cup", start: "2027-03-12T10:00:00+01:00" };
+  const merged = mergeEventDays([...MESSE, cup]);
+  expect(merged.map((item) => item.id)).toEqual(["e-messe", "t-cup"]);
+  expect(merged[0]).toMatchObject({ title: "Gaming-Messe", start: "2027-03-11T09:00:00+01:00", end: "2027-03-14T18:00:00+01:00", mine: true, marker: null });
+  expect(merged[0].parts).toHaveLength(4);
+  expect(spanLabel(merged[0])).toBe("Do 11. – So 14. März");
+  expect(startPhrase(merged[0])).toBe("Do 11. März");
+  expect(spanLabel({ start: "2026-10-30T18:00:00+01:00", end: "2026-11-02T12:00:00+01:00" })).toBe("Fr 30. Oktober – Mo 2. November");
+  expect(spanLabel({ start: "2027-03-12T00:00:00+01:00", all_day: true, day: "2027-03-12" })).toBe("Fr 12. März · ganztägig");
+  expect(spanLabel({ start: "2027-03-12T18:00:00+01:00" }, new Date("2027-01-10T12:00:00Z"))).toBe("Fr 12. März · 18:00");
+  // Über Mitternacht ist noch nicht mehrtägig: Schicht bis 1 Uhr.
+  expect(spanLabel({ start: "2026-10-10T22:00:00+02:00", end: "2026-10-11T01:00:00+02:00" }, new Date("2026-01-01T12:00:00Z"))).toBe("Sa 10. Oktober · 22:00");
+});
+
+test("Balken: mehrtägig über die Tage der Woche, über Monatsgrenzen, in eigenen Reihen; Eintägiges bleibt ein Punkt", () => {
+  const lan = { id: "lan", kind: "event", title: "LAN", start: "2026-10-30T18:00:00+01:00", end: "2026-11-02T12:00:00+01:00" };
+  const overlap = { id: "lap", kind: "fastlap", title: "Fast Lap", start: "2026-10-31T10:00:00+01:00", end: "2026-11-05T20:00:00+01:00" };
+  const single = { id: "abend", kind: "event", title: "Abend", start: "2026-10-31T18:00:00+01:00" };
+  const night = { id: "nacht", kind: "club", title: "Schicht", start: "2026-10-31T22:00:00+01:00", end: "2026-11-01T01:00:00+01:00" };
+  const { spans, singles } = splitSpans([lan, overlap, single, night]);
+  expect(spans.map((item) => item.id)).toEqual(["lan", "lap"]);
+  expect(singles.map((item) => item.id)).toEqual(["abend", "nacht"]);
+
+  const october = monthMatrix(2026, 9);
+  const last = weekBars(october[october.length - 1], spans);
+  expect(last.map(({ item, from, to, lane, continuesBefore, continuesAfter }) => [item.id, from, to, lane, continuesBefore, continuesAfter])).toEqual([
+    ["lan", 4, 6, 0, false, true],
+    ["lap", 5, 6, 1, false, true],
+  ]);
+  const november = monthMatrix(2026, 10);
+  expect(weekBars(november[1], spans).map(({ item, from, to, lane, continuesBefore }) => [item.id, from, to, lane, continuesBefore])).toEqual([
+    ["lan", 0, 0, 0, true],
+    ["lap", 0, 3, 1, true],
+  ]);
+
+  // Eine Messe ist ein Balken Do–So; ein Event mit Lücke zwischen den Tagen zwei.
+  const march = monthMatrix(2027, 2);
+  expect(weekBars(march[1], splitSpans(MESSE).spans).map(({ item, from, to }) => [item.id, item.title, from, to])).toEqual([["e-messe", "Gaming-Messe", 3, 6]]);
+  const gap = splitSpans([MESSE[0], MESSE[2]]).spans;
+  expect(weekBars(march[1], gap).map(({ from, to }) => [from, to])).toEqual([[3, 3], [5, 5]]);
+});
+
+test("Liste: Kommendes nach Monat, Laufendes im aktuellen Monat; leerer Monat zeigt den nächsten Termin", () => {
+  const now = new Date("2027-02-20T12:00:00+01:00");
+  const running = { id: "lap", kind: "fastlap", title: "Saison", start: "2027-01-15T12:00:00+01:00", end: "2027-03-01T12:00:00+01:00" };
+  const old = { id: "alt", kind: "event", title: "Alt", start: "2027-01-02T12:00:00+01:00" };
+  const groups = agenda([...MESSE, running, old], now);
+  expect(groups.map((group) => [group.key, group.label, group.items.map((item) => item.id)])).toEqual([
+    ["2027-02", "Februar 2027", ["lap"]],
+    ["2027-03", "März 2027", ["e-messe"]],
+  ]);
+  expect(nextAfter([...MESSE, old], 2027, 1)?.id).toBe("e-messe");
+  expect(nextAfter([...MESSE, old], 2027, 2)).toBeNull();
+  expect(nextAfter([old], 2027, 1)).toBeNull();
+});
+
+test("am Handy startet die Liste, sonst der Monat; die letzte Wahl gewinnt", () => {
+  expect(preferredView(null, 390)).toBe("list");
+  expect(preferredView(null, 768)).toBe("month");
+  expect(preferredView("month", 390)).toBe("month");
+  expect(preferredView("list", 1440)).toBe("list");
+  expect(preferredView("unsinn", 1440)).toBe("month");
 });
 
 test("Abo-Adressen: https zum Kopieren, webcal zum Öffnen", () => {

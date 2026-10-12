@@ -28,7 +28,7 @@ test("Farben je Art: eine Stelle im Web, dieselben Werte in der App", () => {
   expect(CALENDAR_COLORS).toBe(KIND_COLORS);
   const block = appBlock("kindColors");
   for (const [kind, color] of Object.entries(KIND_COLORS)) expect(block).toContain(`${kind}: "${color}",`);
-  expect(Object.keys(KIND_COLORS).sort()).toEqual(["event", "fastlap", "tournament"]);
+  expect(Object.keys(KIND_COLORS).sort()).toEqual(["club", "event", "fastlap", "tournament"]);
 });
 
 test("Ecken: der Grundwert des Webs (--radius) gilt in der App für Karten, Knöpfe und Schilder", () => {

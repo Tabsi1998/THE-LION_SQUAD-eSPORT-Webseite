@@ -1,6 +1,7 @@
 """Expo push notification delivery for the native mobile app."""
 from __future__ import annotations
 
+import hashlib
 import logging
 from datetime import timedelta
 from typing import Any
@@ -110,6 +111,50 @@ def channel_for_device(kind: str | None, channel_set: int | None) -> str:
     return _channel_for_kind(kind) if int(channel_set or 0) >= PUSH_CHANNEL_SET else _legacy_channel_for_kind(kind)
 
 
+# App-Sperre am Gerät (#1052): der Push sagt nur, dass etwas da ist. Den Inhalt lädt die App nach dem Entsperren.
+PRIVATE_PUSH_TITLE = "LionsAPP"
+PRIVATE_PUSH_BODY = "Neue Benachrichtigung"
+
+
+def push_account_tag(user_id: Any) -> str:
+    """Konto-Kennung am Push (#1053): kurz und nicht umkehrbar. Die App rechnet dieselbe (PushService.pushAccountTag) und
+    verwirft Pushes, die nicht zum angemeldeten Konto gehören."""
+    return hashlib.sha256(f"lsw-push-account:{user_id}".encode("utf-8")).hexdigest()[:16]
+
+
+def _push_payload(notification: dict[str, Any], row: dict[str, Any]) -> dict[str, Any]:
+    kind = notification.get("kind")
+    account = push_account_tag(notification.get("user_id"))
+    payload: dict[str, Any] = {
+        "to": row.get("token"),
+        "sound": "default",
+        # Je Gerät der passende Kanal (#1138): neue App - neue Kanäle, alte App - die zwei alten.
+        "channelId": channel_for_device(kind, row.get("channel_set")),
+        "priority": "high",
+    }
+    if row.get("private_content"):
+        payload.update(
+            # Auch der Kanal verrät nichts (#1052): der Standardkanal statt des Kanals der Art.
+            channelId=channel_for_device(None, row.get("channel_set")),
+            title=PRIVATE_PUSH_TITLE,
+            body=PRIVATE_PUSH_BODY,
+            data={"notification_id": notification.get("id"), "private": True, "account": account},
+        )
+        return payload
+    payload.update(
+        title=str(notification.get("title") or "LionsAPP")[:120],
+        body=str(notification.get("body") or "")[:180],
+        data={
+            "notification_id": notification.get("id"),
+            "kind": kind,
+            "url": notification.get("url"),
+            "meta": notification.get("meta") or {},
+            "account": account,
+        },
+    )
+    return payload
+
+
 def _log_safe(value: Any, limit: int = 240) -> str:
     return str(value or "").replace("\r", " ").replace("\n", " ")[:limit]
 
@@ -122,35 +167,13 @@ async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int
     db = get_db()
     tokens = await db.mobile_push_tokens.find(
         {"user_id": user_id, "enabled": {"$ne": False}},
-        {"_id": 0, "token": 1, "channel_set": 1},
+        {"_id": 0, "token": 1, "channel_set": 1, "private_content": 1},
     ).to_list(20)
     valid = [row for row in tokens if _is_expo_token(row.get("token"))]
     push_tokens = [row.get("token") for row in valid]
     if not push_tokens:
         return 0
-    channel_sets = {row.get("token"): row.get("channel_set") for row in valid}
-
-    title = str(notification.get("title") or "LionsAPP")[:120]
-    body = str(notification.get("body") or "")[:180]
-    kind = notification.get("kind")
-    payloads = [
-        {
-            "to": token,
-            "sound": "default",
-            # Je Gerät der passende Kanal (#1138): neue App - neue Kanäle, alte App - die zwei alten.
-            "channelId": channel_for_device(kind, channel_sets.get(token)),
-            "priority": "high",
-            "title": title,
-            "body": body,
-            "data": {
-                "notification_id": notification.get("id"),
-                "kind": kind,
-                "url": notification.get("url"),
-                "meta": notification.get("meta") or {},
-            },
-        }
-        for token in push_tokens
-    ]
+    payloads = [_push_payload(notification, row) for row in valid]
 
     try:
         async with httpx.AsyncClient(timeout=8) as client:

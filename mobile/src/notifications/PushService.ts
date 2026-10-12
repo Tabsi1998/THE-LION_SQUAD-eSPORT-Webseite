@@ -17,6 +17,7 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import { api } from "../lib/api";
+import { sha256Hex } from "../lib/sha256";
 import type { UserNotification } from "../types";
 import { PUSH_CHANNELS, PUSH_CHANNEL_SET, RETIRED_CHANNEL_IDS } from "./channels";
 
@@ -45,17 +46,48 @@ try {
   console.info("[PushService] expo-notifications nicht installiert – Push-Notifications deaktiviert.");
 }
 
+/**
+ * Konto-Kennung an Pushes (#1053): ein kurzer, nicht umkehrbarer Hash der Nutzer-ID. Der Server rechnet dieselbe
+ * (backend/services/push_notifications.py, push_account_tag); so verwirft die App Pushes, die nicht zum Konto gehören.
+ */
+export function pushAccountTag(userId: string): string {
+  return sha256Hex(`lsw-push-account:${userId}`).slice(0, 16);
+}
+
+// Wem die App gerade gehört und ob sie gesperrt ist. Bis die Glocke es weiß, gilt: verborgen (#1052).
+let currentAccountTag: string | null = null;
+let foregroundHidden = true;
+
+/** Das angemeldete Konto (#1053) - setzt die Anmeldung, sobald es wechselt; null für Gäste. */
+export function setPushAccount(userId: string | null) {
+  currentAccountTag = userId ? pushAccountTag(userId) : null;
+}
+
+/** Gesperrt oder Sperrzustand noch unbekannt (#1052): Pushes im Vordergrund ohne Banner, Ton, Zähler und Eintrag. */
+export function setForegroundPushHidden(hidden: boolean) {
+  foregroundHidden = hidden;
+}
+
+/** Ein Push mit Konto-Kennung, die nicht zum angemeldeten Konto passt (#1053). Alte Server schicken keine Kennung. */
+function foreignAccount(data: Record<string, unknown>): boolean {
+  const account = stringValue(data.account);
+  return Boolean(account) && account !== currentAccountTag;
+}
+
+const SHOW = { shouldShowAlert: true, shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: true };
+const SILENT = { shouldShowAlert: false, shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false };
+
+/** Wie ein Push im Vordergrund erscheint: gesperrt oder fürs falsche Konto gar nicht - auch ein voller Push alter Server. */
+export function foregroundPresentation(notification: unknown) {
+  const data = (notification as { request?: { content?: { data?: Record<string, unknown> } } } | null)?.request?.content?.data || {};
+  return foregroundHidden || foreignAccount(data) ? SILENT : SHOW;
+}
+
 /** Konfiguriert wie Notifications im Foreground angezeigt werden */
 export function configurePushNotifications() {
   if (!Notifications) return;
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-    }),
+    handleNotification: async (notification: unknown) => foregroundPresentation(notification),
   });
 }
 
@@ -118,8 +150,14 @@ export async function setupAndroidChannels(): Promise<void> {
   }
 }
 
-/** Fragt Push-Permission an und registriert den Token beim Backend */
-export async function registerPushToken(): Promise<string | null> {
+/** `privateConfirmed` (#1052): der Server hat die Wahl „ohne Inhalt“ ausdrücklich übernommen - ein alter Server nicht. */
+export type PushRegistration = { token: string; privateConfirmed: boolean };
+
+/**
+ * Fragt Push-Permission an und registriert den Token beim Backend.
+ * `private` (#1052): mit App-Sperre schickt der Server nur Pushes ohne Inhalt - die Details lädt die App nach dem Entsperren.
+ */
+export async function registerPushToken(options: { private?: boolean } = {}): Promise<PushRegistration | null> {
   if (!Notifications || !Device) return null;
 
   // Nur auf echten Geräten (nicht im Simulator/Emulator)
@@ -157,13 +195,14 @@ export async function registerPushToken(): Promise<string | null> {
     console.info(`[PushService] Push-Token: ${token.slice(0, 30)}...`);
 
     // Token beim Backend registrieren - mit dem Stand der Kanäle, damit der Server die neuen Kennungen schickt.
-    await api.post("/mobile/push-token", {
+    const { data } = await api.post<{ private_content?: boolean }>("/mobile/push-token", {
       token,
       platform: Platform.OS,
       channels: PUSH_CHANNEL_SET,
+      private: Boolean(options.private),
     });
 
-    return token;
+    return { token, privateConfirmed: data?.private_content === Boolean(options.private) };
   } catch (err) {
     console.warn("[PushService] Fehler bei Token-Registrierung:", err);
     return null;
@@ -186,10 +225,13 @@ function notificationFromResponse(response: unknown): UserNotification | null {
 
 function notificationFromContent(content?: { title?: string | null; body?: string | null; data?: Record<string, unknown> } | null): UserNotification | null {
   const data = content?.data || {};
+  // Fürs falsche Konto (#1053): weder Liste noch Banner noch Sprung beim Antippen.
+  if (foreignAccount(data)) return null;
   const notificationId = stringValue(data.notification_id || data.id);
   const kind = stringValue(data.kind);
   const url = stringValue(data.url);
-  const meta = objectValue(data.meta);
+  // Ein privater Push (#1052) trägt nur die Kennung - der Inhalt kommt erst nach dem Entsperren vom Server.
+  const meta = data.private === true ? { content_hidden: true } : objectValue(data.meta);
   if (!notificationId && !kind && !url) return null;
   return {
     id: notificationId || `${kind || "push"}:${Date.now()}`,
@@ -200,6 +242,11 @@ function notificationFromContent(content?: { title?: string | null; body?: strin
     read: false,
     meta,
   };
+}
+
+/** Ein Push ohne Inhalt (#1052): Titel und Text sind Platzhalter, der echte Eintrag steht in der Liste vom Server. */
+export function isContentHiddenPush(item: UserNotification): boolean {
+  return item.meta?.content_hidden === true;
 }
 
 function stringValue(value: unknown) {

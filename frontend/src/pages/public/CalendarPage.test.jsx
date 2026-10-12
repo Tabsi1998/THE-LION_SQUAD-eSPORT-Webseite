@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 // Kalender (#402): Monatsraster mit Punkten je Art, Termine des gewählten Tags, Abo-Adresse;
-// ohne Login der Hinweis, mit Login das „Angemeldet“ vom Server.
+// ohne Login der Hinweis, mit Login das „Angemeldet“ vom Server. Seit #1271 öffnet er im aktuellen Monat mit „Heute“,
+// Mehrtägiges ist ein Balken bzw. eine Zeile, am Handy startet die Liste; seit #1190 stehen Vereinstermine grün dabei.
 
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock }));
@@ -20,14 +21,41 @@ const ITEMS = [
   { id: "t-cup", kind: "tournament", slug: "autumn-cup", title: "Autumn Cup", start: "2099-10-12T19:00:00+02:00", end: null, status: "registration_open", phase: { label: "Anmeldung offen", state: "registration_open" }, location: "Mario Kart 8", path: "/tournaments/autumn-cup", visibility: "public", mine: true, marker: null },
 ];
 
+// Eine dreitägige LAN im Dezember, wie der Server sie liefert: ein Eintrag je Tag (#884) mit dem Namen des Events.
+const LAN = [17, 18, 19].map((day, index) => ({
+  id: `e-lan-tag-${index + 1}`, kind: "event", slug: "lan", title: `Herbst-LAN – Tag ${index + 1}/3`, start: `2099-12-${day}T10:00:00+01:00`, end: `2099-12-${day}T22:00:00+01:00`,
+  status: "scheduled", phase: null, location: "Vereinsheim", path: "/events/lan", visibility: "public", mine: false, marker: "event_day", event_id: "e-lan", event_name: "Herbst-LAN",
+}));
+
+const CLUB = [
+  { id: "meeting-7", kind: "club", club_kind: "meeting", title: "Generalversammlung 2099", start: "2099-10-24T16:00:00+00:00", end: "2099-10-24T18:00:00+00:00", all_day: false, day: "2099-10-24", status: "invited", phase: { label: "Eingeladen", state: "invited" }, location: "Vereinsheim", path: "/members/meetings?meeting=7", visibility: "members", mine: false, marker: "meeting" },
+  { id: "shift-5-52", kind: "club", club_kind: "shift", title: "Helferschicht: Bar · Sommerfest", start: "2099-10-10T20:00:00+00:00", end: "2099-10-10T23:00:00+00:00", all_day: false, day: "2099-10-10", status: "planned", phase: { label: "Angefragt", state: "requested" }, location: "Vereinsheim", path: "/members/helfen?event=5", visibility: "members", mine: true, marker: "shift" },
+];
+
+function respond(items, signedIn = false) {
+  apiMock.get.mockResolvedValue({ data: { items, signed_in: signedIn, feed_path: "/api/calendar/feed.ics" } });
+}
+
+async function renderPage(title) {
+  render(<MemoryRouter><CalendarPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("calendar-title")).toHaveTextContent(title));
+}
+
 beforeEach(() => {
   apiMock.get.mockReset();
+  window.localStorage.clear();
+  window.innerWidth = 1440;
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2099-10-01T10:00:00Z"));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 test("Raster mit Punkten, Tag antippen zeigt seine Termine, Abo-Adresse und Login-Hinweis", async () => {
-  apiMock.get.mockResolvedValue({ data: { items: ITEMS, signed_in: false, feed_path: "/api/calendar/feed.ics" } });
-  render(<MemoryRouter><CalendarPage /></MemoryRouter>);
-  await waitFor(() => expect(screen.getByTestId("calendar-title")).toHaveTextContent("Oktober 2099"));
+  respond(ITEMS);
+  await renderPage("Oktober 2099");
 
   expect(screen.getByTestId("calendar-dot-2099-10-05-event")).toBeInTheDocument();
   expect(screen.getByTestId("calendar-dot-2099-10-05-tournament")).toBeInTheDocument();
@@ -51,10 +79,10 @@ test("Raster mit Punkten, Tag antippen zeigt seine Termine, Abo-Adresse und Logi
 });
 
 test("Arten lassen sich ausblenden, die letzte bleibt; mit Login kein Hinweis", async () => {
-  apiMock.get.mockResolvedValue({ data: { items: ITEMS, signed_in: true, feed_path: "/api/calendar/feed.ics" } });
-  render(<MemoryRouter><CalendarPage /></MemoryRouter>);
-  await waitFor(() => expect(screen.getByTestId("calendar-title")).toHaveTextContent("Oktober 2099"));
+  respond(ITEMS, true);
+  await renderPage("Oktober 2099");
   expect(screen.queryByTestId("calendar-login-hint")).toBeNull();
+  expect(screen.queryByTestId("calendar-kind-club")).toBeNull();
 
   await userEvent.click(screen.getByTestId("calendar-kind-tournament"));
   expect(screen.queryByTestId("calendar-dot-2099-10-05-tournament")).toBeNull();
@@ -68,4 +96,74 @@ test("Arten lassen sich ausblenden, die letzte bleibt; mit Login kein Hinweis", 
   await userEvent.click(screen.getByTestId("calendar-prev"));
   await userEvent.click(screen.getByTestId("calendar-prev"));
   expect(screen.getByTestId("calendar-title")).toHaveTextContent("September 2099");
+});
+
+test("öffnet im aktuellen Monat; ein leerer Monat nennt den nächsten Termin, „Heute“ springt zurück", async () => {
+  vi.setSystemTime(new Date("2099-11-10T10:00:00Z"));
+  respond([...ITEMS, ...LAN]);
+  await renderPage("November 2099");
+
+  const hint = screen.getByTestId("calendar-next-hint");
+  expect(hint).toHaveTextContent("Nächster Termin: Do 17. Dezember – Herbst-LAN");
+  await userEvent.click(hint);
+  expect(screen.getByTestId("calendar-title")).toHaveTextContent("Dezember 2099");
+  expect(screen.queryByTestId("calendar-next-hint")).toBeNull();
+  expect(screen.getByTestId("calendar-day-items")).toHaveTextContent("17. Dezember");
+
+  await userEvent.click(screen.getByTestId("calendar-today"));
+  expect(screen.getByTestId("calendar-title")).toHaveTextContent("November 2099");
+});
+
+test("eine mehrtägige LAN ist im Monat ein Balken und in der Liste eine Zeile", async () => {
+  vi.setSystemTime(new Date("2099-12-01T10:00:00Z"));
+  respond(LAN);
+  await renderPage("Dezember 2099");
+
+  const bars = screen.getAllByTestId("calendar-bar-event-e-lan");
+  expect(bars).toHaveLength(1);
+  expect(bars[0]).toHaveTextContent("Herbst-LAN");
+  expect(bars[0]).toHaveAttribute("href", "/events/lan");
+  expect(bars[0].style.gridColumn).toBe("4 / 7");
+  expect(screen.queryByTestId("calendar-dot-2099-12-18-event")).toBeNull();
+
+  const upcoming = screen.getByTestId("calendar-upcoming");
+  expect(within(upcoming).getAllByRole("link")).toHaveLength(1);
+  expect(upcoming).toHaveTextContent("Do 17. – Sa 19. Dezember");
+
+  await userEvent.click(screen.getByTestId("calendar-view-list"));
+  const list = screen.getByTestId("calendar-list");
+  expect(within(list).getByTestId("calendar-list-month-2099-12")).toHaveTextContent("Dezember 2099");
+  expect(within(list).getAllByRole("link")).toHaveLength(1);
+  expect(within(list).getByTestId("calendar-item-event-e-lan")).toHaveTextContent("Do 17. – Sa 19. Dezember");
+  expect(screen.queryByTestId("calendar-grid")).toBeNull();
+  expect(window.localStorage.getItem("tls_calendar_view")).toBe("list");
+});
+
+test("am Handy startet die Liste; die letzte Wahl bleibt am Gerät", async () => {
+  window.innerWidth = 390;
+  respond(ITEMS);
+  render(<MemoryRouter><CalendarPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("calendar-list")).toBeInTheDocument());
+  expect(screen.getByTestId("calendar-view-list")).toHaveAttribute("aria-pressed", "true");
+  expect(within(screen.getByTestId("calendar-list")).getByTestId("calendar-list-month-2099-10")).toBeInTheDocument();
+
+  await userEvent.click(screen.getByTestId("calendar-view-month"));
+  expect(screen.getByTestId("calendar-grid")).toBeInTheDocument();
+  expect(window.localStorage.getItem("tls_calendar_view")).toBe("month");
+});
+
+test("Mitglieder sehen Versammlungen und eigene Schichten grün, der Tipp führt in den Mitgliederbereich", async () => {
+  respond([...ITEMS, ...CLUB], true);
+  await renderPage("Oktober 2099");
+
+  expect(screen.getByTestId("calendar-dot-2099-10-24-club").style.backgroundColor).toBe("rgb(16, 185, 129)");
+  expect(screen.getByTestId("calendar-kind-club")).toHaveTextContent("Verein");
+
+  await userEvent.click(screen.getByTestId("calendar-day-2099-10-24"));
+  const meeting = within(screen.getByTestId("calendar-day-items")).getByTestId("calendar-item-club-meeting-7");
+  expect(meeting).toHaveAttribute("href", "/members/meetings?meeting=7");
+  expect(meeting).toHaveTextContent("Versammlung");
+  const shift = within(screen.getByTestId("calendar-upcoming")).getByTestId("calendar-item-club-shift-5-52");
+  expect(shift).toHaveAttribute("href", "/members/helfen?event=5");
+  expect(shift).toHaveTextContent("Helferschicht");
 });

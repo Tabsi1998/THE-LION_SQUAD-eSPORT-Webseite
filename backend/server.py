@@ -455,6 +455,10 @@ async def security_headers(request, call_next):
             # Teilen-Bilder (#1412): öffentlich und für alle gleich - fünf Minuten zwischenspeicherbar. Genau diese
             # Pfade und nur bei Erfolg; alles andere bleibt no-store, auch das private Bild des Jahresrückblicks.
             response.headers["Cache-Control"] = share_image_cache.CACHE_CONTROL
+        elif request.url.path.startswith("/api/calendar") and response.headers.get("Cache-Control"):
+            # Kalender (#1190, Codex-Prüfung #1460): die Route entscheidet selbst - öffentliche Liste, Feed und Dateien
+            # kurz zwischenspeicherbar, alles Persönliche „private, no-store“. Ohne eigene Regel (Fehler) gilt no-store.
+            pass
         else:
             response.headers["Cache-Control"] = "no-store"
             response.headers["Pragma"] = "no-cache"
