@@ -5,10 +5,9 @@ import { colors, kindColors, radius } from "./theme";
 // blau, wie auf den Karten und im Web (der Gleichheits-Test mit dem Web steht in frontend/src/lib/categoryColors.test.js).
 
 test("Kalender: Farben je Art aus dem Thema", () => {
-  const { club, ...kinds } = KIND_COLORS;
-  expect(kinds).toEqual(kindColors);
-  // Vereinstermine (#1445) bleiben gold.
-  expect(club).toBe(colors.gold);
+  expect(KIND_COLORS).toEqual(kindColors);
+  // Versammlungen und eigene Schichten (#1190) sind grün, nicht gold - Gold heißt „angemeldet“.
+  expect(KIND_COLORS.club).not.toBe(colors.gold);
   expect(kindColors.event).not.toBe(kindColors.fastlap);
 });
 

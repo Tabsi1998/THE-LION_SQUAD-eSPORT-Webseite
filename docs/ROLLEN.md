@@ -138,6 +138,13 @@ Einlass ein und wertet aus. Mit dem Bereich Turnierleitung (Rolle oder Freigabe)
 „Nur Mitglieder“ (Listen, Event-Seite, Kalender, Suche, App), Alben und News am Event dagegen nur als Mitglied
 oder mit Vereinsverwaltung/System. Code: `services/visibility.lead_can_see`.
 
+Im **Kalender** (`GET /api/calendar`, Web `/calendar`, App-Monat im Tab Events) stehen seit #1190 auch
+**Versammlungen und die eigenen Helferschichten** (Art `club`, grün) – nur für Konten mit Weg zur Vereinsakte, und nur
+die Sitzungen, zu denen die Person im Vereinsmodul eingeladen ist (der Vorstand so auch seine Vorstandssitzungen),
+sowie die Schichten, für die sie eingetragen ist. Ohne Namen anderer, Tagesordnung oder Einwahl-Link; ein Tipp führt
+in den Mitgliederbereich. Der öffentliche Abo-Feed bleibt ohne sie. Interne Events stehen nicht mehr zusätzlich im
+Mitgliederbereich, sondern bei den Events und im Kalender. Code: `services/club_calendar.club_items`.
+
 In der App fragt die Team-Seite dieselben Rollen wie der Server: Team bearbeiten und Squads dürfen Leitung,
 Co-Leitung, Turnierleitung, Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und
 Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe.

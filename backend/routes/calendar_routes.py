@@ -2,7 +2,8 @@
 
 `GET /api/calendar` liefert, was die angemeldete Person sehen darf (mit „angemeldet“-Kennzeichen);
 `GET /api/calendar/feed.ics` ist der öffentliche Feed für Kalender-Apps - anonym, ohne
-Personendaten, damit die Adresse weitergegeben werden kann. `GET /api/calendar/events/{id}.ics`,
+Personendaten, damit die Adresse weitergegeben werden kann. Für Mitglieder stehen in der Liste auch Versammlungen und die
+eigenen Helferschichten (#1190, Art „club“). `GET /api/calendar/events/{id}.ics`,
 `.../tournaments/{id}.ics` (#580) und `.../fastlaps/{id}.ics` (#1272) sind ein einzelner Termin zum
 Hinzufügen - nur, was öffentlich ist, mit Erinnerung eine Stunde vorher und bei Turnieren dem Check-in
 im Text; ein mehrtägiges Event liefert mit `?day=2` nur diesen Tag.
@@ -26,10 +27,23 @@ router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 FEED_PATH = "/api/calendar/feed.ics"
 
 
+# Die Liste ohne Login ist für alle gleich und darf kurz zwischengespeichert werden; mit Login trägt sie „angemeldet“ und
+# Vereinstermine (#1190) - dann bleibt sie in keinem Zwischenspeicher (wie die privaten Kalender-Dateien).
+PUBLIC_LIST_CACHE = "public, max-age=60"
+PRIVATE_CACHE = "private, no-store"
+
+
 @router.get("")
-async def calendar(user: dict | None = Depends(get_optional_user)):
+async def calendar(response: Response, user: dict | None = Depends(get_optional_user)):
+    response.headers["Cache-Control"] = PRIVATE_CACHE if user else PUBLIC_LIST_CACHE
+    response.headers["Vary"] = "Authorization, Cookie"
     db = get_db()
     items = await calendar_items.collect(db, user)
+    # Versammlungen und eigene Helferschichten (#1190): nur, wer einen Weg zur Vereinsakte hat, bekommt welche - der
+    # Vorstand seine Sitzungen; der öffentliche Feed bleibt ohne sie.
+    club = await club_calendar.club_items(db, user)
+    if club:
+        items = sorted(items + club, key=lambda item: (item["start"], item["kind"], item["title"]))
     return {"items": items, "signed_in": bool(user), "feed_path": FEED_PATH}
 
 
@@ -48,7 +62,7 @@ async def calendar_feed(request: Request):
 
 def _ics_response(text: str, filename: str, *, private: bool = False) -> Response:
     # Persönliches (Versammlung, eigene Schicht) bleibt in keinem geteilten Zwischenspeicher liegen.
-    cache = "private, no-store" if private else "public, max-age=600"
+    cache = PRIVATE_CACHE if private else "public, max-age=600"
     return Response(
         content=text,
         media_type="text/calendar; charset=utf-8",
