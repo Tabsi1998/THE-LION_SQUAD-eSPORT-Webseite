@@ -85,21 +85,20 @@ test.describe("live admin checks", () => {
     await expect(page.getByRole("button", { name: /^html übernehmen$/i })).toBeVisible();
   });
 
-  test("profile image editor renders selected image instead of black preview", async ({ page }) => {
+  test("profile image crop dialog shows the selected image", async ({ page }) => {
     await page.goto("/profile");
     await page.getByTestId("profile-avatar-file").setInputFiles({
       name: "tls-editor-smoke.png",
       mimeType: "image/png",
       buffer: createSmokePng(),
     });
-    await expect(page.getByText("Bild bearbeiten")).toBeVisible();
-    const canvas = page.locator('canvas[aria-label="Bildvorschau"]').first();
-    await expect(canvas).toBeVisible();
-    await expect.poll(async () => canvas.evaluate((node) => {
-      const ctx = node.getContext("2d");
-      const data = ctx.getImageData(Math.floor(node.width / 2), Math.floor(node.height / 2), 1, 1).data;
-      return Array.from(data).join(",");
-    })).toBe("41,182,232,255");
+    // Profilbild zuschneiden (#1459): eigener Dialog mit runder Vorschau statt des allgemeinen Bild-Editors.
+    await expect(page.getByRole("dialog", { name: "Profilbild zuschneiden" })).toBeVisible();
+    const preview = page.getByTestId("profile-avatar-crop-view").locator("img");
+    await expect(preview).toBeVisible();
+    await expect.poll(async () => preview.evaluate((node) => node.naturalWidth > 0 && !node.classList.contains("opacity-0"))).toBe(true);
+    await page.getByTestId("profile-avatar-crop-cancel").click();
+    await expect(page.getByRole("dialog", { name: "Profilbild zuschneiden" })).toBeHidden();
   });
 
   test("image upload API accepts, serves and deletes a smoke image", async ({ request }) => {
