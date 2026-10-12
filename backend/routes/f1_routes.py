@@ -7,7 +7,7 @@ from urllib.parse import quote, urlencode
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse, StreamingResponse
 from database import get_db
-from services.permissions import is_tournament_lead
+from services.permissions import MFA_MESSAGE, is_confirmed_tournament_lead, lead_without_second_factor
 from auth import get_current_user, require_admin, get_optional_user, require_area
 from services.visibility import user_can_see
 from services.visibility import lead_can_see
@@ -111,8 +111,9 @@ def _auth_user(user) -> dict | None:
 
 
 def _is_staff(user: dict | None) -> bool:
-    # Bereich Turnierleitung aus Rolle oder Freigabe (#1350): die Freigabe zählt in jeder Fast Lap wie die Rolle.
-    return is_tournament_lead(_auth_user(user))
+    # Bereich Turnierleitung aus Rolle oder Freigabe (#1350): die Freigabe zählt in jeder Fast Lap wie die Rolle -
+    # wie jeder Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung (#291).
+    return is_confirmed_tournament_lead(_auth_user(user))
 
 
 async def _has_f1_staff_permission(
@@ -139,6 +140,8 @@ async def _has_f1_staff_permission(
 async def _require_f1_result_permission(user: dict | None, challenge_id: str) -> None:
     if await _has_f1_staff_permission(user, challenge_id, F1_RESULT_STAFF_ROLES):
         return
+    if lead_without_second_factor(_auth_user(user)):
+        raise HTTPException(status_code=403, detail=MFA_MESSAGE)
     raise HTTPException(status_code=403, detail="Keine Fast-Lap-Berechtigung für diese Aktion")
 
 

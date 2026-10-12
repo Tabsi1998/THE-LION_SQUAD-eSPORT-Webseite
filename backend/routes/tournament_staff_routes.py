@@ -16,11 +16,14 @@ from routes.tournament_router import router
 
 # --- Tournament staff assignments ---
 async def _enrich_staff_assignments(assignments: list[dict]) -> list[dict]:
+    """Die Zuweisungen mit Name, Benutzername und Bild der Person - mehr braucht die Liste nicht. Sie sehen auch die
+    Helfer des Turniers (#1294): E-Mail-Adresse und Kontorolle gehen deshalb nicht mit; die Rolle im Turnier steht in
+    der Zuweisung selbst."""
     db = get_db()
     user_ids = list({a.get("user_id") for a in assignments if a.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "email": 1, "role": 1},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
     ).to_list(500)}
     for assignment in assignments:
         u = users.get(assignment.get("user_id")) or {}
@@ -29,8 +32,6 @@ async def _enrich_staff_assignments(assignments: list[dict]) -> list[dict]:
             "username": u.get("username"),
             "display_name": u.get("display_name"),
             "avatar_url": u.get("avatar_url"),
-            "email": u.get("email"),
-            "role": u.get("role"),
         }
     return assignments
 

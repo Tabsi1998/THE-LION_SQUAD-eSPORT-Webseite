@@ -7,7 +7,7 @@ from fastapi.responses import RedirectResponse
 from urllib.parse import quote, urlencode
 from pymongo.errors import DuplicateKeyError
 from database import get_db
-from services.permissions import is_tournament_lead
+from services.permissions import is_confirmed_tournament_lead
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see
 from services.visibility import lead_can_see
@@ -134,7 +134,7 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
                            include_drafts: bool = False,
                            user=Depends(get_optional_user)):
     db = get_db()
-    is_admin = is_tournament_lead(user)
+    is_admin = is_confirmed_tournament_lead(user)
     assigned_ids = await assigned_tournament_ids(user)
     can_include_drafts = bool(include_drafts and (is_admin or assigned_ids))
     q = {}
@@ -194,7 +194,7 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
     t, was_old_slug = await find_by_slug_or_history(db.tournaments, slug_or_id, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    is_admin = is_tournament_lead(user)
+    is_admin = is_confirmed_tournament_lead(user)
     is_assigned = await _is_tournament_staff(t["id"], user)
     is_participant = await _user_participates_in_tournament(db, t["id"], user)
     access_link = await validate_access_link(db, access, "tournament", t["id"], user, "view")

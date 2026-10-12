@@ -57,11 +57,26 @@ def _matches(doc, query):
 def test_global_tournament_staff_does_not_need_assignment(monkeypatch):
     monkeypatch.setattr(perms, "get_db", lambda: pytest.fail("global roles must not query assignments"))
 
-    assert asyncio.run(perms.has_tournament_staff_permission(
-        {"id": "u1", "role": "tournament_admin"},
+    allowed = asyncio.run(perms.has_tournament_staff_permission(
+        {"id": "u1", "role": "tournament_admin", "mfa_enabled": True, "auth_mfa_verified": True},
         "t1",
         perms.RESULT_STAFF_ROLES,
     ))
+    assert allowed
+
+
+def test_global_tournament_staff_needs_a_confirmed_second_factor(monkeypatch):
+    """Wie jeder Adminbereich (#291): ohne bestätigte Zwei-Faktor-Anmeldung keine Rechte über alle Turniere - und
+    der Hinweis darauf statt „keine Berechtigung“. Einsätze als Helfer gelten weiter."""
+    from services.permissions import MFA_MESSAGE
+
+    monkeypatch.setattr(perms, "get_db", lambda: FakeDb([]))
+    lead = {"id": "u1", "role": "tournament_admin", "mfa_enabled": True, "auth_mfa_verified": False}
+    allowed = asyncio.run(perms.has_tournament_staff_permission(lead, "t1", perms.RESULT_STAFF_ROLES))
+    assert not perms.is_global_tournament_staff(lead) and not perms.is_global_tournament_admin(lead) and not allowed
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(perms.require_tournament_staff_permission(lead, "t1", perms.RESULT_STAFF_ROLES))
+    assert exc.value.status_code == 403 and exc.value.detail == MFA_MESSAGE
 
 
 def test_moderators_get_tournament_rights_only_through_an_assignment(monkeypatch):

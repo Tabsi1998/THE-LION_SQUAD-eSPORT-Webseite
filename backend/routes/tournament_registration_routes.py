@@ -6,7 +6,7 @@ from fastapi import HTTPException, Depends
 from datetime import datetime, timezone
 from pymongo.errors import DuplicateKeyError
 from database import get_db
-from services.permissions import is_tournament_lead
+from services.permissions import is_confirmed_tournament_lead
 from auth import get_current_user, get_optional_user
 from services.access_links import record_access_link_use, validate_access_link
 from services.match_audience import responsible_registration
@@ -91,7 +91,7 @@ def _can_register_team(team: dict, user: dict) -> bool:
     return (
         team.get("leader_id") == user["id"]
         or user["id"] in (team.get("co_leader_ids") or [])
-        or is_tournament_lead(user)
+        or is_confirmed_tournament_lead(user)
     )
 
 
@@ -377,8 +377,11 @@ async def list_assignable_tournament_users(tid: str, q: str | None = None, limit
     db = get_db()
     tid = await _resolve_tid(tid)
     await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
-    # Helfer eines einzelnen Turniers wählen Konten nach Name und Bild; E-Mail und Rolle sehen nur Vorstand und Admins.
-    full_view = _is_staff(me)
+    # Helfer und Turnierleitung wählen Konten nach Name und Bild; E-Mail-Adresse und Kontorolle sieht nur der Bereich
+    # System (#1294) - mit bestätigter Zwei-Faktor-Anmeldung.
+    from services.permissions import needs_mfa, user_has_area
+
+    full_view = await user_has_area(me, "system") and not needs_mfa(me)
     query = {"is_banned": {"$ne": True}}
     if q:
         pattern = safe_regex(q)

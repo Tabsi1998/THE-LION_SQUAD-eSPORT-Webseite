@@ -93,7 +93,7 @@ async def test_fast_lap_helper_picks_drivers_by_name_without_account_data(flow):
 
 
 @pytest.mark.asyncio
-async def test_tournament_helper_picks_accounts_by_name_staff_still_sees_email(flow):
+async def test_tournament_helper_and_lead_pick_accounts_by_name_only_system_sees_email(flow):
     await flow.add_user(role="player", name="Mitspielerin")
     tournament = await flow.create_tournament()
     helper = await flow.add_user(role="player", name="Turnierhelfer")
@@ -110,10 +110,16 @@ async def test_tournament_helper_picks_accounts_by_name_staff_still_sees_email(f
     by_name = await flow.get(f"/api/tournaments/{tournament['id']}/assignable-users", params={"q": "Mitspiel"})
     assert [row["display_name"] for row in by_name.json()] == ["Mitspielerin"]
 
+    # Die Turnierleitung ist kein Bereich System: auch sie wählt Konten nach Name und Bild.
     flow.act_as(await flow.add_user(role="tournament_admin"))
-    staff_view = await flow.get(f"/api/tournaments/{tournament['id']}/assignable-users", params={"q": "Mitspiel"})
-    assert staff_view.status_code == 200, staff_view.text
-    assert staff_view.json()[0]["email"].endswith("@example.test")
+    lead_view = await flow.get(f"/api/tournaments/{tournament['id']}/assignable-users", params={"q": "Mitspiel"})
+    assert lead_view.status_code == 200, lead_view.text
+    assert lead_view.json() and all("email" not in row and "role" not in row for row in lead_view.json())
+
+    flow.act_as(await flow.add_user(role="club_admin"))
+    system_view = await flow.get(f"/api/tournaments/{tournament['id']}/assignable-users", params={"q": "Mitspiel"})
+    assert system_view.status_code == 200, system_view.text
+    assert system_view.json()[0]["email"].endswith("@example.test"), "der Bereich System sieht die Adresse wie bisher"
 
 
 @pytest.mark.asyncio
