@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, ClipboardCheck } from "lucide-react";
+import { Check, ClipboardCheck, X } from "lucide-react";
+import { chatAttachmentSrc } from "@/lib/chatAttachments";
+import { viennaDateTime } from "@/lib/vienna";
 import { REPORT_STATE_TEXT, rankingMode } from "@/lib/matchReport";
 import { initialState, inputKind, resultSentence, resultsFor, tapGame } from "@/lib/resultEntry";
 import { BestOfInput, OrderInput, ScoreInput, WinnerInput } from "@/components/tls/results/ResultInputs";
@@ -30,7 +32,17 @@ function fallbackEntry(participants, match, allowsDraw) {
   };
 }
 
-export function MatchReportForm({ participants = [], match = {}, entry: serverEntry = null, state = null, allowsDraw = false, busy = false, onReport }) {
+function clock(value) {
+  try {
+    return value ? viennaDateTime(value, { hour: "2-digit", minute: "2-digit" }) : "";
+  } catch {
+    return "";
+  }
+}
+
+// `readOnly`: Team-Mitglieder ohne Leitung sehen die Meldung der Gegenseite, bestätigen kann die Teamleitung (#1159).
+// `onWrongResult`: „Stimmt nicht“ öffnet „Problem melden“ mit „Falsches Ergebnis“ (#1158).
+export function MatchReportForm({ participants = [], match = {}, entry: serverEntry = null, state = null, allowsDraw = false, busy = false, readOnly = false, onReport, onWrongResult }) {
   const status = state?.status || "open";
   const entry = useMemo(() => serverEntry || fallbackEntry(participants, match, allowsDraw), [serverEntry, participants, match, allowsDraw]);
   const kind = inputKind(entry, "order");
@@ -70,25 +82,36 @@ export function MatchReportForm({ participants = [], match = {}, entry: serverEn
       {status !== "open" && status !== "agreed" && (
         <div className={`rounded-sm border px-4 py-3 text-sm ${TONE[status] || TONE.waiting}`} data-testid="match-report-state" data-status={status}>
           <p className="font-bold">{REPORT_STATE_TEXT[status]}</p>
-          {status === "confirm" && state?.proposal_summary && <p className="mt-1">Die Gegenseite meldet: <strong>{state.proposal_summary}</strong></p>}
-          {status !== "confirm" && state?.own_summary && <p className="mt-1">Deine Meldung: <strong>{state.own_summary}</strong></p>}
-          {status === "confirm" && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" disabled={busy} onClick={() => onReport({ results: state.proposal, screenshot_url: null, note: null })} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-confirm">
-                <Check className="w-3.5 h-3.5" /> Ja, stimmt
-              </button>
-              {!editing && (
-                <button type="button" onClick={() => setEditing(true)} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="match-report-differs">Nein, anderes Ergebnis</button>
-              )}
-            </div>
+          {/* Bestätigen mit einem Tipp (#1159): die Meldung der Gegenseite in Worten, von wem und wann, mit Foto. */}
+          {status === "confirm" && (state?.proposal_text || state?.proposal_summary) && (
+            <p className="mt-1 text-base font-bold text-white" data-testid="match-report-proposal">{state.proposal_text || `Die Gegenseite meldet: ${state.proposal_summary}`}</p>
           )}
+          {status === "confirm" && state?.proposal_by && <p className="mt-0.5 text-xs opacity-80">gemeldet von {state.proposal_by}{state.proposal_at ? ` um ${clock(state.proposal_at)}` : ""}</p>}
+          {status === "confirm" && state?.proposal_photo?.url && (
+            <a href={chatAttachmentSrc(state.proposal_photo.url)} target="_blank" rel="noreferrer" className="mt-2 block w-32 overflow-hidden rounded-sm border border-white/15" data-testid="match-report-proposal-photo">
+              <img src={chatAttachmentSrc(state.proposal_photo.url, 400)} alt="Foto der Gegenseite" className="h-20 w-full object-cover" />
+            </a>
+          )}
+          {status !== "confirm" && state?.own_summary && <p className="mt-1">Deine Meldung: <strong>{state.own_summary}</strong></p>}
+          {status === "confirm" && (readOnly || state?.can_confirm === false ? (
+            <p className="mt-2 text-xs opacity-80" data-testid="match-report-lead-confirms">Bestätigen kann die Teamleitung.</p>
+          ) : (
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              <button type="button" disabled={busy} onClick={() => onReport({ results: state.proposal, screenshot_url: null, note: null })} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-confirm">
+                <Check className="w-3.5 h-3.5" /> Stimmt
+              </button>
+              <button type="button" disabled={busy} onClick={() => onWrongResult?.()} className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-wrong">
+                <X className="w-3.5 h-3.5" /> Stimmt nicht
+              </button>
+            </div>
+          ))}
           {(status === "waiting" || status === "conflict") && !editing && (
             <button type="button" onClick={() => setEditing(true)} className="mt-2 text-xs font-bold uppercase tracking-wider underline underline-offset-2 hover:text-white" data-testid="match-report-change">Meldung ändern</button>
           )}
         </div>
       )}
 
-      {editing && (
+      {editing && !readOnly && (
         <form onSubmit={submit} className="space-y-4" data-testid="match-report-form" noValidate>
           {kind === "score" && <ScoreInput entry={entry} state={form} onChange={setForm} showFlags={false} />}
           {kind === "bestof" && (

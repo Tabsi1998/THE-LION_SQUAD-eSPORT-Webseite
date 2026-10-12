@@ -40,11 +40,12 @@ from services.rate_limit import enforce_rate_limit
 from services import word_filter
 from services.station_labels import attach_station_info
 from match_rules import match_allows_draw
-from services.match_audience import acting_registration, player_user_ids
+from services.match_audience import acting_registration, player_ids, player_user_ids, teams_by_id
 # Solange ein Spiel einen dieser Zustände hat, darf ein Aufruf (#1122) stehen bleiben.
 from services.match_calls import CALL_OPEN_STATUSES, call_view
 from services.match_disputes import CATEGORIES as DISPUTE_CATEGORIES, CLOSED_DETAIL as DISPUTE_CLOSED_DETAIL, dispute_window
 from services.match_notifications import (
+    proposal_sentence,
     notify_dispute_kept,
     notify_dispute_opened,
     notify_report_conflict,
@@ -513,11 +514,18 @@ def _accepts_reports(match: dict) -> bool:
     return len(_registration_ids_for_match(match)) >= 2
 
 
-async def _report_view(db, match: dict, acting_reg: dict) -> dict:
+async def _report_view(db, match: dict, acting_reg: dict, can_confirm: bool = True) -> dict:
     state = report_state(match.get("reports") or [], acting_reg.get("id"))
     registrations = await _registrations_for_match(match)
     regs_by_id = {reg["id"]: reg for reg in registrations if reg.get("id")}
     own, proposal = state["own"], state["proposal"]
+    # Bestätigen mit einem Tipp (#1159): die Meldung der Gegenseite in Worten, von wem und wann. Bestätigen dürfen die
+    # Verantwortlichen (#1136); die anderen Mitglieder eines Teams sehen die Meldung ohne Knöpfe.
+    proposal_extra = {
+        "proposal_text": proposal_sentence(proposal.get("results"), regs_by_id, proposal.get("registration_id"), acting_reg.get("id")),
+        "proposal_by": (regs_by_id.get(proposal.get("registration_id")) or {}).get("display_name"),
+        "proposal_at": proposal.get("at"),
+    } if proposal else {}
     # Foto vom Ergebnis (#1157): die eigene Seite sieht ihr Foto, beim Bestätigen das der Gegenseite - erst nach der
     # Bildprüfung; die Adresse liefert nur an Spieler und Turnierleitung aus.
     photos = await visible_proofs(db, [(own or {}).get("photo_id"), (proposal or {}).get("photo_id")])
@@ -529,7 +537,18 @@ async def _report_view(db, match: dict, acting_reg: dict) -> dict:
         "proposal": public_report_results(proposal.get("results")) if proposal else None,
         "proposal_summary": results_summary(proposal.get("results"), regs_by_id) if proposal else None,
         "proposal_photo": photos.get((proposal or {}).get("photo_id") or ""),
+        "can_confirm": can_confirm,
+        **proposal_extra,
     }
+
+
+async def _member_registration_for_match(db, match: dict, user_id: str | None) -> dict | None:
+    """Die Anmeldung, zu der diese Person im Spiel gehört - auch als einfaches Team-Mitglied (#1136: player_ids)."""
+    if not user_id:
+        return None
+    registrations = await _registrations_for_match(match)
+    teams = await teams_by_id(db, registrations)
+    return next((reg for reg in registrations if user_id in player_ids(reg, teams.get(reg.get("team_id") or ""))), None)
 
 
 async def _match_page_payload(match: dict, collection: str, user: dict | None = None) -> dict:
@@ -568,6 +587,11 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     report_view = None
     if acting_reg and _players_can_report(policy):
         report_view = await _report_view(db, match, acting_reg)
+    elif user and _players_can_report(policy):
+        # Team-Mitglieder ohne Leitung (#1159): sie sehen die Meldung der Gegenseite, bestätigen kann die Teamleitung.
+        member_reg = await _member_registration_for_match(db, match, user.get("id"))
+        if member_reg:
+            report_view = await _report_view(db, match, member_reg, can_confirm=False)
     # Dispute (#1134): jeder Teilnehmer in jedem Modus - vor dem Ergebnis immer, danach bis 30 Minuten nach dem
     # Ergebnis oder bis das nächste Spiel des Siegers beginnt. Website und App zeigen genau das.
     window = await dispute_window(db, match) if acting_reg else {"open": False, "until": None}

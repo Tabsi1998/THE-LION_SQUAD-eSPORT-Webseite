@@ -85,7 +85,7 @@ async def test_first_report_asks_the_other_side_and_confirming_decides_the_match
     asked = await notes(flow, "match_report")
     assert [row["user_id"] for row in asked] == [player[second]["id"]], "nur die Gegenseite - nicht der Melder, niemand sonst"
     assert asked[0]["title"] == "Ergebnis gemeldet – bitte bestätigen"
-    assert "gewinnt 2:1." in asked[0]["body"]
+    assert asked[0]["body"].endswith("meldet 2:1 für sich. Stimmt das?")
     mails = await flow.db.mail_jobs.find({"template_key": "score_reported"}, {"_id": 0}).to_list(10)
     assert [mail["to"] for mail in mails] == [player[second]["email"]]
 

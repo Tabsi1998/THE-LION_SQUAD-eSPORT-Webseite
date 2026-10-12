@@ -39,6 +39,7 @@ import { MatchReportCard, type ReportPayload, type ReportState } from "../../com
 import { rankingMode } from "../../lib/matchReport";
 import type { ResultEntry } from "../../lib/resultEntry";
 import { ProblemReportCard, type ProblemPayload } from "../../components/results/ProblemReportCard";
+import type { DisputeReason } from "../../lib/disputeReasons";
 import { countdown, type MatchCall } from "../../lib/matchCall";
 import { asInstant, viennaTime } from "../../lib/vienna";
 import type { CatalogSticker } from "../../lib/stickers";
@@ -212,6 +213,10 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   // beides dürfte, bekommt das Formular der Turnierleitung.
   const canStaffSubmitResult = Boolean(page?.can_staff_submit_result ?? page?.can_submit_result);
   const canPlayerReportResult = Boolean((page?.can_player_report_result ?? page?.can_report_score) && !canStaffSubmitResult && !isCompleted);
+  // Team-Mitglieder ohne Leitung (#1159): sie sehen die Meldung der Gegenseite, bestätigen kann die Teamleitung.
+  const showReportReadOnly = Boolean(!canPlayerReportResult && !canStaffSubmitResult && !isCompleted && page?.report_state?.status === "confirm");
+  // „Stimmt nicht“ (#1159) öffnet „Problem melden“ mit „Falsches Ergebnis“.
+  const [problemCategory, setProblemCategory] = useState<DisputeReason | null>(null);
   const canSubmitV2Result = Boolean(!isCompleted && canStaffSubmitResult && v2Rows.length);
   const canProposeSchedule = Boolean(page?.can_propose_schedule);
   const canManageSchedule = Boolean(page?.can_manage_schedule);
@@ -226,7 +231,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const scheduleModeLabel = formatScheduleMode(page?.schedule_mode);
   // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - der Server sagt, bis wann.
   const canDispute = Boolean(page?.can_dispute);
-  const hasResultActions = Boolean(canPlayerReportResult || canSubmitV2Result || canDispute || (!isCompleted && page?.can_forfeit));
+  const hasResultActions = Boolean(canPlayerReportResult || showReportReadOnly || canSubmitV2Result || canDispute || (!isCompleted && page?.can_forfeit));
   const showFlowNotice = Boolean(!hasResultActions && (page?.result_entry_mode || page?.schedule_mode));
 
   const propose = useCallback(async () => {
@@ -515,8 +520,10 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         {hasResultActions ? (
           <Card style={styles.card}>
             <Heading>{canPlayerReportResult ? "Ergebnis melden" : canSubmitV2Result ? "Ergebnis eintragen" : "Ergebnis"}</Heading>
-            {canPlayerReportResult ? (
+            {canPlayerReportResult || showReportReadOnly ? (
               <MatchReportCard
+                readOnly={!canPlayerReportResult}
+                onWrongResult={() => setProblemCategory("wrong_result")}
                 participants={participants}
                 match={match}
                 entry={page.report_entry || null}
@@ -552,7 +559,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
               </>
             ) : null}
             {canDispute ? (
-              <ProblemReportCard matchId={route.params.id} until={page.dispute_until} busy={busy} onSubmit={submitDispute} />
+              <ProblemReportCard matchId={route.params.id} until={page.dispute_until} busy={busy} onSubmit={submitDispute} initialCategory={problemCategory} />
             ) : null}
             {page.can_forfeit && !isCompleted && duelParticipants.length >= 2 ? (
               <>

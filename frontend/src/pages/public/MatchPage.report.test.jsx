@@ -102,14 +102,34 @@ test("nach der eigenen Meldung: „wartet auf die Gegenseite“, ändern geht", 
   expect(screen.getByTestId("match-report-form")).toBeInTheDocument();
 });
 
-test("die Gegenseite hat gemeldet: „Ja, stimmt“ schickt genau diese Meldung", async () => {
+test("die Gegenseite hat gemeldet (#1159): der Satz in Worten, „Stimmt“ schickt genau diese Meldung", async () => {
   const proposal = [{ registration_id: "r2", rank: 1, score: 3 }, { registration_id: "r1", rank: 2, score: 1 }];
-  renderMatch({ ...PAGE, report_state: { status: "confirm", own_summary: null, proposal, proposal_summary: "LunaByte gewinnt 3:1." } });
+  renderMatch({ ...PAGE, report_state: { status: "confirm", own_summary: null, proposal, proposal_summary: "LunaByte gewinnt 3:1.",
+    proposal_text: "LunaByte meldet 3:1 für sich.", proposal_by: "LunaByte", proposal_at: "2026-05-23T16:10:00Z", can_confirm: true } });
   const box = await screen.findByTestId("match-report-confirm");
   expect(screen.getByTestId("match-report-state")).toHaveAttribute("data-status", "confirm");
-  expect(screen.getByText("LunaByte gewinnt 3:1.")).toBeInTheDocument();
+  expect(screen.getByTestId("match-report-proposal")).toHaveTextContent("LunaByte meldet 3:1 für sich.");
+  expect(screen.getByText(/gemeldet von LunaByte um/)).toBeInTheDocument();
+  expect(box).toHaveTextContent("Stimmt");
   fireEvent.click(box);
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/report", { results: proposal, screenshot_url: null, note: null }));
+});
+
+test("„Stimmt nicht“ öffnet „Problem melden“ mit „Falsches Ergebnis“", async () => {
+  const proposal = [{ registration_id: "r2", rank: 1 }, { registration_id: "r1", rank: 2 }];
+  renderMatch({ ...PAGE, can_dispute: true, report_state: { status: "confirm", proposal, proposal_text: "LunaByte meldet einen Sieg für sich.", can_confirm: true } });
+  fireEvent.click(await screen.findByTestId("match-report-wrong"));
+  await waitFor(() => expect(screen.getByTestId("match-dispute-reason-wrong_result")).toHaveAttribute("aria-pressed", "true"));
+  expect(apiMock.post).not.toHaveBeenCalled();
+});
+
+test("Team-Mitglied ohne Leitung: sieht die Meldung, bestätigen kann die Teamleitung", async () => {
+  const proposal = [{ registration_id: "r2", rank: 1 }, { registration_id: "r1", rank: 2 }];
+  renderMatch({ ...PAGE, can_player_report_result: false, can_report_score: false,
+    report_state: { status: "confirm", proposal, proposal_text: "LunaByte meldet einen Sieg für sich.", can_confirm: false } });
+  expect(await screen.findByTestId("match-report-lead-confirms")).toHaveTextContent("Bestätigen kann die Teamleitung.");
+  expect(screen.queryByTestId("match-report-confirm")).toBeNull();
+  expect(screen.queryByTestId("match-report-form")).toBeNull();
 });
 
 test("Meldungen weichen ab: die Turnierleitung entscheidet", async () => {

@@ -226,6 +226,27 @@ async def _match_context(db, match: dict) -> tuple[dict, list[dict], dict[str, d
     return tournament, registrations, {reg["id"]: reg for reg in registrations if reg.get("id")}
 
 
+def proposal_sentence(results: list[dict] | None, regs_by_id: dict[str, dict], reporter_id: str | None,
+                      viewer_id: str | None) -> str:
+    """Eine Meldung der Gegenseite in Worten, aus Sicht der Person, die bestätigen soll (#1159):
+    „Frostbiss meldet 2:1 für dich.“ - „… für sich.“ - „… ein Unentschieden 1:1.“ - bei Durchgängen die Plätze."""
+    reporter = _name(regs_by_id.get(reporter_id), "Die Gegenseite")
+    ordered = sorted(results or [], key=_rank_sort_key)
+    if len(ordered) != 2:
+        return f"{reporter} meldet: {results_summary(ordered, regs_by_id)}"
+    top, bottom = ordered
+    top_value, bottom_value = _value_text(top), _value_text(bottom)
+    score = f"{top_value}:{bottom_value}" if top_value is not None and bottom_value is not None else ""
+    if int(top.get("rank") or 0) == int(bottom.get("rank") or 0):
+        return f"{reporter} meldet ein Unentschieden{f' {score}' if score else ''}."
+    winner = top.get("registration_id")
+    if winner == viewer_id:
+        return f"{reporter} meldet {score} für dich." if score else f"{reporter} meldet einen Sieg für dich."
+    if winner == reporter_id:
+        return f"{reporter} meldet {score} für sich." if score else f"{reporter} meldet einen Sieg für sich."
+    return f"{reporter} meldet: {results_summary(ordered, regs_by_id)}"
+
+
 async def notify_result_reported(db, match: dict, report: dict, actor_id: str | None) -> int:
     """Die erste Meldung ist da (#1132): die Verantwortlichen der Gegenseite sollen bestätigen oder anders melden -
     im Postfach, per Push und, wenn die Person es zulässt, per Mail (``score_reported``). Nur die Gegenseite, nie
@@ -241,17 +262,23 @@ async def notify_result_reported(db, match: dict, report: dict, actor_id: str | 
     path = f"/matches/{match.get('id')}"
     absolute_url = await build_public_url(path)
     dedupe = f"match-report:{match.get('id')}:{reporter_id}:{report.get('at')}"
+    # Bestätigen mit einem Tipp (#1159): der Satz aus Sicht der Gegenseite, und was „Stimmt“ in der Glocke schickt -
+    # dieselbe Meldung noch einmal (nur Plätze und Stand, nie Notiz oder Foto).
+    from services.v2_match_flows import public_report_results
+
+    viewer_id = others[0].get("id") if len(others) == 1 else None
+    sentence = proposal_sentence(report.get("results"), regs_by_id, reporter_id, viewer_id)
     sent = 0
     for user in await users_for(db, recipient_ids):
         created = await create_user_notification(
             user["id"],
             "Ergebnis gemeldet – bitte bestätigen",
-            f"{tournament_title}: {_name(regs_by_id.get(reporter_id), 'Die Gegenseite')} meldet „{summary}“ "
-            "Stimmt das? Bestätige es auf der Matchseite – sonst melde dein Ergebnis.",
+            f"{tournament_title}: {sentence} Stimmt das?",
             url=path,
             kind="match_report",
             meta={"category": "match_reminders", "dedupe_key": dedupe, "match_id": match.get("id"),
-                  "tournament_id": match.get("tournament_id")},
+                  "tournament_id": match.get("tournament_id"),
+                  "confirm_results": public_report_results(report.get("results"))},
         )
         if created:
             sent += 1

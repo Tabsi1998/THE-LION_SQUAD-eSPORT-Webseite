@@ -95,6 +95,8 @@ export default function MatchPage() {
   const [forfeitWinnerId, setForfeitWinnerId] = useState("");
   const [v2Rows, setV2Rows] = useState([]);
   const { submitting: busy, submitOnce } = useSubmissionGuard();
+  // „Stimmt nicht“ (#1159) öffnet „Problem melden“ mit „Falsches Ergebnis“.
+  const [problemCategory, setProblemCategory] = useState("");
   const [actionError, setActionError] = useState("");
 
   const load = useCallback(async ({ preserveDrafts = true } = {}) => {
@@ -279,12 +281,18 @@ export default function MatchPage() {
   // dürfte, bekommt das Formular der Turnierleitung.
   const canStaffSubmit = Boolean(data.can_staff_submit_result);
   const canPlayerReport = Boolean(data.can_player_report_result && !canStaffSubmit && !isCompleted);
+  // Team-Mitglieder ohne Leitung (#1159): sie sehen die Meldung der Gegenseite, bestätigen kann die Teamleitung.
+  const showReportReadOnly = Boolean(!canPlayerReport && !canStaffSubmit && !isCompleted && data.report_state?.status === "confirm");
+  const wrongResult = () => {
+    setProblemCategory("wrong_result");
+    window.setTimeout(() => document.querySelector("[data-testid='match-dispute-form']")?.scrollIntoView({ block: "center" }), 0);
+  };
   const canSubmitV2Result = Boolean(!isCompleted && canStaffSubmit && v2Rows.length);
   // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - der Server sagt, bis wann.
   const canDispute = Boolean(data.can_dispute);
   // Nur Turnierleitung (#1157): wer mitspielt, sieht statt eines Melde-Knopfs, wer das Ergebnis einträgt.
   const showStaffEnters = Boolean(data.acting_registration_id && !canPlayerReport && !canStaffSubmit && !finished && data.result_entry_mode === "staff_only" && !data.in_dispute);
-  const hasOtherResultActions = Boolean(canPlayerReport || canSubmitV2Result);
+  const hasOtherResultActions = Boolean(canPlayerReport || canSubmitV2Result || showReportReadOnly);
   const hasResultActions = Boolean(hasOtherResultActions || canDispute || (!isCompleted && data.can_forfeit));
   const reports = Array.isArray(match.reports) ? match.reports : [];
   const resultParticipants = isV2 ? participants : duelParticipants;
@@ -418,8 +426,10 @@ export default function MatchPage() {
 
           {hasResultActions ? (
             <div className="mt-5 border-t border-white/10 pt-5 space-y-5">
-              {canPlayerReport && (
+              {(canPlayerReport || showReportReadOnly) && (
                 <MatchReportForm
+                  readOnly={!canPlayerReport}
+                  onWrongResult={wrongResult}
                   participants={participants}
                   match={match}
                   entry={data.report_entry}
@@ -464,7 +474,7 @@ export default function MatchPage() {
               )}
 
               {canDispute && (
-                <ProblemReportForm matchId={id} until={data.dispute_until} busy={busy} onSubmit={submitDispute} separated={hasOtherResultActions} />
+                <ProblemReportForm matchId={id} until={data.dispute_until} busy={busy} onSubmit={submitDispute} separated={hasOtherResultActions} initialCategory={problemCategory} />
               )}
 
               {data.can_forfeit && !isCompleted && duelParticipants.length >= 2 && (

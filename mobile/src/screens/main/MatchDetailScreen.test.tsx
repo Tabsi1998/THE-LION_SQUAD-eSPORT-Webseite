@@ -88,12 +88,12 @@ test("Spieler melden: Sieger wählen, Spielstand freiwillig - die Platzierungsli
   expect(mockPost.mock.calls.some(([, body]) => body && "score_a" in (body as object))).toBe(false);
 });
 
-test("die Gegenseite hat gemeldet: „Ja, stimmt“ schickt genau diese Meldung", async () => {
+test("die Gegenseite hat gemeldet (#1159): der Satz, „Stimmt“ schickt genau diese Meldung", async () => {
   const proposal = [{ registration_id: "r2", rank: 1, score: 3 }, { registration_id: "r1", rank: 2, score: 1 }];
-  answer({ ...PAGE, report_state: { status: "confirm", own_summary: null, proposal, proposal_summary: "LunaByte gewinnt 3:1." } });
+  answer({ ...PAGE, report_state: { status: "confirm", own_summary: null, proposal, proposal_summary: "LunaByte gewinnt 3:1.", proposal_text: "LunaByte meldet 3:1 für sich.", proposal_by: "LunaByte", can_confirm: true } });
   await render(<MatchDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("match-report-state")).toBeTruthy());
-  expect(screen.getByText("Die Gegenseite meldet: LunaByte gewinnt 3:1.")).toBeTruthy();
+  expect(screen.getByTestId("match-report-proposal")).toHaveTextContent("LunaByte meldet 3:1 für sich.");
   expect(screen.queryByTestId("match-report-form")).toBeNull();
   await fireEvent.press(screen.getByTestId("match-report-confirm"));
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/report", { results: proposal, screenshot_url: null, note: null }));
@@ -238,5 +238,25 @@ describe("Foto vom Ergebnis und „Nur Turnierleitung“ (#1157)", () => {
     await waitFor(() => expect(screen.getByTestId("match-staff-enters")).toBeTruthy());
     expect(screen.getByText("Das Ergebnis trägt die Turnierleitung ein.")).toBeTruthy();
     expect(screen.queryByTestId("match-report")).toBeNull();
+  });
+});
+
+describe("Bestätigen mit einem Tipp (#1159)", () => {
+  const proposal = [{ registration_id: "r2", rank: 1 }, { registration_id: "r1", rank: 2 }];
+
+  test("„Stimmt nicht“ öffnet „Problem melden“ mit „Falsches Ergebnis“", async () => {
+    answer({ ...PAGE, can_dispute: true, report_state: { status: "confirm", proposal, proposal_text: "LunaByte meldet einen Sieg für sich.", can_confirm: true } });
+    await render(<MatchDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("match-report-wrong")).toBeTruthy());
+    await fireEvent.press(screen.getByTestId("match-report-wrong"));
+    await waitFor(() => expect(screen.getByTestId("match-dispute-reason-wrong_result").props.accessibilityState).toEqual({ selected: true }));
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  test("Team-Mitglied ohne Leitung sieht die Meldung ohne Knöpfe", async () => {
+    answer({ ...PAGE, can_player_report_result: false, can_report_score: false, report_state: { status: "confirm", proposal, proposal_text: "LunaByte meldet einen Sieg für sich.", can_confirm: false } });
+    await render(<MatchDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("match-report-lead-confirms")).toBeTruthy());
+    expect(screen.queryByTestId("match-report-confirm")).toBeNull();
   });
 });
