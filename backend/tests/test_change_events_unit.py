@@ -58,6 +58,20 @@ def test_staff_stream_needs_the_confirmed_second_factor():
         assert change_events.visibility_scope_for_user({"role": role, "mfa_enabled": True, "auth_mfa_verified": True}) == "staff"
 
 
+def test_staff_stream_follows_the_confirmed_tournament_lead_from_role_or_grant():
+    # Turnierleitung aus Rolle oder Freigabe (#1350) - beide nur mit bestätigter Zwei-Faktor-Anmeldung.
+    confirmed = {"mfa_enabled": True, "auth_mfa_verified": True}
+    role_lead = {"role": "tournament_admin"}
+    granted_lead = {"role": "player", "areas": ["tournaments"]}
+    for lead in (role_lead, granted_lead):
+        assert change_events.visibility_scope_for_user({**lead, **confirmed}) == "staff"
+        assert change_events.visibility_scope_for_user(lead) == "public"
+        assert change_events.visibility_scope_for_user({**lead, "mfa_enabled": True}) == "public"
+    # Andere Freigaben öffnen den Strom nicht; Moderation auch mit Zwei-Faktor nicht.
+    assert change_events.visibility_scope_for_user({"role": "player", "areas": ["content"], **confirmed}) == "public"
+    assert change_events.visibility_scope_for_user({"role": "moderator", **confirmed}) == "public"
+
+
 def test_private_mutation_is_visible_to_staff_only():
     async def scenario():
         public_queue = asyncio.Queue()
