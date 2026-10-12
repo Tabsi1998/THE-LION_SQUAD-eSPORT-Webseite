@@ -241,6 +241,11 @@ async def test_linking_discord_sends_matching_servers_once_and_only_as_a_dm(flow
     # Über den echten Rückruf: Verknüpfen löst die Direktnachricht im Hintergrund aus.
     monkeypatch.setattr(platform_links, "read_state_payload", lambda state, platform: {"sub": paula["id"]})
 
+    async def flow_of_this_browser(db, flow_id, platform, state_payload):
+        """Start und Ablauf-Cookie (#1027) prüft test_platform_links_flow - hier geht es um die Direktnachricht."""
+
+    monkeypatch.setattr(platform_links, "consume_flow", flow_of_this_browser)
+
     async def identity(platform, branding, query, state_payload=None, db=None):
         return {"external_id": PAULA_DISCORD, "handle": "paula", "display_name": "Paula"}
 

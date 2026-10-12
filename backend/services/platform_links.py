@@ -7,8 +7,10 @@ sagt, wer man ist; die Website trägt den Wert ins Profil ein und merkt sich
 und bei Turnieren.
 
 Ablauf: ``start`` baut die Anmeldeadresse mit einem signierten ``state`` (JWT: Nutzer, Plattform,
-Nonce, zehn Minuten). Die Plattform ruft ``callback`` auf - ohne Anmeldung bei uns, der ``state``
-sagt, wer verknüpft. Ein Plattform-Konto gehört genau einem Nutzer (``taken``). Ändert jemand das
+Nonce, zehn Minuten) und merkt sich den Ablauf auf dem Server; der Browser bekommt dazu ein kurzlebiges
+Cookie (#1027). Die Plattform ruft ``callback`` auf - ohne Anmeldung bei uns: der ``state`` sagt, wer
+verknüpft, und zählt nur zusammen mit dem Cookie des Browsers, der gestartet hat, und nur einmal.
+Ein Plattform-Konto gehört genau einem Nutzer (``taken``). Ändert jemand das
 Profilfeld von Hand, fällt die Verifizierung weg.
 
 Jede Plattform steht in ``PLATFORMS`` mit ihrem Profilfeld, dem Sichtbarkeitsschlüssel des Profils,
@@ -572,7 +574,7 @@ async def _bluesky_identity(db, query: dict, code: str, nonce: str) -> dict:
 
 def make_state(user_id: str, platform: str) -> str:
     payload = {
-        "sub": user_id, "plt": platform, "type": STATE_TYPE, "nonce": secrets.token_urlsafe(8),
+        "sub": user_id, "plt": platform, "type": STATE_TYPE, "nonce": secrets.token_urlsafe(16),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=STATE_MINUTES),
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm="HS256")
@@ -587,6 +589,57 @@ def read_state_payload(token: str | None, platform: str) -> dict:
     if payload.get("type") != STATE_TYPE or payload.get("plt") != platform or not payload.get("sub"):
         raise LinkError("invalid", "state passt nicht zur Plattform")
     return payload
+
+
+# ---------------------------------------------------------------- Ablauf an den Browser binden (#1027)
+#
+# Der Server merkt sich jeden Start als Ablauf (Nutzer, Plattform, Nonce des state, Frist, verbraucht ja/nein),
+# der Browser bekommt die zufällige Kennung als kurzlebiges Cookie. Der Rückruf zählt nur, wenn Cookie,
+# gespeicherter Ablauf und ``state`` zusammenpassen - und nur einmal.
+
+FLOW_COOKIE = "tls_link_flow"
+
+
+def flow_cookie_path(platform: str) -> str:
+    """Das Cookie geht nur an den Rückruf genau dieser Plattform - mehrere Starts nebeneinander stören sich nicht."""
+    return f"/api/platform-links/{platform}/callback"
+
+
+def flow_cookie_secure() -> bool:
+    """Secure, sobald der Rückruf über HTTPS läuft - lokal (http://localhost) geht es sonst gar nicht."""
+    return public_base_url().startswith("https://")
+
+
+def _flow_hash(flow_id: str) -> str:
+    return hashlib.sha256(flow_id.encode("utf-8")).hexdigest()
+
+
+async def open_flow(db, user_id: str, platform: str, state: str) -> str:
+    """Den Start merken; zurück kommt die Kennung fürs Cookie (in der Datenbank liegt nur ihr Hash)."""
+    flow_id = secrets.token_urlsafe(32)
+    now = now_utc()
+    await db.platform_link_flows.insert_one({
+        "flow_hash": _flow_hash(flow_id), "user_id": user_id, "platform": platform,
+        "nonce": str(read_state_payload(state, platform)["nonce"]), "consumed": False,
+        "created_at": now, "expires_at": now + timedelta(minutes=STATE_MINUTES),
+    })
+    return flow_id
+
+
+async def consume_flow(db, flow_id: str | None, platform: str, state_payload: dict) -> None:
+    """Den Ablauf zum Rückruf verbrauchen - in einem Schritt, damit zwei gleichzeitige Rückrufe nicht beide zählen.
+    Passt etwas nicht (kein Cookie, anderer Browser, andere Plattform, abgelaufen, schon verbraucht): ``invalid``."""
+    nonce = str(state_payload.get("nonce") or "")
+    if not flow_id or not nonce:
+        raise LinkError("invalid", "kein Ablauf zu diesem Browser")
+    now = now_utc()
+    flow = await db.platform_link_flows.find_one_and_update(
+        {"flow_hash": _flow_hash(str(flow_id)), "platform": platform, "user_id": str(state_payload.get("sub") or ""),
+         "nonce": nonce, "consumed": False, "expires_at": {"$gt": now}},
+        {"$set": {"consumed": True, "consumed_at": now}},
+    )
+    if not flow:
+        raise LinkError("invalid", "Ablauf passt nicht zu diesem Browser, ist abgelaufen oder verbraucht")
 
 
 def read_state(token: str | None, platform: str) -> str:

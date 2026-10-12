@@ -170,6 +170,10 @@ async def init_indexes():
     await db.passkeys.create_index("user_id")
     await db.passkey_challenges.create_index("expires_at", expireAfterSeconds=0)
     await db.passkey_challenges.create_index("user_id")
+    # Plattform verknüpfen (#1027): ein Ablauf je Start, nach zehn Minuten räumt MongoDB ihn selbst weg.
+    await db.platform_link_flows.create_index("flow_hash", unique=True)
+    await db.platform_link_flows.create_index("expires_at", expireAfterSeconds=0)
+    await db.platform_link_flows.create_index("user_id")
     await db.login_attempts.create_index("identifier")
     await db.login_attempts.create_index("created_at", expireAfterSeconds=3600)
     await db.rate_limits.create_index("key")
