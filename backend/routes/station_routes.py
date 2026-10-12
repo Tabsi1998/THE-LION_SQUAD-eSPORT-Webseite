@@ -145,6 +145,9 @@ async def update_station(sid: str, body: StationUpdate, me: dict = Depends(requi
     if updates.get("tournament_id"):
         await _ensure_tournament_unlocked(db, updates["tournament_id"])
     updates["updated_at"] = now_utc().isoformat()
+    # Seit wann defekt (#1160) - für „Braucht Aufmerksamkeit“; wieder frei heißt: der Zeitpunkt fällt weg.
+    if updates.get("status") == "broken" and (current or {}).get("status") != "broken":
+        updates["broken_at"] = updates["updated_at"]
     change: dict = {"$set": updates}
     # Ein Aufruf (#1122) gilt nur, solange die Station für genau dieses Spiel reserviert ist.
     previous_match = (current or {}).get("current_match_id")
@@ -176,9 +179,14 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
     if start_now and not _match_has_minimum_participants(match):
         raise HTTPException(status_code=409, detail="Match hat zu wenige Teilnehmer und kann nicht gestartet werden.")
     await db.stations.update_many(
-        {"current_match_id": match["id"], "id": {"$ne": station["id"]}},
+        {"current_match_id": match["id"], "id": {"$ne": station["id"]}, "status": {"$ne": "broken"}},
         {"$set": {"current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()},
          "$unset": {"called_at": ""}},
+    )
+    # Umlegen von einer defekten Station (#1160): sie gibt das Spiel ab, bleibt aber defekt.
+    await db.stations.update_many(
+        {"current_match_id": match["id"], "id": {"$ne": station["id"]}, "status": "broken"},
+        {"$set": {"current_match_id": None, "current_match_type": None, "updated_at": now_utc().isoformat()}, "$unset": {"called_at": ""}},
     )
     now_iso = now_utc().isoformat()
     match_updates = {

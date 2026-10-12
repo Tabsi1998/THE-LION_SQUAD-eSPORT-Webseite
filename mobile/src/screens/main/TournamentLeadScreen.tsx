@@ -19,13 +19,29 @@ import type { TournamentStackParamList } from "../../navigation/types";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import { colors } from "../../theme";
 
-// Turnierleitung am Handy (#1156): dieselbe Ansicht wie /tournaments/<slug>/leitung auf der Website. Reiter
-// „Ergebnisse“: alle offenen Spiele, zuerst was fehlt, dann nach Station; „Eintragen“ öffnet das Ergebnis-Fenster,
-// danach 10 Sekunden „Rückgängig“. Nur für die Turnierleitung dieses Turniers - der Server prüft jede Anfrage.
+// Turnierleitung am Handy (#1156): dieselbe Ansicht wie /tournaments/<slug>/leitung auf der Website. Erster Reiter
+// „Braucht Aufmerksamkeit“ (#1160): was hängt, mit dem passenden Knopf (Eintragen, Ansehen, Umlegen) - Erledigtes
+// verschwindet von selbst. Reiter „Ergebnisse“: alle offenen Spiele, zuerst was fehlt, dann nach Station; „Eintragen“
+// öffnet das Ergebnis-Fenster, danach 10 Sekunden „Rückgängig“. Nur für die Turnierleitung dieses Turniers.
 
 type Props = NativeStackScreenProps<TournamentStackParamList, "TournamentLead">;
 
+type AttentionItem = {
+  id: string;
+  kind: "result_missing" | "dispute" | "report_conflict" | "station_broken" | string;
+  title: string;
+  detail?: string;
+  action: "enter" | "view" | "move" | string;
+  match_id?: string;
+  match_ids?: string[];
+  station_text?: string;
+  label?: string;
+  names?: string;
+};
+
 type LeadView = {
+  attention?: AttentionItem[];
+  stations?: Array<{ id: string; name: string; status?: string; busy?: boolean }>;
   tournament?: { id: string; slug?: string; title?: string; status?: string };
   matches?: ResultEntry[];
   recent?: ResultEntry[];
@@ -43,6 +59,8 @@ export function TournamentLeadScreen({ route }: Props) {
   const [openId, setOpenId] = useState(route.params?.spiel || "");
   const [notice, setNotice] = useState("");
   const [deciding, setDeciding] = useState(false);
+  const [tab, setTab] = useState<"attention" | "results" | null>(null);
+  const [movingId, setMovingId] = useState("");
   // Eigene Adresse je Fall (#1158, #1160): fall=ds-<spiel> hebt den Streitfall hervor.
   const fall = route.params?.fall || "";
 
@@ -67,7 +85,25 @@ export function TournamentLeadScreen({ route }: Props) {
   const matches = useMemo(() => view?.matches || [], [view]);
   const shown = useMemo(() => matches.filter((item) => leadFilter(item, filter)), [matches, filter]);
   const opened = [...matches, ...(view?.recent || [])].find((item) => item.id === openId && item.can_enter) || null;
-  const disputes = matches.filter((item) => item.dispute);
+  const attention = view?.attention || [];
+  const byId = Object.fromEntries(matches.map((item) => [item.id, item]));
+  const activeTab = tab || (fall || attention.length ? "attention" : "results");
+  const freeStations = (view?.stations || []).filter((station) => station.status !== "broken" && !station.busy);
+
+  // Umlegen (#1160): die wartenden Spiele einer defekten Station auf eine freie Station legen.
+  const moveTo = async (item: AttentionItem, stationId: string) => {
+    setDeciding(true);
+    try {
+      for (const matchId of item.match_ids || []) await api.patch(`/matches/${matchId}`, { station_id: stationId });
+      setNotice("Umgelegt.");
+      setMovingId("");
+      await load();
+    } catch (err) {
+      setNotice(errorMessage(err, "Umlegen hat nicht geklappt."));
+    } finally {
+      setDeciding(false);
+    }
+  };
 
   // Streitfall entscheiden (#1158): „Ergebnis bleibt“ mit einem Tipp - beide Seiten bekommen Bescheid.
   const keepResult = async (item: ResultEntry, note: string | null) => {
@@ -101,14 +137,48 @@ export function TournamentLeadScreen({ route }: Props) {
           <Muted style={styles.eyebrow}>Turnierleitung</Muted>
           <Title>{view.tournament?.title || "Turnier"}</Title>
         </View>
-        {disputes.length ? (
-          <View style={styles.stack} testID="lead-disputes">
-            <Muted style={[styles.hint, styles.red]}>Streitfälle ({disputes.length})</Muted>
-            {disputes.map((item) => (
-              <DisputeCard key={item.id} item={item} busy={deciding} highlighted={fall === `ds-${item.id}`} onKeep={(note) => { void keepResult(item, note); }} onChange={() => setOpenId(item.id)} />
-            ))}
+        <SegmentedTabs
+          value={activeTab}
+          onChange={setTab}
+          items={[{ key: "attention", label: `Braucht Aufmerksamkeit (${attention.length})` }, { key: "results", label: "Ergebnisse" }]}
+        />
+        {notice ? <Muted style={styles.notice} testID="lead-notice">{notice}</Muted> : null}
+        {activeTab === "attention" ? (
+          <View style={styles.stack} testID="lead-attention">
+            {attention.length === 0 ? <Card><Muted testID="lead-attention-empty">Gerade hängt nichts.</Muted></Card> : null}
+            {attention.map((item) => (item.kind === "dispute" && item.match_id && byId[item.match_id]?.dispute ? (
+              <DisputeCard key={item.id} item={byId[item.match_id]} busy={deciding} highlighted={fall === item.id} onKeep={(note) => { void keepResult(byId[item.match_id as string], note); }} onChange={() => setOpenId(item.match_id as string)} />
+            ) : (
+              <Card key={item.id} style={[styles.caseCard, fall === item.id && styles.highlighted, item.kind === "station_broken" && styles.broken]} testID={`lead-case-${item.id}`}>
+                <View style={styles.row}>
+                  <View style={[styles.station, styles.stationOn]}>
+                    <Muted style={[styles.stationText, styles.cyan]} numberOfLines={2}>{item.station_text ? item.station_text.split(" · ")[0] : "ohne Station"}</Muted>
+                  </View>
+                  <View style={styles.flex}>
+                    <Body style={styles.strong}>{item.title}</Body>
+                    <Muted numberOfLines={1}>{item.label} · {item.names}</Muted>
+                    <Muted style={item.kind === "station_broken" ? styles.red : styles.gold}>{item.detail}</Muted>
+                  </View>
+                  {item.action === "move" ? (
+                    <Button label="Umlegen" variant="secondary" onPress={() => setMovingId(movingId === item.id ? "" : item.id)} disabled={deciding} testID={`lead-case-move-${item.id}`} />
+                  ) : item.match_id && byId[item.match_id]?.can_enter ? (
+                    <Button label="Eintragen" onPress={() => setOpenId(item.match_id as string)} disabled={deciding} testID={`lead-case-enter-${item.id}`} />
+                  ) : null}
+                </View>
+                {movingId === item.id ? (
+                  <View style={styles.stack} testID={`lead-case-stations-${item.id}`}>
+                    <Muted style={styles.hint}>Auf welche Station?</Muted>
+                    {freeStations.length ? freeStations.map((station) => (
+                      <Button key={station.id} label={station.name} variant="secondary" onPress={() => { void moveTo(item, station.id); }} disabled={deciding} testID={`lead-move-to-${station.id}`} />
+                    )) : <Muted>Gerade ist keine Station frei.</Muted>}
+                  </View>
+                ) : null}
+              </Card>
+            )))}
+            <Muted>Erledigtes verschwindet von selbst. Bei neuen Fällen kommt eine Benachrichtigung.</Muted>
           </View>
         ) : null}
+        {activeTab === "results" ? (<>
         <SegmentedTabs
           value={filter}
           onChange={setFilter}
@@ -119,7 +189,6 @@ export function TournamentLeadScreen({ route }: Props) {
           ]}
         />
         <Muted style={styles.hint}>Zuerst, was fehlt · dann nach Station</Muted>
-        {notice ? <Muted style={styles.notice} testID="lead-notice">{notice}</Muted> : null}
         {shown.length === 0 ? <Card><Muted testID="lead-empty">Hier ist gerade nichts offen.</Muted></Card> : null}
         {shown.map((item) => <LeadCard key={item.id} item={item} onEnter={() => setOpenId(item.id)} />)}
         {(view.recent || []).length ? (
@@ -136,6 +205,7 @@ export function TournamentLeadScreen({ route }: Props) {
             ))}
           </View>
         ) : null}
+        </>) : null}
         <Muted>Hier stehen nur Spiele, für die du eingeteilt bist. Jede Eingabe steht im Protokoll.</Muted>
       </ScrollView>
       <ResultEntrySheet entry={opened} onClose={() => setOpenId("")} onSaved={undo.start} />
@@ -180,6 +250,9 @@ const styles = StyleSheet.create({
   missing: { backgroundColor: "rgba(255,215,0,0.05)", borderColor: "rgba(255,215,0,0.45)" },
   notice: { color: colors.success, fontWeight: "800" },
   red: { color: colors.live },
+  broken: { borderColor: "rgba(255,59,48,0.45)" },
+  caseCard: { borderColor: "rgba(255,215,0,0.45)", gap: 10 },
+  highlighted: { borderColor: colors.gold, borderWidth: 2 },
   row: { alignItems: "center", flexDirection: "row", gap: 10 },
   stack: { gap: 8 },
   station: { alignItems: "center", borderColor: colors.border, borderRadius: 7, borderWidth: 1, height: 48, justifyContent: "center", paddingHorizontal: 4, width: 58 },

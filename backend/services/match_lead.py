@@ -290,6 +290,11 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
         and not match.get("is_preview")
     ]
     open_items.sort(key=lead_sort_key)
+    # „Braucht Aufmerksamkeit“ (#1160): dieselben Spiele, als Fälle mit Knopf; dazu die Stationen zum Umlegen.
+    from services.match_attention import attention_items
+
+    stations = await db.stations.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(500)
+    attention = attention_items(tournament, matches, stations, regs_by_id, now)
     recent = sorted(
         [match for match in matches if str(match.get("status") or "") in {"completed", "forfeit"} and match.get("completed_at")],
         key=lambda match: str(match.get("completed_at") or ""), reverse=True,
@@ -302,9 +307,16 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
         "now": now.isoformat(),
         "missing_after_minutes": MISSING_AFTER_MINUTES,
         "matches": open_items,
+        "attention": attention,
+        "stations": [
+            {"id": row.get("id"), "name": row.get("name") or row.get("label") or "Station", "status": row.get("status") or "free",
+             "busy": bool(row.get("current_match_id"))}
+            for row in sorted(stations, key=lambda row: _station_sort_key(row.get("name") or ""))
+        ],
         "recent": [describe(match) for match in recent],
         "counts": {
             "disputes": sum(1 for item in open_items if item.get("dispute")),
+            "attention": len(attention),
             "open": len(open_items),
             "running": sum(1 for item in open_items if item["status"] in RUNNING_STATUSES or item.get("started_at")),
             "missing": sum(1 for item in open_items if (item.get("timing") or {}).get("missing")),

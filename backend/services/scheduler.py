@@ -639,6 +639,18 @@ async def _safe_proof_photo_retention():
         _log_task_failure("proof_photo_retention", exc)
 
 
+async def _safe_match_attention():
+    """„Braucht Aufmerksamkeit“ (#1160): je neuem „Ergebnis fehlt“ oder „Station defekt“ eine Nachricht."""
+    try:
+        from database import get_db
+        from services.match_attention import sweep
+        sent = await sweep(get_db())
+        if sent:
+            logger.info(f"[scheduler] match_attention sent={sent}")
+    except Exception as exc:
+        _log_task_failure("match_attention", exc)
+
+
 async def _safe_media_scan():
     try:
         from services.media_scan import process_pending
@@ -924,6 +936,9 @@ def start_scheduler() -> AsyncIOScheduler:
                   id="proof_photo_retention", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("ops_retention", _safe_ops_retention, lease_seconds=600.0), IntervalTrigger(hours=24), id="ops_retention", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("ops_checks", _safe_ops_checks), IntervalTrigger(minutes=5), id="ops_checks",
+                  max_instances=1, coalesce=True)
+    # Braucht Aufmerksamkeit (#1160): fehlende Ergebnisse und defekte Stationen - jede Minute nachsehen.
+    sched.add_job(_single_replica("match_attention", _safe_match_attention, lease_seconds=120.0), IntervalTrigger(seconds=60), id="match_attention",
                   max_instances=1, coalesce=True)
     # Ergebnisse mit „Rückgängig“ (#1156): nach 10 Sekunden veröffentlichen, auch nach einem Neustart.
     sched.add_job(_single_replica("result_holds", _safe_result_holds, lease_seconds=60.0), IntervalTrigger(seconds=5), id="result_holds",

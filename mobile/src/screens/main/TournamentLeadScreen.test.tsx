@@ -7,8 +7,9 @@ import { TournamentLeadScreen } from "./TournamentLeadScreen";
 
 const mockGet = jest.fn();
 const mockPost = jest.fn();
+const mockPatch = jest.fn();
 jest.mock("../../lib/api", () => ({
-  api: { get: (...args: unknown[]) => mockGet(...args), post: (...args: unknown[]) => mockPost(...args) },
+  api: { get: (...args: unknown[]) => mockGet(...args), post: (...args: unknown[]) => mockPost(...args), patch: (...args: unknown[]) => mockPatch(...args) },
   errorMessage: (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback),
 }));
 jest.mock("expo-secure-store", () => ({ getItemAsync: jest.fn(async () => null), setItemAsync: jest.fn(async () => undefined) }));
@@ -77,7 +78,8 @@ test("ohne Turnier-Recht: der Satz vom Server statt der Liste", async () => {
 test("Streitfall (#1158): Karte mit Grund und Ergebnis, „Ergebnis bleibt“ mit einem Tipp", async () => {
   const disputed = { ...LATE, status: "disputed", has_result: true, result_summary: "Frostbiss gewinnt 2:1.",
     dispute: { by: "TurboTina", category_label: "Falsches Ergebnis", text: "Es stand 2:1 für mich.", photo: null, result_by: "Ergebnisdienst", reports: [] } };
-  mockGet.mockResolvedValue({ data: { tournament: { id: "t1", title: "FC 26 Herbst-Cup" }, matches: [disputed], recent: [], counts: { open: 1 } } });
+  mockGet.mockResolvedValue({ data: { tournament: { id: "t1", title: "FC 26 Herbst-Cup" }, matches: [disputed], recent: [], counts: { open: 1 },
+    attention: [{ id: "ds-m2", kind: "dispute", match_id: "m2", title: "Streitfall gemeldet", action: "view" }] } });
   mockPost.mockResolvedValue({ data: { ok: true } });
   await render(<TournamentLeadScreen navigation={navigation} route={{ key: "l", name: "TournamentLead", params: { id: "fc-cup", fall: "ds-m2" } } as never} />);
   await waitFor(() => expect(screen.getByTestId("lead-dispute-m2")).toBeTruthy());
@@ -87,4 +89,20 @@ test("Streitfall (#1158): Karte mit Grund und Ergebnis, „Ergebnis bleibt“ mi
   await act(async () => { await fireEvent.press(screen.getByTestId("lead-dispute-keep-m2")); });
   expect(mockPost).toHaveBeenCalledWith("/matches/m2/dispute/decision", { decision: "keep", note: "Foto eindeutig" });
   await waitFor(() => expect(screen.getByTestId("lead-notice")).toHaveTextContent("Entschieden – beide Seiten bekommen Bescheid."));
+});
+
+test("Braucht Aufmerksamkeit (#1160): Station defekt → Umlegen → freie Station wählen", async () => {
+  const station = { id: "st-sw2", kind: "station_broken", title: "Station defekt", action: "move", station_text: "Switch 2", label: "Durchgang 3",
+    names: "4 Teilnehmer", detail: "1 Spiel wartet darauf", match_ids: ["m7"] };
+  mockGet.mockResolvedValue({ data: { tournament: { id: "t1", title: "Herbst-LAN Cup" }, matches: [], recent: [], counts: { open: 0 }, attention: [station],
+    stations: [{ id: "sw2", name: "Switch 2", status: "broken" }, { id: "sw3", name: "Switch 3", status: "free", busy: false }] } });
+  mockPatch.mockResolvedValue({ data: { id: "m7" } });
+  await render(<TournamentLeadScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("lead-case-st-sw2")).toBeTruthy());
+  expect(screen.getByText("1 Spiel wartet darauf")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("lead-case-move-st-sw2"));
+  expect(screen.queryByTestId("lead-move-to-sw2")).toBeNull();
+  await act(async () => { await fireEvent.press(screen.getByTestId("lead-move-to-sw3")); });
+  expect(mockPatch).toHaveBeenCalledWith("/matches/m7", { station_id: "sw3" });
+  await waitFor(() => expect(screen.getByTestId("lead-notice")).toHaveTextContent("Umgelegt."));
 });

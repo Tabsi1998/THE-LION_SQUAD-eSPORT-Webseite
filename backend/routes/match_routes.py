@@ -1022,6 +1022,14 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         if v2_match.get("called_at") and (status_moved or station_moved):
             change["$unset"] = {"called_at": ""}
         await db.matches_v2.update_one({"id": match_id}, change)
+        if station_moved and v2_match.get("station_id"):
+            # Umlegen (#1160): die alte Station gibt das Spiel ab - eine defekte bleibt defekt, sonst ist sie frei.
+            old = await db.stations.find_one({"id": v2_match["station_id"], "current_match_id": match_id}, {"_id": 0, "status": 1})
+            if old:
+                await db.stations.update_one({"id": v2_match["station_id"]}, {
+                    "$set": {"current_match_id": None, "current_match_type": None, "updated_at": updates["updated_at"],
+                             **({} if old.get("status") == "broken" else {"status": "free"})},
+                    "$unset": {"called_at": ""}})
         updated = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
         return {**updated, "idempotent_replay": False}
     raise HTTPException(status_code=404, detail="Match nicht gefunden")

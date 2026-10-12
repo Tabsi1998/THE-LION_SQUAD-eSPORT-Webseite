@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ClipboardCheck, Clock, Radio } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, Clock, Radio } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -14,8 +14,10 @@ import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { DisputeCard } from "@/components/tls/results/DisputeCard";
 
-// Turnierleitung am Handy (#1156): /tournaments/<slug>/leitung - nur für die Turnierleitung dieses Turniers. Reiter
-// „Ergebnisse“: alle offenen Spiele, zuerst was fehlt, dann nach Station; Filter „Läuft“ und „Ergebnis fehlt“.
+// Turnierleitung am Handy (#1156): /tournaments/<slug>/leitung - nur für die Turnierleitung dieses Turniers. Erster
+// Reiter „Braucht Aufmerksamkeit“ (#1160): was hängt, mit dem passenden Knopf - Erledigtes verschwindet von selbst; jeder
+// Fall hat eine eigene Adresse (?fall=…). Reiter „Ergebnisse“: alle offenen Spiele, zuerst was fehlt, dann nach
+// Station; Filter „Läuft“ und „Ergebnis fehlt“.
 // „Eintragen“ öffnet das Ergebnis-Fenster (#1370), danach 10 Sekunden „Rückgängig“. Die Verwaltung bleibt zum
 // Vorbereiten - die Live-Werkzeuge stehen hier.
 
@@ -34,7 +36,9 @@ export default function TournamentLeadPage() {
   const [filter, setFilter] = useState("all");
   const [openId, setOpenId] = useState(searchParams.get("spiel") || "");
   const [deciding, setDeciding] = useState(false);
-  // Eigene Adresse je Fall (#1158, #1160): ?fall=ds-<spiel> springt zum Streitfall.
+  const [tab, setTab] = useState(null);
+  const [movingId, setMovingId] = useState("");
+  // Eigene Adresse je Fall (#1158, #1160): ?fall=<id> springt zum Fall.
   const fall = searchParams.get("fall") || "";
   const scrolledTo = useRef("");
 
@@ -57,7 +61,25 @@ export default function TournamentLeadPage() {
   const shown = useMemo(() => matches.filter((item) => leadFilter(item, filter)), [matches, filter]);
   const everyone = useMemo(() => [...matches, ...(data?.recent || [])], [matches, data]);
   const opened = everyone.find((item) => item.id === openId) || null;
-  const disputes = useMemo(() => matches.filter((item) => item.dispute), [matches]);
+  const attention = useMemo(() => data?.attention || [], [data]);
+  const byId = useMemo(() => Object.fromEntries(matches.map((item) => [item.id, item])), [matches]);
+  const activeTab = tab || (fall || attention.length ? "attention" : "results");
+  const freeStations = (data?.stations || []).filter((station) => station.status !== "broken" && !station.busy);
+
+  // Umlegen (#1160): die wartenden Spiele einer defekten Station auf eine freie Station legen.
+  const moveTo = async (item, stationId) => {
+    setDeciding(true);
+    try {
+      for (const matchId of item.match_ids || []) await api.patch(`/matches/${matchId}`, { station_id: stationId });
+      toast.success("Umgelegt.");
+      setMovingId("");
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Umlegen hat nicht geklappt.");
+    } finally {
+      setDeciding(false);
+    }
+  };
 
   useEffect(() => {
     if (!fall || !data || scrolledTo.current === fall) return;
@@ -115,21 +137,38 @@ export default function TournamentLeadPage() {
         <div className="text-[11px] uppercase tracking-[0.3em] text-[#FFD700] font-bold">Turnierleitung</div>
         <h1 className="mt-1 font-heading text-2xl md:text-4xl font-black uppercase [overflow-wrap:anywhere]">{data?.tournament?.title || "…"}</h1>
 
-        <div className="mt-6 flex items-center gap-2 border-b border-white/10" role="tablist" aria-label="Turnierleitung">
-          <span role="tab" aria-selected="true" className="inline-flex items-center gap-2 border-b-2 border-[#29B6E8] px-3 pb-2 text-sm font-bold uppercase tracking-wider text-white" data-testid="lead-tab-results">
-            <ClipboardCheck className="w-4 h-4 text-[#29B6E8]" /> Ergebnisse
-          </span>
+        <div className="mt-6 flex items-center gap-1 border-b border-white/10" role="tablist" aria-label="Turnierleitung">
+          {[["attention", `Braucht Aufmerksamkeit (${attention.length})`, AlertTriangle], ["results", "Ergebnisse", ClipboardCheck]].map(([key, label, Icon]) => (
+            <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setTab(key)} className={`inline-flex min-h-[44px] items-center gap-2 border-b-2 px-3 text-xs sm:text-sm font-bold uppercase tracking-wider ${activeTab === key ? "border-[#29B6E8] text-white" : "border-transparent text-white/50"}`} data-testid={`lead-tab-${key}`}>
+              <Icon className={`w-4 h-4 ${key === "attention" && attention.length ? "text-[#FFD700]" : "text-[#29B6E8]"}`} /> {label}
+            </button>
+          ))}
         </div>
 
-        {disputes.length ? (
-          <div className="mt-5 space-y-3" data-testid="lead-disputes">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-[#FF6B60]">Streitfälle ({disputes.length})</div>
-            {disputes.map((item) => (
-              <DisputeCard key={item.id} item={item} busy={deciding} highlighted={fall === `ds-${item.id}`} onKeep={(note) => keepResult(item, note)} onChange={() => openEntry(item.id)} />
-            ))}
+        {activeTab === "attention" ? (
+          <div className="mt-5 space-y-3" data-testid="lead-attention">
+            {data && attention.length === 0 ? <div className="rounded-sm border border-white/10 bg-[#121212] p-6 text-center text-white/50" data-testid="lead-attention-empty">Gerade hängt nichts.</div> : null}
+            {attention.map((item) => (item.kind === "dispute" && byId[item.match_id]?.dispute ? (
+              <DisputeCard key={item.id} item={byId[item.match_id]} busy={deciding} highlighted={fall === item.id} onKeep={(note) => keepResult(byId[item.match_id], note)} onChange={() => openEntry(item.match_id)} />
+            ) : (
+              <AttentionRow
+                key={item.id}
+                item={item}
+                highlighted={fall === item.id}
+                busy={deciding}
+                canEnter={Boolean(byId[item.match_id]?.can_enter)}
+                moving={movingId === item.id}
+                stations={freeStations}
+                onEnter={() => openEntry(item.match_id)}
+                onMove={() => setMovingId(movingId === item.id ? "" : item.id)}
+                onMoveTo={(stationId) => moveTo(item, stationId)}
+              />
+            )))}
+            <p className="text-xs text-white/40">Erledigtes verschwindet von selbst. Bei neuen Fällen kommt eine Benachrichtigung.</p>
           </div>
         ) : null}
 
+        {activeTab === "results" ? (<>
         <div className="mt-4 grid grid-cols-3 gap-1 rounded-sm border border-white/10 bg-white/5 p-1" role="group" aria-label="Filter" data-testid="lead-filters">
           {FILTERS.map(([key, label, count]) => (
             <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)} className={`min-h-[40px] rounded-sm text-[11px] sm:text-xs font-bold uppercase tracking-wider ${filter === key ? "bg-[#29B6E8] text-black" : "text-white/60"}`} data-testid={`lead-filter-${key}`}>
@@ -163,12 +202,48 @@ export default function TournamentLeadPage() {
             </div>
           </div>
         ) : null}
+        </>) : null}
         <p className="mt-6 text-xs text-white/40">Hier stehen nur Spiele, für die du eingeteilt bist. Jede Eingabe steht im Protokoll (wer, wann, was).</p>
       </section>
 
       {opened && opened.can_enter ? <ResultWindow key={opened.id} entry={opened} onClose={closeEntry} onSaved={undo.start} /> : null}
       <ResultUndoBar undo={undo} />
     </PublicLayout>
+  );
+}
+
+function AttentionRow({ item, highlighted, busy, canEnter, moving, stations, onEnter, onMove, onMoveTo }) {
+  const bad = item.kind === "station_broken";
+  return (
+    <div id={`fall-${item.id}`} className={`rounded-sm border bg-[#121212] p-3 ${highlighted ? "border-[#FFD700]/70 ring-2 ring-[#FFD700]/40" : bad ? "border-[#FF3B30]/45" : "border-[#FFD700]/45"}`} data-testid={`lead-case-${item.id}`}>
+      <div className="flex items-center gap-3">
+        <div className={`flex h-12 w-14 shrink-0 items-center justify-center rounded-sm border text-center text-[10px] font-bold uppercase leading-tight ${bad ? "border-[#FF3B30]/50 text-[#FF6B60]" : "border-[#29B6E8]/40 text-[#29B6E8]"}`}>
+          {item.station_text ? item.station_text.split(" · ")[0] : "ohne Station"}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold text-white">{item.title}</div>
+          <div className="text-xs text-white/55 truncate">{item.label} · {item.names}</div>
+          <div className={`text-[11px] ${bad ? "text-[#FF6B60]" : "text-[#FFD700]"}`}>{item.detail}</div>
+        </div>
+        {item.action === "move" ? (
+          <button type="button" disabled={busy} onClick={onMove} className="tls-btn tls-btn--secondary shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-case-move-${item.id}`}>Umlegen</button>
+        ) : canEnter ? (
+          <button type="button" disabled={busy} onClick={onEnter} className="tls-btn tls-btn--primary shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-case-enter-${item.id}`}>Eintragen</button>
+        ) : null}
+      </div>
+      {moving ? (
+        <div className="mt-3 border-t border-white/10 pt-3" data-testid={`lead-case-stations-${item.id}`}>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-white/50">Auf welche Station?</div>
+          {stations.length ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {stations.map((station) => (
+                <button key={station.id} type="button" disabled={busy} onClick={() => onMoveTo(station.id)} className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-move-to-${station.id}`}>{station.name}</button>
+              ))}
+            </div>
+          ) : <p className="mt-2 text-xs text-white/50">Gerade ist keine Station frei.</p>}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

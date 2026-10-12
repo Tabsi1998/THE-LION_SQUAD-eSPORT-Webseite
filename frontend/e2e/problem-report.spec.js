@@ -51,7 +51,8 @@ test.describe("Problem melden und entscheiden", () => {
         return route.fulfill(json({ id: "m1", status: "disputed" }));
       }
       if (path === "/api/tournaments/fc-cup/lead") {
-        return route.fulfill(json({ tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup" }, matches: decision ? [] : [CASE], recent: [], counts: { open: decision ? 0 : 1, running: 0, missing: 0, disputes: decision ? 0 : 1 } }));
+        const cases = decision ? [] : [{ id: "ds-m1", kind: "dispute", match_id: "m1", title: "Streitfall gemeldet", detail: "TurboTina: „Falsches Ergebnis“", action: "view", station_text: "PC 4", label: "Halbfinale B", names: "TurboTina gegen Frostbiss" }];
+        return route.fulfill(json({ tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup" }, matches: decision ? [] : [CASE], attention: cases, stations: [], recent: [], counts: { open: decision ? 0 : 1, running: 0, missing: 0, disputes: decision ? 0 : 1, attention: cases.length } }));
       }
       if (path === "/api/matches/m1/dispute/decision" && request.method() === "POST") {
         decision = request.postDataJSON();
