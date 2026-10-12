@@ -58,7 +58,7 @@ export const MAIN_TABS: Array<{ name: MainTabName; title: string; icon: keyof ty
 
 export function AppNavigator() {
   const { user, loading } = useAuth();
-  const { locked } = useAppLock();
+  const { locked, ready: lockReady } = useAppLock();
   const signedIn = Boolean(user && !isGuestUser(user));
   // Wer angemeldet war, kennt den Weg: der Hinweis für Gäste (#918) kommt dann auch nach dem Abmelden nicht mehr.
   useEffect(() => {
@@ -67,7 +67,8 @@ export function AppNavigator() {
   // Links von außen (#921): Discord, WhatsApp, Browser - Android reicht Adressen von lionsquad.at an die App.
   useEffect(() => listenForAppLinks(), []);
 
-  if (loading) return <BootScreen />;
+  // App-Sperre (#1052): erst wenn klar ist, ob gesperrt wird, zeigt sich ein Konto - sonst blitzt der Inhalt kurz auf.
+  if (loading || (signedIn && !lockReady)) return <BootScreen />;
   // App-Sperre (#217): erst Fingerabdruck, dann Chats und Profil. Gäste haben nichts zu schützen.
   if (signedIn && locked) return <LockScreen />;
 

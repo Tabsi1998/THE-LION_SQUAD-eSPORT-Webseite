@@ -118,8 +118,11 @@ export async function setupAndroidChannels(): Promise<void> {
   }
 }
 
-/** Fragt Push-Permission an und registriert den Token beim Backend */
-export async function registerPushToken(): Promise<string | null> {
+/**
+ * Fragt Push-Permission an und registriert den Token beim Backend.
+ * `private` (#1052): mit App-Sperre schickt der Server nur Pushes ohne Inhalt - die Details lädt die App nach dem Entsperren.
+ */
+export async function registerPushToken(options: { private?: boolean } = {}): Promise<string | null> {
   if (!Notifications || !Device) return null;
 
   // Nur auf echten Geräten (nicht im Simulator/Emulator)
@@ -161,6 +164,7 @@ export async function registerPushToken(): Promise<string | null> {
       token,
       platform: Platform.OS,
       channels: PUSH_CHANNEL_SET,
+      private: Boolean(options.private),
     });
 
     return token;
@@ -189,7 +193,8 @@ function notificationFromContent(content?: { title?: string | null; body?: strin
   const notificationId = stringValue(data.notification_id || data.id);
   const kind = stringValue(data.kind);
   const url = stringValue(data.url);
-  const meta = objectValue(data.meta);
+  // Ein privater Push (#1052) trägt nur die Kennung - der Inhalt kommt erst nach dem Entsperren vom Server.
+  const meta = data.private === true ? { content_hidden: true } : objectValue(data.meta);
   if (!notificationId && !kind && !url) return null;
   return {
     id: notificationId || `${kind || "push"}:${Date.now()}`,
@@ -200,6 +205,11 @@ function notificationFromContent(content?: { title?: string | null; body?: strin
     read: false,
     meta,
   };
+}
+
+/** Ein Push ohne Inhalt (#1052): Titel und Text sind Platzhalter, der echte Eintrag steht in der Liste vom Server. */
+export function isContentHiddenPush(item: UserNotification): boolean {
+  return item.meta?.content_hidden === true;
 }
 
 function stringValue(value: unknown) {

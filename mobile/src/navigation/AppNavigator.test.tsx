@@ -28,7 +28,7 @@ jest.mock("./screenRegistry", () => {
 const mockAuth = { user: { id: "u-1", username: "neonfalke", display_name: "NeonFalke", role: "player" } as Record<string, unknown> | null, loading: false };
 jest.mock("../auth/AuthContext", () => ({ useAuth: () => mockAuth }));
 jest.mock("../live", () => ({ isGuestUser: (user: { id?: string } | null) => !user || user.id === "guest" }));
-jest.mock("../lock/AppLockProvider", () => ({ useAppLock: () => ({ locked: false }) }));
+jest.mock("../lock/AppLockProvider", () => ({ useAppLock: () => ({ locked: false, ready: true }) }));
 const mockUnread = { value: 3 };
 jest.mock("../chats/ChatsContext", () => ({ useUnreadChats: () => mockUnread.value }));
 jest.mock("../seasons/SeasonStage", () => ({ SeasonStage: () => null, useSeasonTabIcon: () => null, SeasonBackdropSlot: () => null }));

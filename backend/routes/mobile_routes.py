@@ -48,6 +48,8 @@ class MobilePushTokenCreate(BaseModel):
     device_name: str | None = Field(default=None, max_length=120)
     # Welche Android-Kanäle die App angelegt hat (#1138) - ab 2 die fünf Themen-Kanäle.
     channels: int | None = Field(default=None, ge=1, le=99)
+    # App-Sperre am Gerät an (#1052): Pushes ohne Inhalt. Eine ältere App meldet nichts - dann bleibt alles, wie es war.
+    private: bool | None = None
 
 
 class MobileClientLogCreate(BaseModel):
@@ -814,6 +816,7 @@ async def register_mobile_push_token(body: MobilePushTokenCreate, user: dict = D
     now = now_utc().isoformat()
     # Die Kanäle des Geräts (#1138): eine ältere App meldet nichts und bekommt weiter die zwei alten Kanäle.
     channel_set = {"channel_set": body.channels} if body.channels else {}
+    private_content = {"private_content": body.private} if body.private is not None else {}
     await db.mobile_push_tokens.update_one(
         {"token": token},
         {
@@ -825,6 +828,7 @@ async def register_mobile_push_token(body: MobilePushTokenCreate, user: dict = D
                 "enabled": True,
                 "updated_at": now,
                 **channel_set,
+                **private_content,
             },
             "$setOnInsert": {"created_at": now},
         },
