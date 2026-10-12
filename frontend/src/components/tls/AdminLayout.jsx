@@ -82,7 +82,8 @@ export const ADMIN_GROUPS = [
     items: [
       { to: "/admin/events", label: "Events", icon: CalendarDays, areas: ["tournaments"] },
       { to: "/admin/news", label: "News", icon: Newspaper, areas: ["content"] },
-      { to: "/admin/gallery", label: "Galerie", icon: ImageIcon, areas: ["content"] },
+      // Eingesandte Fotos (#1186) gibt auch der Vorstand (Vereinsverwaltung) hier frei - ein Ort für die Freigabe.
+      { to: "/admin/gallery", label: "Galerie", icon: ImageIcon, areas: ["content", "club"] },
       { to: "/admin/media", label: "Medien", icon: FolderOpen, areas: ["content"] },
       { to: "/admin/nav", label: "Navigation", icon: Code2, areas: ["content"] },
       { to: "/admin/achievements", label: "Erfolge", icon: Medal, areas: ["content"] },
