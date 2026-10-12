@@ -3,6 +3,7 @@ import { ModerationStateBadge } from "@/components/tls/ModerationStateBadge";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useAccountGeneration } from "@/hooks/useAccountGeneration";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -39,12 +40,14 @@ import { GameDiscordTile } from "@/components/tls/DiscordServerTile";
 import { viennaDateTime } from "@/lib/vienna";
 import { ShareButton } from "@/components/tls/ShareButton";
 
-// Eigener Stand je Turnier und Konto (#1047): ein Wechsel baut die Seite neu auf - Anmeldung, Chat-Entwurf und
-// Anhänge des vorigen Turniers gehen weg, und dessen späte Antworten laufen ins Leere.
+// Eigener Stand je Turnier und Konto (#1047): ein Wechsel des Turniers oder ein echter Kontowechsel baut die Seite
+// neu auf - Chat-Entwurf und Anhänge gehen weg, späte Antworten laufen ins Leere. Das erste Laden der Anmeldung
+// zählt nicht als Wechsel.
 export default function TournamentDetailPage() {
   const { slug } = useParams();
   const { user } = useAuth();
-  return <TournamentDetailView key={`${slug}:${user?.id || ""}`} />;
+  const accountGeneration = useAccountGeneration(user?.id);
+  return <TournamentDetailView key={`${slug}:${accountGeneration}`} />;
 }
 
 function TournamentDetailView() {
@@ -363,8 +366,8 @@ function TournamentDetailView() {
               </div>
             </section>
           )}
-          {/* Eigener Stand je Turnier und Konto (#1047): Entwurf und Anhänge bleiben nicht am nächsten Turnier hängen. */}
-          {t.show_chat && <TournamentChat key={`${t.id}:${user?.id || ""}`} tournament={t} user={user} />}
+          {/* Eigener Stand je Turnier (#1047); den Kontowechsel übernimmt die Hülle oben. */}
+          {t.show_chat && <TournamentChat key={t.id} tournament={t} user={user} />}
           <section id="teilnehmer" data-testid="tournament-participants">
             <h2 className="font-heading text-2xl font-bold uppercase mb-3">Teilnehmer ({regs.length})</h2>
             <div className="border border-white/10 rounded-sm divide-y divide-white/5 bg-[#121212]">

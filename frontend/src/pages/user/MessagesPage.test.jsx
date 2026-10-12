@@ -332,3 +332,20 @@ test("ein Fehler beim Senden aus A meldet sich nicht mehr, wenn B offen ist", as
 
   expect(toastMock.error).not.toHaveBeenCalled();
 });
+
+test("die Anmeldung lädt erst nach der Seite: Entwurf und erster Stand bleiben", async () => {
+  auth.user = undefined;
+  stubTwoChats();
+  const user = userEvent.setup();
+  const view = renderAt("/messages/u-schatten");
+  await heading("Schattenwolf");
+  await user.type(screen.getByTestId("direct-chat-input"), "schon getippt");
+  const loads = apiMock.get.mock.calls.filter(([url]) => String(url).startsWith("/messages/direct/u-schatten")).length;
+
+  auth.user = { id: "u-neon", username: "neonfalke" };
+  view.rerender(tree("/messages/u-schatten"));
+  await screen.findByTestId("conversation-item-u-pixel");
+
+  expect(screen.getByTestId("direct-chat-input")).toHaveValue("schon getippt");
+  expect(apiMock.get.mock.calls.filter(([url]) => String(url).startsWith("/messages/direct/u-schatten"))).toHaveLength(loads);
+});

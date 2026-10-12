@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useAccountGeneration } from "@/hooks/useAccountGeneration";
 import { useChatList } from "@/hooks/useChats";
 import { badgeText, chatHref, chatPreview, chatTime, markChatRead } from "@/lib/chats";
 import { ChatAttachButton, ChatAttachmentDrafts, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
@@ -28,6 +29,8 @@ const KIND_ICONS = { direct: User, team: Users, tournament: Trophy, match: Gamep
 export default function MessagesPage() {
   const { user } = useAuth();
   const accountId = user?.id || "";
+  // Nur ein echter Kontowechsel leert; das erste Laden der Anmeldung nicht (#1047).
+  const accountGeneration = useAccountGeneration(accountId);
   const { userId } = useParams();
   const navigate = useNavigate();
   const confirm = useConfirm();
@@ -51,7 +54,7 @@ export default function MessagesPage() {
   const resetDrafts = dmAttachments.reset;
   // Das offene Gespräch als Marke: jeder Wechsel (Gesprächspartner oder Konto) legt eine neue an. Eine Antwort, die
   // mit einer älteren Marke losgeschickt wurde, verfällt.
-  const conversationRef = useRef({ userId: null, accountId: null });
+  const conversationRef = useRef({ userId: null, accountGeneration: null });
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -92,7 +95,7 @@ export default function MessagesPage() {
 
   // Vor dem Zeichnen, damit der Entwurf des vorigen Gesprächs keinen Augenblick unter dem neuen steht.
   useLayoutEffect(() => {
-    conversationRef.current = { userId: userId || null, accountId };
+    conversationRef.current = { userId: userId || null, accountGeneration };
     setMessages([]);
     setHasMore(false);
     setLoadingOlder(false);
@@ -110,7 +113,7 @@ export default function MessagesPage() {
     } else {
       setActive(null);
     }
-  }, [accountId, userId, loadLatest, resetDrafts]);
+  }, [accountGeneration, userId, loadLatest, resetDrafts]);
 
   // Der offene Chat lädt bei jeder Nachrichtenänderung nach; ohne Strom alle 8 s.
   useLiveRefresh(() => userId && loadLatest(userId, { silent: true }), ["messages"], { fallbackMs: 8000, enabled: Boolean(userId) });
@@ -137,7 +140,7 @@ export default function MessagesPage() {
   useLayoutEffect(() => {
     setQuery("");
     setCandidates([]);
-  }, [accountId]);
+  }, [accountGeneration]);
 
   // Nur die Antwort auf die aktuelle Eingabe (und das aktuelle Konto) zählt; eine überholte Suche verfällt.
   useEffect(() => {
@@ -159,7 +162,7 @@ export default function MessagesPage() {
       current = false;
       clearTimeout(timer);
     };
-  }, [accountId, query]);
+  }, [accountGeneration, query]);
 
   const open = (id) => {
     setQuery("");

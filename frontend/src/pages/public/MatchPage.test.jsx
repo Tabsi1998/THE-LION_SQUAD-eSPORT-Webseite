@@ -210,3 +210,30 @@ test("Wechsel zu einem anderen Match: keine Anhänge vom vorigen, späte Antwort
     authState.user = null;
   }
 });
+
+test("die Anmeldung lädt erst nach der Seite: kein zweiter Aufbau", async () => {
+  authState.user = undefined;
+  try {
+    apiMock.get.mockImplementation(async (url) => {
+      if (url === "/matches/m1/page") return { data: openMatch("m1", ["NeonFalke", "LunaByte"]) };
+      return { data: [] };
+    });
+    const page = () => (
+      <MemoryRouter initialEntries={["/matches/m1"]}>
+        <Routes><Route path="/matches/:id" element={<MatchPage />} /></Routes>
+      </MemoryRouter>
+    );
+    const view = render(page());
+    const headline = await screen.findByTestId("match-headline");
+    const loads = apiMock.get.mock.calls.filter(([url]) => url === "/matches/m1/page").length;
+
+    authState.user = { id: "u-neon", username: "neonfalke" };
+    view.rerender(page());
+
+    expect(await screen.findByTestId("match-chat")).toBeInTheDocument();
+    expect(headline.isConnected).toBe(true);
+    expect(apiMock.get.mock.calls.filter(([url]) => url === "/matches/m1/page")).toHaveLength(loads);
+  } finally {
+    authState.user = null;
+  }
+});

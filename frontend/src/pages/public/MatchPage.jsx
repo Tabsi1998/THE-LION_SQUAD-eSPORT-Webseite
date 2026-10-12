@@ -11,6 +11,7 @@ import { ChatMessageSticker, ChatStickerButton, ChatStickerPicker } from "@/comp
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useAccountGeneration } from "@/hooks/useAccountGeneration";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useChatRead } from "@/hooks/useChats";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -81,12 +82,14 @@ function fromLocalInput(value) {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-// Eigener Stand je Match und Konto (#1047): ein Wechsel baut die Seite neu auf - Chat-Entwurf, Anhänge und
-// Eingaben des vorigen Matches gehen weg, und dessen späte Antworten laufen ins Leere.
+// Eigener Stand je Match und Konto (#1047): ein Wechsel des Matches oder ein echter Kontowechsel baut die Seite neu
+// auf - Chat-Entwurf, Anhänge und Eingaben gehen weg, späte Antworten laufen ins Leere. Das erste Laden der
+// Anmeldung zählt nicht als Wechsel.
 export default function MatchPage() {
   const { id } = useParams();
   const { user } = useAuth();
-  return <MatchPageView key={`${id}:${user?.id || ""}`} />;
+  const accountGeneration = useAccountGeneration(user?.id);
+  return <MatchPageView key={`${id}:${accountGeneration}`} />;
 }
 
 function MatchPageView() {

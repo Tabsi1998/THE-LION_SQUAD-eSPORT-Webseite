@@ -283,3 +283,22 @@ test("Wechsel von Turnier A zu B: die späte Antwort von A ändert B nicht", asy
 
   expect(screen.getByTestId("tournament-title")).toHaveTextContent("Winter-Cup");
 });
+
+test("die Anmeldung lädt erst nach der Seite: kein zweiter Aufbau, der erste Stand bleibt", async () => {
+  authUser = undefined;
+  mockApi(base);
+  const page = () => (
+    <MemoryRouter initialEntries={["/tournaments/cup"]}>
+      <Routes><Route path="/tournaments/:slug" element={<TournamentDetailPage />} /></Routes>
+    </MemoryRouter>
+  );
+  const view = render(page());
+  const title = await screen.findByTestId("tournament-title");
+
+  authUser = { id: "u1", username: "paula", display_name: "Paula" };
+  view.rerender(page());
+
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/teams/my"));
+  expect(title.isConnected).toBe(true);
+  expect(screen.getByTestId("tournament-title")).toBe(title);
+});

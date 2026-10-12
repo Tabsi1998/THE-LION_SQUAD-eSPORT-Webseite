@@ -222,3 +222,23 @@ test("Kontowechsel auf der Teamseite: Einladung und Bearbeiten des vorigen Konto
 
   await waitFor(() => expect(screen.queryByTestId("team-invite-sheet")).toBeNull());
 });
+
+test("die Anmeldung lädt erst nach der Seite: kein zweiter Aufbau der Teamseite", async () => {
+  authState.user = undefined;
+  serve();
+  const page = () => (
+    <MemoryRouter initialEntries={["/teams/t-1"]}>
+      <Routes><Route path="/teams/:id" element={<TeamsPage />} /></Routes>
+    </MemoryRouter>
+  );
+  const view = render(page());
+  const upcoming = await screen.findByTestId("team-upcoming");
+  const loads = apiMock.get.mock.calls.filter(([url]) => url === "/teams/t-1").length;
+
+  authState.user = { id: "u-cap", username: "neonfalke" };
+  view.rerender(page());
+
+  expect(await screen.findByTestId("team-chat")).toBeInTheDocument();
+  expect(upcoming.isConnected).toBe(true);
+  expect(apiMock.get.mock.calls.filter(([url]) => url === "/teams/t-1")).toHaveLength(loads);
+});
