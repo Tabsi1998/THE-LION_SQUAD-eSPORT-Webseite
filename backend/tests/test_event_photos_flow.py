@@ -168,7 +168,8 @@ async def test_waits_for_uploads_to_settle_and_skips_old_empty_and_unlinked_albu
     unlinked = await make_album(flow, None)
     await add_photos(flow, unlinked, 2)
 
-    assert await event_photos.notify_due() == {"items": 0, "sent": 0}
+    first_run = await event_photos.notify_due()
+    assert first_run == {"items": 0, "sent": 0}
     assert await notices(flow, person) == []
     stored_old = await flow.db.gallery_albums.find_one({"id": old["id"]})
     assert stored_old.get("participants_notified_at"), "alte Alben gelten still als gemeldet"
@@ -255,30 +256,37 @@ async def test_who_may_submit_where_and_until_when(flow, monkeypatch):
     event = await make_event(flow)
     album = await make_album(flow, event)
     flow.act_as(None)
-    assert (await submit(flow, album)).status_code == 401
+    response = await submit(flow, album)
+    assert response.status_code == 401
 
     not_member = await guest(flow, "Gast")
     flow.act_as(not_member)
     assert (await flow.get(f"/api/gallery/{album['slug']}")).json()["photo_submission"] is None, "Nicht-Mitglieder sehen den Knopf nicht"
-    assert (await submit(flow, album)).status_code == 403
+    response = await submit(flow, album)
+    assert response.status_code == 403
 
     anna = await member(flow, "Anna")
     flow.act_as(anna)
     plain = await make_album(flow, None)
-    assert (await submit(flow, plain)).status_code == 409, "nur Alben eines Events"
+    response = await submit(flow, plain)
+    assert response.status_code == 409, "nur Alben eines Events"
     assert (await flow.get(f"/api/gallery/{plain['slug']}")).json()["photo_submission"] is None
 
     late_event = await make_event(flow, ended_days_ago=8)
     late = await make_album(flow, late_event)
     info = (await flow.get(f"/api/gallery/{late['slug']}")).json()["photo_submission"]
     assert info["open"] is False and info["can_submit"] is False
-    assert (await submit(flow, late)).status_code == 409, "nach sieben Tagen ist Einsenden zu"
+    response = await submit(flow, late)
+    assert response.status_code == 409, "nach sieben Tagen ist Einsenden zu"
     last_day = await make_album(flow, await make_event(flow, ended_days_ago=7))
-    assert (await submit(flow, last_day)).status_code == 200, "am siebten Tag geht es noch"
+    response = await submit(flow, last_day)
+    assert response.status_code == 200, "am siebten Tag geht es noch"
 
     monkeypatch.setattr(event_photos, "MAX_PER_PERSON", 2)
-    assert (await submit(flow, album)).status_code == 200
-    assert (await submit(flow, album)).status_code == 200
+    response = await submit(flow, album)
+    assert response.status_code == 200
+    response = await submit(flow, album)
+    assert response.status_code == 200
     full = await submit(flow, album)
     assert full.status_code == 409
     assert (await flow.get(f"/api/gallery/{album['slug']}")).json()["photo_submission"]["can_submit"] is False
@@ -299,7 +307,8 @@ async def test_board_approves_with_credit_and_rejects_with_deletion(flow):
     flow.act_as(await member(flow, "Bert"))
     assert (await flow.get("/api/admin/gallery-submissions")).status_code == 403
     flow.act_as(await flow.add_user(role="tournament_admin", name="Leitung"))
-    assert (await flow.post("/api/admin/gallery-submissions/decide", json={"ids": [named["id"]], "action": "approve"})).status_code == 403
+    response = await flow.post("/api/admin/gallery-submissions/decide", json={"ids": [named["id"]], "action": "approve"})
+    assert response.status_code == 403
 
     vorstand = await board(flow)
     flow.act_as(vorstand)
@@ -354,7 +363,8 @@ async def test_no_approval_before_the_image_check_is_through(flow):
     assert refused.status_code == 409
     assert await flow.db.gallery_photos.count_documents({"album_id": album["id"]}) == 0
     # Ablehnen geht immer.
-    assert (await flow.post("/api/admin/gallery-submissions/decide", json={"ids": [doubtful["id"]], "action": "reject"})).status_code == 200
+    response = await flow.post("/api/admin/gallery-submissions/decide", json={"ids": [doubtful["id"]], "action": "reject"})
+    assert response.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -380,5 +390,6 @@ async def test_account_erasure_and_album_deletion_take_the_submissions_along(flo
     third = (await submit(flow, album)).json()
     staff = await flow.add_staff()
     flow.act_as(staff)
-    assert (await flow.delete(f"/api/gallery/{album['id']}")).status_code == 200
+    deleted = await flow.delete(f"/api/gallery/{album['id']}")
+    assert deleted.status_code == 200
     assert await flow.db.gallery_submissions.find_one({"id": third["id"]}) is None
