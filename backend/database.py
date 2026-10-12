@@ -231,6 +231,9 @@ async def init_indexes():
     await db.gallery_albums.create_index("event_id")
     await db.gallery_photos.create_index("id", unique=True)
     await db.gallery_photos.create_index("album_id")
+    await db.gallery_submissions.create_index("id", unique=True)
+    await db.gallery_submissions.create_index([("album_id", 1), ("owner_id", 1)])
+    await db.gallery_submissions.create_index("status")
     # News indexes for category / pinning
     await db.news_posts.create_index("category")
     await db.news_posts.create_index([("pinned", -1), ("created_at", -1)])

@@ -47,6 +47,10 @@ PUSH_CHANNELS = {
     "f1_prize_reminder": "lion_tournaments",
     "event_member": "lion_tournaments",
     "event_board": "lion_tournaments",
+    # Fotos vom Event (#1185) und Bescheid zu eingesandten Fotos (#1186).
+    "gallery_event": "lion_tournaments",
+    "gallery_member": "lion_tournaments",
+    "gallery_submission": "lion_club",
     "access_link_invite": "lion_tournaments",
     "feedback_request": "lion_tournaments",
     # Direkt-, Team-, Turnier- und Match-Chat, Erwähnungen, Freundschafts- und Team-Einladungen.

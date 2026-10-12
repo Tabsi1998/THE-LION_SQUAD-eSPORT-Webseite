@@ -194,6 +194,11 @@ NOTIFICATION_KIND_CATEGORY = {
     "news_board": "club_internal",
     "event_member": "club_internal",
     "event_board": "club_internal",
+    # Fotos vom Event (#1185): „Die Fotos sind da“ an die Teilnehmer - Mitglieder-Alben unter „Vereinsintern“.
+    "gallery_event": "news_events",
+    "gallery_member": "club_internal",
+    # Fotos einsenden (#1186): freigegeben oder abgelehnt - an die Person, die eingesandt hat.
+    "gallery_submission": "club_internal",
     # Abstimmung offen (#844): einmal je Abstimmung, nur mit offenem Stimmrecht.
     "ballot_open": "club_internal",
     # Helferdienste (#1197): Aufruf und Erinnerung am Vortag - eigenes Thema, abschaltbar.
