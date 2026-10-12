@@ -129,3 +129,28 @@ async def test_a_lead_who_is_also_a_helper_keeps_the_helper_rights_without_a_sec
     elsewhere = await flow.get(f"/api/tournaments/{other['id']}/staff")
     assert own.status_code == 200, "der Einsatz als Helfer gilt weiter"
     assert elsewhere.status_code == 403 and elsewhere.json()["detail"] == MFA_MESSAGE, "für alle Turniere braucht es Zwei-Faktor"
+
+
+@pytest.mark.asyncio
+async def test_the_management_list_shows_a_helper_only_his_tournament(flow):
+    # Die Verwaltungsliste (#1028): Helfer sehen dort nur das Turnier ihres Einsatzes, die Turnierleitung alle - und
+    # ohne Zwei-Faktor keines. Die öffentliche Liste bleibt, wie sie ist.
+    setup = await tournament_with_helper(flow)
+    other = await flow.create_tournament()
+    own_id, other_id = setup["tournament"]["id"], other["id"]
+    params = {"include_drafts": True, "managed": True}
+
+    flow.act_as(setup["helper"])
+    managed = await flow.get("/api/tournaments", params=params)
+    public = await flow.get("/api/tournaments", params={"include_drafts": True})
+    assert managed.status_code == 200, managed.text
+    assert [t["id"] for t in managed.json()] == [own_id], "nur das eigene Turnier"
+    assert {own_id, other_id} <= {t["id"] for t in public.json()}, "die öffentliche Liste ändert sich nicht"
+
+    lead = await flow.add_user(role="tournament_admin", name="Leitung")
+    flow.act_as({**lead, "auth_mfa_verified": False})
+    unconfirmed = await flow.get("/api/tournaments", params=params)
+    flow.act_as(lead)
+    confirmed = await flow.get("/api/tournaments", params=params)
+    assert unconfirmed.json() == [], "ohne Zwei-Faktor nichts zu verwalten"
+    assert {own_id, other_id} <= {t["id"] for t in confirmed.json()}

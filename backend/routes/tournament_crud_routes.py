@@ -131,7 +131,7 @@ async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
 async def list_tournaments(status: str | None = None, game_id: str | None = None,
                            event_id: str | None = None, limit: int = 100,
                            offset: int = 0, paged: bool = False, compact: bool = False,
-                           include_drafts: bool = False,
+                           include_drafts: bool = False, managed: bool = False,
                            user=Depends(get_optional_user)):
     db = get_db()
     is_admin = is_confirmed_tournament_lead(user)
@@ -148,7 +148,11 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
         q["$or"] = [{"status": {"$ne": "draft"}}, {"id": {"$in": assigned_ids}}]
     else:
         q["status"] = {"$ne": "draft"}
-    assigned_visible_ids = assigned_ids if include_drafts else []
+    if managed and not is_admin:
+        # Verwaltungsliste (#1028): ohne die Turnierleitung über alle Turniere - dazu gehört die bestätigte
+        # Zwei-Faktor-Anmeldung - nur die Turniere des eigenen Helfer-Einsatzes.
+        q["id"] = {"$in": assigned_ids}
+    assigned_visible_ids = assigned_ids if include_drafts or managed else []
     participant_visible_ids = await _user_tournament_participation_ids(db, user)
     if game_id:
         q["game_id"] = game_id
