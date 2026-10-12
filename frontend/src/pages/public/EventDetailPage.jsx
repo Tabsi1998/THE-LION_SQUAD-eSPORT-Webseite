@@ -271,7 +271,7 @@ function EventTabs({ tabs, value, onChange }) {
           aria-selected={value === entry.key}
           onClick={() => onChange(entry.key)}
           data-testid={`event-tab-${entry.key}`}
-          className={`-mb-px border-b-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition ${value === entry.key ? "border-[#9F7AEA] text-white" : "border-transparent text-white/50 hover:text-white"}`}
+          className={`-mb-px min-h-11 border-b-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition ${value === entry.key ? "border-[#9F7AEA] text-white" : "border-transparent text-white/50 hover:text-white"}`}
         >
           {entry.key === "live" ? <Radio className="inline w-3.5 h-3.5 mr-1.5 -mt-0.5 text-[#FF3B30]" aria-hidden="true" /> : null}{entry.label}
         </button>
@@ -366,7 +366,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
       {/* 3. Live verfolgen: führt in den Reiter „Live“; „Display“ nur für die Turnierleitung. */}
       {!over && !!rows.length && (
         <section className="flex flex-wrap gap-3" data-section="live" data-testid="event-live-links">
-          <button type="button" onClick={onLive} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-live-follow">
+          <button type="button" onClick={onLive} className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-live-follow">
             <Radio className="w-4 h-4" /> Live verfolgen
           </button>
           {hasArea(user, "tournaments") && (
