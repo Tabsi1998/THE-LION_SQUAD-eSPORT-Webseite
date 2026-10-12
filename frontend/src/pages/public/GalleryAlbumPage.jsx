@@ -26,6 +26,8 @@ import {
 import { ArrowLeft, X, ChevronLeft, ChevronRight, Calendar, Play, Film, ExternalLink, Layers, Download } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
 import { ShareButton } from "@/components/tls/ShareButton";
+import { PhotoSubmitPanel } from "@/components/tls/PhotoSubmitPanel";
+import { photoCredit } from "@/lib/photoSubmission";
 
 function dimensionKey(item) {
   return item?.id || galleryMediaUrl(item) || item?.image_url || "";
@@ -162,11 +164,13 @@ export default function GalleryAlbumPage() {
         <h1 className="mt-6 font-heading text-3xl md:text-5xl font-black uppercase">{a.title}</h1>
         <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/60">
           {a.taken_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {viennaDate(a.taken_at, { dateStyle: "long" })}</span>}
-          {a.event && <Link to={`/events/${a.event.slug}`} className="text-[#9F7AEA] hover:underline">→ {a.event.name}</Link>}
+          {/* Fotos gehören zum Event (#1185): das Album nennt sein Event und führt zurück. */}
+          {a.event && <Link to={`/events/${a.event.slug || a.event.id}`} className="text-[#9F7AEA] hover:underline" data-testid="album-event-link">Vom Event: {a.event.name} →</Link>}
           {items.length > 0 && <span>{items.length} Medien</span>}
           {hasSections && <span className="inline-flex items-center gap-1.5"><Layers className="w-3.5 h-3.5" /> {sectionGroups.filter((group) => group.section).length} Abschnitte</span>}
         </div>
         {a.description && <p className="mt-3 text-white/70 max-w-2xl">{a.description}</p>}
+        <PhotoSubmitPanel album={a} info={a.photo_submission} onSent={load} />
         {hasSections && (
           <div className="mt-6 flex flex-wrap gap-2">
             {sectionGroups.map((group) => (
@@ -354,9 +358,11 @@ function Lightbox({ item, onClose, onPrev, onNext, tile = null }) {
         {type === "image" ? <LightboxImage item={item} /> : <LightboxVideo item={item} />}
       </div>
       <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="absolute right-4 p-3 text-white/70 hover:text-white z-10" aria-label="Nächstes"><ChevronRight className="w-6 h-6" /></button>
-      {item.caption && (
+      {(item.caption || photoCredit(item)) && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 max-w-[80vw] text-center text-sm text-white/85 bg-black/60 px-4 py-2 rounded-sm">
           {item.caption}
+          {/* Eingesandt (#1186): „Foto: Name“, wenn die Person das wollte. */}
+          {photoCredit(item) ? <span className={item.caption ? "block text-xs text-white/60" : ""} data-testid="gallery-lightbox-credit">{photoCredit(item)}</span> : null}
         </div>
       )}
     </div>

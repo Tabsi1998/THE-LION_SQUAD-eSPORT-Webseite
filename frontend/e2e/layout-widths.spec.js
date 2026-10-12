@@ -85,6 +85,10 @@ test.describe("Fußzeile: Satz und Knöpfe", () => {
     test(`bei ${width} px steht der Satz in ganzen Zeilen und kein Knopf läuft aus dem Bild`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/events");
+      // Erst die Seite selbst: solange ihr Code lädt, steht der Rahmen des Seitenwechsels (#1324) mit eigener Fußzeile da.
+      // Kommt die Seite, baut sie ihre eigene - wer vorher misst, hält ein Element in der Hand, das gleich verschwindet.
+      await expect(page.getByRole("heading", { level: 1, name: "Events" })).toBeVisible();
+      await expect(page.getByTestId("page-loading")).toHaveCount(0);
       const cta = page.getByTestId("footer-cta");
       await expect(page.getByTestId("footer-appstore-button")).toBeVisible();
       await expect(page.getByTestId("footer-discord-live")).toBeVisible();

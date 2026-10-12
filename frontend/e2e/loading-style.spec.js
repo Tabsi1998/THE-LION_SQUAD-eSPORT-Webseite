@@ -77,9 +77,14 @@ test.describe("Laden im Vereinsstil (#1324)", () => {
     await page.goto("/events/herbst-lan", { waitUntil: "domcontentloaded" });
     const line = page.getByTestId("route-progress");
     await expect(line).toBeVisible();
-    const animation = await line.evaluate((node) => getComputedStyle(node, "::before").animationName);
-    expect(animation).toBe("none");
-    const skeletonAnimation = await page.locator(".tls-skeleton").first().evaluate((node) => getComputedStyle(node).animationName);
-    expect(skeletonAnimation).toBe("none");
+    // In einem Schritt gelesen: beim Wechsel vom Rahmen des Seitenwechsels zur Seite wird der Kopf samt Linie getauscht -
+    // ein abgehängtes Element liefert für jeden Stil "" statt "none".
+    const styles = () => page.evaluate(() => {
+      const bar = document.querySelector("[data-testid='route-progress']");
+      const skeleton = document.querySelector(".tls-skeleton");
+      if (!bar || !skeleton) return null;
+      return { line: getComputedStyle(bar, "::before").animationName, skeleton: getComputedStyle(skeleton).animationName };
+    });
+    await expect.poll(styles).toEqual({ line: "none", skeleton: "none" });
   });
 });
