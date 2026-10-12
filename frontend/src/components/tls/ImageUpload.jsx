@@ -3,6 +3,7 @@ import { Check, Crop, RotateCcw, RotateCw, Upload, X, Image as ImageIcon } from 
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
+import { AvatarCropDialog } from "./AvatarCropDialog";
 import { toast } from "sonner";
 
 const parseUploadMb = (value, fallback) => {
@@ -322,7 +323,8 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
  *   label: optional label
  *   testId: data-testid prefix
  *   variant: "square" | "wide" (visual)
- *   crop: "round" | "square" | "banner" - Zuschnitt wie in der App (#1153): Profilbild rund, Logo quadratisch, Banner 3:1
+ *   crop: "round" | "square" | "banner" - Zuschnitt wie in der App (#1153): Profilbild rund, Logo quadratisch, Banner 3:1;
+ *         "round" öffnet den Profilbild-Zuschnitt (#1459: runde Vorschau, Zoom, Verschieben, quadratisch bis 512 px)
  *   endpoint: "/uploads/image" (default), "/uploads/logo" or "/uploads/sponsor-logo"
  *   mediaScope: "user" | "admin" | "sponsor" | "branding" | "gallery"; defaults by route
  */
@@ -341,6 +343,12 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
   const [drag, setDrag] = useState(null);
   const [cropBox, setCropBox] = useState({ width: 0, height: 0 });
   const [previewReady, setPreviewReady] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+
+  const closeAvatarCrop = useCallback(() => {
+    setAvatarFile(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }, []);
 
   useEffect(() => {
     if (!editor || !cropBoxRef.current) return undefined;
@@ -368,12 +376,13 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     if (fileRef.current) fileRef.current.value = "";
   }, []);
 
-  const uploadFile = async (file, editOptions = null) => {
+  const uploadFile = async (file, editOptions = null, { prepared = false } = {}) => {
     if (!file) return;
     setUploading(true);
     changeActiveUploads(1);
     try {
-      const uploadFile = await prepareImageForUpload(file, maxSizeMb, editOptions);
+      // Schon zugeschnitten (Profilbild, #1459): klein und fertig, nicht noch einmal durch die Optimierung.
+      const uploadFile = prepared ? file : await prepareImageForUpload(file, maxSizeMb, editOptions);
       if (uploadFile.size > maxSizeMb * 1024 * 1024) {
         toast.error(`Datei zu groß (max ${maxSizeMb} MB). Bitte Bild kleiner exportieren oder Proxy-Limit erhöhen.`);
         return false;
@@ -413,6 +422,11 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     if (!fileLooksSupported(file)) {
       toast.error("Nur PNG, JPG oder WebP erlaubt.");
       if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    // Profilbild (#1459): eigener Zuschnitt mit runder Vorschau, Zoom und Verschieben - Ergebnis immer quadratisch.
+    if (crop === "round" && browserCanOptimizeImages()) {
+      setAvatarFile(file);
       return;
     }
     if (browserCanOptimizeImages()) {
@@ -621,6 +635,24 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
             )}
           </div>
         </div>
+      )}
+      {avatarFile && (
+        <AvatarCropDialog
+          file={avatarFile}
+          busy={uploading}
+          testId={`${testId}-crop`}
+          onCancel={closeAvatarCrop}
+          onApply={async (cropped) => {
+            const ok = await uploadFile(cropped, null, { prepared: true });
+            if (ok) closeAvatarCrop();
+          }}
+          onLoadError={async () => {
+            // Der Browser kann das Bild nicht anzeigen: wie bisher ohne Zuschnitt hochladen, der Server wandelt es um.
+            const original = avatarFile;
+            closeAvatarCrop();
+            await uploadFile(original);
+          }}
+        />
       )}
       {editor && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={closeEditor}>
