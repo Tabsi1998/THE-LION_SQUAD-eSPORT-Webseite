@@ -24,9 +24,9 @@ Sterne am Level-Schild), der Rahmen bleibt der Löwenkönig.
 - Backend: `backend/services/levels.py` (`RANK_NAMES`, `rank_for_level`, `rank_view`). Der Level-Payload trägt
   `rank`, `rank_name`, `rank_from`, `rank_to` und `step` (Level innerhalb des Rangs).
 - Web: `frontend/src/lib/loewenRang.js` (dieselben Namen, ein Test vergleicht sie mit dem Backend) und der Profilrahmen
-  `frontend/src/components/tls/LevelAvatarFrame.jsx` mit den Größen Profil (172 px, auf dem Handy 128), Karte (96)
-  und Liste (44). In Listen nur die Grafik, ohne Glanz und Schild; mit „Bewegung reduzieren“ blendet der Glanz nur ein
-  und aus.
+  `frontend/src/components/tls/LevelAvatarFrame.jsx`. Jede Größe hat eine feste Fläche für Rahmen und Foto, gleich
+  für alle Ränge: Profil 260 px (auf dem Handy 200), Karte 150, Liste 92, klein (Podest) 64. In Listen und klein nur
+  die Grafik, ohne Glanz und Schild; mit „Bewegung reduzieren“ blendet der Glanz nur ein und aus.
 
 ## Rahmen-Grafiken
 
@@ -50,6 +50,7 @@ deshalb so skaliert und verschoben, dass der gemessene Ring auf dem runden Foto 
 Versatz `((0,5 − cx) · F, (0,5 − cy) · F)` bei Foto-Radius `P`. Die Prüfsumme hängt als `?v=` an der Bildadresse,
 damit nach einem Austausch kein alter Rahmen aus dem 30-Tage-Cache kommt.
 
-Den Außenabstand rechnet `framePadding` aus `box` und Ring, je Seite: Profil und Karte je Rang genau (niedrige Ränge
-brauchen weniger Platz), Listen einheitlich mit dem Größten über alle Ränge, damit Zeilen gleich hoch bleiben. So
-überdeckt kein Rahmen etwas daneben. In Listen trägt der Rahmen „Level n, Rang Name“ als zugänglichen Namen.
+Wie groß das Foto in der festen Fläche wird, rechnet `frameFit` aus `box` und Ring: so groß, dass die ganze Grafik
+samt Schwingen und Krone hineinpasst, mittig. Rang 1 bekommt so 76 % der Fläche als Foto, die Ränge mit Schwingen und
+Strahlen (9, 11, 12) knapp 50 %. Der Kopf ist bei jedem Rang gleich groß, nichts springt beim Rangwechsel, und kein
+Rahmen überdeckt etwas daneben. In Listen trägt der Rahmen „Level n, Rang Name“ als zugänglichen Namen.

@@ -499,20 +499,20 @@ test("level frames: the drawn frame of the rank sits with its ring exactly on th
     const ring = RING[key];
     const photo = await card.locator(".tls-lvf-photo").boundingBox();
     const art = await img.boundingBox();
-    expect(Math.abs(photo.width - 44), `${username}: Foto in der Liste 44 px`).toBeLessThanOrEqual(1);
+    // Feste Fläche (Liste 92 px) für jeden Rang; das Foto ist so groß, dass die ganze Grafik hineinpasst.
+    const area = await card.locator(".tls-lvf").boundingBox();
+    expect(Math.abs(area.width - 92) <= 1 && Math.abs(area.height - 92) <= 1, `${username}: Fläche 92 px`).toBe(true);
+    const fit = Number(await card.locator(".tls-lvf").evaluate((el) => el.style.getPropertyValue("--lvf-fit")));
+    expect(Math.abs(photo.width - 92 * fit), `${username}: Foto ${photo.width} px`).toBeLessThanOrEqual(1);
     expect(Math.abs(art.x + ring.cx * art.width - (photo.x + photo.width / 2)), `${username}: Ring waagrecht mittig`).toBeLessThanOrEqual(1);
     expect(Math.abs(art.y + ring.cy * art.height - (photo.y + photo.height / 2)), `${username}: Ring senkrecht mittig`).toBeLessThanOrEqual(1);
     expect(Math.abs(ring.r * art.width - photo.width / 2), `${username}: Ring so groß wie das Foto`).toBeLessThanOrEqual(1);
-    // Die gezeichnete Grafik bleibt im Außenabstand des Rahmens und überdeckt nichts daneben.
-    const margin = await card.locator(".tls-lvf").evaluate((el) => {
-      const s = getComputedStyle(el);
-      return [s.marginTop, s.marginRight, s.marginBottom, s.marginLeft].map(parseFloat);
-    });
+    // Die gezeichnete Grafik bleibt in der Fläche und überdeckt nichts daneben.
     const [left, top, right, bottom] = ring.box;
-    expect(art.y + top * art.height, `${username}: oben im Platz`).toBeGreaterThanOrEqual(photo.y - margin[0] - 1);
-    expect(art.x + right * art.width, `${username}: rechts im Platz`).toBeLessThanOrEqual(photo.x + photo.width + margin[1] + 1);
-    expect(art.y + bottom * art.height, `${username}: unten im Platz`).toBeLessThanOrEqual(photo.y + photo.height + margin[2] + 1);
-    expect(art.x + left * art.width, `${username}: links im Platz`).toBeGreaterThanOrEqual(photo.x - margin[3] - 1);
+    expect(art.y + top * art.height, `${username}: oben in der Fläche`).toBeGreaterThanOrEqual(area.y - 1);
+    expect(art.x + right * art.width, `${username}: rechts in der Fläche`).toBeLessThanOrEqual(area.x + area.width + 1);
+    expect(art.y + bottom * art.height, `${username}: unten in der Fläche`).toBeLessThanOrEqual(area.y + area.height + 1);
+    expect(art.x + left * art.width, `${username}: links in der Fläche`).toBeGreaterThanOrEqual(area.x - 1);
     await expect(card.locator(".tls-lvf")).toHaveAttribute("aria-label", new RegExp(`^Level ${username === "garlic" ? 9 : 32}, Rang `));
   }
 });

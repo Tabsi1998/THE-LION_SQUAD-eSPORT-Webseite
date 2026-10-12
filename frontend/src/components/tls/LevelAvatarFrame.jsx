@@ -1,21 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import { FRAME_SIZES, LIST_PADDING, frameLayout, framePadding, frameSources, rankInfo, ringOf } from "@/lib/loewenRang";
+import { FRAME_SIZES, PROFILE_SMALL, frameFit, frameLayout, framePadding, frameSources, rankInfo, ringOf } from "@/lib/loewenRang";
 
 const TLS_BLUE = "#29B6E8";
-// Profil auf dem Handy (unter 640 px): kleineres Foto, sonst ragt der Rahmen über den Bildschirm.
-const PROFILE_SMALL = 128;
 const MAX_PRESTIGE = 5;
 
-/* Löwen-Rang (#1454): 12 gezeichnete Rahmen statt der 30 Code-Looks. Der Rahmen wird so skaliert und verschoben,
-   dass sein gemessener Ring genau auf dem runden Foto liegt - das Foto sitzt immer mittig. Kronen kommen weiter aus
-   der Punktewertung. */
+/* Löwen-Rang (#1454): 12 gezeichnete Rahmen statt der 30 Code-Looks. Jede Größe hat eine feste Fläche für Rahmen und
+   Foto; das Foto wird je Rang so groß, dass die ganze Grafik hineinpasst, und der Rahmen so skaliert und verschoben,
+   dass sein gemessener Ring genau auf dem runden Foto liegt. Kronen kommen weiter aus der Punktewertung. */
 export function levelFrameConfig(levelInput) {
   const info = rankInfo(levelInput);
   const ring = ringOf(info.key);
   // Foto-Durchmesser 1 (Radius 0,5): Größe und Versatz der Grafik als Vielfache des Durchmessers.
   const { F: scale, ox, oy } = frameLayout(0.5, ring);
-  return { ...info, ring, scale, ox, oy };
+  return { ...info, ring, scale, ox, oy, fit: frameFit(ring), pad: framePadding(ring) };
 }
 
 /* ---- Dynamic crowns (points leaderboard rank 1-3 + obsidian for level 30+) ---- */
@@ -97,49 +95,47 @@ export function CrownIcon({ variant, className = "" }) {
   );
 }
 
-/** Kantenlänge der Grafik in CSS-Pixeln für ein Foto mit Durchmesser `d`. */
-const artPx = (d, scale) => Math.round(d * scale);
+/** Kantenlänge der Grafik in CSS-Pixeln für eine Fläche mit Kantenlänge `area`. */
+const artPx = (area, cfg) => Math.round(area * cfg.fit.photo * cfg.scale);
+const STILL = new Set(["list", "mini"]);
 
 /**
- * Profilbild mit dem Rahmen seines Löwen-Rangs.
- * size: "profile" (172 px, auf dem Handy 128), "card" (96) oder "list" (44); `compact` heißt "list".
- * Listen reservieren für alle Ränge denselben Platz, damit Zeilen gleich hoch bleiben. `tight` nimmt auch dort den
- * genauen Platz des Rangs - für Stellen ohne Zeilen, etwa das Podest mit drei Karten nebeneinander.
- * In Listen bleibt nur die Grafik, ohne Glanz und ohne Schild. Die Kinder füllen das runde Foto.
+ * Profilbild mit dem Rahmen seines Löwen-Rangs, in einer festen Fläche für alle Ränge.
+ * size: "profile" (260 px, auf dem Handy 200), "card" (150), "list" (92) oder "mini" (64, etwa das Podest);
+ * `compact` heißt "list". In Listen und klein bleibt nur die Grafik, ohne Glanz und ohne Schild.
+ * Die Kinder füllen das runde Foto.
  */
-export function LevelAvatarFrame({ level, prestige = 0, crown = null, size, className = "", compact = false, tight = false, showBadge = true, team = false, testId, children }) {
+export function LevelAvatarFrame({ level, prestige = 0, crown = null, size, className = "", compact = false, showBadge = true, team = false, testId, children }) {
   const cfg = useMemo(() => levelFrameConfig(level), [level]);
   const variant = FRAME_SIZES[size] ? size : compact ? "list" : "profile";
-  const still = variant === "list";
-  const diameter = FRAME_SIZES[variant];
-  const px = artPx(diameter, cfg.scale);
-  const sizes = variant === "profile" ? `(min-width: 640px) ${px}px, ${artPx(PROFILE_SMALL, cfg.scale)}px` : `${px}px`;
+  const still = STILL.has(variant);
+  const px = artPx(FRAME_SIZES[variant], cfg);
+  const sizes = variant === "profile" ? `(min-width: 640px) ${px}px, ${artPx(PROFILE_SMALL, cfg)}px` : `${px}px`;
   const sources = frameSources(cfg.key, px);
   const [loaded, setLoaded] = useState(false);
   const stars = Math.max(0, Math.min(MAX_PRESTIGE, Math.floor(Number(prestige) || 0)));
   const shown = Math.max(1, Math.floor(Number(level) || 1));
   const crownStyle = crown ? CROWN_STYLES[crown] : null;
   const plate = showBadge && !still;
-  // Außenabstand aus der gemessenen Ausdehnung: Profil und Karte je Rang genau, Listen einheitlich für gleich hohe Zeilen.
-  const [padTop, padRight, padBottom, padLeft] = still && !tight ? LIST_PADDING : framePadding(cfg.ring);
   // In Listen gibt es kein Schild - dort trägt der Rahmen selbst Level und Rang als zugänglichen Namen.
   const label = `${team ? "Team-Level" : "Level"} ${shown}, Rang ${cfg.name}${stars > 0 ? `, Prestige ${stars}` : ""}`;
   useEffect(() => { setLoaded(false); }, [cfg.key]);
   return (
     <div
-      className={["tls-lvf", `tls-lvf--${variant}`, plate ? "tls-lvf--plate" : "", plate && stars > 0 ? "tls-lvf--stars" : "", team ? "tls-lvf--team" : "", className].filter(Boolean).join(" ")}
+      className={["tls-lvf", `tls-lvf--${variant}`, still ? "tls-lvf--still" : "", plate ? "tls-lvf--plate" : "", plate && stars > 0 ? "tls-lvf--stars" : "", team ? "tls-lvf--team" : "", className].filter(Boolean).join(" ")}
       role={still ? "img" : undefined}
       aria-label={still ? label : undefined}
       style={{
+        "--lvf-fit": cfg.fit.photo,
+        "--lvf-left": cfg.fit.left.toFixed(4),
+        "--lvf-top": cfg.fit.top.toFixed(4),
         "--lvf-scale": cfg.scale.toFixed(4),
         "--lvf-ox": cfg.ox.toFixed(4),
         "--lvf-oy": cfg.oy.toFixed(4),
+        "--lvf-pt": cfg.pad[0].toFixed(4),
+        "--lvf-pb": cfg.pad[2].toFixed(4),
         "--lvf-rc": cfg.color,
         "--lvf-shine": (0.35 + 0.55 * cfg.progress).toFixed(2),
-        "--lvf-pt": padTop,
-        "--lvf-pr": padRight,
-        "--lvf-pb": padBottom,
-        "--lvf-pl": padLeft,
       }}
       data-level={shown}
       data-rank={cfg.rank}
@@ -147,46 +143,48 @@ export function LevelAvatarFrame({ level, prestige = 0, crown = null, size, clas
       data-crown={crown || undefined}
       data-testid={testId}
     >
-      <div className="tls-lvf-photo">{children}</div>
-      <span className="tls-lvf-art" data-loaded={loaded ? "1" : undefined} aria-hidden="true">
-        <img
-          className="tls-lvf-img"
-          src={sources.src}
-          srcSet={sources.srcSet}
-          sizes={sizes}
-          width={px}
-          height={px}
-          loading="lazy"
-          decoding="async"
-          alt=""
-          draggable="false"
-          onLoad={() => setLoaded(true)}
-        />
-        {!still && <span className="tls-lvf-shine" style={{ "--lvf-mask": `url("${sources.mask}")` }} />}
-      </span>
-      {crown && (
-        <span
-          className={`tls-lvf-crown tls-lvf-crown--${crown}`}
-          style={{ "--crown-glow": crownStyle?.glow }}
-          title={CROWN_LABELS[crown]}
-          data-testid="avatar-crown"
-          aria-hidden="true"
-        >
-          <span className="tls-lvf-crown-rays" />
-          <CrownIcon variant={crown} />
+      <div className="tls-lvf-core">
+        <div className="tls-lvf-photo">{children}</div>
+        <span className="tls-lvf-art" data-loaded={loaded ? "1" : undefined} aria-hidden="true">
+          <img
+            className="tls-lvf-img"
+            src={sources.src}
+            srcSet={sources.srcSet}
+            sizes={sizes}
+            width={px}
+            height={px}
+            loading="lazy"
+            decoding="async"
+            alt=""
+            draggable="false"
+            onLoad={() => setLoaded(true)}
+          />
+          {!still && <span className="tls-lvf-shine" style={{ "--lvf-mask": `url("${sources.mask}")` }} />}
         </span>
-      )}
-      {plate && (
-        <span className="tls-lvf-plate" data-testid="level-frame-badge">
-          {stars > 0 && <span className="tls-lvf-stars" role="img" aria-label={`Prestige ${stars}`}>{"★".repeat(stars)}</span>}
-          <span className="tls-lvf-tag">{team ? `TEAM LVL ${shown}` : cfg.max ? "LVL 60 · MAX" : `LVL ${shown}`}</span>
-          <span className="tls-lvf-pips" role="img" aria-label={`${cfg.name}: ${cfg.filled} von ${cfg.pips}`}>
-            {Array.from({ length: cfg.pips }, (_, i) => (
-              <i key={i} className={`tls-lvf-pip${i < cfg.filled ? " is-on" : ""}`} />
-            ))}
+        {crown && (
+          <span
+            className={`tls-lvf-crown tls-lvf-crown--${crown}`}
+            style={{ "--crown-glow": crownStyle?.glow }}
+            title={CROWN_LABELS[crown]}
+            data-testid="avatar-crown"
+            aria-hidden="true"
+          >
+            <span className="tls-lvf-crown-rays" />
+            <CrownIcon variant={crown} />
           </span>
-        </span>
-      )}
+        )}
+        {plate && (
+          <span className="tls-lvf-plate" data-testid="level-frame-badge">
+            {stars > 0 && <span className="tls-lvf-stars" role="img" aria-label={`Prestige ${stars}`}>{"★".repeat(stars)}</span>}
+            <span className="tls-lvf-tag">{team ? `TEAM LVL ${shown}` : cfg.max ? "LVL 60 · MAX" : `LVL ${shown}`}</span>
+            <span className="tls-lvf-pips" role="img" aria-label={`${cfg.name}: ${cfg.filled} von ${cfg.pips}`}>
+              {Array.from({ length: cfg.pips }, (_, i) => (
+                <i key={i} className={`tls-lvf-pip${i < cfg.filled ? " is-on" : ""}`} />
+              ))}
+            </span>
+          </span>
+        )}
+      </div>
     </div>
   );
 }

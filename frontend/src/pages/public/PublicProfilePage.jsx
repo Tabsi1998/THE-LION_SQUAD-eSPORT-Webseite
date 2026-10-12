@@ -571,7 +571,7 @@ export default function PublicProfilePage() {
               Namen nur ein schmaler Streifen mit einem Buchstaben je Zeile (#1218). */}
           <div ref={tiltRef} className="tls-tilt relative -mt-14 sm:-mt-16 lg:-mt-20 flex flex-col md:flex-row md:flex-wrap xl:flex-nowrap md:items-end gap-4 md:gap-6" data-testid="profile-tilt">
             <div className="tls-tilt__deep shrink-0">
-              <LevelAvatarFrame level={level.level} prestige={level.prestige} crown={crown} size="profile" className="!mt-0" testId="profile-avatar-frame">
+              <LevelAvatarFrame level={level.level} prestige={level.prestige} crown={crown} size="profile" testId="profile-avatar-frame">
                 {profile.avatar_url ? (
                   <img src={resolveMediaUrl(profile.avatar_url)} alt={displayName} className="w-full h-full object-cover" />
                 ) : (

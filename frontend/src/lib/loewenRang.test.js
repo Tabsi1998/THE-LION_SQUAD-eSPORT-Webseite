@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import RING from "./loewenRangRing.json";
-import { FRAME_WIDTHS, LIST_PADDING, RANK_NAMES, frameLayout, framePadding, frameSources, rankForLevel, rankInfo, ringOf } from "./loewenRang";
+import { FRAME_SIZES, FRAME_WIDTHS, PROFILE_SMALL, RANK_NAMES, frameFit, frameLayout, frameSources, rankForLevel, rankInfo, ringOf } from "./loewenRang";
 
 // Löwen-Rang (#1452, #1454): Rang-Zuordnung wie im Backend, Ausrichtung des Rahmens am gemessenen Ring.
 
@@ -75,27 +75,32 @@ test("Bildquellen: srcset über drei Breiten, Maske passend zur Größe", () => 
   expect(frameSources("01", 60).mask).toContain("rang-01-160.webp");
 });
 
-test("Platz: für alle 12 Ränge liegt die Grafik in der reservierten Box", () => {
-  for (const key of Object.keys(RING)) {
-    const ring = ringOf(key);
-    const D = 100;
-    const { F, ox, oy } = frameLayout(D / 2, ring);
-    const [left, top, right, bottom] = ring.box;
-    // Grafik in Koordinaten um die Fotomitte; die Box reicht vom Foto aus um den Außenabstand je Seite.
-    const art = { left: ox - F / 2 + left * F, top: oy - F / 2 + top * F, right: ox - F / 2 + right * F, bottom: oy - F / 2 + bottom * F };
-    for (const [name, pad] of [["eigener", framePadding(ring)], ["Listen", LIST_PADDING]]) {
-      const [pt, pr, pb, pl] = pad.map((value) => value * D);
-      expect(art.top, `${key} ${name} oben`).toBeGreaterThanOrEqual(-D / 2 - pt - 1e-9);
-      expect(art.right, `${key} ${name} rechts`).toBeLessThanOrEqual(D / 2 + pr + 1e-9);
-      expect(art.bottom, `${key} ${name} unten`).toBeLessThanOrEqual(D / 2 + pb + 1e-9);
-      expect(art.left, `${key} ${name} links`).toBeGreaterThanOrEqual(-D / 2 - pl - 1e-9);
+// Kleinstes Foto als Anteil der Fläche. Fabians Ziel war etwa 0,6 - die Ränge mit Schwingen und Strahlen (5–12)
+// liegen mit fester Fläche bei 0,49–0,58 (gemeldet im PR). Der Test hält die heutige Untergrenze.
+const MIN_PHOTO = 0.48;
+
+test("feste Fläche: für alle 12 Ränge und alle Größen passt die Grafik hinein, das Foto bleibt über dem Minimum", () => {
+  for (const area of [...Object.values(FRAME_SIZES), PROFILE_SMALL]) {
+    for (const key of Object.keys(RING)) {
+      const ring = ringOf(key);
+      const fit = frameFit(ring);
+      const D = area * fit.photo;
+      const { F, ox, oy } = frameLayout(D / 2, ring);
+      // Mitte des Fotos in der Fläche, daraus die Grafik; ihre gemessene Ausdehnung muss in [0, area] liegen.
+      const centerX = area * fit.left + D / 2;
+      const centerY = area * fit.top + D / 2;
+      const [left, top, right, bottom] = ring.box;
+      const artLeft = centerX + ox - F / 2;
+      const artTop = centerY + oy - F / 2;
+      expect(artLeft + left * F, `${key} @${area} links`).toBeGreaterThanOrEqual(-1e-6);
+      expect(artTop + top * F, `${key} @${area} oben`).toBeGreaterThanOrEqual(-1e-6);
+      expect(artLeft + right * F, `${key} @${area} rechts`).toBeLessThanOrEqual(area + 1e-6);
+      expect(artTop + bottom * F, `${key} @${area} unten`).toBeLessThanOrEqual(area + 1e-6);
+      // eng: die Grafik füllt die Fläche in einer Richtung fast ganz aus (Rundung auf drei Stellen)
+      expect(Math.max((right - left) * F, (bottom - top) * F)).toBeGreaterThan(area * 0.995);
+      expect(fit.photo, `${key}: Foto über dem Minimum`).toBeGreaterThanOrEqual(MIN_PHOTO);
     }
-    // eng: der eigene Abstand ist nicht größer als nötig (Rundung auf drei Stellen)
-    const own = framePadding(ring).map((value) => value * D);
-    expect(own[0] - (-D / 2 - art.top) < 0.11 || own[0] === 0).toBe(true);
-    expect(own[2] - (art.bottom - D / 2) < 0.11 || own[2] === 0).toBe(true);
   }
-  // Niedrige Ränge brauchen weniger Platz als hohe - das Profil wächst nicht pauschal.
-  expect(framePadding(ringOf("01"))[1]).toBeLessThan(framePadding(ringOf("12"))[1]);
-  expect(LIST_PADDING.every((value) => value > 0 && value < 0.7)).toBe(true);
+  // Rang 1 bekommt ein großes Foto, Rang 12 ein kleineres.
+  expect(frameFit(ringOf("01")).photo).toBeGreaterThan(frameFit(ringOf("12")).photo);
 });

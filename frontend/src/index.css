@@ -1133,27 +1133,36 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 }
 
 /* ===== Löwen-Rang: Profilrahmen (LevelAvatarFrame.jsx, #1454) =====
-   Das runde Foto hat den Durchmesser --lvf-d. Die Rahmen-Grafik ist --lvf-scale mal so groß und um --lvf-ox/--lvf-oy
-   (Anteile von --lvf-d) verschoben, damit ihr gemessener Ring genau auf dem Foto liegt. Der Außenabstand
-   --lvf-pt/-pr/-pb/-pl kommt aus der gemessenen Ausdehnung der Grafik (lib/loewenRang.js): Profil und Karte je Rang
-   genau, Listen einheitlich. So überdeckt der Rahmen nichts daneben. Listen: nur das Bild, ohne Bewegung. */
+   Jede Größe hat eine feste Fläche --lvf-s für Rahmen und Foto, gleich für alle Ränge - der Kopf springt beim
+   Rangwechsel nicht. Das Foto (--lvf-d = Fläche × --lvf-fit) wird je Rang so groß, dass die ganze Grafik samt Schwingen
+   und Krone hineinpasst, und sitzt bei --lvf-left/--lvf-top (lib/loewenRang.js: frameFit). Die Grafik ist --lvf-scale mal
+   so groß wie das Foto und um --lvf-ox/--lvf-oy verschoben, damit ihr gemessener Ring genau auf dem Foto liegt.
+   Listen und klein: nur das Bild, ohne Bewegung. */
 .tls-lvf {
-  --lvf-d: 172px;
+  --lvf-s: 260px;
+  --lvf-plate: 0px;
   position: relative;
   flex: none;
-  width: var(--lvf-d);
-  height: var(--lvf-d);
-  --lvf-plate: 0px;
-  margin: calc(var(--lvf-d) * var(--lvf-pt, 0.5)) calc(var(--lvf-d) * var(--lvf-pr, 0.5))
-    calc(var(--lvf-d) * var(--lvf-pb, 0.5) + var(--lvf-plate)) calc(var(--lvf-d) * var(--lvf-pl, 0.5));
+  width: var(--lvf-s);
+  height: var(--lvf-s);
+  margin-bottom: var(--lvf-plate);
   isolation: isolate;
 }
-.tls-lvf--profile { --lvf-d: 128px; }
+.tls-lvf--profile { --lvf-s: 200px; }
 @media (min-width: 640px) {
-  .tls-lvf--profile { --lvf-d: 172px; }
+  .tls-lvf--profile { --lvf-s: 260px; }
 }
-.tls-lvf--card { --lvf-d: 96px; }
-.tls-lvf--list { --lvf-d: 44px; }
+.tls-lvf--card { --lvf-s: 150px; }
+.tls-lvf--list { --lvf-s: 92px; }
+.tls-lvf--mini { --lvf-s: 64px; }
+.tls-lvf-core {
+  --lvf-d: calc(var(--lvf-s) * var(--lvf-fit, 0.5));
+  position: absolute;
+  left: calc(var(--lvf-s) * var(--lvf-left, 0.25));
+  top: calc(var(--lvf-s) * var(--lvf-top, 0.25));
+  width: var(--lvf-d);
+  height: var(--lvf-d);
+}
 /* Das Schild ragt unter der Grafik heraus (10 px überlappen): Platz für Schild und Rauten, mit Prestige für die Sterne. */
 .tls-lvf--plate { --lvf-plate: 26px; }
 .tls-lvf--card.tls-lvf--plate { --lvf-plate: 21px; }
@@ -1180,8 +1189,8 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
   opacity: 0;
   transition: opacity var(--tls-motion-slow) var(--tls-ease);
 }
-.tls-lvf-art[data-loaded="1"], .tls-lvf--list .tls-lvf-art { opacity: 1; }
-.tls-lvf--list .tls-lvf-art { transition: none; }
+.tls-lvf-art[data-loaded="1"], .tls-lvf--still .tls-lvf-art { opacity: 1; }
+.tls-lvf--still .tls-lvf-art { transition: none; }
 .tls-lvf-img { display: block; width: 100%; height: 100%; max-width: none; user-select: none; }
 /* Glanz, der nur über das Metall läuft: die Grafik selbst ist die Maske. Stärke --lvf-shine wächst mit dem Level im Rang. */
 .tls-lvf-shine {
@@ -1334,18 +1343,18 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
   0%, 100% { filter: drop-shadow(0 0 8px rgba(41, 182, 232, 0.7)); }
   50% { filter: drop-shadow(0 0 22px rgba(41, 182, 232, 1)) drop-shadow(0 0 40px rgba(41, 182, 232, 0.65)); }
 }
-.tls-lvf--list .tls-lvf-crown {
+.tls-lvf--still .tls-lvf-crown {
   top: calc(var(--lvf-d) * var(--lvf-pt, 0.5) * -1 - 8px);
   width: 38px;
   margin-left: -19px;
 }
 /* Listen bleiben ruhig: die Krone steht still, ohne Schweben, Pulsen und Funkeln. */
-.tls-lvf--list .tls-lvf-crown,
-.tls-lvf--list .tls-lvf-crown::before,
-.tls-lvf--list .tls-lvf-crown::after,
-.tls-lvf--list .tls-lvf-crown-rays { animation: none; }
-.tls-lvf--list .tls-lvf-crown::after { display: none; }
-.tls-lvf--list .tls-lvf-crown-rays { display: none; }
+.tls-lvf--still .tls-lvf-crown,
+.tls-lvf--still .tls-lvf-crown::before,
+.tls-lvf--still .tls-lvf-crown::after,
+.tls-lvf--still .tls-lvf-crown-rays { animation: none; }
+.tls-lvf--still .tls-lvf-crown::after { display: none; }
+.tls-lvf--still .tls-lvf-crown-rays { display: none; }
 
 /* profile quick-stat highlight for strong performances */
 .tls-stat-glory {

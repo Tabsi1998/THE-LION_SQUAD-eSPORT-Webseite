@@ -207,7 +207,7 @@ function LinkedAccountCard({ account }) {
         <div className="flex items-center gap-3">
           <LevelAvatarFrame level={level} compact className="shrink-0">
             {account.avatar_url ? (
-              <SizedImage src={account.avatar_url} size={44} alt="" className="w-full h-full" />
+              <SizedImage src={account.avatar_url} size={72} alt="" className="w-full h-full" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-white/25"><UserIcon className="w-6 h-6" /></div>
             )}

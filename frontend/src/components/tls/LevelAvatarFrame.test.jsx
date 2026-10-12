@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { render, screen } from "@testing-library/react";
 import RING from "@/lib/loewenRangRing.json";
+import { frameFit } from "@/lib/loewenRang";
 import { LevelAvatarFrame, levelFrameConfig } from "./LevelAvatarFrame";
 
 // Löwen-Rang (#1454): der Rahmen des Rangs als Grafik, am gemessenen Ring ausgerichtet, Schild mit Rauten.
@@ -36,7 +37,7 @@ test("Bild lazy, mit srcset und passender Breite", () => {
   expect(img.getAttribute("loading")).toBe("lazy");
   expect(img.getAttribute("decoding")).toBe("async");
   expect(img.getAttribute("srcset").split(", ")).toHaveLength(3);
-  const px = Math.round(96 / (2 * RING["01"].r));
+  const px = Math.round(150 * frameFit(RING["01"]).photo / (2 * RING["01"].r));
   expect(img.getAttribute("sizes")).toBe(`${px}px`);
   expect(img.getAttribute("width")).toBe(String(px));
   expect(img.getAttribute("alt")).toBe("");
@@ -100,29 +101,29 @@ test("Listen: Level und Rang als zugänglicher Name, sonst über das Schild", ()
   expect(frame({ level: 60, prestige: 2 }, "profil").getAttribute("role")).toBeNull();
 });
 
-test("Außenabstand aus der Geometrie: Profil je Rang, Listen einheitlich", () => {
+test("feste Fläche: jeder Rang dieselbe Größe, das Foto passt sich an", () => {
   const low = frame({ level: 1 }, "rang1");
   const high = frame({ level: 42 }, "rang9");
-  expect(Number(low.style.getPropertyValue("--lvf-pr"))).toBeLessThan(Number(high.style.getPropertyValue("--lvf-pr")));
-  const a = frame({ level: 1, compact: true }, "liste1");
-  const b = frame({ level: 42, compact: true }, "liste9");
-  for (const side of ["pt", "pr", "pb", "pl"]) {
-    expect(a.style.getPropertyValue(`--lvf-${side}`)).toBe(b.style.getPropertyValue(`--lvf-${side}`));
-  }
+  expect(low.className).toContain("tls-lvf--profile");
+  expect(high.className).toContain("tls-lvf--profile");
+  // Rang 1 bekommt ein großes Foto, Rang 9 mit den Schwingen ein kleineres.
+  expect(Number(low.style.getPropertyValue("--lvf-fit"))).toBeGreaterThan(Number(high.style.getPropertyValue("--lvf-fit")));
+  expect(Number(high.style.getPropertyValue("--lvf-fit"))).toBe(frameFit(RING["09"]).photo);
   expect(high.className).toContain("tls-lvf--plate");
   expect(frame({ level: 60, prestige: 1 }, "sterne").className).toContain("tls-lvf--stars");
 });
 
 test("Listen: die Krone steht still (CSS)", () => {
   const css = readFileSync(path.join(process.cwd(), "src/index.css"), "utf8").replace(/\r\n/g, "\n");
-  const rule = css.match(/\.tls-lvf--list \.tls-lvf-crown,\n\.tls-lvf--list \.tls-lvf-crown::before,\n\.tls-lvf--list \.tls-lvf-crown::after,\n\.tls-lvf--list \.tls-lvf-crown-rays \{ animation: none; \}/);
+  const rule = css.match(/\.tls-lvf--still \.tls-lvf-crown,\n\.tls-lvf--still \.tls-lvf-crown::before,\n\.tls-lvf--still \.tls-lvf-crown::after,\n\.tls-lvf--still \.tls-lvf-crown-rays \{ animation: none; \}/);
   expect(rule).not.toBeNull();
 });
 
-test("tight: auch klein der genaue Platz des Rangs (Podest)", () => {
-  const list = frame({ level: 12, compact: true }, "liste");
-  const tight = frame({ level: 12, compact: true, tight: true }, "podest");
-  expect(Number(tight.style.getPropertyValue("--lvf-pt"))).toBeLessThan(Number(list.style.getPropertyValue("--lvf-pt")));
-  expect(tight.className).toContain("tls-lvf--list");
-  expect(tight.querySelector(".tls-lvf-shine")).toBeNull();
+test("mini (Podest): klein, still, ohne Schild", () => {
+  const mini = frame({ level: 12, size: "mini" }, "podest");
+  expect(mini.className).toContain("tls-lvf--mini");
+  expect(mini.className).toContain("tls-lvf--still");
+  expect(mini.getAttribute("aria-label")).toBe("Level 12, Rang Rudel");
+  expect(mini.querySelector(".tls-lvf-shine")).toBeNull();
+  expect(mini.querySelector("[data-testid='level-frame-badge']")).toBeNull();
 });

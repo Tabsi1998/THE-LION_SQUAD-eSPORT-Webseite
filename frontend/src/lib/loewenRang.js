@@ -12,8 +12,11 @@ export const RANK_NAMES = [
   "Löwenhaupt", "Brüller", "Schwingen", "Obsidian", "Sonnenlöwe", "Löwenkönig",
 ];
 export const FRAME_WIDTHS = [160, 320, 640];
-// Durchmesser des Fotos: Profil, Spielerkarte, Listen (Chat, Teilnehmer, Rangliste).
-export const FRAME_SIZES = { profile: 172, card: 96, list: 44 };
+// Feste Fläche für Rahmen und Foto zusammen (Kantenlänge in px), gleich für alle Ränge: Profil (am Handy 200), Karte,
+// Listen (Chat, Teilnehmer, Rangliste) und klein fürs Podest. Das Foto wird je Rang so groß, dass der Rahmen samt
+// Schwingen und Krone genau hineinpasst - der Kopf ist bei jedem Rang gleich hoch.
+export const FRAME_SIZES = { profile: 260, card: 150, list: 92, mini: 64 };
+export const PROFILE_SMALL = 200;
 const CYAN = "#29B6E8";
 const GOLD = "#FFD700";
 
@@ -63,18 +66,26 @@ export function frameLayout(P, ring) {
 
 /**
  * Platz, den die Grafik rund um ein Foto mit Durchmesser 1 braucht - [oben, rechts, unten, links], aus der gemessenen
- * Ausdehnung (`box`) und dem Ring. Mal Foto-Durchmesser ergibt das den Außenabstand, damit der Rahmen nichts daneben
- * überdeckt. Auf drei Stellen nach oben gerundet.
+ * Ausdehnung (`box`) und dem Ring.
  */
 export function framePadding(ring) {
   const scale = 1 / (2 * ring.r);
   const [left, top, right, bottom] = ring.box;
-  const up = (value) => Math.max(0, Math.ceil(value * 1000) / 1000);
-  return [(ring.cy - top) * scale - 0.5, (right - ring.cx) * scale - 0.5, (bottom - ring.cy) * scale - 0.5, (ring.cx - left) * scale - 0.5].map(up);
+  return [(ring.cy - top) * scale - 0.5, (right - ring.cx) * scale - 0.5, (bottom - ring.cy) * scale - 0.5, (ring.cx - left) * scale - 0.5].map((value) => Math.max(0, value));
 }
 
-// Listen: ein Wert für alle Ränge (je Seite das Größte), damit Zeilen gleich hoch bleiben.
-export const LIST_PADDING = Object.values(RING).map(framePadding).reduce((max, pad) => max.map((value, i) => Math.max(value, pad[i])), [0, 0, 0, 0]);
+/**
+ * Wie das Foto in der festen Fläche (Kantenlänge 1) sitzt: `photo` ist sein Durchmesser, `left`/`top` seine linke obere
+ * Ecke - so, dass die ganze Grafik in die Fläche passt und darin mittig steht. Auf drei Stellen abgerundet, damit
+ * nichts über den Rand ragt.
+ */
+export function frameFit(ring) {
+  const [pt, pr, pb, pl] = framePadding(ring);
+  const width = 1 + pl + pr;
+  const height = 1 + pt + pb;
+  const photo = Math.floor(1000 / Math.max(width, height)) / 1000;
+  return { photo, left: (1 - width * photo) / 2 + pl * photo, top: (1 - height * photo) / 2 + pt * photo };
+}
 
 /** Die Bilder eines Rahmens: srcset über 160/320/640 und die Fassung für die Glanz-Maske. */
 export function frameSources(key, displayPx = 320) {
