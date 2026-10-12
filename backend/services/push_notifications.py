@@ -1,6 +1,7 @@
 """Expo push notification delivery for the native mobile app."""
 from __future__ import annotations
 
+import hashlib
 import logging
 from datetime import timedelta
 from typing import Any
@@ -111,8 +112,15 @@ PRIVATE_PUSH_TITLE = "LionsAPP"
 PRIVATE_PUSH_BODY = "Neue Benachrichtigung"
 
 
+def push_account_tag(user_id: Any) -> str:
+    """Konto-Kennung am Push (#1053): kurz und nicht umkehrbar. Die App rechnet dieselbe (PushService.pushAccountTag) und
+    verwirft Pushes, die nicht zum angemeldeten Konto gehören."""
+    return hashlib.sha256(f"lsw-push-account:{user_id}".encode("utf-8")).hexdigest()[:16]
+
+
 def _push_payload(notification: dict[str, Any], row: dict[str, Any]) -> dict[str, Any]:
     kind = notification.get("kind")
+    account = push_account_tag(notification.get("user_id"))
     payload: dict[str, Any] = {
         "to": row.get("token"),
         "sound": "default",
@@ -122,9 +130,11 @@ def _push_payload(notification: dict[str, Any], row: dict[str, Any]) -> dict[str
     }
     if row.get("private_content"):
         payload.update(
+            # Auch der Kanal verrät nichts (#1052): der Standardkanal statt des Kanals der Art.
+            channelId=channel_for_device(None, row.get("channel_set")),
             title=PRIVATE_PUSH_TITLE,
             body=PRIVATE_PUSH_BODY,
-            data={"notification_id": notification.get("id"), "private": True},
+            data={"notification_id": notification.get("id"), "private": True, "account": account},
         )
         return payload
     payload.update(
@@ -135,6 +145,7 @@ def _push_payload(notification: dict[str, Any], row: dict[str, Any]) -> dict[str
             "kind": kind,
             "url": notification.get("url"),
             "meta": notification.get("meta") or {},
+            "account": account,
         },
     )
     return payload

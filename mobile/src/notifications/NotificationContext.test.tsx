@@ -1,7 +1,7 @@
 import React from "react";
-import { Text } from "react-native";
+import { AppState, Text } from "react-native";
 import { act, render, screen, waitFor } from "@testing-library/react-native";
-import { NotificationProvider, useNotifications } from "./NotificationContext";
+import { NotificationProvider, PUSH_RETRY_MS, useNotifications } from "./NotificationContext";
 import type { UserNotification } from "../types";
 
 // Die Glocke der App beim Kontowechsel (#1053) und mit App-Sperre (#1052): kein Rest vom vorigen Konto, das Gerät gehört
@@ -13,8 +13,12 @@ type ReceiveListener = (item: UserNotification) => void;
 const mockAuth: { user: MockUser | null } = { user: null };
 const mockLock = { ready: true, enabled: false, locked: false };
 const mockApi = { get: jest.fn(), post: jest.fn() };
-const mockRegisterPushToken = jest.fn(async (..._args: unknown[]): Promise<string | null> => "ExponentPushToken[test]");
+type Registration = { token: string; privateConfirmed: boolean } | null;
+const REGISTERED: Registration = { token: "ExponentPushToken[test]", privateConfirmed: true };
+const mockRegisterPushToken = jest.fn(async (..._args: unknown[]): Promise<Registration> => REGISTERED);
 const mockSetBadgeCount = jest.fn(async (..._args: unknown[]) => {});
+const mockSetForegroundPushHidden = jest.fn();
+const mockRenders: { user: string | undefined; titles: string[] }[] = [];
 const mockNavigateToNotification = jest.fn();
 const mockListeners: { receive: ReceiveListener | null; open: ReceiveListener | null } = { receive: null, open: null };
 
@@ -41,6 +45,7 @@ jest.mock("./PushService", () => ({
   consumeInitialPushNotification: async () => null,
   registerPushToken: (...args: unknown[]) => mockRegisterPushToken(...args),
   setBadgeCount: (...args: unknown[]) => mockSetBadgeCount(...args),
+  setForegroundPushHidden: (...args: unknown[]) => mockSetForegroundPushHidden(...args),
   isContentHiddenPush: (item: UserNotification) => item.meta?.content_hidden === true,
   addPushNotificationReceivedListener: (listener: ReceiveListener) => {
     mockListeners.receive = listener;
@@ -63,6 +68,7 @@ const ITEM_B: UserNotification = { id: "n-b", kind: "club", title: "Für B", rea
 
 function Probe() {
   const { items, unread } = useNotifications();
+  mockRenders.push({ user: mockAuth.user?.id, titles: items.map((item) => item.title) });
   return (
     <>
       <Text testID="unread">{unread}</Text>
@@ -81,6 +87,8 @@ function listFor(rows: UserNotification[]) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockRenders.length = 0;
+  mockRegisterPushToken.mockImplementation(async () => REGISTERED);
   mockAuth.user = USER_A;
   Object.assign(mockLock, { ready: true, enabled: false, locked: false });
   mockListeners.receive = null;
@@ -102,6 +110,39 @@ describe("Kontowechsel (#1053)", () => {
     expect(await screen.findByText("Für B")).toBeTruthy();
     expect(screen.queryByText("Nachricht für A")).toBeNull();
     await waitFor(() => expect(mockRegisterPushToken).toHaveBeenCalledTimes(2));
+  });
+
+  test("schon das erste Bild von B zeigt nichts von A", async () => {
+    const view = await render(tree());
+    expect(await screen.findByText("Nachricht für A")).toBeTruthy();
+
+    mockApi.get.mockResolvedValue(listFor([ITEM_B]));
+    mockAuth.user = USER_B;
+    await view.rerender(tree());
+    expect(await screen.findByText("Für B")).toBeTruthy();
+
+    const shownToB = mockRenders.filter((entry) => entry.user === USER_B.id);
+    expect(shownToB.length).toBeGreaterThan(0);
+    expect(shownToB.some((entry) => entry.titles.includes("Nachricht für A"))).toBe(false);
+  });
+
+  test("kam die Anmeldung des Geräts nicht durch, versucht die App es später noch einmal", async () => {
+    jest.useFakeTimers();
+    try {
+      mockRegisterPushToken.mockImplementationOnce(async () => null);
+      await render(tree());
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(mockRegisterPushToken).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        jest.advanceTimersByTime(PUSH_RETRY_MS);
+      });
+      expect(mockRegisterPushToken).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test("eine späte Antwort für A landet nicht in der Liste von B", async () => {
@@ -156,6 +197,49 @@ describe("App-Sperre (#1052)", () => {
     await render(tree());
     expect(await screen.findByText("Nachricht für A")).toBeTruthy();
     expect(mockRegisterPushToken).not.toHaveBeenCalled();
+  });
+
+  test("bestätigt der Server „ohne Inhalt“ nicht, fragt die App beim nächsten Öffnen noch einmal", async () => {
+    mockLock.enabled = true;
+    mockRegisterPushToken.mockImplementation(async () => ({ token: "ExponentPushToken[test]", privateConfirmed: false }));
+    await render(tree());
+    await waitFor(() => expect(mockRegisterPushToken).toHaveBeenCalledTimes(1));
+
+    // Die App kommt wieder nach vorn: der zuletzt angemeldete Zuhörer für AppState.
+    const calls = (AppState.addEventListener as unknown as jest.Mock).mock.calls.filter(([type]) => type === "change");
+    const onAppState = calls[calls.length - 1][1] as (state: string) => void;
+    await act(async () => {
+      onAppState("active");
+    });
+    await waitFor(() => expect(mockRegisterPushToken).toHaveBeenCalledTimes(2));
+    expect(mockRegisterPushToken).toHaveBeenLastCalledWith({ private: true });
+  });
+
+  test("die Anzeige im Vordergrund folgt der Sperre - unbekannt zählt als gesperrt", async () => {
+    mockLock.ready = false;
+    const view = await render(tree());
+    expect(mockSetForegroundPushHidden).toHaveBeenLastCalledWith(true);
+
+    Object.assign(mockLock, { ready: true, enabled: true, locked: false });
+    await view.rerender(tree());
+    expect(mockSetForegroundPushHidden).toHaveBeenLastCalledWith(false);
+  });
+
+  test("gesperrt kommt ein Push nicht in die Liste; nach dem Entsperren lädt die Glocke neu", async () => {
+    Object.assign(mockLock, { enabled: true, locked: true });
+    const view = await render(tree());
+    expect(await screen.findByText("Nachricht für A")).toBeTruthy();
+    const loadsBefore = mockApi.get.mock.calls.length;
+
+    await act(async () => {
+      mockListeners.receive?.({ id: "n-neu", kind: "direct_message", title: "Hallo von Max", read: false });
+    });
+    expect(screen.queryByText("Hallo von Max")).toBeNull();
+    expect(mockApi.get.mock.calls.length).toBe(loadsBefore);
+
+    mockLock.locked = false;
+    await view.rerender(tree());
+    await waitFor(() => expect(mockApi.get.mock.calls.length).toBeGreaterThan(loadsBefore));
   });
 
   test("gesperrt: kein Banner mit Inhalt", async () => {

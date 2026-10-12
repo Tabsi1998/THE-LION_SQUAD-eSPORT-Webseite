@@ -74,18 +74,34 @@ def test_gesperrtes_geraet_bekommt_den_push_ohne_inhalt(monkeypatch):
         {"token": "ExponentPushToken[alt]", "channel_set": 2},
     ])
 
+    account = push_notifications.push_account_tag("u1")
     hidden = sent["ExponentPushToken[gesperrt]"]
     assert hidden["title"] == "LionsAPP"
     assert hidden["body"] == "Neue Benachrichtigung"
-    assert hidden["data"] == {"notification_id": "n1", "private": True}
+    assert hidden["data"] == {"notification_id": "n1", "private": True, "account": account}
+    # Auch der Kanal verrät die Art nicht: der Standardkanal statt „Chats“.
+    assert hidden["channelId"] == push_notifications.FALLBACK_CHANNEL
     text = repr(hidden)
-    for secret in ("Max", "acht", "/messages", "direct_message"):
+    for secret in ("Max", "acht", "/messages", "direct_message", "lion_chats", "u1"):
         assert secret not in text
 
     for token in ("ExponentPushToken[offen]", "ExponentPushToken[alt]"):
         assert sent[token]["title"] == "Nachricht von Max"
         assert sent[token]["body"] == "Treffen um acht?"
         assert sent[token]["data"]["url"] == "/messages/max"
+        assert sent[token]["data"]["account"] == account
+        assert sent[token]["channelId"] == "lion_chats"
+
+
+def test_alte_app_mit_sperre_bekommt_ihren_standardkanal(monkeypatch):
+    sent = _send(monkeypatch, [{"token": "ExponentPushToken[alt-gesperrt]", "private_content": True}])
+    assert sent["ExponentPushToken[alt-gesperrt]"]["channelId"] == "default"
+
+
+def test_konto_kennung_ist_kurz_und_gleich_wie_in_der_app():
+    # Derselbe Wert steht in mobile/src/notifications/PushService.test.ts - beide Seiten rechnen gleich.
+    assert push_notifications.push_account_tag("u-test-1") == "c6c8cd198acdde30"
+    assert push_notifications.push_account_tag("u-test-2") != "c6c8cd198acdde30"
 
 
 @pytest.mark.asyncio
@@ -97,14 +113,38 @@ async def test_das_geraet_meldet_die_app_sperre_beim_registrieren(flow):
     async def stored():
         return await flow.db.mobile_push_tokens.find_one({"token": token}, {"_id": 0})
 
-    assert (await flow.post("/api/mobile/push-token", json={"token": token, "platform": "android", "private": True})).status_code == 200
+    answer = await flow.post("/api/mobile/push-token", json={"token": token, "platform": "android", "private": True})
+    assert answer.status_code == 200
+    # Der Server bestätigt die Wahl ausdrücklich - daran erkennt die App, dass er Pushes ohne Inhalt schickt.
+    assert answer.json() == {"ok": True, "private_content": True}
     assert (await stored())["private_content"] is True
 
     # Sperre wieder aus: derselbe Weg schaltet zurück.
-    await flow.post("/api/mobile/push-token", json={"token": token, "platform": "android", "private": False})
+    answer = await flow.post("/api/mobile/push-token", json={"token": token, "platform": "android", "private": False})
+    assert answer.json()["private_content"] is False
     assert (await stored())["private_content"] is False
 
-    # Eine ältere App ohne die Angabe lässt die gespeicherte Wahl stehen.
+    # Eine ältere App ohne die Angabe lässt ein gespeichertes „ohne Inhalt“ stehen - vorsichtig ist hier richtig.
     await flow.post("/api/mobile/push-token", json={"token": token, "platform": "android", "private": True})
-    await flow.post("/api/mobile/push-token", json={"token": token, "platform": "android"})
+    answer = await flow.post("/api/mobile/push-token", json={"token": token, "platform": "android"})
+    assert answer.json()["private_content"] is True
     assert (await stored())["private_content"] is True
+
+
+@pytest.mark.asyncio
+async def test_ein_geraet_gehoert_nur_dem_zuletzt_angemeldeten_konto(flow):
+    first = await flow.add_user(name="erster")
+    second = await flow.add_user(name="zweiter")
+    token = "ExponentPushToken[wechsel-test-geraet]"
+
+    flow.act_as(first)
+    await flow.post("/api/mobile/push-token", json={"token": token, "platform": "android", "private": True})
+    # Die App konnte das Gerät für das erste Konto nicht abmelden - der Wechsel geht trotzdem.
+    flow.act_as(second)
+    assert (await flow.post("/api/mobile/push-token", json={"token": token, "platform": "android"})).status_code == 200
+
+    rows = await flow.db.mobile_push_tokens.find({"token": token}, {"_id": 0}).to_list(10)
+    assert [row["user_id"] for row in rows] == [second["id"]]
+    assert await flow.db.mobile_push_tokens.count_documents({"user_id": first["id"]}) == 0
+    # Die Wahl „ohne Inhalt“ hängt am Gerät, nicht am Konto.
+    assert rows[0]["private_content"] is True

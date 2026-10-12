@@ -29,7 +29,11 @@ import {
   isContentHiddenPush,
   registerPushToken,
   setBadgeCount,
+  setForegroundPushHidden,
 } from "./PushService";
+
+/** Ein späterer Versuch (#1053), wenn das Anmelden des Geräts nicht durchkam - etwa ohne Netz direkt nach dem Wechsel. */
+export const PUSH_RETRY_MS = 30_000;
 
 type NotificationContextValue = {
   items: UserNotification[];
@@ -61,6 +65,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const userId = enabled && user ? user.id : null;
   const userIdRef = useRef(userId);
   userIdRef.current = userId;
+  // Kontowechsel (#1053): schon im ersten Bild des neuen Kontos keine Liste, kein Zähler, kein Banner des vorigen.
+  const [shownFor, setShownFor] = useState(userId);
+  if (shownFor !== userId) {
+    setShownFor(userId);
+    setItems([]);
+    setPopup(null);
+  }
   // App-Sperre (#1052): solange gesperrt - oder noch nicht klar ist, ob gesperrt wird - kein Banner und kein Sprung zum
   // Inhalt. Ein angetippter Push wartet in `pendingOpen` auf das Entsperren.
   const locked = enabled && (!appLock.ready || appLock.locked);
@@ -74,25 +85,54 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const registrationRef = useRef(registration);
   registrationRef.current = registration;
   const registeredAs = useRef<string | null>(null);
+  // Ein alter Server übernimmt „ohne Inhalt“ nicht (#1052): beim nächsten Öffnen der App fragt sie noch einmal. Bis dahin
+  // zeigt sie gesperrt trotzdem nichts an (setForegroundPushHidden).
+  const privateUnconfirmed = useRef(false);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retriedFor = useRef<string | null>(null);
+  const ensureRef = useRef<() => Promise<void>>(async () => {});
 
   const ensurePushRegistered = useCallback(async () => {
     if (!registration || registeredAs.current === registration) return;
-    const token = await registerPushToken({ private: privatePush }).catch(() => null);
-    if (token && registrationRef.current === registration) registeredAs.current = registration;
+    const result = await registerPushToken({ private: privatePush }).catch(() => null);
+    if (registrationRef.current !== registration) return;
+    if (!result) {
+      // Nicht durchgekommen (#1053): einmal später nachholen - erst die Anmeldung für das neue Konto nimmt das Gerät
+      // am Server jedem anderen Konto weg.
+      if (retriedFor.current !== registration && !retryTimer.current) {
+        retriedFor.current = registration;
+        retryTimer.current = setTimeout(() => {
+          retryTimer.current = null;
+          void ensureRef.current();
+        }, PUSH_RETRY_MS);
+      }
+      return;
+    }
+    registeredAs.current = registration;
+    privateUnconfirmed.current = privatePush && !result.privateConfirmed;
   }, [privatePush, registration]);
+  ensureRef.current = ensurePushRegistered;
 
-  // Kontowechsel (#1053): nichts vom vorigen Konto bleibt stehen - Liste, Banner, Zähler und ein wartender Push.
-  const shownFor = useRef(userId);
+  useEffect(() => () => {
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+  }, []);
+
+  // Kontowechsel (#1053): auch die Merker des vorigen Kontos gehen - bekannte Hinweise und ein wartender Push.
+  const resetFor = useRef(userId);
   useEffect(() => {
-    if (shownFor.current === userId) return;
-    shownFor.current = userId;
-    setItems([]);
-    setPopup(null);
+    if (resetFor.current === userId) return;
+    resetFor.current = userId;
     knownIds.current = new Set();
     primed.current = false;
     pendingOpen.current = null;
     registeredAs.current = null;
+    privateUnconfirmed.current = false;
   }, [userId]);
+
+  // Gesperrt oder Sperrzustand unbekannt (#1052): Pushes im Vordergrund ganz ohne Anzeige.
+  useEffect(() => {
+    setForegroundPushHidden(locked);
+  }, [locked]);
 
   const mergeIncomingNotification = useCallback((item: UserNotification) => {
     knownIds.current.add(item.id);
@@ -160,6 +200,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (!enabled) return undefined;
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") {
+        if (privateUnconfirmed.current) registeredAs.current = null;
         ensurePushRegistered();
         load();
       }
@@ -237,6 +278,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     const removeListener = addPushNotificationResponseListener(openFromSystemNotification);
     const removeReceivedListener = addPushNotificationReceivedListener((item) => {
+      // Gesperrt (#1052): nichts in Liste und Banner - nach dem Entsperren lädt die Glocke neu.
+      if (lockedRef.current) return;
       // Ein Push ohne Inhalt (#1052) kommt nicht als Platzhalter in die Liste - die Liste vom Server bringt den Eintrag.
       if (!isContentHiddenPush(item)) mergeIncomingNotification(item);
       load();
@@ -257,10 +300,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     };
   }, [enabled, load, mergeIncomingNotification, openFromSystemNotification]);
 
-  // Nach dem Entsperren (#1052) öffnet sich der Push, der davor angetippt wurde.
+  // Nach dem Entsperren (#1052) öffnet sich der Push, der davor angetippt wurde - sonst lädt die Glocke neu.
+  const wasLocked = useRef(locked);
   useEffect(() => {
-    if (!locked && pendingOpen.current) openFromSystemNotification(pendingOpen.current);
-  }, [locked, openFromSystemNotification]);
+    const unlocked = wasLocked.current && !locked;
+    wasLocked.current = locked;
+    if (locked) return;
+    if (pendingOpen.current) openFromSystemNotification(pendingOpen.current);
+    else if (unlocked) void load();
+  }, [load, locked, openFromSystemNotification]);
 
   const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
 

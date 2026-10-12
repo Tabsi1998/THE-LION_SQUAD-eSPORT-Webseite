@@ -15,6 +15,7 @@ const mockApi = { get: jest.fn(), post: jest.fn(), delete: jest.fn(), put: jest.
 const mockClearAllCache = jest.fn(async (..._args: unknown[]) => {});
 const mockUnregisterPushToken = jest.fn(async (..._args: unknown[]) => {});
 const mockDismissAllNotifications = jest.fn(async (..._args: unknown[]) => {});
+const mockSetPushAccount = jest.fn();
 
 // Die Fabriken werden vor den Konstanten oben ausgefuehrt, deshalb wird die
 // Referenz erst beim Aufruf aufgeloest statt beim Erzeugen des Mocks.
@@ -33,6 +34,7 @@ jest.mock("../lib/cache", () => ({ clearAllCache: (...args: unknown[]) => mockCl
 jest.mock("../notifications/PushService", () => ({
   unregisterPushToken: (...args: unknown[]) => mockUnregisterPushToken(...args),
   dismissAllNotifications: (...args: unknown[]) => mockDismissAllNotifications(...args),
+  setPushAccount: (...args: unknown[]) => mockSetPushAccount(...args),
 }));
 
 const ACCESS_KEY = "tls.mobile.accessToken";
@@ -358,6 +360,8 @@ describe("Kontowechsel", () => {
 
     expect(mockUnregisterPushToken).toHaveBeenCalledTimes(1);
     expect(tokenAtUnregister).toBe("access-neu");
+    // Ab jetzt gelten nur noch Pushes von B.
+    expect(mockSetPushAccount).toHaveBeenLastCalledWith("u-2");
     expect(mockDismissAllNotifications).toHaveBeenCalled();
     expect(await SecureStore.getItemAsync("tls.recent-searches")).toBeNull();
     expect(await SecureStore.getItemAsync("tls.member-card")).toBeNull();
@@ -384,6 +388,34 @@ describe("Kontowechsel", () => {
     expect(mockClearAllCache).not.toHaveBeenCalled();
     expect(await SecureStore.getItemAsync("tls.recent-searches")).toBe(JSON.stringify(["rocket"]));
     expect(result.current.user?.id).toBe("u-1");
+  });
+
+  test("schlägt das Abmelden des Geräts für A fehl, geht der Wechsel trotzdem durch", async () => {
+    const { result } = await renderAuth();
+    await act(async () => {
+      await result.current.login("fan@lionsquad.at", "geheim", true);
+    });
+    mockUnregisterPushToken.mockRejectedValueOnce(new Error("offline"));
+
+    mockApi.post.mockResolvedValue({ data: { user: { ...USER, id: "u-2" }, access_token: "a2", refresh_token: "r2" } });
+    await act(async () => {
+      await result.current.login("zweiter@lionsquad.at", "geheim", true);
+    });
+
+    // Den Rest erledigt der Server, sobald sich das Gerät für B anmeldet.
+    expect(result.current.user?.id).toBe("u-2");
+    expect(mockSetPushAccount).toHaveBeenLastCalledWith("u-2");
+  });
+
+  test("abgemeldet gilt kein Push mehr als eigener", async () => {
+    const { result } = await renderAuth();
+    await act(async () => {
+      await result.current.login("fan@lionsquad.at", "geheim", true);
+    });
+    await act(async () => {
+      await result.current.logout();
+    });
+    expect(mockSetPushAccount).toHaveBeenLastCalledWith(null);
   });
 
   test("Gast→Anmeldung meldet kein Gerät ab", async () => {
