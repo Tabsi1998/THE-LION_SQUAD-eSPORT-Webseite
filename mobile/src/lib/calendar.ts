@@ -129,15 +129,37 @@ function isMultiDay(item: CalendarItem): boolean {
   return Boolean(start && end && end.getTime() - start.getTime() >= DAY_MS && coveredDays(item).length > 1);
 }
 
-/** Mehrtägiges wird ein Balken (mit seinen Tagen), alles andere bleibt ein Punkt am Tag - dieselbe Rechnung wie im Web. */
+/**
+ * Mehrtägiges wird ein Balken (mit seinen Tagen), alles andere bleibt ein Punkt am Tag - dieselbe Rechnung wie im Web.
+ * Einträge mit derselben Art und Kennung sind die Tage eines Events (Codex-Prüfung #1460): ein Termin, dessen Balken nur
+ * die echten Tage belegt - eine Lücke dazwischen teilt ihn.
+ */
 export function splitSpans(items: CalendarItem[]): { spans: CalendarSpan[]; singles: CalendarItem[] } {
   const spans: CalendarSpan[] = [];
   const singles: CalendarItem[] = [];
+  const groups = new Map<string, CalendarItem[]>();
   for (const item of items) {
-    if (isMultiDay(item)) spans.push({ ...item, days: coveredDays(item) });
-    else singles.push(item);
+    const key = `${item.kind}-${item.id}`;
+    groups.set(key, [...(groups.get(key) || []), item]);
   }
-  spans.sort((a, b) => (parseIso(a.start)?.getTime() ?? 0) - (parseIso(b.start)?.getTime() ?? 0));
+  const startOf = (item: CalendarItem) => parseIso(item.start)?.getTime() ?? 0;
+  const endOf = (item: CalendarItem) => parseIso(item.end)?.getTime() ?? startOf(item);
+  for (const parts of groups.values()) {
+    if (parts.length > 1) {
+      const sorted = [...parts].sort((a, b) => startOf(a) - startOf(b));
+      const last = sorted.reduce((latest, part) => (endOf(part) > endOf(latest) ? part : latest), sorted[0]);
+      const days = Array.from(new Set(sorted.flatMap(coveredDays))).sort();
+      if (days.length > 1) {
+        spans.push({ ...sorted[0], end: last.end || last.start, mine: sorted.some((part) => part.mine), days });
+        continue;
+      }
+    }
+    for (const item of parts) {
+      if (isMultiDay(item)) spans.push({ ...item, days: coveredDays(item) });
+      else singles.push(item);
+    }
+  }
+  spans.sort((a, b) => startOf(a) - startOf(b));
   return { spans, singles };
 }
 

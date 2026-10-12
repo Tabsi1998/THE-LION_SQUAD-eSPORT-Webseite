@@ -68,6 +68,20 @@ test("Balken (#1271): mehrtägig über die Tage der Woche, über Monatsgrenzen, 
   ]);
 });
 
+test("Tage eines Events (Codex-Prüfung #1460): gleiche Kennung ist ein Termin, mit Lücke zwei Balken", () => {
+  // Die App liefert je Tag eines mehrtägigen Events einen Eintrag mit derselben Kennung - Do 11. und Sa 13. März 2027.
+  const days = [11, 13].map((day) => ({ id: "messe", kind: "event" as const, title: "Gaming-Messe", start: `2027-03-${day}T09:00:00+01:00`, end: `2027-03-${day}T18:00:00+01:00`, mine: day === 13 }));
+  const { spans, singles } = splitSpans(days);
+  expect(singles).toEqual([]);
+  expect(spans).toHaveLength(1);
+  expect(spans[0]).toMatchObject({ id: "messe", start: "2027-03-11T09:00:00+01:00", end: "2027-03-13T18:00:00+01:00", mine: true, days: ["2027-03-11", "2027-03-13"] });
+  const march = monthMatrix(2027, 2);
+  expect(weekBars(march[1], spans).map(({ from, to }) => [from, to])).toEqual([[3, 3], [5, 5]]);
+  // Zwei Tage ohne Lücke: ein Balken.
+  const both = [11, 12].map((day) => ({ ...days[0], start: `2027-03-${day}T09:00:00+01:00`, end: `2027-03-${day}T18:00:00+01:00` }));
+  expect(weekBars(march[1], splitSpans(both).spans).map(({ from, to }) => [from, to])).toEqual([[3, 4]]);
+});
+
 test("ics und Google-Link tragen Zeitfenster, Ort und Text - ohne Ende zwei Stunden", () => {
   const item = { id: "e1", kind: "event" as const, title: "Weihnachtsfeier, Vereinsheim", start: "2026-12-12T18:00:00+01:00", location: "Vereinsheim; Telfs", detail: "Essen & Getränke", url: "https://lionsquad.at/events/weihnachtsfeier" };
   const window = calendarWindow(item);

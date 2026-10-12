@@ -115,3 +115,54 @@ async def test_days_of_a_multi_day_event_carry_its_name(flow):
     items = [item for item in (await flow.get("/api/calendar")).json()["items"] if item["kind"] == "event"]
     assert [item["title"] for item in items] == ["Gaming-Messe – Tag 1/2", "Gaming-Messe – Tag 2/2"]
     assert {item["event_id"] for item in items} == {"e-messe"} and {item["event_name"] for item in items} == {"Gaming-Messe"}
+
+
+@pytest.mark.asyncio
+async def test_personal_calendar_stays_out_of_caches_public_one_may_be_cached(flow):
+    """Codex-Prüfung #1460: mit Login trägt die Liste Persönliches - nie zwischenspeichern; ohne Login ist sie für alle gleich."""
+    flow.act_as(None)
+    public = await flow.get("/api/calendar")
+    assert public.status_code == 200 and public.headers["cache-control"] == "public, max-age=60"
+    assert "Cookie" in public.headers["vary"] and "Authorization" in public.headers["vary"]
+
+    paula = await flow.add_user(role="player", name="paula")
+    flow.act_as(paula)
+    personal = await flow.get("/api/calendar")
+    assert personal.status_code == 200 and personal.headers["cache-control"] == "private, no-store"
+
+    flow.act_as(None)
+    missing = await flow.get("/api/calendar/events/gibt-es-nicht.ics")
+    assert missing.status_code == 404 and missing.headers["cache-control"] == "no-store", "Fehler ohne eigene Regel: no-store"
+
+
+@pytest.mark.asyncio
+async def test_meetings_and_shifts_are_asked_at_once_and_one_failure_keeps_the_other(monkeypatch):
+    """Codex-Prüfung #1460: Sitzungen und Schichten werden gleichzeitig abgefragt; fällt einer aus, kommt der andere."""
+    import asyncio
+
+    from services import club_calendar, dolibarr_helper_shifts, dolibarr_meetings
+
+    shifts_asked = asyncio.Event()
+    shift_view = {"events": [{"id": 5, "label": "Sommerfest", "day": "2026-10-10", "shifts": [
+        {"id": 52, "label": "Bar", "day": "2026-10-10", "start": "22:00", "end": "01:00", "mine": "requested"}]}]}
+
+    seen: list[bool] = []
+
+    async def meetings(db, user):
+        # Wartet auf die Schicht-Abfrage - nacheinander gefragt, käme sie nicht rechtzeitig.
+        try:
+            await asyncio.wait_for(shifts_asked.wait(), timeout=1)
+        except asyncio.TimeoutError:
+            pass
+        seen.append(shifts_asked.is_set())
+        raise RuntimeError("Vereinsmodul antwortet nicht")
+
+    async def shifts(db, user):
+        shifts_asked.set()
+        return shift_view
+
+    monkeypatch.setattr(dolibarr_meetings, "overview", meetings)
+    monkeypatch.setattr(dolibarr_helper_shifts, "overview", shifts)
+    items = await club_calendar.club_items(None, {"id": "u-paula"})
+    assert seen == [True], "beide Abfragen laufen gleichzeitig"
+    assert [item["id"] for item in items] == ["shift-5-52"], "ohne Sitzungen kommen die Schichten trotzdem"

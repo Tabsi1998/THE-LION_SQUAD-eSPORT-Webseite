@@ -178,13 +178,19 @@ export function TournamentsScreen({ navigation, route }: Props) {
   }), [openItems]);
 
   // Kalender (#216): jeder Termin an seinen Tagen; eigene Anmeldungen bekommen den Ring.
+  // Mehrtägige Events (#884, Codex-Prüfung #1460): je Tag aus dem Tagesplan ein Eintrag mit derselben Kennung - der Balken
+  // belegt nur die echten Tage, ein Tag in einer Lücke bleibt frei.
   const calendarItems = useMemo<CalendarItem[]>(() => items
     .filter((item) => item.date)
-    .map((item): CalendarItem => ({
-      id: item.id, kind: item.kind, title: item.title, start: item.date as string, end: item.endDate,
-      mine: Boolean(item.kind === "event" ? item.raw.own_registration : item.kind === "tournament" ? item.raw.my_registration : false),
-      detail: item.detail,
-    })).concat(clubItems), [clubItems, items]);
+    .flatMap((item): CalendarItem[] => {
+      const base: CalendarItem = {
+        id: item.id, kind: item.kind, title: item.title, start: item.date as string, end: item.endDate,
+        mine: Boolean(item.kind === "event" ? item.raw.own_registration : item.kind === "tournament" ? item.raw.my_registration : false),
+        detail: item.detail,
+      };
+      const days = item.kind === "event" && item.raw.schedule?.multi_day ? item.raw.schedule.days || [] : [];
+      return days.length ? days.map((day) => ({ ...base, start: day.start_at, end: day.end_at })) : [base];
+    }).concat(clubItems), [clubItems, items]);
   const shownMonth = month;
   const clubDayItems = useMemo(() => (selectedDay ? (itemsByDay(clubItems).get(selectedDay) || []) : []), [clubItems, selectedDay]);
   const dayItems = useMemo(() => {

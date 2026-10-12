@@ -170,3 +170,30 @@ test("Gäste laden keine Vereinstermine", async () => {
   await waitFor(() => expect(screen.getByText("Cup 1")).toBeTruthy());
   expect(mockGet).not.toHaveBeenCalledWith("/calendar");
 });
+
+// Mehrtägige Events (Codex-Prüfung #1460): der Kalender nimmt die einzelnen Tage aus dem Tagesplan - mit Lücke zwei Balken.
+test("ein Event mit Lücke zwischen den Tagen sind im Monat zwei Balken", async () => {
+  const today = viennaDay(new Date());
+  const [year, month, day] = today.split("-").map(Number);
+  const first = day <= 15 ? day : day - 2;
+  const key = (value: number) => `${year}-${String(month).padStart(2, "0")}-${String(value).padStart(2, "0")}`;
+  const event = {
+    id: "e-lan", slug: "lan", name: "Herbst-LAN", start_date: `${key(first)}T08:00:00Z`, end_date: `${key(first + 2)}T20:00:00Z`, status: "scheduled",
+    schedule: { multi_day: true, count: 2, label: "", range_label: "", now: { state: "before", text: "" }, days: [
+      { index: 1, date: key(first), start_at: `${key(first)}T08:00:00Z`, end_at: `${key(first)}T20:00:00Z`, state: "upcoming" },
+      { index: 2, date: key(first + 2), start_at: `${key(first + 2)}T08:00:00Z`, end_at: `${key(first + 2)}T20:00:00Z`, state: "upcoming" },
+    ] },
+  };
+  mockGet.mockImplementation(async (path: string) => ({ data: path === "/events" ? [event] : [] }));
+  await render(<TournamentsScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getAllByText("Herbst-LAN").length).toBeGreaterThan(0));
+  await fireEvent.press(screen.getByText("Kalender"));
+  expect(screen.getAllByTestId("calendar-bar-event-lan")).toHaveLength(2);
+  expect(screen.queryByTestId(`calendar-dot-${key(first + 1)}-event`)).toBeNull();
+
+  // Der Tag in der Lücke ist frei, der zweite Tag zeigt das Event.
+  await fireEvent.press(screen.getByTestId(`calendar-day-${key(first + 1)}`));
+  expect(screen.getByTestId("calendar-day-empty")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId(`calendar-day-${key(first + 2)}`));
+  expect(screen.getByTestId("calendar-day-items")).toBeTruthy();
+});
