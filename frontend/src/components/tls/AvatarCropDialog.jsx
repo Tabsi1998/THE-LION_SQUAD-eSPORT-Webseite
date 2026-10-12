@@ -6,6 +6,7 @@ import {
   AVATAR_MAX_ZOOM,
   avatarPreviewBox,
   INITIAL_AVATAR_CROP,
+  isSafeBlobUrl,
   panAvatarCrop,
   renderAvatarFile,
   zoomAvatarCrop,
@@ -69,13 +70,23 @@ export function AvatarCropDialog({ file, busy = false, onCancel, onApply, onLoad
     viewRef.current?.focus();
   }, []);
 
+  const loadErrorRef = useRef(onLoadError);
+  loadErrorRef.current = onLoadError;
+
   useEffect(() => {
     if (!file) return undefined;
     const next = URL.createObjectURL(file);
-    setUrl(next);
     setDims(null);
     setCrop(INITIAL_AVATAR_CROP);
-    return () => URL.revokeObjectURL(next);
+    // Nur eine echte Blob-Adresse kommt in die Vorschau; alles andere gilt als „Bild nicht ladbar“.
+    if (isSafeBlobUrl(next)) {
+      setUrl(next);
+      return () => URL.revokeObjectURL(next);
+    }
+    URL.revokeObjectURL(next);
+    setUrl("");
+    loadErrorRef.current?.();
+    return undefined;
   }, [file]);
 
   const update = useCallback((next) => {

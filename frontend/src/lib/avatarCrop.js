@@ -9,6 +9,14 @@ export const AVATAR_OUTPUT_SIZE = 512;
 export const AVATAR_MAX_ZOOM = 4;
 export const INITIAL_AVATAR_CROP = Object.freeze({ zoom: 1, offsetX: 0, offsetY: 0 });
 
+/**
+ * Sicherheitsprüfung für die Vorschau: nur eine echte Blob-Adresse aus `URL.createObjectURL` darf ins `<img>`.
+ * Kein anderes Schema (`javascript:`, `data:`, `https:`), keine Leerzeichen, Anführungszeichen oder spitzen Klammern.
+ */
+export function isSafeBlobUrl(value) {
+  return typeof value === "string" && /^blob:[A-Za-z0-9+.-]+:[^\s"'<>`]+$/.test(value);
+}
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }

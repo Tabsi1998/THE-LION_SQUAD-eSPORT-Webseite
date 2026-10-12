@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   drawCalls = [];
   canvases = [];
-  URL.createObjectURL = vi.fn(() => "blob:bild");
+  URL.createObjectURL = vi.fn(() => "blob:http://localhost:3000/5d2b8c1e-7f3a-4e6b-9a0d-2c4f6e8a1b3c");
   URL.revokeObjectURL = vi.fn();
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function getContext() {
     canvases.push(this);
@@ -137,4 +137,14 @@ test("Ziehen verschiebt, der Ausschnitt bleibt im Bild", async () => {
   // Ganz nach rechts gezogen = linker Bildrand.
   expect(sx).toBe(0);
   expect(sw).toBe(800);
+});
+
+test("Vorschau übernimmt nur Blob-Adressen: eine andere Adresse wird nicht gesetzt", async () => {
+  const { AvatarCropDialog } = await import("./AvatarCropDialog");
+  URL.createObjectURL = vi.fn(() => "javascript:alert(1)");
+  const onLoadError = vi.fn();
+  render(<AvatarCropDialog file={new File(["foto"], "ich.png", { type: "image/png" })} onCancel={vi.fn()} onApply={vi.fn()} onLoadError={onLoadError} />);
+  await waitFor(() => expect(onLoadError).toHaveBeenCalledTimes(1));
+  expect(screen.getByTestId("avatar-crop-view").querySelector("img")).toBeNull();
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith("javascript:alert(1)");
 });
