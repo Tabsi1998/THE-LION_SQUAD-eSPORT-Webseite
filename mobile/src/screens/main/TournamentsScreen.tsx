@@ -29,6 +29,7 @@ import { colors, kindColors, radius } from "../../theme";
 import type { ClubEvent, F1Challenge, Tournament } from "../../types";
 import { dayNoon, viennaDate, viennaDateTime, viennaDay, viennaTime } from "../../lib/vienna";
 import { useAuth } from "../../auth/AuthContext";
+import { isGuestUser } from "../../live";
 import { navigateToUrl } from "../../navigation/rootNavigation";
 
 const TOURNAMENT_LIST_LIVE_RESOURCES = ["tournaments", "events", "f1"];
@@ -162,7 +163,7 @@ export function TournamentsScreen({ navigation, route }: Props) {
       setFastlaps(Array.isArray(fastLapResult.data) ? fastLapResult.data : []);
       // Versammlungen und eigene Schichten (#1190) und der eigene Stand (#1189): nur angemeldet; fehlen sie, bleibt der
       // Rest, wie er ist.
-      if (user) {
+      if (user && !isGuestUser(user)) {
         const [club, own] = await Promise.all([
           api.get<{ items?: ClubCalendarItem[] }>("/calendar").catch(() => null),
           api.get<MineMap>("/calendar/mine").catch(() => null),
@@ -190,7 +191,7 @@ export function TournamentsScreen({ navigation, route }: Props) {
   }, [load]);
   useLiveRefresh(load, TOURNAMENT_LIST_LIVE_RESOURCES, { fallbackMs: 30000 });
 
-  const signedIn = Boolean(user);
+  const signedIn = Boolean(user && !isGuestUser(user));
   const mineOnly = signedIn && onlyMine;
 
   // Die Liste (#1182): Events mit ihren Turnieren und Fast Laps als eine Karte, der Rest für sich.
