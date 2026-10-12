@@ -36,6 +36,18 @@ export type ResultEntry = {
   started_at?: string | null;
   timing?: { running_minutes?: number | null; overdue_minutes?: number | null; missing?: boolean } | null;
   can_enter?: boolean;
+  // Streitfall (#1158): nur in der Ansicht der Turnierleitung.
+  dispute?: {
+    at?: string | null;
+    by?: string;
+    category?: string;
+    category_label?: string;
+    text?: string;
+    photo?: { id: string; url: string } | null;
+    result_at?: string | null;
+    result_by?: string | null;
+    reports?: Array<{ by?: string; summary?: string; at?: string; photo?: { id: string; url: string } | null }>;
+  } | null;
 };
 
 export type EntryState = {

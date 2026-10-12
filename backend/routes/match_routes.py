@@ -26,6 +26,7 @@ from models import (
     MatchUpdate,
     MatchScoreReport,
     MatchDispute,
+    MatchDisputeDecision,
     now_utc,
     new_id,
 )
@@ -42,8 +43,14 @@ from match_rules import match_allows_draw
 from services.match_audience import acting_registration, player_user_ids
 # Solange ein Spiel einen dieser Zustände hat, darf ein Aufruf (#1122) stehen bleiben.
 from services.match_calls import CALL_OPEN_STATUSES, call_view
-from services.match_disputes import CLOSED_DETAIL as DISPUTE_CLOSED_DETAIL, dispute_window
-from services.match_notifications import notify_dispute_opened, notify_report_conflict, notify_result_reported, results_summary
+from services.match_disputes import CATEGORIES as DISPUTE_CATEGORIES, CLOSED_DETAIL as DISPUTE_CLOSED_DETAIL, dispute_window
+from services.match_notifications import (
+    notify_dispute_kept,
+    notify_dispute_opened,
+    notify_report_conflict,
+    notify_result_reported,
+    results_summary,
+)
 from services.tournament_rules import match_policy, players_can_report, schedule_proposals_enabled
 from services.user_notifications import create_user_notification
 from services.v2_result_submission import submit_v2_result
@@ -1111,15 +1118,25 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
         m["idempotent_replay"] = True
         return m
     if not reason:
-        raise HTTPException(status_code=422, detail="Bitte einen Grund angeben.")
+        raise HTTPException(status_code=422, detail="Bitte kurz beschreiben, was nicht stimmt.")
+    # „Problem melden“ (#1158): ein Grund zum Antippen - ohne Angabe „Sonstiges“.
+    category = (body.category or "other").strip()
+    if category not in DISPUTE_CATEGORIES:
+        raise HTTPException(status_code=422, detail="Bitte einen Grund wählen: Falsches Ergebnis, Regelverstoß, Technik oder Sonstiges.")
     # Wer bis wann (#1134): vor dem Ergebnis immer, danach 30 Minuten - und nur, bis das nächste Spiel des Siegers
     # beginnt. Die Turnierleitung korrigiert ohnehin direkt.
     if acting_reg and not (await dispute_window(db, m))["open"]:
         raise HTTPException(status_code=409, detail=DISPUTE_CLOSED_DETAIL)
-    entry = {**dispute_entry(me["id"], reason), **({"registration_id": acting_reg["id"]} if acting_reg else {})}
+    photo = await claim_proof(db, body.photo_id, owner_id=me["id"], match_id=match_id, kind="dispute")
+    entry = {**dispute_entry(me["id"], reason, category=category, photo_id=(photo or {}).get("id")),
+             **({"registration_id": acting_reg["id"]} if acting_reg else {})}
+    change = {"status": "disputed", "updated_at": now_utc().isoformat()}
+    # Für „Ergebnis bleibt“ (#1158): in welchem Stand das Spiel vor dem Dispute war.
+    if str(m.get("status") or "") != "disputed":
+        change["status_before_dispute"] = m.get("status") or "pending"
     await getattr(db, collection).update_one({"id": match_id}, {
         "$push": {"disputes": entry},
-        "$set": {"status": "disputed", "updated_at": now_utc().isoformat()},
+        "$set": change,
     })
     await _audit_match_action(db, "match.dispute.open", m, me.get("id"), {
         "reason_length": len((body.reason or "").strip()),
@@ -1138,6 +1155,43 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
         logger.warning("[achievements] Dispute in %s nicht ausgewertet", _log_safe(match_id), exc_info=True)
     m["idempotent_replay"] = False
     return m
+
+
+@router.post("/{match_id}/dispute/decision")
+async def decide_dispute(match_id: str, body: MatchDisputeDecision, me: dict = Depends(get_current_user),
+                         _mutation: None = Depends(_serialized_match_write)):
+    """Die Turnierleitung entscheidet mit einem Tipp (#1158): „Ergebnis bleibt“ (ohne Ergebnis: weiter wie bisher).
+    „Ergebnis ändern“ läuft über das Ergebnis-Fenster - eine Korrektur mit Grund, die den Dispute ebenfalls schließt.
+    Entscheiden darf, wer Ergebnisse eintragen darf; beide Seiten bekommen die Entscheidung."""
+    db = get_db()
+    m, collection = await _find_match_any(match_id)
+    await _ensure_match_tournament_unlocked(db, m)
+    await _require_result_permission(me, m)
+    if str(m.get("status") or "") != "disputed":
+        raise HTTPException(status_code=409, detail="Zu diesem Spiel ist kein Dispute offen.")
+    now_iso = now_utc().isoformat()
+    note = (body.note or "").strip() or None
+    previous = str(m.get("status_before_dispute") or "")
+    if previous not in {"completed", "forfeit", "pending", "ready", "scheduled", "in_progress", "running", "waiting_result"}:
+        previous = ("forfeit" if m.get("forfeit_registration_id") else "completed") if m.get("results") else (
+            "waiting_result" if m.get("started_at") else "ready")
+    disputes = [
+        {**row, "resolved_at": row.get("resolved_at") or now_iso, "resolved_by": row.get("resolved_by") or me["id"],
+         **({} if row.get("resolved_at") else {"decision": "keep", **({"decision_note": note} if note else {})})}
+        for row in m.get("disputes") or [] if isinstance(row, dict)
+    ]
+    await getattr(db, collection).update_one({"id": match_id}, {
+        "$set": {"status": previous, "disputes": disputes, "dispute_resolved_at": now_iso, "dispute_resolved_by": me["id"],
+                 "updated_at": now_iso},
+        "$unset": {"status_before_dispute": ""},
+    })
+    await _audit_match_action(db, "match.dispute.keep", m, me.get("id"), {"status": previous, **({"note": note} if note else {})})
+    decided = await getattr(db, collection).find_one({"id": match_id}, {"_id": 0}) or m
+    try:
+        await notify_dispute_kept(db, decided, note, me.get("id"), now_iso)
+    except Exception as exc:  # noqa: BLE001 - eine Nachricht hält keine Entscheidung auf
+        logger.warning("Dispute decision notification failed for match=%s type=%s", _log_safe(match_id), type(exc).__name__)
+    return {"ok": True, "decision": "keep", "status": previous}
 
 
 async def _forfeit_v2(db, match: dict, body: dict, me: dict, force: bool) -> dict:

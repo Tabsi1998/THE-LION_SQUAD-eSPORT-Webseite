@@ -21,6 +21,23 @@ CLOSED_STATUSES = {"cancelled", "archived", "bye"}
 STARTED_STATUSES = {"in_progress", "running", "waiting_result", "completed", "forfeit", "disputed"}
 CLOSED_DETAIL = ("Ein Dispute ist nur bis 30 Minuten nach dem Ergebnis möglich – und nur, bis das nächste Spiel "
                  "des Siegers beginnt.")
+# „Problem melden“ (#1158): der Grund zum Antippen - dieselben Wörter auf Website und App.
+CATEGORIES = {
+    "wrong_result": "Falsches Ergebnis",
+    "rule_violation": "Regelverstoß",
+    "technical": "Technik",
+    "other": "Sonstiges",
+}
+
+
+def category_label(code: str | None) -> str:
+    return CATEGORIES.get(str(code or ""), CATEGORIES["other"])
+
+
+def open_dispute(match: dict) -> dict | None:
+    """Der jüngste offene Dispute eines Spiels - der, über den die Turnierleitung gerade entscheidet."""
+    rows = [row for row in match.get("disputes") or [] if isinstance(row, dict) and not row.get("resolved_at")]
+    return rows[-1] if rows else None
 
 
 def _parse(value) -> datetime | None:

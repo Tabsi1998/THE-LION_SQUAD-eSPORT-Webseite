@@ -168,6 +168,9 @@ test("Benachrichtigungen: Chats, Teams, Turniere, Gewinne und Freunde - sonst di
   expect(targetFromNotification(note("team_chat_message", { team_id: "t-1" }) as never)).toEqual(detail("TeamChat", { id: "t-1", title: "Team-Chat" }));
   expect(targetFromNotification(note("tournament_chat_message", { tournament_id: "x" }) as never)).toEqual(detail("TournamentChat", { id: "x", title: "Turnier-Chat" }));
   expect(targetFromNotification(note("match_chat_message", { match_id: "m" }) as never)).toEqual(detail("MatchDetail", { id: "m" }));
+  // Turnierleitung (#1158, #1160): Fälle öffnen ihre Ansicht mit genau diesem Fall.
+  expect(targetFromNotification(note("match_attention", { match_id: "m" }, "/tournaments/cup/leitung?fall=ds-m") as never)).toEqual(detail("TournamentLead", { id: "cup", fall: "ds-m" }));
+  expect(targetFromNotification(note("match_attention", { match_id: "m" }, "/matches/m") as never)).toEqual(detail("MatchDetail", { id: "m" }));
   expect(targetFromNotification(note("prize_ready") as never)).toEqual(detail("MyPrizes"));
   expect(targetFromNotification(note("friend_request", { requester_username: "kiwikomet" }) as never)).toEqual(detail("PublicProfile", { username: "kiwikomet" }));
   expect(targetFromNotification(note("friend_accepted") as never)).toEqual(tab("CommunityTab", "CommunityHub", { section: "players" }));

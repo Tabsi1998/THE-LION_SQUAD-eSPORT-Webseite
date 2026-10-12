@@ -144,9 +144,13 @@ test("Dispute auch nach dem Ergebnis: mit Frist; in Klärung steht der Hinweis f
   apiMock.post.mockResolvedValue({ data: {} });
   const { unmount } = renderMatch(done);
   expect(await screen.findByTestId("match-dispute-hint")).toHaveTextContent("Möglich bis heute 18:30.");
+  // Problem melden (#1158): erst den Grund antippen, dann kurz beschreiben.
   fireEvent.change(screen.getByTestId("match-dispute-input"), { target: { value: "Falscher Spielstand" } });
   fireEvent.click(screen.getByTestId("match-dispute-btn"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/dispute", { reason: "Falscher Spielstand" }));
+  expect(await screen.findByTestId("match-dispute-error")).toHaveTextContent("Bitte antippen, was nicht stimmt.");
+  fireEvent.click(screen.getByTestId("match-dispute-reason-wrong_result"));
+  fireEvent.click(screen.getByTestId("match-dispute-btn"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/dispute", { reason: "Falscher Spielstand", category: "wrong_result", photo_id: null }));
   unmount();
 
   renderMatch({ ...done, can_dispute: false, in_dispute: true, match: { ...done.match, status: "disputed" } });

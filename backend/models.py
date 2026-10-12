@@ -850,6 +850,16 @@ class MatchV2Update(BaseModel):
 
 class MatchDispute(BaseModel):
     reason: str
+    # „Problem melden“ (#1158): Grund zum Antippen und ein Foto, vorher über /matches/{id}/proof-photos hochgeladen.
+    category: Optional[str] = None
+    photo_id: Optional[str] = None
+
+
+class MatchDisputeDecision(BaseModel):
+    # Die Turnierleitung entscheidet (#1158): „keep“ = das Ergebnis bleibt (ohne Ergebnis: weiter wie bisher).
+    # „Ergebnis ändern“ läuft über das Ergebnis-Fenster (Korrektur mit Grund).
+    decision: Literal["keep"]
+    note: Optional[str] = Field(default=None, max_length=500)
 
 
 # ---------- F1 ----------

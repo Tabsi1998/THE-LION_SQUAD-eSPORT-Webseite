@@ -10,6 +10,7 @@ import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Muted, Title } from "../../components/Text";
 import { ResultEntrySheet, ResultUndoBar, useResultUndo } from "../../components/results/ResultEntrySheet";
+import { DisputeCard } from "../../components/results/DisputeCard";
 import { api, errorMessage } from "../../lib/api";
 import { formatWhen } from "../../lib/format";
 import type { ResultEntry } from "../../lib/resultEntry";
@@ -41,6 +42,9 @@ export function TournamentLeadScreen({ route }: Props) {
   const [filter, setFilter] = useState<LeadFilter>("all");
   const [openId, setOpenId] = useState(route.params?.spiel || "");
   const [notice, setNotice] = useState("");
+  const [deciding, setDeciding] = useState(false);
+  // Eigene Adresse je Fall (#1158, #1160): fall=ds-<spiel> hebt den Streitfall hervor.
+  const fall = route.params?.fall || "";
 
   const load = useCallback(async () => {
     try {
@@ -63,6 +67,21 @@ export function TournamentLeadScreen({ route }: Props) {
   const matches = useMemo(() => view?.matches || [], [view]);
   const shown = useMemo(() => matches.filter((item) => leadFilter(item, filter)), [matches, filter]);
   const opened = [...matches, ...(view?.recent || [])].find((item) => item.id === openId && item.can_enter) || null;
+  const disputes = matches.filter((item) => item.dispute);
+
+  // Streitfall entscheiden (#1158): „Ergebnis bleibt“ mit einem Tipp - beide Seiten bekommen Bescheid.
+  const keepResult = async (item: ResultEntry, note: string | null) => {
+    setDeciding(true);
+    try {
+      await api.post(`/matches/${item.id}/dispute/decision`, { decision: "keep", note });
+      setNotice("Entschieden – beide Seiten bekommen Bescheid.");
+      await load();
+    } catch (err) {
+      setNotice(errorMessage(err, "Entscheidung konnte nicht gespeichert werden."));
+    } finally {
+      setDeciding(false);
+    }
+  };
 
   if (loading) {
     return <Screen><SkeletonList count={4} hasImage={false} /></Screen>;
@@ -82,6 +101,14 @@ export function TournamentLeadScreen({ route }: Props) {
           <Muted style={styles.eyebrow}>Turnierleitung</Muted>
           <Title>{view.tournament?.title || "Turnier"}</Title>
         </View>
+        {disputes.length ? (
+          <View style={styles.stack} testID="lead-disputes">
+            <Muted style={[styles.hint, styles.red]}>Streitfälle ({disputes.length})</Muted>
+            {disputes.map((item) => (
+              <DisputeCard key={item.id} item={item} busy={deciding} highlighted={fall === `ds-${item.id}`} onKeep={(note) => { void keepResult(item, note); }} onChange={() => setOpenId(item.id)} />
+            ))}
+          </View>
+        ) : null}
         <SegmentedTabs
           value={filter}
           onChange={setFilter}
@@ -152,6 +179,7 @@ const styles = StyleSheet.create({
   lineRow: { alignItems: "center", flexDirection: "row", gap: 5 },
   missing: { backgroundColor: "rgba(255,215,0,0.05)", borderColor: "rgba(255,215,0,0.45)" },
   notice: { color: colors.success, fontWeight: "800" },
+  red: { color: colors.live },
   row: { alignItems: "center", flexDirection: "row", gap: 10 },
   stack: { gap: 8 },
   station: { alignItems: "center", borderColor: colors.border, borderRadius: 7, borderWidth: 1, height: 48, justifyContent: "center", paddingHorizontal: 4, width: 58 },

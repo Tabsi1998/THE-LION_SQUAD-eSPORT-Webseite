@@ -67,8 +67,14 @@ def is_duplicate_dispute(match: dict, user_id: str, reason: str) -> bool:
     )
 
 
-def dispute_entry(user_id: str, reason: str) -> dict:
-    return {"user_id": user_id, "reason": (reason or "").strip(), "at": now_utc().isoformat()}
+def dispute_entry(user_id: str, reason: str, category: str | None = None, photo_id: str | None = None) -> dict:
+    entry = {"user_id": user_id, "reason": (reason or "").strip(), "at": now_utc().isoformat()}
+    # „Problem melden“ (#1158): Grund zum Antippen und auf Wunsch ein Foto (sehen nur Spieler und Turnierleitung).
+    if category:
+        entry["category"] = category
+    if photo_id:
+        entry["photo_id"] = photo_id
+    return entry
 
 
 def report_entry(user_id: str, registration_id: str | None, results: list[dict],

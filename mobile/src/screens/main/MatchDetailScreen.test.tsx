@@ -136,11 +136,15 @@ test("Dispute auch nach dem Ergebnis: mit Frist, der Grund geht an /dispute", as
   await render(<MatchDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("match-dispute")).toBeTruthy());
   expect(screen.getByTestId("match-dispute-hint")).toHaveTextContent(
-    "Stimmt etwas nicht? Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet. Möglich bis 23.05.2026, 18:30.",
+    "Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet. Möglich bis 23.05.2026, 18:30.",
   );
+  // Problem melden (#1158): Grund antippen, kurz beschreiben.
   await fireEvent.changeText(screen.getByTestId("match-dispute-input"), "Falscher Spielstand");
   await fireEvent.press(screen.getByTestId("match-dispute-submit"));
-  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/dispute", { reason: "Falscher Spielstand" }));
+  expect(screen.getByTestId("match-dispute-error")).toHaveTextContent("Bitte antippen, was nicht stimmt.");
+  await fireEvent.press(screen.getByTestId("match-dispute-reason-wrong_result"));
+  await fireEvent.press(screen.getByTestId("match-dispute-submit"));
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/dispute", { reason: "Falscher Spielstand", category: "wrong_result", photo_id: null }));
 });
 
 test("in Klärung: der Hinweis steht oben, ohne Recht kein Dispute-Feld", async () => {

@@ -136,6 +136,11 @@ export function targetFromNotification(item: UserNotification): AppTarget | null
   const meta = (item.meta || {}) as Record<string, unknown>;
   const kind = String(item.kind || "").toLowerCase();
 
+  // Turnierleitung (#1158, #1160): „Dispute: bitte prüfen“, „Ergebnis fehlt“, „Station defekt“ öffnen ihre Ansicht.
+  if (kind === "match_attention" && String(item.url || "").includes("/leitung")) {
+    const lead = targetFromUrl(item.url);
+    if (lead) return lead;
+  }
   const matchId = stringMeta(meta, "match_id");
   if (matchId && (kind.includes("match") || kind.includes("station"))) return detail("MatchDetail", { id: matchId });
 

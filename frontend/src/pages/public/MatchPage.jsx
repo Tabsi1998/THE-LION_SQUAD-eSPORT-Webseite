@@ -23,6 +23,7 @@ import { matchIsOver } from "@/lib/afterEnd";
 import { rankingMode } from "@/lib/matchReport";
 import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
+import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
 
 const scheduleLabels = {
   proposed: "Terminvorschlag offen",
@@ -90,7 +91,6 @@ export default function MatchPage() {
   const [message, setMessage] = useState("");
   const [proofUrl, setProofUrl] = useState("");
   const [reportNote, setReportNote] = useState("");
-  const [disputeReason, setDisputeReason] = useState("");
   const [forfeitReason, setForfeitReason] = useState("");
   const [forfeitWinnerId, setForfeitWinnerId] = useState("");
   const [v2Rows, setV2Rows] = useState([]);
@@ -210,17 +210,12 @@ export default function MatchPage() {
     }, "Ergebnis konnte nicht gespeichert werden.");
   };
 
-  const submitDispute = async (e) => {
-    e.preventDefault();
-    const reason = disputeReason.trim();
-    if (!reason) return failAction("Bitte Grund angeben.");
-    await runAction(async () => {
-      await api.post(`/matches/${id}/dispute`, { reason });
-      toast.success("Dispute gemeldet – die Turnierleitung prüft und entscheidet.");
-      setDisputeReason("");
-      await load({ preserveDrafts: false });
-    }, "Dispute konnte nicht gemeldet werden.");
-  };
+  // Problem melden (#1158): Grund, Text und auf Wunsch ein Foto - die Turnierleitung entscheidet.
+  const submitDispute = async (payload) => runAction(async () => {
+    await api.post(`/matches/${id}/dispute`, payload);
+    toast.success("Gemeldet. Die Turnierleitung schaut es sich an.");
+    await load({ preserveDrafts: false });
+  }, "Problem konnte nicht gemeldet werden.");
 
   const submitForfeit = async (e) => {
     e.preventDefault();
@@ -414,6 +409,10 @@ export default function MatchPage() {
           {data.in_dispute && (
             <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#FFD2CF]" data-testid="match-in-dispute">
               <strong>In Klärung</strong> – zu diesem Spiel liegt ein Dispute vor. Die Turnierleitung prüft und entscheidet.
+              {/* Die Turnierleitung entscheidet in ihrer Ansicht (#1158) - mit Meldung, Foto und Ergebnis. */}
+              {canStaffSubmit && data.tournament ? (
+                <Link to={`/tournaments/${data.tournament.slug || data.tournament.id}/leitung?fall=ds-${id}`} className="ml-2 font-bold text-white underline underline-offset-2" data-testid="match-dispute-decide">Streitfall entscheiden</Link>
+              ) : null}
             </p>
           )}
 
@@ -465,16 +464,7 @@ export default function MatchPage() {
               )}
 
               {canDispute && (
-                <form onSubmit={submitDispute} className={hasOtherResultActions ? "border-t border-white/10 pt-5" : ""} data-testid="match-dispute-form">
-                  <Field label="Dispute-Grund">
-                    <input value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} className="input" placeholder="Was stimmt nicht?" data-testid="match-dispute-input" />
-                  </Field>
-                  <p className="mt-2 text-xs text-white/50" data-testid="match-dispute-hint">
-                    Stimmt etwas nicht? Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet.
-                    {data.dispute_until ? ` Möglich bis ${formatWhen(data.dispute_until)}.` : ""}
-                  </p>
-                  <button disabled={busy || !disputeReason.trim()} className="tls-btn tls-btn--danger mt-3 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-dispute-btn">Dispute melden</button>
-                </form>
+                <ProblemReportForm matchId={id} until={data.dispute_until} busy={busy} onSubmit={submitDispute} separated={hasOtherResultActions} />
               )}
 
               {data.can_forfeit && !isCompleted && duelParticipants.length >= 2 && (

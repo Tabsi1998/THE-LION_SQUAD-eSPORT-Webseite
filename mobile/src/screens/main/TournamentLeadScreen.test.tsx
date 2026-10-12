@@ -14,6 +14,8 @@ jest.mock("../../lib/api", () => ({
 jest.mock("expo-secure-store", () => ({ getItemAsync: jest.fn(async () => null), setItemAsync: jest.fn(async () => undefined) }));
 jest.mock("../../realtime/LiveChangesProvider", () => ({ useLiveRefresh: () => undefined }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
+jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ accessToken: "zugang" }) }));
+jest.mock("../../components/AuthorizedImage", () => ({ AuthorizedImage: () => null }));
 jest.mock("@react-navigation/native", () => {
   const { useEffect } = jest.requireActual("react");
   return {
@@ -70,4 +72,19 @@ test("ohne Turnier-Recht: der Satz vom Server statt der Liste", async () => {
   await render(<TournamentLeadScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByText("Diese Ansicht ist nur für die Turnierleitung dieses Turniers.")).toBeTruthy());
   expect(screen.queryByTestId("lead-row-m1")).toBeNull();
+});
+
+test("Streitfall (#1158): Karte mit Grund und Ergebnis, „Ergebnis bleibt“ mit einem Tipp", async () => {
+  const disputed = { ...LATE, status: "disputed", has_result: true, result_summary: "Frostbiss gewinnt 2:1.",
+    dispute: { by: "TurboTina", category_label: "Falsches Ergebnis", text: "Es stand 2:1 für mich.", photo: null, result_by: "Ergebnisdienst", reports: [] } };
+  mockGet.mockResolvedValue({ data: { tournament: { id: "t1", title: "FC 26 Herbst-Cup" }, matches: [disputed], recent: [], counts: { open: 1 } } });
+  mockPost.mockResolvedValue({ data: { ok: true } });
+  await render(<TournamentLeadScreen navigation={navigation} route={{ key: "l", name: "TournamentLead", params: { id: "fc-cup", fall: "ds-m2" } } as never} />);
+  await waitFor(() => expect(screen.getByTestId("lead-dispute-m2")).toBeTruthy());
+  expect(screen.getByText("Falsches Ergebnis")).toBeTruthy();
+  expect(screen.getByTestId("lead-dispute-result-m2")).toHaveTextContent("Eingetragen: Frostbiss gewinnt 2:1. · von Ergebnisdienst");
+  await fireEvent.changeText(screen.getByTestId("lead-dispute-note-m2"), "Foto eindeutig");
+  await act(async () => { await fireEvent.press(screen.getByTestId("lead-dispute-keep-m2")); });
+  expect(mockPost).toHaveBeenCalledWith("/matches/m2/dispute/decision", { decision: "keep", note: "Foto eindeutig" });
+  await waitFor(() => expect(screen.getByTestId("lead-notice")).toHaveTextContent("Entschieden – beide Seiten bekommen Bescheid."));
 });

@@ -38,6 +38,7 @@ import { MessageSticker, StickerButton, StickerPicker } from "../../components/C
 import { MatchReportCard, type ReportPayload, type ReportState } from "../../components/MatchReportCard";
 import { rankingMode } from "../../lib/matchReport";
 import type { ResultEntry } from "../../lib/resultEntry";
+import { ProblemReportCard, type ProblemPayload } from "../../components/results/ProblemReportCard";
 import { countdown, type MatchCall } from "../../lib/matchCall";
 import { asInstant, viennaTime } from "../../lib/vienna";
 import type { CatalogSticker } from "../../lib/stickers";
@@ -130,7 +131,6 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const [message, setMessage] = useState("");
   const [proofUrl, setProofUrl] = useState("");
   const [resultNote, setResultNote] = useState("");
-  const [disputeReason, setDisputeReason] = useState("");
   const [forfeitReason, setForfeitReason] = useState("");
   const [forfeitWinnerId, setForfeitWinnerId] = useState("");
   const [v2Rows, setV2Rows] = useState<V2ResultRow[]>([]);
@@ -180,7 +180,6 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setMessage("");
     setProofUrl("");
     setResultNote("");
-    setDisputeReason("");
     setForfeitReason("");
     setForfeitWinnerId("");
     setV2Rows([]);
@@ -365,22 +364,23 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     }
   }, [busy, canSubmitV2Result, proofUrl, refreshAfterResult, resultNote, route.params.id, v2Rows]);
 
-  const submitDispute = useCallback(async () => {
-    const reason = disputeReason.trim();
-    if (!reason || busy || !page?.can_dispute) return;
+  // Problem melden (#1158): Grund, Text und auf Wunsch ein Foto - die Turnierleitung entscheidet.
+  const submitDispute = useCallback(async (payload: ProblemPayload) => {
+    if (busy || !page?.can_dispute) return false;
     setBusy(true);
     setError("");
     try {
-      await api.post(`/matches/${route.params.id}/dispute`, { reason });
-      setDisputeReason("");
+      await api.post(`/matches/${route.params.id}/dispute`, payload);
       await load({ preserveDrafts: false });
-      setSuccess("Dispute gemeldet – die Turnierleitung prüft und entscheidet.");
+      setSuccess("Gemeldet. Die Turnierleitung schaut es sich an.");
+      return true;
     } catch (err) {
-      setError(errorMessage(err, "Dispute konnte nicht gemeldet werden."));
+      setError(errorMessage(err, "Problem konnte nicht gemeldet werden."));
+      return false;
     } finally {
       setBusy(false);
     }
-  }, [busy, disputeReason, load, page?.can_dispute, route.params.id]);
+  }, [busy, load, page?.can_dispute, route.params.id]);
 
   const submitForfeit = useCallback(async () => {
     const note = forfeitReason.trim();
@@ -552,14 +552,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
               </>
             ) : null}
             {canDispute ? (
-              <View style={styles.stack} testID="match-dispute">
-                <FormInput label="Dispute-Grund" value={disputeReason} onChangeText={setDisputeReason} placeholder="Was stimmt nicht?" testID="match-dispute-input" />
-                <Muted testID="match-dispute-hint">
-                  Stimmt etwas nicht? Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet.
-                  {page.dispute_until ? ` Möglich bis ${formatDateTime(page.dispute_until)}.` : ""}
-                </Muted>
-                <Button label="Dispute melden" variant="secondary" onPress={submitDispute} disabled={busy || !disputeReason.trim()} testID="match-dispute-submit" />
-              </View>
+              <ProblemReportCard matchId={route.params.id} until={page.dispute_until} busy={busy} onSubmit={submitDispute} />
             ) : null}
             {page.can_forfeit && !isCompleted && duelParticipants.length >= 2 ? (
               <>

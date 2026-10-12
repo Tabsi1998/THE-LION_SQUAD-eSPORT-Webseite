@@ -199,9 +199,11 @@ test("match action validation and API errors remain visible without duplicate re
   await page.goto("/matches/match-1");
   await acceptCookies(page);
   await dispatchDoubleSubmit(page, "match-dispute-btn");
-  await expect(page.locator("#match-action-error")).toContainText("Bitte Grund angeben");
+  // Problem melden (#1158): ohne Grund zum Antippen geht nichts raus - der Satz steht am Formular.
+  await expect(page.getByTestId("match-dispute-error")).toContainText("Bitte antippen, was nicht stimmt.");
   expect(submissions).toBe(0);
 
+  await page.getByTestId("match-dispute-reason-wrong_result").click();
   await page.getByTestId("match-dispute-input").fill("Das gemeldete Ergebnis ist falsch.");
   await dispatchDoubleSubmit(page, "match-dispute-btn");
   await expect(page.locator("#match-action-error")).toContainText("Klärfall bereits vorhanden");

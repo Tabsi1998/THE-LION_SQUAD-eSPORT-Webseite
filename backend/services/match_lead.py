@@ -15,12 +15,15 @@ from datetime import datetime, timedelta, timezone
 
 from match_rules import match_allows_draw
 from models import now_utc
+from services.match_disputes import category_label, open_dispute
 from services.match_notifications import results_summary
+from services.match_proofs import visible_proofs
 from services.match_v2_results import _advancement_result_rank, _ranking_mode
 from services.result_hold import has_result, hold_view
 from services.round_labels import round_label, rounds_by_section, stage_kind
 from services.station_labels import attach_station_info
 from services.tournament_permissions import RESULT_STAFF_ROLES, is_global_tournament_staff
+from services.v2_match_flows import latest_reports
 
 # Spiele, für die ein Ergebnis eingetragen werden kann - sobald beide Seiten feststehen.
 OPEN_STATUSES = {"pending", "ready", "scheduled", "in_progress", "running", "waiting_result", "disputed"}
@@ -170,6 +173,36 @@ def entry_info(match: dict, *, tournament: dict | None, stage: dict | None, stag
     }
 
 
+def dispute_card(match: dict, regs_by_id: dict[str, dict], photos: dict[str, dict], names: dict[str, str]) -> dict | None:
+    """Ein Streitfall für die Turnierleitung (#1158): wer was meldet, Foto, das eingetragene Ergebnis und die
+    Meldungen der Spieler - alles, um mit einem Tipp zu entscheiden."""
+    row = open_dispute(match)
+    if not row:
+        return None
+    reports = [
+        {"by": registration_name(regs_by_id.get(key)), "summary": results_summary(report.get("results"), regs_by_id),
+         "at": report.get("at"), "photo": photos.get(report.get("photo_id") or "")}
+        for key, report in latest_reports(match.get("reports") or []).items()
+    ]
+    return {
+        "at": row.get("at"),
+        "by": registration_name(regs_by_id.get(row.get("registration_id"))) if row.get("registration_id") else "Turnierleitung",
+        "category": row.get("category") or "other",
+        "category_label": category_label(row.get("category")),
+        "text": row.get("reason") or "",
+        "photo": photos.get(row.get("photo_id") or ""),
+        "result_at": match.get("completed_at"),
+        "result_by": names.get(match.get("completed_by") or ""),
+        "reports": reports,
+    }
+
+
+def _photo_ids(match: dict) -> list[str]:
+    ids = [row.get("photo_id") for row in match.get("disputes") or [] if isinstance(row, dict)]
+    ids += [row.get("photo_id") for row in match.get("reports") or [] if isinstance(row, dict)]
+    return [photo_id for photo_id in ids if photo_id]
+
+
 async def _result_scope(db, user: dict, tournament_id: str):
     """Darf diese Person für ein Spiel eintragen? Einmal laden, je Spiel nur noch nachsehen - dieselbe Regel wie
     ``has_match_result_permission`` (ganzes Turnier, Phase, Gruppe, Station oder genau dieses Spiel)."""
@@ -232,6 +265,14 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
     for match in matches:
         by_stage.setdefault(match.get("stage_id") or "", []).append(match)
     may_enter = await _result_scope(db, user, tournament_id)
+    # Streitfälle (#1158): Fotos (nur nach der Bildprüfung) und wer das Ergebnis eingetragen hat.
+    disputed = [match for match in matches if str(match.get("status") or "") == "disputed"]
+    photos = await visible_proofs(db, [photo_id for match in disputed for photo_id in _photo_ids(match)])
+    actor_ids = sorted({match.get("completed_by") for match in disputed if match.get("completed_by")})
+    names = {
+        row["id"]: row.get("display_name") or row.get("username") or "Turnierleitung"
+        for row in await db.users.find({"id": {"$in": actor_ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}).to_list(len(actor_ids) + 1)
+    } if actor_ids else {}
 
     def describe(match: dict) -> dict:
         info = entry_info(match, tournament=tournament, stage=stages.get(match.get("stage_id") or ""),
@@ -239,6 +280,8 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
                           viewer_id=user.get("id"))
         info["timing"] = timing(match, tournament, now)
         info["can_enter"] = may_enter(match)
+        if str(match.get("status") or "") == "disputed":
+            info["dispute"] = dispute_card(match, regs_by_id, photos, names)
         return info
 
     open_items = [
@@ -261,6 +304,7 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
         "matches": open_items,
         "recent": [describe(match) for match in recent],
         "counts": {
+            "disputes": sum(1 for item in open_items if item.get("dispute")),
             "open": len(open_items),
             "running": sum(1 for item in open_items if item["status"] in RUNNING_STATUSES or item.get("started_at")),
             "missing": sum(1 for item in open_items if (item.get("timing") or {}).get("missing")),

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ClipboardCheck, Clock, Radio } from "lucide-react";
+import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { api, formatApiError } from "@/lib/api";
@@ -11,6 +12,7 @@ import { formatWhen } from "@/lib/datetime";
 import { leadFilter, leadLine, leadNames } from "@/lib/tournamentLead";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
+import { DisputeCard } from "@/components/tls/results/DisputeCard";
 
 // Turnierleitung am Handy (#1156): /tournaments/<slug>/leitung - nur für die Turnierleitung dieses Turniers. Reiter
 // „Ergebnisse“: alle offenen Spiele, zuerst was fehlt, dann nach Station; Filter „Läuft“ und „Ergebnis fehlt“.
@@ -31,6 +33,10 @@ export default function TournamentLeadPage() {
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState("all");
   const [openId, setOpenId] = useState(searchParams.get("spiel") || "");
+  const [deciding, setDeciding] = useState(false);
+  // Eigene Adresse je Fall (#1158, #1160): ?fall=ds-<spiel> springt zum Streitfall.
+  const fall = searchParams.get("fall") || "";
+  const scrolledTo = useRef("");
 
   const load = useCallback(async () => {
     try {
@@ -51,6 +57,30 @@ export default function TournamentLeadPage() {
   const shown = useMemo(() => matches.filter((item) => leadFilter(item, filter)), [matches, filter]);
   const everyone = useMemo(() => [...matches, ...(data?.recent || [])], [matches, data]);
   const opened = everyone.find((item) => item.id === openId) || null;
+  const disputes = useMemo(() => matches.filter((item) => item.dispute), [matches]);
+
+  useEffect(() => {
+    if (!fall || !data || scrolledTo.current === fall) return;
+    const target = document.getElementById(`fall-${fall}`);
+    if (target) {
+      scrolledTo.current = fall;
+      target.scrollIntoView({ block: "center" });
+    }
+  }, [fall, data]);
+
+  // Streitfall entscheiden (#1158): „Ergebnis bleibt“ mit einem Tipp - beide Seiten bekommen die Entscheidung.
+  const keepResult = async (item, note) => {
+    setDeciding(true);
+    try {
+      await api.post(`/matches/${item.id}/dispute/decision`, { decision: "keep", note });
+      toast.success("Entschieden – beide Seiten bekommen Bescheid.");
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Entscheidung konnte nicht gespeichert werden.");
+    } finally {
+      setDeciding(false);
+    }
+  };
 
   const openEntry = (id) => {
     setOpenId(id);
@@ -90,6 +120,15 @@ export default function TournamentLeadPage() {
             <ClipboardCheck className="w-4 h-4 text-[#29B6E8]" /> Ergebnisse
           </span>
         </div>
+
+        {disputes.length ? (
+          <div className="mt-5 space-y-3" data-testid="lead-disputes">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-[#FF6B60]">Streitfälle ({disputes.length})</div>
+            {disputes.map((item) => (
+              <DisputeCard key={item.id} item={item} busy={deciding} highlighted={fall === `ds-${item.id}`} onKeep={(note) => keepResult(item, note)} onChange={() => openEntry(item.id)} />
+            ))}
+          </div>
+        ) : null}
 
         <div className="mt-4 grid grid-cols-3 gap-1 rounded-sm border border-white/10 bg-white/5 p-1" role="group" aria-label="Filter" data-testid="lead-filters">
           {FILTERS.map(([key, label, count]) => (
