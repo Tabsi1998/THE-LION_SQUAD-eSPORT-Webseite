@@ -3,7 +3,7 @@ import { viennaTime } from "@/lib/vienna";
 
 // Netz der Website (#1152, wie mobile/src/lib/network.ts): Der Browser meldet „offline“ und „online“; der API-Client
 // meldet jede echte Antwort (dann ist das Netz da, und die Uhrzeit ist der Stand der gezeigten Daten) und jeden Abruf,
-// der ohne Antwort scheitert. Die Leiste „Offline · Stand 14:05“ liest von hier - offene Seiten behalten ihren Inhalt.
+// der ohne Antwort scheitert (zählt nur, wenn der Browser auch offline meldet). Die Leiste „Offline · Stand 14:05“ liest von hier - offene Seiten behalten ihren Inhalt.
 
 let state = { offline: false, stand: null };
 let lastFresh = null;
@@ -28,6 +28,11 @@ export function noteFresh(at = Date.now()) {
 /** Kein Netz (Browser meldet offline, oder ein Abruf kam ohne Antwort zurück). */
 export function noteOffline() {
   set({ offline: true, stand: state.offline ? state.stand : lastFresh });
+}
+
+/** Ein Abruf kam ohne Antwort zurück: offline nur, wenn der Browser es auch meldet - sonst sagt es die Seite selbst. */
+export function noteRequestFailed() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) noteOffline();
 }
 
 export function networkSnapshot() {

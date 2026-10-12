@@ -40,3 +40,16 @@ test("Art des Fehlers: ohne Antwort offline, 404 nicht gefunden, 403 nicht freig
   expect(problemKind({ response: { status: 403 } })).toBe("denied");
   expect(problemKind({ response: { status: 500 } })).toBe("error");
 });
+
+test("ein Abruf ohne Antwort zeigt die Leiste nur, wenn der Browser offline meldet", async () => {
+  const { noteRequestFailed } = await import("./network");
+  resetNetwork();
+  const online = vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(true);
+  noteRequestFailed();
+  expect(networkSnapshot().offline).toBe(false);
+  online.mockReturnValue(false);
+  noteRequestFailed();
+  expect(networkSnapshot().offline).toBe(true);
+  online.mockRestore();
+  resetNetwork();
+});

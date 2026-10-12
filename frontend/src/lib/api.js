@@ -1,6 +1,6 @@
 import axios from "axios";
 import { emitApiInvalidation } from "./apiInvalidation";
-import { noteFresh, noteOffline } from "./network";
+import { noteFresh, noteRequestFailed } from "./network";
 import { asInstant, viennaDate } from "@/lib/vienna";
 
 const configuredBackendUrl = (import.meta.env.VITE_BACKEND_URL || "").trim().replace(/\/+$/, "");
@@ -133,8 +133,9 @@ function attachResponseInterceptors(client) {
       return response;
     },
     async (error) => {
-      // Kein Netz: der Abruf kam ohne Antwort zurück (abgebrochene Abrufe zählen nicht).
-      if (!error.response && error.code !== "ERR_CANCELED" && !axios.isCancel(error)) noteOffline();
+      // Kein Netz: der Abruf kam ohne Antwort zurück (abgebrochene Abrufe zählen nicht) - die Leiste kommt nur, wenn auch
+      // der Browser offline meldet. Ein einzelner geblockter Abruf (Werbeblocker, Firmen-Filter) ist kein „Offline“.
+      if (!error.response && error.code !== "ERR_CANCELED" && !axios.isCancel(error)) noteRequestFailed();
       const original = error.config;
       const url = original?.url || "";
       const authRequest = url.includes("/auth/login") || url.includes("/auth/register") || url.includes("/auth/refresh") || url.includes("/auth/passkeys/");
