@@ -3,6 +3,7 @@ import { ModerationStateBadge } from "@/components/tls/ModerationStateBadge";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useAccountGeneration } from "@/hooks/useAccountGeneration";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Reveal } from "@/components/tls/Reveal";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -38,9 +39,13 @@ import { ShareButton } from "@/components/tls/ShareButton";
 
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "", color: AUTO_COLOR };
 
+// Eigener Stand je Team und Konto (#1047): ein Teamwechsel oder ein echter Kontowechsel baut die Teamseite neu auf -
+// Bearbeiten, Einladung und Chat-Entwurf bleiben nicht hängen. Das erste Laden der Anmeldung zählt nicht.
 export default function TeamsPage() {
   const { id } = useParams();
-  return id ? <TeamDetail id={id} /> : <TeamList />;
+  const { user } = useAuth();
+  const accountGeneration = useAccountGeneration(user?.id);
+  return id ? <TeamDetail key={`${id}:${accountGeneration}`} id={id} /> : <TeamList />;
 }
 
 function TeamList() {
@@ -427,7 +432,8 @@ function TeamDetail({ id }) {
               })}
             </div>
           </section>}
-          {(isMember || canEdit) && <TeamChat team={team} user={user} />}
+          {/* Eigener Stand je Team (#1047); den Kontowechsel übernimmt die Hülle oben. */}
+          {(isMember || canEdit) && <TeamChat key={team.id} team={team} user={user} />}
         </div>
         <aside className="space-y-4">
           {levelInfo && <TeamLevelPanel info={levelInfo} />}

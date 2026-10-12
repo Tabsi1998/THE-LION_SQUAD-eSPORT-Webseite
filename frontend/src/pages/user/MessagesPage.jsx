@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Gamepad2, MessageSquare, Search, Send, Trophy, User, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useAccountGeneration } from "@/hooks/useAccountGeneration";
 import { useChatList } from "@/hooks/useChats";
 import { badgeText, chatHref, chatPreview, chatTime, markChatRead } from "@/lib/chats";
 import { ChatAttachButton, ChatAttachmentDrafts, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
@@ -18,17 +19,23 @@ import { mergeMessages } from "./messages/messageGroups";
 // Match-Chats - das Neueste oben, mit der Zahl der Ungelesenen; rechts die Direktnachricht in fester Höhe mit eigener
 // Scrollleiste. Gruppen-Chats öffnen ihre Seite (Team, Turnier, Match), dort steht der Chat. Am Handy zuerst die Liste,
 // dann die Unterhaltung mit Zurück. Die Unterhaltung lädt die neuesten 50 und beim Hochscrollen die älteren.
+//
+// Gesprächswechsel (#1047): Entwurf und Anhänge gehören zu genau einem Gespräch und gehen beim Wechsel weg -
+// ebenso beim Kontowechsel. Jede Antwort vom Server zählt nur, wenn ihr Gespräch noch offen ist.
 export const PAGE_SIZE = 50;
 
 const KIND_ICONS = { direct: User, team: Users, tournament: Trophy, match: Gamepad2 };
 
 export default function MessagesPage() {
   const { user } = useAuth();
+  const accountId = user?.id || "";
+  // Nur ein echter Kontowechsel leert; das erste Laden der Anmeldung nicht (#1047).
+  const accountGeneration = useAccountGeneration(accountId);
   const { userId } = useParams();
   const navigate = useNavigate();
   const confirm = useConfirm();
   const prompt = usePrompt();
-  const { list: chats, loading: chatsLoading, reload: reloadChats } = useChatList(Boolean(user));
+  const { list: chats, loading: chatsLoading, reload: reloadChats } = useChatList(accountId);
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
   const [hasMore, setHasMore] = useState(false);
@@ -44,6 +51,10 @@ export default function MessagesPage() {
   const [stickersOpen, setStickersOpen] = useState(false);
   const messagesRef = useRef([]);
   const dmAttachments = useChatAttachmentDrafts();
+  const resetDrafts = dmAttachments.reset;
+  // Das offene Gespräch als Marke: jeder Wechsel (Gesprächspartner oder Konto) legt eine neue an. Eine Antwort, die
+  // mit einer älteren Marke losgeschickt wurde, verfällt.
+  const conversationRef = useRef({ userId: null, accountGeneration: null });
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -54,8 +65,11 @@ export default function MessagesPage() {
   // (Änderungsstrom) führt nur zusammen, was neu ist, und lässt geladene
   // ältere Seiten stehen.
   const loadLatest = useCallback(async (id, { silent = false } = {}) => {
+    const ticket = conversationRef.current;
+    if (!id || ticket.userId !== id) return;
     try {
       const { data } = await api.get(`/messages/direct/${id}?limit=${PAGE_SIZE}`);
+      if (conversationRef.current !== ticket) return;
       setActive(data.user || { id });
       setCanSend(data.can_send !== false);
       setBlockedByMe(!!data.blocked_by_me);
@@ -75,95 +89,124 @@ export default function MessagesPage() {
         void markChatRead("direct", id);
       }
     } catch (err) {
-      if (!silent) toast.error(formatRequestError(err, "Nachrichten konnten nicht geladen werden."));
+      if (!silent && conversationRef.current === ticket) toast.error(formatRequestError(err, "Nachrichten konnten nicht geladen werden."));
     }
   }, []);
 
-  useEffect(() => {
+  // Vor dem Zeichnen, damit der Entwurf des vorigen Gesprächs keinen Augenblick unter dem neuen steht.
+  useLayoutEffect(() => {
+    conversationRef.current = { userId: userId || null, accountGeneration };
     setMessages([]);
     setHasMore(false);
+    setLoadingOlder(false);
     setNewCount(0);
     setStickersOpen(false);
+    setText("");
+    resetDrafts();
+    setSending(false);
+    setCanSend(true);
+    setBlockedByMe(false);
+    setHint("");
     if (userId) {
       setActive({ id: userId });
       loadLatest(userId);
     } else {
       setActive(null);
     }
-  }, [userId, loadLatest]);
+  }, [accountGeneration, userId, loadLatest, resetDrafts]);
 
   // Der offene Chat lädt bei jeder Nachrichtenänderung nach; ohne Strom alle 8 s.
   useLiveRefresh(() => userId && loadLatest(userId, { silent: true }), ["messages"], { fallbackMs: 8000, enabled: Boolean(userId) });
 
   const loadOlder = useCallback(async () => {
+    const ticket = conversationRef.current;
     const oldest = messagesRef.current[0];
-    if (!userId || !oldest || loadingOlder) return;
+    if (!userId || ticket.userId !== userId || !oldest || loadingOlder) return;
     setLoadingOlder(true);
     try {
       const { data } = await api.get(`/messages/direct/${userId}?before=${encodeURIComponent(oldest.id)}&limit=${PAGE_SIZE}`);
+      if (conversationRef.current !== ticket) return;
       const { messages: merged } = mergeMessages(messagesRef.current, data.messages || []);
       setMessages(merged);
       setHasMore(!!data.has_more);
     } catch (err) {
-      toast.error(formatRequestError(err, "Ältere Nachrichten konnten nicht geladen werden."));
+      if (conversationRef.current === ticket) toast.error(formatRequestError(err, "Ältere Nachrichten konnten nicht geladen werden."));
     } finally {
-      setLoadingOlder(false);
+      if (conversationRef.current === ticket) setLoadingOlder(false);
     }
   }, [loadingOlder, userId]);
 
+  // Die Namenssuche gehört zum Konto: ein Kontowechsel leert sie (#1047).
+  useLayoutEffect(() => {
+    setQuery("");
+    setCandidates([]);
+  }, [accountGeneration]);
+
+  // Nur die Antwort auf die aktuelle Eingabe (und das aktuelle Konto) zählt; eine überholte Suche verfällt.
   useEffect(() => {
     const needle = query.trim();
     if (needle.length < 2) {
       setCandidates([]);
       return undefined;
     }
+    let current = true;
     const timer = setTimeout(async () => {
       try {
         const { data } = await api.get(`/messages/users?q=${encodeURIComponent(needle)}`);
-        setCandidates(data || []);
+        if (current) setCandidates(data || []);
       } catch {
-        setCandidates([]);
+        if (current) setCandidates([]);
       }
     }, 220);
-    return () => clearTimeout(timer);
-  }, [query]);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [accountGeneration, query]);
 
   const open = (id) => {
     setQuery("");
     navigate(`/messages/${id}`);
   };
 
+  // Text, Anhänge und Empfänger stammen aus demselben Stand; die Antwort ändert nur das Gespräch, aus dem gesendet wurde.
   const send = async () => {
+    const ticket = conversationRef.current;
     const message = text.trim();
-    if (!userId || !dmAttachments.canSend(message) || sending) return;
+    if (!userId || ticket.userId !== userId || !dmAttachments.canSend(message) || sending) return;
     setSending(true);
     try {
       const { data } = await api.post(`/messages/direct/${userId}`, { message, attachment_ids: dmAttachments.attachmentIds });
-      setMessages((rows) => mergeMessages(rows, [data]).messages);
-      setText("");
-      dmAttachments.reset();
-      setHint("");
-      setCanSend(true);
+      if (conversationRef.current === ticket) {
+        setMessages((rows) => mergeMessages(rows, [data]).messages);
+        setText("");
+        resetDrafts();
+        setHint("");
+        setCanSend(true);
+      }
       reloadChats();
     } catch (err) {
-      toast.error(formatRequestError(err, "Nachricht konnte nicht gesendet werden."));
+      if (conversationRef.current === ticket) toast.error(formatRequestError(err, "Nachricht konnte nicht gesendet werden."));
     } finally {
-      setSending(false);
+      if (conversationRef.current === ticket) setSending(false);
     }
   };
 
   const sendSticker = async (sticker) => {
-    if (!userId || sending) return;
+    const ticket = conversationRef.current;
+    if (!userId || ticket.userId !== userId || sending) return;
     setSending(true);
     try {
       const { data } = await api.post(`/messages/direct/${userId}`, { sticker_id: sticker.id });
-      setMessages((rows) => mergeMessages(rows, [data]).messages);
-      setStickersOpen(false);
+      if (conversationRef.current === ticket) {
+        setMessages((rows) => mergeMessages(rows, [data]).messages);
+        setStickersOpen(false);
+      }
       reloadChats();
     } catch (err) {
-      toast.error(formatRequestError(err, "Sticker konnte nicht gesendet werden."));
+      if (conversationRef.current === ticket) toast.error(formatRequestError(err, "Sticker konnte nicht gesendet werden."));
     } finally {
-      setSending(false);
+      if (conversationRef.current === ticket) setSending(false);
     }
   };
 
