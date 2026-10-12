@@ -145,7 +145,7 @@ async def notify_album(db, album: dict, event: dict, photos: int, videos: int) -
     return sent
 
 
-async def notify_due(*, now: datetime | None = None, limit: int = 50) -> dict:
+async def notify_due(*, now: datetime | None = None, limit: int = 1000) -> dict:
     """Veröffentlichte Event-Alben mit Fotos, die noch niemand gemeldet hat."""
     from database import get_db
 
@@ -153,6 +153,7 @@ async def notify_due(*, now: datetime | None = None, limit: int = 50) -> dict:
     current = now or now_utc()
     settle = (current - timedelta(minutes=SETTLE_MINUTES)).isoformat()
     too_old = (current - timedelta(hours=MAX_AGE_HOURS)).isoformat()
+    # Leere Alben bleiben ungemeldet in der Liste, bis Fotos kommen - deshalb großzügig statt der ersten 50.
     albums = await db.gallery_albums.find(
         {"published": True, "event_id": {"$nin": [None, ""]}, "participants_notified_at": {"$exists": False}}, {"_id": 0},
     ).to_list(limit)
@@ -403,7 +404,9 @@ async def _publish(db, doc: dict, actor: dict) -> dict:
         "submitted_by": doc["owner_id"],
         "submission_id": doc["id"],
         "uploaded_at": now,
-        "uploaded_by": actor["id"],
+        # Zählt für den Erfolg „Fotos in der Galerie“ (gallery_uploads_approved) - bei der Person, die eingesandt hat.
+        "uploaded_by": doc["owner_id"],
+        "approved_by": actor["id"],
     }
     await db.gallery_photos.insert_one(dict(photo))
     await db.media_uploads.insert_one({

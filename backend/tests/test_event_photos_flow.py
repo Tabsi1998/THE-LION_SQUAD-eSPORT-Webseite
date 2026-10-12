@@ -312,6 +312,8 @@ async def test_board_approves_with_credit_and_rejects_with_deletion(flow):
     assert approved.status_code == 200, approved.text
     photos = await flow.db.gallery_photos.find({"album_id": album["id"]}, {"_id": 0}).to_list(10)
     assert sorted(photo["credit"] or "" for photo in photos) == ["", "Anna"]
+    assert {photo["uploaded_by"] for photo in photos} == {anna["id"]}, "zählt für den Erfolg der Person, die eingesandt hat"
+    assert {photo["approved_by"] for photo in photos} == {vorstand["id"]}
     for photo in photos:
         assert photo["image_url"].startswith("/api/static/uploads/")
         with Image.open(event_photos.PUBLIC_DIR / photo["image_url"].rsplit("/", 1)[1]) as image:
