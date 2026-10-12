@@ -40,7 +40,7 @@ const emptyTeam = { name: "", tag: "", description: "", logo_url: "", banner_url
 
 export default function TeamsPage() {
   const { id } = useParams();
-  return id ? <TeamDetail id={id} /> : <TeamList />;
+  return id ? <TeamDetail key={id} id={id} /> : <TeamList />;
 }
 
 function TeamList() {
@@ -427,7 +427,8 @@ function TeamDetail({ id }) {
               })}
             </div>
           </section>}
-          {(isMember || canEdit) && <TeamChat team={team} user={user} />}
+          {/* Eigener Stand je Team und Konto (#1047): Entwurf und Anhänge bleiben nicht am nächsten Team hängen. */}
+          {(isMember || canEdit) && <TeamChat key={`${team.id}:${user?.id || ""}`} team={team} user={user} />}
         </div>
         <aside className="space-y-4">
           {levelInfo && <TeamLevelPanel info={levelInfo} />}

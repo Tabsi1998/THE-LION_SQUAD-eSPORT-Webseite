@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 
 // Matchseite im Klartext (#1220): Überschrift mit Runde und Namen statt „Match A“, ein fertiges Spiel zeigt „Beendet“
 // mit Ergebnis statt „Terminstatus: Noch offen“, Freilos heißt Freilos, die Station steht einmal im Klartext.
@@ -154,4 +154,59 @@ test("offenes Match: Live-Refresh, Terminabstimmung und Chat bleiben", async () 
   expect(screen.getByTestId("match-live-refresh")).toBeInTheDocument();
   expect(screen.getByTestId("match-scheduling")).toBeInTheDocument();
   expect(screen.getByTestId("match-chat")).toBeInTheDocument();
+});
+
+// Matchwechsel (#1047): Chat-Entwurf und Anhänge gehören zu einem Match und einem Konto.
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+function GoTo({ to }) {
+  const navigate = useNavigate();
+  return <button type="button" data-testid={`goto-${to}`} onClick={() => navigate(to)}>wechseln</button>;
+}
+
+function openMatch(id, names) {
+  return { ...BASE, can_act: true, match: { id, match_key: "A", status: "scheduled", round_name: "Halbfinale", slots: [{ slot: 1, registration_id: "r1" }, { slot: 2, registration_id: "r2" }], results: [] },
+    participants: [{ ...NEON, display_name: names[0] }, { ...LUNA, display_name: names[1] }], matchday_label: "Halbfinale" };
+}
+
+test("Wechsel zu einem anderen Match: keine Anhänge vom vorigen, späte Antworten ändern das neue nicht", async () => {
+  authState.user = { id: "u-neon", username: "neonfalke" };
+  const urlSpies = [vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:vorschau"), vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {})];
+  const lateChat = deferred();
+  let m1Calls = 0;
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/matches/m1/page") return { data: openMatch("m1", ["NeonFalke", "LunaByte"]) };
+    if (url === "/matches/m1/chat") { m1Calls += 1; return m1Calls === 1 ? { data: [] } : lateChat.promise; }
+    if (url === "/matches/m2/page") return { data: openMatch("m2", ["PixelPanther", "Schattenwolf"]) };
+    if (url === "/matches/m2/chat") return { data: [] };
+    return { data: [] };
+  });
+  apiMock.post.mockImplementation(async (url) => (url === "/chat-attachments" ? { data: { id: "att-m1", kind: "image" } } : { data: {} }));
+  try {
+    render(
+      <MemoryRouter initialEntries={["/matches/m1"]}>
+        <Routes><Route path="/matches/:id" element={<><GoTo to="/matches/m2" /><MatchPage /></>} /></Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId("match-headline")).toHaveTextContent("NeonFalke gegen LunaByte");
+    fireEvent.change(screen.getByTestId("match-chat-attach-input"), { target: { files: [new File(["x"], "bild.png", { type: "image/png" })] } });
+    await waitFor(() => expect(screen.getByTestId("chat-attachment-drafts").querySelector('[data-status="ready"]')).not.toBeNull());
+    // Ein Nachladen für m1 läuft noch, während gewechselt wird.
+    window.dispatchEvent(new Event("focus"));
+
+    fireEvent.click(screen.getByTestId("goto-/matches/m2"));
+    expect(await screen.findByText("PixelPanther gegen Schattenwolf")).toBeInTheDocument();
+    expect(screen.queryByTestId("chat-attachment-drafts")).toBeNull();
+
+    await act(async () => lateChat.resolve({ data: [{ id: "c-m1", message: "nur in m1", author: { display_name: "LunaByte" } }] }));
+    expect(screen.getByTestId("match-headline")).toHaveTextContent("PixelPanther gegen Schattenwolf");
+    expect(screen.queryByText("nur in m1")).toBeNull();
+  } finally {
+    urlSpies.forEach((spy) => spy.mockRestore());
+    authState.user = null;
+  }
 });

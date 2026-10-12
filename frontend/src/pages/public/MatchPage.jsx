@@ -81,7 +81,15 @@ function fromLocalInput(value) {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+// Eigener Stand je Match und Konto (#1047): ein Wechsel baut die Seite neu auf - Chat-Entwurf, Anhänge und
+// Eingaben des vorigen Matches gehen weg, und dessen späte Antworten laufen ins Leere.
 export default function MatchPage() {
+  const { id } = useParams();
+  const { user } = useAuth();
+  return <MatchPageView key={`${id}:${user?.id || ""}`} />;
+}
+
+function MatchPageView() {
   const { id } = useParams();
   const { user } = useAuth();
   const [data, setData] = useState(null);

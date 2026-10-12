@@ -355,7 +355,8 @@ export default function TournamentDetailPage() {
               </div>
             </section>
           )}
-          {t.show_chat && <TournamentChat tournament={t} user={user} />}
+          {/* Eigener Stand je Turnier und Konto (#1047): Entwurf und Anhänge bleiben nicht am nächsten Turnier hängen. */}
+          {t.show_chat && <TournamentChat key={`${t.id}:${user?.id || ""}`} tournament={t} user={user} />}
           <section id="teilnehmer" data-testid="tournament-participants">
             <h2 className="font-heading text-2xl font-bold uppercase mb-3">Teilnehmer ({regs.length})</h2>
             <div className="border border-white/10 rounded-sm divide-y divide-white/5 bg-[#121212]">
