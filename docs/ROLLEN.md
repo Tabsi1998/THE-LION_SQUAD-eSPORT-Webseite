@@ -212,6 +212,9 @@ Benachrichtigungen ab. Es hängt nicht am Newsletter.
   Profile, geheime Erfolgs-Gruppen, die Verein-Kategorie fremder Profile, gesperrte Dokument-Downloads, Admin-Medien
   und das Upload-Protokoll sowie die Live-Aktualisierungen für die Verwaltung gehen nur mit bestätigter
   Zwei-Faktor-Anmeldung. Ohne gilt, was jede angemeldete Person sieht. Moderation bleibt ohne Zwei-Faktor.
+- Inhalte „Nur intern“ und „Nur Mitglieder“ öffnet ein Adminbereich (Rolle, Freigabe, Vorstandsposten, Dolibarr)
+  nur mit bestätigter Zwei-Faktor-Anmeldung; als Mitglied sieht man Mitglieder-Inhalte weiter ohne. Dasselbe gilt
+  für Profilfelder mit der Stufe „Nur Admins“ (Moderation ausgenommen). Meldungen an Empfänger hängen nicht davon ab.
 
 ## Benutzermenü und Konto-Seiten (#516)
 
