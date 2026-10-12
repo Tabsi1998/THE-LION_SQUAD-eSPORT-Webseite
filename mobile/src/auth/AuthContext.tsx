@@ -7,7 +7,7 @@ import { clearAllCache } from "../lib/cache";
 import { signInWithPasskey } from "../lib/passkeys";
 import { accessTokenExpired, isNetworkError, isSessionRejected } from "../lib/session";
 import { isGuestUser, liveGuestUser } from "../live";
-import { unregisterPushToken } from "../notifications/PushService";
+import { dismissAllNotifications, setPushAccount, unregisterPushToken } from "../notifications/PushService";
 import type { AuthResponse, User } from "../types";
 
 const ACCESS_KEY = "tls.mobile.accessToken";
@@ -59,6 +59,17 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** Was am Konto hängt und beim Abmelden wie beim Kontowechsel (#1053) gehen muss. */
+function forgetAccountData() {
+  return Promise.all([
+    clearAllCache(),
+    // Die letzten Suchen (#1145) gehen mit dem Konto.
+    clearRecentSearches(),
+    // Die gespeicherte Mitgliedskarte (#1256) gehört dem Konto, das geht.
+    clearOfflineCard(),
+  ]);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -66,21 +77,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [rememberSession, setRememberSession] = useState(true);
   const rememberSessionRef = useRef(true);
   const activeUserIdRef = useRef<string | null>(null);
+  // Das Konto der Sitzung - auch für die Pushes (#1053): ab hier gelten nur noch Pushes dieses Kontos.
+  const rememberActiveUser = useCallback((id: string) => {
+    activeUserIdRef.current = id;
+    setPushAccount(id === liveGuestUser.id ? null : id);
+  }, []);
   const [loading, setLoading] = useState(true);
   const [passkeyOffer, setPasskeyOffer] = useState<PasskeyOffer | null>(null);
 
   // Gast zuerst (#918): ohne Sitzung bleibt die App offen - mit allem Öffentlichen, ohne Anmeldebildschirm vorweg.
   const enterGuest = useCallback(() => {
     setUser(liveGuestUser);
-    activeUserIdRef.current = liveGuestUser.id;
-  }, []);
+    rememberActiveUser(liveGuestUser.id);
+  }, [rememberActiveUser]);
 
   const persistSession = useCallback(async (session: AuthResponse, remember?: boolean) => {
     const shouldRemember = remember ?? rememberSessionRef.current;
-    if (activeUserIdRef.current && activeUserIdRef.current !== session.user.id) {
-      await clearAllCache();
+    const previousId = activeUserIdRef.current;
+    if (previousId && previousId !== session.user.id) {
+      if (previousId !== liveGuestUser.id) {
+        // Kontowechsel A→B (#1053): so gründlich wie beim Abmelden. Das Gerät wird für A abgemeldet, solange A noch die
+        // Sitzung ist; die Hinweise im System und alles Gemerkte von A gehen mit. Für B meldet es die Glocke neu an - und
+        // der Server nimmt das Gerät dabei jedem anderen Konto weg, auch wenn das Abmelden hier nicht durchkam.
+        setPasskeyOffer(null);
+        await unregisterPushToken().catch(() => {});
+        await Promise.all([forgetAccountData(), dismissAllNotifications().catch(() => {})]);
+      } else {
+        await clearAllCache();
+      }
     }
-    activeUserIdRef.current = session.user.id;
+    rememberActiveUser(session.user.id);
     setUser(session.user);
     setAccessToken(session.access_token);
     setRefreshToken(session.refresh_token);
@@ -101,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         SecureStore.setItemAsync(REMEMBER_KEY, "false"),
       ]);
     }
-  }, []);
+  }, [rememberActiveUser]);
 
   const clearSession = useCallback(async () => {
     // Abgemeldet oder Sitzung abgelaufen (#918): zurück in den Gastmodus statt auf den Anmeldebildschirm.
@@ -113,11 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       SecureStore.deleteItemAsync(ACCESS_KEY),
       SecureStore.deleteItemAsync(REFRESH_KEY),
       SecureStore.deleteItemAsync(USER_KEY),
-      clearAllCache(),
-      // Die letzten Suchen (#1145) gehen mit dem Konto.
-      clearRecentSearches(),
-      // Die gespeicherte Mitgliedskarte (#1256) gehört dem abgemeldeten Konto.
-      clearOfflineCard(),
+      forgetAccountData(),
     ]);
   }, [enterGuest]);
 
@@ -179,7 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const { data } = await api.get<User>("/auth/me", { headers: { Authorization: `Bearer ${storedAccess}` } });
             if (mounted) {
               setUser(data);
-              activeUserIdRef.current = data.id;
+              rememberActiveUser(data.id);
               await SecureStore.setItemAsync(USER_KEY, JSON.stringify(data));
             }
             return;
@@ -200,7 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Offline oder Server gestört: angemeldet bleiben, mit dem gemerkten Konto - der nächste Aufruf erneuert.
         if (storedUser) {
           setUser(storedUser);
-          activeUserIdRef.current = storedUser.id;
+          rememberActiveUser(storedUser.id);
         } else {
           enterGuest();
         }
@@ -212,7 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [clearSession, enterGuest, persistSession]);
+  }, [clearSession, enterGuest, persistSession, rememberActiveUser]);
 
   const offerPasskey = useCallback((session: AuthResponse & { passkey_ticket?: string | null }, deviceWithout = false) => {
     setPasskeyOffer(session.passkey_ticket ? { ticket: session.passkey_ticket, userId: session.user.id, deviceWithout } : null);
