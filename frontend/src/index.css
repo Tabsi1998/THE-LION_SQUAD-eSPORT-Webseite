@@ -2045,10 +2045,66 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 
 /* Dynamik-Block (#224, #225, #226): Skelette, Änderungs-Leuchten, Seiten-Einblenden.
    Alles endlich; mit „Bewegung reduzieren“ bleibt nur die Hervorhebung ohne Bewegung. */
-.tls-skeleton { animation: tls-skeleton-pulse 1.6s ease-in-out infinite; }
-@keyframes tls-skeleton-pulse {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
+/* Laden im Vereinsstil (#1324): ein weicher Schimmer läuft über die Skelette statt Pulsieren. */
+.tls-skeleton {
+  background-image: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.07) 50%, transparent 70%);
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  animation: tls-skeleton-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes tls-skeleton-shimmer {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+/* Die dünne cyane Linie unter dem Kopf, solange eine Seite lädt (RouteProgress) - mit „Bewegung reduzieren“ steht sie
+   still als ganze Linie. */
+.tls-route-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tls-route-progress::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--tls-cyan), transparent);
+  animation: tls-route-progress calc(var(--tls-motion-slow) * 3) var(--tls-ease) infinite;
+}
+@keyframes tls-route-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+/* Erster Start der installierten Website (#1324): der Löwe mit „Das Rudel sammelt sich …“, bis die erste Seite da ist. */
+.tls-start-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  background: var(--tls-black);
+  color: rgba(255, 255, 255, 0.9);
+  font: 600 15px/1.4 'Outfit', 'Segoe UI', sans-serif;
+  transition: opacity var(--tls-motion-mid) var(--tls-ease);
+}
+.tls-start-splash[data-leaving] { opacity: 0; }
+.tls-start-splash svg { width: 72px; height: 92px; filter: drop-shadow(0 0 14px rgba(41, 182, 232, 0.55)); }
+.tls-start-splash__bar { width: 140px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; position: relative; }
+.tls-start-splash__bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: var(--tls-cyan);
+  animation: tls-route-progress calc(var(--tls-motion-slow) * 3) var(--tls-ease) infinite;
 }
 .tls-page-enter { animation: tls-page-enter 0.22s ease-out both; }
 @keyframes tls-page-enter {
@@ -2073,6 +2129,7 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 }
 @media (prefers-reduced-motion: reduce) {
   .tls-skeleton, .tls-page-enter, .tls-changed, .tls-changed-row { animation: none !important; }
+  .tls-route-progress::before, .tls-start-splash__bar::before { animation: none !important; width: 100%; transform: none; }
   .tls-changed { box-shadow: 0 0 0 2px rgba(41,182,232,0.6); }
   .tls-changed-row { background-color: rgba(41,182,232,0.18); }
 }

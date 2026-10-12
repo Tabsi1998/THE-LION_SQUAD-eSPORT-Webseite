@@ -29,6 +29,7 @@ import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, Smartphone } from "
 import { UserMenu } from "@/components/tls/UserMenu";
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { OfflineBar } from "@/components/tls/OfflineBar";
+import { RouteProgress } from "@/components/tls/RouteProgress";
 
 export function PublicLayout({ children }) {
   const { user, logout, isAdmin, isClubMember } = useAuth();
@@ -200,6 +201,8 @@ export function PublicLayout({ children }) {
         )}
         </AnimatePresence>
         </MotionConfig>
+        {/* Laden im Vereinsstil (#1324): die dünne Linie unter dem Kopf, solange eine Seite lädt. */}
+        <RouteProgress />
       </header>
       {/* Ohne Netz (#1152): „Offline · Stand 14:05“ - der Inhalt darunter bleibt stehen. */}
       <OfflineBar />

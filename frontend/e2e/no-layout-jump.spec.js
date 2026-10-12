@@ -93,7 +93,8 @@ test.describe("Seiten springen beim Laden nicht (#1231)", () => {
         await page.goto(entry.path, { waitUntil: "domcontentloaded" });
         // Während des Ladens: ein Skelett, keine Fußzeile im ersten Bildschirm.
         await expect(page.locator("[aria-busy='true']").first()).toBeVisible();
-        const footerTop = await page.locator("footer").first().evaluate((node) => node.getBoundingClientRect().top);
+        // In einem Schritt gemessen: beim Wechsel vom Rahmen des Seitenwechsels zur Seite wird der Rahmen getauscht.
+        const footerTop = await page.evaluate(() => document.querySelector("footer")?.getBoundingClientRect().top ?? Infinity);
         expect(footerTop, "Fußzeile während des Ladens").toBeGreaterThanOrEqual(page.viewportSize().height);
         // Nach dem Laden: Inhalt da, kein Skelett mehr, kaum Sprung.
         if (entry.ready) await expect(page.getByTestId(entry.ready)).toBeVisible();

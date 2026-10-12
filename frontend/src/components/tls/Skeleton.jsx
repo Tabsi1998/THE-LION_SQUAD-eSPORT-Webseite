@@ -1,5 +1,8 @@
+import { usePageLoadingMark } from "@/lib/pageLoading";
+
 // Skelett-Ladezustände (#226): Platzhalter in der Form des späteren Inhalts statt „Lade …“.
-// Alle atmen leicht (animate-pulse); mit „Bewegung reduzieren“ stehen sie still (index.css).
+// Ein weicher Schimmer läuft darüber (#1324); mit „Bewegung reduzieren“ stehen sie still (index.css). Jedes Skelett
+// meldet „Seite lädt“ - der Kopf zeigt solange die dünne Linie (RouteProgress).
 
 const bone = "tls-skeleton rounded-sm bg-white/[0.07]";
 
@@ -8,6 +11,7 @@ function Bone({ className = "" }) {
 }
 
 function Busy({ label, className = "", children, testId = "skeleton" }) {
+  usePageLoadingMark();
   return (
     <div className={className} role="status" aria-busy="true" aria-label={label} data-testid={testId}>
       {children}
@@ -25,18 +29,27 @@ export function SkeletonLines({ lines = 3, className = "", label = "Lade Inhalte
   );
 }
 
-/** Karten mit Bild oben und Text darunter - News, Events, Turniere. */
+/**
+ * Karten in der Form der echten Karten (#1324): Bild oben, darunter Datums-Kachel, Kennzeile und Titel, unten ein
+ * Schild - News, Events, Turniere.
+ */
 export function SkeletonCards({ count = 3, columns = 3, image = true, className = "", label = "Lade Einträge" }) {
   const grid = columns === 1 ? "grid-cols-1" : columns === 2 ? "grid-cols-1 md:grid-cols-2" : columns === 4 ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
   return (
     <Busy label={label} className={`grid gap-5 ${grid} ${className}`}>
       {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className="overflow-hidden rounded-sm border border-white/10 bg-[#121212]">
+        <div key={index} className="overflow-hidden rounded-sm border border-white/10 bg-[#121212]" data-skeleton="card">
           {image && <Bone className="aspect-video rounded-none" />}
-          <div className="space-y-3 p-5">
-            <Bone className="h-3 w-1/3" />
-            <Bone className="h-5 w-3/4" />
-            <Bone className="h-3 w-1/2" />
+          <div className="flex gap-4 p-5">
+            <div className="w-12 shrink-0 overflow-hidden rounded-sm border border-white/10" data-skeleton="date">
+              <Bone className="h-3.5 w-full rounded-none bg-white/[0.12]" />
+              <Bone className="mx-auto my-2 h-5 w-7" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-3">
+              <Bone className="h-3 w-1/3" />
+              <Bone className="h-5 w-4/5" />
+              <Bone className="h-6 w-24" />
+            </div>
           </div>
         </div>
       ))}

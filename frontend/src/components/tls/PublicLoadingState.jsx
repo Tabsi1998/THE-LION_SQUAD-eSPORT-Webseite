@@ -1,3 +1,4 @@
+import { usePageLoadingMark } from "@/lib/pageLoading";
 import { SkeletonCards, SkeletonDetailPage, SkeletonLines } from "./Skeleton";
 
 /**
@@ -13,6 +14,11 @@ export function PublicLoadingState({
 }) {
   if (cards > 0) return <SkeletonCards count={cards} label={label} className={className} />;
   if (variant === "inline") return <SkeletonLines lines={2} label={label} className={`py-2 ${className}`} />;
+  return <PageSkeleton label={label} className={className} />;
+}
+
+function PageSkeleton({ label, className }) {
+  usePageLoadingMark();
   return (
     <div
       className={`mx-auto min-h-[100svh] max-w-7xl px-4 py-10 sm:px-6 lg:px-8 ${className}`}
