@@ -4,7 +4,7 @@ Je Sammlung eine Entscheidung - sie steht für Betroffene in der Datenschutzerkl
 „Konto löschen“) und für den Betreiber in ``DATA_PROTECTION.md``:
 
 - **Gelöscht**, weil ohne Konto ohne Zweck: XP und ihre Ereignisse, Einladungen zur Mitgliedschaft, die Tokens der
-  Mitgliedskarte, Discord-Aktivität und -Zugehörigkeit, die Warteschlange der Erfolge, Stream-Zustände, Aufgaben im
+  Mitgliedskarte, der persönliche Kalender-Link (#1189), Discord-Aktivität und -Zugehörigkeit, die Warteschlange der Erfolge, Stream-Zustände, Aufgaben im
   Turnier-Team, der selbst angelegte Eintrag im Mitgliederverzeichnis und die eigenen Bilder.
 - **Überschrieben**, weil die Zeile als Zählung oder Nachweis bleibt: Anmeldungen zu Events und Turnieren,
   Mitgliedsanträge, Rundenzeiten, Gewinne, die Textauszüge der Moderation, Zugangslinks.
@@ -30,7 +30,7 @@ DELETED_TEXT = "[Nachricht gelöscht]"
 # Zeilen, die nur mit Konto einen Zweck haben: Verhalten, Zustände und Zugänge.
 PURGED = (
     "user_xp", "xp_events", "membership_invitations", "member_card_tokens", "discord_activity", "discord_guild_active", "discord_memberships",
-    "achievement_eval_queue", "live_streams", "twitch_stream_sessions", "tournament_staff_assignments",
+    "achievement_eval_queue", "live_streams", "twitch_stream_sessions", "tournament_staff_assignments", "calendar_feed_tokens",
 )
 # Ein Antrag in diesen Zuständen läuft noch - ohne Konto ist er zurückgezogen (der Abgleich mit der
 # Mitgliederverwaltung fasst ihn dann nicht mehr an).

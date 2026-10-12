@@ -29,7 +29,7 @@ kann es für jemanden tun. Die Entscheidung je Art von Daten (`backend/routes/ds
 | Eintrag im Mitgliederverzeichnis aus der Mitgliederverwaltung oder von der Redaktion, Vorstandsposten | bleibt beim Verein, verliert nur die Verknüpfung zum Konto |
 | Einlass bei der Generalversammlung (Anwesenheit am Eingang) | bleibt beim Verein, verliert nur die Verknüpfung zum Konto; wer als Vorstand selbst eingelassen hat, steht dort danach ohne Namen |
 | Mitgliedsanträge | Motivation und Angaben zur Person gelöscht, ein laufender Antrag gilt als zurückgezogen; der Datensatz in der Mitgliederverwaltung bleibt Sache des Vereins |
-| Einladungen zur Mitgliedschaft, Tokens der Mitgliedskarte, Zugangslinks, Aufgaben im Turnier-Team | gelöscht bzw. abgeschaltet |
+| Einladungen zur Mitgliedschaft, Tokens der Mitgliedskarte, persönlicher Kalender-Link, Zugangslinks, Aufgaben im Turnier-Team | gelöscht bzw. abgeschaltet |
 | Anmeldungen zu Events und Turnieren | bleiben als Zählung und für den Turnierbaum – ohne Name, E-Mail, Notiz, Discord- und Plattform-Kennung |
 | Turnier-Ergebnisse, Rundenzeiten, Saisonpunkte | bleiben ohne Namen (sportliche Integrität); Nachweis-Link und Notiz einer Rundenzeit gelöscht |
 | Gewinne | der Nachweis der Übergabe bleibt, die Notiz ist gelöscht |

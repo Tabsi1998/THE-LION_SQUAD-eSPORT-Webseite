@@ -115,12 +115,15 @@ from runtime_config import (
     trusted_http_hosts,
     validate_runtime_environment,
 )
+from services.log_safe import SecretPathFilter
 from storage import PUBLIC_UPLOAD_DIR, UPLOAD_DIR, ensure_storage_directories
 
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("tls-arena")
+# Der persönliche Kalender-Link (#1189) trägt sein Token im Pfad - im Zugriffsprotokoll steht es nur gekürzt.
+logging.getLogger("uvicorn.access").addFilter(SecretPathFilter())
 
 app_env = resolve_app_environment()
 is_production = app_env == "production"

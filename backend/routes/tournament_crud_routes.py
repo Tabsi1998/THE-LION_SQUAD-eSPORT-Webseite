@@ -74,6 +74,10 @@ def _compact_tournament(t: dict) -> dict:
         "public_phase": t.get("public_phase"),
         "platform": t.get("platform"),
         "start_date": t.get("start_date"),
+        # Das Event als Klammer (#1182): Liste und Startseite stellen das Turnier unter sein Event.
+        "end_date": t.get("end_date"),
+        "event_id": t.get("event_id"),
+        "team_mode": t.get("team_mode"),
         "max_participants": t.get("max_participants"),
         "participant_count": t.get("participant_count", 0),
         "prize_pool": t.get("prize_pool"),
@@ -160,7 +164,7 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
         projection = {
             "_id": 0, "id": 1, "title": 1, "slug": 1, "banner_url": 1,
             "status": 1, "visibility": 1, "is_public": 1, "game_id": 1,
-            "platform": 1, "start_date": 1, "max_participants": 1,
+            "platform": 1, "start_date": 1, "end_date": 1, "event_id": 1, "team_mode": 1, "max_participants": 1,
             "prize_pool": 1, "registration_enabled": 1, "online_registration_enabled": 1,
             "registration_open_from": 1, "registration_open_until": 1, "is_invite_only": 1,
         }
