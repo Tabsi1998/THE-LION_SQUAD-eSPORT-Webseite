@@ -8,9 +8,10 @@ import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { formatDateTime } from "../../lib/format";
+import { notificationKindLabel } from "../../lib/notificationKinds";
 import type { MoreStackParamList } from "../../navigation/types";
 import { useNotifications } from "../../notifications/NotificationContext";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "Notifications">;
 type NotificationFilter = "all" | "unread";
@@ -80,7 +81,7 @@ export function NotificationsScreen({ navigation }: Props) {
           <EmptyState
             icon="notifications-outline"
             title="Keine Benachrichtigungen"
-            detail="Erinnerungen, Mentions, Nachrichten und Match-Updates erscheinen hier."
+            detail="Erinnerungen, Erwähnungen, Nachrichten und Match-Updates erscheinen hier. Was ankommt, stellst du im Profil am Zahnrad ein."
           />
         ) : null}
         {!loading && items.length > 0 && !visibleItems.length ? (
@@ -95,7 +96,7 @@ export function NotificationsScreen({ navigation }: Props) {
               </View>
               {item.body ? <Body>{item.body}</Body> : null}
               <View style={styles.meta}>
-                {item.kind ? <Muted style={styles.kind}>{item.kind}</Muted> : null}
+                {item.kind ? <Muted style={styles.kind}>{notificationKindLabel(item.kind, item.meta)}</Muted> : null}
                 {item.created_at ? <Muted>{formatDateTime(item.created_at)}</Muted> : null}
                 <Muted style={styles.openHint}>Öffnen</Muted>
               </View>
@@ -126,7 +127,7 @@ function StatCard({
         <Ionicons name={icon} color={accent} size={18} />
       </View>
       <Muted>{label}</Muted>
-      <Heading numberOfLines={compact ? 2 : 1} style={[styles.statValue, compact && styles.statValueCompact]}>
+      <Heading numberOfLines={compact ? 2 : 1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.statValue, compact && styles.statValueCompact]}>
         {value}
       </Heading>
     </Card>
@@ -166,7 +167,7 @@ const styles = StyleSheet.create({
   },
   statIcon: {
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 34,
     justifyContent: "center",
@@ -182,7 +183,7 @@ const styles = StyleSheet.create({
   filterRow: {
     backgroundColor: colors.cardAlt,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 6,
@@ -190,10 +191,10 @@ const styles = StyleSheet.create({
   },
   filterButton: {
     alignItems: "center",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     flex: 1,
     justifyContent: "center",
-    minHeight: 38,
+    minHeight: 48,
   },
   filterButtonActive: {
     backgroundColor: colors.cyan,
@@ -232,10 +233,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
+  // Die Art in Worten, normal geschrieben (#1296).
   kind: {
     color: colors.cyan,
-    fontWeight: "900",
-    textTransform: "uppercase",
+    fontWeight: "800",
   },
   openHint: {
     color: colors.gold,

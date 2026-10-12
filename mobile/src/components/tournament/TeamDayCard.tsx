@@ -7,7 +7,7 @@ import { Body, Heading, Muted } from "../Text";
 import { api, errorMessage } from "../../lib/api";
 import { lineupLabel, presenceLine, starterLabel, type TeamDay } from "../../lib/teamDay";
 import { viennaDateTime, viennaTime } from "../../lib/vienna";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 // Team am Spieltag (#1192) - wie im Web in „Dein Stand“: Kapitän oder Co-Kapitän wählt, wer spielt (genau so viele
 // wie je Team, die übrigen sind Ersatz, wenn erlaubt), bis zum Ende des Check-ins. Am Turniertag tippt jedes Mitglied
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   countOk: { color: colors.cyan, fontWeight: "900" },
   row: { alignItems: "center", borderTopColor: colors.border, borderTopWidth: 1, flexDirection: "row", gap: 10, minHeight: 44, paddingTop: 8 },
   pressed: { opacity: 0.72 },
-  box: { alignItems: "center", borderColor: "rgba(255,255,255,0.3)", borderRadius: 4, borderWidth: 1.5, height: 20, justifyContent: "center", width: 20 },
+  box: { alignItems: "center", borderColor: "rgba(255,255,255,0.3)", borderRadius: radius.lg, borderWidth: 1.5, height: 20, justifyContent: "center", width: 20 },
   boxOn: { backgroundColor: colors.cyan, borderColor: colors.cyan },
   name: { flex: 1, fontWeight: "800" },
   label: { fontSize: 11, fontWeight: "900" },

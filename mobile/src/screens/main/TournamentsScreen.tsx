@@ -4,14 +4,14 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { ListItemFadeIn, useListEntrance, type ListEntrance } from "../../components/FadeIn";
-import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { TabHeader, useTabScrollToTop } from "../../components/TabHeader";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { MonthCalendar } from "../../components/MonthCalendar";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted } from "../../components/Text";
-import { api, errorMessage, responseFromCache } from "../../lib/api";
+import { api, errorMessage } from "../../lib/api";
 import { initialMonth, itemsByDay, parseDay, shiftMonth, type CalendarItem } from "../../lib/calendar";
 import { compareByNearestDate } from "../../lib/contentSort";
 import { splitOpenAndPast } from "../../lib/dashboard";
@@ -19,7 +19,7 @@ import { formatEventType, formatTournamentFormat, placeParts } from "../../lib/f
 import { applyScope, type ScopeFilter } from "../../lib/memberArea";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, kindColors, radius } from "../../theme";
 import type { ClubEvent, F1Challenge, Tournament } from "../../types";
 import { dayNoon, viennaDate } from "../../lib/vienna";
 
@@ -73,7 +73,6 @@ export function TournamentsScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [offline, setOffline] = useState(false);
   // Die Listen blenden gestaffelt ein (#1085) - jede Karte nur beim ersten Erscheinen.
   const entrance = useListEntrance();
 
@@ -94,7 +93,6 @@ export function TournamentsScreen({ navigation, route }: Props) {
       setEvents(Array.isArray(eventResult.data) ? eventResult.data : []);
       setTournaments(Array.isArray(tournamentResult.data) ? tournamentResult.data : []);
       setFastlaps(Array.isArray(fastLapResult.data) ? fastLapResult.data : []);
-      setOffline([eventResult, tournamentResult, fastLapResult].some(responseFromCache));
     } catch (err) {
       setError(errorMessage(err, "Events konnten nicht geladen werden."));
     } finally {
@@ -207,7 +205,6 @@ export function TournamentsScreen({ navigation, route }: Props) {
         <TabHeader title="Events" testID="events-header">
           {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>Was ansteht: Events, Turniere und Fast Laps.</Muted>}
         </TabHeader>
-        {offline && !error ? <OfflineNotice detail="Events, Turniere und Fast-Laps werden aus gespeicherten Daten angezeigt." /> : null}
 
         {/* Die Filterzeilen rücken mit eigenem Abstand zusammen: ein negativer Rand am Inhalt der waagrechten Liste schnitt
             die Oberkante der Knöpfe ab (Geräteprobe vor 1.4.0). */}
@@ -244,9 +241,9 @@ export function TournamentsScreen({ navigation, route }: Props) {
 
         {view === "list" && filter === "all" && openItems.length ? (
           <View style={styles.stats}>
-            <Stat label="Events" value={String(groupedItems.events.length)} />
-            <Stat label="Turniere" value={String(groupedItems.tournaments.length)} tone="gold" />
-            <Stat label="Fast Laps" value={String(groupedItems.fastlaps.length)} />
+            <Stat label="Events" value={String(groupedItems.events.length)} color={kindColors.event} />
+            <Stat label="Turniere" value={String(groupedItems.tournaments.length)} color={kindColors.tournament} />
+            <Stat label="Fast Laps" value={String(groupedItems.fastlaps.length)} color={kindColors.fastlap} />
           </View>
         ) : null}
 
@@ -318,10 +315,11 @@ function HubContentCard({ item, onPress }: { item: HubItem; onPress: () => void 
   );
 }
 
-function Stat({ label, value, tone = "cyan" }: { label: string; value: string; tone?: "cyan" | "gold" }) {
+/** Eine Zahl je Art - in der Farbe ihrer Art (#1151): Events lila, Turniere gold, Fast Laps blau. */
+function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <Card style={styles.stat}>
-      <Body style={[styles.statValue, tone === "gold" && styles.gold]}>{value}</Body>
+      <Body style={[styles.statValue, { color }]}>{value}</Body>
       <Muted>{label}</Muted>
     </Card>
   );
@@ -350,7 +348,7 @@ const styles = StyleSheet.create({
   pastToggle: {
     alignItems: "center",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     minHeight: 42,
     justifyContent: "center",
@@ -370,9 +368,6 @@ const styles = StyleSheet.create({
     color: colors.cyan,
     fontSize: 23,
     fontWeight: "900",
-  },
-  gold: {
-    color: colors.gold,
   },
   section: {
     gap: 10,

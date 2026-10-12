@@ -289,7 +289,7 @@ export default function MatchPage() {
               {data.tournament && (
                 <>
                   <span aria-hidden="true" className="text-white/25">·</span>
-                  <Link to={`/tournaments/${data.tournament.slug || data.tournament.id}`} className="hover:text-[#29B6E8]">{data.tournament.title}</Link>
+                  <Link to={`/tournaments/${data.tournament.slug || data.tournament.id}`} className="tls-hit hover:text-[#29B6E8]">{data.tournament.title}</Link>
                 </>
               )}
             </div>
@@ -419,7 +419,7 @@ export default function MatchPage() {
 
             </div>
           ) : !user && !isCompleted ? (
-            <Link to={`/login?next=/matches/${id}`} className="tls-btn tls-btn--secondary mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+            <Link to={`/login?next=/matches/${id}`} className="tls-btn tls-btn--secondary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
               Login zum Ergebnis melden
             </Link>
           ) : showStaffEnters ? null : (
@@ -430,7 +430,8 @@ export default function MatchPage() {
 
         {/* Nach dem Ende (#1221): Ergebnis und Verlauf - keine Terminabstimmung mehr; der Matchchat bleibt für
             Teilnehmer und Turnierleitung zum Nachlesen, ein leerer Chat verschwindet. */}
-        <div className={`mt-6 grid gap-6 ${showChat ? "lg:grid-cols-[minmax(0,1fr)_24rem]" : ""}`}>
+        {/* Eine Spalte, die nie breiter als der Bildschirm wird (#1155): mit großer Schrift brechen Namen um. */}
+        <div className={`mt-6 grid grid-cols-1 gap-6 ${showChat ? "lg:grid-cols-[minmax(0,1fr)_24rem]" : ""}`}>
           <div className="space-y-6">
             <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
               <h2 className="font-heading text-xl font-black uppercase">Teilnehmer</h2>
@@ -515,7 +516,7 @@ export default function MatchPage() {
             ) : canUseChat ? (
               <form onSubmit={sendMessage} className="mt-4 space-y-2">
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={addStaffMention} className="tls-btn tls-btn--secondary px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">@leitung</button>
+                  <button type="button" onClick={addStaffMention} className="tls-btn tls-btn--secondary tls-hit px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">@leitung</button>
                 </div>
                 <ChatAttachmentDrafts drafts={chatAttachments.drafts} onRemove={chatAttachments.remove} />
                 <ChatStickerPicker open={stickersOpen} onClose={() => setStickersOpen(false)} onPick={sendSticker} disabled={busy} />

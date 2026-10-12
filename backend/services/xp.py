@@ -8,6 +8,8 @@ der Stand je Person steht in ``user_xp``. Ein Level-Aufstieg legt eine Benachric
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -126,13 +128,44 @@ async def grant(user_id: str, source: str, ref: str, *, amount: int | None = Non
     await db.user_xp.update_one({"user_id": user_id}, {"$set": {"total": total_after, "level": level_after, "updated_at": event["at"]}, "$setOnInsert": {"user_id": user_id, "prestige": prestige}}, upsert=True)
     result = {"amount": amount, "bonus": bonus, "total": total_after, "level": level_after, "level_up": level_after > level_before, "title_changed": levels.title_for_level(level_after) != levels.title_for_level(level_before)}
     if result["level_up"]:
-        await _announce_level_up(user_id, level_before, level_after, prestige)
+        await _level_up(user_id, level_before, level_after, prestige)
         try:
             from services.achievement_queue import request_evaluation
             await request_evaluation([user_id], "level_up", sources={"xp"})
         except Exception:  # noqa: BLE001
             logger.debug("[xp] queue after level-up failed", exc_info=True)
     return result
+
+
+# Mehrere Aufstiege in einer Auswertung (#1296): vier Erfolge auf einmal schickten vier Meldungen „Level X erreicht“
+# hintereinander. In einer Sammlung (``collected_level_ups``) merkt sich jede Person nur den Stand vor dem ersten und
+# nach dem letzten Aufstieg - am Ende kommt eine Meldung mit dem erreichten Level.
+_level_batch: ContextVar[dict | None] = ContextVar("xp_level_batch", default=None)
+
+
+async def _level_up(user_id: str, before: int, after: int, prestige: int) -> None:
+    batch = _level_batch.get()
+    if batch is None:
+        await _announce_level_up(user_id, before, after, prestige)
+        return
+    first = batch.get(user_id)
+    batch[user_id] = (min(before, first[0]) if first else before, max(after, first[1]) if first else after, prestige)
+
+
+@asynccontextmanager
+async def collected_level_ups():
+    """Aufstiege sammeln und am Ende je Person einmal melden. Liegt schon eine Sammlung offen, meldet diese."""
+    if _level_batch.get() is not None:
+        yield
+        return
+    batch: dict[str, tuple[int, int, int]] = {}
+    token = _level_batch.set(batch)
+    try:
+        yield
+    finally:
+        _level_batch.reset(token)
+        for uid, (before, after, prestige) in batch.items():
+            await _announce_level_up(uid, before, after, prestige)
 
 
 async def _announce_level_up(user_id: str, before: int, after: int, prestige: int) -> None:
@@ -257,7 +290,7 @@ async def grant_many(user_ids: list[str], source: str, ref: str, *, amount: int)
                 doc = new_docs[err["index"]]
                 await db.user_xp.update_one({"user_id": doc["user_id"]}, {"$inc": {"total": doc["total"]}, "$set": {"level": doc["level"], "updated_at": stamp}})
     for uid, level_before, level_after, prestige in risen:
-        await _announce_level_up(uid, level_before, level_after, prestige)
+        await _level_up(uid, level_before, level_after, prestige)
     if risen:
         try:
             from services.achievement_queue import request_evaluation

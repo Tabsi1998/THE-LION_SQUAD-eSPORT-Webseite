@@ -7,7 +7,7 @@ import { Card } from "../../components/Card";
 import { platformColor, platformIcon } from "../../components/LinkedAccounts";
 import { API_BASE_URL } from "../../config";
 import { ContentCard } from "../../components/ContentCard";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
@@ -17,7 +17,7 @@ import { api } from "../../lib/api";
 import { formatDate, formatMembershipStatus, formatMembershipType, formatRole, placeParts } from "../../lib/format";
 import { groupSponsorsByTier } from "../../lib/sponsors";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { Reference, ReferenceSummary } from "../../types";
 
 // Partnerseiten (#469) liegen im Web; die App zeigt je Partner die Kanäle und den Weg dorthin.
@@ -77,6 +77,9 @@ export function InfoCenterScreen({ navigation, route }: Props) {
   const [referenceSummary, setReferenceSummary] = useState<ReferenceSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Was beim letzten Laden nicht kam (#1001, #1152): der Bereich behält seinen letzten Stand; ohne Stand zeigt er den
+  // Fehler mit „Nochmal versuchen“ statt „Keine Sponsoren“.
+  const [failed, setFailed] = useState<Partial<Record<SectionKey, LoadProblem>>>({});
   const active = useMemo(() => sections.find((item) => item.key === section) || sections[0], [section]);
   const fixedSection = Boolean(route.params?.section);
 
@@ -86,24 +89,34 @@ export function InfoCenterScreen({ navigation, route }: Props) {
 
   const loadLive = useCallback(async () => {
     try {
-      const [liveSponsors, livePartners, liveEvents, liveProfiles, liveBenefits, liveReferences] = await Promise.all([
-        api.get<any[]>("/sponsors").catch(() => ({ data: [] })),
-        api.get<any[]>("/partners").catch(() => ({ data: [] })),
-        api.get<any[]>("/events").catch(() => ({ data: [] })),
-        api.get<any[]>("/users/public-list").catch(() => ({ data: [] })),
-        api.get<any[]>("/membership/benefits").catch(() => ({ data: [] })),
-        api.get<Reference[] | { items?: Reference[]; summary?: ReferenceSummary }>("/references").catch(() => ({ data: [] as Reference[] })),
+      const [liveSponsors, livePartners, liveEvents, liveProfiles, liveBenefits, liveReferences] = await Promise.allSettled([
+        api.get<any[]>("/sponsors"),
+        api.get<any[]>("/partners"),
+        api.get<any[]>("/events"),
+        api.get<any[]>("/users/public-list"),
+        api.get<any[]>("/membership/benefits"),
+        api.get<Reference[] | { items?: Reference[]; summary?: ReferenceSummary }>("/references"),
       ]);
-      setSponsors(Array.isArray(liveSponsors.data) ? liveSponsors.data : []);
-      setPartners(Array.isArray(livePartners.data) ? livePartners.data : []);
-      setEvents(Array.isArray(liveEvents.data) ? liveEvents.data : []);
-      setProfiles(Array.isArray(liveProfiles.data) ? liveProfiles.data : []);
-      setBenefits(Array.isArray(liveBenefits.data) ? liveBenefits.data : []);
-      // Der Server liefert { items, summary }; die Liste war leer, solange die
-      // App ein Array erwartete (#252). Ein Array bleibt für ältere Server erlaubt.
-      const referenceData = liveReferences.data;
-      setReferences(Array.isArray(referenceData) ? referenceData : referenceData?.items ?? []);
-      setReferenceSummary(Array.isArray(referenceData) ? null : referenceData?.summary ?? null);
+      const problems: Partial<Record<SectionKey, LoadProblem>> = {};
+      const list = <T,>(key: SectionKey, result: PromiseSettledResult<{ data: T[] }>, set: (items: T[]) => void) => {
+        if (result.status === "fulfilled") set(Array.isArray(result.value.data) ? result.value.data : []);
+        else problems[key] = loadProblem(result.reason);
+      };
+      list("sponsors", liveSponsors, setSponsors);
+      list("partners", livePartners, setPartners);
+      list("events", liveEvents, setEvents);
+      list("profiles", liveProfiles, setProfiles);
+      list("benefits", liveBenefits, setBenefits);
+      if (liveReferences.status === "fulfilled") {
+        // Der Server liefert { items, summary }; die Liste war leer, solange die
+        // App ein Array erwartete (#252). Ein Array bleibt für ältere Server erlaubt.
+        const referenceData = liveReferences.value.data;
+        setReferences(Array.isArray(referenceData) ? referenceData : referenceData?.items ?? []);
+        setReferenceSummary(Array.isArray(referenceData) ? null : referenceData?.summary ?? null);
+      } else {
+        problems.references = loadProblem(liveReferences.reason);
+      }
+      setFailed(problems);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -134,6 +147,8 @@ export function InfoCenterScreen({ navigation, route }: Props) {
 
         {loading ? (
           <SkeletonList count={4} hasImage={false} />
+        ) : failed[section] && !sectionHasData(section, { sponsors, partners, events, profiles, benefits, references }) ? (
+          <ErrorState problem={failed[section]} title={`${active.label} nicht gefunden`} onRetry={() => { void loadLive(); }} testID="info-center-error" />
         ) : (
           <>
             {section === "sponsors" ? <Sponsors items={sponsors} /> : null}
@@ -147,6 +162,11 @@ export function InfoCenterScreen({ navigation, route }: Props) {
       </ScrollView>
     </Screen>
   );
+}
+
+/** Hat der Bereich schon einen Stand? Dann bleibt er stehen, auch wenn das Nachladen scheiterte. */
+function sectionHasData(section: SectionKey, data: Record<string, unknown[]>): boolean {
+  return Array.isArray(data[section]) && data[section].length > 0;
 }
 
 // Stufen wie auf der Webseite: Hauptsponsor volle Breite, Bronze zu viert, Logos
@@ -318,7 +338,7 @@ function SummaryTile({ label, value, tone = "cyan" }: { label: string; value: nu
   return (
     <View style={styles.summaryTile}>
       <Body style={[styles.summaryValue, tone === "gold" && styles.summaryValueGold]}>{value}</Body>
-      <Muted style={styles.summaryLabel} numberOfLines={1}>{label}</Muted>
+      <Muted style={styles.summaryLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Muted>
     </View>
   );
 }
@@ -344,7 +364,7 @@ function ReferenceCard({ item }: { item: Reference }) {
         <View style={styles.refTop}>
           <View style={[styles.refRank, placement === 1 && styles.refRankGold, placement === 2 && styles.refRankSilver, placement === 3 && styles.refRankBronze]}>
             <Body style={[styles.refRankText, !placed && styles.refRankTextSmall]} numberOfLines={1} adjustsFontSizeToFit>{placementText}</Body>
-            <Muted style={styles.refRankLabel} numberOfLines={1}>
+            <Muted style={styles.refRankLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
               {item.teams_count ? `${item.teams_count} Teams` : item.participants_count ? `${item.participants_count} Teilnehmer` : "Platz"}
             </Muted>
           </View>
@@ -439,7 +459,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flex: 1,
     gap: 2,
@@ -464,7 +484,7 @@ const styles = StyleSheet.create({
   refRank: {
     alignItems: "center",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     justifyContent: "center",
     minHeight: 64,
@@ -517,7 +537,7 @@ const styles = StyleSheet.create({
   channelChip: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.25)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 5,
@@ -536,7 +556,7 @@ const styles = StyleSheet.create({
   badge: {
     backgroundColor: "rgba(41, 182, 232, 0.12)",
     borderColor: "rgba(41, 182, 232, 0.3)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -556,7 +576,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   logoBox: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 58,
     width: 76,
   },
@@ -594,7 +614,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255, 255, 255, 0.06)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",
@@ -645,7 +665,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   sponsorBanner: {
-    borderRadius: 4,
+    borderRadius: radius.lg,
     marginBottom: 6,
     overflow: "hidden",
     width: "100%",

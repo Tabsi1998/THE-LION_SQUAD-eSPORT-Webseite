@@ -14,7 +14,8 @@ import { calendarAskDue, rememberCalendarAsked, shiftCalendarItem } from "../../
 import { defaultAskCalendar, type AskCalendar } from "./MemberMeetingsScreen";
 import { formatDate } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
+import { Button } from "../../components/Button";
 
 // Helferdienste (#331): dieselben Daten wie auf lionsquad.at/members/helfen - Schichten aus der Vereinsakte
 // (Vereine 1.4), Anfrage nach Rückfrage, Rücknahme nur unbestätigt. Der Vorstand bestätigt in Dolibarr.
@@ -152,9 +153,7 @@ export function MemberHelperShiftsScreen({ confirmShift = defaultConfirmShift, a
                       {shift.mine === "confirmed" ? <Muted>Absagen bitte beim Vorstand.</Muted> : null}
                     </View>
                     {shift.can_request ? (
-                      <Pressable onPress={() => request(event, shift)} disabled={busy === `shift-${shift.id}`} accessibilityRole="button" testID={`shift-${shift.id}-request`} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-                        <Body style={styles.primaryText}>Ich helfe</Body>
-                      </Pressable>
+                      <Button compact arrow={false} label="Ich helfe" onPress={() => request(event, shift)} busy={busy === `shift-${shift.id}`} testID={`shift-${shift.id}-request`} />
                     ) : null}
                     {shift.can_withdraw ? (
                       <Pressable onPress={() => withdraw(event, shift)} disabled={busy === `shift-${shift.id}`} accessibilityRole="button" testID={`shift-${shift.id}-withdraw`} style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
@@ -181,15 +180,13 @@ const styles = StyleSheet.create({
   upcoming: { borderColor: "rgba(255,215,0,0.45)" },
   wanted: { borderColor: colors.gold, borderWidth: 2 },
   eyebrow: { fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: colors.gold },
-  shift: { flexDirection: "row", alignItems: "center", gap: 10, borderColor: "rgba(255,255,255,0.12)", borderRadius: 6, borderWidth: 1, padding: 10 },
+  shift: { flexDirection: "row", alignItems: "center", gap: 10, borderColor: "rgba(255,255,255,0.12)", borderRadius: radius.lg, borderWidth: 1, padding: 10 },
   flex: { flex: 1, gap: 2 },
   strong: { fontWeight: "700" },
   mine: { fontSize: 12, fontWeight: "700" },
   mineOk: { color: colors.success },
   mineWait: { color: colors.gold },
-  primary: { backgroundColor: colors.gold, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 8 },
-  primaryText: { color: colors.black, fontWeight: "700", fontSize: 13 },
-  secondary: { borderColor: "rgba(255,255,255,0.2)", borderRadius: 6, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
+  secondary: { borderColor: "rgba(255,255,255,0.2)", borderRadius: radius.lg, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   secondaryText: { fontSize: 12 },
   pressed: { opacity: 0.7 },
 });

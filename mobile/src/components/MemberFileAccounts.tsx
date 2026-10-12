@@ -4,7 +4,7 @@ import { Button } from "./Button";
 import { Card } from "./Card";
 import { Body, Heading, Muted } from "./Text";
 import { api, errorMessage } from "../lib/api";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 
 // Konten in der Mitgliederakte (#846) - wie im Web: ein auf der Website geprüftes Konto geht nur auf Wunsch in die Akte,
 // je Konto ein Schalter; wünscht der Verein ein Konto, das fehlt, führt ein Knopf zum Verknüpfen im Profil.
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   wish: {
     backgroundColor: "rgba(255, 215, 0, 0.06)",
     borderColor: "rgba(255, 215, 0, 0.4)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 8,
     padding: 10,
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   row: {
     alignItems: "center",
     borderColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,

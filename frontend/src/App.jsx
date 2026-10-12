@@ -20,18 +20,7 @@ import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 import { AppErrorBoundary } from "@/components/tls/AppErrorBoundary";
 import { BottomNav } from "@/components/tls/BottomNav";
 import { PageTransition } from "@/components/tls/PageTransition";
-
-function RouteFallback() {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0A0A0A] gap-4">
-      <div className="relative w-12 h-12">
-        <div className="absolute inset-0 rounded-full border-2 border-[#29B6E8]/20" />
-        <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[#29B6E8] animate-spin" />
-      </div>
-      <span className="text-white/30 font-display tracking-[0.3em] text-xs uppercase">Einen Moment</span>
-    </div>
-  );
-}
+import { RouteFallback, StartSplashGate } from "@/components/tls/RouteFallback";
 
 function MeRedirect() {
   const { user } = useAuth();
@@ -229,6 +218,7 @@ function App() {
             {/* Jahreszeiten (#634): Deko-Ebenen über der ganzen Website, nie im Admin, nie klickbar. */}
             <SeasonStage />
             <Toaster theme="dark" position="top-right" richColors />
+            <StartSplashGate />
             <AppErrorBoundary>
             <BottomNav />
             <Suspense fallback={<RouteFallback />}>

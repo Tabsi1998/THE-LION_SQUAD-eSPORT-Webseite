@@ -2,11 +2,13 @@ import React, { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useScreenFocused } from "../screenFocus";
 import { useSeason } from "../SeasonProvider";
-import { HEADER_BAND, chainLayout } from "./lights";
+import { HANG_BAND } from "../room";
+import { chainLayout } from "./lights";
 import { LAYER_HEIGHT, LightChain, useChainSwing, type ChainMode } from "./LightChain";
 
 // Eine Lichterkette an einer Karte (Jahreszeiten IV, Variante B, #1091 - wie CardChains.jsx im Web): dieselbe Kette wie
-// an der Begrüßungskarte, das Band beginnt 16 Punkte über der Unterkante. Wird die Karte angetippt, schwingt sie nach,
+// an der Begrüßungskarte. Das Band beginnt 10 Punkte über der Unterkante (#1295: mit Luft zur letzten Zeile, die
+// Lämpchen hängen über die Kante); ob dort Platz ist, prüft cardDeco.tsx. Wird die Karte angetippt, schwingt sie nach,
 // ein Licht flackert einmal - nur an dieser Karte, höchstens alle zehn Sekunden. Nie klickbar.
 
 /** Der Wind des Wetters wie an der Begrüßungskarte (christmas/index.tsx). */
@@ -31,5 +33,5 @@ export function CardChain({ perchId, seed, year }: { perchId: string; seed: stri
 }
 
 const styles = StyleSheet.create({
-  edge: { position: "absolute", left: 0, right: 0, bottom: HEADER_BAND - LAYER_HEIGHT, height: LAYER_HEIGHT },
+  edge: { position: "absolute", left: 0, right: 0, bottom: HANG_BAND - LAYER_HEIGHT, height: LAYER_HEIGHT },
 });

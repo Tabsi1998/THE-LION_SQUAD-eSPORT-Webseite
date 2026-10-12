@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { qrRows } from "../lib/qr";
+import { radius } from "../theme";
 
 // Ein QR-Code aus Views - ohne SVG-Bibliothek und ohne Bild vom Server (#346). Weißer Grund mit
 // „stiller Zone“, damit jede Kamera ihn liest, auch auf dem dunklen App-Hintergrund.
@@ -28,7 +29,7 @@ export function QrCode({ value, size = 220, testID, label = "QR-Code der Mitglie
 const styles = StyleSheet.create({
   box: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     overflow: "hidden",
     position: "relative",
   },

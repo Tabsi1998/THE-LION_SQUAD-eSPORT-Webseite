@@ -50,7 +50,7 @@ export default function TournamentBracketPage() {
   if (!data) {
     return (
       <PublicLayout>
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 min-h-[100svh]">
           <SkeletonDetailHeader label="Lade Turnierbaum" />
           <SkeletonCards count={4} columns={4} image={false} label="Lade Turnierbaum" />
         </div>

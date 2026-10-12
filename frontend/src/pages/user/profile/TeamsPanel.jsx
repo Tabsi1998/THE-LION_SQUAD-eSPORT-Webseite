@@ -183,6 +183,7 @@ export function TeamsPanel() {
                 key={team.id}
                 type="button"
                 onClick={() => setActiveId(team.id)}
+                aria-pressed={activeId === team.id}
                 className={`w-full text-left border rounded-sm p-3 bg-[#121212] flex items-center gap-3 ${activeId === team.id ? "border-[#29B6E8]" : "border-white/10 hover:border-white/25"}`}
                 data-testid={`profile-team-${team.id}`}
               >

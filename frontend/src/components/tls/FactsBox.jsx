@@ -15,21 +15,22 @@ export function FactsBox({ rows = [], children = null, className = "", testId = 
         {rows.map((row, index) => {
           const Icon = row.icon || ICONS[row.key] || Info;
           return (
-            <div key={row.key} className={`flex gap-3 px-4 py-3 ${index ? "border-t border-white/[0.07]" : ""}`} data-testid={`${testId}-${row.key}`}>
-              <Icon className="w-4 h-4 mt-1 text-[#9F7AEA] shrink-0" aria-hidden="true" />
-              <div className="min-w-0 flex-1">
-                <dt className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">{row.label}</dt>
-                <dd className={`mt-0.5 text-sm font-bold break-words ${row.free ? "text-[#1FD08E]" : "text-white"}`}>{row.title}</dd>
-                {(row.lines || []).map((line) => <dd key={line} className="text-xs text-white/60 break-words">{line}</dd>)}
-                {row.hybrid ? <dd className="text-xs text-white/60">auch online</dd> : null}
-                {row.route ? (
-                  <dd className="mt-1">
-                    <a href={row.route} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-[#29B6E8] hover:underline underline-offset-4" data-testid={`${testId}-route`}>
-                      <Navigation className="w-3.5 h-3.5" aria-hidden="true" /> Route planen
-                    </a>
-                  </dd>
-                ) : null}
-              </div>
+            // dt und dd stehen direkt in der Zeile (#1155, axe: Vorleser lesen „Wann: …“ als Paar); das Symbol sitzt im dt.
+            <div key={row.key} className={`relative min-w-0 py-3 pl-11 pr-4 ${index ? "border-t border-white/[0.07]" : ""}`} data-testid={`${testId}-${row.key}`}>
+              <dt className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">
+                <Icon className="absolute left-4 top-4 w-4 h-4 text-[#9F7AEA]" aria-hidden="true" />
+                {row.label}
+              </dt>
+              <dd className={`mt-0.5 text-sm font-bold break-words ${row.free ? "text-[#1FD08E]" : "text-white"}`}>{row.title}</dd>
+              {(row.lines || []).map((line) => <dd key={line} className="text-xs text-white/60 break-words">{line}</dd>)}
+              {row.hybrid ? <dd className="text-xs text-white/60">auch online</dd> : null}
+              {row.route ? (
+                <dd className="mt-1">
+                  <a href={row.route} target="_blank" rel="noreferrer" className="tls-hit inline-flex items-center gap-1 text-xs font-bold text-[#29B6E8] hover:underline underline-offset-4" data-testid={`${testId}-route`}>
+                    <Navigation className="w-3.5 h-3.5" aria-hidden="true" /> Route planen
+                  </a>
+                </dd>
+              ) : null}
             </div>
           );
         })}

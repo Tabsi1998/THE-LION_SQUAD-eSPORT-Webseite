@@ -7,7 +7,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View, type LayoutCha
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { ListItemFadeIn, useListEntrance } from "../../components/FadeIn";
-import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { TabHeader, useTabScrollToTop } from "../../components/TabHeader";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -16,11 +16,11 @@ import { AdventHint } from "../../advent/entry";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { useBranding } from "../../branding/BrandingProvider";
-import { api, errorMessage, responseFromCache } from "../../lib/api";
+import { api, errorMessage } from "../../lib/api";
 import { API_BASE_URL } from "../../config";
 import { compareByNearestDate } from "../../lib/contentSort";
 import { seasonLine, splitHomeTimeline, type HomeItem } from "../../lib/dashboard";
-import { displayName, formatEventType, formatNewsCategory, formatStatus, formatWhen, placeParts } from "../../lib/format";
+import { displayName, formatEventType, formatNewsCategory, formatStatus, formatWhen, placeParts, upperDe } from "../../lib/format";
 import { stationText } from "../../lib/matchText";
 import { isGuestUser } from "../../live";
 import { openSignIn, openTab } from "../../navigation/rootNavigation";
@@ -28,8 +28,9 @@ import { FeedbackSheet } from "../../components/FeedbackSheet";
 import { YearReviewCard } from "../../components/YearReviewCard";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { AppStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { ClubEvent, DashboardAction, LiveStream, Match, MobileDashboardData, NewsPost, Tournament } from "../../types";
+import { Button } from "../../components/Button";
 
 // Was das Dashboard zeigt: eigene Matches, Turniere, Events, News, Streams und die Glocke.
 const DASHBOARD_LIVE_RESOURCES = ["tournaments", "matches", "events", "news", "streams", "notifications", "teams", "f1"];
@@ -83,7 +84,6 @@ export function DashboardScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [offline, setOffline] = useState(false);
   // Rückmeldung (#1196): „Wie war …?“ aus den offenen Aktionen oder aus der Meldung (Parameter `feedback`).
   const [feedbackTarget, setFeedbackTarget] = useState<string | null>(null);
   const [feedbackThanks, setFeedbackThanks] = useState("");
@@ -111,7 +111,6 @@ export function DashboardScreen({ navigation, route }: Props) {
       const nextData = normalizeDashboard(response.data);
       nextData.me.matches = nextData.me.matches.filter((match: any) => OPEN_MATCH_STATUSES.has(String(match.status || "")));
       setData(nextData);
-      setOffline(responseFromCache(response));
       if (!isGuest) {
         await refreshMe().catch(() => {});
         api.get<{ open: boolean; note?: string }>("/membership/invitation/me").then((r) => setInvitation(r.data?.open ? r.data : null)).catch(() => setInvitation(null));
@@ -208,9 +207,7 @@ export function DashboardScreen({ navigation, route }: Props) {
           <Card style={styles.inviteCard} testID="dashboard-invitation">
             <Heading>Einladung zum Verein</Heading>
             <Body>Der Vorstand lädt dich ein, Mitglied zu werden – der Antrag ist für dich freigeschaltet.{invitation.note ? ` „${invitation.note}“` : ""}</Body>
-            <Pressable accessibilityRole="button" onPress={() => openLink(`${WEB_BASE_URL}/membership/apply`)} style={styles.inviteButton} testID="dashboard-invitation-apply">
-              <Body style={styles.inviteButtonText}>Antrag ausfüllen</Body>
-            </Pressable>
+            <Button compact label="Antrag ausfüllen" onPress={() => openLink(`${WEB_BASE_URL}/membership/apply`)} style={styles.inviteButton} testID="dashboard-invitation-apply" />
           </Card>
         ) : null}
         {/* Eine Zeile Begrüßung mit den Pills daneben; der Erklärsatz ist weg (#248). */}
@@ -241,7 +238,6 @@ export function DashboardScreen({ navigation, route }: Props) {
         {!isGuest ? <YearReviewCard onOpen={() => navigation.navigate("YearReview")} /> : null}
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
-        {offline && !error ? <OfflineNotice /> : null}
 
         {/* Eine Null als Kennzahl sagt nichts: "Aktionen" nur, wenn es welche gibt (#248). */}
         <View style={styles.grid}>
@@ -348,7 +344,12 @@ export function DashboardScreen({ navigation, route }: Props) {
           ) : liveItems.length ? (
             <Muted>Alles Weitere steht oben unter „Heute und Live“.</Muted>
           ) : (
-            <EmptyState icon="calendar-outline" title={isGuest ? "Noch keine Termine" : "Keine anstehenden Termine"} detail={isGuest ? "Sobald Website-Termine veröffentlicht sind, stehen sie hier." : "Sobald du dich für ein Turnier oder Event anmeldest, steht es hier. Vergangene Termine findest du im Profil unter Referenzen."} />
+            <EmptyState
+              icon="calendar-outline"
+              title={isGuest ? "Noch keine Termine" : "Keine anstehenden Termine"}
+              detail={isGuest ? "Sobald Termine veröffentlicht sind, stehen sie hier." : "Sobald du dich für ein Turnier oder Event anmeldest, steht es hier. Vergangene Termine findest du im Profil unter Referenzen."}
+              action={isGuest ? null : { label: "Termine ansehen", onPress: () => openTab("TournamentList"), testID: "dashboard-empty-events" }}
+            />
           )}
         </Section>
 
@@ -468,10 +469,10 @@ function Section({ title, actionLabel, onAction, children }: { title: string; ac
   return (
     <View style={styles.section}>
       <View style={styles.sectionHead}>
-        <Heading>{title}</Heading>
+        <Heading style={styles.sectionTitle} accessibilityRole="header">{title}</Heading>
         {actionLabel && onAction ? (
-          <Pressable onPress={onAction} hitSlop={10}>
-            <Muted style={styles.sectionAction}>{actionLabel}</Muted>
+          <Pressable onPress={onAction} hitSlop={10} accessibilityRole="button" accessibilityLabel={actionLabel} style={styles.sectionActionTap}>
+            <Muted style={styles.sectionAction} textBreakStrategy="simple">{upperDe(actionLabel)}</Muted>
           </Pressable>
         ) : null}
       </View>
@@ -656,16 +657,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   inviteButton: {
-    marginTop: 10,
     alignSelf: "flex-start",
-    backgroundColor: colors.gold,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 4,
-  },
-  inviteButtonText: {
-    color: "#000",
-    fontWeight: "700",
+    marginTop: 10,
   },
   heroCard: {
     backgroundColor: colors.card,
@@ -681,7 +674,7 @@ const styles = StyleSheet.create({
   heroMark: {
     alignItems: "center",
     backgroundColor: colors.cyan,
-    borderRadius: 10,
+    borderRadius: radius.lg,
     height: 46,
     justifyContent: "center",
     width: 46,
@@ -754,15 +747,24 @@ const styles = StyleSheet.create({
   section: {
     gap: 10,
   },
+  // Große Schrift (#1296): der Titel bricht um, „Alle“ behält Abstand und seinen Platz rechts.
   sectionHead: {
     alignItems: "center",
     flexDirection: "row",
+    gap: 12,
     justifyContent: "space-between",
+  },
+  sectionTitle: {
+    flexShrink: 1,
+  },
+  sectionActionTap: {
+    flexShrink: 0,
+    justifyContent: "center",
+    minHeight: 44,
   },
   sectionAction: {
     color: colors.cyan,
     fontWeight: "900",
-    textTransform: "uppercase",
   },
   matchCard: {
     alignItems: "center",
@@ -779,7 +781,7 @@ const styles = StyleSheet.create({
   matchIcon: {
     alignItems: "center",
     backgroundColor: "rgba(41,182,232,0.1)",
-    borderRadius: 9,
+    borderRadius: radius.lg,
     height: 42,
     justifyContent: "center",
     width: 42,
@@ -805,7 +807,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.12)",
     borderColor: "rgba(41, 182, 232, 0.28)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 38,
     justifyContent: "center",
@@ -828,7 +830,7 @@ const styles = StyleSheet.create({
   badge: {
     backgroundColor: "rgba(41, 182, 232, 0.12)",
     borderColor: "rgba(41, 182, 232, 0.28)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -858,7 +860,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(240,180,41,0.12)",
     borderColor: "rgba(240,180,41,0.28)",
-    borderRadius: 10,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 48,
     justifyContent: "center",
@@ -878,7 +880,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,59,48,0.12)",
     borderColor: "rgba(255,59,48,0.32)",
-    borderRadius: 10,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",

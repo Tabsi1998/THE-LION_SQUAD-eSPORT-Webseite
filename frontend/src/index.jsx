@@ -5,9 +5,12 @@ import "@/index.css";
 import App from "@/App";
 import { startWebClientLogging } from "@/lib/clientLog";
 import { startVitals } from "@/lib/vitals";
+import { mountStartSplash, shouldShowStartSplash } from "@/lib/startSplash";
 import { toast } from "sonner";
 import { applyWaitingServiceWorker, register as registerServiceWorker } from "@/serviceWorkerRegistration";
 
+// Erster Start der installierten Website (#1324): der Löwe steht, bevor React die erste Seite zeigt.
+if (shouldShowStartSplash()) mountStartSplash();
 const root = ReactDOM.createRoot(document.getElementById("root"));
 window.addEventListener("vite:preloadError", () => {
   toast.error("Eine neue Website-Version ist verfügbar oder die Verbindung wurde unterbrochen.", {

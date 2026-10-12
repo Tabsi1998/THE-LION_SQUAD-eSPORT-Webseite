@@ -35,6 +35,7 @@ import {
   Monitor, Music, Newspaper, Pizza, Radio, Star, Trophy, UserPlus, Users, Wifi, XCircle,
 } from "lucide-react";
 import { viennaDate, viennaDateTime, viennaTime } from "@/lib/vienna";
+import { ShareButton } from "@/components/tls/ShareButton";
 
 // Die Event-Seite als Startpunkt (#1183) mit Kopf und Bild (#1273) und Fakten-Kasten (#1346). Feste Reihenfolge, gleich in
 // der App (EventDetailScreen): 1. Dein Event, 2. Was läuft beim Event, 3. Live verfolgen, 4. Fotos, 5. News, 6. Infos
@@ -240,6 +241,8 @@ function EventHeader({ e }) {
               <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]" data-testid="event-kind">{eventKindLabel(e.event_type)}</span>
               <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status || "draft"} size="md" />
               {chip && <span className={`text-[11px] font-bold ${e.visibility === "members" ? "text-[#FFD700]" : "text-white/60"}`} data-testid="event-visibility">{chip}</span>}
+              {/* Teilen (#1154): oben rechts; interne Events öffnen sich nur für Mitglieder. */}
+              <ShareButton kind="event" id={e.slug || e.id} title={e.name} start={e.start_date} end={e.end_date} className="ml-auto" />
             </div>
             <h1 className="mt-3 font-heading text-4xl md:text-5xl xl:text-6xl font-black uppercase leading-tight break-words">{e.name}</h1>
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/70 min-w-0">
@@ -268,7 +271,7 @@ function EventTabs({ tabs, value, onChange }) {
           aria-selected={value === entry.key}
           onClick={() => onChange(entry.key)}
           data-testid={`event-tab-${entry.key}`}
-          className={`-mb-px border-b-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition ${value === entry.key ? "border-[#9F7AEA] text-white" : "border-transparent text-white/50 hover:text-white"}`}
+          className={`-mb-px min-h-11 border-b-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition ${value === entry.key ? "border-[#9F7AEA] text-white" : "border-transparent text-white/50 hover:text-white"}`}
         >
           {entry.key === "live" ? <Radio className="inline w-3.5 h-3.5 mr-1.5 -mt-0.5 text-[#FF3B30]" aria-hidden="true" /> : null}{entry.label}
         </button>
@@ -363,7 +366,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
       {/* 3. Live verfolgen: führt in den Reiter „Live“; „Display“ nur für die Turnierleitung. */}
       {!over && !!rows.length && (
         <section className="flex flex-wrap gap-3" data-section="live" data-testid="event-live-links">
-          <button type="button" onClick={onLive} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-live-follow">
+          <button type="button" onClick={onLive} className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-live-follow">
             <Radio className="w-4 h-4" /> Live verfolgen
           </button>
           {hasArea(user, "tournaments") && (

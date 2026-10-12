@@ -11,7 +11,9 @@ test("live zeigt den Punkt mit Ring, andere Zustaende nicht", async () => {
   render(<StatusBadge phase={{ state: "live", label: "Laeuft" }} />);
   await waitFor(() => expect(spy).toHaveBeenCalled());
   expect(screen.getByTestId("status-live-dot")).toBeTruthy();
-  expect(screen.getByText("Laeuft")).toBeTruthy();
+  // Großbuchstaben im Text selbst (#1296), der Vorleser liest das Wort normal.
+  expect(screen.getByText("LAEUFT")).toBeTruthy();
+  expect(screen.getByLabelText("Laeuft")).toBeTruthy();
   spy.mockRestore();
   render(<StatusBadge phase={{ state: "registration_open", label: "Anmeldung offen" }} />);
   expect(screen.queryAllByTestId("status-live-dot")).toHaveLength(1);

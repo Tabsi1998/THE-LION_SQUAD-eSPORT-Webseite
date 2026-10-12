@@ -16,7 +16,7 @@ import { api } from "../../lib/api";
 import { badgeText } from "../../lib/chats";
 import { isGuestUser } from "../../live";
 import type { AppStackParamList, CommunitySection } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import { ChatsSection } from "./community/ChatsSection";
 import { TeamsSection } from "./TeamsScreen";
 
@@ -114,8 +114,8 @@ function PlayersSection({ navigation, guest }: { navigation: Navigation; guest: 
           <Pressable key={player.id} onPress={() => openProfile(player.username)} accessibilityRole="button" style={({ pressed }) => [styles.playerRow, pressed && styles.pressed]} testID={`player-${player.username}`}>
             <MediaImage uri={player.avatar_url} style={styles.playerAvatar} fallback={<Body style={styles.playerInitial}>{name.slice(0, 1).toUpperCase()}</Body>} />
             <View style={styles.playerText}>
-              <Body style={styles.strong} numberOfLines={1}>{name}</Body>
-              <Muted numberOfLines={1}>{[player.achievement_level?.title, games.slice(0, 2).join(", ")].filter(Boolean).join(" · ") || `@${player.username || ""}`}</Muted>
+              <Body style={styles.strong}>{name}</Body>
+              <Muted numberOfLines={2}>{[player.achievement_level?.title, games.slice(0, 2).join(", ")].filter(Boolean).join(" · ") || `@${player.username || ""}`}</Muted>
             </View>
             <Ionicons name="chevron-forward" color={colors.muted} size={16} />
           </Pressable>
@@ -184,7 +184,7 @@ function BoardCard({ icon, title, detail, rows, onPress, testID }: { icon: keyof
         {rows.map((row) => (
           <View key={`${row.rank}-${row.name}`} style={styles.boardRow}>
             <Body style={[styles.rank, row.rank === 1 && styles.rankGold]}>{row.rank}.</Body>
-            <Body style={styles.boardName} numberOfLines={1}>{row.name}</Body>
+            <Body style={styles.boardName}>{row.name}</Body>
             <Muted>{row.value}</Muted>
           </View>
         ))}
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 8,
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   boardIcon: {
     alignItems: "center",
     backgroundColor: "rgba(255,215,0,0.12)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 40,
     justifyContent: "center",
     width: 40,

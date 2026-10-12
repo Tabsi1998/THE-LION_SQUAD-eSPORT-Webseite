@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -77,7 +79,7 @@ export default function CurrentSeasonRedirect() {
   if (loading) {
     return (
       <PublicLayout>
-        <div className="p-20 text-center text-white/40 font-display tracking-widest">LADE AKTUELLE JAHRESWERTUNG …</div>
+        <PublicLoadingState label="Lade Jahreswertung" />
       </PublicLayout>
     );
   }
@@ -100,6 +102,10 @@ export default function CurrentSeasonRedirect() {
         </div>
       </section>
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
+        {/* Noch keine Wertung (#1325): der schlafende Löwe statt einer leeren Fläche. */}
+        {!latest && !next && (
+          <PublicEmptyState title="Die Saison startet bald" description="Sobald das erste Turnier gespielt ist, steht hier die Rangliste." primaryAction={{ to: "/tournaments", label: "Turniere ansehen" }} />
+        )}
         {latest && (
           <div data-testid="season-final">
             <div className="flex flex-wrap items-end justify-between gap-3">

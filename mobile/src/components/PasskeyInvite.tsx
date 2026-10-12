@@ -5,7 +5,7 @@ import { Button } from "./Button";
 import { Body, Heading, Muted } from "./Text";
 import { useAuth } from "../auth/AuthContext";
 import { createPasskey, listPasskeys, passkeyCreateError, passkeysSupported, silentPasskeyMiss } from "../lib/passkeys";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 
 // Passkey-Einladung (#919): direkt nach einer Anmeldung mit Passwort - hat das Konto noch keinen Passkey und kann das Gerät
 // welche, lädt die App einmal ein. Hat das Konto schon welche anderswo (etwa am PC mit Windows Hello), aber dieses Handy
@@ -104,7 +104,7 @@ export function PasskeyInvite() {
 
 const styles = StyleSheet.create({
   backdrop: { alignItems: "center", backgroundColor: "rgba(0,0,0,0.6)", flex: 1, justifyContent: "center", padding: 20 },
-  card: { backgroundColor: colors.card, borderColor: "rgba(41,182,232,0.35)", borderRadius: 10, borderWidth: 1, gap: 12, maxWidth: 420, padding: 20, width: "100%" },
+  card: { backgroundColor: colors.card, borderColor: "rgba(41,182,232,0.35)", borderRadius: radius.lg, borderWidth: 1, gap: 12, maxWidth: 420, padding: 20, width: "100%" },
   error: { color: colors.live, fontWeight: "700" },
   hint: { color: colors.muted },
   later: { alignItems: "center", paddingVertical: 6 },

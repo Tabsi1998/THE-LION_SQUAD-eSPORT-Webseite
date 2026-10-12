@@ -37,6 +37,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { GameDiscordTile } from "@/components/tls/DiscordServerTile";
 import { viennaDateTime } from "@/lib/vienna";
+import { ShareButton } from "@/components/tls/ShareButton";
 
 export default function TournamentDetailPage() {
   const { slug } = useParams();
@@ -239,7 +240,11 @@ export default function TournamentDetailPage() {
               </Link>
             ))}
           </div>
-          <h1 data-testid="tournament-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{t.title}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 data-testid="tournament-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight min-w-0 break-words">{t.title}</h1>
+            {/* Teilen (#1154): oben rechts neben dem Titel. */}
+            <ShareButton kind="tournament" id={t.slug || t.id} title={t.title} start={t.start_date} end={t.end_date} className="shrink-0 mt-1" />
+          </div>
           {t.description && <div className="mt-4 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(t.description) }} />}
 
           <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
@@ -291,9 +296,9 @@ export default function TournamentDetailPage() {
           <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3" data-testid="tournament-actions">
             {primaryAction}
             <div className="flex flex-wrap items-center gap-4 text-xs font-bold uppercase tracking-wider">
-              {primaryKey !== "bracket" && <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className="text-white/70 hover:text-[#29B6E8]">Turnierbaum</Link>}
-              {primaryKey !== "schedule" && <Link to={subPage("matches")} data-testid="tournament-schedule-link" className="text-white/70 hover:text-[#29B6E8]">Spielplan</Link>}
-              {primaryKey !== "standings" && <Link to={subPage("standings")} data-testid="tournament-standings-link" className="text-white/70 hover:text-[#29B6E8]">Rangliste</Link>}
+              {primaryKey !== "bracket" && <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Turnierbaum</Link>}
+              {primaryKey !== "schedule" && <Link to={subPage("matches")} data-testid="tournament-schedule-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Spielplan</Link>}
+              {primaryKey !== "standings" && <Link to={subPage("standings")} data-testid="tournament-standings-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Rangliste</Link>}
               {t.stream_link && <a href={t.stream_link} target="_blank" rel="noreferrer" data-testid="tournament-stream-link" className="inline-flex items-center gap-1 text-[#FF3B30] hover:text-white"><Radio className="w-3.5 h-3.5" /> Stream</a>}
               {/* Turnierleitung am Handy (#1156): die Live-Werkzeuge - Ergebnisse, was fehlt, Streitfälle. */}
               {t.can_manage_results && <Link to={`/tournaments/${t.slug || t.id}/leitung`} data-testid="tournament-result-entry-link" className="inline-flex items-center gap-1 text-[#FFD700] hover:text-white"><ExternalLink className="w-3.5 h-3.5" /> Turnierleitung</Link>}

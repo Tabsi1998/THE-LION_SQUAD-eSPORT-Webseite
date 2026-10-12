@@ -62,7 +62,8 @@ test("scheitert die Meldung, bleibt der Beitrag trotzdem stehen", async () => {
 });
 
 test("nicht sichtbarer Beitrag: Hinweis statt Inhalt, keine Meldung", async () => {
-  mockGet.mockRejectedValue(new Error("Nicht sichtbar."));
+  // Ein 404 des Servers, wie ihn axios liefert (#1152: „nicht gefunden“ ist etwas anderes als „ohne Netz“).
+  mockGet.mockRejectedValue(Object.assign(new Error("Nicht sichtbar."), { isAxiosError: true, response: { status: 404, data: { detail: "Nicht sichtbar." } } }));
   await render(<NewsDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByText("Beitrag nicht gefunden")).toBeTruthy());
   expect(mockPost).not.toHaveBeenCalled();

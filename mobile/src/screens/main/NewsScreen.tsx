@@ -5,16 +5,16 @@ import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput,
 import { useBranding } from "../../branding/BrandingProvider";
 import { Card } from "../../components/Card";
 import { ListItemFadeIn, useListEntrance } from "../../components/FadeIn";
-import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
+import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted, Title } from "../../components/Text";
-import { api, errorMessage, responseFromCache } from "../../lib/api";
+import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatNewsCategory } from "../../lib/format";
 import { applyScope, internalLabel, type ScopeFilter } from "../../lib/memberArea";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { NewsPost } from "../../types";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "NewsList">;
@@ -25,7 +25,6 @@ export function NewsScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [offline, setOffline] = useState(false);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [scope, setScope] = useState<ScopeFilter>("all");
@@ -38,7 +37,6 @@ export function NewsScreen({ navigation }: Props) {
     try {
       const response = await api.get<NewsPost[]>("/news", { params: { sort: "latest" } });
       setItems(Array.isArray(response.data) ? response.data : []);
-      setOffline(responseFromCache(response));
     } catch (err) {
       setError(errorMessage(err, "News konnten nicht geladen werden."));
     } finally {
@@ -115,7 +113,6 @@ export function NewsScreen({ navigation }: Props) {
             ) : (
               <Muted>Aktuelle Ankündigungen, Updates und Vereinsnews.</Muted>
             )}
-            {offline && !error ? <OfflineNotice detail="News werden aus gespeicherten Daten angezeigt." /> : null}
 
             <View style={styles.searchRow}>
               <Ionicons name="search-outline" color={colors.muted} size={16} style={styles.searchIcon} />
@@ -285,7 +282,7 @@ const styles = StyleSheet.create({
   headerIcon: {
     alignItems: "center",
     backgroundColor: colors.cyan,
-    borderRadius: 10,
+    borderRadius: radius.lg,
     height: 44,
     justifyContent: "center",
     width: 44,
@@ -303,7 +300,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 8,
@@ -326,7 +323,7 @@ const styles = StyleSheet.create({
   chip: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 7,
@@ -376,7 +373,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   image: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 88,
     width: 92,
   },
@@ -399,7 +396,7 @@ const styles = StyleSheet.create({
   badgePinned: {
     backgroundColor: "rgba(240, 180, 41, 0.14)",
     borderColor: "rgba(240, 180, 41, 0.34)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.gold,
     fontSize: 11,
@@ -410,7 +407,7 @@ const styles = StyleSheet.create({
   badgeCategory: {
     backgroundColor: "rgba(41, 182, 232, 0.1)",
     borderColor: "rgba(41, 182, 232, 0.28)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.cyan,
     fontSize: 11,

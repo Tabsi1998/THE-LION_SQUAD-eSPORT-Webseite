@@ -3,7 +3,7 @@ import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { ErrorState, SkeletonList } from "../../components/ListState";
+import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { TeamSchedule } from "../../components/team/TeamSchedule";
@@ -19,8 +19,11 @@ import { memberRole as faceRole, ROLE_LABELS, type TeamOverview } from "../../li
 import { AUTO_COLOR, TEAM_COLORS } from "../../lib/teamColors";
 import { openSignIn } from "../../navigation/rootNavigation";
 import type { TeamStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { Team, TeamSquad, User } from "../../types";
+import { ImagePickField } from "../../components/ImagePickField";
+import { useShareHeader } from "../../components/HeaderActions";
+import { sharePage } from "../../lib/share";
 
 type Props = NativeStackScreenProps<TeamStackParamList, "TeamDetail">;
 type Candidate = { id: string; username?: string; display_name?: string; avatar_url?: string | null; has_pending_invite?: boolean };
@@ -48,6 +51,9 @@ const emptySquad: SquadForm = { name: "", description: "", game_id: "", status: 
 export function TeamDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [team, setTeam] = useState<Team | undefined>();
+  // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
+  const share = useMemo(() => (team ? () => { void sharePage({ kind: "team", id: String(team.id), title: team.tag ? `${team.name} [${team.tag}]` : team.name, detail: "Team" }); } : null), [team]);
+  useShareHeader(navigation, share);
   // Termine und letzte Spiele (#1191) aus den Team-Anmeldungen; Einladungs-Link mit QR-Code für Kapitäne.
   const [overview, setOverview] = useState<TeamOverview | null>(null);
   const inviteToken = route.params.invite || "";
@@ -55,6 +61,8 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [message, setMessage] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [editOpen, setEditOpen] = useState(false);
@@ -68,6 +76,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
 
   const load = useCallback(async () => {
+    setProblem(null);
     setError("");
     try {
       const { data } = await api.get<Team>(`/teams/${route.params.id}`);
@@ -89,6 +98,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
       });
     } catch (err) {
       setError(errorMessage(err, "Teamdetail konnte nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -225,6 +235,13 @@ export function TeamDetailScreen({ navigation, route }: Props) {
     } : { ...emptySquad });
   }, []);
 
+  const saveTeamImage = useCallback(async (key: "logo_url" | "banner_url", url: string) => {
+    if (!team) return;
+    await api.patch(`/teams/${team.id}`, { [key]: url });
+    setTeamForm((current) => ({ ...current, [key]: url }));
+    setTeam((current) => (current ? { ...current, [key]: url } : current));
+  }, [team]);
+
   const saveSquad = useCallback(() => {
     if (!team || !squadForm || !canManage) return;
     const payload = {
@@ -282,7 +299,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   if (!team) {
     return (
       <Screen>
-        <ErrorState title="Teamdetail nicht verfügbar" detail={error || "Das Team konnte nicht geladen werden."} />
+        <ErrorState title="Teamdetail nicht verfügbar" detail={error || "Das Team konnte nicht geladen werden."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }
@@ -321,8 +338,9 @@ export function TeamDetailScreen({ navigation, route }: Props) {
             <Field label="Name" value={teamForm.name} onChangeText={(value) => setTeamForm((current) => ({ ...current, name: value }))} />
             <Field label="Tag" value={teamForm.tag} onChangeText={(value) => setTeamForm((current) => ({ ...current, tag: value.toUpperCase().slice(0, 8) }))} />
             <Field label="Beschreibung" value={teamForm.description} multiline onChangeText={(value) => setTeamForm((current) => ({ ...current, description: value }))} />
-            <Field label="Logo URL" value={teamForm.logo_url} onChangeText={(value) => setTeamForm((current) => ({ ...current, logo_url: value }))} />
-            <Field label="Banner URL" value={teamForm.banner_url} onChangeText={(value) => setTeamForm((current) => ({ ...current, banner_url: value }))} />
+            {/* Logo und Banner vom Handy (#1153) - nur für Kapitän und Co-Kapitän; gespeichert wird sofort. */}
+            <ImagePickField label="Logo" shape="square" value={teamForm.logo_url} onUploaded={(url) => saveTeamImage("logo_url", url)} fallback={<Body style={styles.logoInitials}>{(team.tag || team.name).slice(0, 2).toUpperCase()}</Body>} testID="team-logo" />
+            <ImagePickField label="Banner" shape="banner" value={teamForm.banner_url} onUploaded={(url) => saveTeamImage("banner_url", url)} testID="team-banner" />
             <Field label="Discord-Link" value={teamForm.discord_link} onChangeText={(value) => setTeamForm((current) => ({ ...current, discord_link: value }))} />
             <ColorPicker value={teamForm.color} onChange={(color) => setTeamForm((current) => ({ ...current, color }))} />
             <Button label={busy ? "Speichert ..." : "Team speichern"} disabled={busy || !teamForm.name.trim() || !teamForm.tag.trim()} onPress={saveTeam} />
@@ -397,7 +415,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
         <Card style={styles.card}>
           <View style={styles.cardTop}>
             <Heading>Squads</Heading>
-            {canManage ? <Pressable onPress={() => startSquadEdit()} style={({ pressed }) => [styles.smallAction, pressed && styles.pressed]}><Muted style={styles.smallActionText}>Neu</Muted></Pressable> : null}
+            {canManage ? <Button compact variant="secondary" icon="add" label="Neu" accessibilityLabel="Neuer Squad" onPress={() => startSquadEdit()} /> : null}
           </View>
           {squadForm ? (
             <View style={styles.squadForm}>
@@ -457,9 +475,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
                   <Body style={styles.rowTitle}>{candidate.display_name || candidate.username}</Body>
                   {candidate.username ? <Muted>@{candidate.username}</Muted> : null}
                 </View>
-                <Pressable disabled={busy || candidate.has_pending_invite} onPress={() => invite(candidate)} style={[styles.smallAction, candidate.has_pending_invite && styles.disabled]}>
-                  <Muted style={styles.smallActionText}>{candidate.has_pending_invite ? "Offen" : "Einladen"}</Muted>
-                </Pressable>
+                <Button compact variant="secondary" label={candidate.has_pending_invite ? "Offen" : "Einladen"} disabled={busy || Boolean(candidate.has_pending_invite)} onPress={() => invite(candidate)} />
               </View>
             ))}
           </Card>
@@ -516,19 +532,13 @@ function MemberRow({
         {canRole || canKick ? (
           <View style={styles.memberActions}>
             {canRole ? (
-              <Pressable disabled={busy} onPress={() => onRole(member, role === "co_leader" ? "member" : "co_leader")} style={styles.memberAction}>
-                <Muted style={styles.smallActionText}>{role === "co_leader" ? "Spieler" : "Co-Kapitän"}</Muted>
-              </Pressable>
+              <Button compact variant="secondary" label={role === "co_leader" ? "Spieler" : "Co-Kapitän"} accessibilityLabel={role === "co_leader" ? "Zum Spieler machen" : "Zum Co-Kapitän machen"} disabled={busy} onPress={() => onRole(member, role === "co_leader" ? "member" : "co_leader")} />
             ) : null}
             {canRole ? (
-              <Pressable disabled={busy} onPress={() => onTransfer(member)} style={styles.memberAction}>
-                <Muted style={styles.smallActionText}>Kapitän</Muted>
-              </Pressable>
+              <Button compact variant="secondary" label="Kapitän" accessibilityLabel="Zum Kapitän machen" disabled={busy} onPress={() => onTransfer(member)} />
             ) : null}
             {canKick ? (
-              <Pressable disabled={busy} onPress={() => onKick(member)} style={[styles.memberAction, styles.dangerOutline]}>
-                <Muted style={styles.dangerText}>Entfernen</Muted>
-              </Pressable>
+              <Button compact variant="danger" label="Entfernen" accessibilityLabel="Aus dem Team entfernen" disabled={busy} onPress={() => onKick(member)} />
             ) : null}
           </View>
         ) : null}
@@ -554,8 +564,8 @@ function SquadRow({ canManage, onDelete, onEdit, squad }: { canManage: boolean; 
       </View>
       {canManage ? (
         <View style={styles.squadActions}>
-          <Pressable onPress={() => onEdit(squad)} style={styles.memberAction}><Muted style={styles.smallActionText}>Edit</Muted></Pressable>
-          {squad.id ? <Pressable onPress={() => onDelete(squad)} style={[styles.memberAction, styles.dangerOutline]}><Muted style={styles.dangerText}>Del</Muted></Pressable> : null}
+          <Button compact variant="quiet" label="Bearbeiten" onPress={() => onEdit(squad)} />
+          {squad.id ? <Button compact variant="danger" label="Löschen" accessibilityLabel="Squad löschen" onPress={() => onDelete(squad)} /> : null}
         </View>
       ) : null}
     </View>
@@ -643,6 +653,11 @@ function isTeamAdmin(user?: User | null) {
 }
 
 const styles = StyleSheet.create({
+  logoInitials: {
+    color: colors.cyan,
+    fontSize: 26,
+    fontWeight: "900",
+  },
   content: {
     gap: 14,
     padding: 18,
@@ -673,7 +688,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.white,
     minHeight: 46,
@@ -701,7 +716,7 @@ const styles = StyleSheet.create({
   },
   avatar: {
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 44,
     width: 44,
@@ -728,29 +743,9 @@ const styles = StyleSheet.create({
     gap: 7,
     paddingTop: 2,
   },
-  memberAction: {
-    backgroundColor: "rgba(41,182,232,0.1)",
-    borderColor: "rgba(41,182,232,0.28)",
-    borderRadius: 7,
-    borderWidth: 1,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-  },
-  smallAction: {
-    backgroundColor: "rgba(41,182,232,0.12)",
-    borderColor: "rgba(41,182,232,0.32)",
-    borderRadius: 7,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  smallActionText: {
-    color: colors.cyan,
-    fontWeight: "900",
-  },
   squadForm: {
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 10,
     padding: 10,
@@ -769,7 +764,7 @@ const styles = StyleSheet.create({
   option: {
     backgroundColor: "rgba(255,255,255,0.045)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -784,7 +779,7 @@ const styles = StyleSheet.create({
   },
   swatch: {
     borderColor: "transparent",
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 2,
     height: 34,
     width: 34,
@@ -795,7 +790,7 @@ const styles = StyleSheet.create({
   memberChip: {
     backgroundColor: "rgba(255,255,255,0.045)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 9,
     paddingVertical: 6,
@@ -807,7 +802,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: "rgba(255,255,255,0.06)",
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -836,14 +831,6 @@ const styles = StyleSheet.create({
   },
   textSuccess: {
     color: colors.success,
-  },
-  dangerOutline: {
-    backgroundColor: "rgba(255,59,48,0.1)",
-    borderColor: "rgba(255,59,48,0.3)",
-  },
-  dangerText: {
-    color: colors.live,
-    fontWeight: "900",
   },
   success: {
     color: colors.success,

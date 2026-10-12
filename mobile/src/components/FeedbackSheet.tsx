@@ -5,7 +5,7 @@ import { api, errorMessage } from "../lib/api";
 import { feedbackTagPrompt, parseFeedbackTarget, STAR_LABELS, type FeedbackPrompt } from "../lib/feedback";
 import { viennaDate } from "../lib/vienna";
 import { useSeasonOverlay } from "../seasons/anchors";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { Button } from "./Button";
 import { Heading, Muted } from "./Text";
 
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: "rgba(41,182,232,0.12)", borderColor: colors.cyan },
   chipText: { fontWeight: "800" },
   chipTextOn: { color: colors.cyan },
-  input: { backgroundColor: colors.black, borderColor: colors.border, borderRadius: 8, borderWidth: 1, color: colors.white, minHeight: 72, padding: 10, textAlignVertical: "top" },
+  input: { backgroundColor: colors.black, borderColor: colors.border, borderRadius: radius.lg, borderWidth: 1, color: colors.white, minHeight: 72, padding: 10, textAlignVertical: "top" },
   counter: { fontSize: 11, textAlign: "right" },
   error: { color: colors.live, fontWeight: "800" },
   decline: { alignItems: "center", paddingVertical: 8 },

@@ -115,13 +115,13 @@ export default function EsportsOverviewPage() {
           {loading ? (
             <PublicLoadingState cards={3} />
           ) : error ? (
-            <PublicEmptyState icon={Radio} eyebrow="eSports" title="Aktivitäten konnten nicht geladen werden" description="Bitte lade die Seite neu oder prüfe später noch einmal." primaryAction={{ label: "Erneut laden", onClick: load }} />
+            <PublicEmptyState art="offline" title="Aktivitäten konnten nicht geladen werden" description="Bitte lade die Seite neu oder prüfe später noch einmal." primaryAction={{ label: "Erneut laden", onClick: load }} />
           ) : spotlight.length ? (
             <Reveal className="tls-reveal-grid grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {spotlight.map((item, index) => <ActivityCard key={`${item.kind}-${item.id}`} item={item} index={index} />)}
             </Reveal>
           ) : (
-            <PublicEmptyState icon={Trophy} eyebrow="eSports" title="Noch keine Aktivitäten sichtbar" description="Sobald Turniere oder Fast-Lap-Challenges öffentlich sind, erscheint hier automatisch die Übersicht." primaryAction={{ to: "/events", label: "Events ansehen" }} />
+            <PublicEmptyState title="Noch keine Aktivitäten sichtbar" description="Sobald Turniere oder Fast-Lap-Challenges öffentlich sind, erscheint hier automatisch die Übersicht." primaryAction={{ to: "/events", label: "Events ansehen" }} />
           )}
         </section>
 

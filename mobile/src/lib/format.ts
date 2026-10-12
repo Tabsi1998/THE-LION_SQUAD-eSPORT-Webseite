@@ -50,6 +50,15 @@ export function formatWhen(value?: string | null, { now = new Date(), fallback =
   return `${weekday} ${date}. ${monthName}${yearPart} · ${time}`;
 }
 
+/**
+ * In Großbuchstaben - im Text selbst, nicht über `textTransform` (#1296): Android misst die Zeile sonst mit den kleinen
+ * Buchstaben und bricht die breiteren großen um, auf dem Tablet stand von „ANMELDUNG OFFEN“ nur „ANMELDUNG“. Deutsch:
+ * aus „ß“ wird „SS“.
+ */
+export function upperDe(value?: string | null): string {
+  return String(value || "").toLocaleUpperCase("de-DE");
+}
+
 export function formatStatus(value?: string | null) {
   if (!value) return "Offen";
   const key = String(value).trim().toLowerCase();

@@ -271,7 +271,7 @@ export default function ProfilePage() {
             <span className="mx-2 text-white/20">·</span>
             <span>@{user.username}</span>
             {/* Zurück zum eigenen Profil (#1149) - dort steht auch „So sehen dich andere“. */}
-            <Link to={`/u/${user.username}`} data-testid="settings-to-profile" className="ml-2 inline-flex items-center gap-1 px-2 py-1 border border-white/15 text-[11px] uppercase tracking-wider hover:border-[#29B6E8] hover:text-[#29B6E8]"><UserCircle className="w-3.5 h-3.5" /> Mein Profil</Link>
+            <Link to={`/u/${user.username}`} data-testid="settings-to-profile" className="tls-hit ml-2 inline-flex items-center gap-1 px-2 py-1 border border-white/15 text-[11px] uppercase tracking-wider hover:border-[#29B6E8] hover:text-[#29B6E8]"><UserCircle className="w-3.5 h-3.5" /> Mein Profil</Link>
           </div>
         </div>
 
@@ -308,7 +308,7 @@ export default function ProfilePage() {
 
             {FORM_TABS.has(tab) && (
               <div className="sticky bottom-0 z-10 -mx-4 px-4 py-3 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 bg-[#050505]/95 backdrop-blur border-t border-white/10 flex flex-wrap items-center gap-3" data-testid="profile-save-bar">
-                <button type="submit" disabled={saving} data-testid="profile-save" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-6 py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50 text-xs">
+                <button type="submit" disabled={saving} data-testid="profile-save" className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-6 py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50 text-xs">
                   <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
                 </button>
                 {dirty ? (

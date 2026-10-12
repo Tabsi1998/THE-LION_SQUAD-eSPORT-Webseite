@@ -49,7 +49,7 @@ export function AddToCalendar({ item, days = null, className = "", block = false
         aria-expanded={open}
         aria-haspopup="dialog"
         data-testid={`${testId}-button`}
-        className={`tls-btn tls-btn--secondary inline-flex items-center justify-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm ${block ? "w-full" : ""}`}
+        className={`tls-btn tls-btn--secondary inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm ${block ? "w-full" : ""}`}
       >
         <CalendarPlus className="w-4 h-4" /> In den Kalender <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>

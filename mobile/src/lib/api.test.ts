@@ -5,7 +5,7 @@ import type { AxiosRequestConfig } from "axios";
 // auszusperren, und wenn offline auf alte Daten zurueckgefallen wird, muss das
 // erkennbar bleiben - sonst zeigt ein Screen veraltete Staende als aktuell an.
 
-const mockGetStaleCache = jest.fn();
+const mockGetStaleEntry = jest.fn();
 const mockSetCached = jest.fn(async (..._args: unknown[]) => {});
 const mockBuildCacheKey = jest.fn((..._args: unknown[]) => "cache-key");
 
@@ -13,7 +13,7 @@ const mockDeviceHeaders = jest.fn(async () => ({ "X-Device-Id": "geraet-1", "X-D
 jest.mock("./deviceIdentity", () => ({ deviceHeaders: () => mockDeviceHeaders() }));
 jest.mock("./cache", () => ({
   buildCacheKey: (...args: unknown[]) => mockBuildCacheKey(...args),
-  getStaleCache: (...args: unknown[]) => mockGetStaleCache(...args),
+  getStaleEntry: (...args: unknown[]) => mockGetStaleEntry(...args),
   setCached: (...args: unknown[]) => mockSetCached(...args),
   invalidateCache: jest.fn(async () => {}),
   clearAllCache: jest.fn(async () => {}),
@@ -21,6 +21,7 @@ jest.mock("./cache", () => ({
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { api, configureAuthBridge, responseFromCache, refreshSession } = require("./api");
+const network = require("./network");
 
 type Handler = (config: AxiosRequestConfig) => Promise<unknown> | unknown;
 
@@ -124,8 +125,9 @@ test("mehrere gleichzeitige 401er teilen sich eine einzige Erneuerung", async ()
   expect(refreshCalls).toBe(1);
 });
 
-test("offline wird auf zwischengespeicherte Daten zurueckgegriffen - erkennbar markiert", async () => {
-  mockGetStaleCache.mockResolvedValue({ stand: "von gestern" });
+test("offline wird auf zwischengespeicherte Daten zurueckgegriffen - erkennbar markiert, die Leiste kennt ihren Stand", async () => {
+  network.resetNetwork();
+  mockGetStaleEntry.mockResolvedValue({ data: { stand: "von gestern" }, timestamp: 1_700_000_000_000, ttl: 600000 });
   handler = async (config) => {
     throw networkError(config);
   };
@@ -134,6 +136,12 @@ test("offline wird auf zwischengespeicherte Daten zurueckgegriffen - erkennbar m
 
   expect(response.data).toEqual({ stand: "von gestern" });
   expect(responseFromCache(response)).toBe(true);
+  // #1152: offline mit dem Stand der gezeigten Daten - eine echte Antwort danach heißt wieder online.
+  expect(network.networkSnapshot()).toEqual({ offline: true, stand: 1_700_000_000_000 });
+  handler = async (config) => ({ data: { ok: true }, status: 200, headers: {}, config });
+  await api.get("/dashboard");
+  expect(network.networkSnapshot().offline).toBe(false);
+  network.resetNetwork();
 });
 
 test("frische Antworten sind nicht als Cache markiert", async () => {
@@ -145,7 +153,7 @@ test("frische Antworten sind nicht als Cache markiert", async () => {
 });
 
 test("offline ohne Zwischenspeicher meldet den Fehler weiter", async () => {
-  mockGetStaleCache.mockResolvedValue(null);
+  mockGetStaleEntry.mockResolvedValue(null);
   handler = async (config) => {
     throw networkError(config);
   };

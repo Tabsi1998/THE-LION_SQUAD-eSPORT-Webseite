@@ -54,13 +54,13 @@ export const AchievementGroupCard = React.memo(function AchievementGroupCard({ g
         />
         <View style={styles.title}>
           <View style={styles.titleRow}>
-            <Text style={styles.name} numberOfLines={1}>{group.name}</Text>
+            <Text style={styles.name}>{group.name}</Text>
             {progress.top ? <Text style={[styles.level, { color: topColor }]}>{materialName(progress.top)}</Text> : null}
           </View>
           <View style={styles.track} testID={`achievement-progress-${group.code}`}>
             <View style={[styles.fill, { width: `${Math.round(progress.percent)}%`, backgroundColor: progress.done ? topColor : accent }]} />
           </View>
-          <Text style={styles.muted} numberOfLines={1}>
+          <Text style={styles.muted} numberOfLines={2}>
             {progress.next ? `${progress.label} · nächste Stufe: ${progress.next.name}` : progress.label}
           </Text>
           {rare?.top ? (

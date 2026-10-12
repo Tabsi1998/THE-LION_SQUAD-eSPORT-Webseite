@@ -2,15 +2,18 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
-import { EmptyState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { useTabScrollToTop } from "../../components/TabHeader";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
+import { openLink } from "../../lib/openLink";
+import { WEB_BASE_URL } from "../../lib/siteUrls";
 import { chatTitle, splitTeams, teamMembers, teamMeta, teamSquads } from "../../lib/teams";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { Team, TeamInvite } from "../../types";
+import { Button } from "../../components/Button";
 
 // Teams: eigene zuerst, mit Chat direkt auf der Karte; darunter die weiteren
 // öffentlichen Teams. Vorher zeigte die Liste entweder nur eigene oder nur
@@ -28,24 +31,24 @@ export function TeamsSection({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
 
   const load = useCallback(async () => {
     setError("");
-    try {
-      const [mine, all, inviteResult] = await Promise.all([
-        api.get<Team[]>("/teams/my").catch(() => ({ data: [] })),
-        api.get<Team[]>("/teams").catch(() => ({ data: [] })),
-        api.get<TeamInvite[]>("/teams/invites/my").catch(() => ({ data: [] })),
-      ]);
-      setMyTeams(Array.isArray(mine.data) ? mine.data : []);
-      setAllTeams(Array.isArray(all.data) ? all.data : []);
-      setInvites(Array.isArray(inviteResult.data) ? inviteResult.data : []);
-    } catch (err) {
-      setError(errorMessage(err, "Teams konnten nicht geladen werden."));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    // Ein Ladefehler ist kein „Noch kein Team“ (#1001, #1152): was fehlschlägt, behält seinen letzten Stand, und ohne
+    // jeden Stand zeigt der Screen den Fehler mit „Nochmal versuchen“.
+    const [mine, all, inviteResult] = await Promise.allSettled([
+      api.get<Team[]>("/teams/my"),
+      api.get<Team[]>("/teams"),
+      api.get<TeamInvite[]>("/teams/invites/my"),
+    ]);
+    if (mine.status === "fulfilled") setMyTeams(Array.isArray(mine.value.data) ? mine.value.data : []);
+    if (all.status === "fulfilled") setAllTeams(Array.isArray(all.value.data) ? all.value.data : []);
+    if (inviteResult.status === "fulfilled") setInvites(Array.isArray(inviteResult.value.data) ? inviteResult.value.data : []);
+    const failed = [all, mine].find((result): result is PromiseRejectedResult => result.status === "rejected");
+    setProblem(failed ? loadProblem(failed.reason) : null);
+    setLoading(false);
+    setRefreshing(false);
   }, []);
 
   useEffect(() => {
@@ -126,13 +129,17 @@ export function TeamsSection({ navigation }: Props) {
             ) : null}
           </View>
         }
-        ListEmptyComponent={
+        ListEmptyComponent={problem ? (
+          <ErrorState problem={problem} title="Teams nicht gefunden" onRetry={() => { void load(); }} testID="teams-error" />
+        ) : (
           <EmptyState
             icon="people-outline"
             title="Noch kein Team"
-            detail="Einem Team trittst du über eine Einladung oder einen Join-Code bei. Öffentliche Teams erscheinen hier, sobald es welche gibt."
+            detail="Einem Team trittst du über eine Einladung oder einen Join-Code bei - oder du gründest selbst eins."
+            action={{ label: "Team gründen", onPress: () => { openLink(`${WEB_BASE_URL}/teams`); }, testID: "teams-empty-create" }}
+            testID="teams-empty"
           />
-        }
+        )}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
         contentContainerStyle={styles.list}
         renderItem={({ item }) =>
@@ -168,19 +175,14 @@ function InviteCard({ invite, onAccept, onDecline }: { invite: TeamInvite; onAcc
         </View>
       </View>
       <View style={styles.inviteActions}>
-        <Pressable onPress={onAccept} accessibilityRole="button" style={({ pressed }) => [styles.acceptButton, pressed && styles.pressed]}>
-          <Body style={styles.acceptText}>Annehmen</Body>
-        </Pressable>
-        <Pressable onPress={onDecline} accessibilityRole="button" style={({ pressed }) => [styles.declineButton, pressed && styles.pressed]}>
-          <Muted style={styles.declineText}>Ablehnen</Muted>
-        </Pressable>
+        <Button compact arrow={false} label="Annehmen" onPress={onAccept} />
+        <Button compact variant="quiet" label="Ablehnen" onPress={onDecline} />
       </View>
     </Card>
   );
 }
 
 function TeamCard({ team, onPress, onChat }: { team: Team; onPress: () => void; onChat?: () => void }) {
-  const lastMessage = team.chat_preview?.length ? team.chat_preview[team.chat_preview.length - 1] : null;
   return (
     <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [pressed && styles.pressed]}>
       <Card style={styles.card} perch={`team-${team.id}`}>
@@ -192,7 +194,7 @@ function TeamCard({ team, onPress, onChat }: { team: Team; onPress: () => void; 
           />
           <View style={styles.teamText}>
             <View style={styles.titleRow}>
-              <Body style={styles.title} numberOfLines={1}>{team.name}</Body>
+              <Body style={styles.title}>{team.name}</Body>
               {team.tag ? <Pill label={team.tag} /> : null}
             </View>
             <Muted>{teamMeta(team)}</Muted>
@@ -211,9 +213,8 @@ function TeamCard({ team, onPress, onChat }: { team: Team; onPress: () => void; 
             <Ionicons name="chevron-forward" color={colors.cyan} size={18} />
           )}
         </View>
-        {onChat && lastMessage ? (
-          <Muted numberOfLines={1}>{lastMessage.author}: {lastMessage.message}</Muted>
-        ) : team.description ? (
+        {/* Die letzte Chat-Nachricht stand hier nie: `chat_preview` schickt der Server nicht (#1296). */}
+        {team.description ? (
           <Muted numberOfLines={2}>{team.description}</Muted>
         ) : null}
       </Card>
@@ -285,37 +286,13 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,215,0,0.32)",
   },
   inviteLogo: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 46,
     width: 46,
   },
   inviteActions: {
     flexDirection: "row",
     gap: 8,
-  },
-  acceptButton: {
-    alignItems: "center",
-    backgroundColor: colors.cyan,
-    borderRadius: 7,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 42,
-  },
-  acceptText: {
-    color: colors.black,
-    fontWeight: "900",
-  },
-  declineButton: {
-    alignItems: "center",
-    borderColor: colors.border,
-    borderRadius: 7,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 42,
-  },
-  declineText: {
-    fontWeight: "900",
   },
   card: {
     gap: 8,
@@ -327,7 +304,7 @@ const styles = StyleSheet.create({
   },
   logoImage: {
     borderColor: "rgba(41,182,232,0.35)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 48,
     width: 48,
@@ -361,7 +338,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: "rgba(41,182,232,0.12)",
     borderColor: "rgba(41,182,232,0.28)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,

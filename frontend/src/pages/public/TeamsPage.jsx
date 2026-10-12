@@ -32,6 +32,9 @@ import { SideSheet } from "@/components/tls/SideSheet";
 import { TeamHeader } from "@/pages/public/team/TeamHeader";
 import { inviteTokenFrom, memberRole, ROLE_LABELS } from "@/lib/teamPage";
 import { AUTO_COLOR, TEAM_COLORS } from "@/lib/teamColors";
+import { PublicErrorState } from "@/components/tls/PublicEmptyState";
+import { problemKind } from "@/lib/loadProblem";
+import { ShareButton } from "@/components/tls/ShareButton";
 
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "", color: AUTO_COLOR };
 
@@ -183,7 +186,19 @@ function TeamDetail({ id }) {
       setOverview(plan);
     } catch { setOverview(null); }
   }, [id]);
-  const refresh = useCallback(() => load().catch(() => { setTeam(null); setMissing(true); }), [load]);
+  // Laden (#983, #1152): 404/403 heißt „nicht gefunden“; ohne Netz oder bei einem Serverfehler bleibt ein schon
+  // geladenes Team stehen, sonst steht der Fehler mit „Nochmal versuchen“ da - nie ein ewiges „Lade Team“.
+  const [problem, setProblem] = useState(null);
+  const refresh = useCallback(() => load().then(() => setProblem(null)).catch((error) => {
+    const kind = problemKind(error);
+    if (kind === "notFound" || kind === "denied") {
+      setTeam(null);
+      setMissing(true);
+      setProblem(null);
+    } else {
+      setProblem(kind);
+    }
+  }), [load]);
 
   useEffect(() => { refresh(); }, [refresh]);
   useApiInvalidation(refresh, ["teams"]);
@@ -210,6 +225,15 @@ function TeamDetail({ id }) {
         <div className="p-20 text-center" data-testid="team-missing">
           <h1 className="font-heading text-3xl uppercase">Team nicht gefunden</h1>
           <Link to="/teams" className="inline-block mt-4 text-[#29B6E8] hover:underline">← Zu den Teams</Link>
+        </div>
+      </PublicLayout>
+    );
+  }
+  if (!team && problem) {
+    return (
+      <PublicLayout>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
+          <PublicErrorState kind={problem} title={problem === "offline" ? "Ohne Netz" : "Team konnte nicht geladen werden"} onRetry={refresh} />
         </div>
       </PublicLayout>
     );
@@ -299,12 +323,18 @@ function TeamDetail({ id }) {
         header={overview?.header}
         levelInfo={levelInfo}
         userId={user?.id}
-        actions={canEdit ? (
+        actions={(
           <>
-            <button type="button" onClick={() => setInviteOpen(true)} data-testid="team-invite-open" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><UserPlus className="w-3.5 h-3.5" /> Einladen</button>
-            <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
+            {canEdit ? (
+              <>
+                <button type="button" onClick={() => setInviteOpen(true)} data-testid="team-invite-open" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><UserPlus className="w-3.5 h-3.5" /> Einladen</button>
+                <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
+              </>
+            ) : null}
+            {/* Teilen (#1154): für alle, auch Gäste. */}
+            <ShareButton kind="team" id={team.id} title={team.tag ? `${team.name} [${team.tag}]` : team.name} detail="Team" />
           </>
-        ) : null}
+        )}
       >
         {team.featured_award && (
           <div className="mt-5 w-full max-w-xl text-left" data-testid="team-featured-award">
@@ -597,8 +627,8 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, onDissolved })
         <Field label="Name"><Input value={form.name} onChange={(v) => set("name", v)} required testId="team-name-input" /></Field>
         <Field label="Tag"><Input value={form.tag} onChange={(v) => set("tag", v.toUpperCase().slice(0, 8))} required testId="team-tag" placeholder="TLS" /></Field>
         <Field label="Beschreibung"><textarea value={form.description || ""} onChange={(e) => set("description", e.target.value)} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-        <Field label="Logo"><ImageUpload value={form.logo_url || ""} onChange={(v) => set("logo_url", v)} testId="team-logo" variant="square" allowLibrary /></Field>
-        <Field label="Banner"><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" allowLibrary /></Field>
+        <Field label="Logo"><ImageUpload value={form.logo_url || ""} onChange={(v) => set("logo_url", v)} testId="team-logo" variant="square" crop="square" allowLibrary /></Field>
+        <Field label="Banner"><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" crop="banner" allowLibrary /></Field>
         <Field label="Discord-Link"><Input value={form.discord_link || ""} onChange={(v) => set("discord_link", v)} placeholder="https://discord.gg/..." /></Field>
         {!isNew && <TeamColorPicker value={form.color || AUTO_COLOR} onChange={(v) => set("color", v)} />}
       </form>

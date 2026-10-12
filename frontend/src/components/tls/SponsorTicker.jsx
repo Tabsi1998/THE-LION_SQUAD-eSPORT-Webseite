@@ -50,7 +50,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
     try {
       const url = placement === "all" ? "/sponsors" : `/sponsors?placement=${placement}`;
       const { data } = await api.get(url);
-      setSponsors(data || []);
+      setSponsors(Array.isArray(data) ? data : []);
     }
     catch { setSponsors([]); }
   }, [placement]);

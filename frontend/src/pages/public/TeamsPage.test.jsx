@@ -145,3 +145,22 @@ test("läuft ein Turnier, bleibt Auflösen gesperrt und das Turnier steht da; Co
   await screen.findByTestId("team-edit-sheet");
   expect(screen.queryByTestId("team-dissolve")).toBeNull();
 });
+
+test("ohne Netz oder bei einem Serverfehler: Fehler mit „Nochmal versuchen“ statt ewigem Laden oder „nicht gefunden“ (#983, #1152)", async () => {
+  const offline = new Error("Network Error");
+  serve(TEAM, { "/teams/t-1": offline });
+  renderAt("/teams/t-1");
+  const error = await screen.findByTestId("public-error-state");
+  expect(error).toHaveAttribute("data-kind", "offline");
+  expect(screen.queryByTestId("team-missing")).toBeNull();
+  serve(TEAM);
+  fireEvent.click(screen.getByTestId("public-error-retry"));
+  expect(await screen.findByText("Lions Rocket")).toBeInTheDocument();
+  expect(screen.queryByTestId("public-error-state")).toBeNull();
+});
+
+test("404 ist „Team nicht gefunden“", async () => {
+  serve(TEAM, { "/teams/t-1": Object.assign(new Error("404"), { response: { status: 404 } }) });
+  renderAt("/teams/t-1");
+  expect(await screen.findByTestId("team-missing")).toBeInTheDocument();
+});

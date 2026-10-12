@@ -11,7 +11,8 @@ import { approachPath, awayMs, flightDurationMs, hopPath, inView, rotationFrames
 import { endFlight, fleePath, startFlight, subscribeFlightEnd, subscribeFlights, subscribeHops, type Flight as PerchFlightData } from "./flights";
 import { capabilities, scaleForScreen, type Capabilities } from "./intensity";
 import { getMotionScheduler, releaseMotion, requestMotion, type MotionToken } from "./motion";
-import { assign, assignWebs, assignmentsFor, choosePerches, chooseWebPerches, clearAssignment, perchSnapshot, perchesFor, placementFor, subscribePerches, perchPoint, type Perch, type PerchAssignment } from "./perches";
+import { assign, assignWebs, assignmentsFor, choosePerches, chooseWebPerches, clearAssignment, perchSnapshot, perchesFor, placementFor, subscribePerches, perchPoint, type Perch, type PerchAssignment, type PerchCorner } from "./perches";
+import { blockersFor, boxFree, isBlocked, subscribeRoom } from "./room";
 import { advanceRappel, createRappel, rappelView, type RappelSpec, type RappelState } from "./rappel";
 import { between, pick, screenRng, seasonRng, seasonYear } from "./rng";
 import type { ActiveSeason } from "./SeasonProvider";
@@ -30,6 +31,9 @@ import { EXTENT, buildPlan, planLines, stepDurationMs, toPixels, webRadius, type
 // Halloween IV App (A1/A3, #715/#717): Screen-Klassen kappen die Anordnung (intensity.ts), ein Bewegungsbudget
 // begrenzt große Bewegungen (motion.ts), Karten bieten Plätze an (perches.ts, anchors.tsx), die Bühne teilt sie
 // gesät zu und zeichnet die Flüge (flights.ts); im App-Hintergrund ruht alles, offene Dialoge sperren.
+// Platz (#1295): das große Netz liegt hinter dem Inhalt (Backdrop) - der Titel des Screens steht darüber, nie darunter.
+// Die Spinne in der Nabe bleibt antippbar, wo die Nabe frei liegt (ein Tippfeld auf der Bühne). Netze an Karten und
+// Fledermäuse auf Karten nehmen nur Ecken ohne Schrift, Knöpfe oder fremde Karten (room.ts).
 
 export const SIGNAL_KEY = "halloween_pumpkin";
 /** Jahres-Salz (C4, #724): die Anordnung bleibt das ganze Saisonjahr gleich und würfelt sich im nächsten Jahr neu. */
@@ -225,13 +229,13 @@ export function Ghost({ size = 36 }: { size?: number }) {
 // ------------------------------------------------------------------ Das Netz
 
 /** Das runde Netz in einer oberen Ecke: fertig auf einmal, oder Faden für Faden mit laufender Spinne. */
-export function OrbWeb({ web, width, reduced }: { web: WebSpec; width: number; reduced: boolean }) {
+export function OrbWeb({ web, width, reduced, screen }: { web: WebSpec; width: number; reduced: boolean; screen?: string }) {
   const plan = useMemo(() => buildPlan(web.seed), [web.seed]);
   if (web.factor <= 0) return null;
-  return <OrbWebInner web={web} width={width} reduced={reduced} plan={plan} />;
+  return <OrbWebInner web={web} width={width} reduced={reduced} plan={plan} screen={screen} />;
 }
 
-function OrbWebInner({ web, width, reduced, plan }: { web: WebSpec; width: number; reduced: boolean; plan: WebPlan }) {
+function OrbWebInner({ web, width, reduced, plan, screen }: { web: WebSpec; width: number; reduced: boolean; plan: WebPlan; screen?: string }) {
   const radius = webRadius(width, web.factor);
   const mirror = web.corner === "tr";
   const lines = useMemo(() => planLines(plan, radius, mirror), [plan, radius, mirror]);
@@ -304,7 +308,7 @@ function OrbWebInner({ web, width, reduced, plan }: { web: WebSpec; width: numbe
         }) : null}
       </Svg>
       {done ? (
-        <HubSpider hub={hub} corner={web.corner} boxWidth={boxWidth} size={spiderSize} reduced={reduced} />
+        <HubSpider hub={hub} corner={web.corner} boxWidth={boxWidth} size={spiderSize} reduced={reduced} screen={screen} />
       ) : (
         <Animated.View pointerEvents="none" style={{ position: "absolute", left: -spiderSize / 2, top: -spiderSize / 2, transform: [{ translateX: position.x }, { translateY: position.y }] }}>
           <SpiderBody size={spiderSize} heading={heading} />
@@ -317,15 +321,82 @@ function OrbWebInner({ web, width, reduced, plan }: { web: WebSpec; width: numbe
 export const SPIDER_RETREAT_MS = 25000;
 export const SPIDER_RETREAT_COOLDOWN_MS = 30000;
 
+// Die Spinne in der Nabe liegt mit dem Netz hinter dem Inhalt (#1295) - dort erreicht sie kein Finger, der Screen liegt
+// darüber. Liegt die Nabe frei (keine Schrift, kein Knopf, keine Karte), meldet sie ihre Stelle, und die Bühne legt dort
+// ein unsichtbares Tippfeld hin; ein Tippen darauf schickt sie in die Ecke wie zuvor.
+type HubSpot = { key: string; screen: string; x: number; y: number; size: number };
+const hubSpots = new Map<string, HubSpot>();
+const hubListeners = new Set<() => void>();
+const tapListeners = new Set<(key: string) => void>();
+
+function setHubSpot(key: string, spot: HubSpot | null) {
+  if (spot) hubSpots.set(key, spot);
+  else if (!hubSpots.delete(key)) return;
+  hubListeners.forEach((listener) => listener());
+}
+
+/** Die freien Naben eines Screens (Fensterkoordinaten). */
+export function hubSpotsFor(screen: string): HubSpot[] {
+  return [...hubSpots.values()].filter((spot) => spot.screen === screen);
+}
+
+function useHubSpots(screen: string): HubSpot[] {
+  const [spots, setSpots] = useState<HubSpot[]>(() => hubSpotsFor(screen));
+  useEffect(() => {
+    const update = () => setSpots(hubSpotsFor(screen));
+    update();
+    hubListeners.add(update);
+    return () => {
+      hubListeners.delete(update);
+    };
+  }, [screen]);
+  return spots;
+}
+
+/** Ein Tippen auf das Tippfeld der Nabe `key` (Screen und Ecke). */
+export function tapHubSpider(key: string) {
+  tapListeners.forEach((listener) => listener(key));
+}
+
+/** Nur für Tests. */
+export function resetHubSpots() {
+  hubSpots.clear();
+  hubListeners.forEach((listener) => listener());
+}
+
 /**
  * Die Spinne in der Nabe des fertigen Netzes (A4): Antippen lässt sie am Ankerfaden in die Ecke huschen; nach einer
  * Weile kommt sie zurück, und in den nächsten 30 s reagiert sie nicht wieder - subtil statt dauernd.
  */
-function HubSpider({ hub, corner, boxWidth, size, reduced }: { hub: { x: number; y: number }; corner: "tl" | "tr"; boxWidth: number; size: number; reduced: boolean }) {
+function HubSpider({ hub, corner, boxWidth, size, reduced, screen }: { hub: { x: number; y: number }; corner: "tl" | "tr"; boxWidth: number; size: number; reduced: boolean; screen?: string }) {
   const away = useRef(new Animated.Value(0)).current;
   const [hidden, setHidden] = useState(false);
   const lastRef = useRef(0);
+  const node = useRef<View>(null);
+  const key = `${screen || "screen"}:${corner}`;
   useEffect(() => () => away.stopAnimation(), [away]);
+  // Liegt die Nabe frei? Dann bekommt die Bühne ein Tippfeld an dieser Stelle (#1295).
+  useEffect(() => {
+    if (!screen || reduced) return undefined;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      const view = node.current as unknown as { measureInWindow?: (callback: (x: number, y: number, width: number, height: number) => void) => void } | null;
+      if (!view || typeof view.measureInWindow !== "function") return;
+      view.measureInWindow((x, y, width, height) => {
+        if (cancelled || !(width > 0 && height > 0)) return;
+        const box = { x: x - 6, y: y - 6, width: width + 12, height: height + 12 };
+        void blockersFor(screen, "", box).then((rects) => {
+          if (cancelled) return;
+          setHubSpot(key, boxFree(box, rects, 0) ? { key, screen, x, y, size: Math.max(width, height) } : null);
+        });
+      });
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      setHubSpot(key, null);
+    };
+  }, [screen, reduced, key]);
   const onPress = () => {
     const now = Date.now();
     if (reduced || hidden || now - lastRef.current < SPIDER_RETREAT_COOLDOWN_MS) return;
@@ -336,12 +407,23 @@ function HubSpider({ hub, corner, boxWidth, size, reduced }: { hub: { x: number;
       Animated.timing(away, { toValue: 0, duration: 1200, easing: Easing.out(Easing.quad), useNativeDriver: true }).start(() => setHidden(false));
     }, SPIDER_RETREAT_MS);
   };
+  const pressRef = useRef(onPress);
+  pressRef.current = onPress;
+  useEffect(() => {
+    const listener = (tapped: string) => {
+      if (tapped === key) pressRef.current();
+    };
+    tapListeners.add(listener);
+    return () => {
+      tapListeners.delete(listener);
+    };
+  }, [key]);
   const cornerX = corner === "tl" ? 0 : boxWidth;
   const translateX = away.interpolate({ inputRange: [0, 1], outputRange: [0, cornerX - hub.x] });
   const translateY = away.interpolate({ inputRange: [0, 1], outputRange: [0, -hub.y] });
   const scale = away.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] });
   return (
-    <Animated.View style={{ position: "absolute", left: hub.x - size / 2, top: hub.y - size / 2, transform: [{ translateX }, { translateY }, { scale }] }} testID="halloween-web-spider" data-hidden={hidden ? "1" : "0"}>
+    <Animated.View ref={node} collapsable={false} style={{ position: "absolute", left: hub.x - size / 2, top: hub.y - size / 2, transform: [{ translateX }, { translateY }, { scale }] }} testID="halloween-web-spider" data-hidden={hidden ? "1" : "0"}>
       <Pressable accessibilityRole="button" accessibilityLabel="Spinne" onPress={onPress} hitSlop={8} disabled={reduced} testID="halloween-web-spider-press">
         <SpiderBody size={size} heading={0} />
       </Pressable>
@@ -680,9 +762,13 @@ export function usePerchAssignments(screen: string, wanted: number, active: bool
       assign([]);
       return undefined;
     }
-    const assignmentFor = (perch: Perch, landed: boolean): PerchAssignment => {
+    // Platz (#1295): Ecken, an denen die Fledermaus über Schrift oder einer anderen Karte säße, sind gesperrt.
+    const blockedCorner = (perch: Perch) => (corner: PerchCorner) => isBlocked(perch.id, `bat:${corner}`);
+    const hasRoom = (perch: Perch) => (perch.kind === "banner" ? ["bottom" as const] : ["tl" as const, "tr" as const, "bottom" as const]).some((corner) => !blockedCorner(perch)(corner));
+    const assignmentFor = (perch: Perch, landed: boolean): PerchAssignment | null => {
       const rng = halloweenRng(perch.id, "placement");
-      return { perchId: perch.id, ...placementFor(perch, rng), temperament: temperamentFor(rng), landed };
+      const placement = placementFor(perch, rng, blockedCorner(perch));
+      return placement ? { perchId: perch.id, ...placement, temperament: temperamentFor(rng), landed } : null;
     };
     const landingPoint = (rect: { x: number; y: number; width: number; height: number }, assignment: PerchAssignment) => {
       const point = perchPoint(rect, assignment.corner);
@@ -693,6 +779,7 @@ export function usePerchAssignments(screen: string, wanted: number, active: bool
     const approach = async (perch: Perch) => {
       const rect = await perch.measure();
       const assignment = assignmentFor(perch, true);
+      if (!assignment) return true;
       if (!rect) {
         // Nicht messbar (abgebaut, kein Layout): ohne Flug zuteilen, damit der Platz nicht leer bleibt.
         if (perchSnapshot().perches.some((entry) => entry.id === perch.id)) assign([...assignmentsFor(screen), { ...assignment, landed: false }]);
@@ -715,7 +802,7 @@ export function usePerchAssignments(screen: string, wanted: number, active: bool
     };
     const recompute = () => {
       // Karten mit Zuschnitt tragen keine Fledermaus - sie säße halb abgeschnitten auf der Kante.
-      const perches = perchesFor(screen).filter((perch) => !perch.clip);
+      const perches = perchesFor(screen).filter((perch) => !perch.clip && hasRoom(perch));
       const now = Date.now();
       const vacated = Object.entries(vacatedRef.current).filter(([, until]) => until > now).map(([id]) => id);
       const current = assignmentsFor(screen).filter((entry) => perches.some((perch) => perch.id === entry.perchId));
@@ -727,7 +814,7 @@ export function usePerchAssignments(screen: string, wanted: number, active: bool
       if (!initializedRef.current || entering()) {
         // Beim Betreten des Screens sitzen die Fledermäuse schon da - kein Flugschwarm zur Begrüßung.
         initializedRef.current = true;
-        assign([...current, ...chosen.map((perch) => assignmentFor(perch, false))]);
+        assign([...current, ...chosen.map((perch) => assignmentFor(perch, false)).filter((entry): entry is PerchAssignment => Boolean(entry))]);
         return;
       }
       chosen.forEach((perch) => {
@@ -737,6 +824,7 @@ export function usePerchAssignments(screen: string, wanted: number, active: bool
     recompute();
     initializedRef.current = true;
     const stopPerches = subscribePerches(recompute);
+    const stopRoom = subscribeRoom(recompute);
     // Eine verscheuchte Fledermaus lässt ihren Platz frei (Temperament: 20–90 s); danach darf ein anderer besetzt werden.
     const stopFlights = subscribeFlights((flights) => {
       flights.forEach((flight) => {
@@ -756,7 +844,7 @@ export function usePerchAssignments(screen: string, wanted: number, active: bool
     // Umzug (A2): eine unruhige Fledermaus will zu einem anderen freien, sichtbaren Platz.
     const stopHops = subscribeHops(async (request) => {
       if (request.screen !== screen) return;
-      const perches = perchesFor(screen).filter((perch) => perch.id !== request.perchId && !perch.clip);
+      const perches = perchesFor(screen).filter((perch) => perch.id !== request.perchId && !perch.clip && hasRoom(perch));
       const taken = new Set([...assignmentsFor(screen).map((entry) => entry.perchId), ...reservedRef.current]);
       const free = perches.filter((perch) => !taken.has(perch.id));
       if (!free.length) return;
@@ -768,6 +856,10 @@ export function usePerchAssignments(screen: string, wanted: number, active: bool
       const token = requestMotion("bat_flight");
       if (!token) return;
       const assignment = assignmentFor(target.perch, true);
+      if (!assignment) {
+        releaseMotion(token);
+        return;
+      }
       const to = landingPoint(target.rect as { x: number; y: number; width: number; height: number }, assignment);
       const path = hopPath(request.from, to, rng);
       reservedRef.current.add(target.perch.id);
@@ -779,6 +871,7 @@ export function usePerchAssignments(screen: string, wanted: number, active: bool
     const timer = setInterval(recompute, 5000 / timeScale);
     return () => {
       stopPerches();
+      stopRoom();
       stopFlights();
       stopEnds();
       stopHops();
@@ -798,16 +891,20 @@ export function useWebAssignments(screen: string, count: number, active: boolean
       assignWebs([]);
       return undefined;
     }
+    // Platz (#1295): eine Ecke über einer Überschrift, Augenbraue oder Text ist gesperrt - dann die andere oder keine.
+    const sidesOf = (perch: Perch) => (["tl", "tr"] as const).filter((side) => !isBlocked(perch.id, `web:${side}`));
     const recompute = () => {
       const perches = perchesFor(screen);
       const rng = halloweenRng(`${screen}|${perches.map((perch) => perch.id).join(",")}`, "corner-webs");
       const withBats = assignmentsFor(screen).map((entry) => entry.perchId);
-      assignWebs(chooseWebPerches(perches, count, rng, withBats));
+      assignWebs(chooseWebPerches(perches, count, rng, withBats, sidesOf));
     };
     recompute();
     const stop = subscribePerches(recompute);
+    const stopRoom = subscribeRoom(recompute);
     return () => {
       stop();
+      stopRoom();
       assignWebs([]);
     };
   }, [screen, count, active]);
@@ -866,14 +963,16 @@ export function HalloweenCorners({ season, screen, timeScale = 1 }: { season: Ac
   void salt;
   usePerchAssignments(screen, moving ? layout.perchBats : 0, moving, { width, height }, timeScale);
   useWebAssignments(screen, caps.cornerWebs, season.effective !== "off");
+  const hubs = useHubSpots(screen);
   useEffect(() => {
     getMotionScheduler().setHidden(!appActive);
   }, [appActive]);
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill} testID="halloween-corners" data-class={caps.cls}>
       <Fog level={caps.fog} width={width} height={height} bottom={bottom - 4} />
-      <OrbWeb web={layout.web} width={width} reduced={!moving} />
-      {layout.secondWeb ? <OrbWeb web={layout.secondWeb} width={width} reduced={!moving} /> : null}
+      {moving ? hubs.map((spot) => (
+        <Pressable key={spot.key} accessibilityRole="button" accessibilityLabel="Spinne" onPress={() => tapHubSpider(spot.key)} hitSlop={8} style={[styles.hubTap, { left: spot.x - 4, top: spot.y - insets.top - 4, width: spot.size + 8, height: spot.size + 8 }]} testID="halloween-web-spider-tap" />
+      )) : null}
       {layout.spider ? <DropSpider spec={layout.spider} width={width} reduced={!moving} /> : null}
       {layout.crawler ? <Crawler spec={layout.crawler} width={width} bottom={bottom} reduced={!moving} /> : null}
       {layout.rappel && moving ? <RappelSpider spec={layout.rappel} width={width} floorY={floorY} reduced={!moving} /> : null}
@@ -881,6 +980,25 @@ export function HalloweenCorners({ season, screen, timeScale = 1 }: { season: Ac
       {moving ? <Graveyard graves={layout.graves} width={width} bottom={bottom} reduced={!moving} /> : null}
       {caps.cat && season.effective !== "subtle" ? <CatOnEdge bottom={bottom} width={width} moving={moving} /> : null}
       {moving ? <FlightLayer top={insets.top} /> : null}
+    </View>
+  );
+}
+
+/**
+ * Das große Netz in der Ecke des Screens - hinter dem Inhalt (#1295, wie im Web): der Titel des Screens, Karten und
+ * Knöpfe liegen darüber. `Screen` legt die Ebene unter alles; jeder Screen hat sein eigenes Netz (aus seinem Namen).
+ */
+export function HalloweenBackdrop({ season, screen }: { season: ActiveSeason; screen: string }) {
+  const { width, height } = useWindowDimensions();
+  const { reducedMotion } = useSeason();
+  const appActive = useAppActive();
+  const caps = useMemo(() => scaleForScreen(capabilities(screen, season.effective), width, height), [screen, season.effective, width, height]);
+  const layout = useMemo(() => screenLayout(screen, season.effective, caps), [screen, season.effective, caps]);
+  const moving = !reducedMotion && season.effective !== "subtle" && appActive;
+  return (
+    <View pointerEvents="box-none" style={StyleSheet.absoluteFill} testID="halloween-backdrop">
+      <OrbWeb web={layout.web} width={width} reduced={!moving} screen={screen} />
+      {layout.secondWeb ? <OrbWeb web={layout.secondWeb} width={width} reduced={!moving} screen={screen} /> : null}
     </View>
   );
 }
@@ -999,6 +1117,7 @@ export function HalloweenBats({ season, screen, reducedMotion }: { season: Activ
 
 const styles = StyleSheet.create({
   web: { position: "absolute", top: 0, opacity: 0.85 },
+  hubTap: { position: "absolute" },
   spider: { position: "absolute", top: 0 },
   crawler: { position: "absolute", left: 0 },
   rappel: { position: "absolute", top: 0, width: 0, transformOrigin: "50% 0%" },

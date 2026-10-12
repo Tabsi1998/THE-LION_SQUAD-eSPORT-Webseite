@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator, type NativeStackNavigationOptions } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import React, { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { UnderHeaderContext } from "../components/Screen";
 import { HeaderBell } from "../components/TabHeader";
 import { BootScreen } from "../screens/BootScreen";
@@ -21,6 +21,7 @@ import { SiteBannerTicker } from "../components/SiteBannerTicker";
 import { useAuth } from "../auth/AuthContext";
 import { useUnreadChats } from "../chats/ChatsContext";
 import { badgeText } from "../lib/chats";
+import { upperDe } from "../lib/format";
 import { isGuestUser } from "../live";
 import { useAppLock } from "../lock/AppLockProvider";
 import { SeasonStage, useSeasonTabIcon } from "../seasons/SeasonStage";
@@ -139,11 +140,8 @@ function MainTabs() {
           borderRadius: 8,
           minHeight: 50,
         },
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: "900",
-          textTransform: "uppercase",
-        },
+        // Große Schrift (#1296): der Name wird kleiner statt „COMMUNI…“, in Großbuchstaben im Text selbst.
+        tabBarLabel: ({ color, children }) => <TabLabel color={color} label={String(children)} />,
         tabBarBadgeStyle: styles.tabBadge,
         tabBarIcon: ({ color, focused, size }) => (
           <View style={styles.tabIconWrap}>
@@ -168,6 +166,18 @@ function MainTabs() {
       <Tabs.Screen name="VereinTab" component={VereinStackScreen} options={{ title: "Verein", tabBarButtonTestID: "tab-verein" }} />
       <Tabs.Screen name="ProfileTab" component={ProfileStackScreen} options={{ title: "Profil", tabBarButtonTestID: "tab-profile" }} />
     </Tabs.Navigator>
+  );
+}
+
+/**
+ * Der Name eines Tabs (#1296): eine Zeile, nie „…“ - mit großer Schrift (1,3 und mehr) wird er kleiner, bis er passt.
+ * Großbuchstaben stehen im Text selbst: mit `textTransform` misst Android die kleinen Buchstaben und schneidet ab.
+ */
+function TabLabel({ color, label }: { color: string; label: string }) {
+  return (
+    <Text style={[styles.tabLabel, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} maxFontSizeMultiplier={1.4} textBreakStrategy="simple">
+      {upperDe(label)}
+    </Text>
   );
 }
 
@@ -270,6 +280,11 @@ function iconFor(route: MainTabName) {
 const styles = StyleSheet.create({
   mainWithBanner: {
     flex: 1,
+  },
+  tabLabel: {
+    fontSize: 10,
+    fontWeight: "900",
+    textAlign: "center",
   },
   tabIconWrap: {
     alignItems: "center",

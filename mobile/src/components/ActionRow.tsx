@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { Body, Muted } from "./Text";
 
 type ActionTone = "cyan" | "danger";
@@ -25,6 +25,9 @@ export function ActionTile({
     <Pressable
       disabled={isDisabled}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: isDisabled }}
       style={({ pressed }) => [styles.tile, tone === "danger" && styles.dangerSurface, isDisabled && styles.disabled, pressed && styles.pressed]}
     >
       <Ionicons name={icon} color={color} size={18} />
@@ -51,10 +54,14 @@ export function ActionRow({
 }) {
   const isDisabled = disabled || !onPress;
   const color = tone === "danger" ? colors.live : colors.cyan;
+  // Vorlesen (#1155): eine Zeile ist ein Knopf mit einem Satz - „Mitgliedsausweis, zeigt den QR-Code“.
   return (
     <Pressable
       disabled={isDisabled}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={detail ? `${label}, ${detail}` : label}
+      accessibilityState={{ disabled: isDisabled }}
       style={({ pressed }) => [styles.row, tone === "danger" && styles.dangerSurface, isDisabled && styles.disabled, pressed && styles.pressed]}
     >
       <View style={[styles.rowIcon, tone === "danger" && styles.dangerIcon]}>
@@ -74,7 +81,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.1)",
     borderColor: "rgba(41, 182, 232, 0.28)",
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexBasis: "23%",
     flexGrow: 1,
@@ -93,16 +100,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.08)",
     borderColor: "rgba(41, 182, 232, 0.24)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
+    minHeight: 48,
     padding: 12,
   },
   rowIcon: {
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.12)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 36,
     justifyContent: "center",
     width: 36,

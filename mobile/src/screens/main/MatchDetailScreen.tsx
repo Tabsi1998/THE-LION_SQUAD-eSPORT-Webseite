@@ -7,7 +7,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
-import { ErrorState, SkeletonList } from "../../components/ListState";
+import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -31,7 +31,7 @@ import { finishedMatchText, formatMatchKind, isMatchFinished, matchHeadline, slo
 import { viennaWall, wallToIso } from "../../lib/dateChoice";
 import { DateTimeChooser } from "../../components/DateTimeChooser";
 import type { TournamentStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { ChatMessage, Tournament } from "../../types";
 import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmentDrafts } from "../../components/ChatAttachments";
 import { MessageSticker, StickerButton, StickerPicker } from "../../components/ChatStickers";
@@ -115,6 +115,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [success, setSuccess] = useState("");
   const [proposalAt, setProposalAt] = useState("");
   const [proposalNote, setProposalNote] = useState("");
@@ -126,6 +128,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
 
   const lastReadChat = useRef<string | null>(null);
   const load = useCallback(async (options?: { preserveDrafts?: boolean }) => {
+    setProblem(null);
     const preserveDrafts = options?.preserveDrafts !== false;
     setError("");
     try {
@@ -151,6 +154,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       }
     } catch (err) {
       setError(errorMessage(err, "Match konnte nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -350,7 +354,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   if (!page) {
     return (
       <Screen>
-        <ErrorState title="Match nicht gefunden" detail={error || "Dieses Match ist nicht sichtbar oder wurde entfernt."} />
+        <ErrorState title="Match nicht gefunden" detail={error || "Dieses Match ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }
@@ -682,7 +686,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     maxWidth: "92%",
     padding: 10,
@@ -708,7 +712,7 @@ const styles = StyleSheet.create({
   choice: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 9,
@@ -733,7 +737,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(240,180,41,0.12)",
     borderColor: "rgba(240,180,41,0.5)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -759,7 +763,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,59,48,0.1)",
     borderColor: "rgba(255,59,48,0.4)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 9,
@@ -779,7 +783,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(0,255,136,0.08)",
     borderColor: "rgba(0,255,136,0.32)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 9,
@@ -797,7 +801,7 @@ const styles = StyleSheet.create({
   finishedBox: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 6,
     padding: 12,
@@ -814,7 +818,7 @@ const styles = StyleSheet.create({
   mentionChip: {
     backgroundColor: "rgba(41,182,232,0.08)",
     borderColor: "rgba(41,182,232,0.35)",
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -845,7 +849,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 9,
     paddingVertical: 5,
@@ -870,7 +874,7 @@ const styles = StyleSheet.create({
   proposal: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 10,
     padding: 10,
@@ -879,7 +883,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(41,182,232,0.12)",
     borderColor: "rgba(41,182,232,0.3)",
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 38,
     justifyContent: "center",
@@ -935,7 +939,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,

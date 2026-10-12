@@ -7,7 +7,7 @@ import { AddToCalendarButton } from "../../components/AddToCalendarButton";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { FormInput } from "../../components/FormInput";
-import { ErrorState, SkeletonList } from "../../components/ListState";
+import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
@@ -29,8 +29,10 @@ import { getRegistrationState } from "../../lib/registration";
 import { isGuestUser } from "../../live";
 import { openSignIn } from "../../navigation/rootNavigation";
 import type { TournamentStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, kindColors, radius } from "../../theme";
 import type { ClubEvent, EventRegistration, F1Challenge, NewsPost, Tournament } from "../../types";
+import { useShareHeader } from "../../components/HeaderActions";
+import { sharePage } from "../../lib/share";
 
 // Einzahl und Mehrzahl (#1223): „1 Platz“, „2 Plätze“, „1 Begleitperson“, „2 Begleitpersonen“.
 function placesLabel(count: number): string {
@@ -65,10 +67,15 @@ type EventDetail = ClubEvent & {
 export function EventDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [event, setEvent] = useState<EventDetail | null>(null);
+  // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
+  const share = useMemo(() => (event ? () => { void sharePage({ kind: "event", id: String(event.slug || event.id), title: event.title || event.name || "Event", start: (event.start_date || event.date) as string, end: event.end_date }); } : null), [event]);
+  useShareHeader(navigation, share);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [companionCount, setCompanionCount] = useState("0");
   const [note, setNote] = useState("");
   // Kosten (#396): wählbare Positionen und der Kostenhaken - wie beim Startgeld am Turnier.
@@ -80,12 +87,14 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const guest = isGuestUser(user);
 
   const load = useCallback(async () => {
+    setProblem(null);
     setError("");
     try {
       const { data } = await api.get<EventDetail>(`/events/${route.params.id}`);
       setEvent(data || null);
     } catch (err) {
       setError(errorMessage(err, "Event konnte nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -219,7 +228,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   if (!event) {
     return (
       <Screen>
-        <ErrorState title="Event nicht gefunden" detail={error || "Dieses Event ist nicht sichtbar oder wurde entfernt."} />
+        <ErrorState title="Event nicht gefunden" detail={error || "Dieses Event ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }
@@ -804,7 +813,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   dayTag: {
-    color: "#9F7AEA",
+    color: kindColors.event,
     fontWeight: "800",
   },
   dayTagLive: {
@@ -814,7 +823,7 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.live,
   },
   dayNext: {
-    borderLeftColor: "#9F7AEA",
+    borderLeftColor: kindColors.event,
   },
   dayPast: {
     opacity: 0.6,
@@ -829,7 +838,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: "rgba(41, 182, 232, 0.12)",
     borderColor: "rgba(41, 182, 232, 0.3)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -884,7 +893,7 @@ const styles = StyleSheet.create({
     width: 96,
   },
   logo: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 58,
     width: 90,
   },
@@ -902,7 +911,7 @@ const styles = StyleSheet.create({
     width: 132,
   },
   albumImage: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 84,
     width: 132,
   },
@@ -913,7 +922,7 @@ const styles = StyleSheet.create({
   feeBox: {
     backgroundColor: "rgba(255, 215, 0, 0.06)",
     borderColor: "rgba(255, 215, 0, 0.35)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 8,
     padding: 12,
@@ -933,7 +942,7 @@ const styles = StyleSheet.create({
   },
   optionGroup: {
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 8,
     padding: 12,
@@ -946,7 +955,7 @@ const styles = StyleSheet.create({
   checkbox: {
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 4,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 20,
     width: 20,

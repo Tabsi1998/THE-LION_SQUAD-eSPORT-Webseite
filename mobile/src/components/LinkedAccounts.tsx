@@ -4,7 +4,7 @@ import { Linking, Pressable, StyleSheet, View } from "react-native";
 import { Card } from "./Card";
 import { Body, Heading, Muted } from "./Text";
 import { formatDate } from "../lib/format";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 
 // Verknüpfte Konten (#459, wie im Web #260): jedes per Anmeldung bestätigte Konto mit Rahmen in
 // Plattformfarbe, Anzeigename, Kennung, „seit …“ und der offiziellen Adresse - man sieht, dass es
@@ -110,10 +110,10 @@ export function LinkedAccountsCard({ accounts, testID = "linked-accounts", title
               </View>
               <View style={styles.flex}>
                 <View style={styles.nameRow}>
-                  <Body style={styles.strong} numberOfLines={1}>{accountTitle(account)}</Body>
+                  <Body style={styles.strong}>{accountTitle(account)}</Body>
                   <Ionicons name="checkmark-circle" color={VERIFIED_COLOR} size={16} />
                 </View>
-                <Muted numberOfLines={1}>{accountDetail(account)}</Muted>
+                <Muted numberOfLines={2}>{accountDetail(account)}</Muted>
               </View>
               {account.url ? <Ionicons name="open-outline" color={colors.muted} size={17} /> : null}
             </Pressable>
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   row: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.25)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   icon: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.4)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 2,
     height: 38,
     justifyContent: "center",
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   },
   brand: {
     alignItems: "center",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 6,
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   },
   unlink: {
     borderColor: "rgba(255,255,255,0.15)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -338,14 +338,14 @@ function AccountRow({ entry }: { entry: AccountEntry }) {
       </View>
       <View style={styles.flex}>
         <View style={styles.nameRow}>
-          <Body style={styles.strong} numberOfLines={1}>{entry.title}</Body>
+          <Body style={styles.strong}>{entry.title}</Body>
           {entry.verified ? (
             <View testID={`profile-account-${entry.platform}-verified`} accessibilityLabel="verifiziert">
               <Ionicons name="checkmark-circle" color={VERIFIED_COLOR} size={16} />
             </View>
           ) : null}
         </View>
-        <Muted numberOfLines={1}>{entry.detail}</Muted>
+        <Muted numberOfLines={2}>{entry.detail}</Muted>
       </View>
       {entry.url ? <Ionicons name="open-outline" color={colors.muted} size={17} /> : null}
     </Pressable>
@@ -440,14 +440,14 @@ export function PlatformLinkRows({ links, available, onLink, onUnlink, disabled 
             </View>
             <View style={styles.flex}>
               <View style={styles.nameRow}>
-                <Body style={styles.strong} numberOfLines={1}>{label}</Body>
+                <Body style={styles.strong}>{label}</Body>
                 {link ? (
                   <View testID={`profile-link-${platform}-verified`} accessibilityLabel="verifiziert">
                     <Ionicons name="checkmark-circle" color={VERIFIED_COLOR} size={16} />
                   </View>
                 ) : null}
               </View>
-              <Muted numberOfLines={1}>
+              <Muted numberOfLines={2}>
                 {link ? `verknüpft als ${accountTitle(link)}${link.linked_at ? ` · seit ${formatDate(link.linked_at)}` : ""}`
                   : available[platform] ? "nicht verknüpft – einmal im Browser anmelden" : "auf der Website noch nicht eingerichtet"}
               </Muted>

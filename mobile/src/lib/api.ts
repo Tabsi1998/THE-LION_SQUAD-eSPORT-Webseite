@@ -1,7 +1,8 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { API_BASE_URL, API_URL } from "../config";
 import type { AuthResponse } from "../types";
-import { buildCacheKey, getStaleCache, setCached } from "./cache";
+import { buildCacheKey, getStaleEntry, setCached } from "./cache";
+import { noteFresh, noteOffline } from "./network";
 import { deviceHeaders } from "./deviceIdentity";
 
 type TokenSnapshot = {
@@ -84,6 +85,8 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
 // ─── Response Interceptor: Cache befüllen + Offline-Fallback ─────────────────
 api.interceptors.response.use(
   async (response) => {
+    // Eine echte Antwort: das Netz ist da (#1152, Offline-Leiste).
+    noteFresh();
     // Erfolgreiche GET-Responses cachen
     if (response.config.method?.toLowerCase() === "get" && response.config.url) {
       const config = response.config as CacheAwareConfig;
@@ -126,12 +129,13 @@ api.interceptors.response.use(
 
     if (isNetworkError && original?.url && original._cacheKey && original.method?.toLowerCase() === "get" && !original._offlineFallback) {
       original._offlineFallback = true;
-      const stale = await getStaleCache(original._cacheKey, original.url);
+      const stale = await getStaleEntry(original._cacheKey, original.url);
       if (stale !== null) {
-        // Stale-Daten als Response zurückgeben mit Offline-Marker
+        // Stale-Daten als Response zurückgeben mit Offline-Marker; die Leiste zeigt ihren Stand (#1152).
         console.warn(`[LionsAPP] Offline – verwende gecachte Daten für: ${original.url}`);
+        noteOffline(stale.timestamp);
         return {
-          data: stale,
+          data: stale.data,
           status: 200,
           statusText: "OK (cached)",
           headers: {},
@@ -141,6 +145,7 @@ api.interceptors.response.use(
         };
       }
     }
+    if (isNetworkError) noteOffline(null);
 
     return Promise.reject(error);
   }

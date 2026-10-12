@@ -1,11 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
-import { ErrorState, SkeletonList } from "../../components/ListState";
+import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
@@ -16,18 +16,26 @@ import type { ContentTarget } from "../../lib/contentLinks";
 import { formatDate, placeParts } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { NewsPost } from "../../types";
+import { useShareHeader } from "../../components/HeaderActions";
+import { sharePage } from "../../lib/share";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "NewsDetail">;
 export function NewsDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const readerId = user?.id && !isGuestUser(user) ? user.id : null;
   const [post, setPost] = useState<NewsPost | null>(null);
+  // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
+  const share = useMemo(() => (post ? () => { void sharePage({ kind: "news", id: String(post.slug || post.id), title: post.title }); } : null), [post]);
+  useShareHeader(navigation, share);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
 
   const load = useCallback(async () => {
+    setProblem(null);
     setError("");
     try {
       const { data } = await api.get<NewsPost>(`/news/${route.params.id}`);
@@ -36,6 +44,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
       if (data?.id && readerId) api.post(`/news/${data.id}/read`).catch(() => undefined);
     } catch (err) {
       setError(errorMessage(err, "News-Beitrag konnte nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
     }
@@ -80,7 +89,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
   if (!post) {
     return (
       <Screen>
-        <ErrorState title="Beitrag nicht gefunden" detail={error || "Dieser Beitrag ist nicht sichtbar oder wurde entfernt."} />
+        <ErrorState title="Beitrag nicht gefunden" detail={error || "Dieser Beitrag ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }
@@ -217,14 +226,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
     padding: 10,
   },
   mentionAvatar: {
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 42,
     width: 42,
   },

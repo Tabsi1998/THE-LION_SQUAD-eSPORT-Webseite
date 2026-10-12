@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { useReduceMotion } from "./FadeIn";
-import { formatStatus } from "../lib/format";
-import { colors } from "../theme";
+import { formatStatus, upperDe } from "../lib/format";
+import { colors, radius } from "../theme";
 import { Muted } from "./Text";
 
 type StatusTone = "default" | "danger" | "gold" | "success" | "cyan";
@@ -35,13 +35,14 @@ export function StatusBadge({
 
   const remaining = targetMs ? formatRemaining(targetMs - now) : "";
   const prefix = remaining ? countdownPrefix(phaseCountdownKind(phase)) : "";
-  const statusLabel = formatStatus(label || phaseLabel(phase) || status);
+  const statusLabel = statusText({ label, phase, status });
   const text = [statusLabel, prefix && `${prefix} ${remaining}`].filter(Boolean).join(" · ");
   const tone = toneForStatus(`${text} ${status || ""} ${phaseState(phase)}`);
   return (
-    <View style={[styles.badge, toneStyles[tone].badge, style]}>
+    <View style={[styles.badge, toneStyles[tone].badge, style]} accessible accessibilityLabel={text}>
       {phaseState(phase) === "live" ? <LiveDot color={toneStyles[tone].text.color} /> : null}
-      <Muted style={[styles.text, toneStyles[tone].text]}>{text}</Muted>
+      {/* Großbuchstaben im Text selbst (#1296): so misst Android die Zeile richtig - kein Abschneiden auf dem Tablet. */}
+      <Muted style={[styles.text, toneStyles[tone].text]} textBreakStrategy="simple">{upperDe(text)}</Muted>
     </View>
   );
 }
@@ -70,6 +71,11 @@ function LiveDot({ color }: { color: string }) {
       <View style={[styles.dot, { backgroundColor: color }]} />
     </View>
   );
+}
+
+/** Der Zustand in Worten, wie ihn der Chip zeigt (ohne Countdown) - auch für den Satz einer Karte (#1155). */
+export function statusText({ label, phase, status }: { label?: string | null; phase?: PhaseLike | string | null; status?: string | null }): string {
+  return formatStatus(label || phaseLabel(phase) || status);
 }
 
 function phaseLabel(phase?: PhaseLike | string | null) {
@@ -162,7 +168,7 @@ const styles = StyleSheet.create({
   badge: {
     alignItems: "center",
     alignSelf: "flex-start",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 5,
@@ -186,6 +192,5 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 11,
     fontWeight: "900",
-    textTransform: "uppercase",
   },
 });

@@ -10,7 +10,8 @@ const MONTHS = ["Jänner", "Februar", "März", "April", "Mai", "Juni", "Juli", "
 const MAX_SPAN_DAYS = 31;
 
 export const KIND_LABELS = { event: "Event", tournament: "Turnier", fastlap: "Fast Lap" };
-export const KIND_COLORS = { event: "#9F7AEA", tournament: "#FFD700", fastlap: "#29B6E8" };
+// Farben je Art: eine Stelle für Website und App (#1151, categoryColors.js).
+export { KIND_COLORS } from "@/lib/categoryColors";
 export const KINDS = Object.keys(KIND_LABELS);
 
 export function dayKey(date) {

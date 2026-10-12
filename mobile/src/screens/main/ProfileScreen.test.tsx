@@ -61,11 +61,15 @@ function answer(path: string, config?: { params?: Record<string, string> }) {
     "/achievements/user/u-neon": { awards: [], groups: [], pinned: [] },
     "/achievements/user/u-kiwi": { awards: [], groups: [], pinned: [] },
   };
-  if (path === "/users/public/neonfalke") return mockPublic.private ? Promise.reject(new Error("404")) : Promise.resolve({ data: config?.params?.view_as === "public" ? asOthers : publicNeon });
-  if (path === "/users/public/kiwikomet") return mockPublic.kiwiHidden ? Promise.reject(new Error("404")) : Promise.resolve({ data: { id: "u-kiwi", username: "kiwikomet", display_name: "KiwiKomet", is_club_member: false, stats: { wins: 2 }, can_message: true, relationship: { status: "none" }, teams: [], awards: [], references: { items: [] } } });
+  if (path === "/users/public/neonfalke") return mockPublic.private ? Promise.reject(notFound()) : Promise.resolve({ data: config?.params?.view_as === "public" ? asOthers : publicNeon });
+  if (path === "/users/public/kiwikomet") return mockPublic.kiwiHidden ? Promise.reject(notFound()) : Promise.resolve({ data: { id: "u-kiwi", username: "kiwikomet", display_name: "KiwiKomet", is_club_member: false, stats: { wins: 2 }, can_message: true, relationship: { status: "none" }, teams: [], awards: [], references: { items: [] } } });
   return path in responses ? Promise.resolve({ data: responses[path] }) : Promise.reject(new Error(`unerwartet ${path}`));
 }
 const mockPublic = { private: false, kiwiHidden: false };
+/** Ein 404 des Servers, wie ihn axios liefert (#1152: „nicht gefunden“ ist etwas anderes als „ohne Netz“). */
+function notFound() {
+  return Object.assign(new Error("404"), { isAxiosError: true, response: { status: 404, data: { detail: "Nicht gefunden." } } });
+}
 
 const navigate = jest.fn();
 const navigation = { navigate, isFocused: () => true, addListener: () => () => {}, getParent: () => undefined, getState: () => undefined } as never;
@@ -163,4 +167,22 @@ test("fremdes privates Profil: nur der Hinweis", async () => {
   mockPublic.kiwiHidden = true;
   await render(<PublicProfileScreen navigation={navigation} route={{ key: "p", name: "PublicProfile", params: { username: "kiwikomet" } } as never} />);
   await waitFor(() => expect(screen.getByText("Profil nicht sichtbar")).toBeTruthy());
+});
+
+test("erst auswerten, dann die Erfolge laden - einmal je Öffnen, die anderen Abrufe laufen daneben (#1296)", async () => {
+  const { api } = require("../../lib/api");
+  const order: string[] = [];
+  (api.post as jest.Mock).mockImplementation(async (path: string) => {
+    order.push(`post ${path}`);
+    return { data: { newly_awarded: 4 } };
+  });
+  mockGet.mockImplementation((path: string, config?: { params?: Record<string, string> }) => {
+    order.push(`get ${path}`);
+    return answer(path, config);
+  });
+  await renderOwn();
+  await waitFor(() => expect(order).toContain("get /achievements/me"));
+  expect(order.indexOf("post /achievements/evaluate")).toBeGreaterThanOrEqual(0);
+  expect(order.indexOf("post /achievements/evaluate")).toBeLessThan(order.indexOf("get /achievements/me"));
+  expect(order.filter((entry) => entry === "post /achievements/evaluate")).toHaveLength(1);
 });

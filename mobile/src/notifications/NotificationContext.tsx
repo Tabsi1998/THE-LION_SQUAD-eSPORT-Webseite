@@ -250,7 +250,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           >
             <Ionicons name="notifications" color={colors.cyan} size={18} />
             <View style={styles.popupText}>
-              <Body style={styles.popupTitle} numberOfLines={1}>{popupTitle(popup)}</Body>
+              <Body style={styles.popupTitle} numberOfLines={2}>{popupTitle(popup)}</Body>
               {popupBody(popup) ? <Muted numberOfLines={2}>{popupBody(popup)}</Muted> : null}
             </View>
           </Pressable>

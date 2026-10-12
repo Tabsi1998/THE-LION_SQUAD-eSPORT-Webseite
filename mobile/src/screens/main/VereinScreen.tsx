@@ -25,7 +25,7 @@ import type { AppStackParamList, LooseNavigation } from "../../navigation/types"
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import { SeasonShelfSlot } from "../../seasons/SeasonStage";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { NewsPost } from "../../types";
 
 // Der Tab Verein (#1147): alles vom Verein an einem Ort. Mitglieder sehen oben ihre Mitgliedskarte mit „Hallo“, „Mitglied
@@ -249,7 +249,7 @@ export function VereinScreen({ navigation }: Props) {
                   <Pressable key={post.id} onPress={() => open("NewsDetail", { id: post.slug || post.id })} accessibilityRole="button" style={({ pressed }) => [styles.newsRow, pressed && styles.pressed]}>
                     <Ionicons name="newspaper-outline" color={colors.gold} size={16} />
                     <View style={styles.flex}>
-                      <Body style={styles.strong} numberOfLines={1}>{post.title}</Body>
+                      <Body style={styles.strong}>{post.title}</Body>
                       <Muted>{formatDate(post.published_at || post.created_at)}</Muted>
                     </View>
                     <Ionicons name="chevron-forward" color={colors.gold} size={14} />
@@ -296,7 +296,7 @@ export function VereinScreen({ navigation }: Props) {
             {(discordVoice.voice || []).map((channel) => (
               <View key={channel.name} style={styles.voiceRow} testID={`member-area-discord-voice-${channel.name}`}>
                 <Ionicons name="volume-high" color="#5865F2" size={16} />
-                <Body style={styles.flex} numberOfLines={1}>{channel.name}</Body>
+                <Body style={styles.flex}>{channel.name}</Body>
                 <Body style={styles.strong}>{channel.count}</Body>
               </View>
             ))}
@@ -348,7 +348,7 @@ export function VereinScreen({ navigation }: Props) {
               <View key={server.guild_id} style={styles.contact} testID={`member-area-discord-server-${server.guild_id}`}>
                 <MediaImage uri={server.icon_url || undefined} style={styles.serverIcon} fallback={<Ionicons name="logo-discord" color="#5865F2" size={18} />} />
                 <View style={styles.flex}>
-                  <Body style={styles.strong} numberOfLines={1}>{server.name}</Body>
+                  <Body style={styles.strong}>{server.name}</Body>
                   {discordServerLine(server) ? <Muted>{discordServerLine(server)}</Muted> : null}
                 </View>
                 {server.member === true ? (
@@ -413,7 +413,8 @@ function Tile({ icon, label, onPress, testID, note = "" }: { icon: keyof typeof 
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={note ? `${label}, ${note}` : label} testID={testID} style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
       <Ionicons name={icon} color={colors.gold} size={22} />
-      <Body style={styles.tileLabel} numberOfLines={1}>{label}</Body>
+      {/* Große Schrift (#1296): ein langes Wort wird kleiner statt „Mitgliedsch…“. */}
+      <Body style={styles.tileLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Body>
       {note ? <Muted style={styles.tileNote} testID={testID ? `${testID}-note` : undefined}>{note}</Muted> : null}
     </Pressable>
   );
@@ -462,7 +463,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.07)",
     borderColor: "rgba(41, 182, 232, 0.35)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -471,7 +472,7 @@ const styles = StyleSheet.create({
   admissionIcon: {
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.14)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 40,
     justifyContent: "center",
     width: 40,
@@ -487,7 +488,7 @@ const styles = StyleSheet.create({
   feeBadge: {
     alignItems: "center",
     alignSelf: "flex-start",
-    borderRadius: 4,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 6,
@@ -517,7 +518,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255, 215, 0, 0.05)",
     borderColor: "rgba(255, 215, 0, 0.3)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexBasis: "30%",
     flexGrow: 1,
@@ -589,7 +590,7 @@ const styles = StyleSheet.create({
   reasonIcon: {
     alignItems: "center",
     backgroundColor: "rgba(41, 182, 232, 0.12)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     height: 36,
     justifyContent: "center",
     width: 36,
@@ -649,7 +650,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 40,
     justifyContent: "center",
@@ -675,7 +676,7 @@ const styles = StyleSheet.create({
   },
   join: {
     backgroundColor: "#5865F2",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -688,7 +689,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(88, 101, 242, 0.1)",
     borderColor: "rgba(88, 101, 242, 0.4)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,

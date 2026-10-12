@@ -5,7 +5,7 @@ import { Body, Muted } from "../../../components/Text";
 import { API_BASE_URL } from "../../../config";
 import { formatDate, formatStatus } from "../../../lib/format";
 import { prizeKindLabel, prizeKindMark, prizePlaceText, prizeSourceLabel, prizeTarget } from "../../../lib/prizes";
-import { colors } from "../../../theme";
+import { colors, radius } from "../../../theme";
 import type { PersonalReferenceItem, PrizePickup } from "../../../types";
 
 // Bausteine des Profils (#1149, #1146): früher alle in ProfileScreen.tsx. Das eigene Profil, die Einstellungen, „Profil
@@ -222,7 +222,7 @@ export function Stat({ label, value, tone = "cyan" }: { label: string; value: st
     <View style={profileStyles.stat}>
       {/* Ein Wert bleibt eine Zeile: "Superadmin" brach vorher als "Superad/min" (#247). */}
       <Body style={[profileStyles.statValue, tone === "gold" && profileStyles.gold]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{value}</Body>
-      <Muted numberOfLines={1}>{label}</Muted>
+      <Muted numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Muted>
     </View>
   );
 }
@@ -267,7 +267,7 @@ export const profileStyles = StyleSheet.create({
   },
   awardAction: {
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -284,7 +284,7 @@ export const profileStyles = StyleSheet.create({
   },
   profileHero: {
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     minHeight: 220,
     overflow: "hidden",
@@ -317,7 +317,7 @@ export const profileStyles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.black,
     borderColor: colors.cyan,
-    borderRadius: 12,
+    borderRadius: radius.lg,
     borderWidth: 2,
     height: 78,
     justifyContent: "center",
@@ -346,7 +346,7 @@ export const profileStyles = StyleSheet.create({
   pill: {
     backgroundColor: "rgba(255, 255, 255, 0.07)",
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -434,7 +434,7 @@ export const profileStyles = StyleSheet.create({
   stat: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flex: 1,
     padding: 10,
@@ -477,7 +477,7 @@ export const profileStyles = StyleSheet.create({
   input: {
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 4,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.white,
     fontSize: 15,
@@ -520,7 +520,7 @@ export const profileStyles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexBasis: "31%",
     flexDirection: "row",
@@ -552,7 +552,7 @@ export const profileStyles = StyleSheet.create({
   option: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -569,7 +569,7 @@ export const profileStyles = StyleSheet.create({
   },
   smallAction: {
     borderColor: "rgba(41,182,232,0.38)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 9,
     paddingVertical: 6,
@@ -590,7 +590,7 @@ export const profileStyles = StyleSheet.create({
   },
   referenceIcon: {
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 46,
     justifyContent: "center",

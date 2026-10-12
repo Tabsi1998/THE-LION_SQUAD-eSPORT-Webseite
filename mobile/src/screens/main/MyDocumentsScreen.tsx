@@ -10,7 +10,7 @@ import { api, errorMessage } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import { categoryLabel, formatFileSize, openDocument, type OpenDocument, type OwnDocuments } from "../../lib/memberDocuments";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 // Deine Unterlagen (#1255): die eigenen Schreiben aus der Vereinsakte (Bestätigungen, Spendenbestätigung) - aus „Nur für
 // dich“ im Profil. Öffnen wie bei den Vereinsdokumenten: mit Anmeldung in den privaten Cache, dann der PDF-Betrachter
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,

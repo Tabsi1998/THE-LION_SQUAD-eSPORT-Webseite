@@ -295,3 +295,14 @@ test("Mein Website-Profil (#260, Vereine 1.2): Felder des Vereins, nur Geändert
   await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Website-Profil gespeichert."));
   expect(card).toBeInTheDocument();
 });
+
+test("ein Ladefehler beendet das Laden: Fehler mit „Nochmal versuchen“, danach die Seite (#983, #1152)", async () => {
+  apiMock.get.mockRejectedValueOnce(Object.assign(new Error("boom"), { response: { status: 500 } }));
+  renderPage();
+  const error = await screen.findByTestId("public-error-state");
+  expect(error).toHaveAttribute("data-kind", "error");
+  expect(screen.getByText("Mitgliedschaft konnte nicht geladen werden")).toBeInTheDocument();
+  apiMock.get.mockResolvedValue({ data: { membership: null, is_active_member: false, dolibarr: { connected: true, led_by_dolibarr: false, link: null } } });
+  await userEvent.click(screen.getByTestId("public-error-retry"));
+  await waitFor(() => expect(screen.queryByTestId("public-error-state")).toBeNull());
+});

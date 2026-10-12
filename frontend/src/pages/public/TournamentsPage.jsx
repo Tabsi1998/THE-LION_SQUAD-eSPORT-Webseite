@@ -9,7 +9,6 @@ import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { sortByNearestDate } from "@/lib/contentSort";
-import { Trophy } from "lucide-react";
 
 export default function TournamentsPage() {
   useDocumentTitle(
@@ -106,8 +105,6 @@ export default function TournamentsPage() {
             {list.map((t, i) => <TournamentCard key={t.id} tournament={t} index={i} />)}
             {list.length === 0 && (
               <PublicEmptyState
-                icon={Trophy}
-                eyebrow="Turniere"
                 title={statusFilter === "all" ? "Noch keine Turniere sichtbar" : "Keine Turniere in diesem Filter"}
                 description={statusFilter === "all" ? "Sobald neue Cups, Ligen oder Community-Turniere angelegt sind, erscheinen sie hier automatisch." : "Wechsle auf alle Turniere oder schau später wieder rein, wenn sich der Status ändert."}
                 primaryAction={statusFilter === "all" ? { to: "/events", label: "Events ansehen" } : { to: "/tournaments", label: "Alle Turniere" }}

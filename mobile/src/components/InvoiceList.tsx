@@ -5,7 +5,7 @@ import { formatDate } from "../lib/format";
 import { sourceLine } from "../lib/invoices";
 import { formatMoney } from "../lib/memberArea";
 import type { Invoice } from "../lib/memberDocuments";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { Body, Muted } from "./Text";
 
 /**
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   badge: {
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 7,
     paddingVertical: 3,

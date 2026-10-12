@@ -10,7 +10,8 @@ export function useReduceMotion(): boolean {
   const [reduce, setReduce] = useState(false);
   useEffect(() => {
     let active = true;
-    AccessibilityInfo.isReduceMotionEnabled()
+    // Promise.resolve: manche Umgebungen (Tests mit wiederhergestellten Mocks) liefern hier kein Promise.
+    Promise.resolve(AccessibilityInfo.isReduceMotionEnabled())
       .then((value) => { if (active) setReduce(Boolean(value)); })
       .catch(() => {});
     const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", (value) => setReduce(Boolean(value)));

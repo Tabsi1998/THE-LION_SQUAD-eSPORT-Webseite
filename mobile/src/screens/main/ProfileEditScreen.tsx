@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Linking, ScrollView, StyleSheet } from "react-native";
+import { Alert, Linking, ScrollView, StyleSheet, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { ImagePickField } from "../../components/ImagePickField";
 import { LINKABLE_PLATFORMS, PlatformLinkRows, type LinkedAccount } from "../../components/LinkedAccounts";
 import { Screen } from "../../components/Screen";
-import { Heading, Muted } from "../../components/Text";
+import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import { Field, labelFor, profileStyles, setField, Toggle, WEB_BASE_URL } from "./profile/parts";
+import { colors } from "../../theme";
 
 // Profil bearbeiten (#1146): früher ein Reiter im Profil, jetzt eine eigene Seite - erreichbar über Einstellungen → Konto
 // und über „Nur für dich“ im Profil, wenn noch etwas fehlt. Gespeichert wird nur, was hier steht.
@@ -91,6 +93,13 @@ export function ProfileEditScreen() {
       setSaving(false);
     }
   }, [refreshMe]);
+  // Bilder vom Handy (#1153): hochgeladen wird sofort gespeichert - scheitert das Speichern, bleibt das alte Bild.
+  const saveImage = useCallback(async (key: "avatar_url" | "banner_url", url: string) => {
+    await api.patch("/users/me", { [key]: url });
+    setField(setForm, key, url);
+    await refreshMe().catch(() => {});
+  }, [refreshMe]);
+  const initials = String(form.display_name || user?.username || "?").trim().slice(0, 2).toUpperCase();
   const save = useCallback(() => send({
     ...Object.fromEntries(PROFILE_FIELDS.map((key) => [key, form[key]])),
     discord_game_roles: form.discord_game_roles,
@@ -101,6 +110,21 @@ export function ProfileEditScreen() {
     <Screen padded={false}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" testID="profile-edit-screen">
         <Card style={profileStyles.card}>
+          <Heading>Bilder</Heading>
+          <ImagePickField
+            label="Profilbild"
+            shape="round"
+            value={form.avatar_url}
+            onUploaded={(url) => saveImage("avatar_url", url)}
+            fallback={<Body style={styles.initials}>{initials}</Body>}
+            testID="profile-avatar"
+          />
+          {/* Ein Ort für „Banner“ (#1153): hochladen; „Vorlage wählen“ aus den Vereins-Vorlagen (#1344) kommt hier daneben. */}
+          <View testID="profile-banner-place">
+            <ImagePickField label="Banner" shape="banner" value={form.banner_url} onUploaded={(url) => saveImage("banner_url", url)} testID="profile-banner" />
+          </View>
+        </Card>
+        <Card style={profileStyles.card}>
           <Field label="Anzeigename" value={form.display_name} onChangeText={(v) => setField(setForm, "display_name", v)} />
           <Muted>So heißt du überall: im Profil, in Teams, Turnieren und Ranglisten.</Muted>
           <Field label="Vorname" value={form.first_name} onChangeText={(v) => setField(setForm, "first_name", v)} />
@@ -108,8 +132,6 @@ export function ProfileEditScreen() {
           <Field label="Bio" value={form.bio} multiline onChangeText={(v) => setField(setForm, "bio", v)} />
           <Field label="Land" value={form.country} onChangeText={(v) => setField(setForm, "country", v)} />
           <Field label="Stadt" value={form.city} onChangeText={(v) => setField(setForm, "city", v)} />
-          <Field label="Avatar URL" value={form.avatar_url} onChangeText={(v) => setField(setForm, "avatar_url", v)} />
-          <Field label="Banner URL" value={form.banner_url} onChangeText={(v) => setField(setForm, "banner_url", v)} />
           <Field label="Lieblingsspiele, getrennt mit Komma" value={form.favorite_games} onChangeText={(v) => setField(setForm, "favorite_games", v)} />
           <Field label="Hauptplattform" value={form.main_platform} onChangeText={(v) => setField(setForm, "main_platform", v)} />
           <Field label="Bevorzugte Rolle" value={form.preferred_role} onChangeText={(v) => setField(setForm, "preferred_role", v)} />
@@ -141,6 +163,11 @@ export function ProfileEditScreen() {
 }
 
 const styles = StyleSheet.create({
+  initials: {
+    color: colors.cyan,
+    fontSize: 26,
+    fontWeight: "900",
+  },
   content: {
     gap: 16,
     padding: 18,

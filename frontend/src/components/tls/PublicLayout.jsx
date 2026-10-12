@@ -28,12 +28,16 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, Smartphone } from "lucide-react";
 import { UserMenu } from "@/components/tls/UserMenu";
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import { OfflineBar } from "@/components/tls/OfflineBar";
+import { RouteProgress } from "@/components/tls/RouteProgress";
+import { useMobileMenu } from "@/lib/mobileMenu";
 
 export function PublicLayout({ children }) {
   const { user, logout, isAdmin, isClubMember } = useAuth();
   const location = useLocation();
   const routeFade = useRouteFade(location.pathname);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  // Geteilt mit dem Rahmen des Seitenwechsels (#1324) - ein Tipp aufs Menü während des Ladens geht nicht verloren.
+  const [mobileOpen, setMobileOpen] = useMobileMenu(location.pathname);
   const [branding, setBranding] = useState(getCachedBranding());
   const [siteBanners, setSiteBanners] = useState([]);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -130,7 +134,7 @@ export function PublicLayout({ children }) {
             )}
             <button
               data-testid="nav-mobile-toggle"
-              className="lg:hidden p-2 text-white"
+              className="tls-hit lg:hidden p-2 text-white"
               onClick={() => setMobileOpen((v) => !v)}
               aria-label={mobileOpen ? "Menü schließen" : "Menü öffnen"}
               aria-expanded={mobileOpen}
@@ -199,7 +203,11 @@ export function PublicLayout({ children }) {
         )}
         </AnimatePresence>
         </MotionConfig>
+        {/* Laden im Vereinsstil (#1324): die dünne Linie unter dem Kopf, solange eine Seite lädt. */}
+        <RouteProgress />
       </header>
+      {/* Ohne Netz (#1152): „Offline · Stand 14:05“ - der Inhalt darunter bleibt stehen. */}
+      <OfflineBar />
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="below_nav" />
       {/* Einladung zum Verein (#507): nur für angemeldete Konten, die noch nicht Mitglied sind. */}
       {user && !isClubMember ? <InvitationBanner pathname={location.pathname} /> : null}

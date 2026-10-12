@@ -6,7 +6,7 @@ import { Body, Heading, Muted } from "../../../components/Text";
 import { api } from "../../../lib/api";
 import { formatDate } from "../../../lib/format";
 import { shareResultImage, shareResultLink, type ResultShareOptions } from "../../../lib/resultShare";
-import { colors } from "../../../theme";
+import { colors, radius } from "../../../theme";
 import type { PersonalReferenceItem } from "../../../types";
 import { ReferenceCard } from "./parts";
 
@@ -160,7 +160,7 @@ export function RecordCard({ username, publicView = false, onOpenUser, onOpenTea
               <Muted style={styles.avatarText}>{String(row.tag || row.name || "?").slice(0, 2).toUpperCase()}</Muted>
             </View>
             <View style={styles.flex}>
-              <Body style={styles.recordName} numberOfLines={1}>{row.name}</Body>
+              <Body style={styles.recordName}>{row.name}</Body>
               <View style={styles.bar}>
                 <View style={[styles.barWins, { width: `${(row.wins / games) * 100}%` }]} />
                 <View style={[styles.barDraws, { width: `${((row.draws || 0) / games) * 100}%` }]} />
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   card: { gap: 12 },
   recordRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   avatar: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", backgroundColor: "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center" },
-  avatarTeam: { borderRadius: 6 },
+  avatarTeam: { borderRadius: radius.lg },
   avatarText: { fontWeight: "800", fontSize: 11 },
   recordName: { fontWeight: "700" },
   bar: { flexDirection: "row", height: 6, borderRadius: 3, overflow: "hidden", backgroundColor: "rgba(255,255,255,0.15)", marginTop: 5 },

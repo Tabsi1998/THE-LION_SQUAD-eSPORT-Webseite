@@ -6,7 +6,7 @@ import { tournamentIsOver } from "../../lib/afterEnd";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
-import { ErrorState, SkeletonList } from "../../components/ListState";
+import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -24,9 +24,11 @@ import { isGuestUser } from "../../live";
 import { openSignIn } from "../../navigation/rootNavigation";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { Team, Tournament, User } from "../../types";
 import { useSeasonOverlay } from "../../seasons/anchors";
+import { useShareHeader } from "../../components/HeaderActions";
+import { sharePage } from "../../lib/share";
 
 const TOURNAMENT_LIVE_RESOURCES = ["tournaments", "matches", "matches-v2", "teams"];
 
@@ -62,6 +64,9 @@ const CLOSED_MATCH_STATUSES = new Set(["completed", "forfeit", "closed"]);
 export function TournamentDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [tournament, setTournament] = useState<Tournament | undefined>();
+  // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
+  const share = useMemo(() => (tournament ? () => { void sharePage({ kind: "tournament", id: String(tournament.slug || tournament.id), title: tournament.title, start: tournament.start_date, end: tournament.end_date }); } : null), [tournament]);
+  useShareHeader(navigation, share);
   const [bracket, setBracket] = useState<BracketPayload>({});
   const [standings, setStandings] = useState<any[]>([]);
   const [myTeams, setMyTeams] = useState<Team[]>([]);
@@ -70,9 +75,12 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const guest = isGuestUser(user);
 
   const load = useCallback(async () => {
+    setProblem(null);
     setError("");
     try {
       const [detailResult, bracketResult, standingsResult, registrationsResult, teamsResult] = await Promise.all([
@@ -88,6 +96,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
       setMyTeams(Array.isArray(teamsResult.data) ? teamsResult.data : []);
     } catch (err) {
       setError(errorMessage(err, "Turnierdetail konnte nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
     }
@@ -241,7 +250,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   if (!tournament) {
     return (
       <Screen>
-        <ErrorState title="Turnierdetail nicht verfügbar" detail={error || "Das Turnier konnte nicht geladen werden."} />
+        <ErrorState title="Turnierdetail nicht verfügbar" detail={error || "Das Turnier konnte nicht geladen werden."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }
@@ -936,7 +945,7 @@ const styles = StyleSheet.create({
   checkInHint: {
     backgroundColor: "rgba(41,182,232,0.08)",
     borderColor: "rgba(41,182,232,0.35)",
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.white,
     fontWeight: "800",
@@ -950,7 +959,7 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 10,
     padding: 16,
@@ -973,7 +982,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 9,
     paddingVertical: 5,
@@ -1003,7 +1012,7 @@ const styles = StyleSheet.create({
   winnerBox: {
     backgroundColor: colors.black,
     borderColor: "rgba(247,199,68,0.45)",
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 5,
     padding: 12,
@@ -1026,7 +1035,7 @@ const styles = StyleSheet.create({
   podiumCard: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flex: 1,
     gap: 5,
@@ -1052,7 +1061,7 @@ const styles = StyleSheet.create({
   registrationBox: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 8,
     padding: 10,
@@ -1076,7 +1085,7 @@ const styles = StyleSheet.create({
   stat: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flex: 1,
     padding: 10,
@@ -1122,7 +1131,7 @@ const styles = StyleSheet.create({
   placementRow: {
     backgroundColor: "rgba(255,255,255,0.03)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     padding: 10,
   },
@@ -1139,7 +1148,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.06)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 38,
     justifyContent: "center",
@@ -1180,7 +1189,7 @@ const styles = StyleSheet.create({
   matchCard: {
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -1290,7 +1299,7 @@ const styles = StyleSheet.create({
   feeBox: {
     backgroundColor: "rgba(255,215,0,0.06)",
     borderColor: "rgba(255,215,0,0.35)",
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 6,
     padding: 11,
@@ -1315,7 +1324,7 @@ const styles = StyleSheet.create({
   },
   checkbox: {
     borderColor: colors.border,
-    borderRadius: 4,
+    borderRadius: radius.lg,
     borderWidth: 2,
     height: 18,
     marginTop: 2,
@@ -1334,7 +1343,7 @@ const styles = StyleSheet.create({
   modalCard: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     maxHeight: "88%",
     overflow: "hidden",
@@ -1363,7 +1372,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,

@@ -8,6 +8,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { CountLine, EntryRow, FieldChips, GameChip, MEDAL, MEDAL_RANK, MedalStat, PlacementBadge, RefButton, ReferenceCard, SectionTitle, bestPlacement, displayTitle, entriesOf, entryTitle, formatDate, gameKey, gameTitle, hasMember, medalOf, memberEntryOf, memberName, platformLabel, referenceGameName, timeOf } from "@/components/tls/references/referenceParts";
 import { Medal, Trophy, User, Users, X } from "lucide-react";
 import { TrophyShelf } from "@/components/tls/TrophyShelf";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 
 // Referenzen als Erfolgswand (#409, Design-Rework nach Rückmeldung des Betreibers): oben die
 // Medaillenbilanz des Vereins, dann die Trophäenwand mit allen Podestplätzen (Spiel-Cover, große
@@ -224,7 +225,7 @@ export function ReferenceDetailPage() {
     api.get(`/references/${id}`).then(({ data }) => setItem(data)).catch(() => setItem(null)).finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE REFERENZ ...</div></PublicLayout>;
+  if (loading) return <PublicLayout><PublicLoadingState label="Lade Referenz" /></PublicLayout>;
   if (!item) return <PublicLayout><div className="p-20 text-center text-white/50">Referenz nicht gefunden.</div></PublicLayout>;
 
   const entries = entriesOf(item);

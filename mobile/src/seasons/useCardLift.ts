@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { subscribeCardLift, type CardLift } from "./cardLift";
 import { useSeason } from "./SeasonProvider";
 
@@ -7,12 +7,8 @@ import { useSeason } from "./SeasonProvider";
 // Platz (`Card perch="..."`) gibt ihren Schlüssel an alles in ihr weiter (`useCardKey`) - so weiß Deko wie die
 // Schneehaube an der Begrüßungskarte, zu welcher Karte sie gehört.
 
-export const CardKeyContext = createContext<string | null>(null);
-
-/** Der Schlüssel der Karte, in der die Komponente liegt - null außerhalb einer Karte mit Platz. */
-export function useCardKey(): string | null {
-  return useContext(CardKeyContext);
-}
+// Der Kontext selbst liegt in cardKey.ts - so kann die Schrift (components/Text.tsx) ihn lesen, ohne die Saisons zu laden.
+export { CardKeyContext, useCardKey } from "./cardKey";
 
 export function useCardLift(handler: (detail: CardLift) => void, enabled = true): void {
   const { reducedMotion } = useSeason();

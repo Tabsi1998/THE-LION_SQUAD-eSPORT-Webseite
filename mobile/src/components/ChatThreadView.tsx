@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, errorMessage } from "../lib/api";
 import { continuesMessageGroup, formatChatTime } from "../lib/format";
 import type { ContentTarget } from "../lib/contentLinks";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import type { ChatMessage } from "../types";
 import { resourceFromPath } from "../realtime/liveChanges";
 import { useLiveRefresh } from "../realtime/LiveChangesProvider";
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     maxWidth: "88%",
     padding: 10,
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.045)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 8,
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.white,
     flex: 1,
@@ -456,9 +456,9 @@ const styles = StyleSheet.create({
   send: {
     alignItems: "center",
     backgroundColor: colors.cyan,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     justifyContent: "center",
-    minHeight: 44,
+    minHeight: 48,
     paddingHorizontal: 14,
   },
   sendText: {

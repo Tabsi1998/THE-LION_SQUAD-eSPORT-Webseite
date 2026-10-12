@@ -106,7 +106,7 @@ export function GlobalSearch() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-sm border border-white/10 text-white/70 transition hover:border-[#29B6E8]/50 hover:text-[#29B6E8] hover:bg-[#29B6E8]/10"
+        className="tls-hit inline-flex h-10 w-10 items-center justify-center rounded-sm border border-white/10 text-white/70 transition hover:border-[#29B6E8]/50 hover:text-[#29B6E8] hover:bg-[#29B6E8]/10"
         aria-label="Suche öffnen"
         title="Suche"
         data-testid="global-search-open"

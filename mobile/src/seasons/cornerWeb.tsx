@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import Svg, { Circle, Ellipse, Line, Path } from "react-native-svg";
 import { REST_MS, createRest, endReaction, startReaction } from "./cardLift";
+import { cornerBox, type RoomRect } from "./room";
 import { useCardLift } from "./useCardLift";
+import { useRoomCheck } from "./useRoom";
 import { EXTENT, buildPlan, planLines, toPixels, type PlanLine } from "./webPlan";
 import { TEAR, buildDelays, tearPhase, tearPlan, type TearPhase, type TearPlan } from "./webTear";
 
@@ -13,6 +15,8 @@ import { TEAR, buildDelays, tearPhase, tearPlan, type TearPhase, type TearPlan }
 // einer Minute Faden für Faden neu baut. Drei sichtbare Vorgänge, keine Standbilder. Der Zustand hängt an der Karte,
 // nicht an der Anzeige: wer wegscrollt und wiederkommt, sieht das Netz in derselben Phase. Bewegt werden nur Views
 // (nie SVG-Transformationen - die sind auf Android unzuverlässig), gedreht und geschrumpft um echte Punkte des Netzes.
+// Platz (#1295): liegt in der Ecke Schrift - eine Augenbraue wie „MITGLIED WERDEN“, eine Überschrift - oder ein Knopf,
+// bleibt das Netz unsichtbar und die Saison nimmt die andere Ecke oder eine andere Karte.
 
 const THREAD = "rgba(170,225,240,0.52)";
 const THREAD_SOFT = "rgba(170,225,240,0.36)";
@@ -196,6 +200,8 @@ export function countBuilt(delays: number[], elapsedMs: number): number {
  */
 export function CornerWeb({ side, seed, radius, perchId = null }: { side: Side; seed: number; radius: number; perchId?: string | null }) {
   const box = useMemo(() => boxOf({ side, seed, radius }), [side, seed, radius]);
+  const boxes = useCallback((card: RoomRect) => [cornerBox(card, side, box.width, box.height)], [side, box.width, box.height]);
+  const roomy = useRoomCheck(perchId, `web:${side}`, boxes);
   const [tear, setTear] = useState<Tear | null>(() => (perchId ? tears.get(perchId) || null : null));
   const [, setTick] = useState(0);
   // Nur wer das Reißen selbst gestartet hat, zeigt es; kommt die Karte mitten darin zurück, ist das Netz schon weg.
@@ -232,7 +238,7 @@ export function CornerWeb({ side, seed, radius, perchId = null }: { side: Side; 
   if (tear && phase === "gone") return null;
   if (tear && phase === "build") return <BuildingWeb tear={tear} />;
   return (
-    <View pointerEvents="none" style={[styles.web, side === "tl" ? { left: 0 } : { right: 0 }, { width: box.width, height: box.height }]} testID="halloween-corner-web" data-side={side}>
+    <View pointerEvents="none" style={[styles.web, side === "tl" ? { left: 0 } : { right: 0 }, { width: box.width, height: box.height }, !roomy && styles.waiting]} testID="halloween-corner-web" data-side={side} data-room={roomy ? "1" : "0"}>
       <Threads box={box} />
     </View>
   );
@@ -240,5 +246,6 @@ export function CornerWeb({ side, seed, radius, perchId = null }: { side: Side; 
 
 const styles = StyleSheet.create({
   web: { position: "absolute", top: 0, opacity: 0.75 },
+  waiting: { opacity: 0 },
   spider: { position: "absolute" },
 });

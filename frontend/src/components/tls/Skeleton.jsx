@@ -1,5 +1,8 @@
+import { usePageLoadingMark } from "@/lib/pageLoading";
+
 // Skelett-Ladezustände (#226): Platzhalter in der Form des späteren Inhalts statt „Lade …“.
-// Alle atmen leicht (animate-pulse); mit „Bewegung reduzieren“ stehen sie still (index.css).
+// Ein weicher Schimmer läuft darüber (#1324); mit „Bewegung reduzieren“ stehen sie still (index.css). Jedes Skelett
+// meldet „Seite lädt“ - der Kopf zeigt solange die dünne Linie (RouteProgress).
 
 const bone = "tls-skeleton rounded-sm bg-white/[0.07]";
 
@@ -8,6 +11,7 @@ function Bone({ className = "" }) {
 }
 
 function Busy({ label, className = "", children, testId = "skeleton" }) {
+  usePageLoadingMark();
   return (
     <div className={className} role="status" aria-busy="true" aria-label={label} data-testid={testId}>
       {children}
@@ -16,27 +20,36 @@ function Busy({ label, className = "", children, testId = "skeleton" }) {
 }
 
 /** Ein paar Textzeilen - für Absätze, Hinweise, kurze Listen. */
-export function SkeletonLines({ lines = 3, className = "", label = "Lade Inhalte" }) {
+export function SkeletonLines({ lines = 3, className = "", label = "Lade Inhalte", testId = "skeleton" }) {
   const widths = ["w-3/4", "w-full", "w-5/6", "w-2/3", "w-1/2"];
   return (
-    <Busy label={label} className={`space-y-2.5 ${className}`}>
+    <Busy label={label} className={`space-y-2.5 ${className}`} testId={testId}>
       {Array.from({ length: lines }).map((_, index) => <Bone key={index} className={`h-3.5 ${widths[index % widths.length]}`} />)}
     </Busy>
   );
 }
 
-/** Karten mit Bild oben und Text darunter - News, Events, Turniere. */
+/**
+ * Karten in der Form der echten Karten (#1324): Bild oben, darunter Datums-Kachel, Kennzeile und Titel, unten ein
+ * Schild - News, Events, Turniere.
+ */
 export function SkeletonCards({ count = 3, columns = 3, image = true, className = "", label = "Lade Einträge" }) {
   const grid = columns === 1 ? "grid-cols-1" : columns === 2 ? "grid-cols-1 md:grid-cols-2" : columns === 4 ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
   return (
     <Busy label={label} className={`grid gap-5 ${grid} ${className}`}>
       {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className="overflow-hidden rounded-sm border border-white/10 bg-[#121212]">
+        <div key={index} className="overflow-hidden rounded-sm border border-white/10 bg-[#121212]" data-skeleton="card">
           {image && <Bone className="aspect-video rounded-none" />}
-          <div className="space-y-3 p-5">
-            <Bone className="h-3 w-1/3" />
-            <Bone className="h-5 w-3/4" />
-            <Bone className="h-3 w-1/2" />
+          <div className="flex gap-4 p-5">
+            <div className="w-12 shrink-0 overflow-hidden rounded-sm border border-white/10" data-skeleton="date">
+              <Bone className="h-3.5 w-full rounded-none bg-white/[0.12]" />
+              <Bone className="mx-auto my-2 h-5 w-7" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-3">
+              <Bone className="h-3 w-1/3" />
+              <Bone className="h-5 w-4/5" />
+              <Bone className="h-6 w-24" />
+            </div>
           </div>
         </div>
       ))}
@@ -97,4 +110,47 @@ export function SkeletonPage({ cards = 3, className = "", label = "Lade Seite" }
       <SkeletonCards count={cards} label={label} />
     </div>
   );
+}
+
+/**
+ * Detailseite in ihrer Form (#1231): Kennzeile, großer Titel, zwei Zeilen, Schilder, drei Kacheln und eine Liste -
+ * so steht beim Laden schon ungefähr da, was kommt, und nichts springt. `bare` lässt den Status weg, wenn der Rahmen
+ * darum ihn schon trägt (PublicLoadingState).
+ */
+export function SkeletonDetailPage({ className = "", label = "Lade Seite", bare = false }) {
+  const body = (
+    <>
+      <div className="space-y-4">
+        <Bone className="h-3 w-32" />
+        <Bone className="h-10 w-4/5 max-w-2xl" />
+        <Bone className="h-4 w-1/2 max-w-md" />
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Bone className="h-7 w-28" />
+          <Bone className="h-7 w-24" />
+          <Bone className="h-7 w-32" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {[0, 1, 2].map((index) => (
+          <div key={index} className="space-y-3 rounded-sm border border-white/10 bg-[#121212] p-4">
+            <Bone className="h-3 w-1/3" />
+            <Bone className="h-6 w-2/3" />
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2">
+        {[0, 1, 2, 3].map((index) => (
+          <div key={index} className="flex items-center gap-3 rounded-sm border border-white/10 bg-[#121212] p-3">
+            <Bone className="h-10 w-10 shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Bone className="h-3.5 w-1/2" />
+              <Bone className="h-3 w-1/3" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+  if (bare) return <div className={`space-y-8 ${className}`} aria-hidden="true">{body}</div>;
+  return <Busy label={label} className={`space-y-8 ${className}`} testId="skeleton-detail">{body}</Busy>;
 }

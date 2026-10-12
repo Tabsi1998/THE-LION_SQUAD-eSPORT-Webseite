@@ -25,7 +25,7 @@ export function TournamentTabs({ tournament, accessToken = "", participantCount 
         const active = tab.match(pathname);
         return (
           <Link key={tab.key} to={tab.to} data-testid={`tournament-tab-${tab.key}`} aria-current={active ? "page" : undefined}
-            className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 -mb-px transition ${active ? "border-[#29B6E8] text-white" : "border-transparent text-white/55 hover:text-white"}`}>
+            className={`inline-flex min-h-11 items-center gap-1.5 px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 -mb-px transition ${active ? "border-[#29B6E8] text-white" : "border-transparent text-white/55 hover:text-white"}`}>
             <tab.icon className="w-3.5 h-3.5" /> {tab.label}
           </Link>
         );

@@ -543,7 +543,8 @@ async def team_meta(db, team_id: str, base: dict, origin: str) -> dict:
     if not team:
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     title = team.get("name") or team.get("tag") or "Team"
-    image = absolute_url(team.get("logo_url") or base["image"], origin)
+    # Teilen (#1154): das Banner zuerst - es füllt die breite Vorschau in WhatsApp und Discord -, sonst das Logo.
+    image = absolute_url(team.get("banner_url") or team.get("logo_url") or base["image"], origin)
     canonical = f"{origin}/teams/{team.get('id') or team_id}"
     member_count = team.get("member_count")
     meta = {

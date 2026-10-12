@@ -13,6 +13,8 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet, Users, ShieldCheck } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
+import { PublicErrorState } from "@/components/tls/PublicEmptyState";
+import { problemKind } from "@/lib/loadProblem";
 
 const STATUS_LABELS = {
   active: "Aktives Mitglied", honorary: "Ehrenmitglied",
@@ -28,12 +30,26 @@ export default function MyMembershipPage() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
 
+  // Ein Fehler beendet das Laden (#983, #1152): ohne Stand der Fehler mit „Nochmal versuchen“, mit Stand bleibt er.
+  const [problem, setProblem] = useState(null);
   const load = useCallback(() => {
-    api.get("/membership/me").then(({ data }) => setData(data)).catch(() => {});
+    api.get("/membership/me").then(({ data }) => {
+      setData(data);
+      setProblem(null);
+    }).catch((error) => setProblem(problemKind(error)));
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["membership", "users"]);
 
+  if (!data && problem) {
+    return (
+      <PublicLayout>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <PublicErrorState kind={problem === "offline" ? "offline" : "error"} title={problem === "offline" ? "Ohne Netz" : "Mitgliedschaft konnte nicht geladen werden"} onRetry={load} />
+        </div>
+      </PublicLayout>
+    );
+  }
   if (!data) return <PublicLayout><div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8"><SkeletonDetailHeader label="Lade Mitgliedschaft" /><SkeletonCards count={4} columns={4} image={false} label="Lade Mitgliedschaft" /></div></PublicLayout>;
 
   const m = data.membership;

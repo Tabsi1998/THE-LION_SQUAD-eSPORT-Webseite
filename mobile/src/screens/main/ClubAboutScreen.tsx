@@ -17,7 +17,7 @@ import { boardContacts, type BoardPosition } from "../../lib/memberArea";
 import { openLink } from "../../lib/openLink";
 import { WEB_BASE_URL } from "../../lib/siteUrls";
 import type { AppStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 
 // Über uns, Vorstand, Werte und Kontakt in der App (#1024, Fabians Auswahl Idee 24): kurz und mit denselben Inhalten
 // wie die Website - ein paar Sätze, die Zahlen, der Vorstand mit Bild und Aufgabe, Werte und Ziele, Kontakt und
@@ -177,7 +177,7 @@ export function ClubAboutScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   content: { gap: 14, padding: 18, paddingBottom: 34 },
-  hero: { backgroundColor: "#0d2533", borderColor: colors.border, borderRadius: 10, borderWidth: 1, gap: 4, minHeight: 110, justifyContent: "flex-end", overflow: "hidden", padding: 16 },
+  hero: { backgroundColor: "#0d2533", borderColor: colors.border, borderRadius: radius.lg, borderWidth: 1, gap: 4, minHeight: 110, justifyContent: "flex-end", overflow: "hidden", padding: 16 },
   heroLion: { height: 170, opacity: 0.16, position: "absolute", right: -30, top: -30, width: 170 },
   eyebrow: { color: colors.cyan, fontSize: 11, fontWeight: "900", letterSpacing: 1.5 },
   heroTitle: { fontSize: 26 },
@@ -195,8 +195,8 @@ const styles = StyleSheet.create({
   pillars: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   pillar: { backgroundColor: "rgba(41,182,232,0.1)", borderColor: "rgba(41,182,232,0.35)", borderRadius: 14, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
   pillarText: { color: colors.cyan, fontWeight: "800" },
-  contact: { alignItems: "center", borderColor: colors.border, borderRadius: 8, borderWidth: 1, flexDirection: "row", gap: 12, padding: 10 },
-  contactIcon: { alignItems: "center", backgroundColor: "rgba(41,182,232,0.1)", borderRadius: 8, height: 36, justifyContent: "center", width: 36 },
+  contact: { alignItems: "center", borderColor: colors.border, borderRadius: radius.lg, borderWidth: 1, flexDirection: "row", gap: 12, padding: 10 },
+  contactIcon: { alignItems: "center", backgroundColor: "rgba(41,182,232,0.1)", borderRadius: radius.lg, height: 36, justifyContent: "center", width: 36 },
   join: { borderColor: "rgba(255,215,0,0.35)" },
-  webRow: { alignItems: "center", borderTopColor: colors.border, borderTopWidth: 1, flexDirection: "row", gap: 12, minHeight: 44, paddingTop: 8 },
+  webRow: { alignItems: "center", borderTopColor: colors.border, borderTopWidth: 1, flexDirection: "row", gap: 12, minHeight: 48, paddingTop: 8 },
 });

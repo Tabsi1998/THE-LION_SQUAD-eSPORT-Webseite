@@ -15,6 +15,8 @@ export type Perch = {
   measure: () => Promise<PerchRect | null>;
   /** Schneidet die Karte ab, was über ihren Rand ragt? Dann sitzt dort keine Fledermaus (sie wäre halb weg). */
   clip?: boolean;
+  /** Liegt in der letzten Zeile ein Knopf (#1295)? Dann hängt dort keine Kette und kein Wimpel. */
+  bottomControl?: boolean;
 };
 export type PerchAssignment = { perchId: string; corner: PerchCorner; pose: PerchPose; size: number; temperament: string; /** nach einem Flug gelandet (Einfedern mit Haptik) */ landed?: boolean };
 /** Ein kleines Netz in einer oberen Innenecke einer Karte (A4): Seite und Seed je Karte. */
@@ -74,16 +76,22 @@ export function websFor(screen: string): WebAssignment[] {
   return Object.values(state.webs).filter((entry) => state.perches.some((perch) => perch.id === entry.perchId && perch.screen === screen));
 }
 
-/** Auswahl der Netz-Karten je Screen: gesät aus Screen und Kartenliste, nie eine Karte mit einer Fledermaus, nie zwei Netze an derselben Karte. */
-export function chooseWebPerches(candidates: Perch[], count: number, rng: () => number, taken: string[] = []): WebAssignment[] {
+/**
+ * Auswahl der Netz-Karten je Screen: gesät aus Screen und Kartenliste, nie eine Karte mit einer Fledermaus, nie zwei Netze
+ * an derselben Karte. `sidesOf` nennt die freien Ecken einer Karte (#1295: keine Ecke über Überschrift oder Augenbraue) -
+ * ist die gewürfelte belegt, nimmt das Netz die andere; ohne freie Ecke bekommt die Karte keins.
+ */
+export function chooseWebPerches(candidates: Perch[], count: number, rng: () => number, taken: string[] = [], sidesOf: (perch: Perch) => Array<"tl" | "tr"> = () => ["tl", "tr"]): WebAssignment[] {
   const used = new Set(taken);
   const out: WebAssignment[] = [];
   for (let n = 0; n < count; n += 1) {
-    const options = candidates.filter((perch) => !used.has(perch.id) && perch.kind !== "banner");
+    const options = candidates.filter((perch) => !used.has(perch.id) && perch.kind !== "banner" && sidesOf(perch).length > 0);
     if (!options.length) break;
     const pick = options[Math.min(options.length - 1, Math.floor(rng() * options.length))];
     used.add(pick.id);
-    out.push({ perchId: pick.id, side: rng() < 0.5 ? "tl" : "tr", seed: rng(), radius: Math.round(22 + rng() * 8) });
+    const rolled: "tl" | "tr" = rng() < 0.5 ? "tl" : "tr";
+    const sides = sidesOf(pick);
+    out.push({ perchId: pick.id, side: sides.includes(rolled) ? rolled : sides[0], seed: rng(), radius: Math.round(22 + rng() * 8) });
   }
   return out;
 }
@@ -178,13 +186,22 @@ export function choosePerches(candidates: Perch[], count: number, rng: () => num
   return chosen;
 }
 
-/** Ecke und Haltung je Platz aus dem Seed: Karten oben sitzend (links oder rechts), unten hängend; Banner unten hängend. */
-export function placementFor(perch: Perch, rng: () => number): { corner: PerchCorner; pose: PerchPose; size: number } {
-  if (perch.kind === "banner") return { corner: "bottom", pose: "hang", size: 22 };
+type Placement = { corner: PerchCorner; pose: PerchPose; size: number };
+const SIT_TL: Placement = { corner: "tl", pose: "sit", size: 20 };
+const SIT_TR: Placement = { corner: "tr", pose: "sit", size: 20 };
+const HANG: Placement = { corner: "bottom", pose: "hang", size: 22 };
+
+/**
+ * Ecke und Haltung je Platz aus dem Seed: Karten oben sitzend (links oder rechts), unten hängend; Banner unten hängend.
+ * `blocked` nennt Ecken ohne Platz (#1295: über einer Überschrift, unter der Kante eine andere Karte) - dann nimmt die
+ * Fledermaus die nächste freie Ecke; ist keine frei, gibt es keinen Platz (null).
+ */
+export function placementFor(perch: Perch, rng: () => number, blocked: (corner: PerchCorner) => boolean = () => false): Placement | null {
+  if (perch.kind === "banner") return blocked("bottom") ? null : HANG;
   const roll = rng();
-  if (roll < 0.4) return { corner: "tl", pose: "sit", size: 20 };
-  if (roll < 0.8) return { corner: "tr", pose: "sit", size: 20 };
-  return { corner: "bottom", pose: "hang", size: 22 };
+  const rolled = roll < 0.4 ? SIT_TL : roll < 0.8 ? SIT_TR : HANG;
+  if (!blocked(rolled.corner)) return rolled;
+  return [SIT_TL, SIT_TR, HANG].find((option) => !blocked(option.corner)) || null;
 }
 
 /** Der Punkt der Fledermaus in Fensterkoordinaten, aus dem Rechteck der Karte. */

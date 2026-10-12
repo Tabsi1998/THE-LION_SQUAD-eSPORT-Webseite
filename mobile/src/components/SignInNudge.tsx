@@ -4,7 +4,7 @@ import { Modal, Pressable, StyleSheet, View } from "react-native";
 import { Button } from "./Button";
 import { Body, Heading, Muted } from "./Text";
 import { openSignIn, signInOpen } from "../navigation/rootNavigation";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { useAppUpdate } from "../update/AppUpdateProvider";
 
 // Gast zuerst (#918): Die App startet ohne Konto. Nur beim allerersten Start kommt nach ein paar Sekunden einmal dieser
@@ -80,7 +80,7 @@ export function SignInNudge({ delayMs = NUDGE_DELAY_MS }: { delayMs?: number }) 
 
 const styles = StyleSheet.create({
   backdrop: { alignItems: "center", backgroundColor: "rgba(0,0,0,0.6)", flex: 1, justifyContent: "center", padding: 20 },
-  card: { backgroundColor: colors.card, borderColor: "rgba(41,182,232,0.35)", borderRadius: 10, borderWidth: 1, gap: 12, maxWidth: 420, padding: 20, width: "100%" },
+  card: { backgroundColor: colors.card, borderColor: "rgba(41,182,232,0.35)", borderRadius: radius.lg, borderWidth: 1, gap: 12, maxWidth: 420, padding: 20, width: "100%" },
   actions: { gap: 10 },
   later: { alignItems: "center", paddingVertical: 6 },
 });

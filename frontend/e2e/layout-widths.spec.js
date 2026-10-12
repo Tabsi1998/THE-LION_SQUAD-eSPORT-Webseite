@@ -40,6 +40,9 @@ test.describe("PC-Layout: Container nutzt die Breite", () => {
       for (const path of PAGES) {
         await page.goto(path);
         await expect(page.locator("header")).toBeVisible();
+        // Der Kopf steht seit #1324 schon während des Seitenwechsels; gemessen wird, wenn die Seite selbst da ist.
+        await expect(page.getByTestId("page-loading")).toHaveCount(0);
+        await expect.poll(async () => Boolean(await page.getByTestId("site-header-row").boundingBox())).toBe(true);
         const box = await page.getByTestId("site-header-row").boundingBox();
         expect(box, `Kopfzeile auf ${path}`).not.toBeNull();
         expect(box.width, `Kopfzeile auf ${path} bei ${viewport.width}px`).toBeGreaterThanOrEqual(expected - 2);

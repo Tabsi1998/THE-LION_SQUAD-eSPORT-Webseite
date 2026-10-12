@@ -4,7 +4,7 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, Vi
 import { AddToCalendarButton } from "../../components/AddToCalendarButton";
 import { challengeIsOver } from "../../lib/afterEnd";
 import { Card } from "../../components/Card";
-import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -13,19 +13,27 @@ import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime } from "../../lib/format";
 import { getRegistrationState, hasOnlineRegistration } from "../../lib/registration";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload, PublicUser } from "../../types";
+import { Button } from "../../components/Button";
+import { useShareHeader } from "../../components/HeaderActions";
+import { sharePage } from "../../lib/share";
 
-type Props = { route: { params: { id: string } } };
+type Props = { route: { params: { id: string } }; navigation?: { setOptions?: (options: { headerRight?: () => React.ReactNode }) => void } };
 
-export function FastLapDetailScreen({ route }: Props) {
+export function FastLapDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [challenge, setChallenge] = useState<F1Challenge | null>(null);
+  // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
+  const share = useMemo(() => (challenge ? () => { void sharePage({ kind: "fastlap", id: String(challenge.slug || challenge.id), title: challenge.title, detail: "Fast Lap", start: challenge.start_date, end: challenge.end_date }); } : null), [challenge]);
+  useShareHeader(navigation, share);
   const [leaderboard, setLeaderboard] = useState<F1LeaderboardPayload | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [managerUsers, setManagerUsers] = useState<PublicUser[]>([]);
   const [managerSearch, setManagerSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -42,6 +50,7 @@ export function FastLapDetailScreen({ route }: Props) {
   const activeTrack = tracks.find((track) => track.id === activeTrackId) || leaderboard?.track || tracks[0] || null;
 
   const load = useCallback(async (trackId?: string | null) => {
+    setProblem(null);
     setError("");
     try {
       const challengeResult = await api.get<F1Challenge>(`/f1/challenges/${route.params.id}`);
@@ -62,6 +71,7 @@ export function FastLapDetailScreen({ route }: Props) {
       }
     } catch (err) {
       setError(errorMessage(err, "Fast-Lap Zeiten konnten nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -137,7 +147,7 @@ export function FastLapDetailScreen({ route }: Props) {
   if (!challenge) {
     return (
       <Screen>
-        <ErrorState title="Challenge nicht gefunden" detail={error || "Diese Challenge ist nicht sichtbar oder wurde entfernt."} />
+        <ErrorState title="Challenge nicht gefunden" detail={error || "Diese Challenge ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }
@@ -308,9 +318,7 @@ export function FastLapDetailScreen({ route }: Props) {
               <TogglePill label="Disqualifiziert" active={invalidLap} tone="danger" onPress={() => setInvalidLap((current) => !current)} />
             </View>
             {forceReference ? <Muted style={styles.warning}>Vereinsmitglied: laut Challenge-Regel nur als Referenzzeit.</Muted> : null}
-            <Pressable disabled={savingTime || !selectedUserId || !timeInput.trim()} onPress={submitManagedTime} style={[styles.saveButton, (savingTime || !selectedUserId || !timeInput.trim()) && styles.disabled]}>
-              <Body style={styles.saveButtonText}>{savingTime ? "Speichert ..." : "Zeit speichern"}</Body>
-            </Pressable>
+            <Button label={savingTime ? "Speichert ..." : "Zeit speichern"} arrow={false} disabled={!selectedUserId || !timeInput.trim()} busy={savingTime} onPress={submitManagedTime} />
           </Card>
         ) : null}
 
@@ -483,7 +491,7 @@ const styles = StyleSheet.create({
   heroMark: {
     alignItems: "center",
     backgroundColor: colors.gold,
-    borderRadius: 10,
+    borderRadius: radius.lg,
     height: 46,
     justifyContent: "center",
     width: 46,
@@ -526,7 +534,7 @@ const styles = StyleSheet.create({
   tab: {
     backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderColor: colors.border,
-    borderRadius: 7,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -564,7 +572,7 @@ const styles = StyleSheet.create({
   trackIcon: {
     alignItems: "center",
     backgroundColor: colors.gold,
-    borderRadius: 9,
+    borderRadius: radius.lg,
     height: 38,
     justifyContent: "center",
     width: 38,
@@ -585,7 +593,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,215,0,0.12)",
     borderColor: "rgba(255,215,0,0.32)",
-    borderRadius: 10,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 48,
     justifyContent: "center",
@@ -602,7 +610,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.black,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     color: colors.white,
     minHeight: 46,
@@ -674,7 +682,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: "rgba(41, 182, 232, 0.12)",
     borderColor: "rgba(41, 182, 232, 0.28)",
-    borderRadius: 6,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -694,17 +702,6 @@ const styles = StyleSheet.create({
   noteInput: {
     minHeight: 72,
     textAlignVertical: "top",
-  },
-  saveButton: {
-    alignItems: "center",
-    backgroundColor: colors.cyan,
-    borderRadius: 8,
-    minHeight: 46,
-    justifyContent: "center",
-  },
-  saveButtonText: {
-    color: colors.black,
-    fontWeight: "900",
   },
   togglePill: {
     backgroundColor: "rgba(255,255,255,0.05)",
@@ -731,7 +728,7 @@ const styles = StyleSheet.create({
   userChoice: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     padding: 10,
   },

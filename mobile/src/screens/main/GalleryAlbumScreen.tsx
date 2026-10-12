@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
-import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -11,7 +11,9 @@ import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import { albumCountLabel, groupBySection, mediaType, posterUrl, sizedUpload, type GalleryAlbum, type GalleryItem } from "../../lib/gallery";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
+import { useShareHeader } from "../../components/HeaderActions";
+import { sharePage } from "../../lib/share";
 
 // Album (#236): Raster aus 400-px-Kacheln, drei je Zeile; Abschnitte wie im Web. Antippen
 // öffnet die Großansicht an dieser Stelle.
@@ -23,11 +25,17 @@ export function GalleryAlbumScreen({ navigation, route }: Props) {
   const { id } = route.params;
   const { width } = useWindowDimensions();
   const [album, setAlbum] = useState<GalleryAlbum | null>(null);
+  // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
+  const share = useMemo(() => (album ? () => { void sharePage({ kind: "album", id: String(album.slug || album.id), title: album.title, detail: "Galerie" }); } : null), [album]);
+  useShareHeader(navigation, share);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
 
   const load = useCallback(async () => {
+    setProblem(null);
     setError("");
     try {
       const response = await api.get<GalleryAlbum>(`/gallery/${encodeURIComponent(id)}`);
@@ -35,6 +43,7 @@ export function GalleryAlbumScreen({ navigation, route }: Props) {
       navigation.setOptions({ title: response.data?.title || "Album" });
     } catch (err) {
       setError(errorMessage(err, "Das Album konnte nicht geladen werden."));
+      setProblem(loadProblem(err));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -53,7 +62,7 @@ export function GalleryAlbumScreen({ navigation, route }: Props) {
   };
 
   if (loading) return <Screen><SkeletonList count={3} hasImage /></Screen>;
-  if (!album) return <Screen><ErrorState title="Album nicht gefunden" detail={error || "Dieses Album ist nicht sichtbar oder wurde entfernt."} /></Screen>;
+  if (!album) return <Screen><ErrorState title="Album nicht gefunden" detail={error || "Dieses Album ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} /></Screen>;
 
   return (
     <Screen padded={false}>
@@ -92,7 +101,7 @@ const styles = StyleSheet.create({
   header: { gap: 6 },
   section: { gap: 8 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: GAP },
-  tile: { backgroundColor: colors.surface, borderRadius: 6, overflow: "hidden" },
+  tile: { backgroundColor: colors.surface, borderRadius: radius.lg, overflow: "hidden" },
   tileImage: { height: "100%", width: "100%" },
   pressed: { opacity: 0.8 },
   playBadge: {

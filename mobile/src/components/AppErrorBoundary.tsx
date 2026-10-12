@@ -1,8 +1,9 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { logMobileError } from "../lib/mobileLog";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
+import { Button } from "./Button";
 
 type State = {
   error?: Error;
@@ -30,9 +31,7 @@ export class AppErrorBoundary extends React.Component<{ children: React.ReactNod
             <Text style={styles.body}>
               Die App ist weiter gestartet, aber diese Ansicht hat einen Fehler ausgelöst. Du kannst die Ansicht neu laden oder die App neu öffnen.
             </Text>
-            <Pressable accessibilityRole="button" onPress={() => this.setState({ error: undefined })} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-              <Text style={styles.buttonText}>Ansicht neu laden</Text>
-            </Pressable>
+            <Button label="Ansicht neu laden" onPress={() => this.setState({ error: undefined })} />
           </View>
         </SafeAreaView>
       );
@@ -52,7 +51,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 12,
     padding: 18,
@@ -75,21 +74,5 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 14,
     lineHeight: 20,
-  },
-  button: {
-    alignItems: "center",
-    backgroundColor: colors.cyan,
-    borderRadius: 7,
-    minHeight: 46,
-    justifyContent: "center",
-    marginTop: 4,
-  },
-  buttonText: {
-    color: colors.black,
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  pressed: {
-    opacity: 0.72,
   },
 });

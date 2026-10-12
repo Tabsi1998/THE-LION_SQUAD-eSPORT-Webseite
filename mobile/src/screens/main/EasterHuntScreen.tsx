@@ -10,7 +10,7 @@ import { isGuestUser } from "../../live";
 import { openSignIn } from "../../navigation/rootNavigation";
 import { EggArt } from "../../seasons/easter/art";
 import { fetchHuntPage, onHuntProgress, type HuntMe, type HuntPage } from "../../seasons/easterHunt/api";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
 import { asInstant, viennaDate } from "../../lib/vienna";
 
 // Der Korb der Ostereiersuche (#647, wie /ostern im Web): Zeitraum, der eigene Korb mit den gefundenen Eiern in ihrem
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   card: { gap: 8 },
   cardTitle: { color: colors.white },
   line: { color: "rgba(255,255,255,0.82)" },
-  cta: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", backgroundColor: GOLD, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  cta: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", backgroundColor: GOLD, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 8 },
   ctaText: { color: "#000", fontWeight: "800" },
   prize: { gap: 2, paddingVertical: 4 },
   prizeKind: { color: GOLD, fontWeight: "800", textTransform: "uppercase", fontSize: 11 },
