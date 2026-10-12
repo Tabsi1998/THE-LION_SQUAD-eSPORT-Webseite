@@ -16,7 +16,8 @@ import dns.reversename
 
 from database import get_db
 from models import new_id, now_utc
-from services.email_delivery import html_to_text, mailbox_domain
+from services.email_delivery import header_text, html_to_text, mailbox_domain
+from services.log_safe import log_safe, mask_addresses
 
 logger = logging.getLogger("tls.mailqueue")
 
@@ -540,7 +541,8 @@ async def enqueue_mail(
     job = {
         "id": new_id(),
         "to": to,
-        "subject": subject,
+        # Jede Mail der Website kommt hier vorbei: der Betreff bleibt eine Zeile - kein Wert hängt eine Kopfzeile an.
+        "subject": header_text(subject),
         "html": html,
         "template_key": template_key,
         "status": "pending",
@@ -670,7 +672,9 @@ async def _try_send_job(job: dict) -> None:
             "created_at": now_utc().isoformat(),
         })
     except Exception as exc:
-        logger.error(f"[mailqueue] {job['id']} failed: {exc}")
+        # Ins Protokoll ohne Mail-Adressen und in einer Zeile; die volle Meldung steht unten im Eintrag der
+        # Warteschlange, den der Admin unter System sieht.
+        logger.error("[mailqueue] %s failed: %s", job["id"], log_safe(mask_addresses(exc), 300))
         attempts = (job.get("attempts") or 0) + 1
         if attempts >= MAX_ATTEMPTS:
             await db.mail_jobs.update_one(
@@ -696,7 +700,7 @@ async def _try_send_job(job: dict) -> None:
                 from services.ops_alerts import notify
                 masked = f"{str(job['to'])[:1]}***{str(job['to'])[str(job['to']).find('@'):]}" if "@" in str(job["to"]) else "***"
                 await notify(db, "mail_failed", f"Mail nicht zustellbar: {job.get('subject') or ''}"[:180],
-                             f"An {masked} · Vorlage {job.get('template_key', 'custom')} · {str(exc)[:200]}", key=f"mail:{job.get('template_key', 'custom')}")
+                             f"An {masked} · Vorlage {job.get('template_key', 'custom')} · {mask_addresses(exc)[:200]}", key=f"mail:{job.get('template_key', 'custom')}")
             except Exception:  # noqa: BLE001 - ein Alarm darf den Versand nicht abbrechen
                 logger.warning("[mailqueue] Alarm fehlgeschlagen", exc_info=True)
         else:
@@ -734,7 +738,8 @@ async def process_mail_queue(batch: int = 10) -> dict:
             await _try_send_job(claimed)
             sent += 1
         except Exception as exc:
-            logger.exception(f"[mailqueue] dispatch crash: {exc}")
+            # Ohne Stacktrace: der trüge die Meldung samt Mail-Adresse ins Protokoll.
+            logger.error("[mailqueue] dispatch crash (%s): %s", type(exc).__name__, log_safe(mask_addresses(exc), 300))
     return {"processed": len(jobs), "sent": sent, "recovered": recovered}
 
 

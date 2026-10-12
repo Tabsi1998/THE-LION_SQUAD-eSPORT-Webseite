@@ -5,7 +5,6 @@ es den Antrag, steht die Einladung auf „Antrag gestellt“; der Vorstand kann 
 30 Tagen läuft sie ab. Ohne Einladung bleibt „Mitglied werden“ wie bisher erreichbar."""
 from __future__ import annotations
 
-import html
 from datetime import timedelta
 
 from models import new_id, now_utc
@@ -74,12 +73,13 @@ async def _notify(user: dict, doc: dict) -> None:
     from services.mail_queue import enqueue_mail
 
     name = user.get("display_name") or user.get("username") or "du"
-    note_html = f"<p><em>{html.escape(doc['note'])}</em></p>" if doc.get("note") else ""
+    # Werte nur als {{…}} - render_template setzt sie als Text ein.
+    note_part = "<p><em>{{note}}</em></p>" if doc.get("note") else ""
     subject, body = await render_template(
         "membership_invited", {"name": name, "note": doc.get("note") or ""},
         fallback_subject="Einladung: Werde Mitglied bei uns",
-        fallback_html=(f"<p>Hallo {html.escape(name)},</p><p>der Vorstand lädt dich ein, Mitglied zu werden. Melde dich auf der Website an und "
-                       f"fülle den Mitgliedsantrag aus – er ist für dich freigeschaltet.</p>{note_html}"),
+        fallback_html=("<p>Hallo {{name}},</p><p>der Vorstand lädt dich ein, Mitglied zu werden. Melde dich auf der Website an und "
+                       f"fülle den Mitgliedsantrag aus – er ist für dich freigeschaltet.</p>{note_part}"),
     )
     await enqueue_mail(user["email"], subject, body, template_key="membership_invited", dedupe_key=f"invite:{doc['id']}")
 

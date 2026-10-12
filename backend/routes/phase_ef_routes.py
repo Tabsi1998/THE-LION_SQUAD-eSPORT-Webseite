@@ -16,7 +16,6 @@ Endpoints:
   POST /api/admin/discord/counter/{user_id}         — bump discord_messages_count (+N)
   GET  /api/admin/discord/counters                  — list users with counter
 """
-import html as html_lib
 import logging
 import re
 from typing import Optional
@@ -26,6 +25,7 @@ from pydantic import BaseModel, Field
 from database import get_db
 from auth import require_area
 from models import now_utc, new_id
+from services.email_delivery import fill_placeholders
 from services.permissions import user_has_area
 from services.stream_visibility import homepage_visibility, reason_text
 from services.log_safe import log_safe
@@ -268,18 +268,15 @@ async def admin_reset_template(key: str, me: dict = Depends(require_area("system
 
 
 async def render_template(key: str, vars_: dict, fallback_subject: str = "", fallback_html: str = "") -> tuple[str, str]:
-    """Helper used by mail_queue/phase_c to substitute {{var}} placeholders."""
+    """Vorlage aus der Datenbank (oder der Ersatztext des Aufrufers) mit `{{var}}`-Werten: im HTML jeder Wert als
+    Text, im Betreff einzeilig (services/email_delivery). Werte gehören deshalb immer als `{{var}}` in den
+    Ersatztext, nie direkt hineingeschrieben."""
     db = get_db()
     t = await db.email_templates.find_one({"key": key}, {"_id": 0})
     subj = (t and t.get("subject")) or fallback_subject
     html = (t and t.get("html")) or fallback_html
-    for k, v in (vars_ or {}).items():
-        v_str = "" if v is None else str(v)
-        subject_v = v_str.replace("\r", " ").replace("\n", " ")
-        safe_v = html_lib.escape(v_str, quote=True)
-        subj = subj.replace("{{" + k + "}}", subject_v)
-        html = html.replace("{{" + k + "}}", safe_v)
-    return subj, html
+    values = vars_ or {}
+    return fill_placeholders(subj, values, as_html=False), fill_placeholders(html, values, as_html=True)
 
 
 # ============= Discord Counter (manual mods +1) =============
