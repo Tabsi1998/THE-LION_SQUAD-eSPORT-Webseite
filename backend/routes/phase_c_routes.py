@@ -436,26 +436,12 @@ async def admin_decide_application(app_id: str, body: DecisionBody,
 
     # Notify applicant via mail queue
     try:
-        from services.mail_queue import enqueue_mail
-        from routes.phase_ef_routes import render_template
+        from services.membership_decision_mail import queue_decision_mail
         u = await db.users.find_one(
             {"id": app["user_id"]},
             {"_id": 0, "email": 1, "display_name": 1, "username": 1, "newsletter_consent": 1, "notification_preferences": 1},
         )
-        if u and u.get("email"):
-            tpl_key = "membership_approve" if body.decision == "approve" else "membership_reject"
-            display = u.get("display_name") or u.get("username") or "Spieler"
-            subj, html = await render_template(
-                tpl_key,
-                {"display_name": display, "note": body.note or ""},
-                fallback_subject=("Mitgliedsbewerbung angenommen 🦁" if body.decision == "approve" else "Mitgliedsbewerbung abgelehnt"),
-                fallback_html=("<p>Hallo {{display_name}},</p><p>Deine Bewerbung wurde "
-                               f"{'angenommen' if body.decision == 'approve' else 'abgelehnt'}.</p>"
-                               "<p>{{note}}</p>"),
-            )
-            from services.notification_preferences import email_allowed
-            if email_allowed(u, tpl_key, "membership_updates"):
-                await enqueue_mail(to=u["email"], subject=subj, html=html)
+        await queue_decision_mail(u, approved=body.decision == "approve", note=body.note or "", application_id=app_id)
     except Exception:
         logger.warning("[membership] Mail zur Entscheidung über Bewerbung %s fehlgeschlagen", log_safe(app_id), exc_info=True)
 

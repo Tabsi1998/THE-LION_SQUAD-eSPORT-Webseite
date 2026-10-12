@@ -36,6 +36,7 @@ CHECK_INTERVAL_SECONDS = 120          # so oft liest die eigene Seite höchstens
 JOB_CHECK_INTERVAL_SECONDS = 600      # der Job liest offene Anträge alle zehn Minuten nach
 RETRY_DELAYS = (60, 300, 900, 3600)   # Sendeversuche nach einem technischen Fehler
 RETRY_MAX = 24
+MAIL_CLAIM_SECONDS = 600              # so lange gehört eine Entscheidungsmail dem Lauf, der sie gerade einreiht
 FORM_FIELDS = ("firstname", "lastname", "phone", "birth", "address", "zip", "town")
 FIELD_LABELS = {"firstname": "Vorname", "lastname": "Nachname", "email": "E-Mail", "phone": "Telefon", "birth": "Geburtsdatum", "address": "Straße und Hausnummer", "zip": "PLZ", "town": "Ort"}
 DURATION_LABELS = {"y": ("je Jahr", "Jahre"), "m": ("je Monat", "Monate"), "w": ("je Woche", "Wochen"), "d": ("je Tag", "Tage")}
@@ -168,18 +169,35 @@ async def submit(db, client: DolibarrClient, doc: dict) -> dict:
     return await db.membership_applications.find_one({"id": doc["id"]}, {"_id": 0})
 
 
-async def _notify_decision(db, doc: dict, status: str, reason: str) -> None:
-    """Die Person erfährt die Entscheidung genau einmal - über die Vorlagen, die es schon gibt."""
-    from services.notification_preferences import send_user_template
+async def _notify_decision(db, doc: dict) -> bool:
+    """Die Person erfährt die Entscheidung genau einmal - über dieselbe Mail wie im Admin (#1444).
 
+    Mitgeteilt (``notified_at``) ist sie erst, wenn die Mail in der Warteschlange liegt oder die Person
+    Mitgliedschafts-Mails abgeschaltet hat. Vorher beansprucht ein Lauf den Antrag atomar
+    (``decision_mail_claimed_at``) - zwei Läufe zugleich reihen nie zwei Mails ein - und markiert ihn als offen
+    (``decision_mail_pending``). Scheitert das Einreihen (oder bricht der Lauf ab), bleibt die Markierung
+    stehen und der Job holt genau diese Mail nach; Altbestand ohne Markierung fasst er nie an."""
+    from services.log_safe import log_safe, mask_addresses
+    from services.membership_decision_mail import queue_decision_mail
+
+    now = now_utc()
+    stale = (now - timedelta(seconds=MAIL_CLAIM_SECONDS)).isoformat()
+    claim = await db.membership_applications.update_one(
+        {"id": doc["id"], "notified_at": None, "$or": [{"decision_mail_claimed_at": None}, {"decision_mail_claimed_at": {"$lte": stale}}]},
+        {"$set": {"decision_mail_claimed_at": now.isoformat(), "decision_mail_pending": True}})
+    if claim.modified_count != 1:
+        return False
     user = await db.users.find_one({"id": doc["user_id"]}, {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1, "newsletter_consent": 1, "notification_preferences": 1})
-    if not user:
-        return
-    template = "membership_approve" if status == "approved" else "membership_reject"
     try:
-        await send_user_template(user, template, display_name=user.get("display_name") or user.get("username") or "Spieler", note=reason or "")
-    except Exception:  # noqa: BLE001 - eine Mail darf den Stand nie blockieren
-        logger.warning("[dolibarr] Entscheidungsmail nicht gesendet", exc_info=True)
+        await queue_decision_mail(user, approved=doc.get("status") == "approved", note=doc.get("decision_note") or "", application_id=doc["id"])
+    except Exception as exc:  # noqa: BLE001 - eine Mail darf den Stand nie blockieren
+        logger.warning("[dolibarr] Entscheidungsmail zu Antrag %s nicht eingereiht, der nächste Lauf versucht es wieder: %s: %s",
+                       log_safe(doc["id"]), type(exc).__name__, log_safe(mask_addresses(exc), 300))
+        await db.membership_applications.update_one({"id": doc["id"]}, {"$unset": {"decision_mail_claimed_at": ""}})
+        return False
+    await db.membership_applications.update_one({"id": doc["id"]}, {
+        "$set": {"notified_at": now_utc().isoformat()}, "$unset": {"decision_mail_pending": "", "decision_mail_claimed_at": ""}})
+    return True
 
 
 async def _accept(db, settings: dict, doc: dict, state: dict) -> None:
@@ -232,8 +250,7 @@ async def refresh(db, settings: dict, client: DolibarrClient, doc: dict, *, forc
     if status in ("approved", "rejected") and not fresh.get("notified_at"):
         if status == "approved":
             await _accept(db, settings, fresh, state)
-        await _notify_decision(db, fresh, status, fresh.get("decision_note") or "")
-        await db.membership_applications.update_one({"id": doc["id"]}, {"$set": {"notified_at": now}})
+        await _notify_decision(db, fresh)
         fresh = await db.membership_applications.find_one({"id": doc["id"]}, {"_id": 0})
     return fresh
 
@@ -250,7 +267,8 @@ async def withdraw(db, client: DolibarrClient, doc: dict) -> dict:
 
 
 async def refresh_due(db=None) -> dict:
-    """Der Job: hängende Sendungen wieder versuchen, offene Anträge nachlesen."""
+    """Der Job: hängende Sendungen wieder versuchen, liegengebliebene Entscheidungsmails einreihen,
+    offene Anträge nachlesen."""
     from database import get_db
     from services.dolibarr_client import load_settings
 
@@ -263,17 +281,21 @@ async def refresh_due(db=None) -> dict:
     except DolibarrError as exc:
         return {"ok": False, "kind": exc.kind}
     now = now_utc().isoformat()
-    sent = checked = 0
+    sent = checked = notified = 0
     async for doc in db.membership_applications.find({"status": "submitting", "external_id": {"$exists": True}}, {"_id": 0}):
         if (doc.get("dolibarr") or {}).get("next_try_at", "") <= now:
             await submit(db, client, doc)
             sent += 1
+    # Entschieden, aber die Mail kam beim ersten Mal nicht in die Warteschlange (#1444) - nur, was der Abgleich
+    # selbst als offen markiert hat; Altbestand ohne notified_at bleibt still.
+    async for doc in db.membership_applications.find({"decision_mail_pending": True, "notified_at": None, "status": {"$in": ["approved", "rejected"]}}, {"_id": 0}):
+        notified += await _notify_decision(db, doc)
     due = (now_utc() - timedelta(seconds=JOB_CHECK_INTERVAL_SECONDS)).isoformat()
     async for doc in db.membership_applications.find({"status": "pending", "external_id": {"$exists": True}}, {"_id": 0}):
         if (doc.get("dolibarr") or {}).get("checked_at", "") <= due:
             await refresh(db, settings, client, doc, force=True)
             checked += 1
-    return {"ok": True, "sent": sent, "checked": checked}
+    return {"ok": True, "sent": sent, "checked": checked, "notified": notified}
 
 
 def _parse(value: str):

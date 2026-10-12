@@ -16,6 +16,7 @@ from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import dolibarr_applications, dolibarr_client, dolibarr_sync  # noqa: E402
+from services.notification_preferences import preference_key  # noqa: E402
 from services.secret_store import encrypt_secret  # noqa: E402
 
 
@@ -153,7 +154,7 @@ async def test_outage_keeps_the_application_in_transit_and_the_job_sends_it_late
     fake.fail_with = None
     await flow.db.membership_applications.update_one({"user_id": amelie["id"]}, {"$set": {"dolibarr.next_try_at": "2026-01-01T00:00:00+00:00"}})
     result = await dolibarr_applications.refresh_due(flow.db)
-    assert result == {"ok": True, "sent": 1, "checked": 0}
+    assert result == {"ok": True, "sent": 1, "checked": 0, "notified": 0}
     mine = (await flow.get("/api/membership/apply/me")).json()
     assert mine["status"] == "pending" and len(fake.applications) == 1
 
@@ -188,3 +189,146 @@ async def test_outage_keeps_the_application_in_transit_and_the_job_sends_it_late
     assert stale["status"] == "failed" and stale["dolibarr"]["error"] == "bad_request"
     mine = (await flow.get("/api/membership/apply/me")).json()
     assert mine["status"] == "failed" and mine["dolibarr"]["error_text"]
+
+
+# --------------------------------------------------------------------------- Entscheidungsmail (#1444)
+async def applied(flow, fake, name="amelie"):
+    """Ein Antrag, der in Dolibarr liegt - zurück kommen Person und external_id."""
+    await connect(flow, applications_enabled=True)
+    user = await person(flow, name)
+    flow.act_as(user)
+    sent = await flow.post("/api/membership/apply", json=APPLICATION)
+    assert sent.status_code == 200, sent.text
+    return user, sent.json()["dolibarr"]["external_id"]
+
+
+async def decided_in_dolibarr(flow, fake, external_id, status, reason=""):
+    """Der Verein entscheidet in Dolibarr, der Job liest nach."""
+    fake.decide(external_id, status, reason=reason)
+    await flow.db.membership_applications.update_one({"external_id": external_id}, {"$set": {"dolibarr.checked_at": "2026-01-01T00:00:00+00:00"}})
+    return await dolibarr_applications.refresh_due(flow.db)
+
+
+async def mails_to(flow, user):
+    address = (await flow.db.users.find_one({"id": user["id"]}))["email"]
+    return await flow.db.mail_jobs.find({"to": address}, {"_id": 0}).to_list(50)
+
+
+@pytest.mark.asyncio
+async def test_acceptance_in_dolibarr_puts_exactly_one_mail_in_the_queue(flow, fake):
+    amelie, external_id = await applied(flow, fake)
+    await decided_in_dolibarr(flow, fake, external_id, "accepted")
+    mails = await mails_to(flow, amelie)
+    assert len(mails) == 1 and mails[0]["template_key"] == "membership_approve" and "Amelie" in mails[0]["html"]
+    assert (await flow.db.membership_applications.find_one({"external_id": external_id}))["notified_at"]
+
+    # Ein weiterer Lauf schickt nichts nach.
+    await dolibarr_applications.refresh_due(flow.db)
+    assert len(await mails_to(flow, amelie)) == 1
+
+
+@pytest.mark.asyncio
+async def test_rejection_in_dolibarr_sends_the_reason_once(flow, fake):
+    amelie, external_id = await applied(flow, fake)
+    await decided_in_dolibarr(flow, fake, external_id, "rejected", reason="Bitte zuerst bei zwei Vereinsabenden vorbeischauen.")
+    mails = await mails_to(flow, amelie)
+    assert len(mails) == 1 and mails[0]["template_key"] == "membership_reject"
+    assert "Bitte zuerst bei zwei Vereinsabenden vorbeischauen." in mails[0]["html"]
+    assert (await flow.db.membership_applications.find_one({"external_id": external_id}))["notified_at"]
+
+
+@pytest.mark.asyncio
+async def test_switched_off_membership_mails_send_nothing_but_count_as_done(flow, fake):
+    amelie, external_id = await applied(flow, fake)
+    await flow.db.users.update_one({"id": amelie["id"]}, {"$set": {"notification_preferences": {preference_key("email", "membership_updates"): False}}})
+    await decided_in_dolibarr(flow, fake, external_id, "accepted")
+    assert await mails_to(flow, amelie) == []
+    assert (await flow.db.membership_applications.find_one({"external_id": external_id}))["notified_at"]
+
+
+@pytest.mark.asyncio
+async def test_a_failed_enqueue_leaves_the_decision_open_and_the_next_run_sends_once(flow, fake, monkeypatch, caplog):
+    from services import mail_queue
+
+    amelie, external_id = await applied(flow, fake)
+
+    async def broken(*args, **kwargs):
+        raise RuntimeError("Warteschlange voll für amelie@example.test")
+
+    real = mail_queue.enqueue_mail
+    monkeypatch.setattr(mail_queue, "enqueue_mail", broken)
+    caplog.set_level("WARNING")
+    await decided_in_dolibarr(flow, fake, external_id, "accepted")
+    doc = await flow.db.membership_applications.find_one({"external_id": external_id}, {"_id": 0})
+    assert doc["status"] == "approved" and not doc.get("notified_at"), "ohne Mail in der Warteschlange ist die Entscheidung nicht mitgeteilt"
+    assert await mails_to(flow, amelie) == []
+    assert "Entscheidungsmail" in caplog.text and "amelie@example.test" not in caplog.text, "Fehler im Protokoll, aber ohne Adresse"
+    assert doc["decision_mail_pending"] is True, "der Fehlschlag ist für den nächsten Lauf markiert"
+
+    monkeypatch.setattr(mail_queue, "enqueue_mail", real)
+    await dolibarr_applications.refresh_due(flow.db)
+    mails = await mails_to(flow, amelie)
+    assert len(mails) == 1 and mails[0]["template_key"] == "membership_approve"
+    done = await flow.db.membership_applications.find_one({"external_id": external_id}, {"_id": 0})
+    assert done["notified_at"] and "decision_mail_pending" not in done and "decision_mail_claimed_at" not in done
+    await dolibarr_applications.refresh_due(flow.db)
+    assert len(await mails_to(flow, amelie)) == 1
+
+
+@pytest.mark.asyncio
+async def test_old_decisions_without_the_mark_get_no_mail_after_the_update(flow, fake):
+    """Altbestand ohne notified_at (etwa aus der Zeit vor dem Feld) bleibt still - nachgeholt wird nur, was der
+    neue Code selbst als gescheitert markiert hat."""
+    await connect(flow, applications_enabled=True)
+    old = await person(flow, "altbestand")
+    await flow.db.membership_applications.insert_one({
+        "id": "app-alt-entschieden", "user_id": old["id"], "external_id": "web-app-alt-entschieden", "source": "dolibarr",
+        "status": "approved", "decided_by": "dolibarr", "decided_at": "2025-03-01T10:00:00+00:00", "created_at": "2025-02-01T10:00:00+00:00",
+    })
+    result = await dolibarr_applications.refresh_due(flow.db)
+    assert result["notified"] == 0
+    assert await mails_to(flow, old) == []
+    assert not (await flow.db.membership_applications.find_one({"id": "app-alt-entschieden"})).get("notified_at")
+
+
+@pytest.mark.asyncio
+async def test_two_runs_at_once_queue_one_decision_mail(flow, fake, monkeypatch):
+    import asyncio
+
+    from services import mail_queue
+
+    amelie, external_id = await applied(flow, fake)
+    fake.decide(external_id, "accepted")
+    await flow.db.membership_applications.update_one({"external_id": external_id}, {"$set": {"status": "approved", "decided_by": "dolibarr"}})
+    doc = await flow.db.membership_applications.find_one({"external_id": external_id}, {"_id": 0})
+
+    real = mail_queue.enqueue_mail
+
+    async def slow(*args, **kwargs):
+        await asyncio.sleep(0.01)  # beide Läufe sind gleichzeitig mitten im Einreihen
+        return await real(*args, **kwargs)
+
+    monkeypatch.setattr(mail_queue, "enqueue_mail", slow)
+    first, second = await asyncio.gather(dolibarr_applications._notify_decision(flow.db, doc), dolibarr_applications._notify_decision(flow.db, doc))
+    assert sorted([first, second]) == [False, True]
+    assert len(await mails_to(flow, amelie)) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_admin_decision_without_dolibarr_still_mails_the_person(flow, fake):
+    """Der Weg ohne Dolibarr nutzt dieselbe Mail: Vorlage, Begründung, Einstellungen der Person."""
+    admin = await flow.add_user(role="club_admin")
+    for name, prefs in (("amelie", {}), ("ruhig", {preference_key("email", "membership_updates"): False})):
+        user = await person(flow, name)
+        await flow.db.users.update_one({"id": user["id"]}, {"$set": {"notification_preferences": prefs}})
+        flow.act_as(user)
+        sent = await flow.post("/api/membership/apply", json={"motivation": "Ich möchte mitspielen und mich einbringen.", "contribution_pref": "full", "accept_statutes": True, "accept_privacy": True})
+        assert sent.status_code == 200, sent.text
+        flow.act_as(admin)
+        decided = await flow.patch(f"/api/membership/applications/{sent.json()['id']}", json={"decision": "reject", "note": "Bitte im Frühjahr nochmal."})
+        assert decided.status_code == 200, decided.text
+        mails = await mails_to(flow, user)
+        if prefs:
+            assert mails == [], "abgeschaltete Mitgliedschafts-Mails bleiben aus"
+        else:
+            assert len(mails) == 1 and "Bitte im Frühjahr nochmal." in mails[0]["html"]
