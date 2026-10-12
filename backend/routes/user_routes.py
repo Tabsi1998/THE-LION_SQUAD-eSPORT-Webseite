@@ -113,10 +113,11 @@ async def _viewer_context(db, viewer: dict | None, target_id: str) -> dict:
     if not viewer:
         return {"self": False, "logged_in": False, "member": False, "admin": False}
     from services.membership_service import get_membership, is_active_member
-    from services.permissions import areas_for
-    from services.visibility import ADMIN_ROLES
+    from services.permissions import MFA_AREAS, areas_for, needs_mfa
     areas = await areas_for(viewer)
-    admin = viewer.get("role") in ADMIN_ROLES or any(area in areas for area in ("tournaments", "content", "club", "finance", "system", "moderation"))
+    # Admin-Team: jeder Bereich (Rolle, Freigabe, Vorstand) - wie in ``require_area`` nur mit bestätigter
+    # Zwei-Faktor-Anmeldung (#1469); Moderation geht laut ``MFA_AREAS`` ohne.
+    admin = bool(areas - MFA_AREAS) or (bool(areas & MFA_AREAS) and not needs_mfa(viewer))
     member = bool(viewer.get("is_club_member")) or is_active_member(await get_membership(viewer["id"]))
     return {"self": viewer.get("id") == target_id, "logged_in": True, "member": member or admin, "admin": admin}
 

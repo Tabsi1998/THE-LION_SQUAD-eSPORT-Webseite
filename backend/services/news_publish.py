@@ -106,7 +106,8 @@ async def notify_news_mentions(db, post: dict, actor: dict | None = None) -> int
     for user in users:
         if post.get("visibility") == "internal" and user.get("role") not in STAFF_ROLES:
             continue
-        if not await user_can_see(user, post.get("visibility") or "public"):
+        # Empfänger aus der Datenbank: die Zwei-Faktor-Bestätigung gehört zur Anmeldung, nicht zum Konto.
+        if not await user_can_see(user, post.get("visibility") or "public", for_request=False):
             continue
         await create_user_notification(
             user["id"],

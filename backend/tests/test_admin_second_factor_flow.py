@@ -246,8 +246,20 @@ async def test_locked_document_downloads_need_the_second_factor(flow):
 
     flow.act_as(admin)
     assert (await flow.post(f"/api/documents/{doc['id']}/track-download")).status_code == 200
+    # Als Mitglied sieht der Club-Admin das Dokument auch ohne Zwei-Faktor - der gesperrte Download nennt sie.
+    flow.act_as({**without_second_factor(admin), "is_club_member": True})
+    refused = await flow.post(f"/api/documents/{doc['id']}/track-download")
+    assert refused.status_code == 403
+    assert refused.json()["detail"] == MFA_MESSAGE
+    # Ohne Mitgliedschaft und ohne Zwei-Faktor öffnet die Rolle das Dokument gar nicht.
     flow.act_as(without_second_factor(admin))
     assert (await flow.post(f"/api/documents/{doc['id']}/track-download")).status_code == 403
+    # Ein Mitglied ohne Adminrolle bekommt den allgemeinen Satz.
+    member = await flow.add_user(role="player", name="mitglied")
+    flow.act_as({**without_second_factor(member), "is_club_member": True})
+    refused = await flow.post(f"/api/documents/{doc['id']}/track-download")
+    assert refused.status_code == 403
+    assert refused.json()["detail"] == "Download ist für dieses Dokument deaktiviert."
 
 
 @pytest.mark.asyncio
@@ -262,7 +274,12 @@ async def test_admin_media_needs_the_second_factor(flow):
     assert _is_admin_media_user(lead) is True
 
     flow.act_as(without_second_factor(lead))
-    assert (await flow.get("/api/uploads/events")).status_code == 403
+    log = await flow.get("/api/uploads/events")
+    assert log.status_code == 403
+    assert log.json()["detail"] == MFA_MESSAGE
+    player = await flow.add_user(role="player", name="spieler")
+    flow.act_as(player)
+    assert (await flow.get("/api/uploads/events")).json()["detail"] == "Upload-Protokoll nur für Admin/CMS-Rollen."
     assert _is_admin_media_user(without_second_factor(lead)) is False
     with pytest.raises(HTTPException) as refused:
         _clean_media_scope("gallery", without_second_factor(lead))
@@ -270,3 +287,78 @@ async def test_admin_media_needs_the_second_factor(flow):
     assert refused.value.detail == MFA_MESSAGE
     # Eigene Bilder lädt jedes Konto weiter hoch.
     assert _clean_media_scope("user", without_second_factor(lead)) == "user"
+
+
+# ------------------------------------------------------------------ Interne und Mitglieder-Inhalte
+
+@pytest.mark.asyncio
+async def test_internal_and_member_news_need_the_second_factor_unless_member(flow):
+    admin = await flow.add_user(role="club_admin", name="clubadmin")
+    internal = await make_news(flow, "Vorstand intern", published=True)
+    members = await make_news(flow, "Vereinsabend", published=True)
+    public = await make_news(flow, "Saisonstart", published=True)
+    await flow.db.news_posts.update_one({"id": internal["id"]}, {"$set": {"visibility": "internal"}})
+    await flow.db.news_posts.update_one({"id": members["id"]}, {"$set": {"visibility": "members"}})
+
+    async def status(post):
+        return (await flow.get(f"/api/news/{post['slug']}")).status_code
+
+    flow.act_as(admin)
+    assert [await status(p) for p in (internal, members, public)] == [200, 200, 200]
+    flow.act_as(without_second_factor(admin))
+    assert [await status(p) for p in (internal, members, public)] == [403, 403, 200]
+    # Mitgliedschaft bleibt die Ausnahme: Mitglieder-Inhalte ohne Zwei-Faktor, „Nur intern“ nicht.
+    flow.act_as({**without_second_factor(admin), "is_club_member": True})
+    assert [await status(p) for p in (internal, members, public)] == [403, 200, 200]
+    # Bereich aus einer Freigabe: dieselbe Regel.
+    granted = await flow.add_user(role="player", name="vereinsverwaltung")
+    granted = {**granted, "areas": ["club"]}
+    flow.act_as(granted)
+    assert [await status(p) for p in (internal, members)] == [200, 200]
+    flow.act_as(without_second_factor(granted))
+    assert [await status(p) for p in (internal, members)] == [403, 403]
+
+
+@pytest.mark.asyncio
+async def test_internal_news_mentions_still_reach_recipients_from_the_database(flow):
+    from services.news_publish import notify_news_mentions
+
+    admin = await flow.add_user(role="club_admin", name="clubadmin")
+    # Konten aus der Datenbank tragen keine Sitzungs-Bestätigung - sie gehört zur Anmeldung.
+    await flow.db.users.update_one({"id": admin["id"]}, {"$unset": {"auth_mfa_verified": ""}})
+    post = await make_news(flow, "Vorstand intern", published=True)
+    post = {**post, "visibility": "internal", "mentioned_user_ids": [admin["id"]]}
+    await flow.db.news_posts.update_one({"id": post["id"]}, {"$set": {"visibility": "internal", "mentioned_user_ids": [admin["id"]]}})
+    assert await notify_news_mentions(flow.db, post) == 1
+
+
+@pytest.mark.asyncio
+async def test_admin_profile_fields_need_the_second_factor_except_moderation(flow):
+    from routes.user_routes import _viewer_context
+
+    target = await flow.add_user(role="player", name="profilperson")
+    granted = {**(await flow.add_user(role="player", name="redaktion")), "areas": ["content"]}
+    moderator = await flow.add_user(role="moderator", name="moderation")
+
+    assert (await _viewer_context(flow.db, granted, target["id"]))["admin"] is True
+    assert (await _viewer_context(flow.db, without_second_factor(granted), target["id"]))["admin"] is False
+    # Moderation geht laut Vertrag (MFA_AREAS) ohne Zwei-Faktor.
+    assert (await _viewer_context(flow.db, without_second_factor(moderator), target["id"]))["admin"] is True
+    plain = await flow.add_user(role="player", name="zuschauer")
+    assert (await _viewer_context(flow.db, plain, target["id"]))["admin"] is False
+
+
+@pytest.mark.asyncio
+async def test_additional_roles_list_grants_nothing_on_its_own(flow):
+    # ``roles[]`` spiegelt die Rolle (models.py); Rechte kommen wie in ``base_areas`` und ``require_area`` nur aus
+    # ``role`` und den Freigaben - eine Zusatzrolle öffnet weder Bereiche noch Rollenlisten.
+    from services.permissions import admin_role_without_second_factor, base_areas, is_confirmed_admin_role
+
+    confirmed = {"mfa_enabled": True, "auth_mfa_verified": True}
+    stale = {"role": "player", "roles": ["player", "club_admin"], **confirmed}
+    assert base_areas(stale) == set()
+    assert is_confirmed_admin_role(stale, {"club_admin", "superadmin"}) is False
+    assert admin_role_without_second_factor({**stale, "auth_mfa_verified": False}, {"club_admin"}) is False
+    seeded = {"role": "superadmin", "roles": ["superadmin", "club_admin", "tournament_admin"]}
+    assert is_confirmed_admin_role(seeded, {"tournament_admin", "superadmin"}) is False
+    assert is_confirmed_admin_role({**seeded, **confirmed}, {"tournament_admin", "superadmin"}) is True
