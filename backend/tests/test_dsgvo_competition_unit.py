@@ -73,6 +73,8 @@ class FakeDb:
             "discord_memberships", "media_uploads",
             # Auskunft Fassung 4: Einlass bei der Generalversammlung
             "meeting_admissions",
+            # Eingesandte Galerie-Fotos (#1186)
+            "gallery_submissions",
         ):
             setattr(self, name, FakeCollection())
 

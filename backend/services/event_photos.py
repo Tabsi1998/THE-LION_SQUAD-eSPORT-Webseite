@@ -570,7 +570,8 @@ EXPORT_FIELDS = ("id", "album_id", "event_id", "status", "credit", "consent_at",
 async def export_for_user(db, user_id: str) -> list[dict]:
     """DSGVO-Auskunft: die eigenen Einsendungen mit Einwilligung und Stand - nur Angaben, nie die Datei oder ihr Ablageort.
     Abgelehnte stehen nicht darin: sie sind samt Datei gelöscht."""
-    rows = await db.gallery_submissions.find({"owner_id": user_id}, {"_id": 0}).sort("created_at", 1).to_list(5000)
+    rows = await db.gallery_submissions.find({"owner_id": user_id}, {"_id": 0}).to_list(5000)
+    rows.sort(key=lambda row: str(row.get("created_at") or ""))
     return [{key: row.get(key) for key in EXPORT_FIELDS} for row in rows]
 
 
