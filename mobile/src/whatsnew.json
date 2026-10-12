@@ -1,15 +1,21 @@
 {
-  "version": "1.4.0",
-  "build": 90,
-  "date": "2026-10-07",
+  "version": "1.5.0",
+  "build": 91,
+  "date": "2026-10-12",
   "items": [
-    "Neuer Aufbau mit fünf Tabs: Home, Events, Community, Verein und Profil. Oben in jeder Übersicht stehen Suche und Glocke, Einstellungen öffnest du über das Zahnrad im Profil, und Seiten öffnen dort, wo du gerade bist – „Zurück“ führt dorthin zurück.",
-    "Alle Chats in einer Liste unter Community – Direkt-, Team-, Turnier- und Matchchats, neueste zuerst, mit den ungelesenen Nachrichten. Was du in der App liest, ist auch auf der Website gelesen.",
-    "Tab „Verein“: Mitglieder sehen oben ihren Mitgliederbereich mit Karte, Versammlungen, Helfen und Dokumenten, alle anderen „Mitglied werden“. Darunter News, Galerie, Referenzen, Sponsoren und Partner.",
-    "Ein Profil: Dein eigenes Profil sieht aus wie das, was andere sehen, dazu der Kasten „Nur für dich“ mit Rechnungen und Gewinnen und der Schalter „So sehen dich andere“.",
-    "Angemeldet bleiben: Ohne Netz bleibt die Sitzung, jedes Gerät hat seine eigene, und „Angemeldet bleiben“ wirkt.",
-    "Mehrtägige Events zeigen jeden Tag mit Datum, Beginn und Ende; „In den Kalender“ trägt alle Tage ein.",
-    "Bewegung wie auf der Website: Karten geben beim Antippen nach, Listen blenden sich ruhig ein.",
-    "Saison-Deko an Karten: Antippen oder kurz Halten lässt Schnee abrutschen, das Netz reißen und Fledermäuse flattern; Lichterkette, Osterei, Luftschlange und Wimpel hängen jetzt auch an Karten (#1087–#1094)."
+    "Ergebnisse am Handy: Wer ein Turnier leitet, trägt Ergebnisse mit großen Knöpfen ein, sieht vorher in einem Satz, was daraus folgt, und hat 10 Sekunden „Rückgängig“. Spieler melden ihr Ergebnis selbst, auf Wunsch mit Foto, und die Gegenseite bestätigt mit einem Tipp: „Stimmt“ oder „Stimmt nicht“.",
+    "Problem melden: Bei falschem Ergebnis, Regelverstoß oder Technik-Ärger meldest du das mit Grund, kurzem Text und Foto – auch gegen ein Ergebnis der Turnierleitung. Die Turnierleitung sieht alle offenen Fälle unter „Braucht Aufmerksamkeit“ und entscheidet.",
+    "Du bist dran: Reserviert die Turnierleitung deine Station, kommt der Aufruf aufs Handy, und die Matchseite zählt bis zum Antreten herunter. Bei Vor-Ort-Turnieren steht „Check-in vor Ort“ statt eines Knopfs.",
+    "Eigene Benachrichtigungs-Kanäle: „Aufrufe & Spielstart“ mit Gong, „Turniere & Events“, „Chats“, „Verein“ und „Erfolge“ – schaltest du Chats stumm, verpasst du trotzdem keinen Aufruf.",
+    "Turnier- und Matchseiten im Klartext: „Sieger aus A“, „Freilos“, „noch offen“ statt Kürzeln, Zeiten als „geplant ca. 15:20“, Terminvorschläge mit Datum- und Uhrzeit-Auswahl.",
+    "Neue Event-Seite: Banner oben, darunter ein Kasten mit Wann, Wo, Eintritt und Mitbringen, dann „Was läuft beim Event“, Live, Fotos und News – in derselben Reihenfolge wie auf der Website.",
+    "Ein Knopf „In den Kalender“, jetzt auch an Versammlungen und deinen Helferschichten; nach „Ich komme“ oder „Ich helfe“ fragt die App einmal nach. Ist ein Event, Turnier oder Fast Lap vorbei, verschwindet der Knopf.",
+    "Teams: Kopf in der Team-Farbe mit Wappen und Rollen, Einladungs-Link mit QR-Code, „Angemeldet für“ und „Letzte Spiele“. Bei Team-Turnieren stellt der Kapitän die Aufstellung auf und jeder tippt „Ich bin da“. „Team auflösen“ steht jetzt unten im Bearbeiten-Blatt.",
+    "Dein Jahr und mehr: Jahresrückblick, Ergebnis-Bild zum Teilen nach einem Turnier, dein Turnier-Weg und die Bilanz gegen andere im Profil, Rückmeldung nach Turnier oder Event und der Helfer-Aufruf für offene Schichten.",
+    "Verein: „Über uns, Vorstand, Kontakt“ als erste Zeile im Tab „Verein“. Die Mitgliedskarte zeigt ohne Netz den letzten Stand, der Mitgliederbereich deine Karte mit Beitrag und offenen Punkten, deine persönlichen Schreiben liegen im Profil unter „Deine Unterlagen“. Wer noch nicht Mitglied ist, sieht die Beiträge.",
+    "Bilder vom Handy und Teilen: Profilbild, Banner und Team-Logo wählst du direkt in der App; Events, Turniere, Fast Laps, News, Teams und Alben haben einen Teilen-Knopf.",
+    "Klare Zustände: Leere Seiten, Fehler und fehlendes Netz zeigen den Vereinslöwen mit einem Satz und einem Knopf, die Offline-Leiste kommt nur, wenn du wirklich offline bist, und beim Laden steht ein ruhiges Gerüst der Seite statt eines Kreisels. Knöpfe und Farben wie auf der Website.",
+    "Große Schrift: Alle Screens sind mit 1,5- und 2-facher Schrift geprüft – nichts wird abgeschnitten, Namen brechen um, Tippflächen sind groß genug, und der gewählte Tab wird vorgelesen.",
+    "Kleinigkeiten: Bilder laden in passender Größe und sparen Daten, leere Alben sind ausgeblendet, Saison-Deko hängt nur dort, wo Platz ist."
   ]
 }

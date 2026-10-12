@@ -6,12 +6,14 @@ Die LionsAPP für Android wird **lokal gebaut** und als GitHub-Release veröffen
 
 | Version | Bedeutung |
 | --- | --- |
-| `0.2.0-beta`, `0.3.0-beta` … | Vor 1.0.0 gibt es nur Betas. |
-| `1.0.0` | Das erste richtige Release. |
-| `1.2.3-beta`, danach `1.2.3` | Ab 1.0.0: erst die Beta zum Testen, dann dieselbe Version als Release. |
+| `0.2.0-beta`, `0.3.0-beta` … | Vor 1.0.0 gab es nur Betas (historisch). |
+| `1.0.0` | Das erste Release, zugleich die erste Version in Google Play. |
+| `1.4.0`, `1.5.0`, `1.5.1` … | Ab 1.0.0 geht jede Version direkt ohne `-beta` in den **offenen Test** der Play Console; die Freigabe für alle (Produktion) klickt der Betreiber. |
 
-- Neue Funktionen: Minor erhöhen, z. B. `0.2.0-beta` → `0.3.0-beta`.
-- Nur Fehlerbehebungen: Patch erhöhen, z. B. `0.2.0-beta` → `0.2.1-beta`.
+- Neue Funktionen: Minor erhöhen, z. B. `1.4.0` → `1.5.0`.
+- Nur Fehlerbehebungen: Patch erhöhen, z. B. `1.5.0` → `1.5.1`.
+- Ein Fix nach einem schon hochgeladenen Build ist immer eine neue Patch-Version – eine Version wird nie ein zweites Mal hochgeladen.
+- `-beta` nimmt das Release-Skript technisch noch an (dann als Pre-Release auf GitHub), genutzt wird es seit 1.0.0 nicht mehr.
 - Die Version steht gleich in `mobile/package.json`, `mobile/package-lock.json` und `mobile/app.json`. Der Preflight prüft das.
 
 ### Build-Zähler
@@ -24,11 +26,11 @@ Im September 2026 fing die sichtbare Version neu bei 0.x an (#205). Die alten 1.
 
 | | Beispiel |
 | --- | --- |
-| Tag | `mobile-v0.2.0-beta-build57` |
-| Release | `LionsAPP v0.2.0-beta (Build 57)` |
-| APK | `LionsAPP-v0.2.0-beta-build57-<commit>.apk` |
+| Tag | `mobile-v1.5.0-build91` |
+| Release | `LionsAPP v1.5.0 (Build 91)` |
+| APK | `LionsAPP-v1.5.0-build91-<commit>.apk` |
 
-Betas erscheinen auf GitHub als Pre-Release, Releases als „Latest“.
+Releases erscheinen auf GitHub als „Latest“; die alten Betas vor 1.0.0 stehen dort als Pre-Release.
 
 ## Einmalig einrichten
 
@@ -204,6 +206,7 @@ Neueste oben.
 - `1.0.4`: Build 83, Adventkalender und Adventkranz in der App, Halloween-Fundstücke zählen aus der App, Katze wedelt an der Wurzel (Meilenstein Jahreszeiten II, #641, #637, #678)
 - `1.0.5`: Build 84, Schnee und Wetter in der App, Weihnachten mit Lichterkette und Gruß, Nikolausstiefel mit Sticker (Meilenstein Jahreszeiten II, #642, #771, #736)
 - `1.2.0`: Build 86, ohne Konto gleich hinein und Passkeys ohne eigenen Knopf, Abstimmung live, Ehrungen und Teilnahmen im Profil, Konten und einmalige Freigabe in „Meine Mitgliedschaft“, Feinschliff der Jahreszeiten; Release-Build mit R8 und ohne Hochkant-Sperre im Manifest (Meilensteine App 1.2.0, Vereinsmodul 1.5, #917, #918, #919)
+- `1.5.0`: Build 91, Ergebnisse am Handy mit Foto und Bestätigen per Tipp, Problem melden, Aufruf mit Countdown, fünf Benachrichtigungs-Kanäle (#1132–#1140, #1156–#1160, #1370), neue Event-Seite und ein Kalender-Knopf (#1183, #1272, #1273, #1346), Teams mit Wappen, Einladungs-Link und Spieltag, Jahresrückblick (#1191–#1197, #1274, #1347), Verein und Mitgliederbereich (#1024, #1251–#1257, #1332–#1336), Bilder vom Handy, Teilen, Zustände mit Löwe, große Schrift (#1151–#1155, #1231, #1324, #1325)
 - `1.4.0`: Build 90, neuer Aufbau mit fünf Tabs, Kopfzeile mit Suche und Glocke, Einstellungen am Zahnrad, Tab Verein, alle Chats in einer Liste, ein Profil (#1143–#1150), Sitzungen bleiben offline (#942), mehrtägige Events (#884), Bewegung (#1100, #1085), Saison-Deko an Karten (#1087–#1094)
 - `1.3.0`: Build 89, Links öffnen die App (auch von außen, #921), Passkey ohne Gegenstück am Server (#949), Schneehaube im Dashboard (#729), Neigungssensor für Netz, Spinne, Flocken und Sterne (#667), Einlass per Mitgliedskarte für den Vorstand (#845)
 - `1.2.2`: Build 88, mehrere Passkeys: Einladung auch, wenn dieses Handy noch keinen hat, Gerätename im Passkey (#939); dazu am Server jede Schreibweise der App-Herkunft (#938)

@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.5.0 - 2026-10-12
+
+- Mobile: Ergebnisse am Handy: Wer ein Turnier leitet, trägt Ergebnisse mit großen Knöpfen ein, sieht vorher in einem Satz, was daraus folgt, und hat 10 Sekunden „Rückgängig“. Spieler melden ihr Ergebnis selbst, auf Wunsch mit Foto, und die Gegenseite bestätigt mit einem Tipp: „Stimmt“ oder „Stimmt nicht“ (#1132, #1156, #1157, #1159, #1370).
+- Mobile: Problem melden: Bei falschem Ergebnis, Regelverstoß oder Technik-Ärger meldest du das mit Grund, kurzem Text und Foto – auch gegen ein Ergebnis der Turnierleitung. Die Turnierleitung sieht alle offenen Fälle unter „Braucht Aufmerksamkeit“ und entscheidet (#1134, #1158, #1160).
+- Mobile: Du bist dran: Reserviert die Turnierleitung deine Station, kommt der Aufruf aufs Handy, und die Matchseite zählt bis zum Antreten herunter. Bei Vor-Ort-Turnieren steht „Check-in vor Ort“ statt eines Knopfs (#1135, #1137).
+- Mobile: Eigene Benachrichtigungs-Kanäle: „Aufrufe & Spielstart“ mit Gong, „Turniere & Events“, „Chats“, „Verein“ und „Erfolge“ – schaltest du Chats stumm, verpasst du trotzdem keinen Aufruf (#1138).
+- Mobile: Turnier- und Matchseiten im Klartext: „Sieger aus A“, „Freilos“, „noch offen“ statt Kürzeln, Zeiten als „geplant ca. 15:20“, Terminvorschläge mit Datum- und Uhrzeit-Auswahl (#1139, #1140).
+- Mobile: Neue Event-Seite: Banner oben, darunter ein Kasten mit Wann, Wo, Eintritt und Mitbringen, dann „Was läuft beim Event“, Live, Fotos und News – in derselben Reihenfolge wie auf der Website (#1183, #1273, #1346).
+- Mobile: Ein Knopf „In den Kalender“, jetzt auch an Versammlungen und deinen Helferschichten; nach „Ich komme“ oder „Ich helfe“ fragt die App einmal nach. Ist ein Event, Turnier oder Fast Lap vorbei, verschwindet der Knopf (#1221, #1272).
+- Mobile: Teams: Kopf in der Team-Farbe mit Wappen und Rollen, Einladungs-Link mit QR-Code, „Angemeldet für“ und „Letzte Spiele“. Bei Team-Turnieren stellt der Kapitän die Aufstellung auf und jeder tippt „Ich bin da“. „Team auflösen“ steht jetzt unten im Bearbeiten-Blatt (#1191, #1192, #1274, #1347).
+- Mobile: Dein Jahr und mehr: Jahresrückblick, Ergebnis-Bild zum Teilen nach einem Turnier, dein Turnier-Weg und die Bilanz gegen andere im Profil, Rückmeldung nach Turnier oder Event und der Helfer-Aufruf für offene Schichten (#1193, #1194, #1195, #1196, #1197).
+- Mobile: Verein: „Über uns, Vorstand, Kontakt“ als erste Zeile im Tab „Verein“. Die Mitgliedskarte zeigt ohne Netz den letzten Stand, der Mitgliederbereich deine Karte mit Beitrag und offenen Punkten, deine persönlichen Schreiben liegen im Profil unter „Deine Unterlagen“. Wer noch nicht Mitglied ist, sieht die Beiträge (#1024, #1252, #1255, #1256, #1257, #1335, #1336).
+- Mobile: Bilder vom Handy und Teilen: Profilbild, Banner und Team-Logo wählst du direkt in der App; Events, Turniere, Fast Laps, News, Teams und Alben haben einen Teilen-Knopf (#1153, #1154).
+- Mobile: Klare Zustände: Leere Seiten, Fehler und fehlendes Netz zeigen den Vereinslöwen mit einem Satz und einem Knopf, die Offline-Leiste kommt nur, wenn du wirklich offline bist, und beim Laden steht ein ruhiges Gerüst der Seite statt eines Kreisels. Knöpfe und Farben wie auf der Website (#1151, #1152, #1231, #1324, #1325).
+- Mobile: Große Schrift: Alle Screens sind mit 1,5- und 2-facher Schrift geprüft – nichts wird abgeschnitten, Namen brechen um, Tippflächen sind groß genug, und der gewählte Tab wird vorgelesen (#1155).
+- Mobile: Kleinigkeiten: Bilder laden in passender Größe und sparen Daten, leere Alben sind ausgeblendet, Saison-Deko hängt nur dort, wo Platz ist (#1224, #1227, #1295, #1296).
+
 ## 1.4.0 - 2026-10-07
 
 - Mobile: Neuer Aufbau mit fünf Tabs: Home, Events, Community, Verein und Profil. Oben in jeder Übersicht stehen Suche und Glocke, Einstellungen öffnest du über das Zahnrad im Profil, und Seiten öffnen dort, wo du gerade bist – „Zurück“ führt dorthin zurück (#1143, #1144, #1145, #1146).
