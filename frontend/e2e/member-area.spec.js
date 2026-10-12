@@ -2,7 +2,7 @@ const { test, expect } = require("@playwright/test");
 
 // Mitgliederbereich (#283, #284, #1257, #1336): oben die eigene Karte mit Gruß und Beitragsstand, darunter die
 // Sprungleiste mit dem, was offen ist (am Handy eine Zeile zum Wischen, am PC links fest), darunter nur Abschnitte mit
-// Inhalt - interne Events aus der Event-Liste, Dokumente, Vorteile, interne News, Ansprechpartner. Ist nichts
+// Inhalt - Dokumente, Vorteile, interne News, Ansprechpartner; interne Events stehen seit #1190 nur noch bei den Events. Ist nichts
 // freigeschaltet, steht ein Satz statt leerer Karten. Kein Verweis überdeckt eine Überschrift (gemessen, nicht geschätzt).
 
 const member = { id: "user-1", username: "lunabyte", display_name: "LunaByte", role: "player", is_club_member: true };
@@ -83,19 +83,17 @@ async function acceptCookies(page) {
 
 const FULL = { eventList: events, board: BOARD, documents: DOCUMENTS, news: NEWS, me: MEMBERSHIP, summary: SUMMARY, helping: HELPING, settings: { discord_invite_url: "https://discord.com/invite/lions" } };
 
-test("ein Mitglieder-Event steht im Mitgliederbereich, ein öffentliches nicht; keine Kacheln mehr", async ({ page }) => {
+test("interne Events stehen nicht doppelt im Mitgliederbereich (#1190); keine Kacheln mehr", async ({ page }) => {
   await mockServer(page, { eventList: events });
   await page.goto("/members/area");
   await acceptCookies(page);
 
-  await expect(page.getByTestId("member-area-event-e-hallo")).toContainText("Halloween Gaming Night 2099");
-  await expect(page.getByTestId("member-area-event-e-hallo")).toContainText("Vereinsheim");
-  await expect(page.getByTestId("member-area-event-e-hallo")).toHaveAttribute("href", "/events/halloween-2099");
-  await expect(page.getByTestId("member-area-event-e-lan")).toHaveCount(0);
+  // Nur interne Events, sonst nichts: der Satz statt leerer Karten - die Events stehen bei den Events und im Kalender.
+  await expect(page.getByTestId("member-area-empty")).toBeVisible();
+  await expect(page.getByTestId("member-area-events")).toHaveCount(0);
+  await expect(page.getByTestId("member-area-event-e-hallo")).toHaveCount(0);
   await expect(page.locator('[data-testid^="tile-"]')).toHaveCount(0);
-  await expect(page.getByTestId("member-area-empty")).toHaveCount(0);
   await expect(page.getByTestId("member-area-news")).toHaveCount(0);
-  await expect(page.getByTestId("member-area-links")).toContainText("Versammlung");
 });
 
 test("ist nichts freigeschaltet, steht ein Satz statt leerer Karten", async ({ page }) => {
@@ -179,7 +177,7 @@ for (const width of [390, 768, 1440, 2560]) {
       }
 
       // Kein Verweis („Alle …“, „Vorstand“) überdeckt seine Überschrift - auch nicht in der schmalen Spalte rechts.
-      for (const section of ["member-area-meetings", "member-area-helping", "member-area-news", "member-area-documents", "member-area-events", "member-area-board"]) {
+      for (const section of ["member-area-meetings", "member-area-helping", "member-area-news", "member-area-documents", "member-area-board"]) {
         const title = await box(page.getByTestId(`${section}-title`));
         const more = await box(page.getByTestId(`${section}-more`));
         expect(overlaps(title, more), `${section}: Titel und Verweis überlappen`).toBe(false);

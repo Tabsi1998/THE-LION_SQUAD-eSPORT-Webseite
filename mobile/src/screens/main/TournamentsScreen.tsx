@@ -12,7 +12,7 @@ import { MonthCalendar } from "../../components/MonthCalendar";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
-import { initialMonth, itemsByDay, parseDay, shiftMonth, type CalendarItem } from "../../lib/calendar";
+import { currentMonth, itemsByDay, parseDay, shiftMonth, type CalendarItem } from "../../lib/calendar";
 import { compareByNearestDate } from "../../lib/contentSort";
 import { splitOpenAndPast } from "../../lib/dashboard";
 import { formatEventType, formatTournamentFormat, placeParts } from "../../lib/format";
@@ -21,13 +21,17 @@ import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors, kindColors, radius } from "../../theme";
 import type { ClubEvent, F1Challenge, Tournament } from "../../types";
-import { dayNoon, viennaDate } from "../../lib/vienna";
+import { dayNoon, viennaDate, viennaDay, viennaTime } from "../../lib/vienna";
+import { useAuth } from "../../auth/AuthContext";
+import { navigateToUrl } from "../../navigation/rootNavigation";
 
 const TOURNAMENT_LIST_LIVE_RESOURCES = ["tournaments", "events", "f1"];
 
 type Props = NativeStackScreenProps<TournamentStackParamList, "TournamentList">;
 type Filter = "all" | "events" | "tournaments" | "fastlaps";
 type ViewMode = "list" | "calendar";
+// Ein Vereinstermin aus /calendar (#1190): Versammlung oder eigene Helferschicht - nur für Mitglieder, der Server entscheidet.
+type ClubCalendarItem = { id: string; kind: string; club_kind?: string; title: string; start: string; end?: string | null; mine?: boolean; path?: string | null; all_day?: boolean; day?: string | null; location?: string | null };
 type HubBase = { id: string; title: string; date?: string | null; endDate?: string | null; status?: string; phase?: string; image?: string | null; detail?: string; visibility?: string | null };
 type HubItem =
   | (HubBase & { kind: "event"; raw: ClubEvent })
@@ -64,7 +68,10 @@ export function TournamentsScreen({ navigation, route }: Props) {
   useTabScrollToTop(scrollRef);
   const [scope, setScope] = useState<ScopeFilter>("all");
   const [view, setView] = useState<ViewMode>("list");
-  const [month, setMonth] = useState<{ year: number; month: number } | null>(null);
+  const { user } = useAuth();
+  // Der Kalender öffnet im aktuellen Monat (#1271), „Heute“ springt zurück.
+  const [month, setMonth] = useState<{ year: number; month: number }>(() => currentMonth());
+  const [clubItems, setClubItems] = useState<CalendarItem[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
   const [events, setEvents] = useState<ClubEvent[]>([]);
@@ -93,13 +100,24 @@ export function TournamentsScreen({ navigation, route }: Props) {
       setEvents(Array.isArray(eventResult.data) ? eventResult.data : []);
       setTournaments(Array.isArray(tournamentResult.data) ? tournamentResult.data : []);
       setFastlaps(Array.isArray(fastLapResult.data) ? fastLapResult.data : []);
+      // Versammlungen und eigene Schichten (#1190): nur angemeldet; fehlen sie, bleibt der Kalender, wie er ist.
+      if (user) {
+        const club = await api.get<{ items?: ClubCalendarItem[] }>("/calendar").catch(() => null);
+        const rows = Array.isArray(club?.data?.items) ? club.data.items : [];
+        setClubItems(rows.filter((row) => row.kind === "club").map((row) => ({
+          id: row.id, kind: "club", title: row.title, start: row.start, end: row.end, mine: Boolean(row.mine), path: row.path,
+          allDay: Boolean(row.all_day), day: row.day, location: row.location, detail: row.club_kind === "shift" ? "Helferschicht" : "Versammlung",
+        })));
+      } else {
+        setClubItems([]);
+      }
     } catch (err) {
       setError(errorMessage(err, "Events konnten nicht geladen werden."));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     load();
@@ -160,14 +178,21 @@ export function TournamentsScreen({ navigation, route }: Props) {
   }), [openItems]);
 
   // Kalender (#216): jeder Termin an seinen Tagen; eigene Anmeldungen bekommen den Ring.
+  // Mehrtägige Events (#884, Codex-Prüfung #1460): je Tag aus dem Tagesplan ein Eintrag mit derselben Kennung - der Balken
+  // belegt nur die echten Tage, ein Tag in einer Lücke bleibt frei.
   const calendarItems = useMemo<CalendarItem[]>(() => items
     .filter((item) => item.date)
-    .map((item) => ({
-      id: item.id, kind: item.kind, title: item.title, start: item.date as string, end: item.endDate,
-      mine: Boolean(item.kind === "event" ? item.raw.own_registration : item.kind === "tournament" ? item.raw.my_registration : false),
-      detail: item.detail,
-    })), [items]);
-  const shownMonth = month || initialMonth(calendarItems);
+    .flatMap((item): CalendarItem[] => {
+      const base: CalendarItem = {
+        id: item.id, kind: item.kind, title: item.title, start: item.date as string, end: item.endDate,
+        mine: Boolean(item.kind === "event" ? item.raw.own_registration : item.kind === "tournament" ? item.raw.my_registration : false),
+        detail: item.detail,
+      };
+      const days = item.kind === "event" && item.raw.schedule?.multi_day ? item.raw.schedule.days || [] : [];
+      return days.length ? days.map((day) => ({ ...base, start: day.start_at, end: day.end_at })) : [base];
+    }).concat(clubItems), [clubItems, items]);
+  const shownMonth = month;
+  const clubDayItems = useMemo(() => (selectedDay ? (itemsByDay(clubItems).get(selectedDay) || []) : []), [clubItems, selectedDay]);
   const dayItems = useMemo(() => {
     if (!selectedDay) return [];
     const ids = new Set((itemsByDay(calendarItems).get(selectedDay) || []).map((entry) => `${entry.kind}-${entry.id}`));
@@ -223,18 +248,20 @@ export function TournamentsScreen({ navigation, route }: Props) {
               selected={selectedDay}
               onSelect={selectDay}
               onShift={(delta) => { setMonth(shiftMonth(shownMonth.year, shownMonth.month, delta)); setSelectedDay(null); }}
+              onToday={() => { setMonth(currentMonth()); setSelectedDay(viennaDay(new Date())); }}
             />
             {selectedDay ? (
-              dayItems.length ? (
+              dayItems.length || clubDayItems.length ? (
                 <View style={styles.section} testID="calendar-day-items">
                   <Heading>{viennaDate(dayNoon(selectedDay), { weekday: "long", day: "numeric", month: "long" })}</Heading>
+                  {clubDayItems.map((item) => <ClubRow key={item.id} item={item} />)}
                   {dayItems.map((item) => <HubContentCard key={`${item.kind}-${item.id}`} item={item} onPress={() => open(item)} />)}
                 </View>
               ) : (
                 <Muted testID="calendar-day-empty">An diesem Tag ist nichts geplant.</Muted>
               )
             ) : (
-              <Muted>Tag antippen, um die Termine zu sehen. Punkte zeigen, was an einem Tag ist; ein goldener Rahmen heißt: du bist angemeldet.</Muted>
+              <Muted>Tag antippen, um die Termine zu sehen. Punkte zeigen, was an einem Tag ist, Balken, was mehrere Tage dauert; ein goldener Rahmen heißt: du bist angemeldet.</Muted>
             )}
           </View>
         ) : null}
@@ -281,6 +308,26 @@ export function TournamentsScreen({ navigation, route }: Props) {
         ) : null}
       </ScrollView>
     </Screen>
+  );
+}
+
+/** Eine Versammlung oder eigene Schicht (#1190) - grün; ein Tipp öffnet sie im Mitgliederbereich, Details bleiben dort. */
+function ClubRow({ item }: { item: CalendarItem }) {
+  const when = item.allDay ? "ganztägig" : viennaTime(item.start, { hour: "2-digit", minute: "2-digit" });
+  return (
+    <Pressable
+      onPress={() => navigateToUrl(item.path)}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.detail}: ${item.title}`}
+      style={({ pressed }) => [styles.clubRow, pressed && styles.pressed]}
+      testID={`calendar-club-${item.id}`}
+    >
+      <View style={styles.clubDot} />
+      <View style={styles.clubText}>
+        <Muted>{[item.detail, when, item.location].filter(Boolean).join(" · ")}</Muted>
+        <Body style={styles.clubTitle}>{item.title}</Body>
+      </View>
+    </Pressable>
   );
 }
 
@@ -333,6 +380,32 @@ function matchesFilter(item: HubItem, filter: Filter) {
 }
 
 const styles = StyleSheet.create({
+  clubRow: {
+    alignItems: "flex-start",
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderLeftColor: kindColors.club,
+    borderLeftWidth: 3,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 12,
+  },
+  clubDot: {
+    backgroundColor: kindColors.club,
+    borderRadius: 4,
+    height: 8,
+    marginTop: 5,
+    width: 8,
+  },
+  clubText: {
+    flex: 1,
+    gap: 2,
+  },
+  clubTitle: {
+    fontWeight: "800",
+  },
   content: {
     gap: 14,
     padding: 18,
