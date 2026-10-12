@@ -89,7 +89,7 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
           </div>
 
           <div className="relative mt-8 flex flex-col items-center">
-            <LevelAvatarFrame level={level?.level} crown={crown} className="w-32 h-32" showBadge>
+            <LevelAvatarFrame level={level?.level} prestige={level?.prestige} crown={crown} size="card" showBadge>
               {profile.avatar_url ? (
                 <img src={resolveMediaUrl(profile.avatar_url)} alt="" crossOrigin="anonymous" className="w-full h-full object-cover" />
               ) : (

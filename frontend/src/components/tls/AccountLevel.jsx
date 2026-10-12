@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Zap } from "lucide-react";
 import { motion } from "framer-motion";
+import { rankInfo } from "@/lib/loewenRang";
 
 function useCountUp(target, duration = 950) {
   const [value, setValue] = useState(0);
@@ -20,48 +21,30 @@ function useCountUp(target, duration = 950) {
   return value;
 }
 
+// Löwen-Rang (#1452): der Titel ist der Rang-Name, wie im Backend und am Rahmen. Farben nur Cyan (Rang 1–5) und Gold
+// (ab Rang 6); `key` wählt die bestehenden Karten- und Leuchtklassen, Rang 12 bekommt den Puls.
+const BORDER = { rookie: "border-[#29B6E8]/40", pro: "border-[#29B6E8]/70", elite: "border-[#FFD700]/70", legendary: "border-[#FFD700]/80" };
+
 export function accountLevelTier(level) {
-  const value = Number(level || 1);
-  if (value >= 20) return { key: "legendary", title: "Legendär", color: "#FFD700", progressColor: "#FFD700" };
-  if (value >= 16) return { key: "champion", title: "Champion", color: "#FF3B30", progressColor: "#FF3B30" };
-  if (value >= 12) return { key: "elite", title: "Elite", color: "#FFD700", progressColor: "#FFD700" };
-  if (value >= 8) return { key: "veteran", title: "Veteran", color: "#A855F7", progressColor: "#A855F7" };
-  if (value >= 5) return { key: "pro", title: "Pro", color: "#29B6E8", progressColor: "#29B6E8" };
-  if (value >= 3) return { key: "challenger", title: "Challenger", color: "#00FF88", progressColor: "#00FF88" };
-  return { key: "rookie", title: "Rookie", color: "#29B6E8", progressColor: "#29B6E8" };
+  const info = rankInfo(level);
+  const key = info.rank >= 12 ? "legendary" : info.rank >= 6 ? "elite" : info.rank >= 2 ? "pro" : "rookie";
+  return { key, rank: info.rank, title: info.name, color: info.color, progressColor: info.color };
 }
 
 export function accountLevelFrameClass(level) {
-  const tier = accountLevelTier(level);
-  if (tier.key === "legendary") return "tls-account-frame tls-account-frame-legendary border-[#FFD700]/80";
-  if (tier.key === "champion") return "tls-account-frame tls-account-frame-champion border-[#FF3B30]/70";
-  if (tier.key === "elite") return "tls-account-frame tls-account-frame-elite border-[#FFD700]/70";
-  if (tier.key === "veteran") return "tls-account-frame tls-account-frame-veteran border-[#A855F7]/70";
-  if (tier.key === "pro") return "tls-account-frame tls-account-frame-pro border-[#29B6E8]/70";
-  if (tier.key === "challenger") return "tls-account-frame tls-account-frame-challenger border-[#00FF88]/60";
-  return "tls-account-frame border-[#29B6E8]/40";
+  const { key } = accountLevelTier(level);
+  return key === "rookie" ? `tls-account-frame ${BORDER.rookie}` : `tls-account-frame tls-account-frame-${key} ${BORDER[key]}`;
 }
 
 export function accountAvatarFrameClass(level, isMember = false) {
-  const tier = accountLevelTier(level);
-  if (tier.key === "legendary") return "tls-account-avatar-frame tls-account-avatar-frame-legendary border-[#FFD700]/80";
-  if (tier.key === "champion") return "tls-account-avatar-frame tls-account-avatar-frame-champion border-[#FF3B30]/75";
-  if (tier.key === "elite") return "tls-account-avatar-frame tls-account-avatar-frame-elite border-[#FFD700]/70";
-  if (tier.key === "veteran") return "tls-account-avatar-frame tls-account-avatar-frame-veteran border-[#A855F7]/70";
-  if (tier.key === "pro") return "tls-account-avatar-frame tls-account-avatar-frame-pro border-[#29B6E8]/70";
-  if (tier.key === "challenger") return "tls-account-avatar-frame tls-account-avatar-frame-challenger border-[#00FF88]/60";
-  return isMember ? "border-[#FFD700]/50" : "border-white/15";
+  const { key } = accountLevelTier(level);
+  if (key === "rookie") return isMember ? "border-[#FFD700]/50" : "border-white/15";
+  return `tls-account-avatar-frame tls-account-avatar-frame-${key} ${BORDER[key]}`;
 }
 
 export function accountLevelAuraClass(level) {
-  const tier = accountLevelTier(level);
-  if (tier.key === "legendary") return "tls-profile-aura tls-profile-aura--legendary";
-  if (tier.key === "champion") return "tls-profile-aura tls-profile-aura--champion";
-  if (tier.key === "elite") return "tls-profile-aura tls-profile-aura--elite";
-  if (tier.key === "veteran") return "tls-profile-aura tls-profile-aura--veteran";
-  if (tier.key === "pro") return "tls-profile-aura tls-profile-aura--pro";
-  if (tier.key === "challenger") return "tls-profile-aura tls-profile-aura--challenger";
-  return "tls-profile-aura";
+  const { key } = accountLevelTier(level);
+  return key === "rookie" ? "tls-profile-aura" : `tls-profile-aura tls-profile-aura--${key}`;
 }
 
 export function AccountLevelPill({ level, className = "" }) {
@@ -93,7 +76,7 @@ export function AccountLevelProgress({ level, points = 0, nextLevelPoints = 100,
             transition={{ type: "spring", stiffness: 240, damping: 16 }}
           >
             {lvlNum}
-            {["elite", "champion", "legendary"].includes(tier.key) && (
+            {["elite", "legendary"].includes(tier.key) && (
               <span className="tls-orbit rounded-full" style={{ "--orbit-color": tier.color, "--orbit-speed": "3.2s" }} aria-hidden="true"><i /></span>
             )}
           </motion.div>

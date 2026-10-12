@@ -610,9 +610,9 @@ function PodiumCard({ entry, index, byLevel = false }) {
         {entry.rank}
       </div>
       <div className={`mx-auto mb-2 sm:mb-3 flex justify-center ${crown ? "pt-4" : ""}`}>
-        <LevelAvatarFrame level={level} crown={crown} compact className="w-12 h-12 sm:w-16 sm:h-16">
+        <LevelAvatarFrame level={level} crown={crown} compact>
           {entry.avatar_url ? (
-            <SizedImage src={entry.avatar_url} sizes="(min-width: 640px) 64px, 48px" widths={[160, 320]} alt="" className="w-full h-full" />
+            <SizedImage src={entry.avatar_url} sizes="44px" widths={[160]} alt="" className="w-full h-full" />
           ) : (
             <div className="w-full h-full flex items-center justify-center font-bold text-white/60">
               {(entry.display_name || "?").trim().charAt(0).toUpperCase()}

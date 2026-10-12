@@ -205,9 +205,9 @@ function LinkedAccountCard({ account }) {
         className={`tls-card mt-2 group block border ${accountLevelFrameClass(level)} bg-[#08151A] rounded-sm p-3`}
       >
         <div className="flex items-center gap-3">
-          <LevelAvatarFrame level={level} compact className="w-14 h-14 shrink-0">
+          <LevelAvatarFrame level={level} compact className="shrink-0">
             {account.avatar_url ? (
-              <SizedImage src={account.avatar_url} size={56} alt="" className="w-full h-full" />
+              <SizedImage src={account.avatar_url} size={44} alt="" className="w-full h-full" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-white/25"><UserIcon className="w-6 h-6" /></div>
             )}

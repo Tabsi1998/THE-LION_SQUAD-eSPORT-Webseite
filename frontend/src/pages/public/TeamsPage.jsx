@@ -119,7 +119,7 @@ function TeamCard({ team: t, levelInfo, crown = null }) {
       <div className="relative -mt-8 p-5">
         <div className="flex items-center gap-4">
           {levelInfo ? (
-            <LevelAvatarFrame level={levelInfo.level} crown={crown} compact team showBadge={false} testId={`team-frame-${t.tag}`} className="w-16 h-16 shrink-0">
+            <LevelAvatarFrame level={levelInfo.level} crown={crown} compact team showBadge={false} testId={`team-frame-${t.tag}`} className="shrink-0">
               <TeamLogo team={t} bare />
             </LevelAvatarFrame>
           ) : (

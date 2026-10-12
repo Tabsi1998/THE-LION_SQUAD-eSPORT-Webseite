@@ -1,4 +1,5 @@
 const { test, expect } = require("@playwright/test");
+const RING = require("../src/lib/loewenRangRing.json");
 
 async function acceptCookies(page) {
   const button = page.getByRole("button", { name: /alle erlauben/i });
@@ -474,14 +475,14 @@ test("club members render gamertag-first cards", async ({ page }) => {
   await expect(card.getByText("Obmann")).toBeVisible();
 });
 
-test("level frames: the hex shield sits square and centred on the avatar (#888)", async ({ page }) => {
-  // Die globale Regel svg { max-width: 100% } kappte das Sechseck auf die Bildbreite - schmal, hoch, 12 px zu weit links.
+test("level frames: the drawn frame of the rank sits with its ring exactly on the photo (#1454)", async ({ page }) => {
+  // Löwen-Rang: die Grafiken sind nicht genau mittig gezeichnet - der gemessene Ring (cx, cy, r) muss auf dem Foto liegen.
   await mockPublicChrome(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.route("**/api/users/public-list**", async (route) => {
     await route.fulfill({ contentType: "application/json", body: JSON.stringify({ total: 2, items: [
       { id: "u9", username: "garlic", display_name: "Garlic Jr.", achievement_level: { level: 9 }, achievements_count: 12 },
-      { id: "u24", username: "totor", display_name: "TotorRuns", achievement_level: { level: 24 }, achievements_count: 24 },
+      { id: "u32", username: "totor", display_name: "TotorRuns", achievement_level: { level: 32 }, achievements_count: 24 },
     ] }) });
   });
   await page.route("**/api/membership/public", (route) => route.fulfill({ contentType: "application/json", body: "[]" }));
@@ -489,15 +490,19 @@ test("level frames: the hex shield sits square and centred on the avatar (#888)"
 
   await page.goto("/players");
   await acceptCookies(page);
-  for (const username of ["garlic", "totor"]) {
+  for (const [username, key] of [["garlic", "02"], ["totor", "07"]]) {
     const card = page.getByTestId(`player-card-${username}`);
     await expect(card).toBeVisible();
-    const frame = await card.locator(".tls-lvf").boundingBox();
-    const hexa = await card.locator(".tls-lvf-hexa").boundingBox();
-    expect(Math.abs(hexa.width - hexa.height), `${username}: Sechseck quadratisch`).toBeLessThanOrEqual(1);
-    expect(Math.abs(hexa.width - (frame.width + 18)), `${username}: in der Liste 9 px ringsum`).toBeLessThanOrEqual(1);
-    expect(Math.abs(hexa.x + hexa.width / 2 - (frame.x + frame.width / 2)), `${username}: mittig`).toBeLessThanOrEqual(1);
-    expect(Math.abs(hexa.y + hexa.height / 2 - (frame.y + frame.height / 2)), `${username}: mittig`).toBeLessThanOrEqual(1);
+    await expect(card.locator(".tls-lvf")).toHaveAttribute("data-rank", String(Number(key)));
+    const img = card.locator("img.tls-lvf-img");
+    await expect(img).toHaveAttribute("src", new RegExp(`rang-${key}-320[.]webp`));
+    const ring = RING[key];
+    const photo = await card.locator(".tls-lvf-photo").boundingBox();
+    const art = await img.boundingBox();
+    expect(Math.abs(photo.width - 44), `${username}: Foto in der Liste 44 px`).toBeLessThanOrEqual(1);
+    expect(Math.abs(art.x + ring.cx * art.width - (photo.x + photo.width / 2)), `${username}: Ring waagrecht mittig`).toBeLessThanOrEqual(1);
+    expect(Math.abs(art.y + ring.cy * art.height - (photo.y + photo.height / 2)), `${username}: Ring senkrecht mittig`).toBeLessThanOrEqual(1);
+    expect(Math.abs(ring.r * art.width - photo.width / 2), `${username}: Ring so groß wie das Foto`).toBeLessThanOrEqual(1);
   }
 });
 
