@@ -61,7 +61,7 @@ type EventDetail = ClubEvent & {
   f1_challenges?: F1Challenge[];
   news?: NewsPost[];
   sponsors?: Array<{ id: string; name: string; tier?: string; logo_url?: string | null; url?: string | null; link?: string | null }>;
-  albums?: Array<{ id: string; title?: string; cover_url?: string | null; image_url?: string | null }>;
+  albums?: Array<{ id: string; slug?: string; title?: string; cover_url?: string | null; image_url?: string | null }>;
 };
 
 export function EventDetailScreen({ navigation, route }: Props) {
@@ -548,11 +548,19 @@ export function EventDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>Fotos</Heading>
             <View style={styles.albumGrid}>
+              {/* Fotos gehören zum Event (#1185): eine Kachel öffnet das Album. */}
               {event.albums.map((album) => (
-                <View key={album.id} style={styles.albumItem}>
+                <Pressable
+                  key={album.id}
+                  style={({ pressed }) => [styles.albumItem, pressed && styles.albumPressed]}
+                  onPress={() => navigation.navigate("GalleryAlbum", { id: album.slug || album.id })}
+                  accessibilityRole="button"
+                  accessibilityLabel={album.title ? `Album ${album.title} öffnen` : "Album öffnen"}
+                  testID={`event-album-${album.id}`}
+                >
                   <MediaImage uri={album.cover_url || album.image_url} style={styles.albumImage} fallback={<Ionicons name="images-outline" color={colors.cyan} size={24} />} />
                   <Muted numberOfLines={2}>{album.title || "Album"}</Muted>
-                </View>
+                </Pressable>
               ))}
             </View>
           </Card>
@@ -909,6 +917,9 @@ const styles = StyleSheet.create({
   albumItem: {
     gap: 6,
     width: 132,
+  },
+  albumPressed: {
+    opacity: 0.8,
   },
   albumImage: {
     borderRadius: radius.lg,

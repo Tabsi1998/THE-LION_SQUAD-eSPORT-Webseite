@@ -1,4 +1,4 @@
-import { albumCountLabel, groupBySection, mediaType, mediaUrl, posterUrl, sizedUpload } from "./gallery";
+import { albumCountLabel, groupBySection, mediaType, mediaUrl, photoCredit, posterUrl, sizedUpload, submissionDoneText, submissionHint } from "./gallery";
 
 // Galerie in der App (#236): Medienart, Adressen und Größen wie im Web.
 
@@ -38,4 +38,14 @@ test("Abschnitte gruppieren in Albumreihenfolge, Lose zuerst", () => {
 
 test("eine Adresse mit Breite bekommt keine zweite", () => {
   expect(sizedUpload("/api/static/uploads/foto.webp?w=400", 800)).toBe("/api/static/uploads/foto.webp?w=400");
+});
+
+test("Fotos einsenden (#1186): Hinweis, Satz nach dem Senden, Name am Foto - wie im Web", () => {
+  expect(submissionHint({ open: true, until: "2026-10-22", remaining: 18, pending: 2, max: 20, used: 2, can_submit: true })).toBe("Bis Do., 22. Oktober · noch 18 Fotos · 2 warten auf Freigabe");
+  expect(submissionHint({ open: false, until: "2026-10-22", remaining: 20, pending: 0, max: 20, used: 0, can_submit: false })).toBe("Einsenden war bis Do., 22. Oktober möglich.");
+  expect(submissionHint(null)).toBe("");
+  expect(submissionDoneText(1, 0)).toBe("Danke! Dein Foto wartet auf Freigabe durch den Vorstand.");
+  expect(submissionDoneText(0, 1)).toBe("Das hat nicht geklappt – bitte noch einmal versuchen.");
+  expect(photoCredit({ id: "p", credit: "Anna" })).toBe("Foto: Anna");
+  expect(photoCredit({ id: "p" })).toBe("");
 });

@@ -9,7 +9,7 @@ import { ErrorState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Muted } from "../../components/Text";
 import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
-import { groupBySection, mediaType, mediaUrl, posterUrl, sizedUpload, type GalleryAlbum, type GalleryItem } from "../../lib/gallery";
+import { groupBySection, mediaType, mediaUrl, photoCredit, posterUrl, sizedUpload, type GalleryAlbum, type GalleryItem } from "../../lib/gallery";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 
@@ -85,6 +85,8 @@ export function GalleryViewerScreen({ navigation, route }: Props) {
       {chrome ? (
         <View style={styles.chrome} pointerEvents="box-none">
           {current?.caption ? <Body style={styles.caption}>{current.caption}</Body> : null}
+          {/* Eingesandt (#1186): „Foto: Name“, wenn die Person das wollte. */}
+          {photoCredit(current) ? <Muted style={styles.caption} testID="gallery-credit">{photoCredit(current)}</Muted> : null}
           <View style={styles.actions}>
             <Pressable onPress={share} disabled={sharing} accessibilityRole="button" accessibilityLabel="Teilen oder speichern" style={({ pressed }) => [styles.action, pressed && styles.pressed]} testID="gallery-share">
               <Ionicons name="share-outline" color={colors.white} size={20} />
