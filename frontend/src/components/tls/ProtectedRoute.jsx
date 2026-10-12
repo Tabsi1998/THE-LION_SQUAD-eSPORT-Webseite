@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { ADMIN_AREAS, hasArea, isAnyAdmin } from "@/lib/permissions";
+import { ADMIN_AREAS, MFA_AREAS, hasArea, isAnyAdmin, leadWithoutSecondFactor, mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 
 // Rechte nach Bereichen (#287): `requireArea` verlangt einen der genannten
@@ -8,8 +8,10 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 // `requireAdmin` heißt „irgendein Adminbereich“, `requireClubAdmin` bleibt als
 // Kurzform für System. Zwei-Faktor ist Pflicht für alles außer Moderation.
 // `requireTournamentStaff` öffnet die Turnierseiten (Turniere, Fast Lap, Stationen,
-// Turnierbaum-TV) für Helfer mit Einsatz und jeden Adminbereich - Moderation allein nicht.
-const MFA_AREAS = new Set(ADMIN_AREAS);
+// Turnierbaum-TV) für die Turnierleitung und für Helfer mit Einsatz - Moderation oder ein anderer
+// Adminbereich allein nicht. Die Turnierleitung braucht dafür, wie im Server, die bestätigte
+// Zwei-Faktor-Anmeldung (#1028); Helfer nicht - auch eine Turnierleitung mit eigenem Einsatz
+// (`has_staff_assignment`) kommt ohne Zwei-Faktor in diesen Einsatz, die Seiten zeigen ihr dann nur dessen Aktionen.
 
 export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireTournamentStaff = false }) {
   const { user } = useAuth();
@@ -29,11 +31,12 @@ export function ProtectedRoute({ children, requireArea = null, requireAdmin = fa
   if (wantedAreas.length && !hasArea(user, ...wantedAreas)) {
     return <Navigate to="/403" replace state={{ areas: wantedAreas, from: loc.pathname }} />;
   }
-  if (wantedAreas.some((area) => MFA_AREAS.has(area)) && (!user.mfa_enabled || !user.auth_mfa_verified)) {
+  const leadNeedsSecondFactor = requireTournamentStaff && leadWithoutSecondFactor(user) && !user.has_staff_assignment;
+  if ((wantedAreas.some((area) => MFA_AREAS.has(area)) && needsSecondFactor(user)) || leadNeedsSecondFactor) {
     // Zwei-Faktor wohnt seit #258 unter „Sicherheit“ - dorthin, mit der Erklärung, warum (#348).
-    return <Navigate to={`/profile?tab=security&mfa=required&next=${encodeURIComponent(loc.pathname)}`} replace />;
+    return <Navigate to={mfaSetupPath(loc.pathname)} replace />;
   }
-  if (requireTournamentStaff && !user.is_tournament_staff && !isAnyAdmin(user)) {
+  if (requireTournamentStaff && !hasArea(user, "tournaments") && !user.is_tournament_staff) {
     return <Navigate to="/403" replace state={{ areas: ["tournaments"], from: loc.pathname }} />;
   }
   if (requireMember && !user.is_club_member && !isAnyAdmin(user)) {

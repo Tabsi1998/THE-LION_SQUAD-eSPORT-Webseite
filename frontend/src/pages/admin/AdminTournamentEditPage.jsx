@@ -24,7 +24,8 @@ import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournamen
 import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
 
 export default function AdminTournamentEditPage() {
-  const { isAdmin, isModerator } = useAuth();
+  // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
+  const { isTournamentLead: isAdmin, isModerator } = useAuth();
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [t, setT] = useState(null);

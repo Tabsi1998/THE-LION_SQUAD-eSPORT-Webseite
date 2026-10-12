@@ -44,14 +44,16 @@ const TOURNAMENT_STATUS_FILTERS = [
 ];
 
 export default function AdminTournamentsPage() {
-  const { isAdmin } = useAuth();
+  // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
+  const { isTournamentLead: isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
   const confirm = useConfirm();
   const load = useCallback(async () => {
-    const { data } = await api.get("/tournaments?include_drafts=true");
+    // Verwaltungsliste (#1028): die Turnierleitung bekommt alle Turniere, Helfer nur die ihres Einsatzes.
+    const { data } = await api.get("/tournaments?include_drafts=true&managed=true");
     setList(data);
   }, []);
   useEffect(() => { load(); }, [load]);

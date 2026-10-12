@@ -288,17 +288,17 @@ async def get_current_user(request: Request) -> dict:
         user["user_type"] = "club_member"
     elif not user.get("user_type"):
         user["user_type"] = "community_user"
-    # Turnierleitung über alle Turniere (Rolle oder Freigabe, #1350) oder Helfer in mindestens einem;
-    # Moderation allein zählt nicht.
+    # Turnierleitung über alle Turniere (Rolle oder Freigabe, #1350) oder Helfer in mindestens einem Turnier oder
+    # einer Fast Lap; Moderation allein zählt nicht. Der Einsatz steht getrennt daneben (#1028): eine Turnierleitung
+    # ohne bestätigte Zwei-Faktor-Anmeldung behält ihn - die Rechte über alle Turniere nicht.
     from services.permissions import is_tournament_lead
 
-    user["is_tournament_staff"] = bool(
-        is_tournament_lead(user)
-        or await db.tournament_staff_assignments.count_documents({
-            "user_id": user["id"],
-            "is_active": {"$ne": False},
-        })
+    assignment_query = {"user_id": user["id"], "is_active": {"$ne": False}}
+    user["has_staff_assignment"] = bool(
+        await db.tournament_staff_assignments.count_documents(assignment_query)
+        or await db.f1_staff_assignments.count_documents(assignment_query)
     )
+    user["is_tournament_staff"] = bool(is_tournament_lead(user) or user["has_staff_assignment"])
     user["auth_mfa_verified"] = bool(payload.get("mfa"))
     privacy_version = os.environ.get("PRIVACY_POLICY_VERSION", "2026-08-26")
     terms_version = os.environ.get("TERMS_VERSION", "2026-08-26")

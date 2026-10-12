@@ -20,7 +20,7 @@ def fake_db(session: dict | None, user: dict | None):
     memberships = SimpleNamespace(find_one=AsyncMock(return_value=None))
     staff = SimpleNamespace(count_documents=AsyncMock(return_value=0))
     sessions = SimpleNamespace(find_one=AsyncMock(return_value=session), update_one=AsyncMock(return_value=SimpleNamespace(matched_count=1)))
-    return SimpleNamespace(users=users, memberships=memberships, tournament_staff_assignments=staff, auth_sessions=sessions, refresh_tokens=SimpleNamespace())
+    return SimpleNamespace(users=users, memberships=memberships, tournament_staff_assignments=staff, f1_staff_assignments=staff, auth_sessions=sessions, refresh_tokens=SimpleNamespace())
 
 
 def test_a_normal_call_touches_the_session_only_when_the_stand_is_older_than_an_hour(secret, monkeypatch):

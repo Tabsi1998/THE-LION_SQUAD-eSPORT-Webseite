@@ -1,5 +1,7 @@
 import inspect
 
+import pytest
+
 from fastapi.params import Depends
 
 from auth import get_optional_user
@@ -67,3 +69,16 @@ def test_pdf_filenames_use_safe_fallbacks():
     assert export_routes._pdf_filename_part("", "t1") == "t1"
     assert export_routes._pdf_filename_part(None, "", fallback="turnier") == "turnier"
     assert export_routes._pdf_filename("matches Gamers Heaven • Sonntag.pdf") == "matches_Gamers_Heaven_Sonntag.pdf"
+
+
+@pytest.mark.asyncio
+async def test_unfinished_results_only_for_the_confirmed_tournament_lead():
+    # Ergebnis-PDFs vor dem Turnierende (#1028): derselbe Vertrag wie überall - Turnierleitung aus Rolle oder Freigabe,
+    # mit bestätigter Zwei-Faktor-Anmeldung. Die Rolle allein reicht nicht.
+    running = {"status": "live", "is_public": True}
+    confirmed = {"id": "lead", "role": "tournament_admin", "mfa_enabled": True, "auth_mfa_verified": True}
+    granted = {"id": "granted", "role": "player", "areas": ["tournaments"], "mfa_enabled": True, "auth_mfa_verified": True}
+    assert await export_routes._result_export_allowed(running, confirmed)
+    assert await export_routes._result_export_allowed(running, granted)
+    assert not await export_routes._result_export_allowed(running, {**confirmed, "auth_mfa_verified": False})
+    assert not await export_routes._result_export_allowed(running, {**granted, "mfa_enabled": False})

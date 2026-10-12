@@ -18,7 +18,7 @@ vi.mock("@/components/tls/ImageUpload", () => ({ ImageUpload: () => <div data-te
 vi.mock("@/components/tls/MarkdownEditor", () => ({ MarkdownEditor: ({ testId }) => <textarea data-testid={testId} readOnly /> }));
 vi.mock("@/components/tls/AccessLinksPanel", () => ({ AccessLinksPanel: () => <div data-testid="access-links" /> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ isAdmin: true, user: { id: "admin-1" } }) }));
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ isAdmin: true, isTournamentLead: true, user: { id: "admin-1" } }) }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
