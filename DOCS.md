@@ -28,6 +28,7 @@ Was die Funktionen können und was ihr dafür einrichtet – zum Durchlesen, ohn
 | [Rollen](docs/ROLLEN.md) | Rollen, Bereiche und wer was darf |
 | [Moderation](docs/MODERATION.md) | Meldungen, Wortfilter, Bildprüfung, Sperren |
 | [Jahreszeiten](docs/SEASONS.md) | Saison-Deko und Aktionen in Web und App |
+| [Löwen-Rang](docs/LOEWEN_RANG.md) | 12 Ränge, Namen, Profilrahmen und ihre Grafiken |
 | [Google Play](docs/PLAY_STORE.md) | App-Eintrag, Tests, Veröffentlichung |
 
 ## Qualität und Abnahme
