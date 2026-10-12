@@ -21,8 +21,8 @@ TARGETS: list[tuple[str, list[str]]] = [
     ("settings", ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "qr_logo_url", "favicon_url", "favicon_light_url", "favicon_dark_url", "avatar_url"]),
     ("users", ["avatar_url", "banner_url"]),
     ("teams", ["logo_url", "banner_url"]),
-    ("sponsors", ["logo_url"]),
-    ("partners", ["logo_url"]),
+    ("sponsors", ["logo_url", "banner_url"]),
+    ("partners", ["logo_url", "banner_url"]),
     ("news_posts", ["banner_url", "cover_url"]),
     ("events", ["banner_url", "cover_url"]),
     ("games", ["cover_url", "logo_url"]),
@@ -55,6 +55,9 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
     ("stickers", ["url"]),
     ("gallery_photos", ["original_url"]),
     ("game_servers", ["server_icon_url"]),
+    # Bilder aus der Mitgliederverwaltung je Hintergrund (``services.sponsor_images``).
+    *((collection, [f"dolibarr_images.{kind}.{variant}.url" for kind in ("logo", "banner") for variant in ("dark", "light")])
+      for collection in ("sponsors", "partners")),
 ]
 
 USAGE_TEXT_TARGETS: list[tuple[str, list[str]]] = [
