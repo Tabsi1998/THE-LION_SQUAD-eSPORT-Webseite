@@ -11,6 +11,8 @@ import { formatDateTime } from "@/lib/datetime";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { Plus, Trash2, Link as LinkIcon, X as XIcon, Wand2, Play } from "lucide-react";
 import { toast } from "sonner";
+import { ResultWindowLoader } from "@/components/tls/results/ResultWindow";
+import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 
 const DEVICES = [
   ["switch", "Switch"], ["switch2", "Switch 2"], ["pc", "PC"],
@@ -38,6 +40,8 @@ export default function AdminStationsPage() {
   const [form, setForm] = useState({ name: "", device_type: "switch", notes: "" });
   const [bulk, setBulk] = useState({ prefix: "Station", count: 4, device_type: "switch", notes: "" });
   const [assignFor, setAssignFor] = useState(null); // station object for assignment dialog
+  // Das eine Ergebnis-Fenster (#1370) statt eigener Formulare je Station.
+  const [resultFor, setResultFor] = useState("");
   const stationsRequestRef = useRef(0);
   const matchesRequestRef = useRef(0);
   const confirm = useConfirm();
@@ -111,6 +115,7 @@ export default function AdminStationsPage() {
   }, [activeTid]);
   useEffect(() => { loadMatches(); }, [loadMatches]);
   useApiInvalidation(loadMatches, ["stations", "matches", "tournaments"]);
+  const resultUndo = useResultUndo({ onDone: () => { loadStations(); loadMatches(); } });
   useEffect(() => {
     setAssignFor(null);
     setList([]);
@@ -379,12 +384,9 @@ export default function AdminStationsPage() {
                       {s.status === "reserved" && currentMatch && <button onClick={() => assign(s.id, s.current_match_id, true)} className="text-[10px] text-[#00FF88] font-bold uppercase tracking-widest hover:underline inline-flex items-center gap-1"><Play className="w-3 h-3" /> Starten</button>}
                       <button onClick={() => clearStation(s.id)} data-testid={`station-clear-${s.id}`} className="text-[10px] text-[#FF3B30] font-bold uppercase tracking-widest hover:underline inline-flex items-center gap-1"><XIcon className="w-3 h-3" /> Freigeben</button>
                     </div>
-                    {currentMatch && !currentMatch.is_multi_slot && (
-                      <StationDuelResult match={currentMatch} regById={regById} onSaved={() => { loadStations(); loadMatches(); }} />
-                    )}
-                    {currentMatch?.is_multi_slot && (
-                      <StationHeatResult match={currentMatch} regById={regById} onSaved={() => { loadStations(); loadMatches(); }} />
-                    )}
+                    {currentMatch ? (
+                      <button type="button" onClick={() => setResultFor(currentMatch.id)} className="mt-3 w-full px-3 py-2 bg-[#29B6E8] text-black rounded-sm text-[10px] font-bold uppercase tracking-widest" data-testid={`station-result-${s.id}`}>Ergebnis eintragen</button>
+                    ) : null}
                   </div>
                 ) : (
                   <button onClick={() => setAssignFor(s)} data-testid={`station-assign-${s.id}`} className="mt-3 w-full py-2 border border-dashed border-white/20 rounded-sm text-xs text-white/60 hover:text-[#29B6E8] hover:border-[#29B6E8] inline-flex items-center justify-center gap-2">
@@ -401,6 +403,8 @@ export default function AdminStationsPage() {
         </div>
       </div>
 
+      {resultFor ? <ResultWindowLoader matchId={resultFor} onClose={() => setResultFor("")} onSaved={resultUndo.start} /> : null}
+      <ResultUndoBar undo={resultUndo} />
       {/* Zuweisen als Seitenblatt (#435): die Stationen bleiben daneben sichtbar. */}
       {assignFor && (
         <AdminSheet title={assignFor.name} eyebrow="Zuweisen zu" onClose={() => setAssignFor(null)} testId="station-assign-sheet">
@@ -430,102 +434,4 @@ function safeArray(value) {
 function stationName(stationId, stations) {
   const station = safeArray(stations).find((item) => item.id === stationId);
   return station?.name || station?.label || stationId || "offen";
-}
-
-function StationDuelResult({ match, regById, onSaved }) {
-  const a = regById[match.participant_a_id] || {};
-  const b = regById[match.participant_b_id] || {};
-  const [scoreA, setScoreA] = useState(match.score_a ?? 0);
-  const [scoreB, setScoreB] = useState(match.score_b ?? 0);
-  const winnerId = Number(scoreA) > Number(scoreB)
-    ? match.participant_a_id
-    : Number(scoreB) > Number(scoreA)
-      ? match.participant_b_id
-      : "";
-  const save = async () => {
-    try {
-      await api.patch(`/matches/${match.id}`, {
-        score_a: Number(scoreA) || 0,
-        score_b: Number(scoreB) || 0,
-        winner_id: winnerId || null,
-        status: winnerId ? "completed" : "waiting_result",
-      });
-      toast.success("Ergebnis gespeichert.");
-      onSaved();
-    } catch (e) {
-      toast.error(formatRequestError(e, "Ergebnis konnte nicht gespeichert werden."));
-    }
-  };
-  return (
-    <div className="mt-3 border-t border-white/10 pt-3 space-y-2">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-white/50">Ergebnis</div>
-      <div className="grid grid-cols-[1fr_4rem] gap-2 items-center text-xs">
-        <div className="truncate">{a.display_name || "Teilnehmer A"}</div>
-        <input type="number" min="0" value={scoreA} onChange={(e) => setScoreA(e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-center" aria-label="Punkte A" />
-        <div className="truncate">{b.display_name || "Teilnehmer B"}</div>
-        <input type="number" min="0" value={scoreB} onChange={(e) => setScoreB(e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-center" aria-label="Punkte B" />
-      </div>
-      <button type="button" onClick={save} className="w-full px-3 py-2 bg-[#29B6E8] text-black rounded-sm text-[10px] font-bold uppercase tracking-widest">Bestätigen</button>
-    </div>
-  );
-}
-
-function StationHeatResult({ match, regById, onSaved }) {
-  const filledSlots = safeArray(match.slots).filter((slot) => slot?.status === "filled" && slot?.registration_id);
-  const initialRows = () => {
-    const existing = safeArray(match.results).length
-      ? safeArray(match.results).sort((a, b) => (a.rank || 0) - (b.rank || 0))
-      : filledSlots.map((slot, index) => ({ registration_id: slot.registration_id, rank: index + 1, score: "", dnf: false, forfeit: false }));
-    const byReg = Object.fromEntries(existing.map((row) => [row.registration_id, row]));
-    return filledSlots.map((slot, index) => ({
-      registration_id: slot.registration_id,
-      rank: byReg[slot.registration_id]?.rank || index + 1,
-      score: byReg[slot.registration_id]?.score ?? byReg[slot.registration_id]?.points ?? "",
-      dnf: !!byReg[slot.registration_id]?.dnf,
-      forfeit: !!byReg[slot.registration_id]?.forfeit,
-    }));
-  };
-  const [rows, setRows] = useState(initialRows);
-  const [note, setNote] = useState(match.result_meta?.note || "");
-  useEffect(() => {
-    setRows(initialRows());
-    setNote(match.result_meta?.note || "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [match.id, match.updated_at, filledSlots.length]);
-  const labelFor = (registrationId) => regById[registrationId]?.display_name || regById[registrationId]?.ingame_name || registrationId;
-  const update = (registrationId, patch) => setRows((current) => current.map((row) => row.registration_id === registrationId ? { ...row, ...patch } : row));
-  const save = async () => {
-    try {
-      await api.post(`/matches/${match.id}/result`, {
-        results: rows.map((row) => ({
-          registration_id: row.registration_id,
-          rank: Number(row.rank) || 1,
-          score: row.score === "" ? null : Number(row.score),
-          dnf: !!row.dnf,
-          forfeit: !!row.forfeit,
-        })),
-        note: note || null,
-      });
-      toast.success("Ergebnis gespeichert.");
-      onSaved();
-    } catch (e) {
-      toast.error(formatRequestError(e, "Ergebnis konnte nicht gespeichert werden."));
-    }
-  };
-  if (!filledSlots.length) return null;
-  return (
-    <div className="mt-3 border-t border-white/10 pt-3 space-y-2">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-white/50">Platzierungen</div>
-      {rows.map((row) => (
-        <div key={row.registration_id} className="grid grid-cols-12 gap-2 items-center text-xs">
-          <div className="col-span-5 truncate">{labelFor(row.registration_id)}</div>
-          <input type="number" min="1" value={row.rank} onChange={(e) => update(row.registration_id, { rank: e.target.value })} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-center" aria-label="Platz" />
-          <input type="number" min="0" value={row.score} onChange={(e) => update(row.registration_id, { score: e.target.value })} className="col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-center" placeholder="Punkte" aria-label="Punkte" />
-          <label className="col-span-2 text-[10px] text-white/60"><input type="checkbox" checked={row.dnf} onChange={(e) => update(row.registration_id, { dnf: e.target.checked })} className="accent-[#29B6E8]" /> DNF</label>
-        </div>
-      ))}
-      <input value={note} onChange={(e) => setNote(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder="Notiz optional" />
-      <button type="button" onClick={save} className="w-full px-3 py-2 bg-[#29B6E8] text-black rounded-sm text-[10px] font-bold uppercase tracking-widest">Bestätigen</button>
-    </div>
-  );
 }

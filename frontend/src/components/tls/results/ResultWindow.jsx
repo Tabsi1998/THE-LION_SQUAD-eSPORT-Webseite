@@ -166,3 +166,37 @@ export function ResultWindow({ entry, onClose, onSaved, testId = "result-window"
     </div>
   );
 }
+
+/**
+ * Das Ergebnis-Fenster für Stellen, die nur die Kennung des Spiels kennen (Matchplan, Stationen, #1370): die
+ * Beschreibung kommt von der Matchseite (`result_entry`, nur mit Ergebnis-Recht) - so sind Felder, Wörter und Satz
+ * überall dieselben.
+ */
+export function ResultWindowLoader({ matchId, onClose, onSaved, testId = "result-window" }) {
+  const [entry, setEntry] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    setEntry(null);
+    setError("");
+    api.get(`/matches/${matchId}/page`)
+      .then(({ data }) => {
+        if (!alive) return;
+        if (data?.result_entry) setEntry(data.result_entry);
+        else setError("Für dieses Spiel kannst du kein Ergebnis eintragen.");
+      })
+      .catch((err) => { if (alive) setError(formatApiError(err.response?.data?.detail) || "Spiel konnte nicht geladen werden."); });
+    return () => { alive = false; };
+  }, [matchId]);
+
+  if (entry) return <ResultWindow entry={entry} onClose={onClose} onSaved={onSaved} testId={testId} />;
+  return (
+    <div role="presentation" className="fixed inset-0 z-50 flex items-end xl:items-center justify-center bg-black/70" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }} data-testid={`${testId}-loading`}>
+      <div className="w-full xl:max-w-xl rounded-t-xl xl:rounded-xl border border-white/10 bg-[#0F0F10] p-6 text-center text-sm text-white/60">
+        {error ? <span className="text-[#FF6B60]" role="alert">{error}</span> : "Wird geladen …"}
+        <div className="mt-4"><button type="button" onClick={onClose} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">Schließen</button></div>
+      </div>
+    </div>
+  );
+}

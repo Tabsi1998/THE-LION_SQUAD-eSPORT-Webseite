@@ -86,7 +86,7 @@ export default function TournamentLeadPage() {
     const target = document.getElementById(`fall-${fall}`);
     if (target) {
       scrolledTo.current = fall;
-      target.scrollIntoView({ block: "center" });
+      target.scrollIntoView?.({ block: "center" });
     }
   }, [fall, data]);
 

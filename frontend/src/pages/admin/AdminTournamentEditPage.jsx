@@ -380,29 +380,6 @@ export default function AdminTournamentEditPage() {
       toast.error(formatRequestError(err, "Matchplanung konnte nicht gespeichert werden."));
     }
   };
-  const updateMatchV2Result = async (match, results, meta = {}) => {
-    try {
-      const suffix = meta.force ? "?force=true" : "";
-      await api.post(`/matches/${match.id}/result${suffix}`, {
-        results,
-        proof_url: meta.proof_url || null,
-        note: meta.note || null,
-      });
-      toast.success("Ergebnis gespeichert.");
-      load();
-    } catch (e) {
-      if (e.response?.status === 409 && !meta.force) {
-        const force = await confirm({
-          title: "Folgeslots überschreiben?",
-          description: "Dieses Ergebnis würde bereits gefüllte Folgematches ändern.",
-          confirmLabel: "Mit force speichern",
-          tone: "danger",
-        });
-        if (force) return updateMatchV2Result(match, results, { ...meta, force: true });
-      }
-      toast.error(formatRequestError(e, "Ergebnis konnte nicht gespeichert werden."));
-    }
-  };
   const generateGroups = async () => {
     const gc = await prompt({
       title: "Gruppen generieren",
@@ -761,7 +738,6 @@ export default function AdminTournamentEditPage() {
           isAdmin={false}
           isModerator={isModerator}
           onChanged={load}
-          onSaveResult={updateMatchV2Result}
           onSaveMatchMeta={updateMatchV2Schedule}
           canRecordResults={canRecordResults}
         />

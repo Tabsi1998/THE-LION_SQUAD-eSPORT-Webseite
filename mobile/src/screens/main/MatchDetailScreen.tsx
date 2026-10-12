@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -36,9 +36,9 @@ import type { ChatMessage, Tournament } from "../../types";
 import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmentDrafts } from "../../components/ChatAttachments";
 import { MessageSticker, StickerButton, StickerPicker } from "../../components/ChatStickers";
 import { MatchReportCard, type ReportPayload, type ReportState } from "../../components/MatchReportCard";
-import { rankingMode } from "../../lib/matchReport";
 import type { ResultEntry } from "../../lib/resultEntry";
 import { ProblemReportCard, type ProblemPayload } from "../../components/results/ProblemReportCard";
+import { ResultEntrySheet, ResultUndoBar, useResultUndo } from "../../components/results/ResultEntrySheet";
 import type { DisputeReason } from "../../lib/disputeReasons";
 import { countdown, type MatchCall } from "../../lib/matchCall";
 import { asInstant, viennaTime } from "../../lib/vienna";
@@ -98,15 +98,6 @@ type MatchPage = {
   tournament?: Tournament | null;
 };
 
-type V2ResultRow = {
-  dnf: boolean;
-  forfeit: boolean;
-  rank: string;
-  registration_id: string;
-  score: string;
-  time_ms: string;
-};
-
 // Dieselben Wörter wie auf der Website (#1139, MatchPage.jsx).
 const scheduleLabels: Record<string, string> = {
   accepted: "Termin bestätigt",
@@ -130,11 +121,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const [counterAt, setCounterAt] = useState("");
   const [decisionNote, setDecisionNote] = useState("");
   const [message, setMessage] = useState("");
-  const [proofUrl, setProofUrl] = useState("");
-  const [resultNote, setResultNote] = useState("");
-  const [forfeitReason, setForfeitReason] = useState("");
-  const [forfeitWinnerId, setForfeitWinnerId] = useState("");
-  const [v2Rows, setV2Rows] = useState<V2ResultRow[]>([]);
+  // Das eine Ergebnis-Fenster (#1156, #1370): dieselbe Eingabe wie in der Ansicht „Turnierleitung“.
+  const [resultOpen, setResultOpen] = useState(false);
 
   const lastReadChat = useRef<string | null>(null);
   const load = useCallback(async (options?: { preserveDrafts?: boolean }) => {
@@ -158,12 +146,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       }
       if (preserveDrafts) {
         setProposalAt((current) => current || viennaWall(match.scheduled_at));
-        setForfeitWinnerId((current) => current || firstRegistrationId(nextPage?.participants));
-        setV2Rows((current) => current.length ? current : buildV2Rows(nextPage));
       } else {
         setProposalAt(viennaWall(match.scheduled_at));
-        setForfeitWinnerId(firstRegistrationId(nextPage?.participants));
-        setV2Rows(buildV2Rows(nextPage));
       }
     } catch (err) {
       setError(errorMessage(err, "Match konnte nicht geladen werden."));
@@ -179,11 +163,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setCounterAt("");
     setDecisionNote("");
     setMessage("");
-    setProofUrl("");
-    setResultNote("");
-    setForfeitReason("");
-    setForfeitWinnerId("");
-    setV2Rows([]);
+    setResultOpen(false);
     setSuccess("");
   }, [route.params.id]);
 
@@ -205,9 +185,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const participants = page?.participants || [];
   const pendingProposals = (page?.schedule_proposals || []).filter((proposal) => proposal.status === "pending");
   const isV2 = page?.collection === "matches_v2" || Boolean(match.slots?.length);
-  const v2Mode = rankingMode(match);
   const isCompleted = ["completed", "forfeit"].includes(String(match.status));
-  const duelParticipants = participants.slice(0, 2);
   const canUseChat = Boolean(page?.can_act);
   // Ergebnis (#1132): Spieler melden über das Meldeformular (/report), die Turnierleitung trägt über /result ein. Wer
   // beides dürfte, bekommt das Formular der Turnierleitung.
@@ -217,7 +195,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const showReportReadOnly = Boolean(!canPlayerReportResult && !canStaffSubmitResult && !isCompleted && page?.report_state?.status === "confirm");
   // „Stimmt nicht“ (#1159) öffnet „Problem melden“ mit „Falsches Ergebnis“.
   const [problemCategory, setProblemCategory] = useState<DisputeReason | null>(null);
-  const canSubmitV2Result = Boolean(!isCompleted && canStaffSubmitResult && v2Rows.length);
+  // Turnierleitung (#1370): ein Knopf öffnet das Ergebnis-Fenster - eintragen oder, wenn es schon eins gibt, korrigieren.
+  const canSubmitV2Result = Boolean(canStaffSubmitResult && page?.result_entry && !page.result_entry.hold);
   const canProposeSchedule = Boolean(page?.can_propose_schedule);
   const canManageSchedule = Boolean(page?.can_manage_schedule);
   const hasScheduleProposals = pendingProposals.length > 0;
@@ -231,7 +210,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const scheduleModeLabel = formatScheduleMode(page?.schedule_mode);
   // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - der Server sagt, bis wann.
   const canDispute = Boolean(page?.can_dispute);
-  const hasResultActions = Boolean(canPlayerReportResult || showReportReadOnly || canSubmitV2Result || canDispute || (!isCompleted && page?.can_forfeit));
+  const hasResultActions = Boolean(canPlayerReportResult || showReportReadOnly || canSubmitV2Result || canDispute);
   const showFlowNotice = Boolean(!hasResultActions && (page?.result_entry_mode || page?.schedule_mode));
 
   const propose = useCallback(async () => {
@@ -340,34 +319,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     }
   }, [busy, canPlayerReportResult, refreshAfterResult, route.params.id]);
 
-  const submitV2Result = useCallback(async () => {
-    if (!canSubmitV2Result || busy) return;
-    setBusy(true);
-    setError("");
-    setSuccess("");
-    try {
-      await api.post(`/matches/${route.params.id}/result`, {
-        proof_url: proofUrl.trim() || null,
-        note: resultNote.trim() || null,
-        results: v2Rows.map((row) => ({
-          dnf: row.dnf,
-          forfeit: row.forfeit,
-          rank: Math.max(1, Number.parseInt(row.rank || "0", 10) || 1),
-          registration_id: row.registration_id,
-          score: numberOrNull(row.score),
-          time_ms: numberOrNull(row.time_ms),
-        })),
-      });
-      setProofUrl("");
-      setResultNote("");
-      await refreshAfterResult();
-      setSuccess("Ergebnis gespeichert und Matchstand aktualisiert.");
-    } catch (err) {
-      setError(errorMessage(err, "Ergebnis konnte nicht gespeichert werden."));
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, canSubmitV2Result, proofUrl, refreshAfterResult, resultNote, route.params.id, v2Rows]);
+  const resultUndo = useResultUndo(() => { void refreshAfterResult(); });
 
   // Problem melden (#1158): Grund, Text und auf Wunsch ein Foto - die Turnierleitung entscheidet.
   const submitDispute = useCallback(async (payload: ProblemPayload) => {
@@ -386,31 +338,6 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       setBusy(false);
     }
   }, [busy, load, page?.can_dispute, route.params.id]);
-
-  const submitForfeit = useCallback(async () => {
-    const note = forfeitReason.trim();
-    if (!note || !forfeitWinnerId || busy || !page?.can_forfeit) return;
-    Alert.alert("Forfeit speichern?", "Diese Staff-Aktion wertet das Match als Forfeit.", [
-      { text: "Abbrechen", style: "cancel" },
-      {
-        text: "Speichern",
-        style: "destructive",
-        onPress: async () => {
-          setBusy(true);
-          setError("");
-          try {
-            await api.post(`/matches/${route.params.id}/forfeit`, { winner_id: forfeitWinnerId, note });
-            setForfeitReason("");
-            await load({ preserveDrafts: false });
-          } catch (err) {
-            setError(errorMessage(err, "Forfeit konnte nicht gespeichert werden."));
-          } finally {
-            setBusy(false);
-          }
-        },
-      },
-    ]);
-  }, [busy, forfeitReason, forfeitWinnerId, load, page?.can_forfeit, route.params.id]);
 
   if (loading) {
     return (
@@ -533,51 +460,17 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                 onReport={submitReport}
               />
             ) : null}
-            {canSubmitV2Result ? (
-              <>
-                <Muted>{v2Mode === "time" ? "Zeit erfassen. Schnellste Zeit gewinnt automatisch." : v2Mode === "lower_score" ? "Score erfassen. Niedrigster Score gewinnt automatisch." : "Punkte erfassen. Höchste Punkte gewinnen automatisch."}</Muted>
-                {v2Rows.map((row, index) => (
-                  <View key={row.registration_id} style={styles.v2Row}>
-                    <View style={styles.flex}>
-                      <Body style={styles.strong}>{participantNameByRegistration(participants, row.registration_id)}</Body>
-                      <Muted>Platzierung wird automatisch berechnet.</Muted>
-                      <View style={styles.flagRow}>
-                        <ToggleChip label="Nicht erschienen" active={row.forfeit} tone="danger" onPress={() => updateV2Row(setV2Rows, index, { forfeit: !row.forfeit })} />
-                        <ToggleChip label="Disqualifiziert" active={row.dnf} tone="gold" onPress={() => updateV2Row(setV2Rows, index, { dnf: !row.dnf })} />
-                      </View>
-                    </View>
-                    {v2Mode === "time" ? (
-                      <FormInput label="Zeit ms" value={row.time_ms} keyboardType="numeric" onChangeText={(value) => updateV2Row(setV2Rows, index, { time_ms: value })} style={styles.smallInput} />
-                    ) : (
-                      <FormInput label={v2Mode === "lower_score" ? "Score" : "Punkte"} value={row.score} keyboardType="numeric" onChangeText={(value) => updateV2Row(setV2Rows, index, { score: value })} style={styles.smallInput} />
-                    )}
-                  </View>
-                ))}
-                <FormInput label="Nachweis-Link optional" value={proofUrl} onChangeText={setProofUrl} placeholder="https://..." />
-                <FormInput label="Notiz optional" value={resultNote} onChangeText={setResultNote} placeholder="Kommentar zum Heat" />
-                <Button label={busy ? "Speichert ..." : "Ergebnis speichern"} onPress={submitV2Result} disabled={busy} testID="match-staff-result-submit" />
-              </>
+            {canSubmitV2Result && page.result_entry ? (
+              <View style={styles.stack} testID="match-staff-result">
+                <Button label={page.result_entry.has_result ? "Ergebnis korrigieren" : "Ergebnis eintragen"} onPress={() => setResultOpen(true)} testID="match-staff-result-open" />
+                <Muted>{page.result_entry.has_result ? "Korrigieren geht nur mit Grund – er steht im Protokoll." : "Mit „Nicht erschienen“ und „Aufgegeben“ je Seite. Danach 10 Sekunden „Rückgängig“."}</Muted>
+              </View>
+            ) : null}
+            {canStaffSubmitResult && page.result_entry?.hold ? (
+              <Muted style={styles.textCyan} testID="match-staff-result-held">{page.result_entry.hold.mine ? "Gespeichert – in wenigen Sekunden geht es raus." : `${page.result_entry.hold.actor_name || "Die Turnierleitung"} trägt gerade das Ergebnis ein.`}</Muted>
             ) : null}
             {canDispute ? (
               <ProblemReportCard matchId={route.params.id} until={page.dispute_until} busy={busy} onSubmit={submitDispute} initialCategory={problemCategory} />
-            ) : null}
-            {page.can_forfeit && !isCompleted && duelParticipants.length >= 2 ? (
-              <>
-                <Muted style={styles.warning}>Staff-Aktion: Forfeit setzt einen Gewinner und wertet den Gegner als Forfeit.</Muted>
-                <View style={styles.buttonRow}>
-                  {duelParticipants.map((participant) => (
-                    <Pressable
-                      key={participant.registration_id}
-                      onPress={() => setForfeitWinnerId(participant.registration_id || "")}
-                      style={[styles.choice, forfeitWinnerId === participant.registration_id && styles.choiceActive]}
-                    >
-                      <Muted style={forfeitWinnerId === participant.registration_id && styles.choiceTextActive}>{participant.display_name || "Teilnehmer"}</Muted>
-                    </Pressable>
-                  ))}
-                </View>
-                <FormInput label="Forfeit-Begründung" value={forfeitReason} onChangeText={setForfeitReason} placeholder="Mindestens 5 Zeichen" />
-                <Button label="Forfeit speichern" variant="danger" onPress={submitForfeit} disabled={busy || forfeitReason.trim().length < 5 || !forfeitWinnerId} />
-              </>
             ) : null}
           </Card>
         ) : null}
@@ -659,6 +552,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         </Card>
       </ScrollView>
       </KeyboardAvoidingView>
+      <ResultEntrySheet entry={resultOpen ? page.result_entry || null : null} onClose={() => setResultOpen(false)} onSaved={resultUndo.start} />
+      <ResultUndoBar undo={resultUndo} onMessage={setSuccess} />
     </Screen>
   );
 }
@@ -719,22 +614,6 @@ function Pill({ label, accent }: { label: string; accent?: "cyan" | "gold" }) {
   );
 }
 
-function ToggleChip({ label, active, onPress, tone = "cyan" }: { label: string; active: boolean; onPress: () => void; tone?: "cyan" | "gold" | "danger" }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.toggleChip,
-        active && tone === "cyan" && styles.toggleChipCyan,
-        active && tone === "gold" && styles.toggleChipGold,
-        active && tone === "danger" && styles.toggleChipDanger,
-      ]}
-    >
-      <Muted style={[styles.toggleChipText, active && styles.toggleChipTextActive]}>{label}</Muted>
-    </Pressable>
-  );
-}
-
 function FlowNotice({ page, canUseChat }: { page: MatchPage; canUseChat: boolean }) {
   const resultMode = String(page.result_entry_mode || "");
   const scheduleMode = String(page.schedule_mode || "");
@@ -771,28 +650,6 @@ function FlowNotice({ page, canUseChat }: { page: MatchPage; canUseChat: boolean
   );
 }
 
-function buildV2Rows(page?: MatchPage | null): V2ResultRow[] {
-  const match = page?.match || {};
-  const byRegistration = new Map((match.results || []).map((result: any) => [result.registration_id, result]));
-  return (page?.participants || [])
-    .filter((participant) => participant.registration_id)
-    .map((participant, index) => {
-      const existing: any = byRegistration.get(participant.registration_id || "");
-      return {
-        dnf: Boolean(existing?.dnf),
-        forfeit: Boolean(existing?.forfeit),
-        rank: String(existing?.rank || index + 1),
-        registration_id: participant.registration_id || "",
-        score: existing?.score != null ? String(existing.score) : existing?.points != null ? String(existing.points) : "",
-        time_ms: existing?.time_ms != null ? String(existing.time_ms) : "",
-      };
-    });
-}
-
-function firstRegistrationId(participants?: MatchParticipant[]) {
-  return (participants || []).find((participant) => participant.registration_id)?.registration_id || "";
-}
-
 // Ein laufendes Spiel nennt im Kopf seinen Zustand statt des Termins (wie scheduleHeadline der Website, #1220).
 const LIVE_MATCH_STATUSES = new Set(["in_progress", "running", "waiting_result", "disputed"]);
 
@@ -802,24 +659,10 @@ function scheduleHeadline(match: { status?: string | null; schedule_status?: str
   return match.scheduled_at ? "Termin steht" : "Noch offen";
 }
 
-function participantNameByRegistration(participants: MatchParticipant[], registrationId: string) {
-  return participants.find((participant) => participant.registration_id === registrationId)?.display_name || "Teilnehmer";
-}
-
-function numberOrNull(value: string) {
-  if (value.trim() === "") return null;
-  const parsed = Number(value.replace(",", "."));
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
 function canDecideScheduleProposal(page: MatchPage | null, proposal: ScheduleProposal) {
   if (!page?.can_manage_schedule) return false;
   if (!page.acting_registration_id) return true;
   return proposal.actor_registration_id !== page.acting_registration_id;
-}
-
-function updateV2Row(setRows: React.Dispatch<React.SetStateAction<V2ResultRow[]>>, index: number, patch: Partial<V2ResultRow>) {
-  setRows((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
 }
 
 const styles = StyleSheet.create({

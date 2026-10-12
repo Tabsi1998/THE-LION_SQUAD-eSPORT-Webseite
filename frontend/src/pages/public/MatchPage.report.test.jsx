@@ -137,19 +137,28 @@ test("Meldungen weichen ab: die Turnierleitung entscheidet", async () => {
   expect(await screen.findByTestId("match-report-state")).toHaveTextContent("Die Meldungen weichen ab – die Turnierleitung entscheidet.");
 });
 
-test("ohne Recht kein Formular; die Turnierleitung trägt über /result ein", async () => {
+test("ohne Recht kein Formular; die Turnierleitung trägt über das Ergebnis-Fenster ein (#1370)", async () => {
   const { unmount } = renderMatch({ ...PAGE, can_player_report_result: false, can_report_score: false, report_state: null });
   expect(await screen.findByTestId("match-headline")).toBeInTheDocument();
   expect(screen.queryByTestId("match-report")).toBeNull();
   unmount();
 
-  apiMock.post.mockResolvedValue({ data: {} });
-  renderMatch({ ...PAGE, can_player_report_result: false, report_state: null, can_staff_submit_result: true, can_submit_result: true });
-  const staffForm = await screen.findByTestId("match-staff-result-form");
+  apiMock.post.mockResolvedValue({ data: { held: true, hold: { id: "h1" } } });
+  const entry = {
+    id: "m1", kind: "duel", best_of: 1, ranking_mode: "higher_score", allows_draw: false, has_result: false, result: [], advance: {},
+    participants: [{ registration_id: "r1", name: "NeonFalke" }, { registration_id: "r2", name: "LunaByte" }],
+  };
+  renderMatch({ ...PAGE, can_player_report_result: false, report_state: null, can_staff_submit_result: true, can_submit_result: true, result_entry: entry });
+  fireEvent.click(await screen.findByTestId("match-staff-result-open"));
   expect(screen.queryByTestId("match-report")).toBeNull();
-  fireEvent.submit(staffForm);
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/result", expect.objectContaining({ results: expect.any(Array) })));
-  expect(apiMock.post.mock.calls.some(([url]) => url === "/matches/m1/report")).toBe(false);
+  expect(screen.queryByText(/Forfeit|DNF/)).toBeNull();
+  fireEvent.click(screen.getByTestId("result-flag-r2-no_show"));
+  fireEvent.click(screen.getByTestId("result-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/result", {
+    results: [{ registration_id: "r1", rank: 1 }, { registration_id: "r2", rank: 2, forfeit: true }], hold: true, reason: null,
+  }));
+  expect(await screen.findByTestId("result-undo-bar")).toHaveTextContent("NeonFalke gewinnt kampflos, LunaByte ist nicht erschienen");
+  expect(apiMock.post.mock.calls.some(([url]) => url === "/matches/m1/report" || url === "/matches/m1/forfeit")).toBe(false);
 });
 
 // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - bis zur Frist vom Server.

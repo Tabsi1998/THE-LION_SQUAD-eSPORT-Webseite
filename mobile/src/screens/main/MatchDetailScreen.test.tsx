@@ -55,6 +55,11 @@ const PAGE = {
   report_state: { status: "open", own_summary: null, proposal: null, proposal_summary: null },
 };
 
+const STAFF_ENTRY = {
+  id: "m1", kind: "duel", best_of: 1, ranking_mode: "higher_score", allows_draw: false, has_result: false, result: [], advance: {},
+  participants: [{ registration_id: "r1", name: "NeonFalke" }, { registration_id: "r2", name: "LunaByte" }],
+};
+
 function answer(page: Record<string, unknown>) {
   mockGet.mockImplementation(async (path: string) => {
     if (path === "/matches/m1/page") return { data: page };
@@ -115,13 +120,19 @@ test("ohne Recht kein Formular; die Turnierleitung speichert über /result", asy
   expect(screen.queryByTestId("match-report")).toBeNull();
   await view.unmount();
 
-  mockPost.mockResolvedValue({ data: {} });
-  answer({ ...PAGE, can_player_report_result: false, report_state: null, can_staff_submit_result: true, can_submit_result: true });
+  // Das eine Ergebnis-Fenster (#1370): ein Knopf, große Knöpfe, „Nicht erschienen“ mit einem Tipp, 10 Sekunden Rückgängig.
+  mockPost.mockResolvedValue({ data: { held: true, hold: { id: "h1" } } });
+  answer({ ...PAGE, can_player_report_result: false, report_state: null, can_staff_submit_result: true, can_submit_result: true, result_entry: STAFF_ENTRY });
   await render(<MatchDetailScreen navigation={navigation} route={route} />);
-  await waitFor(() => expect(screen.getByTestId("match-staff-result-submit")).toBeTruthy());
+  await waitFor(() => expect(screen.getByTestId("match-staff-result-open")).toBeTruthy());
   expect(screen.queryByTestId("match-report")).toBeNull();
-  await fireEvent.press(screen.getByTestId("match-staff-result-submit"));
-  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/result", expect.objectContaining({ results: expect.any(Array) })));
+  await fireEvent.press(screen.getByTestId("match-staff-result-open"));
+  await fireEvent.press(screen.getByTestId("result-flag-r2-no_show"));
+  await fireEvent.press(screen.getByTestId("result-save"));
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/result", {
+    results: [{ registration_id: "r1", rank: 1 }, { registration_id: "r2", rank: 2, forfeit: true }], hold: true, reason: null,
+  }));
+  expect(screen.getByTestId("result-undo-sentence")).toHaveTextContent("NeonFalke gewinnt kampflos, LunaByte ist nicht erschienen");
 });
 
 // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - bis zur Frist vom Server.
@@ -186,7 +197,7 @@ test("fertiges Spiel: Überschrift mit Namen, „Beendet“ mit Ergebnis, Statio
   expect(screen.queryByTestId("match-proposal-at")).toBeNull();
 });
 
-test("Freilos statt „Offen“; die Turnierleitung liest „Höchste Punkte“", async () => {
+test("Freilos statt „Offen“", async () => {
   answer({
     ...PAGE, can_player_report_result: false, report_state: null, can_staff_submit_result: true, can_submit_result: true,
     participants: [NEON, { slot: 2, status: "bye", registration_id: null, display_name: null }],
@@ -194,7 +205,6 @@ test("Freilos statt „Offen“; die Turnierleitung liest „Höchste Punkte“"
   await render(<MatchDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("match-headline")).toHaveTextContent("NeonFalke gegen Freilos"));
   expect(screen.queryByText("Offen")).toBeNull();
-  expect(screen.getByText("Punkte erfassen. Höchste Punkte gewinnen automatisch.")).toBeTruthy();
 });
 
 // Terminvorschlag zum Antippen (#1139) in Wiener Zeit (#960): Tag wählen, Uhrzeit in Viertelstunden.
