@@ -265,7 +265,7 @@ export function AvatarCropDialog({ file, busy = false, onCancel, onApply, onLoad
               </div>
               <span className="text-[10px] uppercase tracking-widest font-bold text-white/40">Klein</span>
             </div>
-            <button type="button" onClick={() => update(INITIAL_AVATAR_CROP)} disabled={!dims || locked} className="inline-flex min-h-11 items-center gap-2 px-3 py-2 border border-white/15 text-white/70 hover:text-white rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+            <button type="button" onClick={() => update(INITIAL_AVATAR_CROP)} disabled={!dims || locked} className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
               <RotateCcw className="w-3.5 h-3.5" /> Zurücksetzen
             </button>
           </div>
