@@ -252,3 +252,14 @@ test("Reihenfolge, Fakten und „Was läuft“ wie im Web", async () => {
   fireEvent.press(screen.getByTestId("event-row-tournament-t2"));
   expect(navigate).toHaveBeenCalledWith("TournamentDetail", { id: "rl" });
 });
+
+// Fotos gehören zum Event (#1185): eine Album-Kachel öffnet das Album.
+test("Album-Kacheln öffnen das Album", async () => {
+  mockGet.mockResolvedValue({ data: { ...EVENT, visibility: "public", offer: null, albums: [{ id: "a1", slug: "herbst-lan-fotos", title: "Herbst-LAN Fotos" }, { id: "a2", title: "Ohne Slug" }] } });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("event-album-a1")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("event-album-a1"));
+  expect(navigate).toHaveBeenCalledWith("GalleryAlbum", { id: "herbst-lan-fotos" });
+  await fireEvent.press(screen.getByTestId("event-album-a2"));
+  expect(navigate).toHaveBeenCalledWith("GalleryAlbum", { id: "a2" });
+});

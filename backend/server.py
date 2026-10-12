@@ -61,6 +61,7 @@ from routes.discord_design_routes import router as discord_design_router
 from routes.upload_routes import router as upload_router
 from routes.chat_attachment_routes import router as chat_attachment_router
 from routes.match_proof_routes import router as match_proof_router
+from routes.gallery_submission_routes import router as gallery_submission_router
 from routes.sticker_routes import router as sticker_router
 from routes.badge_routes import router as badge_router, admin_router as achievement_admin_router
 from routes.phase_c_routes import router as phase_c_router
@@ -297,6 +298,7 @@ app.include_router(audit_router)
 app.include_router(upload_router)
 app.include_router(chat_attachment_router)
 app.include_router(match_proof_router)
+app.include_router(gallery_submission_router)
 app.include_router(sticker_router)
 app.include_router(badge_router)
 app.include_router(achievement_admin_router)

@@ -332,7 +332,7 @@ function App() {
           <Route path="/admin/news" element={<ProtectedRoute requireArea="content"><AdminNewsPage /></ProtectedRoute>} />
           <Route path="/admin/news/new" element={<ProtectedRoute requireArea="content"><AdminNewsEditPage /></ProtectedRoute>} />
           <Route path="/admin/news/:id" element={<ProtectedRoute requireArea="content"><AdminNewsEditPage /></ProtectedRoute>} />
-          <Route path="/admin/gallery" element={<ProtectedRoute requireArea="content"><AdminGalleryPage /></ProtectedRoute>} />
+          <Route path="/admin/gallery" element={<ProtectedRoute requireArea={["content", "club"]}><AdminGalleryPage /></ProtectedRoute>} />
           <Route path="/admin/documents" element={<ProtectedRoute requireArea="club"><AdminDocumentsPage /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requireArea="system"><AdminSettingsPage /></ProtectedRoute>} />
           <Route path="/admin/settings/:section" element={<ProtectedRoute requireArea="system"><AdminSettingsPage /></ProtectedRoute>} />

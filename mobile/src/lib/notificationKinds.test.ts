@@ -10,6 +10,8 @@ test("Arten in Worten - bekannt, über das Thema, über den Anfang, nie roh", ()
   expect(notificationKindLabel("level")).toBe("Level");
   expect(notificationKindLabel("team_chat_mention")).toBe("Erwähnung");
   expect(notificationKindLabel("helper_call")).toBe("Helfer gesucht");
+  expect(notificationKindLabel("gallery_event")).toBe("Fotos");
+  expect(notificationKindLabel("gallery_submission")).toBe("Eingesandte Fotos");
   expect(notificationKindLabel("brand_new_thing", { category: "prize_updates" })).toBe("Gewinn");
   expect(notificationKindLabel("tournament_seeding_done")).toBe("Turnier");
   expect(notificationKindLabel("something_else")).toBe("Hinweis");
