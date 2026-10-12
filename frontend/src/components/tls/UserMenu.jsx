@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, Crown, LogOut, Shield, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { resolveMediaUrl } from "@/lib/api";
+import { useUserMenu } from "@/lib/mobileMenu";
 import { mfaSetupPath } from "@/lib/permissions";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { userMenuEntries, userMenuTestId } from "@/pages/user/profile/constants";
@@ -35,7 +36,9 @@ const logoutClass = `${itemBase} w-full text-left text-[#FF3B30] hover:bg-[#FF3B
 export function UserMenu() {
   const { user, logout, isAdmin, adminNeedsSecondFactor, isClubMember } = useAuth();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+  // Geteilt mit dem Kopf des Seitenwechsels (#1324): ein Klick auf den Namen, während die Seite lädt, geht nicht verloren.
+  const [open, setOpen] = useUserMenu(pathname);
   const boxRef = useRef(null);
 
   useEffect(() => {
@@ -52,7 +55,7 @@ export function UserMenu() {
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [open, setOpen]);
 
   if (!user) return null;
 

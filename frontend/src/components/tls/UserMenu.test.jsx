@@ -14,6 +14,7 @@ vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 vi.mock("@/lib/api", () => ({ resolveMediaUrl: (value) => value || "", api: apiMock }));
 
 const { UserMenu } = await import("./UserMenu");
+const { closeFrameMenus } = await import("@/lib/mobileMenu");
 
 function renderMenu() {
   return render(
@@ -22,6 +23,8 @@ function renderMenu() {
     </MemoryRouter>
   );
 }
+
+afterEach(() => closeFrameMenus());
 
 beforeEach(() => {
   authState.isAdmin = false;
@@ -88,4 +91,16 @@ test("ein Admin ohne Zwei-Faktor (#1028) sieht statt „Admin“ den Hinweis „
   const hint = screen.getByTestId("nav-mfa-setup");
   expect(hint).toHaveTextContent("2FA einrichten");
   expect(hint).toHaveAttribute("href", "/profile?tab=security&mfa=required&next=%2Fadmin");
+});
+
+test("offen bleibt offen, wenn während des Ladens der Kopf der Seite den des Seitenwechsels ablöst (#1324)", async () => {
+  const user = userEvent.setup();
+  const first = renderMenu();
+  await user.click(screen.getByTestId("nav-user"));
+  expect(screen.getByTestId("nav-logout")).toBeInTheDocument();
+  first.unmount();
+  renderMenu();
+  expect(screen.getByTestId("nav-logout")).toBeInTheDocument();
+  await user.keyboard("{Escape}");
+  expect(screen.queryByTestId("nav-logout")).toBeNull();
 });
