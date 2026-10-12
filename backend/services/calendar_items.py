@@ -96,6 +96,8 @@ def event_items(doc: dict, *, mine: bool = False) -> list[dict]:
         item = _item("event", doc, title=title, path=f"/events/{doc.get('slug') or doc.get('id')}", start=day["start_at"], end=day["end_at"],
                      location=place, mine=mine, marker="event_day", item_id=f"{doc.get('id')}-tag-{index}")
         if item:
+            # Der Name und die Kennung des Events (#1271): die Kalender-Ansicht fasst die Tage zu einer Zeile und einem Balken.
+            item["event_id"], item["event_name"] = doc.get("id"), doc.get("name") or "Event"
             out.append(item)
     return out
 

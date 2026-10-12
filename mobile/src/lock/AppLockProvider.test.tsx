@@ -121,3 +121,17 @@ test("ohne Bildschirmsperre am Gerät gilt auch eine gespeicherte Sperre nicht, 
   expect(screen.getByTestId("state")).toHaveTextContent("bereit|aus|offen");
   expect(LocalAuthentication.authenticateAsync).not.toHaveBeenCalled();
 });
+
+// #1052: hängt die Abfrage am Gerät, bleibt die App nicht auf dem Startbild stehen - sie gilt dann als gesperrt.
+test("hängt die Abfrage, gilt die App nach der Wartezeit als gesperrt", async () => {
+  (LocalAuthentication.getEnrolledLevelAsync as jest.Mock).mockReturnValueOnce(new Promise(() => {}));
+  (LocalAuthentication.authenticateAsync as jest.Mock).mockResolvedValueOnce({ success: false, error: "user_cancel" });
+  await render(
+    <AppLockProvider now={() => clock} readTimeoutMs={50}>
+      <Probe />
+    </AppLockProvider>,
+  );
+  expect(screen.getByTestId("state")).toHaveTextContent("lade|aus|offen");
+  await waitFor(() => expect(screen.getByTestId("state")).toHaveTextContent("bereit|an|gesperrt"));
+  expect(screen.getByText("Abmelden")).toBeTruthy();
+});

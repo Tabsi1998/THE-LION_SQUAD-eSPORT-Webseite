@@ -8,6 +8,7 @@ gerade nicht antwortet, gibt es schlicht keine Vereinstermine.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -145,6 +146,8 @@ async def own_shifts_for(db, user: dict | None) -> list[tuple[dict, dict]]:
 
 async def club_items(db, user: dict | None) -> list[dict]:
     """Versammlungen und eigene Schichten der Person als Termine - für Kalender und persönlichen Feed."""
-    items = [item for item in (meeting_item(meeting) for meeting in await meetings_for(db, user)) if item]
-    items += [item for item in (shift_item(event, shift) for event, shift in await own_shifts_for(db, user)) if item]
+    # Beide Abrufe gleichzeitig (Codex-Prüfung #1460): jeder fängt seine Fehler selbst, fällt einer aus, kommt der andere.
+    meetings, shifts = await asyncio.gather(meetings_for(db, user), own_shifts_for(db, user))
+    items = [item for item in (meeting_item(meeting) for meeting in meetings) if item]
+    items += [item for item in (shift_item(event, shift) for event, shift in shifts) if item]
     return items
