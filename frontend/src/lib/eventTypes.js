@@ -7,7 +7,7 @@
 
 export const EVENT_TYPE_LABELS = {
   general: "Allgemein",
-  public_event: "Public Event",
+  public_event: "Öffentliches Event",
   club_evening: "Vereinsabend",
   lan_party: "LAN-Party",
   online_event: "Online Event",

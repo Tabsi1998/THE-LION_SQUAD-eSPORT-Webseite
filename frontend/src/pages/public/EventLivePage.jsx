@@ -1,18 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
-import { Activity, CalendarClock, CheckCircle2, Flag, MapPin, Monitor, Radio, RotateCw, Trophy, Users } from "lucide-react";
-import { PublicLayout } from "@/components/tls/PublicLayout";
-import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
-import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
-import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
-import { PhaseBadge } from "@/components/tls/PhaseBadge";
+import { Activity, CalendarClock, CheckCircle2, Flag, Monitor, Radio, RotateCw, Trophy, Users } from "lucide-react";
 import { api } from "@/lib/api";
-import { formatDateTime, formatWhen } from "@/lib/datetime";
+import { formatWhen } from "@/lib/datetime";
 import { sortByNearestDate } from "@/lib/contentSort";
 import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel, slotName, stationText } from "@/lib/tournamentLabels";
-import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { seoTextPreview } from "@/lib/textPreview";
 import { viennaTime } from "@/lib/vienna";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { eventIsOver } from "@/lib/afterEnd";
@@ -93,201 +86,131 @@ function normalizeBracketRows(payload) {
   }));
 }
 
+// „Live“ ist seit #1183 ein Reiter der Event-Seite: die alte Adresse /events/<slug>/live führt dorthin (Links aus
+// Discord, Mails und der App bleiben gültig). Den Inhalt zeigt EventLiveBoard - im Reiter, mit dem Event der Seite.
 export default function EventLivePage() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
-  const accessToken = searchParams.get("access") || "";
-  const [event, setEvent] = useState(null);
+  const params = new URLSearchParams({ tab: "live" });
+  const access = searchParams.get("access");
+  if (access) params.set("access", access);
+  return <Navigate to={`/events/${encodeURIComponent(slug || "")}?${params.toString()}`} replace />;
+}
+
+/**
+ * Was gerade läuft (#1183, vorher eine eigene Seite): laufende und nächste Matches, Stationen, Ergebnisse und die
+ * Turniere und Fast Laps des Events. Lädt die Bäume und Stationen selbst und frischt sich auf, solange das Event läuft.
+ */
+export function EventLiveBoard({ event, accessToken = "" }) {
   const [matches, setMatches] = useState([]);
   const [stations, setStations] = useState([]);
-  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
-  // Nach dem Ende (#1221) gibt es nichts mehr live zu verfolgen: die Adresse führt auf die Event-Seite.
-  const [ended, setEnded] = useState(false);
+  const tournaments = useMemo(() => sortByNearestDate(event?.tournaments || []), [event?.tournaments]);
+  const over = eventIsOver(event);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!event?.id) return;
     try {
-      const { data } = await api.get(`/events/${slug}`, accessParams(accessToken));
-      if (eventIsOver(data)) {
-        setEvent(data);
-        setEnded(true);
-        return;
-      }
-      const tournaments = sortByNearestDate(data?.tournaments || []);
       const bracketResponses = await Promise.allSettled(
         tournaments.map((tournament) => api.get(`/tournaments/${tournament.id}/bracket`, accessParams(accessToken)))
       );
       const stationResponses = await Promise.allSettled([
-        api.get(`/stations?event_id=${encodeURIComponent(data.id)}`),
+        api.get(`/stations?event_id=${encodeURIComponent(event.id)}`),
         ...tournaments.map((tournament) => api.get(`/stations?tournament_id=${encodeURIComponent(tournament.id)}`)),
       ]);
-
-      const nextMatches = bracketResponses
-        .filter((result) => result.status === "fulfilled")
-        .flatMap((result) => normalizeBracketRows(result.value.data));
-      const nextStations = stationResponses
-        .filter((result) => result.status === "fulfilled")
-        .flatMap((result) => result.value.data || []);
-
-      setEvent({ ...data, tournaments });
-      setMatches(nextMatches);
+      setMatches(bracketResponses.filter((result) => result.status === "fulfilled").flatMap((result) => normalizeBracketRows(result.value.data)));
+      const nextStations = stationResponses.filter((result) => result.status === "fulfilled").flatMap((result) => result.value.data || []);
       setStations(Array.from(new Map(nextStations.map((station) => [station.id, station])).values()));
-      setError(null);
       setLastUpdated(Date.now());
-    } catch (err) {
-      setError(err);
     } finally {
       setLoading(false);
     }
-  }, [accessToken, slug]);
+  }, [accessToken, event?.id, tournaments]);
 
   useEffect(() => {
     load();
   }, [load]);
-  useLiveRefresh(load, ["events", "tournaments", "matches", "matches-v2", "stations", "f1"], { fallbackMs: 20000, enabled: !ended });
+  useLiveRefresh(load, ["events", "tournaments", "matches", "matches-v2", "stations", "f1"], { fallbackMs: 20000, enabled: !over });
 
   const stationMap = useMemo(() => new Map(stations.map((station) => [station.id, station])), [stations]);
   const liveMatches = useMemo(() => matches.filter((match) => ACTIVE_MATCH_STATUSES.has(match.status)).sort((a, b) => a.sortTime - b.sortTime), [matches]);
   const nextMatches = useMemo(() => matches.filter((match) => NEXT_MATCH_STATUSES.has(match.status)).sort((a, b) => a.sortTime - b.sortTime).slice(0, 8), [matches]);
   const resultMatches = useMemo(() => matches.filter((match) => DONE_MATCH_STATUSES.has(match.status)).sort((a, b) => b.sortTime - a.sortTime).slice(0, 8), [matches]);
-  const activityItems = useMemo(() => {
-    if (!event) return [];
-    return sortByNearestDate([
-      ...(event.tournaments || []).map((item) => ({ ...item, kind: "tournament" })),
-      ...(event.f1_challenges || []).map((item) => ({ ...item, kind: "fastlap" })),
-    ]);
-  }, [event]);
+  const activityItems = useMemo(() => sortByNearestDate([
+    ...tournaments.map((item) => ({ ...item, kind: "tournament" })),
+    ...(event?.f1_challenges || []).map((item) => ({ ...item, kind: "fastlap" })),
+  ]), [event?.f1_challenges, tournaments]);
 
   const busyStations = stations.filter((station) => BUSY_STATION_STATUSES.has(station.status));
   const freeStations = stations.filter((station) => !BUSY_STATION_STATUSES.has(station.status) && station.status !== "broken");
   const brokenStations = stations.filter((station) => station.status === "broken");
 
-  const seoDescription = seoTextPreview(event?.description || event?.program, "Live-Übersicht mit Zeitplan, Matches, Stationen und Ergebnissen für lokale THE LION SQUAD Events.");
-  useDocumentTitle(`${event?.name || "Event"} Live`, seoDescription, {
-    image: event?.banner_url,
-    canonical: event?.slug ? `${window.location.origin}/events/${event.slug}/live` : undefined,
-  });
-
-  if (ended && event) {
-    return <Navigate to={`/events/${event.slug || event.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} replace />;
-  }
-
-  if (loading && !event) {
-    return <PublicLayout><PublicLoadingState label="Lade Event-Live" /></PublicLayout>;
-  }
-
-  if (!event && error) {
-    return (
-      <PublicLayout>
-        <PublicEmptyState
-          icon={Radio}
-          eyebrow="Event Live"
-          title="Live-Seite nicht verfügbar"
-          description="Das Event konnte nicht geladen werden oder ist nicht öffentlich sichtbar."
-          primaryAction={{ to: "/events", label: "Events ansehen" }}
-          className="my-16"
-        />
-      </PublicLayout>
-    );
-  }
-
-  const eventUrl = `/events/${event.slug || event.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
+  if (loading) return <p className="text-sm text-white/45 py-6" data-testid="event-live-loading">Lade, was gerade läuft …</p>;
 
   return (
-    <PublicLayout>
-      <section className="border-b border-white/10 bg-[#0A0A0A]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <Breadcrumbs
-            items={[
-              { label: "Home", to: "/" },
-              { label: "Events", to: "/events" },
-              { label: event.name, to: eventUrl },
-              { label: "Live" },
-            ]}
-            className="mb-4"
-          />
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Event Live</span>
-                <PhaseBadge phase={event.public_phase || event.event_phase} status={event.status} />
-              </div>
-              <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase leading-tight break-words">{event.name}</h1>
-              <div className="mt-4 flex flex-wrap gap-4 text-sm text-white/60">
-                {event.start_date && <span className="inline-flex items-center gap-2"><CalendarClock className="w-4 h-4 text-[#29B6E8]" />{formatDateTime(event.start_date)}</span>}
-                {(event.location || event.city) && <span className="inline-flex items-center gap-2"><MapPin className="w-4 h-4 text-[#FFD700]" />{[event.location, event.city].filter(Boolean).join(", ")}</span>}
-                {lastUpdated && <span className="inline-flex items-center gap-2"><RotateCw className="w-4 h-4 text-white/35" />Aktualisiert {viennaTime(lastUpdated, { hour: "2-digit", minute: "2-digit" })}</span>}
-              </div>
+    <div className="space-y-8" data-testid="event-live-board">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {lastUpdated ? <span className="inline-flex items-center gap-2 text-xs text-white/45"><RotateCw className="w-3.5 h-3.5" /> Aktualisiert {viennaTime(lastUpdated, { hour: "2-digit", minute: "2-digit" })}</span> : <span />}
+        <button type="button" onClick={load} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-1.5 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-live-refresh">
+          <RotateCw className="w-3.5 h-3.5" /> Aktualisieren
+        </button>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <LiveStat icon={Radio} label="Jetzt live" value={liveMatches.length} tone="cyan" />
+        <LiveStat icon={CalendarClock} label="Als nächstes" value={nextMatches.length} tone="gold" />
+        <LiveStat icon={CheckCircle2} label="Ergebnisse" value={resultMatches.length} tone="green" />
+        <LiveStat icon={Monitor} label="Freie Stationen" value={freeStations.length} tone="white" />
+      </div>
+
+      <div className="grid xl:grid-cols-12 gap-6">
+        <section className="xl:col-span-7 space-y-6 min-w-0">
+          <LivePanel icon={Radio} title="Jetzt läuft" count={liveMatches.length}>
+            {liveMatches.length ? liveMatches.map((match) => (
+              <MatchCard key={match.id} match={match} stationMap={stationMap} featured />
+            )) : (
+              <InlineEmpty text="Aktuell ist kein Match als laufend markiert." />
+            )}
+          </LivePanel>
+
+          <LivePanel icon={CalendarClock} title="Als nächstes" count={nextMatches.length}>
+            {nextMatches.length ? nextMatches.map((match) => (
+              <MatchCard key={match.id} match={match} stationMap={stationMap} />
+            )) : (
+              <InlineEmpty text="Noch keine kommenden Matches geplant." />
+            )}
+          </LivePanel>
+        </section>
+
+        <aside className="xl:col-span-5 space-y-6 min-w-0">
+          <LivePanel icon={Monitor} title="Stationen" count={stations.length}>
+            <div className="grid grid-cols-3 gap-2">
+              <MiniMetric label="Belegt" value={busyStations.length} />
+              <MiniMetric label="Frei" value={freeStations.length} />
+              <MiniMetric label="Defekt" value={brokenStations.length} />
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Link to={eventUrl} className="tls-btn tls-btn--quiet px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">Eventdetails</Link>
-              <button type="button" onClick={load} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
-                <RotateCw className="w-3.5 h-3.5" /> Aktualisieren
-              </button>
+            <div className="space-y-2">
+              {stations.slice(0, 12).map((station) => <StationRow key={station.id} station={station} />)}
+              {!stations.length && <InlineEmpty text="Keine Stationen mit diesem Event verknüpft." />}
             </div>
-          </div>
-        </div>
-      </section>
+          </LivePanel>
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <LiveStat icon={Radio} label="Jetzt live" value={liveMatches.length} tone="cyan" />
-          <LiveStat icon={CalendarClock} label="Als nächstes" value={nextMatches.length} tone="gold" />
-          <LiveStat icon={CheckCircle2} label="Ergebnisse" value={resultMatches.length} tone="green" />
-          <LiveStat icon={Monitor} label="Freie Stationen" value={freeStations.length} tone="white" />
-        </div>
+          <LivePanel icon={CheckCircle2} title="Ergebnis-Ticker" count={resultMatches.length}>
+            {resultMatches.length ? resultMatches.map((match) => (
+              <ResultRow key={match.id} match={match} />
+            )) : (
+              <InlineEmpty text="Sobald Ergebnisse eingetragen sind, erscheinen sie hier." />
+            )}
+          </LivePanel>
 
-        <div className="grid lg:grid-cols-12 gap-6">
-          <section className="lg:col-span-7 space-y-6 min-w-0">
-            <LivePanel icon={Radio} title="Jetzt läuft" count={liveMatches.length}>
-              {liveMatches.length ? liveMatches.map((match) => (
-                <MatchCard key={match.id} match={match} stationMap={stationMap} featured />
-              )) : (
-                <InlineEmpty text="Aktuell ist kein Match als laufend markiert." />
-              )}
-            </LivePanel>
-
-            <LivePanel icon={CalendarClock} title="Als nächstes" count={nextMatches.length}>
-              {nextMatches.length ? nextMatches.map((match) => (
-                <MatchCard key={match.id} match={match} stationMap={stationMap} />
-              )) : (
-                <InlineEmpty text="Noch keine kommenden Matches geplant." />
-              )}
-            </LivePanel>
-          </section>
-
-          <aside className="lg:col-span-5 space-y-6 min-w-0">
-            <LivePanel icon={Monitor} title="Stationen" count={stations.length}>
-              <div className="grid grid-cols-3 gap-2">
-                <MiniMetric label="Belegt" value={busyStations.length} />
-                <MiniMetric label="Frei" value={freeStations.length} />
-                <MiniMetric label="Defekt" value={brokenStations.length} />
-              </div>
-              <div className="space-y-2">
-                {stations.slice(0, 12).map((station) => <StationRow key={station.id} station={station} />)}
-                {!stations.length && <InlineEmpty text="Keine Stationen mit diesem Event verknüpft." />}
-              </div>
-            </LivePanel>
-
-            <LivePanel icon={CheckCircle2} title="Ergebnis-Ticker" count={resultMatches.length}>
-              {resultMatches.length ? resultMatches.map((match) => (
-                <ResultRow key={match.id} match={match} />
-              )) : (
-                <InlineEmpty text="Sobald Ergebnisse eingetragen sind, erscheinen sie hier." />
-              )}
-            </LivePanel>
-
-            <LivePanel icon={Activity} title="Aktivitäten" count={activityItems.length}>
-              {activityItems.length ? activityItems.map((item) => <ActivityRow key={`${item.kind}-${item.id}`} item={item} accessToken={accessToken} />) : (
-                <InlineEmpty text="Keine Turniere oder Fast Laps verknüpft." />
-              )}
-            </LivePanel>
-          </aside>
-        </div>
-      </section>
-    </PublicLayout>
+          <LivePanel icon={Activity} title="Aktivitäten" count={activityItems.length}>
+            {activityItems.length ? activityItems.map((item) => <ActivityRow key={`${item.kind}-${item.id}`} item={item} accessToken={accessToken} />) : (
+              <InlineEmpty text="Keine Turniere oder Fast Laps verknüpft." />
+            )}
+          </LivePanel>
+        </aside>
+      </div>
+    </div>
   );
 }
 

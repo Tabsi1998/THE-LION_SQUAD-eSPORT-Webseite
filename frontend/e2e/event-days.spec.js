@@ -65,7 +65,7 @@ test("Event-Seite: Zeitraum, Tageskarten, Tag des Turniers und Kalender je Tag",
   await expect(page.getByTestId("event-day-2").locator(".tls-live-dot")).toHaveCount(1);
   await expect(page.getByTestId("event-day-3")).toContainText("Als Nächstes");
   await expect(page.getByTestId("event-day-3")).toContainText("Finaltag mit Siegerehrung");
-  await expect(page.getByTestId("embed-event-day")).toHaveText("Tag 2/3");
+  await expect(page.getByTestId("embed-event-day")).toHaveText("Tag 2");
 
   // Ein Knopf „In den Kalender“ (#1272): alle Tage als Datei, ein Tag mit Google.
   await page.getByTestId("add-to-calendar-button").click();

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -10,27 +10,36 @@ import { RichContent } from "@/components/tls/RichContent";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
+import { FactsBox } from "@/components/tls/FactsBox";
+import { EventBanner } from "@/components/tls/EventBanner";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
-import { formatRoundName, formatTournamentDisplay, slotName } from "@/lib/tournamentLabels";
-import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { formatWhen } from "@/lib/datetime";
 import { eventIsOver, photosComingWindow } from "@/lib/afterEnd";
 import { countText, ownSeatsSentence, seatsLabel } from "@/lib/eventSeats";
+import { eventFacts, eventTabs, stripHeadingEmoji, visibilityChip, whatsOnRows } from "@/lib/eventPage";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { hasArea } from "@/lib/permissions";
-import { gameLabel } from "@/lib/gameLabels";
 import { eventTypeLabel, normalizeEventType } from "@/lib/eventTypes";
 import { formatCents, offerSummary, previewQuote } from "@/lib/pricing";
 import { AddToCalendar } from "@/components/tls/AddToCalendar";
+import { EventLiveBoard } from "@/pages/public/EventLivePage";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Calendar, CheckCircle, Clock, Crown, ExternalLink, Flag, Handshake, Image as ImageIcon, Lock, Mail, MapPin, Newspaper, Radio, Trophy, UserPlus, Users, XCircle } from "lucide-react";
+import {
+  Calendar, Camera, CheckCircle, Clock, CupSoda, ExternalLink, Flag, Gamepad2, Gift, Glasses, Handshake, Image as ImageIcon, Joystick, Mail, MapPin,
+  Monitor, Music, Newspaper, Pizza, Radio, Star, Trophy, UserPlus, Users, Wifi, XCircle,
+} from "lucide-react";
 import { viennaDate, viennaDateTime, viennaTime } from "@/lib/vienna";
+
+// Die Event-Seite als Startpunkt (#1183) mit Kopf und Bild (#1273) und Fakten-Kasten (#1346). Feste Reihenfolge, gleich in
+// der App (EventDetailScreen): 1. Dein Event, 2. Was läuft beim Event, 3. Live verfolgen, 4. Fotos, 5. News, 6. Infos
+// (Beschreibung mit Highlights, die Tage, Standorte, Programm), 7. Sponsoren. Der Fakten-Kasten steht am Handy direkt unter
+// dem Titel, am PC rechts und bleibt beim Scrollen stehen. „Live“ ist ein Reiter; /events/<slug>/live führt dorthin.
 
 // Der Standardtyp "general" sagt nichts; im Kopf steht dann schlicht "Event".
 function eventKindLabel(value) {
@@ -58,6 +67,12 @@ function mapLinkUrl(query) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
+// Highlights (#1346): die feste Liste der Symbole (lib/eventPage.js → HIGHLIGHT_ICONS) mit ihrem Bild.
+const HIGHLIGHT_ICON_COMPONENTS = {
+  gamepad: Gamepad2, trophy: Trophy, flag: Flag, monitor: Monitor, vr: Glasses, retro: Joystick, music: Music, food: Pizza,
+  drink: CupSoda, wifi: Wifi, gift: Gift, users: Users, camera: Camera, star: Star,
+};
+
 // Mehrtägig (#884): je Tag eine Karte - der laufende Tag mit LIVE-Punkt, der nächste markiert, vergangene gedimmt.
 // Die Texte (Wochentag, Zeiten, Einlass) kommen fertig vom Server, damit Website, App und Discord dasselbe sagen.
 function EventDaysBlock({ schedule }) {
@@ -65,7 +80,7 @@ function EventDaysBlock({ schedule }) {
   const columns = days.length <= 2 ? "md:grid-cols-2" : days.length === 4 ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3";
   return (
     <div data-testid="event-days">
-      <h2 className="font-heading text-2xl font-black uppercase mb-1">Die Tage</h2>
+      <h3 className="font-heading text-xl font-black uppercase mb-1">Die Tage</h3>
       {schedule.now?.text && <p className="text-sm text-white/60 mb-4" data-testid="event-days-now">{schedule.now.text}</p>}
       <ol className={`grid gap-4 ${columns}`}>
         {days.map((day) => {
@@ -117,13 +132,24 @@ function uniqueLogoSponsors(sponsors = []) {
   });
 }
 
+function SectionTitle({ icon: Icon, accent = "#9F7AEA", children }) {
+  return (
+    <h2 className="font-heading text-2xl font-black uppercase mb-4 inline-flex items-center gap-2">
+      {Icon ? <Icon className="w-5 h-5" style={{ color: accent }} aria-hidden="true" /> : null}{children}
+    </h2>
+  );
+}
+
 export default function EventDetailPage() {
   const { slug } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const accessToken = searchParams.get("access") || "";
   const { user } = useAuth();
   const [e, setE] = useState(null);
   const [error, setError] = useState(null);
+  // „Anmelden“ im Fakten-Kasten öffnet das Formular unter „Dein Event“ und springt dorthin.
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const yoursRef = useRef(null);
   const { hasConsent } = useCookieConsent();
   const seoDescription = seoTextPreview(e?.description || e?.program, "Gaming Event von THE LION SQUAD eSports in Tirol.");
   useDocumentTitle(e?.name || "Event", seoDescription, {
@@ -158,111 +184,261 @@ export default function EventDetailPage() {
   );
   if (!e) return <PublicLayout><PublicLoadingState label="Lade Event" /></PublicLayout>;
 
-  const eventSponsors = uniqueLogoSponsors(e.sponsors || []);
-  const organizerName = e.organizer_name || (e.owned_by_club ? "THE LION SQUAD - eSports" : "");
-  const liveUrl = `/events/${e.slug || e.id}/live${accessSuffix(accessToken)}`;
   const over = eventIsOver(e);
-  const photosComing = Boolean(e.photos_coming) && (e.albums || []).every((album) => album.is_empty) && photosComingWindow(e);
+  const tabs = eventTabs(e, { over });
+  const tabParam = searchParams.get("tab");
+  const tab = tabs.some((entry) => entry.key === tabParam) ? tabParam : "overview";
+  const selectTab = (key) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (key === "overview") next.delete("tab");
+      else next.set("tab", key);
+      return next;
+    }, { replace: true });
+  };
+  const openRegistration = () => {
+    setRegisterOpen(true);
+    if (tab !== "overview") selectTab("overview");
+    window.requestAnimationFrame?.(() => yoursRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" }));
+  };
 
   return (
     <PublicLayout>
-      <div className="relative border-b border-white/10">
-        {e.banner_url && <img src={resolveMediaUrl(e.banner_url)} className="absolute inset-0 w-full h-full object-cover opacity-25" alt="" />}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/40 via-[#0A0A0A]/80 to-[#0A0A0A]" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 min-w-0">
-          <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Events", to: "/events" }, { label: e.name }]} className="mb-4" />
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]">{eventKindLabel(e.event_type)}</span>
-            <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status || "draft"} size="md" />
-            {e.visibility === "members" && <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]"><Crown className="w-3 h-3" /> Mitglieder</span>}
-            {e.visibility === "internal" && <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-white/60"><Lock className="w-3 h-3" /> Intern</span>}
-          </div>
-          <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase leading-tight break-words">{e.name}</h1>
-          {e.description && <div className="mt-3 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(e.description) }} />}
-          <div className="mt-6 flex flex-wrap gap-5 text-sm text-white/70 min-w-0">
-            {e.schedule?.multi_day
-              ? <span className="inline-flex min-w-0 items-center gap-2" data-testid="event-days-summary"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{[e.schedule.label, e.schedule.now?.state !== "after" && e.schedule.now?.text].filter(Boolean).join(" · ")}</span></span>
-              : e.start_date && <span className="inline-flex min-w-0 items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{viennaDateTime(e.start_date, { dateStyle: "long", timeStyle: "short" })}</span></span>}
-            {(e.locations?.length || 0) > 1
-              ? <span className="inline-flex min-w-0 items-center gap-2" data-testid="event-location-count"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span>{e.locations.length} Standorte</span></span>
-              : (e.location || fullAddress(e)) && <span className="inline-flex min-w-0 items-center gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{[e.location, fullAddress(e)].filter(Boolean).join(", ")}</span></span>}
-            {e.contact && <span className="inline-flex min-w-0 items-center gap-2"><Mail className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-all">{e.contact}</span></span>}
-            {e.max_participants && <span className="inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#9F7AEA] shrink-0" />max. {e.max_participants}</span>}
-            {e.has_registration && e.registration_summary && <span className="inline-flex items-center gap-2"><UserPlus className="w-4 h-4 text-[#9F7AEA] shrink-0" />{e.registration_summary.reserved_seats || 0}{e.max_participants ? `/${e.max_participants}` : ""} Plätze reserviert</span>}
-            {organizerName && (
-              e.organizer_url ? (
-                <a href={e.organizer_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-[#29B6E8] hover:underline">
-                  <ExternalLink className="w-4 h-4" /> {organizerName}
-                </a>
-              ) : <span className="inline-flex items-center gap-2">{organizerName}</span>
-            )}
-          </div>
-          {/* Nach dem Ende (#1221): kein Kalender, kein „Live verfolgen“, kein „Display“ - stattdessen der Satz, wo die
-              Ergebnisse stehen (bis der Rückblick kommt). „Display“ sehen auch vorher nur Konten mit dem Bereich Turniere. */}
-          {over && e.status !== "cancelled" && (
-            <div className="mt-6 max-w-3xl border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3" data-testid="event-over">
-              <div className="text-sm text-white/85">{e.tournaments?.length ? "Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:" : "Das Event ist vorbei."}</div>
-              {!!e.tournaments?.length && (
-                <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
-                  {e.tournaments.map((t) => (
-                    <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex items-center gap-1.5 text-sm font-bold text-[#FFD700] hover:text-white">
-                      <Trophy className="w-3.5 h-3.5" /> {t.title}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          {!over && (
-            <AddToCalendar className="mt-6" days={e.schedule?.multi_day ? e.schedule.days : null} item={{
-              id: e.id, slug: e.slug, kind: "event", title: e.name, start: e.start_date, end: e.end_date,
-              location: [e.location, fullAddress(e)].filter(Boolean).join(", ") || null,
-              detail: eventKindLabel(e.event_type), url: typeof window !== "undefined" && e.slug ? `${window.location.origin}/events/${e.slug}` : null,
-            }} />
-          )}
-          {!over && Boolean(e.tournaments?.length || e.f1_challenges?.length) && (
-            <div className="mt-7 flex flex-wrap gap-3" data-testid="event-live-links">
-              <Link to={liveUrl} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
-                <Radio className="w-4 h-4" /> Live verfolgen
-              </Link>
-              {hasArea(user, "tournaments") && (
-                <Link to={`/display/event/${e.id}`} data-testid="event-display-link" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
-                  <ExternalLink className="w-4 h-4" /> Display
-                </Link>
-              )}
-            </div>
+      <EventHeader e={e} />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start min-w-0">
+        <aside className="min-w-0 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24" data-testid="event-facts-column">
+          <EventFactsBox e={e} user={user} over={over} onRegister={openRegistration} />
+        </aside>
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1 space-y-10">
+          {tabs.length > 1 && <EventTabs tabs={tabs} value={tab} onChange={selectTab} />}
+          {tab === "live" ? (
+            <EventLiveBoard event={e} accessToken={accessToken} />
+          ) : (
+            <EventOverview
+              e={e} user={user} over={over} accessToken={accessToken} hasConsent={hasConsent} onChanged={load}
+              registerOpen={registerOpen} yoursRef={yoursRef} onLive={() => selectTab("live")}
+            />
           )}
         </div>
       </div>
+    </PublicLayout>
+  );
+}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12 min-w-0">
-        {(e.has_registration || (e.show_map && mapEmbedUrl(e))) && (
-          <div className="grid lg:grid-cols-2 gap-5 min-w-0">
-            {e.has_registration && (
-              <EventRegistrationPanel event={e} user={user} accessToken={accessToken} onChanged={load} />
-            )}
-            {(e.locations?.length || 0) <= 1 && e.show_map && mapEmbedUrl(e) && hasConsent("external_media") && (
-              <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
-                <iframe title={`Karte ${e.name}`} src={mapEmbedUrl(e)} className="w-full h-72 border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
-              </div>
-            )}
-            {(e.locations?.length || 0) <= 1 && e.show_map && mapEmbedUrl(e) && !hasConsent("external_media") && (
-              <ExternalMediaNotice
-                service="Google Maps"
-                reason="Die Karte wird erst nach Zustimmung zu externen Medien geladen, weil dabei Daten an Google übertragen werden können."
-                url={mapLinkUrl(mapQuery(e))}
-                accent="#9F7AEA"
-                testId="event-map-consent-notice"
-              />
-            )}
+// Kopf mit Bild (#1273): das Bild als Banner (am Handy im Breitformat über dem Titel, am PC rechts daneben), darunter bzw.
+// daneben Titel, Datum, Ort und Status. Die Beschreibung beginnt erst nach dem Kopf (unter „Infos“).
+function EventHeader({ e }) {
+  const chip = e.visibility && e.visibility !== "public" ? visibilityChip(e.visibility) : "";
+  return (
+    <header className="border-b border-white/10 bg-[#0A0A0A]" data-testid="event-header">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-8 lg:pt-10 lg:pb-12 min-w-0">
+        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Events", to: "/events" }, { label: e.name }]} className="mb-4" />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:items-center min-w-0">
+          <EventBanner event={e} eager className="w-full lg:order-2" />
+          <div className="min-w-0 lg:order-1">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]" data-testid="event-kind">{eventKindLabel(e.event_type)}</span>
+              <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status || "draft"} size="md" />
+              {chip && <span className={`text-[11px] font-bold ${e.visibility === "members" ? "text-[#FFD700]" : "text-white/60"}`} data-testid="event-visibility">{chip}</span>}
+            </div>
+            <h1 className="mt-3 font-heading text-4xl md:text-5xl xl:text-6xl font-black uppercase leading-tight break-words">{e.name}</h1>
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/70 min-w-0">
+              {e.schedule?.multi_day
+                ? <span className="inline-flex min-w-0 items-center gap-2" data-testid="event-days-summary"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{[e.schedule.label, e.schedule.now?.state !== "after" && e.schedule.now?.text].filter(Boolean).join(" · ")}</span></span>
+                : e.start_date && <span className="inline-flex min-w-0 items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{formatWhen(e.start_date)}</span></span>}
+              {(e.locations?.length || 0) > 1
+                ? <span className="inline-flex min-w-0 items-center gap-2" data-testid="event-location-count"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span>{e.locations.length} Standorte</span></span>
+                : (e.location || e.city) && <span className="inline-flex min-w-0 items-center gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{e.location || e.city}</span></span>}
+            </div>
           </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function EventTabs({ tabs, value, onChange }) {
+  return (
+    <div role="tablist" aria-label="Ansicht" className="flex gap-1 border-b border-white/10" data-testid="event-tabs">
+      {tabs.map((entry) => (
+        <button
+          key={entry.key}
+          type="button"
+          role="tab"
+          aria-selected={value === entry.key}
+          onClick={() => onChange(entry.key)}
+          data-testid={`event-tab-${entry.key}`}
+          className={`-mb-px border-b-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition ${value === entry.key ? "border-[#9F7AEA] text-white" : "border-transparent text-white/50 hover:text-white"}`}
+        >
+          {entry.key === "live" ? <Radio className="inline w-3.5 h-3.5 mr-1.5 -mt-0.5 text-[#FF3B30]" aria-hidden="true" /> : null}{entry.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Der Fakten-Kasten (#1346): Wann, Wo, Eintritt, Mitbringen; darunter „Anmelden“ (wichtig) bzw. der eigene Stand und
+// „In den Kalender“ (#1272). Nach dem Ende gibt es keinen Kalender-Knopf mehr (#1221).
+function EventFactsBox({ e, user, over, onRegister }) {
+  const own = e.own_registration;
+  const activeOwn = own && !["cancelled", "no_show"].includes(own.status);
+  const phaseState = e.public_phase?.state || e.event_phase?.state || e.status;
+  const canRegister = e.has_registration && !e.registration_url && !activeOwn && !over
+    && (phaseState === "registration_open" || e.access_link?.grants?.includes("register"));
+  const loginTarget = typeof window !== "undefined" ? `/login?next=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}` : "/login";
+  const calendarItem = {
+    id: e.id, slug: e.slug, kind: "event", title: e.name, start: e.start_date, end: e.end_date,
+    location: [e.location, fullAddress(e)].filter(Boolean).join(", ") || null,
+    detail: eventKindLabel(e.event_type), url: typeof window !== "undefined" && e.slug ? `${window.location.origin}/events/${e.slug}` : null,
+  };
+  return (
+    <FactsBox rows={eventFacts(e)} testId="event-facts">
+      {e.has_registration && e.registration_url && !over ? (
+        <a href={e.registration_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-facts-register">
+          Anmelden <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      ) : null}
+      {activeOwn ? (
+        <a href="#dein-event" className="tls-btn tls-btn--secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-sm" data-testid="event-facts-own">
+          <CheckCircle className="w-4 h-4" /> {own.status === "waitlist" ? "Warteliste" : "Du bist dabei"}
+        </a>
+      ) : null}
+      {canRegister && user ? (
+        <button type="button" onClick={onRegister} className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-facts-register">
+          <UserPlus className="w-4 h-4" /> Anmelden
+        </button>
+      ) : null}
+      {canRegister && !user ? (
+        <Link to={loginTarget} className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-facts-register">
+          Einloggen zum Anmelden
+        </Link>
+      ) : null}
+      {!over ? <AddToCalendar block days={e.schedule?.multi_day ? e.schedule.days : null} item={calendarItem} /> : null}
+    </FactsBox>
+  );
+}
+
+function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, registerOpen, yoursRef, onLive }) {
+  const eventSponsors = uniqueLogoSponsors(e.sponsors || []);
+  const organizerName = e.organizer_name || (e.owned_by_club ? "THE LION SQUAD - eSports" : "");
+  const photosComing = Boolean(e.photos_coming) && (e.albums || []).every((album) => album.is_empty) && photosComingWindow(e);
+  const rows = whatsOnRows(e);
+  const singleMap = (e.locations?.length || 0) <= 1 && e.show_map && mapEmbedUrl(e);
+  return (
+    <div className="space-y-12" data-testid="event-overview">
+      {/* Nach dem Ende (#1221): kein Kalender, kein „Live verfolgen“, kein „Display“ - stattdessen der Satz, wo die
+          Ergebnisse stehen (bis der Rückblick kommt). */}
+      {over && e.status !== "cancelled" && (
+        <div className="border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3" data-testid="event-over">
+          <div className="text-sm text-white/85">{e.tournaments?.length ? "Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:" : "Das Event ist vorbei."}</div>
+          {!!e.tournaments?.length && (
+            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+              {e.tournaments.map((t) => (
+                <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex items-center gap-1.5 text-sm font-bold text-[#FFD700] hover:text-white">
+                  <Trophy className="w-3.5 h-3.5" /> {t.title}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 1. Dein Event: der eigene Stand (später mit Ticket) - oder die Anmeldung, solange sie offen ist. */}
+      {e.has_registration && (
+        <section id="dein-event" ref={yoursRef} className="scroll-mt-24" data-section="yours" data-testid="event-yours">
+          <EventRegistrationPanel event={e} user={user} accessToken={accessToken} onChanged={onChanged} open={registerOpen} />
+        </section>
+      )}
+
+      {/* 2. Was läuft beim Event: jedes Turnier und jede Fast Lap mit Tag, Uhrzeit, Spielart und dem eigenen Stand. */}
+      {!!rows.length && (
+        <section data-section="whatson" data-testid="event-whatson">
+          <SectionTitle icon={Trophy} accent="#29B6E8">Was läuft beim Event</SectionTitle>
+          <ul className="space-y-2">
+            {rows.map((row) => <WhatsOnRow key={`${row.kind}-${row.id}`} row={row} accessToken={accessToken} />)}
+          </ul>
+        </section>
+      )}
+
+      {/* 3. Live verfolgen: führt in den Reiter „Live“; „Display“ nur für die Turnierleitung. */}
+      {!over && !!rows.length && (
+        <section className="flex flex-wrap gap-3" data-section="live" data-testid="event-live-links">
+          <button type="button" onClick={onLive} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-live-follow">
+            <Radio className="w-4 h-4" /> Live verfolgen
+          </button>
+          {hasArea(user, "tournaments") && (
+            <Link to={`/display/event/${e.id}`} data-testid="event-display-link" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
+              <ExternalLink className="w-4 h-4" /> Display
+            </Link>
+          )}
+        </section>
+      )}
+
+      {/* 4. Fotos. Leere Alben (#1224): Besucher sehen nur Alben mit Fotos; ist eines angelegt, aber noch leer, steht bis
+          14 Tage nach dem Event „Fotos folgen in den nächsten Tagen“. Die Verwaltung sieht leere Alben mit Hinweis. */}
+      {(!!e.albums?.length || photosComing) && (
+        <section data-section="photos" data-testid="event-gallery">
+          <SectionTitle icon={ImageIcon} accent="#29B6E8">Fotos</SectionTitle>
+          {photosComing && (
+            <div className="mb-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-4 py-3 text-sm text-white/80" data-testid="event-photos-coming">
+              Fotos folgen in den nächsten Tagen.
+            </div>
+          )}
+          {!!e.albums?.length && (
+            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {e.albums.map((a) => (
+                <Link key={a.id} to={`/galerie/${a.slug}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
+                  <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
+                    {a.cover_url ? <img src={resolveMediaUrl(a.cover_url)} alt={a.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-8 h-8 text-white/15" /></div>}
+                  </div>
+                  <div className="p-4">
+                    <div className="font-heading font-bold">{a.title}</div>
+                    {a.is_empty && <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]" data-testid={`event-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* 5. News zum Event. */}
+      {!!e.news?.length && (
+        <section data-section="news" data-testid="event-news">
+          <SectionTitle icon={Newspaper} accent="#29B6E8">News zum Event</SectionTitle>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {e.news.map((n) => (
+              <Link key={n.id} to={`/news/${n.slug}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] p-4">
+                <div className="text-[10px] uppercase tracking-widest text-white/40">{viennaDate(n.published_at || n.created_at)}</div>
+                <div className="font-heading font-bold mt-1">{n.title}</div>
+                {n.excerpt && <div className="text-xs text-white/60 mt-1 line-clamp-2">{n.excerpt}</div>}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 6. Infos: Beschreibung mit Highlight-Kacheln (statt Emoji-Zwischentiteln), die Tage, Standorte, Programm. */}
+      <section className="space-y-8" data-section="infos" data-testid="event-infos">
+        <SectionTitle>Infos</SectionTitle>
+        {!!e.highlights?.length && (
+          <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2" data-testid="event-highlights">
+            {e.highlights.map((highlight) => {
+              const Icon = HIGHLIGHT_ICON_COMPONENTS[highlight.icon] || Star;
+              return (
+                <li key={`${highlight.icon}-${highlight.text}`} className="flex items-center gap-2.5 rounded-sm bg-white/[0.04] px-3 py-2.5 min-w-0">
+                  <Icon className="w-4 h-4 text-[#9F7AEA] shrink-0" aria-hidden="true" />
+                  <span className="text-sm font-bold text-white/90 break-words">{highlight.text}</span>
+                </li>
+              );
+            })}
+          </ul>
         )}
-
+        {e.description && <div className="max-w-3xl prose-cms" data-testid="event-description" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(stripHeadingEmoji(e.description)) }} />}
         {e.schedule?.multi_day && <EventDaysBlock schedule={e.schedule} />}
-
         {(e.locations?.length || 0) > 1 && (
           <div data-testid="event-locations">
-            <h2 className="font-heading text-2xl font-black uppercase mb-4">Standorte</h2>
+            <h3 className="font-heading text-xl font-black uppercase mb-4">Standorte</h3>
             <div className="grid md:grid-cols-2 gap-5">
               {e.locations.map((place, index) => (
                 <div key={place.key || index} className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden flex flex-col" data-testid={`event-location-${index}`}>
@@ -288,103 +464,101 @@ export default function EventDetailPage() {
             </div>
           </div>
         )}
-
+        {singleMap && hasConsent("external_media") && (
+          <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
+            <iframe title={`Karte ${e.name}`} src={mapEmbedUrl(e)} className="w-full h-72 border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+          </div>
+        )}
+        {singleMap && !hasConsent("external_media") && (
+          <ExternalMediaNotice
+            service="Google Maps"
+            reason="Die Karte wird erst nach Zustimmung zu externen Medien geladen, weil dabei Daten an Google übertragen werden können."
+            url={mapLinkUrl(mapQuery(e))}
+            accent="#9F7AEA"
+            testId="event-map-consent-notice"
+          />
+        )}
         {e.program && (
           <div>
-            <h2 className="font-heading text-2xl font-black uppercase mb-4">Programm</h2>
+            <h3 className="font-heading text-xl font-black uppercase mb-4">Programm</h3>
             <RichContent text={e.program} embeds={e.content_embeds || []} className="border border-white/10 bg-[#121212] p-6 rounded-sm text-white/85" />
           </div>
         )}
-
-        {!!e.tournaments?.length && (
-          <div>
-            <h2 className="font-heading text-2xl font-black uppercase mb-5">Turniere</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 min-w-0">
-              {e.tournaments.map((t) => <EventTournamentEmbed key={t.id} tournament={t} accessToken={accessToken} />)}
-            </div>
+        {(e.contact || organizerName) && (
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/65" data-testid="event-contact">
+            {e.contact && <span className="inline-flex min-w-0 items-center gap-2"><Mail className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-all">{e.contact}</span></span>}
+            {organizerName && (e.organizer_url ? (
+              <a href={e.organizer_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-[#29B6E8] hover:underline">
+                <ExternalLink className="w-4 h-4" /> {organizerName}
+              </a>
+            ) : <span className="inline-flex items-center gap-2">Veranstalter: {organizerName}</span>)}
           </div>
         )}
+      </section>
 
-        {!!e.f1_challenges?.length && (
-          <div>
-            <h2 className="font-heading text-2xl font-black uppercase mb-5">Fast-Lap Challenges</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 min-w-0">
-              {e.f1_challenges.map((c) => <EventFastLapEmbed key={c.id} challenge={c} accessToken={accessToken} />)}
-            </div>
-          </div>
-        )}
-
-        {/* Leere Alben (#1224): Besucher sehen nur Alben mit Fotos; ist eines angelegt, aber noch leer, steht bis 14 Tage
-            nach dem Event „Fotos folgen in den nächsten Tagen“. Die Verwaltung sieht leere Alben mit Hinweis. */}
-        {(!!e.albums?.length || photosComing) && (
-          <div data-testid="event-gallery">
-            <h2 className="font-heading text-2xl font-black uppercase mb-5 inline-flex items-center gap-2"><ImageIcon className="w-5 h-5 text-[#29B6E8]" /> Galerie</h2>
-            {photosComing && (
-              <div className="mb-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-4 py-3 text-sm text-white/80" data-testid="event-photos-coming">
-                Fotos folgen in den nächsten Tagen.
+      {/* 7. Sponsoren und Partner. */}
+      {(!!(e.partners || []).length || !!eventSponsors.length) && (
+        <section className="space-y-8" data-section="sponsors" data-testid="event-sponsors">
+          {!!(e.partners || []).length && (
+            <div data-testid="event-partners">
+              <SectionTitle icon={Handshake} accent="#29B6E8">Gemeinsam mit</SectionTitle>
+              <div className="flex flex-wrap gap-3">
+                {e.partners.map((p) => (
+                  <Link key={p.id} to={`/partners/${p.slug || p.id}`} data-testid={`event-partner-${p.slug || p.id}`} className="inline-flex items-center gap-3 border border-white/10 bg-[#101010] rounded-sm px-3 py-2 hover:border-[#29B6E8]/60 transition">
+                    {p.logo_url ? <img src={resolveMediaUrl(p.logo_url)} alt="" className="h-8 w-8 object-contain" /> : <Handshake className="h-5 w-5 text-[#29B6E8]" />}
+                    <span className="font-heading font-bold uppercase text-sm">{p.name}</span>
+                  </Link>
+                ))}
               </div>
-            )}
-            {!!e.albums?.length && (
-            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {e.albums.map((a) => (
-                <Link key={a.id} to={`/galerie/${a.slug}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-                  <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
-                    {a.cover_url ? <img src={resolveMediaUrl(a.cover_url)} alt={a.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-8 h-8 text-white/15" /></div>}
-                  </div>
-                  <div className="p-4">
-                    <div className="font-heading font-bold">{a.title}</div>
-                    {a.is_empty && <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]" data-testid={`event-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
-                  </div>
-                </Link>
-              ))}
             </div>
-            )}
-          </div>
-        )}
+          )}
+          {!!eventSponsors.length && (
+            <div>
+              <SectionTitle>Unterstützt von</SectionTitle>
+              <div className="flex flex-wrap items-center gap-8 border-y border-white/10 py-6 min-w-0">
+                {eventSponsors.map((s) => (
+                  <a key={sponsorKey(s)} href={s.link || "#"} target={s.link ? "_blank" : undefined} rel="noreferrer" aria-label={s.name} className="group inline-flex items-center justify-center min-w-32">
+                    <img src={resolveMediaUrl(s.logo_url)} alt="" className="max-h-14 max-w-44 object-contain opacity-80 group-hover:opacity-100 transition" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}
 
-        {!!e.news?.length && (
-          <div>
-            <h2 className="font-heading text-2xl font-black uppercase mb-5 inline-flex items-center gap-2"><Newspaper className="w-5 h-5 text-[#29B6E8]" /> Verknüpfte News</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
-              {e.news.map((n) => (
-                <Link key={n.id} to={`/news/${n.slug}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] p-4">
-                  <div className="text-[10px] uppercase tracking-widest text-white/40">{viennaDate(n.published_at || n.created_at)}</div>
-                  <div className="font-heading font-bold mt-1">{n.title}</div>
-                  {n.excerpt && <div className="text-xs text-white/60 mt-1 line-clamp-2">{n.excerpt}</div>}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {!!(e.partners || []).length && (
-          <div data-testid="event-partners">
-            <h2 className="font-heading text-2xl font-black uppercase mb-5">Gemeinsam mit</h2>
-            <div className="flex flex-wrap gap-3">
-              {e.partners.map((p) => (
-                <Link key={p.id} to={`/partners/${p.slug || p.id}`} data-testid={`event-partner-${p.slug || p.id}`} className="inline-flex items-center gap-3 border border-white/10 bg-[#101010] rounded-sm px-3 py-2 hover:border-[#29B6E8]/60 transition">
-                  {p.logo_url ? <img src={resolveMediaUrl(p.logo_url)} alt="" className="h-8 w-8 object-contain" /> : <Handshake className="h-5 w-5 text-[#29B6E8]" />}
-                  <span className="font-heading font-bold uppercase text-sm">{p.name}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {!!eventSponsors.length && (
-          <div>
-            <h2 className="font-heading text-2xl font-black uppercase mb-5">Unterstützt von</h2>
-            <div className="flex flex-wrap items-center gap-8 border-y border-white/10 py-6 min-w-0">
-              {eventSponsors.map((s) => (
-                <a key={sponsorKey(s)} href={s.link || "#"} target={s.link ? "_blank" : undefined} rel="noreferrer" aria-label={s.name} className="group inline-flex items-center justify-center min-w-32">
-                  <img src={resolveMediaUrl(s.logo_url)} alt="" className="max-h-14 max-w-44 object-contain opacity-80 group-hover:opacity-100 transition" />
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </PublicLayout>
+// Eine Zeile „Was läuft“ (#1183): links Tag und Uhrzeit, dann Titel mit Spielart, rechts der eigene Stand - oder „Anmelden“,
+// solange die Anmeldung offen ist, sonst der Zustand. Die ganze Zeile führt auf das Turnier bzw. die Fast Lap.
+function WhatsOnRow({ row, accessToken }) {
+  const Icon = row.kind === "fastlap" ? Flag : Trophy;
+  return (
+    <li data-testid={`event-row-${row.kind}-${row.id}`}>
+      <Link to={`${row.path}${row.accessLink ? accessSuffix(accessToken) : ""}`} className="tls-card flex items-center gap-3 rounded-sm border border-white/10 bg-[#121212] px-3 py-3 min-w-0">
+        <span className="w-16 shrink-0 text-center">
+          {row.dayLabel ? <span className="block text-[10px] font-bold uppercase tracking-widest text-[#9F7AEA]" data-testid="embed-event-day">{row.dayLabel}</span> : null}
+          <span className="block text-sm font-bold tabular-nums text-white/85">{row.timeLabel || "–"}</span>
+        </span>
+        <Icon className={`w-4 h-4 shrink-0 ${row.kind === "fastlap" ? "text-[#2DD4BF]" : "text-[#29B6E8]"}`} aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="tls-card__title block font-heading font-bold leading-tight break-words">{row.title}</span>
+          <span className="block text-xs text-white/55 truncate">{[row.mode, row.detail].filter(Boolean).join(" · ")}</span>
+        </span>
+        <span className="shrink-0">
+          {row.mine ? (
+            <span className="inline-flex items-center gap-1 rounded-sm bg-[#29B6E8]/15 px-2 py-1 text-[11px] font-bold text-[#29B6E8]" data-testid="event-row-mine">
+              <CheckCircle className="w-3.5 h-3.5" aria-hidden="true" /> {row.mine.label}{row.mine.team ? ` · ${row.mine.team}` : ""}
+            </span>
+          ) : row.action === "register" ? (
+            <span className="tls-btn tls-btn--primary inline-flex items-center px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-sm" data-testid="event-row-register">Anmelden</span>
+          ) : (
+            <PhaseBadge phase={row.phase} status={row.status} />
+          )}
+        </span>
+      </Link>
+    </li>
   );
 }
 
@@ -396,7 +570,7 @@ const EVENT_REGISTRATION_LABELS = {
   no_show: "Nicht erschienen",
 };
 
-function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
+function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open = false }) {
   const [companionCount, setCompanionCount] = useState(0);
   const [note, setNote] = useState("");
   // Kosten (#318): Positionen und Summe vor dem Absenden; wählbare Positionen als Haken.
@@ -418,6 +592,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
   const steps = eventSteps(event, activeOwn ? own : null);
   const step = eventStep(steps, activeOwn ? own : null);
   const showSteps = !event.registration_url && step >= 0 && (activeOwn || (user && (registrationOpen || hasRegisterAccess)));
+  const formRef = useRef(null);
 
   useEffect(() => {
     setCompanionCount(0);
@@ -425,6 +600,11 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
     setSelectedPositions([]);
     setActionError("");
   }, [event.id]);
+
+  // „Anmelden“ im Fakten-Kasten: das Formular bekommt den Fokus.
+  useEffect(() => {
+    if (open) formRef.current?.querySelector("input, textarea, button")?.focus?.({ preventScroll: true });
+  }, [open]);
 
   const register = async (ev) => {
     ev.preventDefault();
@@ -471,8 +651,8 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
 
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
-      <div className="text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">Anmeldung</div>
-      <h2 className="mt-2 font-heading text-2xl font-black uppercase">{event.registration_url ? "Registrierung möglich" : "Event-Anmeldung"}</h2>
+      <div className="text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">{activeOwn ? "Dein Event" : "Anmeldung"}</div>
+      <h2 className="mt-2 font-heading text-2xl font-black uppercase">{activeOwn ? "Du bist angemeldet" : event.registration_url ? "Registrierung möglich" : "Event-Anmeldung"}</h2>
       {showSteps ? <StepBar steps={steps} current={step} className="mt-3" testId="event-register-steps" /> : null}
       <div className="mt-4 grid grid-cols-3 gap-2">
         <MiniStat label="Reserviert" value={`${summary.reserved_seats || 0}${event.max_participants ? `/${event.max_participants}` : ""}`} />
@@ -542,7 +722,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
           Einloggen zum Anmelden
         </Link>
       ) : (
-        <form onSubmit={register} className="mt-5 space-y-3">
+        <form ref={formRef} onSubmit={register} className="mt-5 space-y-3" data-testid="event-register-form">
           {event.allow_companions && (
             <label className="block">
               <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Begleitpersonen</div>
@@ -605,166 +785,4 @@ function MiniStat({ label, value }) {
 
 function accessSuffix(accessToken) {
   return accessToken ? `?access=${encodeURIComponent(accessToken)}` : "";
-}
-
-// Turnier-Karte am Event (#1220): mit Ergebnissen die ersten drei Plätze, sonst die Baum-Vorschau, wenn es einen Baum
-// gibt. Kann der Baum nicht geladen werden, steht das da; Liga und Durchgänge haben keinen Baum - dort steht nichts statt
-// „noch nicht generiert“.
-const FINISHED_TOURNAMENT_STATES = new Set(["completed", "results_published", "archived"]);
-const NO_TREE_FORMATS = new Set(["league", "round_robin", "swiss", "ffa", "battle_royale", "time_trial", "grand_prix"]);
-
-export function tournamentEmbedMode(tournament) {
-  if (FINISHED_TOURNAMENT_STATES.has(tournament?.status) || FINISHED_TOURNAMENT_STATES.has(tournament?.public_phase?.state)) return "podium";
-  return NO_TREE_FORMATS.has(tournament?.format) ? "none" : "tree";
-}
-
-function EventTournamentEmbed({ tournament, accessToken = "" }) {
-  const mode = tournamentEmbedMode(tournament);
-  const [state, setState] = useState({ loaded: false, failed: false, data: null });
-
-  useEffect(() => {
-    if (mode === "none") return undefined;
-    let active = true;
-    setState({ loaded: false, failed: false, data: null });
-    const path = mode === "podium" ? `/tournaments/${tournament.id}/standings` : `/tournaments/${tournament.id}/bracket`;
-    api.get(path, { params: tournament.access_link && accessToken ? { access: accessToken } : undefined })
-      .then(({ data }) => { if (active) setState({ loaded: true, failed: false, data }); })
-      .catch(() => { if (active) setState({ loaded: true, failed: true, data: null }); });
-    return () => { active = false; };
-  }, [mode, tournament.id, tournament.access_link, accessToken]);
-
-  const base = `/tournaments/${tournament.slug || tournament.id}`;
-  const suffix = tournament.access_link ? accessSuffix(accessToken) : "";
-  const podium = mode === "podium" && Array.isArray(state.data)
-    ? state.data.filter((row) => Number(row.rank) >= 1 && Number(row.rank) <= 3).sort((a, b) => Number(a.rank) - Number(b.rank)).slice(0, 3)
-    : [];
-  const treeMatches = mode === "tree" ? previewMatches(state.data) : [];
-  const showLower = mode !== "none" && (!state.loaded || state.failed || podium.length > 0 || treeMatches.length > 0);
-
-  return (
-    <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden min-w-0" data-testid={`event-tournament-${tournament.id}`}>
-      <Link to={`${base}${suffix}`} className="block p-5 hover:bg-white/[0.03] transition">
-        <div className="flex flex-wrap items-center gap-2">
-          <Trophy className="w-4 h-4 text-[#FFD700]" />
-          <PhaseBadge phase={tournament.public_phase} status={tournament.status} />
-          {tournament.event_day && <span className="text-[10px] font-bold uppercase tracking-widest text-[#9F7AEA]" data-testid="embed-event-day">Tag {tournament.event_day.index}/{tournament.event_day.count}</span>}
-          {tournament.start_date && <span className="text-xs text-white/45">{formatWhen(tournament.start_date)}</span>}
-        </div>
-        <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#FFD700] transition break-words">{tournament.title}</h3>
-        <div className="mt-2 flex flex-wrap gap-3 text-xs text-white/55">
-          {tournament.game && <span>{gameLabel(tournament.game)}</span>}
-          {tournament.format && <span>{formatTournamentDisplay(tournament)}</span>}
-          {Number.isFinite(tournament.participant_count) && <span>{tournament.participant_count}/{tournament.max_participants} Teilnehmer</span>}
-        </div>
-      </Link>
-      {showLower && (
-        <div className="border-t border-white/10 p-5" data-testid={`event-tournament-${mode}`}>
-          <div className="flex items-center justify-between gap-3 mb-3 min-w-0">
-            <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">{mode === "podium" ? "Die ersten drei Plätze" : "Turnierbaum-Vorschau"}</div>
-            <Link to={`${base}/${mode === "podium" ? "standings" : "bracket"}${suffix}`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">{mode === "podium" ? "Rangliste" : "Öffnen"}</Link>
-          </div>
-          {!state.loaded ? (
-            <div className="text-sm text-white/40 py-4">{mode === "podium" ? "Lade Ergebnisse…" : "Lade Turnierbaum…"}</div>
-          ) : state.failed ? (
-            <div className="text-sm text-white/45 border border-dashed border-white/10 rounded-sm p-4" data-testid="event-tournament-failed">{mode === "podium" ? "Ergebnisse gerade nicht ladbar." : "Baum gerade nicht ladbar."}</div>
-          ) : mode === "podium" ? (
-            <ol className="space-y-2">
-              {podium.map((row) => (
-                <li key={`${row.rank}-${row.registration_id || row.display_name}`} className="flex items-center gap-3 border border-white/10 bg-black/20 rounded-sm px-3 py-2 min-w-0">
-                  <span className={`font-display font-black w-7 shrink-0 ${Number(row.rank) === 1 ? "text-[#FFD700]" : Number(row.rank) === 2 ? "text-white/75" : "text-[#CD7F32]"}`}>#{row.rank}</span>
-                  <span className="truncate text-sm text-white/85">{row.display_name || row.ingame_name || row.user?.display_name || "Teilnehmer"}</span>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <div className="space-y-2">
-              {treeMatches.map((match) => (
-                <div key={match.id} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-widest text-white/35">{formatRoundName(match.round_name, match.round)}</div>
-                  <div className="mt-1 text-sm text-white/75 flex items-center justify-between gap-3 min-w-0">
-                    <span className="truncate">{match.labels[0]}</span>
-                    <span className="text-white/30">vs</span>
-                    <span className="truncate text-right">{match.labels[1]}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Die ersten vier Spiele des Baums mit Namen - „Freilos“ und „noch offen“ statt leerer Plätze (#1220). */
-export function previewMatches(bracket) {
-  const registrations = new Map((bracket?.registrations || []).map((registration) => [registration.id, registration]));
-  const matches = (bracket?.matches_v2 || []).filter((match) => (match.slots || []).length >= 2);
-  const finder = finderFor(matches);
-  return matches
-    .slice()
-    .sort((a, b) => (Number(a.round) || 0) - (Number(b.round) || 0) || (Number(a.order ?? a.match_index) || 0) - (Number(b.order ?? b.match_index) || 0))
-    .slice(0, 4)
-    .map((match) => ({
-      ...match,
-      labels: (match.slots || []).slice(0, 2).map((slot) => {
-        const registration = registrations.get(slot.registration_id);
-        const name = registration?.display_name || registration?.user?.display_name || registration?.ingame_name || "";
-        return name || sourceLabel(slot.source, finder(match)) || slotName("", slot, match);
-      }),
-    }));
-}
-
-function EventFastLapEmbed({ challenge, accessToken = "" }) {
-  const [board, setBoard] = useState(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    api.get(`/f1/challenges/${challenge.id}/leaderboard`, { params: challenge.access_link && accessToken ? { access: accessToken } : undefined })
-      .then(({ data }) => { if (active) setBoard(data); })
-      .catch(() => { if (active) setBoard(null); })
-      .finally(() => { if (active) setLoaded(true); });
-    return () => { active = false; };
-  }, [challenge.id, challenge.access_link, accessToken]);
-
-  const entries = (board?.entries || []).slice(0, 3);
-
-  return (
-    <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden min-w-0">
-      <Link to={`/fastlap/${challenge.slug || challenge.id}${challenge.access_link ? accessSuffix(accessToken) : ""}`} className="block p-5 hover:bg-white/[0.03] transition">
-        <div className="flex flex-wrap items-center gap-2">
-          <Flag className="w-4 h-4 text-[#29B6E8]" />
-          <PhaseBadge phase={challenge.public_phase} status={challenge.status} />
-          {challenge.event_day && <span className="text-[10px] font-bold uppercase tracking-widest text-[#9F7AEA]" data-testid="embed-event-day">Tag {challenge.event_day.index}/{challenge.event_day.count}</span>}
-          {challenge.start_date && <span className="text-xs text-white/45">{viennaDateTime(challenge.start_date, { dateStyle: "medium", timeStyle: "short" })}</span>}
-        </div>
-        <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#29B6E8] transition break-words">{challenge.title}</h3>
-        {challenge.description && <p className="mt-2 text-sm text-white/55 line-clamp-2">{challenge.description}</p>}
-      </Link>
-      <div className="border-t border-white/10 p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3 min-w-0">
-          <div className="text-[10px] uppercase tracking-widest font-bold text-white/45 break-words">Top 3{board?.track?.name ? ` · ${board.track.name}` : ""}</div>
-          <Link to={`/fastlap/${challenge.slug || challenge.id}${challenge.access_link ? accessSuffix(accessToken) : ""}`} className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">Rangliste</Link>
-        </div>
-        {!loaded ? (
-          <div className="text-sm text-white/40 py-4">Lade Zeiten…</div>
-        ) : entries.length ? (
-          <div className="space-y-2">
-            {entries.map((entry) => (
-              <div key={entry.user_id} className="flex items-center justify-between gap-3 border border-white/10 bg-black/20 rounded-sm px-3 py-2">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className={`font-display font-black w-6 ${entry.rank === 1 ? "text-[#FFD700]" : entry.rank === 2 ? "text-white/75" : "text-[#CD7F32]"}`}>{entry.rank}</span>
-                  <span className="truncate text-sm text-white/80">{entry.display_name || entry.username}</span>
-                </div>
-                <span className="font-display text-sm text-[#29B6E8] tabular-nums">{entry.time_str}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-sm text-white/45 border border-dashed border-white/10 rounded-sm p-4">Noch keine gültigen Zeiten eingetragen.</div>
-        )}
-      </div>
-    </div>
-  );
 }

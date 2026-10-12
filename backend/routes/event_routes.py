@@ -17,7 +17,7 @@ from services.sponsor_utils import dedupe_public_sponsors
 from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import billing_orders, event_days, event_locations, event_registration, pricing
+from services import billing_orders, event_days, event_facts, event_locations, event_registration, pricing
 from services.event_registration import RegistrationError
 from services.permissions import areas_for, needs_mfa, user_has_area
 from services.permissions import is_confirmed_tournament_lead
@@ -560,7 +560,7 @@ async def event_meta():
     return {
         "types": [
             {"k": "general", "l": "Allgemein"},
-            {"k": "public_event", "l": "Public Event"},
+            {"k": "public_event", "l": "Öffentliches Event"},
             {"k": "club_evening", "l": "Vereinsabend"},
             {"k": "lan_party", "l": "LAN-Party"},
             {"k": "online_event", "l": "Online Event"},
@@ -656,6 +656,15 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     event["content_embeds"] = await resolve_content_embeds(db, event.get("program"), user)
     await _decorate_event(event, include_sponsors=True)
     await _attach_event_registration_view(event, user)
+    # Event-Seite als Startpunkt (#1183): je Turnier und Fast Lap der eigene Stand - nur für die Person selbst.
+    await event_facts.attach_own_states(db, event, user)
+    # Kopfbild (#1273): ältere Events ohne Einschätzung bekommen sie einmal beim ersten Abruf.
+    if event.get("banner_url") and not event.get("banner_kind") and event.get("banner_style") in (None, "auto"):
+        kind = await event_facts.banner_kind(event["banner_url"])
+        if kind:
+            event["banner_kind"] = kind
+            await db.events.update_one({"id": event["id"]}, {"$set": {"banner_kind": kind}})
+    event["banner"] = event_facts.banner_view(event)
     # Standorte (#203): immer als Liste, auch für Events, die nur die alten Felder haben.
     event["locations"] = [event_locations.with_map(place) for place in event_locations.event_locations(event)]
     event["map_query"] = event_locations.map_query(event_locations.primary_from_event(event) or (event["locations"][0] if event["locations"] else None))
@@ -881,6 +890,27 @@ def _apply_days(target: dict, raw: dict, existing: dict | None = None) -> None:
     target.update(event_days.derived_range(days))
 
 
+async def _apply_facts(target: dict, raw: dict, existing: dict | None = None) -> None:
+    """Fakten-Kasten und Kopfbild (#1346, #1273): „Mitbringen“ und Highlights prüfen, den Fokuspunkt begrenzen und ein
+    neues Kopfbild einmal als Foto oder Logo einschätzen. Was nicht in der Anfrage steht, bleibt, wie es ist."""
+    try:
+        if "bring_along" in raw:
+            target["bring_along"] = event_facts.normalize_bring_along(raw.get("bring_along"))
+        if "highlights" in raw:
+            target["highlights"] = event_facts.normalize_highlights(raw.get("highlights"))
+    except event_facts.FactsError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    for key in ("banner_focus_x", "banner_focus_y"):
+        if raw.get(key) is not None:
+            target[key] = event_facts.normalize_focus(raw[key])
+        else:
+            target.pop(key, None)
+    if "banner_style" in raw:
+        target["banner_style"] = raw.get("banner_style") or "auto"
+    if "banner_url" in raw and raw.get("banner_url") != (existing or {}).get("banner_url"):
+        target["banner_kind"] = await event_facts.banner_kind(raw.get("banner_url"))
+
+
 async def _billing_updates(raw: dict, existing: dict | None, me: dict) -> dict | None:
     """Kosten pflegt nur, wer den Bereich Finanzen hat (#322). Ohne Angabe bleibt alles wie es ist."""
     if "billing" not in raw:
@@ -903,6 +933,9 @@ async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
     doc["billing"] = billing if billing is not None else pricing.normalize_offer(None)
     _apply_locations(doc, body.model_dump(exclude_unset=True))
     _apply_days(doc, body.model_dump(exclude_unset=True))
+    doc["bring_along"], doc["highlights"] = [], []
+    await _apply_facts(doc, body.model_dump(exclude_unset=True))
+    doc["banner_style"] = doc.get("banner_style") or "auto"
     doc["slug"] = await unique_slug(db.events, doc.get("slug") or doc.get("name"), fallback="event")
     doc["id"] = new_id()
     if not doc.get("status"):
@@ -957,6 +990,7 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
         updates.pop("billing", None)
     _apply_locations(updates, raw)
     _apply_days(updates, raw, existing)
+    await _apply_facts(updates, raw, existing)
     slug_source = slug_source_for_update(raw, existing, "name", fallback="event")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.events, slug_source, current_id=event_id, fallback="event")

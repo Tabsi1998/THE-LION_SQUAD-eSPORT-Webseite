@@ -15,6 +15,8 @@ import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { EventBillingSection } from "@/components/tls/EventBillingSection";
 import { EventLocationsSection, formToLocations, locationsFormError, locationsToForm } from "@/components/tls/EventLocationsSection";
 import { EventDaysSection, daysFormError, daysToForm, formToDays } from "@/components/tls/EventDaysSection";
+import { EventBannerFields, EventFactsSection, bringToText, formToHighlights, highlightsToForm, textToBring } from "@/components/tls/EventFactsSection";
+import { descriptionEchoesTitle } from "@/lib/eventPage";
 import { SkeletonDetailHeader, SkeletonLines } from "@/components/tls/Skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { billingFormError, formToBilling, positionsToForm } from "@/lib/pricing";
@@ -133,6 +135,9 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
   const [daysForm, setDaysForm] = useState(() => daysToForm(event?.days));
   const daysDirty = JSON.stringify(daysForm) !== JSON.stringify(daysToForm(event?.days));
   const usesDays = daysForm.length > 0;
+  // Highlights (#1346): eigene Liste; sie geht nur mit, wenn sie sich geändert hat.
+  const [highlightsForm, setHighlightsForm] = useState(() => highlightsToForm(event?.highlights));
+  const highlightsDirty = JSON.stringify(formToHighlights(highlightsForm)) !== JSON.stringify(formToHighlights(highlightsToForm(event?.highlights)));
   const slugFrom = (txt) => (txt || "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -174,6 +179,11 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
     is_online: source.is_online ?? false,
     is_hybrid: source.is_hybrid ?? false,
     banner_url: source.banner_url || "",
+    // Kopfbild (#1273) und „Mitbringen“ (#1346).
+    banner_style: source.banner_style || "auto",
+    banner_focus_x: source.banner_focus_x ?? 50,
+    banner_focus_y: source.banner_focus_y ?? 50,
+    bring_along_text: bringToText(source.bring_along),
     contact: source.contact || "",
     max_participants: source.max_participants || "",
     show_participants: source.show_participants ?? true,
@@ -229,6 +239,9 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
     if (payload.allow_companions) payload.max_companions_per_registration = parseInt(payload.max_companions_per_registration || 1);
     else payload.max_companions_per_registration = 0;
     payload.sponsor_ids = payload.owned_by_club && payload.show_sponsors ? (payload.sponsor_ids || []) : [];
+    payload.bring_along = textToBring(payload.bring_along_text);
+    delete payload.bring_along_text;
+    payload.banner_style = payload.banner_style || "auto";
     return payload;
   };
 
@@ -266,9 +279,14 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
       toast.error(daysProblem);
       return;
     }
+    // Beginnt die Beschreibung mit dem Titel (#1273), stünde er auf der Seite doppelt - die Verwaltung warnt, speichert aber.
+    if (descriptionEchoesTitle(form.name, form.description)) {
+      toast.warning("Die Beschreibung beginnt mit dem Titel – auf der Event-Seite steht er dann doppelt. Am besten die erste Zeile löschen.");
+    }
     setSaving(true);
     try {
       const payload = normalizeEventPayload(form);
+      payload.highlights = formToHighlights(highlightsForm);
       if (canFinance && billingDirty) payload.billing = formToBilling(billingForm);
       if (locationsDirty) payload.locations = formToLocations(locationsForm);
       if (daysDirty) payload.days = formToDays(daysForm);
@@ -277,7 +295,9 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
         const { data } = await api.post("/events", payload);
         savedEvent = data;
       } else {
-        const patch = buildDirtyPayload(payload, originalEventPayload());
+        const { highlights, ...rest } = payload;
+        const patch = buildDirtyPayload(rest, originalEventPayload());
+        if (highlightsDirty) patch.highlights = highlights;
         if (canFinance && billingDirty) patch.billing = formToBilling(billingForm);
         if (locationsDirty) patch.locations = formToLocations(locationsForm);
         if (daysDirty) patch.days = formToDays(daysForm);
@@ -351,9 +371,20 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
         <FieldLabel label="Beschreibung">
           <MarkdownEditor value={form.description} onChange={(v) => set("description", v)} rows={5} testId="event-description" />
         </FieldLabel>
-        <FieldLabel label="Banner-Bild">
+        {descriptionEchoesTitle(form.name, form.description) ? (
+          <p className="text-xs text-[#FF9F43]" data-testid="event-description-echo">
+            Die Beschreibung beginnt mit dem Titel. Auf der Event-Seite steht der Titel schon groß im Kopf – die erste Zeile kann weg.
+          </p>
+        ) : null}
+        <FieldLabel label="Kopfbild (Banner)">
           <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="event-banner" variant="wide" allowLibrary />
         </FieldLabel>
+        <EventBannerFields url={form.banner_url} style={form.banner_style} focusX={form.banner_focus_x} focusY={form.banner_focus_y}
+          onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} />
+      </FormSection>
+
+      <FormSection title="Fakten-Kasten und Highlights" accent={ACCENT} hint="Steht oben auf der Event-Seite: Wann, Wo und Eintritt kommen aus den Feldern hier; „Mitbringen“ und die Highlights pflegst du hier.">
+        <EventFactsSection bringText={form.bring_along_text} onBringText={(v) => set("bring_along_text", v)} highlights={highlightsForm} onHighlights={setHighlightsForm} />
       </FormSection>
 
       <FormSection title="Ort und Veranstalter" accent={ACCENT}>

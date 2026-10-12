@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 // /admin/events/:id mit den Daten aus der Liste; Speichern führt zurück zur Liste.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_err, fallback) => fallback }));
+vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_err, fallback) => fallback, resolveMediaUrl: (url) => url }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/DiscordPreview", () => ({ DiscordPreview: () => <div data-testid="discord-preview" /> }));
 vi.mock("@/components/tls/SharePreviewToggle", () => ({ SharePreviewToggle: () => null }));
@@ -21,7 +21,7 @@ vi.mock("@/components/tls/EventLocationsSection", () => ({
 }));
 vi.mock("@/components/tls/RichContent", () => ({ appendEmbedToken: (text) => text }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ can: () => false }) }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
 // Verteilen (#1359): der Kasten fragt vor dem Senden nach.
 const confirmMock = vi.fn(async () => true);
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
@@ -269,4 +269,30 @@ test("Verteilen im Event: gesendet – ein zweites Mal nur Redaktion und System"
   expect(screen.queryByTestId("distribute-resend")).toBeNull();
   expect(screen.getByTestId("distribute-announcement")).toHaveTextContent("Mitglieder bekommen eine Meldung");
   expect(apiMock.get).toHaveBeenCalledWith("/settings/newsletter/state", { params: { kind: "event", id: "ev-1" } });
+});
+
+// Kopf mit Bild (#1273) und Fakten-Kasten (#1346): Warnung bei einer Beschreibung, die mit dem Titel beginnt; „Mitbringen“
+// als Zeilen; Highlights mit Symbol aus der festen Liste; nur Geändertes geht mit.
+test("Beschreibung mit dem Titel am Anfang: Hinweis im Formular und beim Speichern - gespeichert wird trotzdem", async () => {
+  const echo = { ...EVENTS[0], description: "## 🎃 Halloween Night\nGruselig gut.", banner_url: "/api/static/uploads/foto.jpg", banner_kind: "photo" };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/meta") return { data: META };
+    if (url.startsWith("/events?")) return { data: [echo] };
+    return { data: [] };
+  });
+  apiMock.patch.mockResolvedValue({ data: echo });
+  renderAt("/admin/events/ev-1");
+  expect(await screen.findByTestId("event-description-echo")).toHaveTextContent("beginnt mit dem Titel");
+  expect(screen.getByTestId("event-banner-style")).toHaveValue("auto");
+  fireEvent.change(screen.getByTestId("event-banner-style"), { target: { value: "logo" } });
+  expect(screen.queryByTestId("event-banner-focus")).toBeNull();
+  fireEvent.change(screen.getByTestId("event-bring-along"), { target: { value: "eigener Controller\n\nKopfhörer " } });
+  fireEvent.click(screen.getByTestId("event-highlight-add"));
+  fireEvent.change(screen.getByTestId("event-highlight-icon-0"), { target: { value: "vr" } });
+  fireEvent.change(screen.getByTestId("event-highlight-text-0"), { target: { value: "VR-Ecke" } });
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining("beginnt mit dem Titel"));
+  const [, patch] = apiMock.patch.mock.calls[0];
+  expect(patch).toEqual({ banner_style: "logo", bring_along: ["eigener Controller", "Kopfhörer"], highlights: [{ icon: "vr", text: "VR-Ecke" }] });
 });
