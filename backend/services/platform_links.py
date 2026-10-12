@@ -7,8 +7,10 @@ sagt, wer man ist; die Website trägt den Wert ins Profil ein und merkt sich
 und bei Turnieren.
 
 Ablauf: ``start`` baut die Anmeldeadresse mit einem signierten ``state`` (JWT: Nutzer, Plattform,
-Nonce, zehn Minuten). Die Plattform ruft ``callback`` auf - ohne Anmeldung bei uns, der ``state``
-sagt, wer verknüpft. Ein Plattform-Konto gehört genau einem Nutzer (``taken``). Ändert jemand das
+Nonce, zehn Minuten) und merkt sich den Ablauf auf dem Server; der Browser bekommt dazu ein kurzlebiges
+Cookie (#1027). Die Plattform ruft ``callback`` auf - ohne Anmeldung bei uns: der ``state`` sagt, wer
+verknüpft, und zählt nur zusammen mit dem Cookie des Browsers, der gestartet hat, und nur einmal.
+Ein Plattform-Konto gehört genau einem Nutzer (``taken``). Ändert jemand das
 Profilfeld von Hand, fällt die Verifizierung weg.
 
 Jede Plattform steht in ``PLATFORMS`` mit ihrem Profilfeld, dem Sichtbarkeitsschlüssel des Profils,
@@ -36,6 +38,8 @@ from urllib.parse import quote, urlencode
 
 import httpx
 import jwt
+from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
 from auth import get_jwt_secret
 from models import new_id, now_utc
@@ -214,7 +218,7 @@ HOST_RE = re.compile(r"^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-
 
 class LinkError(Exception):
     """Warum die Verknüpfung nicht zustande kam - der Code landet als ``link_error`` in der Adresse,
-    ein kurzer Grund (von der Plattform oder von uns, nie ein Geheimnis) als ``link_detail``."""
+    der kurze Grund (von der Plattform oder von uns, nie ein Geheimnis) nur im Server-Log."""
 
     def __init__(self, code: str, text: str = ""):
         self.code = code
@@ -572,7 +576,7 @@ async def _bluesky_identity(db, query: dict, code: str, nonce: str) -> dict:
 
 def make_state(user_id: str, platform: str) -> str:
     payload = {
-        "sub": user_id, "plt": platform, "type": STATE_TYPE, "nonce": secrets.token_urlsafe(8),
+        "sub": user_id, "plt": platform, "type": STATE_TYPE, "nonce": secrets.token_urlsafe(16),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=STATE_MINUTES),
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm="HS256")
@@ -587,6 +591,64 @@ def read_state_payload(token: str | None, platform: str) -> dict:
     if payload.get("type") != STATE_TYPE or payload.get("plt") != platform or not payload.get("sub"):
         raise LinkError("invalid", "state passt nicht zur Plattform")
     return payload
+
+
+# ---------------------------------------------------------------- Ablauf an den Browser binden (#1027)
+#
+# Der Server merkt sich jeden Start als Ablauf (Nutzer, Plattform, Nonce des state, Frist, verbraucht ja/nein),
+# der Browser bekommt die zufällige Kennung als kurzlebiges Cookie. Der Rückruf zählt nur, wenn Cookie,
+# gespeicherter Ablauf und ``state`` zusammenpassen - und nur einmal. Jeder Start hat sein eigenes Cookie
+# (der Name hängt an der Nonce des state): zwei Starts im selben Browser verdrängen einander nicht.
+
+FLOW_COOKIE = "tls_link_flow"
+
+
+def flow_cookie_name(nonce: str) -> str:
+    """Der Cookie-Name dieses einen Starts - aus der Nonce abgeleitet, damit der Rückruf ihn wiederfindet."""
+    return f"{FLOW_COOKIE}_{hashlib.sha256(str(nonce).encode('utf-8')).hexdigest()[:20]}"
+
+
+def flow_cookie_path(platform: str) -> str:
+    """Das Cookie geht nur an den Rückruf genau dieser Plattform - mehrere Starts nebeneinander stören sich nicht."""
+    return f"/api/platform-links/{platform}/callback"
+
+
+def flow_cookie_secure() -> bool:
+    """Secure, sobald der Rückruf über HTTPS läuft - lokal (http://localhost) geht es sonst gar nicht."""
+    return public_base_url().startswith("https://")
+
+
+def _flow_hash(flow_id: str) -> str:
+    return hashlib.sha256(flow_id.encode("utf-8")).hexdigest()
+
+
+async def open_flow(db, user_id: str, platform: str, state: str) -> tuple[str, str]:
+    """Den Start merken; zurück kommen Name und Wert des Cookies (in der Datenbank liegt nur der Hash des Werts)."""
+    flow_id = secrets.token_urlsafe(32)
+    nonce = str(read_state_payload(state, platform)["nonce"])
+    now = now_utc()
+    await db.platform_link_flows.insert_one({
+        "flow_hash": _flow_hash(flow_id), "user_id": user_id, "platform": platform, "nonce": nonce, "consumed": False,
+        "created_at": now, "expires_at": now + timedelta(minutes=STATE_MINUTES),
+    })
+    return flow_cookie_name(nonce), flow_id
+
+
+async def consume_flow(db, cookies, platform: str, state_payload: dict) -> None:
+    """Den Ablauf zum Rückruf verbrauchen - in einem Schritt, damit zwei gleichzeitige Rückrufe nicht beide zählen.
+    Passt etwas nicht (kein Cookie, anderer Browser, andere Plattform, abgelaufen, schon verbraucht): ``invalid``."""
+    nonce = str(state_payload.get("nonce") or "")
+    flow_id = cookies.get(flow_cookie_name(nonce)) if nonce else None
+    if not flow_id or not nonce:
+        raise LinkError("invalid", "kein Ablauf zu diesem Browser")
+    now = now_utc()
+    flow = await db.platform_link_flows.find_one_and_update(
+        {"flow_hash": _flow_hash(str(flow_id)), "platform": platform, "user_id": str(state_payload.get("sub") or ""),
+         "nonce": nonce, "consumed": False, "expires_at": {"$gt": now}},
+        {"$set": {"consumed": True, "consumed_at": now}},
+    )
+    if not flow:
+        raise LinkError("invalid", "Ablauf passt nicht zu diesem Browser, ist abgelaufen oder verbraucht")
 
 
 def read_state(token: str | None, platform: str) -> str:
@@ -1318,13 +1380,19 @@ async def link_account(db, user_id: str, platform: str, identity: dict) -> dict:
     now = now_utc().isoformat()
     link = {"user_id": user_id, "platform": platform, "external_id": identity["external_id"], "handle": identity.get("handle") or "",
             "display_name": identity.get("display_name") or "", "linked_at": now}
-    existing = await db.platform_links.find_one({"user_id": user_id, "platform": platform}, {"_id": 0, "id": 1})
-    if existing:
-        await db.platform_links.update_one({"id": existing["id"]}, {"$set": link})
-        link["id"] = existing["id"]
-    else:
-        link["id"] = new_id()
-        await db.platform_links.insert_one(dict(link))
+    # Je Person und Plattform genau eine Zeile (eindeutiger Index user_platform): in einem Schritt anlegen oder
+    # aktualisieren. Kommt ein gleichzeitiger Rückruf zuvor, gewinnt beim zweiten Versuch das Aktualisieren;
+    # scheitert auch der, gehört das Plattform-Konto inzwischen jemand anderem.
+    for attempt in range(2):
+        try:
+            stored = await db.platform_links.find_one_and_update(
+                {"user_id": user_id, "platform": platform}, {"$set": link, "$setOnInsert": {"id": new_id()}},
+                upsert=True, projection={"_id": 0, "id": 1}, return_document=ReturnDocument.AFTER)
+            break
+        except DuplicateKeyError:
+            if attempt:
+                raise LinkError("taken", "dieses Konto ist schon mit einem anderen Profil verknüpft")
+    link["id"] = stored["id"]
     profile = {spec["field"]: identity.get("handle") or identity["external_id"], f"platform_verified.{platform}": True, "updated_at": now}
     if platform == "discord":
         profile["discord_id"] = identity["external_id"]
@@ -1397,13 +1465,11 @@ def changed_verified_platforms(updates: dict, user: dict) -> list[str]:
     return changed
 
 
-def callback_target(*, linked: str | None = None, error: str | None = None, detail: str | None = None) -> str:
+def callback_target(*, linked: str | None = None, error: str | None = None) -> str:
+    """Zurück ins Profil - mit einem allgemeinen Code, nie mit dem Wortlaut der Plattform (der steht im Server-Log)."""
     query = {"tab": "socials"}
     if linked:
         query["linked"] = linked
     if error:
         query["link_error"] = error
-    if error and detail:
-        # Kurz und ohne Steuerzeichen - es landet in der Adresse und im Hinweis auf der Seite.
-        query["link_detail"] = re.sub(r"[^\w .,:;()/=+@'-]", " ", str(detail))[:160].strip()
     return f"{frontend_url()}/profile?{urlencode(query)}"

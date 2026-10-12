@@ -393,12 +393,20 @@ async def test_discord_callback_fills_and_verifies_the_field_once_per_account(fl
     assert await flow.db.platform_links.count_documents({"user_id": paula["id"]}) == 1
 
     # Abgelehnt bei Discord, kaputter Code, gefälschter oder fremder state: immer eine Erklärung, nie ein Häkchen.
-    assert target(await flow.get(f"/api/platform-links/discord/callback?error=access_denied&state={state3}"))["link_error"] == "denied"
-    failed = target(await flow.get(f"/api/platform-links/discord/callback?code=schlecht&state={state3}"))
-    assert failed["link_error"] == "exchange_failed" and failed["link_detail"] == "token 400"
+    # Jeder Rückruf verbraucht seinen Start (#1027) - deshalb vor jedem Versuch ein neuer Start.
+    async def fresh_state() -> str:
+        flow.act_as(paula)
+        state = state_of((await flow.post("/api/me/platform-links/discord/start")).json()["url"])
+        flow.act_as(None)
+        return state
+
+    assert target(await flow.get(f"/api/platform-links/discord/callback?error=access_denied&state={await fresh_state()}"))["link_error"] == "denied"
+    failed = target(await flow.get(f"/api/platform-links/discord/callback?code=schlecht&state={await fresh_state()}"))
+    # Nach außen nur der allgemeine Code - der Wortlaut der Plattform steht im Server-Log (#1027).
+    assert failed == {"tab": "socials", "link_error": "exchange_failed"}
     # Einrichtungsfehler der Plattform (z. B. Rückrufadresse nicht eingetragen): der Grund kommt mit.
-    mismatch = target(await flow.get(f"/api/platform-links/discord/callback?error=redirect_mismatch&error_description=Parameter+redirect_uri+does+not+match+registered+URI&state={state3}"))
-    assert mismatch["link_error"] == "platform_error" and "redirect_uri does not match" in mismatch["link_detail"]
+    mismatch = target(await flow.get(f"/api/platform-links/discord/callback?error=redirect_mismatch&error_description=Parameter+redirect_uri+does+not+match+registered+URI&state={await fresh_state()}"))
+    assert mismatch == {"tab": "socials", "link_error": "platform_error"}
     assert target(await flow.get("/api/platform-links/discord/callback?code=gut&state=kaputt"))["link_error"] == "invalid"
     flow.act_as(paula)
     wrong = state_of((await flow.post("/api/me/platform-links/twitch/start")).json()["url"])
@@ -461,6 +469,9 @@ async def test_steam_openid_is_verified_at_steam_and_names_the_player(flow, fake
     state = state_of((await flow.post("/api/me/platform-links/steam/start")).json()["url"])
     flow.act_as(None)
     assert target(await flow.get("/api/platform-links/steam/callback", params={**openid, "state": state}))["link_error"] == "exchange_failed"
+    flow.act_as(max_)
+    state = state_of((await flow.post("/api/me/platform-links/steam/start")).json()["url"])   # jeder Rückruf verbraucht seinen Start (#1027)
+    flow.act_as(None)
     assert target(await flow.get("/api/platform-links/steam/callback", params={"openid.mode": "id_res", "openid.claimed_id": "https://boese.example/id/1", "state": state}))["link_error"] == "denied"
     assert await flow.db.platform_links.count_documents({"user_id": max_["id"]}) == 0
 
@@ -635,7 +646,7 @@ async def test_every_oauth_platform_fills_its_field_and_verifies(flow, fake):
     state = state_of((await flow.post("/api/me/platform-links/epic/start")).json()["url"])
     flow.act_as(None)
     failed = target(await flow.get(f"/api/platform-links/epic/callback?code=gut&state={state}"))
-    assert failed["link_error"] == "exchange_failed" and failed["link_detail"] == "token 401"
+    assert failed == {"tab": "socials", "link_error": "exchange_failed"}
 
     # Die Datenschutzerklärung nennt jede eingerichtete Plattform - auch die mit zusätzlichem API Key (Bungie)
     # und die ohne Secret (Wargaming); die Projektion in privacy_facts muss diese Felder mitlesen.
@@ -785,3 +796,195 @@ async def test_a_reason_with_line_breaks_stays_one_log_line(flow, fake, caplog):
     logged = [record.getMessage() for record in caplog.records if "Rückruf fehlgeschlagen" in record.getMessage()]
     assert len(logged) == 1 and "erfundene Zeile" in logged[0]
     assert "\r" not in logged[0] and "\n" not in logged[0]
+
+
+# ---------------------------------------------------------------- #1027: Verknüpfen gehört zur Sitzung, die es gestartet hat
+
+FLOW_COOKIE = "tls_link_flow"
+
+
+def other_browser():
+    """Ein zweiter Browser: dieselbe Anwendung, aber ein eigener, leerer Cookie-Speicher."""
+    from httpx import ASGITransport, AsyncClient
+    from flow_harness import load_application
+    return AsyncClient(transport=ASGITransport(app=load_application()[1].app), base_url="http://testserver")
+
+
+def flow_cookie_line(response) -> str:
+    return next(line for line in response.headers.get_list("set-cookie") if line.startswith(f"{FLOW_COOKIE}_"))
+
+
+def flow_cookie(response) -> tuple[str, str]:
+    name, value = flow_cookie_line(response).split(";", 1)[0].split("=", 1)
+    return name, value
+
+
+async def start_link(client, platform: str) -> tuple[str, str, str]:
+    """Start in diesem Browser: die Rückrufadresse, wie die Plattform sie aufriefe, und Name und Wert des Cookies."""
+    started = await client.post(f"/api/me/platform-links/{platform}/start")
+    assert started.status_code == 200, started.text
+    name, value = flow_cookie(started)
+    return f"/api/platform-links/{platform}/callback?code=gut&state={state_of(started.json()['url'])}", name, value
+
+
+def token_calls(fake, platform_url: str) -> int:
+    return sum(1 for _method, url, _form in fake.calls if url == platform_url)
+
+
+async def linked_audits(flow) -> int:
+    return await flow.db.audit_logs.count_documents({"action": "platform_link.linked"})
+
+
+def outcome(response) -> str:
+    landed = target(response)
+    return landed.get("linked") or landed["link_error"]
+
+
+@pytest.mark.asyncio
+async def test_a_link_flow_counts_once_and_only_in_the_browser_that_started_it(flow, fake):
+    """#1027: Der Start setzt ein kurzlebiges Cookie und merkt sich den Ablauf auf dem Server. Der Rückruf zählt nur
+    in dem Browser, der gestartet hat - und nur einmal."""
+    await configure(flow)
+    paula = await person(flow, "paula")
+    flow.act_as(paula)
+    started = await flow.post("/api/me/platform-links/discord/start")
+    line = flow_cookie_line(started).lower()
+    assert "httponly" in line and "samesite=lax" in line and "max-age=600" in line
+    assert "path=/api/platform-links/discord/callback" in line
+    cookie_name, flow_id = flow_cookie(started)
+    assert len(flow_id) >= 32
+    stored = await flow.db.platform_link_flows.find_one({}, {"_id": 0})
+    assert stored["user_id"] == paula["id"] and stored["platform"] == "discord" and stored["consumed"] is False and stored["expires_at"]
+    assert flow_id not in json.dumps(stored, default=str), "in der Datenbank liegt nur der Hash"
+    url = f"/api/platform-links/discord/callback?code=gut&state={state_of(started.json()['url'])}"
+    flow.act_as(None)
+
+    # Derselbe Rückruf in einem anderen Browser: abgewiesen, ohne Details, nichts verknüpft.
+    async with other_browser() as stranger:
+        assert target(await stranger.get(url)) == {"tab": "socials", "link_error": "invalid"}
+    assert await flow.db.platform_links.count_documents({}) == 0
+    assert token_calls(fake, platform_links.DISCORD_TOKEN) == 0, "ohne passenden Ablauf wird kein Code eingelöst"
+
+    # Im eigenen Browser klappt es - genau einmal; das Cookie wird dabei gelöscht.
+    landed = await flow.get(url)
+    assert target(landed) == {"tab": "socials", "linked": "discord"}
+    assert "max-age=0" in flow_cookie_line(landed).lower()
+    assert (await flow.db.platform_link_flows.find_one({}, {"_id": 0}))["consumed"] is True
+
+    # Wiederholt - ohne Cookie und mit dem alten Cookie von Hand: abgewiesen, keine zweite Einlösung.
+    assert outcome(await flow.get(url)) == "invalid"
+    async with other_browser() as same_cookie:
+        assert outcome(await same_cookie.get(url, headers={"Cookie": f"{cookie_name}={flow_id}"})) == "invalid"
+    assert token_calls(fake, platform_links.DISCORD_TOKEN) == 1 and await linked_audits(flow) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_callback_from_someone_elses_browser_session_is_refused(flow, fake):
+    """#1027: Zwei Personen starten gleichzeitig. Keiner der beiden Rückrufe zählt im Browser der anderen -
+    und der eigene Ablauf bleibt davon unberührt."""
+    await configure(flow)
+    paula = await person(flow, "paula")
+    max_ = await person(flow, "max")
+    flow.act_as(paula)
+    paula_url, _, _ = await start_link(flow.client, "discord")
+    async with other_browser() as max_browser:
+        flow.act_as(max_)
+        max_url, _, _ = await start_link(max_browser, "discord")
+        flow.act_as(None)
+        assert outcome(await max_browser.get(paula_url)) == "invalid"
+        assert outcome(await flow.get(max_url)) == "invalid"
+        assert await flow.db.platform_links.count_documents({}) == 0
+        assert outcome(await max_browser.get(max_url)) == "discord"
+    assert [row["user_id"] for row in await flow.db.platform_links.find({}, {"_id": 0}).to_list(5)] == [max_["id"]]
+    paula_now = await flow.db.users.find_one({"id": paula["id"]}, {"_id": 0})
+    assert not (paula_now.get("platform_verified") or {}).get("discord")
+
+
+@pytest.mark.asyncio
+async def test_expired_wrong_platform_and_parallel_callbacks_do_not_link_twice(flow, fake):
+    """#1027: abgelaufen, falsche Plattform, zweimal gleichzeitig - verknüpft wird höchstens einmal."""
+    import asyncio
+    from datetime import timedelta
+
+    await configure(flow)
+    paula = await person(flow, "paula")
+    flow.act_as(paula)
+
+    # Abgelaufen: der Ablauf auf dem Server zählt, auch wenn Cookie und state noch da sind.
+    url, _, _ = await start_link(flow.client, "discord")
+    await flow.db.platform_link_flows.update_many({}, {"$set": {"expires_at": platform_links.now_utc() - timedelta(seconds=1)}})
+    assert outcome(await flow.get(url)) == "invalid"
+    assert await flow.db.platform_links.count_documents({}) == 0
+
+    # Falsche Plattform: state von Discord am Twitch-Rückruf, Cookie von Twitch am Discord-Rückruf.
+    discord_url, discord_cookie, _ = await start_link(flow.client, "discord")
+    twitch_url, _, twitch_flow = await start_link(flow.client, "twitch")
+    discord_state = discord_url.split("state=", 1)[1]
+    assert outcome(await flow.get(f"/api/platform-links/twitch/callback?code=gut&state={discord_state}")) == "invalid"
+    async with other_browser() as crossed:
+        assert outcome(await crossed.get(discord_url, headers={"Cookie": f"{discord_cookie}={twitch_flow}"})) == "invalid"
+    assert await flow.db.platform_links.count_documents({}) == 0
+
+    # Zweimal gleichzeitig derselbe Rückruf: einer verknüpft, der andere wird abgewiesen.
+    before = token_calls(fake, platform_links.DISCORD_TOKEN)
+    first, second = await asyncio.gather(flow.get(discord_url), flow.get(discord_url))
+    assert sorted([outcome(first), outcome(second)]) == ["discord", "invalid"]
+    assert token_calls(fake, platform_links.DISCORD_TOKEN) - before == 1 and await linked_audits(flow) == 1
+    assert outcome(await flow.get(twitch_url)) == "twitch", "der Twitch-Ablauf daneben bleibt gültig"
+
+
+def test_link_flows_expire_on_their_own_and_exist_once():
+    """#1027: Abläufe räumt MongoDB selbst weg (TTL), und jeden Ablauf gibt es nur einmal."""
+    import asyncio
+
+    import database
+    from mongomock_motor import AsyncMongoMockClient
+
+    db = AsyncMongoMockClient()["link_flows"]
+    original = database.get_db
+    database.get_db = lambda: db
+    try:
+        asyncio.run(database.init_indexes())
+        info = asyncio.run(db.platform_link_flows.index_information())
+    finally:
+        database.get_db = original
+    assert any(spec.get("key") == [("expires_at", 1)] and spec.get("expireAfterSeconds") == 0 for spec in info.values())
+    assert any(spec.get("key") == [("flow_hash", 1)] and spec.get("unique") for spec in info.values())
+
+
+@pytest.mark.asyncio
+async def test_two_starts_in_one_browser_each_count_and_leave_one_link(flow, fake, monkeypatch):
+    """#1027: Zweimal hintereinander auf „Verknüpfen“ - jeder Start hat sein eigenes Cookie, der erste wird nicht
+    verdrängt. Kommen beide Rückrufe gleichzeitig, bleibt trotzdem genau eine Verknüpfung je Person und Plattform."""
+    import asyncio
+
+    await configure(flow)
+    paula = await person(flow, "paula")
+    flow.act_as(paula)
+    first_url, _, _ = await start_link(flow.client, "discord")
+    second_url, _, _ = await start_link(flow.client, "discord")
+    flow.act_as(None)
+    assert outcome(await flow.get(first_url)) == "discord", "der erste Start gilt auch nach einem zweiten"
+    assert outcome(await flow.get(second_url)) == "discord"
+    assert await flow.db.platform_links.count_documents({"user_id": paula["id"], "platform": "discord"}) == 1
+
+    # Zwei gültige Starts, beide Rückrufe gleichzeitig: beide klappen, gespeichert ist eine Zeile.
+    # Die Speicher-Attrappe arbeitet jede Abfrage am Stück ab; damit sich die beiden Rückrufe wirklich überlappen
+    # wie bei MongoDB, gibt jede Leseabfrage danach kurz die Kontrolle ab.
+    from mongomock_motor import AsyncMongoMockCollection
+
+    read_one = AsyncMongoMockCollection.find_one
+
+    async def find_one_and_yield(self, *args, **kwargs):
+        found = await read_one(self, *args, **kwargs)
+        await asyncio.sleep(0)
+        return found
+
+    monkeypatch.setattr(AsyncMongoMockCollection, "find_one", find_one_and_yield)
+    await flow.db.platform_links.delete_many({})
+    flow.act_as(paula)
+    urls = [(await start_link(flow.client, "twitch"))[0] for _ in range(2)]
+    flow.act_as(None)
+    results = await asyncio.gather(*(flow.get(url) for url in urls))
+    assert [outcome(result) for result in results] == ["twitch", "twitch"]
+    assert await flow.db.platform_links.count_documents({"user_id": paula["id"], "platform": "twitch"}) == 1

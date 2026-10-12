@@ -124,7 +124,7 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     for collection in (db.refresh_tokens, db.auth_sessions, db.email_verification_tokens,
                        db.password_reset_tokens, db.mfa_login_challenges, db.mobile_push_tokens,
                        db.mobile_client_logs, db.notifications, db.user_socials,
-                       db.passkeys, db.passkey_challenges, db.platform_links,
+                       db.passkeys, db.passkey_challenges, db.platform_links, db.platform_link_flows,
                        # Verhalten, das nur für die Erfolge gezählt wurde (#616, #678) - ohne Konto ohne Zweck.
                        # Das gegebene GG bleibt: es gehört zum Match wie das Ergebnis, und das Lob der anderen Seite
                        # soll nicht verschwinden, weil jemand sein Konto löscht.
