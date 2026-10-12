@@ -11,13 +11,15 @@ Sortiert wird wie gewünscht: zuerst, wo ein Ergebnis fehlt, dann nach Station.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 from match_rules import match_allows_draw
 from models import now_utc
+from services.match_attention import attention_items
 from services.match_disputes import category_label, open_dispute
 from services.match_notifications import results_summary
 from services.match_proofs import visible_proofs
+from services.match_timing import MISSING_AFTER_MINUTES, OPEN_STATUSES, RUNNING_STATUSES, as_int, filled_slots, registration_name, timing
 from services.match_v2_results import _advancement_result_rank, _ranking_mode
 from services.result_hold import has_result, hold_view
 from services.round_labels import round_label, rounds_by_section, stage_kind
@@ -25,71 +27,13 @@ from services.station_labels import attach_station_info
 from services.tournament_permissions import RESULT_STAFF_ROLES, is_global_tournament_staff
 from services.v2_match_flows import latest_reports
 
-# Spiele, für die ein Ergebnis eingetragen werden kann - sobald beide Seiten feststehen.
-OPEN_STATUSES = {"pending", "ready", "scheduled", "in_progress", "running", "waiting_result", "disputed"}
-RUNNING_STATUSES = {"in_progress", "running", "waiting_result"}
-# „Ergebnis fehlt“: geplante Zeit plus Dauer plus diese Minuten vorbei (#1160).
-MISSING_AFTER_MINUTES = 5
-DEFAULT_DURATION_MINUTES = 30
 RECENT_LIMIT = 6
-
-
-def _parse(value) -> datetime | None:
-    if not value:
-        return None
-    try:
-        parsed = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
-
-
-def _int(value, fallback: int = 0) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return fallback
-
-
-def filled_slots(match: dict) -> list[dict]:
-    return sorted(
-        [slot for slot in match.get("slots") or [] if slot.get("registration_id")],
-        key=lambda slot: _int(slot.get("slot"), 999),
-    )
-
-
-def registration_name(registration: dict | None) -> str:
-    return (registration or {}).get("display_name") or (registration or {}).get("ingame_name") or (registration or {}).get("team_name") or "Teilnehmer"
-
-
-def duration_minutes(match: dict, tournament: dict | None) -> int:
-    value = match.get("duration_minutes") or (match.get("settings") or {}).get("duration_minutes") \
-        or (tournament or {}).get("match_duration_minutes") or DEFAULT_DURATION_MINUTES
-    return max(1, _int(value, DEFAULT_DURATION_MINUTES))
-
-
-def timing(match: dict, tournament: dict | None, now: datetime) -> dict:
-    """Wie lange läuft das Spiel, und wie weit ist es über der Zeit? Ohne geplante Zeit (und ohne Start an einer
-    Station) gibt es kein „Ergebnis fehlt“ (#1160)."""
-    started = _parse(match.get("started_at"))
-    base = _parse(match.get("scheduled_at")) or (started if match.get("station_id") else None)
-    out: dict = {"running_minutes": None, "overdue_minutes": None, "missing": False, "due_at": None}
-    if started and str(match.get("status") or "") in RUNNING_STATUSES | {"scheduled", "ready"}:
-        out["running_minutes"] = max(0, int((now - started).total_seconds() // 60))
-    if base:
-        planned_end = base + timedelta(minutes=duration_minutes(match, tournament))
-        due = planned_end + timedelta(minutes=MISSING_AFTER_MINUTES)
-        out["due_at"] = due.isoformat()
-        if now > planned_end:
-            out["overdue_minutes"] = int((now - planned_end).total_seconds() // 60)
-        out["missing"] = now >= due
-    return out
 
 
 def best_of(match: dict, stage: dict | None, tournament: dict | None) -> int:
     value = match.get("best_of") or (match.get("settings") or {}).get("best_of") \
         or ((stage or {}).get("settings") or {}).get("best_of") or (tournament or {}).get("best_of") or 1
-    return max(1, _int(value, 1))
+    return max(1, as_int(value, 1))
 
 
 def into(label: str) -> str:
@@ -291,7 +235,6 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
     ]
     open_items.sort(key=lead_sort_key)
     # „Braucht Aufmerksamkeit“ (#1160): dieselben Spiele, als Fälle mit Knopf; dazu die Stationen zum Umlegen.
-    from services.match_attention import attention_items
 
     stations = await db.stations.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(500)
     attention = attention_items(tournament, matches, stations, regs_by_id, now)
