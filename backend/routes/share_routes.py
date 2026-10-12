@@ -4,6 +4,9 @@
 - ``GET /api/share/result/{turnier}/{benutzer}/story.png``  hoch, 1080×1920 (WhatsApp-Status, Instagram-Story)
 - ``GET /api/share/result/{turnier}/{benutzer}/wide.png``   breit, 1200×630 (Link-Vorschau)
 - ``GET /api/share/result-options/{turnier}``               für den Knopf „Ergebnis teilen“: geht es, und wenn nicht, warum
+
+Die beiden Bilder dürfen fünf Minuten zwischengespeichert werden und werden bei gleichen Daten nur einmal gezeichnet
+(#1412, services/share_image_cache); die Daten der Seite bleiben „no-store“.
 """
 from __future__ import annotations
 
@@ -16,6 +19,7 @@ from auth import get_current_user
 from database import get_db
 from services import result_share
 from services.profile_references import RESULT_TOURNAMENT_STATUSES, _visible_tournament
+from services.share_image_cache import share_images
 
 router = APIRouter(prefix="/api/share", tags=["share"])
 
@@ -36,8 +40,10 @@ async def shared_result_image(tournament: str, username: str, fmt: Literal["stor
     if not payload:
         raise HTTPException(status_code=404, detail=NOT_PUBLIC)
     name = f"ergebnis-{payload['tournament']['slug']}-{username}-{fmt}.png"
-    return Response(content=result_share.render(payload, fmt), media_type="image/png",
-                    headers={"Content-Disposition": f'inline; filename="{name}"'})
+    # Gleiche Daten, gleiches Bild (#1412): gezeichnet wird beim ersten Abruf und sobald sich etwas geändert hat.
+    key = ("result", payload["tournament"]["id"], payload["user"]["username"], fmt)
+    png = share_images.get_or_draw(key, payload, lambda: result_share.render(payload, fmt))
+    return Response(content=png, media_type="image/png", headers={"Content-Disposition": f'inline; filename="{name}"'})
 
 
 @router.get("/result-options/{tournament}")
