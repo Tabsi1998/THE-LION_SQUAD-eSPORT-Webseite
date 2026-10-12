@@ -223,54 +223,63 @@ function EventCard({ card, meta }) {
   const typeLabel = eventTypeLabel(e.event_type, meta.types);
   const descriptionPreview = plainTextPreview(e.description);
   const ownChild = card.children.some((row) => row.mine);
-  return (
-    <article
-      data-testid={`event-card-${e.slug}`}
-      data-season-perch="card"
-      data-live={e.public_phase?.state === "live" ? "1" : undefined}
-      className={`tls-card tls-reveal-item tls-card--purple group min-w-0 border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col ${e.public_phase?.state === "live" ? "tls-live-frame" : ""}`}
-    >
-      <Link to={`/events/${e.slug}`} data-testid={`event-card-link-${e.slug}`} className="flex flex-col min-w-0 flex-1">
-        {e.banner_url ? (
-          <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
-            <LazyImg src={e.banner_url} alt="" sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="w-full h-full object-contain group-hover:scale-[1.02] transition duration-500" />
-          </div>
-        ) : (
-          <div className="aspect-video bg-gradient-to-br from-[#9F7AEA]/20 via-[#0A0A0A] to-[#0A0A0A] flex items-center justify-center">
-            <Calendar className="w-10 h-10 text-[#9F7AEA]/40" />
+  // Die Saison-Deko an Karten (Ketten, Eier) braucht unten ein freies Band: ein Link über die ganze Karte zählt dort als
+  // Bedienung. Ohne Turniere ist die Karte darum selbst der Link (wie bisher), mit Turnieren hält sie Link und Knopf.
+  const shell = {
+    "data-testid": `event-card-${e.slug}`,
+    "data-season-perch": "card",
+    "data-live": e.public_phase?.state === "live" ? "1" : undefined,
+    className: `tls-card tls-reveal-item tls-card--purple group min-w-0 border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col ${e.public_phase?.state === "live" ? "tls-live-frame" : ""}`,
+  };
+  const content = (
+    <>
+      {e.banner_url ? (
+        <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
+          <LazyImg src={e.banner_url} alt="" sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="w-full h-full object-contain group-hover:scale-[1.02] transition duration-500" />
+        </div>
+      ) : (
+        <div className="aspect-video bg-gradient-to-br from-[#9F7AEA]/20 via-[#0A0A0A] to-[#0A0A0A] flex items-center justify-center">
+          <Calendar className="w-10 h-10 text-[#9F7AEA]/40" />
+        </div>
+      )}
+      <div className="p-5 flex-1 flex flex-col min-w-0">
+        <div className="flex items-center gap-2 flex-wrap text-[10px] uppercase tracking-widest font-bold">
+          <span className="text-[#9F7AEA]">{typeLabel}</span>
+          <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status} />
+          {VIcon && <VIcon className="w-3 h-3 text-[#FFD700]" />}
+        </div>
+        <h3 className="tls-card__title mt-2 font-heading font-black text-lg break-words">{e.name}</h3>
+        {card.mine && <div className="mt-2"><MineChip state={card.mine} testId={`event-card-mine-${e.slug}`} /></div>}
+        {e.start_date && (
+          <div className="mt-2 inline-flex min-w-0 items-center gap-1.5 text-xs text-white/60">
+            <Calendar className="w-3 h-3" />
+            <span className="min-w-0 truncate" data-testid={e.schedule?.multi_day ? "event-card-days" : undefined}>{scheduleLine(e.schedule) || viennaDateTime(e.start_date, { dateStyle: "medium", timeStyle: "short" })}</span>
           </div>
         )}
-        <div className="p-5 flex-1 flex flex-col min-w-0">
-          <div className="flex items-center gap-2 flex-wrap text-[10px] uppercase tracking-widest font-bold">
-            <span className="text-[#9F7AEA]">{typeLabel}</span>
-            <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status} />
-            {VIcon && <VIcon className="w-3 h-3 text-[#FFD700]" />}
+        {e.location && (
+          <div className="mt-1 inline-flex min-w-0 items-center gap-1.5 text-xs text-white/60">
+            <MapPin className="w-3 h-3 shrink-0" /> <span className="min-w-0 truncate">{e.location}</span>
           </div>
-          <h3 className="tls-card__title mt-2 font-heading font-black text-lg break-words">{e.name}</h3>
-          {card.mine && <div className="mt-2"><MineChip state={card.mine} testId={`event-card-mine-${e.slug}`} /></div>}
-          {e.start_date && (
-            <div className="mt-2 inline-flex min-w-0 items-center gap-1.5 text-xs text-white/60">
-              <Calendar className="w-3 h-3" />
-              <span className="min-w-0 truncate" data-testid={e.schedule?.multi_day ? "event-card-days" : undefined}>{scheduleLine(e.schedule) || viennaDateTime(e.start_date, { dateStyle: "medium", timeStyle: "short" })}</span>
-            </div>
-          )}
-          {e.location && (
-            <div className="mt-1 inline-flex min-w-0 items-center gap-1.5 text-xs text-white/60">
-              <MapPin className="w-3 h-3 shrink-0" /> <span className="min-w-0 truncate">{e.location}</span>
-            </div>
-          )}
-          {e.max_participants && (
-            <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/50">
-              <UsersIcon className="w-3 h-3" /> {e.registration_summary?.reserved_seats || 0}/{e.max_participants} Plätze
-            </div>
-          )}
-          {e.has_registration && !e.max_participants && (
-            <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/50">
-              <UsersIcon className="w-3 h-3" /> {e.registration_summary?.registered_count || 0} angemeldet
-            </div>
-          )}
-          {descriptionPreview && <p className="mt-3 text-sm text-white/65 line-clamp-2 flex-1">{descriptionPreview}</p>}
-        </div>
+        )}
+        {e.max_participants && (
+          <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/50">
+            <UsersIcon className="w-3 h-3" /> {e.registration_summary?.reserved_seats || 0}/{e.max_participants} Plätze
+          </div>
+        )}
+        {e.has_registration && !e.max_participants && (
+          <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/50">
+            <UsersIcon className="w-3 h-3" /> {e.registration_summary?.registered_count || 0} angemeldet
+          </div>
+        )}
+        {descriptionPreview && <p className="mt-3 text-sm text-white/65 line-clamp-2 flex-1">{descriptionPreview}</p>}
+      </div>
+    </>
+  );
+  if (!card.children.length) return <Link to={`/events/${e.slug}`} {...shell}>{content}</Link>;
+  return (
+    <article {...shell}>
+      <Link to={`/events/${e.slug}`} data-testid={`event-card-link-${e.slug}`} className="flex flex-col min-w-0 flex-1">
+        {content}
       </Link>
       {card.children.length > 0 && (
         <div className="border-t border-white/10">

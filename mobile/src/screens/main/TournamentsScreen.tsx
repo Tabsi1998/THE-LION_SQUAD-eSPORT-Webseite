@@ -530,9 +530,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     justifyContent: "center",
-    minHeight: 40,
+    // Tippfläche wie bei den Reitern (#1155): mindestens 48 Punkte hoch.
+    minHeight: 48,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   chipOn: {
     backgroundColor: "rgba(255,215,0,0.12)",
