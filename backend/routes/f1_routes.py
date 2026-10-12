@@ -10,7 +10,7 @@ from database import get_db
 from services.permissions import MFA_MESSAGE, is_confirmed_tournament_lead, lead_without_second_factor
 from auth import get_current_user, require_admin, get_optional_user, require_area
 from services.visibility import user_can_see
-from services.visibility import lead_can_see
+from services.visibility import hide_unseen_event_links, lead_can_see
 from services.access_links import public_access_link_payload, touch_access_link, validate_access_link
 from services.public_phase import derive_public_phase
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
@@ -344,6 +344,8 @@ async def list_challenges(
         c["track_count"] = await db.f1_tracks.count_documents({"challenge_id": c["id"]})
         c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", _official_time_query({"challenge_id": c["id"]})))
         visible.append(c)
+    # Das Event als Klammer (#1182): die Kennung des Events nur, wenn es für die Person sichtbar ist (#1473).
+    await hide_unseen_event_links(db, user, visible)
     if compact:
         visible = [_compact_challenge(c) for c in visible]
         return _page_items(visible, limit, offset, paged)

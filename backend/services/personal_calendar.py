@@ -6,7 +6,8 @@
   löscht ihn. Beim Löschen des Kontos fällt er mit weg (``account_erasure.PURGED``).
 - Der Feed enthält nur, was die Person selbst sehen darf und wofür sie (oder ihr Team) dabei ist: dieselbe Liste wie
   ``GET /api/calendar`` mit ihrem Konto, davon nur „angemeldet“ - dazu ihre Vereinstermine (zugesagte Versammlungen,
-  eigene Schichten). Ein gesperrtes oder abgeschaltetes Konto bekommt nichts. Ohne Sitzung gilt keine bestätigte
+  eigene Schichten). Abgesagtes und „Nur intern“ stehen nie darin, auch nicht für die Vereinsverwaltung. Ein gesperrtes oder
+  abgeschaltetes Konto bekommt nichts. Ohne Sitzung gilt keine bestätigte
   Zwei-Faktor-Anmeldung: die Ausnahme der Turnierleitung für „Nur Mitglieder“ greift hier nicht (eher weniger als mehr).
 - Das Token steht nie im Protokoll: ``log_safe.SecretPathFilter`` kürzt es im Zugriffsprotokoll von Uvicorn, nginx
   schreibt für diese Adressen keines (``frontend/nginx.conf``).
@@ -80,8 +81,23 @@ async def owner_for(db, token: str) -> dict | None:
     return user
 
 
+# Nie im Link, egal mit welcher Rolle (Codex-Prüfung #1473): Abgesagtes und „Nur intern“. Der Link wirkt ohne Sitzung und
+# ohne Zwei-Faktor-Anmeldung - was die Vereinsverwaltung über ihre Rolle sieht, gehört nicht in eine Adresse, die in einer
+# Kalender-App liegt.
+EXCLUDED_STATUS = frozenset({"cancelled"})
+EXCLUDED_VISIBILITY = frozenset({"internal"})
+
+
+def _allowed(item: dict) -> bool:
+    return bool(item.get("mine")) and item.get("status") not in EXCLUDED_STATUS and item.get("visibility") not in EXCLUDED_VISIBILITY
+
+
 async def personal_items(db, user: dict) -> list[dict]:
-    """Nur die eigenen Termine: aus der Sicht der Person, davon was „angemeldet“ ist, plus ihre Vereinstermine."""
-    items = [item for item in await calendar_items.collect(db, user) if item.get("mine")]
-    items += [item for item in await club_calendar.club_items(db, user) if item.get("mine")]
+    """Nur die eigenen Termine: aus der Sicht der Person, davon was „angemeldet“ ist, plus ihre Vereinstermine.
+
+    Vereinstermine sind gewollt (#1189: „nur die eigenen Termine“, `club_calendar.club_items` ist dafür gebaut): zugesagte
+    Versammlungen und eigene Helferschichten - ohne Namen anderer, ohne Zugangslink. Abgesagtes und Internes nie.
+    """
+    items = [item for item in await calendar_items.collect(db, user) if _allowed(item)]
+    items += [item for item in await club_calendar.club_items(db, user) if _allowed(item)]
     return sorted(items, key=lambda item: (item["start"], item["kind"], item["title"]))

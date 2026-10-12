@@ -249,3 +249,32 @@ async def test_without_a_session_the_lead_exception_does_not_apply(flow):
     path = (await flow.post("/api/calendar/personal")).json()["path"]
     flow.act_as(None)
     assert "Vereinsabend" not in (await flow.get(path)).text
+
+
+@pytest.mark.asyncio
+async def test_cancelled_and_internal_never_reach_the_link_even_for_club_admins(flow):
+    """Codex-Prüfung #1473: der Link wirkt ohne Sitzung - Abgesagtes und „Nur intern“ gehören nie hinein, egal mit welcher
+    Rolle. In der Liste mit Sitzung sieht die Vereinsverwaltung den internen Termin weiter."""
+    admin = await flow.add_user(role="club_admin", name="verwaltung")
+    await flow.db.events.insert_many([
+        {"id": "e-ok", "slug": "lan", "name": "Herbst-LAN", "status": "scheduled", "visibility": "public", "start_date": _at(10)},
+        {"id": "e-intern", "slug": "klausur", "name": "Vorstandsklausur", "status": "scheduled", "visibility": "internal", "start_date": _at(11)},
+        {"id": "e-abgesagt", "slug": "grillabend", "name": "Grillabend", "status": "cancelled", "visibility": "public", "start_date": _at(12)},
+    ])
+    await flow.db.tournaments.insert_one({"id": "t-abgesagt", "slug": "abgesagter-cup", "title": "Abgesagter Cup", "status": "cancelled",
+                                          "visibility": "public", "is_public": True, "start_date": _at(13)})
+    await flow.db.event_registrations.insert_many([
+        {"id": f"er-{event_id}", "event_id": event_id, "user_id": admin["id"], "status": "registered"} for event_id in ("e-ok", "e-intern", "e-abgesagt")
+    ])
+    await flow.db.tournament_registrations.insert_one({"id": "tr-1", "tournament_id": "t-abgesagt", "user_id": admin["id"], "status": "approved"})
+
+    flow.act_as(admin)
+    listed = {item["id"] for item in (await flow.get("/api/calendar")).json()["items"] if item["mine"]}
+    assert {"e-ok", "e-intern"} <= listed, "mit Sitzung sieht die Verwaltung ihren internen Termin"
+    path = (await flow.post("/api/calendar/personal")).json()["path"]
+
+    flow.act_as(None)
+    text = (await flow.get(path)).text
+    assert "Herbst-LAN" in text, "Gegenprobe: der eigene öffentliche Termin steht drin"
+    for hidden in ("Vorstandsklausur", "Grillabend", "Abgesagter Cup"):
+        assert hidden not in text, f"{hidden} gehört nicht in den Link"

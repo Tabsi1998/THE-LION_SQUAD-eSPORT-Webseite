@@ -10,7 +10,7 @@ from database import get_db
 from services.permissions import is_confirmed_tournament_lead
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see
-from services.visibility import lead_can_see
+from services.visibility import hide_unseen_event_links, lead_can_see
 from services import partner_pages
 from services.access_links import (
     public_access_link_payload,
@@ -186,6 +186,8 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     for t in tournaments:
         await _enrich_tournament(t, user)
         _expose_offer(t, finance)
+    # Das Event als Klammer (#1182): die Kennung des Events nur, wenn es für die Person sichtbar ist (#1473).
+    await hide_unseen_event_links(db, user, tournaments)
     if compact:
         tournaments = [_compact_tournament(t) for t in tournaments]
         return _page_items(tournaments, limit, offset, paged)
