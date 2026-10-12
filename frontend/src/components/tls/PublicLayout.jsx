@@ -30,12 +30,14 @@ import { UserMenu } from "@/components/tls/UserMenu";
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { OfflineBar } from "@/components/tls/OfflineBar";
 import { RouteProgress } from "@/components/tls/RouteProgress";
+import { useMobileMenu } from "@/lib/mobileMenu";
 
 export function PublicLayout({ children }) {
   const { user, logout, isAdmin, isClubMember } = useAuth();
   const location = useLocation();
   const routeFade = useRouteFade(location.pathname);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  // Geteilt mit dem Rahmen des Seitenwechsels (#1324) - ein Tipp aufs Menü während des Ladens geht nicht verloren.
+  const [mobileOpen, setMobileOpen] = useMobileMenu(location.pathname);
   const [branding, setBranding] = useState(getCachedBranding());
   const [siteBanners, setSiteBanners] = useState([]);
   const [showScrollTop, setShowScrollTop] = useState(false);
