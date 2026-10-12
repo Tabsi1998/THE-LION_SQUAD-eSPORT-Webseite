@@ -28,7 +28,14 @@ const AppLockContext = createContext<AppLockValue>({
   unlock: async () => true,
 });
 
-export function AppLockProvider({ children, now = Date.now }: { children: React.ReactNode; now?: () => number }) {
+/** So lange darf das Lesen von Schalter und Gerätesperre dauern (#1052), danach gilt die App als gesperrt. */
+export const LOCK_READ_TIMEOUT_MS = 5000;
+
+export function AppLockProvider({ children, now = Date.now, readTimeoutMs = LOCK_READ_TIMEOUT_MS }: {
+  children: React.ReactNode;
+  now?: () => number;
+  readTimeoutMs?: number;
+}) {
   const [ready, setReady] = useState(false);
   const [enabled, setEnabledState] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -38,21 +45,37 @@ export function AppLockProvider({ children, now = Date.now }: { children: React.
 
   useEffect(() => {
     let mounted = true;
+    let settled = false;
+    let timedOut = false;
+    // Hängt die Abfrage (#1052), wartet die App nicht ewig auf dem Startbild: nach LOCK_READ_TIMEOUT_MS gilt sie als
+    // gesperrt. Entsperren oder Abmelden gehen dann über den Sperrbildschirm.
+    const timer = setTimeout(() => {
+      if (!mounted || settled) return;
+      timedOut = true;
+      enabledRef.current = true;
+      setEnabledState(true);
+      setLocked(true);
+      setReady(true);
+    }, readTimeoutMs);
     void (async () => {
       const [stored, found] = await Promise.all([readAppLock(), lockAvailability()]);
       if (!mounted) return;
+      settled = true;
+      clearTimeout(timer);
       // Eine gespeicherte Sperre ohne Gerätesperre wäre nicht zu öffnen - dann gilt sie nicht.
       const on = stored && found.available;
       enabledRef.current = on;
       setEnabledState(on);
       setAvailability(found);
-      setLocked(on);
+      // Kam die Antwort erst nach der Wartezeit, hebt sie eine Sperre nur auf, sperrt aber nicht nach dem Entsperren neu.
+      setLocked((current) => (timedOut ? current && on : on));
       setReady(true);
     })();
     return () => {
       mounted = false;
+      clearTimeout(timer);
     };
-  }, []);
+  }, [readTimeoutMs]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state: AppStateStatus) => {
