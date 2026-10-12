@@ -238,20 +238,25 @@ async def test_linking_discord_sends_matching_servers_once_and_only_as_a_dm(flow
     await db.tournaments.insert_one({"id": "t-fc", "game_id": games["fc26"]["id"], "title": "Cup"})
     await db.tournament_registrations.insert_one({"id": "r-1", "tournament_id": "t-fc", "user_id": paula["id"]})
 
-    # Über den echten Rückruf: Verknüpfen löst die Direktnachricht im Hintergrund aus.
-    monkeypatch.setattr(platform_links, "read_state_payload", lambda state, platform: {"sub": paula["id"]})
+    # Über den echten Start und Rückruf (mit Ablauf-Cookie, #1027): Verknüpfen löst die Direktnachricht im
+    # Hintergrund aus. Nur die Antwort von Discord selbst ist nachgestellt.
+    from services.secret_store import encrypt_secret
 
-    async def flow_of_this_browser(db, flow_id, platform, state_payload):
-        """Start und Ablauf-Cookie (#1027) prüft test_platform_links_flow - hier geht es um die Direktnachricht."""
-
-    monkeypatch.setattr(platform_links, "consume_flow", flow_of_this_browser)
+    monkeypatch.setenv("JWT_SECRET", "flow-tests-secret-with-at-least-32-characters")
+    monkeypatch.setenv("FRONTEND_URL", "http://localhost:3000")
+    await db.settings.update_one({"id": "branding"}, {"$set": {
+        "discord_client_id": "discord-app", "discord_client_secret": encrypt_secret("discord-geheim")}}, upsert=True)
 
     async def identity(platform, branding, query, state_payload=None, db=None):
         return {"external_id": PAULA_DISCORD, "handle": "paula", "display_name": "Paula"}
 
     monkeypatch.setattr(platform_links, "fetch_identity", identity)
+    flow.act_as(paula)
+    started = await flow.post("/api/me/platform-links/discord/start")
+    assert started.status_code == 200, started.text
+    state = parse_qs(urlparse(started.json()["url"]).query)["state"][0]
     flow.act_as(None)
-    response = await flow.get("/api/platform-links/discord/callback?code=gut&state=x")
+    response = await flow.get(f"/api/platform-links/discord/callback?code=gut&state={state}")
     assert response.status_code == 302 and parse_qs(urlparse(response.headers["location"]).query).get("linked") == ["discord"]
     assert len(bot.dms) == 1 and bot.dms[0]["to"] == PAULA_DISCORD
     text = bot.dms[0]["embed"]["description"]

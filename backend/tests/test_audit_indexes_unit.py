@@ -18,7 +18,7 @@ EXPECTED = {
     "news_reads": {"user_news_unique"},
     "discord_memberships": {"user_guild_unique"},
     "youtube_videos": {"channel_video_unique"},
-    "platform_links": {"platform_external_unique", "user_id_1"},
+    "platform_links": {"platform_external_unique", "user_platform_unique", "user_id_1"},
     "moderation_sanctions": {"user_id_1_status_1"},
     "moderation_strikes": {"user_id_1", "source_1_ref_id_1"},
     "team_members": {"team_id_1_user_id_1", "user_id_1"},
@@ -76,6 +76,31 @@ def test_the_unique_indexes_really_refuse_a_second_row():
         await db.platform_links.insert_one({"platform": "twitch", "external_id": "42", "user_id": "u2"})
         await db.platform_links.insert_one({"platform": "steam", "user_id": "u1"})
         await db.platform_links.insert_one({"platform": "steam", "user_id": "u2"})
+        # Je Person und Plattform eine Verknüpfung (#1027).
+        with pytest.raises(DuplicateKeyError):
+            await db.platform_links.insert_one({"platform": "discord", "external_id": "43", "user_id": "u1"})
+    asyncio.run(scenario())
+
+
+def test_doubled_platform_links_are_merged_before_the_unique_index(caplog):
+    """#1027: Ältere Dubletten (eine Person, eine Plattform, zwei Zeilen) halten den eindeutigen Index nicht auf -
+    die zuletzt verknüpfte Zeile bleibt, die anderen gehen, andere Personen und Plattformen bleiben unberührt."""
+    async def scenario():
+        db = fresh()
+        await db.platform_links.insert_many([
+            {"id": "alt", "platform": "discord", "external_id": "1", "user_id": "u1", "linked_at": "2026-01-01T00:00:00+00:00"},
+            {"id": "neu", "platform": "discord", "external_id": "2", "user_id": "u1", "linked_at": "2026-05-01T00:00:00+00:00"},
+            {"id": "twitch", "platform": "twitch", "external_id": "3", "user_id": "u1", "linked_at": "2026-02-01T00:00:00+00:00"},
+            {"id": "andere", "platform": "discord", "external_id": "4", "user_id": "u2", "linked_at": "2026-01-01T00:00:00+00:00"},
+        ])
+        with caplog.at_level(logging.WARNING, logger="database"):
+            summary = await database.init_audit_indexes(db)
+        assert summary["blocked"] == []
+        assert "user_platform_unique" in await names(db, "platform_links")
+        assert sorted(row["id"] for row in await db.platform_links.find({}, {"_id": 0, "id": 1}).to_list(10)) == ["andere", "neu", "twitch"]
+        assert any("zusammengeführt" in record.getMessage() for record in caplog.records)
+        # Ein weiterer Start findet nichts mehr zu tun.
+        assert await database.merge_duplicate_platform_links(db) == 0
     asyncio.run(scenario())
 
 

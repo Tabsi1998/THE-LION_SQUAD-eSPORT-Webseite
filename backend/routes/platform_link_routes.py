@@ -80,8 +80,8 @@ async def start_platform_link(platform: str, response: Response, body: LinkStart
         if exc.code == "not_configured":
             raise HTTPException(409, f"{PLATFORMS[platform]['label']} ist auf der Website noch nicht eingerichtet (Einstellungen → Twitch/Discord).")
         raise HTTPException(400, str(exc))
-    flow_id = await platform_links.open_flow(db, me["id"], platform, state)
-    response.set_cookie(platform_links.FLOW_COOKIE, flow_id, max_age=platform_links.STATE_MINUTES * 60, httponly=True,
+    cookie_name, flow_id = await platform_links.open_flow(db, me["id"], platform, state)
+    response.set_cookie(cookie_name, flow_id, max_age=platform_links.STATE_MINUTES * 60, httponly=True,
                         secure=platform_links.flow_cookie_secure(), samesite="lax", path=platform_links.flow_cookie_path(platform))
     return {"url": url}
 
@@ -110,12 +110,12 @@ async def platform_link_callback(platform: str, request: Request, background: Ba
         return RedirectResponse(platform_links.callback_target(error="unknown"), status_code=302)
     query = dict(request.query_params)
     db = get_db()
-    consumed = False
+    consumed_cookie = ""
     try:
         state_payload = platform_links.read_state_payload(query.get("state"), platform)
         # Erst der Ablauf dieses Browsers (einmal, atomar) - vorher wird kein Code bei der Plattform eingelöst.
-        await platform_links.consume_flow(db, request.cookies.get(platform_links.FLOW_COOKIE), platform, state_payload)
-        consumed = True
+        await platform_links.consume_flow(db, request.cookies, platform, state_payload)
+        consumed_cookie = platform_links.flow_cookie_name(str(state_payload.get("nonce") or ""))
         user_id = str(state_payload["sub"])
         user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "is_active": 1})
         if not user or user.get("is_active") is False:
@@ -123,21 +123,21 @@ async def platform_link_callback(platform: str, request: Request, background: Ba
         identity = await platform_links.fetch_identity(platform, await _branding(db), query, state_payload=state_payload, db=db)
         link = await platform_links.link_account(db, user_id, platform, identity)
     except LinkError as exc:
-        # Im Log steht, woran es lag (Einrichtung, Plattform, Sitzung) - und die Person liest den Grund im Profil.
+        # Woran es lag (Einrichtung, Plattform, Sitzung), steht nur im Server-Log. Die Adresse ins Profil trägt
+        # nur den allgemeinen Code - die Seite erklärt ihn in eigenen Worten.
         logger.warning("[platform-links] %s: Rückruf fehlgeschlagen - %s (%s)", log_safe(platform), log_safe(exc.code), log_safe(exc, 300))
-        detail = str(exc) if exc.code in ("platform_error", "exchange_failed") else None
-        return _finish(RedirectResponse(platform_links.callback_target(error=exc.code, detail=detail), status_code=302), platform, consumed)
+        return _finish(RedirectResponse(platform_links.callback_target(error=exc.code), status_code=302), platform, consumed_cookie)
     await _audit(db, user_id, "platform_link.linked", platform, {"handle": link.get("handle")})
     if platform == "discord":
         background.add_task(_greet_linked, user_id, str(link.get("external_id") or ""))
-    return _finish(RedirectResponse(platform_links.callback_target(linked=platform), status_code=302), platform, consumed)
+    return _finish(RedirectResponse(platform_links.callback_target(linked=platform), status_code=302), platform, consumed_cookie)
 
 
-def _finish(response: RedirectResponse, platform: str, consumed: bool) -> RedirectResponse:
+def _finish(response: RedirectResponse, platform: str, consumed_cookie: str) -> RedirectResponse:
     """Ein verbrauchter Ablauf nimmt sein Cookie mit. Passt der Rückruf nicht, bleibt das Cookie stehen -
     ein noch laufender Start in diesem Browser gilt weiter."""
-    if consumed:
-        response.delete_cookie(platform_links.FLOW_COOKIE, path=platform_links.flow_cookie_path(platform),
+    if consumed_cookie:
+        response.delete_cookie(consumed_cookie, path=platform_links.flow_cookie_path(platform),
                                secure=platform_links.flow_cookie_secure(), httponly=True, samesite="lax")
     return response
 

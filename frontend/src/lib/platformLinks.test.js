@@ -21,4 +21,6 @@ test("Felder, Verknüpfung je Feld und Texte", () => {
   expect(linkErrorText("taken")).toMatch(/anderen Profil/);
   expect(linkErrorText("denied")).toMatch(/abgebrochen/);
   expect(linkErrorText("was-auch-immer")).toMatch(/nicht geklappt/);
+  // #1027: Ein Rückruf zählt nur im Browser, der gestartet hat - das sagt der Hinweis.
+  expect(linkErrorText("invalid")).toMatch(/Bitte im selben Browser neu starten\./);
 });
