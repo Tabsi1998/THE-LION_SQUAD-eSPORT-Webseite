@@ -39,7 +39,15 @@ import { GameDiscordTile } from "@/components/tls/DiscordServerTile";
 import { viennaDateTime } from "@/lib/vienna";
 import { ShareButton } from "@/components/tls/ShareButton";
 
+// Eigener Stand je Turnier und Konto (#1047): ein Wechsel baut die Seite neu auf - Anmeldung, Chat-Entwurf und
+// Anhänge des vorigen Turniers gehen weg, und dessen späte Antworten laufen ins Leere.
 export default function TournamentDetailPage() {
+  const { slug } = useParams();
+  const { user } = useAuth();
+  return <TournamentDetailView key={`${slug}:${user?.id || ""}`} />;
+}
+
+function TournamentDetailView() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
   const accessToken = searchParams.get("access") || "";

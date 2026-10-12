@@ -133,22 +133,33 @@ export default function MessagesPage() {
     }
   }, [loadingOlder, userId]);
 
+  // Die Namenssuche gehört zum Konto: ein Kontowechsel leert sie (#1047).
+  useLayoutEffect(() => {
+    setQuery("");
+    setCandidates([]);
+  }, [accountId]);
+
+  // Nur die Antwort auf die aktuelle Eingabe (und das aktuelle Konto) zählt; eine überholte Suche verfällt.
   useEffect(() => {
     const needle = query.trim();
     if (needle.length < 2) {
       setCandidates([]);
       return undefined;
     }
+    let current = true;
     const timer = setTimeout(async () => {
       try {
         const { data } = await api.get(`/messages/users?q=${encodeURIComponent(needle)}`);
-        setCandidates(data || []);
+        if (current) setCandidates(data || []);
       } catch {
-        setCandidates([]);
+        if (current) setCandidates([]);
       }
     }, 220);
-    return () => clearTimeout(timer);
-  }, [query]);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [accountId, query]);
 
   const open = (id) => {
     setQuery("");
@@ -172,7 +183,7 @@ export default function MessagesPage() {
       }
       reloadChats();
     } catch (err) {
-      toast.error(formatRequestError(err, "Nachricht konnte nicht gesendet werden."));
+      if (conversationRef.current === ticket) toast.error(formatRequestError(err, "Nachricht konnte nicht gesendet werden."));
     } finally {
       if (conversationRef.current === ticket) setSending(false);
     }
@@ -190,7 +201,7 @@ export default function MessagesPage() {
       }
       reloadChats();
     } catch (err) {
-      toast.error(formatRequestError(err, "Sticker konnte nicht gesendet werden."));
+      if (conversationRef.current === ticket) toast.error(formatRequestError(err, "Sticker konnte nicht gesendet werden."));
     } finally {
       if (conversationRef.current === ticket) setSending(false);
     }

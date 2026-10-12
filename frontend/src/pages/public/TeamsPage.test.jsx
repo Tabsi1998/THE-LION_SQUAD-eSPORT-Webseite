@@ -205,3 +205,20 @@ test("Wechsel zu einem anderen Team: der Team-Chat startet ohne Anhänge des vor
     authState.user = null;
   }
 });
+
+test("Kontowechsel auf der Teamseite: Einladung und Bearbeiten des vorigen Kontos sind zu", async () => {
+  serve();
+  const page = () => (
+    <MemoryRouter initialEntries={["/teams/t-1"]}>
+      <Routes><Route path="/teams/:id" element={<TeamsPage />} /></Routes>
+    </MemoryRouter>
+  );
+  const view = render(page());
+  fireEvent.click(await screen.findByTestId("team-invite-open"));
+  expect(await screen.findByTestId("team-invite-sheet")).toBeInTheDocument();
+
+  authState.user = { id: "u-3", username: "lunabyte" };
+  view.rerender(page());
+
+  await waitFor(() => expect(screen.queryByTestId("team-invite-sheet")).toBeNull());
+});

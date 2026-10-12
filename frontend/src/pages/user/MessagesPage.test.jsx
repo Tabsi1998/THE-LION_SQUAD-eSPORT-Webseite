@@ -11,6 +11,8 @@ vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (e, f) => f, res
 const auth = { user: { id: "u-neon", username: "neonfalke" } };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => auth }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
+const toastMock = { error: vi.fn(), success: vi.fn() };
+vi.mock("sonner", () => ({ toast: toastMock }));
 // Die Live-Aktualisierung merkt sich jeden Rückruf, den die Seite übergibt - so lässt sich ein Nachladen auslösen,
 // das noch zum vorigen Gespräch gehört.
 const liveCallbacks = [];
@@ -292,4 +294,41 @@ test("ein Kontowechsel leert Entwurf, Anhänge und Chatliste", async () => {
   expect(screen.queryByTestId("chat-attachment-drafts")).not.toBeInTheDocument();
   expect(screen.queryByTestId("conversation-item-u-pixel")).not.toBeInTheDocument();
   await act(async () => chatsForOther.resolve({ data: { items: [] } }));
+});
+
+test("ein Kontowechsel leert die Namenssuche, und eine überholte Suchantwort verfällt", async () => {
+  stubTwoChats();
+  const lateSearch = deferred();
+  const searchFor = vi.fn(() => lateSearch.promise);
+  stubTwoChats({ "/messages/users": searchFor });
+  const user = userEvent.setup();
+  const view = renderAt("/messages");
+  await screen.findByTestId("conversation-item-u-pixel");
+  await user.type(screen.getByTestId("messages-search"), "pix");
+  await waitFor(() => expect(searchFor).toHaveBeenCalled());
+
+  auth.user = { id: "u-other", username: "anderes-konto" };
+  view.rerender(tree("/messages"));
+  await act(async () => lateSearch.resolve({ data: [{ id: "u-pixel", username: "pixelpanther", display_name: "PixelPanther", can_message: true }] }));
+
+  expect(screen.getByTestId("messages-search")).toHaveValue("");
+  expect(screen.queryByTestId("messages-candidate-u-pixel")).not.toBeInTheDocument();
+});
+
+test("ein Fehler beim Senden aus A meldet sich nicht mehr, wenn B offen ist", async () => {
+  stubTwoChats();
+  let failA;
+  const sentA = new Promise((_, reject) => { failA = reject; });
+  apiMock.post.mockImplementation(async (url) => (url === "/messages/direct/u-schatten" ? sentA : { data: { ok: true } }));
+  toastMock.error.mockClear();
+  const user = userEvent.setup();
+  renderAt("/messages/u-schatten");
+  await heading("Schattenwolf");
+  await user.type(screen.getByTestId("direct-chat-input"), "an A");
+  await user.click(screen.getByTestId("direct-chat-send"));
+  await openPeer("u-pixel", "PixelPanther");
+
+  await act(async () => failA(new Error("offline")));
+
+  expect(toastMock.error).not.toHaveBeenCalled();
 });

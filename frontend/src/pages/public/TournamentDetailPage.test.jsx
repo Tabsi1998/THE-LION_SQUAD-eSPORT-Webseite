@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 
 // Startgeld (#319): die Seite nennt das Startgeld vor der Anmeldung, die Anmeldung geht nur mit
 // der Kostenübernahme raus, und danach sieht nur die anmeldende Person ihren Preis.
@@ -253,4 +253,33 @@ test("Kalender-Knopf nur, solange das Turnier nicht vorbei ist", async () => {
   renderPage();
   expect(await screen.findByTestId("tournament-title")).toBeInTheDocument();
   expect(screen.queryByTestId("add-to-calendar")).toBeNull();
+});
+
+// Turnierwechsel (#1047): eine späte Antwort für das vorige Turnier ändert das neue nicht.
+function GoTo({ to }) {
+  const navigate = useNavigate();
+  return <button type="button" data-testid={`goto-${to}`} onClick={() => navigate(to)}>wechseln</button>;
+}
+
+test("Wechsel von Turnier A zu B: die späte Antwort von A ändert B nicht", async () => {
+  let resolveA;
+  const lateA = new Promise((done) => { resolveA = done; });
+  const winter = { ...base, id: "t2", slug: "winter", title: "Winter-Cup" };
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return lateA;
+    if (path === "/tournaments/winter") return Promise.resolve({ data: winter });
+    if (path === "/teams/my") return Promise.resolve({ data: [] });
+    return Promise.resolve({ data: [] });
+  });
+  render(
+    <MemoryRouter initialEntries={["/tournaments/cup"]}>
+      <Routes><Route path="/tournaments/:slug" element={<><GoTo to="/tournaments/winter" /><TournamentDetailPage /></>} /></Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByTestId("goto-/tournaments/winter"));
+  expect(await screen.findByTestId("tournament-title")).toHaveTextContent("Winter-Cup");
+
+  await act(async () => resolveA({ data: base }));
+
+  expect(screen.getByTestId("tournament-title")).toHaveTextContent("Winter-Cup");
 });

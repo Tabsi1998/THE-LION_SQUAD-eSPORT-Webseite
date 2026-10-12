@@ -38,9 +38,12 @@ import { ShareButton } from "@/components/tls/ShareButton";
 
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "", color: AUTO_COLOR };
 
+// Eigener Stand je Team und Konto (#1047): ein Wechsel baut die Teamseite neu auf - Bearbeiten, Einladung und
+// Chat-Entwurf bleiben nicht hängen.
 export default function TeamsPage() {
   const { id } = useParams();
-  return id ? <TeamDetail key={id} id={id} /> : <TeamList />;
+  const { user } = useAuth();
+  return id ? <TeamDetail key={`${id}:${user?.id || ""}`} id={id} /> : <TeamList />;
 }
 
 function TeamList() {
