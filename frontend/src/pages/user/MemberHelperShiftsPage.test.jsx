@@ -97,3 +97,22 @@ test("Mitglieder ohne Vorstandsposten sehen keinen Aufruf-Knopf", async () => {
   expect(screen.queryByTestId("helper-call-panel")).toBeNull();
   expect(apiMock.get).not.toHaveBeenCalledWith("/membership/helper-calls");
 });
+
+test("In den Kalender (#1272): Knopf an der eigenen Schicht, nach „Ich helfe“ einmal die Frage", async () => {
+  window.localStorage.removeItem("tls-calendar-asked");
+  const requested = { ...EVENT, shifts: EVENT.shifts.map((shift) => (shift.id === 51 ? { ...shift, mine: "requested", mine_label: "angefragt", can_request: false, can_withdraw: true } : shift)) };
+  apiMock.get.mockResolvedValueOnce({ data: VIEW }).mockResolvedValue({ data: { ...VIEW, events: [requested] } });
+  const user = userEvent.setup();
+  render(<MemoryRouter><MemberHelperShiftsPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("shift-53-calendar-button")).toBeInTheDocument());
+  expect(screen.queryByTestId("shift-51-calendar-button")).toBeNull();
+  expect(screen.queryByTestId("shift-52-calendar-button")).toBeNull();
+  await user.click(screen.getByTestId("shift-53-calendar-button"));
+  expect(screen.getByTestId("shift-53-calendar-ics")).toHaveAttribute("href", "/api/calendar/shifts/5/53.ics");
+
+  await user.click(screen.getByTestId("shift-51-request"));
+  await waitFor(() => expect(screen.getByTestId("shift-51-calendar-ask")).toHaveTextContent("Im Kalender eintragen?"));
+  await user.click(screen.getByTestId("shift-51-calendar-ask-no"));
+  expect(screen.queryByTestId("shift-51-calendar-ask")).toBeNull();
+  expect(screen.getByTestId("shift-51-calendar-button")).toBeInTheDocument();
+});

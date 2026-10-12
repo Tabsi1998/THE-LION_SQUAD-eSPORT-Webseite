@@ -4,10 +4,11 @@ import { Button } from "./Button";
 import type { CalendarItem } from "../lib/calendar";
 import { addToDeviceCalendar } from "../lib/deviceCalendar";
 
-// „In meinen Kalender“ (#216) an Event, Turnier und Fast Lap. Ein mehrtägiges Event (#884) kommt als ein
-// Eintrag je Tag (`items`); ohne Gerätekalender öffnet Google nur den ersten Tag - mehr Fenster wären Spam.
+// „In den Kalender“ (#216, seit #1272 dasselbe Wort wie im Web) an Event, Turnier, Fast Lap, Versammlung und eigener
+// Helferschicht. Ein mehrtägiges Event (#884) kommt als ein Eintrag je Tag (`items`); ohne Gerätekalender öffnet
+// Google nur den ersten Tag - mehr Fenster wären Spam.
 
-export function AddToCalendarButton({ item, items, variant = "secondary" }: { item: CalendarItem | null; items?: CalendarItem[] | null; variant?: "primary" | "secondary" }) {
+export function AddToCalendarButton({ item, items, variant = "secondary", testID = "add-to-calendar" }: { item: CalendarItem | null; items?: CalendarItem[] | null; variant?: "primary" | "secondary"; testID?: string }) {
   const [busy, setBusy] = useState(false);
   const list = items?.length ? items : item ? [item] : [];
   if (!list.length || !list[0].start) return null;
@@ -30,6 +31,6 @@ export function AddToCalendarButton({ item, items, variant = "secondary" }: { it
       setBusy(false);
     }
   };
-  const label = list.length > 1 ? `Alle ${list.length} Tage in meinen Kalender` : "In meinen Kalender";
-  return <Button label={busy ? "Trage ein ..." : label} variant={variant} onPress={press} disabled={busy} testID="add-to-calendar" />;
+  const label = list.length > 1 ? `Alle ${list.length} Tage in den Kalender` : "In den Kalender";
+  return <Button label={busy ? "Trage ein ..." : label} variant={variant} onPress={press} disabled={busy} testID={testID} />;
 }

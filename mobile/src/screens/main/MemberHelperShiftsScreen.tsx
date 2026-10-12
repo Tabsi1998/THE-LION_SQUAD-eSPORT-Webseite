@@ -1,6 +1,7 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { AddToCalendarButton } from "../../components/AddToCalendarButton";
 import { Card } from "../../components/Card";
 import { HelperCallCard } from "../../components/HelperCallCard";
 import { useAuth } from "../../auth/AuthContext";
@@ -9,6 +10,8 @@ import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
+import { calendarAskDue, rememberCalendarAsked, shiftCalendarItem } from "../../lib/clubCalendar";
+import { defaultAskCalendar, type AskCalendar } from "./MemberMeetingsScreen";
 import { formatDate } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -41,9 +44,15 @@ export function shiftWhen(shift: HelperShift): string {
   return [formatDate(shift.day), time].filter(Boolean).join(" · ");
 }
 
-type Props = NativeStackScreenProps<MoreStackParamList, "MemberHelperShifts"> & { confirmShift?: ConfirmShift };
+type Props = NativeStackScreenProps<MoreStackParamList, "MemberHelperShifts"> & { confirmShift?: ConfirmShift; askCalendar?: AskCalendar };
 
-export function MemberHelperShiftsScreen({ confirmShift = defaultConfirmShift, route }: Props) {
+// Die eigene Schicht in den Kalender (#1272): ein Knopf an jeder kommenden eigenen Schicht; nach „Ich helfe“ fragt die App
+// einmal „Im Kalender eintragen?“.
+function ownShiftItem(event: HelperEvent, shift: HelperShift) {
+  return event.upcoming && (shift.mine === "requested" || shift.mine === "confirmed") ? shiftCalendarItem(event, shift) : null;
+}
+
+export function MemberHelperShiftsScreen({ confirmShift = defaultConfirmShift, askCalendar = defaultAskCalendar, route }: Props) {
   // Helfer-Aufruf (#1197): den Knopf sieht nur der Vorstand; aus der Meldung steht die genannte Veranstaltung oben.
   const { user } = useAuth();
   const wanted = Number(route?.params?.event || 0);
@@ -74,13 +83,21 @@ export function MemberHelperShiftsScreen({ confirmShift = defaultConfirmShift, r
     const ok = await confirmShift(`Beim Dienst „${shift.label}“ helfen?`, `${event.label} · ${shiftWhen(shift)}. Der Vorstand bestätigt die Anfrage; bis dahin kannst du sie zurückziehen.`);
     if (!ok) return;
     setBusy(`shift-${shift.id}`);
+    let requested = false;
     try {
       await api.put(`/membership/me/events/${event.id}/shifts/${shift.id}`);
+      requested = true;
     } catch (err) {
       Alert.alert("Das hat nicht geklappt", errorMessage(err, "Die Anfrage wurde nicht angenommen."));
     } finally {
       setBusy("");
       await load();
+    }
+    const item = requested && event.upcoming ? shiftCalendarItem(event, shift) : null;
+    if (item && await calendarAskDue(item.id)) {
+      await rememberCalendarAsked(item.id);
+      // Die Frage wartet auf die Person - der Knopf ist dann schon wieder frei.
+      askCalendar(item).catch(() => undefined);
     }
   };
 
@@ -126,7 +143,8 @@ export function MemberHelperShiftsScreen({ confirmShift = defaultConfirmShift, r
                 <Muted>{formatDate(event.day)}{event.end_day && event.end_day !== event.day ? ` – ${formatDate(event.end_day)}` : ""}{event.place ? ` · ${event.place}` : ""}</Muted>
                 <Muted testID={`helper-event-${event.id}-registration`}>{event.registration?.text}</Muted>
                 {event.shifts.map((shift) => (
-                  <View key={shift.id} style={styles.shift} testID={`shift-${shift.id}`}>
+                  <React.Fragment key={shift.id}>
+                  <View style={styles.shift} testID={`shift-${shift.id}`}>
                     <View style={styles.flex}>
                       <Body style={styles.strong}>{shift.label}</Body>
                       <Muted>{shiftWhen(shift)} · {shift.taken}/{shift.capacity}{shift.full ? " · voll" : ""}</Muted>
@@ -144,6 +162,8 @@ export function MemberHelperShiftsScreen({ confirmShift = defaultConfirmShift, r
                       </Pressable>
                     ) : null}
                   </View>
+                  {ownShiftItem(event, shift) ? <AddToCalendarButton item={ownShiftItem(event, shift)} testID={`shift-${shift.id}-calendar`} /> : null}
+                  </React.Fragment>
                 ))}
                 {!event.shifts.length ? <Muted>Keine Helferdienste ausgeschrieben.</Muted> : null}
               </Card>

@@ -17,6 +17,7 @@ vi.mock("@/hooks/useCanonicalSlugRedirect", () => ({ useCanonicalSlugRedirect: (
 vi.mock("@/components/tls/RichContent", () => ({ RichContent: () => null }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("@/pages/public/EventLivePage", () => ({ EventLiveBoard: ({ event }) => <div data-testid="live-board">Live {event.name}</div> }));
 
 const EventDetailPage = (await import("./EventDetailPage")).default;
 
@@ -116,82 +117,16 @@ test("Mehrtägig (#884): Zeitraum und Jetzt-Satz im Kopf, je Tag eine Karte, Tur
   expect(screen.getByTestId("event-day-2")).toHaveTextContent("Läuft");
   expect(screen.getByTestId("event-day-2")).toHaveTextContent("Vereinsheim");
   expect(screen.getByTestId("event-day-3")).toHaveTextContent("Finaltag");
-  expect(screen.getByTestId("embed-event-day")).toHaveTextContent("Tag 2/3");
+  expect(screen.getByTestId("embed-event-day")).toHaveTextContent("Tag 2");
 
-  // Kalender: Google und Outlook je Tag mit „Tag n/3“ im Titel, eine ICS-Datei mit allen Tagen.
-  expect(screen.getByTestId("add-to-calendar-days").querySelectorAll("li")).toHaveLength(3);
-  const google = decodeURIComponent(screen.getByTestId("add-to-calendar-google-3").getAttribute("href").replace(/\+/g, " "));
-  expect(google).toContain("Vereinsausflug – Tag 3/3 · Finaltag");
-  expect(google).toContain("20261018T080000Z/20261018T140000Z");
+  // Kalender (#1272): ein Knopf; im Menü die Datei mit allen Tagen, je Tag Google und Outlook mit „Tag n/3“.
+  fireEvent.click(screen.getByTestId("add-to-calendar-button"));
   expect(screen.getByTestId("add-to-calendar-ics")).toHaveTextContent("allen 3 Tagen");
   expect(screen.getByTestId("add-to-calendar-ics").getAttribute("href")).toBe("/api/calendar/events/ausflug.ics");
-});
-
-// Turnier-Karte am Event (#1220): Baum, wenn es einen gibt; bei Fehler „Baum gerade nicht ladbar“; ohne Baum nichts;
-// mit Ergebnissen die ersten drei Plätze - nie mehr „Turnierbaum wurde noch nicht generiert“.
-function renderWithTournament(tournament, answers) {
-  apiMock.get.mockImplementation(async (url) => {
-    if (url === "/events/ausflug") return { data: { ...base, tournaments: [tournament] } };
-    if (url in answers) {
-      if (answers[url] instanceof Error) throw answers[url];
-      return { data: answers[url] };
-    }
-    throw new Error(`unerwartet: ${url}`);
-  });
-  return render(
-    <MemoryRouter initialEntries={["/events/ausflug"]}>
-      <Routes><Route path="/events/:slug" element={<EventDetailPage />} /></Routes>
-    </MemoryRouter>,
-  );
-}
-
-const CUP = { id: "t1", slug: "mk-cup", title: "Mario Kart Cup", status: "registration_open", format: "single_elim" };
-
-test("Turnier-Karte: der Baum mit Namen, Freilos und noch offenen Plätzen", async () => {
-  renderWithTournament(CUP, {
-    "/tournaments/t1/bracket": {
-      registrations: [{ id: "r1", display_name: "NeonFalke" }, { id: "r2", display_name: "LunaByte" }],
-      matches_v2: [
-        { id: "m2", match_key: "B", round: 1, order: 2, status: "completed", winner_id: "r2", slots: [{ slot: 1, status: "bye" }, { slot: 2, registration_id: "r2", status: "filled" }] },
-        { id: "m1", match_key: "A", round: 1, order: 1, status: "scheduled", slots: [{ slot: 1, registration_id: "r1", status: "filled" }, { slot: 2, status: "pending" }] },
-      ],
-      matches: [],
-    },
-  });
-  const tree = await screen.findByTestId("event-tournament-tree");
-  expect(tree).toHaveTextContent("Turnierbaum-Vorschau");
-  await waitFor(() => expect(tree).toHaveTextContent("NeonFalke"));
-  expect(tree).toHaveTextContent("noch offen");
-  expect(tree).toHaveTextContent("Freilos");
-  expect(screen.queryByText(/noch nicht generiert/)).toBeNull();
-});
-
-test("Turnier-Karte: Baum nicht ladbar - und Liga ohne Baum zeigt nichts", async () => {
-  const { unmount } = renderWithTournament(CUP, { "/tournaments/t1/bracket": new Error("kaputt") });
-  expect(await screen.findByTestId("event-tournament-failed")).toHaveTextContent("Baum gerade nicht ladbar.");
-  unmount();
-  apiMock.get.mockClear();
-  renderWithTournament({ ...CUP, format: "league" }, {});
-  expect(await screen.findByTestId("event-tournament-t1")).toHaveTextContent("Mario Kart Cup");
-  expect(screen.queryByTestId("event-tournament-none")).toBeNull();
-  expect(screen.queryByText(/Turnierbaum/)).toBeNull();
-  expect(apiMock.get.mock.calls.map(([url]) => url)).not.toContain("/tournaments/t1/bracket");
-});
-
-test("Turnier-Karte: mit Ergebnissen die ersten drei Plätze statt „noch nicht generiert“", async () => {
-  renderWithTournament({ ...CUP, status: "results_published" }, {
-    "/tournaments/t1/standings": [
-      { rank: 2, registration_id: "r2", display_name: "LunaByte" },
-      { rank: 1, registration_id: "r1", display_name: "NeonFalke" },
-      { rank: 3, registration_id: "r3", display_name: "KiwiKomet" },
-      { rank: 4, registration_id: "r4", display_name: "DriftDaniel" },
-    ],
-  });
-  const podium = await screen.findByTestId("event-tournament-podium");
-  expect(podium).toHaveTextContent("Die ersten drei Plätze");
-  await waitFor(() => expect(podium).toHaveTextContent("#1NeonFalke#2LunaByte#3KiwiKomet"));
-  expect(podium).not.toHaveTextContent("DriftDaniel");
-  expect(screen.queryByText(/noch nicht generiert/)).toBeNull();
+  fireEvent.click(screen.getByTestId("add-to-calendar-scope-3"));
+  const google = decodeURIComponent(screen.getByTestId("add-to-calendar-google").getAttribute("href").replace(/\+/g, " "));
+  expect(google).toContain("Vereinsausflug – Tag 3/3 · Finaltag");
+  expect(google).toContain("20261018T080000Z/20261018T140000Z");
 });
 
 // Nach dem Ende (#1221): kein Kalender, kein „Live verfolgen“, kein „Display“ - stattdessen der Satz mit den Turnieren.
@@ -216,7 +151,7 @@ test("beendetes Event: Satz mit den Turnieren, kein Kalender, kein Live, kein Di
   const over = await screen.findByTestId("event-over");
   expect(over).toHaveTextContent("Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:");
   expect(over.querySelector("a")).toHaveAttribute("href", "/tournaments/sommer-cup");
-  expect(screen.queryByTestId("add-to-calendar-ics")).toBeNull();
+  expect(screen.queryByTestId("add-to-calendar-button")).toBeNull();
   expect(screen.queryByTestId("event-live-links")).toBeNull();
   expect(screen.queryByText("Live verfolgen")).toBeNull();
   expect(screen.queryByTestId("event-display-link")).toBeNull();
@@ -236,7 +171,7 @@ test("laufendes Event: Gäste sehen „Live verfolgen“ ohne „Display“, die
   expect(await screen.findByTestId("event-live-links")).toHaveTextContent("Live verfolgen");
   expect(screen.queryByTestId("event-display-link")).toBeNull();
   expect(screen.queryByTestId("event-over")).toBeNull();
-  expect(screen.getByTestId("add-to-calendar-ics")).toBeInTheDocument();
+  expect(screen.getByTestId("add-to-calendar-button")).toBeInTheDocument();
   unmount();
 
   authState.user = { id: "u9", role: "tournament_admin", areas: ["tournaments", "moderation"] };
@@ -320,4 +255,103 @@ test("Verwaltung: ein leeres Album steht mit Hinweis da", async () => {
     albums: [{ id: "a1", slug: "ausflug-fotos", title: "Ausflug-Fotos", is_empty: true }] });
   expect(await screen.findByTestId("event-album-empty-a1")).toHaveTextContent("leer – für Besucher unsichtbar");
   expect(screen.getByTestId("event-photos-coming")).toBeInTheDocument();
+});
+
+
+// Event-Seite als Startpunkt (#1183), Kopf mit Bild (#1273), Fakten-Kasten (#1346).
+const LAN = {
+  ...base, name: "Herbst-LAN 2026", slug: "ausflug", status: "registration_open", has_registration: true,
+  public_phase: { state: "registration_open", label: "Anmeldung offen" }, start_date: "2026-10-24T16:00:00Z", end_date: "2026-10-24T21:00:00Z",
+  description: "## 🎮 Herbst-LAN 2026\nDrei Stunden zocken.\n## 🚀 Noch mehr Highlights\nAlles da.",
+  bring_along: ["eigener Controller", "Kopfhörer"], highlights: [{ icon: "monitor", text: "Switch-Stationen" }, { icon: "vr", text: "VR-Ecke" }],
+  banner: { url: "/api/static/uploads/logo.png", kind: "logo", focus_x: 50, focus_y: 50 },
+  news: [{ id: "n1", slug: "plan", title: "Der Plan", created_at: "2026-10-01T10:00:00Z" }],
+  tournaments: [
+    { id: "t1", slug: "mk", title: "Mario Kart", team_mode: "solo", start_date: "2026-10-24T17:00:00Z", status: "registration_open", public_phase: { state: "registration_open", label: "Anmeldung offen" } },
+    { id: "t2", slug: "rl", title: "Rocket League 2v2", team_mode: "team", start_date: "2026-10-24T18:00:00Z", status: "registration_open", public_phase: { state: "registration_open" },
+      my_status: { state: "approved", label: "Du bist dabei", team_name: "Lions Rocket" } },
+  ],
+  f1_challenges: [{ id: "f1", slug: "spa", title: "Fast Lap Spa", status: "live", public_phase: { state: "live", label: "Läuft" } }],
+  sponsors: [{ id: "s1", name: "Sponsor", logo_url: "/s.png" }],
+};
+
+test("Reihenfolge wie in der App; Fakten-Kasten mit Wann, Wo, Eintritt, Mitbringen und den Knöpfen", async () => {
+  authState.user = { id: "u1", role: "player", areas: [] };
+  renderPage(LAN);
+  expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Herbst-LAN 2026");
+  const order = [...document.querySelectorAll("[data-section]")].map((node) => node.getAttribute("data-section"));
+  expect(order).toEqual(["yours", "whatson", "live", "news", "infos", "sponsors"]);
+  expect(screen.getByTestId("event-facts-when")).toHaveTextContent("Sa 24. Oktober · 18:00 – 23:00");
+  expect(screen.getByTestId("event-facts-where")).toHaveTextContent("Treffpunkt Vereinsheim");
+  expect(screen.getByTestId("event-facts-route")).toHaveAttribute("href", expect.stringContaining("google.com/maps/dir/"));
+  expect(screen.getByTestId("event-facts-entry")).toHaveTextContent("frei");
+  expect(screen.getByTestId("event-facts-bring")).toHaveTextContent("eigener ControllerKopfhörer");
+  expect(screen.getByTestId("event-facts-register")).toHaveTextContent("Anmelden");
+  expect(screen.getByTestId("event-facts")).toContainElement(screen.getByTestId("add-to-calendar-button"));
+});
+
+test("Kopf: Logo klein auf der Fläche, die Beschreibung erst unter Infos, Highlights als Kacheln ohne Emoji-Zwischentitel", async () => {
+  renderPage(LAN);
+  const banner = await screen.findByTestId("event-banner");
+  expect(banner).toHaveAttribute("data-kind", "logo");
+  expect(screen.getByTestId("event-header")).not.toHaveTextContent("Drei Stunden zocken");
+  expect(screen.getByTestId("event-kind")).toHaveTextContent("Event");
+  expect(screen.getByTestId("event-highlights")).toHaveTextContent("Switch-StationenVR-Ecke");
+  const description = screen.getByTestId("event-description");
+  expect(description).toHaveTextContent("Noch mehr Highlights");
+  expect(description.textContent).not.toMatch(/🚀|🎮/);
+});
+
+test("Kopf: ein Foto füllt das Banner mit Fokuspunkt; ohne Bild ein ruhiges Zeichen", async () => {
+  const { unmount } = renderPage({ ...LAN, banner: { url: "/api/static/uploads/foto.jpg", kind: "photo", focus_x: 30, focus_y: 70 } });
+  const banner = await screen.findByTestId("event-banner");
+  expect(banner).toHaveAttribute("data-kind", "photo");
+  expect(banner.querySelector("img").style.objectPosition).toBe("30% 70%");
+  unmount();
+  renderPage({ ...LAN, banner: null, banner_url: null });
+  expect(await screen.findByTestId("event-banner")).toHaveAttribute("data-kind", "none");
+});
+
+test("Was läuft: Zeilen mit Uhrzeit, Spielart und eigenem Stand - „Anmelden“ nur, wo man noch nicht dabei ist", async () => {
+  renderPage(LAN);
+  const solo = await screen.findByTestId("event-row-tournament-t1");
+  expect(solo).toHaveTextContent("19:00");
+  expect(solo).toHaveTextContent("Einzel");
+  expect(solo.querySelector("[data-testid='event-row-register']")).not.toBeNull();
+  const team = screen.getByTestId("event-row-tournament-t2");
+  expect(team).toHaveTextContent("Team");
+  expect(team.querySelector("[data-testid='event-row-mine']")).toHaveTextContent("Du bist dabei · Lions Rocket");
+  expect(team.querySelector("[data-testid='event-row-register']")).toBeNull();
+  expect(screen.getByTestId("event-row-fastlap-f1")).toHaveTextContent("Bestzeit fahren");
+  expect(team.querySelector("a")).toHaveAttribute("href", "/tournaments/rl");
+});
+
+test("Gäste: „Einloggen zum Anmelden“; angemeldet: der eigene Stand statt „Anmelden“", async () => {
+  const { unmount } = renderPage(LAN);
+  expect(await screen.findByTestId("event-facts-register")).toHaveTextContent("Einloggen zum Anmelden");
+  unmount();
+  authState.user = { id: "u1", role: "player", areas: [] };
+  renderPage({ ...LAN, own_registration: { id: "r1", status: "registered", seat_count: 1 } });
+  expect(await screen.findByTestId("event-facts-own")).toHaveTextContent("Du bist dabei");
+  expect(screen.queryByTestId("event-facts-register")).toBeNull();
+  expect(screen.getByTestId("event-yours")).toHaveTextContent("Dein Event");
+});
+
+test("Reiter „Live“: aus „Live verfolgen“ und über ?tab=live; nach dem Ende gibt es ihn nicht", async () => {
+  const { unmount } = renderPage(LAN);
+  fireEvent.click(await screen.findByTestId("event-live-follow"));
+  expect(await screen.findByTestId("live-board")).toHaveTextContent("Live Herbst-LAN 2026");
+  expect(screen.getByTestId("event-tab-live")).toHaveAttribute("aria-selected", "true");
+  fireEvent.click(screen.getByTestId("event-tab-overview"));
+  expect(await screen.findByTestId("event-overview")).toBeInTheDocument();
+  unmount();
+  apiMock.get.mockResolvedValue({ data: { ...LAN, start_date: "2026-06-20T08:00:00Z", end_date: "2026-06-21T18:00:00Z" } });
+  render(
+    <MemoryRouter initialEntries={["/events/ausflug?tab=live"]}>
+      <Routes><Route path="/events/:slug" element={<EventDetailPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByTestId("event-over")).toBeInTheDocument();
+  expect(screen.queryByTestId("event-tabs")).toBeNull();
+  expect(screen.queryByTestId("live-board")).toBeNull();
 });

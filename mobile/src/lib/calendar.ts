@@ -4,7 +4,8 @@
 // selbst ist reine Kalenderrechnung.
 import { viennaDay } from "./vienna";
 
-export type CalendarKind = "event" | "tournament" | "fastlap";
+// „club“ (#1190, #1272): Versammlungen und eigene Helferschichten - nur für Mitglieder, in der Farbe des Vereins.
+export type CalendarKind = "event" | "tournament" | "fastlap" | "club";
 
 export type CalendarItem = {
   id: string;
@@ -16,7 +17,17 @@ export type CalendarItem = {
   location?: string | null;
   detail?: string | null;
   url?: string | null;
+  /** Ein ganzer Tag (Versammlung ohne Uhrzeit) - `day` ist dann der Kalendertag „JJJJ-MM-TT“. */
+  allDay?: boolean;
+  day?: string | null;
 };
+
+/** „JJJJ-MM-TT“ und der Tag danach - am Kalender gezählt, für ganze Tage. */
+export function allDayRange(item: Pick<CalendarItem, "allDay" | "day">): { from: string; to: string } | null {
+  if (!item.allDay || !/^\d{4}-\d{2}-\d{2}$/.test(String(item.day || ""))) return null;
+  const [year, month, day] = String(item.day).split("-").map(Number);
+  return { from: String(item.day), to: new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10) };
+}
 
 export type CalendarCell = { key: string; day: number; inMonth: boolean; date: Date };
 
@@ -143,10 +154,11 @@ export function icsFor(item: CalendarItem, now: Date = new Date()): string {
 export function googleCalendarUrl(item: CalendarItem): string {
   const window = calendarWindow(item);
   if (!window) return "";
+  const allDay = allDayRange(item);
   const params = new URLSearchParams({
     action: "TEMPLATE",
     text: item.title,
-    dates: `${icsStamp(window.start)}/${icsStamp(window.end)}`,
+    dates: allDay ? `${allDay.from.replace(/-/g, "")}/${allDay.to.replace(/-/g, "")}` : `${icsStamp(window.start)}/${icsStamp(window.end)}`,
   });
   const details = [item.detail, item.url].filter(Boolean).join("\n");
   if (details) params.set("details", details);

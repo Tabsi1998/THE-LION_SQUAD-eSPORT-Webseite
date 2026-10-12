@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { EventDetailScreen } from "./EventDetailScreen";
 
 // Kostenpflichtige Events (#396) und Teilnehmer für die Verwaltung (#397): Preis vor dem Absenden,
@@ -89,7 +89,9 @@ test("Kosten vor dem Absenden: Zusatz per Haken, Summe live, ohne Kostenhaken ke
   await render(<EventDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("event-offer")).toBeTruthy());
 
-  expect(screen.getByText("20,00 € je Person")).toBeTruthy();
+  expect(within(screen.getByTestId("event-offer")).getByText("20,00 € je Person")).toBeTruthy();
+  // Derselbe Preis steht oben im Fakten-Kasten als Eintritt (#1346).
+  expect(within(screen.getByTestId("event-facts-entry")).getByText("20,00 € je Person")).toBeTruthy();
   expect(screen.getByText("Vereinsintern")).toBeTruthy();
   expect(screen.getByText("20,00 €")).toBeTruthy();
 
@@ -206,4 +208,47 @@ test("„Vom Event abmelden“ nur mit can_cancel", async () => {
   expect(screen.getByTestId("event-own-seats")).toHaveTextContent("Eingecheckt · 1 Platz");
   expect(screen.queryByTestId("event-unregister")).toBeNull();
   expect(screen.queryByText("Vom Event abmelden")).toBeNull();
+});
+
+
+// Event-Seite als Startpunkt (#1183), Kopf (#1273), Fakten-Kasten (#1346): dieselbe Reihenfolge wie im Web, Zeilen mit
+// eigenem Stand, Fakten oben, Logo auf der Fläche, Highlights ohne Emoji-Zwischentitel.
+test("Reihenfolge, Fakten und „Was läuft“ wie im Web", async () => {
+  mockGet.mockResolvedValue({ data: {
+    ...EVENT, visibility: "public", offer: null, start_date: "2099-10-24T16:00:00Z", end_date: "2099-10-24T21:00:00Z", location: "Vereinsheim",
+    map_query: "Bahnhofstraße 1, Telfs", bring_along: ["eigener Controller"], highlights: [{ icon: "vr", text: "VR-Ecke" }],
+    description: "## Herbst-LAN\nDrei Stunden zocken.",
+    banner: { url: "/api/static/uploads/logo.png", kind: "logo" },
+    news: [{ id: "n1", slug: "plan", title: "Der Plan" }],
+    tournaments: [
+      { id: "t1", slug: "mk", title: "Mario Kart", team_mode: "solo", start_date: "2099-10-24T17:00:00Z", status: "registration_open", public_phase: { state: "registration_open" } },
+      { id: "t2", slug: "rl", title: "Rocket League", team_mode: "team", start_date: "2099-10-24T18:00:00Z", status: "registration_open", public_phase: { state: "registration_open" },
+        my_status: { state: "approved", label: "Du bist dabei", team_name: "Lions Rocket" } },
+    ],
+  } });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("event-facts")).toBeTruthy());
+  expect(screen.getByTestId("event-banner-logo")).toBeTruthy();
+  expect(within(screen.getByTestId("event-facts-entry")).getByText("frei")).toBeTruthy();
+  expect(within(screen.getByTestId("event-facts-bring")).getByText("eigener Controller")).toBeTruthy();
+  expect(screen.getByTestId("event-facts-route")).toBeTruthy();
+  expect(within(screen.getByTestId("event-row-tournament-t1")).getByTestId("event-row-register")).toBeTruthy();
+  expect(within(screen.getByTestId("event-row-tournament-t2")).getByTestId("event-row-mine")).toHaveTextContent("Du bist dabei · Lions Rocket");
+  expect(screen.getByTestId("event-highlights")).toBeTruthy();
+  const ids = ["event-facts", "event-yours", "event-whatson", "event-live", "event-infos"];
+  const found: string[] = [];
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) { node.forEach(walk); return; }
+    const entry = node as { props?: { testID?: string }; children?: unknown };
+    if (entry.props?.testID && ids.includes(entry.props.testID) && !found.includes(entry.props.testID)) found.push(entry.props.testID);
+    walk(entry.children);
+  };
+  walk(screen.toJSON());
+  const tree = found.map((id) => `"testID":"${id}"`).join("|");
+  const positions = ids.map((id) => tree.indexOf(`"testID":"${id}"`));
+  expect(positions.every((position) => position >= 0)).toBe(true);
+  expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+  fireEvent.press(screen.getByTestId("event-row-tournament-t2"));
+  expect(navigate).toHaveBeenCalledWith("TournamentDetail", { id: "rl" });
 });

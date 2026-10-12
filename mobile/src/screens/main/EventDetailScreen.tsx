@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Button } from "../../components/Button";
 import { AddToCalendarButton } from "../../components/AddToCalendarButton";
@@ -21,7 +21,9 @@ import { openLink } from "../../lib/openLink";
 import { companionChangeHint, eventBasisLabel, eventOfferSummary, formatCents, ownEventPriceLine, quoteTotal } from "../../lib/eventPrice";
 import { eventDayItems, scheduleLine } from "../../lib/eventDays";
 import { eventIsOver } from "../../lib/afterEnd";
-import { formatDateTime, formatStatus, placeParts } from "../../lib/format";
+import { formatDateTime, formatEventType, formatStatus, placeParts } from "../../lib/format";
+import { HIGHLIGHT_ICONS, eventFacts, stripHeadingEmoji, visibilityChip, whatsOnRows } from "../../lib/eventPage";
+import { WEB_BASE_URL } from "../../lib/siteUrls";
 import { internalLabel } from "../../lib/memberArea";
 import { getRegistrationState } from "../../lib/registration";
 import { isGuestUser } from "../../live";
@@ -113,6 +115,13 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const currency = offer?.currency || "EUR";
   const participants = event?.registrations || [];
   const staffView = event?.participant_view === "staff";
+  const over = event ? eventIsOver(event) : false;
+  const rows = useMemo(() => whatsOnRows(event), [event]);
+  const facts = useMemo(() => eventFacts(event), [event]);
+  const banner = event?.banner || (event?.banner_url ? { url: event.banner_url, kind: "photo" as const } : null);
+  // „Anmelden“ im Fakten-Kasten springt zu „Dein Event“.
+  const scrollRef = useRef<ScrollView>(null);
+  const [yoursY, setYoursY] = useState(0);
 
   const openContentTarget = useCallback((target: ContentTarget) => {
     if (target.type === "event") {
@@ -218,15 +227,23 @@ export function EventDetailScreen({ navigation, route }: Props) {
   return (
     <Screen padded={false}>
       <ScrollView
+        ref={scrollRef}
         {...seasonScrollProps("EventDetail")}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
       >
-        <MediaImage
-          uri={event.banner_url}
-          style={styles.heroImage}
-          fallback={<Ionicons name="calendar-outline" color={colors.cyan} size={42} />}
-        />
+        {/* Kopfbild (#1273): ein Foto füllt das Banner, ein Logo steht klein auf einer Fläche in Event-Violett. */}
+        {banner?.kind === "logo" ? (
+          <View style={styles.logoStage} testID="event-banner-logo">
+            <MediaImage uri={banner.url} resizeMode="contain" style={styles.logoStageImage} fallback={<Ionicons name="calendar-outline" color={colors.white} size={42} />} />
+          </View>
+        ) : (
+          <MediaImage
+            uri={banner?.url || event.banner_url}
+            style={styles.heroImage}
+            fallback={<Ionicons name="calendar-outline" color={colors.cyan} size={42} />}
+          />
+        )}
 
         <View style={styles.header}>
           <View style={styles.headerMeta}>
@@ -235,7 +252,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
           </View>
           <Title>{event.title || event.name || "Event"}</Title>
           <View style={styles.metaRow}>
-            <Pill label={event.event_type || event.type || "Event"} />
+            <Pill label={formatEventType(event.event_type || event.type) || "Event"} />
+            {event.visibility && event.visibility !== "public" && !internalLabel(event) ? <Pill label={visibilityChip(event.visibility)} tone="gold" /> : null}
             {internalLabel(event) ? <Pill label={internalLabel(event) === "Vorstand" ? "Vorstand" : "Vereinsintern"} tone="gold" /> : null}
             {placeParts(event.location, event.city).length ? <Pill label={placeParts(event.location, event.city).join(", ")} tone="gold" /> : null}
             {event.has_registration ? <Pill label={registered ? "Angemeldet" : "Anmeldung"} /> : null}
@@ -244,53 +262,41 @@ export function EventDetailScreen({ navigation, route }: Props) {
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
+        {/* Fakten-Kasten (#1346): Wann, Wo, Eintritt, Mitbringen - direkt unter dem Titel, wie im Web; darunter „Anmelden“
+            bzw. der eigene Stand und „In den Kalender“ (nach dem Ende kein Kalender-Knopf mehr, #1221). */}
+        <Card style={styles.card} testID="event-facts">
+          {facts.map((row) => (
+            <View key={row.key} style={styles.factRow} testID={`event-facts-${row.key}`}>
+              <Ionicons name={FACT_ICONS[row.key]} size={18} color={EVENT_VIOLET} />
+              <View style={styles.flex}>
+                <Muted style={styles.factLabel}>{row.label}</Muted>
+                <Body style={[styles.strong, row.free && styles.free]}>{row.title}</Body>
+                {row.lines.map((line) => <Muted key={line}>{line}</Muted>)}
+                {row.route ? (
+                  <Pressable onPress={() => openLink(row.route as string)} accessibilityRole="link" testID="event-facts-route">
+                    <Body style={styles.placeLink}>Route planen</Body>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+          ))}
+          {registered ? (
+            <Muted style={styles.success} testID="event-facts-own">{event.own_registration?.status === "waitlist" ? "Warteliste" : "Du bist dabei"}</Muted>
+          ) : event.has_registration && !event.registration_url && registration.canRegister && !over ? (
+            <Button label={guest ? "Anmelden oder registrieren" : "Anmelden"} onPress={() => (guest ? openSignIn() : scrollRef.current?.scrollTo({ y: Math.max(0, yoursY - 12), animated: true }))} testID="event-facts-register" />
+          ) : null}
         {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
-        {(event.start_date || event.date) && !eventIsOver(event) ? (
-          <AddToCalendarButton items={eventDayItems(event)} item={{
+          {(event.start_date || event.date) && !eventIsOver(event) ? (
+            <AddToCalendarButton items={eventDayItems(event)} item={{
             id: event.id, kind: "event", title: event.title || event.name || "Event", start: (event.start_date || event.date) as string, end: event.end_date,
             location: placeParts(event.location, event.city).join(", ") || null, detail: event.event_type || event.type || null,
             url: event.slug ? `https://lionsquad.at/events/${event.slug}` : null,
           }} />
-        ) : null}
+          ) : null}
+        </Card>
 
-        {event.schedule?.multi_day ? (
-          <Card style={styles.card} testID="event-days" perch="event-days">
-            <Heading>Die Tage</Heading>
-            {event.schedule.now?.text ? <Muted testID="event-days-now">{event.schedule.now.text}</Muted> : null}
-            {event.schedule.days.map((day) => (
-              <View key={day.index} style={[styles.place, day.state === "running" ? styles.dayRunning : null, day.state === "next" ? styles.dayNext : null, day.state === "past" ? styles.dayPast : null]} testID={`event-day-${day.index}`}>
-                <View style={styles.dayHead}>
-                  <Muted style={styles.placeIndex}>Tag {day.index}/{event.schedule!.count}</Muted>
-                  {day.state === "running" ? <Muted style={[styles.placeIndex, styles.dayTag, styles.dayTagLive]}>Läuft</Muted> : null}
-                  {day.state === "next" ? <Muted style={[styles.placeIndex, styles.dayTag]}>Als Nächstes</Muted> : null}
-                  {day.state === "past" ? <Muted style={styles.placeIndex}>Vorbei</Muted> : null}
-                </View>
-                <Body style={styles.placeName}>{day.label} · {day.time_label}{day.ends_next_day ? " (bis in den nächsten Morgen)" : ""}</Body>
-                {day.door ? <Muted>Einlass {day.door}</Muted> : null}
-                {day.title ? <Body>{day.title}</Body> : null}
-                {day.location_name ? <Muted>{day.location_name}</Muted> : null}
-              </View>
-            ))}
-          </Card>
-        ) : null}
-
-        {(event.locations?.length || 0) > 1 ? (
-          <Card style={styles.card} testID="event-locations" perch="event-locations">
-            <Heading>Standorte</Heading>
-            {event.locations!.map((place, index) => (
-              <Pressable key={place.key || index} onPress={() => openMap(place.map_query)} disabled={!place.map_query} accessibilityRole="button" style={styles.place}>
-                <Muted style={styles.placeIndex}>Standort {index + 1}</Muted>
-                {place.name ? <Body style={styles.placeName}>{place.name}</Body> : null}
-                {place.start_date ? <Muted>{formatDateTime(place.start_date)}{place.end_date ? ` – ${formatDateTime(place.end_date)}` : ""}</Muted> : null}
-                {place.address_line ? <Muted>{place.address_line}</Muted> : null}
-                {place.max_participants != null ? <Muted>{place.max_participants} Plätze</Muted> : null}
-                {place.note ? <Muted>{place.note}</Muted> : null}
-                {place.map_query ? <Muted style={styles.placeLink}>Karte öffnen</Muted> : null}
-              </Pressable>
-            ))}
-          </Card>
-        ) : null}
-
+        {/* 1. Dein Event: der eigene Stand - oder die Anmeldung, solange sie offen ist. */}
+        <View onLayout={(layout) => setYoursY(layout.nativeEvent.layout.y)} testID="event-yours">
         {hasRegistration ? (
           <Card style={styles.card}>
             <Heading>{event.registration_url ? "Registrierung" : "Anmeldung"}</Heading>
@@ -490,46 +496,56 @@ export function EventDetailScreen({ navigation, route }: Props) {
           </Card>
         ) : null}
 
-        <Card style={styles.card}>
-          <Heading>Infos</Heading>
-          {event.program || event.description ? <RichText text={event.program || event.description} embeds={event.content_embeds} onOpenContent={openContentTarget} /> : <Muted>Keine weiteren Event-Infos hinterlegt.</Muted>}
-        </Card>
+        </View>
 
-        {event.tournaments?.length ? (
-          <Card style={styles.card}>
-            <Heading>Verknüpfte Turniere</Heading>
-            {event.tournaments.map((tournament) => (
-              <ContentCard
-                key={tournament.id}
-                kind="tournament"
-                title={tournament.title}
-                image={tournament.banner_url || tournament.game?.cover_url || tournament.game?.logo_url}
-                date={tournament.start_date}
-                phase={tournament.public_phase}
-                status={tournament.status}
-                description={tournament.description}
-                onPress={() => navigation.navigate("TournamentDetail", { id: tournament.slug || tournament.id })}
-              />
+        {/* 2. Was läuft beim Event (#1183): jedes Turnier und jede Fast Lap mit Tag, Uhrzeit, Spielart und eigenem Stand. */}
+        {rows.length ? (
+          <Card style={styles.card} testID="event-whatson">
+            <Heading>Was läuft beim Event</Heading>
+            {rows.map((row) => (
+              <Pressable
+                key={`${row.kind}-${row.id}`}
+                onPress={() => navigation.navigate(row.kind === "fastlap" ? "FastLapDetail" : "TournamentDetail", { id: row.key })}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+                testID={`event-row-${row.kind}-${row.id}`}
+              >
+                <View style={styles.rowWhen}>
+                  {row.dayLabel ? <Muted style={styles.rowDay}>{row.dayLabel}</Muted> : null}
+                  <Body style={styles.strong}>{row.timeLabel || "–"}</Body>
+                </View>
+                <View style={styles.flex}>
+                  <Body style={styles.strong} numberOfLines={2}>{row.title}</Body>
+                  <Muted numberOfLines={1}>{[row.mode, row.detail].filter(Boolean).join(" · ")}</Muted>
+                </View>
+                {row.mine ? (
+                  <Muted style={styles.rowMine} testID="event-row-mine">{row.mine.label}{row.mine.team ? ` · ${row.mine.team}` : ""}</Muted>
+                ) : row.action === "register" ? (
+                  <Muted style={styles.rowRegister} testID="event-row-register">Anmelden</Muted>
+                ) : (
+                  <StatusBadge phase={row.phase} status={row.status} />
+                )}
+              </Pressable>
             ))}
           </Card>
         ) : null}
 
-        {event.f1_challenges?.length ? (
+        {/* 3. Live verfolgen: der Reiter „Live“ der Website, bis die App eigene Live-Ansichten bekommt (Events II). */}
+        {rows.length && !over ? (
+          <Button label="Live verfolgen" variant="secondary" onPress={() => openLink(`${WEB_BASE_URL}/events/${event.slug || event.id}?tab=live`)} testID="event-live" />
+        ) : null}
+
+        {event.albums?.length ? (
           <Card style={styles.card}>
-            <Heading>Fast-Lap Challenges</Heading>
-            {event.f1_challenges.map((challenge) => (
-              <ContentCard
-                key={challenge.id}
-                kind="fastlap"
-                title={challenge.title}
-                image={challenge.banner_url}
-                date={challenge.start_date}
-                phase={challenge.public_phase}
-                status={challenge.status}
-                description={challenge.description}
-                onPress={() => navigation.navigate("FastLapDetail", { id: challenge.slug || challenge.id })}
-              />
-            ))}
+            <Heading>Fotos</Heading>
+            <View style={styles.albumGrid}>
+              {event.albums.map((album) => (
+                <View key={album.id} style={styles.albumItem}>
+                  <MediaImage uri={album.cover_url || album.image_url} style={styles.albumImage} fallback={<Ionicons name="images-outline" color={colors.cyan} size={24} />} />
+                  <Muted numberOfLines={2}>{album.title || "Album"}</Muted>
+                </View>
+              ))}
+            </View>
           </Card>
         ) : null}
 
@@ -550,17 +566,64 @@ export function EventDetailScreen({ navigation, route }: Props) {
           </Card>
         ) : null}
 
-        {event.albums?.length ? (
-          <Card style={styles.card}>
-            <Heading>Galerie</Heading>
-            <View style={styles.albumGrid}>
-              {event.albums.map((album) => (
-                <View key={album.id} style={styles.albumItem}>
-                  <MediaImage uri={album.cover_url || album.image_url} style={styles.albumImage} fallback={<Ionicons name="images-outline" color={colors.cyan} size={24} />} />
-                  <Muted numberOfLines={2}>{album.title || "Album"}</Muted>
+        {/* 6. Infos: Highlights als Kacheln, Beschreibung (ohne Emoji-Zwischentitel), die Tage, Standorte, Programm. */}
+        <Card style={styles.card} testID="event-infos">
+          <Heading>Infos</Heading>
+          {event.highlights?.length ? (
+            <View style={styles.highlights} testID="event-highlights">
+              {event.highlights.map((highlight) => (
+                <View key={`${highlight.icon}-${highlight.text}`} style={styles.highlight} accessibilityLabel={`${HIGHLIGHT_ICONS[highlight.icon] || "Highlight"}: ${highlight.text}`}>
+                  <Ionicons name={HIGHLIGHT_IONICONS[highlight.icon] || "star-outline"} size={16} color={EVENT_VIOLET} />
+                  <Body style={styles.highlightText}>{highlight.text}</Body>
                 </View>
               ))}
             </View>
+          ) : null}
+          {event.description ? <RichText text={stripHeadingEmoji(event.description)} embeds={event.content_embeds} onOpenContent={openContentTarget} /> : null}
+          {!event.description && !event.program && !event.highlights?.length ? <Muted>Keine weiteren Event-Infos hinterlegt.</Muted> : null}
+        </Card>
+        {event.schedule?.multi_day ? (
+          <Card style={styles.card} testID="event-days" perch="event-days">
+            <Heading>Die Tage</Heading>
+            {event.schedule.now?.text ? <Muted testID="event-days-now">{event.schedule.now.text}</Muted> : null}
+            {event.schedule.days.map((day) => (
+              <View key={day.index} style={[styles.place, day.state === "running" ? styles.dayRunning : null, day.state === "next" ? styles.dayNext : null, day.state === "past" ? styles.dayPast : null]} testID={`event-day-${day.index}`}>
+                <View style={styles.dayHead}>
+                  <Muted style={styles.placeIndex}>Tag {day.index}/{event.schedule!.count}</Muted>
+                  {day.state === "running" ? <Muted style={[styles.placeIndex, styles.dayTag, styles.dayTagLive]}>Läuft</Muted> : null}
+                  {day.state === "next" ? <Muted style={[styles.placeIndex, styles.dayTag]}>Als Nächstes</Muted> : null}
+                  {day.state === "past" ? <Muted style={styles.placeIndex}>Vorbei</Muted> : null}
+                </View>
+                <Body style={styles.placeName}>{day.label} · {day.time_label}{day.ends_next_day ? " (bis in den nächsten Morgen)" : ""}</Body>
+                {day.door ? <Muted>Einlass {day.door}</Muted> : null}
+                {day.title ? <Body>{day.title}</Body> : null}
+                {day.location_name ? <Muted>{day.location_name}</Muted> : null}
+              </View>
+            ))}
+          </Card>
+        ) : null}
+
+        {(event.locations?.length || 0) > 1 ? (
+          <Card style={styles.card} testID="event-locations" perch="event-locations">
+            <Heading>Standorte</Heading>
+            {event.locations!.map((place, index) => (
+              <Pressable key={place.key || index} onPress={() => openMap(place.map_query)} disabled={!place.map_query} accessibilityRole="button" style={styles.place}>
+                <Muted style={styles.placeIndex}>Standort {index + 1}</Muted>
+                {place.name ? <Body style={styles.placeName}>{place.name}</Body> : null}
+                {place.start_date ? <Muted>{formatDateTime(place.start_date)}{place.end_date ? ` – ${formatDateTime(place.end_date)}` : ""}</Muted> : null}
+                {place.address_line ? <Muted>{place.address_line}</Muted> : null}
+                {place.max_participants != null ? <Muted>{place.max_participants} Plätze</Muted> : null}
+                {place.note ? <Muted>{place.note}</Muted> : null}
+                {place.map_query ? <Muted style={styles.placeLink}>Karte öffnen</Muted> : null}
+              </Pressable>
+            ))}
+          </Card>
+        ) : null}
+
+        {event.program ? (
+          <Card style={styles.card} testID="event-program">
+            <Heading>Programm</Heading>
+            <RichText text={event.program} embeds={event.content_embeds} onOpenContent={openContentTarget} />
           </Card>
         ) : null}
 
@@ -581,6 +644,20 @@ export function EventDetailScreen({ navigation, route }: Props) {
     </Screen>
   );
 }
+
+// Event-Violett (#1305): die Farbe der Art „Event“ - wie im Web (#9F7AEA).
+const EVENT_VIOLET = "#9F7AEA";
+
+const FACT_ICONS: Record<string, React.ComponentProps<typeof Ionicons>["name"]> = {
+  when: "calendar-outline", where: "location-outline", entry: "ticket-outline", bring: "bag-handle-outline",
+};
+
+// Highlights (#1346): dieselbe feste Liste wie im Web, je ein Symbol.
+const HIGHLIGHT_IONICONS: Record<string, React.ComponentProps<typeof Ionicons>["name"]> = {
+  gamepad: "game-controller-outline", trophy: "trophy-outline", flag: "flag-outline", monitor: "desktop-outline", vr: "glasses-outline",
+  retro: "joystick-outline" as React.ComponentProps<typeof Ionicons>["name"], music: "musical-notes-outline", food: "pizza-outline", drink: "beer-outline",
+  wifi: "wifi-outline", gift: "gift-outline", users: "people-outline", camera: "camera-outline", star: "star-outline",
+};
 
 function Pill({ label, tone = "cyan" }: { label: string; tone?: "cyan" | "gold" }) {
   return (
@@ -613,6 +690,78 @@ const styles = StyleSheet.create({
   content: {
     gap: 16,
     paddingBottom: 30,
+  },
+  logoStage: {
+    alignItems: "center",
+    backgroundColor: "#4b3592",
+    height: 200,
+    justifyContent: "center",
+    width: "100%",
+  },
+  logoStageImage: {
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    height: 90,
+    width: "55%",
+  },
+  factRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+  },
+  factLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  free: {
+    color: colors.success,
+  },
+  row: {
+    alignItems: "center",
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 10,
+  },
+  rowWhen: {
+    alignItems: "center",
+    width: 58,
+  },
+  rowDay: {
+    color: EVENT_VIOLET,
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  rowMine: {
+    color: colors.cyan,
+    fontWeight: "800",
+    maxWidth: 120,
+  },
+  rowRegister: {
+    color: colors.cyan,
+    fontWeight: "900",
+  },
+  highlights: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  highlight: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 8,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  highlightText: {
+    fontWeight: "700",
   },
   heroImage: {
     borderWidth: 0,

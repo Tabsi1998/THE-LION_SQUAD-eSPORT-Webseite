@@ -2,12 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { AddToCalendarButton } from "../../components/AddToCalendarButton";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
+import { calendarAskDue, meetingCalendarItem, rememberCalendarAsked } from "../../lib/clubCalendar";
+import { addToDeviceCalendar } from "../../lib/deviceCalendar";
+import type { CalendarItem } from "../../lib/calendar";
 import { formatDate } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -43,15 +47,26 @@ export const defaultConfirmVote: ConfirmVote = (title, message) => new Promise((
   ], { cancelable: false, onDismiss: () => resolve(false) });
 });
 
+// „Im Kalender eintragen?“ (#1272): nach der Zusage fragt die App einmal je Versammlung - „Eintragen“ legt den Termin in
+// den Kalender des Handys, wie der Knopf „In den Kalender“.
+export type AskCalendar = (item: CalendarItem) => Promise<void>;
+
+export const defaultAskCalendar: AskCalendar = (item) => new Promise((resolve) => {
+  Alert.alert("Im Kalender eintragen?", `„${item.title}“ in den Kalender deines Handys legen?`, [
+    { text: "Nein danke", style: "cancel", onPress: () => resolve() },
+    { text: "Eintragen", onPress: () => { addToDeviceCalendar(item).catch(() => undefined).finally(() => resolve()); } },
+  ], { cancelable: true, onDismiss: () => resolve() });
+});
+
 export function meetingWhen(meeting: Meeting): string {
   return [formatDate(meeting.day), meeting.time ? `${meeting.time} Uhr` : ""].filter(Boolean).join(" · ");
 }
 
 const RESPONSES: [string, string][] = [["yes", "Ich komme"], ["maybe", "Vielleicht"], ["no", "Ich komme nicht"]];
 
-type Props = NativeStackScreenProps<MoreStackParamList, "MemberMeetings"> & { confirmVote?: ConfirmVote };
+type Props = NativeStackScreenProps<MoreStackParamList, "MemberMeetings"> & { confirmVote?: ConfirmVote; askCalendar?: AskCalendar };
 
-export function MemberMeetingsScreen({ confirmVote = defaultConfirmVote }: Props) {
+export function MemberMeetingsScreen({ confirmVote = defaultConfirmVote, askCalendar = defaultAskCalendar }: Props) {
   const [view, setView] = useState<MeetingsView | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,13 +93,21 @@ export function MemberMeetingsScreen({ confirmVote = defaultConfirmVote }: Props
 
   const respond = async (meeting: Meeting, response: string) => {
     setBusy(`respond-${meeting.id}`);
+    let accepted = false;
     try {
       await api.put(`/membership/me/meetings/${meeting.id}/response`, { response });
+      accepted = response === "yes";
       await load();
     } catch (err) {
       Alert.alert("Das hat nicht geklappt", errorMessage(err, "Die Antwort wurde nicht übernommen."));
     } finally {
       setBusy("");
+    }
+    const item = accepted && meeting.upcoming ? meetingCalendarItem(meeting) : null;
+    if (item && await calendarAskDue(item.id)) {
+      await rememberCalendarAsked(item.id);
+      // Die Frage wartet auf die Person - der Knopf ist dann schon wieder frei.
+      askCalendar(item).catch(() => undefined);
     }
   };
 
@@ -227,6 +250,9 @@ export function MemberMeetingsScreen({ confirmVote = defaultConfirmVote }: Props
                         </Pressable>
                       ))}
                     </View>
+                  ) : null}
+                  {meeting.upcoming && meetingCalendarItem(meeting) ? (
+                    <AddToCalendarButton item={meetingCalendarItem(meeting)} testID={`meeting-${meeting.id}-calendar`} />
                   ) : null}
                   {meeting.motions.length ? (
                     <View style={styles.motions} testID={`meeting-${meeting.id}-motions`}>

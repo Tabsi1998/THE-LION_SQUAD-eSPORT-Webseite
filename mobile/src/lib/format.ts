@@ -237,7 +237,7 @@ const SCHEDULE_MODE_LABELS: Record<string, string> = {
 // Wie /api/events/meta im Backend - dieselben Begriffe wie auf der Webseite.
 const EVENT_TYPE_LABELS: Record<string, string> = {
   general: "Allgemein",
-  public_event: "Public Event",
+  public_event: "Öffentliches Event",
   club_evening: "Vereinsabend",
   lan_party: "LAN-Party",
   online_event: "Online Event",

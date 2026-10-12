@@ -394,6 +394,15 @@ class EventDay(BaseModel):
     location_key: Optional[str] = Field(default=None, max_length=40)
 
 
+class EventHighlight(BaseModel):
+    """Eine Highlight-Kachel (#1346): Symbol aus der festen Liste und ein kurzer Text; geprüft in services/event_facts."""
+    icon: str = Field(max_length=20)
+    text: str = Field(default="", max_length=120)
+
+
+EventBannerStyle = Literal["auto", "photo", "logo"]
+
+
 class EventCreate(BaseModel):
     name: str
     slug: Optional[str] = None
@@ -443,6 +452,13 @@ class EventCreate(BaseModel):
     locations: Optional[List[EventLocation]] = None
     # Mehrere Tage mit eigenen Zeiten (#884); leer = ein Tag aus start_date und end_date.
     days: Optional[List[EventDay]] = None
+    # Fakten-Kasten (#1346): „Mitbringen“ (eine Zeile je Punkt) und Highlights als Kacheln über dem Text.
+    bring_along: Optional[List[str]] = None
+    highlights: Optional[List[EventHighlight]] = None
+    # Kopfbild (#1273): Foto füllt das Banner (Fokuspunkt in Prozent), Logo steht klein auf einer Fläche; „auto“ schätzt.
+    banner_style: Optional[EventBannerStyle] = None
+    banner_focus_x: Optional[int] = Field(default=None, ge=0, le=100)
+    banner_focus_y: Optional[int] = Field(default=None, ge=0, le=100)
 
 
 class EventUpdate(BaseModel):
@@ -490,6 +506,13 @@ class EventUpdate(BaseModel):
     locations: Optional[List[EventLocation]] = None
     # Mehrere Tage mit eigenen Zeiten (#884); leer = ein Tag aus start_date und end_date.
     days: Optional[List[EventDay]] = None
+    # Fakten-Kasten (#1346): „Mitbringen“ (eine Zeile je Punkt) und Highlights als Kacheln über dem Text.
+    bring_along: Optional[List[str]] = None
+    highlights: Optional[List[EventHighlight]] = None
+    # Kopfbild (#1273): Foto füllt das Banner (Fokuspunkt in Prozent), Logo steht klein auf einer Fläche; „auto“ schätzt.
+    banner_style: Optional[EventBannerStyle] = None
+    banner_focus_x: Optional[int] = Field(default=None, ge=0, le=100)
+    banner_focus_y: Optional[int] = Field(default=None, ge=0, le=100)
 
 
 EventRegistrationStatus = Literal["registered", "waitlist", "checked_in", "cancelled", "no_show"]

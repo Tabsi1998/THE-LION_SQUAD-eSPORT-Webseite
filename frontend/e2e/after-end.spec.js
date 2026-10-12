@@ -47,7 +47,9 @@ test.describe("Beendetes Event", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockApi(page);
     await page.goto("/events/gamers-fest-2026/live");
-    await expect(page).toHaveURL(/\/events\/gamers-fest-2026$/);
+    // „Live“ ist ein Reiter (#1183): die alte Adresse führt dorthin; nach dem Ende gibt es ihn nicht, die Übersicht steht da.
+    await expect(page).toHaveURL(/\/events\/gamers-fest-2026\?tab=live$/);
     await expect(page.getByTestId("event-over")).toBeVisible();
+    await expect(page.getByTestId("event-tabs")).toHaveCount(0);
   });
 });

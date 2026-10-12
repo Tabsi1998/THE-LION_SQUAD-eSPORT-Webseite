@@ -42,10 +42,20 @@ export function icsFor(item, now = new Date()) {
   return `${lines.join("\r\n")}\r\n`;
 }
 
+// Ein ganzer Tag (#1272, Versammlung ohne Uhrzeit): „JJJJ-MM-TT“ und der Tag danach - am Kalender gezählt.
+function allDayRange(item) {
+  if (!item?.allDay || !/^\d{4}-\d{2}-\d{2}$/.test(String(item.day || ""))) return null;
+  const [year, month, day] = item.day.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+  return { from: item.day, to: next };
+}
+
 export function googleCalendarUrl(item) {
   const window = calendarWindow(item);
   if (!window) return "";
-  const params = new URLSearchParams({ action: "TEMPLATE", text: item.title || "", dates: `${stamp(window.start)}/${stamp(window.end)}` });
+  const allDay = allDayRange(item);
+  const dates = allDay ? `${allDay.from.replace(/-/g, "")}/${allDay.to.replace(/-/g, "")}` : `${stamp(window.start)}/${stamp(window.end)}`;
+  const params = new URLSearchParams({ action: "TEMPLATE", text: item.title || "", dates });
   const details = [item.detail, item.url].filter(Boolean).join("\n");
   if (details) params.set("details", details);
   if (item.location) params.set("location", item.location);
@@ -55,18 +65,30 @@ export function googleCalendarUrl(item) {
 export function outlookCalendarUrl(item) {
   const window = calendarWindow(item);
   if (!window) return "";
-  const params = new URLSearchParams({ path: "/calendar/action/compose", rru: "addevent", subject: item.title || "", startdt: window.start.toISOString(), enddt: window.end.toISOString() });
+  const allDay = allDayRange(item);
+  const params = new URLSearchParams({ path: "/calendar/action/compose", rru: "addevent", subject: item.title || "",
+    startdt: allDay ? allDay.from : window.start.toISOString(), enddt: allDay ? allDay.to : window.end.toISOString() });
+  if (allDay) params.set("allday", "true");
   const body = [item.detail, item.url].filter(Boolean).join("\n");
   if (body) params.set("body", body);
   if (item.location) params.set("location", item.location);
   return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
 }
 
-/** Die ICS vom Server (#580) - nur für Events und Turniere mit Kennung; sonst leer. */
-export function serverIcsPath(item) {
+const ICS_FOLDERS = { event: "events", tournament: "tournaments", fastlap: "fastlaps" };
+
+/**
+ * Die ICS vom Server (#580, #1272): für Events, Turniere und Fast Laps mit Kennung, bei einem mehrtägigen Event mit
+ * `day` nur dieser Tag. Versammlungen und Schichten bringen ihren Weg selbst mit (`icsPath`). Sonst leer - dann baut
+ * der Browser die Datei.
+ */
+export function serverIcsPath(item, { day = null } = {}) {
+  if (item?.icsPath) return item.icsPath;
   const key = item?.slug || item?.id;
-  if (!key || !["event", "tournament"].includes(item?.kind)) return "";
-  return `/api/calendar/${item.kind === "event" ? "events" : "tournaments"}/${encodeURIComponent(key)}.ics`;
+  const folder = ICS_FOLDERS[item?.kind];
+  if (!key || !folder) return "";
+  const path = `/api/calendar/${folder}/${encodeURIComponent(key)}.ics`;
+  return day && item.kind === "event" ? `${path}?day=${Number(day)}` : path;
 }
 
 export function icsFileName(item) {

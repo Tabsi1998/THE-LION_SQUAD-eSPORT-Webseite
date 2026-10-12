@@ -119,6 +119,9 @@ export type Tournament = {
   prize_places?: Array<{ group?: string | null; place?: number | string; label?: string; value?: string }> | null;
   prizes?: string[];
   my_registration?: { id?: string; status?: string; display_name?: string | null; ingame_name?: string | null; team_id?: string | null; user_id?: string | null } | null;
+  // Event-Seite als Startpunkt (#1183): der eigene Stand (auch mit dem Team) und der Tag des Events.
+  my_status?: { state?: string; label: string; team_name?: string | null } | null;
+  event_day?: { index: number; count: number; label?: string; date?: string } | null;
 };
 
 export type Team = {
@@ -299,6 +302,15 @@ export type ClubEvent = {
   participant_view?: "staff" | "public" | "none";
   can_check_in?: boolean;
   content_embeds?: ContentEmbed[];
+  // Kopfbild (#1273) und Fakten-Kasten (#1346).
+  banner?: { url: string; kind: "photo" | "logo"; focus_x?: number; focus_y?: number } | null;
+  bring_along?: string[];
+  highlights?: Array<{ icon: string; text: string }>;
+  map_query?: string | null;
+  address?: string | null;
+  postal_code?: string | null;
+  is_online?: boolean;
+  is_hybrid?: boolean;
 };
 
 export type EventScheduleDay = {
@@ -514,6 +526,9 @@ export type F1Track = {
 
 export type F1Challenge = {
   id: string;
+  // Event-Seite als Startpunkt (#1183): der eigene Stand (auch mit dem Team) und der Tag des Events.
+  my_status?: { state?: string; label: string; team_name?: string | null } | null;
+  event_day?: { index: number; count: number; label?: string; date?: string } | null;
   slug?: string;
   title: string;
   description?: string | null;

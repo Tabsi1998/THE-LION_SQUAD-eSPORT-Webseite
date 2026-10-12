@@ -86,3 +86,20 @@ test("ohne Weg zur Akte steht der Grund", async () => {
   await waitFor(() => expect(screen.getByTestId("meetings-unavailable")).toBeTruthy());
   expect(screen.getByText(/verbunden sein/)).toBeTruthy();
 });
+
+test("In den Kalender (#1272): Knopf an der kommenden Versammlung, nach der Zusage einmal die Frage", async () => {
+  const ask = jest.fn(async () => undefined);
+  await render(<MemberMeetingsScreen navigation={navigation} route={route} confirmVote={async () => true} askCalendar={ask} />);
+  await waitFor(() => expect(screen.getByTestId("meeting-7-calendar")).toBeTruthy());
+  expect(screen.getByTestId("meeting-7-calendar")).toHaveTextContent("In den Kalender");
+
+  await fireEvent.press(screen.getByTestId("meeting-7-respond-yes"));
+  await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
+  const asked = (ask.mock.calls[0] as unknown[])[0] as { title: string; start: string; id: string };
+  expect(asked.title).toBe("Generalversammlung 2026");
+  expect(asked.start).toBe("2026-10-24T16:00:00.000Z");
+  // Ein zweites Mal fragt die App nicht.
+  await fireEvent.press(screen.getByTestId("meeting-7-respond-yes"));
+  await waitFor(() => expect(mockPut).toHaveBeenCalledTimes(2));
+  expect(ask).toHaveBeenCalledTimes(1);
+});
