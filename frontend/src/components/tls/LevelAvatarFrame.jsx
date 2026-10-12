@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import { FRAME_SIZES, frameSources, rankInfo, ringOf } from "@/lib/loewenRang";
+import { FRAME_SIZES, frameLayout, frameSources, rankInfo, ringOf } from "@/lib/loewenRang";
 
 const TLS_BLUE = "#29B6E8";
 // Profil auf dem Handy (unter 640 px): kleineres Foto, sonst ragt der Rahmen über den Bildschirm.
@@ -13,8 +13,9 @@ const MAX_PRESTIGE = 5;
 export function levelFrameConfig(levelInput) {
   const info = rankInfo(levelInput);
   const ring = ringOf(info.key);
-  const scale = 1 / (2 * ring.r);
-  return { ...info, ring, scale, ox: (0.5 - ring.cx) * scale, oy: (0.5 - ring.cy) * scale };
+  // Foto-Durchmesser 1 (Radius 0,5): Größe und Versatz der Grafik als Vielfache des Durchmessers.
+  const { F: scale, ox, oy } = frameLayout(0.5, ring);
+  return { ...info, ring, scale, ox, oy };
 }
 
 /* ---- Dynamic crowns (points leaderboard rank 1-3 + obsidian for level 30+) ---- */
