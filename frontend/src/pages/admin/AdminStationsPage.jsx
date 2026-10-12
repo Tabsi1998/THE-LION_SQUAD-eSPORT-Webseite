@@ -28,7 +28,8 @@ function stationExportUrl(tournamentId, orientation) {
 }
 
 export default function AdminStationsPage() {
-  const { isAdmin } = useAuth();
+  // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
+  const { isTournamentLead: isAdmin } = useAuth();
   const [list, setList] = useState([]);
   const [tournaments, setTournaments] = useState([]);
   const [activeTid, setActiveTid] = useState("");

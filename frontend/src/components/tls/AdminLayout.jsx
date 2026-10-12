@@ -221,10 +221,11 @@ function itemMatchesQuery(item, groupLabel, query) {
 
 // Was jemand im Menü sieht: nur seine Bereiche (#287), und die außer Moderation erst mit bestätigter
 // Zwei-Faktor-Anmeldung - wie Seiten und Server (#1028); Wegweiser-Einträge (searchOnly) nur, wenn die Suche sie
-// trifft. Die Turnierseiten (staff) auch für Helfer mit Einsatz; die Turnierleitung selbst nur mit Zwei-Faktor.
+// trifft. Die Turnierseiten (staff) auch für Helfer mit Einsatz - die Turnierleitung ohne Zwei-Faktor nur mit eigenem
+// Einsatz (`has_staff_assignment`).
 export function navGroupsFor(user, query, disabledPlatforms = []) {
   const searchQuery = normalizeSearch(query);
-  const helper = Boolean(user?.is_tournament_staff) && !hasArea(user, "tournaments");
+  const helper = Boolean(user?.has_staff_assignment) || (Boolean(user?.is_tournament_staff) && !hasArea(user, "tournaments"));
   // Abgehakte Plattformen (#558) fehlen im Menü - einschalten geht unter Alle Verbindungen.
   const off = new Set(Array.isArray(disabledPlatforms) ? disabledPlatforms : []);
   return ADMIN_GROUPS.map((group) => ({

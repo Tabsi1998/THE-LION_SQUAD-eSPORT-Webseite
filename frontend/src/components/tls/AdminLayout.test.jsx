@@ -175,3 +175,15 @@ test("statt der Verwaltung steht im Menü „2FA einrichten“ - mit dem Weg zur
   expect(screen.getByTestId("admin-nav-tournaments")).toBeInTheDocument();
   authState.user = null;
 });
+
+test("eine Turnierleitung ohne Zwei-Faktor mit Helfer-Einsatz sieht ihre Turnierseiten und den Hinweis", () => {
+  const leadAndHelper = { ...LEAD_WITHOUT_MFA, has_staff_assignment: true };
+  const targets = navGroupsFor(leadAndHelper, "").flatMap((entry) => entry.items).map((item) => item.to);
+  expect(targets).toEqual(["/admin/tournaments", "/admin/f1", "/admin/stations", "/admin/moderation"]);
+  authState.user = leadAndHelper;
+  renderLayout("/admin/tournaments");
+  expect(screen.getByTestId("admin-nav-mfa-setup")).toBeInTheDocument();
+  expect(screen.getByTestId("admin-nav-tournaments")).toBeInTheDocument();
+  expect(screen.queryByTestId("admin-nav-seasons")).toBeNull();
+  authState.user = null;
+});

@@ -113,3 +113,10 @@ test("ein Helfer mit Einsatz kommt ohne Zwei-Faktor hinein, ein anderer Adminber
   renderAt("/admin/tournaments", page);
   expect(screen.getByText("verboten")).toBeInTheDocument();
 });
+
+test("eine Turnierleitung ohne Zwei-Faktor mit eigenem Helfer-Einsatz kommt in ihren Einsatz", () => {
+  // Wie im Server (#1028): der Einsatz gilt ohne Zwei-Faktor weiter, die Rechte über alle Turniere nicht.
+  authState.user = { id: "u", role: "tournament_admin", areas: ["tournaments", "moderation"], is_tournament_staff: true, has_staff_assignment: true, mfa_enabled: false };
+  renderAt("/admin/tournaments", <ProtectedRoute requireTournamentStaff><div>turniere</div></ProtectedRoute>);
+  expect(screen.getByText("turniere")).toBeInTheDocument();
+});

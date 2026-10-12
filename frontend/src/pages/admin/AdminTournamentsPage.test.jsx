@@ -6,7 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 // die der Server dann ablehnt.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), delete: vi.fn() };
-const authState = { isAdmin: false };
+const authState = { isAdmin: false, isTournamentLead: false };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_error, fallback) => fallback, resolveMediaUrl: (value) => value || "" }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
@@ -30,4 +30,21 @@ test("ein Helfer sieht in der Verwaltung nur sein Turnier - die Seite fragt die 
   expect(await screen.findByText("Eigenes Turnier")).toBeInTheDocument();
   expect(screen.queryByText("Fremdes Turnier")).toBeNull();
   expect(apiMock.get).toHaveBeenCalledWith("/tournaments?include_drafts=true&managed=true");
+});
+
+test("globale Aktionen nur für die Turnierleitung mit Zwei-Faktor - nicht für Adminbereich plus Helfer-Einsatz", async () => {
+  apiMock.get.mockResolvedValue({ data: [{ ...OWN, status: "draft" }] });
+  authState.isAdmin = true;
+  authState.isTournamentLead = false;
+  const helper = render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  expect(await screen.findByText("Eigenes Turnier")).toBeInTheDocument();
+  expect(screen.queryByTestId("admin-new-tournament")).toBeNull();
+  expect(screen.queryByTitle("Löschen")).toBeNull();
+  expect(screen.queryByTitle("Anmeldung öffnen")).toBeNull();
+  helper.unmount();
+
+  authState.isTournamentLead = true;
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("admin-new-tournament")).toBeInTheDocument();
+  expect(screen.getByTitle("Löschen")).toBeInTheDocument();
 });

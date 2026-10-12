@@ -22,12 +22,13 @@ const FAST_LAP_STATUS_OPTIONS = [
 ];
 
 export default function AdminF1Page() {
-  const { isAdmin } = useAuth();
+  // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
+  const { isTournamentLead: isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
-  const load = useCallback(() => api.get("/f1/challenges?include_drafts=true").then(({ data }) => setList(data)), []);
+  const load = useCallback(() => api.get("/f1/challenges?include_drafts=true&managed=true").then(({ data }) => setList(data)), []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["f1"]);
 

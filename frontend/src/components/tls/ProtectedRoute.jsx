@@ -10,7 +10,8 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 // `requireTournamentStaff` öffnet die Turnierseiten (Turniere, Fast Lap, Stationen,
 // Turnierbaum-TV) für die Turnierleitung und für Helfer mit Einsatz - Moderation oder ein anderer
 // Adminbereich allein nicht. Die Turnierleitung braucht dafür, wie im Server, die bestätigte
-// Zwei-Faktor-Anmeldung (#1028); Helfer nicht.
+// Zwei-Faktor-Anmeldung (#1028); Helfer nicht - auch eine Turnierleitung mit eigenem Einsatz
+// (`has_staff_assignment`) kommt ohne Zwei-Faktor in diesen Einsatz, die Seiten zeigen ihr dann nur dessen Aktionen.
 
 export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireTournamentStaff = false }) {
   const { user } = useAuth();
@@ -30,7 +31,7 @@ export function ProtectedRoute({ children, requireArea = null, requireAdmin = fa
   if (wantedAreas.length && !hasArea(user, ...wantedAreas)) {
     return <Navigate to="/403" replace state={{ areas: wantedAreas, from: loc.pathname }} />;
   }
-  const leadNeedsSecondFactor = requireTournamentStaff && leadWithoutSecondFactor(user);
+  const leadNeedsSecondFactor = requireTournamentStaff && leadWithoutSecondFactor(user) && !user.has_staff_assignment;
   if ((wantedAreas.some((area) => MFA_AREAS.has(area)) && needsSecondFactor(user)) || leadNeedsSecondFactor) {
     // Zwei-Faktor wohnt seit #258 unter „Sicherheit“ - dorthin, mit der Erklärung, warum (#348).
     return <Navigate to={mfaSetupPath(loc.pathname)} replace />;

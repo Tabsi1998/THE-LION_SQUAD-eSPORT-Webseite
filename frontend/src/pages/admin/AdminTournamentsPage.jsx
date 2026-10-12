@@ -44,7 +44,8 @@ const TOURNAMENT_STATUS_FILTERS = [
 ];
 
 export default function AdminTournamentsPage() {
-  const { isAdmin } = useAuth();
+  // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
+  const { isTournamentLead: isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [query, setQuery] = useState(searchParams.get("q") || "");
