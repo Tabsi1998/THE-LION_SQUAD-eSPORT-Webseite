@@ -45,6 +45,22 @@ test("direkt (Turnierleitung, Matchseite) und geladen (Matchplan, Stationen): di
   expect(direct).toEqual(["/matches/m1/result", { results: [{ registration_id: "r1", rank: 1, score: 3 }, { registration_id: "r2", rank: 2, score: 1 }], hold: true, reason: null }]);
 });
 
+test("geladen: wer gleich beim Erscheinen tippt, verliert keinen Tipp - ein später Effekt setzt nichts zurück", async () => {
+  render(<ResultWindowLoader matchId="m1" onClose={() => {}} onSaved={() => {}} />);
+  // Ohne den Umweg über findBy: getippt wird im selben Takt, in dem das Fenster erscheint - also bevor React die Effekte
+  // des Aufbaus nachholt. Unter Last auf GitHub ist genau das passiert (aus 3:1 wurde 2:1).
+  await new Promise((resolve) => {
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector("[data-testid='result-score-r1-plus']")) return;
+      observer.disconnect();
+      resolve();
+    });
+    observer.observe(document.body, { subtree: true, childList: true });
+  });
+  const request = await enterThreeOne();
+  expect(request[1].results).toEqual([{ registration_id: "r1", rank: 1, score: 3 }, { registration_id: "r2", rank: 2, score: 1 }]);
+});
+
 test("Matchplan: „Ergebnis eintragen“ öffnet das Fenster - ohne Zahlenfelder, ohne „DNF“ und „Forfeit“", async () => {
   const match = {
     id: "m1", stage_id: "s1", match_key: "VF-1", round: 1, round_name: "Viertelfinale", section: "main", status: "in_progress",

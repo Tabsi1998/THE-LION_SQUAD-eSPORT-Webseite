@@ -39,11 +39,15 @@ export function ResultWindow({ entry, onClose, onSaved, testId = "result-window"
   const outcome = useMemo(() => resultsFor(entry, kind, state), [entry, kind, state]);
   const sentence = outcome.results ? resultSentence(entry, outcome.results) : "";
 
-  useEffect(() => {
+  // Ein anderes Spiel beginnt leer. Abgeleitet beim Rendern statt in einem Effekt: der Effekt lief auch beim ersten
+  // Aufbau und konnte, wenn er spät kam, die ersten Tipps auf Plus und Minus wieder wegwischen (aus 3:1 wurde 2:1).
+  const [seenEntryId, setSeenEntryId] = useState(entry?.id);
+  if (seenEntryId !== entry?.id) {
+    setSeenEntryId(entry?.id);
     setState(initialState(entry));
     setReason("");
     setError("");
-  }, [entry?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   useEffect(() => {
     const onKey = (event) => { if (event.key === "Escape") onClose?.(); };

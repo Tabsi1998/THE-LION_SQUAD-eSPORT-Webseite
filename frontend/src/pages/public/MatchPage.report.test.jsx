@@ -102,6 +102,22 @@ test("nach der eigenen Meldung: „wartet auf die Gegenseite“, ändern geht", 
   expect(screen.getByTestId("match-report-form")).toBeInTheDocument();
 });
 
+test("„Meldung ändern“ gleich beim Erscheinen öffnet das Formular - ein später Effekt schließt es nicht wieder", async () => {
+  renderMatch({ ...PAGE, report_state: { status: "waiting", own_summary: "LunaByte gewinnt 3:1.", proposal: null, proposal_summary: null } });
+  // Ohne den Umweg über findBy: geklickt wird im selben Takt, in dem der Knopf erscheint - also bevor React die Effekte
+  // des Aufbaus nachholt. Unter Last auf GitHub ist genau das passiert.
+  await new Promise((resolve) => {
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector("[data-testid='match-report-change']")) return;
+      observer.disconnect();
+      resolve();
+    });
+    observer.observe(document.body, { subtree: true, childList: true });
+  });
+  fireEvent.click(screen.getByTestId("match-report-change"));
+  expect(screen.getByTestId("match-report-form")).toBeInTheDocument();
+});
+
 test("die Gegenseite hat gemeldet (#1159): der Satz in Worten, „Stimmt“ schickt genau diese Meldung", async () => {
   const proposal = [{ registration_id: "r2", rank: 1, score: 3 }, { registration_id: "r1", rank: 2, score: 1 }];
   renderMatch({ ...PAGE, report_state: { status: "confirm", own_summary: null, proposal, proposal_summary: "LunaByte gewinnt 3:1.",
