@@ -19,6 +19,8 @@ APP_RELEASE_DIR = UPLOAD_DIR / "app-releases"
 QUARANTINE_DIR = UPLOAD_DIR / "quarantine"
 # Fotos vom Ergebnis (#1157, #1158): nie öffentlich, nur über /api/matches/{id}/proof-photos für Spieler und Turnierleitung.
 PROOF_DIR = UPLOAD_DIR / "proofs"
+# Eingesandte Galerie-Fotos (#1186): privat bis zur Freigabe, nur über /api/gallery/submissions/{id}/image.
+GALLERY_SUBMISSION_DIR = UPLOAD_DIR / "gallery-submissions"
 
 
 def ensure_directory(path: Path) -> Path:
@@ -27,5 +29,5 @@ def ensure_directory(path: Path) -> Path:
 
 
 def ensure_storage_directories() -> None:
-    for path in (UPLOAD_DIR, PUBLIC_UPLOAD_DIR, PRIVATE_DOC_DIR, PRIVATE_CHAT_DIR, APP_RELEASE_DIR, QUARANTINE_DIR, PROOF_DIR):
+    for path in (UPLOAD_DIR, PUBLIC_UPLOAD_DIR, PRIVATE_DOC_DIR, PRIVATE_CHAT_DIR, APP_RELEASE_DIR, QUARANTINE_DIR, PROOF_DIR, GALLERY_SUBMISSION_DIR):
         ensure_directory(path)

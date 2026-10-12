@@ -1,6 +1,8 @@
 // Galerie in der App (#236): dieselben Alben wie im Web. Kacheln laden die 400-px-Fassung, die
 // Großansicht 1600 px - nur für eigene Uploads, fremde Adressen bleiben, wie sie sind.
 
+import { dayNoon, viennaDate } from "./vienna";
+
 export type GalleryMediaType = "image" | "video" | "embed";
 
 export type GalleryItem = {
@@ -14,6 +16,8 @@ export type GalleryItem = {
   caption?: string | null;
   section_id?: string | null;
   order_index?: number;
+  /** Eingesandt (#1186): „Foto: Name“, wenn die Person ihren Namen zeigen wollte. */
+  credit?: string | null;
 };
 
 export type GallerySection = { id: string; title: string; count?: number };
@@ -32,6 +36,19 @@ export type GalleryAlbum = {
   sections?: GallerySection[];
   photos?: GalleryItem[];
   event?: { id: string; slug?: string; name?: string } | null;
+  /** Fotos einsenden (#1186): nur für Mitglieder und nur bei Event-Alben, sonst leer. */
+  photo_submission?: PhotoSubmissionInfo | null;
+};
+
+export type PhotoSubmissionInfo = {
+  open: boolean;
+  opens?: string | null;
+  until?: string | null;
+  max: number;
+  used: number;
+  pending: number;
+  remaining: number;
+  can_submit: boolean;
 };
 
 const LOCAL_UPLOAD = /\/(api\/static\/uploads|static\/uploads|uploads)\//;
@@ -90,4 +107,32 @@ export function groupBySection(album: GalleryAlbum): Array<{ id: string | null; 
   const loose = items.filter((item) => !item.section_id || !sections.some((section) => section.id === item.section_id));
   if (loose.length) groups.unshift({ id: null, title: "", items: loose });
   return groups.filter((group) => group.items.length);
+}
+
+// ---------------------------------------------------------------- Fotos einsenden (#1186)
+// Dieselben Sätze wie im Web (frontend/src/lib/photoSubmission.js). Der Server prüft alles noch einmal.
+
+function dayLabel(day: string): string {
+  return viennaDate(dayNoon(day), { weekday: "short", day: "numeric", month: "long" });
+}
+
+/** Eine Zeile unter dem Knopf: bis wann und wie viele noch gehen, was schon wartet. */
+export function submissionHint(info: PhotoSubmissionInfo | null | undefined): string {
+  if (!info) return "";
+  if (!info.open) return info.until ? `Einsenden war bis ${dayLabel(info.until)} möglich.` : "";
+  const parts = [info.until ? `Bis ${dayLabel(info.until)}` : ""];
+  parts.push(info.remaining > 0 ? `noch ${info.remaining} ${info.remaining === 1 ? "Foto" : "Fotos"}` : `alle ${info.max || 20} Fotos geschickt`);
+  if (info.pending) parts.push(`${info.pending} ${info.pending === 1 ? "wartet" : "warten"} auf Freigabe`);
+  return parts.filter(Boolean).join(" · ");
+}
+
+/** Der Satz nach dem Senden. */
+export function submissionDoneText(sent: number, failed: number): string {
+  if (!sent && failed) return "Das hat nicht geklappt – bitte noch einmal versuchen.";
+  const head = `Danke! ${sent === 1 ? "Dein Foto wartet" : `${sent} Fotos warten`} auf Freigabe durch den Vorstand.`;
+  return failed ? `${head} ${failed === 1 ? "Ein Foto ging" : `${failed} Fotos gingen`} nicht durch.` : head;
+}
+
+export function photoCredit(item: GalleryItem | null | undefined): string {
+  return item?.credit ? `Foto: ${item.credit}` : "";
 }

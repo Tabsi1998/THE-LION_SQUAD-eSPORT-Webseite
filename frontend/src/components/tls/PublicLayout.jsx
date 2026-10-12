@@ -25,7 +25,8 @@ import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/b
 import { contactLines, footerButtons, footerColumns } from "@/lib/siteFooter";
 import { StoreButton } from "@/components/tls/StoreButton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, Smartphone } from "lucide-react";
+import { Menu, X, LogOut, Shield, ShieldCheck, Crown, Megaphone, ArrowUp, Smartphone } from "lucide-react";
+import { mfaSetupPath } from "@/lib/permissions";
 import { UserMenu } from "@/components/tls/UserMenu";
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { OfflineBar } from "@/components/tls/OfflineBar";
@@ -33,7 +34,7 @@ import { RouteProgress } from "@/components/tls/RouteProgress";
 import { useMobileMenu } from "@/lib/mobileMenu";
 
 export function PublicLayout({ children }) {
-  const { user, logout, isAdmin, isClubMember } = useAuth();
+  const { user, logout, isAdmin, adminNeedsSecondFactor, isClubMember } = useAuth();
   const location = useLocation();
   const routeFade = useRouteFade(location.pathname);
   // Geteilt mit dem Rahmen des Seitenwechsels (#1324) - ein Tipp aufs Menü während des Ladens geht nicht verloren.
@@ -162,7 +163,12 @@ export function PublicLayout({ children }) {
                     <Crown className="w-3.5 h-3.5 inline mr-1.5" /> Mitgliederbereich
                   </Link>
                 )}
-                {user && isAdmin && (
+                {user && isAdmin && adminNeedsSecondFactor && (
+                  <Link to={mfaSetupPath("/admin")} onClick={closeMobile} data-testid="nav-mfa-setup-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#29B6E8]">
+                    <ShieldCheck className="w-3.5 h-3.5 inline mr-1.5" /> 2FA einrichten
+                  </Link>
+                )}
+                {user && isAdmin && !adminNeedsSecondFactor && (
                   <Link to="/admin" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#29B6E8]">
                     <Shield className="w-3.5 h-3.5 inline mr-1.5" /> Admin
                   </Link>

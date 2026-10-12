@@ -12,6 +12,8 @@ dsgvo_router = APIRouter(prefix="/api/dsgvo", tags=["dsgvo"])
 
 
 async def _user_data_export(db, user_id: str) -> dict:
+    from services.event_photos import export_for_user as export_gallery_submissions
+
     user = await db.users.find_one(
         {"id": user_id},
         {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0,
@@ -87,6 +89,8 @@ async def _user_data_export(db, user_id: str) -> dict:
         "meeting_admissions_recorded": [{key: row.get(key) for key in ("meeting_id", "state", "updated_at")}
                                         for row in await rows(db.meeting_admissions, {"by": user_id})],
         "uploads": await rows(db.media_uploads, {"owner_id": user_id}),
+        # Eingesandte Galerie-Fotos (#1186): Album, Stand, „Foto: Name“ gewünscht und wann eingewilligt - ohne Datei.
+        "gallery_submissions": await export_gallery_submissions(db, user_id),
     }
 
 
@@ -120,7 +124,7 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     for collection in (db.refresh_tokens, db.auth_sessions, db.email_verification_tokens,
                        db.password_reset_tokens, db.mfa_login_challenges, db.mobile_push_tokens,
                        db.mobile_client_logs, db.notifications, db.user_socials,
-                       db.passkeys, db.passkey_challenges, db.platform_links,
+                       db.passkeys, db.passkey_challenges, db.platform_links, db.platform_link_flows,
                        # Verhalten, das nur für die Erfolge gezählt wurde (#616, #678) - ohne Konto ohne Zweck.
                        # Das gegebene GG bleibt: es gehört zum Match wie das Ergebnis, und das Lob der anderen Seite
                        # soll nicht verschwinden, weil jemand sein Konto löscht.
@@ -140,6 +144,9 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     # Fotos vom Ergebnis (#1157): Dateien und Einträge weg; Meldungen behalten nur die (dann tote) Kennung.
     from services.match_proofs import delete_for_user as delete_user_proofs
     await delete_user_proofs(db, user_id)
+    # Eingesandte Galerie-Fotos (#1186): offene samt Dateien weg, „Foto: Name“ an freigegebenen weg.
+    from services.event_photos import delete_for_user as delete_user_photo_submissions
+    await delete_user_photo_submissions(db, user_id)
     await db.email_logs.update_many({"to": user.get("email")}, {"$set": {"to": anonymous_email, "recipient_anonymized": True}})
     await db.memberships.update_many({"user_id": user_id}, {"$set": {
         "email": anonymous_email, "first_name": None, "last_name": None, "phone": None,

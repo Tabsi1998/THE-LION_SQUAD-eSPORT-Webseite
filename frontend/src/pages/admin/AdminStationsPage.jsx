@@ -28,7 +28,8 @@ function stationExportUrl(tournamentId, orientation) {
 }
 
 export default function AdminStationsPage() {
-  const { isAdmin } = useAuth();
+  // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
+  const { isTournamentLead: isAdmin } = useAuth();
   const [list, setList] = useState([]);
   const [tournaments, setTournaments] = useState([]);
   const [activeTid, setActiveTid] = useState("");
@@ -48,7 +49,7 @@ export default function AdminStationsPage() {
 
   const load = useCallback(async () => {
     try {
-      const { data: t } = await api.get("/tournaments?include_drafts=true");
+      const { data: t } = await api.get("/tournaments?include_drafts=true&managed=true");
       const rows = Array.isArray(t) ? t.filter(Boolean) : [];
       setTournaments(rows);
       setActiveTid((current) => rows.some((row) => row.id === current) ? current : rows?.[0]?.id || "");

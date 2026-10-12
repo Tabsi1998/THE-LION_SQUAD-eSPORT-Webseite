@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { loadChats, markChatRead, normalizeChatList, onChatsChanged } from "@/lib/chats";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -32,25 +32,37 @@ export function useUnreadChats(userId) {
   return count;
 }
 
-/** Die ganze Liste für /messages. */
-export function useChatList(enabled = true) {
+/**
+ * Die ganze Liste für /messages - zum angemeldeten Konto `accountId`, leer ohne Konto.
+ * Ein Kontowechsel leert die Liste sofort; eine Antwort, die noch zum vorigen Konto gehört, verfällt (#1047).
+ */
+export function useChatList(accountId) {
+  const enabled = Boolean(accountId);
   const [list, setList] = useState(() => normalizeChatList(null));
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState("");
+  const accountRef = useRef({ accountId: null });
   const load = useCallback(async () => {
-    if (!enabled) return;
+    const ticket = accountRef.current;
+    if (!accountId || ticket.accountId !== accountId) return;
     try {
-      setList(await loadChats());
+      const next = await loadChats();
+      if (accountRef.current !== ticket) return;
+      setList(next);
       setError("");
     } catch {
-      setError("Chats konnten nicht geladen werden.");
+      if (accountRef.current === ticket) setError("Chats konnten nicht geladen werden.");
     } finally {
-      setLoading(false);
+      if (accountRef.current === ticket) setLoading(false);
     }
-  }, [enabled]);
-  useEffect(() => {
+  }, [accountId]);
+  useLayoutEffect(() => {
+    accountRef.current = { accountId: accountId || null };
+    setList(normalizeChatList(null));
+    setError("");
+    setLoading(Boolean(accountId));
     void load();
-  }, [load]);
+  }, [accountId, load]);
   useEffect(() => onChatsChanged(() => { void load(); }), [load]);
   useLiveRefresh(load, RESOURCES, { pollMs: 30000, enabled });
   return { list, loading, error, reload: load };

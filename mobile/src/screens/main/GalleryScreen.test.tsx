@@ -53,3 +53,28 @@ test("Album: Kacheln je Abschnitt, Antippen öffnet die Großansicht mit dem ric
   await fireEvent.press(screen.getByTestId("gallery-item-v1"));
   expect(navigation.navigate).toHaveBeenCalledWith("GalleryViewer", { albumId: "lan-2026", index: 2 });
 });
+
+// Fotos gehören zum Event (#1185) und Fotos einsenden (#1186).
+test("Album: nennt sein Event und führt zurück; ohne Einsende-Angaben kein Knopf", async () => {
+  mockGet.mockResolvedValue({ data: {
+    id: "a1", slug: "herbst-lan-fotos", title: "Herbst-LAN Fotos", photo_count: 1, sections: [],
+    event: { id: "e1", slug: "herbst-lan", name: "Herbst-LAN" }, photo_submission: null,
+    photos: [{ id: "p1", order_index: 1, image_url: "/api/static/uploads/p1.webp", credit: "Anna" }],
+  } });
+  await render(<GalleryAlbumScreen navigation={navigation as never} route={{ key: "al", name: "GalleryAlbum", params: { id: "herbst-lan-fotos" } } as never} />);
+  await waitFor(() => expect(screen.getByTestId("album-event-link")).toBeTruthy());
+  expect(screen.getByText("Vom Event: Herbst-LAN")).toBeTruthy();
+  expect(screen.queryByTestId("photo-submit")).toBeNull();
+  await fireEvent.press(screen.getByTestId("album-event-link"));
+  expect(navigation.navigate).toHaveBeenCalledWith("EventDetail", { id: "herbst-lan" });
+});
+
+test("Album: Mitglieder sehen „Fotos einsenden“", async () => {
+  mockGet.mockResolvedValue({ data: {
+    id: "a1", slug: "herbst-lan-fotos", title: "Herbst-LAN Fotos", photo_count: 0, sections: [], photos: [],
+    event: { id: "e1", slug: "herbst-lan", name: "Herbst-LAN" },
+    photo_submission: { open: true, until: "2026-10-22", max: 20, used: 0, pending: 0, remaining: 20, can_submit: true },
+  } });
+  await render(<GalleryAlbumScreen navigation={navigation as never} route={{ key: "al", name: "GalleryAlbum", params: { id: "herbst-lan-fotos" } } as never} />);
+  await waitFor(() => expect(screen.getByTestId("photo-submit-open")).toBeTruthy());
+});
