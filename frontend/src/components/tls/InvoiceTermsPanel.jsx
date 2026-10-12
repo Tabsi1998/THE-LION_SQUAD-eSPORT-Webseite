@@ -31,6 +31,9 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave, optionsUrl =
 
   const termsDirty = FIELDS.some((field) => String(draft[field.key] || "") !== String(terms?.[field.key] || ""));
   const dirty = termsDirty || lang !== savedLang;
+  // Solange die Listen aus Dolibarr unterwegs sind, steht ein gesperrtes Auswahlfeld da - nicht das Feld für die Nummer
+  // von Hand: das wurde sonst nach dem Laden unter dem Finger zur Auswahl getauscht, Getipptes inklusive.
+  const listsLoading = Boolean(connected) && options === null;
   const suggested = options?.suggested || {};
   const canSuggest = FIELDS.some((field) => suggested[field.key] && !draft[field.key]);
   const complete = FIELDS.every((field) => Number(draft[field.key]) > 0);
@@ -58,7 +61,11 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave, optionsUrl =
           return (
             <label key={field.key} className="text-xs">
               <div className="uppercase tracking-widest text-white/45 font-bold mb-1">{field.label}</div>
-              {Array.isArray(list) && list.length ? (
+              {listsLoading ? (
+                <select disabled value="" onChange={() => {}} aria-busy="true" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm opacity-60" data-testid={`invoice-terms-${field.key}`}>
+                  <option value="">Liste lädt …</option>
+                </select>
+              ) : Array.isArray(list) && list.length ? (
                 <select value={draft[field.key] || ""} onChange={(ev) => setDraft((current) => ({ ...current, [field.key]: ev.target.value }))} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" data-testid={`invoice-terms-${field.key}`}>
                   <option value="">– bitte wählen –</option>
                   {list.map((item) => <option key={item.id} value={item.id}>{item.label}{item.code ? ` (${item.code})` : ""}</option>)}
