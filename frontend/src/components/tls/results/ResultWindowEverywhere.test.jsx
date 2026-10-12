@@ -45,6 +45,23 @@ test("direkt (Turnierleitung, Matchseite) und geladen (Matchplan, Stationen): di
   expect(direct).toEqual(["/matches/m1/result", { results: [{ registration_id: "r1", rank: 1, score: 3 }, { registration_id: "r2", rank: 2, score: 1 }], hold: true, reason: null }]);
 });
 
+test("ein anderes Spiel beginnt leer, dasselbe Spiel mit neuer Beschreibung behält die Eingabe", async () => {
+  const { rerender } = render(<ResultWindow entry={ENTRY} onClose={() => {}} onSaved={() => {}} />);
+  const empty = screen.getByTestId("result-sentence").textContent;
+  for (let step = 0; step < 3; step += 1) fireEvent.click(screen.getByTestId("result-score-r1-plus"));
+  fireEvent.click(screen.getByTestId("result-score-r2-plus"));
+  expect(screen.getByTestId("result-sentence")).toHaveTextContent("Lions Rocket gewinnt 3:1 – weiter ins Halbfinale");
+  // Gleiche Kennung, neues Objekt (z. B. nach dem Nachladen): nichts wird weggewischt.
+  rerender(<ResultWindow entry={{ ...ENTRY }} onClose={() => {}} onSaved={() => {}} />);
+  expect(screen.getByTestId("result-sentence")).toHaveTextContent("Lions Rocket gewinnt 3:1 – weiter ins Halbfinale");
+  // Anderes Spiel: der Stand beginnt leer.
+  rerender(<ResultWindow entry={{ ...ENTRY, id: "m2" }} onClose={() => {}} onSaved={() => {}} />);
+  expect(screen.getByTestId("result-sentence").textContent).toBe(empty);
+  expect(screen.getByTestId("result-sentence")).not.toHaveTextContent("3:1");
+  fireEvent.click(screen.getByTestId("result-score-r2-plus"));
+  expect(screen.getByTestId("result-sentence")).toHaveTextContent("Boost und Burger gewinnt 1:0");
+});
+
 test("geladen: wer gleich beim Erscheinen tippt, verliert keinen Tipp - ein später Effekt setzt nichts zurück", async () => {
   render(<ResultWindowLoader matchId="m1" onClose={() => {}} onSaved={() => {}} />);
   // Ohne den Umweg über findBy: getippt wird im selben Takt, in dem das Fenster erscheint - also bevor React die Effekte

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Ergebnis melden (#1132): Spieler finden auf der Matchseite ein Meldeformular - online melden sie selbst, die
@@ -116,6 +116,25 @@ test("„Meldung ändern“ gleich beim Erscheinen öffnet das Formular - ein sp
   });
   fireEvent.click(screen.getByTestId("match-report-change"));
   expect(screen.getByTestId("match-report-form")).toBeInTheDocument();
+});
+
+test("neuer Meldestand vom Server (die Gegenseite meldet): das offene „Meldung ändern“ schließt, „Stimmt“ steht da", async () => {
+  renderMatch({ ...PAGE, report_state: { status: "waiting", own_summary: "LunaByte gewinnt 3:1.", proposal: null, proposal_summary: null } });
+  fireEvent.click(await screen.findByTestId("match-report-change"));
+  expect(screen.getByTestId("match-report-form")).toBeInTheDocument();
+  // Dasselbe noch einmal vom Server (gleicher Stand): das Formular bleibt offen.
+  await act(async () => { window.dispatchEvent(new Event("focus")); });
+  await waitFor(() => expect(apiMock.get.mock.calls.filter(([url]) => url === "/matches/m1/page")).toHaveLength(2));
+  expect(screen.getByTestId("match-report-form")).toBeInTheDocument();
+  // Die Gegenseite hat inzwischen anders gemeldet: neuer Stand, das Formular schließt.
+  const proposal = [{ registration_id: "r1", rank: 1, score: 2 }, { registration_id: "r2", rank: 2, score: 0 }];
+  apiMock.get.mockImplementation(async (url) => (url === "/matches/m1/page"
+    ? { data: { ...PAGE, report_state: { status: "confirm", proposal, proposal_text: "NeonFalke meldet 2:0 für sich.", can_confirm: true } } }
+    : { data: [] }));
+  await act(async () => { window.dispatchEvent(new Event("focus")); });
+  expect(await screen.findByTestId("match-report-confirm")).toBeInTheDocument();
+  expect(screen.getByTestId("match-report-state")).toHaveAttribute("data-status", "confirm");
+  expect(screen.queryByTestId("match-report-form")).toBeNull();
 });
 
 test("die Gegenseite hat gemeldet (#1159): der Satz in Worten, „Stimmt“ schickt genau diese Meldung", async () => {
