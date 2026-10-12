@@ -44,10 +44,18 @@ def test_only_global_staff_roles_receive_internal_stream_scope():
     }) == "public"
     # Moderatoren moderieren; die vollen Pfade interner Änderungen braucht die Moderationsseite nicht.
     assert change_events.visibility_scope_for_user({"role": "moderator"}) == "public"
-    assert change_events.visibility_scope_for_user({"role": "tournament_admin"}) == "staff"
-    assert change_events.visibility_scope_for_user({"role": "superadmin"}) == "staff"
+    confirmed = {"mfa_enabled": True, "auth_mfa_verified": True}
+    assert change_events.visibility_scope_for_user({"role": "tournament_admin", **confirmed}) == "staff"
+    assert change_events.visibility_scope_for_user({"role": "superadmin", **confirmed}) == "staff"
 
 
+def test_staff_stream_needs_the_confirmed_second_factor():
+    # #1469: die vollen Pfade interner Änderungen gehören zur Verwaltung - wie jeder Adminbereich nur mit bestätigter
+    # Zwei-Faktor-Anmeldung. Ohne bleibt der öffentliche Strom, mit denselben Ereignissen wie für Besucher.
+    for role in ("tournament_admin", "club_admin", "superadmin"):
+        assert change_events.visibility_scope_for_user({"role": role}) == "public"
+        assert change_events.visibility_scope_for_user({"role": role, "mfa_enabled": True}) == "public"
+        assert change_events.visibility_scope_for_user({"role": role, "mfa_enabled": True, "auth_mfa_verified": True}) == "staff"
 
 
 def test_private_mutation_is_visible_to_staff_only():

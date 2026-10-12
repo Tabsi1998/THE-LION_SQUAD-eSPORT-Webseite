@@ -52,7 +52,8 @@ PUBLIC_RESOURCE_ALIASES = {
     "settings/branding": "settings",
     "settings/site-banners/admin": "settings",
 }
-# Volle Pfade interner Änderungen für die Verwaltungsseiten; die Moderationsseite braucht sie nicht.
+# Volle Pfade interner Änderungen für die Verwaltungsseiten; die Moderationsseite braucht sie nicht. Wie jeder
+# Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung (#1469) - ohne bleibt der öffentliche Strom.
 STAFF_STREAM_ROLES = frozenset({"tournament_admin", "club_admin", "superadmin"})
 USER_SCOPE = "user"
 # Held only in the in-memory buffer; stripped before an event reaches a client.
@@ -72,7 +73,9 @@ def last_event_occurred_at() -> str | None:
 
 
 def visibility_scope_for_user(user: dict | None) -> str:
-    if user and user.get("role") in STAFF_STREAM_ROLES:
+    from services.permissions import is_confirmed_admin_role
+
+    if is_confirmed_admin_role(user, STAFF_STREAM_ROLES):
         return "staff"
     return "public"
 

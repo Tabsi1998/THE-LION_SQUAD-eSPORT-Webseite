@@ -14,13 +14,15 @@ from models import DocumentCreate, DocumentUpdate, new_id, now_utc
 from services import dolibarr_identity
 from services.dolibarr_client import DolibarrError
 from services.member_activity import note_document_open
+from services.permissions import is_confirmed_admin_role
 from services.visibility import user_can_see
 from storage import PRIVATE_DOC_DIR, UPLOAD_DIR
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 logger = logging.getLogger("tls.documents")
 # Vereinsdokumente: Mitglieder und wer die Vereinsverwaltung oder System hat (#1350, services/visibility.py);
-# Moderatoren und die Turnierleitung sehen sie als Mitglied. Gesperrte Downloads öffnen Club-Admin und Superadmin.
+# Moderatoren und die Turnierleitung sehen sie als Mitglied. Gesperrte Downloads öffnen Club-Admin und Superadmin,
+# wie jeder Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung (#1469).
 ADMIN_ROLES = {"club_admin", "superadmin"}
 
 
@@ -29,7 +31,7 @@ def _normalise_visibility(value: str | None) -> str:
 
 
 def _is_admin(user: dict | None) -> bool:
-    return bool(user and user.get("role") in ADMIN_ROLES)
+    return is_confirmed_admin_role(user, ADMIN_ROLES)
 
 
 async def _user_can_see(user: dict | None, visibility: str | None) -> bool:
