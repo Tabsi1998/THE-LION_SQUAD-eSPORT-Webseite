@@ -71,12 +71,15 @@ export function BottomNav() {
     }
   };
 
+  // Ruhezone (seasons/quiet.js): unter der Leiste sitzt keine Saison-Deko - auch dann nicht, wenn eine kurze Seite
+  // (etwa der Löwe bei leeren Listen, #1325) die obere Ecke der Fußzeile genau hinter die Leiste schiebt.
   return (
     <nav
       className="tls-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0A0A0A]/96 backdrop-blur-xl border-t border-white/10"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       aria-label="Mobile Navigation"
       data-testid="bottom-nav"
+      data-season-quiet=""
     >
       <div className="flex items-stretch justify-around h-16">
         {items.map((item) => {
