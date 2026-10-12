@@ -101,8 +101,6 @@ export default function EventsPage() {
           <PublicLoadingState cards={6} className="mt-10" />
         ) : filtered.length === 0 ? (
           <PublicEmptyState
-            icon={Calendar}
-            eyebrow="Events"
             title={tab === "upcoming" ? "Aktuell keine kommenden Events" : "Keine vergangenen Events in dieser Auswahl"}
             description={tab === "upcoming" ? "Sobald neue Vereinsabende, LANs oder Messe-Termine geplant sind, landen sie hier automatisch." : "Ändere den Event-Typ oder wechsle zur kommenden Ansicht."}
             primaryAction={tab === "upcoming" ? { to: "/tournaments", label: "Turniere ansehen" } : { label: "Kommende Events", onClick: () => updateEventFilters({ view: "upcoming" }) }}

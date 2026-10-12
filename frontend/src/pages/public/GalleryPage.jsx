@@ -44,8 +44,6 @@ export default function GalleryPage() {
           <PublicLoadingState cards={4} className="mt-10 lg:grid-cols-4" />
         ) : albums.length === 0 ? (
           <PublicEmptyState
-            icon={ImageIcon}
-            eyebrow="Galerie"
             title="Noch keine Alben sichtbar"
             description="Fotos von Events, Turnieren und Vereinsmomenten erscheinen hier automatisch, sobald ein Album veröffentlicht ist."
             primaryAction={{ to: "/events", label: "Events ansehen" }}

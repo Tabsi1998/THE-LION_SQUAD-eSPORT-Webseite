@@ -65,9 +65,9 @@ test("403, 404 and 500 views explain recovery and stay out of search indexes", a
   await mockPublicChrome(page);
 
   for (const entry of [
-    { path: "/403", code: "403", title: "Kein Zugriff" },
-    { path: "/audit-does-not-exist", code: "404", title: "Seite nicht gefunden" },
-    { path: "/500", code: "500", title: "Etwas ist schiefgelaufen" },
+    { path: "/403", code: "403", title: "Nur für Mitglieder" },
+    { path: "/audit-does-not-exist", code: "404", title: "Hier ist kein Rudel" },
+    { path: "/500", code: "500", title: "Da ist uns ein Kabel rausgerutscht" },
   ]) {
     await page.goto(entry.path);
     await expect(page.getByTestId(`error-title-${entry.code}`)).toHaveText(entry.title);

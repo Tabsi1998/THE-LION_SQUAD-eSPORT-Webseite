@@ -2,12 +2,16 @@ import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { areaList } from "@/lib/permissions";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { AlertTriangle, Home, ArrowLeft, ShieldOff, Search, Calendar, Trophy, Newspaper, Medal, LogIn, RefreshCw } from "lucide-react";
+import { Home, ArrowLeft, Calendar, Trophy, Newspaper, Medal, LogIn, RefreshCw } from "lucide-react";
+import { LionArt } from "@/components/tls/LionArt";
+import { LION_ART_SIZE } from "@/components/tls/PublicEmptyState";
 
+// Fehlerseiten mit dem Löwen (#1325): 404 mit Lupe, 403 schlafend, 500 mit Stecker. Ein Satz für Gäste, ein Knopf, der
+// weiterhilft; die Nummer steht nur noch klein darunter.
 const ERROR_DEFS = {
-  "404": { code: "404", title: "Seite nicht gefunden", desc: "Diese Seite gibt es nicht (mehr) — vielleicht hast du dich verlaufen.", icon: Search, accent: "#29B6E8" },
-  "403": { code: "403", title: "Kein Zugriff", desc: "Du bist nicht berechtigt, diese Seite zu sehen. Logge dich ein oder werde Vereinsmitglied.", icon: ShieldOff, accent: "#FFD700" },
-  "500": { code: "500", title: "Etwas ist schiefgelaufen", desc: "Wir haben einen Fehler erhalten. Bitte versuche es später erneut.", icon: AlertTriangle, accent: "#FF3B30" },
+  "404": { code: "404", art: "search", title: "Hier ist kein Rudel", desc: "Diese Seite gibt es nicht (mehr). Vielleicht hilft die Suche oder einer der Wege unten." },
+  "403": { code: "403", art: "sleep", title: "Nur für Mitglieder", desc: "Du bist nicht berechtigt, diese Seite zu sehen. Melde dich an - manche Seiten sind nur für Mitglieder." },
+  "500": { code: "500", art: "offline", title: "Da ist uns ein Kabel rausgerutscht", desc: "Das liegt nicht an dir. Versuch es gleich noch einmal." },
 };
 
 const QUICK_LINKS = [
@@ -20,7 +24,6 @@ const QUICK_LINKS = [
 
 export function ErrorPage({ code = "404", detail = "" }) {
   const def = ERROR_DEFS[code] || ERROR_DEFS["404"];
-  const Icn = def.icon;
   useEffect(() => {
     const previousTitle = document.title;
     let robots = document.head.querySelector('meta[name="robots"]');
@@ -50,34 +53,33 @@ export function ErrorPage({ code = "404", detail = "" }) {
   return (
     <PublicLayout>
       <div className="min-h-[70vh] flex items-center justify-center px-4 py-16">
-        <section className="text-center max-w-2xl" aria-labelledby={`error-heading-${def.code}`}>
-          <div className="relative inline-block mb-6">
-            <span className="font-display text-[160px] md:text-[200px] font-black leading-none" style={{ color: def.accent, opacity: 0.15 }}>
-              {def.code}
-            </span>
-            <Icn className="w-20 h-20 absolute inset-0 m-auto" style={{ color: def.accent }} />
-          </div>
-          <h1 id={`error-heading-${def.code}`} className="font-heading text-3xl md:text-5xl font-black uppercase mb-3" data-testid={`error-title-${def.code}`}>
-            {def.title}
-          </h1>
-          <p className="text-white/60 mb-8" data-testid={`error-detail-${def.code}`}>{detail || def.desc}</p>
-          <div className="flex flex-wrap gap-3 justify-center">
-            <Link to="/" data-testid="error-home-btn" className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
-              <Home className="w-4 h-4" /> Zur Startseite
-            </Link>
-            {def.code === "403" && (
-              <Link to="/login" data-testid="error-login-btn" className="px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:bg-[#FFD700]/10">
-                <LogIn className="w-4 h-4" /> Einloggen
-              </Link>
-            )}
-            {def.code === "500" && (
-              <button type="button" onClick={() => window.location.reload()} data-testid="error-retry-btn" className="px-5 py-2.5 border border-[#FF3B30]/40 text-[#FF8A80] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:bg-[#FF3B30]/10">
-                <RefreshCw className="w-4 h-4" /> Erneut versuchen
-              </button>
-            )}
-            <button type="button" onClick={goBack} data-testid="error-back-btn" className="px-5 py-2.5 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:border-white/40">
-              <ArrowLeft className="w-4 h-4" /> Zurück
-            </button>
+        <section className="max-w-3xl w-full" aria-labelledby={`error-heading-${def.code}`}>
+          <div className="flex flex-col items-center gap-6 text-center lg:flex-row lg:items-center lg:gap-10 lg:text-left">
+            <LionArt art={def.art} className={`shrink-0 text-white/90 ${LION_ART_SIZE}`} />
+            <div className="min-w-0">
+              <h1 id={`error-heading-${def.code}`} className="font-heading text-3xl md:text-4xl font-black mb-3" data-testid={`error-title-${def.code}`}>
+                {def.title}
+              </h1>
+              <p className="text-base text-white/65" data-testid={`error-detail-${def.code}`}>{detail || def.desc}</p>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 lg:justify-start">
+                {def.code === "403" ? (
+                  <Link to="/login" data-testid="error-login-btn" className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm">
+                    <LogIn className="w-4 h-4" aria-hidden="true" /> Anmelden
+                  </Link>
+                ) : def.code === "500" ? (
+                  <button type="button" onClick={() => window.location.reload()} data-testid="error-retry-btn" className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm">
+                    <RefreshCw className="w-4 h-4" aria-hidden="true" /> Nochmal versuchen
+                  </button>
+                ) : null}
+                <Link to="/" data-testid="error-home-btn" className={def.code === "404" ? "tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm" : "tls-hit inline-flex items-center gap-2 text-sm font-semibold text-[#29B6E8] hover:text-white"}>
+                  <Home className="w-4 h-4" aria-hidden="true" /> Zur Startseite
+                </Link>
+                <button type="button" onClick={goBack} data-testid="error-back-btn" className="tls-hit inline-flex items-center gap-2 text-sm font-semibold text-white/60 hover:text-white">
+                  <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Zurück
+                </button>
+              </div>
+              <p className="mt-6 text-xs text-white/40" data-testid="error-code">Fehler {def.code}</p>
+            </div>
           </div>
           <div className="mt-8 grid grid-cols-2 sm:grid-cols-5 gap-2">
             {QUICK_LINKS.map((item) => {

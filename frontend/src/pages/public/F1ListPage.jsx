@@ -56,8 +56,6 @@ export default function F1ListPage() {
           list.map((c) => <FastLapCard key={c.id} challenge={c} />)
         ) : (
           <PublicEmptyState
-            icon={Flag}
-            eyebrow="Fast Lap"
             title="Noch keine Challenges sichtbar"
             description="Sobald eine Fast-Lap-Challenge aktiv oder angekündigt ist, findest du hier Strecken, Leaderboards und Teilnahmeinfos."
             primaryAction={{ to: "/tournaments", label: "Turniere ansehen" }}

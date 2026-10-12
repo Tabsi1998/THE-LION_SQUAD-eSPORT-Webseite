@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import { LionArt, type LionArtKind } from "./LionArt";
 import axios from "axios";
 import { ActivityIndicator, Animated, StyleSheet, View } from "react-native";
 import { offlineLabel, useNetwork } from "../lib/network";
@@ -27,16 +28,19 @@ export type StateAction = { label: string; onPress: () => void; testID?: string 
 
 export function EmptyState({
   detail,
-  icon,
+  art = "sleep",
   title,
-  tone = "cyan",
   action,
   secondaryAction,
   testID,
 }: {
   detail?: string;
+  /** Von früher: das Symbol - der Löwe ersetzt es (#1325), der Wert wird nicht mehr gezeigt. */
   icon?: keyof typeof Ionicons.glyphMap;
+  /** Welcher Löwe (#1325): sleep (noch nichts da), search (nichts gefunden), offline. */
+  art?: LionArtKind;
   title: string;
+  /** Von früher: die Farbe des Symbols - mit dem Löwen ohne Wirkung. */
   tone?: EmptyTone;
   /** Der nächste Schritt - genau ein wichtiger Knopf. */
   action?: StateAction | null;
@@ -44,14 +48,10 @@ export function EmptyState({
   secondaryAction?: StateAction | null;
   testID?: string;
 }) {
-  const accent = tone === "danger" ? colors.live : tone === "gold" ? colors.gold : colors.cyan;
   return (
     <View style={styles.center} testID={testID}>
-      {icon ? (
-        <View style={[styles.iconBadge, { borderColor: accent }]}>
-          <Ionicons name={icon} color={accent} size={22} />
-        </View>
-      ) : null}
+      {/* Der Löwe wie im Web (#1325): schläft, sucht oder hat den Stecker in der Hand. */}
+      <LionArt art={art} size={96} />
       <Body style={styles.emptyTitle} accessibilityRole="header">{title}</Body>
       {detail ? <Muted style={styles.detail}>{detail}</Muted> : null}
       {action || secondaryAction ? (
@@ -81,11 +81,11 @@ export function loadProblem(error: unknown): LoadProblem {
   return { kind: "error", message: error instanceof Error ? error.message : "" };
 }
 
-const PROBLEM_TEXT: Record<LoadProblem["kind"], { title: string; detail: string; icon: keyof typeof Ionicons.glyphMap }> = {
-  offline: { title: "Ohne Netz", detail: "Sobald dein Handy wieder Netz hat, lädt es hier weiter. Nichts ist verloren.", icon: "cloud-offline-outline" },
-  notFound: { title: "Nicht gefunden", detail: "Das gibt es nicht (mehr) oder es ist nicht sichtbar.", icon: "search-outline" },
-  denied: { title: "Nicht freigegeben", detail: "Das sehen nur Mitglieder oder die zuständige Leitung.", icon: "lock-closed-outline" },
-  error: { title: "Laden hat nicht geklappt", detail: "Das liegt an der Verbindung oder am Server, nicht an dir.", icon: "alert-circle-outline" },
+const PROBLEM_TEXT: Record<LoadProblem["kind"], { title: string; detail: string; art: LionArtKind }> = {
+  offline: { title: "Ohne Netz", detail: "Sobald dein Handy wieder Netz hat, lädt es hier weiter. Nichts ist verloren.", art: "offline" },
+  notFound: { title: "Nicht gefunden", detail: "Das gibt es nicht (mehr) oder es ist nicht sichtbar.", art: "search" },
+  denied: { title: "Nicht freigegeben", detail: "Das sehen nur Mitglieder oder die zuständige Leitung.", art: "sleep" },
+  error: { title: "Laden hat nicht geklappt", detail: "Da ist uns ein Kabel rausgerutscht - das liegt an der Verbindung oder am Server, nicht an dir.", art: "offline" },
 };
 
 /**
@@ -117,9 +117,7 @@ export function ErrorState({
   const retry = onRetry && (kind === "offline" || kind === "error") ? onRetry : null;
   return (
     <View style={styles.center} testID={testID} data-kind={problem ? kind : undefined} accessibilityLiveRegion="polite">
-      <View style={[styles.iconBadge, styles.problemBadge, kind === "offline" && styles.offlineBadge]}>
-        <Ionicons name={problem ? known.icon : "alert-circle-outline"} color={kind === "offline" ? colors.gold : colors.live} size={22} />
-      </View>
+      <LionArt art={known.art} size={96} />
       <Body style={styles.emptyTitle} accessibilityRole="header">{shownTitle}</Body>
       <Muted style={styles.detail}>{shownDetail}</Muted>
       {retry ? <Button label="Nochmal versuchen" icon="refresh" arrow={false} onPress={retry} testID={`${testID}-retry`} style={styles.action} /> : null}
@@ -153,7 +151,7 @@ export function OfflineBar() {
   const label = offlineLabel(stand);
   return (
     <View style={styles.bar} testID="offline-bar" accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={`${label}. Zum Aktualisieren nach unten ziehen.`}>
-      <Ionicons name="cloud-offline-outline" color={colors.gold} size={15} />
+      <LionArt art="offline" size={24} color={colors.gold} />
       <Muted style={styles.barText} numberOfLines={2}>{label} · zum Aktualisieren ziehen</Muted>
     </View>
   );
@@ -169,9 +167,7 @@ export function OfflineNotice({
 }) {
   return (
     <View style={styles.notice}>
-      <View style={styles.noticeIcon}>
-        <Ionicons name="cloud-offline-outline" color={colors.gold} size={18} />
-      </View>
+      <LionArt art="offline" size={40} />
       <View style={styles.noticeText}>
         <Body style={styles.noticeTitle}>{title}</Body>
         <Muted>{detail}</Muted>
@@ -246,21 +242,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 28,
   },
-  iconBadge: {
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  problemBadge: {
-    borderColor: "rgba(255, 59, 48, 0.5)",
-  },
-  offlineBadge: {
-    borderColor: "rgba(255, 215, 0, 0.45)",
-  },
   emptyTitle: {
     fontWeight: "800",
     textAlign: "center",
@@ -315,14 +296,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     padding: 12,
-  },
-  noticeIcon: {
-    alignItems: "center",
-    backgroundColor: "rgba(255, 215, 0, 0.12)",
-    borderRadius: radius.lg,
-    height: 36,
-    justifyContent: "center",
-    width: 36,
   },
   noticeText: {
     flex: 1,
