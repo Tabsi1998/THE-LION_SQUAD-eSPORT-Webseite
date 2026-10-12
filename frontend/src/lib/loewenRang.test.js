@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import RING from "./loewenRangRing.json";
-import { FRAME_SIZES, FRAME_WIDTHS, PROFILE_SMALL, RANK_NAMES, frameFit, frameLayout, frameSources, rankForLevel, rankInfo, ringOf } from "./loewenRang";
+import { FRAME_SIZES, FRAME_WIDTHS, PROFILE_SMALL, RANK_NAMES, TOP_OVERHANG, frameFit, frameLayout, frameSources, rankForLevel, rankInfo, ringOf } from "./loewenRang";
 
 // Löwen-Rang (#1452, #1454): Rang-Zuordnung wie im Backend, Ausrichtung des Rahmens am gemessenen Ring.
 
@@ -75,11 +75,11 @@ test("Bildquellen: srcset über drei Breiten, Maske passend zur Größe", () => 
   expect(frameSources("01", 60).mask).toContain("rang-01-160.webp");
 });
 
-// Kleinstes Foto als Anteil der Fläche. Fabians Ziel war etwa 0,6 - die Ränge mit Schwingen und Strahlen (5–12)
-// liegen mit fester Fläche bei 0,49–0,58 (gemeldet im PR). Der Test hält die heutige Untergrenze.
+// Kleinstes Foto als Anteil der Fläche: Rang 9 mit den Schwingen bis an beide Bildränder (0,488). Seitlich darf nichts
+// hinausragen, deshalb hilft der Überstand oben dort nicht.
 const MIN_PHOTO = 0.48;
 
-test("feste Fläche: für alle 12 Ränge und alle Größen passt die Grafik hinein, das Foto bleibt über dem Minimum", () => {
+test("feste Fläche: seitlich und unten passt die Grafik hinein, oben höchstens 15 % Überstand, Foto über dem Minimum", () => {
   for (const area of [...Object.values(FRAME_SIZES), PROFILE_SMALL]) {
     for (const key of Object.keys(RING)) {
       const ring = ringOf(key);
@@ -93,14 +93,20 @@ test("feste Fläche: für alle 12 Ränge und alle Größen passt die Grafik hine
       const artLeft = centerX + ox - F / 2;
       const artTop = centerY + oy - F / 2;
       expect(artLeft + left * F, `${key} @${area} links`).toBeGreaterThanOrEqual(-1e-6);
-      expect(artTop + top * F, `${key} @${area} oben`).toBeGreaterThanOrEqual(-1e-6);
+      expect(artTop + top * F, `${key} @${area} oben`).toBeGreaterThanOrEqual(-TOP_OVERHANG * area - 1e-6);
       expect(artLeft + right * F, `${key} @${area} rechts`).toBeLessThanOrEqual(area + 1e-6);
       expect(artTop + bottom * F, `${key} @${area} unten`).toBeLessThanOrEqual(area + 1e-6);
-      // eng: die Grafik füllt die Fläche in einer Richtung fast ganz aus (Rundung auf drei Stellen)
-      expect(Math.max((right - left) * F, (bottom - top) * F)).toBeGreaterThan(area * 0.995);
+      // eng: seitlich füllt die Grafik die Fläche fast ganz, oder oben ist der Überstand fast ausgeschöpft
+      const sideFull = (right - left) * F > area * 0.995;
+      const topFull = (bottom - top) * F > area * (1 + TOP_OVERHANG) * 0.995;
+      expect(sideFull || topFull, `${key} @${area} eng`).toBe(true);
+      // passt die Grafik ohne Überstand, steht sie mittig; sonst sitzt sie unten auf
+      const artBottom = artTop + bottom * F;
+      if ((bottom - top) * F > area) expect(Math.abs(artBottom - area)).toBeLessThan(1e-6);
       expect(fit.photo, `${key}: Foto über dem Minimum`).toBeGreaterThanOrEqual(MIN_PHOTO);
     }
   }
-  // Rang 1 bekommt ein großes Foto, Rang 12 ein kleineres.
+  // Rang 1 bekommt ein großes Foto, Rang 12 ein kleineres; der Überstand oben macht Rang 1 größer als ohne.
   expect(frameFit(ringOf("01")).photo).toBeGreaterThan(frameFit(ringOf("12")).photo);
+  expect(frameFit(ringOf("01")).photo).toBeGreaterThan(frameFit(ringOf("01"), 0).photo);
 });

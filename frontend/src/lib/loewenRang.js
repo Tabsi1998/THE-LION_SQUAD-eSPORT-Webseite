@@ -12,11 +12,13 @@ export const RANK_NAMES = [
   "Löwenhaupt", "Brüller", "Schwingen", "Obsidian", "Sonnenlöwe", "Löwenkönig",
 ];
 export const FRAME_WIDTHS = [160, 320, 640];
-// Feste Fläche für Rahmen und Foto zusammen (Kantenlänge in px), gleich für alle Ränge: Profil (am Handy 200), Karte,
-// Listen (Chat, Teilnehmer, Rangliste) und klein fürs Podest. Das Foto wird je Rang so groß, dass der Rahmen samt
-// Schwingen und Krone genau hineinpasst - der Kopf ist bei jedem Rang gleich hoch.
-export const FRAME_SIZES = { profile: 260, card: 150, list: 92, mini: 64 };
-export const PROFILE_SMALL = 200;
+// Feste Fläche für Rahmen und Foto zusammen (Kantenlänge in px), gleich für alle Ränge: Profil (am Handy 220), Karte,
+// Listen (Chat, Teilnehmer, Rangliste) und klein fürs Podest. Das Foto wird je Rang so groß, dass der Rahmen seitlich und
+// unten genau hineinpasst; oben dürfen Krone und Schwingen bis TOP_OVERHANG über die Fläche ragen. Der Kopf ist bei
+// jedem Rang gleich hoch.
+export const FRAME_SIZES = { profile: 285, card: 150, list: 92, mini: 64 };
+export const PROFILE_SMALL = 220;
+export const TOP_OVERHANG = 0.15;
 const CYAN = "#29B6E8";
 const GOLD = "#FFD700";
 
@@ -76,15 +78,17 @@ export function framePadding(ring) {
 
 /**
  * Wie das Foto in der festen Fläche (Kantenlänge 1) sitzt: `photo` ist sein Durchmesser, `left`/`top` seine linke obere
- * Ecke - so, dass die ganze Grafik in die Fläche passt und darin mittig steht. Auf drei Stellen abgerundet, damit
- * nichts über den Rand ragt.
+ * Ecke. Seitlich und unten passt die ganze Grafik in die Fläche, oben darf sie bis `overhang` hinausragen. Passt sie
+ * auch ohne Überstand, steht sie mittig; sonst sitzt sie unten auf und ragt oben hinaus. Auf drei Stellen abgerundet,
+ * damit nichts über den Rand ragt.
  */
-export function frameFit(ring) {
+export function frameFit(ring, overhang = TOP_OVERHANG) {
   const [pt, pr, pb, pl] = framePadding(ring);
   const width = 1 + pl + pr;
   const height = 1 + pt + pb;
-  const photo = Math.floor(1000 / Math.max(width, height)) / 1000;
-  return { photo, left: (1 - width * photo) / 2 + pl * photo, top: (1 - height * photo) / 2 + pt * photo };
+  const photo = Math.floor(1000 * Math.min(1 / width, (1 + overhang) / height)) / 1000;
+  const artTop = height * photo <= 1 ? (1 - height * photo) / 2 : 1 - height * photo;
+  return { photo, left: (1 - width * photo) / 2 + pl * photo, top: artTop + pt * photo };
 }
 
 /** Die Bilder eines Rahmens: srcset über 160/320/640 und die Fassung für die Glanz-Maske. */

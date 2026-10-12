@@ -1134,12 +1134,14 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 
 /* ===== Löwen-Rang: Profilrahmen (LevelAvatarFrame.jsx, #1454) =====
    Jede Größe hat eine feste Fläche --lvf-s für Rahmen und Foto, gleich für alle Ränge - der Kopf springt beim
-   Rangwechsel nicht. Das Foto (--lvf-d = Fläche × --lvf-fit) wird je Rang so groß, dass die ganze Grafik samt Schwingen
-   und Krone hineinpasst, und sitzt bei --lvf-left/--lvf-top (lib/loewenRang.js: frameFit). Die Grafik ist --lvf-scale mal
+   Rangwechsel nicht. Das Foto (--lvf-d = Fläche × --lvf-fit) wird je Rang so groß, dass die Grafik seitlich und unten
+   hineinpasst; oben dürfen Krone und Schwingen bis 15 % hinausragen (in Banner oder Hintergrund). Es sitzt bei
+   --lvf-left/--lvf-top (lib/loewenRang.js: frameFit). Der Rahmen nimmt keine Klicks an - was darunter liegt, bleibt
+   bedienbar; nur die Krone der Punktewertung zeigt ihren Titel. Die Grafik ist --lvf-scale mal
    so groß wie das Foto und um --lvf-ox/--lvf-oy verschoben, damit ihr gemessener Ring genau auf dem Foto liegt.
    Listen und klein: nur das Bild, ohne Bewegung. */
 .tls-lvf {
-  --lvf-s: 260px;
+  --lvf-s: 285px;
   --lvf-plate: 0px;
   position: relative;
   flex: none;
@@ -1147,10 +1149,11 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
   height: var(--lvf-s);
   margin-bottom: var(--lvf-plate);
   isolation: isolate;
+  pointer-events: none;
 }
-.tls-lvf--profile { --lvf-s: 200px; }
+.tls-lvf--profile { --lvf-s: 220px; }
 @media (min-width: 640px) {
-  .tls-lvf--profile { --lvf-s: 260px; }
+  .tls-lvf--profile { --lvf-s: 285px; }
 }
 .tls-lvf--card { --lvf-s: 150px; }
 .tls-lvf--list { --lvf-s: 92px; }
@@ -2615,6 +2618,10 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 }
 .tls-tilt__mid {
   transform: perspective(1100px) rotateX(calc(var(--tls-tilt-x, 0deg) * 0.6 * var(--tls-motion-on))) rotateY(calc(var(--tls-tilt-y, 0deg) * 0.6 * var(--tls-motion-on))) translateZ(calc(6px * var(--tls-tilt-on, 0) * var(--tls-motion-on)));
+}
+/* Das Bild nimmt die Maus für die Neigung nur am PC an - dort liegt die Auszeichnung im Banner rechts, nicht darunter. */
+@media (hover: hover) and (min-width: 768px) {
+  .tls-tilt .tls-lvf-photo { pointer-events: auto; }
 }
 
 /* Galerie (#1079): das Bild zoomt beim Drüberfahren leicht, die Beschriftung kommt aus einer Maske von unten; das

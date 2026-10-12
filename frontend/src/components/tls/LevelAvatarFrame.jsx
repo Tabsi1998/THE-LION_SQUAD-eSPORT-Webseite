@@ -101,7 +101,7 @@ const STILL = new Set(["list", "mini"]);
 
 /**
  * Profilbild mit dem Rahmen seines Löwen-Rangs, in einer festen Fläche für alle Ränge.
- * size: "profile" (260 px, auf dem Handy 200), "card" (150), "list" (92) oder "mini" (64, etwa das Podest);
+ * size: "profile" (285 px, auf dem Handy 220), "card" (150), "list" (92) oder "mini" (64, etwa das Podest);
  * `compact` heißt "list". In Listen und klein bleibt nur die Grafik, ohne Glanz und ohne Schild.
  * Die Kinder füllen das runde Foto.
  */
