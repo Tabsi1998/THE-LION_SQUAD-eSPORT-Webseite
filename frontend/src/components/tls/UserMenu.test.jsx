@@ -25,6 +25,7 @@ function renderMenu() {
 
 beforeEach(() => {
   authState.isAdmin = false;
+  authState.adminNeedsSecondFactor = false;
   authState.isClubMember = false;
   authState.logout.mockReset();
   apiMock.get.mockReset();
@@ -74,4 +75,17 @@ test("Abmelden ruft die Abmeldung auf und schließt das Menü", async () => {
   await user.click(screen.getByTestId("nav-logout"));
   expect(authState.logout).toHaveBeenCalledTimes(1);
   expect(screen.queryByTestId("nav-user-menu")).toBeNull();
+});
+
+test("ein Admin ohne Zwei-Faktor (#1028) sieht statt „Admin“ den Hinweis „2FA einrichten“", async () => {
+  const user = userEvent.setup();
+  authState.isAdmin = true;
+  authState.adminNeedsSecondFactor = true;
+  renderMenu();
+
+  await user.click(screen.getByTestId("nav-user"));
+  expect(screen.queryByTestId("nav-admin")).toBeNull();
+  const hint = screen.getByTestId("nav-mfa-setup");
+  expect(hint).toHaveTextContent("2FA einrichten");
+  expect(hint).toHaveAttribute("href", "/profile?tab=security&mfa=required&next=%2Fadmin");
 });

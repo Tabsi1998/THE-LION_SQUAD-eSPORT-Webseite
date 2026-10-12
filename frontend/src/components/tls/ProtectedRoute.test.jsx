@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 // Rechte nach Bereichen (#287): eine Seite verlangt einen Bereich, nicht einen Rang.
 
@@ -8,6 +8,11 @@ vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 
 const { ProtectedRoute } = await import("./ProtectedRoute");
 
+function MfaSetup() {
+  const { search } = useLocation();
+  return <div data-testid="mfa-setup" data-search={search}>mfa einrichten</div>;
+}
+
 function renderAt(path, element) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -15,7 +20,7 @@ function renderAt(path, element) {
         <Route path={path} element={element} />
         <Route path="/403" element={<div>verboten</div>} />
         <Route path="/login" element={<div>anmelden</div>} />
-        <Route path="/profile" element={<div>mfa einrichten</div>} />
+        <Route path="/profile" element={<MfaSetup />} />
       </Routes>
     </MemoryRouter>
   );
@@ -71,4 +76,40 @@ test("requireAdmin heißt irgendein Adminbereich; ohne Anmeldung geht es zum Log
   authState.user = null;
   renderAt("/admin", <ProtectedRoute requireAdmin><div>tageszentrale</div></ProtectedRoute>);
   expect(screen.getByText("anmelden")).toBeInTheDocument();
+});
+
+// Turnierleitung (#1028): derselbe Vertrag wie im Server - die Leitung über alle Turniere (Rolle oder Freigabe) nur mit
+// bestätigter Zwei-Faktor-Anmeldung, Helfer mit Einsatz ohne. Wer sonst einen Adminbereich hat, kommt nur als Helfer hinein.
+test("die Turnierleitung mit Zwei-Faktor kommt in die Turnierseiten", () => {
+  authState.user = { id: "u", role: "tournament_admin", areas: ["tournaments", "moderation"], is_tournament_staff: true, ...mfa };
+  renderAt("/admin/tournaments", <ProtectedRoute requireTournamentStaff><div>turniere</div></ProtectedRoute>);
+  expect(screen.getByText("turniere")).toBeInTheDocument();
+});
+
+test("die Turnierleitung ohne Zwei-Faktor geht zur Einrichtung - aus Rolle wie aus Freigabe", () => {
+  const leads = [
+    { id: "u", role: "tournament_admin", areas: ["tournaments", "moderation"], is_tournament_staff: true, mfa_enabled: false },
+    { id: "u", role: "tournament_admin", areas: ["tournaments", "moderation"], is_tournament_staff: true, mfa_enabled: true, auth_mfa_verified: false },
+    { id: "u", role: "player", areas: ["tournaments"], is_tournament_staff: true, mfa_enabled: false },
+  ];
+  for (const lead of leads) {
+    authState.user = lead;
+    const view = renderAt("/admin/f1", <ProtectedRoute requireTournamentStaff><div>fast lap</div></ProtectedRoute>);
+    expect(screen.queryByText("fast lap")).toBeNull();
+    const params = new URLSearchParams(screen.getByTestId("mfa-setup").dataset.search);
+    expect(Object.fromEntries(params)).toEqual({ tab: "security", mfa: "required", next: "/admin/f1" });
+    view.unmount();
+  }
+});
+
+test("ein Helfer mit Einsatz kommt ohne Zwei-Faktor hinein, ein anderer Adminbereich ohne Einsatz nicht", () => {
+  const page = <ProtectedRoute requireTournamentStaff><div>turniere</div></ProtectedRoute>;
+  authState.user = { id: "u", role: "player", areas: [], is_tournament_staff: true, mfa_enabled: false };
+  const helper = renderAt("/admin/tournaments", page);
+  expect(screen.getByText("turniere")).toBeInTheDocument();
+  helper.unmount();
+
+  authState.user = { id: "u", role: "player", areas: ["content"], is_tournament_staff: false, ...mfa };
+  renderAt("/admin/tournaments", page);
+  expect(screen.getByText("verboten")).toBeInTheDocument();
 });

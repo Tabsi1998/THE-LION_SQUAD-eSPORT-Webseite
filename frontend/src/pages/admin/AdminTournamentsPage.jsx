@@ -51,7 +51,8 @@ export default function AdminTournamentsPage() {
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
   const confirm = useConfirm();
   const load = useCallback(async () => {
-    const { data } = await api.get("/tournaments?include_drafts=true");
+    // Verwaltungsliste (#1028): die Turnierleitung bekommt alle Turniere, Helfer nur die ihres Einsatzes.
+    const { data } = await api.get("/tournaments?include_drafts=true&managed=true");
     setList(data);
   }, []);
   useEffect(() => { load(); }, [load]);

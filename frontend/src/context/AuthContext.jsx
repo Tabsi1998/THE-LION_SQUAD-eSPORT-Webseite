@@ -1,4 +1,4 @@
-import { areasOf, hasArea, isAnyAdmin } from "@/lib/permissions";
+import { adminWithoutSecondFactor, areasOf, hasArea, isAnyAdmin } from "@/lib/permissions";
 import { clearRecentSearches } from "@/lib/recentSearches";
 import { clearOfflineCard, offlineCardOwner } from "@/lib/memberCardOffline";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
@@ -165,13 +165,15 @@ export function AuthProvider({ children }) {
   const areas = areasOf(user);
   const can = (...wanted) => hasArea(user, ...wanted);
   const isAdmin = Boolean(user) && isAnyAdmin(user);
+  // Adminbereich, aber noch ohne bestätigte Zwei-Faktor-Anmeldung (#1028): Menüs zeigen „2FA einrichten“ statt „Admin“.
+  const adminNeedsSecondFactor = adminWithoutSecondFactor(user);
   const isModerator = Boolean(user) && (user.is_tournament_staff || isAdmin || hasArea(user, "moderation"));
   const isSuperAdmin = user?.role === "superadmin";
   const isClubMember = !!user?.is_club_member;
   const userType = user?.user_type || (user ? "community_user" : "guest");
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, completeMfa, mfaTicket, setMfaTicket, register, logout, error, isAdmin, isModerator, isSuperAdmin, isClubMember, areas, can, userType, refresh: fetchMe, googleAuthenticate, googleLink, googleProcessing }}>
+    <AuthContext.Provider value={{ user, setUser, login, completeMfa, mfaTicket, setMfaTicket, register, logout, error, isAdmin, adminNeedsSecondFactor, isModerator, isSuperAdmin, isClubMember, areas, can, userType, refresh: fetchMe, googleAuthenticate, googleLink, googleProcessing }}>
       {children}
     </AuthContext.Provider>
   );

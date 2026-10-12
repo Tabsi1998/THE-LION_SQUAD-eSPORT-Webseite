@@ -48,7 +48,7 @@ export default function AdminStationsPage() {
 
   const load = useCallback(async () => {
     try {
-      const { data: t } = await api.get("/tournaments?include_drafts=true");
+      const { data: t } = await api.get("/tournaments?include_drafts=true&managed=true");
       const rows = Array.isArray(t) ? t.filter(Boolean) : [];
       setTournaments(rows);
       setActiveTid((current) => rows.some((row) => row.id === current) ? current : rows?.[0]?.id || "");

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronDown, Crown, LogOut, Shield } from "lucide-react";
+import { ChevronDown, Crown, LogOut, Shield, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { resolveMediaUrl } from "@/lib/api";
+import { mfaSetupPath } from "@/lib/permissions";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { userMenuEntries, userMenuTestId } from "@/pages/user/profile/constants";
 
@@ -32,7 +33,7 @@ const adminClass = `${itemBase} text-[#29B6E8] hover:bg-[#29B6E8]/10`;
 const logoutClass = `${itemBase} w-full text-left text-[#FF3B30] hover:bg-[#FF3B30]/10 border-t border-white/10`;
 
 export function UserMenu() {
-  const { user, logout, isAdmin, isClubMember } = useAuth();
+  const { user, logout, isAdmin, adminNeedsSecondFactor, isClubMember } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const boxRef = useRef(null);
@@ -94,7 +95,10 @@ export function UserMenu() {
           {isClubMember ? (
             <Link to="/members/area" role="menuitem" onClick={close} data-testid="nav-member-area" className={memberClass}><Crown className="w-3.5 h-3.5" /> Mitgliederbereich</Link>
           ) : null}
-          {isAdmin ? (
+          {/* Ohne bestätigte Zwei-Faktor-Anmeldung (#1028) führt der Eintrag zur Einrichtung statt in die Verwaltung. */}
+          {isAdmin && adminNeedsSecondFactor ? (
+            <Link to={mfaSetupPath("/admin")} role="menuitem" onClick={close} data-testid="nav-mfa-setup" className={adminClass}><ShieldCheck className="w-3.5 h-3.5" /> 2FA einrichten</Link>
+          ) : isAdmin ? (
             <Link to="/admin" role="menuitem" onClick={close} data-testid="nav-admin" className={adminClass}><Shield className="w-3.5 h-3.5" /> Admin</Link>
           ) : null}
           <button type="button" role="menuitem" onClick={doLogout} data-testid="nav-logout" className={logoutClass}>

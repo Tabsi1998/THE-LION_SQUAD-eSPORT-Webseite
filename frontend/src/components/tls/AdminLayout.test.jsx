@@ -1,9 +1,19 @@
 // Adminmenü (#408): wer „den Verein pflegen“ will, findet alles in einer Gruppe; Finanzen sind
 // eine eigene Gruppe; Rechte je Eintrag bleiben wie vorher.
 
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: null, logout: () => {} }) }));
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 
-const { ADMIN_GROUPS, navGroupsFor } = await import("./AdminLayout");
+const authState = { user: null, logout: () => {} };
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
+vi.mock("@/hooks/usePublicSiteSettings", () => ({ usePublicSiteSettings: () => ({}) }));
+
+const { ADMIN_GROUPS, AdminLayout, navGroupsFor } = await import("./AdminLayout");
+
+// jsdom kennt kein scrollIntoView; das Menü führt damit zum aktiven Eintrag.
+beforeAll(() => {
+  window.Element.prototype.scrollIntoView = () => {};
+});
 
 function group(label) {
   return ADMIN_GROUPS.find((entry) => entry.label === label);
@@ -52,7 +62,7 @@ test("Finanzen sind eine eigene Gruppe; Dolibarr liegt bei den Mitgliedern (#512
 
 // Wegweiser: Reiter der Einstellungen und der Dolibarr-Seite sind nur über die Suche sichtbar -
 // „Steam“ führt zu „Login & Konten“, „Wortfilter“ zur Moderation, ohne dass das Menü länger wird.
-const SYSTEM_USER = { role: "superadmin" };
+const SYSTEM_USER = { role: "superadmin", mfa_enabled: true, auth_mfa_verified: true };
 
 test("ohne Suche bleiben die Wegweiser-Einträge unsichtbar", () => {
   const items = navGroupsFor(SYSTEM_USER, "").flatMap((entry) => entry.items);
@@ -112,4 +122,56 @@ test("TV & Beamer (#1110): ein Eintrag unter eSports, nur mit dem Bereich Turnie
   expect(find("fernseher")).toContain("/admin/tv");
   expect(find("anzeige-schlüssel")).toContain("/admin/tv");
   expect(find("beamer", { role: "moderator" })).not.toContain("/admin/tv");
+});
+
+// Turnierleitung ohne Zwei-Faktor (#1028): im Menü keine Verwaltungs-Einträge, die der Server dann ablehnt, sondern
+// der Hinweis „2FA einrichten“. Moderation braucht keine Zwei-Faktor-Anmeldung und bleibt.
+const LEAD = { role: "tournament_admin", areas: ["tournaments", "moderation"], is_tournament_staff: true, mfa_enabled: true, auth_mfa_verified: true };
+const LEAD_WITHOUT_MFA = { ...LEAD, auth_mfa_verified: false };
+
+test("die Turnierleitung ohne Zwei-Faktor sieht keine Verwaltungs-Einträge - auch nicht über die Suche", () => {
+  const targets = (user, query = "") => navGroupsFor(user, query).flatMap((entry) => entry.items).map((item) => item.to);
+  expect(targets(LEAD)).toEqual(expect.arrayContaining(["/admin", "/admin/tournaments", "/admin/f1", "/admin/stations", "/admin/seasons", "/admin/prizes", "/admin/moderation"]));
+  expect(targets(LEAD_WITHOUT_MFA)).toEqual(["/admin/moderation"]);
+  expect(targets(LEAD_WITHOUT_MFA, "beamer")).toEqual([]);
+  // Mit Freigabe statt Rolle gilt dasselbe.
+  expect(targets({ role: "player", areas: ["tournaments"], is_tournament_staff: true, mfa_enabled: false })).toEqual([]);
+});
+
+test("ein Helfer sieht ohne Zwei-Faktor nur seine Turnierseiten", () => {
+  const helper = { role: "player", areas: [], is_tournament_staff: true, mfa_enabled: false };
+  const targets = navGroupsFor(helper, "").flatMap((entry) => entry.items).map((item) => item.to);
+  expect(targets).toEqual(["/admin/tournaments", "/admin/f1", "/admin/stations"]);
+});
+
+function renderLayout(path = "/admin/moderation") {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <AdminLayout><div>inhalt</div></AdminLayout>
+    </MemoryRouter>,
+  );
+}
+
+test("statt der Verwaltung steht im Menü „2FA einrichten“ - mit dem Weg zurück", () => {
+  authState.user = LEAD_WITHOUT_MFA;
+  const view = renderLayout();
+  const hint = screen.getByTestId("admin-nav-mfa-setup");
+  expect(hint).toHaveTextContent("2FA einrichten");
+  expect(hint).toHaveAttribute("href", "/profile?tab=security&mfa=required&next=%2Fadmin%2Fmoderation");
+  expect(screen.queryByTestId("admin-nav-tournaments")).toBeNull();
+  expect(screen.getByTestId("admin-nav-moderation")).toBeInTheDocument();
+  view.unmount();
+
+  authState.user = LEAD;
+  const confirmed = renderLayout("/admin/tournaments");
+  expect(screen.queryByTestId("admin-nav-mfa-setup")).toBeNull();
+  expect(screen.getByTestId("admin-nav-tournaments")).toBeInTheDocument();
+  confirmed.unmount();
+
+  // Helfer brauchen keine Zwei-Faktor-Anmeldung - also auch keinen Hinweis.
+  authState.user = { role: "player", areas: [], is_tournament_staff: true, mfa_enabled: false };
+  renderLayout("/admin/tournaments");
+  expect(screen.queryByTestId("admin-nav-mfa-setup")).toBeNull();
+  expect(screen.getByTestId("admin-nav-tournaments")).toBeInTheDocument();
+  authState.user = null;
 });

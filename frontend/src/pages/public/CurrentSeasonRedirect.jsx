@@ -7,7 +7,7 @@ import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { hasArea } from "@/lib/permissions";
+import { canUseArea, hasArea, mfaSetupPath } from "@/lib/permissions";
 import { ArrowRight, CalendarDays, Settings, Trophy } from "lucide-react";
 import { asInstant, viennaDate } from "@/lib/vienna";
 
@@ -86,6 +86,8 @@ export default function CurrentSeasonRedirect() {
 
   const { latest, earlier, next } = overview;
   const canSetUp = hasArea(user, "tournaments");
+  // Ohne bestätigte Zwei-Faktor-Anmeldung (#1028) führt der Knopf zur Einrichtung - die Verwaltung lehnt sonst ab.
+  const canOpenAdmin = canUseArea(user, "tournaments");
 
   return (
     <PublicLayout>
@@ -131,8 +133,8 @@ export default function CurrentSeasonRedirect() {
           <div className="border border-dashed border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-5" data-testid="season-admin-guide">
             <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]"><Settings className="w-3.5 h-3.5" /> Für die Turnierleitung</div>
             <p className="mt-2 text-sm text-white/75">Gerade läuft keine Saison. Lege in der Verwaltung eine Saison an und setze sie auf aktiv – dann öffnet diese Seite automatisch Rangliste, Punkte und Top-Spieler.</p>
-            <Link to="/admin/seasons" className="tls-btn tls-btn--secondary mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
-              Zu den Saisons <ArrowRight className="w-3.5 h-3.5" />
+            <Link to={canOpenAdmin ? "/admin/seasons" : mfaSetupPath("/admin/seasons")} className="tls-btn tls-btn--secondary mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+              {canOpenAdmin ? "Zu den Saisons" : "2FA einrichten"} <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         )}
