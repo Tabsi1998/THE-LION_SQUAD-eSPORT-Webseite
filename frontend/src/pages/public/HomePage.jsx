@@ -23,6 +23,7 @@ import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
 import { eventSortTime, scheduleLine } from "@/lib/eventDays";
+import { childSummary, nestUnderEvents } from "@/lib/eventGroups";
 import { PublicErrorState } from "@/components/tls/PublicEmptyState";
 import { problemKind } from "@/lib/loadProblem";
 
@@ -62,7 +63,8 @@ export default function HomePage() {
   useApiInvalidation(load, ["home", "tournaments", "events", "news", "f1", "sponsors", "settings"]);
   useHomeStructuredData(state);
   // Ein Stand, eine Liste: sonst sähe der Änderungsvergleich in NextUp bei jedem Tick neue Objekte.
-  const timeline = useMemo(() => (state ? buildHomeTimeline(state).slice(0, 5) : []), [state]);
+  // Ein Event mit seinen Turnieren und Fast Laps ist eine Zeile (#1182) - aus drei Karten wird eine.
+  const timeline = useMemo(() => (state ? nestUnderEvents(buildHomeTimeline(state)).slice(0, 5) : []), [state]);
   const primaryNews = state?.featured_news?.[0] || state?.news?.[0] || null;
   const newsItems = homeNews(state, primaryNews?.id).slice(0, 3);
   const isEmptyHome = state && !state.has_live && !timeline.length && !primaryNews && !newsItems.length;
@@ -444,6 +446,11 @@ function NextUp({ items }) {
                     {isChanged && <span className="tls-new-chip" data-testid="home-next-new">Neu</span>}
                   </div>
                   {counts && <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/55 tabular-nums" data-testid="home-live-counts"><Users className="w-3 h-3" /> {counts}</div>}
+                  {item.children?.length > 0 && (
+                    <div className="mt-1 text-xs text-white/55 line-clamp-2" data-testid={`home-next-children-${item.slug || item.id}`}>
+                      {childSummary(item.children.map((child) => ({ kind: child.kind })))}: {item.children.map((child) => child.label).join(", ")}
+                    </div>
+                  )}
                 </div>
               </div>
               {/* Einzeilig (#832): die Plakette brach in der schmalen Spalte um - jetzt so breit wie nötig. */}

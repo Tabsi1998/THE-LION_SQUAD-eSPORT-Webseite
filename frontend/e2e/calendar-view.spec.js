@@ -16,14 +16,24 @@ const MEETING = {
   day: "2026-12-05", status: "invited", phase: { label: "Eingeladen", state: "invited" }, location: "Vereinsheim", path: "/members/meetings?meeting=7", visibility: "members", mine: false, marker: "meeting",
 };
 
-async function mockApi(page) {
+// Eigene Anmeldung (#1189): das Turnier gehört Paula, die LAN nicht.
+const CUP = {
+  id: "t-cup", kind: "tournament", slug: "cup", title: "Winter-Cup", start: "2026-12-12T19:00:00+01:00", end: null, status: "registration_open",
+  phase: { label: "Anmeldung offen", state: "registration_open" }, location: "Mario Kart 8", path: "/tournaments/cup", visibility: "public", mine: true, marker: null,
+};
+
+async function mockApi(page, { personal = { active: false, created_at: null, last_used_at: null } } = {}) {
   await page.clock.setFixedTime(new Date("2026-12-02T10:00:00+00:00"));
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
   });
   await page.route("**/api/**", (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (path === "/api/calendar") return route.fulfill(json({ items: [...LAN, MEETING], signed_in: true, feed_path: "/api/calendar/feed.ics" }));
+    if (path === "/api/calendar") return route.fulfill(json({ items: [...LAN, MEETING, CUP], signed_in: true, feed_path: "/api/calendar/feed.ics" }));
+    if (path === "/api/calendar/personal" && route.request().method() === "POST") {
+      return route.fulfill(json({ active: true, path: "/api/calendar/personal/beispiel-token-zum-testen.ics", created_at: "2026-12-02T10:00:00+00:00", last_used_at: null }));
+    }
+    if (path === "/api/calendar/personal") return route.fulfill(json(personal));
     if (path === "/api/settings/public") return route.fulfill(json({ club_name: "THE LION SQUAD", domain: "lionsquad.at" }));
     if (path === "/api/auth/me") return route.fulfill(json({ detail: "anonym" }, 401));
     return route.abort();
@@ -66,5 +76,24 @@ test.describe("Kalender-Ansicht", () => {
     expect(Math.abs(barBox.x + barBox.width - (last.x + last.width))).toBeLessThanOrEqual(2);
     await expect(page.getByTestId("calendar-dot-2026-12-05-club")).toBeVisible();
     await testInfo.attach("kalender-monat-1440.png", { body: await page.screenshot(), contentType: "image/png" });
+  });
+
+  test("bei 390 px: „Nur meine“ und der persönliche Link passen ins Bild", async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockApi(page);
+    await page.goto("/calendar");
+    const list = page.getByTestId("calendar-list");
+    await expect(list.getByTestId("calendar-item-event-e-lan")).toBeVisible();
+    await page.getByTestId("calendar-only-mine").click();
+    await expect(list.getByTestId("calendar-item-event-e-lan")).toHaveCount(0);
+    await expect(list.getByTestId("calendar-item-tournament-t-cup")).toBeVisible();
+
+    await page.getByTestId("calendar-personal-create").click();
+    await expect(page.getByTestId("calendar-personal-feed-url")).toHaveValue(/\/api\/calendar\/personal\/beispiel-token-zum-testen\.ics$/);
+    await expect(page.getByTestId("calendar-personal-webcal")).toHaveAttribute("href", /^webcal:\/\//);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    await page.getByTestId("calendar-personal").scrollIntoViewIfNeeded();
+    await testInfo.attach("kalender-persoenlich-390.png", { body: await page.screenshot(), contentType: "image/png" });
   });
 });
