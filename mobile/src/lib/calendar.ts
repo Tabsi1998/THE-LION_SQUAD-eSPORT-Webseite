@@ -20,6 +20,8 @@ export type CalendarItem = {
   /** Ein ganzer Tag (Versammlung ohne Uhrzeit) - `day` ist dann der Kalendertag „JJJJ-MM-TT“. */
   allDay?: boolean;
   day?: string | null;
+  /** Vereinstermine (#1190): der Weg in den Mitgliederbereich, z. B. „/members/meetings?meeting=7“. */
+  path?: string | null;
 };
 
 /** „JJJJ-MM-TT“ und der Tag danach - am Kalender gezählt, für ganze Tage. */
@@ -35,6 +37,7 @@ const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const MONTHS = ["Jänner", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 // Ein Termin, der länger dauert, belegt höchstens so viele Tage - ein offenes Ende füllt sonst das Jahr.
 const MAX_SPAN_DAYS = 31;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const WEEKDAY_LABELS = WEEKDAYS;
 
@@ -81,37 +84,101 @@ function parseIso(value?: string | null): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+/** Die Wiener Tage, die ein Termin berührt - offene Enden gekappt. */
+function coveredDays(item: CalendarItem): string[] {
+  const start = parseIso(item.start);
+  if (!start) return [];
+  const end = parseIso(item.end) || start;
+  const cursor = parseDay(viennaDay(start));
+  const last = parseDay(viennaDay(end));
+  const keys: string[] = [];
+  while (cursor.getTime() <= last.getTime() && keys.length < MAX_SPAN_DAYS) {
+    keys.push(dayKey(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return keys;
+}
+
 /** Termine je Tag - ein mehrtägiger Termin steht an jedem Tag, den er berührt. */
 export function itemsByDay(items: CalendarItem[]): Map<string, CalendarItem[]> {
   const map = new Map<string, CalendarItem[]>();
   for (const item of items) {
-    const start = parseIso(item.start);
-    if (!start) continue;
-    const end = parseIso(item.end) || start;
-    const cursor = parseDay(viennaDay(start));
-    const last = parseDay(viennaDay(end));
-    let steps = 0;
-    while (cursor.getTime() <= last.getTime() && steps < MAX_SPAN_DAYS) {
-      const key = dayKey(cursor);
+    for (const key of coveredDays(item)) {
       const list = map.get(key) || [];
       list.push(item);
       map.set(key, list);
-      cursor.setDate(cursor.getDate() + 1);
-      steps += 1;
     }
   }
   for (const list of map.values()) list.sort((a, b) => a.start.localeCompare(b.start));
   return map;
 }
 
-/** Der Monat, in dem der Kalender aufgeht: der nächste Termin, sonst heute. */
-export function initialMonth(items: CalendarItem[], now: Date = new Date()): { year: number; month: number } {
-  const upcoming = items
-    .map((item) => parseIso(item.start))
-    .filter((date): date is Date => Boolean(date) && (date as Date).getTime() >= now.getTime())
-    .sort((a, b) => a.getTime() - b.getTime())[0];
-  const [year, month] = viennaDay(upcoming || now).split("-").map(Number);
+/** Der Monat, in dem der Kalender aufgeht (#1271): der aktuelle, in Wien gezählt - wie im Web. */
+export function currentMonth(now: Date = new Date()): { year: number; month: number } {
+  const [year, month] = viennaDay(now).split("-").map(Number);
   return { year, month: month - 1 };
+}
+
+export type CalendarSpan = CalendarItem & { days: string[] };
+export type CalendarBar = { item: CalendarSpan; from: number; to: number; lane: number; continuesBefore: boolean; continuesAfter: boolean };
+
+/** Mehrtägig (#1271) heißt mindestens 24 Stunden über mehrere Tage - eine Nachtschicht bis 1 Uhr ist es nicht. */
+function isMultiDay(item: CalendarItem): boolean {
+  const start = parseIso(item.start);
+  const end = parseIso(item.end);
+  return Boolean(start && end && end.getTime() - start.getTime() >= DAY_MS && coveredDays(item).length > 1);
+}
+
+/** Mehrtägiges wird ein Balken (mit seinen Tagen), alles andere bleibt ein Punkt am Tag - dieselbe Rechnung wie im Web. */
+export function splitSpans(items: CalendarItem[]): { spans: CalendarSpan[]; singles: CalendarItem[] } {
+  const spans: CalendarSpan[] = [];
+  const singles: CalendarItem[] = [];
+  for (const item of items) {
+    if (isMultiDay(item)) spans.push({ ...item, days: coveredDays(item) });
+    else singles.push(item);
+  }
+  spans.sort((a, b) => (parseIso(a.start)?.getTime() ?? 0) - (parseIso(b.start)?.getTime() ?? 0));
+  return { spans, singles };
+}
+
+function shiftDay(key: string, delta: number): string {
+  const date = parseDay(key);
+  date.setDate(date.getDate() + delta);
+  return dayKey(date);
+}
+
+/** Die Balken einer Woche: Spalten 0-6, davor/danach weiter, überlappende in eigenen Reihen (höchstens `maxLanes`). */
+export function weekBars(week: CalendarCell[], spans: CalendarSpan[], maxLanes = 3): CalendarBar[] {
+  const runs: Omit<CalendarBar, "lane">[] = [];
+  for (const item of spans) {
+    const days = new Set(item.days);
+    let col = 0;
+    while (col < week.length) {
+      if (!days.has(week[col].key)) {
+        col += 1;
+        continue;
+      }
+      const from = col;
+      while (col < week.length && days.has(week[col].key)) col += 1;
+      const to = col - 1;
+      runs.push({ item, from, to, continuesBefore: days.has(shiftDay(week[from].key, -1)), continuesAfter: days.has(shiftDay(week[to].key, 1)) });
+    }
+  }
+  const startOf = (item: CalendarItem) => parseIso(item.start)?.getTime() ?? 0;
+  runs.sort((a, b) => a.from - b.from || startOf(a.item) - startOf(b.item) || (b.to - b.from) - (a.to - a.from));
+  const laneEnds: number[] = [];
+  const placed: CalendarBar[] = [];
+  for (const run of runs) {
+    let lane = laneEnds.findIndex((end) => end < run.from);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(run.to);
+    } else {
+      laneEnds[lane] = run.to;
+    }
+    if (lane < maxLanes) placed.push({ ...run, lane });
+  }
+  return placed;
 }
 
 // ---------------------------------------------------------------- „In meinen Kalender“

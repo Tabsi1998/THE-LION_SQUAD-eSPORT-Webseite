@@ -1,4 +1,4 @@
-import { calendarWindow, dayKey, googleCalendarUrl, icsFor, initialMonth, itemsByDay, monthMatrix, shiftMonth } from "./calendar";
+import { calendarWindow, currentMonth, dayKey, googleCalendarUrl, icsFor, itemsByDay, monthMatrix, shiftMonth, splitSpans, weekBars } from "./calendar";
 
 // Kalender in der App (#216): Raster ab Montag, Termine je Tag, „In meinen Kalender“.
 
@@ -38,14 +38,34 @@ test("ein Termin steht am Wiener Tag - auch kurz nach Mitternacht und über den 
   expect(map.get("2026-10-04")?.map((item) => item.id)).toEqual(["nacht"]);
   expect(map.get("2026-10-03")).toBeUndefined();
   expect(map.get("2027-01-01")?.map((item) => item.id)).toEqual(["silvester"]);
-  // Halb eins am Neujahrstag in Wien: der Kalender geht im Jänner auf, auch wenn es in UTC noch Dezember ist.
-  expect(initialMonth([{ id: "neujahr", kind: "event", title: "Neujahr", start: "2026-12-31T23:30:00Z" }], new Date("2026-12-01T12:00:00Z"))).toEqual({ year: 2027, month: 0 });
+  // Halb eins am Neujahrstag in Wien: der Kalender steht im Jänner, auch wenn es in UTC noch Dezember ist.
+  expect(currentMonth(new Date("2026-12-31T23:30:00Z"))).toEqual({ year: 2027, month: 0 });
 });
 
-test("der Kalender öffnet beim nächsten Termin, sonst heute", () => {
-  const now = new Date("2026-09-22T12:00:00+02:00");
-  expect(initialMonth([{ id: "a", kind: "event", title: "A", start: "2026-11-05T18:00:00+01:00" }, { id: "b", kind: "event", title: "B", start: "2026-08-01T18:00:00+02:00" }], now)).toEqual({ year: 2026, month: 10 });
-  expect(initialMonth([{ id: "b", kind: "event", title: "B", start: "2026-08-01T18:00:00+02:00" }], now)).toEqual({ year: 2026, month: 8 });
+test("der Kalender öffnet im aktuellen Monat (#1271)", () => {
+  expect(currentMonth(new Date("2026-09-22T12:00:00+02:00"))).toEqual({ year: 2026, month: 8 });
+});
+
+test("Balken (#1271): mehrtägig über die Tage der Woche, über Monatsgrenzen, in eigenen Reihen; Eintägiges bleibt ein Punkt", () => {
+  const lan = { id: "lan", kind: "event" as const, title: "LAN", start: "2026-10-30T18:00:00+01:00", end: "2026-11-02T12:00:00+01:00" };
+  const lap = { id: "lap", kind: "fastlap" as const, title: "Fast Lap", start: "2026-10-31T10:00:00+01:00", end: "2026-11-05T20:00:00+01:00" };
+  const single = { id: "abend", kind: "event" as const, title: "Abend", start: "2026-10-31T18:00:00+01:00" };
+  // Über Mitternacht ist noch nicht mehrtägig: eine Schicht bis 1 Uhr bleibt ein Punkt.
+  const night = { id: "nacht", kind: "club" as const, title: "Schicht", start: "2026-10-31T22:00:00+01:00", end: "2026-11-01T01:00:00+01:00" };
+  const { spans, singles } = splitSpans([lan, lap, single, night]);
+  expect(spans.map((item) => item.id)).toEqual(["lan", "lap"]);
+  expect(singles.map((item) => item.id)).toEqual(["abend", "nacht"]);
+
+  const october = monthMatrix(2026, 9);
+  expect(weekBars(october[october.length - 1], spans).map(({ item, from, to, lane, continuesBefore, continuesAfter }) => [item.id, from, to, lane, continuesBefore, continuesAfter])).toEqual([
+    ["lan", 4, 6, 0, false, true],
+    ["lap", 5, 6, 1, false, true],
+  ]);
+  const november = monthMatrix(2026, 10);
+  expect(weekBars(november[1], spans).map(({ item, from, to, lane, continuesBefore }) => [item.id, from, to, lane, continuesBefore])).toEqual([
+    ["lan", 0, 0, 0, true],
+    ["lap", 0, 3, 1, true],
+  ]);
 });
 
 test("ics und Google-Link tragen Zeitfenster, Ort und Text - ohne Ende zwei Stunden", () => {

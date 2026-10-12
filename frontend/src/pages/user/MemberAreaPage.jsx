@@ -11,15 +11,15 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { feeBadge } from "@/lib/dolibarr";
 import { motionAllowed } from "@/lib/motion";
 import {
-  AREA_JUMPS, MEETING_ANSWERS, areaCard, boardContacts, dateTileParts, eventDateLine, helperEvents, isRecent, jumpEntries, memberEvents, memberNews,
+  AREA_JUMPS, MEETING_ANSWERS, areaCard, boardContacts, dateTileParts, helperEvents, isRecent, jumpEntries, memberNews,
 } from "@/lib/memberArea";
-import { AlertCircle, Bell, Cake, Calendar, CheckCircle2, Eye, FileText, Gamepad2, Gift, HandHelping, MapPin, MessageCircle, Users, Vote } from "lucide-react";
+import { AlertCircle, Bell, Cake, CheckCircle2, Eye, FileText, Gamepad2, Gift, HandHelping, MapPin, MessageCircle, Users, Vote } from "lucide-react";
 import { SteamPresence } from "@/components/tls/SteamPresence";
 import { useSeason } from "@/seasons/SeasonContext";
 import { StickerClaim } from "@/seasons/birthday/StickerClaim";
 import { DiscordServerList } from "@/components/tls/DiscordServerTile";
 import { DiscordVoice } from "@/components/tls/DiscordNow";
-import { viennaDate, viennaDay } from "@/lib/vienna";
+import { viennaDate } from "@/lib/vienna";
 
 // Der Mitgliederbereich (#284, #1336, #1257): oben die eigene Mitgliedskarte mit „Hallo“, „Mitglied seit“ und dem
 // Beitragsstand, darunter die Sprungleiste mit dem, was offen ist („Versammlung · 1 offen“) - am Handy eine Zeile zum
@@ -82,9 +82,7 @@ export default function MemberAreaPage() {
   const [me, setMe] = useState(null);
   const [docs, setDocs] = useState([]);
   const [internalNews, setInternalNews] = useState([]);
-  // Interne Events (#283): die Event-Liste liefert, was ich sehen darf; hier
-  // bleiben nur Mitglieder- und interne Events, die noch anstehen.
-  const [internalEvents, setInternalEvents] = useState([]);
+  // Interne Events stehen seit #1190 nur noch im Events-Bereich (gold markiert) und im Kalender - nicht doppelt hier.
   const [contacts, setContacts] = useState([]);
   const [discordUrl, setDiscordUrl] = useState("");
   // Was offen ist (#1257): offene Versammlungen und Abstimmungen, freie Plätze, neue News und Dokumente, die nächste
@@ -107,7 +105,6 @@ export default function MemberAreaPage() {
       api.get("/membership/me"),
       api.get("/documents", { params: { scope: "club" } }),
       api.get("/news"),
-      api.get("/events?upcoming=true&compact=true&limit=48"),
       api.get("/board?active_only=true"),
       api.get("/settings/public"),
       api.get("/membership/area-summary"),
@@ -115,12 +112,11 @@ export default function MemberAreaPage() {
       api.get("/membership/steam-presence"),
       api.get("/membership/discord-servers"),
       api.get("/membership/discord-voice"),
-    ]).then(([b, m, d, n, e, p, s, sm, hs, sp, ds, dv]) => {
+    ]).then(([b, m, d, n, p, s, sm, hs, sp, ds, dv]) => {
       if (b.status === "fulfilled") setBenefits(Array.isArray(b.value.data) ? b.value.data : []);
       if (m.status === "fulfilled") setMe(m.value.data && typeof m.value.data === "object" ? m.value.data : null);
       if (d.status === "fulfilled") setDocs(Array.isArray(d.value.data) ? d.value.data : []);
       if (n.status === "fulfilled") setInternalNews(memberNews(n.value.data));
-      if (e.status === "fulfilled") setInternalEvents(memberEvents(e.value.data));
       if (p.status === "fulfilled") setContacts(boardContacts(p.value.data));
       if (s.status === "fulfilled") setDiscordUrl(s.value.data?.discord_invite_url || "");
       if (sm.status === "fulfilled" && sm.value.data && typeof sm.value.data === "object" && !Array.isArray(sm.value.data)) setSummary(sm.value.data);
@@ -141,7 +137,7 @@ export default function MemberAreaPage() {
   const showMeetings = Boolean(nextMeeting || openBallots);
   const present = new Set(["karte", showMeetings && "versammlung", helpingSomething && "helfen", internalNews.length && "news", docs.length && "dokumente"].filter(Boolean));
   const [active, pin] = useActiveSection(AREA_ORDER.filter((key) => present.has(key)));
-  const nothingYet = loaded && !internalEvents.length && !docs.length && !benefits.length && !internalNews.length && !showMeetings && !helpingSomething;
+  const nothingYet = loaded && !docs.length && !benefits.length && !internalNews.length && !showMeetings && !helpingSomething;
 
   const jump = useCallback((key) => {
     const element = document.getElementById(key);
@@ -303,22 +299,6 @@ export default function MemberAreaPage() {
               </div>
 
               <div className="xl:col-span-2 space-y-6 min-w-0">
-                {internalEvents.length ? (
-                  <AreaSection title="Interne Events" icon={Calendar} testId="member-area-events" more={{ to: "/events", label: "Alle Events" }}>
-                    <div className="space-y-4">
-                      {internalEvents.slice(0, 3).map((event) => (
-                        <Link key={event.id} to={`/events/${event.slug}`} data-testid={`member-area-event-${event.id}`} className="group flex items-center gap-4">
-                          <DateTile day={viennaDay(event.start_date)} />
-                          <span className="min-w-0">
-                            <span className="block text-[10px] uppercase tracking-widest text-white/45">{eventDateLine(event)}</span>
-                            <span className="block font-bold text-white mt-0.5 break-words group-hover:text-[#29B6E8] transition">{event.name}</span>
-                            {event.location ? <span className="mt-0.5 inline-flex items-center gap-1 text-xs text-white/50"><MapPin className="w-3 h-3" aria-hidden="true" /> {event.location}</span> : null}
-                          </span>
-                        </Link>
-                      ))}
-                    </div>
-                  </AreaSection>
-                ) : null}
 
                 {discordVoice ? (
                   <AreaSection title="Discord jetzt" icon={MessageCircle} testId="member-area-discord-now">

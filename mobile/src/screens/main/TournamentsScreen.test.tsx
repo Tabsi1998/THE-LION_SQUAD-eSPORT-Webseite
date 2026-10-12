@@ -2,6 +2,8 @@ import React from "react";
 import { AccessibilityInfo, Animated, StyleSheet } from "react-native";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { TournamentsScreen } from "./TournamentsScreen";
+import { currentMonth, monthLabel } from "../../lib/calendar";
+import { viennaDay } from "../../lib/vienna";
 
 // Gestaffelte Listen (#1085): die Karten der Events-Seite blenden beim ersten Erscheinen nacheinander ein (70 ms je
 // Stelle, höchstens acht Stufen) - beim Live-Aktualisieren und beim Wechsel des Filters nicht noch einmal, mit
@@ -22,6 +24,10 @@ jest.mock("../../realtime/LiveChangesProvider", () => ({
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 jest.mock("../../components/MediaImage", () => ({ MediaImage: () => null }));
 jest.mock("../../seasons/anchors", () => ({ SeasonPerch: () => null }));
+const mockAuth: { user: Record<string, unknown> | null } = { user: null };
+jest.mock("../../auth/AuthContext", () => ({ useAuth: () => mockAuth }));
+const mockNavigateToUrl = jest.fn();
+jest.mock("../../navigation/rootNavigation", () => ({ navigateToUrl: (...args: unknown[]) => mockNavigateToUrl(...args) }));
 
 const navigation = { navigate: jest.fn() } as never;
 const route = { key: "tournaments", name: "TournamentList" } as never;
@@ -50,6 +56,7 @@ beforeEach(() => {
   jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(false);
   timing = jest.spyOn(Animated, "timing");
   tournaments = [];
+  mockAuth.user = null;
   mockGet.mockImplementation(async (path: string) => ({ data: path === "/tournaments" ? tournaments : [] }));
 });
 afterEach(() => timing.mockRestore());
@@ -131,4 +138,35 @@ test("die Filterknöpfe werden oben nicht abgeschnitten - kein negativer Rand in
       }
     }
   }
+});
+
+// Kalender (#1271, #1190): öffnet im aktuellen Monat; für Mitglieder stehen Versammlungen und eigene Schichten aus
+// /calendar grün dabei, ein Tipp öffnet sie im Mitgliederbereich. Gäste fragen /calendar gar nicht erst.
+test("der Kalender öffnet im aktuellen Monat und zeigt Mitgliedern ihre Versammlung", async () => {
+  const today = viennaDay(new Date());
+  const meeting = { id: "meeting-7", kind: "club", club_kind: "meeting", title: "Generalversammlung", start: `${today}T10:00:00Z`, end: `${today}T11:00:00Z`, path: "/members/meetings?meeting=7", mine: false };
+  mockAuth.user = { id: "u-1", username: "paula" };
+  mockGet.mockImplementation(async (path: string) => ({ data: path === "/calendar" ? { items: [meeting, { id: "e1", kind: "event", title: "Öffentlich", start: `${today}T10:00:00Z` }] } : [] }));
+  await render(<TournamentsScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/calendar"));
+  await fireEvent.press(screen.getByText("Kalender"));
+  const { year, month } = currentMonth();
+  expect(screen.getByTestId("calendar-title").props.children).toBe(monthLabel(year, month));
+  expect(screen.getByTestId(`calendar-dot-${today}-club`)).toBeTruthy();
+  expect(screen.queryByTestId(`calendar-dot-${today}-event`)).toBeNull();
+
+  await fireEvent.press(screen.getByTestId(`calendar-day-${today}`));
+  await fireEvent.press(screen.getByTestId("calendar-club-meeting-7"));
+  expect(mockNavigateToUrl).toHaveBeenCalledWith("/members/meetings?meeting=7");
+
+  await fireEvent.press(screen.getByTestId("calendar-next"));
+  await fireEvent.press(screen.getByTestId("calendar-today"));
+  expect(screen.getByTestId("calendar-title").props.children).toBe(monthLabel(year, month));
+});
+
+test("Gäste laden keine Vereinstermine", async () => {
+  tournaments = [cup(1)];
+  await render(<TournamentsScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Cup 1")).toBeTruthy());
+  expect(mockGet).not.toHaveBeenCalledWith("/calendar");
 });

@@ -2,7 +2,8 @@
 
 `GET /api/calendar` liefert, was die angemeldete Person sehen darf (mit „angemeldet“-Kennzeichen);
 `GET /api/calendar/feed.ics` ist der öffentliche Feed für Kalender-Apps - anonym, ohne
-Personendaten, damit die Adresse weitergegeben werden kann. `GET /api/calendar/events/{id}.ics`,
+Personendaten, damit die Adresse weitergegeben werden kann. Für Mitglieder stehen in der Liste auch Versammlungen und die
+eigenen Helferschichten (#1190, Art „club“). `GET /api/calendar/events/{id}.ics`,
 `.../tournaments/{id}.ics` (#580) und `.../fastlaps/{id}.ics` (#1272) sind ein einzelner Termin zum
 Hinzufügen - nur, was öffentlich ist, mit Erinnerung eine Stunde vorher und bei Turnieren dem Check-in
 im Text; ein mehrtägiges Event liefert mit `?day=2` nur diesen Tag.
@@ -30,6 +31,11 @@ FEED_PATH = "/api/calendar/feed.ics"
 async def calendar(user: dict | None = Depends(get_optional_user)):
     db = get_db()
     items = await calendar_items.collect(db, user)
+    # Versammlungen und eigene Helferschichten (#1190): nur, wer einen Weg zur Vereinsakte hat, bekommt welche - der
+    # Vorstand seine Sitzungen; der öffentliche Feed bleibt ohne sie.
+    club = await club_calendar.club_items(db, user)
+    if club:
+        items = sorted(items + club, key=lambda item: (item["start"], item["kind"], item["title"]))
     return {"items": items, "signed_in": bool(user), "feed_path": FEED_PATH}
 
 
