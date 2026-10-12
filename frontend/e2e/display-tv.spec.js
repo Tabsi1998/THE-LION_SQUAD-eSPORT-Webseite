@@ -21,6 +21,9 @@ async function mockDisplayChrome(page) {
         display_name: "Turnier Staff",
         role: "tournament_admin",
         is_tournament_staff: true,
+        // Die Turnierleitung öffnet den Turnierbaum-TV ohne Anzeige-Schlüssel nur mit Zwei-Faktor (#1028).
+        mfa_enabled: true,
+        auth_mfa_verified: true,
       }),
     });
   });

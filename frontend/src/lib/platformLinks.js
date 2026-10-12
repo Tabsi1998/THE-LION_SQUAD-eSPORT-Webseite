@@ -63,7 +63,7 @@ const ERROR_TEXTS = {
   taken: "Dieses Konto ist schon mit einem anderen Profil verknüpft. Melde dich dort ab oder trenne es zuerst.",
   exchange_failed: "Die Plattform hat die Anmeldung nicht bestätigt. Bitte noch einmal versuchen.",
   platform_error: "Die Plattform hat die Anmeldung abgelehnt – meist fehlt die Rückrufadresse in der Entwickler-Konsole (Einstellungen → Login & Konten).",
-  invalid: "Der Rückruf passte nicht zu deiner Sitzung (zu alt oder verfälscht). Bitte noch einmal starten.",
+  invalid: "Der Rückruf passte nicht zu deiner Sitzung oder war zu alt. Bitte im selben Browser neu starten.",
   not_configured: "Diese Plattform ist auf der Website noch nicht eingerichtet.",
   unknown: "Diese Plattform gibt es nicht.",
 };

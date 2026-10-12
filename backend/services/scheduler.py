@@ -452,6 +452,16 @@ async def _safe_member_announcements():
         _log_task_failure("member_announcements", exc)
 
 
+async def _safe_event_photo_notices():
+    try:
+        from services.event_photos import notify_due
+        res = await notify_due()
+        if res.get("items"):
+            logger.info(f"[scheduler] event_photo_notices {res}")
+    except Exception as exc:
+        _log_task_failure("event_photo_notices", exc)
+
+
 async def _safe_achievement_queue():
     try:
         from services.achievement_queue import flush_awards, process_queue
@@ -887,6 +897,9 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("achievement_queue", _safe_achievement_queue, lease_seconds=120.0), IntervalTrigger(seconds=30), id="achievement_queue",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("member_announcements", _safe_member_announcements), IntervalTrigger(seconds=60), id="member_announcements",
+                  max_instances=1, coalesce=True)
+    # Fotos vom Event (#1185): „Die Fotos sind da“ an die Teilnehmer, einmal je Album.
+    sched.add_job(_single_replica("event_photo_notices", _safe_event_photo_notices), IntervalTrigger(seconds=60), id="event_photo_notices",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("billing_orders", _safe_billing_orders), IntervalTrigger(seconds=120), id="billing_orders",
                   max_instances=1, coalesce=True)

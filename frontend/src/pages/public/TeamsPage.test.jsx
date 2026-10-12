@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 
 // Team-Seite: Termine und letzte Spiele (#1191), „Einladen“ mit Link und QR-Code, Beitreten über den Link.
 // Erfundene Daten, keine echten Personen.
@@ -163,4 +163,82 @@ test("404 ist „Team nicht gefunden“", async () => {
   serve(TEAM, { "/teams/t-1": Object.assign(new Error("404"), { response: { status: 404 } }) });
   renderAt("/teams/t-1");
   expect(await screen.findByTestId("team-missing")).toBeInTheDocument();
+});
+
+// Teamwechsel (#1047): Chat-Entwurf und Anhänge bleiben beim Team, für das sie gedacht waren.
+function GoTo({ to }) {
+  const navigate = useNavigate();
+  return <button type="button" data-testid={`goto-${to}`} onClick={() => navigate(to)}>wechseln</button>;
+}
+
+test("Wechsel zu einem anderen Team: der Team-Chat startet ohne Anhänge des vorigen", async () => {
+  authState.user = { id: "u-cap", username: "neonfalke" };
+  const urlSpies = [vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:vorschau"), vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {})];
+  const other = { ...TEAM, id: "t-2", name: "Lions Valorant", tag: "LVA" };
+  apiMock.get.mockImplementation(async (url) => {
+    const match = String(url).match(/^\/teams\/(t-[12])(\/.*)?$/);
+    if (!match) return { data: {} };
+    const [, id, rest = ""] = match;
+    if (rest === "") return { data: id === "t-1" ? TEAM : other };
+    if (rest === "/overview") return { data: OVERVIEW };
+    if (rest === "/chat") return { data: [] };
+    if (rest === "/level") throw new Error("kein Level");
+    return { data: {} };
+  });
+  apiMock.post.mockImplementation(async (url) => (url === "/chat-attachments" ? { data: { id: "att-t1", kind: "image" } } : { data: {} }));
+  try {
+    render(
+      <MemoryRouter initialEntries={["/teams/t-1"]}>
+        <Routes><Route path="/teams/:id" element={<><GoTo to="/teams/t-2" /><TeamsPage /></>} /></Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByTestId("team-chat");
+    fireEvent.change(screen.getByTestId("team-chat-attach-input"), { target: { files: [new File(["x"], "bild.png", { type: "image/png" })] } });
+    await waitFor(() => expect(screen.getByTestId("chat-attachment-drafts").querySelector('[data-status="ready"]')).not.toBeNull());
+
+    fireEvent.click(screen.getByTestId("goto-/teams/t-2"));
+    expect(await screen.findAllByText("Lions Valorant")).not.toHaveLength(0);
+    await screen.findByTestId("team-chat");
+    expect(screen.queryByTestId("chat-attachment-drafts")).toBeNull();
+  } finally {
+    urlSpies.forEach((spy) => spy.mockRestore());
+    authState.user = null;
+  }
+});
+
+test("Kontowechsel auf der Teamseite: Einladung und Bearbeiten des vorigen Kontos sind zu", async () => {
+  serve();
+  const page = () => (
+    <MemoryRouter initialEntries={["/teams/t-1"]}>
+      <Routes><Route path="/teams/:id" element={<TeamsPage />} /></Routes>
+    </MemoryRouter>
+  );
+  const view = render(page());
+  fireEvent.click(await screen.findByTestId("team-invite-open"));
+  expect(await screen.findByTestId("team-invite-sheet")).toBeInTheDocument();
+
+  authState.user = { id: "u-3", username: "lunabyte" };
+  view.rerender(page());
+
+  await waitFor(() => expect(screen.queryByTestId("team-invite-sheet")).toBeNull());
+});
+
+test("die Anmeldung lädt erst nach der Seite: kein zweiter Aufbau der Teamseite", async () => {
+  authState.user = undefined;
+  serve();
+  const page = () => (
+    <MemoryRouter initialEntries={["/teams/t-1"]}>
+      <Routes><Route path="/teams/:id" element={<TeamsPage />} /></Routes>
+    </MemoryRouter>
+  );
+  const view = render(page());
+  const upcoming = await screen.findByTestId("team-upcoming");
+  const loads = apiMock.get.mock.calls.filter(([url]) => url === "/teams/t-1").length;
+
+  authState.user = { id: "u-cap", username: "neonfalke" };
+  view.rerender(page());
+
+  expect(await screen.findByTestId("team-chat")).toBeInTheDocument();
+  expect(upcoming.isConnected).toBe(true);
+  expect(apiMock.get.mock.calls.filter(([url]) => url === "/teams/t-1")).toHaveLength(loads);
 });

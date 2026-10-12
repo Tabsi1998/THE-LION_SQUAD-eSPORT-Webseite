@@ -1,9 +1,9 @@
-import { hasArea, roleLabel } from "@/lib/permissions";
+import { adminWithoutSecondFactor, canUseArea, hasArea, mfaSetupPath, roleLabel } from "@/lib/permissions";
 import { INTEGRATIONS, MENU_INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
-import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv } from "lucide-react";
+import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { OfflineBar } from "@/components/tls/OfflineBar";
@@ -82,7 +82,8 @@ export const ADMIN_GROUPS = [
     items: [
       { to: "/admin/events", label: "Events", icon: CalendarDays, areas: ["tournaments"] },
       { to: "/admin/news", label: "News", icon: Newspaper, areas: ["content"] },
-      { to: "/admin/gallery", label: "Galerie", icon: ImageIcon, areas: ["content"] },
+      // Eingesandte Fotos (#1186) gibt auch der Vorstand (Vereinsverwaltung) hier frei - ein Ort für die Freigabe.
+      { to: "/admin/gallery", label: "Galerie", icon: ImageIcon, areas: ["content", "club"] },
       { to: "/admin/media", label: "Medien", icon: FolderOpen, areas: ["content"] },
       { to: "/admin/nav", label: "Navigation", icon: Code2, areas: ["content"] },
       { to: "/admin/achievements", label: "Erfolge", icon: Medal, areas: ["content"] },
@@ -219,17 +220,20 @@ function itemMatchesQuery(item, groupLabel, query) {
   return haystack.includes(query);
 }
 
-// Was jemand im Menü sieht: nur seine Bereiche (#287); Wegweiser-Einträge (searchOnly)
-// nur, wenn die Suche sie trifft.
+// Was jemand im Menü sieht: nur seine Bereiche (#287), und die außer Moderation erst mit bestätigter
+// Zwei-Faktor-Anmeldung - wie Seiten und Server (#1028); Wegweiser-Einträge (searchOnly) nur, wenn die Suche sie
+// trifft. Die Turnierseiten (staff) auch für Helfer mit Einsatz - die Turnierleitung ohne Zwei-Faktor nur mit eigenem
+// Einsatz (`has_staff_assignment`).
 export function navGroupsFor(user, query, disabledPlatforms = []) {
   const searchQuery = normalizeSearch(query);
+  const helper = Boolean(user?.has_staff_assignment) || (Boolean(user?.is_tournament_staff) && !hasArea(user, "tournaments"));
   // Abgehakte Plattformen (#558) fehlen im Menü - einschalten geht unter Alle Verbindungen.
   const off = new Set(Array.isArray(disabledPlatforms) ? disabledPlatforms : []);
   return ADMIN_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
       if (item.platform && off.has(item.platform)) return false;
-      const allowed = hasArea(user, ...(item.areas || [])) || (item.staff && Boolean(user?.is_tournament_staff));
+      const allowed = canUseArea(user, ...(item.areas || [])) || (item.staff && helper);
       if (item.searchOnly && !searchQuery) return false;
       return allowed && itemMatchesQuery(item, group.label, searchQuery);
     }),
@@ -300,6 +304,9 @@ export function AdminLayout({ children }) {
   // seiner Bereiche hat; die Seiten der Turnierleitung auch für zugewiesene
   // Helfer (staff). Wer nichts davon hat, sieht kein Menü.
   const visibleGroups = useMemo(() => navGroupsFor(user, navQuery, disabledPlatforms), [disabledPlatforms, navQuery, user]);
+  // Adminbereich ohne bestätigte Zwei-Faktor-Anmeldung (#1028): statt der Einträge, die der Server ablehnt, der Weg
+  // zur Einrichtung - danach zurück auf diese Seite.
+  const mfaHint = adminWithoutSecondFactor(user);
 
   const activeGroup = groupLabelForPath(location.pathname);
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
@@ -386,6 +393,20 @@ export function AdminLayout({ children }) {
         </div>
 
         <nav ref={navRef} className="flex-1 overflow-y-auto p-3 admin-scroll">
+          {mfaHint && (
+            <Link
+              to={mfaSetupPath(location.pathname)}
+              onClick={() => setOpenMobile(false)}
+              data-testid="admin-nav-mfa-setup"
+              className="mb-3 flex items-start gap-3 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/5 px-3 py-2.5 text-sm font-semibold text-[#FFD700] hover:bg-[#FFD700]/10"
+            >
+              <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                <span className="block">2FA einrichten</span>
+                <span className="block text-[11px] font-normal text-white/60">Die Verwaltung öffnet sich erst mit bestätigter Zwei-Faktor-Anmeldung.</span>
+              </span>
+            </Link>
+          )}
           {visibleGroups.map((group) => {
             const open = groupIsOpen(group.label);
             return (
@@ -430,7 +451,7 @@ export function AdminLayout({ children }) {
               </div>
             );
           })}
-          {visibleGroups.length === 0 && (
+          {visibleGroups.length === 0 && (searchQuery || !mfaHint) && (
             <div className="px-3 py-8 text-center text-xs text-white/40">
               <div>Keine Admin-Seite gefunden.</div>
               <button

@@ -98,7 +98,12 @@ test.describe("Oberfläche, Welle 1: Kopfleiste, Menü, Seitenwechsel, Social-Lo
     const header = page.getByTestId("site-header");
     await page.evaluate(() => window.scrollTo(0, 200));
     await expect(header).toHaveAttribute("data-compact", "1");
+    // Erst klicken, wenn der Kopf fertig geschrumpft ist: Playwright rollt den Knopf vor dem Klick „in den Blick“, und
+    // Chromium rollt dafür bei einem klebenden Kopf, der sich gerade bewegt, mitunter an den Seitenanfang - dann ist der
+    // Kopf nach dem Schließen zu Recht wieder hoch, und der Test wäre rot, ohne dass die Seite etwas falsch macht.
+    await page.waitForFunction(() => document.querySelector("[data-testid='site-header']").getAnimations({ subtree: true }).every((animation) => !(animation instanceof window.CSSTransition)));
     await page.getByTestId("nav-mobile-toggle").click();
+    expect(await page.evaluate(() => window.scrollY), "der Klick hat die Seite nicht nach oben gerollt").toBeGreaterThan(24);
     const menu = page.locator("#mobile-navigation");
     await expect(menu).toBeVisible();
     await expect(header).toHaveAttribute("data-compact", "0");

@@ -125,6 +125,19 @@ oben auf der eigenen Seite ein und aus und wählt, wo sie erscheinen (Website, A
 Auftritt → Jahreszeiten stehen beide nur noch zum Lesen; den Hauptschalter, Deko, Wetter und alle anderen Jahreszeiten
 schaltet weiter System.
 
+## Fotos vom Event (#1185, #1186)
+
+**Einsenden** dürfen Mitglieder (wer Mitglieder-Inhalte sieht, siehe unten) – nur ins Album eines Events, vom ersten
+Event-Tag bis sieben Tage nach dem letzten, höchstens 20 Bilder je Person und Album und nur mit dem Haken „Die Personen
+auf den Fotos sind einverstanden“. Gäste sehen den Knopf nicht. Jedes Bild wird neu gespeichert (ohne EXIF und GPS-Ort),
+liegt bis zur Freigabe privat und geht durch die Bildprüfung. **Freigeben oder ablehnen** dürfen Redaktion und
+Vereinsverwaltung (also auch der Vorstand) – an einem Ort, Admin → Galerie; wer nur die Vereinsverwaltung hat, sieht
+dort nur die Einsendungen, nicht die Alben-Verwaltung. Freigeben geht erst, wenn die Bildprüfung nichts gefunden hat;
+abgelehnte Bilder werden gleich gelöscht. Jede Entscheidung steht im Protokoll (`gallery.submission_approve`,
+`gallery.submission_reject`). **„Die Fotos sind da“** geht einmal je Album an die Angemeldeten des Events (Event und
+Turniere, Teams mit allen Mitgliedern) unter „Turnier-Updates“ – bei Mitglieder-Alben nur an Mitglieder, unter
+„Vereinsintern“. Code: `services/event_photos.py`.
+
 ## Mitglieder-Inhalte (#1350)
 
 Inhalte mit der Sichtbarkeit „Nur Mitglieder“ – News, Events, Galerie, Dokumente wie Protokolle, Spielserver,
@@ -188,7 +201,10 @@ Jede Liste lädt für sich: fehlt ein Recht, steht an der Stelle ein Satz, der R
   die Sitzung gilt als bestätigt, auch für Adminbereiche. Die Einrichtung des Codes bleibt für
   Adminbereiche Pflicht (Rückweg, wenn das Gerät weg ist).
 - Wer einen Adminbereich betritt und noch keinen hat, landet unter Profil → Sicherheit mit der
-  Erklärung, warum.
+  Erklärung, warum. Das gilt auch für die Turnierleitung auf den Turnierseiten (Turniere, Fast Lap,
+  Stationen, Turnierbaum-TV, #1028); Helfer mit Einsatz kommen dort ohne Zwei-Faktor hinein. Menü und
+  Knöpfe zeigen ohne bestätigte Zwei-Faktor-Anmeldung keine Verwaltungs-Einträge, sondern „2FA einrichten“.
+  Die Verwaltungsliste der Turniere zeigt Helfern nur die Turniere ihres Einsatzes.
 - **Angemeldet bleiben** (Haken im Login, Standard an): 90 Tage, die mit jeder Nutzung neu
   beginnen. Ohne Haken endet die Sitzung mit dem Browser.
 

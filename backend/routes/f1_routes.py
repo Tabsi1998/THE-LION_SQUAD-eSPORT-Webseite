@@ -140,6 +140,12 @@ async def _has_f1_staff_permission(
     return bool(await db.f1_staff_assignments.find_one(query, {"_id": 0, "id": 1}))
 
 
+async def _assigned_challenge_ids(user: dict | None) -> list[str]:
+    if not user or not user.get("id"):
+        return []
+    return await get_db().f1_staff_assignments.distinct("challenge_id", {"user_id": user["id"], "is_active": {"$ne": False}})
+
+
 async def _require_f1_result_permission(user: dict | None, challenge_id: str) -> None:
     if await _has_f1_staff_permission(user, challenge_id, F1_RESULT_STAFF_ROLES):
         return
@@ -311,17 +317,28 @@ async def list_challenges(
     paged: bool = False,
     compact: bool = False,
     include_drafts: bool = False,
+    managed: bool = False,
     user=Depends(get_optional_user),
 ):
     db = get_db()
     is_staff = _is_staff(user)
+    # Helfer einer Fast Lap sehen deren Entwurf wie die Turnierleitung (#1028).
+    assigned_ids = [] if is_staff else await _assigned_challenge_ids(_auth_user(user))
     q = {}
     if status:
-        if status == "draft" and not (include_drafts and is_staff):
+        if status == "draft" and not (include_drafts and (is_staff or assigned_ids)):
             return []
         q["status"] = status
-    elif not (include_drafts and is_staff):
+    elif include_drafts and is_staff:
+        pass
+    elif include_drafts and assigned_ids:
+        q["$or"] = [{"status": {"$ne": "draft"}}, {"id": {"$in": assigned_ids}}]
+    else:
         q["status"] = {"$ne": "draft"}
+    if managed and not is_staff:
+        # Verwaltungsliste (#1028): ohne die Turnierleitung über alle Fast Laps - dazu gehört die bestätigte
+        # Zwei-Faktor-Anmeldung - nur die Fast Laps des eigenen Helfer-Einsatzes.
+        q["id"] = {"$in": assigned_ids}
     safe_limit = max(1, min(int(limit or 100), 500))
     projection = {"_id": 0}
     if compact:
@@ -337,7 +354,7 @@ async def list_challenges(
     challenges = await db.f1_challenges.find(q, projection).sort("created_at", -1).to_list(fetch_limit)
     visible = []
     for c in challenges:
-        if not await lead_can_see(user, c.get("visibility") or "public"):
+        if c.get("id") not in assigned_ids and not await lead_can_see(user, c.get("visibility") or "public"):
             continue
         await _annotate_reference_policy(c, include_counts=True)
         c["public_phase"] = derive_public_phase(c, "f1")

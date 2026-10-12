@@ -319,6 +319,7 @@ def test_access_token_is_rejected_after_its_session_is_revoked(monkeypatch):
             })),
             memberships=SimpleNamespace(find_one=AsyncMock(return_value=None)),
             tournament_staff_assignments=SimpleNamespace(count_documents=AsyncMock(return_value=0)),
+            f1_staff_assignments=SimpleNamespace(count_documents=AsyncMock(return_value=0)),
         )
         monkeypatch.setattr("auth.get_db", lambda: db)
         token = create_access_token("user-1", "player@example.test", "player", "session-1")

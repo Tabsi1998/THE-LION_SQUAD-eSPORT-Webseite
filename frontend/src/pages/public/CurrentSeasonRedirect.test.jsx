@@ -76,11 +76,19 @@ test("gar keine Saison: ein Satz für Gäste, die Anleitung nur mit dem Bereich 
   expect(screen.queryByText(/Admin-Bereich/)).toBeNull();
   unmount();
 
-  authState.user = { id: "u9", role: "tournament_admin", areas: ["tournaments", "moderation"] };
-  renderPage();
+  authState.user = { id: "u9", role: "tournament_admin", areas: ["tournaments", "moderation"], mfa_enabled: true, auth_mfa_verified: true };
+  const lead = renderPage();
   const guide = await screen.findByTestId("season-admin-guide");
   expect(guide).toHaveTextContent("Lege in der Verwaltung eine Saison an und setze sie auf aktiv");
   expect(guide.querySelector("a")).toHaveAttribute("href", "/admin/seasons");
+  lead.unmount();
+
+  // Ohne Zwei-Faktor (#1028) führt der Knopf zur Einrichtung, nicht in die Verwaltung.
+  authState.user = { id: "u9", role: "tournament_admin", areas: ["tournaments", "moderation"], mfa_enabled: false };
+  renderPage();
+  const hint = await screen.findByTestId("season-admin-guide");
+  expect(hint.querySelector("a")).toHaveAttribute("href", "/profile?tab=security&mfa=required&next=%2Fadmin%2Fseasons");
+  expect(hint.querySelector("a")).toHaveTextContent("2FA einrichten");
 });
 
 test("Auswahl: die zuletzt beendete Wertung, die nächste angelegte, nichts aus der Vergangenheit als „nächste“", () => {

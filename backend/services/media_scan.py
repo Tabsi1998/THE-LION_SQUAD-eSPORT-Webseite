@@ -60,7 +60,7 @@ RACY_LABELS = {"FEMALE_GENITALIA_COVERED", "FEMALE_BREAST_COVERED", "BUTTOCKS_CO
 # Google SafeSearch antwortet mit Wahrscheinlichkeitsstufen; hier ihre Zahl fürs Schwellenmodell.
 LIKELIHOOD = {"VERY_UNLIKELY": 0.05, "UNLIKELY": 0.2, "POSSIBLE": 0.5, "LIKELY": 0.75, "VERY_LIKELY": 0.95}
 PROVIDER_LABELS = {"off": "aus", "local": "Selbst gehostet (NudeNet)", "google_vision": "Google Cloud Vision (SafeSearch)", "fake": "Testanbieter"}
-KIND_LABELS = {"chat": "Chat-Bild", "upload": "Upload", "proof": "Foto vom Ergebnis"}
+KIND_LABELS = {"chat": "Chat-Bild", "upload": "Upload", "proof": "Foto vom Ergebnis", "gallery_submission": "eingesandtes Foto"}
 # Wo ein öffentlicher Upload verwiesen wird - beim Entfernen werden diese Felder geleert.
 REFERENCE_FIELDS = (("users", "avatar_url"), ("users", "banner_url"), ("teams", "logo_url"), ("teams", "banner_url"))
 
@@ -470,8 +470,9 @@ def preview_path(doc: dict) -> Path | None:
     return path if path.is_file() else None
 
 
-# Wo der Stand der Prüfung am Bild steht: Chat-Anhang, Foto vom Ergebnis (#1157) oder Upload der Medienverwaltung.
-REF_COLLECTIONS = {"chat": "chat_attachments", "proof": "match_proof_photos"}
+# Wo der Stand der Prüfung am Bild steht: Chat-Anhang, Foto vom Ergebnis (#1157), eingesandtes Galerie-Foto (#1186)
+# oder Upload der Medienverwaltung.
+REF_COLLECTIONS = {"chat": "chat_attachments", "proof": "match_proof_photos", "gallery_submission": "gallery_submissions"}
 
 
 async def _mark_ref(db, doc: dict, state: str) -> None:
@@ -581,6 +582,8 @@ def _context_label(doc: dict, chat_context: dict | None = None) -> str:
         return {"direct": "Direktnachricht", "team": "Team-Chat", "tournament": "Turnier-Chat", "match": "Match-Chat"}.get(kind, "Chat")
     if doc.get("kind") == "proof":
         return "Foto vom Ergebnis (Match)"
+    if doc.get("kind") == "gallery_submission":
+        return "Eingesandtes Foto (Galerie)"
     scope = context.get("media_scope") or "user"
     return {"user": "Profil/Team", "club": "Verein", "admin": "Admin"}.get(scope, f"Upload ({scope})")
 

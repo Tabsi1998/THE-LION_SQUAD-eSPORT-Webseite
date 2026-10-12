@@ -27,7 +27,7 @@ vi.mock("@/lib/api", () => ({
 // Der Bereich Finanzen (#322) entscheidet, ob das Startgeld (#319) im Formular steht.
 const authState = { areas: [] };
 vi.mock("@/context/AuthContext", () => ({
-  useAuth: () => ({ isAdmin: true, isModerator: true, user: { id: "admin-1", display_name: "Admin" }, can: (area) => authState.areas.includes(area) }),
+  useAuth: () => ({ isAdmin: true, isTournamentLead: true, isModerator: true, user: { id: "admin-1", display_name: "Admin" }, can: (area) => authState.areas.includes(area) }),
 }));
 
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
