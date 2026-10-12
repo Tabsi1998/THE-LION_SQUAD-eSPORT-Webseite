@@ -609,8 +609,9 @@ function PodiumCard({ entry, index, byLevel = false }) {
       >
         {entry.rank}
       </div>
-      <div className={`mx-auto mb-2 sm:mb-3 flex justify-center ${crown ? "pt-4" : ""}`}>
-        <LevelAvatarFrame level={level} crown={crown} compact>
+      {/* Podest: drei Karten nebeneinander, keine Zeilen - der Rahmen nimmt nur den Platz, den sein Rang braucht. */}
+      <div className={`mx-auto mb-2 sm:mb-3 flex justify-center ${crown ? "pt-2" : ""}`}>
+        <LevelAvatarFrame level={level} crown={crown} compact tight>
           {entry.avatar_url ? (
             <SizedImage src={entry.avatar_url} sizes="44px" widths={[160]} alt="" className="w-full h-full" />
           ) : (

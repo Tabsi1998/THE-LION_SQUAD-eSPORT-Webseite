@@ -118,3 +118,11 @@ test("Listen: die Krone steht still (CSS)", () => {
   const rule = css.match(/\.tls-lvf--list \.tls-lvf-crown,\n\.tls-lvf--list \.tls-lvf-crown::before,\n\.tls-lvf--list \.tls-lvf-crown::after,\n\.tls-lvf--list \.tls-lvf-crown-rays \{ animation: none; \}/);
   expect(rule).not.toBeNull();
 });
+
+test("tight: auch klein der genaue Platz des Rangs (Podest)", () => {
+  const list = frame({ level: 12, compact: true }, "liste");
+  const tight = frame({ level: 12, compact: true, tight: true }, "podest");
+  expect(Number(tight.style.getPropertyValue("--lvf-pt"))).toBeLessThan(Number(list.style.getPropertyValue("--lvf-pt")));
+  expect(tight.className).toContain("tls-lvf--list");
+  expect(tight.querySelector(".tls-lvf-shine")).toBeNull();
+});

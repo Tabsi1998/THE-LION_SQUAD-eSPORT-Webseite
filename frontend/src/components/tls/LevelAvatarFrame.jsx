@@ -103,9 +103,11 @@ const artPx = (d, scale) => Math.round(d * scale);
 /**
  * Profilbild mit dem Rahmen seines Löwen-Rangs.
  * size: "profile" (172 px, auf dem Handy 128), "card" (96) oder "list" (44); `compact` heißt "list".
+ * Listen reservieren für alle Ränge denselben Platz, damit Zeilen gleich hoch bleiben. `tight` nimmt auch dort den
+ * genauen Platz des Rangs - für Stellen ohne Zeilen, etwa das Podest mit drei Karten nebeneinander.
  * In Listen bleibt nur die Grafik, ohne Glanz und ohne Schild. Die Kinder füllen das runde Foto.
  */
-export function LevelAvatarFrame({ level, prestige = 0, crown = null, size, className = "", compact = false, showBadge = true, team = false, testId, children }) {
+export function LevelAvatarFrame({ level, prestige = 0, crown = null, size, className = "", compact = false, tight = false, showBadge = true, team = false, testId, children }) {
   const cfg = useMemo(() => levelFrameConfig(level), [level]);
   const variant = FRAME_SIZES[size] ? size : compact ? "list" : "profile";
   const still = variant === "list";
@@ -119,7 +121,7 @@ export function LevelAvatarFrame({ level, prestige = 0, crown = null, size, clas
   const crownStyle = crown ? CROWN_STYLES[crown] : null;
   const plate = showBadge && !still;
   // Außenabstand aus der gemessenen Ausdehnung: Profil und Karte je Rang genau, Listen einheitlich für gleich hohe Zeilen.
-  const [padTop, padRight, padBottom, padLeft] = still ? LIST_PADDING : framePadding(cfg.ring);
+  const [padTop, padRight, padBottom, padLeft] = still && !tight ? LIST_PADDING : framePadding(cfg.ring);
   // In Listen gibt es kein Schild - dort trägt der Rahmen selbst Level und Rang als zugänglichen Namen.
   const label = `${team ? "Team-Level" : "Level"} ${shown}, Rang ${cfg.name}${stars > 0 ? `, Prestige ${stars}` : ""}`;
   useEffect(() => { setLoaded(false); }, [cfg.key]);
