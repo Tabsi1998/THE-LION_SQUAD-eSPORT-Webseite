@@ -91,13 +91,13 @@ async def test_level_stand_prestige_und_ruecknahme(flow):
     res = await flow.get("/api/users/me/level")
     assert res.status_code == 200
     body = res.json()
-    assert body["level"] == 1 and body["xp"] == 0 and body["points"] == 0 and body["title"] == "Rookie" and body["max_level"] == 60
+    assert body["level"] == 1 and body["xp"] == 0 and body["points"] == 0 and body["title"] == "Jungtier" and body["rank"] == 1 and body["max_level"] == 60
     assert {"current_level_points", "next_level_points", "progress", "prestige", "prestige_available", "member_bonus", "login_streak"} <= set(body)
     assert body["prestige_undo_until"] is None
     assert (await flow.post("/api/users/me/prestige")).status_code == 400, "erst ab Level 60"
     await xp.grant(user["id"], "correction", "boost", amount=levels.xp_for_level(60))
     body = (await flow.get("/api/users/me/level")).json()
-    assert body["level"] == 60 and body["title"] == "Legende" and body["prestige_available"] is True
+    assert body["level"] == 60 and body["title"] == "Löwenkönig" and body["rank"] == 12 and body["prestige_available"] is True
     res = await flow.post("/api/users/me/prestige")
     assert res.status_code == 200 and res.json()["prestige"] == 1 and res.json()["level"] == 1
     assert res.json()["prestige_undo_until"], "die App und das Web zeigen, bis wann die Rücknahme geht"
