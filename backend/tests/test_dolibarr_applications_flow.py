@@ -263,13 +263,54 @@ async def test_a_failed_enqueue_leaves_the_decision_open_and_the_next_run_sends_
     assert doc["status"] == "approved" and not doc.get("notified_at"), "ohne Mail in der Warteschlange ist die Entscheidung nicht mitgeteilt"
     assert await mails_to(flow, amelie) == []
     assert "Entscheidungsmail" in caplog.text and "amelie@example.test" not in caplog.text, "Fehler im Protokoll, aber ohne Adresse"
+    assert doc["decision_mail_pending"] is True, "der Fehlschlag ist für den nächsten Lauf markiert"
 
     monkeypatch.setattr(mail_queue, "enqueue_mail", real)
     await dolibarr_applications.refresh_due(flow.db)
     mails = await mails_to(flow, amelie)
     assert len(mails) == 1 and mails[0]["template_key"] == "membership_approve"
-    assert (await flow.db.membership_applications.find_one({"external_id": external_id}))["notified_at"]
+    done = await flow.db.membership_applications.find_one({"external_id": external_id}, {"_id": 0})
+    assert done["notified_at"] and "decision_mail_pending" not in done and "decision_mail_claimed_at" not in done
     await dolibarr_applications.refresh_due(flow.db)
+    assert len(await mails_to(flow, amelie)) == 1
+
+
+@pytest.mark.asyncio
+async def test_old_decisions_without_the_mark_get_no_mail_after_the_update(flow, fake):
+    """Altbestand ohne notified_at (etwa aus der Zeit vor dem Feld) bleibt still - nachgeholt wird nur, was der
+    neue Code selbst als gescheitert markiert hat."""
+    await connect(flow, applications_enabled=True)
+    old = await person(flow, "altbestand")
+    await flow.db.membership_applications.insert_one({
+        "id": "app-alt-entschieden", "user_id": old["id"], "external_id": "web-app-alt-entschieden", "source": "dolibarr",
+        "status": "approved", "decided_by": "dolibarr", "decided_at": "2025-03-01T10:00:00+00:00", "created_at": "2025-02-01T10:00:00+00:00",
+    })
+    result = await dolibarr_applications.refresh_due(flow.db)
+    assert result["notified"] == 0
+    assert await mails_to(flow, old) == []
+    assert not (await flow.db.membership_applications.find_one({"id": "app-alt-entschieden"})).get("notified_at")
+
+
+@pytest.mark.asyncio
+async def test_two_runs_at_once_queue_one_decision_mail(flow, fake, monkeypatch):
+    import asyncio
+
+    from services import mail_queue
+
+    amelie, external_id = await applied(flow, fake)
+    fake.decide(external_id, "accepted")
+    await flow.db.membership_applications.update_one({"external_id": external_id}, {"$set": {"status": "approved", "decided_by": "dolibarr"}})
+    doc = await flow.db.membership_applications.find_one({"external_id": external_id}, {"_id": 0})
+
+    real = mail_queue.enqueue_mail
+
+    async def slow(*args, **kwargs):
+        await asyncio.sleep(0.01)  # beide Läufe sind gleichzeitig mitten im Einreihen
+        return await real(*args, **kwargs)
+
+    monkeypatch.setattr(mail_queue, "enqueue_mail", slow)
+    first, second = await asyncio.gather(dolibarr_applications._notify_decision(flow.db, doc), dolibarr_applications._notify_decision(flow.db, doc))
+    assert sorted([first, second]) == [False, True]
     assert len(await mails_to(flow, amelie)) == 1
 
 

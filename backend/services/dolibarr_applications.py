@@ -36,6 +36,7 @@ CHECK_INTERVAL_SECONDS = 120          # so oft liest die eigene Seite höchstens
 JOB_CHECK_INTERVAL_SECONDS = 600      # der Job liest offene Anträge alle zehn Minuten nach
 RETRY_DELAYS = (60, 300, 900, 3600)   # Sendeversuche nach einem technischen Fehler
 RETRY_MAX = 24
+MAIL_CLAIM_SECONDS = 600              # so lange gehört eine Entscheidungsmail dem Lauf, der sie gerade einreiht
 FORM_FIELDS = ("firstname", "lastname", "phone", "birth", "address", "zip", "town")
 FIELD_LABELS = {"firstname": "Vorname", "lastname": "Nachname", "email": "E-Mail", "phone": "Telefon", "birth": "Geburtsdatum", "address": "Straße und Hausnummer", "zip": "PLZ", "town": "Ort"}
 DURATION_LABELS = {"y": ("je Jahr", "Jahre"), "m": ("je Monat", "Monate"), "w": ("je Woche", "Wochen"), "d": ("je Tag", "Tage")}
@@ -172,19 +173,30 @@ async def _notify_decision(db, doc: dict) -> bool:
     """Die Person erfährt die Entscheidung genau einmal - über dieselbe Mail wie im Admin (#1444).
 
     Mitgeteilt (``notified_at``) ist sie erst, wenn die Mail in der Warteschlange liegt oder die Person
-    Mitgliedschafts-Mails abgeschaltet hat. Scheitert das Einreihen, bleibt ``notified_at`` leer und der
-    nächste Lauf des Jobs versucht es wieder."""
+    Mitgliedschafts-Mails abgeschaltet hat. Vorher beansprucht ein Lauf den Antrag atomar
+    (``decision_mail_claimed_at``) - zwei Läufe zugleich reihen nie zwei Mails ein - und markiert ihn als offen
+    (``decision_mail_pending``). Scheitert das Einreihen (oder bricht der Lauf ab), bleibt die Markierung
+    stehen und der Job holt genau diese Mail nach; Altbestand ohne Markierung fasst er nie an."""
     from services.log_safe import log_safe, mask_addresses
     from services.membership_decision_mail import queue_decision_mail
 
+    now = now_utc()
+    stale = (now - timedelta(seconds=MAIL_CLAIM_SECONDS)).isoformat()
+    claim = await db.membership_applications.update_one(
+        {"id": doc["id"], "notified_at": None, "$or": [{"decision_mail_claimed_at": None}, {"decision_mail_claimed_at": {"$lte": stale}}]},
+        {"$set": {"decision_mail_claimed_at": now.isoformat(), "decision_mail_pending": True}})
+    if claim.modified_count != 1:
+        return False
     user = await db.users.find_one({"id": doc["user_id"]}, {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1, "newsletter_consent": 1, "notification_preferences": 1})
     try:
         await queue_decision_mail(user, approved=doc.get("status") == "approved", note=doc.get("decision_note") or "", application_id=doc["id"])
     except Exception as exc:  # noqa: BLE001 - eine Mail darf den Stand nie blockieren
         logger.warning("[dolibarr] Entscheidungsmail zu Antrag %s nicht eingereiht, der nächste Lauf versucht es wieder: %s: %s",
                        log_safe(doc["id"]), type(exc).__name__, log_safe(mask_addresses(exc), 300))
+        await db.membership_applications.update_one({"id": doc["id"]}, {"$unset": {"decision_mail_claimed_at": ""}})
         return False
-    await db.membership_applications.update_one({"id": doc["id"]}, {"$set": {"notified_at": now_utc().isoformat()}})
+    await db.membership_applications.update_one({"id": doc["id"]}, {
+        "$set": {"notified_at": now_utc().isoformat()}, "$unset": {"decision_mail_pending": "", "decision_mail_claimed_at": ""}})
     return True
 
 
@@ -274,8 +286,9 @@ async def refresh_due(db=None) -> dict:
         if (doc.get("dolibarr") or {}).get("next_try_at", "") <= now:
             await submit(db, client, doc)
             sent += 1
-    # Entschieden, aber die Mail kam beim ersten Mal nicht in die Warteschlange (#1444).
-    async for doc in db.membership_applications.find({"status": {"$in": ["approved", "rejected"]}, "decided_by": "dolibarr", "notified_at": None}, {"_id": 0}):
+    # Entschieden, aber die Mail kam beim ersten Mal nicht in die Warteschlange (#1444) - nur, was der Abgleich
+    # selbst als offen markiert hat; Altbestand ohne notified_at bleibt still.
+    async for doc in db.membership_applications.find({"decision_mail_pending": True, "notified_at": None, "status": {"$in": ["approved", "rejected"]}}, {"_id": 0}):
         notified += await _notify_decision(db, doc)
     due = (now_utc() - timedelta(seconds=JOB_CHECK_INTERVAL_SECONDS)).isoformat()
     async for doc in db.membership_applications.find({"status": "pending", "external_id": {"$exists": True}}, {"_id": 0}):
