@@ -24,7 +24,7 @@ from datetime import datetime
 
 from models import now_utc
 from services.match_disputes import category_label, open_dispute
-from services.match_lead import OPEN_STATUSES, filled_slots, registration_name, timing
+from services.match_timing import OPEN_STATUSES, filled_slots, registration_name, timing
 from services.station_labels import attach_station_info, station_text
 from services.tournament_permissions import result_staff_user_ids
 from services.user_notifications import create_user_notification
