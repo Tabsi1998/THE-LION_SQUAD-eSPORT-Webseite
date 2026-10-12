@@ -16,10 +16,10 @@ function Busy({ label, className = "", children, testId = "skeleton" }) {
 }
 
 /** Ein paar Textzeilen - für Absätze, Hinweise, kurze Listen. */
-export function SkeletonLines({ lines = 3, className = "", label = "Lade Inhalte" }) {
+export function SkeletonLines({ lines = 3, className = "", label = "Lade Inhalte", testId = "skeleton" }) {
   const widths = ["w-3/4", "w-full", "w-5/6", "w-2/3", "w-1/2"];
   return (
-    <Busy label={label} className={`space-y-2.5 ${className}`}>
+    <Busy label={label} className={`space-y-2.5 ${className}`} testId={testId}>
       {Array.from({ length: lines }).map((_, index) => <Bone key={index} className={`h-3.5 ${widths[index % widths.length]}`} />)}
     </Busy>
   );
@@ -97,4 +97,47 @@ export function SkeletonPage({ cards = 3, className = "", label = "Lade Seite" }
       <SkeletonCards count={cards} label={label} />
     </div>
   );
+}
+
+/**
+ * Detailseite in ihrer Form (#1231): Kennzeile, großer Titel, zwei Zeilen, Schilder, drei Kacheln und eine Liste -
+ * so steht beim Laden schon ungefähr da, was kommt, und nichts springt. `bare` lässt den Status weg, wenn der Rahmen
+ * darum ihn schon trägt (PublicLoadingState).
+ */
+export function SkeletonDetailPage({ className = "", label = "Lade Seite", bare = false }) {
+  const body = (
+    <>
+      <div className="space-y-4">
+        <Bone className="h-3 w-32" />
+        <Bone className="h-10 w-4/5 max-w-2xl" />
+        <Bone className="h-4 w-1/2 max-w-md" />
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Bone className="h-7 w-28" />
+          <Bone className="h-7 w-24" />
+          <Bone className="h-7 w-32" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {[0, 1, 2].map((index) => (
+          <div key={index} className="space-y-3 rounded-sm border border-white/10 bg-[#121212] p-4">
+            <Bone className="h-3 w-1/3" />
+            <Bone className="h-6 w-2/3" />
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2">
+        {[0, 1, 2, 3].map((index) => (
+          <div key={index} className="flex items-center gap-3 rounded-sm border border-white/10 bg-[#121212] p-3">
+            <Bone className="h-10 w-10 shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Bone className="h-3.5 w-1/2" />
+              <Bone className="h-3 w-1/3" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+  if (bare) return <div className={`space-y-8 ${className}`} aria-hidden="true">{body}</div>;
+  return <Busy label={label} className={`space-y-8 ${className}`} testId="skeleton-detail">{body}</Busy>;
 }

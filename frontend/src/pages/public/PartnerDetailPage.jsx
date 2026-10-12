@@ -15,6 +15,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { seoTextPreview } from "@/lib/textPreview";
 import { asInstant, viennaDate } from "@/lib/vienna";
+import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 
 // Partnerseite (#469 Teil 1): Kopf mit Logo, Art, „Partner seit“ und Kanal-Symbolen; links der
 // laufende Twitch-Stream (nur wenn live), der Text über den Partner, seine Tools und Projekte
@@ -73,7 +74,7 @@ export default function PartnerDetailPage() {
   useDocumentTitle(partner?.name || "Partner", seoTextPreview(partner?.description, "Partner von THE LION SQUAD eSports."), { image: partner?.logo_url });
 
   if (state === "loading") {
-    return <PublicLayout><div className="p-20 text-center font-display tracking-widest text-white/40">LADE PARTNER …</div></PublicLayout>;
+    return <PublicLayout><PublicLoadingState label="Lade Partner" /></PublicLayout>;
   }
   if (!partner) {
     return (

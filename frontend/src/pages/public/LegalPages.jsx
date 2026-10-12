@@ -6,6 +6,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api } from "@/lib/api";
 import { asInstant, viennaDate } from "@/lib/vienna";
+import { SkeletonLines } from "@/components/tls/Skeleton";
 
 // Rechtstexte kommen fertig als Abschnitte vom Backend (#545, eine Quelle für Website und Crawler-Vorschau):
 // Datenschutz aus den Schaltern, die wirklich an sind, Impressum aus den öffentlichen Vereinsdaten. Hier wird
@@ -132,7 +133,8 @@ export function LegalPage({ page }) {
     <LegalArticle title={doc?.title || meta.title} intro={doc?.intro || meta.intro} updatedAt={doc?.updated_at}>
       <LegalDataNotice ready={doc?.legal_ready} />
       {doc === null ? (
-        <p className="text-white/40" data-testid="legal-loading">Text wird geladen …</p>
+        // Platz für den Text (#1231): die Fußzeile bleibt unten, bis er da ist.
+        <SkeletonLines lines={14} label="Text wird geladen" className="min-h-[100svh]" testId="legal-loading" />
       ) : (
         doc.sections.map((section) => (
           <Section key={section.id} id={section.id} title={section.title}>
