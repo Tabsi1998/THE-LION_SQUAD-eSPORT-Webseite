@@ -128,6 +128,33 @@ def _is_measured(entry: dict) -> bool:
     )
 
 
+def _has_value(entry: dict) -> bool:
+    return entry.get("points") is not None or entry.get("score") is not None or entry.get("time_ms") not in (None, "")
+
+
+def _rank_by_reported_places(match: dict, raw_results: list[dict]) -> list[dict]:
+    """Nur Plätze und „Nicht erschienen“/„Aufgegeben“ (#1156, Zielreihenfolge antippen): die gemeldete Reihenfolge
+    zählt, wer nicht erschienen ist oder aufgegeben hat, rückt nach hinten. Ohne diese Regel würden alle anderen
+    gleich bewertet - in Gruppen, wo Gleichstand erlaubt ist, stünden dann alle auf Platz 1."""
+    allow_draw = match_allows_draw(match)
+
+    def key(item: tuple[int, dict]) -> tuple:
+        entry = item[1]
+        return (bool(entry.get("forfeit")), bool(entry.get("dnf")), int(entry.get("rank") or 0))
+
+    ordered = sorted(enumerate(raw_results), key=lambda item: (key(item), item[0]))
+    next_rows = [dict(entry) for entry in raw_results]
+    rank = 0
+    previous = None
+    for position, item in enumerate(ordered, start=1):
+        current = key(item)
+        if not (allow_draw and previous is not None and current == previous):
+            rank = position
+        next_rows[item[0]]["rank"] = rank
+        previous = current
+    return next_rows
+
+
 def _auto_rank_results(match: dict, raw_results: list[dict]) -> list[dict]:
     """Derive placements from what was measured.
 
@@ -140,6 +167,9 @@ def _auto_rank_results(match: dict, raw_results: list[dict]) -> list[dict]:
     if raw_results and not any(_is_measured(entry) for entry in raw_results) \
             and all(entry.get("rank") is not None for entry in raw_results):
         return [dict(entry) for entry in raw_results]
+    if raw_results and all(entry.get("rank") is not None for entry in raw_results) \
+            and not any(_has_value(entry) for entry in raw_results):
+        return _rank_by_reported_places(match, raw_results)
 
     mode = _ranking_mode(match)
     allow_draw = match_allows_draw(match)

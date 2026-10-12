@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, ClipboardCheck } from "lucide-react";
-import { REPORT_STATE_TEXT, duelResults, heatResults, rankingMode } from "@/lib/matchReport";
-import { slotName } from "@/lib/tournamentLabels";
+import { Check, ClipboardCheck, X } from "lucide-react";
+import { chatAttachmentSrc } from "@/lib/chatAttachments";
+import { viennaDateTime } from "@/lib/vienna";
+import { REPORT_STATE_TEXT, rankingMode } from "@/lib/matchReport";
+import { initialState, inputKind, resultSentence, resultsFor, tapGame } from "@/lib/resultEntry";
+import { BestOfInput, OrderInput, ScoreInput, WinnerInput } from "@/components/tls/results/ResultInputs";
+import { ProofPhotoPicker } from "@/components/tls/results/ProofPhotoPicker";
 
-// Ergebnis melden (#1132): Wer selbst im Spiel steht und melden darf, meldet hier - im Duell, wer gewonnen hat, sonst
-// die Plätze, freiwillig mit Spielstand, Beweis-Link und Notiz. Melden beide Seiten dasselbe, steht das Ergebnis fest;
-// hat die Gegenseite schon gemeldet, genügt „Ja, stimmt“. Weichen die Meldungen ab, entscheidet die Turnierleitung.
+// Ergebnis melden (#1132, #1157): Wer im Spiel steht und melden darf, meldet hier - mit denselben großen Knöpfen wie
+// das Ergebnis-Fenster der Turnierleitung (#1156): Plus/Minus je Seite, bei Best-of je Spiel den Sieger antippen, bei
+// Durchgängen die Zielreihenfolge. Dazu auf Wunsch ein Foto vom Ergebnis. Vor dem Absenden steht der Satz in Worten.
+// Melden beide Seiten dasselbe, steht das Ergebnis fest; hat die Gegenseite schon gemeldet, genügt „Ja, stimmt“.
 
 const TONE = {
   waiting: "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]",
@@ -13,40 +18,59 @@ const TONE = {
   confirm: "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFF2B3]",
 };
 
-function valueLabel(mode) {
-  if (mode === "time") return "Zeit in ms";
-  return mode === "lower_score" ? "Score" : "Punkte";
+/** Ohne Beschreibung vom Server: aus den Teilnehmern der Matchseite. */
+function fallbackEntry(participants, match, allowsDraw) {
+  const sides = participants.filter((participant) => participant.registration_id);
+  return {
+    id: match?.id,
+    kind: sides.length === 2 ? "duel" : "heat",
+    best_of: 1,
+    ranking_mode: rankingMode(match),
+    allows_draw: allowsDraw,
+    participants: sides.map((side) => ({ registration_id: side.registration_id, name: side.display_name || "Teilnehmer" })),
+    advance: {},
+  };
 }
 
-export function MatchReportForm({ participants = [], match = {}, state = null, allowsDraw = false, busy = false, onReport }) {
+function clock(value) {
+  try {
+    return value ? viennaDateTime(value, { hour: "2-digit", minute: "2-digit" }) : "";
+  } catch {
+    return "";
+  }
+}
+
+// `readOnly`: Team-Mitglieder ohne Leitung sehen die Meldung der Gegenseite, bestätigen kann die Teamleitung (#1159).
+// `onWrongResult`: „Stimmt nicht“ öffnet „Problem melden“ mit „Falsches Ergebnis“ (#1158).
+export function MatchReportForm({ participants = [], match = {}, entry: serverEntry = null, state = null, allowsDraw = false, busy = false, readOnly = false, onReport, onWrongResult }) {
   const status = state?.status || "open";
-  const mode = rankingMode(match);
-  const sides = useMemo(() => participants.filter((participant) => participant.registration_id), [participants]);
-  const isDuel = sides.length === 2;
+  const entry = useMemo(() => serverEntry || fallbackEntry(participants, match, allowsDraw), [serverEntry, participants, match, allowsDraw]);
+  const kind = inputKind(entry, "order");
   const [editing, setEditing] = useState(status === "open");
-  const [winner, setWinner] = useState("");
-  const [values, setValues] = useState({});
-  const [rows, setRows] = useState(() => sides.map((side, index) => ({ registration_id: side.registration_id, rank: String(index + 1), value: "" })));
-  const [proofUrl, setProofUrl] = useState("");
+  const [form, setForm] = useState(() => initialState({ ...entry, result: [] }));
+  const [photo, setPhoto] = useState(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const outcome = resultsFor(entry, kind, form);
+  const sentence = outcome.results ? resultSentence({ ...entry, advance: {} }, outcome.results) : "";
 
   // Ein neuer Stand vom Server (gemeldet, bestätigt, abgewichen) schließt das Formular - außer, es ist noch nichts da.
   useEffect(() => { setEditing(status === "open"); }, [status]);
 
-  const nameOf = (participant) => slotName(participant?.display_name, participant, match);
-
   const submit = async (event) => {
     event.preventDefault();
-    const outcome = isDuel ? duelResults({ sides: sides.map((side) => side.registration_id), winner, values, mode }) : heatResults(rows, mode);
     if (outcome.error) {
       setError(outcome.error);
       return;
     }
+    if (photo?.status === "uploading") {
+      setError("Das Foto wird noch hochgeladen – einen Moment.");
+      return;
+    }
     setError("");
-    const done = await onReport({ results: outcome.results, screenshot_url: proofUrl.trim() || null, note: note.trim() || null });
+    const done = await onReport({ results: outcome.results, screenshot_url: null, note: note.trim() || null, photo_id: photo?.status === "ready" ? photo.id : null });
     if (done) {
-      setProofUrl("");
+      setPhoto(null);
       setNote("");
     }
   };
@@ -58,86 +82,58 @@ export function MatchReportForm({ participants = [], match = {}, state = null, a
       {status !== "open" && status !== "agreed" && (
         <div className={`rounded-sm border px-4 py-3 text-sm ${TONE[status] || TONE.waiting}`} data-testid="match-report-state" data-status={status}>
           <p className="font-bold">{REPORT_STATE_TEXT[status]}</p>
-          {status === "confirm" && state?.proposal_summary && <p className="mt-1">Die Gegenseite meldet: <strong>{state.proposal_summary}</strong></p>}
-          {status !== "confirm" && state?.own_summary && <p className="mt-1">Deine Meldung: <strong>{state.own_summary}</strong></p>}
-          {status === "confirm" && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" disabled={busy} onClick={() => onReport({ results: state.proposal, screenshot_url: null, note: null })} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-confirm">
-                <Check className="w-3.5 h-3.5" /> Ja, stimmt
-              </button>
-              {!editing && (
-                <button type="button" onClick={() => setEditing(true)} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="match-report-differs">Nein, anderes Ergebnis</button>
-              )}
-            </div>
+          {/* Bestätigen mit einem Tipp (#1159): die Meldung der Gegenseite in Worten, von wem und wann, mit Foto. */}
+          {status === "confirm" && (state?.proposal_text || state?.proposal_summary) && (
+            <p className="mt-1 text-base font-bold text-white" data-testid="match-report-proposal">{state.proposal_text || `Die Gegenseite meldet: ${state.proposal_summary}`}</p>
           )}
+          {status === "confirm" && state?.proposal_by && <p className="mt-0.5 text-xs opacity-80">gemeldet von {state.proposal_by}{state.proposal_at ? ` um ${clock(state.proposal_at)}` : ""}</p>}
+          {status === "confirm" && state?.proposal_photo?.url && (
+            <a href={chatAttachmentSrc(state.proposal_photo.url)} target="_blank" rel="noreferrer" className="mt-2 block w-32 overflow-hidden rounded-sm border border-white/15" data-testid="match-report-proposal-photo">
+              <img src={chatAttachmentSrc(state.proposal_photo.url, 400)} alt="Foto der Gegenseite" className="h-20 w-full object-cover" />
+            </a>
+          )}
+          {status !== "confirm" && state?.own_summary && <p className="mt-1">Deine Meldung: <strong>{state.own_summary}</strong></p>}
+          {status === "confirm" && (readOnly || state?.can_confirm === false ? (
+            <p className="mt-2 text-xs opacity-80" data-testid="match-report-lead-confirms">Bestätigen kann die Teamleitung.</p>
+          ) : (
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              <button type="button" disabled={busy} onClick={() => onReport({ results: state.proposal, screenshot_url: null, note: null })} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-confirm">
+                <Check className="w-3.5 h-3.5" /> Stimmt
+              </button>
+              <button type="button" disabled={busy} onClick={() => onWrongResult?.()} className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-wrong">
+                <X className="w-3.5 h-3.5" /> Stimmt nicht
+              </button>
+            </div>
+          ))}
           {(status === "waiting" || status === "conflict") && !editing && (
             <button type="button" onClick={() => setEditing(true)} className="mt-2 text-xs font-bold uppercase tracking-wider underline underline-offset-2 hover:text-white" data-testid="match-report-change">Meldung ändern</button>
           )}
         </div>
       )}
 
-      {editing && (
+      {editing && !readOnly && (
         <form onSubmit={submit} className="space-y-4" data-testid="match-report-form" noValidate>
-          {isDuel ? (
-            <>
-              <fieldset>
-                <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Wer hat gewonnen?</legend>
-                <div className="flex flex-wrap gap-2">
-                  {sides.map((side) => (
-                    <button
-                      key={side.registration_id}
-                      type="button"
-                      aria-pressed={winner === side.registration_id}
-                      onClick={() => setWinner(side.registration_id)}
-                      className={`rounded-sm border px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${winner === side.registration_id ? "border-[#29B6E8]/70 bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/10 bg-white/5 text-white/70 hover:border-[#29B6E8]/45"}`}
-                      data-testid={`match-report-winner-${side.registration_id}`}
-                    >
-                      {nameOf(side)}
-                    </button>
-                  ))}
-                  {allowsDraw && (
-                    <button type="button" aria-pressed={winner === "draw"} onClick={() => setWinner("draw")} className={`rounded-sm border px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${winner === "draw" ? "border-[#FFD700]/70 bg-[#FFD700]/15 text-[#FFD700]" : "border-white/10 bg-white/5 text-white/70 hover:border-[#FFD700]/45"}`} data-testid="match-report-draw">
-                      Unentschieden
-                    </button>
-                  )}
-                </div>
-              </fieldset>
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spielstand (freiwillig)</div>
-                <div className="grid grid-cols-2 gap-3">
-                  {sides.map((side) => (
-                    <label key={side.registration_id} className="block min-w-0">
-                      <span className="block text-xs text-white/55 truncate mb-1">{valueLabel(mode)} {nameOf(side)}</span>
-                      <input inputMode="decimal" value={values[side.registration_id] || ""} onChange={(e) => setValues((current) => ({ ...current, [side.registration_id]: e.target.value }))} className="input text-center font-display text-xl font-bold" data-testid={`match-report-value-${side.registration_id}`} />
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="grid gap-3">
-              {rows.map((row, index) => (
-                <div key={row.registration_id} className="grid grid-cols-[minmax(0,1fr)_5rem_7rem] gap-2 items-end border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-                  <div className="font-heading font-bold uppercase truncate">{nameOf(sides.find((side) => side.registration_id === row.registration_id))}</div>
-                  <label className="block">
-                    <span className="block text-[10px] uppercase tracking-widest text-white/45 mb-1">Platz</span>
-                    <input inputMode="numeric" value={row.rank} onChange={(e) => setRows((current) => current.map((item, i) => (i === index ? { ...item, rank: e.target.value } : item)))} className="input text-center font-bold" data-testid={`match-report-rank-${row.registration_id}`} />
-                  </label>
-                  <label className="block">
-                    <span className="block text-[10px] uppercase tracking-widest text-white/45 mb-1">{valueLabel(mode)}</span>
-                    <input inputMode="decimal" value={row.value} onChange={(e) => setRows((current) => current.map((item, i) => (i === index ? { ...item, value: e.target.value } : item)))} className="input text-center font-bold" />
-                  </label>
-                </div>
-              ))}
-            </div>
+          {kind === "score" && <ScoreInput entry={entry} state={form} onChange={setForm} showFlags={false} />}
+          {kind === "bestof" && (
+            <BestOfInput
+              entry={entry}
+              state={form}
+              onChange={setForm}
+              showFlags={false}
+              onTap={(index, winner) => setForm((current) => ({ ...current, games: tapGame(current.games, index, winner, { sides: current.sides, bestOf: entry.best_of }) }))}
+            />
           )}
-          <div className="grid sm:grid-cols-2 gap-3">
-            <input type="url" value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} className="input" placeholder="Screenshot-/Beweis-Link (freiwillig)" />
-            <input value={note} onChange={(e) => setNote(e.target.value)} className="input" placeholder="Notiz für die Turnierleitung (freiwillig)" />
-          </div>
+          {kind === "winner" && <WinnerInput entry={entry} state={form} onChange={setForm} showFlags={false} />}
+          {kind === "order" && <OrderInput entry={entry} state={form} onChange={setForm} showFlags={false} />}
+
+          <ProofPhotoPicker matchId={match.id} value={photo} onChange={setPhoto} />
+          <input value={note} onChange={(e) => setNote(e.target.value)} className="input" placeholder="Notiz für die Turnierleitung (freiwillig)" data-testid="match-report-note" />
+          <p className={`rounded-sm border px-3 py-2 text-sm font-bold ${sentence ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="match-report-sentence">
+            {sentence || outcome.error}
+          </p>
           {error && <p className="text-sm text-[#FF6B60]" role="alert" data-testid="match-report-error">{error}</p>}
           <div className="flex flex-wrap items-center gap-3">
-            <button disabled={busy} className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-submit">Ergebnis melden</button>
+            <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-submit">Ergebnis melden</button>
             <p className="text-xs text-white/50">Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Weicht es ab, entscheidet die Turnierleitung.</p>
           </div>
         </form>

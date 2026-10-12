@@ -1,0 +1,153 @@
+{
+  "_hinweis": "Ergebnis-Fenster (#1156, #1370): dieselben Fälle prüfen frontend/src/lib/resultEntry.test.js und mobile/src/lib/resultEntry.test.ts. Namen sind erfunden.",
+  "score": [
+    {
+      "name": "höherer Stand gewinnt",
+      "input": { "sides": ["a", "b"], "scores": { "a": 2, "b": 1 }, "mode": "higher_score" },
+      "results": [{ "registration_id": "a", "rank": 1, "score": 2 }, { "registration_id": "b", "rank": 2, "score": 1 }]
+    },
+    {
+      "name": "niedrigster Stand gewinnt",
+      "input": { "sides": ["a", "b"], "scores": { "a": 72, "b": 68 }, "mode": "lower_score" },
+      "results": [{ "registration_id": "b", "rank": 1, "score": 68 }, { "registration_id": "a", "rank": 2, "score": 72 }]
+    },
+    {
+      "name": "Gleichstand in der Gruppe",
+      "input": { "sides": ["a", "b"], "scores": { "a": 1, "b": 1 }, "allowsDraw": true },
+      "results": [{ "registration_id": "a", "rank": 1, "score": 1 }, { "registration_id": "b", "rank": 1, "score": 1 }]
+    },
+    {
+      "name": "Gleichstand im K.-o.",
+      "input": { "sides": ["a", "b"], "scores": { "a": 1, "b": 1 } },
+      "error": "Gleichstand geht in diesem Spiel nicht – eine Seite muss gewinnen."
+    },
+    {
+      "name": "Nicht erschienen mit einem Tipp",
+      "input": { "sides": ["a", "b"], "scores": { "a": 0, "b": 0 }, "flags": { "b": "no_show" } },
+      "results": [{ "registration_id": "a", "rank": 1 }, { "registration_id": "b", "rank": 2, "forfeit": true }]
+    },
+    {
+      "name": "Aufgegeben behält den Stand",
+      "input": { "sides": ["a", "b"], "scores": { "a": 1, "b": 2 }, "flags": { "b": "gave_up" } },
+      "results": [{ "registration_id": "a", "rank": 1, "score": 1 }, { "registration_id": "b", "rank": 2, "dnf": true, "score": 2 }]
+    },
+    {
+      "name": "beide Seiten markiert",
+      "input": { "sides": ["a", "b"], "flags": { "a": "no_show", "b": "gave_up" } },
+      "error": "Nur eine Seite kann „Nicht erschienen“ oder „Aufgegeben“ haben."
+    }
+  ],
+  "bestof": [
+    {
+      "name": "Best-of-3 2:1",
+      "input": { "sides": ["a", "b"], "games": ["a", "b", "a"], "bestOf": 3 },
+      "results": [{ "registration_id": "a", "rank": 1, "score": 2 }, { "registration_id": "b", "rank": 2, "score": 1 }]
+    },
+    {
+      "name": "Best-of-5 noch offen",
+      "input": { "sides": ["a", "b"], "games": ["a", "b", "a", null, null], "bestOf": 5 },
+      "error": "Noch nicht entschieden – es braucht 3 gewonnene Spiele."
+    },
+    {
+      "name": "Team nicht erschienen",
+      "input": { "sides": ["a", "b"], "games": [], "bestOf": 3, "flags": { "a": "no_show" } },
+      "results": [{ "registration_id": "b", "rank": 1 }, { "registration_id": "a", "rank": 2, "forfeit": true }]
+    }
+  ],
+  "tap": [
+    {
+      "name": "nach der Entscheidung fallen weitere Spiele weg",
+      "input": { "games": ["a", "a", "b"], "index": 1, "winner": "a", "sides": ["a", "b"], "bestOf": 3 },
+      "games": ["a", null, "b"]
+    },
+    {
+      "name": "das dritte Spiel entfällt bei 2:0",
+      "input": { "games": ["a", null, "b"], "index": 1, "winner": "a", "sides": ["a", "b"], "bestOf": 3 },
+      "games": ["a", "a", null]
+    }
+  ],
+  "winner": [
+    {
+      "name": "Zeitduell: Sieger antippen",
+      "input": { "sides": ["a", "b"], "winner": "b" },
+      "results": [{ "registration_id": "b", "rank": 1 }, { "registration_id": "a", "rank": 2 }]
+    },
+    {
+      "name": "niemand angetippt",
+      "input": { "sides": ["a", "b"], "winner": "" },
+      "error": "Bitte antippen, wer gewonnen hat."
+    }
+  ],
+  "order": [
+    {
+      "name": "Zielreihenfolge mit einem Fahrer, der nicht erschienen ist",
+      "input": { "all": ["a", "b", "c", "d"], "order": ["c", "a", "d"], "flags": { "b": "no_show" } },
+      "results": [{ "registration_id": "c", "rank": 1 }, { "registration_id": "a", "rank": 2 }, { "registration_id": "d", "rank": 3 }, { "registration_id": "b", "rank": 4, "forfeit": true }]
+    },
+    {
+      "name": "aufgegeben vor nicht erschienen",
+      "input": { "all": ["a", "b", "c", "d"], "order": ["a", "c"], "flags": { "b": "no_show", "d": "gave_up" } },
+      "results": [{ "registration_id": "a", "rank": 1 }, { "registration_id": "c", "rank": 2 }, { "registration_id": "d", "rank": 3, "dnf": true }, { "registration_id": "b", "rank": 4, "forfeit": true }]
+    },
+    {
+      "name": "es fehlen noch Fahrer",
+      "input": { "all": ["a", "b", "c", "d"], "order": ["a", "c"], "flags": {} },
+      "error": "Bitte alle in Zielreihenfolge antippen – 2 fehlen noch."
+    }
+  ],
+  "points": [
+    {
+      "name": "Punkte je Fahrer",
+      "input": { "all": ["a", "b", "c"], "points": { "a": 12, "b": 15, "c": 10 } },
+      "results": [{ "registration_id": "b", "rank": 1, "score": 15 }, { "registration_id": "a", "rank": 2, "score": 12 }, { "registration_id": "c", "rank": 3, "score": 10 }]
+    },
+    {
+      "name": "Gleichstand ohne Erlaubnis",
+      "input": { "all": ["a", "b", "c"], "points": { "a": 12, "b": 12, "c": 10 }, "names": { "a": "NeonFalke", "b": "LunaRacer" } },
+      "error": "Gleich viele Punkte bei NeonFalke und LunaRacer – bitte prüfen oder die Reihenfolge antippen."
+    },
+    {
+      "name": "Gleichstand in der Gruppe teilt den Platz",
+      "input": { "all": ["a", "b", "c"], "points": { "a": 12, "b": 12, "c": 10 }, "allowsDraw": true },
+      "results": [{ "registration_id": "a", "rank": 1, "score": 12 }, { "registration_id": "b", "rank": 1, "score": 12 }, { "registration_id": "c", "rank": 3, "score": 10 }]
+    }
+  ],
+  "sentence": [
+    {
+      "name": "Duell mit Weiterrücken",
+      "entry": { "kind": "duel", "participants": [{ "registration_id": "a", "name": "NeonFalke" }, { "registration_id": "b", "name": "PixelPanther" }], "advance": { "1": { "text": "ins Halbfinale", "flow": "W" } } },
+      "results": [{ "registration_id": "a", "rank": 1, "score": 2 }, { "registration_id": "b", "rank": 2, "score": 1 }],
+      "sentence": "NeonFalke gewinnt 2:1 – weiter ins Halbfinale"
+    },
+    {
+      "name": "nicht erschienen",
+      "entry": { "kind": "duel", "participants": [{ "registration_id": "a", "name": "NeonFalke" }, { "registration_id": "b", "name": "PixelPanther" }], "advance": {} },
+      "results": [{ "registration_id": "a", "rank": 1 }, { "registration_id": "b", "rank": 2, "forfeit": true }],
+      "sentence": "NeonFalke gewinnt kampflos, PixelPanther ist nicht erschienen"
+    },
+    {
+      "name": "aufgegeben",
+      "entry": { "kind": "duel", "participants": [{ "registration_id": "a", "name": "NeonFalke" }, { "registration_id": "b", "name": "PixelPanther" }], "advance": { "1": { "text": "ins Finale", "flow": "W" } } },
+      "results": [{ "registration_id": "a", "rank": 1, "score": 1 }, { "registration_id": "b", "rank": 2, "score": 1, "dnf": true }],
+      "sentence": "NeonFalke gewinnt 1:1, PixelPanther hat aufgegeben – weiter ins Finale"
+    },
+    {
+      "name": "Unentschieden",
+      "entry": { "kind": "duel", "participants": [{ "registration_id": "a", "name": "NeonFalke" }, { "registration_id": "b", "name": "PixelPanther" }] },
+      "results": [{ "registration_id": "a", "rank": 1, "score": 1 }, { "registration_id": "b", "rank": 1, "score": 1 }],
+      "sentence": "Unentschieden 1:1"
+    },
+    {
+      "name": "Durchgang: wer weiterkommt",
+      "entry": { "kind": "heat", "participants": [{ "registration_id": "a", "name": "KartKönigin" }, { "registration_id": "b", "name": "NeonFalke" }, { "registration_id": "c", "name": "LunaRacer" }], "advance": { "1": { "text": "ins Finale", "flow": "W" }, "2": { "text": "ins Finale", "flow": "W" } } },
+      "results": [{ "registration_id": "a", "rank": 1 }, { "registration_id": "b", "rank": 2 }, { "registration_id": "c", "rank": 3 }],
+      "sentence": "Weiter: KartKönigin und NeonFalke"
+    },
+    {
+      "name": "Durchgang ohne Weiterrücken",
+      "entry": { "kind": "heat", "participants": [{ "registration_id": "a", "name": "KartKönigin" }, { "registration_id": "b", "name": "NeonFalke" }, { "registration_id": "c", "name": "LunaRacer" }, { "registration_id": "d", "name": "Blitzbirne" }] },
+      "results": [{ "registration_id": "b", "rank": 1 }, { "registration_id": "a", "rank": 2 }, { "registration_id": "c", "rank": 3 }, { "registration_id": "d", "rank": 4 }],
+      "sentence": "1. NeonFalke · 2. KartKönigin · 3. LunaRacer · +1 weitere"
+    }
+  ]
+}

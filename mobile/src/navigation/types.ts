@@ -45,6 +45,8 @@ export type DetailParamList = {
   EventDetail: { id: string };
   FastLapDetail: { id: string };
   MatchDetail: { id: string };
+  // Turnierleitung am Handy (#1156): offene Spiele eines Turniers; `spiel` öffnet gleich das Ergebnis-Fenster.
+  TournamentLead: { id: string; spiel?: string; fall?: string };
   TournamentChat: { id: string; title?: string };
   // `invite` (#1191): der Schlüssel aus einem Einladungs-Link (/teams/<id>?einladung=…) - oben steht dann „Beitreten“.
   TeamDetail: { id: string; invite?: string };

@@ -136,6 +136,11 @@ export function targetFromNotification(item: UserNotification): AppTarget | null
   const meta = (item.meta || {}) as Record<string, unknown>;
   const kind = String(item.kind || "").toLowerCase();
 
+  // Turnierleitung (#1158, #1160): „Dispute: bitte prüfen“, „Ergebnis fehlt“, „Station defekt“ öffnen ihre Ansicht.
+  if (kind === "match_attention" && String(item.url || "").includes("/leitung")) {
+    const lead = targetFromUrl(item.url);
+    if (lead) return lead;
+  }
   const matchId = stringMeta(meta, "match_id");
   if (matchId && (kind.includes("match") || kind.includes("station"))) return detail("MatchDetail", { id: matchId });
 
@@ -184,6 +189,10 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   if (first === "dashboard" && query.get("bewerten")) return tab("Dashboard", { feedback: query.get("bewerten") });
   if (parsed.root || first === "dashboard") return tab("Dashboard");
   if (first === "matches" && second) return detail("MatchDetail", { id: second });
+  // Turnierleitung (#1156, #1160): /tournaments/<slug>/leitung?spiel=…&fall=… öffnet die Ansicht der Turnierleitung.
+  if (first === "tournaments" && second && third === "leitung") {
+    return detail("TournamentLead", { id: second, ...(query.get("spiel") ? { spiel: query.get("spiel") } : {}), ...(query.get("fall") ? { fall: query.get("fall") } : {}) });
+  }
   if (first === "tournaments" && second) return detail(third === "chat" ? "TournamentChat" : "TournamentDetail", { id: second });
   if (first === "events" && second) return detail("EventDetail", { id: second });
   if ((first === "fastlap" || first === "fastlaps") && second) return detail("FastLapDetail", { id: second });

@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Trash2 } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { api, formatApiError } from "@/lib/api";
 import { Badge } from "@/components/achievements/Badge";
 import { isExternalUrl, previewText } from "@/lib/notifications";
 import { viennaDateTime } from "@/lib/vienna";
@@ -21,6 +24,34 @@ export function notificationDate(value) {
 export function notificationBadge(bundle) {
   const top = bundle?.kind === "achievement" ? bundle?.meta?.top : null;
   return top?.material ? top : null;
+}
+
+/**
+ * „Stimmt“ direkt in der Glocke (#1159): die Gegenseite hat ein Ergebnis gemeldet - ein Klick schickt dieselbe Meldung
+ * noch einmal, der Server entscheidet wie bei zwei gleichen Meldungen. „Stimmt nicht“ geht über die Matchseite.
+ */
+function ConfirmResultButton({ bundle, onDone, testId }) {
+  const [busy, setBusy] = useState(false);
+  const results = bundle?.meta?.confirm_results;
+  const matchId = bundle?.meta?.match_id;
+  if (bundle?.kind !== "match_report" || bundle.read || !Array.isArray(results) || !results.length || !matchId) return null;
+  const confirm = async () => {
+    setBusy(true);
+    try {
+      await api.post(`/matches/${matchId}/report`, { results, screenshot_url: null, note: null });
+      toast.success("Bestätigt – das Ergebnis gilt.");
+      onDone?.(bundle);
+    } catch (error) {
+      toast.error(formatApiError(error?.response?.data?.detail) || "Bestätigen hat nicht geklappt – bitte auf der Matchseite.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button type="button" disabled={busy} onClick={confirm} className="tls-btn tls-btn--primary shrink-0 self-center mx-2 inline-flex min-h-[36px] items-center gap-1 px-3 py-1 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50" data-testid={testId}>
+      <Check className="w-3 h-3" /> Stimmt
+    </button>
+  );
 }
 
 export function NotificationRow({ bundle, onOpen, onDelete, compact = false, testIdPrefix = "notification-row" }) {
@@ -55,6 +86,7 @@ export function NotificationRow({ bundle, onOpen, onDelete, compact = false, tes
   return (
     <div data-testid={`${testIdPrefix}-${bundle.id}`} className="group border-b border-white/5 flex items-stretch">
       {link}
+      <ConfirmResultButton bundle={bundle} onDone={onOpen} testId={`${testIdPrefix}-confirm-${bundle.id}`} />
       {onDelete ? (
         <button
           type="button"

@@ -197,6 +197,7 @@ export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptio
   EventDetail: { title: "Event" },
   FastLapDetail: { title: "Fast Lap" },
   MatchDetail: { title: "Match" },
+  TournamentLead: { title: "Turnierleitung", ...gold },
   TournamentChat: ({ route }) => ({ title: route.params?.title || "Turnier-Chat" }),
   TeamDetail: { title: "Team" },
   TeamChat: ({ route }) => ({ title: route.params?.title || "Team-Chat" }),

@@ -48,25 +48,47 @@ beforeEach(() => {
   apiMock.post.mockResolvedValue({ data: { awaiting_confirmation: true } });
 });
 
-test("Spieler melden: Sieger wählen, Spielstand freiwillig - die Platzierungsliste geht an /report", async () => {
+test("Spieler melden (#1157): große Plus/Minus-Knöpfe, Satz vor dem Absenden, die Platzierungsliste geht an /report", async () => {
   renderMatch(PAGE);
   const form = await screen.findByTestId("match-report-form");
-  expect(form).toHaveTextContent("Wer hat gewonnen?");
+  expect(form).toContainElement(screen.getByTestId("result-score"));
+  expect(screen.queryByTestId("result-flag-r1")).toBeNull();
   fireEvent.click(screen.getByTestId("match-report-submit"));
-  expect(await screen.findByTestId("match-report-error")).toHaveTextContent("Bitte wähle, wer gewonnen hat.");
+  expect(await screen.findByTestId("match-report-error")).toHaveTextContent("Gleichstand geht in diesem Spiel nicht");
   expect(apiMock.post).not.toHaveBeenCalled();
 
-  fireEvent.click(screen.getByTestId("match-report-winner-r2"));
-  fireEvent.change(screen.getByTestId("match-report-value-r1"), { target: { value: "1" } });
-  fireEvent.change(screen.getByTestId("match-report-value-r2"), { target: { value: "3" } });
+  fireEvent.click(screen.getByTestId("result-score-r1-plus"));
+  for (let step = 0; step < 3; step += 1) fireEvent.click(screen.getByTestId("result-score-r2-plus"));
+  expect(screen.getByTestId("match-report-sentence")).toHaveTextContent("LunaByte gewinnt 3:1");
   fireEvent.click(screen.getByTestId("match-report-submit"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
   expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/report", {
     results: [{ registration_id: "r2", rank: 1, score: 3 }, { registration_id: "r1", rank: 2, score: 1 }],
-    screenshot_url: null, note: null,
+    screenshot_url: null, note: null, photo_id: null,
   });
   expect(screen.queryByTestId("match-staff-result-form")).toBeNull();
-  expect(screen.queryByTestId("match-inline-score-a")).toBeNull();
+});
+
+test("Foto vom Ergebnis: sofort hochgeladen, die Kennung geht mit der Meldung", async () => {
+  apiMock.post.mockImplementation(async (url) => (url === "/matches/m1/proof-photos" ? { data: { id: "p1", url: "/api/matches/m1/proof-photos/p1", scan_state: "safe" } } : { data: { awaiting_confirmation: true } }));
+  window.URL.createObjectURL = vi.fn(() => "blob:vorschau");
+  window.URL.revokeObjectURL = vi.fn();
+  renderMatch(PAGE);
+  await screen.findByTestId("match-report-form");
+  const file = new File(["bild"], "ergebnis.jpg", { type: "image/jpeg" });
+  fireEvent.change(screen.getByTestId("proof-photo-input"), { target: { files: [file] } });
+  expect(await screen.findByText("Foto angehängt – sehen nur die Gegenseite und die Turnierleitung.")).toBeInTheDocument();
+  expect(apiMock.post.mock.calls[0][0]).toBe("/matches/m1/proof-photos");
+  expect(apiMock.post.mock.calls[0][1]).toBeInstanceOf(FormData);
+  fireEvent.click(screen.getByTestId("result-score-r1-plus"));
+  fireEvent.click(screen.getByTestId("match-report-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/report", expect.objectContaining({ photo_id: "p1" })));
+});
+
+test("Nur Turnierleitung (#1157): kein Melde-Knopf, sondern wer das Ergebnis einträgt", async () => {
+  renderMatch({ ...PAGE, result_entry_mode: "staff_only", event_mode: "local", can_player_report_result: false, can_report_score: false, report_state: null, acting_registration_id: "r1" });
+  expect(await screen.findByTestId("match-staff-enters")).toHaveTextContent("Das Ergebnis trägt die Turnierleitung ein.");
+  expect(screen.queryByTestId("match-report")).toBeNull();
 });
 
 test("nach der eigenen Meldung: „wartet auf die Gegenseite“, ändern geht", async () => {
@@ -80,14 +102,34 @@ test("nach der eigenen Meldung: „wartet auf die Gegenseite“, ändern geht", 
   expect(screen.getByTestId("match-report-form")).toBeInTheDocument();
 });
 
-test("die Gegenseite hat gemeldet: „Ja, stimmt“ schickt genau diese Meldung", async () => {
+test("die Gegenseite hat gemeldet (#1159): der Satz in Worten, „Stimmt“ schickt genau diese Meldung", async () => {
   const proposal = [{ registration_id: "r2", rank: 1, score: 3 }, { registration_id: "r1", rank: 2, score: 1 }];
-  renderMatch({ ...PAGE, report_state: { status: "confirm", own_summary: null, proposal, proposal_summary: "LunaByte gewinnt 3:1." } });
+  renderMatch({ ...PAGE, report_state: { status: "confirm", own_summary: null, proposal, proposal_summary: "LunaByte gewinnt 3:1.",
+    proposal_text: "LunaByte meldet 3:1 für sich.", proposal_by: "LunaByte", proposal_at: "2026-05-23T16:10:00Z", can_confirm: true } });
   const box = await screen.findByTestId("match-report-confirm");
   expect(screen.getByTestId("match-report-state")).toHaveAttribute("data-status", "confirm");
-  expect(screen.getByText("LunaByte gewinnt 3:1.")).toBeInTheDocument();
+  expect(screen.getByTestId("match-report-proposal")).toHaveTextContent("LunaByte meldet 3:1 für sich.");
+  expect(screen.getByText(/gemeldet von LunaByte um/)).toBeInTheDocument();
+  expect(box).toHaveTextContent("Stimmt");
   fireEvent.click(box);
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/report", { results: proposal, screenshot_url: null, note: null }));
+});
+
+test("„Stimmt nicht“ öffnet „Problem melden“ mit „Falsches Ergebnis“", async () => {
+  const proposal = [{ registration_id: "r2", rank: 1 }, { registration_id: "r1", rank: 2 }];
+  renderMatch({ ...PAGE, can_dispute: true, report_state: { status: "confirm", proposal, proposal_text: "LunaByte meldet einen Sieg für sich.", can_confirm: true } });
+  fireEvent.click(await screen.findByTestId("match-report-wrong"));
+  await waitFor(() => expect(screen.getByTestId("match-dispute-reason-wrong_result")).toHaveAttribute("aria-pressed", "true"));
+  expect(apiMock.post).not.toHaveBeenCalled();
+});
+
+test("Team-Mitglied ohne Leitung: sieht die Meldung, bestätigen kann die Teamleitung", async () => {
+  const proposal = [{ registration_id: "r2", rank: 1 }, { registration_id: "r1", rank: 2 }];
+  renderMatch({ ...PAGE, can_player_report_result: false, can_report_score: false,
+    report_state: { status: "confirm", proposal, proposal_text: "LunaByte meldet einen Sieg für sich.", can_confirm: false } });
+  expect(await screen.findByTestId("match-report-lead-confirms")).toHaveTextContent("Bestätigen kann die Teamleitung.");
+  expect(screen.queryByTestId("match-report-confirm")).toBeNull();
+  expect(screen.queryByTestId("match-report-form")).toBeNull();
 });
 
 test("Meldungen weichen ab: die Turnierleitung entscheidet", async () => {
@@ -95,19 +137,28 @@ test("Meldungen weichen ab: die Turnierleitung entscheidet", async () => {
   expect(await screen.findByTestId("match-report-state")).toHaveTextContent("Die Meldungen weichen ab – die Turnierleitung entscheidet.");
 });
 
-test("ohne Recht kein Formular; die Turnierleitung trägt über /result ein", async () => {
+test("ohne Recht kein Formular; die Turnierleitung trägt über das Ergebnis-Fenster ein (#1370)", async () => {
   const { unmount } = renderMatch({ ...PAGE, can_player_report_result: false, can_report_score: false, report_state: null });
   expect(await screen.findByTestId("match-headline")).toBeInTheDocument();
   expect(screen.queryByTestId("match-report")).toBeNull();
   unmount();
 
-  apiMock.post.mockResolvedValue({ data: {} });
-  renderMatch({ ...PAGE, can_player_report_result: false, report_state: null, can_staff_submit_result: true, can_submit_result: true });
-  const staffForm = await screen.findByTestId("match-staff-result-form");
+  apiMock.post.mockResolvedValue({ data: { held: true, hold: { id: "h1" } } });
+  const entry = {
+    id: "m1", kind: "duel", best_of: 1, ranking_mode: "higher_score", allows_draw: false, has_result: false, result: [], advance: {},
+    participants: [{ registration_id: "r1", name: "NeonFalke" }, { registration_id: "r2", name: "LunaByte" }],
+  };
+  renderMatch({ ...PAGE, can_player_report_result: false, report_state: null, can_staff_submit_result: true, can_submit_result: true, result_entry: entry });
+  fireEvent.click(await screen.findByTestId("match-staff-result-open"));
   expect(screen.queryByTestId("match-report")).toBeNull();
-  fireEvent.submit(staffForm);
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/result", expect.objectContaining({ results: expect.any(Array) })));
-  expect(apiMock.post.mock.calls.some(([url]) => url === "/matches/m1/report")).toBe(false);
+  expect(screen.queryByText(/Forfeit|DNF/)).toBeNull();
+  fireEvent.click(screen.getByTestId("result-flag-r2-no_show"));
+  fireEvent.click(screen.getByTestId("result-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/result", {
+    results: [{ registration_id: "r1", rank: 1 }, { registration_id: "r2", rank: 2, forfeit: true }], hold: true, reason: null,
+  }));
+  expect(await screen.findByTestId("result-undo-bar")).toHaveTextContent("NeonFalke gewinnt kampflos, LunaByte ist nicht erschienen");
+  expect(apiMock.post.mock.calls.some(([url]) => url === "/matches/m1/report" || url === "/matches/m1/forfeit")).toBe(false);
 });
 
 // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - bis zur Frist vom Server.
@@ -122,9 +173,13 @@ test("Dispute auch nach dem Ergebnis: mit Frist; in Klärung steht der Hinweis f
   apiMock.post.mockResolvedValue({ data: {} });
   const { unmount } = renderMatch(done);
   expect(await screen.findByTestId("match-dispute-hint")).toHaveTextContent("Möglich bis heute 18:30.");
+  // Problem melden (#1158): erst den Grund antippen, dann kurz beschreiben.
   fireEvent.change(screen.getByTestId("match-dispute-input"), { target: { value: "Falscher Spielstand" } });
   fireEvent.click(screen.getByTestId("match-dispute-btn"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/dispute", { reason: "Falscher Spielstand" }));
+  expect(await screen.findByTestId("match-dispute-error")).toHaveTextContent("Bitte antippen, was nicht stimmt.");
+  fireEvent.click(screen.getByTestId("match-dispute-reason-wrong_result"));
+  fireEvent.click(screen.getByTestId("match-dispute-btn"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/dispute", { reason: "Falscher Spielstand", category: "wrong_result", photo_id: null }));
   unmount();
 
   renderMatch({ ...done, can_dispute: false, in_dispute: true, match: { ...done.match, status: "disputed" } });

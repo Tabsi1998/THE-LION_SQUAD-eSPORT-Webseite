@@ -22,6 +22,11 @@ jest.mock("../../components/CommendButton", () => ({ CommendButton: () => null }
 jest.mock("../../components/ChatStickers", () => ({ MessageSticker: () => null, StickerButton: () => null, StickerPicker: () => null }));
 jest.mock("react-native-safe-area-context", () => ({ ...jest.requireActual("react-native-safe-area-context"), useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
+jest.mock("expo-image-picker", () => ({
+  launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: [] })),
+  launchCameraAsync: jest.fn(async () => ({ canceled: true, assets: [] })),
+  requestCameraPermissionsAsync: jest.fn(async () => ({ granted: true })),
+}));
 jest.mock("react-native-keyboard-controller", () => {
   const { View } = jest.requireActual("react-native");
   return { KeyboardAvoidingView: View };
@@ -50,6 +55,11 @@ const PAGE = {
   report_state: { status: "open", own_summary: null, proposal: null, proposal_summary: null },
 };
 
+const STAFF_ENTRY = {
+  id: "m1", kind: "duel", best_of: 1, ranking_mode: "higher_score", allows_draw: false, has_result: false, result: [], advance: {},
+  participants: [{ registration_id: "r1", name: "NeonFalke" }, { registration_id: "r2", name: "LunaByte" }],
+};
+
 function answer(page: Record<string, unknown>) {
   mockGet.mockImplementation(async (path: string) => {
     if (path === "/matches/m1/page") return { data: page };
@@ -67,26 +77,28 @@ test("Spieler melden: Sieger wählen, Spielstand freiwillig - die Platzierungsli
   await render(<MatchDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("match-report-form")).toBeTruthy());
   await fireEvent.press(screen.getByTestId("match-report-submit"));
-  expect(screen.getByTestId("match-report-error")).toHaveTextContent("Bitte wähle, wer gewonnen hat.");
+  expect(screen.getByTestId("match-report-error")).toHaveTextContent("Gleichstand geht in diesem Spiel nicht – eine Seite muss gewinnen.");
   expect(mockPost).not.toHaveBeenCalled();
 
-  await fireEvent.press(screen.getByTestId("match-report-winner-r1"));
-  await fireEvent.changeText(screen.getByTestId("match-report-value-r1"), "2");
-  await fireEvent.changeText(screen.getByTestId("match-report-value-r2"), "0");
+  // Große Knöpfe statt Zahlenfeldern (#1157) - der Satz steht vor dem Absenden.
+  await fireEvent.press(screen.getByTestId("result-score-r1-plus"));
+  await fireEvent.press(screen.getByTestId("result-score-r1-plus"));
+  expect(screen.getByTestId("match-report-sentence")).toHaveTextContent("NeonFalke gewinnt 2:0");
+  expect(screen.queryByTestId("result-flag-r1")).toBeNull();
   await fireEvent.press(screen.getByTestId("match-report-submit"));
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/report", {
     results: [{ registration_id: "r1", rank: 1, score: 2 }, { registration_id: "r2", rank: 2, score: 0 }],
-    screenshot_url: null, note: null,
+    screenshot_url: null, note: null, photo_id: null,
   }));
   expect(mockPost.mock.calls.some(([, body]) => body && "score_a" in (body as object))).toBe(false);
 });
 
-test("die Gegenseite hat gemeldet: „Ja, stimmt“ schickt genau diese Meldung", async () => {
+test("die Gegenseite hat gemeldet (#1159): der Satz, „Stimmt“ schickt genau diese Meldung", async () => {
   const proposal = [{ registration_id: "r2", rank: 1, score: 3 }, { registration_id: "r1", rank: 2, score: 1 }];
-  answer({ ...PAGE, report_state: { status: "confirm", own_summary: null, proposal, proposal_summary: "LunaByte gewinnt 3:1." } });
+  answer({ ...PAGE, report_state: { status: "confirm", own_summary: null, proposal, proposal_summary: "LunaByte gewinnt 3:1.", proposal_text: "LunaByte meldet 3:1 für sich.", proposal_by: "LunaByte", can_confirm: true } });
   await render(<MatchDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("match-report-state")).toBeTruthy());
-  expect(screen.getByText("Die Gegenseite meldet: LunaByte gewinnt 3:1.")).toBeTruthy();
+  expect(screen.getByTestId("match-report-proposal")).toHaveTextContent("LunaByte meldet 3:1 für sich.");
   expect(screen.queryByTestId("match-report-form")).toBeNull();
   await fireEvent.press(screen.getByTestId("match-report-confirm"));
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/report", { results: proposal, screenshot_url: null, note: null }));
@@ -108,13 +120,19 @@ test("ohne Recht kein Formular; die Turnierleitung speichert über /result", asy
   expect(screen.queryByTestId("match-report")).toBeNull();
   await view.unmount();
 
-  mockPost.mockResolvedValue({ data: {} });
-  answer({ ...PAGE, can_player_report_result: false, report_state: null, can_staff_submit_result: true, can_submit_result: true });
+  // Das eine Ergebnis-Fenster (#1370): ein Knopf, große Knöpfe, „Nicht erschienen“ mit einem Tipp, 10 Sekunden Rückgängig.
+  mockPost.mockResolvedValue({ data: { held: true, hold: { id: "h1" } } });
+  answer({ ...PAGE, can_player_report_result: false, report_state: null, can_staff_submit_result: true, can_submit_result: true, result_entry: STAFF_ENTRY });
   await render(<MatchDetailScreen navigation={navigation} route={route} />);
-  await waitFor(() => expect(screen.getByTestId("match-staff-result-submit")).toBeTruthy());
+  await waitFor(() => expect(screen.getByTestId("match-staff-result-open")).toBeTruthy());
   expect(screen.queryByTestId("match-report")).toBeNull();
-  await fireEvent.press(screen.getByTestId("match-staff-result-submit"));
-  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/result", expect.objectContaining({ results: expect.any(Array) })));
+  await fireEvent.press(screen.getByTestId("match-staff-result-open"));
+  await fireEvent.press(screen.getByTestId("result-flag-r2-no_show"));
+  await fireEvent.press(screen.getByTestId("result-save"));
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/result", {
+    results: [{ registration_id: "r1", rank: 1 }, { registration_id: "r2", rank: 2, forfeit: true }], hold: true, reason: null,
+  }));
+  expect(screen.getByTestId("result-undo-sentence")).toHaveTextContent("NeonFalke gewinnt kampflos, LunaByte ist nicht erschienen");
 });
 
 // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - bis zur Frist vom Server.
@@ -129,11 +147,15 @@ test("Dispute auch nach dem Ergebnis: mit Frist, der Grund geht an /dispute", as
   await render(<MatchDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("match-dispute")).toBeTruthy());
   expect(screen.getByTestId("match-dispute-hint")).toHaveTextContent(
-    "Stimmt etwas nicht? Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet. Möglich bis 23.05.2026, 18:30.",
+    "Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet. Möglich bis 23.05.2026, 18:30.",
   );
+  // Problem melden (#1158): Grund antippen, kurz beschreiben.
   await fireEvent.changeText(screen.getByTestId("match-dispute-input"), "Falscher Spielstand");
   await fireEvent.press(screen.getByTestId("match-dispute-submit"));
-  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/dispute", { reason: "Falscher Spielstand" }));
+  expect(screen.getByTestId("match-dispute-error")).toHaveTextContent("Bitte antippen, was nicht stimmt.");
+  await fireEvent.press(screen.getByTestId("match-dispute-reason-wrong_result"));
+  await fireEvent.press(screen.getByTestId("match-dispute-submit"));
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/dispute", { reason: "Falscher Spielstand", category: "wrong_result", photo_id: null }));
 });
 
 test("in Klärung: der Hinweis steht oben, ohne Recht kein Dispute-Feld", async () => {
@@ -175,7 +197,7 @@ test("fertiges Spiel: Überschrift mit Namen, „Beendet“ mit Ergebnis, Statio
   expect(screen.queryByTestId("match-proposal-at")).toBeNull();
 });
 
-test("Freilos statt „Offen“; die Turnierleitung liest „Höchste Punkte“", async () => {
+test("Freilos statt „Offen“", async () => {
   answer({
     ...PAGE, can_player_report_result: false, report_state: null, can_staff_submit_result: true, can_submit_result: true,
     participants: [NEON, { slot: 2, status: "bye", registration_id: null, display_name: null }],
@@ -183,7 +205,6 @@ test("Freilos statt „Offen“; die Turnierleitung liest „Höchste Punkte“"
   await render(<MatchDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("match-headline")).toHaveTextContent("NeonFalke gegen Freilos"));
   expect(screen.queryByText("Offen")).toBeNull();
-  expect(screen.getByText("Punkte erfassen. Höchste Punkte gewinnen automatisch.")).toBeTruthy();
 });
 
 // Terminvorschlag zum Antippen (#1139) in Wiener Zeit (#960): Tag wählen, Uhrzeit in Viertelstunden.
@@ -203,4 +224,49 @@ test("Terminvorschlag: Tag und Uhrzeit antippen - an den Server geht die Wiener 
   } finally {
     jest.useRealTimers();
   }
+});
+
+describe("Foto vom Ergebnis und „Nur Turnierleitung“ (#1157)", () => {
+  test("ein Bild aus der Galerie geht sofort hoch, die Kennung geht mit der Meldung", async () => {
+    const picker = jest.requireMock("expo-image-picker") as { launchImageLibraryAsync: jest.Mock };
+    picker.launchImageLibraryAsync.mockResolvedValueOnce({ canceled: false, assets: [{ uri: "file:///ergebnis.jpg", mimeType: "image/jpeg", fileName: "ergebnis.jpg" }] });
+    mockPost.mockImplementation(async (path: string) => (path === "/matches/m1/proof-photos" ? { data: { id: "p1" } } : { data: { awaiting_confirmation: true } }));
+    answer(PAGE);
+    await render(<MatchDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("match-report-form")).toBeTruthy());
+    await fireEvent.press(screen.getByTestId("proof-photo-gallery"));
+    await waitFor(() => expect(screen.getByTestId("proof-photo-state")).toHaveTextContent("Foto angehängt – sehen nur die Gegenseite und die Turnierleitung."));
+    expect(mockPost.mock.calls[0][0]).toBe("/matches/m1/proof-photos");
+    await fireEvent.press(screen.getByTestId("result-score-r2-plus"));
+    await fireEvent.press(screen.getByTestId("match-report-submit"));
+    await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/matches/m1/report", expect.objectContaining({ photo_id: "p1" })));
+  });
+
+  test("bei „Nur Turnierleitung“ kein Melde-Knopf, sondern wer das Ergebnis einträgt", async () => {
+    answer({ ...PAGE, result_entry_mode: "staff_only", can_player_report_result: false, can_report_score: false, report_state: null, acting_registration_id: "r1" });
+    await render(<MatchDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("match-staff-enters")).toBeTruthy());
+    expect(screen.getByText("Das Ergebnis trägt die Turnierleitung ein.")).toBeTruthy();
+    expect(screen.queryByTestId("match-report")).toBeNull();
+  });
+});
+
+describe("Bestätigen mit einem Tipp (#1159)", () => {
+  const proposal = [{ registration_id: "r2", rank: 1 }, { registration_id: "r1", rank: 2 }];
+
+  test("„Stimmt nicht“ öffnet „Problem melden“ mit „Falsches Ergebnis“", async () => {
+    answer({ ...PAGE, can_dispute: true, report_state: { status: "confirm", proposal, proposal_text: "LunaByte meldet einen Sieg für sich.", can_confirm: true } });
+    await render(<MatchDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("match-report-wrong")).toBeTruthy());
+    await fireEvent.press(screen.getByTestId("match-report-wrong"));
+    await waitFor(() => expect(screen.getByTestId("match-dispute-reason-wrong_result").props.accessibilityState).toEqual({ selected: true }));
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  test("Team-Mitglied ohne Leitung sieht die Meldung ohne Knöpfe", async () => {
+    answer({ ...PAGE, can_player_report_result: false, can_report_score: false, report_state: { status: "confirm", proposal, proposal_text: "LunaByte meldet einen Sieg für sich.", can_confirm: false } });
+    await render(<MatchDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("match-report-lead-confirms")).toBeTruthy());
+    expect(screen.queryByTestId("match-report-confirm")).toBeNull();
+  });
 });

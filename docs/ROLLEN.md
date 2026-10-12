@@ -59,6 +59,11 @@ Gewinne dieses Turniers (#288). Ergebnisse eintragen dürfen außerdem `referee`
 (`station_manager`, Entscheidung zu #1139 – alles steht im Protokoll, die Turnierleitung kann korrigieren); sie alle
 bekommen Dispute und abweichende Ergebnis-Meldungen ihres Bereichs sofort gemeldet (#1132, #1134). Das braucht
 keinen Bereich und keine Zwei-Faktor-Anmeldung.
+Die Ansicht „Turnierleitung“ (`/tournaments/<slug>/leitung`, in der App „Turnierleitung öffnen“, #1156) sehen alle
+Helfer des Turniers; eintragen, „Rückgängig“ (nur der letzte Eintrag) und Streitfälle entscheiden (#1158) darf je Spiel
+nur, wer dort Ergebnis-Recht hat – die Station-Crew nur an ihrer Station. „Braucht Aufmerksamkeit“ (#1160: Ergebnis
+fehlt, Station defekt) geht an genau diese Leute. Fotos vom Ergebnis (#1157) sehen nur die Spieler des Spiels und die
+Turnierleitung dieses Turniers; Moderatoren nur, wenn die Bildprüfung ein Foto zur Prüfung vorlegt.
 Dasselbe gilt je Fast Lap (Challenge → Staff). Turnierrechte, Fast-Lap-Zeiten, Events und Exporte
 kommen nur aus dem Bereich Turnierleitung (Rolle oder Freigabe), Club-Admin, Superadmin oder einem solchen
 Einsatz – auch für Moderatoren.

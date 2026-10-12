@@ -67,12 +67,18 @@ def is_duplicate_dispute(match: dict, user_id: str, reason: str) -> bool:
     )
 
 
-def dispute_entry(user_id: str, reason: str) -> dict:
-    return {"user_id": user_id, "reason": (reason or "").strip(), "at": now_utc().isoformat()}
+def dispute_entry(user_id: str, reason: str, category: str | None = None, photo_id: str | None = None) -> dict:
+    entry = {"user_id": user_id, "reason": (reason or "").strip(), "at": now_utc().isoformat()}
+    # „Problem melden“ (#1158): Grund zum Antippen und auf Wunsch ein Foto (sehen nur Spieler und Turnierleitung).
+    if category:
+        entry["category"] = category
+    if photo_id:
+        entry["photo_id"] = photo_id
+    return entry
 
 
 def report_entry(user_id: str, registration_id: str | None, results: list[dict],
-                 proof_url: str | None = None, note: str | None = None) -> dict:
+                 proof_url: str | None = None, note: str | None = None, photo_id: str | None = None) -> dict:
     entry = {
         "user_id": user_id,
         "registration_id": registration_id,
@@ -84,6 +90,9 @@ def report_entry(user_id: str, registration_id: str | None, results: list[dict],
         entry["proof_url"] = proof_url.strip()
     if (note or "").strip():
         entry["note"] = note.strip()
+    # Foto vom Ergebnis (#1157): sehen dürfen es die Gegenseite und die Turnierleitung (services/match_proofs).
+    if photo_id:
+        entry["photo_id"] = photo_id
     return entry
 
 

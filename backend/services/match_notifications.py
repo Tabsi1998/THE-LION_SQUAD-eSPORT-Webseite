@@ -226,6 +226,27 @@ async def _match_context(db, match: dict) -> tuple[dict, list[dict], dict[str, d
     return tournament, registrations, {reg["id"]: reg for reg in registrations if reg.get("id")}
 
 
+def proposal_sentence(results: list[dict] | None, regs_by_id: dict[str, dict], reporter_id: str | None,
+                      viewer_id: str | None) -> str:
+    """Eine Meldung der Gegenseite in Worten, aus Sicht der Person, die bestätigen soll (#1159):
+    „Frostbiss meldet 2:1 für dich.“ - „… für sich.“ - „… ein Unentschieden 1:1.“ - bei Durchgängen die Plätze."""
+    reporter = _name(regs_by_id.get(reporter_id), "Die Gegenseite")
+    ordered = sorted(results or [], key=_rank_sort_key)
+    if len(ordered) != 2:
+        return f"{reporter} meldet: {results_summary(ordered, regs_by_id)}"
+    top, bottom = ordered
+    top_value, bottom_value = _value_text(top), _value_text(bottom)
+    score = f"{top_value}:{bottom_value}" if top_value is not None and bottom_value is not None else ""
+    if int(top.get("rank") or 0) == int(bottom.get("rank") or 0):
+        return f"{reporter} meldet ein Unentschieden{f' {score}' if score else ''}."
+    winner = top.get("registration_id")
+    if winner == viewer_id:
+        return f"{reporter} meldet {score} für dich." if score else f"{reporter} meldet einen Sieg für dich."
+    if winner == reporter_id:
+        return f"{reporter} meldet {score} für sich." if score else f"{reporter} meldet einen Sieg für sich."
+    return f"{reporter} meldet: {results_summary(ordered, regs_by_id)}"
+
+
 async def notify_result_reported(db, match: dict, report: dict, actor_id: str | None) -> int:
     """Die erste Meldung ist da (#1132): die Verantwortlichen der Gegenseite sollen bestätigen oder anders melden -
     im Postfach, per Push und, wenn die Person es zulässt, per Mail (``score_reported``). Nur die Gegenseite, nie
@@ -241,17 +262,23 @@ async def notify_result_reported(db, match: dict, report: dict, actor_id: str | 
     path = f"/matches/{match.get('id')}"
     absolute_url = await build_public_url(path)
     dedupe = f"match-report:{match.get('id')}:{reporter_id}:{report.get('at')}"
+    # Bestätigen mit einem Tipp (#1159): der Satz aus Sicht der Gegenseite, und was „Stimmt“ in der Glocke schickt -
+    # dieselbe Meldung noch einmal (nur Plätze und Stand, nie Notiz oder Foto).
+    from services.v2_match_flows import public_report_results
+
+    viewer_id = others[0].get("id") if len(others) == 1 else None
+    sentence = proposal_sentence(report.get("results"), regs_by_id, reporter_id, viewer_id)
     sent = 0
     for user in await users_for(db, recipient_ids):
         created = await create_user_notification(
             user["id"],
             "Ergebnis gemeldet – bitte bestätigen",
-            f"{tournament_title}: {_name(regs_by_id.get(reporter_id), 'Die Gegenseite')} meldet „{summary}“ "
-            "Stimmt das? Bestätige es auf der Matchseite – sonst melde dein Ergebnis.",
+            f"{tournament_title}: {sentence} Stimmt das?",
             url=path,
             kind="match_report",
             meta={"category": "match_reminders", "dedupe_key": dedupe, "match_id": match.get("id"),
-                  "tournament_id": match.get("tournament_id")},
+                  "tournament_id": match.get("tournament_id"),
+                  "confirm_results": public_report_results(report.get("results"))},
         )
         if created:
             sent += 1
@@ -309,6 +336,12 @@ def _short(text: str, limit: int = 120) -> str:
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
+def lead_url(tournament: dict, match: dict, case: str) -> str:
+    """Wohin die Turnierleitung springt (#1158, #1160): ihre Ansicht mit genau diesem Fall."""
+    key = tournament.get("slug") or tournament.get("id") or match.get("tournament_id")
+    return f"/tournaments/{key}/leitung?fall={case}-{match.get('id')}"
+
+
 async def notify_dispute_opened(db, match: dict, dispute: dict, actor_id: str | None,
                                 actor_registration_id: str | None) -> int:
     """Ein Dispute ist da (#1134): die Turnierleitung mit Ergebnis-Recht für dieses Spiel bekommt sofort Bescheid -
@@ -320,14 +353,19 @@ async def notify_dispute_opened(db, match: dict, dispute: dict, actor_id: str | 
     who = _name(regs_by_id.get(actor_registration_id), "Eine Seite") if actor_registration_id else "Die Turnierleitung"
     path = f"/matches/{match.get('id')}"
     dedupe = f"match-dispute:{match.get('id')}:{dispute.get('at')}"
+    from services.match_disputes import category_label
+
+    # „Problem melden“ (#1158): der Grund zum Antippen steht vorn; der Knopf führt direkt zur Karte in der Ansicht
+    # „Turnierleitung“, wo Meldung, Foto und Ergebnis stehen.
+    reason_text = f"{category_label(dispute.get('category'))}: " if dispute.get("category") else ""
     sent = 0
     for user_id in sorted(await result_staff_user_ids(db, match) - {actor_id}):
         if await create_user_notification(
             user_id,
             "Dispute: bitte prüfen",
-            f"{tournament_title} · {title_text}: {who} widerspricht – „{_short(dispute.get('reason') or '')}“ "
+            f"{tournament_title} · {title_text}: {who} widerspricht – {reason_text}„{_short(dispute.get('reason') or '')}“ "
             "Bitte prüfen und entscheiden.",
-            url=path,
+            url=lead_url(tournament, match, "ds"),
             kind="match_attention",
             meta={"category": "tournament_updates", "dedupe_key": dedupe, "match_id": match.get("id"),
                   "tournament_id": match.get("tournament_id"), "reason": "dispute"},
@@ -353,4 +391,40 @@ async def notify_dispute_opened(db, match: dict, dispute: dict, actor_id: str | 
             )
         except Exception as exc:  # noqa: BLE001 - eine Mail hält keinen Dispute auf
             logger.warning("Dispute mail failed for match=%s type=%s", _log_safe(match.get("id")), type(exc).__name__)
+    return sent
+
+
+async def notify_dispute_kept(db, match: dict, note: str | None, actor_id: str | None, decided_at: str) -> int:
+    """Die Turnierleitung hat entschieden: das Ergebnis bleibt (#1158). Beide Seiten bekommen es - wie „Dispute
+    entschieden“ jedes Mitglied (#1136), im Postfach, per Push und, wenn sie es zulassen, per Mail."""
+    tournament, registrations, regs_by_id = await _match_context(db, match)
+    tournament_title = tournament.get("title") or "Turnier"
+    has_result = bool(match.get("results"))
+    summary = results_summary(match.get("results"), regs_by_id) if has_result else ""
+    decision = f"Das Ergebnis bleibt: {summary}" if has_result else "Das Spiel geht weiter wie geplant."
+    if (note or "").strip():
+        decision = f"{decision} Begründung: {_short(note or '', 200)}"
+    path = f"/matches/{match.get('id')}"
+    dedupe = f"match-dispute-kept:{match.get('id')}:{decided_at}"
+    absolute_url = await build_public_url(path)
+    sent = 0
+    for user in await users_for(db, await player_user_ids(db, registrations) - {actor_id}):
+        if await create_user_notification(
+            user["id"],
+            "Dispute entschieden",
+            f"{tournament_title} · {match_title(match, regs_by_id)}: Die Turnierleitung hat entschieden. {decision}",
+            url=path,
+            kind="match_result",
+            meta={"match_id": match.get("id"), "tournament_id": match.get("tournament_id"), "dedupe_key": dedupe,
+                  "dispute_resolved": True, "decision": "keep"},
+        ):
+            sent += 1
+        try:
+            await send_user_template(
+                user, "dispute_resolved", tournament_title=tournament_title, decision=decision, url=absolute_url,
+                dedupe_key=f"{dedupe}:{user['id']}:mail",
+                mail_meta={"kind": "dispute_resolved", "match_id": match.get("id"), "user_id": user["id"]},
+            )
+        except Exception as exc:  # noqa: BLE001 - eine Mail hält keine Entscheidung auf
+            logger.warning("Dispute decision mail failed for match=%s type=%s", _log_safe(match.get("id")), type(exc).__name__)
     return sent

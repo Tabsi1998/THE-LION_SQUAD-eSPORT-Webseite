@@ -23,6 +23,9 @@ import { matchIsOver } from "@/lib/afterEnd";
 import { rankingMode } from "@/lib/matchReport";
 import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
+import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
+import { ResultWindow } from "@/components/tls/results/ResultWindow";
+import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 
 const scheduleLabels = {
   proposed: "Terminvorschlag offen",
@@ -88,13 +91,11 @@ export default function MatchPage() {
   const [counterAt, setCounterAt] = useState("");
   const [decisionNote, setDecisionNote] = useState("");
   const [message, setMessage] = useState("");
-  const [proofUrl, setProofUrl] = useState("");
-  const [reportNote, setReportNote] = useState("");
-  const [disputeReason, setDisputeReason] = useState("");
-  const [forfeitReason, setForfeitReason] = useState("");
-  const [forfeitWinnerId, setForfeitWinnerId] = useState("");
-  const [v2Rows, setV2Rows] = useState([]);
+  // Das eine Ergebnis-Fenster (#1370): dieselbe Eingabe wie in Turnierleitung, Matchplan und Stationen.
+  const [resultOpen, setResultOpen] = useState(false);
   const { submitting: busy, submitOnce } = useSubmissionGuard();
+  // „Stimmt nicht“ (#1159) öffnet „Problem melden“ mit „Falsches Ergebnis“.
+  const [problemCategory, setProblemCategory] = useState("");
   const [actionError, setActionError] = useState("");
 
   const load = useCallback(async ({ preserveDrafts = true } = {}) => {
@@ -107,12 +108,8 @@ export default function MatchPage() {
     const nextMatch = page.match || {};
     if (preserveDrafts) {
       setProposalAt((current) => current || toLocalInput(nextMatch.scheduled_at));
-      setForfeitWinnerId((current) => current || firstRegistrationId(page.participants));
-      setV2Rows((current) => current.length ? current : buildV2Rows(page));
     } else {
       setProposalAt(toLocalInput(nextMatch.scheduled_at));
-      setForfeitWinnerId(firstRegistrationId(page.participants));
-      setV2Rows(buildV2Rows(page));
     }
   }, [id]);
 
@@ -188,54 +185,14 @@ export default function MatchPage() {
     await load({ preserveDrafts: false });
   }, "Ergebnis konnte nicht gemeldet werden.");
 
-  const submitV2Result = async (e) => {
-    e.preventDefault();
-    await runAction(async () => {
-      await api.post(`/matches/${id}/result`, {
-        proof_url: proofUrl.trim() || null,
-        note: reportNote.trim() || null,
-        results: v2Rows.map((row) => ({
-          dnf: row.dnf,
-          forfeit: row.forfeit,
-          rank: Math.max(1, Number.parseInt(row.rank || "0", 10) || 1),
-          registration_id: row.registration_id,
-          score: numberOrNull(row.score),
-          time_ms: numberOrNull(row.time_ms),
-        })),
-      });
-      toast.success("Ergebnis gespeichert.");
-      setProofUrl("");
-      setReportNote("");
-      await load({ preserveDrafts: false });
-    }, "Ergebnis konnte nicht gespeichert werden.");
-  };
+  // Problem melden (#1158): Grund, Text und auf Wunsch ein Foto - die Turnierleitung entscheidet.
+  const submitDispute = async (payload) => runAction(async () => {
+    await api.post(`/matches/${id}/dispute`, payload);
+    toast.success("Gemeldet. Die Turnierleitung schaut es sich an.");
+    await load({ preserveDrafts: false });
+  }, "Problem konnte nicht gemeldet werden.");
 
-  const submitDispute = async (e) => {
-    e.preventDefault();
-    const reason = disputeReason.trim();
-    if (!reason) return failAction("Bitte Grund angeben.");
-    await runAction(async () => {
-      await api.post(`/matches/${id}/dispute`, { reason });
-      toast.success("Dispute gemeldet – die Turnierleitung prüft und entscheidet.");
-      setDisputeReason("");
-      await load({ preserveDrafts: false });
-    }, "Dispute konnte nicht gemeldet werden.");
-  };
-
-  const submitForfeit = async (e) => {
-    e.preventDefault();
-    const note = forfeitReason.trim();
-    if (!note || note.length < 5) return failAction("Bitte Forfeit-Begründung mit mindestens 5 Zeichen angeben.");
-    if (!forfeitWinnerId) return failAction("Bitte Gewinner auswählen.");
-    if (!window.confirm("Forfeit wirklich speichern? Diese Staff-Aktion wertet das Match als Forfeit.")) return;
-    await runAction(async () => {
-      await api.post(`/matches/${id}/forfeit`, { winner_id: forfeitWinnerId, note });
-      toast.success("Forfeit gespeichert.");
-      setForfeitReason("");
-      await load({ preserveDrafts: false });
-    }, "Forfeit konnte nicht gespeichert werden.");
-  };
-
+  const resultUndo = useResultUndo({ onDone: () => load({ preserveDrafts: false }).catch(() => {}) });
   const chatAttachments = useChatAttachmentDrafts();
   const [stickersOpen, setStickersOpen] = useState(false);
 
@@ -284,11 +241,20 @@ export default function MatchPage() {
   // dürfte, bekommt das Formular der Turnierleitung.
   const canStaffSubmit = Boolean(data.can_staff_submit_result);
   const canPlayerReport = Boolean(data.can_player_report_result && !canStaffSubmit && !isCompleted);
-  const canSubmitV2Result = Boolean(!isCompleted && canStaffSubmit && v2Rows.length);
+  // Team-Mitglieder ohne Leitung (#1159): sie sehen die Meldung der Gegenseite, bestätigen kann die Teamleitung.
+  const showReportReadOnly = Boolean(!canPlayerReport && !canStaffSubmit && !isCompleted && data.report_state?.status === "confirm");
+  const wrongResult = () => {
+    setProblemCategory("wrong_result");
+    window.setTimeout(() => document.querySelector("[data-testid='match-dispute-form']")?.scrollIntoView?.({ block: "center" }), 0);
+  };
+  // Turnierleitung (#1370): ein Knopf öffnet das Ergebnis-Fenster - eintragen oder, wenn es schon eins gibt, korrigieren.
+  const canSubmitV2Result = Boolean(canStaffSubmit && data.result_entry && !data.result_entry.hold);
   // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - der Server sagt, bis wann.
   const canDispute = Boolean(data.can_dispute);
-  const hasOtherResultActions = Boolean(canPlayerReport || canSubmitV2Result);
-  const hasResultActions = Boolean(hasOtherResultActions || canDispute || (!isCompleted && data.can_forfeit));
+  // Nur Turnierleitung (#1157): wer mitspielt, sieht statt eines Melde-Knopfs, wer das Ergebnis einträgt.
+  const showStaffEnters = Boolean(data.acting_registration_id && !canPlayerReport && !canStaffSubmit && !finished && data.result_entry_mode === "staff_only" && !data.in_dispute);
+  const hasOtherResultActions = Boolean(canPlayerReport || canSubmitV2Result || showReportReadOnly);
+  const hasResultActions = Boolean(hasOtherResultActions || canDispute);
   const reports = Array.isArray(match.reports) ? match.reports : [];
   const resultParticipants = isV2 ? participants : duelParticipants;
   const showFixedScheduleNotice = data.schedule_mode === "fixed_by_staff" && !canProposeSchedule;
@@ -398,18 +364,36 @@ export default function MatchPage() {
           </div>
           )}
 
+          {/* Nur Turnierleitung (#1157): Spieler sehen keinen Melde-Knopf, sondern wer das Ergebnis einträgt. */}
+          {showStaffEnters ? (
+            <div className="mt-5 flex items-start gap-3 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 px-4 py-3" data-testid="match-staff-enters">
+              <Flag className="mt-0.5 w-4 h-4 shrink-0 text-[#29B6E8]" />
+              <div>
+                <p className="text-sm font-bold text-white">Das Ergebnis trägt die Turnierleitung ein.</p>
+                <p className="mt-0.5 text-xs text-white/55">Du musst nichts melden. Sobald es drin ist, bekommst du eine Benachrichtigung.</p>
+              </div>
+            </div>
+          ) : null}
+
           {data.in_dispute && (
             <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#FFD2CF]" data-testid="match-in-dispute">
               <strong>In Klärung</strong> – zu diesem Spiel liegt ein Dispute vor. Die Turnierleitung prüft und entscheidet.
+              {/* Die Turnierleitung entscheidet in ihrer Ansicht (#1158) - mit Meldung, Foto und Ergebnis. */}
+              {canStaffSubmit && data.tournament ? (
+                <Link to={`/tournaments/${data.tournament.slug || data.tournament.id}/leitung?fall=ds-${id}`} className="ml-2 font-bold text-white underline underline-offset-2" data-testid="match-dispute-decide">Streitfall entscheiden</Link>
+              ) : null}
             </p>
           )}
 
           {hasResultActions ? (
             <div className="mt-5 border-t border-white/10 pt-5 space-y-5">
-              {canPlayerReport && (
+              {(canPlayerReport || showReportReadOnly) && (
                 <MatchReportForm
+                  readOnly={!canPlayerReport}
+                  onWrongResult={wrongResult}
                   participants={participants}
                   match={match}
+                  entry={data.report_entry}
                   state={data.report_state}
                   allowsDraw={Boolean(data.allows_draw)}
                   busy={busy}
@@ -418,80 +402,27 @@ export default function MatchPage() {
               )}
 
               {canSubmitV2Result && (
-                <form onSubmit={submitV2Result} className="space-y-4" data-testid="match-staff-result-form">
-                  <p className="text-sm text-white/55">{v2Mode === "time" ? "Zeit erfassen. Schnellste Zeit gewinnt automatisch." : v2Mode === "lower_score" ? "Score erfassen. Niedrigster Score gewinnt automatisch." : "Punkte erfassen. Höchste Punkte gewinnen automatisch."}</p>
-                  <div className="grid gap-3" data-testid="match-v2-result-form">
-                    {v2Rows.map((row, index) => (
-                      <div key={row.registration_id} className="grid lg:grid-cols-[minmax(0,1fr)_12rem] gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
-                        <div className="min-w-0">
-                          <div className="font-heading font-bold uppercase truncate">{participantNameByRegistration(participants, row.registration_id)}</div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <ToggleChip label="Nicht erschienen" active={row.forfeit} tone="danger" onClick={() => updateV2Row(setV2Rows, index, { forfeit: !row.forfeit })} />
-                            <ToggleChip label="Disqualifiziert" active={row.dnf} tone="gold" onClick={() => updateV2Row(setV2Rows, index, { dnf: !row.dnf })} />
-                          </div>
-                        </div>
-                        <Field label={v2Mode === "time" ? "Zeit ms" : v2Mode === "lower_score" ? "Score" : "Punkte"}>
-                          <input
-                            type="number"
-                            min="0"
-                            value={v2Mode === "time" ? row.time_ms : row.score}
-                            onChange={(e) => updateV2Row(setV2Rows, index, v2Mode === "time" ? { time_ms: e.target.value } : { score: e.target.value })}
-                            className="input text-center font-display text-xl font-bold"
-                          />
-                        </Field>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    <input type="url" value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} className="input" placeholder="Screenshot-/Beweis-Link optional" />
-                    <input value={reportNote} onChange={(e) => setReportNote(e.target.value)} className="input" placeholder="Notiz optional" />
-                  </div>
-                  <button disabled={busy} className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-v2-submit-btn">Ergebnis speichern</button>
-                </form>
+                <div className="flex flex-wrap items-center gap-3" data-testid="match-staff-result">
+                  <button type="button" onClick={() => setResultOpen(true)} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="match-staff-result-open">
+                    {data.result_entry.has_result ? "Ergebnis korrigieren" : "Ergebnis eintragen"}
+                  </button>
+                  <p className="text-xs text-white/50">{data.result_entry.has_result ? "Korrigieren geht nur mit Grund – er steht im Protokoll." : "Mit „Nicht erschienen“ und „Aufgegeben“ je Seite. Danach 10 Sekunden „Rückgängig“."}</p>
+                </div>
               )}
+              {canStaffSubmit && data.result_entry?.hold ? (
+                <p className="text-sm text-[#29B6E8]" data-testid="match-staff-result-held">{data.result_entry.hold.mine ? "Gespeichert – in wenigen Sekunden geht es raus." : `${data.result_entry.hold.actor_name} trägt gerade das Ergebnis ein.`}</p>
+              ) : null}
 
               {canDispute && (
-                <form onSubmit={submitDispute} className={hasOtherResultActions ? "border-t border-white/10 pt-5" : ""} data-testid="match-dispute-form">
-                  <Field label="Dispute-Grund">
-                    <input value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} className="input" placeholder="Was stimmt nicht?" data-testid="match-dispute-input" />
-                  </Field>
-                  <p className="mt-2 text-xs text-white/50" data-testid="match-dispute-hint">
-                    Stimmt etwas nicht? Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet.
-                    {data.dispute_until ? ` Möglich bis ${formatWhen(data.dispute_until)}.` : ""}
-                  </p>
-                  <button disabled={busy || !disputeReason.trim()} className="tls-btn tls-btn--danger mt-3 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-dispute-btn">Dispute melden</button>
-                </form>
+                <ProblemReportForm matchId={id} until={data.dispute_until} busy={busy} onSubmit={submitDispute} separated={hasOtherResultActions} initialCategory={problemCategory} />
               )}
 
-              {data.can_forfeit && !isCompleted && duelParticipants.length >= 2 && (
-                <form onSubmit={submitForfeit} className="border-t border-white/10 pt-5">
-                  <div className="text-xs text-[#FFD700] font-bold uppercase tracking-wider flex items-center gap-2"><Flag className="w-3.5 h-3.5" /> Staff-Aktion: Forfeit</div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {duelParticipants.map((participant) => (
-                      <button
-                        key={participant.registration_id}
-                        type="button"
-                        onClick={() => setForfeitWinnerId(participant.registration_id || "")}
-                        className={`px-3 py-2 border rounded-sm text-xs font-bold uppercase tracking-wider ${forfeitWinnerId === participant.registration_id ? "border-[#FFD700]/70 bg-[#FFD700]/15 text-[#FFD700]" : "border-white/10 bg-white/5 text-white/60 hover:border-[#FFD700]/45"}`}
-                      >
-                        {participant.display_name || "Teilnehmer"}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-3">
-                    <Field label="Forfeit-Begründung">
-                      <input value={forfeitReason} onChange={(e) => setForfeitReason(e.target.value)} className="input" placeholder="Mindestens 5 Zeichen" />
-                    </Field>
-                  </div>
-                  <button disabled={busy || forfeitReason.trim().length < 5 || !forfeitWinnerId} className="tls-btn tls-btn--danger mt-3 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Forfeit speichern</button>
-                </form>
-              )}
             </div>
           ) : !user && !isCompleted ? (
             <Link to={`/login?next=/matches/${id}`} className="tls-btn tls-btn--secondary mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
               Login zum Ergebnis melden
             </Link>
-          ) : (
+          ) : showStaffEnters ? null : (
             <p className="mt-4 text-sm text-white/50">{isCompleted ? "Dieses Match ist abgeschlossen." : resultModeLabels[data.result_entry_mode] || "Ergebnis wird durch die Turnierleitung gepflegt."}</p>
           )}
           {canStaffSubmit && !isCompleted && reports.length > 0 && <p className="mt-3 text-xs text-white/45" data-testid="match-report-count">{reports.length} Ergebnismeldung{reports.length === 1 ? "" : "en"} der Spieler vorhanden.</p>}
@@ -612,6 +543,8 @@ export default function MatchPage() {
           )}
         </div>
       </section>
+      {resultOpen && data.result_entry ? <ResultWindow entry={data.result_entry} onClose={() => setResultOpen(false)} onSaved={resultUndo.start} /> : null}
+      <ResultUndoBar undo={resultUndo} />
     </PublicLayout>
   );
 }
@@ -631,23 +564,6 @@ function ResultSide({ participant, match, score, isWinner }) {
   );
 }
 
-function ToggleChip({ label, active, tone = "cyan", onClick }) {
-  const activeClass = tone === "danger"
-    ? "border-[#FF3B30]/55 bg-[#FF3B30]/15 text-[#FF3B30]"
-    : tone === "gold"
-      ? "border-[#FFD700]/55 bg-[#FFD700]/15 text-[#FFD700]"
-      : "border-[#29B6E8]/55 bg-[#29B6E8]/15 text-[#29B6E8]";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition ${active ? activeClass : "border-white/10 bg-white/5 text-white/55 hover:border-white/25"}`}
-    >
-      {label}
-    </button>
-  );
-}
-
 function Field({ label, children }) {
   return (
     <label className="block">
@@ -655,42 +571,6 @@ function Field({ label, children }) {
       {children}
     </label>
   );
-}
-
-function buildV2Rows(page) {
-  const match = page?.match || {};
-  const byRegistration = new Map((match.results || []).map((result) => [result.registration_id, result]));
-  return (page?.participants || [])
-    .filter((participant) => participant.registration_id)
-    .map((participant, index) => {
-      const existing = byRegistration.get(participant.registration_id || "");
-      return {
-        dnf: Boolean(existing?.dnf),
-        forfeit: Boolean(existing?.forfeit),
-        rank: String(existing?.rank || index + 1),
-        registration_id: participant.registration_id || "",
-        score: existing?.score != null ? String(existing.score) : existing?.points != null ? String(existing.points) : "",
-        time_ms: existing?.time_ms != null ? String(existing.time_ms) : "",
-      };
-    });
-}
-
-function firstRegistrationId(participants) {
-  return (participants || []).find((participant) => participant.registration_id)?.registration_id || "";
-}
-
-function participantNameByRegistration(participants, registrationId) {
-  return participants.find((participant) => participant.registration_id === registrationId)?.display_name || "Teilnehmer";
-}
-
-function numberOrNull(value) {
-  if (String(value || "").trim() === "") return null;
-  const parsed = Number(String(value).replace(",", "."));
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
-function updateV2Row(setRows, index, patch) {
-  setRows((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
 }
 
 function v2ResultForParticipant(match, participant) {
@@ -704,8 +584,8 @@ function v2ResultRank(match, participant) {
 function v2ResultDisplay(match, participant, mode) {
   const result = v2ResultForParticipant(match, participant);
   if (!result) return "-";
-  if (result.forfeit) return "Forfeit";
-  if (result.dnf) return "DNF";
+  if (result.forfeit) return "Nicht erschienen";
+  if (result.dnf) return "Aufgegeben";
   if (mode === "time") return result.time_ms != null ? `${result.time_ms} ms` : "-";
   const score = result.score ?? result.points;
   return score != null ? score : "-";

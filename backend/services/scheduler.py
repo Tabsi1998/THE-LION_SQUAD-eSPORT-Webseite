@@ -615,6 +615,42 @@ async def _safe_chat_attachment_cleanup():
         _log_task_failure("chat_attachment_cleanup", exc)
 
 
+async def _safe_result_holds():
+    """Ergebnisse mit „Rückgängig“ (#1156): veröffentlicht, was der Zeitgeber im Server verpasst hat (Neustart)."""
+    try:
+        from database import get_db
+        from services.result_hold import publish_due_holds
+        published = await publish_due_holds(get_db())
+        if published:
+            logger.info(f"[scheduler] result_holds published={published}")
+    except Exception as exc:
+        _log_task_failure("result_holds", exc)
+
+
+async def _safe_proof_photo_retention():
+    """Fotos vom Ergebnis (#1157): nie verwendete nach 24 Stunden, sonst 30 Tage nach dem Hochladen weg."""
+    try:
+        from database import get_db
+        from services.match_proofs import purge
+        removed = await purge(get_db())
+        if removed:
+            logger.info(f"[scheduler] proof_photo_retention removed={removed}")
+    except Exception as exc:
+        _log_task_failure("proof_photo_retention", exc)
+
+
+async def _safe_match_attention():
+    """„Braucht Aufmerksamkeit“ (#1160): je neuem „Ergebnis fehlt“ oder „Station defekt“ eine Nachricht."""
+    try:
+        from database import get_db
+        from services.match_attention import sweep
+        sent = await sweep(get_db())
+        if sent:
+            logger.info(f"[scheduler] match_attention sent={sent}")
+    except Exception as exc:
+        _log_task_failure("match_attention", exc)
+
+
 async def _safe_media_scan():
     try:
         from services.media_scan import process_pending
@@ -896,8 +932,16 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("chat_attachment_cleanup", _safe_chat_attachment_cleanup), IntervalTrigger(hours=1), id="chat_attachment_cleanup",
                   max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("proof_photo_retention", _safe_proof_photo_retention, lease_seconds=300.0), IntervalTrigger(hours=1),
+                  id="proof_photo_retention", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("ops_retention", _safe_ops_retention, lease_seconds=600.0), IntervalTrigger(hours=24), id="ops_retention", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("ops_checks", _safe_ops_checks), IntervalTrigger(minutes=5), id="ops_checks",
+                  max_instances=1, coalesce=True)
+    # Braucht Aufmerksamkeit (#1160): fehlende Ergebnisse und defekte Stationen - jede Minute nachsehen.
+    sched.add_job(_single_replica("match_attention", _safe_match_attention, lease_seconds=120.0), IntervalTrigger(seconds=60), id="match_attention",
+                  max_instances=1, coalesce=True)
+    # Ergebnisse mit „Rückgängig“ (#1156): nach 10 Sekunden veröffentlichen, auch nach einem Neustart.
+    sched.add_job(_single_replica("result_holds", _safe_result_holds, lease_seconds=60.0), IntervalTrigger(seconds=5), id="result_holds",
                   max_instances=1, coalesce=True)
     # Bildprüfung (#415): Sammler für alles, was die sofortige Prüfung nach dem Upload nicht erwischt hat.
     sched.add_job(_single_replica("media_scan", _safe_media_scan, lease_seconds=120.0), IntervalTrigger(seconds=20), id="media_scan",

@@ -161,6 +161,16 @@ CAPABILITIES: tuple[Capability, ...] = (
             "letzten Platz - dadurch brauchen Weiterleitung, Tabelle und Export keinen Sonderfall."),
     _c("result.recalculate", "Weiterleitung neu berechnen",
        ["POST /api/tournaments/{tid}/matches-v2/recalculate-advancement"], [GRAPH]),
+    _c("result.dispute_decision", "Dispute entscheiden",
+       ["POST /api/matches/{match_id}/dispute/decision"], [GRAPH],
+       note="#1158: „Ergebnis bleibt“ mit einem Tipp; „Ergebnis ändern“ läuft über das Ergebnis-Fenster."),
+    _c("result.undo", "Ergebnis zurücknehmen",
+       ["POST /api/matches/{match_id}/result/undo"], [GRAPH],
+       note="#1156: nur der letzte Eintrag. Liegt das Ergebnis noch 10 Sekunden bereit, fällt es weg; sonst nimmt der "
+            "Server auch das Weiterrücken zurück oder lehnt ab, wenn das nächste Spiel schon begonnen hat."),
+    _c("lead.read", "Turnierleitung am Handy",
+       ["GET /api/tournaments/{tid}/lead"], [GRAPH],
+       note="#1156: offene Spiele für die Turnierleitung des Turniers - zuerst, was fehlt, dann nach Station."),
 )
 
 

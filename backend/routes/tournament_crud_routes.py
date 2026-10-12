@@ -392,6 +392,9 @@ async def delete_tournament(tid: str, me: dict = Depends(require_admin()),
     await db.matches_v2.delete_many({"tournament_id": tid})
     if v2_match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
+    # Fotos vom Ergebnis (#1157): persönlich - sie gehen mit dem Turnier.
+    from services.match_proofs import delete_for_tournament
+    await delete_for_tournament(db, tid)
     return {"ok": True}
 
 

@@ -796,6 +796,8 @@ class MatchScoreReport(BaseModel):
     results: Optional[List["MatchV2ResultEntry"]] = None
     screenshot_url: Optional[str] = None
     note: Optional[str] = None
+    # Foto vom Ergebnis (#1157): vorher über /matches/{id}/proof-photos hochgeladen.
+    photo_id: Optional[str] = None
 
 
 class MatchV2ResultEntry(BaseModel):
@@ -813,6 +815,14 @@ class MatchV2ResultSubmit(BaseModel):
     results: List[MatchV2ResultEntry] = Field(min_length=1)
     proof_url: Optional[str] = None
     note: Optional[str] = None
+    # Ergebnis-Fenster (#1156, #1370): 10 Sekunden „Rückgängig“, erst danach geht es raus; Korrektur nur mit Grund.
+    hold: bool = False
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class MatchResultUndo(BaseModel):
+    # Das „Rückgängig“ nennt den Eintrag, den es zurücknehmen will - nur der letzte eines Spiels zählt.
+    hold_id: Optional[str] = None
 
 
 MatchScoreReport.model_rebuild()
@@ -863,6 +873,16 @@ class MatchV2Update(BaseModel):
 
 class MatchDispute(BaseModel):
     reason: str
+    # „Problem melden“ (#1158): Grund zum Antippen und ein Foto, vorher über /matches/{id}/proof-photos hochgeladen.
+    category: Optional[str] = None
+    photo_id: Optional[str] = None
+
+
+class MatchDisputeDecision(BaseModel):
+    # Die Turnierleitung entscheidet (#1158): „keep“ = das Ergebnis bleibt (ohne Ergebnis: weiter wie bisher).
+    # „Ergebnis ändern“ läuft über das Ergebnis-Fenster (Korrektur mit Grund).
+    decision: Literal["keep"]
+    note: Optional[str] = Field(default=None, max_length=500)
 
 
 # ---------- F1 ----------
