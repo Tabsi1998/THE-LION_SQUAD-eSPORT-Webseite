@@ -27,6 +27,7 @@ function renderMenu() {
 afterEach(() => closeFrameMenus());
 
 beforeEach(() => {
+  authState.user = { id: "u-1", username: "lionfan", display_name: "Lion Fan" };
   authState.isAdmin = false;
   authState.adminNeedsSecondFactor = false;
   authState.isClubMember = false;
@@ -103,4 +104,24 @@ test("offen bleibt offen, wenn während des Ladens der Kopf der Seite den des Se
   expect(screen.getByTestId("nav-logout")).toBeInTheDocument();
   await user.keyboard("{Escape}");
   expect(screen.queryByTestId("nav-logout")).toBeNull();
+});
+
+// „Mein Dienst“ (#1352): Helfer und Moderation ohne Verwaltungsbereich bekommen ihren Eingang - Admins behalten „Admin“,
+// Spieler ohne Dienst sehen keinen der beiden.
+test.each([
+  ["Helfer", { role: "player", has_staff_assignment: true, is_tournament_staff: true }, false, "nav-duty"],
+  ["Moderator", { role: "moderator" }, false, "nav-duty"],
+  ["Admin mit Zwei-Faktor", { role: "club_admin", mfa_enabled: true, auth_mfa_verified: true }, true, "nav-admin"],
+  ["Spieler", { role: "player" }, false, null],
+])("%s", async (_name, extra, isAdmin, expected) => {
+  const user = userEvent.setup();
+  authState.user = { id: "u-1", username: "lionfan", display_name: "Lion Fan", ...extra };
+  authState.isAdmin = isAdmin;
+  renderMenu();
+  await user.click(screen.getByTestId("nav-user"));
+  for (const testId of ["nav-duty", "nav-admin"]) {
+    if (testId === expected) expect(screen.getByTestId(testId)).toHaveAttribute("href", "/admin");
+    else expect(screen.queryByTestId(testId)).toBeNull();
+  }
+  if (expected === "nav-duty") expect(screen.getByTestId("nav-duty")).toHaveTextContent("Mein Dienst");
 });

@@ -64,3 +64,22 @@ test("Hinweis einmal: „Verstanden“ bestätigt, „Ausschalten“ schaltet so
   await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith("/users/me/friends-hint", { turn_off: true }));
   await waitFor(() => expect(screen.queryByTestId("event-friends-hint")).toBeNull());
 });
+
+test("Turnier- und Fast-Lap-Seite (#1188 Teil 2): eigene Abfrage und Ortsangabe je Seite", async () => {
+  apiMock.get.mockResolvedValue({ data: { friends: [{ ...LEA, where: [{ kind: "tournament", id: "t-rl", title: "RL", team_name: "Lions Rocket" }] }], sharing: true, hint: false } });
+  const { unmount } = render(<MemoryRouter><FriendsAtEvent user={{ id: "u-vera" }} path="/tournaments/rl/friends" scope="tournament" /></MemoryRouter>);
+  expect(await screen.findByTestId("event-friend-u-lea")).toHaveTextContent("mit Lions Rocket");
+  expect(apiMock.get).toHaveBeenLastCalledWith("/tournaments/rl/friends");
+  unmount();
+  apiMock.get.mockResolvedValue({ data: { friends: [{ ...LEA, where: [{ kind: "fastlap", id: "c-monza", title: "Monza" }] }], sharing: true, hint: false } });
+  render(<MemoryRouter><FriendsAtEvent user={{ id: "u-vera" }} path="/f1/challenges/monza/friends" scope="fastlap" /></MemoryRouter>);
+  expect(await screen.findByTestId("event-friend-u-lea")).toHaveTextContent("Zeit gefahren");
+  expect(apiMock.get).toHaveBeenLastCalledWith("/f1/challenges/monza/friends");
+});
+
+test("Zugangslink (#1500): die Abfrage nimmt ?access= wie die Seite mit", async () => {
+  apiMock.get.mockResolvedValue({ data: { friends: [LEA], sharing: true, hint: false } });
+  render(<MemoryRouter><FriendsAtEvent user={{ id: "u-vera" }} path="/tournaments/intern/friends" scope="tournament" accessToken="tok-1" /></MemoryRouter>);
+  expect(await screen.findByTestId("event-friend-u-lea")).toBeInTheDocument();
+  expect(apiMock.get).toHaveBeenLastCalledWith("/tournaments/intern/friends", { params: { access: "tok-1" } });
+});

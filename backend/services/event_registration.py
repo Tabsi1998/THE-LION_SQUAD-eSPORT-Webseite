@@ -4,12 +4,15 @@ Es gibt keinen zweiten, schwächeren Weg. Fehler sind Sätze mit dem HTTP-Status
 steht, über welchen Weg die Anmeldung kam (``via``)."""
 from __future__ import annotations
 
+from pymongo.errors import DuplicateKeyError
+
 from models import new_id, now_utc
 from services import billing_orders, pricing
 from services.access_links import AccessLinkUsedUp, claim_access_link_use, release_access_link_use
 from services.permissions import is_confirmed_tournament_lead
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
+from services.mutation_lock import MutationLockBusy, mutation_lock
 
 # Wer sich auch für einen Event-Entwurf anmelden darf: die Turnierleitung (Events gehören zu ihr) - seit #1350 nach
 # Bereich (Rolle oder Freigabe); die Rollenliste bleibt nur als Auskunft.
@@ -24,6 +27,13 @@ class RegistrationError(Exception):
         super().__init__(detail)
         self.status = status
         self.detail = detail
+
+
+class SeatsBusy(RegistrationError):
+    """Die Platzsperre war zu lange belegt (#1037) - kein „schon angemeldet“, sondern „gleich nochmal versuchen“."""
+
+    def __init__(self):
+        super().__init__(409, SEAT_BUSY)
 
 
 def registration_open(event: dict) -> bool:
@@ -52,24 +62,37 @@ def validated_companion_count(event: dict, value: int | None) -> int:
 
 async def summary(db, event: dict, exclude_registration_id: str | None = None) -> dict:
     """Plätze, Warteliste und Zähler - dieselbe Rechnung für Formular, Teilnehmerliste und Discord-Zusammenfassung."""
-    regs = await db.event_registrations.find({"event_id": event["id"]}, {"_id": 0}).to_list(2000)
+    # In der Datenbank gezählt, über alle Anmeldungen (#1037): Eine gelesene Liste hätte eine Obergrenze, und was darüber
+    # liegt, zählte nicht mit. Je Status Anzahl und Begleitpersonen (nicht negativ; was keine Zahl ist, zählt 0).
+    match = {"event_id": event["id"]}
     if exclude_registration_id:
-        regs = [r for r in regs if r.get("id") != exclude_registration_id]
-    active = [r for r in regs if r.get("status") in ACTIVE_STATUSES]
-    waitlist = [r for r in regs if r.get("status") == "waitlist"]
-    reserved_seats = sum(seats(r) for r in active)
-    waitlist_seats = sum(seats(r) for r in waitlist)
-    companion_count = sum(max(0, int(r.get("companion_count") or 0)) for r in active)
+        match["id"] = {"$ne": exclude_registration_id}
+    rows = await db.event_registrations.aggregate([
+        {"$match": match},
+        {"$group": {"_id": "$status", "count": {"$sum": 1},
+                    "companions": {"$sum": {"$max": [0, {"$ifNull": ["$companion_count", 0]}]}}}},
+    ]).to_list(None)
+    by_status = {row["_id"]: (int(row.get("count") or 0), int(row.get("companions") or 0)) for row in rows}
+
+    def count(*statuses: str) -> int:
+        return sum(by_status.get(status, (0, 0))[0] for status in statuses)
+
+    def companions(*statuses: str) -> int:
+        return sum(by_status.get(status, (0, 0))[1] for status in statuses)
+
+    companion_count = companions(*ACTIVE_STATUSES)
+    reserved_seats = count(*ACTIVE_STATUSES) + companion_count
+    waitlist_seats = count("waitlist") + companions("waitlist")
     max_participants = event.get("max_participants")
     spots_left = None
     if max_participants:
         spots_left = max(int(max_participants) - reserved_seats, 0)
     return {
-        "registered_count": len(active),
-        "waitlist_count": len(waitlist),
-        "checked_in_count": len([r for r in regs if r.get("status") == "checked_in"]),
-        "no_show_count": len([r for r in regs if r.get("status") == "no_show"]),
-        "cancelled_count": len([r for r in regs if r.get("status") == "cancelled"]),
+        "registered_count": count(*ACTIVE_STATUSES),
+        "waitlist_count": count("waitlist"),
+        "checked_in_count": count("checked_in"),
+        "no_show_count": count("no_show"),
+        "cancelled_count": count("cancelled"),
         "reserved_seats": reserved_seats,
         "waitlist_seats": waitlist_seats,
         "companion_count": companion_count,
@@ -94,13 +117,37 @@ async def existing_registration(db, event: dict, me: dict) -> dict | None:
     return await db.event_registrations.find_one({"event_id": event["id"], "user_id": me["id"]}, {"_id": 0})
 
 
+# Die Platzsperre des Events (#1037): Zählen und Schreiben einer Anmeldung geschehen in einem Zug - bei der Anmeldung
+# wie beim Nachrücken, Einchecken oder Ändern der Begleitpersonen durch die Turnierleitung. Ohne sie sähen zwei
+# gleichzeitige Anfragen denselben freien Platz und bekämen ihn beide. Wer ansteht, wartet kurz; dauert es zu lange,
+# kommt ein Satz zum Wiederholen.
+SEAT_WAIT_SECONDS = 5.0
+SEAT_BUSY = "Gerade melden sich viele gleichzeitig an – bitte versuch es gleich noch einmal."
+
+
+def seat_resource(event_id: str) -> str:
+    return f"event:{event_id}:seats"
+
+
 async def register(db, event: dict, me: dict, *, companion_count: int | None = 0, note: str | None = None,
                    selected_positions: list[str] | None = None, register_access: dict | None = None, via: str = "web") -> dict:
+    """Anmelden unter der Platzsperre - jeder Weg (Website, App, Discord, Zugangslink) kommt hier durch (#1037)."""
+    try:
+        async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
+            return await _register(db, event, me, companion_count=companion_count, note=note,
+                                   selected_positions=selected_positions, register_access=register_access, via=via)
+    except MutationLockBusy:
+        raise SeatsBusy()
+
+
+async def _register(db, event: dict, me: dict, *, companion_count: int | None, note: str | None,
+                    selected_positions: list[str] | None, register_access: dict | None, via: str) -> dict:
     """Anmelden - Platz oder Warteliste, Preis eingefroren und Auftrag angelegt, Audit mit dem Weg (``via``)."""
     companions = validated_companion_count(event, companion_count)
     requested_seats = 1 + companions
     existing = await existing_registration(db, event, me)
     if existing and existing.get("status") not in {"cancelled", "no_show"}:
+        await repair_order(db, event, existing)
         raise RegistrationError(409, "Du bist für dieses Event bereits angemeldet")
 
     # Preis (#315, #318): vor der Buchung rechnen, damit eine unbekannte Position sauber scheitert.
@@ -133,7 +180,8 @@ async def register(db, event: dict, me: dict, *, companion_count: int | None = 0
     # Eingefroren wird nur eine verbindliche Anmeldung - die Warteliste bekommt ihren Preis beim
     # Nachrücken (Admin setzt „registered“), nicht jetzt.
     if status == "registered" and not price.get("free"):
-        doc["price_snapshot"] = pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")})
+        doc["price_snapshot"] = pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")},
+                                                 invoice_timing=offer.get("invoice_timing") or "on_confirm")
         doc["billing_status"] = "pending"
     # Zugangslink mit Limit (#1036): die Nutzung atomar belegen, bevor die Anmeldung geschrieben wird.
     try:
@@ -149,6 +197,15 @@ async def register(db, event: dict, me: dict, *, companion_count: int | None = 0
             doc["created_at"] = now
             await db.event_registrations.insert_one(doc)
             doc.pop("_id", None)
+    except DuplicateKeyError:
+        # Zwei gleichzeitige Anmeldungen derselben Person (Doppelklick, Website und Discord): der eindeutige Index
+        # lässt nur eine durch. Die andere antwortet wie jede Wiederholung und holt einen fehlenden Auftrag nach
+        # (#1491). Die Link-Nutzung bleibt: sie gilt je Person (``used_by``), und die Person ist angemeldet - gäbe
+        # die unterlegene Anfrage ihre Zählung zurück, stünde die Anmeldung ohne Nutzung da.
+        current = await existing_registration(db, event, me)
+        if current:
+            await repair_order(db, event, current)
+        raise RegistrationError(409, "Du bist für dieses Event bereits angemeldet")
     except Exception:
         if claimed:
             await release_access_link_use(db, register_access, me)
@@ -164,8 +221,33 @@ async def register(db, event: dict, me: dict, *, companion_count: int | None = 0
     })
     if doc.get("price_snapshot"):
         await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=doc["id"], user_id=me["id"],
-                                          snapshot=doc["price_snapshot"], timing=offer.get("invoice_timing") or "on_confirm")
+                                          snapshot=doc["price_snapshot"], timing=pricing.order_timing(doc["price_snapshot"], offer))
     return doc
+
+
+async def repair_order(db, event: dict, registration: dict) -> dict | None:
+    """Nachholen (#1491, wie ``tournament_fees.repair_order``): eine verbindliche, kostenpflichtige Anmeldung mit
+    eingefrorenem Preis, aber ohne Rechnungsauftrag, bekommt ihn bei der Wiederholung.
+
+    Anmeldung, Preis und Auftrag werden nacheinander gespeichert. Bricht der Auftrag danach ab, antwortet die
+    Wiederholung sonst nur „bereits angemeldet“, und es entstünde nie eine Rechnung. Genau einmal: ein vorhandener
+    Auftrag zum selben Preis (auch ein stornierter) bleibt, und gleichzeitige Wiederholungen fängt der eindeutige
+    ``booking_key`` ab. Gibt den neuen Auftrag zurück, sonst ``None``.
+
+    Grundlage ist der eingefrorene Preis, nicht die heutige Abrechnung des Events (Codex-Prüfung #1500): wurde die
+    Abrechnung nach dem Abbruch abgeschaltet, gilt der vereinbarte Preis trotzdem."""
+    snapshot = registration.get("price_snapshot")
+    if registration.get("status") not in ACTIVE_STATUSES or not snapshot or int(snapshot.get("total_cents") or 0) <= 0:
+        return None
+    if registration.get("billing_status") not in (None, "pending"):
+        return None
+    key = billing_orders.booking_key("event", registration["id"], snapshot)
+    known = {"booking_key": key} if key else {"kind": "event", "registration_id": registration["id"], "status": {"$nin": ["cancelled", "failed"]}}
+    if await db.billing_orders.find_one(known, {"_id": 0, "id": 1}):
+        return None
+    offer = event.get("billing") or {}
+    return await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=registration["id"],
+                                             user_id=registration["user_id"], snapshot=snapshot, timing=pricing.order_timing(snapshot, offer))
 
 
 CANCELLABLE_STATUSES = {"registered", "waitlist"}

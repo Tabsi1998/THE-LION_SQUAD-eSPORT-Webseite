@@ -149,7 +149,7 @@ test.describe("Oberfläche, Welle 1: Kopfleiste, Menü, Seitenwechsel, Social-Lo
     await discord.scrollIntoViewIfNeeded();
     const rest = await look("footer-discord");
     expect(rest.color).toBe("rgb(88, 101, 242)");
-    expect(rest.size).toBe("9px 2px");
+    expect(rest.size).toBe("7px 2px");
     expect(rest.fill).toBe("rgba(0, 0, 0, 0)");
     expect(rest.logo).toBe("none");
     expect(rest.name).toBe("0");
@@ -277,7 +277,7 @@ test.describe("Oberfläche, Welle 1: Kopfleiste, Menü, Seitenwechsel, Social-Lo
     const style = await discord.evaluate((node) => ({ logo: getComputedStyle(node.querySelector("svg")).transform, size: getComputedStyle(node).backgroundSize.split(",")[0].trim() }));
     // Die Winkel schließen sich weiter (sofort, das ist Farbe), das Logo wächst nicht.
     expect(style.logo).toBe("matrix(1, 0, 0, 1, 0, 0)");
-    expect(style.size).not.toBe("9px 2px");
+    expect(style.size).not.toBe("7px 2px");
     // Auch das Glühen im Hero wandert nicht.
     await page.evaluate(() => window.scrollTo(0, 0));
     expect(await page.getByTestId("home-hero-drift").evaluate((node) => getComputedStyle(node).animationName)).toBe("none");

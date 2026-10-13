@@ -133,3 +133,22 @@ test("fehlt das Recht für das Fast-Lap-Team, steht dort ein Satz – der Rest d
   expect(screen.getByTestId("f1-add-time-value")).toBeInTheDocument();
   expect(screen.getByTestId("f1-staff-person-search")).toBeInTheDocument();
 });
+
+// Nachweis-Links (#1038): nur http(s) wird ein Link - ein alter Eintrag mit javascript: bleibt ohne Link.
+test("Nachweis-Link nur bei http(s)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (String(url).startsWith("/f1/challenges/c-1?")) return { data: { ...CHALLENGE, tracks: [{ id: "tr-1", name: "Spa" }] } };
+    if (String(url).startsWith("/f1/challenges/c-1/times")) {
+      return { data: [
+        { id: "t-ok", attempt_number: 1, time_str: "1:24.587", user: { display_name: "Erika" }, proof_url: "https://example.test/clip" },
+        { id: "t-alt", attempt_number: 2, time_str: "1:25.000", user: { display_name: "Otto" }, proof_url: "javascript:alert(1)" },
+      ] };
+    }
+    return { data: [] };
+  });
+  renderPage();
+  await screen.findByText("Otto");
+  const links = screen.getAllByRole("link", { name: "Proof" });
+  expect(links).toHaveLength(1);
+  expect(links[0]).toHaveAttribute("href", "https://example.test/clip");
+});

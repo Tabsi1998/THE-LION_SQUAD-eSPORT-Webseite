@@ -29,7 +29,7 @@ function stationExportUrl(tournamentId, orientation) {
 
 export default function AdminStationsPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
-  const { isTournamentLead: isAdmin } = useAuth();
+  const { isTournamentLead } = useAuth();
   const [list, setList] = useState([]);
   const [tournaments, setTournaments] = useState([]);
   const [activeTid, setActiveTid] = useState("");
@@ -299,7 +299,7 @@ export default function AdminStationsPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* LEFT: Create form + unassigned matches queue */}
         <div className="space-y-6">
-          {isAdmin && <form onSubmit={create} className="border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
+          {isTournamentLead && <form onSubmit={create} className="border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Einzelne Station</div>
             <input placeholder="Name (z.B. Switch 1)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required data-testid="station-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             <select value={form.device_type} onChange={(e) => setForm({ ...form, device_type: e.target.value })} data-testid="station-device" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
@@ -309,7 +309,7 @@ export default function AdminStationsPage() {
             <button data-testid="station-submit" className="w-full px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Plus className="w-4 h-4" /> Anlegen</button>
           </form>}
 
-          {isAdmin && <div className="border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
+          {isTournamentLead && <div className="border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Schnell-Setup</div>
             <div className="grid grid-cols-2 gap-2">
               <input placeholder="Prefix" value={bulk.prefix} onChange={(e) => setBulk({ ...bulk, prefix: e.target.value })} className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
@@ -367,11 +367,11 @@ export default function AdminStationsPage() {
                     <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{formatDeviceType(s.device_type)}</div>
                     <div className="font-heading text-lg font-bold">{s.name}</div>
                   </div>
-                  {isAdmin && <button onClick={() => del(s.id)} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>}
+                  {isTournamentLead && <button onClick={() => del(s.id)} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>}
                 </div>
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <StatusBadge status={s.status} />
-                  {isAdmin && <select value={s.status} onChange={(e) => updateStatus(s.id, e.target.value)} data-testid={`station-status-${s.id}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs">
+                  {isTournamentLead && <select value={s.status} onChange={(e) => updateStatus(s.id, e.target.value)} data-testid={`station-status-${s.id}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs">
                     {STATUSES.map((st) => <option key={st} value={st}>{formatMatchStatus(st)}</option>)}
                   </select>}
                 </div>

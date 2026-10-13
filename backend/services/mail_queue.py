@@ -17,9 +17,35 @@ import dns.reversename
 from database import get_db
 from models import new_id, now_utc
 from services.email_delivery import header_text, html_to_text, mailbox_domain
-from services.log_safe import log_safe, mask_addresses
+from services.log_safe import log_safe, mask_addresses, mask_addresses_deep
 
 logger = logging.getLogger("tls.mailqueue")
+
+# Felder, die die Liste der Warteschlange nie zeigt (#1418): die ganze Adresse, der Mailtext und der Schlüssel gegen
+# doppelten Versand. Die Adresse steht gekürzt in ``to_masked``; ganz nur über „Adresse zeigen“ (mit Protokoll).
+LIST_HIDDEN_FIELDS = ("to", "html", "dedupe_key")
+
+
+def masked_recipient(address) -> str:
+    """Die Empfänger gekürzt (#1418): je Adresse erster Buchstabe und Domain - ``paula@gmail.com`` → ``p***@gmail.com``,
+    mehrere Empfänger je für sich (``log_safe.mask_addresses``). Was keine Adresse enthält, wird ganz verdeckt."""
+    text = str(address or "").strip()
+    if not text:
+        return ""
+    if "@" not in text:
+        return "***"
+    return mask_addresses(text)
+
+
+def masked_job(job: dict | None) -> dict | None:
+    """Ein Eintrag der Warteschlange ohne ganze Adresse (#1418) - auch nicht in Betreff, Fehlermeldung, Zusatzdaten oder
+    deren Schlüsseln: der Mailserver nennt die Adresse oft in seiner Antwort („550 … <paula@…> unknown“)."""
+    if not job:
+        return job
+    shown = mask_addresses_deep({key: value for key, value in job.items() if key not in LIST_HIDDEN_FIELDS})
+    shown["to_masked"] = masked_recipient(job.get("to"))
+    return shown
+
 
 # Backoff schedule in minutes for retry attempts (1m, 5m, 30m, 2h, 12h)
 RETRY_BACKOFF_MIN = [1, 5, 30, 120, 720]
@@ -603,8 +629,8 @@ async def mail_queue_stats() -> dict:
         "counts": counts,
         "due_pending": due_pending,
         "stale_sending": stale_sending,
-        "latest_problem": latest_problem,
-        "next_pending": next_pending,
+        "latest_problem": masked_job(latest_problem),
+        "next_pending": masked_job(next_pending),
         "max_attempts": MAX_ATTEMPTS,
         "stale_after_minutes": SENDING_STALE_MINUTES,
     }

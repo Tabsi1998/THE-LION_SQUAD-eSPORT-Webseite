@@ -10,20 +10,8 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ArrowRight, Pin, Newspaper, Crown, Lock, Search, X } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
-
-const CATEGORY_COLORS = {
-  club: "#29B6E8",
-  tournaments: "#FFD700",
-  events: "#9F7AEA",
-  community: "#F59E0B",
-  sponsors: "#FFD700",
-  members: "#FFD700",
-  teams: "#10B981",
-  announcement: "#FF3B30",
-  recap: "#6B7280",
-  maintenance: "#6B7280",
-};
+import { formatAgo } from "@/lib/datetime";
+import { newsCategoryColor } from "@/lib/categoryColors";
 
 const VIS_ICON = { members: Crown, internal: Lock, community: null, public: null };
 
@@ -142,7 +130,7 @@ export default function NewsPage() {
           <div className="mt-10 space-y-10">
             {pinned.length > 0 && (
               <div>
-                <div className="text-[11px] uppercase tracking-widest text-[#FFD700]/80 font-bold mb-3 flex items-center gap-2">
+                <div className="text-[11px] uppercase tracking-widest text-white/80 font-bold mb-3 flex items-center gap-2">
                   <Pin className="w-3.5 h-3.5" /> Angepinnt
                 </div>
                 <Reveal className="tls-reveal-grid grid md:grid-cols-2 gap-5">
@@ -164,7 +152,8 @@ export default function NewsPage() {
 }
 
 function NewsCard({ n, featured = false }) {
-  const c = CATEGORY_COLORS[n.category] || "#29B6E8";
+  // Farbe je Kategorie (#1305): Turniere Cyan, Events Violett, Verein und Mitglieder Gold, alles andere Grau.
+  const c = newsCategoryColor(n.category);
   const VIcon = VIS_ICON[n.visibility];
   return (
     <Link
@@ -185,9 +174,9 @@ function NewsCard({ n, featured = false }) {
       <div className="p-5 flex-1 flex flex-col">
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold">
           <span style={{ color: c }}>{newsCategoryLabel(n.category)}</span>
-          {n.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
-          {VIcon && <VIcon className="w-3 h-3 text-[#FFD700]" />}
-          <span className="text-white/30 ml-auto">{viennaDate(n.published_at || n.created_at)}</span>
+          {n.pinned && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
+          {VIcon && <VIcon className="w-3 h-3 text-honor" />}
+          <span className="text-white/45 ml-auto normal-case tracking-normal">{formatAgo(n.published_at || n.created_at)}</span>
         </div>
         <h3 className={`mt-2 font-heading font-black leading-tight break-words line-clamp-3 ${featured ? "text-xl md:text-2xl" : "text-lg"} tls-card__title`}>
           {n.title}

@@ -221,6 +221,20 @@ Jede Liste lädt für sich: fehlt ein Recht, steht an der Stelle ein Satz, der R
   Stationen, Turnierbaum-TV, #1028); Helfer mit Einsatz kommen dort ohne Zwei-Faktor hinein. Menü und
   Knöpfe zeigen ohne bestätigte Zwei-Faktor-Anmeldung keine Verwaltungs-Einträge, sondern „2FA einrichten“.
   Die Verwaltungsliste der Turniere zeigt Helfern nur die Turniere ihres Einsatzes.
+- Knöpfe in Turnier, Fast Lap und Stationen (#1353) richten sich nach dem, was der Server je Turnier schickt
+  (`tournament_rights` in `services/tournament_permissions.py`): `can_manage_results` (irgendwo im Turnier – öffnet die
+  Turnierleitung am Handy), `can_manage_all_results` und `can_plan_matches` (alle Spiele, nur mit Einsatz für das ganze
+  Turnier), `can_manage_structure`, `can_check_in`, `can_manage_participants`, `can_assign_stations`,
+  `can_use_staff_tools` – dieselben Rollen und Scopes wie die Wächter der Routen. Einsätze für einzelne Spiele, Phasen,
+  Gruppen oder Stationen stehen in `staff_scopes`; das Web zeigt Ergebnis- und Termin-Knöpfe nur bei den Spielen, die
+  sie abdecken (`lib/tournamentRights.js`). „Neues Turnier“, „Löschen“, Team, Einstellungen und der Reiter „Bearbeiten“
+  nur mit der Turnierleitung über alle Turniere (`isTournamentLead`).
+- Die Startseite der Verwaltung (`/admin/dashboard`, #1353) schickt jeden Block nur dem Bereich, dem er gehört:
+  Turnier-Zahlen und Termine heute der Turnierleitung, Mitgliederzahlen und Anträge der Vereinsverwaltung, Meldungen der
+  Moderation, Sponsoring der Redaktion, Abrechnung und Belege den Finanzen, Betrieb, Push, App-Logs, Discord und das
+  ganze Protokoll System. Die Liste „Letzte Adminaktionen“ (nur was wann) bekommen Turnierleitung, Redaktion und
+  Vereinsverwaltung, der Kassier nicht; das Wachstum (`/admin/growth-stats`) nur Vereinsverwaltung und System. Ein Wächter-Test (`frontend/src/lib/adminRights.test.js`) meldet `isAdmin` in
+  `pages/admin`; die Bereichslisten von Web und Server vergleicht `frontend/src/lib/permissions.parity.test.js`.
 - **Angemeldet bleiben** (Haken im Login, Standard an): 90 Tage, die mit jeder Nutzung neu
   beginnen. Ohne Haken endet die Sitzung mit dem Browser.
 
@@ -293,7 +307,7 @@ Finanzen; die Turnierleitung Turniere, Stationen, Strafen und Gewinne; der Admin
 
 | Gruppe | Einträge | Wer |
 | --- | --- | --- |
-| Übersicht | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, System) | wer einen dieser Bereiche hat; Moderation allein hat weder Menüeintrag „Admin“ noch `/admin`, nur `/admin/moderation` |
+| Übersicht | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen, System) · Mein Dienst (Helfer mit Einsatz, Moderation ohne Verwaltungsbereich) | Dashboard mit einem dieser Bereiche und Zwei-Faktor (Server: `require_dashboard`, #992, #1353); „Mein Dienst“ (#1352) für Helfer und reine Moderation – im Benutzermenü statt „Admin“, `/admin` führt Helfer nach `/admin/dienst`, Moderation nach `/admin/moderation`, Konten ohne Dienst auf „Kein Zugriff“ mit dem Satz „Die Verwaltung ist für Vereinsdienste …“ |
 | Verein | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) | je Eintrag |
 | Mitglieder | Mitglieder, Mitgliederprofile, Bewerbungen, Mitgliedervorteile, Dokumente, Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung und System) | Vereinsverwaltung |
 | Finanzen | Finanzübersicht | Finanzen |

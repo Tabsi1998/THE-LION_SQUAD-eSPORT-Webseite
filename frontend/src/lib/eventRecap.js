@@ -49,9 +49,18 @@ export function friendsSentence(friends = [], { over = false } = {}) {
   return `${list} ${verb} dabei`;
 }
 
-/** Wo ein Freund dabei ist: „Event“ und je Turnier der Titel, bei Team-Turnieren mit Teamname. */
-export function friendPlaces(friend) {
-  return (friend?.where || []).map((place) => (place.kind === "event" ? "Event" : `${place.title}${place.team_name ? ` (${place.team_name})` : ""}`));
+/**
+ * Wo ein Freund dabei ist. Auf der Event-Seite: „Event“, je Turnier der Titel (bei Team-Turnieren mit Teamname) und je
+ * Fast Lap der Titel. Auf der Turnierseite (#1188 Teil 2) nur der Teamname bzw. „angemeldet“, auf der Fast-Lap-Seite
+ * „Zeit gefahren“ - der Titel steht dort ohnehin oben.
+ */
+export function friendPlaces(friend, { scope = "event" } = {}) {
+  return (friend?.where || []).map((place) => {
+    if (place.kind === "event") return "Event";
+    if (place.kind === "fastlap") return scope === "fastlap" ? "Zeit gefahren" : place.title;
+    if (scope === "tournament") return place.team_name ? `mit ${place.team_name}` : "angemeldet";
+    return `${place.title}${place.team_name ? ` (${place.team_name})` : ""}`;
+  });
 }
 
 function ageOn(birthDate, today) {

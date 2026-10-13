@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminDenied } from "@/components/tls/AdminDenied";
+import { deniedText } from "@/lib/loadProblem";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
@@ -23,12 +25,16 @@ const FAST_LAP_STATUS_OPTIONS = [
 
 export default function AdminF1Page() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
-  const { isTournamentLead: isAdmin } = useAuth();
+  const { isTournamentLead } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
-  const load = useCallback(() => api.get("/f1/challenges?include_drafts=true&managed=true").then(({ data }) => setList(data)), []);
+  const [denied, setDenied] = useState("");
+  // Verweigert der Server die Liste, steht der Grund da - nicht „Keine Challenges“ (#1353).
+  const load = useCallback(() => api.get("/f1/challenges?include_drafts=true&managed=true")
+    .then(({ data }) => { setList(data); setDenied(""); })
+    .catch((error) => { setList([]); setDenied(deniedText(error, ["tournaments"]) || formatRequestError(error, "Fast-Lap-Challenges konnten nicht geladen werden.")); }), []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["f1"]);
 
@@ -98,7 +104,7 @@ export default function AdminF1Page() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Fast Lap</h1>
         </div>
-        {isAdmin && (
+        {isTournamentLead && (
           <Link to="/admin/f1/new" data-testid="admin-f1-new-btn" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2]">
             <Plus className="w-4 h-4" /> Neue Challenge
           </Link>
@@ -147,7 +153,8 @@ export default function AdminF1Page() {
             </div>
           </Link>
         ))}
-        {list.length === 0 && <div className="text-center py-16 text-white/40 font-display tracking-widest">KEINE CHALLENGES</div>}
+        {denied && <AdminDenied text={denied} />}
+        {!denied && list.length === 0 && <div className="text-center py-16 text-white/40 font-display tracking-widest">KEINE CHALLENGES</div>}
         {list.length > 0 && filteredList.length === 0 && <div className="text-center py-16 text-white/40 font-display tracking-widest">KEINE CHALLENGES FÜR DIESEN FILTER</div>}
       </div>
     </AdminLayout>
