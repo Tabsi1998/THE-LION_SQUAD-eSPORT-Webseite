@@ -128,3 +128,27 @@ async def test_events_never_carry_a_full_address_in_json_csv_or_search(flow):
     masked_hits = (await flow.get("/api/admin/ops/events", params={"hours": 0, "q": "p***@gmail.com"})).json()["items"]
     assert any(item["id"] == "m1" for item in masked_hits)
     assert full[0] not in (await flow.get("/api/admin/ops/events", params={"hours": 0, "q": full[0]})).text
+
+
+@pytest.mark.asyncio
+async def test_events_mask_several_recipients_display_names_and_dict_keys(flow):
+    """#1505: mehrere Empfänger, Anzeigenamen und Adressen als Dict-Schlüssel - in JSON und CSV nur gekürzt."""
+    fresh = now_utc().isoformat()
+    raw = ("bob@x.example", "carla.k@y.example", "dora@z.example", "erik@w.example")
+    await flow.db.email_logs.insert_one({"id": "m1", "to": f'"Bob Beispiel" <{raw[0]}>, {raw[1]}', "subject": f"Gruß an {raw[2]}", "status": "failed",
+                                         "channel": "email", "error": f"550 {raw[0]};{raw[1]} unknown", "created_at": fresh})
+    await flow.db.mail_jobs.insert_one({"id": "j1", "to": f"{raw[2]}, {raw[3]}", "subject": f"Für {raw[2]}", "status": "failed", "attempts": 1,
+                                        "last_error": f'rejected "Dora" <{raw[2]}>', "created_at": fresh, "updated_at": fresh})
+    await flow.db.audit_logs.insert_one({"id": "au1", "action": "x", "actor_id": "a", "target_id": "t", "data": {raw[3]: "offen", "mailto": f"mailto:{raw[0]}"},
+                                         "created_at": fresh})
+    flow.act_as(await flow.add_user(role="superadmin"))
+    texts = [(await flow.get("/api/admin/ops/events", params={"hours": 0, "limit": 100})).text,
+             (await flow.get("/api/admin/ops/events", params={"hours": 0, "limit": 100, "format": "csv"})).text,
+             (await flow.get("/api/admin/logs")).text]
+    for text in texts:
+        for address in raw:
+            assert address not in text, address
+    items = {i["id"]: i for i in (await flow.get("/api/admin/ops/events", params={"hours": 0})).json()["items"]}
+    assert "b***@x.example" in items["m1"]["subtitle"] and "c***@y.example" in items["m1"]["subtitle"]
+    assert "d***@z.example" in items["j1"]["subtitle"] and "e***@w.example" in items["j1"]["subtitle"]
+    assert "e***@w.example" in items["au1"]["detail"]

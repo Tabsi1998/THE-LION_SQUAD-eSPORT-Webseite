@@ -18,7 +18,7 @@ from services.ops_alerts import ALERT_KINDS, alert_red_checks, load_alert_settin
 from services.ops_checks import checks_overview, run_checks
 from services.ops_vitals import vitals_overview
 from services import github_releases
-from services.log_safe import mask_addresses
+from services.log_safe import mask_addresses, mask_addresses_deep
 from services.app_releases import delete_release, list_releases, public_release, set_updater_settings, store_release, update_release, updater_settings, upload_token_matches, upload_token_problem, upload_token_status
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -75,7 +75,7 @@ def _log_time(row: dict, *keys: str) -> str:
 def _masked_log_text(value, limit: int) -> str:
     """Text für die Ereignis-Liste (#1505): jede Mail-Adresse darin gekürzt (``p***@gmail.com``, wie in der Mail-Warteschlange
     #1418) - erst kürzen, dann auf die Länge bringen, damit keine halbe Adresse stehen bleibt."""
-    return _clip_log_text(mask_addresses(_clip_log_text(value, 100000)), limit)
+    return _clip_log_text(mask_addresses(_clip_log_text(mask_addresses_deep(value), 100000)), limit)
 
 
 def _log_item(source: str, label: str, href: str, row: dict, *, severity: str, title: str, subtitle: str = "", detail="", status: str = "", time_keys=("created_at",)) -> dict:
@@ -600,7 +600,8 @@ async def ops_events(source: str = "all", severity: str = "all", hours: int = Qu
         writer = csv.writer(buffer, delimiter=";")
         writer.writerow(["Zeit", "Schwere", "Quelle", "Status", "Titel", "Details", "Weitere Angaben"])
         for item in items:
-            writer.writerow([item.get("time"), item.get("severity"), item.get("source_label"), item.get("status"), item.get("title"), item.get("subtitle"), item.get("detail")])
+            # Nur aus den gekürzten Feldern, zur Sicherheit noch einmal gekürzt (#1505).
+            writer.writerow([mask_addresses(item.get(key)) for key in ("time", "severity", "source_label", "status", "title", "subtitle", "detail")])
         return Response(content="﻿" + buffer.getvalue(), media_type="text/csv; charset=utf-8",
                         headers={"Content-Disposition": 'attachment; filename="ereignisse.csv"'})
     return {
