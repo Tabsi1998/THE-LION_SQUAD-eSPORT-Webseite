@@ -11,6 +11,9 @@ Technische Hintergründe für die Entwicklung stehen in den Dateien unter [`docs
 
 | Kapitel | Worum es geht |
 | --- | --- |
+| [Verein und Mitglieder](verein.md) | Mitglied werden, Anträge und Einladungen, Mitgliederbereich, Mitgliedskarte, Vorstand und Stellvertretungen, Statuten, Versammlungen, Helferdienste, persönliche Unterlagen |
+| [Inhalte: News, Galerie und Seiten](inhalte.md) | News schreiben und verteilen, Galerie und Event-Fotos, Medien-Bibliothek, Über uns, Sponsoren, Partner, Referenzen |
+| [Mails und Benachrichtigungen](mails.md) | Mail-Versand (Resend, SMTP), Vorlagen, Mail-Queue, Newsletter, Push und Kanäle, Discord-Direktnachrichten, Themen und Kanäle der Mitglieder |
 | [Discord](discord.md) | Bot, Meldungen, Kanäle, Rollen, Befehle, Hauptserver und Unterserver, Rechte – Einrichtung Schritt für Schritt |
 | [TV und Beamer](tv.md) | Turnierbaum, Aufruf-Tafel, Hallen-Tafel, Stations-Ansicht und Fast-Lap-Rangliste auf Fernseher und Beamer – Link mit Schlüssel, Grundwerte, Sponsoren, Ton |
 | [Fast Lap](fastlap.md) | Challenge anlegen, Strecken und Wertung, Zeiten eintragen und prüfen, Fast-Lap-Team, Bestenliste und Bestzeit-Moment |
