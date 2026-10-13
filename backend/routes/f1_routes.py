@@ -2,8 +2,9 @@
 import io
 import csv
 import logging
+import math
 from datetime import datetime
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlsplit
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse, StreamingResponse
 from database import get_db
@@ -45,6 +46,65 @@ def _max_attempts(challenge: dict) -> int | None:
     except (TypeError, ValueError):
         return None
     return value if value > 0 else None
+
+
+# Grenzen einer Fast-Lap-Zeit (#1038): eine Runde dauert mehr als null und höchstens eine Stunde; Strafsekunden sind
+# nie eine Gutschrift und ebenfalls höchstens eine Stunde.
+MAX_LAP_MS = 60 * 60 * 1000
+MAX_PENALTY_SECONDS = 60 * 60
+
+
+async def check_lap_time(db, challenge: dict, lap: dict, *, current: dict | None = None) -> int:
+    """Die eine Prüfung einer Fast-Lap-Zeit (#1038): Eintragen (Website, App) und Korrigieren rufen dieselbe Funktion;
+    auch das Zurücknehmen einer Strafe aus der Strafen-Liste (#1388) soll hier durch.
+
+    ``lap`` ist der Stand nach der Änderung, ``current`` bei einer Korrektur der gespeicherte Eintrag. Die Rechte
+    (Turnierleitung oder Einsatz in der Challenge) prüft die Route vorher mit ``_require_f1_result_permission``.
+    Gibt die Zahl der bisherigen Versuche in der Wertung zurück - ohne den korrigierten Eintrag selbst."""
+    time_ms = lap.get("time_ms")
+    if isinstance(time_ms, bool) or not isinstance(time_ms, int) or not 0 < time_ms <= MAX_LAP_MS:
+        raise HTTPException(status_code=400, detail="Die Rundenzeit muss größer als null und höchstens 60 Minuten sein.")
+    penalty = lap.get("penalty_seconds") or 0
+    if isinstance(penalty, bool) or not isinstance(penalty, (int, float)) or not math.isfinite(penalty) \
+            or not 0 <= penalty <= MAX_PENALTY_SECONDS:
+        raise HTTPException(status_code=400, detail=f"Strafsekunden müssen zwischen 0 und {MAX_PENALTY_SECONDS} liegen.")
+    proof_url = (lap.get("proof_url") or "").strip()
+    if proof_url:
+        parts = urlsplit(proof_url)
+        if parts.scheme.lower() not in ("http", "https") or not parts.netloc:
+            raise HTTPException(status_code=400, detail="Der Nachweis-Link muss mit http:// oder https:// beginnen.")
+    if not await db.f1_tracks.find_one({"id": lap.get("track_id"), "challenge_id": challenge.get("id")}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=400, detail="Strecke gehört nicht zur Challenge")
+    score_scope = lap.get("score_scope") or "official"
+    if score_scope == "club_reference" and not challenge.get("allow_club_reference_times", True):
+        raise HTTPException(
+            status_code=400,
+            detail="Vereins-Referenzzeiten sind bei dieser Challenge deaktiviert.",
+        )
+    if score_scope == "official" and challenge.get("block_club_member_results") and await _is_active_club_member(lap.get("user_id")):
+        raise HTTPException(
+            status_code=400,
+            detail="Vereinsmitglieder dürfen bei dieser Challenge nur als Vereins-Referenz eingetragen werden.",
+        )
+    _validate_penalty_note(penalty, bool(lap.get("is_invalid")), lap.get("admin_note"))
+    # Versuche zählen, sobald eine Zeit in eine Wertung kommt: beim Eintragen und wenn eine Korrektur die Wertung wechselt.
+    attempt_query = {"challenge_id": challenge.get("id"), "track_id": lap.get("track_id"), "user_id": lap.get("user_id")}
+    if score_scope == "club_reference":
+        attempt_query["score_scope"] = "club_reference"
+    else:
+        attempt_query["$or"] = [{"score_scope": {"$exists": False}}, {"score_scope": "official"}]
+    if current:
+        attempt_query["id"] = {"$ne": current.get("id")}
+    attempt_count = await db.f1_lap_times.count_documents(attempt_query)
+    entering_scope = current is None or (current.get("score_scope") or "official") != score_scope
+    max_attempts = _max_attempts(challenge)
+    if entering_scope and max_attempts is not None and attempt_count >= max_attempts:
+        scope_label = "Referenzzeiten" if score_scope == "club_reference" else "offizielle Zeiten"
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximale Anzahl Versuche erreicht ({max_attempts}) für {scope_label}.",
+        )
+    return attempt_count
 
 
 router = APIRouter(prefix="/api/f1", tags=["f1"])
@@ -794,37 +854,11 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_curre
     if not c:
         raise HTTPException(status_code=404)
     await _require_f1_result_permission(me, cid)
-    if not await db.f1_tracks.find_one({"id": body.track_id, "challenge_id": cid}):
-        raise HTTPException(status_code=400, detail="Strecke gehört nicht zur Challenge")
     if not await db.users.find_one({"id": body.user_id}):
         raise HTTPException(status_code=400, detail="Spieler nicht gefunden")
     score_scope = body.score_scope or "official"
-    if score_scope == "club_reference" and not c.get("allow_club_reference_times", True):
-        raise HTTPException(
-            status_code=400,
-            detail="Vereins-Referenzzeiten sind bei dieser Challenge deaktiviert.",
-        )
-    is_club_member = await _is_active_club_member(body.user_id)
-    if c.get("block_club_member_results") and is_club_member and score_scope != "club_reference":
-        raise HTTPException(
-            status_code=400,
-            detail="Vereinsmitglieder dürfen bei dieser Challenge nur als Vereins-Referenz eingetragen werden.",
-        )
-    _validate_penalty_note(body.penalty_seconds, body.is_invalid, body.admin_note)
-    # Attempt count
-    attempt_query = {"challenge_id": cid, "track_id": body.track_id, "user_id": body.user_id}
-    if score_scope == "club_reference":
-        attempt_query["score_scope"] = "club_reference"
-    else:
-        attempt_query["$or"] = [{"score_scope": {"$exists": False}}, {"score_scope": "official"}]
-    attempt_count = await db.f1_lap_times.count_documents(attempt_query)
-    max_attempts = _max_attempts(c)
-    if max_attempts is not None and attempt_count >= max_attempts:
-        scope_label = "Referenzzeiten" if score_scope == "club_reference" else "offizielle Zeiten"
-        raise HTTPException(
-            status_code=400,
-            detail=f"Maximale Anzahl Versuche erreicht ({max_attempts}) für {scope_label}.",
-        )
+    # Dieselbe Prüfung wie beim Korrigieren (#1038).
+    attempt_count = await check_lap_time(db, c, {**body.model_dump(), "score_scope": score_scope})
     doc = {
         "id": new_id(),
         "challenge_id": cid,
@@ -925,24 +959,12 @@ async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(ge
     nullable_fields = {"proof_url", "admin_note"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    final_scope = updates.get("score_scope", existing.get("score_scope") or "official")
-    challenge = await db.f1_challenges.find_one({"id": existing.get("challenge_id")}, {"_id": 0}) or {}
-    if final_scope == "club_reference" and not challenge.get("allow_club_reference_times", True):
-        raise HTTPException(
-            status_code=400,
-            detail="Vereins-Referenzzeiten sind bei dieser Challenge deaktiviert.",
-        )
-    if final_scope == "official":
-        if challenge.get("block_club_member_results") and await _is_active_club_member(existing.get("user_id")):
-            raise HTTPException(
-                status_code=400,
-                detail="Vereinsmitglieder dürfen bei dieser Challenge nur als Vereins-Referenz eingetragen werden.",
-            )
-    # P0 validation: compute resulting state and require note
-    final_pen = updates.get("penalty_seconds", existing.get("penalty_seconds", 0))
-    final_inv = updates.get("is_invalid", existing.get("is_invalid", False))
-    final_note = updates.get("admin_note", existing.get("admin_note"))
-    _validate_penalty_note(final_pen or 0, final_inv, final_note)
+    challenge = await db.f1_challenges.find_one({"id": existing.get("challenge_id")}, {"_id": 0})
+    if not challenge:
+        raise HTTPException(404, "Challenge nicht gefunden")
+    # Dieselbe Prüfung wie beim Eintragen (#1038) - auf den Stand nach der Korrektur.
+    final = {**existing, **updates, "score_scope": updates.get("score_scope", existing.get("score_scope") or "official")}
+    await check_lap_time(db, challenge, final, current=existing)
     updates["updated_at"] = now_utc().isoformat()
     await db.f1_lap_times.update_one({"id": time_id}, {"$set": updates})
     t = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
