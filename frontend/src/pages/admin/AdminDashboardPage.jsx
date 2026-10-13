@@ -25,6 +25,8 @@ export default function AdminDashboardPage() {
   const canFinance = canUseArea(user, "finance");
   const canContent = canUseArea(user, "content");
   const canSystem = canUseArea(user, "system");
+  // Logins und neue Mitglieder: Vereinsverwaltung und System, wie der Server (#1353).
+  const canGrowth = canUseArea(user, "club", "system");
   const isSuperAdmin = user?.role === "superadmin";
   const helper = hasHelperAssignment(user);
   const may = (to) => canOpenAdminLink(user, to);
@@ -40,7 +42,7 @@ export default function AdminDashboardPage() {
   const [refreshedAt, setRefreshedAt] = useState(null);
   const load = useCallback(() => {
     api.get("/admin/dashboard").then(({ data }) => { setData(data); setRefreshedAt(new Date()); });
-    api.get("/admin/growth-stats?days=30").then(({ data }) => setGrowth(data)).catch(() => {});
+    if (canGrowth) api.get("/admin/growth-stats?days=30").then(({ data }) => setGrowth(data)).catch(() => {});
     // Systemstand, Setup und Einstellungen nur für System - die Login-Schalter nur für den Superadmin, wie im Server.
     if (canSystem) {
       api.get("/setup/status").then(({ data }) => setSetupStatus(data)).catch(() => {});
@@ -51,7 +53,7 @@ export default function AdminDashboardPage() {
     if (isSuperAdmin) api.get("/settings/auth").then(({ data }) => setAuthFlags(data)).catch(() => {});
     // Eigene Helfer-Einsätze stehen oben (#1352) - aus demselben Dienst wie „Mein Dienst“.
     if (helper) api.get("/users/me/duty").then(({ data }) => setDuty(data)).catch(() => {});
-  }, [canSystem, isSuperAdmin, helper]);
+  }, [canSystem, canGrowth, isSuperAdmin, helper]);
   useEffect(() => { load(); }, [load]);
   useLiveRefresh(load, [], { fallbackMs: 30000 });
 
@@ -95,7 +97,7 @@ export default function AdminDashboardPage() {
     { label: "Spiele heute", value: data?.today_matches, icon: Radio, color: "#FFD700" },
     { label: "Fast Lap Live", value: data?.active_f1, icon: Flag, color: "#29B6E8" },
     { label: "Events Gesamt", value: data?.total_events, icon: CalendarDays, color: "#29B6E8" },
-  ];
+  ].filter((kpi) => !data || kpi.value !== undefined);
   const pushErrors = Number(data?.mobile_push?.ticket_errors || 0) + Number(data?.mobile_push?.receipt_errors || 0);
   const pendingApplications = Number(data?.membership_applications?.pending || 0);
   const pendingPrizes = Number(data?.prize_pickups?.pending || 0);
@@ -414,7 +416,9 @@ export default function AdminDashboardPage() {
             <span className="text-sm text-white/70">Nichts offen. Keine Konflikte, Anträge, Gewinne oder Fehler warten gerade auf dich.</span>
           </div>
         )}
-        {/* Termine heute (#227): Matches, Check-ins und Events des Vereinstags als Liste, nicht nur die Zahl. */}
+        {/* Termine heute (#227): Matches, Check-ins und Events des Vereinstags als Liste, nicht nur die Zahl - nur für die
+            Turnierleitung, der Server schickt sie sonst nicht (#1353). */}
+        {Array.isArray(data?.today) && (
         <div className="mt-5 border-t border-white/10 pt-4" data-testid="dashboard-today">
           <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/45 mb-2">Termine heute</div>
           {today.length ? (
@@ -438,6 +442,7 @@ export default function AdminDashboardPage() {
             <p className="text-sm text-white/45">Heute steht nichts an – keine Matches, Check-ins oder Events.</p>
           )}
         </div>
+        )}
         {secondaryTaskItems.length > 0 && (
           <details className="mt-4 border-t border-white/10 pt-4 group">
             <summary className="cursor-pointer list-none text-[10px] font-bold uppercase tracking-[0.25em] text-white/45 hover:text-white inline-flex items-center gap-2">
@@ -479,6 +484,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      {kpis.length > 0 && (
       <div data-testid="dashboard-kpis">
         <h2 className="font-heading font-bold uppercase text-lg mb-3">Zahlen im Überblick</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -493,7 +499,9 @@ export default function AdminDashboardPage() {
           ))}
         </div>
       </div>
+      )}
 
+      {canGrowth && (
       <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-growth-widget">
         <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
           <div>
@@ -551,6 +559,7 @@ export default function AdminDashboardPage() {
           <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#FFD700]" /> Mitglieder gesamt</span>
         </div>
       </div>
+      )}
 
       {settingsHub.length > 0 && (
       <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-settings-hub">
@@ -576,6 +585,8 @@ export default function AdminDashboardPage() {
       </div>
       )}
 
+      {/* Letzte Adminaktionen: nur, wenn der Server sie schickt - der Kassier bekommt sie nicht (#1353). */}
+      {Array.isArray(data?.recent_audit_logs) && (
       <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-audit-log">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="font-heading font-bold uppercase text-lg flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Letzte Adminaktionen</h2>
@@ -588,9 +599,10 @@ export default function AdminDashboardPage() {
               <span className="text-white/40 text-xs shrink-0">{l.created_at && viennaDateTime(l.created_at)}</span>
             </div>
           ))}
-          {(!data || data.recent_audit_logs?.length === 0) && <div className="text-white/40">Keine Einträge.</div>}
+          {data.recent_audit_logs.length === 0 && <div className="text-white/40">Keine Einträge.</div>}
         </div>
       </div>
+      )}
     </AdminLayout>
   );
 }

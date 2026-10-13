@@ -77,10 +77,16 @@ async def has_tournament_staff_permission(
 STATION_ASSIGN_ROLES = {"organizer", "referee", "station_manager"}
 
 
-async def tournament_rights(user: dict | None, tournament_id: str) -> dict[str, bool]:
-    """Was die Person in diesem Turnier darf (#1353) - dieselben Rollen wie die Wächter der Routen. Die Verwaltung zeigt
-    Knöpfe nur nach diesen Feldern, nicht nach „irgendein Adminbereich“: Ergebnisse, Aufbau, Check-in, Teilnehmer,
-    Stationen und die Werkzeuge zum Lesen (Planung prüfen, Matchplan)."""
+async def tournament_rights(user: dict | None, tournament_id: str) -> dict:
+    """Was die Person in diesem Turnier darf (#1353) - dieselben Rollen und Bereiche (Scope) wie die Wächter der Routen.
+    Die Verwaltung zeigt Knöpfe nur nach diesen Feldern, nicht nach „irgendein Adminbereich“.
+
+    - ``can_manage_results``: Ergebnisse irgendwo in diesem Turnier (auch nur für einzelne Spiele) - dafür öffnen Web
+      und App die Turnierleitung am Handy (#1156).
+    - ``can_manage_all_results`` / ``can_plan_matches``: für **alle** Spiele - nur mit Einsatz für das ganze Turnier.
+      Ist der Einsatz an Spiel, Phase, Gruppe oder Station gebunden, steht er in ``staff_scopes``; das Web zeigt die
+      Knöpfe dann nur bei den Spielen, die er abdeckt (wie ``has_match_result_permission`` und ``PATCH /matches``).
+    - Check-in der Anmeldungen, Teilnehmer und die Werkzeuge zum Lesen prüft der Server ohne Scope - hier ebenso."""
     lead = is_global_tournament_admin(user)
 
     async def allowed(roles: set[str], scope: str | None = None) -> bool:
@@ -88,12 +94,34 @@ async def tournament_rights(user: dict | None, tournament_id: str) -> dict[str, 
 
     return {
         "can_manage_results": await allowed(RESULT_STAFF_ROLES),
+        "can_manage_all_results": await allowed(RESULT_STAFF_ROLES, "tournament"),
+        "can_plan_matches": await allowed(CHECKIN_STAFF_ROLES, "tournament"),
         "can_manage_structure": await allowed(STRUCTURE_STAFF_ROLES, "tournament"),
         "can_check_in": await allowed(CHECKIN_STAFF_ROLES),
         "can_manage_participants": await allowed(PARTICIPANT_STAFF_ROLES),
         "can_assign_stations": await allowed(STATION_ASSIGN_ROLES, "tournament"),
         "can_use_staff_tools": await allowed(READ_STAFF_ROLES),
+        "staff_scopes": [] if lead or not user else await _scoped_rights(user, tournament_id),
     }
+
+
+async def _scoped_rights(user: dict, tournament_id: str) -> list[dict]:
+    """Einsätze, die an einen Teil des Turniers gebunden sind: Ergebnisse gelten für Spiel, Phase, Gruppe oder Station
+    (``has_match_result_permission``), Termin und Station eines Spiels nur für genau dieses Spiel (``PATCH /matches``,
+    Scope „match“)."""
+    db = get_db()
+    rows = await db.tournament_staff_assignments.find(
+        {"tournament_id": tournament_id, "user_id": user["id"], "is_active": {"$ne": False}, "scope": {"$nin": [None, "tournament"]}},
+        {"_id": 0, "role": 1, "scope": 1, "scope_id": 1},
+    ).to_list(200)
+    scopes = []
+    for row in rows:
+        # Ohne scope_id gilt der Einsatz - wie in den Wächtern - für jedes Spiel, das diesen Teil hat.
+        results = row.get("role") in RESULT_STAFF_ROLES
+        plan = row.get("scope") == "match" and row.get("role") in CHECKIN_STAFF_ROLES
+        if results or plan:
+            scopes.append({"scope": row["scope"], "scope_id": row.get("scope_id"), "results": results, "plan": plan})
+    return scopes
 
 
 async def has_match_result_permission(user: dict | None, match: dict) -> bool:

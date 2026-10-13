@@ -143,8 +143,9 @@ Oben links im Menü: **Admin suchen …**.
 ### 3.4 Die Kommandozentrale
 
 **Admin** (Menü: Dashboard). Alle mit einem Verwaltungsbereich – auch der Kassier mit dem Bereich Finanzen – sehen
-dieselbe Seite, aber **nur die Teile, die sie auch öffnen dürfen**: Jede Kachel, jede Aufgabe und jeder Knopf hängt an
-dem Bereich der Seite dahinter. Eine eigene Startseite je Rolle kommt noch.
+dieselbe Seite, aber **nur die Teile ihres Bereichs**: Jede Kachel, jede Zahl, jede Aufgabe und jeder Knopf hängt an
+dem Bereich der Seite dahinter – der Server schickt die übrigen Zahlen gar nicht erst. Der Kassier sieht so nur Abrechnung
+und Belege, keine Turnier-, Mitglieder- oder Betriebszahlen. Eine eigene Startseite je Rolle kommt noch.
 
 Von oben nach unten:
 
@@ -230,7 +231,8 @@ führt nach `/admin`, und das öffnet die eigene Arbeit statt „Kein Zugriff“
 
 Die Knöpfe in Turnier, Fast Lap und Stationen richten sich nach der **Rolle im Turnier**: Eine Stream-Betreuung sieht
 zum Beispiel keinen Check-in und kein „Entfernen“, der Ergebnisdienst kein „Zurücksetzen“. Den Reiter „Team“, „Neues
-Turnier“ und „Löschen“ hat nur die Turnierleitung.
+Turnier“, „Löschen“ und den Reiter „Bearbeiten“ hat nur die Turnierleitung. Wer nur für einzelne Spiele oder eine Station
+eingetragen ist, sieht „Ergebnis eintragen“ und Termin nur bei diesen Spielen.
 
 **„Kein Zugriff“** zeigt Angemeldeten keinen „Anmelden“-Knopf. Wer einen Dienst hat, liest genau den Bereich, der für
 die Seite fehlt, und kommt mit **Zu meinem Dienst** bzw. **Zur Verwaltung** zurück. Wer gar keinen Dienst hat, liest:

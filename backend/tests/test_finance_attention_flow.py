@@ -110,4 +110,4 @@ async def test_daily_center_shows_the_numbers_only_to_finance(flow):
     assert board["finance_attention"]["pdf_missing"] == 1
     turnier = await person(flow, "turnier", role="tournament_admin")
     flow.act_as(turnier)
-    assert (await flow.get("/api/admin/dashboard")).json()["finance_attention"] is None
+    assert "finance_attention" not in (await flow.get("/api/admin/dashboard")).json(), "nur Finanzen (#1353)"

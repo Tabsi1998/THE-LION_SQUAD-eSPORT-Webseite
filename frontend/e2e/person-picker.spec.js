@@ -11,7 +11,7 @@ const HITS = [{ id: "u-7", name: "Erika Beispiel", avatar_url: null, context: "M
 const TEAMS = [{ id: "team-1", name: "Lions Rocket", tag: "LRK", logo_url: null, member_count: 2 }, { id: "team-2", name: "Die Flipper", tag: "FLP", logo_url: null, member_count: 2 }];
 
 // Rechte je Turnier (#1353): Turnierleitung und Ergebnisdienst dürfen beide Teilnehmer eintragen - so schickt es der Server.
-const RIGHTS = { can_manage_results: true, can_check_in: true, can_manage_participants: true, can_use_staff_tools: true };
+const RIGHTS = { can_manage_results: true, can_manage_all_results: true, can_plan_matches: true, can_check_in: true, can_manage_participants: true, can_use_staff_tools: true, staff_scopes: [] };
 
 function tournament(id, teamMode) {
   return { id, slug: id, title: teamMode === "solo" ? "Mario Kart Cup" : "Rocket League 2v2", status: "registration_open", format: "single_elim", team_mode: teamMode, max_participants: 16, visibility: "public", ...RIGHTS };

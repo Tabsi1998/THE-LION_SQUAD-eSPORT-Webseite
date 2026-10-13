@@ -106,3 +106,15 @@ test("Admin mit Helfer-Einsatz: die Einsätze stehen oben", async () => {
   expect(await screen.findByTestId("dashboard-duty")).toHaveTextContent("Helfer-Cup");
   expect(screen.getByTestId("duty-open-t-9")).toHaveAttribute("href", "/tournaments/helfer-cup/leitung");
 });
+
+// Nach Codex-Prüfung (#1353): der Server schickt dem Kassier nur die Finanz-Blöcke - die Seite zeigt dann auch nur die,
+// ohne leere Zahlenkacheln, Termine, Protokoll oder Wachstum.
+test("Kassier mit der Antwort des Servers: nur Finanz-Aufgaben, keine fremden Blöcke, kein Wachstum", async () => {
+  authState.user = { id: "k", role: "player", areas: ["finance"], ...mfa };
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/admin/dashboard" ? { daily_tasks: { billing_cases: 2 }, finance_attention: { overdue: 1 } } : {} }));
+  render(<MemoryRouter><AdminDashboardPage /></MemoryRouter>);
+  expect(await screen.findByTestId("dashboard-task-billing-cases")).toBeInTheDocument();
+  expect(screen.getByTestId("dashboard-task-finance-attention")).toBeInTheDocument();
+  for (const testId of ["dashboard-kpis", "dashboard-today", "dashboard-audit-log", "dashboard-growth-widget"]) expect(screen.queryByTestId(testId)).toBeNull();
+  expect(requested()).not.toContain("/admin/growth-stats?days=30");
+});

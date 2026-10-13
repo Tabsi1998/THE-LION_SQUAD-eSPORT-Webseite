@@ -60,6 +60,9 @@ const TOURNAMENT = {
   // Rechte je Turnier (#1353), wie sie der Server der Turnierleitung schickt.
   can_manage_structure: true,
   can_manage_results: true,
+  can_manage_all_results: true,
+  can_plan_matches: true,
+  staff_scopes: [],
   can_check_in: true,
   can_manage_participants: true,
   can_assign_stations: true,
@@ -438,7 +441,7 @@ test("Teilnehmer über die Personensuche: die Anmeldung geht mit der Kennung des
 // Knöpfe nach den Rechten je Turnier (#1353): eine Stream-Betreuung sieht keine Check-in-, Entfernen- oder Aufbau-Knöpfe
 // und keinen Reiter „Team“; eine Redaktion (kein Recht in diesem Turnier) gar keine Werkzeuge.
 const NO_RIGHTS = {
-  can_manage_structure: false, can_manage_results: false, can_check_in: false, can_manage_participants: false,
+  can_manage_structure: false, can_manage_results: false, can_manage_all_results: false, can_plan_matches: false, staff_scopes: [], can_check_in: false, can_manage_participants: false,
   can_assign_stations: false, can_use_staff_tools: false,
 };
 
@@ -487,4 +490,47 @@ test("Redaktion ohne Recht in diesem Turnier: keine Werkzeuge", async () => {
   expect(screen.queryByTestId("admin-tr-tools")).toBeNull();
   expect(screen.queryByTestId("admin-tr-tab-staff")).toBeNull();
   expect(apiMock.get.mock.calls.map(([url]) => String(url)).some((url) => url.startsWith("/stations"))).toBe(false);
+});
+
+// Nach Codex-Prüfung (#1353): „Bearbeiten“ speichert per PATCH, das nur die Turnierleitung darf - Helfer sehen den Reiter
+// nicht, auch nicht über ?tab=edit.
+test("Helfer sehen den Reiter „Bearbeiten“ nicht", async () => {
+  authState.lead = false;
+  serveTournament({ can_use_staff_tools: true, can_manage_structure: true, can_check_in: true, can_manage_participants: true });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect(screen.queryByTestId("admin-tr-tab-edit")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-save")).toBeNull();
+});
+
+test("die Turnierleitung sieht „Bearbeiten“", async () => {
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect(screen.getByTestId("admin-tr-tab-edit")).toBeInTheDocument();
+});
+
+// Ein Einsatz nur für ein Spiel (#1353): „Ergebnis eintragen“ steht nur bei diesem Spiel, nicht bei allen.
+test("an ein Spiel gebundener Ergebnisdienst: Ergebnis-Knopf nur bei seinem Spiel", async () => {
+  const user = userEvent.setup();
+  authState.lead = false;
+  const slots = [{ status: "filled", registration_id: "r-a" }, { status: "filled", registration_id: "r-b" }];
+  const matches = [
+    { id: "m-mine", stage_id: "st-1", match_key: "A1", status: "ready", slots, results: [] },
+    { id: "m-other", stage_id: "st-1", match_key: "A2", status: "ready", slots, results: [] },
+  ];
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/stages")) return Promise.resolve({ data: [{ id: "st-1", name: "Hauptrunde", match_type: "ffa", stage_type: "ffa_custom_bracket", status: "running", settings: {} }] });
+    if (path.includes("/matches-v2")) return Promise.resolve({ data: matches });
+    if (path.includes("/tournaments/t-1") && !path.includes("/", 15)) {
+      return Promise.resolve({ data: { ...TOURNAMENT, ...NO_RIGHTS, status: "live", can_manage_results: true, can_use_staff_tools: true,
+        staff_scopes: [{ scope: "match", scope_id: "m-mine", results: true, plan: false }] } });
+    }
+    return Promise.resolve(routeFor(path));
+  });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-stages"));
+  expect(await screen.findByTestId("matchplan-result-m-mine")).toBeInTheDocument();
+  expect(screen.queryByTestId("matchplan-result-m-other")).toBeNull();
 });

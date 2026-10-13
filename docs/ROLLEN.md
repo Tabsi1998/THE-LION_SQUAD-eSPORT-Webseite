@@ -222,10 +222,18 @@ Jede Liste lädt für sich: fehlt ein Recht, steht an der Stelle ein Satz, der R
   Knöpfe zeigen ohne bestätigte Zwei-Faktor-Anmeldung keine Verwaltungs-Einträge, sondern „2FA einrichten“.
   Die Verwaltungsliste der Turniere zeigt Helfern nur die Turniere ihres Einsatzes.
 - Knöpfe in Turnier, Fast Lap und Stationen (#1353) richten sich nach dem, was der Server je Turnier schickt
-  (`tournament_rights` in `services/tournament_permissions.py`): `can_manage_results`, `can_manage_structure`,
-  `can_check_in`, `can_manage_participants`, `can_assign_stations`, `can_use_staff_tools` – dieselben Rollen wie die
-  Wächter der Routen. „Neues Turnier“, „Löschen“, Team und Einstellungen nur mit der Turnierleitung über alle Turniere
-  (`isTournamentLead`). Ein Wächter-Test (`frontend/src/lib/adminRights.test.js`) meldet `isAdmin` in
+  (`tournament_rights` in `services/tournament_permissions.py`): `can_manage_results` (irgendwo im Turnier – öffnet die
+  Turnierleitung am Handy), `can_manage_all_results` und `can_plan_matches` (alle Spiele, nur mit Einsatz für das ganze
+  Turnier), `can_manage_structure`, `can_check_in`, `can_manage_participants`, `can_assign_stations`,
+  `can_use_staff_tools` – dieselben Rollen und Scopes wie die Wächter der Routen. Einsätze für einzelne Spiele, Phasen,
+  Gruppen oder Stationen stehen in `staff_scopes`; das Web zeigt Ergebnis- und Termin-Knöpfe nur bei den Spielen, die
+  sie abdecken (`lib/tournamentRights.js`). „Neues Turnier“, „Löschen“, Team, Einstellungen und der Reiter „Bearbeiten“
+  nur mit der Turnierleitung über alle Turniere (`isTournamentLead`).
+- Die Startseite der Verwaltung (`/admin/dashboard`, #1353) schickt jeden Block nur dem Bereich, dem er gehört:
+  Turnier-Zahlen und Termine heute der Turnierleitung, Mitgliederzahlen und Anträge der Vereinsverwaltung, Meldungen der
+  Moderation, Sponsoring der Redaktion, Abrechnung und Belege den Finanzen, Betrieb, Push, App-Logs, Discord und das
+  ganze Protokoll System. Die Liste „Letzte Adminaktionen“ (nur was wann) bekommen Turnierleitung, Redaktion und
+  Vereinsverwaltung, der Kassier nicht; das Wachstum (`/admin/growth-stats`) nur Vereinsverwaltung und System. Ein Wächter-Test (`frontend/src/lib/adminRights.test.js`) meldet `isAdmin` in
   `pages/admin`; die Bereichslisten von Web und Server vergleicht `frontend/src/lib/permissions.parity.test.js`.
 - **Angemeldet bleiben** (Haken im Login, Standard an): 90 Tage, die mit jeder Nutzung neu
   beginnen. Ohne Haken endet die Sitzung mit dem Browser.

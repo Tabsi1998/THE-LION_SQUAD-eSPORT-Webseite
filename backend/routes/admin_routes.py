@@ -101,7 +101,7 @@ def _source_summary(key: str, label: str, href: str, *, total: int, problem_coun
 
 
 @router.get("/growth-stats")
-async def growth_stats(days: int = 30, me: dict = Depends(require_dashboard())):
+async def growth_stats(days: int = 30, me: dict = Depends(require_area("club", "system"))):
     """Login + member growth for the dashboard mini chart (last N days)."""
     days = max(7, min(int(days or 30), 90))
     db = get_db()
@@ -134,93 +134,105 @@ async def growth_stats(days: int = 30, me: dict = Depends(require_dashboard())):
     return {"days": out, "window_days": days}
 
 
+# Welcher Bereich welche Aufgabe der Tageszentrale sieht (#1353): dieselben Bereiche wie die Seiten dahinter.
+DAILY_TASK_AREAS = {
+    "reported_results": "tournaments",
+    "schedule_deadlines": "tournaments",
+    "moderation_reports": "moderation",
+    "contact_messages": "club",
+    "billing_cases": "finance",
+    "sponsors_expiring": "content",
+}
+
+
 @router.get("/dashboard")
 async def dashboard(me: dict = Depends(require_dashboard())):
+    """Die Startseite der Verwaltung (#227, #1353): jeder Block nur für den Bereich, dem er gehört - der Kassier bekommt
+    die Finanz-Blöcke, die Redaktion die der Redaktion, System den Betrieb. Fehlt ein Bereich, fehlt der Block ganz
+    (nicht „0“). Der Wächter verlangt schon die bestätigte Zwei-Faktor-Anmeldung, daher reichen hier die Bereiche."""
+    from services.permissions import areas_for
     db = get_db()
+    held = await areas_for(me, db)
+    out: dict = {}
+
+    if "tournaments" in held:
+        out.update({
+            "team_count": await db.teams.count_documents({}),
+            "active_tournaments": await db.tournaments.count_documents({"status": {"$in": ["live", "check_in"]}}),
+            "registration_open": await db.tournaments.count_documents({"status": "registration_open"}),
+            "today_matches": await count_matches_by_status(db, {"ready", "in_progress"}),
+            "open_disputes": await count_matches_by_status(db, {"disputed"}),
+            "active_f1": await db.f1_challenges.count_documents({"status": "live"}),
+            "total_tournaments": await db.tournaments.count_documents({}),
+            "total_f1_challenges": await db.f1_challenges.count_documents({}),
+            "total_events": await db.events.count_documents({}),
+            "prize_pickups": {
+                "pending": await db.prize_pickups.count_documents({"status": "pending"}),
+                "ready": await db.prize_pickups.count_documents({"status": "ready"}),
+            },
+            "tournament_registrations": {"pending": await db.tournament_registrations.count_documents({"status": "pending"})},
+        })
+        # Termine heute (#227): Matches, Check-ins und Events - die Seiten dahinter gehören der Turnierleitung.
+        try:
+            from services.daily_center import today_items
+            out["today"] = await today_items(db)
+        except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
+            logger.warning("daily center today failed", exc_info=True)
+            out["today"] = []
+    if "club" in held:
+        out["player_count"] = await db.users.count_documents({"is_active": True})
+        out["membership_applications"] = {"pending": await db.membership_applications.count_documents({"status": "pending"})}
+    # Tageszentrale (#227): je Aufgabe nur der Bereich, der sie erledigt.
     try:
-        from services.push_notifications import mobile_push_health_summary
-        mobile_push = await mobile_push_health_summary()
-    except Exception as exc:
-        logger.warning("mobile push summary failed", exc_info=True)
-        mobile_push = {"active_tokens": 0, "users_with_tokens": 0, "ticket_errors": 0, "receipt_errors": 0, "error": "Push-Status konnte nicht geladen werden."}
-    client_logs = {
-        "open": await db.mobile_client_logs.count_documents({"status": "open"}),
-        "critical_open": await db.mobile_client_logs.count_documents({"status": "open", "priority": "critical"}),
-        "high_open": await db.mobile_client_logs.count_documents({"status": "open", "priority": "high"}),
-    }
-    membership_applications = {
-        "pending": await db.membership_applications.count_documents({"status": "pending"}),
-    }
-    prize_pickups = {
-        "pending": await db.prize_pickups.count_documents({"status": "pending"}),
-        "ready": await db.prize_pickups.count_documents({"status": "ready"}),
-    }
-    tournament_registrations = {
-        "pending": await db.tournament_registrations.count_documents({"status": "pending"}),
-    }
-    today_matches = await count_matches_by_status(db, {"ready", "in_progress"})
-    open_disputes = await count_matches_by_status(db, {"disputed"})
-    # Tageszentrale (#227): gemeldete Ergebnisse, Meldungen, Kontakt, verfallende Terminvorschläge, Termine heute.
-    try:
-        from services.daily_center import task_counts, today_items
-        daily_tasks = await task_counts(db)
-        today = await today_items(db)
+        from services.daily_center import task_counts
+        counts = await task_counts(db)
+        out["daily_tasks"] = {key: value for key, value in counts.items() if DAILY_TASK_AREAS.get(key) in held}
     except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
         logger.warning("daily center failed", exc_info=True)
-        daily_tasks, today = {}, []
-    try:
-        ops = await ops_summary(db)
-    except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
-        logger.warning("ops summary failed", exc_info=True)
-        ops = None
+        out["daily_tasks"] = {}
     # Wo Belege hängen (#842): PDF fehlt, Entwurf älter als 7 Tage, überfällig - nur für den Bereich Finanzen.
-    finance_attention = None
-    try:
-        from services.permissions import user_has_area
-        if await user_has_area(me, "finance"):
+    if "finance" in held:
+        try:
             from services.billing_orders import attention_counts
-            finance_attention = await attention_counts(db)
-    except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
-        logger.warning("finance attention failed", exc_info=True)
-    # Discord-Kanal ohne Recht oder gelöscht (#303, #566): nur für den, der es in den Einstellungen beheben kann.
-    discord_broken = []
-    try:
-        from services.permissions import user_has_area
-        if await user_has_area(me, "system"):
+            out["finance_attention"] = await attention_counts(db)
+        except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
+            logger.warning("finance attention failed", exc_info=True)
+            out["finance_attention"] = None
+    if "system" in held:
+        try:
+            out["ops"] = await ops_summary(db)
+        except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
+            logger.warning("ops summary failed", exc_info=True)
+            out["ops"] = None
+        try:
+            from services.push_notifications import mobile_push_health_summary
+            out["mobile_push"] = await mobile_push_health_summary()
+        except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
+            logger.warning("mobile push summary failed", exc_info=True)
+            out["mobile_push"] = {"active_tokens": 0, "users_with_tokens": 0, "ticket_errors": 0, "receipt_errors": 0, "error": "Push-Status konnte nicht geladen werden."}
+        out["client_logs"] = {
+            "open": await db.mobile_client_logs.count_documents({"status": "open"}),
+            "critical_open": await db.mobile_client_logs.count_documents({"status": "open", "priority": "critical"}),
+            "high_open": await db.mobile_client_logs.count_documents({"status": "open", "priority": "high"}),
+        }
+        # Discord-Kanal ohne Recht oder gelöscht (#303, #566): nur für den, der es in den Einstellungen beheben kann.
+        try:
             from discord_service import broken_targets
-            discord_broken = await broken_targets(db)
-    except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
-        logger.warning("discord status failed", exc_info=True)
-    return {
-        "ops": ops,
-        "discord_broken": discord_broken,
-        "player_count": await db.users.count_documents({"is_active": True}),
-        "team_count": await db.teams.count_documents({}),
-        "active_tournaments": await db.tournaments.count_documents({"status": {"$in": ["live", "check_in"]}}),
-        "registration_open": await db.tournaments.count_documents({"status": "registration_open"}),
-        "today_matches": today_matches,
-        "open_disputes": open_disputes,
-        "active_f1": await db.f1_challenges.count_documents({"status": "live"}),
-        "total_tournaments": await db.tournaments.count_documents({}),
-        "total_f1_challenges": await db.f1_challenges.count_documents({}),
-        "total_events": await db.events.count_documents({}),
-        "mobile_push": mobile_push,
-        "client_logs": client_logs,
-        "membership_applications": membership_applications,
-        "prize_pickups": prize_pickups,
-        "tournament_registrations": tournament_registrations,
-        "daily_tasks": daily_tasks,
-        "finance_attention": finance_attention,
-        "today": today,
-        "recent_audit_logs": await _recent_audit_logs(db, me),
-    }
+            out["discord_broken"] = await broken_targets(db)
+        except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
+            logger.warning("discord status failed", exc_info=True)
+            out["discord_broken"] = []
+    # Letzte Adminaktionen: ganz nur für System; Turnierleitung, Redaktion und Vereinsverwaltung sehen wie bisher, was wann
+    # geschah - der Kassier nicht (#1353).
+    if held & {"tournaments", "content", "club", "system"}:
+        out["recent_audit_logs"] = await _recent_audit_logs(db, full="system" in held)
+    return out
 
 
-async def _recent_audit_logs(db, me: dict) -> list[dict]:
+async def _recent_audit_logs(db, full: bool) -> list[dict]:
     """Die letzten Adminaktionen auf der Startseite. Vollständige Einträge (mit Gerät und Adresse) liest nur, wer auch das
     Protokoll unter „Betrieb & Logs“ öffnen darf - alle anderen sehen, was wann geschah."""
-    from services.permissions import areas_for
-    projection = {"_id": 0} if "system" in await areas_for(me) else {"_id": 0, "action": 1, "created_at": 1}
+    projection = {"_id": 0} if full else {"_id": 0, "action": 1, "created_at": 1}
     return await db.audit_logs.find({}, projection).sort("created_at", -1).to_list(20)
 
 

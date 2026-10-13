@@ -12,9 +12,12 @@ import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUnd
 import { SelectField, modeLabel } from "./TournamentEditForm";
 import { DEFAULT_FFA_SCHEMA, EVENT_MODE_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, applyStageType, matchSectionKey, sectionSortIndex, sortMatchesForPlan, stageConfigFor, stationDisplay } from "./shared";
 
+// Je Spiel (nach Codex-Prüfung): ein Einsatz für einzelne Spiele, Phasen, Gruppen oder Stationen zeigt seine Knöpfe nur dort.
+const NO_MATCH_RIGHTS = () => ({ plan: false, results: false });
+
 // Rechte je Turnier (#1353), wie sie der Server schickt: Einstellungen der Phasen nur für die Turnierleitung über alle
 // Turniere, Erzeugen mit dem Aufbau-Recht, Termin und Station mit dem Check-in-Recht, Ergebnisse mit dem Ergebnis-Recht.
-export function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], tournamentStartDate = null, canEditSettings = false, canManageStructure = false, canPlanMatches = false, canRecordResults = false, onChanged, onSaveMatchMeta, mode = "operations" }) {
+export function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], tournamentStartDate = null, canEditSettings = false, canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, onChanged, onSaveMatchMeta, mode = "operations" }) {
   const showSettings = canEditSettings && mode === "settings";
   const showMatchList = mode !== "settings";
   const [createOpen, setCreateOpen] = useState(stages.length === 0);
@@ -139,8 +142,7 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
             stations={stations}
             tournamentStartDate={tournamentStartDate}
             canManageStructure={canManageStructure}
-            canPlanMatches={canPlanMatches}
-            canRecordResults={canRecordResults}
+            rightsForMatch={rightsForMatch}
             showSettings={showSettings}
             showMatchList={showMatchList}
             onChanged={onChanged}
@@ -158,7 +160,7 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
   );
 }
 
-function StageCard({ tournamentId, stage, matches, regById, stations = [], tournamentStartDate = null, canManageStructure = false, canPlanMatches = false, canRecordResults = false, showSettings = false, showMatchList = true, onChanged, onDelete, onSaveMatchMeta }) {
+function StageCard({ tournamentId, stage, matches, regById, stations = [], tournamentStartDate = null, canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, showSettings = false, showMatchList = true, onChanged, onDelete, onSaveMatchMeta }) {
   const settings = stage.settings || {};
   const [activeSection, setActiveSection] = useState("all");
   const [form, setForm] = useState({
@@ -363,8 +365,8 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
                   regById={regById}
                   stations={stations}
                   tournamentStartDate={tournamentStartDate}
-                  canEdit={canPlanMatches}
-                  canRecordResults={canRecordResults}
+                  canEdit={rightsForMatch(match).plan}
+                  canRecordResults={rightsForMatch(match).results}
                   onChanged={onChanged}
                   onSaveMatchMeta={onSaveMatchMeta}
                 />
