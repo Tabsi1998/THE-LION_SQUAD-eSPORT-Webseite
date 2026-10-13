@@ -158,3 +158,25 @@ test("/home/state scheitert: Fehler mit „Nochmal versuchen“ statt ewiger Pla
   fireEvent.click(screen.getByTestId("public-error-retry"));
   await waitFor(() => expect(screen.queryByTestId("public-error-state")).toBeNull());
 });
+
+test("ein Event mit seinen Turnieren und Fast Laps ist eine Zeile (#1182)", async () => {
+  const state = {
+    ...stateWith(false),
+    soon: {
+      events: [{ id: "e-lan", slug: "herbst-lan", name: "Herbst-LAN", status: "registration_open", start_date: "2026-09-26T10:00:00Z" }],
+      tournaments: [
+        { id: "t-rocket", slug: "rocket-cup", title: "Rocket Cup", event_id: "e-lan", status: "registration_open", start_date: "2026-09-26T14:00:00Z" },
+        { id: "t1", slug: "cup", title: "Herbst-Cup", status: "registration_open", start_date: "2026-09-25T18:00:00Z" },
+      ],
+      challenges: [{ id: "f-lan", slug: "lan-lap", title: "LAN Fast Lap", event_id: "e-lan", status: "live", start_date: "2026-09-26T10:00:00Z" }],
+    },
+  };
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/home/state" ? state : [] }));
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+  const lan = await screen.findByTestId("home-next-event-herbst-lan");
+  expect(screen.getByTestId("home-next-children-herbst-lan")).toHaveTextContent("1 Turnier · 1 Fast Lap: LAN Fast Lap, Rocket Cup");
+  expect(lan).toHaveAttribute("href", "/events/herbst-lan");
+  expect(screen.queryByTestId("home-next-tournament-rocket-cup")).toBeNull();
+  expect(screen.queryByTestId("home-next-fastlap-lan-lap")).toBeNull();
+  expect(screen.getByTestId("home-next-tournament-cup")).toBeInTheDocument();
+});

@@ -6,6 +6,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
 from auth import get_optional_user, require_area
+from services.permissions import is_confirmed_admin_role
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
 from services.sponsor_utils import dedupe_public_sponsors, public_sponsor_view
@@ -25,6 +26,14 @@ from models import (
 router = APIRouter(prefix="/api", tags=["news"])
 # Entwürfe und unveröffentlichte Beiträge sehen diese Rollen; Moderatoren moderieren.
 STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
+
+
+def _is_staff(user: dict | None) -> bool:
+    """Entwürfe und Event-Entwürfe sieht das Admin-Team - wie jeder Adminbereich nur mit bestätigter
+    Zwei-Faktor-Anmeldung (#1469). Für Empfänger einer Meldung (Konten aus der Datenbank) gilt die Rolle allein."""
+    return is_confirmed_admin_role(user, STAFF_ROLES)
+
+
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 PROFILE_LINK_RE = re.compile(r"/u/([A-Za-z0-9_.-]{2,32})")
 
@@ -58,7 +67,7 @@ async def _visible_event_summary(event_id: str, user: dict | None) -> dict | Non
     )
     if not event:
         return None
-    is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    is_staff = _is_staff(user)
     if event.get("status") == "draft" and not is_staff:
         return None
     if not await _user_can_see(user, event.get("visibility") or "public"):
@@ -374,7 +383,8 @@ async def _notify_news_mentions(db, post: dict, actor: dict) -> None:
     for user in users:
         if post.get("visibility") == "internal" and user.get("role") not in STAFF_ROLES:
             continue
-        if not await _user_can_see(user, post.get("visibility") or "public"):
+        # Empfänger aus der Datenbank: die Zwei-Faktor-Bestätigung gehört zur Anmeldung, nicht zum Konto.
+        if not await user_can_see(user, post.get("visibility") or "public", for_request=False):
             continue
         await create_user_notification(
             user["id"],
@@ -406,7 +416,7 @@ async def list_news(
     user: dict | None = Depends(get_optional_user),
 ):
     db = get_db()
-    is_admin = user and user.get("role") in STAFF_ROLES
+    is_admin = _is_staff(user)
     q: dict = {} if is_admin else {"published": True}
     if category:
         q["category"] = category
@@ -450,7 +460,7 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
     p, was_old_slug = await find_by_slug_or_history(db.news_posts, slug_or_id, {"_id": 0})
     if not p:
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
-    is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    is_staff = _is_staff(user)
     if p.get("published") is False and not is_staff:
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
     if not is_staff and not _published_now(p):

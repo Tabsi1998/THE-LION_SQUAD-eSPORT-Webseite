@@ -158,9 +158,18 @@ sowie die Schichten, für die sie eingetragen ist. Ohne Namen anderer, Tagesordn
 in den Mitgliederbereich. Der öffentliche Abo-Feed bleibt ohne sie. Interne Events stehen nicht mehr zusätzlich im
 Mitgliederbereich, sondern bei den Events und im Kalender. Code: `services/club_calendar.club_items`.
 
+**„Nur meine“ und persönlicher Kalender-Link (#1189):** `GET /api/calendar/mine` sagt nur der angemeldeten Person, wofür
+sie dabei ist (Event-Anmeldung, Turnier selbst oder mit einem eigenen Team, Fast Lap gefahren). Den privaten Abo-Link
+erzeugt, erneuert und schaltet jede Person nur für sich selbst (`/api/calendar/personal`); gespeichert ist nur der Hash
+des Tokens, die Adresse zeigt die Website einmal. Der Feed `GET /api/calendar/personal/{token}.ics` enthält nur, was die
+Person selbst sehen darf und wofür sie angemeldet ist, dazu ihre zugesagten Versammlungen und eigenen Schichten – ohne
+Sitzung gilt dort keine Zwei-Faktor-Ausnahme der Turnierleitung. Gesperrte oder abgeschaltete Konten bekommen nichts,
+beim Löschen des Kontos fällt der Link weg. Code: `services/personal_calendar.py`.
+
 In der App fragt die Team-Seite dieselben Rollen wie der Server: Team bearbeiten und Squads dürfen Leitung,
 Co-Leitung, Turnierleitung, Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und
-Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe.
+Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen dabei –
+wie überall – nur mit bestätigter Zwei-Faktor-Anmeldung (#1469); Leitung und Co-Leitung brauchen sie für ihr Team nicht.
 
 ## Personen, Teams und Sponsoren wählen (#1354)
 
@@ -222,6 +231,14 @@ Benachrichtigungen ab. Es hängt nicht am Newsletter.
   Konten wurden beim Start auf `player` gesetzt, mit Audit-Eintrag.
 - Mitgliederdaten, Dokumente und Einstellungen sind ohne bestätigte Zwei-Faktor-Anmeldung nicht
   erreichbar – auch nicht für Club-Admins.
+- Auch wo der Server noch nach der Rolle fragt (#1469), reicht die Admin-Rolle allein nicht mehr: fremde Teams
+  verwalten, private Teams sehen, News-Entwürfe (Liste, Beitrag, Suche), Erfolge und Saison-Fundstücke privater
+  Profile, geheime Erfolgs-Gruppen, die Verein-Kategorie fremder Profile, gesperrte Dokument-Downloads, Admin-Medien
+  und das Upload-Protokoll sowie die Live-Aktualisierungen für die Verwaltung gehen nur mit bestätigter
+  Zwei-Faktor-Anmeldung. Ohne gilt, was jede angemeldete Person sieht. Moderation bleibt ohne Zwei-Faktor.
+- Inhalte „Nur intern“ und „Nur Mitglieder“ öffnet ein Adminbereich (Rolle, Freigabe, Vorstandsposten, Dolibarr)
+  nur mit bestätigter Zwei-Faktor-Anmeldung; als Mitglied sieht man Mitglieder-Inhalte weiter ohne. Dasselbe gilt
+  für Profilfelder mit der Stufe „Nur Admins“ (Moderation ausgenommen). Meldungen an Empfänger hängen nicht davon ab.
 
 ## Benutzermenü und Konto-Seiten (#516)
 

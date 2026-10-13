@@ -44,6 +44,7 @@ from badges import (
     NEGATIVE_INCIDENTS,
 )
 from models import now_utc, new_id
+from services.permissions import is_confirmed_admin_role
 from achievement_catalog import CATEGORIES, CONDITION_KEY_STATUS, MATERIALS, annotate_tier, category_v2
 from services import achievement_visibility as visibility
 from services import xp
@@ -122,7 +123,7 @@ async def user_achievements(user_id: str, viewer: dict | None = Depends(get_opti
     if not user:
         raise HTTPException(404, "Nutzer nicht gefunden.")
     viewer_is_owner = bool(viewer and viewer.get("id") == user_id)
-    viewer_is_staff = bool(viewer and viewer.get("role") in STAFF_ROLES)
+    viewer_is_staff = is_confirmed_admin_role(viewer, STAFF_ROLES)
     if not user.get("privacy_public_profile") and not (viewer_is_owner or viewer_is_staff):
         raise HTTPException(404, "Nutzer nicht gefunden.")
     if not visibility.achievements_public(user) and not (viewer_is_owner or viewer_is_staff):

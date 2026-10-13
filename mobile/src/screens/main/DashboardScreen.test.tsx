@@ -216,3 +216,17 @@ test("Match-Karte mit Datum und Uhrzeit und Station im Klartext", async () => {
   expect(screen.getByTestId("match-when-m-when")).toHaveTextContent("Sa 2. März 2030 · 18:00");
   expect(screen.getByText("LunaByte · Station 3 · Switch 2")).toBeTruthy();
 });
+
+// Das Event als Klammer (#1182): auf „Start“ ist die LAN mit ihren Turnieren eine Karte, nicht drei.
+test("ein Event mit seinen Turnieren ist auf „Start“ eine Karte", async () => {
+  const lan = { id: "e-lan", slug: "herbst-lan", title: "Herbst-LAN", name: "Herbst-LAN", start_date: "2030-03-10T08:00:00Z", status: "registration_open" };
+  const rocket = { id: "t-rocket", slug: "rocket-cup", title: "Rocket Cup", start_date: "2030-03-11T12:00:00Z", status: "registration_open", event: { id: "e-lan", name: "Herbst-LAN" } };
+  const kart = { id: "t-kart", slug: "kart-cup", title: "Kart Cup", start_date: "2030-03-10T10:00:00Z", status: "registration_open", event_id: "e-lan" };
+  dashboard = { ...dashboard, me: { tournaments: [...tournaments, rocket, kart], events: [lan], matches: [], staff_matches: [], actions: [] } };
+  await render(<DashboardScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Herbst-LAN")).toBeTruthy());
+  expect(screen.queryByText("Rocket Cup")).toBeNull();
+  expect(screen.queryByText("Kart Cup")).toBeNull();
+  expect(screen.getByText(/2 Turniere: Kart Cup, Rocket Cup/)).toBeTruthy();
+  expect(screen.getByText("Cup 0")).toBeTruthy();
+});

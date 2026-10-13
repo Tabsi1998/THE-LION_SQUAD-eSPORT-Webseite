@@ -64,7 +64,7 @@ def test_upload_event_records_diagnostics(monkeypatch):
 
     asyncio.run(upload_routes._record_upload_event(
         request,
-        {"id": "admin-1", "role": "admin"},
+        {"id": "admin-1", "role": "admin", "mfa_enabled": True, "auth_mfa_verified": True},
         endpoint="/uploads/media",
         media_scope="gallery",
         filename="clip.MOV",
@@ -92,7 +92,7 @@ def test_original_media_upload_converts_nef_preview_and_keeps_original(monkeypat
     fake_db = FakeDb()
     monkeypatch.setattr(upload_routes, "PUBLIC_UPLOAD_DIR", tmp_path)
     monkeypatch.setattr(upload_routes, "get_db", lambda: fake_db)
-    me = {"id": "admin-1", "role": "admin"}
+    me = {"id": "admin-1", "role": "admin", "mfa_enabled": True, "auth_mfa_verified": True}
 
     def fake_preview(path, suffix):
         assert suffix == ".nef"
@@ -129,7 +129,7 @@ def test_original_media_upload_accepts_non_preview_video_original(monkeypatch, t
     fake_db = FakeDb()
     monkeypatch.setattr(upload_routes, "PUBLIC_UPLOAD_DIR", tmp_path)
     monkeypatch.setattr(upload_routes, "get_db", lambda: fake_db)
-    me = {"id": "admin-1", "role": "admin"}
+    me = {"id": "admin-1", "role": "admin", "mfa_enabled": True, "auth_mfa_verified": True}
 
     mkv = FakeUpload("clip.mkv", "video/x-matroska", b"\x1a\x45\xdf\xa3MKV-DATA")
     mkv_result = asyncio.run(upload_routes._upload_original_file_impl(mkv, me, "admin"))
@@ -149,7 +149,7 @@ def test_original_tiff_upload_is_converted_to_webp(monkeypatch, tmp_path):
 
     result = asyncio.run(upload_routes._upload_original_file_impl(
         FakeUpload("scan.tif", "image/tiff", source.getvalue()),
-        {"id": "admin-1", "role": "admin"},
+        {"id": "admin-1", "role": "admin", "mfa_enabled": True, "auth_mfa_verified": True},
         "gallery",
     ))
 
