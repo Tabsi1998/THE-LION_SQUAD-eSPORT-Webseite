@@ -15,31 +15,47 @@ ADMIN_ROLES = {"club_admin", "superadmin"}
 INTERNAL_ROLES = {"club_admin", "superadmin"}
 
 
-async def sees_member_content(user: dict | None, *, look_up_membership: bool = True) -> bool:
+def _area_counts(user: dict, for_request: bool) -> bool:
+    """Ein Adminbereich zählt für die angemeldete Person einer Anfrage nur mit bestätigter Zwei-Faktor-Anmeldung
+    (#291, #1469). Für Konten aus der Datenbank - Empfänger einer Meldung - gehört die Bestätigung nicht zum Konto."""
+    if not for_request:
+        return True
+    from services.permissions import needs_mfa
+
+    return not needs_mfa(user)
+
+
+async def sees_member_content(user: dict | None, *, look_up_membership: bool = True, for_request: bool = True) -> bool:
     """Mitglieder-Inhalte (News, Events, Galerie, Dokumente mit „Nur Mitglieder“): aktives Mitglied oder Bereich
-    Vereinsverwaltung/System.
+    Vereinsverwaltung/System - der Bereich bei einer Anfrage nur mit bestätigter Zwei-Faktor-Anmeldung (#1469); als
+    Mitglied geht es ohne.
 
     ``look_up_membership=False`` für die angemeldete Person einer Anfrage: ``auth.get_current_user`` hat die
-    Mitgliedschaft schon nachgesehen (``is_club_member``); nachschlagen braucht es nur bei Konten aus der Datenbank."""
+    Mitgliedschaft schon nachgesehen (``is_club_member``); nachschlagen braucht es nur bei Konten aus der Datenbank.
+    ``for_request=False`` für Konten aus der Datenbank (Empfänger einer Meldung)."""
     if not user:
         return False
     if user.get("is_club_member"):
         return True
     from services.permissions import areas_for
 
-    if MEMBER_CONTENT_AREAS & await areas_for(user):
+    if _area_counts(user, for_request) and MEMBER_CONTENT_AREAS & await areas_for(user):
         return True
     if not look_up_membership or not user.get("id"):
         return False
     return is_active_member(await get_membership(user["id"]))
 
 
-async def user_can_see(user: dict | None, visibility: str | None) -> bool:
+async def user_can_see(user: dict | None, visibility: str | None, *, for_request: bool = True) -> bool:
     """Return True if `user` is allowed to see a record with the given visibility.
 
     `user` may be `None` for anonymous visitors. `visibility` is one of
     `public` / `community` / `members` / `internal`. Unknown values are
     treated as `public`.
+
+    ``for_request`` (Vorgabe): ``user`` ist die angemeldete Person einer Anfrage - Adminbereiche zählen dann nur mit
+    bestätigter Zwei-Faktor-Anmeldung (#1469), die Mitgliedschaft auch ohne. ``for_request=False`` für Konten aus der
+    Datenbank, etwa Empfänger einer Meldung.
     """
     visibility = visibility or "public"
     if visibility == "public":
@@ -50,6 +66,8 @@ async def user_can_see(user: dict | None, visibility: str | None) -> bool:
         # „Nur intern“ heißt Vereinsverwaltung - nach Bereich (#287), nicht nach Rolle: auch ein
         # Vorstandsposten, eine Freigabe oder eine Dolibarr-Funktion lesen es. Dieselbe Regel
         # bestimmt, wer die Meldung dazu bekommt (member_announcements).
+        if not _area_counts(user, for_request):
+            return False
         if user.get("role") in INTERNAL_ROLES:
             return True
         from services.permissions import areas_for
@@ -58,7 +76,7 @@ async def user_can_see(user: dict | None, visibility: str | None) -> bool:
     if visibility == "community":
         return True  # any logged-in user passes
     if visibility == "members":
-        return await sees_member_content(user)
+        return await sees_member_content(user, for_request=for_request)
     return True
 
 

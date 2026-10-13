@@ -467,7 +467,11 @@ def _safe_negative_group_description() -> str:
 async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list[dict]:
     """Public/profile catalog with secret negative/fun awards after unlock."""
     db = get_db()
-    is_admin = bool(viewer and viewer.get("role") in ("club_admin", "superadmin"))
+    from services.permissions import is_confirmed_admin_role
+
+    # Geheime und nicht öffentliche Gruppen zeigt der Katalog Club-Admin und Superadmin - mit bestätigter
+    # Zwei-Faktor-Anmeldung (#1469).
+    is_admin = is_confirmed_admin_role(viewer, ("club_admin", "superadmin"))
 
     groups = await db.achievement_groups.find({}, {"_id": 0}).sort("sort_order", 1).to_list(500)
     tiers = await db.achievements.find({}, {"_id": 0}).sort("rank", 1).to_list(2000)

@@ -487,7 +487,10 @@ async def viewer_sees_club(db, viewer: dict | None, target_id: str) -> bool:
         return False
     if viewer.get("id") == target_id:
         return True
-    if viewer.get("role") in ("tournament_admin", "club_admin", "superadmin"):
+    from services.permissions import is_confirmed_admin_role
+
+    # Das Admin-Team nur mit bestätigter Zwei-Faktor-Anmeldung (#1469); als Mitglied geht es auch ohne.
+    if is_confirmed_admin_role(viewer, ("tournament_admin", "club_admin", "superadmin")):
         return True
     if viewer.get("is_club_member"):
         return True

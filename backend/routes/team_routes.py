@@ -15,6 +15,7 @@ from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_
 from services.query_filters import safe_regex
 from services import word_filter
 from services.log_safe import log_safe
+from services.permissions import MFA_MESSAGE, admin_role_without_second_factor, is_confirmed_admin_role
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
 logger = logging.getLogger("tls.teams")
@@ -63,20 +64,34 @@ MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 
 
 # Teams verwalten außer Leitung und Co-Leitung: Turnierleitung, Club-Admin, Superadmin. Moderatoren
-# moderieren (Wortfilter für Teamnamen, Bildprüfung für Logos und Banner).
+# moderieren (Wortfilter für Teamnamen, Bildprüfung für Logos und Banner). Mitglieder entfernen, Rollen ändern, die
+# Leitung übergeben und auflösen dürfen außer der Leitung nur Club-Admin und Superadmin. Wie jeder Adminbereich nur mit
+# bestätigter Zwei-Faktor-Anmeldung (#1469); Leitung und Co-Leitung brauchen sie für ihr eigenes Team nicht.
 TEAM_ADMIN_ROLES = ("tournament_admin", "club_admin", "superadmin")
+TEAM_OWNER_ADMIN_ROLES = ("club_admin", "superadmin")
+
+
+def _team_admin(user: dict | None, roles=TEAM_ADMIN_ROLES) -> bool:
+    return is_confirmed_admin_role(user, roles)
+
+
+def _refuse(user: dict | None, detail: str, roles=TEAM_ADMIN_ROLES):
+    """403 - mit dem Hinweis auf die Zwei-Faktor-Anmeldung, wenn nur sie fehlt."""
+    if admin_role_without_second_factor(user, roles):
+        raise HTTPException(status_code=403, detail=MFA_MESSAGE)
+    raise HTTPException(status_code=403, detail=detail)
 
 
 def _can_manage(team: dict, user: dict) -> bool:
     return (
         team.get("leader_id") == user["id"]
         or user["id"] in team.get("co_leader_ids", [])
-        or user.get("role") in TEAM_ADMIN_ROLES
+        or _team_admin(user)
     )
 
 
 def _is_staff(user: dict | None) -> bool:
-    return bool(user and user.get("role") in TEAM_ADMIN_ROLES)
+    return _team_admin(user)
 
 
 def _is_member(team: dict, user: dict | None) -> bool:
@@ -355,7 +370,7 @@ async def feature_team_award(team_id: str, award_id: str, me: dict = Depends(get
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_manage(team, me):
-        raise HTTPException(status_code=403, detail="Nur die Teamleitung wählt das Teambanner.")
+        _refuse(me, "Nur die Teamleitung wählt das Teambanner.")
     from services.awards import feature_award_for_team
     chosen = await feature_award_for_team(db, team_id, award_id)
     if not chosen:
@@ -370,7 +385,7 @@ async def unfeature_team_award(team_id: str, me: dict = Depends(get_current_user
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_manage(team, me):
-        raise HTTPException(status_code=403, detail="Nur die Teamleitung wählt das Teambanner.")
+        _refuse(me, "Nur die Teamleitung wählt das Teambanner.")
     from services.awards import feature_award_for_team
     await feature_award_for_team(db, team_id, None)
     return {"ok": True, "featured_award": None}
@@ -456,7 +471,7 @@ async def invite_candidates(team_id: str, q: str | None = None, me: dict = Depen
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_manage(team, me):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+        _refuse(me, "Keine Berechtigung")
     query = {
         "is_active": True,
         "is_banned": {"$ne": True},
@@ -515,7 +530,7 @@ async def invite_team_member(team_id: str, body: TeamInviteCreate, me: dict = De
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_manage(team, me):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+        _refuse(me, "Keine Berechtigung")
     if body.user_id in (team.get("member_ids") or []):
         raise HTTPException(status_code=409, detail="Nutzer ist bereits im Team")
     user = await db.users.find_one(
@@ -655,8 +670,8 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if team["leader_id"] != me["id"] and me["id"] not in team.get("co_leader_ids", []):
-        if me["role"] not in TEAM_ADMIN_ROLES:
-            raise HTTPException(status_code=403, detail="Keine Berechtigung")
+        if not _team_admin(me):
+            _refuse(me, "Keine Berechtigung")
     if body.tag and body.tag != team.get("tag") and await db.teams.find_one({"tag": body.tag}):
         raise HTTPException(status_code=409, detail="Team-Tag bereits vergeben")
     nullable_fields = {"description", "logo_url", "banner_url", "discord_link", "social_links"}
@@ -720,7 +735,7 @@ def _can_manage_team(team: dict, user: dict) -> bool:
     return (
         _is_team_leader(team, user["id"])
         or user["id"] in (team.get("co_leader_ids") or [])
-        or user.get("role") in ("club_admin", "superadmin")
+        or _team_admin(user, TEAM_OWNER_ADMIN_ROLES)
     )
 
 
@@ -732,7 +747,7 @@ async def kick_member(team_id: str, user_id: str, me: dict = Depends(get_current
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_manage_team(team, me):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung das Team zu verwalten")
+        _refuse(me, "Keine Berechtigung das Team zu verwalten", TEAM_OWNER_ADMIN_ROLES)
     if team.get("leader_id") == user_id:
         raise HTTPException(status_code=400, detail="Leader kann nicht gekickt werden — bitte Leader-Übergabe zuerst durchführen")
     if user_id == me["id"]:
@@ -763,8 +778,8 @@ async def set_member_role(team_id: str, user_id: str, body: dict, me: dict = Dep
     team = await db.teams.find_one({"id": team_id})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if not (_is_team_leader(team, me["id"]) or me.get("role") in ("club_admin", "superadmin")):
-        raise HTTPException(status_code=403, detail="Nur der Leader kann Rollen ändern")
+    if not (_is_team_leader(team, me["id"]) or _team_admin(me, TEAM_OWNER_ADMIN_ROLES)):
+        _refuse(me, "Nur der Leader kann Rollen ändern", TEAM_OWNER_ADMIN_ROLES)
     if user_id not in (team.get("member_ids") or []):
         raise HTTPException(status_code=404, detail="Mitglied nicht im Team")
     if team.get("leader_id") == user_id:
@@ -808,8 +823,8 @@ async def transfer_leader(team_id: str, body: dict, me: dict = Depends(get_curre
     team = await db.teams.find_one({"id": team_id})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if not (_is_team_leader(team, me["id"]) or me.get("role") in ("club_admin", "superadmin")):
-        raise HTTPException(status_code=403, detail="Nur der Leader (oder Admin) kann übertragen")
+    if not (_is_team_leader(team, me["id"]) or _team_admin(me, TEAM_OWNER_ADMIN_ROLES)):
+        _refuse(me, "Nur der Leader (oder Admin) kann übertragen", TEAM_OWNER_ADMIN_ROLES)
     if new_leader_id not in (team.get("member_ids") or []):
         raise HTTPException(status_code=404, detail="Empfänger ist kein Team-Mitglied")
     if new_leader_id == team.get("leader_id"):
@@ -855,8 +870,8 @@ async def delete_team(team_id: str, confirm: str | None = None, me: dict = Depen
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if team["leader_id"] != me["id"] and me["role"] not in ("club_admin", "superadmin"):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    if team["leader_id"] != me["id"] and not _team_admin(me, TEAM_OWNER_ADMIN_ROLES):
+        _refuse(me, "Keine Berechtigung", TEAM_OWNER_ADMIN_ROLES)
     # Team auflösen (#1274): nur mit dem eingetippten Teamnamen; was dabei passiert, regelt services/team_dissolve.
     from services.team_dissolve import dissolve, same_name
     if not same_name(team, confirm):
@@ -871,7 +886,7 @@ async def list_squads(team_id: str, me: dict = Depends(get_current_user)):
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if me["id"] not in team.get("member_ids", []) and not _can_manage(team, me):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+        _refuse(me, "Keine Berechtigung")
     squads = await db.team_squads.find({"team_id": team_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
     member_map = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": list({uid for s in squads for uid in s.get("member_ids", [])})}},
@@ -889,7 +904,7 @@ async def create_squad(team_id: str, body: TeamSquadCreate, me: dict = Depends(g
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_manage(team, me):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+        _refuse(me, "Keine Berechtigung")
     doc = body.model_dump()
     doc["member_ids"] = _validate_squad_members(team, doc.get("member_ids") or [])
     doc.update({
@@ -912,7 +927,7 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_manage(team, me):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+        _refuse(me, "Keine Berechtigung")
     nullable_fields = {"description", "tournament_id", "season_id", "game_id", "member_ids"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -932,7 +947,7 @@ async def delete_squad(team_id: str, squad_id: str, me: dict = Depends(get_curre
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_manage(team, me):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+        _refuse(me, "Keine Berechtigung")
     res = await db.team_squads.delete_one({"id": squad_id, "team_id": team_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Squad nicht gefunden")
