@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { PlatformIcon, type PlatformIconName } from "./PlatformIcon";
 import React from "react";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 import { Card } from "./Card";
@@ -35,9 +36,9 @@ const PLATFORM_LABELS: Record<string, string> = {
   threads: "Threads", facebook: "Facebook", linkedin: "LinkedIn", snapchat: "Snapchat", pinterest: "Pinterest", telegram: "Telegram", wargaming: "Wargaming.net", bungie: "Bungie.net",
   mastodon: "Mastodon", bluesky: "Bluesky",
 };
-const PLATFORM_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+const PLATFORM_ICONS: Record<string, PlatformIconName> = {
   discord: "logo-discord", twitch: "logo-twitch", steam: "logo-steam", youtube: "logo-youtube", tiktok: "logo-tiktok",
-  x: "logo-twitter", battlenet: "globe-outline", riot: "flash-outline", xbox: "logo-xbox", epic: "flag-outline", instagram: "logo-instagram",
+  x: "logo-x", battlenet: "globe-outline", riot: "flash-outline", xbox: "logo-xbox", epic: "flag-outline", instagram: "logo-instagram",
   psn: "logo-playstation", nintendo: "game-controller-outline", ea: "game-controller-outline", website: "globe-outline",
   faceit: "flame-outline", startgg: "trophy-outline", roblox: "cube-outline", osu: "disc-outline", lichess: "grid-outline", github: "logo-github", kick: "videocam-outline", reddit: "logo-reddit", spotify: "musical-notes-outline",
   threads: "at-outline", facebook: "logo-facebook", linkedin: "logo-linkedin", snapchat: "logo-snapchat", pinterest: "logo-pinterest", telegram: "paper-plane-outline", wargaming: "shield-outline", bungie: "planet-outline",
@@ -53,7 +54,7 @@ export function platformColor(platform?: string | null): string {
   return PLATFORM_COLORS[platformKey(platform)] || colors.cyan;
 }
 
-export function platformIcon(platform?: string | null): keyof typeof Ionicons.glyphMap {
+export function platformIcon(platform?: string | null): PlatformIconName {
   return PLATFORM_ICONS[platformKey(platform)] || "link-outline";
 }
 
@@ -106,7 +107,7 @@ export function LinkedAccountsCard({ accounts, testID = "linked-accounts", title
               style={({ pressed }) => [styles.row, { borderColor: color }, pressed && styles.pressed]}
             >
               <View style={[styles.icon, { borderColor: color }]}>
-                <Ionicons name={platformIcon(account.platform)} color={color} size={18} />
+                <PlatformIcon name={platformIcon(account.platform)} color={color} size={18} />
               </View>
               <View style={styles.flex}>
                 <View style={styles.nameRow}>
@@ -334,7 +335,7 @@ function AccountRow({ entry }: { entry: AccountEntry }) {
       style={({ pressed }) => [styles.row, { borderColor: entry.verified ? color : "rgba(255,255,255,0.12)" }, pressed && styles.pressed]}
     >
       <View style={[styles.icon, { borderColor: color }]}>
-        <Ionicons name={platformIcon(entry.platform)} color={color} size={18} />
+        <PlatformIcon name={platformIcon(entry.platform)} color={color} size={18} />
       </View>
       <View style={styles.flex}>
         <View style={styles.nameRow}>
@@ -436,7 +437,7 @@ export function PlatformLinkRows({ links, available, onLink, onUnlink, disabled 
         return (
           <View key={platform} testID={`profile-link-${platform}`} style={[styles.row, { borderColor: link ? color : "rgba(255,255,255,0.12)" }]}>
             <View style={[styles.icon, { borderColor: color }]}>
-              <Ionicons name={platformIcon(platform)} color={color} size={18} />
+              <PlatformIcon name={platformIcon(platform)} color={color} size={18} />
             </View>
             <View style={styles.flex}>
               <View style={styles.nameRow}>
@@ -459,7 +460,7 @@ export function PlatformLinkRows({ links, available, onLink, onUnlink, disabled 
             ) : available[platform] ? (
               <Pressable onPress={() => onLink(platform)} accessibilityRole="button" testID={`profile-link-${platform}-link`}
                 style={({ pressed }) => [styles.brand, { backgroundColor: brand.bg, borderColor: brand.border || brand.bg }, pressed && styles.pressed]}>
-                <Ionicons name={platformIcon(platform)} color={brand.fg} size={15} />
+                <PlatformIcon name={platformIcon(platform)} color={brand.fg} size={15} />
                 <Body style={[styles.brandText, { color: brand.fg }]}>{linkButtonLabel(platform)}</Body>
               </Pressable>
             ) : null}

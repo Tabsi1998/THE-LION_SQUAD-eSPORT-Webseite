@@ -309,11 +309,11 @@ export function PublicLayout({ children }) {
                   {footerContact.zvr && <div className="text-white/45">{footerContact.zvr}</div>}
                 </address>
               )}
-              <div className="mt-4 flex flex-wrap gap-2" data-testid="footer-socials">
+              <div className="mt-4 flex flex-wrap gap-1.5" data-testid="footer-socials">
                 {socialLinks.map((social, index) => (
                   <a key={`${social.platform}-${index}`} href={social.url} target="_blank" rel="noreferrer" data-testid={`footer-${social.platform}`} aria-label={social.label} className="tls-social"
                     style={{ "--tls-social": social.ink === "#0A0A0A" && social.color === "#FFFFFF" ? "#FFFFFF" : social.color }}>
-                    <ChannelIcon kind={social.platform} className="w-[18px] h-[18px]" />
+                    <ChannelIcon kind={social.platform} className="w-4 h-4" />
                     <span className="tls-social__name" aria-hidden="true">{social.label}</span>
                   </a>
                 ))}

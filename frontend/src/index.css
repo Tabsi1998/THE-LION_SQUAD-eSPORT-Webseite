@@ -1664,13 +1664,13 @@ html.tls-vt .tls-bottom-nav { view-transition-name: tls-bottom-nav; }
    der Markenfarbe, das Logo wächst leicht und glüht; ein kleines Schild nennt den Namen. Die Logos bleiben unverändert.
    Die Winkel sind acht schmale Verläufe in den Ecken; ihre Größe wächst beim Hover bis zur Mitte jeder Kante. */
 .tls-social {
-  --tls-social-corner: 9px;
+  --tls-social-corner: 7px;
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: 2px;
   color: var(--tls-social, #29B6E8);
   background-color: transparent;
