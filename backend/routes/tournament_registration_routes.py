@@ -349,7 +349,7 @@ async def list_registrations(tid: str, access: str | None = None, user=Depends(g
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     team_ids = list({r["team_id"] for r in regs if r.get("team_id")})
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0}).to_list(500)}
+        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0}).to_list(500)}
     teams = {t["id"]: t for t in await db.teams.find(
         {"id": {"$in": team_ids}}, {"_id": 0}).to_list(500)}
     # Turnier nur mit Event-Anmeldung (#875): die Turnierleitung sieht, wer (noch) beim Event angemeldet ist.
@@ -559,7 +559,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
     payload = body.model_dump()
     user = None
     if payload.get("user_id"):
-        user = await db.users.find_one({"id": payload["user_id"]}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0})
+        user = await db.users.find_one({"id": payload["user_id"]}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0})
         if not user:
             raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
         existing = await db.tournament_registrations.find_one(

@@ -271,7 +271,7 @@ async def get_current_user(request: Request) -> dict:
             "mfa_secret": 0,
             "mfa_pending_secret": 0,
             "mfa_pending_created_at": 0,
-            "mfa_recovery_code_hashes": 0,
+            "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0,
         },
     )
     if not user:

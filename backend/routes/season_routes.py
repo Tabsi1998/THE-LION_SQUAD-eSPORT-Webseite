@@ -367,7 +367,7 @@ async def season_standings(slug_or_id: str):
     # Enrich users
     user_ids = list(per_user_points.keys())
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0}).to_list(500)}
+        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0}).to_list(500)}
     arr = []
     for uid, st in per_user_points.items():
         u = users.get(uid, {})

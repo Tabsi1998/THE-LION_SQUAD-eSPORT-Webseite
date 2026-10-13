@@ -2,9 +2,11 @@
 
 Geprüft über die echten Routen gegen die Datenbank im Speicher. Erfundene Konten, keine echten Personen."""
 import asyncio
+import functools
 import pathlib
 import sys
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 import pytest_asyncio
@@ -17,6 +19,33 @@ from auth import hash_token  # noqa: E402
 
 NEW_PASSWORD = "Neues-Passwort-2026"
 OTHER_PASSWORD = "Anderes-Passwort-2026"
+
+
+class DbWith:
+    """Die Datenbank der Flow-Tests - nur bei einer Sammlung ist eine Methode ausgetauscht."""
+
+    def __init__(self, db, collection: str, **methods):
+        self._db = db
+        self._collection = collection
+        self._methods = methods
+
+    def __getattr__(self, name):
+        target = getattr(self._db, name)
+        return _CollectionWith(target, self._methods) if name == self._collection else target
+
+    def __getitem__(self, name):
+        return self.__getattr__(name)
+
+
+class _CollectionWith:
+    def __init__(self, collection, methods: dict):
+        self._collection = collection
+        self._methods = methods
+
+    def __getattr__(self, name):
+        if name in self._methods:
+            return functools.partial(self._methods[name], self._collection)
+        return getattr(self._collection, name)
 
 
 @pytest_asyncio.fixture
@@ -102,6 +131,52 @@ async def test_two_simultaneous_resets_with_one_link_only_one_wins(flow, sent_li
     responses = await asyncio.gather(reset(flow, token), reset(flow, token, OTHER_PASSWORD))
 
     assert sorted(response.status_code for response in responses) == [200, 400]
+
+
+@pytest.mark.asyncio
+async def test_a_link_that_expires_during_the_request_sets_no_password(flow, sent_links, monkeypatch):
+    import routes.auth_routes as auth_routes
+
+    user = await account(flow)
+    token = await request_link(flow, user, sent_links)
+
+    async def read_then_expire(collection, *args, **kwargs):
+        document = await collection.find_one(*args, **kwargs)
+        if document:
+            await collection.update_one(
+                {"id": document["id"]}, {"$set": {"expires_at": datetime.now(timezone.utc) - timedelta(seconds=1)}},
+            )
+        return document
+
+    expiring = DbWith(flow.db, "password_reset_tokens", find_one=read_then_expire)
+    monkeypatch.setattr(auth_routes, "get_db", lambda: expiring)
+
+    assert (await reset(flow, token)).status_code == 400
+    assert "password_hash" not in await flow.db.users.find_one({"id": user["id"]})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["raises", "matches_nothing"])
+async def test_a_link_stays_usable_when_setting_the_password_fails(flow, sent_links, monkeypatch, failure):
+    import routes.auth_routes as auth_routes
+
+    user = await account(flow)
+    token = await request_link(flow, user, sent_links)
+
+    async def failing_update(collection, *args, **kwargs):
+        if failure == "raises":
+            raise RuntimeError("Datenbank kurz nicht erreichbar")
+        return SimpleNamespace(matched_count=0, modified_count=0)
+
+    monkeypatch.setattr(auth_routes, "get_db", lambda: DbWith(flow.db, "users", update_one=failing_update))
+    try:
+        broken = await reset(flow, token)
+    except RuntimeError:
+        broken = None
+    assert broken is None or broken.status_code >= 400
+
+    monkeypatch.setattr(auth_routes, "get_db", lambda: flow.db)
+    assert (await reset(flow, token)).status_code == 200
 
 
 @pytest.mark.asyncio

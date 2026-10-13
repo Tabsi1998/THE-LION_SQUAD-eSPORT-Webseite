@@ -20,7 +20,7 @@ from models import (
     UserRegister, UserLogin, ForgotPasswordBody, ResetPasswordBody, ChangePasswordBody,
     now_utc, new_id,
 )
-from services.rate_limit import enforce_rate_limit, get_client_ip
+from services.rate_limit import enforce_rate_limit, get_client_ip, keyed_subject, release_rate_limit
 from services.auth_settings import load_auth_settings
 from services.google_identity import GoogleIdentityError, verify_google_credential
 from services.secret_store import decrypt_secret, encrypt_secret
@@ -198,7 +198,8 @@ def _eligible_session_user(user: dict | None) -> dict:
 
 
 MFA_ATTEMPTS_PER_LOGIN = 5
-MFA_ATTEMPTS_PER_ACCOUNT = 10  # je Viertelstunde, über alle offenen Anmeldungen eines Kontos
+MFA_ATTEMPTS_PER_ACCOUNT = 10  # Fehlversuche je Viertelstunde, über alle offenen Anmeldungen eines Kontos
+RESET_CLAIM_MINUTES = 2  # so lange hält eine Anfrage einen Link fest, während sie das Passwort setzt
 
 
 def _requires_admin_mfa(user: dict) -> bool:
@@ -1277,9 +1278,11 @@ async def complete_mfa_login(body: MfaLoginBody, request: Request, response: Res
     if challenge.get("ip") != ip or challenge.get("user_agent") != user_agent:
         raise HTTPException(status_code=401, detail="MFA-Anmeldung gehört zu einem anderen Gerät.")
     user = _eligible_session_user(await db.users.find_one({"id": challenge["user_id"]}))
-    # Je Konto begrenzt (#1032): sonst brächte jede neue Anmeldung wieder fünf frische Versuche.
-    await enforce_rate_limit(
-        request, "auth:mfa:user", limit=MFA_ATTEMPTS_PER_ACCOUNT, window_seconds=900, subject=user["id"],
+    # Je Konto begrenzt (#1032), sonst brächte jede neue Anmeldung wieder fünf frische Versuche. Der Platz wird vor
+    # der Prüfung atomar reserviert und nach einem richtigen Code zurückgegeben - es zählen nur Fehlversuche. Eine
+    # Anmeldung, die hier ankommt, hat das Passwort schon bestanden. Das Konto steht im Zähler nur als Schlüssel-Hash.
+    account_slot = await enforce_rate_limit(
+        request, "auth:mfa:user", limit=MFA_ATTEMPTS_PER_ACCOUNT, window_seconds=900, subject=keyed_subject(user["id"]),
     )
     # Den Versuch zählen, bevor der Code geprüft wird - so bleiben es fünf, auch wenn viele gleichzeitig ankommen.
     attempt = await db.mfa_login_challenges.find_one_and_update(
@@ -1292,11 +1295,13 @@ async def complete_mfa_login(body: MfaLoginBody, request: Request, response: Res
         {"$inc": {"attempts": 1}},
     )
     if not attempt:
+        await release_rate_limit(account_slot)
         raise HTTPException(status_code=401, detail="MFA-Anmeldung ist ungültig oder abgelaufen.")
     if not await _verify_mfa_code(db, user, body.code):
         await db.mfa_login_challenges.update_one({"_id": challenge["_id"]}, {"$set": {"last_failed_at": now}})
         await _security_audit(db, user["id"], "auth.mfa.failed", request)
         raise HTTPException(status_code=401, detail="Ungültiger MFA- oder Wiederherstellungscode.")
+    await release_rate_limit(account_slot)
     claimed = await db.mfa_login_challenges.find_one_and_update(
         {"_id": challenge["_id"], "used": False},
         {"$set": {"used": True, "used_at": now}},
@@ -1392,7 +1397,13 @@ async def enable_mfa(body: MfaCodeBody, request: Request, user: dict = Depends(g
         raise HTTPException(status_code=400, detail="Der Bestätigungscode ist ungültig.")
     recovery_codes = generate_recovery_codes()
     now = now_utc()
-    await db.users.update_one({"id": user["id"]}, {
+    # Nur die Anfrage, die genau diese Einrichtung abschließt, schaltet ein (#1032): bei zwei gleichzeitigen bekäme
+    # sonst die Person Codes angezeigt, die die zweite schon wieder überschrieben hat.
+    result = await db.users.update_one({
+        "id": user["id"],
+        "mfa_pending_secret": full["mfa_pending_secret"],
+        "mfa_enabled": {"$ne": True},
+    }, {
         "$set": {
             "mfa_enabled": True,
             "mfa_secret": encrypt_secret(secret),
@@ -1404,6 +1415,8 @@ async def enable_mfa(body: MfaCodeBody, request: Request, user: dict = Depends(g
         },
         "$unset": {"mfa_pending_secret": "", "mfa_pending_created_at": ""},
     })
+    if result.modified_count != 1:
+        raise HTTPException(status_code=400, detail="MFA-Einrichtung ist abgelaufen. Bitte neu starten.")
     await _security_audit(db, user["id"], "auth.mfa.enabled", request)
     return {"ok": True, "recovery_codes": recovery_codes, "requires_new_login": True}
 
@@ -1443,31 +1456,31 @@ async def reset_password(body: ResetPasswordBody, request: Request):
     if is_invite and not (body.accept_privacy and body.accept_terms):
         raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen für die Account-Aktivierung akzeptiert werden.")
     now = now_utc()
-    # Genau einmal (#1031): erst den Link atomar verbrauchen, dann das Passwort setzen. Kommt derselbe Link zweimal
-    # gleichzeitig an, gewinnt nur eine Anfrage - die andere sieht ihn schon verbraucht.
+    # Genau einmal (#1031): den Link zuerst atomar für diese Anfrage reservieren. Kommt derselbe Link zweimal
+    # gleichzeitig an, gewinnt nur eine Anfrage. Verbraucht ist er erst, wenn das Passwort wirklich gesetzt ist;
+    # scheitert das, wird die Reservierung zurückgenommen. Bricht der Prozess dazwischen ab, läuft sie von selbst ab.
+    claim_id = new_id()
     claimed = await db.password_reset_tokens.find_one_and_update(
-        {"id": doc["id"], "used": False},
-        {"$set": {"used": True, "used_at": now}},
+        {
+            "id": doc["id"],
+            "used": False,
+            "expires_at": {"$gt": now},
+            "$or": [{"claimed_until": {"$exists": False}}, {"claimed_until": {"$lt": now}}],
+        },
+        {"$set": {"claim_id": claim_id, "claimed_until": now + timedelta(minutes=RESET_CLAIM_MINUTES)}},
     )
     if not claimed:
         raise HTTPException(status_code=400, detail="Ungültiger oder abgelaufener Token")
-    updates = {
-        "password_hash": hash_password(body.new_password),
-        "password_setup_required": False,
-        "password_login_available": True,
-        "auth_provider": "hybrid",
-        "email_verified": True,
-        "updated_at": now.isoformat(),
-    }
-    if is_invite:
-        updates.update({
-            "accepted_privacy": True, "accepted_terms": True, "consent_required": False,
-            "privacy_policy_version": os.environ.get("PRIVACY_POLICY_VERSION", "2026-08-26"),
-            "terms_version": os.environ.get("TERMS_VERSION", "2026-08-26"),
-        })
-    await db.users.update_one(
-        {"id": doc["user_id"]},
-        {"$set": updates},
+    try:
+        await _set_password_from_link(db, doc, body, now)
+    except BaseException:
+        await db.password_reset_tokens.update_one(
+            {"id": doc["id"], "claim_id": claim_id}, {"$unset": {"claim_id": "", "claimed_until": ""}},
+        )
+        raise
+    await db.password_reset_tokens.update_one(
+        {"id": doc["id"], "claim_id": claim_id},
+        {"$set": {"used": True, "used_at": now}, "$unset": {"claimed_until": ""}},
     )
     if is_invite:
         await _record_registration_consents(
@@ -1488,6 +1501,31 @@ async def reset_password(body: ResetPasswordBody, request: Request):
     )
     await _revoke_all_auth_sessions(db, doc["user_id"], "password_reset")
     return {"ok": True}
+
+
+async def _set_password_from_link(db, doc: dict, body: ResetPasswordBody, now: datetime) -> None:
+    """Das neue Passwort (bei einer Einladung samt Zustimmung) setzen - schlägt fehl, wenn das Konto fehlt."""
+    is_invite = doc.get("purpose") == "admin_invite"
+    updates = {
+        "password_hash": hash_password(body.new_password),
+        "password_setup_required": False,
+        "password_login_available": True,
+        "auth_provider": "hybrid",
+        "email_verified": True,
+        "updated_at": now.isoformat(),
+    }
+    if is_invite:
+        updates.update({
+            "accepted_privacy": True, "accepted_terms": True, "consent_required": False,
+            "privacy_policy_version": os.environ.get("PRIVACY_POLICY_VERSION", "2026-08-26"),
+            "terms_version": os.environ.get("TERMS_VERSION", "2026-08-26"),
+        })
+    result = await db.users.update_one(
+        {"id": doc["user_id"]},
+        {"$set": updates},
+    )
+    if result.matched_count != 1:
+        raise HTTPException(status_code=400, detail="Ungültiger oder abgelaufener Token")
 
 
 @router.post("/change-password")

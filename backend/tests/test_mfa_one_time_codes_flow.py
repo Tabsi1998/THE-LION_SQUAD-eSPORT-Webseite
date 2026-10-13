@@ -36,13 +36,26 @@ async def flow(monkeypatch):
         await shutdown()
 
 
-async def mfa_account(flow) -> tuple[dict, str]:
+@pytest.fixture
+def frozen_rate_limit_clock(monkeypatch):
+    """Alle Zählfenster der Rate-Limits bleiben während des Tests dieselben."""
+    import services.rate_limit as rate_limit
+
+    class FrozenClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 13, 12, 0, 5, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(rate_limit, "datetime", FrozenClock)
+
+
+async def mfa_account(flow, codes=RECOVERY_CODES) -> tuple[dict, str]:
     user = await flow.add_user(name=f"loewe-{new_id()[:6]}")
     secret = generate_totp_secret()
     await flow.db.users.update_one({"id": user["id"]}, {"$set": {
         "email_verified": True,
         "mfa_secret": encrypt_secret(secret),
-        "mfa_recovery_code_hashes": [hash_token(code) for code in RECOVERY_CODES],
+        "mfa_recovery_code_hashes": [hash_token(code) for code in codes],
     }})
     flow.act_as(None)
     return user, secret
@@ -169,15 +182,7 @@ async def test_simultaneous_wrong_codes_still_count_against_the_five_attempts(fl
 
 
 @pytest.mark.asyncio
-async def test_wrong_codes_are_limited_per_account_across_new_logins(flow, monkeypatch):
-    import services.rate_limit as rate_limit
-
-    class FrozenClock(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return datetime(2026, 10, 13, 12, 0, 5, tzinfo=timezone.utc)
-
-    monkeypatch.setattr(rate_limit, "datetime", FrozenClock)
+async def test_wrong_codes_are_limited_per_account_across_new_logins(flow, frozen_rate_limit_clock):
     user, _ = await mfa_account(flow)
     other, _ = await mfa_account(flow)
 
@@ -189,3 +194,97 @@ async def test_wrong_codes_are_limited_per_account_across_new_logins(flow, monke
 
     assert 429 in statuses, "das Konto bekommt nicht beliebig viele Versuche über neue Anmeldungen"
     assert (await complete(flow, await login_ticket(flow, other), WRONG_CODE)).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_successful_logins_do_not_use_up_the_account_limit(flow, frozen_rate_limit_clock):
+    codes = [f"ABCDEFGH{index:02d}" for index in range(12)]
+    user, _ = await mfa_account(flow, codes)
+
+    statuses = [(await complete(flow, await login_ticket(flow, user), code)).status_code for code in codes]
+
+    assert statuses == [200] * 12
+
+
+@pytest.mark.asyncio
+async def test_simultaneous_wrong_codes_across_logins_stay_within_the_account_limit(flow, frozen_rate_limit_clock,
+                                                                                    monkeypatch):
+    import routes.auth_routes as auth_routes
+
+    user, _ = await mfa_account(flow)
+    tickets = [await login_ticket(flow, user) for _ in range(3)]
+    gate = InterleavedReads(flow.db, "mfa_login_challenges", parties=12)
+    monkeypatch.setattr(auth_routes, "get_db", lambda: gate)
+
+    await asyncio.gather(*[
+        flow.post("/api/auth/mfa/complete", json={"ticket": ticket, "code": WRONG_CODE}, headers=BROWSER)
+        for ticket in tickets[0:1] * 5 + tickets[1:2] * 5 + tickets[2:3] * 2
+    ])
+
+    failed = await flow.db.audit_logs.count_documents({"actor_id": user["id"], "action": "auth.mfa.failed"})
+    assert failed == auth_routes.MFA_ATTEMPTS_PER_ACCOUNT
+
+
+@pytest.mark.asyncio
+async def test_the_account_limit_is_stored_without_the_account_id(flow, frozen_rate_limit_clock):
+    user, _ = await mfa_account(flow)
+
+    assert (await complete(flow, await login_ticket(flow, user), WRONG_CODE)).status_code == 401
+
+    rows = await flow.db.rate_limits.find({}).to_list(50)
+    assert any(row.get("bucket") == "auth:mfa:user" for row in rows)
+    assert all(user["id"] not in str(row) for row in rows)
+
+
+@pytest.mark.asyncio
+async def test_two_simultaneous_enables_only_one_wins(flow, monkeypatch):
+    import routes.auth_routes as auth_routes
+
+    user = await flow.add_user(name=f"loewe-{new_id()[:6]}")
+    secret = generate_totp_secret()
+    await flow.db.users.update_one({"id": user["id"]}, {
+        "$set": {"email_verified": True, "mfa_enabled": False, "mfa_pending_secret": encrypt_secret(secret),
+                 "mfa_pending_created_at": datetime.now(timezone.utc)},
+        "$unset": {"mfa_secret": "", "mfa_recovery_code_hashes": ""},
+    })
+    flow.act_as(user)
+    code = current_totp(secret)
+    gate = InterleavedReads(flow.db, "users")
+    monkeypatch.setattr(auth_routes, "get_db", lambda: gate)
+
+    responses = await asyncio.gather(
+        flow.post("/api/auth/mfa/enable", json={"code": code}),
+        flow.post("/api/auth/mfa/enable", json={"code": code}),
+    )
+
+    assert sorted(response.status_code for response in responses) == [200, 400]
+    shown = next(response for response in responses if response.status_code == 200).json()["recovery_codes"]
+    stored = (await flow.db.users.find_one({"id": user["id"]}))["mfa_recovery_code_hashes"]
+    assert stored == [hash_token(code) for code in shown], "die gezeigten Codes sind die gespeicherten"
+
+
+@pytest.mark.asyncio
+async def test_the_code_counter_is_not_part_of_the_account_view(flow):
+    user, _ = await mfa_account(flow)
+    await flow.db.users.update_one({"id": user["id"]}, {"$set": {"mfa_totp_last_counter": 12345}})
+    flow.act_as(user)
+
+    response = await flow.get(f"/api/users/{user['id']}")
+
+    assert response.status_code == 200
+    assert "mfa_totp_last_counter" not in response.json()
+
+
+def test_every_private_projection_hides_the_code_counter():
+    """Wo die Wiederherstellungscodes aus einer Abfrage herausgenommen werden, gehört auch der Zähler dazu."""
+    backend = pathlib.Path(__file__).resolve().parents[1]
+    missing = []
+    for path in backend.rglob("*.py"):
+        if "tests" in path.parts or "venv" in path.parts or ".venv" in path.parts:
+            continue
+        text = path.read_text(encoding="utf-8")
+        if text.count('"mfa_recovery_code_hashes": 0') != text.count('"mfa_totp_last_counter": 0'):
+            missing.append(f"{path.name}: Projektion")
+        if '"mfa_recovery_code_hashes"' in text and '"mfa_totp_last_counter"' not in text:
+            missing.append(f"{path.name}: Feldliste")
+    assert not missing, missing

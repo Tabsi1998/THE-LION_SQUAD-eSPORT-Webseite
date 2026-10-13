@@ -17,7 +17,7 @@ async def _user_data_export(db, user_id: str) -> dict:
     user = await db.users.find_one(
         {"id": user_id},
         {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0,
-         "mfa_recovery_code_hashes": 0},
+         "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0},
     )
     if not user:
         raise HTTPException(404, "Account nicht gefunden")
