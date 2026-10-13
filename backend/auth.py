@@ -352,17 +352,16 @@ def require_club_member():
 def require_area(*areas: str):
     """Bereich statt Rang (#287): erlaubt, wer einen der Bereiche hat – aus Rolle,
     Freigabe oder Vorstandsposten. Zwei-Faktor ist Pflicht, sobald ein Bereich
-    außer „Moderation“ verlangt wird (#291)."""
+    außer „Moderation“ verlangt wird (#291). Die Entscheidung trifft ``area_refusal`` - dieselbe wie ``can_use_area``
+    (#1479)."""
     wanted = tuple(areas)
 
     async def dep(user: dict = Depends(get_current_user)) -> dict:
-        from services.permissions import MFA_AREAS, MFA_MESSAGE, areas_for, missing_area_message, needs_mfa
+        from services.permissions import area_refusal
 
-        held = await areas_for(user)
-        if not (set(wanted) & held):
-            raise HTTPException(status_code=403, detail=missing_area_message(wanted))
-        if (set(wanted) & MFA_AREAS) and needs_mfa(user):
-            raise HTTPException(status_code=403, detail=MFA_MESSAGE)
+        refusal = await area_refusal(user, wanted)
+        if refusal:
+            raise HTTPException(status_code=403, detail=refusal)
         return user
 
     return dep

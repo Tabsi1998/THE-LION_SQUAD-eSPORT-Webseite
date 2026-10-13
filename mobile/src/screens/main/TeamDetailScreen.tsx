@@ -24,6 +24,7 @@ import type { Team, TeamSquad, User } from "../../types";
 import { ImagePickField } from "../../components/ImagePickField";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
+import { WEB_BASE_URL } from "../../lib/siteUrls";
 
 type Props = NativeStackScreenProps<TeamStackParamList, "TeamDetail">;
 type Candidate = { id: string; username?: string; display_name?: string; avatar_url?: string | null; has_pending_invite?: boolean };
@@ -128,12 +129,16 @@ export function TeamDetailScreen({ navigation, route }: Props) {
 
   const isMember = Boolean(user && team && (team.is_member || team.member_ids?.includes(user.id)));
   const leadsTeam = Boolean(user && team && (team.leader_id === user.id || team.co_leader_ids?.includes(user.id)));
-  // Dieselben Rollen wie der Server (team_routes.py, #1350): Team bearbeiten und Squads = Leitung, Co-Leitung oder
-  // Turnierleitung/Club-Admin/Superadmin; Mitglieder entfernen = Leitung, Co-Leitung oder Club-Admin/Superadmin.
-  // Moderatoren moderieren und sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe.
-  const canManage = Boolean(user && team && (team.can_manage || leadsTeam || isTeamAdmin(user)));
-  const canRemoveMembers = Boolean(user && team && (leadsTeam || isClubAdmin(user)));
+  // Was die Person am Team darf, sagt der Server (team_routes.py, #1350, #1479): `can_manage` (bearbeiten, Squads),
+  // `can_remove_members` und `can_dissolve` - mit denselben Regeln wie die Aktionen, für Admin-Rollen also nur mit
+  // bestätigter Zwei-Faktor-Anmeldung. Kapitän und Co-Kapitän brauchen sie für ihr eigenes Team nicht. Moderatoren
+  // moderieren und sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe.
   const isLeader = Boolean(user && team?.leader_id === user.id);
+  const canManage = Boolean(user && team && (team.can_manage || leadsTeam));
+  const canRemoveMembers = Boolean(user && team && (team.can_remove_members || leadsTeam));
+  const canDissolve = Boolean(user && team && (team.can_dissolve || isLeader));
+  // Admin-Rolle, der nur die bestätigte Zwei-Faktor-Anmeldung fehlt: statt der Knöpfe der Weg dorthin.
+  const needsSecondFactor = Boolean(user && team && !canManage && team.admin_needs_second_factor);
   const members = team?.members || [];
   const squads = team?.squads || [];
 
@@ -329,6 +334,19 @@ export function TeamDetailScreen({ navigation, route }: Props) {
           ) : null}
         />
 
+        {needsSecondFactor && team ? (
+          <Card style={styles.card} testID="team-mfa-hint">
+            <Muted>Teams verwalten geht für Admins erst mit bestätigter Zwei-Faktor-Anmeldung. Einrichten kannst du sie auf der Website unter Profil → Sicherheit.</Muted>
+            <Button
+              compact
+              variant="secondary"
+              label="2FA einrichten"
+              testID="team-mfa-setup"
+              onPress={() => { Linking.openURL(mfaSetupUrl(team.id)).catch(() => undefined); }}
+            />
+          </Card>
+        ) : null}
+
         {message ? <Muted style={styles.success}>{message}</Muted> : null}
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
@@ -344,7 +362,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
             <Field label="Discord-Link" value={teamForm.discord_link} onChangeText={(value) => setTeamForm((current) => ({ ...current, discord_link: value }))} />
             <ColorPicker value={teamForm.color} onChange={(color) => setTeamForm((current) => ({ ...current, color }))} />
             <Button label={busy ? "Speichert ..." : "Team speichern"} disabled={busy || !teamForm.name.trim() || !teamForm.tag.trim()} onPress={saveTeam} />
-            {isLeader || isClubAdmin(user) ? <TeamDissolve team={team} onDissolved={dissolved} /> : null}
+            {canDissolve ? <TeamDissolve team={team} onDissolved={dissolved} /> : null}
           </Card>
         ) : null}
 
@@ -639,17 +657,9 @@ function normalizeLink(url?: string | null) {
   return /^https?:\/\//i.test(value) ? value : `https://${value}`;
 }
 
-// Spiegel von TEAM_ADMIN_ROLES und _can_manage_team im Server (#1350): Team bearbeiten und Squads auch mit
-// Turnierleitung; Mitglieder entfernen und Team auflösen nur Club-Admin und Superadmin (neben der Leitung).
-export const TEAM_ADMIN_ROLES = ["tournament_admin", "club_admin", "superadmin"];
-export const TEAM_MEMBER_ADMIN_ROLES = ["club_admin", "superadmin"];
-
-function isClubAdmin(user?: User | null) {
-  return TEAM_MEMBER_ADMIN_ROLES.includes(String(user?.role || ""));
-}
-
-function isTeamAdmin(user?: User | null) {
-  return TEAM_ADMIN_ROLES.includes(String(user?.role || ""));
+/** Zwei-Faktor wohnt auf der Website unter Profil → Sicherheit (wie `mfaSetupPath` im Web); danach zurück zum Team. */
+export function mfaSetupUrl(teamId: string) {
+  return `${WEB_BASE_URL}/profile?tab=security&mfa=required&next=${encodeURIComponent(`/teams/${teamId}`)}`;
 }
 
 const styles = StyleSheet.create({

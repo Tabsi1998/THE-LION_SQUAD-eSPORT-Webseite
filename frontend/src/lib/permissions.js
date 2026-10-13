@@ -66,9 +66,13 @@ export function needsSecondFactor(user) {
   return !(user?.mfa_enabled && user?.auth_mfa_verified);
 }
 
-/** Darf die Person diesen Bereich jetzt benutzen - Bereich vorhanden und, wo nötig, Zwei-Faktor bestätigt? */
+/** Darf die Person einen der Bereiche jetzt benutzen? Derselbe Vertrag wie `area_refusal`/`require_area` im Server
+ * (#1479): einer der Bereiche vorhanden, und sobald die Liste einen Bereich mit Zwei-Faktor enthält, ist sie bestätigt -
+ * auch wenn die Person aus der Liste nur Moderation hat. */
 export function canUseArea(user, ...areas) {
-  return areas.flat().some((area) => hasArea(user, area) && (!MFA_AREAS.has(area) || !needsSecondFactor(user)));
+  const wanted = areas.flat();
+  if (!user || !hasArea(user, ...wanted)) return false;
+  return !(wanted.some((area) => MFA_AREAS.has(area)) && needsSecondFactor(user));
 }
 
 /** Turnierleitung über alle Turniere (Rolle oder Freigabe), aber noch ohne bestätigte Zwei-Faktor-Anmeldung. */

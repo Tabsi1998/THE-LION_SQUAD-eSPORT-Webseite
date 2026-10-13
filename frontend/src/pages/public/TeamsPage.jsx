@@ -3,6 +3,7 @@ import { ModerationStateBadge } from "@/components/tls/ModerationStateBadge";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
 import { useAccountGeneration } from "@/hooks/useAccountGeneration";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Reveal } from "@/components/tls/Reveal";
@@ -21,7 +22,7 @@ import { useChatRead } from "@/hooks/useChats";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
-import { Crown, Edit, Lock, MessageSquare, Plus, Send, Shield, Star, Swords, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
+import { Crown, Edit, Lock, MessageSquare, Plus, Send, Shield, ShieldCheck, Star, Swords, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
 import { AwardBanner } from "@/components/tls/AwardBanner";
 import { viennaDateTime } from "@/lib/vienna";
 import { TeamsPanel } from "@/pages/user/profile/TeamsPanel";
@@ -164,7 +165,7 @@ function TeamDetail({ id }) {
 
   const nav = useNavigate();
   const location = useLocation();
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
   const [team, setTeam] = useState(null);
   const [missing, setMissing] = useState(false);
   const [levelInfo, setLevelInfo] = useState(null);
@@ -246,7 +247,14 @@ function TeamDetail({ id }) {
   if (!team) return <PublicLayout><PublicLoadingState label="Lade Team" /></PublicLayout>;
 
   const isMember = !!user && (team.is_member || team.member_ids?.includes(user.id));
-  const canEdit = !!user && (team.can_manage || team.leader_id === user.id || team.co_leader_ids?.includes(user.id) || isAdmin);
+  // Was die Person am Team darf, sagt der Server (#1479): `can_manage`, `can_remove_members`, `can_dissolve` - mit
+  // denselben Regeln wie die Aktionen, für Admin-Rollen also nur mit bestätigter Zwei-Faktor-Anmeldung. Kapitän und
+  // Co-Kapitän brauchen sie für ihr eigenes Team nicht. Fehlt nur die Zwei-Faktor-Anmeldung, steht „2FA einrichten“ da.
+  const leadsTeam = !!user && (team.leader_id === user.id || !!team.co_leader_ids?.includes(user.id));
+  const canEdit = !!user && (!!team.can_manage || leadsTeam);
+  const canRemoveMembers = !!user && (!!team.can_remove_members || leadsTeam);
+  const canDissolve = !!user && (!!team.can_dissolve || team.leader_id === user.id);
+  const teamNeedsSecondFactor = !!user && !canEdit && !!team.admin_needs_second_factor && needsSecondFactor(user);
   // Teambanner (#230): eine Auszeichnung des Teams im Kopf; nur die Teamleitung wählt, der Server prüft.
   const featureTeamAward = async (awardId) => {
     try {
@@ -336,6 +344,9 @@ function TeamDetail({ id }) {
                 <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
               </>
             ) : null}
+            {teamNeedsSecondFactor ? (
+              <Link to={mfaSetupPath(`/teams/${team.id}`)} data-testid="team-mfa-setup" title="Teams verwalten geht für Admins erst mit bestätigter Zwei-Faktor-Anmeldung." className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><ShieldCheck className="w-3.5 h-3.5" /> 2FA einrichten</Link>
+            ) : null}
             {/* Teilen (#1154): für alle, auch Gäste. */}
             <ShareButton kind="team" id={team.id} title={team.tag ? `${team.name} [${team.tag}]` : team.name} detail="Team" />
           </>
@@ -386,7 +397,7 @@ function TeamDetail({ id }) {
               const isLead = team.leader_id === m.id;
               const isCo = (team.co_leader_ids || []).includes(m.id);
               const isMe = user && user.id === m.id;
-              const showKick = canEdit && !isLead && !isMe;
+              const showKick = canRemoveMembers && !isLead && !isMe;
               const showRole = !!user && team.leader_id === user.id && !isLead;
               const showTransfer = !!user && team.leader_id === user.id && !isLead;
               const roleLabel = ROLE_LABELS[memberRole(team, m)];
@@ -456,7 +467,7 @@ function TeamDetail({ id }) {
           team={editing}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load(); }}
-          canDissolve={!!user && (team.leader_id === user.id || ["club_admin", "superadmin"].includes(user.role))}
+          canDissolve={canDissolve}
           onDissolved={() => nav("/teams")}
         />
       )}
