@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { areaList } from "@/lib/permissions";
+import { adminHome, areaList } from "@/lib/permissions";
+import { useOptionalAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { Home, ArrowLeft, Calendar, Trophy, Newspaper, Medal, LogIn, RefreshCw } from "lucide-react";
+import { Home, ArrowLeft, Calendar, Trophy, Newspaper, Medal, LogIn, RefreshCw, ClipboardList, Mail } from "lucide-react";
 import { LionArt } from "@/components/tls/LionArt";
 import { LION_ART_SIZE } from "@/components/tls/PublicEmptyState";
 
@@ -22,8 +23,11 @@ const QUICK_LINKS = [
   { to: "/seasons/current", label: "Jahreswertung", icon: Medal },
 ];
 
-export function ErrorPage({ code = "404", detail = "" }) {
-  const def = ERROR_DEFS[code] || ERROR_DEFS["404"];
+// `title` und `primary` ersetzen Überschrift und ersten Knopf - für Angemeldete auf „Kein Zugriff“ (#1352), die keinen
+// „Anmelden“-Knopf brauchen. `primary={null}` heißt: kein erster Knopf.
+export function ErrorPage({ code = "404", detail = "", title = "", primary }) {
+  const base = ERROR_DEFS[code] || ERROR_DEFS["404"];
+  const def = title ? { ...base, title } : base;
   useEffect(() => {
     const previousTitle = document.title;
     let robots = document.head.querySelector('meta[name="robots"]');
@@ -62,7 +66,7 @@ export function ErrorPage({ code = "404", detail = "" }) {
               </h1>
               <p className="text-base text-white/65" data-testid={`error-detail-${def.code}`}>{detail || def.desc}</p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 lg:justify-start">
-                {def.code === "403" ? (
+                {primary !== undefined ? primary : def.code === "403" ? (
                   <Link to="/login" data-testid="error-login-btn" className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm">
                     <LogIn className="w-4 h-4" aria-hidden="true" /> Anmelden
                   </Link>
@@ -103,12 +107,38 @@ export function ErrorPage({ code = "404", detail = "" }) {
 }
 
 export function NotFoundPage() { return <ErrorPage code="404" />; }
-// Rechte nach Bereichen (#292): die Seite sagt, welcher Bereich fehlt und wer ihn vergibt.
+const PRIMARY_BTN = "tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm";
+
+// Rechte nach Bereichen (#292): die Seite sagt, welcher Bereich fehlt und wer ihn vergibt. Angemeldete (#1352) sehen
+// keinen „Anmelden“-Knopf: wer einen Dienst hat, liest genau den Bereich dieser Seite und kommt mit einem Tipp zu seiner
+// Arbeit; wer gar keinen Dienst hat, liest statt einer Bereichsliste, wofür die Verwaltung da ist.
 export function ForbiddenPage() {
-  const areas = useLocation().state?.areas;
-  const detail = Array.isArray(areas) && areas.length
-    ? `Dafür fehlt dir der Bereich ${areaList(areas)}. Vergeben kann ihn der Superadmin unter Admin → Alle Benutzer.`
-    : "";
-  return <ErrorPage code="403" detail={detail} />;
+  const state = useLocation().state || {};
+  const user = useOptionalAuth()?.user || null;
+  const areas = Array.isArray(state.areas) && state.areas.length ? state.areas : null;
+  const areaText = areas ? `Dafür fehlt dir der Bereich ${areaList(areas)}. Vergeben kann ihn der Superadmin unter Admin → Alle Benutzer.` : "";
+  if (!user) return <ErrorPage code="403" detail={areaText} />;
+
+  const home = adminHome(user);
+  if (state.noDuty || home === "none") {
+    const detail = (
+      <>
+        Die Verwaltung ist für Vereinsdienste. Du möchtest mithelfen?{" "}
+        <Link to="/contact" data-testid="error-contact-link" className="font-semibold text-[#29B6E8] hover:text-white underline underline-offset-2">Schreib uns.</Link>
+      </>
+    );
+    const primary = (
+      <Link to="/contact" data-testid="error-contact-btn" className={PRIMARY_BTN}>
+        <Mail className="w-4 h-4" aria-hidden="true" /> Schreib uns
+      </Link>
+    );
+    return <ErrorPage code="403" title="Nur für Vereinsdienste" detail={detail} primary={primary} />;
+  }
+  const primary = (
+    <Link to="/admin" data-testid="error-duty-btn" className={PRIMARY_BTN}>
+      <ClipboardList className="w-4 h-4" aria-hidden="true" /> {home === "dashboard" ? "Zur Verwaltung" : "Zu meinem Dienst"}
+    </Link>
+  );
+  return <ErrorPage code="403" title="Nicht dein Bereich" detail={areaText || "Für diese Seite fehlt dir ein Recht."} primary={primary} />;
 }
 export function ServerErrorPage() { return <ErrorPage code="500" />; }

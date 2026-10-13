@@ -73,14 +73,14 @@ Den ganzen Ordner `%USERPROFILE%\.lionsapp-release` sichern, zum Beispiel auf ei
 
 ## Release bauen
 
-Vorher im PR: Version und Build-Zähler erhöhen, einen Abschnitt in `CHANGELOG.md` schreiben, die Version unten in der Historie eintragen. Dann nach `main` mergen und lokal `main` holen.
+Vorher im PR: Version und Build-Zähler erhöhen, einen Abschnitt in `CHANGELOG.md` schreiben, `npm run whatsnew` ausführen, die Version unten in der Historie eintragen. Dann nach `main` mergen und lokal `main` holen.
 
 ```bash
 cd mobile
-npm run release:local -- --check     # zeigt, was fehlt
-npm run release:local -- --dry-run   # baut und prüft, veröffentlicht nichts
-npm run release:local                # baut, prüft und legt das Release an
-npm run release:local -- --play      # … und lädt das Bundle in den offenen Test der Play Console (#412, #925)
+npm run release:local -- --check           # zeigt, was fehlt
+npm run release:local -- --dry-run --aab   # baut APK und App-Bundle und prüft, veröffentlicht nichts
+npm run release:local -- --aab             # baut, prüft und legt das Release mit APK und App-Bundle an
+npm run release:local -- --play            # … und lädt das Bundle in den offenen Test der Play Console (#412, #925)
 ```
 
 Das Skript geht so vor:
@@ -121,7 +121,7 @@ Einmalig, sobald das Entwicklerkonto freigegeben ist (etwa zehn Minuten Klickweg
 
 1. Play Console → **Einrichtung → API-Zugriff** → „Google Cloud-Projekt verknüpfen“ (das Firebase-Projekt der App geht; sonst ein neues anlegen lassen).
 2. Dort **Dienstkonto erstellen** → in der Google Cloud Console ein Dienstkonto `lionsapp-release` anlegen, **Schlüssel → JSON** erzeugen und herunterladen.
-3. Zurück in der Play Console beim Dienstkonto **Zugriff gewähren** → App „LionsAPP“ → Berechtigung „Releases in Test-Tracks veröffentlichen“ (interner und geschlossener Test). **Produktion bewusst nicht** – die 1.0.0 klickt der Betreiber selbst.
+3. Zurück in der Play Console beim Dienstkonto **Zugriff gewähren** → App „LionsAPP“ → Berechtigung „Releases in Test-Tracks veröffentlichen“ (genutzt wird nur der offene Test, #925). **Produktion bewusst nicht** – die Freigabe für alle klickt der Betreiber selbst.
 4. Die JSON-Datei als `play-service-account.json` nach `%USERPROFILE%\.lionsapp-release` legen (anderer Ort: `playServiceAccountFile` in `signing.json` oder `LIONSAPP_PLAY_SERVICE_ACCOUNT`). **Nie ins Repo, nie in einen Chat.**
 
 `npm run release:local -- --check` sagt danach, ob das Dienstkonto die App sehen darf – ein lesender Aufruf (Edit anlegen, Tracks lesen, Edit verwerfen). Ohne die Datei ist das kein Fehler; sie ist nur für `--play` nötig.
@@ -180,6 +180,7 @@ GitHub sortiert Releases nach Veröffentlichungsdatum, nicht nach Version. Alte 
 
 Neueste oben.
 
+- `1.6.0`: Build 92, Events als Klammer um ihre Turniere mit „Nur meine“ (#1182, #1189), „Spielst du auch mit?“ nach der Event-Anmeldung (#1184), Kalender mit Heute, Balken, Vereinsterminen und Abo (#1271, #1190), Event-Fotos mit Hinweis und Einsenden (#1185, #1186), Rückblick nach dem Event und Freunde beim Event (#1187, #1188), Löwen-Rang-Rahmen im Profil, in Listen und auf dem Podest (#1457, #1463) mit Aufstiegs-Moment und Haptik (#1456), App-Sperre und Kontowechsel ohne Inhalte des vorigen Kontos (#1052, #1053), Team-Verwaltung nur mit Zwei-Faktor (#1479)
 - `1.5.0`: Build 91, Ergebnisse am Handy mit Foto und Bestätigen per Tipp, Problem melden, Aufruf mit Countdown, fünf Benachrichtigungs-Kanäle (#1132–#1140, #1156–#1160, #1370), neue Event-Seite und ein Kalender-Knopf (#1183, #1272, #1273, #1346), Teams mit Wappen, Einladungs-Link und Spieltag, Jahresrückblick (#1191–#1197, #1274, #1347), Verein und Mitgliederbereich (#1024, #1251–#1257, #1332–#1336), Bilder vom Handy, Teilen, Zustände mit Löwe, große Schrift (#1151–#1155, #1231, #1324, #1325)
 - `1.4.0`: Build 90, neuer Aufbau mit fünf Tabs, Kopfzeile mit Suche und Glocke, Einstellungen am Zahnrad, Tab Verein, alle Chats in einer Liste, ein Profil (#1143–#1150), Sitzungen bleiben offline (#942), mehrtägige Events (#884), Bewegung (#1100, #1085), Saison-Deko an Karten (#1087–#1094)
 - `1.3.0`: Build 89, Links öffnen die App (auch von außen, #921), Passkey ohne Gegenstück am Server (#949), Schneehaube im Dashboard (#729), Neigungssensor für Netz, Spinne, Flocken und Sterne (#667), Einlass per Mitgliedskarte für den Vorstand (#845)

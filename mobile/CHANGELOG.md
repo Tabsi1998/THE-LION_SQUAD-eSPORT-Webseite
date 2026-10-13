@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.0 - 2026-10-13
+
+- Mobile: Events mit ihren Turnieren: Im Tab Events und auf der Startseite ist ein Event eine Karte, seine Turniere und Fast Laps klappen darunter auf. Mit „Nur meine“ siehst du in Liste und Kalender nur das, wofür du oder dein Team angemeldet seid (#1182, #1189).
+- Mobile: Spielst du auch mit? Nach der Anmeldung zu einem Event hakst du die Turniere des Events an und bist in einem Schritt dabei. Ist ein Turnier voll, kommst du auf die Warteliste (#1184).
+- Mobile: Kalender: Der Monat startet bei heute und hat einen Knopf „Heute“, mehrtägige Events laufen als Balken über ihre Tage. Als Mitglied siehst du Versammlungen und deine Helferschichten in Grün. Mit „Abonnieren“ holst du den Vereinskalender in deine Kalender-App oder in Google Kalender (#1271, #1190, #1189).
+- Mobile: Fotos vom Event: Die Alben auf der Event-Seite öffnen sich mit einem Tipp, und warst du dabei, bekommst du Bescheid, sobald die Fotos online sind. Als Mitglied schickst du bis eine Woche nach dem Event eigene Fotos aus der Galerie oder direkt von der Kamera; der Vorstand gibt sie frei (#1185, #1186).
+- Mobile: Nach dem Event: Ist ein Event vorbei, wird seine Seite zum Rückblick mit den Siegern je Turnier, ein paar Zahlen und dem Bericht; warst du dabei, steht dort „Du warst dabei“ mit deinem Ergebnis. Außerdem zeigt die Event-Seite, welche deiner bestätigten Freunde dabei sind. Ob Freunde dich dort sehen, stellst du in den Einstellungen unter Privatsphäre ein: „Freunde sehen, wo ich angemeldet bin“ (#1187, #1188).
+- Mobile: Löwen-Rang: Dein Profilbild trägt den Rahmen deines Rangs – zwölf Ränge vom Jungtier bis zum Löwenkönig, mit Level-Schild und einem Glanz, der mit jedem Level stärker wird. Den Rahmen siehst du auch in der Spielerliste und auf dem Podest der Bestenliste. Steigst du auf, feiert die App das mit dir: Bei einem neuen Level springen die Rauten auf, bei einem neuen Rang rastet der neue Rahmen ein, und das Handy vibriert im Takt mit (#1457, #1463, #1456).
+- Mobile: App-Sperre und Kontowechsel: Ist die App gesperrt, steht auf dem Sperrbildschirm nur „Neue Benachrichtigung“ – den Inhalt siehst du erst nach dem Entsperren. Wechselst du das Konto, verschwinden Benachrichtigungen und Zähler des vorigen Kontos, und Pushes kommen nur noch für das neue (#1052, #1053).
+- Mobile: Mehr Schutz für Teams: Fremde Teams bearbeiten oder auflösen geht für Admins nur noch mit bestätigter Zwei-Faktor-Anmeldung, sonst steht dort „2FA einrichten“. Für Kapitäne ändert sich nichts (#1479).
+
 ## 1.5.0 - 2026-10-12
 
 - Mobile: Ergebnisse am Handy: Wer ein Turnier leitet, trägt Ergebnisse mit großen Knöpfen ein, sieht vorher in einem Satz, was daraus folgt, und hat 10 Sekunden „Rückgängig“. Spieler melden ihr Ergebnis selbst, auf Wunsch mit Foto, und die Gegenseite bestätigt mit einem Tipp: „Stimmt“ oder „Stimmt nicht“ (#1132, #1156, #1157, #1159, #1370).

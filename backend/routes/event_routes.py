@@ -19,6 +19,7 @@ from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import billing_orders, event_days, event_facts, event_locations, event_play_along, event_registration, pricing
 from services.event_registration import RegistrationError
+from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.permissions import areas_for, can_use_area, needs_mfa, user_has_area
 from services.permissions import is_confirmed_tournament_lead
 from models import EventCreate, EventUpdate, EventPlayAlongCreate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
@@ -819,6 +820,16 @@ async def update_event_registration(event_id: str, registration_id: str, body: E
     event, _ = await _find_event(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    # Dieselbe Platzsperre wie die Anmeldung (#1037): Nachrücken, Einchecken und mehr Begleitpersonen prüfen die Plätze
+    # und schreiben in einem Zug - auch wenn sich im selben Moment jemand anmeldet.
+    try:
+        async with mutation_lock(db, event_registration.seat_resource(event["id"]), wait_seconds=event_registration.SEAT_WAIT_SECONDS):
+            return await _update_event_registration(db, event, registration_id, body, me)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=event_registration.SEAT_BUSY)
+
+
+async def _update_event_registration(db, event: dict, registration_id: str, body: EventRegistrationUpdate, me: dict) -> dict:
     current = await db.event_registrations.find_one(
         {"id": registration_id, "event_id": event["id"]},
         {"_id": 0},

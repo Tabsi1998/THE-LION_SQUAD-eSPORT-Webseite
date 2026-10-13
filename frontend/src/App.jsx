@@ -97,6 +97,8 @@ const PrivacyAccountPage = lazy(() => import("@/pages/user/PrivacyAccountPage"))
 const ConsentPage = lazy(() => import("@/pages/user/ConsentPage"));
 
 const AdminDashboardPage = lazy(() => import("@/pages/admin/AdminDashboardPage"));
+// „Mein Dienst“ (#1352): eigene Einsätze und Aufgaben für Helfer und Moderation - statt „Kein Zugriff“.
+const AdminDutyPage = lazy(() => import("@/pages/admin/AdminDutyPage"));
 const AdminTournamentsPage = lazy(() => import("@/pages/admin/AdminTournamentsPage"));
 const AdminTournamentNewPage = lazy(() => import("@/pages/admin/AdminTournamentNewPage"));
 const AdminTournamentGuidePage = lazy(() => import("@/pages/admin/AdminTournamentGuidePage"));
@@ -312,7 +314,9 @@ function App() {
           <Route path="/account/documents" element={<ProtectedRoute><AccountDocumentsPage /></ProtectedRoute>} />
 
           {/* Admin */}
-          <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboardPage /></ProtectedRoute>} />
+          {/* Eingang (#1352): Startseite für die Verwaltung, sonst „Mein Dienst“ oder die Meldungen der Moderation. */}
+          <Route path="/admin" element={<ProtectedRoute adminHome><AdminDashboardPage /></ProtectedRoute>} />
+          <Route path="/admin/dienst" element={<ProtectedRoute requireDuty><AdminDutyPage /></ProtectedRoute>} />
           <Route path="/admin/members" element={<ProtectedRoute requireArea="club"><AdminMembersPage /></ProtectedRoute>} />
           <Route path="/admin/member-profiles" element={<ProtectedRoute requireArea="club"><AdminClubMemberProfilesPage /></ProtectedRoute>} />
           <Route path="/admin/benefits" element={<ProtectedRoute requireArea="club"><AdminBenefitsPage /></ProtectedRoute>} />
@@ -353,7 +357,7 @@ function App() {
           <Route path="/admin/mobile-logs" element={<Navigate to="/admin/ops?tab=app" replace />} />
           <Route path="/admin/mobile-push" element={<ProtectedRoute requireArea="system"><AdminMobilePushPage /></ProtectedRoute>} />
           <Route path="/admin/app-releases" element={<ProtectedRoute requireArea="system"><AdminAppReleasesPage /></ProtectedRoute>} />
-          <Route path="/admin/downloads" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
+          <Route path="/admin/downloads" element={<ProtectedRoute requireArea={["tournaments", "content", "club", "system"]}><AdminWidgetsPage /></ProtectedRoute>} />
           {/* Eine Adresse je Seite (#512): Widgets sind Downloads & QR. */}
           <Route path="/admin/widgets" element={<Navigate to="/admin/downloads" replace />} />
 
