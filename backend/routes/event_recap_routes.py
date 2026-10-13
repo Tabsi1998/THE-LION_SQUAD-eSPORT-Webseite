@@ -34,7 +34,9 @@ PRIVATE_PATHS = re.compile(r"^/api/(?:events/[^/]+/friends|tournaments/[^/]+/fri
 
 def is_private_path(path: str) -> bool:
     return bool(PRIVATE_PATHS.match(path or ""))
-VIEWER_FIELDS = {"_id": 0, "id": 1, "role": 1, "roles": 1, "birth_date": 1, event_friends.SETTING: 1, event_friends.HINT_FIELD: 1}
+# Feldnamen ausgeschrieben, damit der Wächter für private Kontofelder (#1492) die reine Auswahl erkennt; sie sind
+# event_friends.SETTING und event_friends.HINT_FIELD.
+VIEWER_FIELDS = {"_id": 0, "id": 1, "role": 1, "roles": 1, "birth_date": 1, "privacy_friends_see_registrations": 1, "friends_registrations_hint_seen_at": 1}
 
 
 async def _viewer(me: dict) -> dict:
@@ -120,5 +122,5 @@ async def confirm_friends_hint(body: FriendsHintBody, response: Response, me: di
     if body.turn_off:
         updates[event_friends.SETTING] = False
     await db.users.update_one({"id": me["id"]}, {"$set": updates})
-    stored = await db.users.find_one({"id": me["id"]}, {"_id": 0, "birth_date": 1, event_friends.SETTING: 1}) or {}
+    stored = await db.users.find_one({"id": me["id"]}, {"_id": 0, "birth_date": 1, "privacy_friends_see_registrations": 1}) or {}
     return {"sharing": event_friends.shares_registrations(stored)}

@@ -175,7 +175,7 @@ async def allowed_friends(db, viewer: dict) -> dict[str, dict]:
         return {}
     users = await db.users.find(
         {"id": {"$in": list(candidates)}, "is_active": {"$ne": False}, "is_banned": {"$ne": True}, "anonymized_at": {"$exists": False}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "birth_date": 1, "privacy_public_profile": 1, SETTING: 1},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "birth_date": 1, "privacy_public_profile": 1, "privacy_friends_see_registrations": 1},
     ).to_list(MAX_FRIENDS * 5)
     return {user["id"]: user for user in users if shares_registrations(user)}
 
