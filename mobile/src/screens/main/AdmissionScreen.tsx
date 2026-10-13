@@ -54,12 +54,16 @@ export function AdmissionScreen(_props: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const gate = useRef(new ScanGate()).current;
   const active = useAppActive();
+  // Welche Versammlung gerade gilt - für Antworten, die nach einem Wechsel ankommen (#1005).
+  const meetingRef = useRef<number | null>(null);
+  meetingRef.current = meetingId;
 
   const load = useCallback(async () => {
     try {
       const data = await loadAdmission();
       setView(data);
-      setMeetingId((current) => current ?? data.meetings[0]?.id ?? null);
+      // Nur eine Versammlung behalten, die es noch gibt; sonst die erste gültige (#1005).
+      setMeetingId((current) => (data.meetings.some((item) => item.id === current) ? current : data.meetings[0]?.id ?? null));
     } catch (error) {
       setView({ ready: false, text: errorMessage(error, "Der Einlass ist gerade nicht erreichbar."), meetings: [] });
     }
@@ -68,6 +72,15 @@ export function AdmissionScreen(_props: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Andere Versammlung (angetippt oder nach dem Nachladen): Ergebnis, offene Rücknahme und Scan-Sperre gehören
+  // zur alten (#1005).
+  useEffect(() => {
+    setResult(null);
+    setUndoFor(null);
+    setReason("");
+    gate.reset();
+  }, [gate, meetingId]);
 
   const meeting = (view?.meetings || []).find((item) => item.id === meetingId) || null;
 
@@ -80,11 +93,12 @@ export function AdmissionScreen(_props: Props) {
     setBusy(true);
     try {
       const data = await admitMember(meeting.id, payload);
-      setResult(resultFromScan(data));
       patchMeeting(meeting.id, (item) => rememberAdmission(item, data));
+      if (meetingRef.current !== meeting.id) return;
+      setResult(resultFromScan(data));
       if (payload.number) setNumber("");
     } catch (error) {
-      setResult(resultFromError(error));
+      if (meetingRef.current === meeting.id) setResult(resultFromError(error));
     } finally {
       setBusy(false);
     }
@@ -96,11 +110,12 @@ export function AdmissionScreen(_props: Props) {
     try {
       const data = await undoAdmission(meeting.id, row.member_id, reason.trim());
       patchMeeting(meeting.id, (item) => rememberAdmission(item, data));
+      if (meetingRef.current !== meeting.id) return;
       setResult({ tone: "info", headline: `Zurückgenommen: ${row.name}`, detail: `Grund: ${reason.trim()}` });
       setUndoFor(null);
       setReason("");
     } catch (error) {
-      setResult(resultFromError(error, "Nicht zurückgenommen"));
+      if (meetingRef.current === meeting.id) setResult(resultFromError(error, "Nicht zurückgenommen"));
     } finally {
       setBusy(false);
     }
@@ -134,6 +149,12 @@ export function AdmissionScreen(_props: Props) {
         {view && !view.ready ? (
           <Card testID="admission-not-ready">
             <Body>{view.text || "Heute ist keine Generalversammlung angesetzt."}</Body>
+          </Card>
+        ) : null}
+
+        {view?.ready && !view.meetings.length ? (
+          <Card testID="admission-no-meeting">
+            <Body>Gerade ist keine Versammlung zum Einlass offen. Zum Nachladen nach unten ziehen.</Body>
           </Card>
         ) : null}
 

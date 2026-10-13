@@ -724,8 +724,11 @@ async def create_mobile_client_log(body: MobileClientLogCreate, user: dict = Dep
 # ---------------------------------------------------------------- App-Releases (#250)
 
 @router.get("/app-version")
-async def app_version(build: int | None = None, user: dict = Depends(get_current_user)):
-    """Das aktuelle Release und ob diese App-Installation ein Update braucht."""
+async def app_version(build: int | None = None):
+    """Das aktuelle Release und ob diese App-Installation ein Update braucht.
+
+    Ohne Anmeldung (#1002): die Prüfung gilt für die Installation, auch Gäste brauchen sie.
+    Es kommen nur öffentliche Angaben zum Release; der APK-Download bleibt angemeldet."""
     db = get_db()
     current = await current_release(db)
     decision = update_decision(build, current)

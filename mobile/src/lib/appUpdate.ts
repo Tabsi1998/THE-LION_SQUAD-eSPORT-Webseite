@@ -64,6 +64,8 @@ export const PLAY_STORE_WEB_URL = "https://play.google.com/store/apps/details?id
 
 export const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 export const SNOOZE_KEY = "tls.mobile.updateSnoozedBuild";
+/** „Später“ (#1003) gilt für den angebotenen Build und höchstens einen Tag, auch über einen Neustart hinweg. */
+export const SNOOZE_MS = 24 * 60 * 60 * 1000;
 export const LAST_CHECK_KEY = "tls.mobile.updateCheckedAt";
 
 /** Der eigene Build aus der App-Konfiguration (Android versionCode). */
@@ -82,11 +84,39 @@ export function shouldCheck(lastCheckedAt: number | null | undefined, now = Date
   return now - lastCheckedAt >= interval;
 }
 
+/** Gespeichertes „Später“ (#1003): welcher Build und wann. */
+export type UpdateSnooze = { build: number; at: number };
+
+/** Liest den gespeicherten Aufschub. Alles andere (alter Wert ohne Zeit, kaputter Text) gilt als kein Aufschub. */
+export function parseSnooze(raw: string | null | undefined): UpdateSnooze | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as Partial<UpdateSnooze> | null;
+    if (!value || typeof value !== "object") return null;
+    const { build, at } = value;
+    if (typeof build !== "number" || !Number.isInteger(build) || build <= 0) return null;
+    if (typeof at !== "number" || !Number.isFinite(at)) return null;
+    return { build, at };
+  } catch {
+    return null;
+  }
+}
+
+/** Der Build, für den „Später“ gerade gilt - null, wenn nichts gespeichert oder die Frist um ist. */
+export function activeSnoozeBuild(snooze: UpdateSnooze | null | undefined, now = Date.now(), duration = SNOOZE_MS): number | null {
+  if (!snooze) return null;
+  const age = now - snooze.at;
+  // Eine zurückgestellte Uhr darf den Aufschub nicht beliebig verlängern.
+  if (age < 0 || age >= duration) return null;
+  return snooze.build;
+}
+
 export type UpdateDecision = { show: boolean; mandatory: boolean; release: AppRelease | null };
 
 /**
- * Ob der Banner erscheint: nur bei einem neueren Build; „Später“ blendet ihn
- * bis zur nächsten Sitzung aus - außer das Update ist Pflicht.
+ * Ob der Banner erscheint: nur bei einem neueren Build; „Später“ blendet ihn für
+ * diesen Build aus (#1003: SNOOZE_MS lang, auch nach einem Neustart) - außer das
+ * Update ist Pflicht. Ein neuerer Build zeigt ihn wieder.
  */
 export function decideUpdate(info: AppVersionInfo | null | undefined, snoozedBuild: number | null | undefined): UpdateDecision {
   const release = info?.current || null;

@@ -5,10 +5,12 @@ import { Card } from "../Card";
 import { QrCode } from "../QrCode";
 import { Body, Heading, Muted } from "../Text";
 import { api, errorMessage } from "../../lib/api";
+import { idSegment, isValidId } from "../../lib/apiIds";
 import { colors, radius } from "../../theme";
 
 // Einladungs-Link (#1191): Kapitäne zeigen den QR-Code oder teilen den Link; wer ihn öffnet, landet im Team und tippt
 // nur noch „Beitreten“. Neu erzeugen macht den alten Link ungültig. Der Join-Code bleibt als Rückfall.
+// Die Team-Kennung geht nur als ein geprüfter Pfadteil in die API (#1512).
 
 type InviteLink = { url: string; token: string; created_at?: string | null };
 
@@ -18,8 +20,12 @@ export function TeamInviteCard({ teamId, teamName, joinCode }: { teamId: string;
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
+    if (!isValidId(teamId)) {
+      setError("Der Einladungs-Link konnte nicht geladen werden.");
+      return;
+    }
     try {
-      const { data } = await api.get<InviteLink>(`/teams/${teamId}/invite-link`);
+      const { data } = await api.get<InviteLink>(`/teams/${idSegment(teamId)}/invite-link`);
       setLink(data);
       setError("");
     } catch (err) {
@@ -46,7 +52,7 @@ export function TeamInviteCard({ teamId, teamName, joinCode }: { teamId: string;
         onPress: async () => {
           setBusy(true);
           try {
-            const { data } = await api.post<InviteLink>(`/teams/${teamId}/invite-link`);
+            const { data } = await api.post<InviteLink>(`/teams/${idSegment(teamId)}/invite-link`);
             setLink(data);
           } catch (err) {
             setError(errorMessage(err, "Neuer Link hat nicht geklappt."));
@@ -95,8 +101,12 @@ export function TeamJoinInvite({ teamId, token, signedIn, onSignIn, onJoined }: 
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!isValidId(teamId)) {
+      setCheck({ valid: false, already_member: false, team: null });
+      return undefined;
+    }
     let alive = true;
-    api.get<InviteCheck>(`/teams/${teamId}/invite-link/check`, { params: { token } })
+    api.get<InviteCheck>(`/teams/${idSegment(teamId)}/invite-link/check`, { params: { token } })
       .then(({ data }) => { if (alive) setCheck(data); })
       .catch(() => { if (alive) setCheck({ valid: false, already_member: false, team: null }); });
     return () => { alive = false; };
@@ -116,7 +126,7 @@ export function TeamJoinInvite({ teamId, token, signedIn, onSignIn, onJoined }: 
     setBusy(true);
     setError("");
     try {
-      await api.post(`/teams/${teamId}/join-link`, { token });
+      await api.post(`/teams/${idSegment(teamId)}/join-link`, { token });
       onJoined();
     } catch (err) {
       setError(errorMessage(err, "Beitreten hat nicht geklappt."));

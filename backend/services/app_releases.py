@@ -5,8 +5,9 @@ zusätzlich eine Kopie im Upload-Volume (``uploads/app-releases``) und liefert
 sie an angemeldete Nutzer: so prüft die App ihr Update gegen den eigenen
 Server (Mindest-Build, Prüfsumme, „Was ist neu“) statt gegen GitHub. Entstanden
 ist das, als das Repo noch privat war und vom Handy aus niemand ohne
-GitHub-Login an die APK kam. Die App fragt ``/api/mobile/app-version`` und
-lädt ``/api/mobile/app-download/{build}``.
+GitHub-Login an die APK kam. Die App fragt ``/api/mobile/app-version`` (seit
+#1002 ohne Anmeldung, auch für Gäste) und lädt ``/api/mobile/app-download/{build}``
+(nur angemeldet).
 
 Hochladen darf der Vereinsadmin (Web) oder das Release-Skript mit dem
 Upload-Token aus der Server-Umgebung (``APP_RELEASE_UPLOAD_TOKEN``) - das

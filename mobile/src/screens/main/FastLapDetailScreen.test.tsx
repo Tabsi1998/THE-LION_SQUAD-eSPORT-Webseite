@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react-native";
+import { act, render, screen, waitFor } from "@testing-library/react-native";
 import { FastLapDetailScreen } from "./FastLapDetailScreen";
 import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
@@ -61,4 +61,41 @@ test("eine verspätete Antwort für die vorige Challenge wird verworfen (#1000)"
     newText: "Spielberg Hotlap",
     oldText: "Alte Challenge",
   });
+});
+
+test("zuweisbare Personen kommen nicht: die Challenge steht, die Seite sagt es statt einer leeren Liste (#1512)", async () => {
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/f1/challenges/hotlap") return Promise.resolve({ data: { ...CHALLENGE, can_manage_times: true } });
+    if (path.endsWith("/leaderboard")) return Promise.resolve({ data: { entries: [], track: { id: "tr1", name: "Spielberg" } } });
+    if (path.endsWith("/assignable-users")) return Promise.reject(Object.assign(new Error("Network Error"), { isAxiosError: true }));
+    return Promise.resolve({ data: [] });
+  });
+  await render(<FastLapDetailScreen route={route} />);
+  await waitFor(() => expect(screen.getByTestId("fastlap-users-partial")).toBeTruthy());
+  expect(screen.getByText("Spielberg Hotlap")).toBeTruthy();
+  expect(screen.getByText("Zeit eintragen")).toBeTruthy();
+});
+
+test("zuweisbare Personen: ein gescheitertes Nachladen behält die Liste von vorhin (#1512)", async () => {
+  let usersFail = false;
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/f1/challenges/hotlap") return Promise.resolve({ data: { ...CHALLENGE, can_manage_times: true } });
+    if (path.endsWith("/leaderboard")) return Promise.resolve({ data: { entries: [], track: { id: "tr1", name: "Spielberg" } } });
+    if (path.endsWith("/assignable-users")) {
+      return usersFail
+        ? Promise.reject(Object.assign(new Error("Network Error"), { isAxiosError: true }))
+        : Promise.resolve({ data: [{ id: "u-7", username: "max", display_name: "Max Fahrer" }] });
+    }
+    return Promise.resolve({ data: [] });
+  });
+  await render(<FastLapDetailScreen route={route} />);
+  await waitFor(() => expect(screen.getByText("Max Fahrer")).toBeTruthy());
+  expect(screen.queryByTestId("fastlap-users-partial")).toBeNull();
+  usersFail = true;
+  const [scroll] = screen.container.queryAll((node) => Boolean(node.props.refreshControl));
+  await act(async () => {
+    await scroll.props.refreshControl.props.onRefresh();
+  });
+  await waitFor(() => expect(screen.getByTestId("fastlap-users-partial")).toBeTruthy());
+  expect(screen.getByText("Max Fahrer")).toBeTruthy();
 });

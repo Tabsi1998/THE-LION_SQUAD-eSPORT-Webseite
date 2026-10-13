@@ -62,8 +62,12 @@ async def test_admin_uploads_and_users_see_and_download_the_update(flow):
     assert download.headers["x-release-sha256"] == body["sha256"]
     assert download.content == FAKE_APK
 
+    # Die Update-Prüfung gilt für die Installation (#1002): auch Gäste ohne Konto fragen sie ab.
+    # Der APK-Download bleibt angemeldeten Nutzern vorbehalten.
     flow.act_as(None)
-    assert (await flow.get("/api/mobile/app-version?build=62")).status_code == 401
+    guest = await flow.get("/api/mobile/app-version?build=62")
+    assert guest.status_code == 200, guest.text
+    assert guest.json()["update_available"] is True and guest.json()["current"]["build"] == 63
     assert (await flow.get("/api/mobile/app-download/63")).status_code == 401
 
 
