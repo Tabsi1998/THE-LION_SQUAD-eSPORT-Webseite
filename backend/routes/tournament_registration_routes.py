@@ -8,7 +8,7 @@ from pymongo.errors import DuplicateKeyError
 from database import get_db
 from services.permissions import is_confirmed_tournament_lead
 from auth import get_current_user, get_optional_user
-from services.access_links import record_access_link_use, validate_access_link
+from services.access_links import AccessLinkUsedUp, claim_access_link_use, release_access_link_use, validate_access_link
 from services.match_audience import responsible_registration
 from services.registration_notifications import notify_registration_status
 from services.tournament_rules import self_checkin_allowed
@@ -469,9 +469,18 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
     }
     if count >= tournament.get("max_participants", 32):
         reg["status"] = "waitlist"
+    # Zugangslink mit Limit (#1036): die Nutzung atomar belegen, bevor die Anmeldung geschrieben wird.
+    try:
+        claimed = await claim_access_link_use(db, register_access, me)
+    except AccessLinkUsedUp as exc:
+        raise HTTPException(status_code=409, detail=exc.detail)
     try:
         await db.tournament_registrations.insert_one(reg)
-    except DuplicateKeyError:
+    except Exception as exc:
+        if claimed:
+            await release_access_link_use(db, register_access, me)
+        if not isinstance(exc, DuplicateKeyError):
+            raise
         existing = await db.tournament_registrations.find_one(
             {"identity_key": reg["identity_key"]},
             {"_id": 0},
@@ -500,8 +509,6 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
         await on_tournament_registered(me["id"], tid)
     except Exception:
         logger.warning("[achievements] Anmeldung zu %s nicht ausgewertet", _log_safe(tid), exc_info=True)
-    if register_access:
-        await record_access_link_use(db, register_access, me)
     return reg
 
 

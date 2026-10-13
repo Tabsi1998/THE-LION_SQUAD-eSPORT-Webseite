@@ -12,7 +12,8 @@ const mockGet = jest.fn();
 const mockStore: Record<string, string> = {};
 
 jest.mock("../lib/api", () => ({ api: { get: (...args: unknown[]) => mockGet(...args) } }));
-jest.mock("../auth/AuthContext", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
+let mockUser = { id: "user-1" };
+jest.mock("../auth/AuthContext", () => ({ useAuth: () => ({ user: mockUser }) }));
 jest.mock("../navigation/rootNavigation", () => ({ navigationRef: { isReady: () => false, navigate: jest.fn() } }));
 jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn(async (key: string) => mockStore[key] ?? null),
@@ -34,6 +35,7 @@ beforeEach(() => {
   mockGet.mockReset();
   Object.keys(mockStore).forEach((key) => delete mockStore[key]);
   level = { level: 4, title: "Jungtier", prestige: 0 };
+  mockUser = { id: "user-1" };
   // Noch ist nichts gerendert - leeren ohne act.
   ceremonyQueue.clear();
 });
@@ -102,4 +104,23 @@ test("ein neues Level seit dem letzten Blick wird gefeiert, ein gleiches nicht",
   await waitFor(() => expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Level 5 erreicht"));
   expect(screen.getByTestId("ceremony-title-banner")).toHaveTextContent("Neuer Titel: Fährte");
   expect(JSON.parse(mockStore["tls_level_seen_user-1"])).toEqual({ level: 5, title: "Fährte", prestige: 0 });
+});
+
+// Codex-Prüfung zu #1502: meldet sich während der Anfrage ein anderes Konto an, gehört die Antwort nicht mehr zum
+// vorigen Konto - sie darf dessen Merker nicht überschreiben und keine Zeremonie auslösen.
+test("Kontowechsel während der Level-Anfrage: die Antwort wird verworfen", async () => {
+  mockStore["tls_ach_seen_user-1"] = "2026-09-21T10:00:00.000Z";
+  mockStore["tls_level_seen_user-1"] = JSON.stringify({ level: 10, title: "Rudel", prestige: 0 });
+  let answer: (value: unknown) => void = () => {};
+  mockGet.mockImplementation((url: string) => {
+    if (url === "/users/me/level") return new Promise((resolve) => { answer = resolve; });
+    return Promise.resolve(groups(null));
+  });
+  const view = await render(<AchievementCatchUpOverlay />);
+  await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/users/me/level"));
+  mockUser = { id: "user-2" };
+  await view.rerender(<AchievementCatchUpOverlay />);
+  await act(async () => { answer({ data: { level: 40, title: "Brüller", prestige: 0 } }); });
+  expect(JSON.parse(mockStore["tls_level_seen_user-1"])).toMatchObject({ level: 10 });
+  expect(ceremonyQueue.getCurrent()).toBeNull();
 });
