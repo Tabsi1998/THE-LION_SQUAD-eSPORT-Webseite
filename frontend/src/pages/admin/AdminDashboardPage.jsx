@@ -180,7 +180,7 @@ export default function AdminDashboardPage() {
     },
     {
       label: "Turnier-Anmeldungen",
-      detail: `${pendingRegistrations} warten auf Freigabe`,
+      detail: `${pendingRegistrations} von Hand eingetragen, noch ausstehend`,
       to: "/admin/tournaments?status=registration_open",
       icon: GamepadIcon,
       tone: pendingRegistrations > 0 ? "#FFD700" : "#00FF88",

@@ -43,7 +43,7 @@ export function PasskeysPanel() {
   return (
     <div className="mt-6 border border-white/10 rounded-sm p-4 space-y-4" data-testid="profile-passkeys">
       <h3 className="font-bold text-lg">Passkeys</h3>
-      <p className="text-sm text-white/65">Melde dich mit Fingerabdruck, Gesichtserkennung oder Geräte-PIN an. Dein Gerät verwaltet den privaten Schlüssel. Eine eingerichtete Admin-MFA wird weiterhin abgefragt.</p>
+      <p className="text-sm text-white/65">Melde dich mit Fingerabdruck, Gesichtserkennung oder Geräte-PIN an. Dein Gerät verwaltet den privaten Schlüssel. Ein Passkey zählt als zweiter Faktor: Danach fragt die Seite nicht noch einmal nach einem Code. Für einen Adminbereich muss die Zwei-Faktor-Anmeldung trotzdem eingerichtet sein.</p>
       {!enabled ? <p className="text-sm text-white/60">Passkeys sind in diesem Browser oder für diese Website derzeit nicht verfügbar.</p> : (
         <>
           <label className="block text-sm">Bezeichnung
