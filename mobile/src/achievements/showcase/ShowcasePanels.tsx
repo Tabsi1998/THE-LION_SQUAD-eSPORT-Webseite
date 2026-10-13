@@ -3,6 +3,7 @@ import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Card } from "../../components/Card";
 import { LoewenRangFrame } from "../../components/LoewenRangFrame";
+import { frameLabel } from "../../lib/loewenRang";
 import { MediaImage } from "../../components/MediaImage";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { achievementIcon } from "../../lib/achievements";
@@ -239,6 +240,13 @@ export function Leaderboard({ board, onBoard, entries, loading, categories, onOp
                   onPress={() => entry.username && onOpenUser(String(entry.username))}
                   style={[styles.podiumCard, { borderColor: `${color}66` }, entry.rank === 1 && styles.podiumFirst]}
                   accessibilityRole="button"
+                  // Der Rahmen ist nur Schmuck - Level und Rang stehen im Namen des Platzes (#1457).
+                  accessibilityLabel={[
+                    `Platz ${entry.rank}`,
+                    entry.display_name,
+                    frameLabel(podiumLevel(entry), { prestige: entry.prestige }),
+                    byLevel ? null : `${Number(entry.points || 0).toLocaleString("de-DE")} Punkte, ${erfolge(entry.count)}`,
+                  ].filter(Boolean).join(", ")}
                   testID={`podium-${entry.rank}`}
                 >
                   <View style={[styles.rankCircle, { borderColor: color }]}><Text style={[styles.rankText, { color }]}>{entry.rank}</Text></View>

@@ -9,6 +9,7 @@ import { API_BASE_URL } from "../../config";
 import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { LoewenRangFrame } from "../../components/LoewenRangFrame";
+import { frameLabel } from "../../lib/loewenRang";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
@@ -392,7 +393,19 @@ function Profiles({ items, onOpen }: { items: any[]; onOpen: (profile: any) => v
   return (
     <>
       {items.map((profile) => (
-        <Pressable key={profile.id} onPress={() => onOpen(profile)} style={({ pressed }) => [pressed && styles.pressed]}>
+        <Pressable
+          key={profile.id}
+          onPress={() => onOpen(profile)}
+          accessibilityRole="button"
+          // Der Rahmen ist nur Schmuck - Level und Rang stehen im Namen des Eintrags, ein Halt je Person (#1457).
+          accessibilityLabel={[
+            profile.name || profile.display_name || profile.username,
+            frameLabel(profile.achievement_level?.level, { rankName: profile.achievement_level?.rank_name, prestige: profile.achievement_level?.prestige }),
+            formatRole(profile.user_type || profile.role),
+            (profile.games || profile.favorite_games || []).join(", "),
+          ].filter(Boolean).join(", ")}
+          style={({ pressed }) => [pressed && styles.pressed]}
+        >
           <Card style={styles.card}>
             <View style={styles.profileRow}>
             {/* Löwen-Rang (#1457): der Rahmen des Rangs, in Listen ruhig und ohne Schild. */}

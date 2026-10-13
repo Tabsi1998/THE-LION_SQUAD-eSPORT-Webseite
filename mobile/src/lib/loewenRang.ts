@@ -133,6 +133,8 @@ export type FrameBox = {
   art: { size: number; left: number; top: number };
   /** Oberkante des Schilds in der Fläche. */
   plateTop: number;
+  /** Wie weit die sichtbare Grafik oben über die Fläche ragt (höchstens 15 %). */
+  overhang: number;
 };
 
 /** Wo Foto, Rahmen und Schild in einer Fläche mit Kantenlänge `area` sitzen - in Punkten, für jedes Level. */
@@ -154,6 +156,7 @@ export function frameBox(level: unknown, area: number): FrameBox {
     photoTop,
     art: { size: F, left: photoLeft + photo / 2 + ox - F / 2, top: photoTop + photo / 2 + oy - F / 2 },
     plateTop: photoTop + photo + pad[2] * photo - PLATE_OVERLAP,
+    overhang: Math.max(0, -(photoTop + photo / 2 + oy - F / 2 + ring.box[1] * F)),
   };
 }
 
@@ -168,6 +171,18 @@ export function plateSpace(variant: FrameVariant, stars: number): number {
   if (STILL_VARIANTS.has(variant)) return 0;
   if (variant === "card") return stars > 0 ? 35 : 21;
   return stars > 0 ? 41 : 26;
+}
+
+/** Der größte Überstand oben über alle 12 Ränge, als Anteil der Fläche (höchstens TOP_OVERHANG). */
+export const MAX_OVERHANG_SHARE = Math.max(...RANK_NAMES.map((_, index) => frameBox(Math.max(1, index * RANK_SIZE), 1).overhang));
+
+/**
+ * Platz über der Fläche für den Überstand oben (Krone, Pfote, Wappen): in Listen und auf dem Podest so viel, wie der
+ * höchste Rahmen braucht - so malt kein Rahmen in die Zeile darüber, und alle Zeilen sind gleich hoch. Profil und
+ * Karte ragen bewusst ins Kopfbild bzw. in den Rand.
+ */
+export function overhangSpace(variant: FrameVariant, area: number): number {
+  return STILL_VARIANTS.has(variant) ? Math.ceil(MAX_OVERHANG_SHARE * area) : 0;
 }
 
 /** Die kleinste Bildbreite, die die Grafik in Gerätepixeln abdeckt (160, 320 oder 640). */

@@ -4,6 +4,7 @@ import GEOMETRY from "../../assets/loewen-rang/geometry.json";
 import {
   FRAME_SIZES,
   FRAME_WIDTHS,
+  MAX_OVERHANG_SHARE,
   MAX_PARTICLES,
   PLATE_OVERLAP,
   PROFILE_WIDE,
@@ -17,6 +18,7 @@ import {
   frameLayout,
   framePadding,
   frameWidthFor,
+  overhangSpace,
   plateSpace,
   plateTag,
   prestigeCount,
@@ -156,4 +158,20 @@ test("Bewegung nur im Profil und nie bei „Bewegung reduzieren“", () => {
   expect(frameAnimated("profile", false)).toBe(true);
   expect(frameAnimated("profile", true)).toBe(false);
   for (const variant of ["card", "list", "mini"] as FrameVariant[]) expect(frameAnimated(variant, false)).toBe(false);
+});
+
+test("Listen und Podest halten oben Platz für den Überstand frei - kein Rahmen malt in die Zeile darüber", () => {
+  expect([overhangSpace("list", 92), overhangSpace("mini", 64), overhangSpace("profile", 220), overhangSpace("card", 150)]).toEqual([7, 5, 0, 0]);
+  for (const variant of ["list", "mini"] as FrameVariant[]) {
+    const area = FRAME_SIZES[variant];
+    for (let level = 1; level <= 60; level += 1) {
+      const box = frameBox(level, area);
+      expect(box.overhang).toBeGreaterThanOrEqual(0);
+      expect(box.overhang).toBeLessThanOrEqual(overhangSpace(variant, area));
+    }
+  }
+  // Am weitesten ragt Rang 1 hinaus (großes Foto, Pfote oben), Rang 9 mit den Schwingen gar nicht.
+  expect(frameBox(1, 92).overhang).toBeGreaterThan(5);
+  expect(frameBox(40, 92).overhang).toBe(0);
+  expect(MAX_OVERHANG_SHARE).toBeLessThanOrEqual(TOP_OVERHANG);
 });

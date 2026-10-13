@@ -1,6 +1,7 @@
 import React from "react";
-import { AccessibilityInfo, Dimensions, Text } from "react-native";
+import { AccessibilityInfo, Dimensions, PixelRatio, StyleSheet, Text } from "react-native";
 import { act, render, screen } from "@testing-library/react-native";
+import { auditTree, findingLines, type A11yNode } from "../a11y/audit";
 import { LoewenRangFrame } from "./LoewenRangFrame";
 import { frameImage } from "./loewenRangImages";
 
@@ -117,22 +118,76 @@ test("Glanz: läuft 45 % von 5,5 s über das Metall (die Grafik ist die Maske), 
   expect([draws.images - before.images, draws.rects - before.rects]).toEqual([1, 1]);
 });
 
-test("Liste und Podest: nur die Grafik - ohne Schild, ohne Bewegung", async () => {
+test("Liste und Podest: nur die Grafik - ohne Schild, ohne Bewegung, nur Schmuck für Vorleser, Platz für den Überstand", async () => {
   reduceMotion(false);
   frameCallbacks.clear();
   await render(
     <>
       <LoewenRangFrame level={27} prestige={2} size="list" testID="row" />
       <LoewenRangFrame level={12} size="mini" testID="podium" />
+      <LoewenRangFrame level={27} size="list" decorative={false} testID="named" />
     </>,
   );
   await settle();
-  expect(screen.getByTestId("row").props.style).toMatchObject({ width: 92, height: 92, marginBottom: 0 });
-  expect(screen.getByTestId("row").props.accessibilityLabel).toBe("Level 27, Rang Goldmähne, Prestige 2");
-  expect(screen.getByTestId("podium").props.style).toMatchObject({ width: 64, height: 64 });
-  expect(screen.queryByTestId("loewen-rang-plate")).toBeNull();
-  expect(screen.queryByTestId("loewen-rang-signature")).toBeNull();
+  const row = screen.getByTestId("row", { includeHiddenElements: true });
+  expect(row.props.style).toMatchObject({ width: 92, height: 92, marginTop: 7, marginBottom: 0 });
+  // In einer antippbaren Zeile: kein eigener Halt - der Name der Zeile trägt Level und Rang.
+  expect(row.props).toMatchObject({ accessible: false, importantForAccessibility: "no-hide-descendants", accessibilityElementsHidden: true });
+  expect(row.props.accessibilityLabel).toBeUndefined();
+  expect(screen.getByTestId("podium", { includeHiddenElements: true }).props.style).toMatchObject({ width: 64, height: 64, marginTop: 5 });
+  expect(screen.getByTestId("named").props.accessibilityLabel).toBe("Level 27, Rang Goldmähne");
+  expect(screen.queryByTestId("loewen-rang-plate", { includeHiddenElements: true })).toBeNull();
+  expect(screen.queryByTestId("loewen-rang-signature", { includeHiddenElements: true })).toBeNull();
   expect(frameCallbacks.size).toBe(0);
+});
+
+test("Ruhe: in Glanz-Pausen und ohne Teilchen wird kein neues Bild aufgezeichnet", async () => {
+  reduceMotion(false);
+  frameCallbacks.clear();
+  jest.spyOn(skia, "useImage").mockReturnValue({ width: () => 640, height: () => 640 });
+  const recorder = jest.spyOn(skia.Skia, "PictureRecorder");
+  // Level 5: erstes Level im Rang - nur der Glanz, keine Teilchen.
+  await render(<LoewenRangFrame level={5} size="profile" />);
+  await settle();
+  const [entry] = [...frameCallbacks];
+  entry.callback({ timeSinceFirstFrame: 1000 });
+  expect(recorder).toHaveBeenCalledTimes(1);
+  // Glanz-Pause (2,5 … 5,5 s): kein Bild, auch nicht über viele Takte.
+  for (let ms = 3000; ms < 5400; ms += 40) entry.callback({ timeSinceFirstFrame: ms });
+  expect(recorder).toHaveBeenCalledTimes(1);
+  // Nächster Durchgang: es wird wieder gezeichnet.
+  entry.callback({ timeSinceFirstFrame: 5600 });
+  expect(recorder).toHaveBeenCalledTimes(2);
+});
+
+test("Blitz zeichnet nur, wenn es blitzt", async () => {
+  reduceMotion(false);
+  frameCallbacks.clear();
+  const recorder = jest.spyOn(skia.Skia, "PictureRecorder");
+  // Level 39: Rang 8 (Brüller) voll - Blitz; ohne geladene Grafik kein Glanz.
+  await render(<LoewenRangFrame level={39} size="profile" />);
+  await settle();
+  const [entry] = [...frameCallbacks];
+  entry.callback({ timeSinceFirstFrame: 2600 });
+  expect(recorder).toHaveBeenCalledTimes(1);
+  // Ein kurzer Nachblitz (2,86 … 2,94 s), danach dunkel bis zum nächsten Schlag bei 5,2 s.
+  for (let ms = 2700; ms < 5150; ms += 40) entry.callback({ timeSinceFirstFrame: ms });
+  expect(recorder).toHaveBeenCalledTimes(3);
+});
+
+test("große Schrift: das Schild passt in die Fläche und bleibt lesbar", async () => {
+  reduceMotion(true);
+  jest.spyOn(PixelRatio, "getFontScale").mockReturnValue(2);
+  Dimensions.set({ window: { ...WINDOW, width: 390, fontScale: 2 } });
+  await render(<LoewenRangFrame level={60} prestige={5} size="card" testID="frame" />);
+  await settle();
+  const tag = screen.getByTestId("loewen-rang-tag");
+  expect(tag.props).toMatchObject({ numberOfLines: 1, adjustsFontSizeToFit: true, maxFontSizeMultiplier: 1.3 });
+  expect(screen.getByTestId("loewen-rang-stars").props).toMatchObject({ numberOfLines: 1, adjustsFontSizeToFit: true });
+  const tagBox = StyleSheet.flatten(tag.parent?.props.style) as { maxWidth?: number };
+  expect(tagBox.maxWidth).toBe(150 - 16);
+  // Die Prüfung aus screens.a11y.test.tsx findet nichts.
+  expect(findingLines(auditTree(screen.root as unknown as A11yNode))).toEqual([]);
 });
 
 test("Tablet: das Profil wie am Desktop mit 285", async () => {

@@ -7,6 +7,7 @@ import { Card } from "../../components/Card";
 import { FriendsCard } from "../../components/FriendsCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { LoewenRangFrame } from "../../components/LoewenRangFrame";
+import { frameLabel } from "../../lib/loewenRang";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
@@ -112,7 +113,13 @@ function PlayersSection({ navigation, guest }: { navigation: Navigation; guest: 
         const name = player.display_name || player.name || player.username || "Spieler";
         const games = player.games || player.favorite_games || [];
         return (
-          <Pressable key={player.id} onPress={() => openProfile(player.username)} accessibilityRole="button" style={({ pressed }) => [styles.playerRow, pressed && styles.pressed]} testID={`player-${player.username}`}>
+          <Pressable
+            key={player.id}
+            onPress={() => openProfile(player.username)}
+            accessibilityRole="button"
+            // Der Rahmen ist hier nur Schmuck - Level und Rang stehen im Namen der Zeile, ein Halt je Person (#1457).
+            accessibilityLabel={[name, frameLabel(player.achievement_level?.level, { rankName: player.achievement_level?.rank_name, prestige: player.achievement_level?.prestige }), games.slice(0, 2).join(", ")].filter(Boolean).join(", ")}
+            style={({ pressed }) => [styles.playerRow, pressed && styles.pressed]} testID={`player-${player.username}`}>
             {/* Löwen-Rang (#1457): in Listen der Rahmen ohne Schild und ohne Bewegung, wie im Web. */}
             <LoewenRangFrame level={player.achievement_level?.level} prestige={player.achievement_level?.prestige} rankName={player.achievement_level?.rank_name} size="list" testID={`player-frame-${player.username}`}>
               <MediaImage uri={player.avatar_url} style={styles.playerAvatar} fallback={<Body style={styles.playerInitial}>{name.slice(0, 1).toUpperCase()}</Body>} />

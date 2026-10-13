@@ -9,6 +9,7 @@ import {
   frameBox,
   frameLabel,
   frameWidthFor,
+  overhangSpace,
   plateSpace,
   plateTag,
   prestigeCount,
@@ -20,7 +21,7 @@ import {
 import { useScreenFocused } from "../seasons/screenFocus";
 import { colors } from "../theme";
 import { frameImage } from "./loewenRangImages";
-import { drawSignature, type SignatureScene } from "./loewenRangSignature";
+import { drawSignature, signatureVisible, type SignatureScene } from "./loewenRangSignature";
 
 // Löwen-Rang in der App (#1457): das Profilbild im Rahmen seines Rangs, wie im Web (LevelAvatarFrame.jsx, #1454).
 // Jede Größe hat eine feste Fläche (Profil 220, Karte 150, Liste 92, Podest 64); das Foto wird je Rang so groß, dass
@@ -32,6 +33,9 @@ const EMPTY_PICTURE: SkPicture = createPicture(() => undefined);
 /** Höchstens etwa 30 Bilder je Sekunde - der Glanz läuft ruhig, schwache Geräte danken es. */
 const FRAME_MS = 33;
 const EDGE_POINTS = 24;
+/** Das Schild wächst mit großer Schrift höchstens 1,3-fach und bleibt 16 Punkte schmaler als die Fläche. */
+const PLATE_FONT_MAX = 1.3;
+const PLATE_INSET = 16;
 
 type Props = {
   level?: number | null;
@@ -42,12 +46,17 @@ type Props = {
   /** Schild unter dem Rahmen (nur Profil und Karte). */
   showBadge?: boolean;
   team?: boolean;
+  /**
+   * Nur Schmuck für Vorleser: in Listen und auf dem Podest (Standard) liegt der Rahmen in einem antippbaren Eintrag,
+   * der Level und Rang selbst im Namen trägt (`frameLabel`) - sonst gäbe es zwei Halte für dieselbe Person.
+   */
+  decorative?: boolean;
   testID?: string;
   /** Das runde Foto - füllt die Fläche des Fotos. */
   children?: React.ReactNode;
 };
 
-export function LoewenRangFrame({ level, prestige, rankName, size = "list", showBadge = true, team = false, testID, children }: Props) {
+export function LoewenRangFrame({ level, prestige, rankName, size = "list", showBadge = true, team = false, decorative, testID, children }: Props) {
   const { width } = useWindowDimensions();
   const area = areaFor(size, width);
   const box = useMemo(() => frameBox(level, area), [level, area]);
@@ -58,14 +67,16 @@ export function LoewenRangFrame({ level, prestige, rankName, size = "list", show
   const source = frameImage(box.info.key, frameWidthFor(box.art.size, PixelRatio.get()));
   const label = frameLabel(level, { rankName, prestige, team });
   const animated = frameAnimated(size, reduceMotion);
+  const hidden = decorative ?? still;
+  const a11y = hidden
+    ? { accessible: false, accessibilityElementsHidden: true, importantForAccessibility: "no-hide-descendants" as const }
+    : { accessible: true, accessibilityRole: "image" as const, accessibilityLabel: label };
 
   return (
     <View
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={label}
+      {...a11y}
       pointerEvents="none"
-      style={{ width: area, height: area, marginBottom: plate ? plateSpace(size, stars) : 0 }}
+      style={{ width: area, height: area, marginTop: overhangSpace(size, area), marginBottom: plate ? plateSpace(size, stars) : 0 }}
       testID={testID}
     >
       <View style={[styles.photo, { left: box.photoLeft, top: box.photoTop, width: box.photo, height: box.photo, borderRadius: box.photo / 2 }]}>
@@ -90,9 +101,20 @@ function Plate({ box, stars, size, tag }: { box: FrameBox; stars: number; size: 
   const centerX = box.photoLeft + box.photo / 2;
   return (
     <View style={[styles.plate, { top: box.plateTop, left: centerX - box.area / 2, width: box.area }]} testID="loewen-rang-plate">
-      {stars > 0 ? <Text style={styles.stars} testID="loewen-rang-stars">{"★".repeat(stars)}</Text> : null}
-      <View style={[styles.tag, small && styles.tagSmall, { backgroundColor: info.color }]}>
-        <Text style={[styles.tagText, small && styles.tagTextSmall]}>{tag}</Text>
+      {stars > 0 ? <Text style={styles.stars} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={PLATE_FONT_MAX} testID="loewen-rang-stars">{"★".repeat(stars)}</Text> : null}
+      <View style={[styles.tag, small && styles.tagSmall, { backgroundColor: info.color, maxWidth: box.area - PLATE_INSET }]}>
+        {/* Große Systemschrift: das Schild wächst mit, aber höchstens 1,3-fach und nie breiter als die Fläche - was
+            nicht passt, wird kleiner statt abgeschnitten. */}
+        <Text
+          style={[styles.tagText, small && styles.tagTextSmall]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+          maxFontSizeMultiplier={PLATE_FONT_MAX}
+          testID="loewen-rang-tag"
+        >
+          {tag}
+        </Text>
       </View>
       <View style={styles.pips} testID="loewen-rang-pips">
         {Array.from({ length: info.pips }, (_, index) => {
@@ -148,6 +170,7 @@ function Signature({ box, level, source }: { box: FrameBox; level?: number | nul
   const running = appActive && focused;
   const picture = useSharedValue<SkPicture>(EMPTY_PICTURE);
   const last = useSharedValue(-FRAME_MS);
+  const blank = useSharedValue(true);
   const scene = useMemo<SignatureScene>(() => {
     const plan = signaturePlan(level);
     const S = box.art.size;
@@ -172,11 +195,21 @@ function Signature({ box, level, source }: { box: FrameBox; level?: number | nul
     const now = frame.timeSinceFirstFrame;
     if (now - last.value < FRAME_MS) return;
     last.value = now;
+    // Ruhe (Glanz-Pause, keine Teilchen, zwischen zwei Blitzen): nichts aufzeichnen. Einmal leeren, dann bleibt das
+    // leere Bild stehen.
+    if (!signatureVisible(scene, now / 1000, image !== null)) {
+      if (!blank.value) {
+        picture.value = EMPTY_PICTURE;
+        blank.value = true;
+      }
+      return;
+    }
+    blank.value = false;
     const recorder = Skia.PictureRecorder();
     const canvas = recorder.beginRecording(Skia.XYWHRect(0, 0, scene.size, scene.size));
     drawSignature(canvas, scene, now / 1000, image);
     picture.value = recorder.finishRecordingAsPicture();
-  }, [scene, image, last, picture]);
+  }, [scene, image, last, picture, blank]);
 
   const frame = useFrameCallback(step, running);
   useEffect(() => {

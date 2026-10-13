@@ -75,6 +75,24 @@ function drawShine(canvas: SkCanvas, scene: SignatureScene, t: number, image: Sk
   canvas.restore();
 }
 
+/** Wetterleuchten: kurz hell, ein kleiner Nachblitz, sonst dunkel (0 … 1). */
+export function blitzFlash(t: number): number {
+  "worklet";
+  const beat = frac(t / 2.6);
+  return beat < 0.05 ? 1 - beat / 0.05 : beat > 0.1 && beat < 0.13 ? 0.6 : 0;
+}
+
+/**
+ * Zeigt die Signatur zum Zeitpunkt `t` überhaupt etwas? In Pausen des Glanzes, ohne Teilchen und zwischen zwei Blitzen
+ * nicht - dann muss kein neues Bild aufgezeichnet werden.
+ */
+export function signatureVisible(scene: SignatureScene, t: number, hasImage: boolean): boolean {
+  "worklet";
+  if (hasImage && frac(t / SHINE_CYCLE_S) < SHINE_RUN) return true;
+  if (scene.count <= 0) return false;
+  return scene.kind !== "blitz" || blitzFlash(t) > 0;
+}
+
 /** Ein leuchtender Punkt: weicher Hof und heller Kern. */
 function dot(canvas: SkCanvas, x: number, y: number, radius: number, color: string, alpha: number) {
   "worklet";
@@ -90,8 +108,7 @@ function drawParticles(canvas: SkCanvas, scene: SignatureScene, t: number) {
   const gain = 0.55 + 0.45 * scene.strength;
   if (kind === "blitz") {
     // Wetterleuchten: der Ring flackert kurz auf, dazu Funken auf dem Metall.
-    const beat = frac(t / 2.6);
-    const flash = beat < 0.05 ? 1 - beat / 0.05 : beat > 0.1 && beat < 0.13 ? 0.6 : 0;
+    const flash = blitzFlash(t);
     if (flash > 0) {
       const ring = rgba(color, flash * 0.75 * gain);
       ring.setStyle(PaintStyle.Stroke);

@@ -35,7 +35,10 @@ Sterne am Level-Schild), der Rahmen bleibt der Löwenkönig.
   Metall und eine schlanke Signatur mit Skia auf dem UI-Thread (höchstens sechs Teilchen, rund 30 Bilder je Sekunde,
   im Hintergrund still). Vier Arten nach der Web-Signatur desselben Rangs: Funken (Rang 1, 2, 4, 6), Glut (3, 7,
   10, 11), Frost (5, 9), Blitz (8, 12); das erste Level eines Rangs nur Glanz. Mit „Bewegung reduzieren“ steht alles
-  still.
+  still. In Ruhe (Glanz-Pause, keine Teilchen) wird kein Bild aufgezeichnet. In Listen und am Podest ist der Rahmen
+  für Vorleser nur Schmuck - Level und Rang stehen im Namen des Eintrags - und hält oben Platz für den höchsten
+  Überstand frei (Liste 7, Podest 5 Punkte). Das Schild wächst mit großer Schrift höchstens 1,3-fach und wird sonst
+  kleiner statt breiter als die Fläche.
 
 ## Rahmen-Grafiken
 
