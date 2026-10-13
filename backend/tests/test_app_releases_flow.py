@@ -180,3 +180,34 @@ async def test_server_updater_switch_reaches_the_app_and_only_club_admins_flip_i
     assert (await flow.get("/api/mobile/app-version?build=62")).json()["server_updater_enabled"] is False
     # Die {build}-Routen bleiben unberührt: „settings“ ist keine Buildnummer.
     assert (await flow.get("/api/admin/app-releases")).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_guests_see_only_public_release_fields_with_short_public_cache(flow):
+    """Ohne Anmeldung (#1002): nur Öffentliches zum Release - kein Hochlader, keine Pfade, keine Download-Adresse."""
+    admin = await flow.add_user(role="club_admin", name="clubadmin")
+    flow.act_as(admin)
+    assert (await upload(flow, min_build=60)).status_code == 200
+
+    flow.act_as(None)
+    answer = await flow.get("/api/mobile/app-version?build=62")
+    assert answer.status_code == 200, answer.text
+    assert answer.headers["cache-control"] == "public, max-age=300"
+    current = answer.json()["current"]
+    assert set(current) == {"build", "version", "notes", "sha256", "size", "min_build", "channel"}
+    assert current["build"] == 63 and current["min_build"] == 60 and current["sha256"] == hashlib.sha256(FAKE_APK).hexdigest()
+    assert current["size"] == len(FAKE_APK) and current["notes"].startswith("- Was ist neu")
+    # Angemeldet kommt dieselbe Auswahl - die Antwort hängt nicht am Konto und darf zwischengespeichert werden.
+    player = await flow.add_user(role="player", name="spieler")
+    flow.act_as(player)
+    assert set((await flow.get("/api/mobile/app-version?build=62")).json()["current"]) == set(current)
+
+
+@pytest.mark.asyncio
+async def test_app_version_is_rate_limited_per_address(flow):
+    flow.act_as(None)
+    answers = [await flow.get("/api/mobile/app-version?build=62") for _ in range(61)]
+    assert [answer.status_code for answer in answers[:60]] == [200] * 60
+    assert answers[60].status_code == 429
+    # Die Bremse wird nicht zwischengespeichert - nur die Antwort mit Release-Angaben.
+    assert answers[60].headers["cache-control"] == "no-store"

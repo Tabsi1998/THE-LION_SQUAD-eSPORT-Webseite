@@ -110,6 +110,19 @@ def public_release(doc: dict | None) -> dict | None:
     }
 
 
+# Was die Update-Prüfung ohne Anmeldung zeigt (#1002): nur Öffentliches zum Release. Kein Hochlader, keine Quelle,
+# keine Pfade oder Download-Adressen; der Kanal ergibt sich aus der Versionsnummer und steht im Banner.
+APP_VERSION_FIELDS = ("build", "version", "notes", "sha256", "size", "min_build", "channel")
+
+
+def app_version_release(doc: dict | None) -> dict | None:
+    """Das Release für ``/api/mobile/app-version`` - nur die Felder aus ``APP_VERSION_FIELDS``."""
+    release = public_release(doc)
+    if release is None:
+        return None
+    return {key: release[key] for key in APP_VERSION_FIELDS}
+
+
 async def store_release(db, *, build: int, version: str, notes: str, chunks: AsyncIterator[bytes],
                         min_build: int | None = None, set_current: bool = True, source: str = "admin") -> dict:
     """Die APK stückweise auf die Platte schreiben, dabei Prüfsumme und Größe rechnen."""

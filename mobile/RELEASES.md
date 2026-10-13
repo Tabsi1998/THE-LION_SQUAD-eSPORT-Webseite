@@ -133,7 +133,10 @@ Automatisch: Bundle hochladen, Versionshinweise aus dem Changelog, Track fertigs
 **Seit 1.0.0 (#593) kommen Updates über Google Play.** Die App fragt beim Start und beim Zurückkehren
 in den Vordergrund höchstens einmal pro Stunde `GET /api/mobile/app-version?build=…`, zeigt bei einem
 neueren Build einen Banner mit „Was ist neu“ und „Später“, startet Googles Update-Dialog (#421) oder
-öffnet die Store-Seite. Die Abfrage braucht keine Anmeldung: Gäste bekommen die Prüfung genauso (#1002).
+öffnet die Store-Seite. Die Abfrage braucht keine Anmeldung: Gäste bekommen die Prüfung genauso (#1002). Sie liefert zum Release nur
+Build, Version, „Was ist neu“, Größe, Prüfsumme, Mindest-Build und Kanal (`APP_VERSION_FIELDS` in
+`backend/services/app_releases.py`), ist fünf Minuten öffentlich zwischenspeicherbar und je Adresse auf 60 Abrufe
+pro Minute gebremst.
 „Später“ gilt für den angebotenen Build und einen Tag, auch nach einem Neustart; ein neuerer Build zeigt
 den Banner wieder (#1003). Liegt der eigene Build unter `min_build`, ist das Update Pflicht und der Banner
 nicht wegdrückbar. Den eigenen APK-Download mit Installer gibt es nicht mehr: Google erlaubt die

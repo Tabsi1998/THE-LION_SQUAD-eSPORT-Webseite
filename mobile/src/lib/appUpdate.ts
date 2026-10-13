@@ -19,8 +19,9 @@ export type AppRelease = {
   is_current?: boolean;
   /** Beta (Pre-Release) oder Release (#309); fehlt der Wert, entscheidet die Versionsnummer. */
   channel?: ReleaseChannel | null;
-  filename: string;
-  download_url: string;
+  /** Seit #1002 nicht mehr in `/api/mobile/app-version` - die App lädt keine APK selbst (#593). */
+  filename?: string;
+  download_url?: string;
 };
 
 export type ReleaseChannel = "beta" | "release";

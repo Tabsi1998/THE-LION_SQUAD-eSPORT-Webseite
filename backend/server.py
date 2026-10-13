@@ -464,6 +464,10 @@ async def security_headers(request, call_next):
             # Kalender (#1190, Codex-Prüfung #1460): die Route entscheidet selbst - öffentliche Liste, Feed und Dateien
             # kurz zwischenspeicherbar, alles Persönliche „private, no-store“. Ohne eigene Regel (Fehler) gilt no-store.
             pass
+        elif request.url.path == "/api/mobile/app-version" and response.status_code == 200 and response.headers.get("Cache-Control"):
+            # Update-Prüfung der App (#1002): ohne Anmeldung und für alle gleich - die Route erlaubt fünf Minuten
+            # öffentlich. Fehler und 429 bleiben no-store.
+            pass
         elif response.headers.get("Cache-Control") == "private, no-store":
             # Persönliche Antworten (Rückblick mit „Du warst dabei“, Freunde beim Event, #1187/#1188) sagen zusätzlich
             # „private“ - strenger als das bloße no-store, deshalb bleibt es stehen.
