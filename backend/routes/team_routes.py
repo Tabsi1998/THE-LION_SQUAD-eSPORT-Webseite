@@ -15,6 +15,7 @@ from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_
 from services.query_filters import safe_regex
 from services import word_filter
 from services.log_safe import log_safe
+from services.private_fields import private_projection
 from services.permissions import MFA_MESSAGE, admin_role_without_second_factor, is_confirmed_admin_role
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
@@ -158,14 +159,14 @@ async def _hydrate_team(team: dict) -> dict:
     db = get_db()
     members = await db.users.find(
         {"id": {"$in": team.get("member_ids", [])}},
-        {"_id": 0, "password_hash": 0, "email": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0},
+        private_projection("email"),
     ).to_list(100)
     member_order = {uid: idx for idx, uid in enumerate(team.get("member_ids", []))}
     members.sort(key=lambda u: member_order.get(u["id"], 999))
     team["members"] = [_public_user(member) for member in members]
     leader = await db.users.find_one(
         {"id": team.get("leader_id")},
-        {"_id": 0, "password_hash": 0, "email": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0},
+        private_projection("email"),
     )
     team["leader"] = _public_user(leader)
     team["squad_count"] = await db.team_squads.count_documents({"team_id": team["id"]})
@@ -906,7 +907,7 @@ async def list_squads(team_id: str, me: dict = Depends(get_current_user)):
     squads = await db.team_squads.find({"team_id": team_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
     member_map = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": list({uid for s in squads for uid in s.get("member_ids", [])})}},
-        {"_id": 0, "password_hash": 0, "email": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0},
+        private_projection("email"),
     ).to_list(500)}
     for squad in squads:
         squad["members"] = [member_map[uid] for uid in squad.get("member_ids", []) if uid in member_map]

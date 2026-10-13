@@ -19,6 +19,7 @@ from fastapi import HTTPException
 
 from models import new_id, now_utc
 from services import dolibarr_helper_shifts, dolibarr_policy
+from services.private_fields import private_projection
 
 TOPIC = "helper_shifts"
 CALL_KIND = "helper_call"
@@ -140,7 +141,7 @@ async def send_reminders(db, *, today: date | None = None) -> dict:
     tomorrow = (day + timedelta(days=1)).isoformat()
     sent = checked = 0
     for uid in await member_recipients(db):
-        user = await db.users.find_one({"id": uid}, {"_id": 0})
+        user = await db.users.find_one({"id": uid}, private_projection())
         if not user or not any(check(user, REMINDER_KIND, TOPIC) for check in (notification_allowed, push_allowed, discord_allowed)):
             continue
         checked += 1

@@ -13,6 +13,7 @@ from auth import require_admin, get_current_user
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import standings_for_structure
+from services.private_fields import private_projection
 from models import now_utc, new_id
 
 season_router = APIRouter(prefix="/api/seasons", tags=["seasons"])
@@ -367,7 +368,7 @@ async def season_standings(slug_or_id: str):
     # Enrich users
     user_ids = list(per_user_points.keys())
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0}).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
     arr = []
     for uid, st in per_user_points.items():
         u = users.get(uid, {})
