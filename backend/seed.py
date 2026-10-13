@@ -2,7 +2,7 @@
 import random
 from datetime import datetime, timezone, timedelta
 from database import get_db
-from auth import hash_password
+from auth import password_fields
 from models import new_id, now_utc
 from runtime_config import resolve_app_environment
 from services.competition_versions import new_competition_version_fields
@@ -24,7 +24,7 @@ async def seed_admin(admin_email: str, admin_password: str) -> bool:
         "id": admin_id,
         "email": admin_email,
         "username": "admin",
-        "password_hash": hash_password(admin_password),
+        **password_fields(admin_password),
         "display_name": "TLS Admin",
         "avatar_url": None, "banner_url": None,
         "role": "superadmin",
@@ -175,7 +175,7 @@ async def seed_demo_data(demo_password: str):
             "id": uid,
             "email": f"{username}@demo.lionsquad.at",
             "username": username,
-            "password_hash": hash_password(demo_password),
+            **password_fields(demo_password),
             "display_name": display,
             "avatar_url": None,
             "role": "player",

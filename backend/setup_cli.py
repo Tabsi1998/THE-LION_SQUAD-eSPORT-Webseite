@@ -176,14 +176,14 @@ async def main():
     print(f"\n{YELLOW}Konfiguration schreiben …{RESET}")
 
     # --- Save admin user ---
-    from auth import hash_password
-    pw_hash = hash_password(admin_pw)
+    from auth import password_fields
+    pw_fields = password_fields(admin_pw)
     from datetime import datetime, timezone
     now_iso = datetime.now(timezone.utc).isoformat()
     if existing_super:
         await db.users.update_one(
             {"email": existing_super["email"]},
-            {"$set": {"password_hash": pw_hash, "email": admin_email.lower(),
+            {"$set": {**pw_fields, "email": admin_email.lower(),
                       "is_banned": False, "updated_at": now_iso}},
         )
         print(f"{GREEN}  ✓ Superadmin aktualisiert{RESET}")
@@ -191,7 +191,7 @@ async def main():
         uid = os.urandom(16).hex()
         await db.users.insert_one({
             "id": uid, "email": admin_email.lower(), "username": "admin",
-            "password_hash": pw_hash, "display_name": "TLS Admin",
+            **pw_fields, "display_name": "TLS Admin",
             "role": "superadmin", "is_active": True, "is_banned": False,
             "privacy_public_profile": False, "accepted_privacy": True,
             "created_at": now_iso, "updated_at": now_iso,

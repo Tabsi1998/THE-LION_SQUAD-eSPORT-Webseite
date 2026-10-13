@@ -8,7 +8,8 @@ Gilt gleich für Registrierung (Web und App), Passwort ändern, Zurücksetzen, E
 - Ein neues Passwort hat mindestens ``MIN_PASSWORD_LENGTH`` Zeichen und höchstens ``MAX_PASSWORD_BYTES`` Byte
   in UTF-8 (die Grenze von bcrypt). Es besteht nicht nur aus Leerzeichen und enthält keine Steuerzeichen.
 - Anmelden und Bestätigen prüfen nur gegen den gespeicherten Hash, nie gegen die Regel für neue Passwörter.
-  Konten von vor diesem Vertrag melden sich weiter an (siehe ``verification_candidates``).
+  Konten von vor diesem Vertrag melden sich weiter an (siehe ``verification_candidates``); neue Hashes tragen die
+  Markierung ``password_contract`` am Konto und werden nur streng geprüft (``auth.password_fields``).
 
 Web und App zeigen dieselben Regeln: ``frontend/src/lib/passwordRules.js`` und der Hinweis in der App.
 """
@@ -59,11 +60,24 @@ def new_password_bytes(value: str) -> bytes:
     return normalize_password(value).encode("utf-8")
 
 
+def contract_bytes(value: str) -> Optional[bytes]:
+    """Die Eingabe in der Form des Vertrags (NFC, ungekürzt) - oder ``None``, wenn sie so nicht hashbar ist.
+
+    Prüft nur die Form, nicht die Regeln für neue Passwörter: ein älteres, kürzeres Passwort lässt sich so neu hashen.
+    """
+    try:
+        encoded = normalize_password(value).encode("utf-8")
+    except UnicodeError:
+        return None
+    return encoded if len(encoded) <= MAX_PASSWORD_BYTES else None
+
+
 def verification_candidates(value: str) -> list[bytes]:
-    """Die Formen, die beim Anmelden gegen einen gespeicherten Hash geprüft werden.
+    """Die Formen, die bei einem Konto ohne Vertragsmarkierung gegen den gespeicherten Hash geprüft werden.
 
     Zuerst die Form des Vertrags. Dazu kommt die Eingabe so, wie sie früher gehasht wurde: unverändert und
     ab Byte 72 abgeschnitten, so wie bcrypt es damals selbst getan hat. So melden sich bestehende Konten weiter an.
+    Konten mit Markierung prüfen nur ``contract_bytes``.
     """
     candidates: list[bytes] = []
     for form in (normalize_password(value), value):

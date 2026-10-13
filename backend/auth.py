@@ -1,4 +1,5 @@
 """JWT auth helpers + password hashing + role deps."""
+import logging
 import os
 import bcrypt
 import jwt
@@ -10,6 +11,8 @@ from fastapi import HTTPException, Request, Depends, Response
 from database import get_db
 from services import password_policy
 from services.private_fields import private_projection
+
+logger = logging.getLogger("tls.auth")
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_MINUTES = 60 * 12  # 12h
@@ -42,16 +45,31 @@ def get_jwt_secret() -> str:
     return os.environ["JWT_SECRET"]
 
 
+# Passwortvertrag (#1033): jeder Hash, der nach dem Vertrag entsteht, trägt diese Markierung am Konto. Mit ihr wird
+# beim Anmelden nur die Form des Vertrags geprüft; ohne sie (Konten von vorher) gilt zusätzlich der frühere Weg.
+PASSWORD_CONTRACT_FIELD = "password_contract"
+PASSWORD_CONTRACT_VERSION = 2
+
+
 def hash_password(password: str) -> str:
-    """Hash eines neuen Passworts nach dem Passwortvertrag (#1033); außerhalb des Vertrags ``ValueError``."""
+    """Hash eines neuen Passworts nach dem Passwortvertrag (#1033); außerhalb des Vertrags ``ValueError``.
+
+    Gespeichert wird er nur über ``password_fields`` - dort kommt die Markierung dazu."""
     return bcrypt.hashpw(password_policy.new_password_bytes(password), bcrypt.gensalt()).decode("utf-8")
 
 
-def verify_password(plain: str, hashed: str) -> bool:
-    """Prüft eine Eingabe gegen den gespeicherten Hash - auch Hashes von vor dem Passwortvertrag (#1033)."""
+def password_fields(password: str) -> dict:
+    """Die Kontofelder für ein neues Passwort: Hash samt Vertragsmarkierung. Jede Stelle, die ein Passwort setzt."""
+    return {"password_hash": hash_password(password), PASSWORD_CONTRACT_FIELD: PASSWORD_CONTRACT_VERSION}
+
+
+def has_password_contract(user: dict) -> bool:
+    return user.get(PASSWORD_CONTRACT_FIELD) == PASSWORD_CONTRACT_VERSION
+
+
+def _matches(candidates: list[bytes], hashed) -> bool:
     try:
         stored = hashed.encode("utf-8")
-        candidates = password_policy.verification_candidates(plain)
     except Exception:
         return False
     for candidate in candidates:
@@ -61,6 +79,47 @@ def verify_password(plain: str, hashed: str) -> bool:
         except Exception:
             return False
     return False
+
+
+def verify_password(plain: str, hashed: str, *, strict: bool = False) -> bool:
+    """Prüft eine Eingabe gegen einen Hash. ``strict``: nur die Form des Vertrags, sonst auch der frühere Weg."""
+    try:
+        if strict:
+            exact = password_policy.contract_bytes(plain)
+            candidates = [exact] if exact is not None else []
+        else:
+            candidates = password_policy.verification_candidates(plain)
+    except Exception:
+        return False
+    return _matches(candidates, hashed)
+
+
+def verify_user_password(user: dict, plain: str) -> bool:
+    """Prüft das Passwort eines Kontos - streng, wenn das Konto die Vertragsmarkierung trägt."""
+    return verify_password(plain, user.get("password_hash") or "", strict=has_password_contract(user))
+
+
+async def verify_and_upgrade_password(db, user: dict, plain: str) -> bool:
+    """Anmeldung: prüft das Passwort und hasht ein Konto ohne Markierung nach dem Vertrag neu, wenn die Eingabe
+    in dessen Form passt (höchstens 72 Byte). So verschwinden Hashes von vor dem Vertrag mit der Zeit."""
+    if not verify_user_password(user, plain):
+        return False
+    if has_password_contract(user):
+        return True
+    exact = password_policy.contract_bytes(plain)
+    if exact is None:
+        return True
+    fresh = bcrypt.hashpw(exact, bcrypt.gensalt()).decode("utf-8")
+    try:
+        # Nur, wenn sich der Hash seit dem Lesen nicht geändert hat - ein gleichzeitig gesetztes Passwort bleibt.
+        await db.users.update_one(
+            {"id": user["id"], "password_hash": user.get("password_hash")},
+            {"$set": {"password_hash": fresh, PASSWORD_CONTRACT_FIELD: PASSWORD_CONTRACT_VERSION}},
+        )
+    except Exception:
+        # Das Neu-Hashen ist eine Aufräumarbeit; die Anmeldung scheitert daran nicht. Beim nächsten Mal wieder.
+        logger.warning("Passwort-Hash konnte nicht nach dem Vertrag erneuert werden", exc_info=True)
+    return True
 
 
 def create_access_token(user_id: str, email: str, role: str, session_id: str, family_id: str | None = None, *, mfa_verified: bool = False) -> str:

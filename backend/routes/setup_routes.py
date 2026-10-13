@@ -8,7 +8,7 @@ from typing import Optional
 from datetime import datetime, timezone
 
 from database import get_db
-from auth import hash_password, require_super, require_any_admin
+from auth import password_fields, require_super, require_any_admin
 from models import now_utc, new_id
 from services.password_policy import NewPassword
 from services.public_site_settings import build_public_legal_settings
@@ -239,9 +239,8 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
     # Admin password change
     if body.new_admin_password:
         # Die Regeln prüft schon das Modell (Passwortvertrag #1033).
-        pw_hash = hash_password(body.new_admin_password)
         await db.users.update_one({"id": me["id"]}, {"$set": {
-            "password_hash": pw_hash, "updated_at": now_iso,
+            **password_fields(body.new_admin_password), "updated_at": now_iso,
         }})
 
     await db.settings.update_one(

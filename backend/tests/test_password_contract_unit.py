@@ -179,3 +179,64 @@ def test_only_the_auth_module_hashes_passwords():
         if "bcrypt.hashpw" in path.read_text(encoding="utf-8"):
             offenders.append(path.relative_to(backend).as_posix())
     assert offenders == []
+
+
+# ---------------------------------------------------------------- Markierung am Konto
+
+def _marked(password: str) -> dict:
+    return {"id": "neu", **auth.password_fields(password)}
+
+
+def _unmarked(raw: str) -> dict:
+    return {"id": "alt", "password_hash": _legacy_hash(raw)}
+
+
+def test_every_new_hash_carries_the_contract_marker():
+    fields = auth.password_fields("a" * 10)
+    assert fields["password_contract"] == auth.PASSWORD_CONTRACT_VERSION == 2
+    assert bcrypt.checkpw(b"a" * 10, fields["password_hash"].encode("utf-8"))
+
+
+def test_marked_accounts_are_checked_strictly():
+    user = _marked("a" * 72)
+    assert auth.verify_user_password(user, "a" * 72)
+    assert not auth.verify_user_password(user, "a" * 72 + "rest")
+    assert not auth.verify_user_password(user, "ä" * 80)
+
+
+def test_marked_accounts_accept_both_unicode_forms():
+    user = _marked(COMPOSED)
+    assert auth.verify_user_password(user, COMPOSED)
+    assert auth.verify_user_password(user, DECOMPOSED)
+
+
+def test_unmarked_accounts_keep_the_previous_check():
+    user = _unmarked("a" * 72)
+    assert auth.verify_user_password(user, "a" * 72)
+    assert auth.verify_user_password(user, "a" * 72 + "rest")
+    assert auth.verify_user_password(_unmarked(DECOMPOSED), DECOMPOSED)
+
+
+@pytest.mark.parametrize("stored", ["!pending_invite", "!disabled", ""])
+def test_marked_placeholders_never_match(stored):
+    assert not auth.verify_user_password({"password_hash": stored, "password_contract": 2}, "a" * 10)
+    assert not auth.verify_user_password({"password_contract": 2}, "a" * 10)
+
+
+def test_marker_is_private_and_not_in_the_data_export():
+    from routes.dsgvo_routes import HIDDEN_KEYS
+    from services.private_fields import PRIVATE_USER_FIELDS
+
+    assert "password_contract" in PRIVATE_USER_FIELDS
+    assert "password_contract" in HIDDEN_KEYS
+
+
+def test_only_password_fields_writes_new_hashes():
+    backend = pathlib.Path(__file__).resolve().parents[1]
+    offenders = []
+    for path in backend.rglob("*.py"):
+        if "tests" in path.parts or path.name == "auth.py":
+            continue
+        if "hash_password(" in path.read_text(encoding="utf-8"):
+            offenders.append(path.relative_to(backend).as_posix())
+    assert offenders == []
