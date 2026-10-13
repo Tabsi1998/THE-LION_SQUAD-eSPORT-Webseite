@@ -37,6 +37,7 @@ from zoneinfo import ZoneInfo
 from fastapi import HTTPException, UploadFile
 
 from models import new_id, now_utc
+from services.private_fields import private_projection
 from storage import GALLERY_SUBMISSION_DIR, PUBLIC_UPLOAD_DIR, ensure_directory
 
 logger = logging.getLogger("tls.event_photos")
@@ -173,7 +174,7 @@ async def notify_album(db, album: dict, event: dict, photos: int, videos: int) -
     internal = visibility in {"members", "internal"}
     recipients = sorted(await event_audience(db, event))
     users = await db.users.find(
-        {"id": {"$in": recipients}, "is_active": {"$ne": False}, "is_banned": {"$ne": True}}, {"_id": 0},
+        {"id": {"$in": recipients}, "is_active": {"$ne": False}, "is_banned": {"$ne": True}}, private_projection(),
     ).to_list(len(recipients) + 1) if recipients else []
     sent = 0
     for user in users:

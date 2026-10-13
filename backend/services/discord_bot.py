@@ -35,6 +35,7 @@ from database import get_db
 from models import now_utc
 from services.dolibarr_policy import CLUB_TZ
 from services.secret_store import decrypt_secret
+from services.private_fields import private_projection
 
 logger = logging.getLogger("tls.discord.bot")
 
@@ -347,7 +348,7 @@ async def count_message(db, user_id: str) -> None:
 async def wanted_roles_by_user(db, user_ids: list[str]) -> dict[str, set[str]]:
     from services.membership_service import is_active_member
     from services.permissions import areas_for
-    users = {u["id"]: u for u in await db.users.find({"id": {"$in": user_ids}, "is_active": {"$ne": False}}, {"_id": 0}).to_list(SYNC_LIMIT)}
+    users = {u["id"]: u for u in await db.users.find({"id": {"$in": user_ids}, "is_active": {"$ne": False}}, private_projection()).to_list(SYNC_LIMIT)}
     memberships = {m["user_id"]: m async for m in db.memberships.find({"user_id": {"$in": user_ids}}, {"_id": 0})}
     out = {}
     for user_id in user_ids:
@@ -704,7 +705,7 @@ class BotRunner:
             from services.permissions import areas_for
             links = await linked_discord_ids(db)
             user_id = links.get(str(interaction.user.id))
-            user = await db.users.find_one({"id": user_id}, {"_id": 0}) if user_id else None
+            user = await db.users.find_one({"id": user_id}, private_projection()) if user_id else None
             areas = await areas_for(user, db) if user else set()
             if not ({"club", "system"} & areas):
                 await interaction.response.send_message("Nur für den Vorstand.", ephemeral=True)

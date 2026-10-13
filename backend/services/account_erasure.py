@@ -1,13 +1,16 @@
 """Was beim Löschen eines Kontos über das Konto selbst hinaus aufgeräumt wird (#928).
 
-Je Sammlung eine Entscheidung - sie steht für Betroffene in der Datenschutzerklärung (``site_texts``, Abschnitt
-„Konto löschen“) und für den Betreiber in ``DATA_PROTECTION.md``:
+Je Sammlung eine Entscheidung - die vollständige Liste führt ``services/personal_data.py`` (ein Test verlangt jede
+Sammlung dort, #1029). Sie steht für Betroffene in der Datenschutzerklärung (``site_texts``, Abschnitt „Konto löschen“)
+und für den Betreiber in ``DATA_PROTECTION.md``:
 
-- **Gelöscht**, weil ohne Konto ohne Zweck: XP und ihre Ereignisse, Einladungen zur Mitgliedschaft, die Tokens der
-  Mitgliedskarte, der persönliche Kalender-Link (#1189), Discord-Aktivität und -Zugehörigkeit, die Warteschlange der Erfolge, Stream-Zustände, Aufgaben im
-  Turnier-Team, der selbst angelegte Eintrag im Mitgliederverzeichnis und die eigenen Bilder.
+- **Gelöscht**, weil ohne Konto ohne Zweck: XP und ihre Ereignisse, Erfolge, Einladungen zur Mitgliedschaft und in
+  Teams, die Tokens der Mitgliedskarte, der persönliche Kalender-Link (#1189), Discord-Aktivität und -Zugehörigkeit,
+  die Warteschlangen der Erfolge, Stream-Zustände, Aufgaben im Turnier- und F1-Team, Lesestände, Sticker, die
+  Verbindung zur Mitgliederakte, der selbst angelegte Eintrag im Mitgliederverzeichnis und die eigenen Bilder.
 - **Überschrieben**, weil die Zeile als Zählung oder Nachweis bleibt: Anmeldungen zu Events und Turnieren,
-  Mitgliedsanträge, Rundenzeiten, Gewinne, die Textauszüge der Moderation, Zugangslinks.
+  Mitgliedsanträge, Rundenzeiten, Gewinne, die Textauszüge der Moderation, Zugangslinks, Kontaktanfragen und
+  gespeicherte Namen (News-Beitrag, Protokoll der Erfolge, Daten im Adminprotokoll).
 - **Gelöst**, nicht gelöscht: Vorstandsposten sowie redaktionelle und aus der Mitgliederverwaltung stammende
   Einträge im Verzeichnis verlieren nur die Verknüpfung zum Konto - sie gehören dem Verein. Ebenso der Einlass bei
   einer Generalversammlung (``meeting_admissions``, #845): die Anwesenheit ist Sache des Vereins; wer als Vorstand
@@ -18,6 +21,7 @@ from __future__ import annotations
 import logging
 import pathlib
 import re
+from datetime import datetime, timezone
 
 from bson import ObjectId
 
@@ -35,7 +39,24 @@ DELETED_TEXT = "[Nachricht gelöscht]"
 PURGED = (
     "user_xp", "xp_events", "membership_invitations", "member_card_tokens", "discord_activity", "discord_guild_active", "discord_memberships",
     "achievement_eval_queue", "live_streams", "twitch_stream_sessions", "tournament_staff_assignments", "calendar_feed_tokens",
+    # Seit #1029: Lesestände, Einladungen in Teams, Erfolge samt Warteschlange, Sticker, Verlauf der Saisonränge, Merker zu
+    # Jahresrückblick, Feedback und Stream-Ankündigungen, F1-Aufgaben und die Verbindung zur Mitgliederakte samt Ehrungen.
+    "chat_reads", "document_opens", "team_invites", "user_achievements", "achievement_outbox", "user_stickers", "season_rank_snapshots",
+    "year_review_notices", "feedback_receipts", "tournament_stream_announcements", "f1_staff_assignments", "dolibarr_identities",
+    "dolibarr_honours",
 )
+# Angaben zur Person, die in den Daten des Adminprotokolls stehen können (#1029). Der Vorgang bleibt, die Angaben nicht.
+AUDIT_PERSONAL_KEYS = ("display_name", "username", "real_name", "first_name", "last_name", "nickname", "email", "phone", "address",
+                       "birth_date")
+# Nachweise, die nach der Löschung bleiben, aber nicht ewig (Entscheidung zu #1029): Einwilligungen, Moderationsfälle
+# (Meldungen von und über die Person, Verwarnungen, Sperren), Ergebnismeldungen und angemeldet geschriebene Kontaktanfragen. Die Löschung setzt ``erase_after`` auf drei
+# Jahre danach; der tägliche Job ``purge_expired_records`` löscht, was abgelaufen ist. Zeilen aktiver Konten tragen das
+# Feld nie und laufen nicht ab. (Sammlung, Feld mit der Konto-ID)
+RETENTION_YEARS = 3
+RETAINED = (("consent_records", "user_id"), ("consent_decisions", "user_id"), ("moderation_strikes", "user_id"),
+            ("moderation_sanctions", "user_id"), ("user_reports", "reporter_id"), ("user_reports", "target_user_id"),
+            ("match_reports_v2", "reporter_user_id"))
+RETAINED_COLLECTIONS = tuple(dict.fromkeys(name for name, _field in RETAINED)) + ("contact_messages",)
 # Ein Antrag in diesen Zuständen läuft noch - ohne Konto ist er zurückgezogen (der Abgleich mit der
 # Mitgliederverwaltung fasst ihn dann nicht mehr an).
 OPEN_APPLICATIONS = ("pending", "submitting", "failed")
@@ -76,7 +97,33 @@ async def _registrations(db, user_id: str, now: str) -> None:
     )
 
 
-async def _records(db, user: dict, now: str) -> None:
+def erase_after(erased_at: str) -> datetime:
+    """Drei Jahre nach der Löschung - am 29. Februar gelöscht heißt: am 28. Februar abgelaufen."""
+    base = datetime.fromisoformat(str(erased_at))
+    base = (base if base.tzinfo else base.replace(tzinfo=timezone.utc)).replace(microsecond=0)
+    try:
+        return base.replace(year=base.year + RETENTION_YEARS)
+    except ValueError:
+        return base.replace(year=base.year + RETENTION_YEARS, day=28)
+
+
+async def _retention(db, user_id: str, until: datetime) -> None:
+    """Frist für die Nachweise dieses Kontos - eine schon gesetzte bleibt (der Nachzug verschiebt sie nicht)."""
+    for name, field in RETAINED:
+        await getattr(db, name).update_many({field: user_id, "erase_after": {"$exists": False}}, {"$set": {"erase_after": until}})
+
+
+async def purge_expired_records(db, now: datetime | None = None) -> int:
+    """Der tägliche Job: Nachweise gelöschter Konten, deren Frist abgelaufen ist, endgültig löschen."""
+    now = now or now_utc()
+    removed = 0
+    for name in RETAINED_COLLECTIONS:
+        removed += (await getattr(db, name).delete_many({"erase_after": {"$lte": now}})).deleted_count
+    return removed
+
+
+async def _records(db, user: dict, now: str, until: datetime) -> int:
+    """Überschreibt Nachweise und Kopien; liefert die Zahl der Kontaktanfragen ohne Konto mit derselben Adresse."""
     user_id = user["id"]
     await db.f1_lap_times.update_many({"user_id": user_id}, {"$set": {"proof_url": None, "admin_note": None}})
     await db.prize_pickups.update_many({"user_id": user_id}, {"$set": {"notes": ""}})
@@ -90,6 +137,23 @@ async def _records(db, user: dict, now: str) -> None:
     email = str(user.get("email") or "").strip().lower()
     bound = [{"user_id": user_id}] + ([{"email": email}] if email else [])
     await db.access_links.update_many({"$or": bound}, {"$set": {"is_active": False, "email": None, "note": None, "updated_at": now}})
+    # Kontaktanfragen (#1029) bleiben als Vorgang des Vereins - ohne Name, Adresse, Betreff und Text. Nur angemeldet
+    # geschriebene: eine Anfrage ohne Konto lässt sich nicht sicher zuordnen, denn ob die Adresse damals schon zu diesem
+    # Konto gehörte, hält niemand fest. Solche bleiben unberührt und werden gezählt (Protokoll der Löschung).
+    await db.contact_messages.update_many({"user_id": user_id}, {"$set": {
+        "name": GONE, "email": None, "user_id": None, "subject": DELETED_TEXT, "message": DELETED_TEXT, "anonymized_at": now,
+        "erase_after": until}})
+    unlinked = await db.contact_messages.count_documents({"user_id": None, "email": email}) if email else 0
+    if email:
+        # Was noch in der Warteschlange steht, geht nicht mehr raus; Versandtes steht überschrieben in email_logs.
+        await db.mail_jobs.delete_many({"to": email})
+    # Gespeicherte Namen: am News-Beitrag, im Protokoll der Erfolge und in den Daten des Adminprotokolls.
+    await db.news_posts.update_many({"author_id": user_id}, {"$set": {"author_name": GONE}})
+    await db.achievement_events.update_many({"user_id": user_id}, {"$set": {"username": None, "user_name": GONE}})
+    await db.achievement_events.update_many({"actor_id": user_id}, {"$set": {"actor_name": GONE}})
+    await db.audit_logs.update_many({"$or": [{"actor_id": user_id}, {"target_id": user_id}], "data": {"$type": "object"}},
+                                    {"$unset": {f"data.{key}": "" for key in AUDIT_PERSONAL_KEYS}})
+    return unlinked
 
 
 # Persönliche Profile (#1039): Steht eine eigene Datei im Profil einer anderen Person, hält das sie nicht fest - sie geht
@@ -246,15 +310,18 @@ async def retry_file_cleanups(db, limit: int = 200) -> int:
     return removed
 
 
-async def erase_related(db, user: dict, now: str) -> dict:
-    """Alles außerhalb des Kontos selbst. ``user`` ist der Stand **vor** dem Überschreiben (E-Mail, Avatar, Banner)."""
+async def erase_related(db, user: dict, now: str, erased_at: str | None = None) -> dict:
+    """Alles außerhalb des Kontos selbst. ``user`` ist der Stand **vor** dem Überschreiben (E-Mail, Avatar, Banner).
+    ``erased_at``: Zeitpunkt der Löschung, ab dem die Frist der Nachweise zählt (beim Nachzug die damalige Löschung)."""
     user_id = user["id"]
+    until = erase_after(erased_at or now)
     purged = 0
     for name in PURGED:
         purged += (await getattr(db, name).delete_many({"user_id": user_id})).deleted_count
     directory_images = await _directory(db, user_id, now)
     await _applications(db, user_id, now)
     await _registrations(db, user_id, now)
-    await _records(db, user, now)
+    unlinked_contacts = await _records(db, user, now, until)
+    await _retention(db, user_id, until)
     images = await _own_images(db, user_id, [user.get("avatar_url"), user.get("banner_url"), *directory_images])
-    return {"purged_rows": purged, "images": images}
+    return {"purged_rows": purged, "images": images, "unlinked_contact_messages": unlinked_contacts}

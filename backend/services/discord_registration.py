@@ -19,6 +19,7 @@ from services import event_days, event_registration, pricing, tournament_event_g
 from services.discord_registration_rules import CUSTOM_ID_PATTERN, custom_id, enabled, event_blocker, tournament_blocker
 from services.discord_texts import LINK_PATH, NOT_LINKED, answer
 from services.event_registration import RegistrationError
+from services.private_fields import private_projection
 from services.visibility import user_can_see
 
 OFF = "Die Anmeldung über Discord ist gerade ausgeschaltet – auf der Website geht es weiter."
@@ -45,7 +46,7 @@ async def linked_user(db, discord_user_id) -> dict | None:
     link = await db.platform_links.find_one({"platform": "discord", "external_id": str(discord_user_id)}, {"_id": 0, "user_id": 1})
     if not link or not link.get("user_id"):
         return None
-    return await db.users.find_one({"id": link["user_id"]}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0})
+    return await db.users.find_one({"id": link["user_id"]}, private_projection())
 
 
 def vienna(value) -> str:
