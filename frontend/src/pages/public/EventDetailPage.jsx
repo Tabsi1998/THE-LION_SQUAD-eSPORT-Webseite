@@ -286,7 +286,9 @@ function EventTabs({ tabs, value, onChange }) {
 // „In den Kalender“ (#1272). Nach dem Ende gibt es keinen Kalender-Knopf mehr (#1221).
 function EventFactsBox({ e, user, over, onRegister }) {
   const own = e.own_registration;
-  const activeOwn = own && !["cancelled", "no_show"].includes(own.status);
+  const recap = over && e.status !== "cancelled";
+  // Nach dem Event (#1187): „Du warst dabei“ führt zum Rückblick; eine Warteliste von damals steht nicht mehr da.
+  const activeOwn = own && !["cancelled", "no_show"].includes(own.status) && !(recap && own.status === "waitlist");
   const phaseState = e.public_phase?.state || e.event_phase?.state || e.status;
   const canRegister = e.has_registration && !e.registration_url && !activeOwn && !over
     && (phaseState === "registration_open" || e.access_link?.grants?.includes("register"));
@@ -304,8 +306,8 @@ function EventFactsBox({ e, user, over, onRegister }) {
         </a>
       ) : null}
       {activeOwn ? (
-        <a href="#dein-event" className="tls-btn tls-btn--secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-sm" data-testid="event-facts-own">
-          <CheckCircle className="w-4 h-4" /> {own.status === "waitlist" ? "Warteliste" : "Du bist dabei"}
+        <a href={recap ? "#rueckblick" : "#dein-event"} className="tls-btn tls-btn--secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-sm" data-testid="event-facts-own">
+          <CheckCircle className="w-4 h-4" /> {own.status === "waitlist" ? "Warteliste" : recap ? "Du warst dabei" : "Du bist dabei"}
         </a>
       ) : null}
       {canRegister && user ? (

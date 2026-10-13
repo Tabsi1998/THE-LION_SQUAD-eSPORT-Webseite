@@ -293,8 +293,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
               </View>
             </View>
           ))}
-          {registered ? (
-            <Muted style={styles.success} testID="event-facts-own">{event.own_registration?.status === "waitlist" ? "Warteliste" : "Du bist dabei"}</Muted>
+          {registered && !(recap && event.own_registration?.status === "waitlist") ? (
+            <Muted style={styles.success} testID="event-facts-own">{event.own_registration?.status === "waitlist" ? "Warteliste" : recap ? "Du warst dabei" : "Du bist dabei"}</Muted>
           ) : event.has_registration && !event.registration_url && registration.canRegister && !over ? (
             <Button label={guest ? "Anmelden oder registrieren" : "Anmelden"} onPress={() => (guest ? openSignIn() : scrollRef.current?.scrollTo({ y: Math.max(0, yoursY - 12), animated: true }))} testID="event-facts-register" />
           ) : null}

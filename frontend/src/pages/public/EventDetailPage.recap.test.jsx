@@ -60,6 +60,7 @@ test("am letzten Tag (23:30 in Wien) noch kein Rückblick - Anmeldung und „Was
   renderAt("2026-10-10T21:30:00Z");
   expect(await screen.findByTestId("event-yours")).toBeInTheDocument();
   expect(screen.getByTestId("event-whatson")).toBeInTheDocument();
+  expect(screen.getByTestId("event-facts-own")).toHaveTextContent("Du bist dabei");
   expect(screen.queryByTestId("event-recap")).toBeNull();
   expect(apiMock.get).not.toHaveBeenCalledWith("/events/sommer-lan/recap", expect.anything());
   expect(await screen.findByTestId("event-friends")).toHaveTextContent("Von deinen Freunden dabei");
@@ -73,6 +74,8 @@ test("am Tag danach: Rückblick oben mit „Du warst dabei“, ohne Anmeldung un
   expect(screen.queryByTestId("event-yours")).toBeNull();
   expect(screen.queryByTestId("event-whatson")).toBeNull();
   expect(screen.queryByTestId("event-over")).toBeNull();
+  expect(screen.getByTestId("event-facts-own")).toHaveTextContent("Du warst dabei");
+  expect(screen.getByTestId("event-facts-own")).toHaveAttribute("href", "#rueckblick");
   expect(await screen.findByTestId("event-friends")).toHaveTextContent("Deine Freunde waren dabei");
   const order = [...document.querySelectorAll("[data-section]")].map((node) => node.getAttribute("data-section"));
   expect(order.slice(0, 2)).toEqual(["recap", "friends"]);

@@ -52,6 +52,7 @@ test("am letzten Tag (23:30 in Wien): kein Rückblick, Anmeldung und „Was läu
   await render(<EventDetailScreen navigation={navigation} route={route} />);
   expect(await screen.findByTestId("event-whatson")).toBeTruthy();
   expect(screen.getByTestId("event-own-seats")).toBeTruthy();
+  expect(screen.getByTestId("event-facts-own")).toHaveTextContent("Du bist dabei");
   expect(screen.queryByTestId("event-recap")).toBeNull();
   expect(mockGet).not.toHaveBeenCalledWith("/events/sommer-lan/recap");
   expect(await screen.findByTestId("event-friends")).toHaveTextContent(/Von deinen Freunden dabei/);
@@ -66,4 +67,5 @@ test("am Tag danach: Rückblick mit „Du warst dabei“, ohne Anmeldung und „
   expect(screen.queryByTestId("event-whatson")).toBeNull();
   expect(screen.queryByTestId("event-own-seats")).toBeNull();
   expect(screen.queryByTestId("event-register-submit")).toBeNull();
+  expect(screen.getByTestId("event-facts-own")).toHaveTextContent("Du warst dabei");
 });

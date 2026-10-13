@@ -63,7 +63,7 @@ export function EventRecap({ event, accessToken = "", fallback = null }) {
   const mine = recap.mine?.was_there ? recap.mine : null;
 
   return (
-    <section className="space-y-6" data-section="recap" data-testid="event-recap">
+    <section id="rueckblick" className="space-y-6 scroll-mt-24" data-section="recap" data-testid="event-recap">
       <h2 className="font-heading text-2xl font-black uppercase inline-flex items-center gap-2">
         <Award className="w-5 h-5 text-[#FFD700]" aria-hidden="true" /> Rückblick
       </h2>
