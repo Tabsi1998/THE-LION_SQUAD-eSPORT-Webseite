@@ -40,14 +40,16 @@ alle Sammlungen im Code und verlangt jede dort – eine neue Sammlung ohne Entsc
 | Gewinne | der Nachweis der Übergabe bleibt, die Notiz ist gelöscht |
 | Eigene Chatnachrichten, gehaltene Texte der Moderation | als „gelöscht“ markiert; die Entscheidung der Moderation bleibt |
 | Meldungen, Verwarnungen und Sperren | bleiben als Nachweis der Moderation; die Kennung zeigt auf „Gelöschter User“ |
-| Kontaktanfragen (auch ohne Anmeldung mit derselben E-Mail-Adresse geschrieben) | bleiben als Vorgang – Name, E-Mail-Adresse und Text überschrieben |
+| Kontaktanfragen, die angemeldet geschrieben wurden | bleiben als Vorgang – Name, E-Mail-Adresse, Betreff und Text überschrieben |
+| Kontaktanfragen ohne Anmeldung mit derselben E-Mail-Adresse | bleiben unberührt: ob die Adresse damals zu diesem Konto gehörte, hält niemand fest. Ihre Zahl steht im Protokoll der Löschung (`unlinked_contact_messages`); der Vorstand prüft sie bei einem Löschwunsch per Hand |
 | Mails, die noch in der Warteschlange stehen | gelöscht; im Versandprotokoll ist der Empfänger überschrieben |
 | Gespeicherte Namen: Autorin oder Autor eines News-Beitrags, Protokoll der Erfolge, Angaben zur Person in den Daten des Adminprotokolls | überschrieben bzw. entfernt; Beitrag und Vorgang bleiben |
 | Einwilligungen (Website und Mitgliederverwaltung) | bleiben als Nachweis |
 | Rechnungen | Belege bleiben sieben Jahre in der Buchhaltung; der Auftrag auf der Website behält Betrag und Belegnummer |
 
 Konten, die vor einer Erweiterung gelöscht wurden, zieht eine Migration auf demselben Weg nach (Migration 4 für #928,
-Migration 5 für #1029).
+Migration 5 für #1029). Sie nimmt nur Konten im vollständigen Löschzustand: Zeitpunkt der Löschung, abgeschaltet,
+„Gelöschter User“ und Ersatzadresse `deleted_…@deleted.invalid`.
 
 ### Was bleibt und wie lange
 
@@ -70,14 +72,19 @@ laufen nach 30 Tagen ab.
 ## Auskunft: was die Datei enthält
 
 `GET /api/dsgvo/export-my-data` (Website: Datenschutz → Meine Daten → Export) liefert eine JSON-Datei, Fassung 5. Je
-Sammlung aus `personal_data.py` steht ein Schlüssel drin; der Test vergleicht beide Listen. Bewusst nicht enthalten:
+Sammlung aus `personal_data.py` steht ein Schlüssel drin; der Test vergleicht beide Listen. Jede Liste ist vollständig:
+Der Server liest seitenweise in der Reihenfolge des Anlegens und schreibt die Datei fortlaufend, ohne Obergrenze und
+ohne alles auf einmal im Speicher. Bewusst nicht enthalten:
 
 - Prüfwerte und Schlüssel: Passwort- und Token-Hashes, MFA-Geheimnisse, Push-Token, Schlüssel der Passkeys,
-  Speicherorte von Dateien, Beitrittscodes von Teams, der Schlüssel der Mitgliederakte.
+  Dateinamen, Adressen und Ablageorte hochgeladener Dateien (Uploads, Anhänge, Ergebnisfotos, Upload-Protokoll: nur
+  Art, Größe, Datum und Prüfstand), Beitrittscodes von Teams, der Schlüssel der Mitgliederakte.
 - Daten Dritter: wer die Person blockiert oder gemeldet hat und was dabei geschrieben wurde (Meldungen über die Person
   nur mit Art und Stand), Namen von Moderatorinnen, Vorstand und Verwaltung, und bei Einträgen im Adminprotokoll, in
-  denen die Person selbst gehandelt hat, nur der Vorgang ohne Inhalt. Direktnachrichten enthalten beide Seiten des
-  Gesprächs, Chats in Team, Match und Turnier nur die eigenen Nachrichten.
+  denen die Person selbst gehandelt hat, nur der Vorgang ohne Inhalt. Nachrichten: eigene mit Inhalt; empfangene
+  Direktnachrichten nur als Vorgang (wann, in welchem Gespräch, gelesen), ohne den Text der anderen Person; Chats in
+  Team, Match und Turnier nur die eigenen Nachrichten. Terminvorschläge ohne Antwort und Kennung der anderen Seite.
+  Kontaktanfragen nur, wenn sie angemeldet geschrieben wurden.
 - Reine Technik: Anmelde-Zwischenschritte und interne Warteschlangen.
 
 ## Betreiberpflichten

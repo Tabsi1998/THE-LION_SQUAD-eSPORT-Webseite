@@ -49,7 +49,11 @@ async def migrate_deleted_account_leftovers(db) -> str:
 
     now = datetime.now(timezone.utc).isoformat()
     accounts = images = 0
-    async for user in db.users.find({"anonymized_at": {"$exists": True, "$ne": None}}, {"_id": 0, "id": 1}):
+    # Nur, was wirklich gelöscht ist: Zeitpunkt, abgeschaltet, überschriebener Name und Ersatzadresse - ein lebendes
+    # Konto, bei dem zufällig ``anonymized_at`` steht, bleibt unberührt (#1029).
+    deleted = {"anonymized_at": {"$exists": True, "$ne": None}, "is_active": False, "display_name": "Gelöschter User",
+               "email": {"$regex": r"^deleted_[^@]*@deleted\.(invalid|local)$"}}
+    async for user in db.users.find(deleted, {"_id": 0, "id": 1}):
         result = await account_erasure.erase_related(db, user, now)
         accounts += 1
         images += result["images"]

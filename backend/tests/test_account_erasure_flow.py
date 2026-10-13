@@ -11,6 +11,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
+from routes import dsgvo_routes  # noqa: E402
 from services import account_erasure, migrations, personal_data  # noqa: E402
 
 UPLOADS = "/api/static/uploads/"
@@ -102,7 +103,8 @@ async def fill_contract(flow, user: dict) -> None:
     db, uid = flow.db, user["id"]
     await db.contact_messages.insert_one({"id": "kontakt-konto", "user_id": uid, "name": "Paula P.", "email": user["email"], "subject": "Frage",
                                           "message": "Ich heiße Paula und habe eine Frage", "status": "new"})
-    await db.contact_messages.insert_one({"id": "kontakt-mail", "user_id": None, "name": "Paula P.", "email": user["email"], "subject": "Noch eine",
+    # Ohne Anmeldung mit derselben Adresse: ob die Adresse damals Paula gehörte, hält niemand fest - nicht sicher zuzuordnen.
+    await db.contact_messages.insert_one({"id": "kontakt-mail", "user_id": None, "name": "Pia Q.", "email": user["email"], "subject": "Noch eine",
                                           "message": "ohne Anmeldung geschrieben", "status": "answered"})
     await db.contact_messages.insert_one({"id": "kontakt-fremd", "user_id": None, "name": "Gast", "email": "gast@example.test", "subject": "Hallo",
                                           "message": "bleibt", "status": "new"})
@@ -131,6 +133,15 @@ async def fill_contract(flow, user: dict) -> None:
     await db.moderation_sanctions.insert_one({"id": "sanktion-1", "user_id": uid, "action": "chat_block", "status": "active", "reason": "Beleidigung"})
     await db.team_chat_messages.insert_one({"id": "teamchat-1", "team_id": "team-1", "user_id": uid, "message": "bin dabei"})
     await db.team_chat_messages.insert_one({"id": "teamchat-2", "team_id": "team-1", "user_id": "anderer", "message": "Otto schreibt"})
+    # Direktnachrichten: die eigene mit Inhalt, die empfangene nur als Vorgang. Terminvorschlag ohne die Antwort der anderen Seite.
+    await db.direct_messages.insert_one({"id": "dm-eigen", "sender_id": uid, "recipient_id": "anderer", "message": "hallo du",
+                                         "created_at": "2026-05-07T10:00:00+00:00"})
+    await db.direct_messages.insert_one({"id": "dm-empfangen", "sender_id": "anderer", "recipient_id": uid, "message": "Otto privat",
+                                         "created_at": "2026-05-07T10:01:00+00:00", "read_at": "2026-05-07T11:00:00+00:00"})
+    await db.match_schedule_proposals.insert_one({"id": "termin-1", "match_id": "m-1", "actor_user_id": uid, "note": "abends passt",
+                                                  "status": "declined", "decision_user_id": "gegnerin", "decision_note": "Otto kann nicht"})
+    await db.upload_events.insert_one({"id": "upload-1", "owner_id": uid, "filename": "GEHEIM-urlaub.jpg", "kind": "image", "size": 1200,
+                                       "status": "success", "ip": "203.0.113.7", "detail": "GEHEIM-detail", "result": {"url": "/GEHEIM"}})
     # Interne Werte: Prüfwerte, Schlüssel, Speicherorte und Codes gehören nicht in die Auskunft.
     await db.teams.update_one({"id": "team-1"}, {"$set": {"join_code": "JOIN-GEHEIM"}})
     await db.auth_sessions.insert_one({"id": "sitzung-1", "user_id": uid, "family_id": "GEHEIM-FAMILIE", "current_jti": "GEHEIM-JTI", "ip": "203.0.113.7",
@@ -175,7 +186,16 @@ async def test_the_export_names_everything_and_deleting_leaves_no_personal_copy(
     assert audit["audit-ueber"]["data"] == {"first_name": "Paula", "last_name": "Probe", "notes": "zahlt bar"}
     assert "data" not in audit["audit-andere"] and "target_id" not in audit["audit-andere"]
     assert [row["message"] for row in export["chat_messages"]] == ["bin dabei"]
-    assert {row["id"] for row in export["contact_messages"]} == {"kontakt-konto", "kontakt-mail"}
+    assert {row["id"] for row in export["contact_messages"]} == {"kontakt-konto"}, "nur angemeldet geschriebene"
+    messages = {row["id"]: row for row in export["direct_messages"]}
+    assert messages["dm-eigen"]["message"] == "hallo du" and messages["dm-eigen"]["conversation"] == "anderer"
+    assert messages["dm-empfangen"] == {"id": "dm-empfangen", "created_at": "2026-05-07T10:01:00+00:00", "read_at": "2026-05-07T11:00:00+00:00",
+                                        "conversation": "anderer", "received": True}
+    assert export["schedule_proposals"][0]["note"] == "abends passt" and "gegnerin" not in str(export["schedule_proposals"])
+    # Dateien ohne Namen, Adresse oder Ablageort.
+    for row in export["uploads"] + export["upload_events"]:
+        assert not {"filename", "url", "original_filename", "detail", "result"} & set(row), row
+    assert export["upload_events"][0]["size"] == 1200 and export["upload_events"][0]["ip"] == "203.0.113.7"
     assert [row["tier_code"] for row in export["achievement_log"]] == ["helfer-1"]
     assert [row["id"] for row in export["moderation_strikes"]] == ["strike-1"] and len(export["moderation_sanctions"]) == 1
     # Einlass: die eigene Anwesenheit ohne den Namen der einlassenden Person; der selbst getätigte Einlass ohne den der anderen.
@@ -242,10 +262,15 @@ async def test_the_export_names_everything_and_deleting_leaves_no_personal_copy(
     assert (public / "teamlogo.webp").exists() and (public / "news.webp").exists()
     assert {row["filename"] async for row in db.media_uploads.find({"owner_id": uid}, {"_id": 0, "filename": 1})} == {"teamlogo.webp", "news.webp"}
 
-    # #1029: Kontaktanfragen bleiben als Vorgang, ohne Name, Adresse und Text; Mails in der Warteschlange gehen nicht mehr raus.
-    for contact_id in ("kontakt-konto", "kontakt-mail"):
-        contact = await db.contact_messages.find_one({"id": contact_id})
-        assert (contact["name"], contact["email"], contact["user_id"], contact["message"]) == ("Gelöschter User", None, None, "[Nachricht gelöscht]")
+    # #1029: Kontaktanfragen bleiben als Vorgang, ohne Name, Adresse, Betreff und Text; Mails in der Warteschlange gehen nicht mehr raus.
+    contact = await db.contact_messages.find_one({"id": "kontakt-konto"})
+    assert (contact["name"], contact["email"], contact["user_id"], contact["subject"], contact["message"]) == (
+        "Gelöschter User", None, None, "[Nachricht gelöscht]", "[Nachricht gelöscht]")
+    # Ohne Konto mit derselben Adresse: unberührt, aber im Protokoll der Löschung gezählt.
+    unlinked = await db.contact_messages.find_one({"id": "kontakt-mail"})
+    assert (unlinked["name"], unlinked["email"], unlinked["message"]) == ("Pia Q.", paula["email"], "ohne Anmeldung geschrieben")
+    deletion = await db.audit_logs.find_one({"action": "user.self_anonymize", "target_id": uid})
+    assert deletion["data"] == {"personal_data_removed": True, "unlinked_contact_messages": 1}
     assert (await db.contact_messages.find_one({"id": "kontakt-fremd"}))["email"] == "gast@example.test"
     assert {row["id"] async for row in db.mail_jobs.find({}, {"_id": 0, "id": 1})} == {"mail-gast"}
     # Gespeicherte Namen: im News-Beitrag, im Protokoll der Erfolge und in den Daten des Adminprotokolls.
@@ -260,10 +285,11 @@ async def test_the_export_names_everything_and_deleting_leaves_no_personal_copy(
     for name in ("chat_reads", "document_opens", "team_invites", "user_achievements", "user_stickers", "season_rank_snapshots", "dolibarr_honours"):
         assert await getattr(db, name).count_documents({"user_id": uid}) == 0, name
 
-    # Und im ganzen Bestand steht die alte E-Mail-Adresse nirgends mehr.
+    # Und im ganzen Bestand steht die alte E-Mail-Adresse nirgends mehr - außer in der Anfrage, die keinem Konto sicher gehört.
     for name in await db.list_collection_names():
         async for row in getattr(db, name).find({}, {"_id": 0}):
-            assert paula["email"] not in str(row), f"{name} trägt noch die E-Mail-Adresse"
+            if (name, row.get("id")) != ("contact_messages", "kontakt-mail"):
+                assert paula["email"] not in str(row), f"{name} trägt noch die E-Mail-Adresse"
 
 
 @pytest.mark.asyncio
@@ -291,7 +317,10 @@ async def test_accounts_deleted_before_this_fix_are_cleaned_once(flow, folders):
     # So sah ein gelöschtes Konto vor dem Fix aus: überschrieben, aber mit allem drumherum.
     await flow.db.users.update_one({"id": paula["id"]}, {"$set": {
         "email": "deleted_x@deleted.invalid", "display_name": "Gelöschter User", "avatar_url": None, "anonymized_at": "2026-09-30T10:00:00+00:00",
+        "is_active": False,
     }})
+    # Ein lebendes Konto, bei dem zufällig ``anonymized_at`` steht: die Migration fasst es nicht an (#1029).
+    await flow.db.users.update_one({"id": bleibt["id"]}, {"$set": {"anonymized_at": "2026-09-30T10:00:00+00:00"}})
 
     result = await migrations.migrate_deleted_account_leftovers(flow.db)
     assert result == "1 deleted accounts cleaned, 3 images removed"
@@ -303,3 +332,20 @@ async def test_accounts_deleted_before_this_fix_are_cleaned_once(flow, folders):
     assert (await flow.db.user_xp.find_one({"user_id": bleibt["id"]}))["total"] == 7
     assert (await flow.db.event_registrations.find_one({"id": "ev-bleibt"}))["display_name"] == "bleibt"
     assert [row[0] for row in migrations.MIGRATIONS] == [1, 2, 3, 4, 5]
+
+
+@pytest.mark.asyncio
+async def test_the_export_has_no_upper_limit_and_streams(flow, monkeypatch):
+    """#1030: Früher schnitt jede Liste still bei 5.000 Einträgen ab. Jetzt wird seitenweise gelesen und geschrieben -
+    die Seite ist hier klein, damit mehrere Seiten durchlaufen werden."""
+    monkeypatch.setattr(dsgvo_routes, "EXPORT_PAGE", 997)
+    paula = await flow.add_user(role="player", name="paula")
+    await flow.db.notifications.insert_many([{"id": f"n-{index:05d}", "user_id": paula["id"], "title": "Hinweis"} for index in range(5001)])
+    await flow.db.team_chat_messages.insert_many([{"id": f"c-{index}", "team_id": "t", "user_id": paula["id"], "message": str(index)}
+                                                  for index in range(5)])
+    flow.act_as(paula)
+    response = await flow.get("/api/dsgvo/export-my-data")
+    assert response.status_code == 200 and response.headers["content-type"].startswith("application/json")
+    export = response.json()
+    assert [row["id"] for row in export["notifications"]] == [f"n-{index:05d}" for index in range(5001)], "vollständig und in Reihenfolge"
+    assert [row["message"] for row in export["chat_messages"]] == ["0", "1", "2", "3", "4"]

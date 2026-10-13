@@ -7,6 +7,12 @@ class FakeCursor:
     def __init__(self, rows):
         self.rows = list(rows)
 
+    def sort(self, *_args):
+        return self
+
+    def limit(self, _count):
+        return self
+
     async def to_list(self, limit):
         return self.rows[:limit]
 
@@ -87,9 +93,7 @@ class FakeDb:
 
 
 def test_dsgvo_export_includes_canonical_stage_match_references(monkeypatch):
-    monkeypatch.setattr(dsgvo_routes, "get_db", FakeDb)
-
-    payload = asyncio.run(dsgvo_routes.export_my_data({"id": "u1"}))
+    payload = asyncio.run(dsgvo_routes._user_data_export(FakeDb(), "u1"))
 
     assert payload["user"]["id"] == "u1"
     assert [registration["id"] for registration in payload["tournament_registrations"]] == ["r1"]

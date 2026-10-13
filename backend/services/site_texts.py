@@ -353,8 +353,8 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                   "ein selbst angelegter Eintrag im Mitgliederverzeichnis, die Angaben in Mitgliedsanträgen und Anmeldedaten; eigene "
                   "Chatnachrichten werden als „gelöscht“ markiert. Erhalten bleiben "
                   "Turnier-Ergebnisse, Rundenzeiten und Anmeldungen ohne Namen "
-                  "(sportliche Integrität und Zählung), Meldungen und Entscheidungen der Moderation, Kontaktanfragen als Vorgang ohne Name, "
-                  "Adresse und Text, der Nachweis über einen übergebenen Gewinn und – wenn du Rechnungen hattest – die Belege "
+                  "(sportliche Integrität und Zählung), Meldungen und Entscheidungen der Moderation, Kontaktanfragen, die du angemeldet "
+                  "geschickt hast, als Vorgang ohne Name, Adresse, Betreff und Text, der Nachweis über einen übergebenen Gewinn und – wenn du Rechnungen hattest – die Belege "
                   "in der Vereinsbuchhaltung, weil das Steuerrecht sieben "
                   "Jahre Aufbewahrung verlangt; der Auftrag auf der Website behält dann nur Betrag und Belegnummer. Die Löschung wirkt sofort und "
                   "lässt sich nicht rückgängig machen."),

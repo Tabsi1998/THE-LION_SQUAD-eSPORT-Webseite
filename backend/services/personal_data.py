@@ -75,7 +75,8 @@ PERSONAL: dict[str, Entry] = {
     "moderation_items": Entry(OVERWRITTEN, ("moderation_items",)),
     "moderation_strikes": Entry(KEPT, ("moderation_strikes",), MODERATION),
     "moderation_sanctions": Entry(KEPT, ("moderation_sanctions",), MODERATION),
-    "contact_messages": Entry(OVERWRITTEN, ("contact_messages",)),
+    "contact_messages": Entry(OVERWRITTEN, ("contact_messages",),
+                              "nur angemeldet geschriebene; ohne Konto mit derselben Adresse nicht sicher zuzuordnen - gezählt"),
     "email_logs": Entry(OVERWRITTEN, ("email_logs",)),
     "mail_jobs": Entry(DELETED, note="Warteschlange des Versands; was versandt wurde, steht unter email_logs"),
     # Erfolge, XP, Mitmachaktionen

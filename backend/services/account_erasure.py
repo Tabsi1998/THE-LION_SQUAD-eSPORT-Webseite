@@ -87,7 +87,8 @@ async def _registrations(db, user_id: str, now: str) -> None:
     )
 
 
-async def _records(db, user: dict, now: str) -> None:
+async def _records(db, user: dict, now: str) -> int:
+    """Überschreibt Nachweise und Kopien; liefert die Zahl der Kontaktanfragen ohne Konto mit derselben Adresse."""
     user_id = user["id"]
     await db.f1_lap_times.update_many({"user_id": user_id}, {"$set": {"proof_url": None, "admin_note": None}})
     await db.prize_pickups.update_many({"user_id": user_id}, {"$set": {"notes": ""}})
@@ -101,9 +102,12 @@ async def _records(db, user: dict, now: str) -> None:
     email = str(user.get("email") or "").strip().lower()
     bound = [{"user_id": user_id}] + ([{"email": email}] if email else [])
     await db.access_links.update_many({"$or": bound}, {"$set": {"is_active": False, "email": None, "note": None, "updated_at": now}})
-    # Kontaktanfragen (#1029) bleiben als Vorgang des Vereins - ohne Name, Adresse und Text, auch ohne Anmeldung geschriebene.
-    await db.contact_messages.update_many({"$or": bound}, {"$set": {
-        "name": GONE, "email": None, "user_id": None, "message": DELETED_TEXT, "anonymized_at": now}})
+    # Kontaktanfragen (#1029) bleiben als Vorgang des Vereins - ohne Name, Adresse, Betreff und Text. Nur angemeldet
+    # geschriebene: eine Anfrage ohne Konto lässt sich nicht sicher zuordnen, denn ob die Adresse damals schon zu diesem
+    # Konto gehörte, hält niemand fest. Solche bleiben unberührt und werden gezählt (Protokoll der Löschung).
+    await db.contact_messages.update_many({"user_id": user_id}, {"$set": {
+        "name": GONE, "email": None, "user_id": None, "subject": DELETED_TEXT, "message": DELETED_TEXT, "anonymized_at": now}})
+    unlinked = await db.contact_messages.count_documents({"user_id": None, "email": email}) if email else 0
     if email:
         # Was noch in der Warteschlange steht, geht nicht mehr raus; Versandtes steht überschrieben in email_logs.
         await db.mail_jobs.delete_many({"to": email})
@@ -113,6 +117,7 @@ async def _records(db, user: dict, now: str) -> None:
     await db.achievement_events.update_many({"actor_id": user_id}, {"$set": {"actor_name": GONE}})
     await db.audit_logs.update_many({"$or": [{"actor_id": user_id}, {"target_id": user_id}], "data": {"$type": "object"}},
                                     {"$unset": {f"data.{key}": "" for key in AUDIT_PERSONAL_KEYS}})
+    return unlinked
 
 
 # Persönliche Profile (#1039): Steht eine eigene Datei im Profil einer anderen Person, hält das sie nicht fest - sie geht
@@ -278,6 +283,6 @@ async def erase_related(db, user: dict, now: str) -> dict:
     directory_images = await _directory(db, user_id, now)
     await _applications(db, user_id, now)
     await _registrations(db, user_id, now)
-    await _records(db, user, now)
+    unlinked_contacts = await _records(db, user, now)
     images = await _own_images(db, user_id, [user.get("avatar_url"), user.get("banner_url"), *directory_images])
-    return {"purged_rows": purged, "images": images}
+    return {"purged_rows": purged, "images": images, "unlinked_contact_messages": unlinked_contacts}
