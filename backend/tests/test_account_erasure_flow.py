@@ -100,7 +100,8 @@ async def fill(flow, user: dict, public: pathlib.Path, quarantine: pathlib.Path)
     await db.moderation_items.insert_one({"id": "mod", "kind": "team_chat", "user_id": uid, "excerpt": "ein gehaltener Satz", "state": "pending"})
     await db.access_links.insert_one({"id": "link-konto", "user_id": uid, "email": None, "note": "für Paula", "is_active": True})
     await db.access_links.insert_one({"id": "link-mail", "user_id": None, "email": user["email"], "note": None, "is_active": True})
-    await db.access_links.insert_one({"id": "link-fremd", "user_id": "anderer", "email": "gast@example.test", "is_active": True})
+    await db.access_links.insert_one({"id": "link-fremd", "user_id": "anderer", "email": "gast@example.test", "is_active": True,
+                                      "use_count": 2, "used_by": [uid, "anderer"], "last_used_by": uid})
     # Einlass bei der Generalversammlung (#845): Paula wurde eingelassen - und hat als Vorstand selbst jemanden eingelassen.
     await db.meeting_admissions.insert_one({"meeting_id": 7, "member_id": 11, "round": 0, "name": "Paula P.", "user_id": uid, "state": "present", "voting": True,
                                             "reason": "own", "arrived": "18:55", "by": "vorstand", "by_name": "Vera V.", "updated_at": "2026-03-14T17:55:00+00:00"})
@@ -272,7 +273,10 @@ async def test_the_export_names_everything_and_deleting_leaves_no_personal_copy(
     for link_id in ("link-konto", "link-mail"):
         link = await db.access_links.find_one({"id": link_id})
         assert link["is_active"] is False and link["email"] is None and link["note"] is None
-    assert (await db.access_links.find_one({"id": "link-fremd"}))["is_active"] is True
+    fremd = await db.access_links.find_one({"id": "link-fremd"})
+    assert fremd["is_active"] is True
+    # Genutzt hat Paula den fremden Link (#1036): sie steht nicht mehr daran, die Nutzung bleibt gezählt.
+    assert fremd["used_by"] == ["anderer"] and fremd["last_used_by"] is None and fremd["use_count"] == 2
 
     # Bilder: Avatar samt kleiner Fassung, das alte Profilbild und die Kopie in der Quarantäne sind weg.
     assert not (public / "avatar.webp").exists() and not (public / "variants" / "avatar-400.webp").exists()

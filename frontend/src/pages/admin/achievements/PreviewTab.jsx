@@ -9,20 +9,33 @@ import { CeremonyHost } from "@/components/achievements/ceremony/CeremonyHost";
 import { createCeremonyQueue } from "@/components/achievements/ceremony/queue";
 import { readSoundPrefs } from "@/components/achievements/ceremony/sounds";
 import { MOTIONS, SEQUENCE_KEYS, SEQUENCES } from "@/components/achievements/ceremony/select";
+import { MAX_LEVEL, rankInfo } from "@/lib/loewenRang";
 
 const previewQueue = createCeremonyQueue();
 const CATEGORY_LABELS = { match: "Spielen", tournament: "Turnier", fastlap: "Fast Lap", season: "Saison", team: "Team", community: "Community", creator: "Streaming & Creator", profile: "Profil & Konto", club: "Verein", special: "Besonders", hidden: "Geheim" };
 const SIZES = ["sm", "md", "lg", "xl", "hero"];
 const ALL = "all";
 
+// Ziel-Level der Level-Vorschau (#1456): jedes Level, das einen Rang beginnt, zeigt den Rangwechsel, die übrigen das
+// Level im Rang; „prestige“ zeigt das Prestige (60 → 1 mit Stern).
+export const PREVIEW_LEVELS = [...Array.from({ length: MAX_LEVEL - 1 }, (_, i) => i + 2), "prestige"];
+
+/** Ein Level-Aufstieg für die Vorschau: von `level - 1` auf `level`, mit Titel-Banner beim Rangwechsel. */
+export function sampleLevelUp(level) {
+  if (level === "prestige" || !Number(level)) return { level: 1, previous: 60, title: rankInfo(1).name, titleChanged: true, prestige: 1, prestigeGained: true };
+  const to = rankInfo(level);
+  const from = rankInfo(Number(level) - 1);
+  return { level: to.level, previous: from.level, title: to.name, titleChanged: to.rank !== from.rank, prestige: 0, prestigeGained: false };
+}
+
 // Ein Beispielpaket für die Zeremonie-Vorschau: Material, Kategorie und Ablauf frei kombinierbar.
-export function sampleCeremony({ material, category, sequence, art }) {
+export function sampleCeremony({ material, category, sequence, art, level = 10 }) {
   const rank = MATERIAL_LOOKS[material]?.rank || 5;
   const make = (i, m = material) => ({
     code: `preview_${m}_${i}`, name: `Beispiel ${["I", "II", "III"][i]}`, description: `So sieht ${MATERIAL_LOOKS[m].name} in „${CATEGORY_LABELS[category] || category}“ aus.`,
     material: m, material_name: MATERIAL_LOOKS[m].name, rank: MATERIAL_LOOKS[m].rank, category, icon: "trophy", art, group_name: CATEGORY_LABELS[category] || category, points: 10 * (MATERIAL_LOOKS[m].rank || rank), award_id: "vorschau", hidden: category === "hidden",
   });
-  if (sequence === "levelup") return { tiers: [], levelUp: { level: 10, previous: 9, title: "Rudel", titleChanged: true, prestige: 1, prestigeGained: true } };
+  if (sequence === "levelup") return { tiers: [], levelUp: sampleLevelUp(level) };
   if (sequence === "stack") return { tiers: [make(0), make(1, "silver"), make(2, "wood")] };
   if (sequence === "diamond") return { tiers: [make(0, "diamond")] };
   if (sequence === "legendary") return { tiers: [make(0, "legendary")] };
@@ -58,11 +71,12 @@ export function PreviewTab() {
   const [ceremonyMaterial, setCeremonyMaterial] = useState("gold");
   const [ceremonyCategory, setCeremonyCategory] = useState("match");
   const [ceremonySequence, setCeremonySequence] = useState("single");
+  const [ceremonyLevel, setCeremonyLevel] = useState("10");
   const [sound, setSound] = useState(() => !readSoundPrefs(user).muted);
   const [reduced, setReduced] = useState(() => systemReduced || user?.ceremony_mode === "subtle");
   const playCeremony = () => {
     previewQueue.clear();
-    previewQueue.enqueue({ id: `preview-${Date.now()}`, ...sampleCeremony({ material: ceremonyMaterial, category: ceremonyCategory, sequence: ceremonySequence, art: focus }) });
+    previewQueue.enqueue({ id: `preview-${Date.now()}`, ...sampleCeremony({ material: ceremonyMaterial, category: ceremonyCategory, sequence: ceremonySequence, art: focus, level: ceremonyLevel === "prestige" ? "prestige" : Number(ceremonyLevel) }) });
   };
   const everyMaterial = material === ALL;
   const look = MATERIAL_LOOKS[everyMaterial ? "gold" : material];
@@ -105,6 +119,15 @@ export function PreviewTab() {
           <select value={ceremonySequence} onChange={(e) => setCeremonySequence(e.target.value)} aria-label="Sonderablauf" data-testid="ceremony-sequence" className={SELECT}>
             {SEQUENCE_KEYS.map((key) => <option key={key} value={key}>{SEQUENCES[key].label}</option>)}
           </select>
+          {ceremonySequence === "levelup" && (
+            <select value={ceremonyLevel} onChange={(e) => setCeremonyLevel(e.target.value)} aria-label="Neues Level" data-testid="ceremony-level" className={SELECT}>
+              {PREVIEW_LEVELS.map((value) => {
+                if (value === "prestige") return <option key={value} value={value}>Prestige</option>;
+                const to = rankInfo(value);
+                return <option key={value} value={String(value)}>Level {value} · {to.from === value ? `Rangwechsel ${to.name}` : to.name}</option>;
+              })}
+            </select>
+          )}
           <Toggle on={sound} onClick={() => setSound((v) => !v)} testId="ceremony-sound" color="#FFD700">{sound ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />} Klang</Toggle>
           <Toggle on={reduced} onClick={() => setReduced((v) => !v)} testId="ceremony-reduced" color="#29B6E8">Weniger Bewegung</Toggle>
           <button type="button" onClick={playCeremony} data-testid="ceremony-play" className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#FFD700]/60 text-[#FFD700] text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-[#FFD700]/10">

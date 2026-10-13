@@ -24,6 +24,8 @@ jest.mock("./sounds", () => ({
 const mockNavigate = jest.fn();
 jest.mock("../../navigation/rootNavigation", () => ({ openTab: (...args: unknown[]) => mockNavigate(...args) }));
 
+// Der Rahmen im Aufstiegs-Moment ist für Vorleser Schmuck (die Überschrift sagt alles) - Tests sehen ihn trotzdem.
+const HIDDEN = { includeHiddenElements: true };
 const tier = (code: string, material: string, rank: number, category: string, extra: Partial<CeremonyTier> = {}): CeremonyTier => ({ code, name: `Stufe ${code}`, material, rank, category, points: rank * 10, group_name: "Gruppe", ...extra });
 
 async function show(pkg: Parameters<typeof planCeremony>[0], props: Partial<React.ComponentProps<typeof Ceremony>> = {}) {
@@ -115,14 +117,56 @@ test("ein Stapel blättert alle 2,5 Sekunden weiter und lässt sich von Hand dur
   expect(screen.getByTestId("ceremony-stack-index")).toHaveTextContent("3 / 3");
 });
 
-test("Level-Aufstieg: erst bricht die alte Zahl, dann fällt die neue; dazu der Titel", async () => {
+test("Löwen-Rang (#1456): Rangwechsel - alter Rahmen blitzt weg, großer Moment, Haptik im Takt, Titel", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Haptics = require("expo-haptics");
+  Haptics.impactAsync.mockClear();
+  Haptics.notificationAsync.mockClear();
   await show({ tiers: [], levelUp: { level: 10, previous: 9, title: "Rudel", titleChanged: true, prestige: 2, prestigeGained: false } });
   expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Level 10 erreicht");
-  expect(screen.getByTestId("ceremony-level-old")).toBeTruthy();
-  await act(async () => { jest.advanceTimersByTime(950); });
-  expect(screen.getByTestId("ceremony-level-number")).toHaveTextContent("10");
+  expect(screen.getByTestId("ceremony-sub")).toHaveTextContent("Neuer Rang: Rudel");
+  expect(screen.getByTestId("loewen-ascent-rank", HIDDEN)).toBeTruthy();
+  expect(screen.getByTestId("loewen-ascent-old", HIDDEN)).toBeTruthy();
+  expect(screen.getByTestId("loewen-ascent-burst", HIDDEN)).toBeTruthy();
+  // Der Rahmen übernimmt das Glitzern - kein zweites Partikelfeld, keine Material-Haptik beim Öffnen.
+  expect(screen.queryByTestId("ceremony-particles")).toBeNull();
+  expect(Haptics.impactAsync).not.toHaveBeenCalled();
   expect(screen.getByTestId("ceremony-title-banner")).toHaveTextContent("Neuer Titel: Rudel");
   expect(screen.queryByTestId("ceremony-prestige-stars")).toBeNull();
+  await act(async () => { jest.advanceTimersByTime(1100); });
+  expect(Haptics.notificationAsync).toHaveBeenCalledWith("success");
+  expect(Haptics.impactAsync).toHaveBeenCalledWith("heavy");
+});
+
+test("Löwen-Rang (#1456): Vorleser hören den neuen Rang, beim Level im Rang keine Extra-Ansage", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { AccessibilityInfo } = require("react-native");
+  const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockImplementation(() => {});
+  const { rendered } = await show({ tiers: [], levelUp: { level: 25, previous: 24, title: "Goldmähne" } });
+  expect(announce).toHaveBeenCalledWith("Level 25 erreicht. Neuer Rang: Goldmähne");
+  await rendered.unmount();
+  announce.mockClear();
+  await show({ tiers: [], levelUp: { level: 27, previous: 26, title: "Goldmähne" } });
+  expect(announce).not.toHaveBeenCalled();
+  announce.mockRestore();
+});
+
+test("Löwen-Rang (#1456): Level im Rang - die neuen Rauten springen, kleiner Moment", async () => {
+  await show({ tiers: [], levelUp: { level: 13, previous: 11, title: "Rudel" } });
+  expect(screen.getByTestId("loewen-ascent-level", HIDDEN)).toBeTruthy();
+  expect(screen.queryByTestId("loewen-ascent-old", HIDDEN)).toBeNull();
+  expect(screen.getByTestId("loewen-ascent-burst", HIDDEN)).toBeTruthy();
+  expect(screen.getAllByTestId("loewen-rang-pip-pop", HIDDEN)).toHaveLength(2);
+  expect(screen.getByTestId("ceremony-sub")).toHaveTextContent("Level-Aufstieg");
+});
+
+test("Löwen-Rang (#1456): Bewegung reduzieren - nur Aus- und Einblenden, keine Teilchen, keine springenden Rauten", async () => {
+  await show({ tiers: [], levelUp: { level: 25, previous: 24, title: "Goldmähne", titleChanged: true } }, { reduced: true });
+  expect(screen.getByTestId("loewen-ascent-rank", HIDDEN)).toBeTruthy();
+  expect(screen.getByTestId("loewen-ascent-old", HIDDEN)).toBeTruthy();
+  expect(screen.queryByTestId("loewen-ascent-burst", HIDDEN)).toBeNull();
+  expect(screen.queryAllByTestId("loewen-rang-pip-pop", HIDDEN)).toHaveLength(0);
+  expect(screen.queryByTestId("ceremony-particles")).toBeNull();
 });
 
 test("Prestige: von 60 auf 1, die Überschrift nennt das Prestige und die Sterne fallen ein", async () => {
