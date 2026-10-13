@@ -3,15 +3,13 @@ import React, { useCallback, useEffect, useRef } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { CeremonyHost } from "../achievements/ceremony/CeremonyHost";
 import { enqueueCeremony, enqueueLevelUp } from "../achievements/ceremony/queue";
-import { describePackage, isLevelGain } from "../achievements/ceremony/select";
+import { type LevelState, describePackage, levelUpFrom } from "../achievements/ceremony/select";
 import { type AchievementGroup, freshTiers, onAchievementUnlocked, onLevelChanged } from "../lib/achievements";
 import { api } from "../lib/api";
 
 // SecureStore keys must be alphanumeric + ".-_"; hash the user id into a safe key.
 const seenKey = (id: string) => `tls_ach_seen_${id.replace(/[^a-zA-Z0-9._-]/g, "")}`;
 const levelKey = (id: string) => `tls_level_seen_${id.replace(/[^a-zA-Z0-9._-]/g, "")}`;
-
-type LevelState = { level: number; title: string; prestige: number };
 
 /**
  * Der Freischalt-Moment (#218, Erfolge II E13 #623). Beim Start holt er nach, was seit dem letzten Blick dazukam
@@ -42,16 +40,8 @@ export function AchievementCatchUpOverlay() {
       } catch {
         prev = null;
       }
-      if (prev && Number(prev.level) && isLevelGain(prev, next)) {
-        enqueueLevelUp({
-          level: next.level,
-          previous: Number(prev.level),
-          title: next.title,
-          titleChanged: Boolean(next.title) && next.title !== String(prev.title || "") && next.prestige <= Number(prev.prestige || 0),
-          prestige: next.prestige,
-          prestigeGained: next.prestige > Number(prev.prestige || 0),
-        });
-      }
+      const levelUp = levelUpFrom(prev, next);
+      if (levelUp) enqueueLevelUp(levelUp);
       await SecureStore.setItemAsync(key, JSON.stringify(next));
     } catch {
       /* rein kosmetisch */

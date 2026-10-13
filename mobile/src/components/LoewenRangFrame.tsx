@@ -1,7 +1,8 @@
 import { Canvas, Picture, Skia, createPicture, useImage, type SkPicture } from "@shopify/react-native-skia";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AccessibilityInfo, AppState, Image, PixelRatio, StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import { useFrameCallback, useSharedValue, type FrameInfo } from "react-native-reanimated";
+import Animated, { Easing, runOnJS, useAnimatedStyle, useFrameCallback, useSharedValue, withDelay, withSequence, withTiming, type FrameInfo } from "react-native-reanimated";
+import { ASCENT_TIMING, type AscentMoment, artAroundPhoto, burstDelayMs, popDelayMs } from "../lib/loewenAufstieg";
 import {
   STILL_VARIANTS,
   areaFor,
@@ -21,7 +22,7 @@ import {
 import { useScreenFocused } from "../seasons/screenFocus";
 import { colors } from "../theme";
 import { frameImage } from "./loewenRangImages";
-import { drawSignature, signatureVisible, type SignatureScene } from "./loewenRangSignature";
+import { BURST_SECONDS, drawBurst, drawSignature, signatureVisible, type SignatureScene } from "./loewenRangSignature";
 
 // Löwen-Rang in der App (#1457): das Profilbild im Rahmen seines Rangs, wie im Web (LevelAvatarFrame.jsx, #1454).
 // Jede Größe hat eine feste Fläche (Profil 220, Karte 150, Liste 92, Podest 64); das Foto wird je Rang so groß, dass
@@ -52,11 +53,17 @@ type Props = {
    */
   decorative?: boolean;
   testID?: string;
+  /**
+   * Aufstiegs-Moment (#1456, aus `ascentMoment`): beim Level im Rang springen die neuen Rauten auf, beim Rangwechsel
+   * blitzt der alte Rahmen weg und der neue rastet ein - dazu ein vereinfachter Moment der Signatur. Bei reduzierter
+   * Bewegung nur Aus- und Einblenden.
+   */
+  ascent?: AscentMoment | null;
   /** Das runde Foto - füllt die Fläche des Fotos. */
   children?: React.ReactNode;
 };
 
-export function LoewenRangFrame({ level, prestige, rankName, size = "list", showBadge = true, team = false, decorative, testID, children }: Props) {
+export function LoewenRangFrame({ level, prestige, rankName, size = "list", showBadge = true, team = false, decorative, ascent = null, testID, children }: Props) {
   const { width } = useWindowDimensions();
   const area = areaFor(size, width);
   const box = useMemo(() => frameBox(level, area), [level, area]);
@@ -68,6 +75,12 @@ export function LoewenRangFrame({ level, prestige, rankName, size = "list", show
   const label = frameLabel(level, { rankName, prestige, team });
   const animated = frameAnimated(size, reduceMotion);
   const hidden = decorative ?? still;
+  const moment = ascent && !still && ascent.level === box.info.level ? ascent : null;
+  // Ob Teilchen und Springen laufen, entscheidet die Zeremonie (Gerät „Bewegung reduzieren“ und „dezent“).
+  const motion = Boolean(moment?.particles);
+  const oldArt = useMemo(() => (moment?.kind === "rank" ? artAroundPhoto(moment.previous, { size: box.photo, left: box.photoLeft, top: box.photoTop }) : null), [moment, box]);
+  const oldSource = oldArt && moment ? frameImage(moment.from.key, frameWidthFor(oldArt.size, PixelRatio.get())) : null;
+  const artRect = { left: box.art.left, top: box.art.top, width: box.art.size, height: box.art.size };
   const a11y = hidden
     ? { accessible: false, accessibilityElementsHidden: true, importantForAccessibility: "no-hide-descendants" as const }
     : { accessible: true, accessibilityRole: "image" as const, accessibilityLabel: label };
@@ -82,22 +95,28 @@ export function LoewenRangFrame({ level, prestige, rankName, size = "list", show
       <View style={[styles.photo, { left: box.photoLeft, top: box.photoTop, width: box.photo, height: box.photo, borderRadius: box.photo / 2 }]}>
         {children}
       </View>
-      <Image
-        source={source}
-        style={[styles.art, { left: box.art.left, top: box.art.top, width: box.art.size, height: box.art.size }]}
-        resizeMode="contain"
-        fadeDuration={still ? 0 : undefined}
-        testID="loewen-rang-art"
-      />
-      {animated ? <Signature box={box} level={level} source={source as number} /> : null}
-      {plate ? <Plate box={box} stars={stars} size={size} tag={plateTag(level, { team })} /> : null}
+      {moment ? (
+        <AscentArt moment={moment} motion={motion} rect={artRect} source={source} old={oldArt && oldSource ? { rect: { left: oldArt.left, top: oldArt.top, width: oldArt.size, height: oldArt.size }, source: oldSource } : null} />
+      ) : (
+        <Image
+          source={source}
+          style={[styles.art, artRect]}
+          resizeMode="contain"
+          fadeDuration={still ? 0 : undefined}
+          testID="loewen-rang-art"
+        />
+      )}
+      {animated && !moment ? <Signature box={box} level={level} source={source as number} /> : null}
+      {moment && motion ? <AscentBurst box={box} moment={moment} /> : null}
+      {plate ? <Plate box={box} stars={stars} size={size} tag={plateTag(level, { team })} ascent={motion ? moment : null} /> : null}
     </View>
   );
 }
 
-function Plate({ box, stars, size, tag }: { box: FrameBox; stars: number; size: FrameVariant; tag: string }) {
+function Plate({ box, stars, size, tag, ascent = null }: { box: FrameBox; stars: number; size: FrameVariant; tag: string; ascent?: AscentMoment | null }) {
   const { info } = box;
   const small = size === "card";
+  const pops = ascent?.pops || [];
   const centerX = box.photoLeft + box.photo / 2;
   return (
     <View style={[styles.plate, { top: box.plateTop, left: centerX - box.area / 2, width: box.area }]} testID="loewen-rang-plate">
@@ -119,16 +138,135 @@ function Plate({ box, stars, size, tag }: { box: FrameBox; stars: number; size: 
       <View style={styles.pips} testID="loewen-rang-pips">
         {Array.from({ length: info.pips }, (_, index) => {
           const on = index < info.filled;
-          return (
-            <View
-              key={index}
-              style={[styles.pip, small && styles.pipSmall, { borderColor: on ? info.color : `${info.color}AA` }, on && [styles.pipOn, { backgroundColor: info.color, shadowColor: info.color }]]}
-              testID={on ? "loewen-rang-pip-on" : "loewen-rang-pip"}
-            />
-          );
+          const pipStyle = [styles.pip, small && styles.pipSmall, { borderColor: on ? info.color : `${info.color}AA` }, on && [styles.pipOn, { backgroundColor: info.color, shadowColor: info.color }]];
+          const order = pops.indexOf(index);
+          if (ascent && order >= 0) return <PopPip key={index} style={pipStyle} delay={popDelayMs(ascent.kind, order)} />;
+          return <View key={index} style={pipStyle} testID={on ? "loewen-rang-pip-on" : "loewen-rang-pip"} />;
         })}
       </View>
     </View>
+  );
+}
+
+/** Eine Raute, die beim Aufstieg aufspringt: 2,2-fach groß, dann zurück auf ihre Größe (#1456). */
+function PopPip({ style, delay }: { style: React.ComponentProps<typeof View>["style"]; delay: number }) {
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    scale.value = withDelay(delay, withSequence(withTiming(2.2, { duration: 0 }), withTiming(1, { duration: 420, easing: Easing.out(Easing.quad) })));
+    // Einmal je Aufstieg.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const animated = useAnimatedStyle(() => ({ transform: [{ rotate: "45deg" }, { scale: scale.value }] }));
+  return <Animated.View style={[style, animated]} testID="loewen-rang-pip-pop" />;
+}
+
+/**
+ * Der Rahmen beim Aufstieg (#1456). Rangwechsel: der alte Rahmen blitzt weg (größer, durchsichtig), der neue rastet ein
+ * (aus 1,3-fach zurück auf seine Größe). Level im Rang: der Rahmen bleibt stehen. Reduziert: nur Aus- und Einblenden.
+ */
+function AscentArt({ moment, motion, rect, source, old }: {
+  moment: AscentMoment;
+  motion: boolean;
+  rect: { left: number; top: number; width: number; height: number };
+  source: ReturnType<typeof frameImage>;
+  old: { rect: { left: number; top: number; width: number; height: number }; source: ReturnType<typeof frameImage> } | null;
+}) {
+  const rank = moment.kind === "rank";
+  const fresh = useSharedValue(rank ? 0 : 1);
+  const gone = useSharedValue(0);
+  useEffect(() => {
+    if (!rank) return;
+    const { hold, out } = ASCENT_TIMING;
+    gone.value = withDelay(hold, withTiming(1, { duration: motion ? out : 400 }));
+    fresh.value = withDelay(hold + (motion ? out : 300), withTiming(1, { duration: motion ? ASCENT_TIMING.in : 500, easing: Easing.out(Easing.quad) }));
+    // Einmal je Aufstieg.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const freshStyle = useAnimatedStyle(() => ({ opacity: fresh.value, transform: [{ scale: motion ? 1.3 - 0.3 * fresh.value : 1 }] }));
+  const oldStyle = useAnimatedStyle(() => ({ opacity: 1 - gone.value, transform: [{ scale: motion ? 1 + 0.12 * gone.value : 1 }] }));
+  return (
+    <>
+      {old ? (
+        <Animated.View pointerEvents="none" style={[styles.art, old.rect, oldStyle]} testID="loewen-ascent-old">
+          <Image source={old.source} style={styles.fill} resizeMode="contain" />
+        </Animated.View>
+      ) : null}
+      <Animated.View pointerEvents="none" style={[styles.art, rect, freshStyle]}>
+        <Image source={source} style={styles.fill} resizeMode="contain" testID="loewen-rang-art" />
+      </Animated.View>
+    </>
+  );
+}
+
+/**
+ * Der vereinfachte Moment der Signatur beim Aufstieg (#1456): Druckwelle und Teilchen in der Farbe des Rangs, auf einer
+ * Zeichenfläche, die 30 % über die Grafik hinausreicht. Läuft nur, solange App und Screen vorne sind, einmal - danach
+ * steht die Bildschleife.
+ */
+function AscentBurst({ box, moment }: { box: FrameBox; moment: AscentMoment }) {
+  const appActive = useAppActive();
+  const focused = useScreenFocused();
+  const [finished, setFinished] = useState(false);
+  const running = appActive && focused && !finished;
+  const picture = useSharedValue<SkPicture>(EMPTY_PICTURE);
+  const last = useSharedValue(-FRAME_MS);
+  const ended = useSharedValue(false);
+  const pad = box.art.size * 0.3;
+  const scene = useMemo<SignatureScene>(() => {
+    const plan = signaturePlan(moment.level);
+    const S = box.art.size;
+    const edge = box.ring.edge || [];
+    const step = Math.max(1, Math.floor(edge.length / EDGE_POINTS));
+    return {
+      size: S + 2 * pad,
+      ringX: box.ring.cx * S + pad,
+      ringY: box.ring.cy * S + pad,
+      ringR: box.ring.r * S,
+      kind: plan.kind,
+      color: plan.color,
+      count: 0,
+      strength: 1,
+      shine: 0,
+      edge: edge.filter((_, index) => index % step === 0).slice(0, EDGE_POINTS).map(([x, y]) => [x * S + pad, y * S + pad] as [number, number]),
+    };
+  }, [box, moment.level, pad]);
+  const delay = burstDelayMs(moment.kind) / 1000;
+  const strong = moment.strong;
+
+  const step = useCallback((frame: FrameInfo) => {
+    "worklet";
+    const now = frame.timeSinceFirstFrame;
+    if (now - last.value < FRAME_MS) return;
+    last.value = now;
+    const t = now / 1000 - delay;
+    if (t < 0) return;
+    if (t > BURST_SECONDS) {
+      if (!ended.value) {
+        ended.value = true;
+        picture.value = EMPTY_PICTURE;
+        runOnJS(setFinished)(true);
+      }
+      return;
+    }
+    const recorder = Skia.PictureRecorder();
+    const canvas = recorder.beginRecording(Skia.XYWHRect(0, 0, scene.size, scene.size));
+    drawBurst(canvas, scene, t, strong);
+    picture.value = recorder.finishRecordingAsPicture();
+  }, [scene, delay, strong, last, ended, picture]);
+
+  const frame = useFrameCallback(step, running);
+  useEffect(() => {
+    frame.setActive(running);
+  }, [running, frame]);
+
+  return (
+    <Canvas
+      style={[styles.art, { left: box.art.left - pad, top: box.art.top - pad, width: scene.size, height: scene.size }]}
+      pointerEvents="none"
+      testID="loewen-ascent-burst"
+    >
+      <Picture picture={picture} />
+    </Canvas>
   );
 }
 
@@ -237,6 +375,10 @@ const styles = StyleSheet.create({
   },
   art: {
     position: "absolute",
+  },
+  fill: {
+    height: "100%",
+    width: "100%",
   },
   plate: {
     alignItems: "center",
