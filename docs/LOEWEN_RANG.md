@@ -55,3 +55,39 @@ und unten hineinpasst; oben dürfen Krone und Schwingen bis 15 % der Fläche hin
 der Rahmen nimmt keine Klicks an). Rang 1 bekommt so 81 % der Fläche als Foto, die Ränge mit Schwingen und Strahlen bis
 an beide Bildränder (9, 11, 12) knapp 50 %. Der Kopf ist bei jedem Rang gleich groß, nichts springt beim Rangwechsel,
 und seitlich überdeckt kein Rahmen etwas daneben. In Listen trägt der Rahmen „Level n, Rang Name“ als zugänglichen Namen.
+
+## Signatur je Rang (#1455)
+
+Jeder Rang hat ein eigenes Element, das mit jedem Level im Rang mehr wird - nur im Profilkopf, nicht in Karten und
+Listen. Stärke `k = (Level − erstes Level) / (letztes Level − erstes Level)`: Beim ersten Level eines Rangs glänzt nur
+der Rahmen, danach kommen die Ebenen der Signatur nacheinander dazu (`SIGNATURE_LAYERS` in
+`frontend/src/lib/loewenSignatur.js`). Beispiel Löwenkönig: 55 Glanz, 56 kleine Cyan-Flammen, 57 Knistern,
+58 Gewitterwolken, 59 Blitze, 60 volles Sturmfeuer.
+
+| Rang | Signatur |
+| --- | --- |
+| 1 Jungtier | Staub, Funkenschlag aus der Pfote |
+| 2 Fährte | Pfotenspuren, ab Level 8 in Cyan |
+| 3 Rudel | Glut aus dem Wappen |
+| 4 Jäger | Bronzefunken, Krallenhiebe |
+| 5 Silbermähne | Mondlicht, Frost, Schnee |
+| 6 Goldmähne | Goldstaub-Wirbel, Goldströme |
+| 7 Löwenhaupt | Feuer Orange/Gold |
+| 8 Brüller | Schallwellen aus dem Maul |
+| 9 Schwingen | fallende Lichtfedern |
+| 10 Obsidian | Rauch, glühende Risse, Glutregen |
+| 11 Sonnenlöwe | Sonnenstrahlen, Lichtblitze |
+| 12 Löwenkönig | Sturmfeuer: Cyan-Flammen, Gewitter, Blitze |
+
+Umsetzung: `LevelAvatarFrame` lädt `LoewenRangSignature.jsx` erst bei Bedarf (dynamischer Import). Zwei Leinwände um die
+Fläche: hinten Licht, Nebel, Wolken und Strahlen (hinter Foto und Rahmen), vorne Funken, Flammen und Blitze - dort
+bleibt der Fotokreis ausgespart, kein Effekt liegt über dem Gesicht. Partikel starten an den Außenkanten-Punkten aus
+`geometry.json` (einmal je Sitzung geladen). Höchstens 240 Partikel, Pixeldichte höchstens 1,5, keine Klicks; die
+Schleife läuft nur, solange die Seite sichtbar und der Kopf im Bild ist. Mit „Bewegung reduzieren“ gibt es keinen
+Effekt. Farben: Schwarz, Gold, Cyan und die Materialfarben der Ränge (Stahl, Bronze, Frost hellblau, Feuer orange).
+
+## Kronen der Punktewertung (#1458)
+
+Platz 1–3 (Gold, Silber, Bronze) und die Onyx-Krone ab Level 30 sitzen klein über der Oberkante der Grafik, ohne
+Dauer-Leuchten: 11,5 % der Fläche, mindestens 14 px (Profil 33 px). Die Level-30-Krone hieß früher „Obsidian“; der Name
+gehört jetzt Rang 10. Die API liefert `onyx`, das Web versteht ältere Antworten mit `obsidian` weiter.
