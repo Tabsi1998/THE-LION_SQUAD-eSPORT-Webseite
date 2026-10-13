@@ -6,6 +6,9 @@
 .tls-ceremony__card { position: relative; width: 100%; max-width: 34rem; border-radius: 0.5rem; border: 1px solid var(--cer-accent, #FFD700); background: linear-gradient(180deg, #141414, #0A0A0A); box-shadow: 0 0 70px color-mix(in srgb, var(--cer-accent, #FFD700) 22%, transparent); overflow: hidden; }
 .tls-ceremony__stage { position: relative; height: 15rem; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 @media (max-width: 640px) { .tls-ceremony__stage { height: 12rem; } .tls-ceremony__stage .tls-badge { width: 120px; height: 120px; } }
+/* Löwen-Rang (#1456): der Aufstiegs-Moment braucht Platz für Rahmen, Schild und Titel-Banner. */
+.tls-ceremony__stage--ascent { height: 16rem; }
+@media (max-width: 640px) { .tls-ceremony__stage--ascent { height: 14rem; } }
 .tls-ceremony__beams { position: absolute; inset: -45%; background: repeating-conic-gradient(from 0deg, transparent 0deg 14deg, color-mix(in srgb, var(--cer-accent, #FFD700) 10%, transparent) 14deg 22deg); animation: tls-spin 16s linear infinite; pointer-events: none; }
 .tls-ceremony__flash { position: absolute; inset: 0; pointer-events: none; background: var(--cer-accent, #FFD700); animation: tls-cer-flash 0.9s ease-out both; }
 .tls-ceremony__flood { position: fixed; inset: 0; pointer-events: none; background: var(--cer-accent, #FFD700); animation: tls-cer-flood 1.4s ease-in-out both; }

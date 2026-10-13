@@ -124,6 +124,32 @@ test("im Detail stehen Verlauf und Summen, eine Erstattung geht nur bis zum Beza
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/finance/orders/o2/resync"));
 });
 
+test("eine Erstattung, die nochmals abgeschickt wird, trägt dieselbe Kennung - eine neue Eingabe eine neue (#1034)", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockRejectedValueOnce(new Error("Netz weg"));
+  render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
+  await user.click(await screen.findByTestId("finance-detail-o2"));
+  const detail = await screen.findByTestId("finance-detail");
+  const save = within(detail).getByTestId("finance-refund-save");
+  await user.type(within(detail).getByLabelText("Erstattungsbetrag in Euro"), "5");
+  await user.type(within(detail).getByLabelText("Grund der Rückzahlung"), "Begleitperson entfallen");
+
+  await user.click(save);
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
+  await user.click(save);
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(2));
+  const [first, again] = apiMock.post.mock.calls.map(([, payload]) => payload);
+  expect(first.request_id).toBeTruthy();
+  expect(again).toEqual(first);
+  await waitFor(() => expect(within(detail).getByLabelText("Erstattungsbetrag in Euro")).toHaveValue(""));
+
+  await user.type(within(detail).getByLabelText("Erstattungsbetrag in Euro"), "5");
+  await user.type(within(detail).getByLabelText("Grund der Rückzahlung"), "Begleitperson entfallen");
+  await user.click(save);
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(3));
+  expect(apiMock.post.mock.calls[2][1].request_id).not.toBe(first.request_id);
+});
+
 test("Gutschrift-Entwurf bei Abmeldung (#843): Schalter in Finanzen, der Prüffall nennt den Entwurf", async () => {
   const user = userEvent.setup();
   const withDraft = {

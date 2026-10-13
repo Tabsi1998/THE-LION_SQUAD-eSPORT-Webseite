@@ -86,7 +86,9 @@ describe("Ceremony", () => {
     unmount();
     const level = renderPlan({ tiers: [], levelUp: { level: 10, previous: 9, title: "Rudel", titleChanged: true, prestige: 1, prestigeGained: false } }, { reduced: true });
     expect(screen.getByTestId("achievement-unlock-overlay")).toHaveAttribute("data-sequence", "levelup");
-    expect(screen.getByTestId("ceremony-level-number")).toHaveTextContent("10");
+    // Löwen-Rang (#1456): Level 10 beginnt den Rang „Rudel“ - der Rahmen zeigt den Rangwechsel.
+    expect(screen.getByTestId("loewen-ascent")).toHaveAttribute("data-kind", "rank");
+    expect(screen.getByTestId("ceremony-sub")).toHaveTextContent("Neuer Rang: Rudel");
     expect(screen.getByTestId("ceremony-title-banner")).toHaveTextContent("Neuer Titel: Rudel");
     expect(screen.queryByTestId("ceremony-prestige-stars")).toBeNull();
     expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Level 10 erreicht");
@@ -100,10 +102,49 @@ describe("Ceremony", () => {
   });
 
   it("Level-Zeremonien glitzern - nur mit „Bewegung reduzieren“ nicht", () => {
-    const { unmount } = renderPlan({ tiers: [], levelUp: { level: 12, previous: 11, title: "Rudel" } });
+    // Prestige hat keinen Rahmen-Moment: dort glitzert weiter die Zeremonie selbst.
+    const prestige = { level: 1, previous: 60, title: "Jungtier", prestige: 1, prestigeGained: true };
+    const { unmount } = renderPlan({ tiers: [], levelUp: prestige });
     expect(screen.getByTestId("ceremony-particles")).toBeInTheDocument();
     unmount();
-    renderPlan({ tiers: [], levelUp: { level: 12, previous: 11, title: "Rudel" } }, { reduced: true });
+    renderPlan({ tiers: [], levelUp: prestige }, { reduced: true });
+    expect(screen.queryByTestId("ceremony-particles")).toBeNull();
+  });
+
+  it("Löwen-Rang (#1456): Level im Rang - Rauten springen, kein zweites Partikelfeld", () => {
+    renderPlan({ tiers: [], levelUp: { level: 13, previous: 11, title: "Rudel" } });
+    const ascent = screen.getByTestId("loewen-ascent");
+    expect(ascent).toHaveAttribute("data-kind", "level");
+    expect(ascent).toHaveAttribute("data-motion", "full");
+    expect(ascent).toHaveAttribute("data-fx", "ember");
+    // Der Rahmen übernimmt das Glitzern - die Zeremonie legt kein eigenes Partikelfeld darüber.
+    expect(screen.queryByTestId("ceremony-particles")).toBeNull();
+    const frame = ascent.querySelector(".tls-lvf");
+    expect(frame).toHaveClass("tls-lvf--ascent", "tls-lvf--ascent-level");
+    expect(frame).not.toHaveClass("tls-lvf--ascent-calm");
+    const popped = [...frame.querySelectorAll(".tls-lvf-pip")].map((pip) => pip.classList.contains("is-pop"));
+    expect(popped).toEqual([false, true, true, false]);
+    expect(screen.queryByTestId("loewen-ascent-old")).toBeNull();
+    expect(screen.getByTestId("ceremony-sub")).toHaveTextContent("Level-Aufstieg");
+  });
+
+  it("Löwen-Rang (#1456): Rangwechsel - alter Rahmen blitzt weg; reduziert nur Ein- und Ausblenden", () => {
+    const { unmount } = renderPlan({ tiers: [], levelUp: { level: 25, previous: 24, title: "Goldmähne", titleChanged: true } });
+    const ascent = screen.getByTestId("loewen-ascent");
+    expect(ascent).toHaveAttribute("data-kind", "rank");
+    expect(ascent).toHaveAttribute("data-fx", "gold");
+    expect(screen.getByTestId("loewen-ascent-old")).toHaveAttribute("data-rank", "5");
+    expect(ascent.querySelector(".tls-lvf")).toHaveAttribute("data-rank", "6");
+    expect(screen.getByTestId("ceremony-sub")).toHaveTextContent("Neuer Rang: Goldmähne");
+    expect(screen.getByTestId("ceremony-live")).toHaveTextContent("Neuer Rang: Goldmähne");
+    unmount();
+    renderPlan({ tiers: [], levelUp: { level: 25, previous: 24, title: "Goldmähne", titleChanged: true } }, { reduced: true });
+    const calm = screen.getByTestId("loewen-ascent");
+    expect(calm).toHaveAttribute("data-motion", "calm");
+    const frame = calm.querySelector(".tls-lvf");
+    expect(frame).toHaveClass("tls-lvf--ascent-calm");
+    expect(frame.querySelectorAll(".tls-lvf-pip.is-pop")).toHaveLength(0);
+    expect(calm.querySelector("canvas")).toBeNull();
     expect(screen.queryByTestId("ceremony-particles")).toBeNull();
   });
 
@@ -126,7 +167,8 @@ describe("Ceremony", () => {
     expect(screen.getByTestId("ceremony-stage")).toHaveAttribute("data-phase", "badge");
     act(() => { vi.advanceTimersByTime(4600); });
     expect(screen.getByTestId("ceremony-stage")).toHaveAttribute("data-phase", "level");
-    expect(screen.getByTestId("ceremony-level-number")).toHaveTextContent("4");
+    expect(screen.getByTestId("loewen-ascent")).toHaveAttribute("data-kind", "level");
+    expect(screen.getByTestId("ceremony-sub")).toHaveTextContent("Level 4 erreicht");
     expect(onClose).not.toHaveBeenCalled();
     act(() => { vi.advanceTimersByTime(6100); });
     expect(onClose).toHaveBeenCalled();

@@ -54,7 +54,8 @@ async def event_friends_view(event_id: str, response: Response, me: dict = Depen
     event = await _visible_event(event_id, me, None)
     db = get_db()
     viewer = await db.users.find_one({"id": me["id"]}, {"_id": 0, "id": 1, "role": 1, "roles": 1, "birth_date": 1,
-                                                       event_friends.SETTING: 1, event_friends.HINT_FIELD: 1}) or {}
+                                                       "privacy_friends_see_registrations": 1,
+                                                       "friends_registrations_hint_seen_at": 1}) or {}
     return await event_friends.friends_at_event(db, event, {**me, **viewer})
 
 
@@ -72,5 +73,5 @@ async def confirm_friends_hint(body: FriendsHintBody, response: Response, me: di
     if body.turn_off:
         updates[event_friends.SETTING] = False
     await db.users.update_one({"id": me["id"]}, {"$set": updates})
-    stored = await db.users.find_one({"id": me["id"]}, {"_id": 0, "birth_date": 1, event_friends.SETTING: 1}) or {}
+    stored = await db.users.find_one({"id": me["id"]}, {"_id": 0, "birth_date": 1, "privacy_friends_see_registrations": 1}) or {}
     return {"sharing": event_friends.shares_registrations(stored)}
