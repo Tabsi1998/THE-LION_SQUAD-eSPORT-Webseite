@@ -271,8 +271,24 @@ def _team_summary(team: dict) -> dict:
     }
 
 
+def _viewer_rights(team: dict, user: dict | None) -> dict:
+    """Was die Person an diesem Team darf - dieselben Regeln wie die Aktionen (#1479). Web und App lesen diese Felder,
+    statt Rollen selbst zu deuten. ``admin_needs_second_factor``: eine Admin-Rolle, der nur die bestätigte
+    Zwei-Faktor-Anmeldung fehlt - dann zeigen sie „2FA einrichten“ statt der Verwaltung."""
+    if not user:
+        return {"can_manage": False, "can_remove_members": False, "can_dissolve": False, "admin_needs_second_factor": False}
+    leads = team.get("leader_id") == user.get("id") or user.get("id") in (team.get("co_leader_ids") or [])
+    return {
+        "can_manage": _can_manage(team, user),
+        "can_remove_members": _can_manage_team(team, user),
+        "can_dissolve": team.get("leader_id") == user.get("id") or _team_admin(user, TEAM_OWNER_ADMIN_ROLES),
+        "admin_needs_second_factor": not leads and admin_role_without_second_factor(user, TEAM_ADMIN_ROLES),
+    }
+
+
 def _team_response(team: dict, user: dict | None = None) -> dict:
-    can_manage = bool(user and _can_manage(team, user))
+    rights = _viewer_rights(team, user)
+    can_manage = rights["can_manage"]
     is_member = _is_member(team, user)
     if not is_member and not can_manage:
         out = _team_summary(team)
@@ -282,12 +298,12 @@ def _team_response(team: dict, user: dict | None = None) -> dict:
         out["co_leader_ids"] = team.get("co_leader_ids", [])
         out["member_ids"] = team.get("member_ids", [])
         out["is_member"] = False
-        out["can_manage"] = False
+        out.update(rights)
         return out
 
     team["member_count"] = len(team.get("member_ids") or [])
     team["is_member"] = is_member
-    team["can_manage"] = can_manage
+    team.update(rights)
     if not can_manage:
         team.pop("join_code", None)
     return team
@@ -330,7 +346,7 @@ async def my_teams(me: dict = Depends(get_current_user)):
         team["my_role"] = "leader" if team.get("leader_id") == me["id"] else (
             "co_leader" if me["id"] in team.get("co_leader_ids", []) else "member"
         )
-        team["can_manage"] = _can_manage(team, me)
+        team.update(_viewer_rights(team, me))
     return teams
 
 

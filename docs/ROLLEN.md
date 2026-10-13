@@ -166,10 +166,13 @@ Person selbst sehen darf und wofür sie angemeldet ist, dazu ihre zugesagten Ver
 Sitzung gilt dort keine Zwei-Faktor-Ausnahme der Turnierleitung. Gesperrte oder abgeschaltete Konten bekommen nichts,
 beim Löschen des Kontos fällt der Link weg. Code: `services/personal_calendar.py`.
 
-In der App fragt die Team-Seite dieselben Rollen wie der Server: Team bearbeiten und Squads dürfen Leitung,
-Co-Leitung, Turnierleitung, Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und
-Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen dabei –
-wie überall – nur mit bestätigter Zwei-Faktor-Anmeldung (#1469); Leitung und Co-Leitung brauchen sie für ihr Team nicht.
+Die Team-Seite in Web und App folgt dem Server: Team bearbeiten und Squads dürfen Leitung, Co-Leitung, Turnierleitung,
+Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und Superadmin; auflösen Leitung,
+Club-Admin und Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen
+dabei – wie überall – nur mit bestätigter Zwei-Faktor-Anmeldung (#1469); Leitung und Co-Leitung brauchen sie für ihr
+Team nicht. Seit #1479 schickt der Server das fertige Ergebnis mit (`can_manage`, `can_remove_members`,
+`can_dissolve`); fehlt einer Admin-Rolle nur die Zwei-Faktor-Anmeldung (`admin_needs_second_factor`), steht statt der
+Knöpfe „2FA einrichten“ da.
 
 ## Personen, Teams und Sponsoren wählen (#1354)
 
@@ -239,6 +242,11 @@ Benachrichtigungen ab. Es hängt nicht am Newsletter.
 - Inhalte „Nur intern“ und „Nur Mitglieder“ öffnet ein Adminbereich (Rolle, Freigabe, Vorstandsposten, Dolibarr)
   nur mit bestätigter Zwei-Faktor-Anmeldung; als Mitglied sieht man Mitglieder-Inhalte weiter ohne. Dasselbe gilt
   für Profilfelder mit der Stufe „Nur Admins“ (Moderation ausgenommen). Meldungen an Empfänger hängen nicht davon ab.
+- Öffentliche Seiten, die Verwaltenden mehr zeigen (#1479), tun das ebenfalls nur mit bestätigter
+  Zwei-Faktor-Anmeldung: die Kosten-Konfiguration an Events und Turnieren (Finanzen; die Preisangabe sehen alle),
+  leere Alben in Galerie und Event-Seite und die Vorschau des Jahresrückblicks (Redaktion), Banner für „Admins“
+  (Moderation ausgenommen) und der Helfer-Aufruf (Vorstand). Code: `can_use_area` in `services/permissions.py`, im Web
+  `canUseArea`.
 
 ## Benutzermenü und Konto-Seiten (#516)
 

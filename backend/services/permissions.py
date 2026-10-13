@@ -208,6 +208,17 @@ async def user_has_area(user: dict | None, *areas: str, db=None) -> bool:
     return bool(set(areas) & await areas_for(user, db))
 
 
+async def can_use_area(user: dict | None, *areas: str, db=None) -> bool:
+    """Darf die angemeldete Person einer Anfrage einen der Bereiche jetzt benutzen (#1479)? Wie ``require_area``, aber
+    als Frage statt Wächter - für Routen, die allen antworten und Verwaltenden mehr zeigen (Kostenangaben, leere Alben).
+    Ein Bereich aus ``MFA_AREAS`` zählt nur mit bestätigter Zwei-Faktor-Anmeldung. Für Konten aus der Datenbank gilt
+    ``user_has_area``. Spiegel von ``canUseArea`` im Web."""
+    if not user:
+        return False
+    held = set(areas) & await areas_for(user, db)
+    return any(area not in MFA_AREAS or not needs_mfa(user) for area in held)
+
+
 async def board_holder_ids(db, user_ids) -> set[str]:
     """Wer von diesen Personen einen aktiven Vorstandsposten hält oder vertritt - wie
     ``is_board_holder``, aber für eine ganze Liste in zwei Abfragen."""
