@@ -10,7 +10,9 @@ Datenschutz (Label „privacy“) - die Regeln stehen hier an einer Stelle:
   einschaltet. Ausschalten wirkt sofort, weil jede Abfrage neu rechnet.
 - Gezeigt werden nur Event-Anmeldungen (angemeldet oder eingecheckt) und Anmeldungen bei Turnieren des Events, die die
   fragende Person selbst sehen darf (keine Entwürfe, nichts Nichtöffentliches, „Nur Mitglieder“ nur für Mitglieder),
-  bei Team-Turnieren mit dem Teamnamen. Warteliste, Storno und „nicht erschienen“ zählen nicht.
+  bei Team-Turnieren mit dem Teamnamen. Warteliste, Storno und „nicht erschienen“ zählen nicht. Zu einem Team zählt,
+  wer in der gespeicherten Aufstellung steht bzw. vor dem Turnier beigetreten ist - nie das heutige Team
+  (``services/event_roster.py``).
 - Aus dem Profil nur, was die Freundesliste ohnehin zeigt: Anzeigename, Bild, Nutzername - den Nutzernamen (für den
   Link aufs Profil) nur, wenn das Profil öffentlich ist; sonst führt der Link ins Leere.
 - Der einmalige Hinweis „Deine Freunde sehen, zu welchen Events du angemeldet bist“ erscheint, sobald es für die Person
@@ -21,6 +23,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
+from services.event_roster import registration_players
 from services.visibility import lead_can_see
 
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -87,7 +90,7 @@ async def blocked_ids(db, user_id: str) -> set[str]:
 async def visible_tournaments(db, event: dict, viewer: dict) -> list[dict]:
     rows = await db.tournaments.find(
         {"event_id": event["id"], "status": {"$nin": list(HIDDEN_TOURNAMENT_STATUSES)}},
-        {"_id": 0, "id": 1, "slug": 1, "title": 1, "team_mode": 1, "visibility": 1, "is_public": 1, "start_date": 1},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "team_mode": 1, "visibility": 1, "is_public": 1, "start_date": 1, "end_date": 1},
     ).sort("start_date", 1).to_list(200)
     out = []
     for row in rows:
@@ -98,34 +101,32 @@ async def visible_tournaments(db, event: dict, viewer: dict) -> list[dict]:
     return out
 
 
-async def _team_members(db, user_ids: set[str]) -> dict[str, set[str]]:
-    """Team → die Freunde darin (aus der Mitgliederliste des Teams und aus ``team_members``)."""
-    members: dict[str, set[str]] = {}
-    async for team in db.teams.find({"member_ids": {"$in": list(user_ids)}}, {"_id": 0, "id": 1, "member_ids": 1}):
-        members.setdefault(team["id"], set()).update(set(team.get("member_ids") or []) & user_ids)
-    async for row in db.team_members.find({"user_id": {"$in": list(user_ids)}}, {"_id": 0, "team_id": 1, "user_id": 1}):
-        if row.get("team_id"):
-            members.setdefault(row["team_id"], set()).add(row["user_id"])
-    return members
+async def tournament_players(db, tournaments: list[dict]) -> list[tuple[dict, set[str]]]:
+    """Gültige Anmeldungen der sichtbaren Turniere mit den Personen, die dazu gehören - Teams nach gespeicherter
+    Aufstellung bzw. Beitrittsdatum (``services/event_roster.py``), nie nach dem heutigen Team."""
+    if not tournaments:
+        return []
+    regs = await db.tournament_registrations.find(
+        {"tournament_id": {"$in": [t["id"] for t in tournaments]}, "status": {"$in": list(TOURNAMENT_STATUSES)}},
+        {"_id": 0, "id": 1, "tournament_id": 1, "user_id": 1, "team_id": 1, "display_name": 1, "lineup": 1, "substitutes": 1},
+    ).to_list(50000)
+    players = await registration_players(db, regs, {t["id"]: t for t in tournaments})
+    return [(reg, players.get(reg["id"], set())) for reg in regs]
 
 
-async def viewer_takes_part(db, event: dict, viewer: dict, tournaments: list[dict]) -> bool:
-    """Ist die fragende Person selbst beim Event dabei (Event oder eines seiner Turniere, auch mit dem Team)?"""
+async def viewer_takes_part(db, event: dict, viewer: dict, entries: list[tuple[dict, set[str]]]) -> bool:
+    """Ist die fragende Person selbst beim Event dabei (Event oder eines seiner Turniere, auch im Team)?"""
     if await db.event_registrations.find_one({"event_id": event["id"], "user_id": viewer["id"], "status": {"$in": list(EVENT_STATUSES)}}, {"_id": 0, "id": 1}):
         return True
-    if not tournaments:
-        return False
-    teams = list((await _team_members(db, {viewer["id"]})).keys())
-    query = {"tournament_id": {"$in": [t["id"] for t in tournaments]}, "status": {"$in": list(TOURNAMENT_STATUSES)},
-             "$or": [{"user_id": viewer["id"]}] + ([{"team_id": {"$in": teams}}] if teams else [])}
-    return bool(await db.tournament_registrations.find_one(query, {"_id": 0, "id": 1}))
+    return any(viewer["id"] in people for _reg, people in entries)
 
 
 async def friends_at_event(db, event: dict, viewer: dict) -> dict:
     """Die Zeile „Von deinen Freunden dabei“ - nur Freunde, die es erlauben, mit Event bzw. Turnier und Teamname."""
     tournaments = await visible_tournaments(db, event, viewer)
+    entries = await tournament_players(db, tournaments)
     sharing = shares_registrations(viewer)
-    hint = sharing and not viewer.get(HINT_FIELD) and await viewer_takes_part(db, event, viewer, tournaments)
+    hint = sharing and not viewer.get(HINT_FIELD) and await viewer_takes_part(db, event, viewer, entries)
     result = {"friends": [], "sharing": sharing, "hint": bool(hint)}
 
     candidates = await accepted_friend_ids(db, viewer["id"])
@@ -146,30 +147,18 @@ async def friends_at_event(db, event: dict, viewer: dict) -> dict:
                                                  {"_id": 0, "user_id": 1}):
         where.setdefault(reg["user_id"], []).append({"kind": "event"})
 
-    if tournaments:
-        by_id = {t["id"]: t for t in tournaments}
-        team_members = await _team_members(db, ids)
-        query = {"tournament_id": {"$in": list(by_id)}, "status": {"$in": list(TOURNAMENT_STATUSES)},
-                 "$or": [{"user_id": {"$in": list(ids)}}] + ([{"team_id": {"$in": list(team_members)}}] if team_members else [])}
-        regs = await db.tournament_registrations.find(query, {"_id": 0, "tournament_id": 1, "user_id": 1, "team_id": 1, "display_name": 1}).to_list(5000)
-        team_ids = {reg["team_id"] for reg in regs if reg.get("team_id")}
-        team_names = {}
-        if team_ids:
-            team_names = {team["id"]: team.get("name") for team in await db.teams.find({"id": {"$in": list(team_ids)}}, {"_id": 0, "id": 1, "name": 1}).to_list(len(team_ids) + 1)}
-        for reg in regs:
-            tournament = by_id[reg["tournament_id"]]
-            if reg.get("team_id"):
-                people = set(team_members.get(reg["team_id"], set()))
-                if reg.get("user_id") in ids:
-                    people.add(reg["user_id"])
-                team_name = team_names.get(reg["team_id"]) or reg.get("display_name") or None
-            else:
-                people = {reg.get("user_id")} & ids
-                team_name = None
-            for person in people:
-                entry = {"kind": "tournament", "id": tournament["id"], "slug": tournament.get("slug"), "title": tournament.get("title") or "Turnier", "team_name": team_name}
-                if entry not in where.setdefault(person, []):
-                    where[person].append(entry)
+    by_id = {t["id"]: t for t in tournaments}
+    team_ids = {reg["team_id"] for reg, people in entries if reg.get("team_id") and people & ids}
+    team_names = {}
+    if team_ids:
+        team_names = {team["id"]: team.get("name") for team in await db.teams.find({"id": {"$in": list(team_ids)}}, {"_id": 0, "id": 1, "name": 1}).to_list(len(team_ids) + 1)}
+    for reg, people in entries:
+        tournament = by_id[reg["tournament_id"]]
+        team_name = (team_names.get(reg["team_id"]) or reg.get("display_name") or None) if reg.get("team_id") else None
+        for person in people & ids:
+            entry = {"kind": "tournament", "id": tournament["id"], "slug": tournament.get("slug"), "title": tournament.get("title") or "Turnier", "team_name": team_name}
+            if entry not in where.setdefault(person, []):
+                where[person].append(entry)
 
     friends = []
     for user_id, places in where.items():

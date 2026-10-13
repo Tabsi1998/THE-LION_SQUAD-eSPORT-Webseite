@@ -40,7 +40,8 @@ async def seed(flow):
                                      "has_registration": True, "start_date": "2099-11-13T16:00:00+00:00"})
     await flow.db.tournaments.insert_many([
         {"id": "t-mk", "slug": "mk", "title": "Mario Kart Cup", "event_id": "e-lan", "status": "registration_open", "visibility": "public", "is_public": True, "team_mode": "solo"},
-        {"id": "t-rl", "slug": "rl", "title": "Rocket League 2v2", "event_id": "e-lan", "status": "registration_open", "visibility": "public", "is_public": True, "team_mode": "team"},
+        {"id": "t-rl", "slug": "rl", "title": "Rocket League 2v2", "event_id": "e-lan", "status": "registration_open", "visibility": "public", "is_public": True, "team_mode": "team",
+         "start_date": "2099-11-14T15:00:00+00:00"},
         {"id": "t-intern", "slug": "intern", "title": "Vereinsturnier", "event_id": "e-lan", "status": "registration_open", "visibility": "members", "is_public": True, "team_mode": "solo"},
         {"id": "t-draft", "slug": "geheim", "title": "Geheim", "event_id": "e-lan", "status": "draft", "visibility": "public", "team_mode": "solo"},
     ])
@@ -148,7 +149,8 @@ async def test_waitlist_and_cancelled_do_not_count_and_team_names_show(flow):
     await flow.db.tournament_registrations.insert_one({"id": new_id(), "tournament_id": "t-mk", "user_id": other["id"], "status": "cancelled"})
     assert await friends_of(flow, viewer) == [], "Warteliste und Storno zählen nicht"
     await flow.db.teams.insert_one({"id": "team-rocket", "name": "Lions Rocket", "member_ids": ["leader-x", friend["id"]]})
-    await flow.db.tournament_registrations.insert_one({"id": new_id(), "tournament_id": "t-rl", "user_id": "leader-x", "team_id": "team-rocket",
+    await flow.db.team_members.insert_one({"team_id": "team-rocket", "user_id": friend["id"], "joined_at": "2026-01-10T10:00:00+00:00"})
+    await flow.db.tournament_registrations.insert_one({"id": "r-rocket", "tournament_id": "t-rl", "user_id": "leader-x", "team_id": "team-rocket",
                                                        "display_name": "Lions Rocket", "status": "approved"})
     friends = await friends_of(flow, viewer)
     assert [f["id"] for f in friends] == [friend["id"]]
@@ -209,3 +211,48 @@ def test_sharing_rules():
     assert event_friends.shares_registrations({"birth_date": "2015-01-01", event_friends.SETTING: True}, today) is True
     assert event_friends.shares_registrations({event_friends.SETTING: False}, today) is False
     assert event_friends.shares_registrations({"birth_date": "kein Datum"}, today) is True
+
+
+@pytest.mark.asyncio
+async def test_team_counts_who_was_in_it_then_not_today(flow):
+    """Codex-Prüfung: das heutige Team zählt nicht - wer erst nach dem Turnier beitritt oder nur in member_ids steht,
+    war nicht angemeldet. Es zählen gespeicherte Aufstellung samt Ersatz bzw. das Beitrittsdatum."""
+    viewer, friend = await seed(flow)
+    await befriend(flow, viewer, friend)
+    await flow.db.event_registrations.delete_many({})
+    await flow.db.tournament_registrations.delete_many({})
+    await flow.db.teams.insert_one({"id": "team-rocket", "name": "Lions Rocket", "member_ids": ["leader-x", friend["id"]]})
+    await flow.db.tournament_registrations.insert_one({"id": "r-rocket", "tournament_id": "t-rl", "user_id": "leader-x", "team_id": "team-rocket",
+                                                       "display_name": "Lions Rocket", "status": "approved"})
+    assert await friends_of(flow, viewer) == [], "nur im heutigen Team (member_ids), ohne Beitrittsdatum"
+    await flow.db.team_members.insert_one({"team_id": "team-rocket", "user_id": friend["id"], "joined_at": "2099-12-01T10:00:00+00:00"})
+    assert await friends_of(flow, viewer) == [], "erst nach dem Turnier beigetreten"
+    await flow.db.team_members.delete_many({})
+    await flow.db.tournament_registrations.update_one({"id": "r-rocket"}, {"$set": {"lineup": ["leader-x"], "substitutes": []}})
+    assert await friends_of(flow, viewer) == [], "nicht in der gespeicherten Aufstellung"
+    # Gegenprobe: in der gespeicherten Aufstellung (als Ersatz) - sichtbar.
+    await flow.db.tournament_registrations.update_one({"id": "r-rocket"}, {"$set": {"substitutes": [friend["id"]]}})
+    assert [f["id"] for f in await friends_of(flow, viewer)] == [friend["id"]]
+
+
+@pytest.mark.asyncio
+async def test_hint_only_for_the_team_the_viewer_was_in(flow):
+    viewer, friend = await seed(flow)
+    await befriend(flow, viewer, friend)
+    await flow.db.teams.insert_one({"id": "team-v", "name": "Vera Team", "member_ids": ["leader-y", viewer["id"]]})
+    await flow.db.tournament_registrations.insert_one({"id": "r-v", "tournament_id": "t-rl", "user_id": "leader-y", "team_id": "team-v", "status": "approved"})
+    flow.act_as(viewer)
+    assert (await flow.get("/api/events/herbst-lan/friends")).json()["hint"] is False, "nur im heutigen Team: kein Hinweis"
+    await flow.db.team_members.insert_one({"team_id": "team-v", "user_id": viewer["id"], "joined_at": "2026-01-10T10:00:00+00:00"})
+    assert (await flow.get("/api/events/herbst-lan/friends")).json()["hint"] is True, "Gegenprobe: vor dem Turnier beigetreten"
+
+
+@pytest.mark.asyncio
+async def test_erasure_removes_the_setting_and_the_hint(flow):
+    viewer, _friend = await seed(flow)
+    await flow.db.users.update_one({"id": viewer["id"]}, {"$set": {event_friends.SETTING: False, event_friends.HINT_FIELD: "2026-10-01T10:00:00+00:00"}})
+    flow.act_as(viewer)
+    res = await flow.post("/api/dsgvo/anonymize-me")
+    assert res.status_code == 200, res.text
+    stored = await flow.db.users.find_one({"id": viewer["id"]}, {"_id": 0})
+    assert event_friends.SETTING not in stored and event_friends.HINT_FIELD not in stored

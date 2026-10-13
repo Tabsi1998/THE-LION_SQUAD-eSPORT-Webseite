@@ -47,7 +47,12 @@ async def seed(flow, *, dates=PAST, status="scheduled"):
         {"id": new_id(), "event_id": "e-lan", "user_id": lena["id"], "status": "checked_in"},
         {"id": new_id(), "event_id": "e-lan", "user_id": mia["id"], "status": "waitlist"},
     ])
+    # Team ohne gespeicherte Aufstellung: es zählt, wer vor dem Turniertag beigetreten ist (team_members.joined_at).
     await flow.db.teams.insert_one({"id": "team-rocket", "name": "Lions Rocket", "member_ids": [noah["id"], mia["id"]]})
+    await flow.db.team_members.insert_many([
+        {"team_id": "team-rocket", "user_id": noah["id"], "joined_at": "2026-01-10T10:00:00+00:00"},
+        {"team_id": "team-rocket", "user_id": mia["id"], "joined_at": "2026-06-01T10:00:00+00:00"},
+    ])
     await flow.db.tournaments.insert_many([
         {"id": "t-mk", "slug": "mk", "title": "Mario Kart Cup", "event_id": "e-lan", "status": "results_published", "visibility": "public",
          "is_public": True, "format": "single_elim", "team_mode": "solo", "start_date": "2026-06-20T10:00:00+00:00"},
@@ -173,6 +178,54 @@ async def test_you_were_there_only_for_participants(flow):
     await flow.db.event_registrations.insert_one({"id": new_id(), "event_id": "e-lan", "user_id": stranger["id"], "status": "no_show"})
     flow.act_as(stranger)
     assert (await flow.get("/api/events/sommer-lan/recap")).json()["mine"] is None, "nicht erschienen ist nicht dabei"
+
+
+@pytest.mark.asyncio
+async def test_team_counts_who_was_in_it_then_not_today(flow):
+    """Codex-Prüfung: wer einem Team erst nach dem Event beitritt, war nicht dabei - weder „Du warst dabei“ noch Zahl."""
+    lena, noah, mia = await seed(flow)
+    late = await flow.add_user(role="player", name="lars")
+    await flow.db.teams.update_one({"id": "team-rocket"}, {"$push": {"member_ids": late["id"]}})
+    await flow.db.team_members.insert_one({"team_id": "team-rocket", "user_id": late["id"], "joined_at": "2026-08-01T10:00:00+00:00"})
+    flow.act_as(late)
+    recap = (await flow.get("/api/events/sommer-lan/recap")).json()
+    assert recap["mine"] is None, "erst nach dem Turnier beigetreten"
+    assert recap["numbers"]["participants"] == 5, "die Zahl bleibt beim damaligen Team"
+    # Ohne Beitrittsdatum zählt niemand aus dem heutigen Team - nur wer angemeldet hat (Kapitän).
+    await flow.db.team_members.delete_many({"user_id": late["id"]})
+    assert (await flow.get("/api/events/sommer-lan/recap")).json()["mine"] is None, "nur in member_ids: nicht dabei"
+    # Gegenprobe: vor dem Turnier beigetreten - dabei.
+    await flow.db.team_members.insert_one({"team_id": "team-rocket", "user_id": late["id"], "joined_at": "2026-06-10T10:00:00+00:00"})
+    assert [row["id"] for row in (await flow.get("/api/events/sommer-lan/recap")).json()["mine"]["results"]] == ["t-rl"]
+
+
+@pytest.mark.asyncio
+async def test_stored_lineup_decides_for_team_registrations(flow):
+    lena, noah, mia = await seed(flow)
+    await flow.db.tournament_registrations.update_one({"id": "r-rocket"}, {"$set": {"lineup": [noah["id"]], "substitutes": []}})
+    flow.act_as(mia)
+    recap = (await flow.get("/api/events/sommer-lan/recap")).json()
+    assert recap["mine"] is None, "nicht in der gespeicherten Aufstellung"
+    assert recap["numbers"]["participants"] == 4
+    # Gegenprobe: als Ersatz gespeichert - dabei.
+    await flow.db.tournament_registrations.update_one({"id": "r-rocket"}, {"$set": {"substitutes": [mia["id"]]}})
+    assert [row["id"] for row in (await flow.get("/api/events/sommer-lan/recap")).json()["mine"]["results"]] == ["t-rl"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", [{"is_banned": True}, {"is_active": False}, {"anonymized_at": "2026-09-01T00:00:00+00:00"}])
+async def test_names_of_blocked_or_deleted_accounts_are_neutral(flow, change):
+    lena, noah, mia = await seed(flow)
+    await flow.db.users.update_one({"id": lena["id"]}, {"$set": change})
+    flow.act_as(None)
+    recap = (await flow.get("/api/events/sommer-lan/recap")).json()
+    assert recap["winners"][0]["podium"][1] == {"rank": 2, "name": "Teilnehmer", "team": False, "detail": "1 Punkt"}, "Rang bleibt, Name neutral"
+    assert recap["fastlaps"][0]["podium"][0]["name"] == "Teilnehmer" and recap["fastlaps"][0]["podium"][0]["detail"] == "1:31.234"
+    assert "Lena" not in str(recap["winners"]) and "lena" not in str(recap["fastlaps"])
+    # Gegenprobe: aktives Konto mit Namen.
+    await flow.db.users.update_one({"id": lena["id"]}, {"$set": {"is_banned": False, "is_active": True}, "$unset": {"anonymized_at": ""}})
+    recap = (await flow.get("/api/events/sommer-lan/recap")).json()
+    assert recap["winners"][0]["podium"][1]["name"] == "Lena" and recap["fastlaps"][0]["podium"][0]["name"] == "lena"
 
 
 @pytest.mark.asyncio
