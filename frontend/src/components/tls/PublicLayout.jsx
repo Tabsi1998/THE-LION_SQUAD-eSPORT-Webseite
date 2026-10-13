@@ -25,8 +25,8 @@ import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/b
 import { contactLines, footerButtons, footerColumns } from "@/lib/siteFooter";
 import { StoreButton } from "@/components/tls/StoreButton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Menu, X, LogOut, Shield, ShieldCheck, Crown, Megaphone, ArrowUp, Smartphone } from "lucide-react";
-import { mfaSetupPath } from "@/lib/permissions";
+import { Menu, X, LogOut, Shield, ShieldCheck, Crown, Megaphone, ArrowUp, Smartphone, ClipboardList } from "lucide-react";
+import { mfaSetupPath, showsDutyEntry } from "@/lib/permissions";
 import { UserMenu } from "@/components/tls/UserMenu";
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { OfflineBar } from "@/components/tls/OfflineBar";
@@ -171,6 +171,11 @@ export function PublicLayout({ children }) {
                 {user && isAdmin && !adminNeedsSecondFactor && (
                   <Link to="/admin" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#29B6E8]">
                     <Shield className="w-3.5 h-3.5 inline mr-1.5" /> Admin
+                  </Link>
+                )}
+                {showsDutyEntry(user) && (
+                  <Link to="/admin" onClick={closeMobile} data-testid="nav-duty-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#29B6E8]">
+                    <ClipboardList className="w-3.5 h-3.5 inline mr-1.5" /> Mein Dienst
                   </Link>
                 )}
                 {user ? (

@@ -1,4 +1,4 @@
-import { adminWithoutSecondFactor, areaList, areasOf, canUseArea, hasArea, isAnyAdmin, leadWithoutSecondFactor, mfaSetupPath, roleLabel } from "./permissions";
+import { adminHome, adminWithoutSecondFactor, areaList, areasOf, canUseArea, hasArea, isAnyAdmin, leadWithoutSecondFactor, mfaSetupPath, roleLabel, showsDutyEntry } from "./permissions";
 
 test("Bereiche kommen vom Server, sonst aus der Rolle", () => {
   expect(areasOf({ role: "player", areas: ["content", "unsinn"] })).toEqual(["content"]);
@@ -63,4 +63,22 @@ test("canUseArea wie require_area: Moderation in der Liste öffnet keinen Bereic
   expect(canUseArea({ role: "player", areas: ["finance"], mfa_enabled: true, auth_mfa_verified: true }, "finance", "content")).toBe(true);
   expect(canUseArea({ role: "player" }, "moderation")).toBe(false);
   expect(canUseArea(null, "moderation")).toBe(false);
+});
+
+// Wohin /admin führt (#1352, #1353): Verwaltung mit Zwei-Faktor auf die Startseite (auch der Kassier, #992), Helfer auf
+// „Mein Dienst“, nur Moderation zu den Meldungen, wer keinen Dienst hat auf „Kein Zugriff“ mit dem freundlichen Satz.
+test.each([
+  ["Superadmin mit 2FA", { role: "superadmin", mfa_enabled: true, auth_mfa_verified: true }, "dashboard", false],
+  ["Kassier (nur Finanzen) mit 2FA", { role: "player", areas: ["finance"], mfa_enabled: true, auth_mfa_verified: true }, "dashboard", false],
+  ["Redaktion ohne 2FA", { role: "player", areas: ["content"] }, "mfa", false],
+  ["Turnierleitung ohne 2FA, mit Einsatz", { role: "tournament_admin", has_staff_assignment: true }, "duty", true],
+  ["Turnierleitung mit 2FA und Einsatz", { role: "tournament_admin", has_staff_assignment: true, mfa_enabled: true, auth_mfa_verified: true }, "dashboard", false],
+  ["Helfer (Spieler mit Einsatz)", { role: "player", has_staff_assignment: true, is_tournament_staff: true }, "duty", true],
+  ["Moderator", { role: "moderator" }, "moderation", true],
+  ["Moderator mit Einsatz", { role: "moderator", has_staff_assignment: true }, "duty", true],
+  ["Spieler ohne Dienst", { role: "player" }, "none", false],
+  ["nicht angemeldet", null, "login", false],
+])("%s → %s", (_name, user, target, dutyEntry) => {
+  expect(adminHome(user)).toBe(target);
+  expect(showsDutyEntry(user)).toBe(dutyEntry);
 });

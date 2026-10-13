@@ -1,17 +1,17 @@
 {
   "GHSA-86W9-CPQP-85RV": {
     "module": "node-forge",
-    "expires": "2026-11-02",
-    "reason": "node-forge 1.4.0 is the newest release and still affected; no patched version exists. It is used only by @expo/cli through @expo/code-signing-certificates (development tooling for signing over-the-air updates, which the app does not use) and is not part of the app bundle. Re-check on expiry."
+    "expires": "2027-01-02",
+    "reason": "node-forge 1.4.0 is the newest release and still affected (re-checked on 2026-10-13 for the 1.6.0 release: advisory range <=1.4.0); no patched version exists. It is used only by @expo/cli through @expo/code-signing-certificates (development tooling for signing over-the-air updates, which the app does not use) and is not part of the app bundle. Re-check on expiry."
   },
   "GHSA-VFJ7-8CJW-P6XM": {
     "module": "braces",
-    "expires": "2026-11-02",
-    "reason": "braces 3.0.3 is the newest release and still affected (stack exhaustion through deeply nested brace patterns; first flagged by the audit gate on 2026-10-03); no patched version exists. It is used only by jest (@jest/core -> micromatch) to match the test file patterns of this repository; it is development tooling, never sees outside input and is not part of the app bundle. Re-check on expiry."
+    "expires": "2027-01-02",
+    "reason": "braces 3.0.3 is the newest release and still affected (stack exhaustion through deeply nested brace patterns; first flagged by the audit gate on 2026-10-03, re-checked on 2026-10-13: advisory range <=3.0.3); no patched version exists. It is used only by jest 29 (@jest/core -> micromatch) to match the test file patterns of this repository; it is development tooling, never sees outside input and is not part of the app bundle. Jest 30 no longer pulls in micromatch there, but jest-expo 57 is built for jest 29, so leaving it is a separate test tooling upgrade, not part of a release. Re-check on expiry."
   },
   "GHSA-HP3W-G68C-FV3C": {
     "module": "sprintf-js",
-    "expires": "2026-11-02",
-    "reason": "sprintf-js 1.1.3 is the newest release and still affected (denial of service through unbounded precision specifiers; first flagged by the audit gate on 2026-10-06); no patched version exists. It is reached only through jest-expo -> babel-plugin-istanbul -> @istanbuljs/load-nyc-config -> js-yaml 3 -> argparse 1, i.e. the coverage configuration reader of the test runner; it is development tooling, never sees outside input and is not part of the app bundle. Re-check on expiry."
+    "expires": "2027-01-02",
+    "reason": "sprintf-js 1.1.3 is the newest release and still affected (denial of service through unbounded precision specifiers; first flagged by the audit gate on 2026-10-06, re-checked on 2026-10-13: advisory range <=1.1.3); no patched version exists. It is reached only through jest-expo -> babel-plugin-istanbul -> @istanbuljs/load-nyc-config -> js-yaml 3 -> argparse 1, i.e. the coverage configuration reader of the test runner; it is development tooling, never sees outside input and is not part of the app bundle. Re-check on expiry."
   }
 }

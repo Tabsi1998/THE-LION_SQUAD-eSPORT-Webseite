@@ -1,9 +1,9 @@
-import { adminWithoutSecondFactor, canUseArea, hasArea, mfaSetupPath, roleLabel } from "@/lib/permissions";
+import { adminWithoutSecondFactor, canUseArea, hasArea, mfaSetupPath, roleLabel, showsDutyEntry } from "@/lib/permissions";
 import { INTEGRATIONS, MENU_INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
-import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv, ShieldCheck, ClipboardList } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { OfflineBar } from "@/components/tls/OfflineBar";
@@ -16,7 +16,10 @@ export const ADMIN_GROUPS = [
   {
     label: "Übersicht",
     items: [
-      { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true, areas: ["tournaments", "content", "club", "system"] },
+      // Startseite für jeden Verwaltungsbereich - auch Finanzen (Kassier, #992); der Server prüft dasselbe (`require_dashboard`).
+      { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true, areas: ["tournaments", "content", "club", "finance", "system"] },
+      // „Mein Dienst“ (#1352): eigene Einsätze und Aufgaben - für Helfer mit Einsatz und für die Moderation ohne Verwaltung.
+      { to: "/admin/dienst", label: "Mein Dienst", icon: ClipboardList, duty: true },
     ],
   },
   {
@@ -137,6 +140,7 @@ export const ADMIN_GROUPS = [
 const ADMIN_SEARCH_TERMS = {
   "/admin/integrations": ["verbindungen", "alle verbindungen", "übersicht", "aktiv", "fehlt", "nicht lesbar", "schlüssel", "schluessel", "encryption", "settings_encryption_key", "verbindung weg"],
   "/admin": ["home", "start", "control"],
+  "/admin/dienst": ["dienst", "einsatz", "einsätze", "helfer", "aufgaben", "meine turniere"],
   "/admin/ops": ["fehler", "tempo", "langsam", "monitoring", "betrieb", "errors", "vitals", "checks", "ampel", "alarme", "logs", "ereignisse", "audit", "audit logs", "aktionen", "adminaktionen", "app-logs", "client-logs", "abstuerze", "abstürze", "versandlogs", "mail logs", "zugestellt", "bounce", "csv", "export", "aufbewahrung", "diagnose"],
   "/admin/app-releases": ["app", "apk", "release", "version", "update", "build", "lionsapp"],
   "/admin/members": ["verein", "mitgliedschaft", "beitrag", "verzeichnis", "einwilligung", "dolibarr", "mitgliedsnummer"],
@@ -227,17 +231,46 @@ function itemMatchesQuery(item, groupLabel, query) {
 export function navGroupsFor(user, query, disabledPlatforms = []) {
   const searchQuery = normalizeSearch(query);
   const helper = Boolean(user?.has_staff_assignment) || (Boolean(user?.is_tournament_staff) && !hasArea(user, "tournaments"));
+  // „Mein Dienst“ (#1352): wer einen Einsatz hat - oder nur moderiert und keine Startseite der Verwaltung bekommt.
+  const duty = helper || showsDutyEntry(user);
   // Abgehakte Plattformen (#558) fehlen im Menü - einschalten geht unter Alle Verbindungen.
   const off = new Set(Array.isArray(disabledPlatforms) ? disabledPlatforms : []);
   return ADMIN_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
       if (item.platform && off.has(item.platform)) return false;
-      const allowed = canUseArea(user, ...(item.areas || [])) || (item.staff && helper);
+      const allowed = item.duty ? duty : canUseArea(user, ...(item.areas || [])) || (item.staff && helper);
       if (item.searchOnly && !searchQuery) return false;
       return allowed && itemMatchesQuery(item, group.label, searchQuery);
     }),
   })).filter((group) => group.items.length > 0);
+}
+
+// Darf die Person diese Verwaltungsseite öffnen (#1353)? Für Knöpfe und Aufgaben außerhalb des Menüs - die Startseite
+// fragt dieselbe Liste wie das Menü: der Menüeintrag mit dem längsten passenden Pfad bestimmt die Bereiche (ohne den
+// Helfer-Zugang - die Startseite ist für Bereiche). Seiten ohne eigenen Eintrag stehen in EXTRA_LINK_AREAS; was nirgends
+// steht, gilt als gesperrt - lieber ein Knopf zu wenig als einer, der auf „Kein Zugriff“ führt.
+const EXTRA_LINK_AREAS = { "/setup": ["system"], "/admin/settings": ["system"], "/admin/integrations": ["system"] };
+
+export function linkAreas(to) {
+  const path = String(to || "").split(/[?#]/)[0];
+  let best = null;
+  for (const item of ADMIN_GROUPS.flatMap((group) => group.items)) {
+    if (item.duty || !item.areas) continue;
+    const route = item.to.split(/[?#]/)[0];
+    const covers = path === route || (!item.end && path.startsWith(`${route}/`));
+    if (covers && (!best || route.length > best.route.length)) best = { route, areas: item.areas };
+  }
+  for (const [route, areas] of Object.entries(EXTRA_LINK_AREAS)) {
+    if ((path === route || path.startsWith(`${route}/`)) && (!best || route.length > best.route.length)) best = { route, areas };
+  }
+  return best ? best.areas : null;
+}
+
+export function canOpenAdminLink(user, to) {
+  if (!String(to || "").startsWith("/admin") && !String(to || "").startsWith("/setup")) return true;
+  const areas = linkAreas(to);
+  return Boolean(areas) && canUseArea(user, ...areas);
 }
 
 // Moderatoren sehen nur diese Routen
