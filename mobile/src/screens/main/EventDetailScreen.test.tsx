@@ -291,7 +291,6 @@ test("Spielst du auch mit? nach der Anmeldung - „Nein danke“ schließt, ohne
   await render(<EventDetailScreen navigation={navigation} route={route} />);
   await fireEvent.press(await screen.findByTestId("event-register-submit"));
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/events/e1/registrations", expect.anything()));
-  // Nur die Event-Abrufe zählen - Freunde beim Event und der einmalige Hinweis (#1188) fragen eigens.
   await waitFor(() => expect(mockGet.mock.calls.filter(([url]) => !String(url).includes("friends"))).toHaveLength(2));
   expect(mockGet.mock.calls.some(([url]) => String(url).endsWith("/play-along"))).toBe(false);
   expect(screen.queryByTestId("play-along-sheet")).toBeNull();
