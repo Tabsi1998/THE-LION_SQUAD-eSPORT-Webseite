@@ -14,7 +14,7 @@ Einfügen. Vorschläge lassen sich hier ändern; die Play Console zeigt nur, was
 | Datenschutzerklärung | `https://lionsquad.at/privacy` hat den Abschnitt „LionsAPP“: Push, Absturzberichte, App-Sperre, Konto löschen – er entsteht aus den Einstellungen und braucht keinen Zusatztext |
 | Konto löschen in der App | Profil → „Konto löschen“ (#390); Google verlangt das bei Registrierung in der App |
 | Melden und Blockieren | in jedem Chat und im Profil (#414); Google verlangt das, sobald Nutzer miteinander schreiben |
-| Update aus der App | Play-Installationen bekommen Googles Update-Dialog, Sideload-Installationen die APK vom Vereinsserver (#421) |
+| Update aus der App | Play-Installationen bekommen Googles Update-Dialog, Geräte ohne Google Play holen die APK vom GitHub-Release im Browser (der Banner führt dorthin bzw. in den Store; #421, #593) |
 | Grafiken | `docs/store/icon-512.png` und `docs/store/feature-graphic-1024x500.png`, erzeugt mit `python scripts/store_graphics.py` aus den Markenbildern |
 
 ## Was der Betreiber klickt
@@ -24,9 +24,8 @@ Einfügen. Vorschläge lassen sich hier ändern; die Play Console zeigt nur, was
 3. **Store-Eintrag** (Abschnitt unten), **Grafiken** hochladen, **Screenshots** (Abschnitt unten).
 4. **Richtlinien** in der Console: Datenschutzerklärung `https://lionsquad.at/privacy`, App-Zugriff (Testkonto, Abschnitt unten), Werbung „nein“, Inhaltseinstufung (Fragebogen), Zielgruppe, Datensicherheit (Tabelle unten), Regierungs-App „nein“, Finanzfunktionen „keine“.
 5. **Einrichtung → API-Zugriff**: Dienstkonto für `--play`, Klickweg in `mobile/RELEASES.md` („Play Console: Bundle automatisch laden“). Optional, spart das Hochladen von Hand.
-6. **Interner Test**: Tester-Liste mit E-Mail-Adressen (Vorstand, zwei bis drei Freiwillige), Bundle hochladen oder `--play`, Link aus der Console an die Tester schicken. Google prüft interne Tests nicht.
-7. **Geschlossener Test** für Mitglieder: eigene Tester-Liste (E-Mail-Adressen der Mitglieder, die mitmachen) oder eine Google-Gruppe; ab hier prüft Google die App einmal (Store-Eintrag, Richtlinien). Das Konto ist als **Organisation** (Verein) angelegt – die 12-Tester-Regel für Privatkonten gilt nicht.
-8. **Produktion** erst mit 1.0.0 (Versionsschema in `mobile/RELEASES.md`); die Freigabe klickt der Betreiber selbst, das Skript lädt nie nach Produktion.
+6. **Offener Test** (seit #925 der einzige Testkanal; interner und geschlossener Test sind abgeschaltet): Bundle hochladen oder `--play`, den Link zum offenen Test aus der Console an die Mitglieder geben. Ab hier prüft Google die App einmal (Store-Eintrag, Richtlinien). Das Konto ist als **Organisation** (Verein) angelegt – die 12-Tester-Regel für Privatkonten gilt nicht.
+7. **Produktion** erst mit 1.0.0 (Versionsschema in `mobile/RELEASES.md`); die Freigabe klickt der Betreiber selbst, das Skript lädt nie nach Produktion.
 
 ## Store-Eintrag (Vorschlag)
 
@@ -95,12 +94,12 @@ mit Mitgliedschaft „aktiv“ in der Vereinsakte, damit der Mitgliederbereich s
 „App-Zugriff“ → „Alle oder einige Funktionen sind eingeschränkt“ → Anleitung:
 
 > Die App startet ohne Konto; Öffentliches (Turniere, Events, News) ist sofort zu sehen. Anmelden: Tab
-> „Mehr“ → „Anmelden oder registrieren“ (oder Tab „Profil“ → „Anmelden“) mit `play-review` und dem
+> „Profil“ → „Anmelden“ mit `play-review` und dem
 > hinterlegten Passwort. Die Einladung zum Passkey danach mit „Später“ schließen. Danach sind Turniere,
 > Events, Chat, Profil und Mitgliederbereich erreichbar. Zahlungen gibt es in der App nicht.
 
 Seit 1.2.0 (#918) startet die App ohne Anmeldebildschirm – die Anleitung in der Console deshalb mit
-diesem Release ersetzen.
+diesem Release ersetzen. Den Tab „Mehr“ gibt es seit #1143 nicht mehr: Der Text oben gilt für die heutige App. **Der Text in der Play Console selbst muss der Betreiber nachziehen** – diese Datei ändert ihn nicht.
 
 Das Passwort nur in die Console eintragen, nie ins Repo oder in einen Chat; nach der Prüfung ändern.
 
