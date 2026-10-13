@@ -42,6 +42,8 @@ logger = logging.getLogger("tls.mutation_lock")
 
 # Anteil der Laufzeit, um den der Halter vor dem rechnerischen Ablauf aufhört.
 LOSS_SAFETY_FRACTION = 0.25
+# Höchstens so lange wird beim Aufräumen auf die Freigabe gewartet; danach läuft die Sperre von selbst ab.
+RELEASE_TIMEOUT_SECONDS = 5.0
 
 
 class MutationLockBusy(RuntimeError):
@@ -109,6 +111,11 @@ class _MutationLease:
                 self._acquired = bool(document and document.get("owner") == self._owner)
             except DuplicateKeyError:
                 self._acquired = False
+            except BaseException:
+                # Abbruch oder Fehler, nachdem der Server die Sperre vielleicht schon vergeben hat: __aexit__ läuft
+                # dann nicht, also die eigene Sperre hier bestmöglich zurückgeben und den Fehler weiterreichen.
+                await self._release()
+                raise
             if self._acquired:
                 break
             remaining = deadline - monotonic()
@@ -166,6 +173,18 @@ class _MutationLease:
             self._confirmed(sent_at)
             delay = interval
 
+    async def _release(self):
+        """Nur die eigene Sperre löschen, zeitlich begrenzt; ein Fehler wird protokolliert, nicht weitergereicht."""
+        try:
+            return await asyncio.wait_for(
+                self._db.mutation_locks.delete_one({"resource": self._resource, "owner": self._owner}),
+                timeout=RELEASE_TIMEOUT_SECONDS,
+            )
+        except Exception:
+            logger.warning("Sperre %s konnte nicht freigegeben werden - sie läuft von selbst ab", self._resource,
+                           exc_info=True)
+            return None
+
     async def __aexit__(self, exc_type, exc, tb) -> bool:
         self._closing = True
         if self._deadline_handle:
@@ -182,8 +201,8 @@ class _MutationLease:
         if self._renewal_task:
             self._renewal_task.cancel()
             await asyncio.gather(self._renewal_task, return_exceptions=True)
-        released = await self._db.mutation_locks.delete_one({"resource": self._resource, "owner": self._owner})
-        if self._acquired and not self._lost and getattr(released, "deleted_count", None) == 0:
+        released = await self._release()
+        if released is not None and self._acquired and not self._lost and getattr(released, "deleted_count", None) == 0:
             logger.error("Sperre %s verloren (beim Freigeben gehörte sie nicht mehr dieser Aktion)", self._resource)
 
         if aborted:
