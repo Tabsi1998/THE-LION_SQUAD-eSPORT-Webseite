@@ -11,7 +11,7 @@ Rechte hängen an Bereichen, nicht an einer Rangfolge. Eine Person kann mehrere 
 | Bereich | Schlüssel | Was dazugehört |
 | --- | --- | --- |
 | Turnierleitung | `tournaments` | Turniere, Events, Stationen, Fast Lap, Saisons, Spiele, Gewinne, Strafen, Zugangslinks, PDF-Exporte |
-| Redaktion | `content` | News, Galerie, Medien, Sponsoren, Partner, Referenzen, Navigation, Sticker, Achievements, Seiten-Banner, Newsletter, Twitch-Streams |
+| Redaktion | `content` | News, Galerie, Medien, Sponsoren, Partner, Referenzen, Navigation, Sticker, Erfolge (Achievements), Seiten-Banner, Newsletter, Twitch-Streams |
 | Vereinsverwaltung | `club` | Mitglieder und Mitgliederprofile, Anträge, Dokumente, Vorteile, Vorstand, Kontakt-Inbox, Benutzerliste (lesen, bannen mit Grund – Konten mit Adminbereich oder Admin-Rolle bannt nur der Superadmin, Superadmin-Konten niemand), Discord-Zähler |
 | Finanzen | `finance` | Kosten und Abrechnung an Events (später Turnieren), Finanzübersicht mit Rechnungsaufträgen, Freigaben (#322, docs/ABRECHNUNG.md), Rechnungsangaben: Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, „Steuersätze geprüft“, „gleich freigeben“ (#1358) – die übrige Dolibarr-Technik bleibt bei System |
 | System | `system` | Einstellungen (Mail, Branding, Discord, Auth), Game-Server, Betrieb, Logs, Audit, App-Logs, Push-Tests, App-Versionen, E-Mail-Vorlagen, Wartungsläufe für Uploads |
@@ -166,6 +166,14 @@ Person selbst sehen darf und wofür sie angemeldet ist, dazu ihre zugesagten Ver
 Sitzung gilt dort keine Zwei-Faktor-Ausnahme der Turnierleitung. Gesperrte oder abgeschaltete Konten bekommen nichts,
 beim Löschen des Kontos fällt der Link weg. Code: `services/personal_calendar.py`.
 
+Die Team-Seite in Web und App folgt dem Server: Team bearbeiten und Squads dürfen Leitung, Co-Leitung, Turnierleitung,
+Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und Superadmin; auflösen Leitung,
+Club-Admin und Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen
+dabei – wie überall – nur mit bestätigter Zwei-Faktor-Anmeldung (#1469); Leitung und Co-Leitung brauchen sie für ihr
+Team nicht. Seit #1479 schickt der Server das fertige Ergebnis mit (`can_manage`, `can_remove_members`,
+`can_dissolve`); fehlt einer Admin-Rolle nur die Zwei-Faktor-Anmeldung (`admin_needs_second_factor`), steht statt der
+Knöpfe „2FA einrichten“ da.
+
 **„Spielst du auch mit?“ (#1184):** nach der Event-Anmeldung meldet `POST /api/events/{id}/play-along` die gewählten
 Einzel-Turniere des Events an – nur mit Konto, nur für die Person selbst. Je Turnier läuft die normale Selbstanmeldung
 mit allen Regeln (Sichtbarkeit, Frist, Event-Pflicht #875, Startgeld #319, voll → Warteliste); es gibt keine Abkürzung.
@@ -246,6 +254,11 @@ Benachrichtigungen ab. Es hängt nicht am Newsletter.
 - Inhalte „Nur intern“ und „Nur Mitglieder“ öffnet ein Adminbereich (Rolle, Freigabe, Vorstandsposten, Dolibarr)
   nur mit bestätigter Zwei-Faktor-Anmeldung; als Mitglied sieht man Mitglieder-Inhalte weiter ohne. Dasselbe gilt
   für Profilfelder mit der Stufe „Nur Admins“ (Moderation ausgenommen). Meldungen an Empfänger hängen nicht davon ab.
+- Öffentliche Seiten, die Verwaltenden mehr zeigen (#1479), tun das ebenfalls nur mit bestätigter
+  Zwei-Faktor-Anmeldung: die Kosten-Konfiguration an Events und Turnieren (Finanzen; die Preisangabe sehen alle),
+  leere Alben in Galerie und Event-Seite und die Vorschau des Jahresrückblicks (Redaktion), Banner für „Admins“
+  (Moderation ausgenommen) und der Helfer-Aufruf (Vorstand). Code: `can_use_area` in `services/permissions.py`, im Web
+  `canUseArea`.
 
 ## Benutzermenü und Konto-Seiten (#516)
 
@@ -266,7 +279,7 @@ genau ein Ziel, in der Reihenfolge, wie oft man es braucht:
 | Gewinne (n) | `/my/prizes` – nur mit offenem Gewinn | Gewinner |
 | Hilfe & Kontakt | `/contact` | jedes Konto |
 | Mitgliederbereich | `/members/area` (Mitgliedschaft, Karte, Vorteile, Dokumente, interne News, Vorstand, Discord) | Mitglieder |
-| Admin | `/admin` | wer einen Bereich hat |
+| Admin | `/admin` | wer einen Verwaltungsbereich hat (nicht Moderation allein) |
 | Abmelden | – | jedes Konto |
 
 Gäste sehen statt des Menüs „Anmelden“ und „Mitglied werden“. Die Profil-Seitenleiste führt nur
@@ -280,16 +293,16 @@ Finanzen; die Turnierleitung Turniere, Stationen, Strafen und Gewinne; der Admin
 
 | Gruppe | Einträge | Wer |
 | --- | --- | --- |
-| Übersicht | Dashboard | jeder mit einem Bereich |
+| Übersicht | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, System) | wer einen dieser Bereiche hat; Moderation allein hat weder Menüeintrag „Admin“ noch `/admin`, nur `/admin/moderation` |
 | Verein | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) | je Eintrag |
 | Mitglieder | Mitglieder, Mitgliederprofile, Bewerbungen, Mitgliedervorteile, Dokumente, Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung und System) | Vereinsverwaltung |
 | Finanzen | Finanzübersicht | Finanzen |
 | eSports | Turniere, Fast Lap, Stationen (Turnierleitung, Helfer) · Turnier-Leitfaden, Jahreswertung, Spiele, Gewinne, Strafen (Turnierleitung) · Game-Server (System) | Turnierleitung |
-| Content | Events (Turnierleitung) · News, Galerie, Medien, Navigation, Achievements, Sticker (Redaktion) · Downloads & QR (alle) | Redaktion |
+| Content | Events (Turnierleitung) · News, Galerie, Medien, Navigation, Erfolge, Sticker (Redaktion) · Downloads & QR (Turnierleitung, Redaktion, Vereinsverwaltung, System) | Redaktion |
 | Verbindungen | Alle Verbindungen (Übersicht mit Zustand: aktiv, aus, fehlt, nicht lesbar, Fehler) · je Dienst eine Seite (Google, Resend, SMTP, Discord, Twitch, Steam, …) | System |
-| E-Mail | Newsletter, Mail-Queue, Versandlogs, E-Mail-Vorlagen | System |
+| E-Mail | Newsletter, Mail-Queue, E-Mail-Vorlagen (Versandlogs: Betrieb & Logs → Ereignisse, Quelle E-Mail) | System |
 | Auftritt | Branding, Socials, SEO & Analytics | System |
-| System | Betrieb, Status, Logs, Audit Logs, App-Logs, Push-Tests, App-Versionen, Zugang, Einrichtung & FAQ (System) · Moderation (Moderation) | System |
+| System | Betrieb & Logs (mit Ereignissen, Adminaktionen/Audit, App-Logs und Versandlogs als Reiter bzw. Quellen), Status, Push-Tests, App-Versionen, Zugang, Einrichtung & FAQ (System) · Moderation (Moderation) | System |
 
 Seit #546 gibt es keine Seite „Einstellungen“ mehr: jeder frühere Reiter ist ein Menüeintrag
 (`/admin/settings/<seite>`), alte Links mit `?tab=` leiten dorthin um. Die Reiter der Dolibarr-Seite

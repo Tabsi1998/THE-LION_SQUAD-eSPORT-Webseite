@@ -19,7 +19,7 @@ from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import billing_orders, event_days, event_facts, event_locations, event_play_along, event_registration, pricing
 from services.event_registration import RegistrationError
-from services.permissions import areas_for, needs_mfa, user_has_area
+from services.permissions import areas_for, can_use_area, needs_mfa, user_has_area
 from services.permissions import is_confirmed_tournament_lead
 from models import EventCreate, EventUpdate, EventPlayAlongCreate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
 
@@ -539,7 +539,7 @@ async def list_events(
                 fresh.append(ev)
         events = fresh
     out = []
-    finance = bool(user) and await user_has_area(user, "finance")
+    finance = await can_use_area(user, "finance")
     for ev in events:
         if await _lead_can_see(user, ev.get("visibility") or "public"):
             # Preisangabe für alle, die Konfiguration mit Dolibarr-Nummern nur für Finanzen (#322).
@@ -641,7 +641,7 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     for album in visible_albums:
         album["media_count"] = await db.gallery_photos.count_documents({"album_id": album["id"]})
         album["is_empty"] = not album["media_count"]
-    shows_empty = await user_has_area(user, "content")
+    shows_empty = await can_use_area(user, "content")
     event["photos_coming"] = any(album["is_empty"] for album in visible_albums)
     event["albums"] = [album for album in visible_albums if shows_empty or not album["is_empty"]]
     # Linked news
@@ -671,7 +671,7 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     # Preisangabe für die Anmeldung (#318); die Konfiguration mit Dolibarr-Nummern sieht nur Finanzen.
     offer = event.pop("billing", None)
     event["offer"] = pricing.public_offer(offer)
-    if user and await user_has_area(user, "finance"):
+    if await can_use_area(user, "finance"):
         event["billing"] = offer or pricing.normalize_offer(None)
     if access_link:
         await touch_access_link(db, access_link, user)

@@ -197,9 +197,10 @@ test("Co-Kapitän bearbeitet, löst aber nicht auf", async () => {
   expect(screen.queryByTestId("team-dissolve")).toBeNull();
 });
 
-// Rollen II (#1350): die Team-Seite fragt dieselben Rollen wie der Server - Moderatoren moderieren und sehen auf fremden
-// Team-Seiten keine Verwaltungs-Knöpfe; die Turnierleitung bearbeitet das Team, Mitglieder entfernt nur die Leitung oder der
-// Club-Admin.
+// Rollen II (#1350, #1479): was eine Admin-Rolle am fremden Team darf, sagt der Server (`can_manage`,
+// `can_remove_members`, `can_dissolve`) - mit denselben Regeln wie die Aktionen, also nur mit bestätigter
+// Zwei-Faktor-Anmeldung. Moderatoren moderieren und sehen keine Verwaltungs-Knöpfe; die Turnierleitung bearbeitet das
+// Team, Mitglieder entfernt nur die Leitung oder der Club-Admin.
 const STRANGER_TEAM = {
   ...TEAM, leader_id: "u-lead", co_leader_ids: [], member_ids: ["u-lead", "u-2"],
   members: [{ id: "u-lead", username: "leitung", display_name: "Leitung" }, { id: "u-2", username: "erika", display_name: "Erika Beispiel" }],
@@ -216,20 +217,49 @@ test("Moderator auf einer fremden Team-Seite: keine Verwaltungs-Knöpfe", async 
   expect(screen.queryByText("Entfernen")).toBeNull();
 });
 
-test("Turnierleitung bearbeitet das Team, entfernt aber keine Mitglieder (wie der Server)", async () => {
+test("Turnierleitung mit Zwei-Faktor bearbeitet das Team, entfernt aber keine Mitglieder und löst nicht auf", async () => {
   mockAuth.user = { id: "u-ta", username: "turnier", role: "tournament_admin" };
-  serve(STRANGER_TEAM);
+  serve({ ...STRANGER_TEAM, can_manage: true, can_remove_members: false, can_dissolve: false });
   await render(<TeamDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("team-edit-open")).toBeTruthy());
   expect(screen.queryByText("Entfernen")).toBeNull();
+  await fireEvent.press(screen.getByTestId("team-edit-open"));
+  await waitFor(() => expect(screen.getByTestId("team-color-picker")).toBeTruthy());
+  expect(screen.queryByTestId("team-dissolve")).toBeNull();
+  expect(screen.queryByTestId("team-mfa-setup")).toBeNull();
 });
 
-test("Club-Admin darf Mitglieder entfernen", async () => {
+test("Club-Admin mit Zwei-Faktor darf Mitglieder entfernen und auflösen", async () => {
   mockAuth.user = { id: "u-ca", username: "clubadmin", role: "club_admin" };
-  serve(STRANGER_TEAM);
+  serve({ ...STRANGER_TEAM, can_manage: true, can_remove_members: true, can_dissolve: true }, {
+    "/teams/t1/dissolve-preview": { member_count: 2, chat_messages: 0, withdraw: [], blocked: [], can_dissolve: true },
+  });
   await render(<TeamDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("team-edit-open")).toBeTruthy());
   expect(screen.getAllByText("Entfernen")).toHaveLength(1);
+  await fireEvent.press(screen.getByTestId("team-edit-open"));
+  await waitFor(() => expect(screen.getByTestId("team-dissolve")).toBeTruthy());
+});
+
+// Ohne bestätigte Zwei-Faktor-Anmeldung (#1479): die Rolle allein öffnet nichts - statt der Knöpfe „2FA einrichten“.
+test.each([
+  ["Club-Admin", { id: "u-ca", username: "clubadmin", role: "club_admin" }],
+  ["Turnierleitung", { id: "u-ta", username: "turnier", role: "tournament_admin" }],
+])("%s ohne Zwei-Faktor: keine Verwaltungs-Knöpfe, dafür „2FA einrichten“", async (_label, who) => {
+  mockAuth.user = who;
+  const Linking = jest.requireActual("react-native").Linking;
+  const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+  serve({ ...STRANGER_TEAM, can_manage: false, can_remove_members: false, can_dissolve: false, admin_needs_second_factor: true });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-mfa-setup")).toBeTruthy());
+  expect(screen.queryByTestId("team-edit-open")).toBeNull();
+  expect(screen.queryByTestId("team-invite-open")).toBeNull();
+  expect(screen.queryByTestId("team-manage-members")).toBeNull();
+  expect(screen.queryByText("Entfernen")).toBeNull();
+  expect(screen.queryByText("Verwaltung aktiv")).toBeNull();
+  await fireEvent.press(screen.getByTestId("team-mfa-setup"));
+  expect(openURL).toHaveBeenCalledWith(expect.stringMatching(/\/profile\?tab=security&mfa=required&next=%2Fteams%2Ft1$/));
+  openURL.mockRestore();
 });
 
 test("Logo und Banner vom Handy: nur Kapitän und Co-Kapitän sehen die Bildauswahl, URL-Felder gibt es nicht mehr (#1153)", async () => {

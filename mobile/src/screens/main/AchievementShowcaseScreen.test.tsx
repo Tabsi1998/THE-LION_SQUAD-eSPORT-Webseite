@@ -108,6 +108,9 @@ test("Bestenliste: Podest und Liste, Level statt Punkte, Kategorie und Zeitraum 
   const first = await screen.findByTestId("podium-1");
   expect(first).toHaveTextContent("Ben", { exact: false });
   expect(first).toHaveTextContent("★", { exact: false });
+  // Löwen-Rang (#1457): der Rahmen am Podest ist Schmuck, Level und Rang stehen im Namen des Platzes.
+  expect(first.props.accessibilityLabel).toBe("Platz 1, Ben, Level 4, Rang Jungtier, Prestige 1, 15 Punkte, 2 Erfolge");
+  expect(screen.getByTestId("podium-frame-1", { includeHiddenElements: true }).props.accessible).toBe(false);
   expect(screen.getByTestId("leaderboard-row-4")).toHaveTextContent("Dora", { exact: false });
   expect(screen.getByTestId("leaderboard-row-4")).toHaveTextContent("1 Erfolg", { exact: false });
   expect(screen.getByTestId("podium-1")).toHaveTextContent("2 Erfolge", { exact: false });

@@ -12,48 +12,20 @@ import uuid
 import pathlib
 import asyncio
 import mimetypes
-import re
+from functools import partial
 from typing import Optional
 
 import httpx
 
 from database import get_db
+from services import media_audit
 from storage import PUBLIC_UPLOAD_DIR, ensure_directory
 
 logger = logging.getLogger("tls.image_migrate")
 
-# (collection, list of fields, optional pointer to nested list of {url_field}, optional sub-doc field-name)
-TARGETS: list[tuple[str, list[str]]] = [
-    ("settings", ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "qr_logo_url", "favicon_url", "favicon_light_url", "favicon_dark_url", "avatar_url"]),
-    ("users", ["avatar_url", "banner_url"]),
-    ("teams", ["logo_url", "banner_url"]),
-    ("sponsors", ["logo_url"]),
-    ("partners", ["logo_url"]),
-    ("news_posts", ["banner_url", "cover_url"]),
-    ("events", ["banner_url", "cover_url"]),
-    ("games", ["cover_url", "logo_url"]),
-    ("tournaments", ["banner_url", "cover_url"]),
-    ("f1_challenges", ["banner_url", "cover_url"]),
-    ("f1_tracks", ["image_url"]),
-    ("seasons", ["banner_url"]),
-    ("gallery_albums", ["cover_url"]),
-    ("gallery_photos", ["image_url", "thumbnail_url"]),
-    ("member_benefits", ["image_url"]),
-    ("club_member_profiles", ["photo_url", "cover_url"]),
-]
-
-TEXT_TARGETS: list[tuple[str, list[str]]] = [
-    ("news_posts", ["content"]),
-    ("events", ["description", "program"]),
-    ("tournaments", ["description"]),
-    ("f1_challenges", ["description"]),
-    ("club_member_profiles", ["bio"]),
-]
-
-TEXT_IMAGE_RE = re.compile(
-    r"!\[[^\]\n]*\]\((?P<md>[^)\s]+)\)|<img\b[^>]*\bsrc=[\"'](?P<html>[^\"']+)[\"']",
-    re.IGNORECASE,
-)
+# Dieselben Stellen wie Kontolöschung und Mediathek (#1471), auch verschachtelte Felder (``media_audit.usage_places``).
+# Videos lädt die Migration nicht: sie nimmt nur Bilder an und müsste ein Video erst ganz herunterladen.
+SKIPPED_FIELDS = {("gallery_photos", "video_url")}
 
 LOCAL_PREFIX = "/api/static/uploads/"
 
@@ -96,67 +68,57 @@ async def _download_to_local(url: str, client: httpx.AsyncClient) -> Optional[st
         return None
 
 
+def _external_urls(value, text: bool) -> list[str]:
+    """Externe Bildadressen in einem Wert: das Feld selbst oder die Bilder in einem Text."""
+    if not isinstance(value, str):
+        return []
+    if not text:
+        return [value] if _is_external(value) else []
+    urls = (match.group("md") or match.group("html") for match in media_audit.TEXT_IMAGE_RE.finditer(value))
+    return [url for url in urls if _is_external(url)]
+
+
+def _localized(value, text: bool, cache: dict[str, Optional[str]]):
+    """Der Wert mit den heruntergeladenen Adressen statt der externen; was scheiterte, bleibt."""
+    for url in _external_urls(value, text):
+        value = value.replace(url, cache.get(url) or url) if text else (cache.get(url) or url)
+    return value
+
+
 async def migrate_all() -> dict:
     """Run the migration. Returns counts per collection."""
     db = get_db()
     summary: dict[str, dict[str, int]] = {}
     cache: dict[str, Optional[str]] = {}
+    grouped: dict[str, list[tuple[str, bool]]] = {}
+    for coll_name, fields, text in media_audit.usage_places():
+        grouped.setdefault(coll_name, []).extend((f, text) for f in fields if (coll_name, f) not in SKIPPED_FIELDS)
     async with httpx.AsyncClient(headers={"User-Agent": "TLS-ImageMigrate/1.0"}) as client:
-        for coll_name, fields in TARGETS:
+        for coll_name, fields in grouped.items():
             scanned = 0
             updated = 0
             failed = 0
             cursor = db[coll_name].find({})
             async for doc in cursor:
                 scanned += 1
-                updates: dict[str, str] = {}
-                for f in fields:
-                    val = doc.get(f)
-                    if not _is_external(val):
-                        continue
-                    if val not in cache:
-                        cache[val] = await _download_to_local(val, client)
-                    new_url = cache[val]
-                    if new_url:
-                        updates[f] = new_url
-                    else:
-                        failed += 1
+                changed = dict(doc)
+                for f, text in fields:
+                    for value in media_audit.values_at(doc, f):
+                        for url in _external_urls(value, text):
+                            if url not in cache:
+                                cache[url] = await _download_to_local(url, client)
+                            if not cache[url]:
+                                failed += 1
+                    top, *rest = f.split(".")
+                    if top in changed:
+                        localize = partial(_localized, text=text, cache=cache)
+                        changed[top] = media_audit.replace_values(changed[top], rest, localize)
+                updates = {key: value for key, value in changed.items() if value != doc.get(key)}
                 if updates:
-                    await db[coll_name].update_one({"id": doc["id"]} if doc.get("id") else {"_id": doc["_id"]}, {"$set": updates})
-                    updated += 1
-            summary[coll_name] = {"scanned": scanned, "updated": updated, "failed": failed}
-        for coll_name, fields in TEXT_TARGETS:
-            scanned = 0
-            updated = 0
-            failed = 0
-            cursor = db[coll_name].find({})
-            async for doc in cursor:
-                scanned += 1
-                updates: dict[str, str] = {}
-                for f in fields:
-                    text = doc.get(f)
-                    if not isinstance(text, str) or not text:
-                        continue
-                    next_text = text
-                    for match in TEXT_IMAGE_RE.finditer(text):
-                        val = match.group("md") or match.group("html")
-                        if not _is_external(val):
-                            continue
-                        if val not in cache:
-                            cache[val] = await _download_to_local(val, client)
-                        new_url = cache[val]
-                        if new_url:
-                            next_text = next_text.replace(val, new_url)
-                        else:
-                            failed += 1
-                    if next_text != text:
-                        updates[f] = next_text
-                if updates:
-                    query = {"id": doc["id"]} if doc.get("id") else ({"slug": doc["slug"]} if doc.get("slug") else {"_id": doc["_id"]})
+                    query = {"id": doc["id"]} if doc.get("id") else {"_id": doc["_id"]}
                     await db[coll_name].update_one(query, {"$set": updates})
                     updated += 1
-            key = f"{coll_name}:text"
-            summary[key] = {"scanned": scanned, "updated": updated, "failed": failed}
+            summary[coll_name] = {"scanned": scanned, "updated": updated, "failed": failed}
     logger.info(f"[image-migrate] done: {summary}")
     return summary
 

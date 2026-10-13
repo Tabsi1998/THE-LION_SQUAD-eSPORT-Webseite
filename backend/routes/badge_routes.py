@@ -220,8 +220,8 @@ async def achievements_leaderboard(limit: int = 24, by: str = "points", category
 
 @router.get("/crowns")
 async def achievement_crowns():
-    """Dynamic crowns: best three non-obsidian players get gold/silver/bronze,
-    players at level 30+ get the obsidian crown. Transitions trigger notifications."""
+    """Dynamic crowns: best three non-onyx players get gold/silver/bronze,
+    players at level 30+ get the onyx crown (#1458: "Obsidian" is rank 10). Transitions trigger notifications."""
     from services.crown_events import get_crowns
     return {"crowns": await get_crowns()}
 

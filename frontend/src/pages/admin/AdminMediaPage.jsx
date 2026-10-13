@@ -150,14 +150,24 @@ export default function AdminMediaPage() {
     ];
   }, [mediaAudit]);
 
+  // Eine verwendete Datei löscht die Mediathek nur nach Warnung (#1471): Die Verwendungen kennt sie aus derselben
+  // Liste wie die Kontolöschung, auch verschachtelte Felder wie Gewinnerbilder oder die Chronik auf „Über uns“.
   const del = async (it) => {
-    if (!await confirm({ title: "Datei endgültig löschen?", description: `"${it.filename}" wird aus der Medienbibliothek entfernt. Verknüpfte Bildfelder werden bereinigt.`, confirmLabel: "Löschen" })) return;
+    const used = (it.usage_count || 0) > 0;
+    const places = [...new Set((it.references || []).map((ref) => ref.place || `${ref.collection}.${ref.field}`))].join(", ");
+    const description = used
+      ? `"${it.filename}" wird noch verwendet (${it.usage_count}x${places ? `: ${places}` : ""}). Diese Bildfelder werden geleert; Bilder in Texten bleiben als toter Verweis stehen.`
+      : `"${it.filename}" wird nirgends verwendet und wird aus der Medienbibliothek entfernt.`;
+    if (!await confirm({ title: used ? "Verwendete Datei löschen?" : "Datei endgültig löschen?", description, confirmLabel: used ? "Trotzdem löschen" : "Löschen" })) return;
     const previous = items;
     setItems((rows) => rows.filter((row) => row.filename !== it.filename));
     setSelected(null);
     try {
-      const { data } = await api.delete(`/admin/media/${encodeURIComponent(it.filename)}`);
-      toast.success(`Datei gelöscht${data?.cleared_references ? `, ${data.cleared_references} Verknüpfung(en) bereinigt` : ""}`);
+      const { data } = await api.delete(`/admin/media/${encodeURIComponent(it.filename)}${used ? "?force=true" : ""}`);
+      const cleared = data?.cleared_references ? `, ${data.cleared_references} Verknüpfung(en) bereinigt` : "";
+      const inText = data?.text_references ? `, ${data.text_references} Verweis(e) in Texten bitte von Hand anpassen` : "";
+      const later = data?.file_pending ? " (die Datei selbst wird beim nächsten Aufräumen entfernt)" : "";
+      toast.success(`Datei gelöscht${later}${cleared}${inText}`);
       load();
     } catch (e) {
       setItems(previous);

@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import RING from "./loewenRangRing.json";
-import { FRAME_SIZES, FRAME_WIDTHS, PROFILE_SMALL, RANK_NAMES, TOP_OVERHANG, frameFit, frameLayout, frameSources, rankForLevel, rankInfo, ringOf } from "./loewenRang";
+import CASES from "./loewenRang.cases.json";
+import { FRAME_SIZES, FRAME_WIDTHS, PROFILE_SMALL, RANK_NAMES, TOP_OVERHANG, frameFit, frameLayout, framePadding, frameSources, rankForLevel, rankInfo, ringOf } from "./loewenRang";
 
 // Löwen-Rang (#1452, #1454): Rang-Zuordnung wie im Backend, Ausrichtung des Rahmens am gemessenen Ring.
 
@@ -109,4 +110,16 @@ test("feste Fläche: seitlich und unten passt die Grafik hinein, oben höchstens
   // Rang 1 bekommt ein großes Foto, Rang 12 ein kleineres; der Überstand oben macht Rang 1 größer als ohne.
   expect(frameFit(ringOf("01")).photo).toBeGreaterThan(frameFit(ringOf("12")).photo);
   expect(frameFit(ringOf("01")).photo).toBeGreaterThan(frameFit(ringOf("01"), 0).photo);
+});
+
+// App und Web rechnen gleich (#1457): die App (mobile/src/lib/loewenRang.test.ts) prüft gegen dieselben Fälle.
+test("dieselben Fälle wie die App: alle 60 Level und alle 12 Rahmen", () => {
+  expect(Array.from({ length: 60 }, (_, i) => rankInfo(i + 1))).toEqual(CASES.levels);
+  expect(CASES.frames.map(({ key }) => key)).toEqual(Object.keys(RING).sort());
+  for (const { key, fit, pad, layout } of CASES.frames) {
+    const ring = ringOf(key);
+    expect(frameFit(ring), key).toEqual(fit);
+    expect(framePadding(ring), key).toEqual(pad);
+    expect(frameLayout(0.5, ring), key).toEqual(layout);
+  }
 });
