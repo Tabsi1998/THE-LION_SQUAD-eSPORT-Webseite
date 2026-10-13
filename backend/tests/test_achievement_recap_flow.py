@@ -51,10 +51,10 @@ async def activity(flow, user, *, xp=0, bonus=0, awards=(), at="2026-10-08T18:00
 def test_the_template_lists_each_achievement_and_escapes_everything():
     import email_service
 
-    subject, html = email_service.tpl_achievement_recap("<Paula>", "05.10. – 11.10.2026", "55", "12", "Kämpfer", unlocked="Champion III (Gold)\nNeu <b>", next_up="Champion IV – noch 2", bonus_hint="Vereinsmitglieder bekommen 10 % mehr XP auf alles.", url="https://x/profile", preferences_url="https://x/prefs")
+    subject, html = email_service.tpl_achievement_recap("<Paula>", "05.10. – 11.10.2026", "55", "12", "Rudel", unlocked="Champion III (Gold)\nNeu <b>", next_up="Champion IV – noch 2", bonus_hint="Vereinsmitglieder bekommen 10 % mehr XP auf alles.", url="https://x/profile", preferences_url="https://x/prefs")
     assert subject == "Deine Woche: +55 XP"
     assert "&lt;Paula&gt;" in html and "<li>Champion III (Gold)</li>" in html and "<li>Neu &lt;b&gt;</li>" in html
-    assert "Level 12 – Kämpfer" in html and "Als Nächstes:" in html and "https://x/prefs" in html
+    assert "Level 12 – Rudel" in html and "Als Nächstes:" in html and "https://x/prefs" in html
 
 
 @pytest.mark.asyncio

@@ -22,7 +22,7 @@ export function sampleCeremony({ material, category, sequence, art }) {
     code: `preview_${m}_${i}`, name: `Beispiel ${["I", "II", "III"][i]}`, description: `So sieht ${MATERIAL_LOOKS[m].name} in „${CATEGORY_LABELS[category] || category}“ aus.`,
     material: m, material_name: MATERIAL_LOOKS[m].name, rank: MATERIAL_LOOKS[m].rank, category, icon: "trophy", art, group_name: CATEGORY_LABELS[category] || category, points: 10 * (MATERIAL_LOOKS[m].rank || rank), award_id: "vorschau", hidden: category === "hidden",
   });
-  if (sequence === "levelup") return { tiers: [], levelUp: { level: 10, previous: 9, title: "Kämpfer", titleChanged: true, prestige: 1, prestigeGained: true } };
+  if (sequence === "levelup") return { tiers: [], levelUp: { level: 10, previous: 9, title: "Rudel", titleChanged: true, prestige: 1, prestigeGained: true } };
   if (sequence === "stack") return { tiers: [make(0), make(1, "silver"), make(2, "wood")] };
   if (sequence === "diamond") return { tiers: [make(0, "diamond")] };
   if (sequence === "legendary") return { tiers: [make(0, "legendary")] };

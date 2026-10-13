@@ -58,6 +58,36 @@ export function isAnyAdmin(user) {
   return hasArea(user, ...ADMIN_AREAS);
 }
 
+// Zwei-Faktor (#291, #1028): jeder Bereich außer Moderation gilt erst mit bestätigter Zwei-Faktor-Anmeldung -
+// wie `MFA_AREAS` und `needs_mfa` im Server. Helfer-Einsätze je Turnier brauchen sie nicht.
+export const MFA_AREAS = new Set(ADMIN_AREAS);
+
+export function needsSecondFactor(user) {
+  return !(user?.mfa_enabled && user?.auth_mfa_verified);
+}
+
+/** Darf die Person diesen Bereich jetzt benutzen - Bereich vorhanden und, wo nötig, Zwei-Faktor bestätigt? */
+export function canUseArea(user, ...areas) {
+  return areas.flat().some((area) => hasArea(user, area) && (!MFA_AREAS.has(area) || !needsSecondFactor(user)));
+}
+
+/** Turnierleitung über alle Turniere (Rolle oder Freigabe), aber noch ohne bestätigte Zwei-Faktor-Anmeldung. */
+export function leadWithoutSecondFactor(user) {
+  return hasArea(user, "tournaments") && needsSecondFactor(user);
+}
+
+/** Irgendein Adminbereich, aber noch ohne bestätigte Zwei-Faktor-Anmeldung: statt der Verwaltung „2FA einrichten“. */
+export function adminWithoutSecondFactor(user) {
+  return isAnyAdmin(user) && needsSecondFactor(user);
+}
+
+/** Zwei-Faktor wohnt unter Profil → Sicherheit (#258); `mfa=required` erklärt dort, warum (#348). */
+export function mfaSetupPath(next = "") {
+  const params = new URLSearchParams({ tab: "security", mfa: "required" });
+  if (next) params.set("next", next);
+  return `/profile?${params.toString()}`;
+}
+
 export function roleLabel(role) {
   return ROLE_LABELS[role] || role || "";
 }

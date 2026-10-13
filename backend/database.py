@@ -170,6 +170,10 @@ async def init_indexes():
     await db.passkeys.create_index("user_id")
     await db.passkey_challenges.create_index("expires_at", expireAfterSeconds=0)
     await db.passkey_challenges.create_index("user_id")
+    # Plattform verknüpfen (#1027): ein Ablauf je Start, nach zehn Minuten räumt MongoDB ihn selbst weg.
+    await db.platform_link_flows.create_index("flow_hash", unique=True)
+    await db.platform_link_flows.create_index("expires_at", expireAfterSeconds=0)
+    await db.platform_link_flows.create_index("user_id")
     await db.login_attempts.create_index("identifier")
     await db.login_attempts.create_index("created_at", expireAfterSeconds=3600)
     await db.rate_limits.create_index("key")
@@ -231,6 +235,12 @@ async def init_indexes():
     await db.gallery_albums.create_index("event_id")
     await db.gallery_photos.create_index("id", unique=True)
     await db.gallery_photos.create_index("album_id")
+    await db.gallery_submissions.create_index("id", unique=True)
+    await db.gallery_submissions.create_index([("album_id", 1), ("owner_id", 1)])
+    await db.gallery_submissions.create_index("status")
+    # Fotos vom Event (#1185, #1186): Quittung je Album und Person, Zähler je Person und Album - beide eindeutig.
+    from services.event_photos import ensure_indexes as ensure_event_photo_indexes
+    await ensure_event_photo_indexes(db)
     # News indexes for category / pinning
     await db.news_posts.create_index("category")
     await db.news_posts.create_index([("pinned", -1), ("created_at", -1)])
@@ -268,6 +278,8 @@ async def init_indexes():
     await db.media_uploads.create_index("filename", unique=True)
     await db.media_uploads.create_index("owner_id")
     await db.media_uploads.create_index("media_scope")
+    await db.media_uploads.create_index([("owner_id", 1), ("media_scope", 1)])
+    await db.pending_file_cleanups.create_index("filename", unique=True)
     await db.upload_events.create_index("id", unique=True)
     await db.upload_events.create_index("created_at")
     await db.upload_events.create_index([("status", 1), ("created_at", -1)])
@@ -391,6 +403,8 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     # Ein fremdes Konto gehört zu höchstens einem Nutzer. Verknüpfungen ohne Kennung der Plattform bleiben außen vor.
     ("platform_links", [("platform", 1), ("external_id", 1)], "platform_external",
      {"partialFilterExpression": {"external_id": {"$type": "string"}}}),
+    # Je Person und Plattform eine Verknüpfung (#1027) - link_account legt sie in einem Schritt an.
+    ("platform_links", [("user_id", 1), ("platform", 1)], "user_platform", {}),
     # Discord (#631): je Person und Tag bzw. je Server und Tag genau eine Zeile - der Bot zählt bei jeder Nachricht hoch.
     ("discord_activity", [("user_id", 1), ("day", 1)], "user_day", {}),
     ("discord_guild_stats", [("guild_id", 1), ("day", 1)], "guild_day", {}),
@@ -432,8 +446,30 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
 )
 
 
+async def merge_duplicate_platform_links(db) -> int:
+    """Vor dem eindeutigen Index user_platform (#1027): Gibt es für eine Person und Plattform mehrere Zeilen, bleibt
+    die zuletzt verknüpfte - sie ist die, die das Profilfeld zuletzt gefüllt hat. Läuft nur, solange der eindeutige
+    Index fehlt; danach kann keine Dublette mehr entstehen."""
+    if "user_platform_unique" in await db.platform_links.index_information():
+        return 0
+    groups = await db.platform_links.aggregate([
+        {"$group": {"_id": {"user_id": "$user_id", "platform": "$platform"}, "count": {"$sum": 1}}},
+        {"$match": {"count": {"$gt": 1}}},
+    ]).to_list(None)
+    removed = 0
+    for group in groups:
+        rows = await db.platform_links.find(dict(group["_id"]), {"_id": 1}).sort([("linked_at", -1), ("_id", -1)]).to_list(None)
+        stale = [row["_id"] for row in rows[1:]]
+        if stale:
+            removed += (await db.platform_links.delete_many({"_id": {"$in": stale}})).deleted_count
+    if removed:
+        logger.warning("[indexes] platform_links: %s doppelte Verknüpfungen zusammengeführt", removed)
+    return removed
+
+
 async def init_audit_indexes(db) -> dict:
     """Die Indizes aus der Vollprüfung. Gibt zurück, welche eindeutigen an Dubletten gescheitert sind."""
+    await merge_duplicate_platform_links(db)
     blocked = []
     for collection, keys, name, options in AUDIT_UNIQUE_INDEXES:
         if not await unique_index(getattr(db, collection), keys, name, **options):

@@ -8,8 +8,14 @@ import { Plus, Trash2, Image as ImageIcon } from "lucide-react";
 import { AlbumModal } from "./gallery/AlbumModal";
 import { AlbumPhotos } from "./gallery/AlbumPhotos";
 import { albumMediaCount } from "./gallery/shared";
+import { SubmissionQueue } from "./gallery/SubmissionQueue";
+import { useAuth } from "@/context/AuthContext";
+import { hasArea } from "@/lib/permissions";
 
 export default function AdminGalleryPage() {
+  const { user } = useAuth();
+  // Eingesandte Fotos (#1186) gibt auch die Vereinsverwaltung frei (der Vorstand); Alben pflegt nur die Redaktion.
+  const editsAlbums = hasArea(user, "content");
   const [albums, setAlbums] = useState([]);
   const [activeAlbum, setActiveAlbum] = useState(null);
   const [editingAlbum, setEditingAlbum] = useState(null);
@@ -17,14 +23,15 @@ export default function AdminGalleryPage() {
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
+    if (!editsAlbums) return;
     const { data } = await api.get("/admin/gallery");
     setAlbums(data);
-  }, []);
+  }, [editsAlbums]);
 
   useEffect(() => {
     load();
-    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data)).catch(() => {});
-  }, [load]);
+    if (editsAlbums) api.get("/events?include_drafts=true").then(({ data }) => setEvents(data)).catch(() => {});
+  }, [load, editsAlbums]);
   useApiInvalidation(load, ["gallery"]);
 
   const remove = async (id) => {
@@ -59,12 +66,14 @@ export default function AdminGalleryPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">VEREINS-CMS</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Galerie</h1>
         </div>
-        <button onClick={() => setEditingAlbum({})} data-testid="album-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#1E95C2] transition">
+        {editsAlbums && <button onClick={() => setEditingAlbum({})} data-testid="album-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#1E95C2] transition">
           <Plus className="w-3.5 h-3.5" /> Neues Album
-        </button>
+        </button>}
       </div>
 
-      {albums.length === 0 ? (
+      <SubmissionQueue />
+
+      {!editsAlbums ? null : albums.length === 0 ? (
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
           <ImageIcon className="w-10 h-10 mx-auto opacity-40 mb-3" />
           <div className="font-heading font-bold">Noch keine Alben</div>

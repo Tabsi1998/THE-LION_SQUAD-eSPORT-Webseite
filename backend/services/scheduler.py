@@ -452,6 +452,16 @@ async def _safe_member_announcements():
         _log_task_failure("member_announcements", exc)
 
 
+async def _safe_event_photo_notices():
+    try:
+        from services.event_photos import notify_due
+        res = await notify_due()
+        if res.get("items"):
+            logger.info(f"[scheduler] event_photo_notices {res}")
+    except Exception as exc:
+        _log_task_failure("event_photo_notices", exc)
+
+
 async def _safe_achievement_queue():
     try:
         from services.achievement_queue import flush_awards, process_queue
@@ -614,6 +624,18 @@ async def _safe_chat_attachment_cleanup():
             logger.info(f"[scheduler] chat_attachment_cleanup removed={removed}")
     except Exception as exc:
         _log_task_failure("chat_attachment_cleanup", exc)
+
+
+async def _safe_erasure_file_cleanup():
+    """Kontolöschung (#1039): Dateien, deren Löschung beim ersten Mal scheiterte, erneut versuchen."""
+    try:
+        from database import get_db
+        from services.account_erasure import retry_file_cleanups
+        removed = await retry_file_cleanups(get_db())
+        if removed:
+            logger.info(f"[scheduler] erasure_file_cleanup removed={removed}")
+    except Exception as exc:
+        _log_task_failure("erasure_file_cleanup", exc)
 
 
 async def _safe_result_holds():
@@ -888,6 +910,9 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("member_announcements", _safe_member_announcements), IntervalTrigger(seconds=60), id="member_announcements",
                   max_instances=1, coalesce=True)
+    # Fotos vom Event (#1185): „Die Fotos sind da“ an die Teilnehmer, einmal je Album.
+    sched.add_job(_single_replica("event_photo_notices", _safe_event_photo_notices), IntervalTrigger(seconds=60), id="event_photo_notices",
+                  max_instances=1, coalesce=True)
     sched.add_job(_single_replica("billing_orders", _safe_billing_orders), IntervalTrigger(seconds=120), id="billing_orders",
                   max_instances=1, coalesce=True)
     # Geltende Spieltag-Termine in die Partien schreiben (#235): abgelaufene Fristen, neue Partien.
@@ -932,6 +957,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("status_transitions", _safe_status_transitions), IntervalTrigger(seconds=60), id="status_transitions",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("chat_attachment_cleanup", _safe_chat_attachment_cleanup), IntervalTrigger(hours=1), id="chat_attachment_cleanup",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("erasure_file_cleanup", _safe_erasure_file_cleanup), IntervalTrigger(hours=1), id="erasure_file_cleanup",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("proof_photo_retention", _safe_proof_photo_retention, lease_seconds=300.0), IntervalTrigger(hours=1),
                   id="proof_photo_retention", max_instances=1, coalesce=True)

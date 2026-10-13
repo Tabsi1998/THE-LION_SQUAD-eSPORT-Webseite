@@ -51,7 +51,7 @@ const PREVIEW = {
 const CAPS = {
   day: "2026-10-03",
   rows: [{ source: "daily_login", xp: 10, cap: 1, used: 1, full: true }, { source: "match_played", xp: 20, cap: null, used: 2, full: false }],
-  view: { level: 7, xp: 1450, title: "Kämpfer", prestige: 2, next_level_xp: 1600, login_streak: 4, prestige_available: false },
+  view: { level: 7, xp: 1450, title: "Fährte", prestige: 2, next_level_xp: 1600, login_streak: 4, prestige_available: false },
 };
 const STATS = {
   base: 40, members_base: 12,

@@ -9,6 +9,7 @@ import io
 
 from database import get_db
 from auth import get_optional_user, require_area
+from services.permissions import is_confirmed_tournament_lead
 from services.visibility import user_can_see
 from services.access_links import validate_access_link
 from services.competition_read import load_competition_read_model, observe_structure_read
@@ -19,7 +20,6 @@ from pdf_service import (
 
 RESULT_EXPORT_STATUSES = {"completed", "results_published", "archived"}
 # Exporte gehören zur Turnierleitung (Bereich „tournaments“); Moderatoren moderieren.
-STAFF_EXPORT_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
 pdf_router = APIRouter(prefix="/api/exports", tags=["exports"])
 
@@ -135,7 +135,9 @@ def _pdf_absolute_url(path_or_url: str, branding: dict) -> str:
 
 
 def _is_export_staff(user: dict | None) -> bool:
-    return bool(user and user.get("role") in STAFF_EXPORT_ROLES)
+    # Ergebnisse vor dem Ende exportiert die Turnierleitung (Rolle oder Freigabe) mit bestätigter
+    # Zwei-Faktor-Anmeldung - derselbe Vertrag wie in den Turnier-Routen (#291, #1028).
+    return is_confirmed_tournament_lead(user)
 
 
 async def _result_export_allowed(item: dict, user: dict | None) -> bool:

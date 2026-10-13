@@ -82,7 +82,7 @@ SAMPLES: dict[str, str] = {
     # Rechnung ist da (#841)
     "source": "Weihnachtsfeier", "amount": "40,00 €", "due_on": "17.10.2026", "paid": "",
     # Wochenrückblick (#622)
-    "week": "29.09. – 05.10.2026", "xp_week": "240", "level": "12", "level_title": "Kämpfer", "unlocked": "Champion III (Gold)\nFrühaufsteher I (Bronze)",
+    "week": "29.09. – 05.10.2026", "xp_week": "240", "level": "12", "level_title": "Rudel", "unlocked": "Champion III (Gold)\nFrühaufsteher I (Bronze)",
     "next_up": "Turnierspieler II – noch 2", "bonus_hint": "Vereinsmitglieder bekommen 10 % mehr XP auf alles.",
 }
 

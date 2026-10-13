@@ -1544,6 +1544,9 @@ async def get_album(slug_or_id: str, user: dict | None = Depends(get_optional_us
         event = await _visible_event_summary(a["event_id"], user)
         if event:
             a["event"] = event
+    # Fotos einsenden (#1186): nur für Mitglieder und nur bei Event-Alben - sonst kein Knopf.
+    from services.event_photos import submission_info
+    a["photo_submission"] = await submission_info(db, a, user)
     return a
 
 
@@ -1614,6 +1617,9 @@ async def delete_album(aid: str, me: dict = Depends(require_area("content"))):
         raise HTTPException(404, "Album nicht gefunden.")
     await db.gallery_photos.delete_many({"album_id": album["id"]})
     await db.gallery_albums.delete_one({"id": album["id"]})
+    # Eingesandte Fotos (#1186), die noch auf Freigabe warten, samt Dateien.
+    from services.event_photos import delete_for_album
+    await delete_for_album(db, album["id"])
     return {"ok": True}
 
 

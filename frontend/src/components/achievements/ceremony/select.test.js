@@ -6,8 +6,8 @@ const tier = (code, material, rank, category, extra = {}) => ({ code, name: code
 
 describe("levelTexts", () => {
   it("ein Aufstieg nennt das Level und darunter den Titel, ein Prestige den Stern statt „Level 1 erreicht“", () => {
-    expect(levelTexts({ level: 12, previous: 11, title: "Kämpfer" })).toEqual({ heading: "Level 12 erreicht", sub: "Level-Aufstieg", phaseSub: "Level 12 erreicht", phaseHeading: "Kämpfer" });
-    expect(levelTexts({ level: 1, previous: 60, title: "Rookie", prestige: 2, prestigeGained: true })).toEqual({ heading: "Prestige", sub: "2. Stern · Neustart bei Level 1", phaseSub: "2. Stern · Neustart bei Level 1", phaseHeading: "Prestige" });
+    expect(levelTexts({ level: 12, previous: 11, title: "Rudel" })).toEqual({ heading: "Level 12 erreicht", sub: "Level-Aufstieg", phaseSub: "Level 12 erreicht", phaseHeading: "Rudel" });
+    expect(levelTexts({ level: 1, previous: 60, title: "Jungtier", prestige: 2, prestigeGained: true })).toEqual({ heading: "Prestige", sub: "2. Stern · Neustart bei Level 1", phaseSub: "2. Stern · Neustart bei Level 1", phaseHeading: "Prestige" });
     expect(levelTexts({ level: 14, prestige: 2, prestigeGained: false }).heading).toBe("Level 14 erreicht");
   });
 });
@@ -43,7 +43,7 @@ describe("planCeremony", () => {
     expect(groupTier(planCeremony({ tiers: [tier("a", "gold", 5, "match")] })).code).toBe("a");
     expect(planCeremony({ tiers: [tier("a", "diamond", 7, "match")], context: { groupCompleted: "x", categoryCompleted: "match" } }).sequence).toBe("category");
     expect(planCeremony({ tiers: [tier("a", "wood", 1, "match")], context: { firstEver: true, categoryCompleted: "match" } }).sequence).toBe("first");
-    expect(planCeremony({ tiers: [], levelUp: { level: 10, title: "Kämpfer" } }).sequence).toBe("levelup");
+    expect(planCeremony({ tiers: [], levelUp: { level: 10, title: "Rudel" } }).sequence).toBe("levelup");
     const withLevel = planCeremony({ tiers: [tier("a", "gold", 5, "team")], levelUp: { level: 10 } });
     expect(withLevel.sequence).toBe("single");
     expect(withLevel.levelUp).toEqual({ level: 10 });

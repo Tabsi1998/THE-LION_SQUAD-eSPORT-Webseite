@@ -30,7 +30,8 @@ const F1_STATUS_OPTIONS = [
 ];
 
 export default function AdminF1EditPage() {
-  const { isAdmin } = useAuth();
+  // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
+  const { isTournamentLead: isAdmin } = useAuth();
   const { id } = useParams();
   const [challenge, setChallenge] = useState(null);
   const [tracks, setTracks] = useState([]);

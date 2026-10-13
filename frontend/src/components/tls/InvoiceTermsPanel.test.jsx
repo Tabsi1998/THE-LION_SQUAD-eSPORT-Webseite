@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // Rechnungskonditionen (#370) mit der Sprache der Rechnungs-PDFs (#840): Vorgabe Deutsch (Österreich), die Liste kommt
@@ -28,4 +28,20 @@ test("ohne Liste vom Server steht Deutsch (Österreich) zur Wahl", () => {
   render(<InvoiceTermsPanel terms={{ complete: false }} connected={false} busy="" onSave={() => {}} />);
   expect(screen.getByTestId("invoice-terms-pdf-lang")).toHaveValue("de_AT");
   expect(screen.getByTestId("invoice-terms-pdf-lang")).toHaveTextContent("Deutsch (Österreich)");
+});
+
+test("solange die Listen laden, steht ein gesperrtes Auswahlfeld da - kein Feld für die Nummer, das danach getauscht wird", async () => {
+  let resolveOptions;
+  apiMock.get.mockImplementation(() => new Promise((resolve) => { resolveOptions = resolve; }));
+  const user = userEvent.setup();
+  render(<InvoiceTermsPanel terms={{ complete: false }} connected busy="" onSave={() => {}} />);
+  const pending = screen.getByTestId("invoice-terms-payment_term_id");
+  expect(pending.tagName).toBe("SELECT");
+  expect(pending).toBeDisabled();
+  resolveOptions({ data: { available: true, terms: [{ id: 2, code: "30D", label: "30 Tage" }], modes: [{ id: 4, code: "VIR", label: "Banküberweisung" }], accounts: null, suggested: {} } });
+  await waitFor(() => expect(screen.getByTestId("invoice-terms-payment_term_id")).toBeEnabled());
+  await user.selectOptions(screen.getByTestId("invoice-terms-payment_term_id"), "2");
+  expect(screen.getByTestId("invoice-terms-payment_term_id")).toHaveValue("2");
+  // Kontenliste nicht lesbar: erst jetzt das Feld für die Nummer von Hand.
+  expect(screen.getByTestId("invoice-terms-bank_account_id").tagName).toBe("INPUT");
 });

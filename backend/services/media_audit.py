@@ -21,8 +21,8 @@ TARGETS: list[tuple[str, list[str]]] = [
     ("settings", ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "qr_logo_url", "favicon_url", "favicon_light_url", "favicon_dark_url", "avatar_url"]),
     ("users", ["avatar_url", "banner_url"]),
     ("teams", ["logo_url", "banner_url"]),
-    ("sponsors", ["logo_url"]),
-    ("partners", ["logo_url"]),
+    ("sponsors", ["logo_url", "banner_url"]),
+    ("partners", ["logo_url", "banner_url"]),
     ("news_posts", ["banner_url", "cover_url"]),
     ("events", ["banner_url", "cover_url"]),
     ("games", ["cover_url", "logo_url"]),
@@ -42,6 +42,26 @@ TEXT_TARGETS: list[tuple[str, list[str]]] = [
     ("tournaments", ["description"]),
     ("f1_challenges", ["description"]),
     ("club_member_profiles", ["bio"]),
+]
+
+# Weitere Stellen, an denen eine hochgeladene Datei verwendet sein kann (#1039): verschachtelte Felder und Texte, die
+# die Prüfung oben nicht reparieren kann. Die Kontolöschung behält eine Datei, solange sie hier oder oben steht.
+# Gewinnerbilder: die Plätze aus ``services.awards.IMAGE_SLOTS``.
+USAGE_TARGETS: list[tuple[str, list[str]]] = [
+    ("tournaments", ["award_images.1", "award_images.2", "award_images.3"]),
+    ("partners", ["tools.image_url"]),
+    ("settings", ["club_photo.url", "timeline.image_url"]),
+    ("advent_doors", ["media_url"]),
+    ("stickers", ["url"]),
+    ("gallery_photos", ["original_url"]),
+    ("game_servers", ["server_icon_url"]),
+    # Bilder aus der Mitgliederverwaltung je Hintergrund (``services.sponsor_images``).
+    *((collection, [f"dolibarr_images.{kind}.{variant}.url" for kind in ("logo", "banner") for variant in ("dark", "light")])
+      for collection in ("sponsors", "partners")),
+]
+
+USAGE_TEXT_TARGETS: list[tuple[str, list[str]]] = [
+    ("tournaments", ["rules", "prize_pool"]),
 ]
 
 SCOPE_TARGETS: list[tuple[str, list[str], str]] = [

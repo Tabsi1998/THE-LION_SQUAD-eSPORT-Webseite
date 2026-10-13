@@ -1,4 +1,5 @@
 const { test, expect } = require("@playwright/test");
+const RING = require("../src/lib/loewenRangRing.json");
 
 async function acceptCookies(page) {
   const button = page.getByRole("button", { name: /alle erlauben/i });
@@ -474,14 +475,14 @@ test("club members render gamertag-first cards", async ({ page }) => {
   await expect(card.getByText("Obmann")).toBeVisible();
 });
 
-test("level frames: the hex shield sits square and centred on the avatar (#888)", async ({ page }) => {
-  // Die globale Regel svg { max-width: 100% } kappte das Sechseck auf die Bildbreite - schmal, hoch, 12 px zu weit links.
+test("level frames: the drawn frame of the rank sits with its ring exactly on the photo (#1454)", async ({ page }) => {
+  // Löwen-Rang: die Grafiken sind nicht genau mittig gezeichnet - der gemessene Ring (cx, cy, r) muss auf dem Foto liegen.
   await mockPublicChrome(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.route("**/api/users/public-list**", async (route) => {
     await route.fulfill({ contentType: "application/json", body: JSON.stringify({ total: 2, items: [
       { id: "u9", username: "garlic", display_name: "Garlic Jr.", achievement_level: { level: 9 }, achievements_count: 12 },
-      { id: "u24", username: "totor", display_name: "TotorRuns", achievement_level: { level: 24 }, achievements_count: 24 },
+      { id: "u32", username: "totor", display_name: "TotorRuns", achievement_level: { level: 32 }, achievements_count: 24 },
     ] }) });
   });
   await page.route("**/api/membership/public", (route) => route.fulfill({ contentType: "application/json", body: "[]" }));
@@ -489,15 +490,57 @@ test("level frames: the hex shield sits square and centred on the avatar (#888)"
 
   await page.goto("/players");
   await acceptCookies(page);
-  for (const username of ["garlic", "totor"]) {
+  for (const [username, key] of [["garlic", "02"], ["totor", "07"]]) {
     const card = page.getByTestId(`player-card-${username}`);
     await expect(card).toBeVisible();
-    const frame = await card.locator(".tls-lvf").boundingBox();
-    const hexa = await card.locator(".tls-lvf-hexa").boundingBox();
-    expect(Math.abs(hexa.width - hexa.height), `${username}: Sechseck quadratisch`).toBeLessThanOrEqual(1);
-    expect(Math.abs(hexa.width - (frame.width + 18)), `${username}: in der Liste 9 px ringsum`).toBeLessThanOrEqual(1);
-    expect(Math.abs(hexa.x + hexa.width / 2 - (frame.x + frame.width / 2)), `${username}: mittig`).toBeLessThanOrEqual(1);
-    expect(Math.abs(hexa.y + hexa.height / 2 - (frame.y + frame.height / 2)), `${username}: mittig`).toBeLessThanOrEqual(1);
+    await expect(card.locator(".tls-lvf")).toHaveAttribute("data-rank", String(Number(key)));
+    const img = card.locator("img.tls-lvf-img");
+    await expect(img).toHaveAttribute("src", new RegExp(`rang-${key}-320[.]webp`));
+    const ring = RING[key];
+    const photo = await card.locator(".tls-lvf-photo").boundingBox();
+    const art = await img.boundingBox();
+    // Feste Fläche (Liste 92 px) für jeden Rang; das Foto ist so groß, dass die ganze Grafik hineinpasst.
+    const area = await card.locator(".tls-lvf").boundingBox();
+    expect(Math.abs(area.width - 92) <= 1 && Math.abs(area.height - 92) <= 1, `${username}: Fläche 92 px`).toBe(true);
+    const fit = Number(await card.locator(".tls-lvf").evaluate((el) => el.style.getPropertyValue("--lvf-fit")));
+    expect(Math.abs(photo.width - 92 * fit), `${username}: Foto ${photo.width} px`).toBeLessThanOrEqual(1);
+    expect(Math.abs(art.x + ring.cx * art.width - (photo.x + photo.width / 2)), `${username}: Ring waagrecht mittig`).toBeLessThanOrEqual(1);
+    expect(Math.abs(art.y + ring.cy * art.height - (photo.y + photo.height / 2)), `${username}: Ring senkrecht mittig`).toBeLessThanOrEqual(1);
+    expect(Math.abs(ring.r * art.width - photo.width / 2), `${username}: Ring so groß wie das Foto`).toBeLessThanOrEqual(1);
+    // Die gezeichnete Grafik bleibt seitlich und unten in der Fläche, oben ragt sie höchstens 15 % hinaus.
+    const [left, top, right, bottom] = ring.box;
+    expect(art.y + top * art.height, `${username}: oben höchstens 15 % über der Fläche`).toBeGreaterThanOrEqual(area.y - 0.15 * area.height - 1);
+    expect(art.x + right * art.width, `${username}: rechts in der Fläche`).toBeLessThanOrEqual(area.x + area.width + 1);
+    expect(art.y + bottom * art.height, `${username}: unten in der Fläche`).toBeLessThanOrEqual(area.y + area.height + 1);
+    expect(art.x + left * art.width, `${username}: links in der Fläche`).toBeGreaterThanOrEqual(area.x - 1);
+    // Der Rahmen nimmt keine Klicks an - was darunter liegt, bleibt bedienbar.
+    expect(await card.locator(".tls-lvf").evaluate((el) => getComputedStyle(el).pointerEvents)).toBe("none");
+    await expect(card.locator(".tls-lvf")).toHaveAttribute("aria-label", new RegExp(`^Level ${username === "garlic" ? 9 : 32}, Rang `));
+  }
+});
+
+test("profile head: the featured award in the banner stays clickable under the bigger frame (#1454)", async ({ page }) => {
+  // Kopf und Rahmen ragen in den Banner. Die Auszeichnung dort muss trotzdem überall anklickbar bleiben.
+  await mockPublicChrome(page);
+  for (const level of [3, 42]) {
+    await page.route("**/api/users/public/tabsi98", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({
+      id: "user-1", username: "tabsi98", display_name: "Tabsi98", bio: "", created_at: "2025-01-01T00:00:00Z", privacy_public_profile: true, stats: {},
+      featured_award: { id: "aw1", kind: "trophy", rank_label: "1. Platz", tournament: { title: "Herbst-Cup", slug: "herbst-cup" } },
+      achievement_level: { level, xp: 1000, next_level_xp: 2000, progress: 40, prestige: 0 }, tournaments: [], f1_bests: [], teams: [],
+      references: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } } }) }));
+    await page.route("**/api/streams/live", (route) => route.fulfill({ contentType: "application/json", body: "[]" }));
+    await page.route("**/api/achievements/user/user-1", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ groups: [], awards: [] }) }));
+    await page.route("**/api/achievements/crowns", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ crowns: {} }) }));
+    await page.goto("/u/tabsi98");
+    await acceptCookies(page);
+    await expect(page.getByTestId("profile-avatar-frame")).toHaveAttribute("data-level", String(level));
+    const award = await page.getByTestId("profile-featured-award").boundingBox();
+    const points = [];
+    for (const fx of [0.1, 0.5, 0.9]) for (const fy of [0.2, 0.5, 0.8]) points.push([award.x + fx * award.width, award.y + fy * award.height]);
+    const covered = await page.evaluate((list) => list.filter(([x, y]) => !document.elementFromPoint(x, y)?.closest("[data-testid='profile-featured-award']")).length, points);
+    expect(covered, `Level ${level}: Stellen der Auszeichnung, die etwas verdeckt`).toBe(0);
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await mockPublicChrome(page);
   }
 });
 

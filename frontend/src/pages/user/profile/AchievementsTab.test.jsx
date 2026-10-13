@@ -46,7 +46,7 @@ const DATA = {
   hidden: { total: 13, earned: 1 },
   pinned: [AWARDS[1]], pinned_codes: ["matches_played_2"],
   privacy_achievements_public: true,
-  level: { level: 7, xp: 1234, next_level_xp: 1500, progress: 40, title: "Anwärter", next_title_at: 10, prestige: 1, points: 1234, next_level_points: 1500 },
+  level: { level: 7, xp: 1234, next_level_xp: 1500, progress: 40, title: "Fährte", next_title_at: 10, prestige: 1, points: 1234, next_level_points: 1500 },
 };
 
 function renderTab(overrides = {}, props = {}) {
@@ -73,7 +73,7 @@ describe("AchievementsTab (#619)", () => {
   it("zeigt Kopf mit Level, Titel und Prestige, die Zahlen und „Als Nächstes“ mit Link", () => {
     renderTab();
     const header = screen.getByTestId("achievement-level-header");
-    expect(within(header).getByTestId("achievement-level-title")).toHaveTextContent("Level 7 · Anwärter");
+    expect(within(header).getByTestId("achievement-level-title")).toHaveTextContent("Level 7 · Fährte");
     expect(within(header).getByTestId("achievement-prestige")).toBeInTheDocument();
     expect(header).toHaveTextContent("Nächster Titel ab Level 10");
     expect(within(header).getByTestId("account-level-progress")).toHaveTextContent("/ 1500 XP");
@@ -88,9 +88,9 @@ describe("AchievementsTab (#619)", () => {
   });
 
   it("Prestige ab Level 60: erst nach Bestätigung, dann ersetzt der neue Stand den alten", async () => {
-    const after = { level: 1, prestige: 1, title: "Rookie", prestige_available: false, prestige_undo_until: "2099-01-01T12:00:00+00:00", xp: 0, next_level_xp: 125, progress: 0 };
+    const after = { level: 1, prestige: 1, title: "Jungtier", prestige_available: false, prestige_undo_until: "2099-01-01T12:00:00+00:00", xp: 0, next_level_xp: 125, progress: 0 };
     apiMock.post.mockResolvedValueOnce({ data: after });
-    const { onAchDataChange } = renderTab({ level: { ...DATA.level, level: 60, title: "Legende", prestige: 0, prestige_available: true } });
+    const { onAchDataChange } = renderTab({ level: { ...DATA.level, level: 60, title: "Löwenkönig", prestige: 0, prestige_available: true } });
     expect(screen.getByTestId("achievement-prestige-panel")).toHaveTextContent("Level 60 erreicht");
     fireEvent.click(screen.getByTestId("achievement-prestige-start"));
     expect(await screen.findByTestId("confirm-dialog")).toHaveTextContent("1. Prestige-Stern?");

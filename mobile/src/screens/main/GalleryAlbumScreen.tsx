@@ -14,6 +14,7 @@ import type { MoreStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
+import { PhotoSubmitCard } from "../../components/PhotoSubmitCard";
 
 // Album (#236): Raster aus 400-px-Kacheln, drei je Zeile; Abschnitte wie im Web. Antippen
 // öffnet die Großansicht an dieser Stelle.
@@ -69,9 +70,19 @@ export function GalleryAlbumScreen({ navigation, route }: Props) {
       <ScrollView {...seasonScrollProps("GalleryAlbum")} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}>
         <View style={styles.header}>
           <Title>{album.title}</Title>
-          <Muted>{[formatDate(album.taken_at), albumCountLabel(album), album.event?.name].filter(Boolean).join(" · ")}</Muted>
+          <Muted>{[formatDate(album.taken_at), albumCountLabel(album)].filter(Boolean).join(" · ")}</Muted>
+          {/* Fotos gehören zum Event (#1185): das Album nennt sein Event und führt zurück. */}
+          {album.event ? (
+            <Pressable onPress={() => navigation.navigate("EventDetail", { id: album.event?.slug || album.event?.id || "" })} accessibilityRole="link" accessibilityLabel={`Zum Event ${album.event.name || ""}`.trim()} style={({ pressed }) => [styles.eventLink, pressed && styles.pressed]} testID="album-event-link">
+              <Ionicons name="calendar-outline" color={colors.cyan} size={16} />
+              <Body style={styles.eventText}>Vom Event: {album.event.name || "Event"}</Body>
+              <Ionicons name="chevron-forward" color={colors.cyan} size={16} />
+            </Pressable>
+          ) : null}
           {album.description ? <Body>{album.description}</Body> : null}
         </View>
+        {/* Fotos einsenden (#1186): nur für Mitglieder, nur bei Event-Alben, bis eine Woche danach. */}
+        <PhotoSubmitCard albumId={String(album.slug || album.id)} info={album.photo_submission} onSent={() => { void load(); }} />
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
         {groups.length ? groups.map((group) => (
           <View key={group.id || "ohne"} style={styles.section}>
@@ -104,6 +115,8 @@ const styles = StyleSheet.create({
   tile: { backgroundColor: colors.surface, borderRadius: radius.lg, overflow: "hidden" },
   tileImage: { height: "100%", width: "100%" },
   pressed: { opacity: 0.8 },
+  eventLink: { alignItems: "center", alignSelf: "flex-start", flexDirection: "row", gap: 6, minHeight: 44 },
+  eventText: { color: colors.cyan, fontWeight: "800" },
   playBadge: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.6)",
