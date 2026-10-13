@@ -614,7 +614,7 @@ async def ops_events(source: str = "all", severity: str = "all", hours: int = Qu
         },
         "filters": {"source": sorted(wanted) or ["all"], "severity": severity, "hours": hours, "q": mask_addresses(q), "limit": limit, "guild": guild},
         # Server für den Filter (#627) - erst ab zwei Servern sinnvoll.
-        "guilds": [{"guild_id": guild_id, "name": name} for guild_id, name in sorted((await _discord_guild_names(db)).items(), key=lambda pair: pair[1].lower())],
+        "guilds": [{"guild_id": guild_id, "name": mask_addresses(name)} for guild_id, name in sorted((await _discord_guild_names(db)).items(), key=lambda pair: pair[1].lower())],
     }
 
 

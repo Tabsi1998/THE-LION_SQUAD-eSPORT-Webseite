@@ -152,3 +152,23 @@ async def test_events_mask_several_recipients_display_names_and_dict_keys(flow):
     assert "b***@x.example" in items["m1"]["subtitle"] and "c***@y.example" in items["m1"]["subtitle"]
     assert "d***@z.example" in items["j1"]["subtitle"] and "e***@w.example" in items["j1"]["subtitle"]
     assert "e***@w.example" in items["au1"]["detail"]
+
+
+@pytest.mark.asyncio
+async def test_events_mask_url_encoded_addresses_and_guild_names(flow):
+    """#1505 (Codex): ``paula%40example.test`` (auch mehrfach kodiert) und Discord-Servernamen mit Adresse - nicht in
+    JSON, CSV, Suche und ``guilds``."""
+    fresh = now_utc().isoformat()
+    await flow.db.email_logs.insert_one({"id": "m1", "to": "paula%40example.test", "subject": "s", "status": "failed", "channel": "email",
+                                         "error": "GET /confirm?mail=paula%2540example.test&b=max%2540x.example", "created_at": fresh})
+    await flow.db.discord_guilds.insert_many([{"guild_id": "1", "name": "Club kontakt@verein.example", "role": "main"}, {"guild_id": "2", "name": "Zweit"}])
+    flow.act_as(await flow.add_user(role="superadmin"))
+    response = await flow.get("/api/admin/ops/events", params={"hours": 0})
+    csv_text = (await flow.get("/api/admin/ops/events", params={"hours": 0, "format": "csv"})).text
+    for text in (response.text, csv_text):
+        assert "paula" not in text and "max%" not in text and "kontakt@" not in text
+    assert any("k***@verein.example" in g["name"] for g in response.json()["guilds"])
+    assert (await flow.get("/api/admin/ops/events", params={"hours": 0, "q": "paula%40example.test"})).json()["items"] == []
+    assert "paula" not in (await flow.get("/api/admin/ops/events", params={"hours": 0, "q": "paula%40example.test"})).text
+    hit = (await flow.get("/api/admin/ops/events", params={"hours": 0, "q": "p***@example.test"})).json()["items"]
+    assert any(i["id"] == "m1" for i in hit)

@@ -31,10 +31,15 @@ _ADDRESS_CHAR = r"[^\s@<>()\[\]{},;:\"'`\\/]"
 _ADDRESS = re.compile(rf"(?<!{_ADDRESS_CHAR})({_ADDRESS_CHAR}){_ADDRESS_CHAR}*@({_ADDRESS_CHAR}+)")
 
 
+# URL-kodiertes „@“ (``%40``, auch mehrfach kodiert: ``%2540``, ``%252540``): so steht eine Adresse in Links und Suchtexten.
+_ENCODED_AT = re.compile(r"%(?:25)*40", re.IGNORECASE)
+
+
 def mask_addresses(value: Any) -> str:
     """``value`` als Text, jede Mail-Adresse darin gekürzt: ``paula@example.test`` wird ``p***@example.test``.
     Für Protokollzeilen zusammen mit ``log_safe`` - erst die Adressen kürzen, dann auf eine Zeile bringen."""
     text = "" if value is None else str(value)
+    text = _ENCODED_AT.sub("@", text)
     return _ADDRESS.sub(lambda match: f"{match.group(1)}***@{match.group(2)}", text)
 
 
