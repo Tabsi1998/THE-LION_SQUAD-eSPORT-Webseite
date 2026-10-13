@@ -71,10 +71,12 @@ test("die Tage eines Events werden eine Zeile: Name, erster Beginn, letztes Ende
   expect(merged.map((item) => item.id)).toEqual(["e-messe", "t-cup"]);
   expect(merged[0]).toMatchObject({ title: "Gaming-Messe", start: "2027-03-11T09:00:00+01:00", end: "2027-03-14T18:00:00+01:00", mine: true, marker: null });
   expect(merged[0].parts).toHaveLength(4);
-  expect(spanLabel(merged[0])).toBe("Do 11. – So 14. März");
-  expect(startPhrase(merged[0])).toBe("Do 11. März");
-  expect(spanLabel({ start: "2026-10-30T18:00:00+01:00", end: "2026-11-02T12:00:00+01:00" })).toBe("Fr 30. Oktober – Mo 2. November");
-  expect(spanLabel({ start: "2027-03-12T00:00:00+01:00", all_day: true, day: "2027-03-12" })).toBe("Fr 12. März · ganztägig");
+  expect(spanLabel(merged[0], new Date("2027-01-15T10:00:00Z"))).toBe("Do 11. – So 14. März");
+  // Aus einem anderen Jahr gesehen steht das Jahr dabei (#1307).
+  expect(spanLabel(merged[0], new Date("2026-10-13T10:00:00Z"))).toBe("Do 11. – So 14. März 2027");
+  expect(startPhrase(merged[0], new Date("2027-01-15T10:00:00Z"))).toBe("Do 11. März");
+  expect(spanLabel({ start: "2026-10-30T18:00:00+01:00", end: "2026-11-02T12:00:00+01:00" }, new Date("2026-10-13T10:00:00Z"))).toBe("Fr 30. Oktober – Mo 2. November");
+  expect(spanLabel({ start: "2027-03-12T00:00:00+01:00", all_day: true, day: "2027-03-12" }, new Date("2027-01-15T10:00:00Z"))).toBe("Fr 12. März · ganztägig");
   expect(spanLabel({ start: "2027-03-12T18:00:00+01:00" }, new Date("2027-01-10T12:00:00Z"))).toBe("Fr 12. März · 18:00");
   // Über Mitternacht ist noch nicht mehrtägig: Schicht bis 1 Uhr.
   expect(spanLabel({ start: "2026-10-10T22:00:00+02:00", end: "2026-10-11T01:00:00+02:00" }, new Date("2026-01-01T12:00:00Z"))).toBe("Sa 10. Oktober · 22:00");

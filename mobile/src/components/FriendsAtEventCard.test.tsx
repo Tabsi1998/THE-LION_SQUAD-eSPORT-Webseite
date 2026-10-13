@@ -72,3 +72,15 @@ test("Hinweis: „Verstanden“ bestätigt nur", async () => {
   await waitFor(() => expect(screen.queryByTestId("event-friends-hint")).toBeNull());
   expect(screen.getByTestId("event-friends")).toHaveTextContent(/Finn/);
 });
+
+test("Turnier- und Fast-Lap-Screen (#1188 Teil 2): eigene Abfrage und Ortsangabe", async () => {
+  mockGet.mockResolvedValue({ data: { friends: [{ ...LEA, where: [{ kind: "tournament", id: "t-rl", title: "RL", team_name: "Lions Rocket" }] }], sharing: true, hint: false } });
+  const first = await render(<FriendsAtEventCard path="/tournaments/rl/friends" scope="tournament" signedIn />);
+  expect(await screen.findByTestId("event-friend-u-lea")).toHaveTextContent(/mit Lions Rocket/);
+  expect(mockGet).toHaveBeenLastCalledWith("/tournaments/rl/friends");
+  await first.unmount();
+  mockGet.mockResolvedValue({ data: { friends: [{ ...LEA, where: [{ kind: "fastlap", id: "c-monza", title: "Monza" }] }], sharing: true, hint: false } });
+  await render(<FriendsAtEventCard path="/f1/challenges/monza/friends" scope="fastlap" signedIn />);
+  expect(await screen.findByTestId("event-friend-u-lea")).toHaveTextContent(/Zeit gefahren/);
+  expect(mockGet).toHaveBeenLastCalledWith("/f1/challenges/monza/friends");
+});
