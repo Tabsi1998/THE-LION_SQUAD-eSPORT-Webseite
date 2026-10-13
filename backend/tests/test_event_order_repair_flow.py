@@ -35,8 +35,9 @@ async def flow():
 async def paid_event(flow, admin=None, **extra):
     admin = admin or await person(flow, "chef", role="superadmin")
     flow.act_as(admin)
-    response = await flow.post("/api/events", json={"name": "Vereins-LAN", "status": "registration_open", "visibility": "public", "has_registration": True,
-                                                     "start_date": (now_utc() + timedelta(days=10)).isoformat(), "billing": FEE, **extra})
+    payload = {"name": "Vereins-LAN", "status": "registration_open", "visibility": "public", "has_registration": True,
+               "start_date": (now_utc() + timedelta(days=10)).isoformat(), "billing": FEE, **extra}
+    response = await flow.post("/api/events", json=payload)
     assert response.status_code == 200, response.text
     return response.json()
 

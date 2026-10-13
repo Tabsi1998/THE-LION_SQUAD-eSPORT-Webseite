@@ -33,6 +33,8 @@ import { formatCents, previewQuote, startFeeSummary } from "@/lib/pricing";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 import { TournamentTimeline, countdownText, timelineSteps } from "@/components/tls/tournament/TournamentTimeline";
 import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
+import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
+import { offerFriendsHint } from "@/lib/friendsHint";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -129,6 +131,8 @@ function TournamentDetailView() {
       toast.success("Erfolgreich angemeldet!");
       setRegisterModal(false);
       await load();
+      // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188), nicht erst auf der Event-Seite.
+      void offerFriendsHint();
     }, "Anmeldung konnte nicht gespeichert werden.");
   };
 
@@ -329,6 +333,8 @@ function TournamentDetailView() {
             canUnregister={canSelfUnregister} onUnregister={handleUnregister} busy={loading} scheduleTo={subPage("matches")} />
           {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
           <TournamentTimeline tournament={t} calendarItem={tournamentIsOver(t) ? null : calendarItem} />
+          {/* Freunde beim Turnier (#1188 Teil 2): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}
+          <FriendsAtEvent user={user} path={`/tournaments/${t.slug || t.id}/friends`} scope="tournament" over={tournamentIsOver(t)} />
           {t.rules && (
             <section>
               <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-[#29B6E8]" /> Regeln</h2>

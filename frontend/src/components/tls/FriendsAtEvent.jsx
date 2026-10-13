@@ -10,6 +10,7 @@ import { SizedImage } from "@/components/tls/SizedImage";
 // Was jemand sehen darf, entscheidet allein der Server (services/event_friends.py); Gäste fragen gar nicht erst.
 // Dazu einmal der Hinweis „Deine Freunde sehen, zu welchen Events du angemeldet bist“ mit „Ausschalten“ - sobald es für
 // die Person selbst wirkt. Dieselbe Zeile hat die App (FriendsAtEventCard).
+// Seit Teil 2 auch auf Turnier- und Fast-Lap-Seiten: ``path`` nennt dann die Abfrage, ``scope`` die Ortsangabe.
 
 const SHOWN = 8;
 
@@ -26,21 +27,22 @@ function FriendAvatar({ friend }) {
   return <SizedImage src={friend.avatar_url || ""} size={32} round alt="" className="shrink-0" fallback={fallback} />;
 }
 
-export function FriendsAtEvent({ event, user, over = false }) {
+export function FriendsAtEvent({ event, user, over = false, path = "", scope = "event" }) {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const key = event?.slug || event?.id;
+  const url = path || (key ? `/events/${key}/friends` : "");
   const userId = user?.id;
 
   useEffect(() => {
     let alive = true;
     setData(null);
-    if (!userId || !key) return undefined;
-    api.get(`/events/${key}/friends`)
+    if (!userId || !url) return undefined;
+    api.get(url)
       .then(({ data: body }) => { if (alive) setData(body && Array.isArray(body.friends) ? body : null); })
       .catch(() => { if (alive) setData(null); });
     return () => { alive = false; };
-  }, [key, userId]);
+  }, [url, userId]);
 
   if (!userId || !data) return null;
   const friends = data.friends;
@@ -88,7 +90,7 @@ export function FriendsAtEvent({ event, user, over = false }) {
                   <FriendAvatar friend={friend} />
                   <span className="min-w-0">
                     {friend.username ? <Link to={`/u/${friend.username}`} className="hover:text-[#9F7AEA]">{name}</Link> : name}
-                    <span className="block text-xs text-white/55 break-words">{friendPlaces(friend).join(" · ")}</span>
+                    <span className="block text-xs text-white/55 break-words">{friendPlaces(friend, { scope }).join(" · ")}</span>
                   </span>
                 </li>
               );
