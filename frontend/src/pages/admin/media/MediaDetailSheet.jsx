@@ -98,7 +98,7 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
             {item.references.map((ref, idx) => (
               <div key={`${ref.collection}-${ref.id}-${ref.field}-${idx}`} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
                 <div className="font-bold text-white/75">{ref.label || ref.id || ref.collection}</div>
-                <div className="text-white/40 font-mono break-all">{ref.collection}.{ref.field}{ref.text_reference ? " · Text" : ""}</div>
+                <div className="text-white/50 break-words" data-testid="media-sheet-reference-place">{ref.place || `${ref.collection}.${ref.field}`}{ref.text_reference ? " · im Text" : ""}</div>
               </div>
             ))}
           </div>

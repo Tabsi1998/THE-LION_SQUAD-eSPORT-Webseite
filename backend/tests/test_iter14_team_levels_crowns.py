@@ -141,8 +141,8 @@ class TestCrownsRegression:
         r = client.get(f"{BASE_URL}/api/achievements/crowns", timeout=60)
         assert r.status_code == 200, r.text[:300]
         crowns = r.json()["crowns"]
-        assert set(crowns.values()) <= {"gold", "silver", "bronze", "obsidian"}
-        ranks = [v for v in crowns.values() if v != "obsidian"]
+        assert set(crowns.values()) <= {"gold", "silver", "bronze", "onyx"}
+        ranks = [v for v in crowns.values() if v != "onyx"]
         assert sorted(ranks) == sorted(set(ranks)), "duplicate rank crowns"
 
     def test_leaderboard_ok(self, client):

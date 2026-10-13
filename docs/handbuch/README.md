@@ -11,6 +11,8 @@ Technische Hintergründe für die Entwicklung stehen in den Dateien unter [`docs
 
 | Kapitel | Worum es geht |
 | --- | --- |
+| [Erste Schritte im Admin](admin.md) | Menü je Rolle, Suche, Kommandozentrale, Zwei-Faktor, Freigaben vergeben, Helfer und Moderation, wo welches Thema steht |
+| [Turniere](turniere.md) | Anlegen, Formate, Anmeldung und Startgeld, Check-in, Aufstellung, Ergebnis-Fenster, Dispute, Stationen, Abschluss, Turniertag mit wenig Helfern |
 | [Die LionsAPP](app.md) | Installation und Updates (Play-Testkanal, App-Versionen), Push und Kanäle, App-Sperre, was nur im Web geht, Fehlerbilder |
 | [Discord](discord.md) | Bot, Meldungen, Kanäle, Rollen, Befehle, Hauptserver und Unterserver, Rechte – Einrichtung Schritt für Schritt |
 | [TV und Beamer](tv.md) | Turnierbaum, Aufruf-Tafel, Hallen-Tafel, Stations-Ansicht und Fast-Lap-Rangliste auf Fernseher und Beamer – Link mit Schlüssel, Grundwerte, Sponsoren, Ton |
