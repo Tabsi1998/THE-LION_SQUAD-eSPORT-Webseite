@@ -23,7 +23,10 @@ function heading(file) {
     if (!existsSync(path.join(src, full))) continue;
     const match = read(full).match(/<h1[^>]*>([\s\S]*?)<\/h1>/);
     if (!match) return null;
-    const text = match[1].replace(/<[^>]+>/g, "").replace(/&shy;/g, "").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+    // Der Titel ist der Text nach dem letzten Tag (Symbole davor sind selbstschließend); es wird nichts "bereinigt", nur gelesen.
+    const inner = match[1];
+    const raw = inner.slice(inner.lastIndexOf(">") + 1);
+    const text = raw.split("&shy;").join("").split("&amp;").join("&").split(/\s+/).filter(Boolean).join(" ");
     return text.startsWith("{") ? null : text;
   }
   return null;
