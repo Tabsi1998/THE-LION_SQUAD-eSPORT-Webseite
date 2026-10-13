@@ -6,7 +6,9 @@ import { Button } from "../../components/Button";
 import { AddToCalendarButton } from "../../components/AddToCalendarButton";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
+import { EventRecapCard } from "../../components/EventRecapCard";
 import { FormInput } from "../../components/FormInput";
+import { FriendsAtEventCard } from "../../components/FriendsAtEventCard";
 import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
@@ -125,6 +127,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const participants = event?.registrations || [];
   const staffView = event?.participant_view === "staff";
   const over = event ? eventIsOver(event) : false;
+  // Rückblick (#1187): nach dem letzten Event-Tag (nicht bei Absage) statt Anmeldung und „Was läuft“.
+  const recap = over && event?.status !== "cancelled";
   const rows = useMemo(() => whatsOnRows(event), [event]);
   const facts = useMemo(() => eventFacts(event), [event]);
   const banner = event?.banner || (event?.banner_url ? { url: event.banner_url, kind: "photo" as const } : null);
@@ -304,9 +308,19 @@ export function EventDetailScreen({ navigation, route }: Props) {
           ) : null}
         </Card>
 
+        {recap ? (
+          <EventRecapCard
+            eventKey={String(event.slug || event.id)}
+            onOpen={(kind, key) => {
+              if (kind === "news") navigation.navigate("NewsDetail", { id: key });
+              else navigation.navigate(kind === "fastlap" ? "FastLapDetail" : "TournamentDetail", { id: key });
+            }}
+          />
+        ) : null}
+
         {/* 1. Dein Event: der eigene Stand - oder die Anmeldung, solange sie offen ist. */}
         <View onLayout={(layout) => setYoursY(layout.nativeEvent.layout.y)} testID="event-yours">
-        {hasRegistration ? (
+        {hasRegistration && !recap ? (
           <Card style={styles.card}>
             <Heading>{event.registration_url ? "Registrierung" : "Anmeldung"}</Heading>
             <Muted>
@@ -507,8 +521,16 @@ export function EventDetailScreen({ navigation, route }: Props) {
 
         </View>
 
+        {/* Freunde beim Event (#1188): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}
+        <FriendsAtEventCard
+          eventKey={String(event.slug || event.id)}
+          signedIn={Boolean(user) && !guest}
+          over={over}
+          onOpenProfile={(username) => navigation.navigate("PublicProfile", { username })}
+        />
+
         {/* 2. Was läuft beim Event (#1183): jedes Turnier und jede Fast Lap mit Tag, Uhrzeit, Spielart und eigenem Stand. */}
-        {rows.length ? (
+        {rows.length && !recap ? (
           <Card style={styles.card} testID="event-whatson">
             <Heading>Was läuft beim Event</Heading>
             {rows.map((row) => (

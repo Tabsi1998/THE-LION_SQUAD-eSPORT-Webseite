@@ -136,7 +136,8 @@ test("eigener Betrag an der Anmeldung; die Verwaltung klappt die Teilnehmer aus 
 
   await fireEvent.press(screen.getByTestId("event-checkin-r1"));
   await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("/events/e1/registrations/r1", { status: "checked_in" }));
-  expect(mockGet).toHaveBeenCalledTimes(2);
+  // Neu geladen wird das Event (die Abfrage „Freunde beim Event“, #1188, zählt hier nicht mit).
+  expect(mockGet.mock.calls.filter(([url]) => url === "/events/vereinsabend")).toHaveLength(2);
 });
 
 test("ohne Rechte nur die öffentliche Liste mit Namen - kein Check-in, keine Notizen", async () => {
