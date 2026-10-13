@@ -97,11 +97,11 @@ export function eventFacts(event, { now = new Date() } = {}) {
   return rows;
 }
 
-function clock(value) {
+export function clock(value) {
   return value ? viennaTime(value, { hour: "2-digit", minute: "2-digit" }) : "";
 }
 
-function weekdayClock(value) {
+export function weekdayClock(value) {
   if (!value) return "";
   const weekday = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"][new Date(`${viennaDay(value)}T12:00:00Z`).getUTCDay()];
   return `${weekday} ${clock(value)}`;

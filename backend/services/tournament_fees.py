@@ -94,6 +94,34 @@ async def freeze_price(db, registration: dict, tournament: dict, *, payer: dict,
     return snapshot
 
 
+async def repair_order(db, registration: dict, tournament: dict, *, actor: dict | None) -> dict | None:
+    """Nachholen (#1184): eine verbindliche, kostenpflichtige Anmeldung ohne Auftrag bekommt ihn bei der Wiederholung.
+
+    Scheitert der Auftrag nach gespeicherter Anmeldung (oder nach gespeichertem Preis), antwortet die Wiederholung sonst
+    nur „schon angemeldet“, und es entstünde nie eine Rechnung. Ohne Preis friert die Wiederholung ihn ein - aber nur für
+    die Person, die die Kosten übernommen hat. Gibt den Preis zurück, wenn jetzt ein Auftrag entstand."""
+    offer = tournament.get("billing") or {}
+    if registration.get("status") not in BILLABLE_STATUSES or not charges(tournament, offer):
+        return None
+    snapshot = registration.get("price_snapshot")
+    if not snapshot:
+        if not actor or registration.get("costs_accepted_by") != actor.get("id"):
+            return None
+        return await freeze_price(db, registration, tournament, payer=actor)
+    if registration.get("billing_status") not in (None, "pending"):
+        return None
+    key = billing_orders.booking_key("tournament", registration["id"], snapshot)
+    known = {"booking_key": key} if key else {"kind": "tournament", "registration_id": registration["id"], "status": {"$nin": ["cancelled", "failed"]}}
+    if await db.billing_orders.find_one(known, {"_id": 0, "id": 1}):
+        return None
+    payer_id = (snapshot.get("recipient") or {}).get("user_id") or registration.get("costs_accepted_by")
+    if not payer_id:
+        return None
+    await billing_orders.create_order(db, kind="tournament", source_id=tournament["id"], registration_id=registration["id"], user_id=payer_id,
+                                      snapshot=snapshot, timing=offer.get("invoice_timing") or "on_confirm")
+    return snapshot
+
+
 async def close_price(db, registration: dict, reason: str) -> None:
     """Abgelehnt oder abgemeldet, bevor ein Beleg entstand: Auftrag zu, Snapshot bleibt als Verlauf."""
     await billing_orders.cancel_orders_for(db, kind="tournament", registration_id=registration["id"], reason=reason)

@@ -102,11 +102,11 @@ export type WhatsOnRow = {
   status?: string;
 };
 
-function clock(value?: string | null): string {
+export function clock(value?: string | null): string {
   return value ? viennaTime(value, { hour: "2-digit", minute: "2-digit" }) : "";
 }
 
-function weekdayClock(value?: string | null): string {
+export function weekdayClock(value?: string | null): string {
   if (!value) return "";
   const weekday = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"][new Date(`${viennaDay(value)}T12:00:00Z`).getUTCDay()];
   return `${weekday} ${clock(value)}`;

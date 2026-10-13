@@ -174,6 +174,18 @@ Team nicht. Seit #1479 schickt der Server das fertige Ergebnis mit (`can_manage`
 `can_dissolve`); fehlt einer Admin-Rolle nur die Zwei-Faktor-Anmeldung (`admin_needs_second_factor`), steht statt der
 Knöpfe „2FA einrichten“ da.
 
+**„Spielst du auch mit?“ (#1184):** nach der Event-Anmeldung meldet `POST /api/events/{id}/play-along` die gewählten
+Einzel-Turniere des Events an – nur mit Konto, nur für die Person selbst. Je Turnier läuft die normale Selbstanmeldung
+mit allen Regeln (Sichtbarkeit, Frist, Event-Pflicht #875, Startgeld #319, voll → Warteliste); es gibt keine Abkürzung.
+Team-Turniere meldet weiter die Teamleitung auf der Turnierseite an, Turniere anderer Events lehnt der Weg ab. Die
+Auswahl (`GET …/play-along`) zeigt nur Turniere und Fast Laps, die die Person sehen darf. Code:
+`services/event_play_along.py`.
+
+In der App fragt die Team-Seite dieselben Rollen wie der Server: Team bearbeiten und Squads dürfen Leitung,
+Co-Leitung, Turnierleitung, Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und
+Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen dabei –
+wie überall – nur mit bestätigter Zwei-Faktor-Anmeldung (#1469); Leitung und Co-Leitung brauchen sie für ihr Team nicht.
+
 ## Personen, Teams und Sponsoren wählen (#1354)
 
 Wo die Verwaltung eine Person wählt, sucht sie nach dem Namen (`GET /api/admin/people/search?purpose=…`). Treffer

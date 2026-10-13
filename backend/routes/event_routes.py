@@ -17,11 +17,11 @@ from services.sponsor_utils import dedupe_public_sponsors
 from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import billing_orders, event_days, event_facts, event_locations, event_registration, pricing
+from services import billing_orders, event_days, event_facts, event_locations, event_play_along, event_registration, pricing
 from services.event_registration import RegistrationError
 from services.permissions import areas_for, can_use_area, needs_mfa, user_has_area
 from services.permissions import is_confirmed_tournament_lead
-from models import EventCreate, EventUpdate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
+from models import EventCreate, EventUpdate, EventPlayAlongCreate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 # Events gehören zur Turnierleitung (Bereich „tournaments“); Moderatoren moderieren.
@@ -766,6 +766,36 @@ async def register_for_event(event_id: str, body: EventRegistrationCreate,
     except RegistrationError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detail)
     return _public_event_registration(doc, is_staff=True)
+
+
+async def _event_for_player(event_id: str, user: dict, access: str | None) -> dict:
+    """Das Event, wie die Event-Seite es der Person zeigt - Entwurf und Sichtbarkeit wie dort."""
+    db = get_db()
+    event, _ = await _find_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    has_access = bool(await validate_access_link(db, access, "event", event["id"], user, "view"))
+    if event.get("status") == "draft" and not (is_confirmed_tournament_lead(user) or has_access):
+        raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    if not has_access and not await _lead_can_see(user, event.get("visibility") or "public"):
+        raise HTTPException(status_code=403, detail="Event ist nicht sichtbar.")
+    return event
+
+
+@router.get("/{event_id}/play-along")
+async def play_along_options(event_id: str, access: str | None = None, me: dict = Depends(get_current_user)):
+    """„Spielst du auch mit?“ (#1184): die Turniere und Fast Laps des Events für den zweiten Schritt - nur mit Konto."""
+    event = await _event_for_player(event_id, me, access)
+    return await event_play_along.options(get_db(), event, me)
+
+
+@router.post("/{event_id}/play-along")
+async def play_along_register(event_id: str, body: EventPlayAlongCreate, access: str | None = None,
+                              me: dict = Depends(get_current_user)):
+    """Je Haken eine normale Turnier-Anmeldung (dieselben Regeln, Warteliste, Startgeld) - Ergebnis je Eintrag."""
+    event = await _event_for_player(event_id, me, access)
+    return await event_play_along.register_many(get_db(), event, me, body.tournament_ids, accept_rules=body.accept_rules,
+                                                accept_privacy=body.accept_privacy, accept_costs=body.accept_costs)
 
 
 @router.delete("/{event_id}/registrations/me")

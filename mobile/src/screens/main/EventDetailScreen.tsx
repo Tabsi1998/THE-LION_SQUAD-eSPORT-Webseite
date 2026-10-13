@@ -9,6 +9,7 @@ import { ContentCard } from "../../components/ContentCard";
 import { FormInput } from "../../components/FormInput";
 import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
+import { PlayAlongSheet } from "../../components/PlayAlongSheet";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -26,6 +27,7 @@ import { HIGHLIGHT_ICONS, eventFacts, stripHeadingEmoji, visibilityChip, whatsOn
 import { WEB_BASE_URL } from "../../lib/siteUrls";
 import { internalLabel } from "../../lib/memberArea";
 import { getRegistrationState } from "../../lib/registration";
+import { offersPlayAlong } from "../../lib/playAlong";
 import { isGuestUser } from "../../live";
 import { openSignIn } from "../../navigation/rootNavigation";
 import type { TournamentStackParamList } from "../../navigation/types";
@@ -85,6 +87,10 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const [showParticipants, setShowParticipants] = useState(false);
   const [checkingIn, setCheckingIn] = useState("");
   const guest = isGuestUser(user);
+  // „Spielst du auch mit?“ (#1184): nach der Event-Anmeldung die Turniere des Events. Kam man von einem Turnier mit
+  // Event-Pflicht (#875), geht es danach dorthin zurück.
+  const [playAlongFor, setPlayAlongFor] = useState<string | null>(null);
+  const returnTournament = route.params.returnTournament || null;
 
   const load = useCallback(async () => {
     setProblem(null);
@@ -156,6 +162,13 @@ export function EventDetailScreen({ navigation, route }: Props) {
     navigation.navigate("PublicProfile", { username: target.id });
   }, [navigation]);
 
+  const finishPlayAlong = useCallback(() => {
+    setPlayAlongFor(null);
+    if (!returnTournament) return;
+    if (navigation.canGoBack?.()) navigation.goBack();
+    else navigation.navigate("TournamentDetail", { id: returnTournament });
+  }, [navigation, returnTournament]);
+
   const register = useCallback(async () => {
     if (!event || busy) return;
     setBusy(true);
@@ -163,12 +176,14 @@ export function EventDetailScreen({ navigation, route }: Props) {
     try {
       await api.post(`/events/${event.id}/registrations`, { companion_count: companionNumber, note: note.trim() || null, selected_positions: selectedPositions });
       await load();
+      if (offersPlayAlong(event, Boolean(user) && !guest)) setPlayAlongFor(event.id);
+      else finishPlayAlong();
     } catch (err) {
       setError(errorMessage(err, "Event-Anmeldung konnte nicht gespeichert werden."));
     } finally {
       setBusy(false);
     }
-  }, [busy, companionNumber, event, load, note, selectedPositions]);
+  }, [busy, companionNumber, event, finishPlayAlong, guest, load, note, selectedPositions, user]);
 
   // Einchecken (#397): dieselbe Route wie die Verwaltung im Web; ob der Knopf da ist, sagt der Server.
   const checkIn = useCallback(async (entry: EventRegistration) => {
@@ -658,6 +673,16 @@ export function EventDetailScreen({ navigation, route }: Props) {
           </Card>
         ) : null}
       </ScrollView>
+      <PlayAlongSheet
+        eventId={playAlongFor}
+        multiDay={Boolean(event.schedule?.multi_day)}
+        from={returnTournament}
+        onClose={finishPlayAlong}
+        onOpenTournament={(key) => {
+          setPlayAlongFor(null);
+          navigation.navigate("TournamentDetail", { id: key });
+        }}
+      />
     </Screen>
   );
 }

@@ -402,7 +402,11 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
     )
     if existing:
         existing.pop("identity_key", None)
-        return {**existing, "auto_bracket_update": None, "idempotent_replay": True}
+        # Fehlte nach einem Abbruch der Rechnungsauftrag, legt die Wiederholung ihn nach (#1184).
+        repaired = await tournament_fees.repair_order(db, existing, tournament, actor=me)
+        if repaired:
+            existing.update({"price_snapshot": repaired, "billing_status": existing.get("billing_status") or "pending"})
+        return {**existing, "auto_bracket_update": None, "idempotent_replay": True, "order_repaired": bool(repaired)}
     team = await _validate_registration_actor(db, tournament, body, me)
     if team:
         existing_team = await db.tournament_registrations.find_one(
