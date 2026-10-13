@@ -10,6 +10,7 @@ import { PasskeysCard } from "../../components/PasskeysCard";
 import { Screen } from "../../components/Screen";
 import { Body, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
+import { friendsSharing } from "../../lib/eventRecap";
 import { availabilityText } from "../../lib/appLock";
 import { formatDateTime } from "../../lib/format";
 import { openLink } from "../../lib/openLink";
@@ -64,7 +65,7 @@ function Group({ title, children, testID }: { title: string; children: React.Rea
   );
 }
 
-const SETTING_FIELDS = ["privacy_public_profile", "privacy_achievements_public", "show_twitch_embed", "privacy_season_finds_public", "dm_privacy", "newsletter_consent", "notification_preferences"] as const;
+const SETTING_FIELDS = ["privacy_public_profile", "privacy_achievements_public", "show_twitch_embed", "privacy_season_finds_public", "privacy_friends_see_registrations", "dm_privacy", "newsletter_consent", "notification_preferences"] as const;
 
 function settingsForm(user: Record<string, any> | null | undefined) {
   const u = user || {};
@@ -74,6 +75,8 @@ function settingsForm(user: Record<string, any> | null | undefined) {
     show_twitch_embed: Boolean(u.show_twitch_embed),
     // Saison-Fundstücke (#678): Standard aus - erst mit dem Schalter sehen andere die Summen.
     privacy_season_finds_public: u.privacy_season_finds_public ?? false,
+    // Freunde beim Event (#1188): Standard an, mit Geburtsdatum unter 14 Jahren aus - der wirksame Stand wie am Server.
+    privacy_friends_see_registrations: friendsSharing(u),
     dm_privacy: u.dm_privacy || "everyone",
     newsletter_consent: Boolean(u.newsletter_consent),
     notification_preferences: { ...(u.notification_preferences || {}) } as Record<string, boolean>,
@@ -237,6 +240,13 @@ function AccountSettings() {
           />
           <Toggle label="Twitch im Profil anzeigen" detail="Live-Embed darf auf deinem öffentlichen Profil erscheinen." value={Boolean(form.show_twitch_embed)} onValueChange={(v) => change("show_twitch_embed", v)} />
           <Toggle label="Saison-Fundstücke öffentlich" detail="Dein öffentliches Profil zeigt, was du über die Jahreszeiten gesammelt hast – nur die Summen, nie wann." value={form.privacy_season_finds_public === true} onValueChange={(v) => change("privacy_season_finds_public", v)} />
+          <Toggle
+            label="Freunde sehen, wo ich angemeldet bin"
+            detail="Deine bestätigten Freunde sehen auf der Event-Seite, bei welchen Events und Turnieren du angemeldet bist. Fremde und Gäste sehen das nie."
+            value={form.privacy_friends_see_registrations !== false}
+            onValueChange={(v) => change("privacy_friends_see_registrations", v)}
+            testID="settings-toggle-friends-registrations"
+          />
           <Muted>Direktnachrichten</Muted>
           <View style={profileStyles.optionGrid}>
             {dmOptions.map(([value, label]) => (

@@ -30,6 +30,7 @@ from fastapi import HTTPException
 from models import new_id, now_utc
 from services import season_raffles as raffles
 from services import seasons
+from services.private_fields import private_projection
 
 logger = logging.getLogger("tls.easter")
 
@@ -450,7 +451,7 @@ async def _enter_raffle(db, hunt: dict, user: dict, now: datetime) -> None:
     raffle = await raffles.for_source(db, raffle_key(hunt["year"]))
     if not raffle or raffles.phase(raffle, now) != "open":
         return
-    full = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0}) or user
+    full = await db.users.find_one({"id": user["id"]}, private_projection()) or user
     if await raffles.why_not(db, raffle, full):
         return
     await db[raffles.ENTRIES].update_one(
@@ -535,7 +536,7 @@ async def draw(db, year: int, actor: dict, now: datetime | None = None) -> dict:
             for row in rows:
                 if len(winners) >= len(place_kinds):
                     break
-                user = await db.users.find_one({"id": row["user_id"]}, {"_id": 0, "password_hash": 0})
+                user = await db.users.find_one({"id": row["user_id"]}, private_projection())
                 if not user or await raffles.why_not(db, stand_in, user):
                     continue
                 kind = place_kinds[len(winners)]

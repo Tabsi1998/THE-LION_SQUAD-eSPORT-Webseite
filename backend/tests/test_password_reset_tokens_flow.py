@@ -17,8 +17,8 @@ from flow_harness import InterleavedReads, make_flow, new_id  # noqa: E402
 
 from auth import hash_token  # noqa: E402
 
-NEW_PASSWORD = "Neues-Passwort-2026"
-OTHER_PASSWORD = "Anderes-Passwort-2026"
+NEW_PASSWORD = "neues-testpasswort-eins"
+OTHER_PASSWORD = "anderes-testpasswort-zwei"
 
 
 class DbWith:
