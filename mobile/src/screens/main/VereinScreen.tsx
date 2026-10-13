@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { PlatformIcon, type PlatformIconName } from "../../components/PlatformIcon";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
@@ -73,7 +74,7 @@ export function steamSummary(presence: SteamPresence | null): string {
 }
 
 // Dieselben Plattform-Schlüssel wie im Web (frontend/src/lib/socialIcons.js).
-const SOCIAL_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+const SOCIAL_ICONS: Record<string, PlatformIconName> = {
   discord: "logo-discord",
   whatsapp: "logo-whatsapp",
   telegram: "paper-plane-outline",
@@ -84,8 +85,8 @@ const SOCIAL_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   youtube: "logo-youtube",
   twitch: "logo-twitch",
   kick: "videocam-outline",
-  twitter: "logo-twitter",
-  x: "logo-twitter",
+  twitter: "logo-x",
+  x: "logo-x",
   bluesky: "cloud-outline",
   mastodon: "logo-mastodon",
   linkedin: "logo-linkedin",
@@ -100,7 +101,7 @@ const SOCIAL_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   website: "globe-outline",
 };
 
-export function socialIcon(platform?: string | null): keyof typeof Ionicons.glyphMap {
+export function socialIcon(platform?: string | null): PlatformIconName {
   return SOCIAL_ICONS[String(platform || "").toLowerCase()] || "link-outline";
 }
 
@@ -394,7 +395,7 @@ export function VereinScreen({ navigation }: Props) {
             <View style={styles.socialRow}>
               {socials.map((link) => (
                 <Pressable key={`${link.platform}-${link.url}`} accessibilityRole="link" accessibilityLabel={link.label || link.platform || "Link"} onPress={() => { openLink(String(link.url)); }} style={({ pressed }) => [styles.social, pressed && styles.pressed]} testID={`social-${String(link.platform || "link").toLowerCase()}`}>
-                  <Ionicons name={socialIcon(link.platform)} color={colors.white} size={22} />
+                  <PlatformIcon name={socialIcon(link.platform)} color={colors.white} size={22} />
                 </Pressable>
               ))}
             </View>

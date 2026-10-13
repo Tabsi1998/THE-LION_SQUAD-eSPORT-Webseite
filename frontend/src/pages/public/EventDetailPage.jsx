@@ -13,6 +13,7 @@ import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { FactsBox } from "@/components/tls/FactsBox";
 import { EventRecap } from "@/components/tls/EventRecap";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
+import { offerFriendsHint } from "@/lib/friendsHint";
 import { EventBanner } from "@/components/tls/EventBanner";
 import { PlayAlongSheet } from "@/components/tls/PlayAlongSheet";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -379,7 +380,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
       )}
 
       {/* Freunde beim Event (#1188): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}
-      <FriendsAtEvent event={e} user={user} over={over} />
+      <FriendsAtEvent event={e} user={user} over={over} accessToken={accessToken} />
 
       {/* 2. Was läuft beim Event: jedes Turnier und jede Fast Lap mit Tag, Uhrzeit, Spielart und dem eigenen Stand. */}
       {!recap && !!rows.length && (
@@ -649,6 +650,8 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
       toast.success("Anmeldung gespeichert.");
       await onChanged();
       onRegistered?.();
+      // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2).
+      void offerFriendsHint();
     });
     if (attempt.started && attempt.error) {
       const message = formatRequestError(attempt.error, "Anmeldung konnte nicht gespeichert werden.");

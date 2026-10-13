@@ -9,6 +9,7 @@ import { ContentCard } from "../../components/ContentCard";
 import { EventRecapCard } from "../../components/EventRecapCard";
 import { FormInput } from "../../components/FormInput";
 import { FriendsAtEventCard } from "../../components/FriendsAtEventCard";
+import { offerFriendsHint } from "../../lib/friendsHint";
 import { ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { PlayAlongSheet } from "../../components/PlayAlongSheet";
@@ -169,6 +170,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
     try {
       await api.post(`/events/${event.id}/registrations`, { companion_count: companionNumber, note: note.trim() || null, selected_positions: selectedPositions });
       await load();
+      // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2).
+      void offerFriendsHint();
       if (offersPlayAlong(event, Boolean(user) && !guest)) setPlayAlongFor(event.id);
       else finishPlayAlong();
     } catch (err) {

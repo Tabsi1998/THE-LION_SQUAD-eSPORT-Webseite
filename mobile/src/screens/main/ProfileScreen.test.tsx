@@ -231,3 +231,27 @@ test("eine verspätete Antwort für das vorige Profil wird verworfen (#1000)", a
     oldText: "Altes Profil",
   });
 });
+
+test("Reiter Erfolge: ein neuer Erfolg lädt nur den Erfolge-Stand nach - keine zweite Auswertung, keine Schleife", async () => {
+  const { api } = require("../../lib/api");
+  const { announceAchievementUnlocked } = require("../../lib/achievements");
+  const order: string[] = [];
+  (api.post as jest.Mock).mockImplementation(async (path: string) => {
+    order.push(`post ${path}`);
+    return { data: { newly_awarded: 1 } };
+  });
+  mockGet.mockImplementation((path: string, config?: { params?: Record<string, string> }) => {
+    order.push(`get ${path}`);
+    return answer(path, config);
+  });
+  await renderOwn();
+  await waitFor(() => expect(order).toContain("get /achievements/me"));
+  await fireEvent.press(screen.getByText("Erfolge"));
+  // Die Benachrichtigung zum neu vergebenen Erfolg meldet sich (wie nach der Auswertung beim Öffnen).
+  announceAchievementUnlocked();
+  await waitFor(() => expect(order.filter((entry) => entry === "get /achievements/me")).toHaveLength(2));
+  await new Promise((resolve) => { setTimeout(resolve, 500); });
+  expect(screen.getByText("Eigene Erfolge mit Fortschritt")).toBeTruthy();
+  expect(order.filter((entry) => entry === "post /achievements/evaluate")).toHaveLength(1);
+  expect(order.filter((entry) => entry === "get /achievements/me")).toHaveLength(2);
+});

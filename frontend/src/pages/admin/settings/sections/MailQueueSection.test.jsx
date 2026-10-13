@@ -8,13 +8,13 @@ const { MailQueueSection } = await import("./MailQueueSection");
 const { mailErrorSentence, mailTemplateLabel, queueActions, queueDetail } = await import("../shared");
 
 const JOBS = [
-  { id: "m-failed", to: "anna@example.test", subject: "Deine Anmeldung", template_key: "registration_received", template_label: "Turnier: Anmeldung eingegangen",
+  { id: "m-failed", to_masked: "a***@example.test", subject: "Deine Anmeldung", template_key: "registration_received", template_label: "Turnier: Anmeldung eingegangen",
     status: "failed", attempts: 5, last_error: "(550, b'5.1.1 user unknown')", created_at: "2026-10-08T07:00:00+00:00", next_attempt_at: "2026-10-08T07:40:00+00:00" },
-  { id: "m-sent", to: "ben@example.test", subject: "Dein Gewinn", template_key: "prize_ready", status: "sent", attempts: 1, sent_at: "2026-10-08T17:00:00+00:00",
+  { id: "m-sent", to_masked: "b***@example.test", subject: "Dein Gewinn", template_key: "prize_ready", status: "sent", attempts: 1, sent_at: "2026-10-08T17:00:00+00:00",
     created_at: "2026-10-08T16:59:00+00:00" },
-  { id: "m-pending", to: "cleo@example.test", subject: "Willkommen", template_key: "registration", status: "pending", attempts: 0, next_attempt_at: "2026-10-08T18:00:00+00:00",
+  { id: "m-pending", to_masked: "c***@example.test", subject: "Willkommen", template_key: "registration", status: "pending", attempts: 0, next_attempt_at: "2026-10-08T18:00:00+00:00",
     created_at: "2026-10-08T17:59:00+00:00" },
-  { id: "m-sending", to: "dora@example.test", subject: "Erinnerung", template_key: "match_reminder", status: "sending", attempts: 0, created_at: "2026-10-08T17:58:00+00:00" },
+  { id: "m-sending", to_masked: "d***@example.test", subject: "Erinnerung", template_key: "match_reminder", status: "sending", attempts: 0, created_at: "2026-10-08T17:58:00+00:00" },
 ];
 
 function renderSection(overrides = {}) {
@@ -85,4 +85,43 @@ test("Tabelle und Karten: nur die fehlgeschlagene Mail hat „Nochmal versuchen�
 test("leere Liste und Filter ohne Treffer sagen es in einem Satz", () => {
   renderSection({ queue: [], filteredQueue: [] });
   expect(screen.getByTestId("queue-empty")).toHaveTextContent("Die Warteschlange ist leer.");
+});
+
+// #1418: Empfänger gekürzt, je Zeile „Adresse zeigen“ - erst dann steht die ganze Adresse da, und nur in dieser Zeile.
+test("Adresse gekürzt; „Adresse zeigen“ holt die ganze Adresse dieser Zeile, „Verbergen“ kürzt wieder", async () => {
+  const user = userEvent.setup();
+  const revealRecipient = vi.fn().mockResolvedValue("anna.beispiel@example.test");
+  renderSection({ revealRecipient, searchQueue: vi.fn() });
+  expect(screen.getByTestId("queue-to-m-failed")).toHaveTextContent("a***@example.test");
+  expect(document.body.innerHTML).not.toContain("anna.beispiel@example.test");
+
+  await user.click(screen.getByTestId("queue-to-reveal-m-failed"));
+  expect(revealRecipient).toHaveBeenCalledWith("m-failed");
+  expect(screen.getByTestId("queue-to-m-failed")).toHaveTextContent("anna.beispiel@example.test");
+  expect(screen.getByTestId("queue-to-m-sent")).toHaveTextContent("b***@example.test");
+
+  await user.click(screen.getByTestId("queue-to-hide-m-failed"));
+  expect(screen.getByTestId("queue-to-m-failed")).toHaveTextContent("a***@example.test");
+  expect(document.body.innerHTML).not.toContain("anna.beispiel@example.test");
+});
+
+test("verweigert der Server das Zeigen, bleibt die Adresse gekürzt", async () => {
+  const user = userEvent.setup();
+  renderSection({ revealRecipient: vi.fn().mockResolvedValue(""), searchQueue: vi.fn() });
+  await user.click(screen.getByTestId("queue-card-to-reveal-m-sent"));
+  expect(screen.getByTestId("queue-card-to-m-sent")).toHaveTextContent("b***@example.test");
+});
+
+test("Suche nach Adresse: schickt den Begriff, „Suche leeren“ setzt zurück, ohne Treffer ein Satz", async () => {
+  const user = userEvent.setup();
+  const searchQueue = vi.fn();
+  renderSection({ searchQueue, revealRecipient: vi.fn(), queue: [], filteredQueue: [], queueSearch: "anna@" });
+  expect(screen.getByTestId("queue-empty")).toHaveTextContent("Keine Mail an diese Adresse.");
+  const input = screen.getByTestId("queue-search-input");
+  await user.clear(input);
+  await user.type(input, "ben@example.test");
+  await user.click(screen.getByTestId("queue-search-submit"));
+  expect(searchQueue).toHaveBeenLastCalledWith("ben@example.test");
+  await user.click(screen.getByTestId("queue-search-clear"));
+  expect(searchQueue).toHaveBeenLastCalledWith("");
 });

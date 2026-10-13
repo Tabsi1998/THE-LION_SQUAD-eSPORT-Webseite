@@ -21,6 +21,8 @@ import { TeamDayCard } from "../../components/tournament/TeamDayCard";
 import { ResultShareCard } from "../../components/ResultShareCard";
 import { basisLabel, formatCents, ownPriceLine, quoteTotal, startFeeSummary } from "../../lib/startFee";
 import { isGuestUser } from "../../live";
+import { FriendsAtEventCard } from "../../components/FriendsAtEventCard";
+import { offerFriendsHint } from "../../lib/friendsHint";
 import { openSignIn } from "../../navigation/rootNavigation";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
@@ -215,6 +217,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
       });
       setRegisterModal(false);
       await load();
+      // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2), nicht erst auf der Event-Seite.
+      void offerFriendsHint();
     } catch (err) {
       setError(errorMessage(err, "Turnier-Anmeldung konnte nicht gespeichert werden."));
     } finally {
@@ -438,6 +442,14 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
             </Card>
             {/* Team am Spieltag (#1192): Aufstellung und „Wer ist da“ - nur angemeldete Teams bei Team-Turnieren. */}
             {registered && isTeamTournament && !guest ? <TeamDayCard tournamentId={tournament.id} /> : null}
+            {/* Freunde beim Turnier (#1188 Teil 2): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}
+            <FriendsAtEventCard
+              path={`/tournaments/${tournament.slug || tournament.id}/friends`}
+              scope="tournament"
+              signedIn={Boolean(user) && !guest}
+              over={tournamentIsOver(tournament)}
+              onOpenProfile={(username) => navigation.navigate("PublicProfile", { username })}
+            />
             {isFinished ? (
               <>
                 {/* Ergebnis teilen (#1194): Bild für Status und Story - der Server sagt, ob es geht. */}

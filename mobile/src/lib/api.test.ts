@@ -210,3 +210,262 @@ test("refreshSession: eine laufende Erneuerung wird geteilt - auch mit dem 401-N
   await expect(refreshSession(null)).rejects.toThrow("Kein Erneuerungs-Token");
   expect(refreshCalls).toBe(1);
 });
+
+// „Angemeldet bleiben“ hält (#1519): ein abgelaufenes Zugangs-Token darf nie still zum Gast machen, und nur eine vom
+// Server abgelehnte Erneuerung beendet die Sitzung - kein Netzfehler, keine Störung, kein zweiter 401 nach dem Erneuern.
+describe("Sitzung erneuern (#1519)", () => {
+  function jwt(expiresInSeconds: number, tag = "alt"): string {
+    const payload = Buffer.from(JSON.stringify({ sub: "u-1", tag, exp: Math.floor(Date.now() / 1000) + expiresInSeconds })).toString("base64")
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    return `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`;
+  }
+  const FRESH = jwt(12 * 3600, "neu");
+  const refreshed = { user: { id: "u-1" }, access_token: FRESH, refresh_token: "refresh-neu" };
+
+  beforeEach(() => {
+    (persistSession as jest.Mock).mockImplementation(async (session: { access_token: string; refresh_token: string }) => {
+      tokens = { ...tokens, accessToken: session.access_token, refreshToken: session.refresh_token };
+    });
+  });
+
+  test("ein abgelaufenes Zugangs-Token wird vor dem Aufruf erneuert - öffentliche Aufrufe sähen sonst einen Gast", async () => {
+    tokens = { accessToken: jwt(-60), refreshToken: "refresh-alt", userId: "u-1" };
+    const seen: string[] = [];
+    handler = async (config) => {
+      seen.push(String(config.url));
+      if (config.url === "/auth/mobile/refresh") return { data: refreshed, status: 200, headers: {}, config };
+      // Wie der Server bei öffentlichen Aufrufen: ein abgelaufenes Token zählt dort still als Gast (200, kein 401).
+      const signedIn = config.headers?.Authorization === `Bearer ${FRESH}`;
+      return { data: { signedIn }, status: 200, headers: {}, config };
+    };
+
+    const { data } = await api.get("/mobile/dashboard");
+
+    expect(data).toEqual({ signedIn: true });
+    expect(seen).toEqual(["/auth/mobile/refresh", "/mobile/dashboard"]);
+    expect(persistSession).toHaveBeenCalledTimes(1);
+    expect(clearSession).not.toHaveBeenCalled();
+  });
+
+  test("zwei gleichzeitige Aufrufe mit abgelaufenem Token: genau eine Erneuerung, beide mit dem neuen Token", async () => {
+    tokens = { accessToken: jwt(-60), refreshToken: "refresh-alt", userId: "u-1" };
+    const refreshTokensSent: unknown[] = [];
+    handler = async (config) => {
+      if (config.url === "/auth/mobile/refresh") {
+        refreshTokensSent.push(JSON.parse(String(config.data)).refresh_token);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return { data: refreshed, status: 200, headers: {}, config };
+      }
+      if (config.headers?.Authorization !== `Bearer ${FRESH}`) throw httpError(401, config);
+      return { data: { url: config.url }, status: 200, headers: {}, config };
+    };
+
+    const [first, second] = await Promise.all([api.get("/dashboard"), api.get("/notifications")]);
+
+    expect(refreshTokensSent).toEqual(["refresh-alt"]);
+    expect(first.data).toEqual({ url: "/dashboard" });
+    expect(second.data).toEqual({ url: "/notifications" });
+    expect(clearSession).not.toHaveBeenCalled();
+  });
+
+  test("kein Netz beim Erneuern meldet nicht ab", async () => {
+    handler = async (config) => {
+      if (config.url === "/auth/mobile/refresh") throw networkError(config);
+      throw httpError(401, config);
+    };
+
+    await expect(api.get("/dashboard")).rejects.toBeTruthy();
+
+    expect(clearSession).not.toHaveBeenCalled();
+    expect(tokens.refreshToken).toBe("refresh-alt");
+  });
+
+  test("Zeitüberschreitung oder Serverstörung beim Erneuern meldet nicht ab", async () => {
+    for (const failure of ["timeout", "502"]) {
+      handler = async (config) => {
+        if (config.url === "/auth/mobile/refresh") {
+          if (failure === "502") throw httpError(502, config);
+          throw Object.assign(new Error("timeout of 15000ms exceeded"), { code: "ECONNABORTED", config, isAxiosError: true });
+        }
+        throw httpError(401, config);
+      };
+      await expect(api.get("/dashboard")).rejects.toBeTruthy();
+    }
+
+    expect(clearSession).not.toHaveBeenCalled();
+  });
+
+  test("ein abgelaufenes Token ohne Netz: der Aufruf scheitert am Netz, die Sitzung bleibt", async () => {
+    tokens = { accessToken: jwt(-60), refreshToken: "refresh-alt", userId: "u-1" };
+    handler = async (config) => {
+      throw networkError(config);
+    };
+
+    await expect(api.get("/dashboard")).rejects.toBeTruthy();
+
+    expect(clearSession).not.toHaveBeenCalled();
+  });
+
+  test("ein 401 nach erfolgreicher Erneuerung beendet die Sitzung nicht", async () => {
+    handler = async (config) => {
+      if (config.url === "/auth/mobile/refresh") return { data: refreshed, status: 200, headers: {}, config };
+      throw httpError(401, config);
+    };
+
+    await expect(api.get("/tournaments/t-1/bracket")).rejects.toBeTruthy();
+
+    expect(persistSession).toHaveBeenCalledTimes(1);
+    expect(clearSession).not.toHaveBeenCalled();
+  });
+
+  test("ein 401 auf einen Anmeldeversuch beendet die bestehende Sitzung nicht", async () => {
+    handler = async (config) => {
+      throw httpError(401, config);
+    };
+
+    await expect(api.post("/auth/mobile/login", {})).rejects.toBeTruthy();
+
+    expect(clearSession).not.toHaveBeenCalled();
+  });
+
+  test("lehnt der Server die Erneuerung ab, endet die Sitzung - auch beim Erneuern vor dem Aufruf", async () => {
+    tokens = { accessToken: jwt(-60), refreshToken: "refresh-alt", userId: "u-1" };
+    const seen: Array<{ url: string; auth: unknown }> = [];
+    handler = async (config) => {
+      seen.push({ url: String(config.url), auth: config.headers?.Authorization });
+      if (config.url === "/auth/mobile/refresh") throw httpError(401, config);
+      return { data: { ok: true }, status: 200, headers: {}, config };
+    };
+
+    await api.get("/news");
+
+    expect(clearSession).toHaveBeenCalledTimes(1);
+    // Der Aufruf geht ohne das abgelaufene Token weiter - als Gast, wie nach dem Abmelden.
+    expect(seen[seen.length - 1]).toEqual({ url: "/news", auth: undefined });
+  });
+
+  test("vorgehende Geräteuhr: ein frisch erhaltenes Token wird nicht bei jedem Aufruf erneuert", async () => {
+    // exp liegt laut Geräteuhr schon zurück (Uhr geht einen Tag vor), erhalten wurde das Token aber gerade eben.
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const payload = Buffer.from(JSON.stringify({ sub: "u-1", iat: nowSeconds - 24 * 3600, exp: nowSeconds - 12 * 3600 })).toString("base64")
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    tokens = { accessToken: `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`, refreshToken: "refresh-alt", userId: "u-1", accessReceivedAt: Date.now() - 1000 } as typeof tokens;
+    const seen: string[] = [];
+    handler = async (config) => {
+      seen.push(String(config.url));
+      return { data: { ok: true }, status: 200, headers: {}, config };
+    };
+
+    await api.get("/news");
+
+    expect(seen).toEqual(["/news"]);
+  });
+});
+
+// Rennen um die Sitzung (#1519): eine Erneuerung, die noch für die vorige Sitzung lief, darf nach Abmelden oder
+// Kontowechsel weder deren Tokens zurückbringen noch die neue Sitzung abmelden.
+describe("Erneuerung über einen Sitzungswechsel hinweg (#1519)", () => {
+  type Snapshot = { accessToken: string | null; refreshToken: string | null; userId: string | null; generation?: number };
+  function jwt(expiresInSeconds: number, tag: string): string {
+    const payload = Buffer.from(JSON.stringify({ sub: tag, exp: Math.floor(Date.now() / 1000) + expiresInSeconds })).toString("base64")
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    return `eyJhbGciOiJIUzI1NiJ9.${payload}.${tag}`;
+  }
+  const ACCESS_B = jwt(12 * 3600, "b");
+  let state: Snapshot;
+  let release: (outcome: "ok" | "401") => void;
+
+  beforeEach(() => {
+    state = { accessToken: jwt(-60, "a"), refreshToken: "refresh-a", userId: "u-a", generation: 1 };
+    configureAuthBridge({
+      readTokens: () => state,
+      persistSession: persistSession as unknown as (session: unknown) => Promise<void>,
+      clearSession,
+    });
+    (persistSession as jest.Mock).mockImplementation(async () => {});
+  });
+
+  function gatedRefresh(seen: Array<{ url: string; auth: unknown }>) {
+    const gate = new Promise<"ok" | "401">((resolve) => { release = resolve; });
+    handler = async (config) => {
+      seen.push({ url: String(config.url), auth: config.headers?.Authorization });
+      if (config.url === "/auth/mobile/refresh") {
+        if ((await gate) === "401") throw httpError(401, config);
+        return { data: { user: { id: "u-a" }, access_token: jwt(12 * 3600, "a2"), refresh_token: "refresh-a2" }, status: 200, headers: {}, config };
+      }
+      return { data: { ok: true }, status: 200, headers: {}, config };
+    };
+  }
+
+  test("Abmelden während der Erneuerung: A kommt nicht zurück, der Aufruf geht als Gast", async () => {
+    const seen: Array<{ url: string; auth: unknown }> = [];
+    gatedRefresh(seen);
+    const call = api.get("/news");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    state = { accessToken: null, refreshToken: null, userId: "guest", generation: 2 };
+    release("ok");
+    await call;
+
+    expect(persistSession).not.toHaveBeenCalled();
+    expect(seen[seen.length - 1]).toEqual({ url: "/news", auth: undefined });
+  });
+
+  test("Abmelden während einer abgelehnten Erneuerung: kein zweites Abmelden, kein Hinweis", async () => {
+    const seen: Array<{ url: string; auth: unknown }> = [];
+    gatedRefresh(seen);
+    const call = api.get("/news");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    state = { accessToken: null, refreshToken: null, userId: "guest", generation: 2 };
+    release("401");
+    await call;
+
+    expect(clearSession).not.toHaveBeenCalled();
+  });
+
+  test("Kontowechsel A→B während der Erneuerung: B bleibt, A überschreibt nichts und meldet B nicht ab", async () => {
+    for (const outcome of ["ok", "401"] as const) {
+      jest.clearAllMocks();
+      state = { accessToken: jwt(-60, "a"), refreshToken: "refresh-a", userId: "u-a", generation: 1 };
+      const seen: Array<{ url: string; auth: unknown }> = [];
+      gatedRefresh(seen);
+      const call = api.get("/news");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      state = { accessToken: ACCESS_B, refreshToken: "refresh-b", userId: "u-b", generation: 2 };
+      release(outcome);
+      await call;
+
+      expect(persistSession).not.toHaveBeenCalled();
+      expect(clearSession).not.toHaveBeenCalled();
+      expect(seen[seen.length - 1]).toEqual({ url: "/news", auth: `Bearer ${ACCESS_B}` });
+    }
+  });
+
+  test("ein 401 auf einen Aufruf von A nach dem Wechsel zu B erneuert nicht mit B", async () => {
+    state = { accessToken: "access-a", refreshToken: "refresh-a", userId: "u-a", generation: 1 };
+    const seen: string[] = [];
+    let respond: () => void = () => {};
+    handler = async (config) => {
+      seen.push(String(config.url));
+      await new Promise<void>((resolve) => { respond = resolve; });
+      throw httpError(401, config);
+    };
+    const call = api.get("/profile");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    state = { accessToken: "access-b", refreshToken: "refresh-b", userId: "u-b", generation: 2 };
+    respond();
+
+    await expect(call).rejects.toBeTruthy();
+    expect(seen).toEqual(["/profile"]);
+    expect(clearSession).not.toHaveBeenCalled();
+  });
+
+  test("eine laufende Erneuerung wird nur für denselben Erneuerungs-Token geteilt", async () => {
+    const sent: unknown[] = [];
+    handler = async (config) => {
+      sent.push(JSON.parse(String(config.data)).refresh_token);
+      return { data: { user: { id: "u" }, access_token: "x", refresh_token: "y" }, status: 200, headers: {}, config };
+    };
+    await Promise.all([refreshSession("refresh-a"), refreshSession("refresh-a"), refreshSession("refresh-b")]);
+    expect(sent).toEqual(["refresh-a", "refresh-b"]);
+  });
+});
