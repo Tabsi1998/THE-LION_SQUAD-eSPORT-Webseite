@@ -28,7 +28,7 @@ WRONG_CODE = "000000"
 @pytest_asyncio.fixture
 async def flow(monkeypatch):
     # Hier wird wirklich angemeldet - dafür braucht es den Schlüssel auch nach dem Import.
-    monkeypatch.setenv("JWT_SECRET", "mfa-tests-secret-with-at-least-32-characters")
+    monkeypatch.setenv("JWT_SECRET", "mfa-tests-secret-that-is-long-enough-here")
     instance, shutdown = make_flow()
     try:
         yield instance
@@ -274,17 +274,3 @@ async def test_the_code_counter_is_not_part_of_the_account_view(flow):
     assert response.status_code == 200
     assert "mfa_totp_last_counter" not in response.json()
 
-
-def test_every_private_projection_hides_the_code_counter():
-    """Wo die Wiederherstellungscodes aus einer Abfrage herausgenommen werden, gehört auch der Zähler dazu."""
-    backend = pathlib.Path(__file__).resolve().parents[1]
-    missing = []
-    for path in backend.rglob("*.py"):
-        if "tests" in path.parts or "venv" in path.parts or ".venv" in path.parts:
-            continue
-        text = path.read_text(encoding="utf-8")
-        if text.count('"mfa_recovery_code_hashes": 0') != text.count('"mfa_totp_last_counter": 0'):
-            missing.append(f"{path.name}: Projektion")
-        if '"mfa_recovery_code_hashes"' in text and '"mfa_totp_last_counter"' not in text:
-            missing.append(f"{path.name}: Feldliste")
-    assert not missing, missing

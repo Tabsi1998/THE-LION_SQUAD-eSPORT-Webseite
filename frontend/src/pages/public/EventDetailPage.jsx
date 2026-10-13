@@ -11,6 +11,8 @@ import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { FactsBox } from "@/components/tls/FactsBox";
+import { EventRecap } from "@/components/tls/EventRecap";
+import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { EventBanner } from "@/components/tls/EventBanner";
 import { PlayAlongSheet } from "@/components/tls/PlayAlongSheet";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -301,7 +303,9 @@ function EventTabs({ tabs, value, onChange }) {
 // „In den Kalender“ (#1272). Nach dem Ende gibt es keinen Kalender-Knopf mehr (#1221).
 function EventFactsBox({ e, user, over, onRegister }) {
   const own = e.own_registration;
-  const activeOwn = own && !["cancelled", "no_show"].includes(own.status);
+  const recap = over && e.status !== "cancelled";
+  // Nach dem Event (#1187): „Du warst dabei“ führt zum Rückblick; eine Warteliste von damals steht nicht mehr da.
+  const activeOwn = own && !["cancelled", "no_show"].includes(own.status) && !(recap && own.status === "waitlist");
   const phaseState = e.public_phase?.state || e.event_phase?.state || e.status;
   const canRegister = e.has_registration && !e.registration_url && !activeOwn && !over
     && (phaseState === "registration_open" || e.access_link?.grants?.includes("register"));
@@ -319,8 +323,8 @@ function EventFactsBox({ e, user, over, onRegister }) {
         </a>
       ) : null}
       {activeOwn ? (
-        <a href="#dein-event" className="tls-btn tls-btn--secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-sm" data-testid="event-facts-own">
-          <CheckCircle className="w-4 h-4" /> {own.status === "waitlist" ? "Warteliste" : "Du bist dabei"}
+        <a href={recap ? "#rueckblick" : "#dein-event"} className="tls-btn tls-btn--secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-sm" data-testid="event-facts-own">
+          <CheckCircle className="w-4 h-4" /> {own.status === "waitlist" ? "Warteliste" : recap ? "Du warst dabei" : "Du bist dabei"}
         </a>
       ) : null}
       {canRegister && user ? (
@@ -343,35 +347,42 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
   const organizerName = e.organizer_name || (e.owned_by_club ? "THE LION SQUAD - eSports" : "");
   const photosComing = Boolean(e.photos_coming) && (e.albums || []).every((album) => album.is_empty) && photosComingWindow(e);
   const rows = whatsOnRows(e);
+  // Rückblick (#1187): nach dem letzten Event-Tag (nicht bei Absage) statt Anmeldung und „Was läuft“.
+  const recap = over && e.status !== "cancelled";
   const singleMap = (e.locations?.length || 0) <= 1 && e.show_map && mapEmbedUrl(e);
   return (
     <div className="space-y-12" data-testid="event-overview">
-      {/* Nach dem Ende (#1221): kein Kalender, kein „Live verfolgen“, kein „Display“ - stattdessen der Satz, wo die
-          Ergebnisse stehen (bis der Rückblick kommt). */}
-      {over && e.status !== "cancelled" && (
-        <div className="border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3" data-testid="event-over">
-          <div className="text-sm text-white/85">{e.tournaments?.length ? "Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:" : "Das Event ist vorbei."}</div>
-          {!!e.tournaments?.length && (
-            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
-              {e.tournaments.map((t) => (
-                <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex items-center gap-1.5 text-sm font-bold text-[#FFD700] hover:text-white">
-                  <Trophy className="w-3.5 h-3.5" /> {t.title}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+      {/* Nach dem Ende (#1221): kein Kalender, kein „Live verfolgen“, kein „Display“. Der Rückblick (#1187) steht oben;
+          solange seine Daten fehlen, der Satz, wo die Ergebnisse stehen. */}
+      {recap && (
+        <EventRecap event={e} accessToken={accessToken} fallback={(
+          <div className="border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3" data-testid="event-over">
+            <div className="text-sm text-white/85">{e.tournaments?.length ? "Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:" : "Das Event ist vorbei."}</div>
+            {!!e.tournaments?.length && (
+              <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+                {e.tournaments.map((t) => (
+                  <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex items-center gap-1.5 text-sm font-bold text-[#FFD700] hover:text-white">
+                    <Trophy className="w-3.5 h-3.5" /> {t.title}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )} />
       )}
 
       {/* 1. Dein Event: der eigene Stand (später mit Ticket) - oder die Anmeldung, solange sie offen ist. */}
-      {e.has_registration && (
+      {e.has_registration && !recap && (
         <section id="dein-event" ref={yoursRef} className="scroll-mt-24" data-section="yours" data-testid="event-yours">
           <EventRegistrationPanel event={e} user={user} accessToken={accessToken} onChanged={onChanged} open={registerOpen} onRegistered={onRegistered} />
         </section>
       )}
 
+      {/* Freunde beim Event (#1188): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}
+      <FriendsAtEvent event={e} user={user} over={over} />
+
       {/* 2. Was läuft beim Event: jedes Turnier und jede Fast Lap mit Tag, Uhrzeit, Spielart und dem eigenen Stand. */}
-      {!!rows.length && (
+      {!recap && !!rows.length && (
         <section data-section="whatson" data-testid="event-whatson">
           <SectionTitle icon={Trophy} accent="#29B6E8">Was läuft beim Event</SectionTitle>
           <ul className="space-y-2">

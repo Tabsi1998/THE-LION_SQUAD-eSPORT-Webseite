@@ -16,6 +16,7 @@ from services.tournament_permissions import READ_STAFF_ROLES, require_tournament
 from services.matchday_schedule import build_matchday_plan, current_matchday_number
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import standings_for_structure
+from services.private_fields import private_projection
 from routes.tournament_common import (
     _collect_plan_matches,
     _get_visible_tournament,
@@ -113,7 +114,7 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
     regs = [_public_registration(r, user, is_staff) for r in regs]
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0}).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
     for r in regs:
         if r.get("user_id"):
             u = users.get(r["user_id"]) or {}
@@ -227,7 +228,7 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
     regs = [_public_registration(r, user, is_staff) for r in regs]
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0}).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
     for r in regs:
         u = users.get(r.get("user_id") or "", {})
         r["display_name"] = r.get("display_name") or u.get("display_name") or u.get("username")

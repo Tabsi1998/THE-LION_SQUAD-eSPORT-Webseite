@@ -70,3 +70,11 @@ condition = "AND"
 paths = ['''^(backend/tests/test_easter_hunt_flow\.py|frontend/src/pages/admin/AdminEasterHuntPage\.test\.jsx|frontend/src/seasons/carnival/index\.test\.jsx|frontend/src/pages/admin/settings/SeasonsSettings\.test\.jsx)$''']
 regexTarget = "secret"
 regexes = ['''^1\.2\.kaputt-und-zu-kurz$''', '''^easter_hunt\.1\.2\.sig$''', '''^carnival\.123\.0\.sig$''', '''^halloween\.123\.456\.abc$''']
+
+[[allowlists]]
+description = "Testwerte, kein Geheimnis: die erfundenen Passwörter des Passwort-Reset-Tests und der JWT-Schlüssel des Zwei-Faktor-Tests aus #1489. Seither haben die Tests Werte, die der Scanner nicht als Geheimnis liest; diese Ausnahme gilt nur für den einen Commit in der Historie, nur für die zwei Dateien und nur für genau diese drei Werte."
+condition = "AND"
+commits = ["7fa5c71908d1a743938ef212762de9cddcb9b19c"]
+paths = ['''^backend/tests/(test_password_reset_tokens_flow|test_mfa_one_time_codes_flow)\.py$''']
+regexTarget = "secret"
+regexes = ['''^Neues-Passwort-2026$''', '''^Anderes-Passwort-2026$''', '''^mfa-tests-secret-with-at-least-32-characters$''']

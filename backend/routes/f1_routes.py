@@ -17,6 +17,7 @@ from services.public_phase import derive_public_phase
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services.log_safe import log_safe
 from services.mutation_lock import MutationLockBusy, mutation_lock
+from services.private_fields import private_projection
 from models import (
     F1ChallengeCreate, F1ChallengeUpdate, F1TrackCreate, F1TrackUpdate,
     F1LapTimeCreate, F1LapTimeUpdate,
@@ -820,7 +821,7 @@ async def leaderboard(cid: str, track_id: str | None = None, access: str | None 
     ).to_list(5000)
     user_ids = list({t["user_id"] for t in times})
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0}).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
     entries = _best_lap_entries(times, users)
     club_reference_entries = []
     if c.get("allow_club_reference_times", True) and c.get("show_club_reference_times", True):
@@ -830,7 +831,7 @@ async def leaderboard(cid: str, track_id: str | None = None, access: str | None 
         ).to_list(5000)
         reference_user_ids = list({t["user_id"] for t in reference_times})
         reference_users = {u["id"]: u for u in await db.users.find(
-            {"id": {"$in": reference_user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0}).to_list(500)}
+            {"id": {"$in": reference_user_ids}}, private_projection()).to_list(500)}
         club_reference_entries = _best_lap_entries(reference_times, reference_users)[:3]
     return {
         "challenge": c,
@@ -855,7 +856,7 @@ async def championship_standings(cid: str, access: str | None = None, user=Depen
     # enrich users
     user_ids = [s["user_id"] for s in standings]
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0}).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
     arr = []
     for s in standings:
         u = users.get(s["user_id"], {})
@@ -874,7 +875,7 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_curre
     if not c:
         raise HTTPException(status_code=404)
     await _require_f1_result_permission(me, cid)
-    if not await db.users.find_one({"id": body.user_id}):
+    if not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
         raise HTTPException(status_code=400, detail="Spieler nicht gefunden")
     score_scope = body.score_scope or "official"
     # Dieselbe Prüfung wie beim Korrigieren (#1038) - Versuche zählen und schreiben unter einer Sperre.
@@ -959,7 +960,7 @@ async def list_times(cid: str, track_id: str | None = None, user_id: str | None 
     times = await db.f1_lap_times.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
     user_ids = list({t["user_id"] for t in times})
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0}).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
     memberships = set(await db.memberships.distinct("user_id", {
         "user_id": {"$in": user_ids},
         "member_status": {"$in": ["active", "honorary"]},

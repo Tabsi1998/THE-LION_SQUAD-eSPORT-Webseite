@@ -19,6 +19,7 @@ from badges import compute_profile_completeness, PROFILE_FIELDS, evaluate_user_p
 from services import dolibarr_applications, membership_fees, membership_invitations
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings as load_dolibarr_settings
 from services.log_safe import log_safe
+from services.private_fields import private_projection
 
 router = APIRouter(prefix="/api", tags=["phase-c"])
 logger = logging.getLogger("tls.membership")
@@ -28,7 +29,7 @@ logger = logging.getLogger("tls.membership")
 @router.get("/users/me/profile-completeness")
 async def my_profile_completeness(me: dict = Depends(get_current_user)):
     db = get_db()
-    user = await db.users.find_one({"id": me["id"]}, {"_id": 0})
+    user = await db.users.find_one({"id": me["id"]}, private_projection())
     if not user:
         raise HTTPException(404, "Nicht gefunden.")
     score = compute_profile_completeness(user)
@@ -47,7 +48,7 @@ async def my_profile_completeness(me: dict = Depends(get_current_user)):
 @router.get("/users/{user_id}/profile-completeness")
 async def public_profile_completeness(user_id: str):
     db = get_db()
-    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    user = await db.users.find_one({"id": user_id}, private_projection())
     if not user:
         raise HTTPException(404, "Nicht gefunden.")
     return {"score": compute_profile_completeness(user)}
