@@ -90,6 +90,7 @@ export function Field({ label, value, onChangeText, multiline = false }: { label
         value={value || ""}
         onChangeText={onChangeText}
         multiline={multiline}
+        accessibilityLabel={label}
         placeholderTextColor={colors.muted}
         style={[profileStyles.input, multiline && profileStyles.inputMulti]}
         autoCapitalize="none"

@@ -40,8 +40,9 @@ export function ProfileSwitch({ label, checked, onCheckedChange, disabled = fals
   );
 }
 
-// Zeigt, was mit dem Speichern von selbst gerade passiert.
-export function AutosaveStatus({ status, message }) {
+// Zeigt, was mit dem Speichern von selbst gerade passiert. Scheitert es, bleibt die Schalterstellung stehen und
+// „Erneut versuchen“ schickt sie noch einmal (#1048).
+export function AutosaveStatus({ status, message, onRetry }) {
   const text = {
     idle: "Änderungen hier speichern von selbst.",
     pending: "Änderung wird gleich gespeichert …",
@@ -51,8 +52,18 @@ export function AutosaveStatus({ status, message }) {
   }[status] || "";
   const tone = status === "error" ? "text-[#FF3B30]" : status === "saved" ? "text-[#00FF88]" : "text-white/50";
   return (
-    <div role="status" aria-live="polite" data-testid="profile-autosave-status" className={`text-xs ${tone}`}>
-      {text}
+    <div role="status" aria-live="polite" data-testid="profile-autosave-status" className={`flex flex-wrap items-center gap-2 text-xs ${tone}`}>
+      <span>{text}</span>
+      {status === "error" && onRetry ? (
+        <button
+          type="button"
+          onClick={() => { void onRetry(); }}
+          data-testid="profile-autosave-retry"
+          className="tls-hit min-h-11 px-3 border border-[#FF3B30]/40 rounded-sm font-bold uppercase tracking-wider hover:bg-[#FF3B30]/10"
+        >
+          Erneut versuchen
+        </button>
+      ) : null}
     </div>
   );
 }

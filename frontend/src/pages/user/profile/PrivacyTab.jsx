@@ -16,7 +16,7 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
     <Section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-white/60">Wer was von deinem Profil sieht.</p>
-        <AutosaveStatus status={autosave.status} message={autosave.message} />
+        <AutosaveStatus status={autosave.status} message={autosave.message} onRetry={autosave.retry} />
       </div>
 
       <SwitchRow

@@ -13,7 +13,10 @@ jest.mock("../../auth/AuthContext", () => ({
 }));
 jest.mock("../../live", () => ({ isGuestUser: (user: unknown) => !user }));
 const mockGet = jest.fn();
-const mockPatch = jest.fn(async () => ({ data: {} }));
+// Der Server antwortet mit dem ganzen Konto - wie /users/me.
+const mockPatch = jest.fn(async (_path?: string, body?: Record<string, unknown>, _config?: unknown): Promise<{ data: Record<string, unknown> }> => ({
+  data: { ...(mockUser.value || {}), ...(body || {}) },
+}));
 jest.mock("../../lib/api", () => ({
   api: { get: (...args: unknown[]) => mockGet(...args), patch: (...args: unknown[]) => mockPatch(...(args as [])), post: jest.fn(), delete: jest.fn() },
   errorMessage: (_error: unknown, fallback: string) => fallback,
@@ -97,6 +100,105 @@ test("Schalter speichern von selbst - nur die Einstellungen, nicht das ganze Pro
   expect(path).toBe("/users/me");
   expect(payload.privacy_public_profile).toBe(false);
   expect(payload).not.toHaveProperty("display_name");
+});
+
+// Speicher-Warteschlange (#1061): höchstens ein PATCH gleichzeitig, keine ältere Antwort über einen neueren Stand,
+// nichts ins falsche Konto, und ein Fehler lässt die Schalterstellung stehen - mit „Erneut versuchen“.
+function deferPatch() {
+  const call: { resolve: (data: Record<string, unknown>) => void } = { resolve: () => {} };
+  mockPatch.mockImplementationOnce(() => new Promise((resolve) => { call.resolve = (data) => resolve({ data }); }));
+  return call;
+}
+
+test("ein zweiter Schalter während des Speicherns wartet - nie zwei PATCH gleichzeitig", async () => {
+  jest.useFakeTimers();
+  const first = deferPatch();
+  await renderSettings();
+  await fireEvent(screen.getByLabelText("Öffentliches Profil"), "valueChange", false);
+  await act(async () => { jest.advanceTimersByTime(800); });
+  expect(mockPatch).toHaveBeenCalledTimes(1);
+  const [, firstPayload, firstConfig] = mockPatch.mock.calls[0] as unknown as [string, Record<string, unknown>, { headers: Record<string, string> }];
+  expect(firstPayload).toEqual({ privacy_public_profile: false });
+  expect(firstConfig.headers["X-Expected-User-Id"]).toBe("u-1");
+
+  await fireEvent(screen.getByLabelText("Twitch im Profil anzeigen"), "valueChange", true);
+  await act(async () => { jest.advanceTimersByTime(800); });
+  expect(mockPatch).toHaveBeenCalledTimes(1);
+
+  // Der Server kennt nach der ersten Anfrage das private Profil.
+  mockPatch.mockImplementationOnce(async (_path, body) => ({ data: { ...mockUser.value, privacy_public_profile: false, ...body } }));
+  await act(async () => { first.resolve({ ...mockUser.value, privacy_public_profile: false }); });
+  await act(async () => { jest.advanceTimersByTime(10); });
+  expect(mockPatch).toHaveBeenCalledTimes(2);
+  expect((mockPatch.mock.calls[1] as unknown as [string, Record<string, unknown>])[1]).toEqual({ show_twitch_embed: true });
+  expect(screen.getByLabelText("Öffentliches Profil").props.value).toBe(false);
+  expect(screen.getByLabelText("Twitch im Profil anzeigen").props.value).toBe(true);
+  jest.useRealTimers();
+});
+
+test("eine späte Antwort der Benachrichtigungen überschreibt keinen gerade umgeschalteten Kanal", async () => {
+  let resolvePrefs: (value: unknown) => void = () => {};
+  mockGet.mockImplementation((path: string) => (path === "/users/me/notification-preferences"
+    ? new Promise((resolve) => { resolvePrefs = resolve; })
+    : Promise.resolve({ data: [] })));
+  await renderSettings();
+  await fireEvent(screen.getByLabelText("Push"), "valueChange", false);
+  await act(async () => { resolvePrefs({ data: { preferences: { push: true, email: true, in_app: false }, discord: { linked: false } } }); });
+  expect(screen.getByLabelText("Push").props.value).toBe(false);
+  // Was nicht umgeschaltet war, kommt vom Server.
+  expect(screen.getByLabelText("In-App").props.value).toBe(false);
+});
+
+test("Kontowechsel: eine offene Änderung wird nicht ins neue Konto geschrieben", async () => {
+  jest.useFakeTimers();
+  const view = await renderSettings();
+  await fireEvent(screen.getByLabelText("Öffentliches Profil"), "valueChange", false);
+  mockUser.value = { id: "u-2", username: "zweites", privacy_public_profile: true, dm_privacy: "everyone", notification_preferences: {} };
+  await view.rerender(
+    <NavigationContext.Provider value={navigation}>
+      <SettingsScreen />
+    </NavigationContext.Provider>,
+  );
+  await act(async () => { jest.advanceTimersByTime(800); });
+  expect(mockPatch).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("Öffentliches Profil").props.value).toBe(true);
+  jest.useRealTimers();
+});
+
+test("Kontowechsel während des Speicherns: die alte Antwort ändert die Schalter des neuen Kontos nicht", async () => {
+  jest.useFakeTimers();
+  const first = deferPatch();
+  const view = await renderSettings();
+  await fireEvent(screen.getByLabelText("Öffentliches Profil"), "valueChange", false);
+  await act(async () => { jest.advanceTimersByTime(800); });
+  expect(mockPatch).toHaveBeenCalledTimes(1);
+  mockUser.value = { id: "u-2", username: "zweites", privacy_public_profile: true, dm_privacy: "everyone", notification_preferences: {} };
+  await view.rerender(
+    <NavigationContext.Provider value={navigation}>
+      <SettingsScreen />
+    </NavigationContext.Provider>,
+  );
+  await act(async () => { first.resolve({ id: "u-1", privacy_public_profile: false }); });
+  await act(async () => { jest.advanceTimersByTime(800); });
+  expect(screen.getByLabelText("Öffentliches Profil").props.value).toBe(true);
+  expect(mockPatch).toHaveBeenCalledTimes(1);
+  jest.useRealTimers();
+});
+
+test("Fehler: Hinweis mit Erneut versuchen, die Schalterstellung bleibt", async () => {
+  jest.useFakeTimers();
+  mockPatch.mockImplementationOnce(async () => { throw new Error("offline"); });
+  await renderSettings();
+  await fireEvent(screen.getByLabelText("Öffentliches Profil"), "valueChange", false);
+  await act(async () => { jest.advanceTimersByTime(800); });
+  jest.useRealTimers();
+  await waitFor(() => expect(screen.getByTestId("settings-message")).toHaveTextContent("Einstellung konnte nicht gespeichert werden."));
+  expect(screen.getByLabelText("Öffentliches Profil").props.value).toBe(false);
+  await fireEvent.press(screen.getByTestId("settings-retry"));
+  await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(2));
+  expect((mockPatch.mock.calls[1] as unknown as [string, Record<string, unknown>])[1]).toEqual({ privacy_public_profile: false });
+  await waitFor(() => expect(screen.getByTestId("settings-message")).toHaveTextContent("Gespeichert."));
+  expect(screen.queryByTestId("settings-retry")).toBeNull();
 });
 
 test("Konto: Profil bearbeiten öffnet die eigene Seite, Abmelden meldet ab", async () => {
