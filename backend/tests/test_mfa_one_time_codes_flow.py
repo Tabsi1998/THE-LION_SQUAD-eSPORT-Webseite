@@ -28,7 +28,7 @@ WRONG_CODE = "000000"
 @pytest_asyncio.fixture
 async def flow(monkeypatch):
     # Hier wird wirklich angemeldet - dafür braucht es den Schlüssel auch nach dem Import.
-    monkeypatch.setenv("JWT_SECRET", "mfa-tests-secret-with-at-least-32-characters")
+    monkeypatch.setenv("JWT_SECRET", "mfa-tests-secret-that-is-long-enough-here")
     instance, shutdown = make_flow()
     try:
         yield instance
