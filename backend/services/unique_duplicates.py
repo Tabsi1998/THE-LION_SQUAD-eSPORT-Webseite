@@ -60,9 +60,9 @@ def rule(index: str) -> str:
     return "die älteste Zeile bleibt - die liest und beschreibt die Anwendung"
 
 
-async def _groups(db, collection: str, keys: Any, options: dict, order: list) -> list[list]:
-    """Je Schlüssel mit mehr als einer Zeile die ``_id`` aller Zeilen, die bleibende zuerst. Fehlt ein Feld, zählt es wie
-    ``null`` - so sieht es auch der Index."""
+async def _groups(db, collection: str, keys: Any, options: dict, order: list) -> list[tuple[dict, list]]:
+    """Je Schlüssel mit mehr als einer Zeile: der Schlüssel und die ``_id`` aller Zeilen, die bleibende zuerst. Fehlt ein
+    Feld, zählt es wie ``null`` - so sieht es auch der Index."""
     match = dict(options.get("partialFilterExpression") or {})
     pipeline: list[dict] = [{"$match": match}] if match else []
     pipeline += [
@@ -72,7 +72,13 @@ async def _groups(db, collection: str, keys: Any, options: dict, order: list) ->
         {"$match": {"count": {"$gt": 1}}},
     ]
     rows = await getattr(db, collection).aggregate(pipeline).to_list(None)
-    return [row["ids"] for row in rows]
+    return [(dict(row["_id"]), row["ids"]) for row in rows]
+
+
+def _unchanged(doc: dict, key: dict, match: dict) -> dict:
+    """Bedingung fürs Löschen: dieselbe Zeile mit genau dem Stand, den das Protokoll festhält - und noch im selben
+    Schlüssel. Hat sie ein laufender Schreiber seitdem geändert, trifft die Bedingung nicht und die Zeile bleibt."""
+    return {**match, **key, **doc}
 
 
 async def _unique_active(db, collection: str, name: str) -> bool:
@@ -93,7 +99,7 @@ async def plan(db, only: set[str] | None = None) -> list[dict]:
         active = await _unique_active(db, collection, name)
         groups = [] if active else await _groups(db, collection, keys, options, KEEP_ORDER.get(index, OLDEST))
         report.append({"index": index, "unique_active": active, "groups": len(groups),
-                       "surplus": sum(len(ids) - 1 for ids in groups),
+                       "surplus": sum(len(ids) - 1 for _key_value, ids in groups),
                        "mode": "manual" if index in MANUAL else "auto", "rule": rule(index)})
     return report
 
@@ -121,6 +127,8 @@ def render_text(report: list[dict], applied: bool = False) -> str:
     if open_auto and not applied:
         lines.append(f"Mit --anwenden werden {open_auto} Zeilen entfernt; das Protokoll (JSON auf stdout) enthält jede "
                      "entfernte Zeile. Vorher eine Sicherung ziehen (BACKUP_RESTORE.md).")
+        lines.append("Bei laufendem Betrieb möglich, besser in ruhiger Zeit: Eine Zeile, die sich inzwischen geändert hat, "
+                     "bleibt stehen und steht im Protokoll unter „skipped“.")
     elif not open_auto:
         lines.append("Nichts automatisch zu bereinigen.")
     return "\n".join(lines) + "\n"
@@ -129,32 +137,48 @@ def render_text(report: list[dict], applied: bool = False) -> str:
 async def apply(db, actor: str, only: set[str] | None = None) -> dict:
     """Der ausdrückliche Lauf: überzählige Zeilen entfernen (nur ``auto``), dann den eindeutigen Index anlegen.
 
-    Gelöscht wird je Zeile über ihre ``_id`` - was zwischen Suche und Löschung neu hinzukommt, bleibt unberührt; dann
-    scheitert höchstens der Index wieder und der nächste Trockenlauf zeigt es."""
+    Bei laufendem Betrieb möglich, besser in ruhiger Zeit. Gelöscht wird je Zeile und nur bedingt (``_unchanged``):
+    Hat ein Schreiber eine Zeile zwischen Suche und Löschung geändert, oder ist die bleibende Zeile nicht mehr da bzw.
+    nicht mehr im Schlüssel, bleibt sie stehen und steht unter ``skipped``. Dann scheitert höchstens der Index wieder,
+    und der nächste Trockenlauf zeigt es."""
     started = now_utc()
     indexes, manual = [], []
     for collection, keys, name, options in _selected(only):
         index = _key(collection, name)
         if await _unique_active(db, collection, name):
-            indexes.append({"index": index, "removed": 0, "unique_active": True, "removed_documents": []})
+            indexes.append({"index": index, "removed": 0, "skipped": [], "unique_active": True, "removed_documents": []})
             continue
         groups = await _groups(db, collection, keys, options, KEEP_ORDER.get(index, OLDEST))
         if index in MANUAL:
-            manual.append({"index": index, "groups": len(groups), "surplus": sum(len(ids) - 1 for ids in groups),
+            manual.append({"index": index, "groups": len(groups), "surplus": sum(len(ids) - 1 for _k, ids in groups),
                            "rule": MANUAL[index]})
             continue
         target = getattr(db, collection)
-        surplus = [row_id for ids in groups for row_id in ids[1:]]
-        documents = await target.find({"_id": {"$in": surplus}}).to_list(None) if surplus else []
-        removed = (await target.delete_many({"_id": {"$in": surplus}})).deleted_count if surplus else 0
+        match = dict(options.get("partialFilterExpression") or {})
+        removed_documents: list[dict] = []
+        skipped: list = []
+        for key, ids in groups:
+            keep, surplus = ids[0], ids[1:]
+            if not await target.find_one({**match, **key, "_id": keep}, {"_id": 1}):
+                skipped += surplus  # die bleibende Zeile hat sich geändert - die Gruppe bleibt, wie sie ist
+                continue
+            documents = await target.find({**match, **key, "_id": {"$in": surplus}}).to_list(None)
+            gone = set(surplus) - {doc["_id"] for doc in documents}
+            skipped += [row_id for row_id in surplus if row_id in gone]
+            for doc in documents:
+                if (await target.delete_one(_unchanged(doc, key, match))).deleted_count:
+                    removed_documents.append(doc)
+                else:
+                    skipped.append(doc["_id"])
         active = await database.unique_index(target, keys, name, **options)
-        indexes.append({"index": index, "removed": removed, "unique_active": active,
-                        "removed_documents": documents})
+        indexes.append({"index": index, "removed": len(removed_documents), "skipped": [str(row_id) for row_id in skipped],
+                        "unique_active": active, "removed_documents": removed_documents})
     protocol = {"at": started.isoformat(), "finished_at": now_utc().isoformat(), "actor": actor,
                 "indexes": indexes, "manual": manual}
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "ops.unique_duplicates.apply", "actor_id": None, "target_id": None,
         "data": {"actor": actor, "removed": {row["index"]: row["removed"] for row in indexes if row["removed"]},
+                 "skipped": {row["index"]: len(row["skipped"]) for row in indexes if row["skipped"]},
                  "unique_active": [row["index"] for row in indexes if row["unique_active"]],
                  "manual": [row["index"] for row in manual]},
         "created_at": protocol["finished_at"],

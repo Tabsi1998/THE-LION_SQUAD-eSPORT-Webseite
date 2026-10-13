@@ -212,14 +212,29 @@ def _unlink(path: pathlib.Path) -> None:
     path.unlink(missing_ok=True)
 
 
-def safe_error(exc: OSError) -> str:
-    """Die Art des Fehlers ohne Pfad (#1046): der Dateiname kann vom Konto stammen, und der Pfad gehört nicht ins Log."""
-    parts = [exc.__class__.__name__]
-    if isinstance(exc.errno, int):
-        parts.append(errno.errorcode.get(exc.errno, str(exc.errno)))
-    if exc.strerror:
-        parts.append(str(exc.strerror))
-    return " ".join(parts)[:200]
+def safe_error(exc: BaseException) -> str:
+    """Die Art des Fehlers ohne Pfad und Text (#1046): Fehlerklasse und - bei Dateifehlern - der Code (``EACCES``).
+    Der Dateiname kann vom Konto stammen, und der Pfad gehört nicht ins Log."""
+    code = getattr(exc, "errno", None)
+    if isinstance(code, int):
+        return f"{exc.__class__.__name__} {errno.errorcode.get(code, str(code))}"
+    return exc.__class__.__name__
+
+
+_SAFE_ERROR = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,60}(?: [A-Z0-9_]{1,20})?$")
+_OLD_ERRNO = re.compile(r"\[(?:Errno|WinError) (\d+)\]")
+
+
+def shown_error(value) -> str:
+    """Für die Anzeige: nur Fehlerklasse bzw. Code. Einträge von vor #1046 tragen den Text des Fehlers samt Pfad -
+    daraus bleibt höchstens der Code; der nächste Versuch schreibt den Eintrag ohnehin neu."""
+    text = str(value or "").strip()
+    if _SAFE_ERROR.match(text):
+        return text
+    found = _OLD_ERRNO.search(text)
+    if found:
+        return f"OSError {errno.errorcode.get(int(found.group(1)), found.group(1))}"
+    return "unbekannt"
 
 
 def retry_delay(attempts: int) -> timedelta:
@@ -366,8 +381,12 @@ async def retry_file_cleanups(db, limit: int = 200, now: datetime | None = None)
         owned, untracked = ({name}, set()) if row.get("owned") else (set(), {name})
         try:
             removed += await _clean(db, row.get("owner_id") or "", owned, untracked, now=now)
-        except Exception as exc:  # noqa: BLE001 - der nächste Lauf versucht es wieder
+        except Exception as exc:  # noqa: BLE001 - zählt als Versuch wie jeder andere Fehler
             logger.warning("[media] Nacharbeit einer Datei abgebrochen: %s", exc.__class__.__name__)
+            try:
+                await _remember(db, name, row.get("owner_id") or "", bool(row.get("owned")), safe_error(exc), now=now)
+            except Exception as again:  # noqa: BLE001 - ohne Datenbank bleibt der Eintrag fällig für den nächsten Lauf
+                logger.warning("[media] Versuch nicht vermerkt: %s", again.__class__.__name__)
     return removed
 
 
@@ -397,6 +416,7 @@ async def file_cleanup_overview(db, limit: int = 100) -> dict:
     for item in items:
         item["status"] = item.get("status") or PENDING_STATUS
         item["source"] = item.get("source") or SOURCE_ERASURE
+        item["last_error"] = shown_error(item.get("last_error"))
     return {"counts": await file_cleanup_counts(db), "items": items, "retry_limit": RETRY_LIMIT}
 
 

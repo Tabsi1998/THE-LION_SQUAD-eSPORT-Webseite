@@ -173,3 +173,77 @@ def test_the_script_refuses_unknown_index_names():
     err = io.StringIO()
     assert run(script.main(["--nur", "gibt_es.nicht"], db=fresh(), out=io.StringIO(), err=err)) == 2
     assert "gibt_es.nicht" in err.getvalue()
+
+
+class ChangingWriter:
+    """Ein Schreiber, der genau zwischen Suche und Löschung eine Zeile ändert - wie die laufende Anwendung."""
+
+    def __init__(self, db, collection: str, change):
+        self._db, self._collection, self._change, self.done = db, collection, change, False
+
+    def __getattr__(self, name):
+        target = getattr(self._db, name)
+        if name != self._collection:
+            return target
+        owner = self
+
+        class Collection:
+            def __getattr__(self, attr):
+                return getattr(target, attr)
+
+            async def delete_one(self, query, *args, **kwargs):
+                if not owner.done:
+                    owner.done = True
+                    await owner._change(target, query["_id"])
+                return await target.delete_one(query, *args, **kwargs)
+
+        return Collection()
+
+
+def test_a_row_changed_by_a_running_writer_is_not_deleted():
+    """Codex-Prüfung zu #1043: gelöscht wird je Zeile und nur mit dem Stand aus dem Protokoll."""
+    async def scenario():
+        db = fresh()
+        await with_xp_duplicates(db)
+
+        async def bump(collection, row_id):
+            await collection.update_one({"_id": row_id}, {"$inc": {"total": 100}})
+
+        protocol = await unique_duplicates.apply(ChangingWriter(db, "user_xp", bump), actor="test", only={"user_xp.user"})
+        entry = protocol["indexes"][0]
+        assert entry["removed"] == 1 and len(entry["skipped"]) == 1
+        assert entry["unique_active"] is False, "die geänderte Dublette bleibt - der Index wartet auf den nächsten Lauf"
+        totals = sorted(row["total"] for row in await db.user_xp.find({"user_id": "u1"}).to_list(10))
+        assert len(totals) == 2 and totals[-1] > 100
+        audit = await db.audit_logs.find_one({"action": "ops.unique_duplicates.apply"})
+        assert audit["data"]["skipped"] == {"user_xp.user": 1}
+    run(scenario())
+
+
+def test_a_group_whose_kept_row_moved_is_left_alone():
+    async def scenario():
+        db = fresh()
+        first = await with_xp_duplicates(db)
+        real_groups = unique_duplicates._groups
+
+        async def groups_then_move(*args, **kwargs):
+            found = await real_groups(*args, **kwargs)
+            await db.user_xp.update_one({"_id": first}, {"$set": {"user_id": "u9"}})
+            return found
+
+        unique_duplicates._groups = groups_then_move
+        try:
+            protocol = await unique_duplicates.apply(db, actor="test", only={"user_xp.user"})
+        finally:
+            unique_duplicates._groups = real_groups
+        assert protocol["indexes"][0]["removed"] == 0 and len(protocol["indexes"][0]["skipped"]) == 2
+        assert await db.user_xp.count_documents({"user_id": "u1"}) == 2
+    run(scenario())
+
+
+def test_the_report_says_it_is_better_done_in_a_quiet_hour():
+    async def scenario():
+        db = fresh()
+        await with_xp_duplicates(db)
+        assert "besser in ruhiger Zeit" in unique_duplicates.render_text(await unique_duplicates.plan(db))
+    run(scenario())

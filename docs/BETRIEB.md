@@ -56,7 +56,9 @@ wird dabei nie etwas – bereinigt wird bewusst, im Backend-Container:
    Je Gruppe bleibt die älteste Zeile (die liest und beschreibt die Anwendung); bei Plattform-Verknüpfungen je
    Person die zuletzt verknüpfte, wie beim Start. Danach legt das Werkzeug den eindeutigen Index gleich an. Die
    Datei enthält jede entfernte Zeile und taugt zum Zurückspielen; sie enthält Kennungen von Personen – nach der
-   Prüfung löschen. Ins Adminprotokoll kommen nur die Zahlen (`ops.unique_duplicates.apply`). Mit
+   Prüfung löschen. Bei laufendem Betrieb möglich, besser in ruhiger Zeit: Gelöscht wird je Zeile und nur, wenn
+   sie noch genau so aussieht wie beim Suchen; eine inzwischen geänderte Zeile bleibt und steht unter `skipped`
+   (dann später noch einmal). Ins Adminprotokoll kommen nur die Zahlen (`ops.unique_duplicates.apply`). Mit
    `--nur sammlung.index` (mehrfach möglich) nur einzelne Indizes.
 4. Unter Checks „Jetzt prüfen“: die Prüfung ist grün.
 
@@ -69,9 +71,10 @@ Zwei Indizes bereinigt das Werkzeug nie, es meldet sie mit „HAND“: dasselbe 
 Scheitert beim Löschen eines Kontos oder in der Mediathek das Löschen einer Datei (Rechte, Sperre), läuft die
 Löschung trotzdem durch; die Datei steht als Eintrag in `pending_file_cleanups`. Der stündliche Job
 `erasure_file_cleanup` versucht es erneut – nach einer, zwei, vier … Stunden, höchstens einem Tag Abstand. Nach
-acht Versuchen gibt er auf. Die Prüfung „Datei-Nacharbeit“ steht bei offenen Einträgen auf Gelb, bei aufgegebenen
-auf Rot (mit Alarm). Unter Checks stehen die Einträge mit Datei, Versuchen und Fehlerart; Log und Eintrag nennen
-weder Pfad noch Konto. Nach dem Beheben am Server (meist die Rechte am Upload-Volume) „Erneut versuchen“: Das gibt
+acht Versuchen gibt er auf; jeder Fehler zählt als Versuch, auch einer außerhalb der Datei selbst. Die Prüfung
+„Datei-Nacharbeit“ steht bei offenen Einträgen auf Gelb, bei aufgegebenen auf Rot (mit Alarm). Unter Checks stehen
+die Einträge mit Datei, Versuchen und Fehlerart (Klasse und Code, etwa `PermissionError EACCES`); Log und Eintrag
+nennen weder Pfad noch Konto, ältere Einträge werden beim Anzeigen entsprechend gekürzt. Nach dem Beheben am Server (meist die Rechte am Upload-Volume) „Erneut versuchen“: Das gibt
 aufgegebenen Einträgen eine neue Runde und versucht alles Offene sofort. Was schon weg ist, gilt als gelöscht; was
 inzwischen wieder verwendet wird, bleibt.
 

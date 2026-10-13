@@ -162,7 +162,36 @@ async def test_one_broken_entry_does_not_stop_the_others(flow, public, monkeypat
     monkeypatch.setattr(account_erasure, "_clean", clean)
     assert await account_erasure.retry_file_cleanups(flow.db) == 1
     assert not (public / "gut.webp").exists()
-    assert await flow.db[account_erasure.PENDING].count_documents({"filename": "kaputt.webp"}) == 1
+    broken = await flow.db[account_erasure.PENDING].find_one({"filename": "kaputt.webp"})
+    # Auch ein solcher Fehler zählt als Versuch: Abstand, Zähler und am Ende „aufgegeben“ (Codex-Prüfung zu #1046).
+    assert broken["attempts"] == 2 and broken["status"] == "pending" and broken["last_error"] == "RuntimeError"
+    assert broken["next_attempt_at"] > now_utc().isoformat()
+    when = now_utc()
+    for _ in range(account_erasure.RETRY_LIMIT + 3):
+        when += account_erasure.RETRY_MAX + timedelta(minutes=1)
+        await account_erasure.retry_file_cleanups(flow.db, now=when)
+    broken = await flow.db[account_erasure.PENDING].find_one({"filename": "kaputt.webp"})
+    assert broken["status"] == "failed" and broken["attempts"] == account_erasure.RETRY_LIMIT
+
+
+@pytest.mark.asyncio
+async def test_old_error_texts_are_shown_without_path_or_name(flow):
+    await flow.db[account_erasure.PENDING].insert_many([
+        {"filename": "a.webp", "owned": True, "attempts": 1,
+         "last_error": "[Errno 13] Permission denied: 'C:\\\\uploads\\\\paula-urlaub.webp'"},
+        {"filename": "b.webp", "owned": True, "attempts": 1, "last_error": "Datei von paula ist in Verwendung"},
+        {"filename": "c.webp", "owned": True, "attempts": 1, "status": "pending", "last_error": "PermissionError EACCES"},
+    ])
+    items = {item["filename"]: item for item in (await account_erasure.file_cleanup_overview(flow.db))["items"]}
+    assert items["a.webp"]["last_error"] == "OSError EACCES"
+    assert items["b.webp"]["last_error"] == "unbekannt"
+    assert items["c.webp"]["last_error"] == "PermissionError EACCES"
+    assert "paula" not in str(items)
+
+
+def test_the_stored_error_is_class_and_code_only():
+    assert account_erasure.safe_error(PermissionError(13, "Permission denied", "/uploads/paula.webp")) == "PermissionError EACCES"
+    assert account_erasure.safe_error(RuntimeError("paula")) == "RuntimeError"
 
 
 @pytest.mark.asyncio
