@@ -302,3 +302,7 @@ Das Symbol oben links (drei Striche, „Admin-Menü öffnen“).
 
 **Gibt es ein Hilfe-„?“ auf jeder Seite?**
 Noch nicht. Hilfe gibt es unter Admin → System → Einrichtung & FAQ und in diesem Handbuch.
+
+**Wo verbinde ich ein Turnier mit einem Event?**
+Nur im Event: Admin → Content → Events → Event öffnen → **Programm** (**+ Turnier in diesem Event**, **+ Fast Lap**,
+**Bestehendes hinzufügen**, **Lösen**). In der Eventliste erscheint **Rückblick schreiben** erst, wenn das Event vorbei ist.

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, FieldLabel, INPUT_CLASS, SelectField, TextField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
-import { normalizeDateTimeFields } from "@/lib/datetime";
+import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
+import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { toast } from "sonner";
 
 const CREATE_STATUS_OPTIONS = [
@@ -35,9 +36,11 @@ const F1_SEASON_WEIGHT_OPTIONS = [
 // 672-px-Spalte.
 export default function AdminF1NewPage() {
   const nav = useNavigate();
+  // „+ Fast Lap“ im Event (#1371): mit ?event= kommt der Zeitraum vom Event, angelegt wird im Event.
+  const [searchParams] = useSearchParams();
+  const eventId = searchParams.get("event") || "";
   const [form, setForm] = useState({
     title: "", slug: "", description: "",
-    event_id: "",
     visibility: "public",
     vehicle: "", weather: "", assists_allowed: "",
     controller_type: "", platform: "", banner_url: "",
@@ -51,7 +54,7 @@ export default function AdminF1NewPage() {
     twitch_channel: "", twitch_enabled: false,
     prize_places: [],
   });
-  const [events, setEvents] = useState([]);
+  const [event, setEvent] = useState(null);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const updatePrize = (index, patch) => {
@@ -61,8 +64,17 @@ export default function AdminF1NewPage() {
   };
 
   useEffect(() => {
-    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(() => {});
-  }, []);
+    if (!eventId) return;
+    api.get(`/events/${encodeURIComponent(eventId)}/program`).then(({ data }) => {
+      setEvent(data?.event || null);
+      const defaults = data?.defaults?.fastlap || {};
+      setForm((current) => ({
+        ...current,
+        ...(defaults.start_date ? { start_date: toDateTimeLocalInput(defaults.start_date) } : {}),
+        ...(defaults.end_date ? { end_date: toDateTimeLocalInput(defaults.end_date) } : {}),
+      }));
+    }).catch(() => toast.error("Das Event ließ sich nicht laden – die Challenge wird ohne Event angelegt."));
+  }, [eventId]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -70,7 +82,6 @@ export default function AdminF1NewPage() {
     try {
       const payload = { ...form };
       if (payload.block_club_member_results) payload.allow_club_reference_times = true;
-      if (!payload.event_id) payload.event_id = null;
       if (payload.unlimited_attempts) payload.max_attempts = null;
       payload.season_weight = Number(payload.season_weight || 0);
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
@@ -78,7 +89,7 @@ export default function AdminF1NewPage() {
         .filter((p) => p.value && p.value.trim())
         .map((p) => ({ place: Number(p.place) || 0, label: p.label || `Platz ${p.place}`, value: p.value }));
       if (payload.prize_places.length === 0) payload.prize_places = null;
-      const { data } = await api.post("/f1/challenges", payload);
+      const { data } = await api.post(event ? `/events/${encodeURIComponent(event.id)}/fastlaps` : "/f1/challenges", payload);
       toast.success("Challenge erstellt.");
       nav(`/admin/f1/${data.id}`);
     } catch (err) { toast.error(formatRequestError(err, "Challenge konnte nicht erstellt werden.", { slug: form.slug, title: form.title })); }
@@ -100,22 +111,14 @@ export default function AdminF1NewPage() {
         eyebrow="Fast Lap"
         title="Neue Challenge"
         intro="Titel und Slug genügen zum Anlegen. Zeiten, Wertung und Preise lassen sich danach jederzeit anpassen — die Challenge startet als Entwurf."
-        backTo="/admin/f1"
-        backLabel="Fast Lap"
+        backTo={event ? `/admin/events/${event.id}` : "/admin/f1"}
+        backLabel={event ? event.name : "Fast Lap"}
         onSubmit={submit}
         testId="f1-new-form"
         aside={(
           <>
             <FormSection title="Veröffentlichung und Zeitplan" hint="Live und Beendet werden anhand von Start/Ende automatisch geschaltet.">
-              {events.length > 0 && (
-                <SelectField
-                  label="Zugehöriges Event"
-                  value={form.event_id || ""}
-                  onChange={(v) => set("event_id", v)}
-                  options={[["", "— kein Event —"], ...events.map((e) => [e.id, e.name])]}
-                  testId="f1-new-event"
-                />
-              )}
+              <EventMembershipLine eventId={event?.id} events={event ? [event] : []} testId="f1-new-event" />
               <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} testId="f1-new-visibility" />
               <SelectField label="Veröffentlichung" value={form.status} onChange={(v) => set("status", v)} options={CREATE_STATUS_OPTIONS} testId="f1-new-status" />
               <TextField label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="f1-new-start" />
@@ -155,7 +158,7 @@ export default function AdminF1NewPage() {
             <FastLapSeasonWeightField value={form.season_weight} onChange={(v) => set("season_weight", v)} />
           </>
         )}
-        actions={<FormActions submitLabel="Challenge erstellen" savingLabel="Erstelle …" saving={saving} submitTestId="f1-new-submit" cancelTo="/admin/f1" icon={null} />}
+        actions={<FormActions submitLabel="Challenge erstellen" savingLabel="Erstelle …" saving={saving} submitTestId="f1-new-submit" cancelTo={event ? `/admin/events/${event.id}` : "/admin/f1"} icon={null} />}
       >
         <FormSection title="Die Challenge">
           <FormGrid>

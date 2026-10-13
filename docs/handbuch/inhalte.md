@@ -168,7 +168,8 @@ die Alben.
 - **Vertrag:** **Vertragsstatus**, **Start**, **Ende**. Status und Laufzeit entscheiden, ob der Sponsor öffentlich erscheint; die
   Vorschau „Ausspielung“ sagt „Wird ausgespielt“ oder „Nicht öffentlich“.
 - **Wo er erscheint:** **Auf Home**, **Im Footer**, **Events**, **TV / Anzeige**, **PDFs**, **E-Mails**. Das Tier ist nur eine Vorlage; die
-  Haken entscheiden. Für Events lassen sich bestimmte Events wählen (leer = alle eigenen).
+  Haken entscheiden. Mit dem Haken **Events** wählst du **Bei allen Events** oder **Bei ausgewählten Events** (dann
+  mindestens eines). Nur hier wird das festgelegt – das Event zeigt die Sponsoren nur an (#1371).
 - **Ansprechpartner**, **Kontakt E-Mail**, **Telefon**, **Interne Notizen** (nie öffentlich).
 - Sponsoren am TV: Haken **TV / Anzeige**, siehe [TV und Beamer](tv.md).
 - Mit Dolibarr-Anbindung kommen Name, Stufe, Laufzeit und Kontakt von dort (diese Felder sind gesperrt); Link, Platzierungen,

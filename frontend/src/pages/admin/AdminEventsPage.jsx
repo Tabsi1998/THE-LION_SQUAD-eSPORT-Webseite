@@ -11,6 +11,7 @@ import { sortByNearestDate } from "@/lib/contentSort";
 import { toast } from "sonner";
 import { Plus, X, Trash2, Calendar, UserCheck, Search, Download, FileText } from "lucide-react";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { eventIsOver, visibilityWord } from "@/lib/eventAdmin";
 
 // Event-Liste. Anlegen und Bearbeiten sind seit #434 eigene Seiten (`/admin/events/new`,
 // `/admin/events/:id`) statt eines Fensters über der Liste - mit Zurück im Browser und Links aus
@@ -144,13 +145,13 @@ export default function AdminEventsPage() {
   const exportCsv = () => {
     downloadCsv(
       `tls-events-${new Date().toISOString().slice(0, 10)}.csv`,
-      ["Name", "Slug", "Typ", "Status", "Sichtbarkeit", "Start", "Ort", "Anmeldungen", "Plaetze"],
+      ["Name", "Slug", "Typ", "Status", "Sichtbarkeit", "Start", "Ort", "Anmeldungen", "Plätze"],
       filteredList.map((event) => [
         event.name,
         event.slug,
         eventTypeLabel(event.event_type, meta.types),
         meta.statuses.find((status) => status.k === event.status)?.l || event.status,
-        event.visibility,
+        visibilityWord(event.visibility, meta.visibilities),
         formatAdminDate(event.start_date),
         [event.location, event.city].filter(Boolean).join(", "),
         event.registration_summary?.registered_count || 0,
@@ -163,7 +164,7 @@ export default function AdminEventsPage() {
     <AdminLayout>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]">VEREINS-CMS</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]">Vereinsleben</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Events</h1>
           <p className="text-sm text-white/60 mt-1">Vereinsabende, LAN-Partys, Grillabende, Messen — alles zentral verwaltet.</p>
         </div>
@@ -216,7 +217,34 @@ export default function AdminEventsPage() {
           <div className="font-heading font-bold">Noch keine Events</div>
         </div>
       ) : (
-        <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
+        <>
+        {/* Handy (#1373): eine Karte je Event statt der breiten Tabelle - „Rückblick schreiben“ steht in der Karte. */}
+        <ul className="md:hidden space-y-3" data-testid="events-admin-cards">
+          {filteredList.map((e) => (
+            <li key={e.id} className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid={`event-card-${e.id}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-bold break-words">{e.name}</div>
+                  <div className="mt-1 text-xs text-white/55">
+                    {[e.start_date ? viennaDate(e.start_date) : "", e.location, meta.statuses.find((s) => s.k === e.status)?.l || e.status].filter(Boolean).join(" · ")}
+                  </div>
+                  <div className="mt-1 text-xs text-white/45">Sichtbar für: {visibilityWord(e.visibility, meta.visibilities)}</div>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {eventIsOver(e) && <RecapButton event={e} busy={creatingRecapId === e.id} onClick={() => createRecapDraft(e)} testPrefix="event-card-recap" />}
+                {e.has_registration && (
+                  <button type="button" onClick={() => setRegistrationsEvent(e)} className="text-xs font-bold uppercase px-3 py-2 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] inline-flex items-center gap-1">
+                    <UserCheck className="w-3 h-3" /> Anmeldungen
+                  </button>
+                )}
+                <Link to={`/admin/events/${e.id}`} className="inline-flex text-xs font-bold uppercase px-3 py-2 rounded-sm border border-[#9F7AEA]/40 text-[#9F7AEA]">Bearbeiten</Link>
+              </div>
+            </li>
+          ))}
+          {filteredList.length === 0 && <li className="py-10 text-center text-sm text-white/40">Keine Events für diesen Filter.</li>}
+        </ul>
+        <div className="hidden md:block border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[900px]">
               <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
@@ -228,7 +256,7 @@ export default function AdminEventsPage() {
                   <th className="text-left px-4 py-3">Start</th>
                   <th className="text-left px-4 py-3">Ort</th>
                   <th className="text-left px-4 py-3">Anmeldung</th>
-                  <th className="text-center px-4 py-3">Aktion</th>
+                  <th className="text-right px-4 py-3">Aktion</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -237,7 +265,7 @@ export default function AdminEventsPage() {
                     <td className="px-4 py-3"><div className="font-bold">{e.name}</div><div className="text-[11px] text-white/50">/{e.slug}</div></td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#9F7AEA] font-bold">{eventTypeLabel(e.event_type, meta.types)}</td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-white/70 font-bold">{meta.statuses.find((s) => s.k === e.status)?.l || e.status}</td>
-                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-white/60">{e.visibility}</td>
+                    <td className="px-4 py-3 text-xs text-white/60" data-testid={`event-visibility-${e.id}`}>{visibilityWord(e.visibility, meta.visibilities)}</td>
                     <td className="px-4 py-3 text-xs text-white/70">{e.start_date ? viennaDate(e.start_date) : "—"}</td>
                     <td className="px-4 py-3 text-xs text-white/55">{e.location || "—"}</td>
                     <td className="px-4 py-3 text-xs text-white/65">
@@ -248,17 +276,18 @@ export default function AdminEventsPage() {
                         </div>
                       ) : "—"}
                     </td>
-                    <td className="px-4 py-3 text-center space-x-1 whitespace-nowrap">
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center justify-end gap-1">
+                      {/* Rückblick (#1373): erst wenn das Event vorbei ist - dann als erster Knopf. */}
+                      {eventIsOver(e) && <RecapButton event={e} busy={creatingRecapId === e.id} onClick={() => createRecapDraft(e)} />}
                       {e.has_registration && (
                         <button onClick={() => setRegistrationsEvent(e)} data-testid={`event-registrations-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10 inline-flex items-center gap-1">
                           <UserCheck className="w-3 h-3" /> Anm.
                         </button>
                       )}
-                      <button onClick={() => createRecapDraft(e)} disabled={creatingRecapId === e.id} data-testid={`event-recap-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 inline-flex items-center gap-1 disabled:opacity-50">
-                        <FileText className="w-3 h-3" /> {creatingRecapId === e.id ? "..." : "Rückblick"}
-                      </button>
                       <Link to={`/admin/events/${e.id}`} data-testid={`event-edit-${e.id}`} className="inline-flex text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#9F7AEA]/40 text-[#9F7AEA] hover:bg-[#9F7AEA]/10">Bearbeiten</Link>
                       <button onClick={() => remove(e.id)} data-testid={`event-delete-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -271,10 +300,21 @@ export default function AdminEventsPage() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {registrationsEvent && <EventRegistrationsModal event={registrationsEvent} onClose={() => setRegistrationsEvent(null)} onChanged={load} />}
     </AdminLayout>
+  );
+}
+
+// „Rückblick schreiben“ (#1373): legt den News-Entwurf an (oder öffnet den vorhandenen) - nur bei vergangenen Events.
+function RecapButton({ event, busy, onClick, testPrefix = "event-recap" }) {
+  return (
+    <button type="button" onClick={onClick} disabled={busy} data-testid={`${testPrefix}-${event.id}`}
+      className="text-xs font-bold uppercase px-3 py-1 rounded-sm bg-[#9F7AEA] text-black hover:bg-[#7C5CE0] inline-flex items-center gap-1 disabled:opacity-50">
+      <FileText className="w-3 h-3" /> {busy ? "…" : "Rückblick schreiben"}
+    </button>
   );
 }
 

@@ -5,6 +5,7 @@ import { FormActions, FormColumns, FormGrid, FormSection } from "@/components/tl
 import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { CheckField, TextField, SelectField as SelectInput } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { EventBillingSection } from "@/components/tls/EventBillingSection";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
@@ -311,12 +312,13 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <TextField label="Slug / URL" value={f.slug} onChange={(v)=>set("slug", slugify(v))} testId="tr-edit-slug"/>
             <SelectInput label="Spiel" value={f.game_id} onChange={(v)=>set("game_id",v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} />
             <TextField label="Plattform" value={f.platform} onChange={(v)=>set("platform",v)} testId="tr-edit-platform"/>
-            <SelectInput label="Event" value={f.event_id || ""} onChange={(v)=>set("event_id",v)} options={[["", "— keins —"], ...events.map((e) => [e.id, e.name])]} />
             <SelectInput label="Status" value={f.status} onChange={(v)=>set("status",v)} options={TOURNAMENT_STATUS_OPTIONS} />
             <SelectInput label="Sichtbarkeit" value={f.visibility} onChange={(v)=>set("visibility",v)} options={VISIBILITY_OPTIONS} />
             <CheckField label="Auf Public-Seiten sichtbar, sobald nicht Entwurf" checked={f.is_public} onChange={(v)=>set("is_public",v)} className="self-end pb-2" />
             <CheckField label="Ohne Discord" hint="Keine Meldung, kein Thread, kein Bracket und kein Termin im Discord – etwa für Probe- oder interne Turniere." checked={f.discord_skip} onChange={(v)=>set("discord_skip",v)} accent="#5865F2" testId="tr-edit-discord-skip" />
           </FormGrid>
+          {/* Event als Klammer (#1371): verbunden wird nur im Event - hier steht nur, wozu das Turnier gehört. */}
+          <EventMembershipLine eventId={f.event_id} events={events} testId="tr-edit-event" />
         </FormSection>
 
         <FormSection title="Spielweise" hint="Vor-Ort-Turniere werden standardmäßig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmäßig Ergebnisberichte beider Parteien und Terminvorschläge.">
@@ -420,7 +422,11 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
 
         <FormSection title="Streaming und externe Links" collapsible accent="#9146FF">
           <FormGrid>
-            <TextField label="Ort" value={f.location} onChange={(v)=>set("location",v)} testId="tr-edit-location"/>
+            {f.event_id ? (
+              <div className="text-sm text-white/70 self-end pb-2" data-testid="tr-edit-location-event">Ort: vom Event{f.location ? ` (${f.location})` : ""}</div>
+            ) : (
+              <TextField label="Ort" value={f.location} onChange={(v)=>set("location",v)} testId="tr-edit-location"/>
+            )}
             <TextField label="Discord-Verweis" value={f.discord_link} onChange={(v)=>set("discord_link",v)} testId="tr-edit-discord"/>
             <TextField label="Alter Stream-Verweis" value={f.stream_link} onChange={(v)=>set("stream_link",v)} testId="tr-edit-stream"/>
             <TextField label="Twitch-Kanal" value={f.twitch_channel} onChange={(v)=>set("twitch_channel",v)} testId="tr-edit-twitch"/>

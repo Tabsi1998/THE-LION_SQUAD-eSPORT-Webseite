@@ -5,10 +5,11 @@ import { presetFor } from "@/lib/tournamentGuide";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { PartnerPicker } from "@/components/tls/PartnerPicker";
+import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
-import { normalizeDateTimeFields } from "@/lib/datetime";
+import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
 import { gameOptionLabel } from "@/lib/gameLabels";
@@ -73,10 +74,12 @@ export default function AdminTournamentNewPage() {
   const preset = presetFor(searchParams.get("preset") || "");
   const [games, setGames] = useState([]);
   const [partners, setPartners] = useState([]);
-  const [events, setEvents] = useState([]);
+  // „+ Turnier in diesem Event“ (#1371): mit ?event= kommt die Vorbelegung vom Event, angelegt wird im Event.
+  const eventId = searchParams.get("event") || "";
+  const [event, setEvent] = useState(null);
   const [form, setForm] = useState(() => ({
     title: "", slug: "", description: "", game_id: "", partner_ids: [],
-    platform: "", event_id: "", format: "single_elim", format_label: "",
+    platform: "", format: "single_elim", format_label: "",
     team_mode: "solo", team_size: 1,
     max_participants: 16, min_participants: 2,
     registration_enabled: true, is_invite_only: false, block_club_member_registration: false, requires_event_registration: false, discord_registration: true,
@@ -106,11 +109,26 @@ export default function AdminTournamentNewPage() {
 
   const loadSources = useCallback(() => {
     api.get("/games").then(({ data }) => setGames(data));
-    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data));
     api.get("/partners").then(({ data }) => setPartners(Array.isArray(data) ? data : [])).catch(() => setPartners([]));
   }, []);
   useEffect(() => { loadSources(); }, [loadSources]);
-  useApiInvalidation(loadSources, ["games", "events"]);
+  useApiInvalidation(loadSources, ["games"]);
+  useEffect(() => {
+    if (!eventId) return;
+    api.get(`/events/${encodeURIComponent(eventId)}/program`).then(({ data }) => {
+      setEvent(data?.event || null);
+      const defaults = data?.defaults?.tournament || {};
+      setForm((current) => ({
+        ...current,
+        ...(defaults.start_date ? { start_date: toDateTimeLocalInput(defaults.start_date) } : {}),
+        ...(defaults.location ? { location: defaults.location } : {}),
+        ...(Array.isArray(defaults.partner_ids) ? { partner_ids: defaults.partner_ids } : {}),
+        ...(typeof defaults.discord_skip === "boolean" ? { discord_skip: defaults.discord_skip } : {}),
+        ...(typeof defaults.discord_registration === "boolean" ? { discord_registration: defaults.discord_registration } : {}),
+        ...(defaults.event_mode ? { event_mode: defaults.event_mode } : {}),
+      }));
+    }).catch(() => toast.error("Das Event ließ sich nicht laden – das Turnier wird ohne Event angelegt."));
+  }, [eventId]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const applyRulePreset = (preset) => setForm((f) => ({ ...f, ...preset.values }));
@@ -137,10 +155,7 @@ export default function AdminTournamentNewPage() {
       if (!payload.result_entry_mode) payload.result_entry_mode = null;
       if (!payload.schedule_mode) payload.schedule_mode = null;
       if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
-      if (!payload.event_id) {
-        delete payload.event_id;
-        payload.requires_event_registration = false;
-      }
+      if (!event) payload.requires_event_registration = false;
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
       // Filter empty prize places
       payload.prize_places = (payload.prize_places || [])
@@ -152,7 +167,7 @@ export default function AdminTournamentNewPage() {
           value: p.value,
         }));
       if (payload.prize_places.length === 0) payload.prize_places = null;
-      const { data } = await api.post("/tournaments", payload);
+      const { data } = await api.post(event ? `/events/${encodeURIComponent(event.id)}/tournaments` : "/tournaments", payload);
       toast.success(data?.auto_generated_bracket?.match_count
         ? `Turnier erstellt. Vorschau mit ${data.auto_generated_bracket.match_count} Spielen angelegt.`
         : "Turnier erstellt.");
@@ -177,14 +192,23 @@ export default function AdminTournamentNewPage() {
         eyebrow="Turniere"
         title="Neues Turnier"
         intro="Titel und Spiel genügen zum Anlegen. Alles Weitere lässt sich danach in Ruhe einstellen — das Turnier startet als Entwurf und ist noch nicht öffentlich."
-        backTo="/admin/tournaments"
-        backLabel="Turniere"
+        backTo={event ? `/admin/events/${event.id}` : "/admin/tournaments"}
+        backLabel={event ? event.name : "Turniere"}
         onSubmit={submit}
         testId="new-tr-form"
-        headerExtra={preset && (
-          <div className="mt-3 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm px-4 py-3 text-sm max-w-2xl" data-testid="new-tr-preset-hint">
-            Voreinstellung <strong className="text-white">„{preset.label}“</strong> aus dem <Link to="/admin/tournament-guide#turnierformen" className="text-[#29B6E8] hover:underline">Leitfaden</Link> übernommen: Format, Teilnahme, Best of und die Spielregel-Vorgabe sind gesetzt – alles bleibt änderbar.
-          </div>
+        headerExtra={(preset || event) && (
+          <>
+            {event && (
+              <div className="mt-3 border border-[#9F7AEA]/40 bg-[#9F7AEA]/5 rounded-sm px-4 py-3 text-sm max-w-2xl" data-testid="new-tr-event-hint">
+                Neues Turnier in <strong className="text-white">{event.name}</strong>{event.window ? ` (${event.window})` : ""}. Ort, Tag, Partner und Discord-Einstellungen sind vom Event übernommen – der Tag muss im Event liegen.
+              </div>
+            )}
+            {preset && (
+              <div className="mt-3 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm px-4 py-3 text-sm max-w-2xl" data-testid="new-tr-preset-hint">
+                Voreinstellung <strong className="text-white">„{preset.label}“</strong> aus dem <Link to="/admin/tournament-guide#turnierformen" className="text-[#29B6E8] hover:underline">Leitfaden</Link> übernommen: Format, Teilnahme, Best of und die Spielregel-Vorgabe sind gesetzt – alles bleibt änderbar.
+              </div>
+            )}
+          </>
         )}
         aside={(
           <>
@@ -200,7 +224,7 @@ export default function AdminTournamentNewPage() {
                 <CheckField label="Nur Einladung/manuelle Teilnehmer, keine öffentliche Anmeldung" checked={form.is_invite_only} onChange={(v) => set("is_invite_only", v)} testId="new-tr-invite-only" />
                 <CheckField label="Anmeldung über Discord erlauben (/anmelden und Knopf unter der Ankündigung)" checked={form.discord_registration} onChange={(v) => set("discord_registration", v)} testId="new-tr-discord-registration" accent="#5865F2" />
                 <CheckField label="Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten" checked={form.block_club_member_registration} onChange={(v) => set("block_club_member_registration", v)} testId="new-tr-block-members" accent="#FFD700" />
-                {form.event_id && <CheckField label="Anmeldung nur mit Event-Anmeldung – wer nicht beim Event angemeldet ist, kann sich nicht anmelden (Teams: so viele Spieler wie die Teamgröße)" checked={form.requires_event_registration} onChange={(v) => set("requires_event_registration", v)} testId="new-tr-event-gate" accent="#29B6E8" />}
+                {event && <CheckField label="Anmeldung nur mit Event-Anmeldung – wer nicht beim Event angemeldet ist, kann sich nicht anmelden (Teams: so viele Spieler wie die Teamgröße)" checked={form.requires_event_registration} onChange={(v) => set("requires_event_registration", v)} testId="new-tr-event-gate" accent="#29B6E8" />}
               </FormSection>
             </FormSection>
             {planningWarnings.length > 0 && (
@@ -216,7 +240,7 @@ export default function AdminTournamentNewPage() {
             )}
           </>
         )}
-        actions={<FormActions submitLabel="Turnier erstellen" savingLabel="Erstelle …" saving={saving} submitTestId="new-tr-submit" cancelTo="/admin/tournaments" icon={null} />}
+        actions={<FormActions submitLabel="Turnier erstellen" savingLabel="Erstelle …" saving={saving} submitTestId="new-tr-submit" cancelTo={event ? `/admin/events/${event.id}` : "/admin/tournaments"} icon={null} />}
       >
         <FormSection title="Das Turnier" hint="Mehr als das braucht es nicht zum Anlegen — alles Weitere lässt sich danach in Ruhe einstellen.">
           <FormGrid>
@@ -255,11 +279,11 @@ export default function AdminTournamentNewPage() {
         </FormSection>
 
         <FormSection title="Darstellung und Regeln" collapsible>
-          <FormGrid cols={3}>
+          <FormGrid>
             <TextField label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", autoSlug(v))} required testId="new-tr-slug" />
             <TextField label="Plattform" value={form.platform} onChange={(v) => set("platform", v)} placeholder="z.B. Nintendo Switch" testId="new-tr-platform" />
-            <SelectField label="Event" value={form.event_id || ""} onChange={(v) => set("event_id", v)} options={[["", "— keins —"], ...events.map((e) => [e.id, e.name])]} testId="new-tr-event" />
           </FormGrid>
+          <EventMembershipLine eventId={event?.id} events={event ? [event] : []} testId="new-tr-event" />
           <TextField label="Format-Anzeigename" value={form.format_label} onChange={(v) => set("format_label", v)} placeholder="z.B. Gamers Heaven F1 Heat" testId="new-tr-format-label" />
           <MarkdownField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="new-tr-description" />
           <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Turnier-Banner" testId="new-tr-banner-upload" variant="wide" allowLibrary />
@@ -310,7 +334,12 @@ export default function AdminTournamentNewPage() {
         <FormSection title="Streaming und externe Links" collapsible accent="#9146FF">
           <FormGrid>
             <TextField label="Twitch-Kanal" value={form.twitch_channel} onChange={(v) => set("twitch_channel", v)} testId="new-tr-twitch" placeholder="the_lion_squad_esports" />
-            <TextField label="Ort" value={form.location} onChange={(v) => set("location", v)} testId="new-tr-location" placeholder="z.B. Gamers Heaven · Bregenz" />
+            {/* Ort (#1371): im Event kommt er vom Event; ein eigener Ort nur ohne Event. */}
+            {event ? (
+              <div className="text-sm text-white/70" data-testid="new-tr-location-event">Ort: {form.location || "wie beim Event"} <span className="text-white/45">(vom Event)</span></div>
+            ) : (
+              <TextField label="Ort" value={form.location} onChange={(v) => set("location", v)} testId="new-tr-location" placeholder="z.B. Gamers Heaven · Bregenz" />
+            )}
           </FormGrid>
           <CheckField label="Twitch-Player auf Turnierseite einbetten" checked={form.twitch_enabled} onChange={(v) => set("twitch_enabled", v)} testId="new-tr-twitch-enabled" accent="#9146FF" />
           <CheckField label="Turnier-Chat für Teilnehmer anzeigen" checked={form.show_chat} onChange={(v) => set("show_chat", v)} testId="new-tr-chat-enabled" accent="#9146FF" />

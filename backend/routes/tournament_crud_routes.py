@@ -52,6 +52,9 @@ from routes.tournament_common import (
 from routes.tournament_router import router
 
 
+EVENT_LINK_ONLY_IN_EVENT = "Zu welchem Event das gehört, änderst du im Event unter „Programm“."
+
+
 def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
     safe_limit = max(1, min(int(limit or 48), 200))
     safe_offset = max(0, int(offset or 0))
@@ -265,6 +268,11 @@ def _expose_offer(t: dict, finance: bool) -> None:
 
 @router.post("")
 async def create_tournament(body: TournamentCreate, me: dict = Depends(require_admin())):
+    return await create_tournament_doc(body, me)
+
+
+async def create_tournament_doc(body: TournamentCreate, me: dict) -> dict:
+    """Anlegen ohne Route - auch für „+ Turnier in diesem Event“ (#1371, ``event_program_routes``)."""
     db = get_db()
     canonical_body = body.model_dump(mode="json")
     creation_digest = hashlib.sha256(
@@ -337,6 +345,10 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
     existing = await _ensure_tournament_unlocked(db, tid)
     raw_updates = body.model_dump(exclude_unset=True)
+    # Event als Klammer (#1371): verbunden wird nur im Event. Derselbe Wert stört nicht, ein anderer wird abgelehnt.
+    if "event_id" in raw_updates:
+        if (raw_updates.pop("event_id") or None) != (existing.get("event_id") or None):
+            raise HTTPException(status_code=400, detail=EVENT_LINK_ONLY_IN_EVENT)
     if "partner_ids" in raw_updates:
         raw_updates["partner_ids"] = await partner_pages.clean_partner_ids(db, raw_updates["partner_ids"])
     if "format_label" in raw_updates:
