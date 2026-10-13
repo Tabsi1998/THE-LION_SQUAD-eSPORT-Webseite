@@ -12,7 +12,7 @@ if not base_url:
     pytest.skip("REACT_APP_BACKEND_URL not configured; skipping live preview tests", allow_module_level=True)
 BASE_URL = base_url.rstrip("/")
 
-OBSIDIAN_FLOOR = 29 * 29 * 100  # points needed for level 30
+ONYX_FLOOR = 29 * 29 * 100  # points needed for level 30
 
 
 @pytest.fixture(scope="module")
@@ -41,25 +41,25 @@ class TestCrowns:
 
     def test_crowns_match_top3_of_leaderboard(self, client, leaderboard):
         crowns = client.get(f"{BASE_URL}/api/achievements/crowns").json()["crowns"]
-        non_obsidian = [r for r in leaderboard if int(r["points"]) < OBSIDIAN_FLOOR]
+        non_onyx = [r for r in leaderboard if int(r["points"]) < ONYX_FLOOR]
         expected = ["gold", "silver", "bronze"]
-        for variant, row in zip(expected, non_obsidian[:3]):
+        for variant, row in zip(expected, non_onyx[:3]):
             uid = row["user_id"]
             assert crowns.get(uid) == variant, (
                 f"{row['username']} expected {variant}, got {crowns.get(uid)}"
             )
         for row in leaderboard:
-            if int(row["points"]) >= OBSIDIAN_FLOOR:
-                assert crowns.get(row["user_id"]) == "obsidian"
+            if int(row["points"]) >= ONYX_FLOOR:
+                assert crowns.get(row["user_id"]) == "onyx"
 
-    def test_no_crowns_outside_top3_unless_obsidian(self, client, leaderboard):
+    def test_no_crowns_outside_top3_unless_onyx(self, client, leaderboard):
         crowns = client.get(f"{BASE_URL}/api/achievements/crowns").json()["crowns"]
-        non_obsidian = [r for r in leaderboard if int(r["points"]) < OBSIDIAN_FLOOR]
-        crowned_ids = {r["user_id"] for r in non_obsidian[:3]}
+        non_onyx = [r for r in leaderboard if int(r["points"]) < ONYX_FLOOR]
+        crowned_ids = {r["user_id"] for r in non_onyx[:3]}
         for row in leaderboard:
             uid = row["user_id"]
-            if int(row["points"]) >= OBSIDIAN_FLOOR:
-                assert crowns.get(uid) == "obsidian"
+            if int(row["points"]) >= ONYX_FLOOR:
+                assert crowns.get(uid) == "onyx"
             elif uid in crowned_ids:
                 assert crowns.get(uid) in {"gold", "silver", "bronze"}
             else:
@@ -67,7 +67,7 @@ class TestCrowns:
 
     def test_crown_variants_valid(self, client):
         crowns = client.get(f"{BASE_URL}/api/achievements/crowns").json()["crowns"]
-        assert set(crowns.values()) <= {"gold", "silver", "bronze", "obsidian"}
+        assert set(crowns.values()) <= {"gold", "silver", "bronze", "onyx"}
         rank_crowns = [v for v in crowns.values() if v in {"gold", "silver", "bronze"}]
         assert len(rank_crowns) == len(set(rank_crowns)), "duplicate rank crowns"
 
