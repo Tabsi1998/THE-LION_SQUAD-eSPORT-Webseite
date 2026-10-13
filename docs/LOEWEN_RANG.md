@@ -27,6 +27,18 @@ Sterne am Level-Schild), der Rahmen bleibt der Löwenkönig.
   `frontend/src/components/tls/LevelAvatarFrame.jsx`. Jede Größe hat eine feste Fläche für Rahmen und Foto, gleich
   für alle Ränge: Profil 285 px (auf dem Handy 220), Karte 150, Liste 92, klein (Podest) 64. In Listen und klein nur
   die Grafik, ohne Glanz und Schild; mit „Bewegung reduzieren“ blendet der Glanz nur ein und aus.
+- App (#1457): `mobile/src/lib/loewenRang.ts` rechnet wie das Web; beide Tests prüfen gegen dieselben Fälle in
+  `frontend/src/lib/loewenRang.cases.json` (alle 60 Level, alle 12 Rahmen) - ändert sich die Rechnung auf einer Seite,
+  wird die andere rot. Der Rahmen `mobile/src/components/LoewenRangFrame.tsx` hat dieselben Flächen (Profil 220, auf
+  Tablets ab 640 Punkten Breite 285, Karte 150, Liste 92, Podest 64) und dasselbe Schild. Eingesetzt im Profil, in
+  der Spielerliste (Community, Info-Center) und auf dem Podest der Bestenliste. Bewegung nur im Profil: Glanz über das
+  Metall und eine schlanke Signatur mit Skia auf dem UI-Thread (höchstens sechs Teilchen, rund 30 Bilder je Sekunde,
+  im Hintergrund still). Vier Arten nach der Web-Signatur desselben Rangs: Funken (Rang 1, 2, 4, 6), Glut (3, 7,
+  10, 11), Frost (5, 9), Blitz (8, 12); das erste Level eines Rangs nur Glanz. Mit „Bewegung reduzieren“ steht alles
+  still. In Ruhe (Glanz-Pause, keine Teilchen) wird kein Bild aufgezeichnet. In Listen und am Podest ist der Rahmen
+  für Vorleser nur Schmuck - Level und Rang stehen im Namen des Eintrags - und hält oben Platz für den höchsten
+  Überstand frei (Liste 7, Podest 5 Punkte). Das Schild wächst mit großer Schrift höchstens 1,3-fach und wird sonst
+  kleiner statt breiter als die Fläche.
 
 ## Rahmen-Grafiken
 
