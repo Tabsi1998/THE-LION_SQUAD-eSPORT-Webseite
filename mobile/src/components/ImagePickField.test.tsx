@@ -60,6 +60,29 @@ test("Galerie: Zuschnitt im Breitformat, Hochladen wie im Web, dann speichern", 
   expect(IMAGE_ASPECT.square).toEqual([1, 1]);
 });
 
+// Profilbild zuschneiden (#1459): Die App nutzt den Zuschnitt des Handys (zoomen und verschieben mit den Fingern).
+// Für das Profilbild immer quadratisch - aus der Galerie und von der Kamera -, damit es im runden Rahmen sitzt.
+test("Profilbild: Galerie und Kamera öffnen den quadratischen Zuschnitt des Handys", async () => {
+  mockLibrary.mockResolvedValue({ canceled: false, assets: [{ ...asset, width: 800, height: 800 }] });
+  mockCamera.mockResolvedValue({ canceled: false, assets: [{ ...asset, width: 800, height: 800 }] });
+  mockPermission.mockResolvedValue({ granted: true });
+  mockPost.mockResolvedValue({ data: { url: "/api/static/uploads/ich.webp" } });
+  const onUploaded = jest.fn(async () => {});
+  await render(<ImagePickField label="Profilbild" shape="round" onUploaded={onUploaded} testID="pick" />);
+
+  chooseIn("Aus der Galerie");
+  await fireEvent.press(screen.getByTestId("pick-open"));
+  await waitFor(() => expect(onUploaded).toHaveBeenCalledTimes(1));
+  jest.restoreAllMocks();
+  chooseIn("Foto aufnehmen");
+  await fireEvent.press(screen.getByTestId("pick-open"));
+  await waitFor(() => expect(onUploaded).toHaveBeenCalledTimes(2));
+
+  const cropOptions = expect.objectContaining({ allowsEditing: true, aspect: [1, 1], mediaTypes: ["images"] });
+  expect(mockLibrary).toHaveBeenCalledWith(cropOptions);
+  expect(mockCamera).toHaveBeenCalledWith(cropOptions);
+});
+
 test("Abbrechen: nichts wird hochgeladen, nichts gespeichert", async () => {
   chooseIn("Aus der Galerie");
   mockLibrary.mockResolvedValue({ canceled: true, assets: null });
