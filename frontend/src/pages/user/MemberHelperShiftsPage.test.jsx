@@ -12,9 +12,15 @@ vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) =
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => confirmAnswer }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-// Helfer-Aufruf (#1197): den Knopf sieht nur der Vorstand (Bereich „Verein“).
-const authState = { areas: [] };
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ can: (area) => authState.areas.includes(area) }) }));
+// Helfer-Aufruf (#1197): den Knopf sieht nur der Vorstand (Bereich „Verein“) - wie jeder Adminbereich nur mit
+// bestätigter Zwei-Faktor-Anmeldung (#1479).
+const authState = { areas: [], secondFactor: true };
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => ({
+    user: { id: "u-1", areas: authState.areas, mfa_enabled: authState.secondFactor, auth_mfa_verified: authState.secondFactor },
+    can: (area) => authState.areas.includes(area),
+  }),
+}));
 
 const { default: MemberHelperShiftsPage, shiftWhen } = await import("./MemberHelperShiftsPage");
 
@@ -88,6 +94,17 @@ test("Helfer-Aufruf (#1197): der Vorstand sendet mit einem Knopf, einmal am Tag;
   await waitFor(() => expect(screen.getByTestId("helper-call-send-5")).toBeDisabled());
   expect(screen.getByTestId("helper-call-send-5")).toHaveTextContent("Heute gesendet");
   authState.areas = [];
+});
+
+test("Vorstand ohne bestätigte Zwei-Faktor-Anmeldung: kein Aufruf-Knopf, keine Abfrage (#1479)", async () => {
+  authState.areas = ["club"];
+  authState.secondFactor = false;
+  render(<MemoryRouter><MemberHelperShiftsPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("helper-event-5")).toBeInTheDocument());
+  expect(screen.queryByTestId("helper-call-panel")).toBeNull();
+  expect(apiMock.get).not.toHaveBeenCalledWith("/membership/helper-calls");
+  authState.areas = [];
+  authState.secondFactor = true;
 });
 
 test("Mitglieder ohne Vorstandsposten sehen keinen Aufruf-Knopf", async () => {
