@@ -166,20 +166,24 @@ describe("startPasskeyAutofill", () => {
     stop();
   });
 
-  test("lehnt der Server ab, steht der Grund da und der Browser darf neu vorschlagen", async () => {
+  test("lehnt der Server ab, steht der Grund da und der Vorschlag endet - keine Schleife aus Optionen und Prüfung", async () => {
     const calls = pendingGets();
     const onError = vi.fn();
+    const onEnd = vi.fn();
     api.post.mockImplementation(async (url) => {
       if (url === "/auth/passkeys/login/options") return { data: { challenge: "AQID", rpId: "club.example" } };
       throw { response: { status: 401, headers: {}, data: { detail: "nein" } } };
     });
-    const stop = autofill({ onSignedIn: vi.fn(), onError });
+    autofill({ onSignedIn: vi.fn(), onError, onEnd });
     await flush();
     calls[0].resolve(credential);
     await flush();
+    await flush();
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(calls).toHaveLength(2);
-    stop();
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(1);
+    const optionCalls = api.post.mock.calls.filter(([url]) => url === "/auth/passkeys/login/options");
+    expect(optionCalls).toHaveLength(1);
   });
 
   test("scheitern die Optionen, endet der Vorschlag still", async () => {

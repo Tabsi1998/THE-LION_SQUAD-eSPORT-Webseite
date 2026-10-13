@@ -188,6 +188,28 @@ test("endet der Vorschlag von selbst, erscheint der Link", async () => {
   expect(await screen.findByTestId("login-passkey")).toBeInTheDocument();
 });
 
+test("nach einer Server-Ablehnung startet der Vorschlag erst wieder beim Fokus aufs Feld – höchstens einmal", async () => {
+  autofillStarted();
+  const user = userEvent.setup();
+  renderPage();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1));
+  act(() => {
+    autofillArgs().onError(new Error("Diesen Passkey kennt der Server nicht."));
+    autofillArgs().onEnd();
+  });
+  expect(await screen.findByTestId("login-passkey")).toBeInTheDocument();
+  expect(screen.getByText("Diesen Passkey kennt der Server nicht.")).toBeInTheDocument();
+  expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1);
+
+  await user.click(screen.getByTestId("login-email"));
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(2));
+  act(() => autofillArgs().onEnd());
+  await user.click(screen.getByTestId("login-password"));
+  await user.click(screen.getByTestId("login-email"));
+  expect(await screen.findByTestId("login-passkey")).toBeInTheDocument();
+  expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(2);
+});
+
 // Ziel nach dem Anmelden (#1225): „Registrieren“ nimmt das Ziel mit, oben steht, wofür man sich anmeldet, und ein Ziel
 // auf einer fremden Adresse führt zum Dashboard.
 function renderAt(entry) {

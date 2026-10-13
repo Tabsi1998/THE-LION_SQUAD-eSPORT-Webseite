@@ -39,9 +39,13 @@ export default function LoginPage() {
   const [offerPasskey, setOfferPasskey] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
   // Vorschlag im E-Mail-Feld (#1520): "checking" bis klar ist, ob der Browser das kann, "on" solange er läuft,
-  // "off" ohne ihn - dann zeigt die Seite den Link „Mit Passkey anmelden“.
+  // "off" ohne ihn, "ended" wenn er von selbst endete (etwa nach einer Ablehnung durch den Server). Ohne
+  // Vorschlag zeigt die Seite den Link „Mit Passkey anmelden“.
   const [autofill, setAutofill] = useState("checking");
   const [autofillRound, setAutofillRound] = useState(0);
+  // Neu starten nur nach einer Handlung: Passwort gescheitert, oder - höchstens einmal je Seitenaufruf - der
+  // Fokus kehrt ins E-Mail-Feld zurück. So entsteht keine Schleife aus Optionen und Prüfung.
+  const focusRestartsLeftRef = useRef(1);
   const rememberRef = useRef(remember);
   const stopAutofillRef = useRef(null);
   rememberRef.current = remember;
@@ -85,7 +89,7 @@ export default function LoginPage() {
         onError: (error) => setErr(passkeyError(error)),
         onEnd: () => {
           stopAutofillRef.current = null;
-          setAutofill("off");
+          setAutofill("ended");
         },
       });
     });
@@ -95,6 +99,12 @@ export default function LoginPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [passkeysEnabled, mfaTicket, passwordForm, autofillRound]);
+
+  const restartAutofillOnFocus = () => {
+    if (autofill !== "ended" || focusRestartsLeftRef.current < 1) return;
+    focusRestartsLeftRef.current -= 1;
+    setAutofillRound((round) => round + 1);
+  };
 
   const changeRemember = (value) => {
     setRemember(value);
@@ -271,6 +281,7 @@ export default function LoginPage() {
             type="email"
             value={email}
             onChange={setField("login-email", setEmail)}
+            onFocus={restartAutofillOnFocus}
             required
             autoComplete="username webauthn"
             description={autofill === "on" ? "Passkey gespeichert? Dann schlägt dein Browser ihn hier vor." : undefined}
@@ -324,7 +335,7 @@ export default function LoginPage() {
         )}
         <div className="mt-6 text-sm text-white/60 text-center space-y-2">
           {/* Browser ohne Vorschlag im E-Mail-Feld (#1520): ein unauffälliger Weg zum Passkey. */}
-          {!mfaTicket && passkeysEnabled && passwordForm && autofill === "off" && (
+          {!mfaTicket && passkeysEnabled && passwordForm && (autofill === "off" || autofill === "ended") && (
             <div><button type="button" disabled={loading} onClick={passkeyLogin} data-testid="login-passkey"
               className="min-h-11 text-white/60 hover:text-[#29B6E8] underline-offset-4 hover:underline disabled:opacity-50">Mit Passkey anmelden</button></div>
           )}

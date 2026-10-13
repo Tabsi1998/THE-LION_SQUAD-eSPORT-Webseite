@@ -120,8 +120,9 @@ async function runAlone(task) {
  * Der Browser schlägt gespeicherte Passkeys im E-Mail-Feld vor (#348, #1520) - statt eines eigenen Knopfs.
  * Die Anfrage bleibt im Hintergrund offen und wird vor Ablauf erneuert. `exclusive` lässt die Prüfung am
  * Server nur laufen, wenn nicht schon eine andere Anmeldung läuft (kein doppeltes Anmelden). Abbruch und eine
- * abgelehnte Auswahl bleiben still; `onError` hört nur, was der Server ablehnt. `onEnd` meldet, dass der
- * Vorschlag nicht mehr läuft und die Seite den Weg über „Mit Passkey anmelden“ zeigen soll.
+ * abgelehnte Auswahl bleiben still; `onError` hört nur, was der Server ablehnt. Danach endet der Vorschlag:
+ * sonst böte der Browser denselben Passkey gleich wieder an. `onEnd` meldet, dass der Vorschlag nicht mehr
+ * läuft und die Seite den Weg über „Mit Passkey anmelden“ zeigen soll; neu starten darf nur die Seite.
  * Liefert eine Funktion zum Beenden: beim Verlassen der Seite, beim Absenden des Passworts und bevor eine
  * eigene Passkey-Anfrage startet - es darf nur eine geben.
  */
@@ -165,7 +166,7 @@ export function startPasskeyAutofill({ remember = () => true, exclusive = runAlo
     if (attempt.error) {
       if (stopped) return;
       onError?.(attempt.error);
-      arm();
+      end();
       return;
     }
     stopped = true;
