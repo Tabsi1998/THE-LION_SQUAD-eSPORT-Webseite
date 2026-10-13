@@ -83,7 +83,8 @@ jobs:
       - name: Check documentation links
         run: python scripts/check-doc-links.py
       - name: Validate shell scripts
-        run: bash -n install.sh update.sh scripts/*.sh
+        # Jede *.sh, die Git kennt, einzeln (#980): `bash -n a.sh b.sh` prüfte nur a.sh. Fehler nennen die Datei.
+        run: bash scripts/check-shell-syntax.sh
       - name: Lint backend for undefined names and syntax hazards
         run: flake8 backend --select=E9,F63,F7,F82 --exclude=backend/tests
       - name: Audit backend dependencies

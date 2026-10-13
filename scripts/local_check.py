@@ -612,9 +612,9 @@ def ratchet(context: Context, key: str, found: set, what: str) -> str:
 def shell_scripts(context: Context) -> str:
     """Every shell script parses, with the line endings Git stores.
 
-    The CI checks the scripts it names. This checks every .sh in the repository:
-    a restore or deploy script that only breaks during an incident is the worst
-    place to find a typo.
+    Every .sh in the repository, one at a time - the CI does the same through
+    scripts/check-shell-syntax.sh (#980): a restore or deploy script that only
+    breaks during an incident is the worst place to find a typo.
     """
     bash = posix_bash(context)
     listed = tracked(context, "*.sh", new=True)

@@ -23,6 +23,8 @@ AREAS = ("backend", "frontend", "mobile", "container")
 BADGE_ART = "frontend/src/components/achievements/motifs/"
 BADGE_ART_FILES = {"frontend/src/components/achievements/badgeArt.jsx", "frontend/src/components/achievements/materials.js"}
 SHARED_CASES = "frontend/src/lib/"
+# Gemeinsamer Auswerter der Paket-Audits (#1055): Website- und App-Job rufen ihn samt Selbsttest auf.
+AUDIT_GATE = {"scripts/dependency-audit-gate.cjs", "scripts/dependency-audit-gate.test.mjs"}
 
 # Dateien, die keinen Job brauchen. Der Geheimnis-Scan läuft trotzdem.
 NO_JOB = {".gitignore", "LICENSE", ".editorconfig"}
@@ -44,9 +46,9 @@ def areas_for(path: str) -> set[str]:
     if path.startswith(("backend/", "scripts/")) or path in {"install.sh", "update.sh", "frontend/nginx.conf", ".flake8"}:
         hits.add("backend")
     if (path.startswith("frontend/") or compose or env_example
-            or path in {"scripts/check-public-routes.sh", "scripts/compose-backup-target.py"}):
+            or path in {"scripts/check-public-routes.sh", "scripts/compose-backup-target.py"} or path in AUDIT_GATE):
         hits.add("frontend")
-    if path.startswith("mobile/"):
+    if path.startswith("mobile/") or path in AUDIT_GATE:
         hits.add("mobile")
     # Die Abzeichen-Kunst der App wird aus dem Web erzeugt (E13, #623): ändert sich dort ein Motiv oder ein
     # Material, prüft der App-Job, ob die erzeugten Daten der App noch passen.
