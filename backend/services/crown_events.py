@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 RANK_ORDER = {"gold": 1, "silver": 2, "bronze": 3}
 CROWN_NAMES = {"gold": "Gold-Krone", "silver": "Silber-Krone", "bronze": "Bronze-Krone"}
-OBSIDIAN_FLOOR = 29 * 29 * 100
+ONYX_FLOOR = 29 * 29 * 100
 
 _cache: dict = {"at": None, "data": None}
 _CACHE_TTL = 30
@@ -49,17 +49,17 @@ async def _points_rows() -> list[dict]:
 
 
 def _split_crowns(rows: list[dict]) -> tuple[dict, dict]:
-    """Returns (merged crowns incl. obsidian, rank-only gold/silver/bronze)."""
+    """Returns (merged crowns incl. onyx, rank-only gold/silver/bronze)."""
     merged: dict[str, str] = {}
     for row in rows:
-        if int(row.get("points", 0)) >= OBSIDIAN_FLOOR:
-            merged[row["user_id"]] = "obsidian"
+        if int(row.get("points", 0)) >= ONYX_FLOOR:
+            merged[row["user_id"]] = "onyx"
     rank_only: dict[str, str] = {}
     variants = ["gold", "silver", "bronze"]
     for row in rows:
         if not variants:
             break
-        if merged.get(row["user_id"]) == "obsidian":
+        if merged.get(row["user_id"]) == "onyx":
             continue
         variant = variants.pop(0)
         merged[row["user_id"]] = variant
@@ -132,7 +132,7 @@ async def _persist_and_notify(rank_crowns: dict[str, str]) -> list[dict]:
 
 
 async def get_crowns(force: bool = False) -> dict[str, str]:
-    """Merged crown map (user_id -> gold/silver/bronze/obsidian), cached briefly."""
+    """Merged crown map (user_id -> gold/silver/bronze/onyx), cached briefly."""
     now = datetime.now(timezone.utc)
     if not force and _cache["at"] and (now - _cache["at"]).total_seconds() < _CACHE_TTL and _cache["data"] is not None:
         return _cache["data"]
