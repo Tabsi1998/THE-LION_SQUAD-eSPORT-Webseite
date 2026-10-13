@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminDenied } from "@/components/tls/AdminDenied";
+import { deniedText } from "@/lib/loadProblem";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { Plus, Trash2, Play, Pause, Search, Users, Download } from "lucide-react";
 import { toast } from "sonner";
@@ -45,16 +47,24 @@ const TOURNAMENT_STATUS_FILTERS = [
 
 export default function AdminTournamentsPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
-  const { isTournamentLead: isAdmin } = useAuth();
+  const { isTournamentLead } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
   const confirm = useConfirm();
+  const [denied, setDenied] = useState("");
   const load = useCallback(async () => {
     // Verwaltungsliste (#1028): die Turnierleitung bekommt alle Turniere, Helfer nur die ihres Einsatzes.
-    const { data } = await api.get("/tournaments?include_drafts=true&managed=true");
-    setList(data);
+    try {
+      const { data } = await api.get("/tournaments?include_drafts=true&managed=true");
+      setList(data);
+      setDenied("");
+    } catch (error) {
+      // Verweigert der Server die Liste, steht der Grund da - nicht „Keine Turniere“ (#1353).
+      setList([]);
+      setDenied(deniedText(error, ["tournaments"]) || formatRequestError(error, "Turniere konnten nicht geladen werden."));
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["tournaments"]);
@@ -153,7 +163,7 @@ export default function AdminTournamentsPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Turniere</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Turniere</h1>
         </div>
-        {isAdmin && (
+        {isTournamentLead && (
           <Link to="/admin/tournaments/new" data-testid="admin-new-tournament" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
             <Plus className="w-4 h-4" /> Neues Turnier
           </Link>
@@ -224,14 +234,20 @@ export default function AdminTournamentsPage() {
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
                     <Link to={`/admin/tournaments/${t.id}?tab=participants`} title="Teilnehmer" className="p-2 hover:text-[#29B6E8]"><Users className="w-3.5 h-3.5" /></Link>
-                    {isAdmin && t.status === "draft" && <button onClick={() => setStatus(t.id, "registration_open")} title="Anmeldung öffnen" className="p-2 hover:text-[#00FF88]"><Play className="w-3.5 h-3.5" /></button>}
-                    {isAdmin && t.status === "live" && <button onClick={() => setStatus(t.id, "paused")} title="Pause" className="p-2 hover:text-[#FFD700]"><Pause className="w-3.5 h-3.5" /></button>}
-                    {isAdmin && <button onClick={() => del(t.id)} className="p-2 hover:text-[#FF3B30]" title="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
+                    {isTournamentLead && t.status === "draft" && <button onClick={() => setStatus(t.id, "registration_open")} title="Anmeldung öffnen" className="p-2 hover:text-[#00FF88]"><Play className="w-3.5 h-3.5" /></button>}
+                    {isTournamentLead && t.status === "live" && <button onClick={() => setStatus(t.id, "paused")} title="Pause" className="p-2 hover:text-[#FFD700]"><Pause className="w-3.5 h-3.5" /></button>}
+                    {isTournamentLead && <button onClick={() => del(t.id)} className="p-2 hover:text-[#FF3B30]" title="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
                   </div>
                 </td>
               </tr>
             ))}
-            {filteredList.length === 0 && <tr><td colSpan="7" className="text-center py-10 text-white/40">{list.length === 0 ? "Keine Turniere" : "Keine Turniere für diesen Filter"}</td></tr>}
+            {filteredList.length === 0 && (
+              <tr>
+                <td colSpan="7" className={denied ? "p-4" : "text-center py-10 text-white/40"}>
+                  {denied ? <AdminDenied text={denied} /> : list.length === 0 ? "Keine Turniere" : "Keine Turniere für diesen Filter"}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
         </div>

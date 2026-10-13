@@ -6,6 +6,7 @@ Kapitel ist der Einstieg: Alle anderen Kapitel setzen voraus, dass ihr hier einm
 **Wo im Admin:**
 
 - **Admin** (`/admin`) – die Startseite, im Menü „Dashboard“, auf der Seite „Kommandozentrale“
+- **Mein Dienst** (`/admin/dienst`) – der Eingang für Helfer und Moderation (3.7)
 - **Admin → Mitglieder → Alle Benutzer** (`/admin/users`) – Rollen und Freigaben vergeben (nur der Superadmin ändert sie)
 - **Admin → System → Einrichtung & FAQ** (`/admin/setup`) – Antworten auf „Wo stelle ich was ein?“ (nur Bereich System)
 - **Benutzermenü → Einstellungen → Sicherheit** (`/profile?tab=security`) – Zwei-Faktor-Anmeldung einrichten
@@ -105,7 +106,7 @@ die Zwei-Faktor-Anmeldung bestätigt ist (Moderation ausgenommen).
 
 | Gruppe | Einträge (Bereich) |
 | --- | --- |
-| **Übersicht** | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, System) |
+| **Übersicht** | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen, System) · Mein Dienst (Helfer mit Einsatz, Moderation ohne Verwaltungsbereich) |
 | **Verein** | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) |
 | **Mitglieder** | Mitglieder, Mitgliederprofile, Bewerbungen, Mitgliedervorteile, Dokumente, Einlass (Versammlung), Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung, System) |
 | **Finanzen** | Finanzübersicht (Finanzen) |
@@ -122,7 +123,9 @@ Gut zu wissen:
   Wechsel auf eine Seite geht ihre Gruppe von selbst wieder auf.
 - Zugeklappt zeigt die Gruppe die Zahl ihrer Einträge, ein blauer Punkt markiert die Gruppe der aktuellen Seite.
 - Wer **abgehakte Plattformen** unter „Alle Verbindungen“ hat, sieht diese nicht mehr als Menüpunkt.
-- Wer **keinen** Bereich hat, sieht kein Menü.
+- Wer **keinen** Bereich und keinen Einsatz hat, sieht kein Menü.
+- Redaktion, Vereinsverwaltung und Finanzen sehen **keine** Turnierseiten – weder im Menü noch über die Adresse. Die
+  gibt es nur mit dem Bereich Turnierleitung oder einem Helfer-Einsatz.
 
 ### 3.3 Die Suche
 
@@ -139,22 +142,25 @@ Oben links im Menü: **Admin suchen …**.
 
 ### 3.4 Die Kommandozentrale
 
-**Admin** (Menü: Dashboard). Alle mit einem Adminbereich sehen **dieselbe** Seite. Eine eigene Startseite je Rolle gibt
-es noch nicht; manche Kacheln führen deshalb zu Seiten, die dir fehlen können (dann kommt „Kein Zugriff“, 4).
+**Admin** (Menü: Dashboard). Alle mit einem Verwaltungsbereich – auch der Kassier mit dem Bereich Finanzen – sehen
+dieselbe Seite, aber **nur die Teile ihres Bereichs**: Jede Kachel, jede Zahl, jede Aufgabe und jeder Knopf hängt an
+dem Bereich der Seite dahinter – der Server schickt die übrigen Zahlen gar nicht erst. Der Kassier sieht so nur Abrechnung
+und Belege, keine Turnier-, Mitglieder- oder Betriebszahlen. Eine eigene Startseite je Rolle kommt noch.
 
 Von oben nach unten:
 
 | Block | Was drinsteht |
 | --- | --- |
-| **Statusleiste** | Datenbank, Mail / SMTP, Discord, Scheduler, Mail-Queue, Push-Tokens mit grünem, gelbem oder rotem Punkt; ein Klick führt zur Seite dahinter |
-| **Plattform-Setup** | Nur wenn die Grundeinrichtung noch nicht vollständig ist: Fortschritt in Prozent und was fehlt |
+| **Deine Einsätze** | Nur, wenn du zusätzlich als Helfer eingetragen bist: deine Turniere wie unter „Mein Dienst“ (3.7) |
+| **Statusleiste** | Nur mit System: Datenbank, Mail / SMTP, Discord, Scheduler, Mail-Queue, Push-Tokens mit grünem, gelbem oder rotem Punkt; ein Klick führt zur Seite dahinter |
+| **Plattform-Setup** | Nur mit System, und nur wenn die Grundeinrichtung noch nicht vollständig ist: Fortschritt in Prozent und was fehlt |
 | **Tageszentrale – Offene Aufgaben** | Nur, wo wirklich etwas wartet (Ergebnis-Konflikte, gemeldete Ergebnisse, Terminvorschläge, Moderation, Kontaktanfragen, Mitgliedsanträge, Turnier-Anmeldungen, Gewinne und mehr). Steht nichts an, heißt es „Nichts offen.“ |
 | **Termine heute** | Matches, Check-ins und Events des Tages |
 | **Weitere Werkzeuge** | Aufklappbar: Links zu Seiten, bei denen gerade nichts ansteht |
-| **Schnellzugriff** | **+ Turnier**, **+ Fast-Lap-Challenge**, **Events**, **Stationen** |
+| **Schnellzugriff** | Nur mit Turnierleitung: **+ Turnier**, **+ Fast-Lap-Challenge**, **Events**, **Stationen** |
 | **Zahlen im Überblick** | Spieler, Teams, Aktive Turniere, Anmeldung offen, Spiele heute, Fast Lap Live, Events Gesamt |
 | **Wachstum** | Logins und neue Mitglieder der letzten 30 Tage |
-| **Einstellungen-Zentrale** | Kacheln zu Login, Konten verknüpfen, Branding, E-Mail, Discord, Twitch, Socials und mehr |
+| **Einstellungen-Zentrale** | Kacheln zu Login, Konten verknüpfen, Branding, E-Mail, Discord, Twitch, Socials und mehr – je Kachel nur mit dem passenden Bereich (fast alles System) |
 | **Letzte Adminaktionen** | Die letzten acht Einträge; **Alle Logs** öffnet Betrieb & Logs |
 
 Die Zahlen laden von selbst nach (regelmäßig von selbst) und mit dem Knopf oben rechts (zeigt die Uhrzeit der letzten
@@ -207,15 +213,30 @@ Es gibt zwei Wege zu einer Rolle ohne Verwaltungsbereich:
   Stationsleitung, Stream-Betreuung). Bei der Fast Lap geht das im Kasten „Fast-Lap-Team“, siehe
   [Fast Lap](fastlap.md). Helfer sehen in der Verwaltung **nur ihr Turnier** bzw. **ihre Fast Laps**; im Menü stehen
   ihnen **Turniere**, **Fast Lap** und **Stationen**. Sie brauchen dafür keinen Bereich und keine Zwei-Faktor-Anmeldung.
-- **Moderator** (nur Bereich Moderation): sieht im Menü nur **System → Moderation**.
+- **Moderator** (nur Bereich Moderation): sieht im Menü **Mein Dienst** und **System → Moderation**.
 
-Ehrlich dazu: Einen Menüpunkt **„Mein Dienst“** gibt es noch nicht (er ist geplant). Für beide gilt deshalb heute:
+Für beide steht im **Benutzermenü** (am Handy im ausklappenden Menü) der Eintrag **„Mein Dienst“** statt „Admin“. Er
+führt nach `/admin`, und das öffnet die eigene Arbeit statt „Kein Zugriff“:
 
-- Im Benutzermenü steht **kein** Eintrag „Admin“ (er erscheint nur mit einem Verwaltungsbereich), und **Admin** selbst
-  (die Kommandozentrale) ist für sie gesperrt.
-- Helfer kommen über den Link **Turnierleitung** auf der öffentlichen Turnierseite zu ihrer Ansicht
-  (`/tournaments/<Name>/leitung`, siehe [Turniere](turniere.md)) oder direkt per Adresse zu `/admin/tournaments`.
-- Moderatoren erreichen ihre Seite über die Adresse `/admin/moderation`. Gebt ihnen die Adresse als Lesezeichen.
+- **Helfer** landen auf **Mein Dienst** (`/admin/dienst`): ihre Turniere und Fast Laps, **heute zuerst**, je mit
+  Uhrzeit, ihrer **Rolle** und dem Knopf **Turnierleitung öffnen** (die Ansicht `/tournaments/<Name>/leitung`, siehe
+  [Turniere](turniere.md)) bzw. **Fast Lap öffnen**. **Vorbereiten** führt in die Turnierverwaltung. Abgeschaltete
+  Einsätze und Turniere, die vorbei sind, stehen nicht mehr da.
+- **Moderatoren** landen direkt bei den **Meldungen** (`/admin/moderation`). Unter „Mein Dienst“ steht die Zahl der
+  offenen Meldungen.
+- Wer einen Verwaltungsbereich **und** einen Helfer-Einsatz hat, behält „Admin“; seine Einsätze stehen oben auf der
+  Kommandozentrale und unter „Mein Dienst“.
+- Eine Turnierleitung ohne Zwei-Faktor-Anmeldung, die als Helfer eingetragen ist, sieht „Mein Dienst“ und daneben
+  „2FA einrichten“.
+
+Die Knöpfe in Turnier, Fast Lap und Stationen richten sich nach der **Rolle im Turnier**: Eine Stream-Betreuung sieht
+zum Beispiel keinen Check-in und kein „Entfernen“, der Ergebnisdienst kein „Zurücksetzen“. Den Reiter „Team“, „Neues
+Turnier“, „Löschen“ und den Reiter „Bearbeiten“ hat nur die Turnierleitung. Wer nur für einzelne Spiele oder eine Station
+eingetragen ist, sieht „Ergebnis eintragen“ und Termin nur bei diesen Spielen.
+
+**„Kein Zugriff“** zeigt Angemeldeten keinen „Anmelden“-Knopf. Wer einen Dienst hat, liest genau den Bereich, der für
+die Seite fehlt, und kommt mit **Zu meinem Dienst** bzw. **Zur Verwaltung** zurück. Wer gar keinen Dienst hat, liest:
+„Die Verwaltung ist für Vereinsdienste. Du möchtest mithelfen? Schreib uns.“ – mit dem Weg zum Kontaktformular.
 
 ### 3.8 Einrichtung & FAQ
 
@@ -265,12 +286,13 @@ Jedes Thema hat genau **einen** Ort:
 | Das Einrichten klappt nicht, der Code wird nicht angenommen | Der Code ist älter als zehn Minuten, oder die Uhr am Handy geht falsch | MFA einrichten erneut anklicken und mit dem neuen QR-Code arbeiten; Uhrzeit am Handy automatisch einstellen |
 | Handy verloren, kein Code | – | Mit einem Wiederherstellungscode anmelden (jeder gilt einmal) oder mit einem Passkey |
 | „Kein Zugriff“ mit „Dafür fehlt dir der Bereich …“ | Die Seite verlangt einen Bereich, den du nicht hast | Beim Superadmin die Freigabe erfragen (3.6) |
-| Du bist Moderator oder Helfer und findest „Admin“ nicht | Beide haben keinen Verwaltungsbereich, „Mein Dienst“ gibt es noch nicht | Wege in 3.7 |
+| Du bist Moderator oder Helfer und findest „Admin“ nicht | Beide haben keinen Verwaltungsbereich | Benutzermenü → **Mein Dienst** (3.7) |
+| Statt einer Liste steht „Dafür fehlt dir …“ | Der Server hat die Liste abgelehnt: der Bereich fehlt, oder die Zwei-Faktor-Anmeldung | Was der Satz nennt: Freigabe erfragen (3.6) oder 2FA (2.1) |
 | Ein Menüpunkt aus einer Anleitung fehlt | Er gehört zu einem Bereich, den du nicht hast, oder es ist nur ein Reiter | Suche nutzen (3.3) |
 | Du kannst die Rolle einer Person nicht ändern | Nur der Superadmin darf das; du siehst nur Text | Superadmin fragen |
 | Eine Person lässt sich nicht sperren | Superadmin-Konto, eigenes Konto, oder ein Konto mit Adminbereich (das sperrt nur der Superadmin) | Siehe 3.6 |
 | Freigabe gespeichert, die Person sieht nichts | Sie hat noch keine bestätigte Zwei-Faktor-Anmeldung, oder sie muss sich neu anmelden | 3.5 |
-| Eine Kachel der Kommandozentrale führt zu „Kein Zugriff“ | Alle sehen dieselbe Seite, die Zielseite braucht aber einen bestimmten Bereich | Gewollt, solange es keine Startseite je Rolle gibt |
+| Auf der Kommandozentrale fehlt eine Kachel, die eine andere Person sieht | Jede Kachel zeigt sich nur mit dem Bereich ihrer Seite | Gewollt; Freigabe beim Superadmin erfragen (3.6) |
 
 ---
 
