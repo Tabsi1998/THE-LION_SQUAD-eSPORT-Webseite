@@ -905,12 +905,15 @@ async def list_squads(team_id: str, me: dict = Depends(get_current_user)):
     if me["id"] not in team.get("member_ids", []) and not _can_manage(team, me):
         _refuse(me, "Keine Berechtigung")
     squads = await db.team_squads.find({"team_id": team_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    # Nur was die Squad-Ansicht zeigt (#1497) - wie _public_user bei den anderen Team-Antworten.
     member_map = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": list({uid for s in squads for uid in s.get("member_ids", [])})}},
-        private_projection("email"),
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
     ).to_list(500)}
     for squad in squads:
-        squad["members"] = [member_map[uid] for uid in squad.get("member_ids", []) if uid in member_map]
+        squad["members"] = [
+            _public_user(member_map[uid]) for uid in squad.get("member_ids", []) if uid in member_map
+        ]
     return squads
 
 

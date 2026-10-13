@@ -1,6 +1,10 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import {
+  formatAgo,
   formatDate,
   formatDateTime,
+  formatRange,
   formatWhen,
   fromDateTimeLocal,
   getRegistrationState,
@@ -164,5 +168,34 @@ describe("formatWhen", () => {
     expect(formatWhen(null)).toBe("");
     expect(formatWhen("", { fallback: "Termin offen" })).toBe("Termin offen");
     expect(formatWhen("kein datum", { fallback: "Termin offen" })).toBe("Termin offen");
+  });
+});
+
+// Ein Datumsformat (#1307): dieselben Fälle wie die App (docs/date-cases.json) - Wiener Zeit, Sommerzeit, Mitternacht,
+// Jahreswechsel und Zeiträume über Monatsgrenzen. Wer eine Regel ändert, ändert sie dort für Website und App zugleich.
+const CASES = JSON.parse(readFileSync(path.join(process.cwd(), "../docs/date-cases.json"), "utf8"));
+const caseNow = (row) => new Date(row.now || CASES.now);
+
+describe("gemeinsame Datumsfälle (docs/date-cases.json)", () => {
+  test.each(CASES.when)("formatWhen: $note", (row) => {
+    expect(formatWhen(row.value, { now: caseNow(row), time: row.time !== false })).toBe(row.expected);
+  });
+
+  test.each(CASES.range)("formatRange: $note", (row) => {
+    expect(formatRange(row.start, row.end, { now: caseNow(row) })).toBe(row.expected);
+  });
+
+  test.each(CASES.ago)("formatAgo: $note", (row) => {
+    expect(formatAgo(row.value, { now: caseNow(row) })).toBe(row.expected);
+  });
+
+  test("ohne gültigen Wert kommt der Platzhalter", () => {
+    expect(formatRange(null, null, { fallback: "Termin folgt" })).toBe("Termin folgt");
+    expect(formatAgo(undefined)).toBe("");
+    expect(formatAgo("kein datum", { fallback: "—" })).toBe("—");
+  });
+
+  test("weit in der Zukunft sagt formatAgo das Datum statt „gerade eben“", () => {
+    expect(formatAgo("2026-05-23T16:00:00Z", { now: new Date(CASES.now) })).toBe("Sa 23. Mai · 18:00");
   });
 });

@@ -1,0 +1,47 @@
+{
+  "_info": "Ein Datumsformat (#1307): dieselben Fälle für Website (frontend/src/lib/datetime.test.js) und App (mobile/src/lib/format.cases.test.ts). Gerechnet in Wiener Zeit; `now` ist der Bezugszeitpunkt, ein Fall kann ihn überschreiben.",
+  "now": "2026-05-20T10:00:00Z",
+  "when": [
+    { "note": "Wochentag kurz, Monat ausgeschrieben, ohne Jahr", "value": "2026-05-23T16:00:00Z", "expected": "Sa 23. Mai · 18:00" },
+    { "note": "Jänner wie in Österreich", "value": "2026-01-04T18:30:00Z", "expected": "So 4. Jänner · 19:30" },
+    { "note": "heute", "value": "2026-05-20T16:00:00Z", "expected": "heute 18:00" },
+    { "note": "morgen", "value": "2026-05-21T16:00:00Z", "expected": "morgen 18:00" },
+    { "note": "Mitternacht in Wien: 23:59 ist noch heute", "value": "2026-05-20T21:59:00Z", "expected": "heute 23:59" },
+    { "note": "Mitternacht in Wien: 00:01 ist schon morgen", "value": "2026-05-20T22:01:00Z", "expected": "morgen 00:01" },
+    { "note": "übermorgen hat wieder den Wochentag", "value": "2026-05-22T08:00:00Z", "expected": "Fr 22. Mai · 10:00" },
+    { "note": "anderes Jahr steht dabei", "value": "2025-05-23T16:00:00Z", "expected": "Fr 23. Mai 2025 · 18:00" },
+    { "note": "Jahreswechsel: Silvester kurz vor Mitternacht", "now": "2026-12-31T12:00:00Z", "value": "2026-12-31T22:30:00Z", "expected": "heute 23:30" },
+    { "note": "Jahreswechsel: Neujahr ist morgen, ohne Jahr", "now": "2026-12-31T12:00:00Z", "value": "2026-12-31T23:30:00Z", "expected": "morgen 00:30" },
+    { "note": "Jahreswechsel: danach mit Jahr", "now": "2026-12-31T12:00:00Z", "value": "2027-01-02T12:00:00Z", "expected": "Sa 2. Jänner 2027 · 13:00" },
+    { "note": "Sommerzeit beginnt: vor der Umstellung (Winterzeit)", "value": "2026-03-29T00:30:00Z", "expected": "So 29. März · 01:30" },
+    { "note": "Sommerzeit beginnt: nach der Umstellung", "value": "2026-03-29T01:30:00Z", "expected": "So 29. März · 03:30" },
+    { "note": "Sommerzeit endet: erste 02:30 (Sommerzeit)", "value": "2026-10-25T00:30:00Z", "expected": "So 25. Oktober · 02:30" },
+    { "note": "Sommerzeit endet: zweite 02:30 (Winterzeit)", "value": "2026-10-25T01:30:00Z", "expected": "So 25. Oktober · 02:30" },
+    { "note": "Serverwert ohne Zone ist Wiener Uhr - auch im Sommer", "value": "2026-07-04T19:00:00", "expected": "Sa 4. Juli · 19:00" },
+    { "note": "ohne Uhrzeit", "value": "2026-05-23T16:00:00Z", "time": false, "expected": "Sa 23. Mai" },
+    { "note": "ohne Uhrzeit: heute", "value": "2026-05-20T16:00:00Z", "time": false, "expected": "heute" },
+    { "note": "ohne Uhrzeit: morgen", "value": "2026-05-21T06:00:00Z", "time": false, "expected": "morgen" },
+    { "note": "ohne Uhrzeit, anderes Jahr", "value": "2027-02-05T16:00:00Z", "time": false, "expected": "Fr 5. Februar 2027" }
+  ],
+  "range": [
+    { "note": "über die Monatsgrenze: beide Monate", "start": "2026-11-30T09:00:00+01:00", "end": "2026-12-02T18:00:00+01:00", "expected": "Mo 30. November – Mi 2. Dezember" },
+    { "note": "im selben Monat: der Monat einmal", "start": "2026-06-19T10:00:00+02:00", "end": "2026-06-20T22:00:00+02:00", "expected": "Fr 19. – Sa 20. Juni" },
+    { "note": "über den Jahreswechsel: beide Jahre", "start": "2026-12-30T10:00:00+01:00", "end": "2027-01-02T18:00:00+01:00", "expected": "Mi 30. Dezember 2026 – Sa 2. Jänner 2027" },
+    { "note": "ganz im nächsten Jahr: das Jahr am Ende", "start": "2027-03-11T10:00:00+01:00", "end": "2027-03-14T18:00:00+01:00", "expected": "Do 11. – So 14. März 2027" },
+    { "note": "Mitternacht in Wien: das Ende um 00:30 ist schon der nächste Tag", "start": "2026-05-23T16:00:00Z", "end": "2026-05-23T22:30:00Z", "expected": "Sa 23. – So 24. Mai" },
+    { "note": "über die Zeitumstellung im Herbst", "start": "2026-10-24T10:00:00+02:00", "end": "2026-10-26T18:00:00+01:00", "expected": "Sa 24. – Mo 26. Oktober" },
+    { "note": "an einem Tag: nur der Tag", "start": "2026-05-23T16:00:00Z", "end": "2026-05-23T20:00:00Z", "expected": "Sa 23. Mai" },
+    { "note": "ohne Ende: nur der Tag", "start": "2026-05-23T16:00:00Z", "end": null, "expected": "Sa 23. Mai" }
+  ],
+  "ago": [
+    { "note": "eben", "value": "2026-05-20T09:59:30Z", "expected": "gerade eben" },
+    { "note": "Minuten", "value": "2026-05-20T09:48:00Z", "expected": "vor 12 Min." },
+    { "note": "Stunden am selben Tag", "value": "2026-05-20T07:00:00Z", "expected": "vor 3 Std." },
+    { "note": "gestern", "value": "2026-05-19T20:00:00Z", "expected": "gestern" },
+    { "note": "danach das Datum", "value": "2026-05-16T08:00:00Z", "expected": "Sa 16. Mai" },
+    { "note": "danach das Datum, anderes Jahr", "value": "2025-12-24T18:00:00Z", "expected": "Mi 24. Dezember 2025" },
+    { "note": "kurz nach Mitternacht in Wien: Minuten zählen weiter", "now": "2026-05-20T22:30:00Z", "value": "2026-05-20T21:50:00Z", "expected": "vor 40 Min." },
+    { "note": "kurz nach Mitternacht in Wien: der Abend davor ist gestern", "now": "2026-05-20T22:30:00Z", "value": "2026-05-20T19:00:00Z", "expected": "gestern" },
+    { "note": "Uhr des Geräts leicht vor: trotzdem eben", "value": "2026-05-20T10:00:20Z", "expected": "gerade eben" }
+  ]
+}

@@ -53,12 +53,15 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_access_token(user_id: str, email: str, role: str, session_id: str, family_id: str | None = None, *, mfa_verified: bool = False) -> str:
+    # `iat` (#1519): die App rechnet die Laufzeit (exp - iat) ab Erhalt, statt `exp` mit der Geräteuhr zu vergleichen.
+    issued_at = datetime.now(timezone.utc)
     payload = {
         "sub": user_id,
         "email": email,
         "role": role,
         "sid": session_id,
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_MINUTES),
+        "iat": issued_at,
+        "exp": issued_at + timedelta(minutes=ACCESS_TOKEN_MINUTES),
         "type": "access",
         "mfa": bool(mfa_verified),
     }

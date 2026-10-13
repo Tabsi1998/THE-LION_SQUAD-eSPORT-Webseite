@@ -1,4 +1,4 @@
-import { formatWhen } from "@/lib/datetime";
+import { formatRange, formatWhen } from "@/lib/datetime";
 import { asInstant, dayNoon, viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
 // Kalender auf der Website (#402): Monatsraster, Termine je Tag und der Abo-Link - dieselbe
 // Rechnung wie in der App (mobile/src/lib/calendar.ts), ohne React, damit sie sich testen lässt.
@@ -9,13 +9,12 @@ export const WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const MONTHS = ["Jänner", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 // Ein Termin, der länger dauert, belegt höchstens so viele Tage - ein offenes Ende füllt sonst das Jahr.
 const MAX_SPAN_DAYS = 31;
-const WEEKDAY_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Am Handy startet die Liste (#1271) - schmaler als das, was Tailwind „sm“ nennt.
 const PHONE_MAX_WIDTH = 639;
 export const VIEW_STORAGE_KEY = "tls_calendar_view";
 
-// „club“ (#1190): Versammlungen und die eigenen Helferschichten - nur für Mitglieder, grün.
+// „club“ (#1190): Versammlungen und die eigenen Helferschichten - nur für Mitglieder, in Vereinsgold (#1305).
 export const KIND_LABELS = { event: "Event", tournament: "Turnier", fastlap: "Fast Lap", club: "Verein" };
 // Farben je Art: eine Stelle für Website und App (#1151, categoryColors.js).
 export { KIND_COLORS } from "@/lib/categoryColors";
@@ -232,27 +231,22 @@ export function nextAfter(items, year, month) {
   return merged.find((item) => parseIso(item.start) && viennaDay(parseIso(item.start)) > `${prefix}-32`) || null;
 }
 
-function dayPhrase(key, withMonth = true) {
-  const noon = dayNoon(key);
-  const day = Number(key.slice(8, 10));
-  return `${WEEKDAY_SHORT[noon.getUTCDay()]} ${day}.${withMonth ? ` ${viennaDate(noon, { month: "long" })}` : ""}`;
-}
-
-/** Der erste Tag eines Termins: „Do 11. März“. */
-export function startPhrase(item) {
+/** Der erste Tag eines Termins: „Do 11. März“ - in einem anderen Jahr mit Jahr (#1307). */
+export function startPhrase(item, now = new Date()) {
   const start = parseIso(item?.start);
-  return start ? dayPhrase(viennaDay(start)) : "";
+  return start ? formatRange(start, null, { now }) : "";
 }
 
-/** Wann, in einer Zeile (#1271): mehrtägig „Do 11. – So 14. März“, ganztägig „Fr 12. März · ganztägig“, sonst wie überall. */
+/**
+ * Wann, in einer Zeile (#1271, #1307 - lib/datetime.js): mehrtägig „Do 11. – So 14. März“, ganztägig „Fr 12. März ·
+ * ganztägig“, sonst „Sa 23. Mai · 18:00“ oder „heute 18:00“.
+ */
 export function spanLabel(item, now = new Date()) {
   const start = parseIso(item?.start);
   if (!start) return "";
-  const first = viennaDay(start);
-  if (item.all_day) return `${dayPhrase(item.day || first)} · ganztägig`;
+  if (item.all_day) return `${formatRange(item.day ? dayNoon(item.day) : start, null, { now })} · ganztägig`;
   if (!isMultiDay(item)) return formatWhen(start, { now });
-  const last = viennaDay(parseIso(item.end) || start);
-  return `${dayPhrase(first, first.slice(0, 7) !== last.slice(0, 7))} – ${dayPhrase(last)}`;
+  return formatRange(start, parseIso(item.end) || start, { now });
 }
 
 /** Liste oder Monat (#1271): die letzte Wahl am Gerät, sonst am Handy die Liste. */

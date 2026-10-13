@@ -1,0 +1,43 @@
+/* Farb-Rollen (#1305): jede Farbe hat genau eine Aufgabe. Neue Stellen nehmen die Rolle - als Tailwind-Farbe
+   (text-ok, bg-live/15, border-warn/50 …) oder hier als Variable -, nie den Hexwert. Die Kanäle stehen einzeln, damit
+   Tailwind und CSS Abstufungen bilden (rgb(var(--tls-ok-rgb) / 0.15)). Dieselben Werte stehen in lib/categoryColors.js
+   und in der App (mobile/src/theme.ts); lib/categoryColors.test.js hält alle drei gleich, styles/colors.test.js
+   wacht über die alten Rohwerte.
+
+   brand   Cyan    Marke, Knöpfe, Links, „du“, aktiv
+   live    Rot     nur „läuft gerade“ - dazu Löschen (tls-btn--danger)
+   warn    Orange  Achtung: Problem, Klärung, defekt, Fehler im Formular
+   ok      Grün    offen und frei: Anmeldung offen, Check-in offen, Station frei
+   honor   Gold    Ehre: Platz 1, Pokal, Auszeichnung, Mitgliedschaft und Verein
+   event   Violett die Art „Event“
+   text-muted      Nebentext (#1232)
+   quiet   Grau    vorbei oder ruhig: beendet, abgesagt, Warteliste
+   silver, bronze  nur für Platz 2 und 3 */
+:root {
+  --tls-brand-rgb: 41 182 232;
+  --tls-brand: rgb(var(--tls-brand-rgb));
+  --tls-live-rgb: 255 59 48;
+  --tls-live: rgb(var(--tls-live-rgb));
+  --tls-warn-rgb: 255 159 67;
+  --tls-warn: rgb(var(--tls-warn-rgb));
+  --tls-ok-rgb: 31 208 142;
+  --tls-ok: rgb(var(--tls-ok-rgb));
+  --tls-honor-rgb: 255 215 0;
+  --tls-honor: rgb(var(--tls-honor-rgb));
+  --tls-event-rgb: 159 122 234;
+  --tls-event: rgb(var(--tls-event-rgb));
+  --tls-text-muted-rgb: 180 180 189;
+  --tls-text-muted: rgb(var(--tls-text-muted-rgb));
+  --tls-quiet-rgb: 142 142 153;
+  --tls-quiet: rgb(var(--tls-quiet-rgb));
+  --tls-silver-rgb: 201 206 214;
+  --tls-silver: rgb(var(--tls-silver-rgb));
+  --tls-bronze-rgb: 208 138 78;
+  --tls-bronze: rgb(var(--tls-bronze-rgb));
+
+  /* Flächen: Schwarz als Grund, darauf drei Stufen (Karte, gehobene Karte, Kachel). */
+  --tls-surface-0: #0A0A0A;
+  --tls-surface-1: #121214;
+  --tls-surface-2: #18181C;
+  --tls-surface-3: #1F1F24;
+}
