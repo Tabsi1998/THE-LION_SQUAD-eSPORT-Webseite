@@ -147,7 +147,7 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
         ))}
         {stages.length === 0 && (
           <div className="border border-white/10 bg-[#121212] rounded-sm p-10 text-center text-white/40">
-            {mode === "settings" ? "Noch keine eigene Bracket-Phase." : "Noch keine Phasen. Lege eigene Bracket-Phasen im Bearbeiten-Tab an oder baue eine Format-Vorschau."}
+            {mode === "settings" ? "Noch keine eigene Bracket-Phase." : "Noch keine Phasen. Sie entstehen mit der Format-Vorschau (Bearbeiten → Speichern & Struktur anwenden) oder mit dem Start des Check-ins."}
           </div>
         )}
       </div>

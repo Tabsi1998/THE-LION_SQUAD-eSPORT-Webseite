@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from database import get_db
 from models import now_utc
+from services import uploads_inventory
 from services.media_formats import PUBLIC_MEDIA_EXTS
 
 
@@ -63,6 +64,39 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
 USAGE_TEXT_TARGETS: list[tuple[str, list[str]]] = [
     ("tournaments", ["rules", "prize_pool"]),
 ]
+
+# Lesbare Namen der Verwendungsstellen für die Mediathek (#1471): „Sammlung · Feld“, Sonderfälle ganz.
+COLLECTION_LABELS = {
+    "settings": "Einstellungen", "users": "Profil", "teams": "Team", "sponsors": "Sponsor", "partners": "Partner",
+    "news_posts": "News", "events": "Event", "games": "Spiel", "tournaments": "Turnier",
+    "f1_challenges": "Fast Lap", "f1_tracks": "Strecke", "seasons": "Jahreswertung",
+    "gallery_albums": "Galerie-Album", "gallery_photos": "Galerie-Foto", "member_benefits": "Mitgliedervorteil",
+    "club_member_profiles": "Vereinsprofil", "advent_doors": "Adventkalender", "stickers": "Sticker",
+    "game_servers": "Spielserver",
+}
+FIELD_LABELS = {
+    "logo_url": "Logo", "logo_light_url": "Logo hell", "logo_dark_url": "Logo dunkel",
+    "share_banner_url": "Bild beim Teilen", "mascot_url": "Maskottchen", "qr_logo_url": "Logo im QR-Code",
+    "favicon_url": "Favicon", "favicon_light_url": "Favicon hell", "favicon_dark_url": "Favicon dunkel",
+    "avatar_url": "Profilbild", "banner_url": "Banner", "cover_url": "Titelbild", "image_url": "Bild",
+    "thumbnail_url": "Vorschaubild", "video_url": "Video", "photo_url": "Foto", "content": "Text",
+    "description": "Beschreibung", "program": "Programm", "bio": "Über mich", "rules": "Regeln", "prize_pool": "Preise",
+    **{f"award_images.{place}": f"Gewinnerbild Platz {place}" for place in ("1", "2", "3")},
+    "tools.image_url": "Bild eines Werkzeugs", "media_url": "Bild oder Video", "url": "Bild",
+    "original_url": "Original", "server_icon_url": "Server-Symbol",
+    **{f"dolibarr_images.{kind}.{variant}.url":
+       f"{kind.capitalize()} aus der Mitgliederverwaltung ({'dunkler' if variant == 'dark' else 'heller'} Hintergrund)"
+       for kind in ("logo", "banner") for variant in ("dark", "light")},
+}
+PLACE_LABELS = {
+    ("settings", "avatar_url"): "Discord · Bild des Bots",
+    ("settings", "club_photo.url"): "Über uns · Vereinsfoto",
+    ("settings", "timeline.image_url"): "Über uns · Bild in der Chronik",
+}
+# Bis zu so vielen Dateien sucht die Verwendungssuche gezielt nach den Namen, darüber liest sie alle Adressen einmal.
+BATCH = 100
+VARIANT_NAME = re.compile(r"^(?P<stem>.+)-(?P<width>\d{3,4})\.webp$")
+LABEL_FIELDS = ("id", "slug", "name", "title", "display_name", "source")
 
 SCOPE_TARGETS: list[tuple[str, list[str], str]] = [
     ("users", ["avatar_url", "banner_url"], "user"),
@@ -125,6 +159,106 @@ def _iter_text_image_urls(value: str) -> list[str]:
         if url and url not in urls:
             urls.append(url)
     return urls
+
+
+def usage_places() -> list[tuple[str, list[str], bool]]:
+    """Alle Stellen, an denen eine hochgeladene Datei verwendet sein kann: (Sammlung, Feldpfade, Text?).
+
+    Eine Liste für Kontolöschung, Mediathek und Bild-Migration (#1471)."""
+    places = [(collection, fields, False) for collection, fields in TARGETS + USAGE_TARGETS]
+    return places + [(collection, fields, True) for collection, fields in TEXT_TARGETS + USAGE_TEXT_TARGETS]
+
+
+def place_label(collection: str, field: str) -> str:
+    """Der lesbare Name einer Verwendungsstelle, z. B. „Turnier · Gewinnerbild Platz 1“."""
+    if (collection, field) in PLACE_LABELS:
+        return PLACE_LABELS[(collection, field)]
+    return f"{COLLECTION_LABELS.get(collection, collection)} · {FIELD_LABELS.get(field, field)}"
+
+
+def canonical_name(value, candidates: dict[str, str]) -> str | None:
+    """Der Dateiname hinter einer Adresse - ohne Query und Fragment, auch absolut; eine kleinere Fassung
+    (``variants/<name>-400.webp``) zählt als ihr Original. ``candidates``: Stamm → Dateiname."""
+    name = uploads_inventory.upload_filename(str(value or ""))
+    if not name or name in candidates.values():
+        return name
+    variant = VARIANT_NAME.match(name)
+    if variant and variant.group("stem") in candidates:
+        return candidates[variant.group("stem")]
+    return name
+
+
+def values_at(document, path: str) -> list:
+    """Alle Werte unter einem Feldpfad mit Punkten - auch durch Listen hindurch (``tools.image_url``)."""
+    current = [document]
+    for key in path.split("."):
+        found = []
+        for item in current:
+            for entry in (item if isinstance(item, list) else [item]):
+                if isinstance(entry, dict) and key in entry:
+                    found.append(entry[key])
+        current = found
+    flat = []
+    for item in current:
+        flat.extend(item if isinstance(item, list) else [item])
+    return flat
+
+
+def replace_values(value, keys: list[str], change):
+    """``value`` mit jedem Wert unter dem Pfad ``keys`` durch ``change(wert)`` ersetzt - auch durch Listen hindurch."""
+    if isinstance(value, list):
+        return [replace_values(item, keys, change) for item in value]
+    if not keys:
+        return change(value)
+    if isinstance(value, dict) and keys[0] in value:
+        return {**value, keys[0]: replace_values(value[keys[0]], keys[1:], change)}
+    return value
+
+
+def urls_in_text(text) -> list[str]:
+    """Upload-Adressen in einem Text: Markdown-Bilder, ``<img>`` und nackte Adressen."""
+    if not isinstance(text, str) or "uploads/" not in text:
+        return []
+    urls = [match.group("md") or match.group("html") or "" for match in TEXT_IMAGE_RE.finditer(text)]
+    return urls + uploads_inventory.URL_IN_TEXT_RE.findall(text)
+
+
+async def iter_usages(db, names: set[str]):
+    """Jede Verwendung einer der Dateien als ``(Sammlung, Dokument, Feldpfad, Dateiname, Text?)``.
+
+    Je Sammlung eine Abfrage für alle Dateien: Bis ``BATCH`` Dateien sucht sie nach den Namen, darüber liest sie jede
+    Upload-Adresse einmal (Mediathek). Gezählt wird der Dateiname hinter der Adresse (``canonical_name``). Das Dokument
+    enthält nur die Feldpfade und ``LABEL_FIELDS``."""
+    if not names:
+        return
+    candidates = {pathlib.PurePosixPath(name).stem: name for name in sorted(names)}
+    pattern = "|".join(re.escape(stem) for stem in sorted(candidates)) if len(names) <= BATCH else "uploads/"
+    grouped: dict[str, list[tuple[str, bool]]] = {}
+    for collection, fields, text in usage_places():
+        grouped.setdefault(collection, []).extend((field, text) for field in fields)
+    for collection, fields in grouped.items():
+        query = {"$or": [{field: {"$regex": pattern}} for field, _text in fields]}
+        projection = {"_id": 1, **{key: 1 for key in LABEL_FIELDS}, **{field: 1 for field, _text in fields}}
+        async for document in getattr(db, collection).find(query, projection):
+            for field, text in fields:
+                found = {canonical_name(url, candidates) for value in values_at(document, field)
+                         for url in (urls_in_text(value) if text else [value])}
+                for name in sorted(found & names):
+                    yield collection, document, field, name, text
+
+
+async def rewrite_field(collection, row_id, path: str, change, extra: dict | None = None) -> bool:
+    """Ändert die Werte unter einem Feldpfad einer Zeile (``replace_values``). Liest dafür das ganze Feld der obersten
+    Ebene neu - die Treffer von ``iter_usages`` enthalten nur die Feldpfade. Liefert, ob sich etwas geändert hat."""
+    top, *rest = path.split(".")
+    row = await collection.find_one({"_id": row_id}, {top: 1})
+    if not row or top not in row:
+        return False
+    value = replace_values(row[top], rest, change)
+    if value == row[top]:
+        return False
+    await collection.update_one({"_id": row_id}, {"$set": {top: value, **(extra or {})}})
+    return True
 
 
 async def audit_image_references(repair: bool = False, clear_missing: bool = False) -> dict:
