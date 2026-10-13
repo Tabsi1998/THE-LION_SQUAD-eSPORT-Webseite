@@ -8,7 +8,12 @@ beforeEach(async () => {
   await clearAllCache();
 });
 
-test.each(["/events/herbst-lan/recap", "/events/herbst-lan/friends", "/api/events/e1/recap", "https://lionsquad.at/api/events/e1/friends?x=1"])(
+test.each([
+  "/events/herbst-lan/recap", "/events/herbst-lan/friends", "/api/events/e1/recap", "https://lionsquad.at/api/events/e1/friends?x=1",
+  // #1188 Teil 2: Freunde bei Turnier und Fast Lap, und ob der einmalige Hinweis fällig ist.
+  "/tournaments/rl/friends", "/api/tournaments/t1/friends", "/f1/challenges/monza/friends", "https://lionsquad.at/api/f1/challenges/c1/friends",
+  "/users/me/friends-hint",
+])(
   "nicht zwischengespeichert: %s",
   async (url) => {
     expect(shouldCache(url)).toBe(false);
@@ -18,7 +23,10 @@ test.each(["/events/herbst-lan/recap", "/events/herbst-lan/friends", "/api/event
   },
 );
 
-test.each(["/events/herbst-lan", "/calendar", "/calendar/mine", "/seasonal/advent", "/friends", "/events/recap-party"])(
+test.each([
+  "/events/herbst-lan", "/calendar", "/calendar/mine", "/seasonal/advent", "/friends", "/events/recap-party",
+  "/tournaments/rl", "/tournaments/friends-cup", "/f1/challenges/monza", "/f1/challenges/monza/leaderboard", "/users/me",
+])(
   "Gegenprobe – weiter zwischengespeichert: %s",
   async (url) => {
     expect(shouldCache(url)).toBe(true);

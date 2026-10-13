@@ -10,8 +10,8 @@ import { viennaDay } from "../lib/vienna";
 // Anmeldung. Der Tag antippen zeigt seine Termine darunter - das macht der Aufrufer.
 // Seit #1271 wie im Web: „Heute“ springt in den aktuellen Monat, Mehrtägiges ist ein Balken über seine Tage.
 
-// Farben je Art (#1151) kommen aus dem Thema - dieselben wie auf den Karten und im Web (Events lila, Turniere gold, Fast Laps
-// blau). Früher waren Events hier blau und Fast Laps rot. Versammlungen und eigene Schichten sind grün (#1190).
+// Farben je Art (#1151, #1305) kommen aus dem Thema - dieselben wie auf den Karten und im Web (Event Violett, Turnier Cyan,
+// Fast Lap Türkis, Verein Gold - auch Versammlungen und eigene Schichten, #1190).
 export const KIND_COLORS: Record<CalendarKind, string> = { event: kindColors.event, tournament: kindColors.tournament, fastlap: kindColors.fastlap, club: kindColors.club };
 const BAR_HEIGHT = 16;
 export const KIND_LABELS: Record<CalendarKind, string> = { event: "Event", tournament: "Turnier", fastlap: "Fast Lap", club: "Verein" };

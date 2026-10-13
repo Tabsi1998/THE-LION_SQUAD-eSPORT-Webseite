@@ -41,14 +41,14 @@ PUBLIC = {
     "public_list": {"username", "display_name", "avatar_url", "country"},
     "team": {"username", "display_name", "avatar_url"},
     "teams_my": {"username", "display_name", "avatar_url"},
-    "squads": {"username", "display_name", "avatar_url", "bio", "country"},
+    "squads": {"username", "display_name", "avatar_url"},
     "admin_user_search": {"username", "display_name", "email", "bio"},
     "membership_user": {"username", "display_name", "email", "bio"},
     "membership_list": {"username", "display_name", "email", "bio"},
     "message_search": {"username", "display_name", "avatar_url"},
 }
 # Diese Antworten geben das ganze Konto (ohne private Felder) - daran zeigt die Gegenprobe, dass sie hinsieht.
-FULL_ACCOUNT = {"auth_me", "user_self", "squads", "admin_user_search", "membership_user", "membership_list"}
+FULL_ACCOUNT = {"auth_me", "user_self", "admin_user_search", "membership_user", "membership_list"}
 
 
 @pytest_asyncio.fixture

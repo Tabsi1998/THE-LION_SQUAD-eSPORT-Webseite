@@ -1,3 +1,5 @@
+@import "./styles/system.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,12 +12,10 @@
   --tls-cyan-hover: #1E95C2;
   --tls-white: #FFFFFF;
   --tls-muted: #A1A1AA;
-  /* Live (#1076, #1116): eine Farbe für „läuft gerade“ - Karten, Turnierbaum, Spielplan und TV. Grün heißt „frei“.
-     Die Kanäle stehen einzeln, damit Tailwind (bg-live/10) und CSS (rgb(var(--tls-live-rgb) / 0.5)) Abstufungen bilden. */
-  --tls-live-rgb: 255 59 48;
-  --tls-live: rgb(var(--tls-live-rgb));
-  --tls-success: #00FF88;
-  --tls-gold: #FFD700;
+  /* Live (#1076, #1116) und die übrigen Farb-Rollen (#1305) stehen in styles/system.css. Die alten Namen zeigen
+     dorthin: Grün ist das weichere #1FD08E statt Neon, Gold heißt Ehre. */
+  --tls-success: var(--tls-ok);
+  --tls-gold: var(--tls-honor);
 
   /* shadcn dark tokens mapped to TLS palette */
   --background: 0 0% 3.9%;
@@ -1664,13 +1664,13 @@ html.tls-vt .tls-bottom-nav { view-transition-name: tls-bottom-nav; }
    der Markenfarbe, das Logo wächst leicht und glüht; ein kleines Schild nennt den Namen. Die Logos bleiben unverändert.
    Die Winkel sind acht schmale Verläufe in den Ecken; ihre Größe wächst beim Hover bis zur Mitte jeder Kante. */
 .tls-social {
-  --tls-social-corner: 9px;
+  --tls-social-corner: 7px;
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: 2px;
   color: var(--tls-social, #29B6E8);
   background-color: transparent;

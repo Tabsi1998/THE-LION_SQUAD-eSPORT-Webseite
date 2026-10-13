@@ -12,6 +12,7 @@ import {
   type PlayAlongRow,
 } from "../lib/playAlong";
 import { formatCents } from "../lib/startFee";
+import { offerFriendsHint } from "../lib/friendsHint";
 import { useSeasonOverlay } from "../seasons/anchors";
 import { colors, radius } from "../theme";
 import { Button } from "./Button";
@@ -105,6 +106,8 @@ export function PlayAlongSheet({ eventId, multiDay = false, from = null, onClose
         tournament_ids: selected, accept_rules: true, accept_privacy: true, accept_costs: acceptCosts,
       });
       setResult(data);
+      // Erste Turnier-Anmeldung über „Spielst du auch mit?“: der einmalige Hinweis (#1188 Teil 2).
+      if ((data?.results || []).some((entry) => entry.state === "registered")) void offerFriendsHint();
     } catch (err) {
       setError(errorMessage(err, "Die Anmeldung hat nicht geklappt."));
     } finally {

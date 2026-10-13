@@ -14,11 +14,11 @@ import { CalendarDays, ChevronLeft, ChevronRight, Copy, Check, ExternalLink, Key
 import { viennaDateTime, viennaDay } from "@/lib/vienna";
 
 // Kalender (#402): dieselbe Monatsansicht wie in der App (#216) - Punkte je Tag in der Farbe der
-// Art, ein goldener Rahmen um Tage mit eigener Anmeldung, darunter die Termine des gewählten Tags.
+// Art, ein blauer Rahmen um Tage mit eigener Anmeldung (#1305: Cyan heißt „du“), darunter die Termine des gewählten Tags.
 // Was jemand sieht, entscheidet der Server (/api/calendar); der Abo-Feed ist die öffentliche Sicht.
 // Seit #1271: öffnet im aktuellen Monat mit „Heute“, Mehrtägiges ist ein Balken über die Tage und in Listen eine Zeile,
 // am Handy startet die Liste (letzte Wahl je Gerät). Seit #1190 stehen für Mitglieder Versammlungen und die eigenen
-// Helferschichten grün dabei; ein Tipp führt in den Mitgliederbereich. Seit #1189 mit „Nur meine“ und dem persönlichen
+// Helferschichten in Vereinsgold dabei; ein Tipp führt in den Mitgliederbereich. Seit #1189 mit „Nur meine“ und dem persönlichen
 // Abo-Link (nur eigene Termine; die Adresse gibt es nur beim Erzeugen, „neu erzeugen“ sperrt die alte).
 
 const CLUB_LABELS = { meeting: "Versammlung", shift: "Helferschicht" };
@@ -98,7 +98,7 @@ export default function CalendarPage() {
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]">TERMINE</span>
         <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase break-words">Kalender</h1>
         <p className="mt-3 text-white/60 max-w-2xl">
-          Events, Turniere und Fast-Lap-Challenges als Liste oder Monat. Mehrtägiges ist ein Balken; ein goldener Rahmen heißt: du bist angemeldet.
+          Events, Turniere und Fast-Lap-Challenges als Liste oder Monat. Mehrtägiges ist ein Balken; ein blauer Rahmen heißt: du bist angemeldet.
         </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
@@ -115,7 +115,7 @@ export default function CalendarPage() {
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: KIND_COLORS[kind] }} /> {KIND_LABELS[kind]}
               </button>
             ))}
-            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm border-[1.5px] border-[#FFD700]" /> angemeldet</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm border-[1.5px] border-brand" /> angemeldet</span>
           </div>
           {signedIn && (
             <button type="button" onClick={() => setOnlyMine((value) => !value)} aria-pressed={onlyMine} data-testid="calendar-only-mine" className={`tls-btn ${onlyMine ? "tls-btn--honor" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-wider`}>
@@ -177,7 +177,7 @@ export default function CalendarPage() {
                                 aria-pressed={selected}
                                 data-testid={`calendar-day-${cell.key}`}
                                 style={{ gridRow: 1 }}
-                                className={`min-h-12 sm:min-h-16 rounded-sm border-[1.5px] px-1 pt-1.5 pb-1 flex flex-col items-center gap-1 transition ${selected ? "border-[#9F7AEA] bg-[#9F7AEA]/15" : mine ? "border-[#FFD700]" : "border-transparent hover:border-white/20"} ${cell.inMonth ? "" : "opacity-40"}`}
+                                className={`min-h-12 sm:min-h-16 rounded-sm border-[1.5px] px-1 pt-1.5 pb-1 flex flex-col items-center gap-1 transition ${selected ? "border-[#9F7AEA] bg-[#9F7AEA]/15" : mine ? "border-brand" : "border-transparent hover:border-white/20"} ${cell.inMonth ? "" : "opacity-40"}`}
                               >
                                 <span className={`text-xs sm:text-sm font-bold ${cell.key === todayKey ? "text-[#9F7AEA] underline underline-offset-4" : ""}`}>{cell.day}</span>
                                 <span className="flex gap-0.5 min-h-1.5">
@@ -243,7 +243,7 @@ export default function CalendarPage() {
 
               {!payload?.signed_in && (
                 <div className="border border-white/10 rounded-sm p-5 text-sm text-white/65" data-testid="calendar-login-hint">
-                  <LogIn className="w-4 h-4 text-[#FFD700]" />
+                  <LogIn className="w-4 h-4 text-brand" />
                   <p className="mt-2">Nach dem Login siehst du auch Vereinstermine und deine eigenen Anmeldungen.</p>
                   <Link to="/login?next=%2Fcalendar" className="mt-3 inline-flex text-[#9F7AEA] font-bold uppercase tracking-wider text-xs">Einloggen</Link>
                 </div>
@@ -269,7 +269,8 @@ function SpanBar({ bar }) {
         gridColumn: `${from + 1} / ${to + 2}`,
         gridRow: lane + 2,
         backgroundColor: KIND_COLORS[item.kind],
-        boxShadow: item.mine ? "inset 0 0 0 1.5px #FFD700" : undefined,
+        // Angemeldet (#1305: Cyan heißt „du“) - auf der farbigen Fläche als weißer Rand, Cyan verschwände auf Turnieren.
+        boxShadow: item.mine ? "inset 0 0 0 1.5px #FFFFFF" : undefined,
       }}
       className={`block h-5 min-w-0 truncate px-1.5 text-[10px] leading-5 font-bold text-[#0A0A0A] hover:brightness-110 transition ${continuesBefore ? "rounded-l-none" : "rounded-l-sm"} ${continuesAfter ? "rounded-r-none" : "rounded-r-sm"}`}
     >
@@ -296,7 +297,7 @@ function ItemRow({ item, withDate = false }) {
         <span className="block text-sm font-bold truncate">{item.title}</span>
         {(item.phase?.label || item.mine) && (
           <span className="block text-xs text-white/50">
-            {item.phase?.label}{item.phase?.label && item.mine ? " · " : ""}{item.mine ? <span className="text-[#FFD700]">Angemeldet</span> : null}
+            {item.phase?.label}{item.phase?.label && item.mine ? " · " : ""}{item.mine ? <span className="text-brand">Angemeldet</span> : null}
           </span>
         )}
       </span>

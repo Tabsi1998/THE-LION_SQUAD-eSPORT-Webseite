@@ -41,7 +41,7 @@ from routes.admin_picker_routes import router as admin_picker_router
 from routes.tv_routes import router as tv_router
 from routes.event_routes import router as event_router
 from routes.event_lead_routes import router as event_lead_router
-from routes.event_recap_routes import router as event_recap_router
+from routes.event_recap_routes import is_private_path as is_private_friends_path, router as event_recap_router
 from routes.tournament_routes import router as tournament_router
 from routes.match_routes import router as match_router
 from routes.f1_routes import router as f1_router
@@ -466,9 +466,11 @@ async def security_headers(request, call_next):
             # Kalender (#1190, Codex-Prüfung #1460): die Route entscheidet selbst - öffentliche Liste, Feed und Dateien
             # kurz zwischenspeicherbar, alles Persönliche „private, no-store“. Ohne eigene Regel (Fehler) gilt no-store.
             pass
-        elif response.headers.get("Cache-Control") == "private, no-store":
+        elif response.headers.get("Cache-Control") == "private, no-store" or is_private_friends_path(request.url.path):
             # Persönliche Antworten (Rückblick mit „Du warst dabei“, Freunde beim Event, #1187/#1188) sagen zusätzlich
-            # „private“ - strenger als das bloße no-store, deshalb bleibt es stehen.
+            # „private“ - strenger als das bloße no-store, deshalb bleibt es stehen. Die Freunde-Pfade bekommen es immer,
+            # auch bei einer Absage vor dem Handler (401 ohne Konto, Codex-Prüfung #1500).
+            response.headers["Cache-Control"] = "private, no-store"
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
         else:
