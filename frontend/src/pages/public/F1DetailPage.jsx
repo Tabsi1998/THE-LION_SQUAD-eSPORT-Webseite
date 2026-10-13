@@ -16,12 +16,15 @@ import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { Award, Tv, Trophy, Flag, Calendar, Trash2, FileDown } from "lucide-react";
 import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
+import { safeHttpUrl } from "@/lib/safeLink";
 import { seoTextPreview } from "@/lib/textPreview";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { ShareButton } from "@/components/tls/ShareButton";
+import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
+import { tournamentIsOver } from "@/lib/afterEnd";
 
 const PUBLIC_RESULT_STATUSES = new Set(["completed", "results_published", "archived"]);
 
@@ -193,6 +196,8 @@ export default function F1DetailPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+        {/* Freunde bei der Fast Lap (#1188 Teil 2): „dabei“ heißt hier eine gültige Zeit - eine eigene Anmeldung gibt es nicht. */}
+        <FriendsAtEvent user={user} path={`/f1/challenges/${challenge.slug || challenge.id}/friends`} scope="fastlap" over={tournamentIsOver(challenge)} accessToken={accessToken} />
         {(challenge.has_live_stream || (challenge.twitch_enabled && challenge.twitch_channel)) && (
           <section data-testid="f1-stream"><StreamEmbed source={challenge} /></section>
         )}
@@ -527,7 +532,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
                   <span>#{time.attempt_number || "-"}</span>
                   {(time.score_scope || "official") === "club_reference" && <span className="text-[#FFD700]">Referenz</span>}
                   {time.penalty_seconds > 0 && <span className="text-[#FF3B30]">+{time.penalty_seconds}s</span>}
-                  {time.proof_url && <a href={time.proof_url} target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">Proof</a>}
+                  {safeHttpUrl(time.proof_url) && <a href={safeHttpUrl(time.proof_url)} target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">Proof</a>}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">

@@ -120,3 +120,47 @@ test("eine Turnierleitung ohne Zwei-Faktor mit eigenem Helfer-Einsatz kommt in i
   renderAt("/admin/tournaments", <ProtectedRoute requireTournamentStaff><div>turniere</div></ProtectedRoute>);
   expect(screen.getByText("turniere")).toBeInTheDocument();
 });
+
+// Der Eingang /admin (#1352): die Startseite für Verwaltungsbereiche (auch Finanzen, #992), „Mein Dienst“ für Helfer,
+// die Meldungen für reine Moderation, „Kein Zugriff“ mit dem freundlichen Satz für alle ohne Dienst.
+function renderEntrance(user) {
+  authState.user = user;
+  return render(
+    <MemoryRouter initialEntries={["/admin"]}>
+      <Routes>
+        <Route path="/admin" element={<ProtectedRoute adminHome><div>startseite</div></ProtectedRoute>} />
+        <Route path="/admin/dienst" element={<ProtectedRoute requireDuty><div>mein dienst</div></ProtectedRoute>} />
+        <Route path="/admin/moderation" element={<ProtectedRoute requireArea="moderation"><div>meldungen</div></ProtectedRoute>} />
+        <Route path="/403" element={<NoDuty />} />
+        <Route path="/profile" element={<MfaSetup />} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
+function NoDuty() {
+  const { state } = useLocation();
+  return <div data-testid="forbidden" data-no-duty={String(Boolean(state?.noDuty))}>verboten</div>;
+}
+
+test.each([
+  ["Kassier mit Zwei-Faktor", { id: "k", role: "player", areas: ["finance"], ...mfa }, "startseite"],
+  ["Superadmin", { id: "s", role: "superadmin", ...mfa }, "startseite"],
+  ["Helfer", { id: "h", role: "player", has_staff_assignment: true, is_tournament_staff: true }, "mein dienst"],
+  ["Turnierleitung ohne Zwei-Faktor, mit Einsatz", { id: "l", role: "tournament_admin", has_staff_assignment: true }, "mein dienst"],
+  ["Moderator", { id: "m", role: "moderator" }, "meldungen"],
+])("%s: /admin öffnet %s", (_name, user, text) => {
+  renderEntrance(user);
+  expect(screen.getByText(text)).toBeInTheDocument();
+  expect(screen.queryByText("verboten")).toBeNull();
+});
+
+test("Spieler ohne Dienst: /admin führt auf „Kein Zugriff“ mit dem Hinweis „kein Dienst“", () => {
+  renderEntrance({ id: "p", role: "player" });
+  expect(screen.getByTestId("forbidden")).toHaveAttribute("data-no-duty", "true");
+});
+
+test("Verwaltungsbereich ohne Zwei-Faktor und ohne Einsatz: erst die Einrichtung", () => {
+  renderEntrance({ id: "r", role: "player", areas: ["content"] });
+  expect(screen.getByTestId("mfa-setup")).toBeInTheDocument();
+});

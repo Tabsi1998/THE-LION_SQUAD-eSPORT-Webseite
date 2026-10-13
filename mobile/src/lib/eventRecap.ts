@@ -18,7 +18,11 @@ export type EventRecapData = {
   report?: { id: string; slug?: string | null; title: string; excerpt?: string | null } | null;
   mine?: { was_there: boolean; results: OwnResult[] } | null;
 };
-export type FriendPlace = { kind: "event" } | { kind: "tournament"; id: string; slug?: string | null; title: string; team_name?: string | null };
+export type FriendPlace =
+  | { kind: "event" }
+  | { kind: "tournament"; id: string; slug?: string | null; title: string; team_name?: string | null }
+  | { kind: "fastlap"; id: string; slug?: string | null; title: string };
+export type FriendScope = "event" | "tournament" | "fastlap";
 export type EventFriend = { id: string; display_name: string; avatar_url?: string | null; username?: string | null; where: FriendPlace[] };
 export type EventFriendsData = { friends: EventFriend[]; sharing: boolean; hint: boolean };
 
@@ -66,8 +70,18 @@ export function friendsSentence(friends: EventFriend[] = [], { over = false }: {
   return `${list} ${verb} dabei`;
 }
 
-export function friendPlaces(friend: EventFriend | null | undefined): string[] {
-  return (friend?.where || []).map((place) => (place.kind === "event" ? "Event" : `${place.title}${place.team_name ? ` (${place.team_name})` : ""}`));
+/**
+ * Wo ein Freund dabei ist - wie im Web (frontend/src/lib/eventRecap.js). Event-Seite: „Event“, je Turnier der Titel
+ * (mit Teamname) und je Fast Lap der Titel. Turnierseite (#1188 Teil 2): Teamname bzw. „angemeldet“; Fast-Lap-Seite:
+ * „Zeit gefahren“ - der Titel steht dort ohnehin oben.
+ */
+export function friendPlaces(friend: EventFriend | null | undefined, { scope = "event" }: { scope?: FriendScope } = {}): string[] {
+  return (friend?.where || []).map((place) => {
+    if (place.kind === "event") return "Event";
+    if (place.kind === "fastlap") return scope === "fastlap" ? "Zeit gefahren" : place.title;
+    if (scope === "tournament") return place.team_name ? `mit ${place.team_name}` : "angemeldet";
+    return `${place.title}${place.team_name ? ` (${place.team_name})` : ""}`;
+  });
 }
 
 function ageOn(birthDate: unknown, today: string): number | null {

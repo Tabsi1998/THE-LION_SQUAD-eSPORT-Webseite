@@ -1,8 +1,10 @@
 // Einstellungen (#223): Abschnitt „Mail-Queue“ – nur Darstellung; Daten und Handler bleiben in AdminSettingsPage.
 // #1361: je Zeile nur die Aktion, die zum Stand passt (Fehlgeschlagen → „Nochmal versuchen“, sonst nichts; „Löschen“
 // unter „Mehr“). Stand, Vorlage und Fehler stehen auf Deutsch. Ab 1024 px eine Tabelle, darunter Karten.
+// #1418: Empfänger stehen gekürzt da („p***@gmail.com“, so schickt es der Server); „Adresse zeigen“ holt die ganze Adresse
+// einer Zeile - das steht im Protokoll. Die Suche nach einer Adresse findet die Mail, zeigt sie aber ebenfalls gekürzt.
 import { useState } from "react";
-import { CheckCircle2, ChevronDown, Clock, RefreshCw, Send, SkipForward, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, Clock, Eye, EyeOff, RefreshCw, Search, Send, SkipForward, Trash2, XCircle } from "lucide-react";
 import { QUEUE_STATES, STATUS_LABELS, mailErrorKnown, mailTemplateLabel, queueActions, queueDetail } from "../shared";
 import { viennaDateTime } from "@/lib/vienna";
 
@@ -52,8 +54,42 @@ function MailText({ job }) {
   );
 }
 
-export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilter, processQueueNow, recoverQueue, retryFailedQueue, cleanupQueue, retryJob, deleteJob, filteredQueue, queueCounts }) {
+function Recipient({ job, shown, onReveal, onHide, testId }) {
+  const full = shown[job.id];
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span className="break-all" data-testid={`${testId}-${job.id}`}>{full || job.to_masked || "–"}</span>
+      {job.to_masked && (full ? (
+        <button type="button" onClick={() => onHide(job.id)} data-testid={`${testId}-hide-${job.id}`} className="inline-flex items-center gap-1 text-[11px] font-semibold text-white/50 hover:text-white">
+          <EyeOff className="w-3 h-3" aria-hidden="true" /> Verbergen
+        </button>
+      ) : (
+        <button type="button" onClick={() => onReveal(job.id)} data-testid={`${testId}-reveal-${job.id}`} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#29B6E8] hover:text-white">
+          <Eye className="w-3 h-3" aria-hidden="true" /> Adresse zeigen
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilter, processQueueNow, recoverQueue, retryFailedQueue, cleanupQueue, retryJob, deleteJob, filteredQueue, queueCounts, queueSearch = "", searchQueue, revealRecipient }) {
   const [menuFor, setMenuFor] = useState(null);
+  // Aufgedeckte Adressen nur in dieser Ansicht und nur bis „Verbergen“ - nicht gespeichert.
+  const [shown, setShown] = useState({});
+  const [term, setTerm] = useState(queueSearch);
+  const reveal = async (id) => {
+    const address = revealRecipient ? await revealRecipient(id) : "";
+    if (address) setShown((current) => ({ ...current, [id]: address }));
+  };
+  const hide = (id) => setShown((current) => {
+    const next = { ...current };
+    delete next[id];
+    return next;
+  });
+  const submitSearch = (event) => {
+    event.preventDefault();
+    searchQueue?.(term);
+  };
   const stale = queueStats?.stale_sending || 0;
   const latest = queueStats?.latest_problem;
 
@@ -121,6 +157,28 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
           <option value="">Alle</option>
           {QUEUE_STATES.map((key) => <option key={key} value={key}>{STATUS_LABELS[key]}</option>)}
         </select>
+        {searchQueue && (
+          <form onSubmit={submitSearch} role="search" className="flex items-center gap-2" data-testid="queue-search">
+            <label className="relative">
+              <span className="sr-only">Nach Empfänger-Adresse suchen</span>
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-white/35" aria-hidden="true" />
+              <input
+                type="search"
+                value={term}
+                onChange={(event) => setTerm(event.target.value)}
+                placeholder="Adresse suchen"
+                autoComplete="off"
+                maxLength={254}
+                data-testid="queue-search-input"
+                className="bg-[#0A0A0A] border border-white/10 pl-8 pr-3 py-2 rounded-sm text-sm w-56"
+              />
+            </label>
+            <button type="submit" data-testid="queue-search-submit" className="px-3 py-2 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm text-xs">Suchen</button>
+            {queueSearch && (
+              <button type="button" onClick={() => { setTerm(""); searchQueue(""); }} data-testid="queue-search-clear" className="text-xs text-white/50 hover:text-white">Suche leeren</button>
+            )}
+          </form>
+        )}
         <span className="text-xs text-white/50" data-testid="queue-count">
           {filteredQueue.length} von {queue.length} Mails · {queueStats?.due_pending || 0} jetzt fällig · der Versand läuft alle 30 Sekunden von selbst
         </span>
@@ -128,7 +186,7 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
 
       {filteredQueue.length === 0 ? (
         <div className="border border-white/10 bg-[#121212] rounded-sm py-10 text-center text-sm text-white/40" data-testid="queue-empty">
-          {queue.length === 0 ? "Die Warteschlange ist leer." : "Keine Mails mit diesem Stand."}
+          {queueSearch && queue.length === 0 ? "Keine Mail an diese Adresse." : queue.length === 0 ? "Die Warteschlange ist leer." : "Keine Mails mit diesem Stand."}
         </div>
       ) : (
         <>
@@ -148,7 +206,7 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
                   {filteredQueue.map((job) => (
                     <tr key={job.id} data-testid={`queue-row-${job.id}`} className="align-top">
                       <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{when(job.created_at)}</td>
-                      <td className="px-4 py-3 break-all max-w-[220px]">{job.to}</td>
+                      <td className="px-4 py-3 max-w-[240px]"><Recipient job={job} shown={shown} onReveal={reveal} onHide={hide} testId="queue-to" /></td>
                       <td className="px-4 py-3 text-xs max-w-[260px]"><MailText job={job} /></td>
                       <td className="px-4 py-3 max-w-[300px]">
                         <StateBadge job={job} testId={`queue-state-${job.id}`} />
@@ -168,7 +226,7 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
                   <StateBadge job={job} testId={`queue-card-state-${job.id}`} />
                   <span className="text-[11px] text-white/45">{when(job.created_at)}</span>
                 </div>
-                <div className="mt-2 text-sm break-all">{job.to}</div>
+                <div className="mt-2 text-sm"><Recipient job={job} shown={shown} onReveal={reveal} onHide={hide} testId="queue-card-to" /></div>
                 <div className="mt-1 text-xs min-w-0"><MailText job={job} /></div>
                 <Detail job={job} testId={`queue-card-detail-${job.id}`} />
                 {queueActions(job).retry || queueActions(job).remove ? <div className="mt-3">{actions(job, "queue-card")}</div> : null}

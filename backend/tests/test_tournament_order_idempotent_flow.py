@@ -85,6 +85,51 @@ async def test_a_failed_order_is_created_exactly_once_by_the_retry(flow, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_switching_the_fee_off_after_the_gap_still_repairs_the_frozen_price(flow, monkeypatch):
+    """Codex-Prüfung #1500: mit eingefrorenem Preis zählt nur dieser, nicht das heutige Startgeld. Gegenprobe: ohne
+    eingefrorenen Preis friert ein abgeschaltetes Startgeld nichts mehr ein."""
+    _, cup = await paid_cup(flow)
+    paula = await person(flow, "paula")
+    other = await person(flow, "other")
+    fail_once(monkeypatch)
+    flow.act_as(paula)
+    with pytest.raises(RuntimeError):
+        await flow.post(f"/api/tournaments/{cup['id']}/register", json=BODY)
+    await flow.db.tournaments.update_one({"id": cup["id"]}, {"$set": {"billing.enabled": False, "billing.positions": []}})
+    retry = await flow.post(f"/api/tournaments/{cup['id']}/register", json=BODY)
+    assert retry.json()["order_repaired"] is True
+    rows = await orders(flow, paula)
+    assert len(rows) == 1 and rows[0]["total_cents"] == 1000
+    assert (await flow.post(f"/api/tournaments/{cup['id']}/register", json=BODY)).json()["order_repaired"] is False
+
+    await flow.db.tournament_registrations.insert_one({"id": "r-other", "identity_key": f"{cup['id']}:user:{other['id']}", "tournament_id": cup["id"],
+                                                       "user_id": other["id"], "status": "approved", "registration_type": "solo", "costs_accepted_by": other["id"]})
+    flow.act_as(other)
+    assert (await flow.post(f"/api/tournaments/{cup['id']}/register", json=BODY)).json()["order_repaired"] is False
+    assert await orders(flow, other) == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("frozen, today, status", [("manual", "on_confirm", "held"), ("on_confirm", "manual", "pending")])
+async def test_the_repaired_order_keeps_the_invoice_timing_of_the_frozen_price(flow, monkeypatch, frozen, today, status):
+    """Codex-Prüfung #1500 (2): Startgeld - der Rechnungszeitpunkt wird mit dem Preis eingefroren und gilt beim
+    Nachholen, auch wenn die Einstellung inzwischen gewechselt hat (in beide Richtungen)."""
+    _, cup = await paid_cup(flow)
+    await flow.db.tournaments.update_one({"id": cup["id"]}, {"$set": {"billing.invoice_timing": frozen}})
+    paula = await person(flow, "paula")
+    fail_once(monkeypatch)
+    flow.act_as(paula)
+    with pytest.raises(RuntimeError):
+        await flow.post(f"/api/tournaments/{cup['id']}/register", json=BODY)
+    reg = await flow.db.tournament_registrations.find_one({"user_id": paula["id"]}, {"_id": 0})
+    assert reg["price_snapshot"]["invoice_timing"] == frozen
+    await flow.db.tournaments.update_one({"id": cup["id"]}, {"$set": {"billing.invoice_timing": today}})
+    assert (await flow.post(f"/api/tournaments/{cup['id']}/register", json=BODY)).json()["order_repaired"] is True
+    rows = await orders(flow, paula)
+    assert len(rows) == 1 and rows[0]["timing"] == frozen and rows[0]["status"] == status
+
+
+@pytest.mark.asyncio
 async def test_without_frozen_price_the_retry_freezes_it_for_the_payer_only(flow):
     _, cup = await paid_cup(flow)
     paula = await person(flow, "paula")

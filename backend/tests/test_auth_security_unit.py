@@ -355,3 +355,15 @@ def test_inactive_account_is_rejected_at_the_authenticated_boundary(monkeypatch)
         assert exc.value.detail == "Account is inactive"
 
     asyncio.run(scenario())
+
+
+def test_access_token_carries_its_lifetime_for_the_app():
+    # #1519: die App rechnet die Laufzeit ab Erhalt (exp - iat) statt gegen ihre eigene Uhr.
+    from auth import ACCESS_TOKEN_MINUTES
+
+    payload = jwt.decode(
+        create_access_token("user-1", "player@example.test", "player", "session-1"),
+        get_jwt_secret(),
+        algorithms=[JWT_ALGORITHM],
+    )
+    assert payload["exp"] - payload["iat"] == ACCESS_TOKEN_MINUTES * 60

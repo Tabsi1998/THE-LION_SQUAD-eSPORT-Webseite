@@ -25,8 +25,8 @@ import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/b
 import { contactLines, footerButtons, footerColumns } from "@/lib/siteFooter";
 import { StoreButton } from "@/components/tls/StoreButton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Menu, X, LogOut, Shield, ShieldCheck, Crown, Megaphone, ArrowUp, Smartphone } from "lucide-react";
-import { mfaSetupPath } from "@/lib/permissions";
+import { Menu, X, LogOut, Shield, ShieldCheck, Crown, Megaphone, ArrowUp, Smartphone, ClipboardList } from "lucide-react";
+import { mfaSetupPath, showsDutyEntry } from "@/lib/permissions";
 import { UserMenu } from "@/components/tls/UserMenu";
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { OfflineBar } from "@/components/tls/OfflineBar";
@@ -173,6 +173,11 @@ export function PublicLayout({ children }) {
                     <Shield className="w-3.5 h-3.5 inline mr-1.5" /> Admin
                   </Link>
                 )}
+                {showsDutyEntry(user) && (
+                  <Link to="/admin" onClick={closeMobile} data-testid="nav-duty-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#29B6E8]">
+                    <ClipboardList className="w-3.5 h-3.5 inline mr-1.5" /> Mein Dienst
+                  </Link>
+                )}
                 {user ? (
                   <>
                     {userMenuEntries({ username: user.username }).map((entry) => (
@@ -304,11 +309,11 @@ export function PublicLayout({ children }) {
                   {footerContact.zvr && <div className="text-white/45">{footerContact.zvr}</div>}
                 </address>
               )}
-              <div className="mt-4 flex flex-wrap gap-2" data-testid="footer-socials">
+              <div className="mt-4 flex flex-wrap gap-1.5" data-testid="footer-socials">
                 {socialLinks.map((social, index) => (
                   <a key={`${social.platform}-${index}`} href={social.url} target="_blank" rel="noreferrer" data-testid={`footer-${social.platform}`} aria-label={social.label} className="tls-social"
                     style={{ "--tls-social": social.ink === "#0A0A0A" && social.color === "#FFFFFF" ? "#FFFFFF" : social.color }}>
-                    <ChannelIcon kind={social.platform} className="w-[18px] h-[18px]" />
+                    <ChannelIcon kind={social.platform} className="w-4 h-4" />
                     <span className="tls-social__name" aria-hidden="true">{social.label}</span>
                   </a>
                 ))}

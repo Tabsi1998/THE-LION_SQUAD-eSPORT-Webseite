@@ -19,13 +19,16 @@ import { FeedbackReport } from "@/pages/admin/feedback/FeedbackReport";
 import { ParticipantAddForm } from "./tournament/ParticipantAddForm";
 import { TournamentStaffPanel } from "./tournament/StaffPanel";
 import { TournamentStagesPanel } from "./tournament/StagesPanel";
+import { matchRights } from "@/lib/tournamentRights";
 import { PauseUntilControl, RoundSponsorsPanel } from "./tournament/TvTournamentPanel";
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
 import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
 
 export default function AdminTournamentEditPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
-  const { isTournamentLead: isAdmin, isModerator } = useAuth();
+  // Turnierleitung über alle Turniere (mit Zwei-Faktor) für Einstellungen, Team, Sperren und Zugangslinks; alles
+  // andere nach den Rechten, die der Server je Turnier schickt (#1353) - nicht nach „irgendein Adminbereich“.
+  const { isTournamentLead } = useAuth();
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [t, setT] = useState(null);
@@ -86,7 +89,7 @@ export default function AdminTournamentEditPage() {
       const [{ data: st }, { data: mv2 }, stationResponse] = await Promise.all([
         api.get(`/tournaments/${id}/stages`),
         api.get(`/tournaments/${id}/matches-v2`),
-        (isAdmin || isModerator) ? api.get(`/stations?tournament_id=${id}`).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+        data.can_use_staff_tools ? api.get(`/stations?tournament_id=${id}`).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
       ]);
       setStages(st || []);
       setMatchesV2(mv2 || []);
@@ -105,7 +108,7 @@ export default function AdminTournamentEditPage() {
     const missing = (failure, what) => (failure?.response?.status === 403
       ? formatRequestError(failure, `Dafür fehlt dir das Recht: ${what}.`)
       : `${what} lassen sich gerade nicht laden.`);
-    if (isAdmin) {
+    if (isTournamentLead) {
       try {
         const { data: s } = await api.get(`/tournaments/${id}/staff`);
         setStaff(s || []);
@@ -115,7 +118,7 @@ export default function AdminTournamentEditPage() {
         setStaffError(missing(failure, "Helfer dieses Turniers"));
       }
     }
-    if (isAdmin || isModerator) {
+    if (data.can_manage_participants) {
       try {
         const { data: teamRows } = await api.get("/admin/choices/teams", { params: { tournament_id: id } });
         setTeams(Array.isArray(teamRows) ? teamRows : []);
@@ -125,7 +128,7 @@ export default function AdminTournamentEditPage() {
         setTeamsError(missing(failure, "Teams dieses Turniers"));
       }
     }
-  }, [id, isAdmin, isModerator]);
+  }, [id, isTournamentLead]);
 
   // Ohne diesen Fang bleibt die Seite bei unerreichbarem Backend stumm auf
   // "Lade…" stehen und die Rejection landet unbehandelt in der Konsole.
@@ -423,16 +426,22 @@ export default function AdminTournamentEditPage() {
         : <div className="p-10"><SkeletonDetailHeader label="Lade Turnier" /></div>}
     </AdminLayout>
   );
-  const canRecordResults = ["live", "paused"].includes(t.status);
+  // Ergebnisse und Termine je Spiel (#1353): turnierweit oder nur für die Spiele, die der Einsatz abdeckt.
+  const resultsOpen = ["live", "paused"].includes(t.status);
+  const rightsForMatch = (match) => {
+    const rights = matchRights(t, match);
+    return { plan: rights.plan, results: resultsOpen && rights.results };
+  };
   const availableTabs = [
     ["participants", "Teilnehmer"],
     ["bracket", "Turnierbaum"],
     ["stages", "Matchplan"],
     ...(t.format === "groups" ? [["groups", "Gruppen"]] : []),
-    ...(isAdmin ? [["staff", "Team"]] : []),
+    ...(isTournamentLead ? [["staff", "Team"]] : []),
     // Rückmeldungen (#1196): erst, wenn das Turnier vorbei ist - ohne Namen.
     ...(["completed", "results_published", "archived"].includes(t.status) ? [["feedback", "Rückmeldungen"]] : []),
-    ["edit", "Bearbeiten"],
+    // Bearbeiten speichert per PATCH - das darf nur die Turnierleitung über alle Turniere (#1353, `require_admin`).
+    ...(isTournamentLead ? [["edit", "Bearbeiten"]] : []),
   ];
   const activeTab = availableTabs.some(([key]) => key === tab) ? tab : "participants";
   const registrationCounts = regs.reduce((acc, registration) => {
@@ -455,20 +464,20 @@ export default function AdminTournamentEditPage() {
     return haystack.includes(participantSearch);
   });
   const primaryAction = primaryTournamentAction(t.status);
-  const canOperateTournament = isAdmin || !!t.can_manage_structure;
-  const visibleStatusOptions = isAdmin
+  const canOperateTournament = isTournamentLead || !!t.can_manage_structure;
+  const visibleStatusOptions = isTournamentLead
     ? TOURNAMENT_STATUS_OPTIONS
     : TOURNAMENT_STATUS_OPTIONS.filter(([value]) => OPERATIONAL_STATUS_VALUES.has(value));
   // Werkzeuge: braucht man gelegentlich, nicht bei jedem Blick auf die Seite.
   // "Zurücksetzen" steht bewusst zuletzt und rot, weil es den Baum verwirft.
-  const canLockTournament = isAdmin && ["completed", "results_published", "archived", "cancelled"].includes(t.status);
+  const canLockTournament = isTournamentLead && ["completed", "results_published", "archived", "cancelled"].includes(t.status);
   const toolActions = [
-    isModerator && stations.length > 0 && (
+    t.can_assign_stations && stations.length > 0 && (
       <button key="stations" type="button" onClick={() => autoAssignStations()} data-testid="admin-tr-auto-stations" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
         <Zap className="w-3.5 h-3.5" /> Stationen automatisch
       </button>
     ),
-    isModerator && (
+    t.can_use_staff_tools && (
       <button key="planning" type="button" onClick={() => runPlanningCheck()} data-testid="admin-tr-planning-check" className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FFD700]/10 inline-flex items-center gap-2">
         <Eye className="w-3.5 h-3.5" /> Planung prüfen
       </button>
@@ -478,7 +487,7 @@ export default function AdminTournamentEditPage() {
         {t.locked_at ? "Entsperren" : "Sperren"}
       </button>
     ),
-    isModerator && (
+    t.can_manage_structure && (
       <button key="reset" type="button" onClick={reset} data-testid="admin-tr-reset" className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10 inline-flex items-center gap-2">
         <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
       </button>
@@ -489,7 +498,7 @@ export default function AdminTournamentEditPage() {
     { key: "checkin", href: `${API}/exports/tournaments/${t.id}/checkin.pdf`, label: "PDF Check-in" },
     { key: "registration-qr", href: `${API}/exports/tournaments/${t.id}/registration-qr.pdf`, label: "PDF Anmeldung QR", highlight: true },
     { key: "matches", href: `${API}/exports/tournaments/${t.id}/matches.pdf`, label: "PDF Spiele" },
-    isModerator && { key: "match-plan", href: `${API}/tournaments/${t.id}/match-plan.csv`, label: "CSV Matchplan" },
+    t.can_use_staff_tools && { key: "match-plan", href: `${API}/tournaments/${t.id}/match-plan.csv`, label: "CSV Matchplan" },
   ].filter(Boolean);
 
   return (
@@ -522,10 +531,10 @@ export default function AdminTournamentEditPage() {
                 <Zap className="w-3.5 h-3.5" /> {primaryAction.label}
               </button>
             )}
-            {isAdmin && t.format === "swiss" && (
+            {isTournamentLead && t.format === "swiss" && (
               <button type="button" onClick={generateSwissRound} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10">Schweizer Runde</button>
             )}
-            {isAdmin && t.format === "groups" && (
+            {isTournamentLead && t.format === "groups" && (
               <button type="button" onClick={generateGroups} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10">Gruppen generieren</button>
             )}
             {canOperateTournament && (
@@ -565,7 +574,7 @@ export default function AdminTournamentEditPage() {
         </div>
       </div>
 
-      {isAdmin && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister collapsible /></div>}
+      {isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister collapsible /></div>}
 
       <TournamentFlowStepper
         tournament={t}
@@ -589,7 +598,7 @@ export default function AdminTournamentEditPage() {
 
       {activeTab === "participants" && (
         <div className="space-y-4">
-        {isModerator && (
+        {t.can_manage_participants && (
           <ParticipantAddForm
             form={participantForm}
             tournament={t}
@@ -643,21 +652,21 @@ export default function AdminTournamentEditPage() {
                   <StatusBadge status={r.status} />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {isAdmin && (
+                  {isTournamentLead && (
                     <select value={r.status} onChange={(e) => setRegStatus(r.id, e.target.value)} data-testid={`admin-reg-status-mobile-${r.id}`} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 text-xs rounded-sm">
                       {["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"].map((s) => <option key={s} value={s}>{formatRegistrationStatus(s)}</option>)}
                     </select>
                   )}
-                  {isModerator && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
+                  {t.can_check_in && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "checked_in")} className="px-2 py-2 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Check-in</button>
                   )}
-                  {isModerator && r.status === "checked_in" && (
+                  {t.can_check_in && r.status === "checked_in" && (
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "approved")} className="px-2 py-2 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Auschecken</button>
                   )}
-                  {isModerator && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
+                  {t.can_check_in && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                   )}
-                  {isModerator && (
+                  {t.can_manage_participants && (
                     <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
                   )}
                 </div>
@@ -685,21 +694,21 @@ export default function AdminTournamentEditPage() {
                   <td className="px-4 py-3 text-white/60">{r.discord || "—"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex flex-wrap justify-end gap-2">
-                      {isAdmin && (
+                      {isTournamentLead && (
                         <select value={r.status} onChange={(e) => setRegStatus(r.id, e.target.value)} data-testid={`admin-reg-status-${r.id}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 text-xs rounded-sm">
                           {["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"].map((s) => <option key={s} value={s}>{formatRegistrationStatus(s)}</option>)}
                         </select>
                       )}
-                      {isModerator && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
+                      {t.can_check_in && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "checked_in")} className="px-2 py-1 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Check-in</button>
                       )}
-                      {isModerator && r.status === "checked_in" && (
+                      {t.can_check_in && r.status === "checked_in" && (
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "approved")} className="px-2 py-1 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Auschecken</button>
                       )}
-                      {isModerator && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
+                      {t.can_check_in && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                       )}
-                      {isModerator && (
+                      {t.can_manage_participants && (
                         <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
                       )}
                     </div>
@@ -736,14 +745,14 @@ export default function AdminTournamentEditPage() {
           registrations={regs}
           stations={stations}
           tournamentStartDate={t.start_date}
-          isAdmin={false}
-          isModerator={isModerator}
+          canEditSettings={false}
+          canManageStructure={Boolean(t.can_manage_structure)}
           onChanged={load}
           onSaveMatchMeta={updateMatchV2Schedule}
-          canRecordResults={canRecordResults}
+          rightsForMatch={rightsForMatch}
         />
       )}
-      {activeTab === "edit" && (
+      {activeTab === "edit" && isTournamentLead && (
         <TournamentEditForm
           key={t.updated_at || t.id}
           tournament={t}
@@ -758,7 +767,7 @@ export default function AdminTournamentEditPage() {
         </div>
       )}
 
-      {activeTab === "staff" && isAdmin && (
+      {activeTab === "staff" && isTournamentLead && (
         <TournamentStaffPanel tournamentId={t.id} staff={staff} staffError={staffError} onChanged={load} />
       )}
       {activeTab === "groups" && (

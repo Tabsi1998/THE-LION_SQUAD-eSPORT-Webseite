@@ -85,6 +85,34 @@ export function adminWithoutSecondFactor(user) {
   return isAnyAdmin(user) && needsSecondFactor(user);
 }
 
+/** Ein Helfer-Einsatz in einem Turnier oder einer Fast Lap (#1352) - gilt ohne Zwei-Faktor, wie im Server. */
+export function hasHelperAssignment(user) {
+  return Boolean(user?.has_staff_assignment);
+}
+
+/** Wohin /admin führt (#1352, #1353):
+ * - „dashboard“: ein Verwaltungsbereich mit bestätigter Zwei-Faktor-Anmeldung (auch Finanzen, #992) - wie
+ *   `require_dashboard` im Server;
+ * - „duty“: „Mein Dienst“ für Helfer mit Einsatz (auch ein Admin, der die Zwei-Faktor-Anmeldung noch nicht hat);
+ * - „mfa“: Verwaltungsbereich ohne Zwei-Faktor und ohne Einsatz - erst einrichten;
+ * - „moderation“: nur Moderation - direkt zu den Meldungen;
+ * - „none“: kein Dienst - „Kein Zugriff“ mit dem freundlichen Satz statt der Bereichsliste;
+ * - „login“: nicht angemeldet. */
+export function adminHome(user) {
+  if (!user) return "login";
+  if (canUseArea(user, ...ADMIN_AREAS)) return "dashboard";
+  if (hasHelperAssignment(user)) return "duty";
+  if (isAnyAdmin(user)) return "mfa";
+  if (canUseArea(user, "moderation")) return "moderation";
+  return "none";
+}
+
+/** „Mein Dienst“ statt „Admin“ im Benutzermenü (#1352): kein nutzbarer Verwaltungsbereich, aber Moderation oder ein
+ * Helfer-Einsatz. Beide Einträge führen nach /admin. */
+export function showsDutyEntry(user) {
+  return ["duty", "moderation"].includes(adminHome(user));
+}
+
 /** Zwei-Faktor wohnt unter Profil → Sicherheit (#258); `mfa=required` erklärt dort, warum (#348). */
 export function mfaSetupPath(next = "") {
   const params = new URLSearchParams({ tab: "security", mfa: "required" });

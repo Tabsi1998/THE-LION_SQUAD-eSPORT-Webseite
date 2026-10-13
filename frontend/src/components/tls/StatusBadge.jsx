@@ -1,34 +1,45 @@
+// Zustände nach Farb-Rolle (#1305, styles/system.css): Rot nur „läuft gerade“ (und eine belegte Station - dort läuft
+// etwas), Grün offen und frei, Orange Achtung, Cyan Marke und „du“, Grau wartet oder ist vorbei. Gold ist Ehre und
+// kommt bei Zuständen nicht mehr vor.
+const LIVE = "bg-live/20 text-live border-live/50";
+const OK = "bg-ok/15 text-ok border-ok/50";
+const WARN = "bg-warn/15 text-warn border-warn/50";
+const BRAND = "bg-brand/15 text-brand border-brand/50";
+// Wartet (Warteliste, Ergebnis, reserviert): ruhiger Nebentext. Vorbei (abgesagt, abgelehnt, nicht erschienen): leiser.
+const WAITING = "bg-white/5 text-muted-text border-white/20";
+const OVER = "bg-white/5 text-quiet border-white/10";
+
 const STATUS_MAP = {
-  live: { label: "LIVE", cls: "bg-[#FF3B30]/20 text-[#FF3B30] border-[#FF3B30]/50 animate-live" },
+  live: { label: "LIVE", cls: `${LIVE} animate-live` },
   // Eine laufende Saison (#1222): „Läuft“ statt „ACTIVE“.
-  active: { label: "LÄUFT", cls: "bg-[#29B6E8]/15 text-[#29B6E8] border-[#29B6E8]/50" },
-  registration_open: { label: "ANMELDUNG OFFEN", cls: "bg-[#00FF88]/15 text-[#00FF88] border-[#00FF88]/50" },
-  check_in: { label: "CHECK-IN OFFEN", cls: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/50" },
-  checkin_open: { label: "CHECK-IN OFFEN", cls: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/50" },
+  active: { label: "LÄUFT", cls: BRAND },
+  registration_open: { label: "ANMELDUNG OFFEN", cls: OK },
+  check_in: { label: "CHECK-IN OFFEN", cls: OK },
+  checkin_open: { label: "CHECK-IN OFFEN", cls: OK },
   paused: { label: "PAUSIERT", cls: "bg-white/10 text-white/80 border-white/20" },
   draft: { label: "ENTWURF", cls: "bg-white/5 text-white/60 border-white/10" },
   completed: { label: "BEENDET", cls: "bg-white/10 text-white/70 border-white/20" },
   archived: { label: "ARCHIVIERT", cls: "bg-white/5 text-white/40 border-white/10" },
-  upcoming: { label: "BEVORSTEHEND", cls: "bg-[#29B6E8]/15 text-[#29B6E8] border-[#29B6E8]/50" },
+  upcoming: { label: "BEVORSTEHEND", cls: BRAND },
   pending: { label: "AUSSTEHEND", cls: "bg-white/10 text-white/70 border-white/20" },
-  approved: { label: "ANGENOMMEN", cls: "bg-[#00FF88]/15 text-[#00FF88] border-[#00FF88]/40" },
-  rejected: { label: "ABGELEHNT", cls: "bg-[#FF3B30]/15 text-[#FF3B30] border-[#FF3B30]/40" },
-  waitlist: { label: "WARTELISTE", cls: "bg-[#FFD700]/10 text-[#FFD700] border-[#FFD700]/40" },
-  checked_in: { label: "EINGECHECKT", cls: "bg-[#29B6E8]/15 text-[#29B6E8] border-[#29B6E8]/40" },
-  no_show: { label: "NICHT ERSCHIENEN", cls: "bg-[#FF3B30]/15 text-[#FF3B30] border-[#FF3B30]/40" },
-  disputed: { label: "KLÄRUNG", cls: "bg-[#FF3B30]/20 text-[#FF3B30] border-[#FF3B30]/50" },
-  ready: { label: "BEREIT", cls: "bg-[#29B6E8]/15 text-[#29B6E8] border-[#29B6E8]/40" },
-  scheduled: { label: "ANGEKÜNDIGT", cls: "bg-[#29B6E8]/10 text-[#29B6E8] border-[#29B6E8]/40" },
+  approved: { label: "ANGENOMMEN", cls: OK },
+  rejected: { label: "ABGELEHNT", cls: OVER },
+  waitlist: { label: "WARTELISTE", cls: WAITING },
+  checked_in: { label: "EINGECHECKT", cls: BRAND },
+  no_show: { label: "NICHT ERSCHIENEN", cls: OVER },
+  disputed: { label: "KLÄRUNG", cls: WARN },
+  ready: { label: "BEREIT", cls: BRAND },
+  scheduled: { label: "ANGEKÜNDIGT", cls: "bg-brand/10 text-brand border-brand/40" },
   registration_closed: { label: "ANMELDUNG GESCHLOSSEN", cls: "bg-white/10 text-white/70 border-white/20" },
-  results_published: { label: "ERGEBNISSE", cls: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/40" },
-  cancelled: { label: "ABGESAGT", cls: "bg-[#FF3B30]/15 text-[#FF3B30] border-[#FF3B30]/40" },
-  in_progress: { label: "LÄUFT", cls: "bg-[#FF3B30]/15 text-[#FF3B30] border-[#FF3B30]/40 animate-live" },
-  waiting_result: { label: "WARTET AUF ERGEBNIS", cls: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/40" },
+  results_published: { label: "ERGEBNISSE", cls: WAITING },
+  cancelled: { label: "ABGESAGT", cls: OVER },
+  in_progress: { label: "LÄUFT", cls: `${LIVE} animate-live` },
+  waiting_result: { label: "WARTET AUF ERGEBNIS", cls: WAITING },
   forfeit: { label: "WERTUNG", cls: "bg-white/10 text-white/70 border-white/20" },
-  free: { label: "FREI", cls: "bg-[#00FF88]/15 text-[#00FF88] border-[#00FF88]/40" },
-  busy: { label: "BELEGT", cls: "bg-[#FF3B30]/15 text-[#FF3B30] border-[#FF3B30]/40" },
-  broken: { label: "DEFEKT", cls: "bg-white/10 text-white/50 border-white/20" },
-  reserved: { label: "RESERVIERT", cls: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/40" },
+  free: { label: "FREI", cls: OK },
+  busy: { label: "BELEGT", cls: LIVE },
+  broken: { label: "DEFEKT", cls: WARN },
+  reserved: { label: "RESERVIERT", cls: WAITING },
 };
 
 /** Die Beschriftung eines Zustands - auch für Schilder, die anders aussehen (TV-Seiten). */
