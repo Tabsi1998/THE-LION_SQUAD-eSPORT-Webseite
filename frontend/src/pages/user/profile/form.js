@@ -1,3 +1,5 @@
+import { friendsSharing } from "@/lib/eventRecap";
+
 
 export function dateInputValue(value) {
   if (!value) return "";
@@ -74,6 +76,8 @@ export function profileToForm(user) {
     privacy_achievements_public: user.privacy_achievements_public ?? true,
     // Saison-Fundstücke (#678): Standard aus - erst mit dem Schalter sehen andere die Summen.
     privacy_season_finds_public: user.privacy_season_finds_public ?? false,
+    // Freunde beim Event (#1188): Standard an, mit Geburtsdatum unter 14 Jahren aus - der wirksame Stand wie am Server.
+    privacy_friends_see_registrations: friendsSharing(user),
     // Zeremonien (E8, #618): Ton an, volle Lautstärke, volle Bewegung - außer die Person will es dezent.
     ceremony_sound: user.ceremony_sound ?? true,
     ceremony_volume: Number.isFinite(Number(user.ceremony_volume)) && user.ceremony_volume !== null && user.ceremony_volume !== undefined ? Number(user.ceremony_volume) : 80,

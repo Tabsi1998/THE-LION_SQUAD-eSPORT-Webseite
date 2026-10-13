@@ -43,3 +43,21 @@ describe("PrivacyTab – Erfolge öffentlich", () => {
     expect(set).toHaveBeenCalledWith("privacy_season_finds_public", true);
   });
 });
+
+describe("PrivacyTab – Freunde sehen, wo ich angemeldet bin (#1188)", () => {
+  it("zeigt den wirksamen Stand und speichert beim Umschalten", () => {
+    const set = renderTab({ privacy_friends_see_registrations: true });
+    const toggle = screen.getByTestId("profile-privacy-friends-registrations");
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(toggle);
+    expect(set).toHaveBeenCalledWith("privacy_friends_see_registrations", false);
+  });
+
+  it("aus (etwa unter 14 Jahren) bleibt aus, bis die Person es einschaltet", () => {
+    const set = renderTab({ privacy_friends_see_registrations: false });
+    const toggle = screen.getByTestId("profile-privacy-friends-registrations");
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(toggle);
+    expect(set).toHaveBeenCalledWith("privacy_friends_see_registrations", true);
+  });
+});
