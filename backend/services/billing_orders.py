@@ -216,9 +216,25 @@ class RefundError(ValueError):
     """Eine Erstattung, die so nicht stimmt - der Text ist für die Finanzverwaltung."""
 
 
-async def add_refund(db, order: dict, actor_id: str, *, amount_cents: int, paid_on: str, reference: str, reason: str) -> dict:
+REFUND_ATTEMPTS = 5
+
+
+def _same_refunds(order: dict) -> dict:
+    """Bedingung „die Erstattungen sind noch die, die ich gelesen habe“ - über ihre Anzahl, denn Einträge kommen nur dazu."""
+    count = len(order.get("refunds") or [])
+    if count:
+        return {"refunds": {"$size": count}}
+    return {"$or": [{"refunds": {"$exists": False}}, {"refunds": {"$size": 0}}]}
+
+
+async def add_refund(db, order: dict, actor_id: str, *, amount_cents: int, paid_on: str, reference: str, reason: str,
+                     request_id: str | None = None) -> dict:
     """Rückzahlung erfassen, nachdem sie außerhalb der Website passiert ist (Überweisung, bar).
-    Nie mehr als bezahlt, nie ohne Grund; kein Auslöser für irgendetwas in Dolibarr."""
+    Nie mehr als bezahlt, nie ohne Grund; kein Auslöser für irgendetwas in Dolibarr.
+
+    Gleichzeitig und wiederholt sicher (#1034): Geschrieben wird nur, wenn seit dem Lesen keine andere Erstattung
+    dazukam - sonst neu lesen und neu rechnen. Kommt dieselbe Erfassung (``request_id``) ein zweites Mal an, gilt
+    der schon gespeicherte Eintrag."""
     amount = int(amount_cents)
     if amount <= 0:
         raise RefundError("Der Betrag muss größer als null sein.")
@@ -226,15 +242,30 @@ async def add_refund(db, order: dict, actor_id: str, *, amount_cents: int, paid_
         raise RefundError("Der Tag der Rückzahlung fehlt (JJJJ-MM-TT).")
     if not (reason or "").strip():
         raise RefundError("Ein Grund ist Pflicht (z. B. „Begleitperson entfallen, Gutschrift GA2026-0003“).")
-    refundable = paid_cents(order) - refunded_cents(order)
-    if amount > refundable:
-        from services.pricing import format_cents
-        raise RefundError(f"Erstattbar sind höchstens {format_cents(max(0, refundable), order.get('currency') or 'EUR')} (bezahlt abzüglich schon erstattet).")
-    refund = {
-        "id": new_id(), "amount_cents": amount, "paid_on": paid_on, "reference": (reference or "").strip()[:MAX_REFUND_REFERENCE],
-        "reason": reason.strip()[:MAX_REASON], "recorded_by": actor_id, "recorded_at": now_utc().isoformat(),
-    }
-    await db.billing_orders.update_one({"id": order["id"]}, {"$push": {"refunds": refund}, "$set": {"updated_at": now_utc().isoformat()}})
+    request_id = (request_id or "").strip()[:64] or None
+    for _ in range(REFUND_ATTEMPTS):
+        if request_id:
+            earlier = next((row for row in order.get("refunds") or [] if row.get("request_id") == request_id), None)
+            if earlier:
+                return earlier
+        refundable = paid_cents(order) - refunded_cents(order)
+        if amount > refundable:
+            from services.pricing import format_cents
+            raise RefundError(f"Erstattbar sind höchstens {format_cents(max(0, refundable), order.get('currency') or 'EUR')} (bezahlt abzüglich schon erstattet).")
+        refund = {
+            "id": new_id(), "amount_cents": amount, "paid_on": paid_on, "reference": (reference or "").strip()[:MAX_REFUND_REFERENCE],
+            "reason": reason.strip()[:MAX_REASON], "recorded_by": actor_id, "recorded_at": now_utc().isoformat(),
+            **({"request_id": request_id} if request_id else {}),
+        }
+        written = await db.billing_orders.update_one({"id": order["id"], **_same_refunds(order)},
+                                                     {"$push": {"refunds": refund}, "$set": {"updated_at": now_utc().isoformat()}})
+        if written.modified_count:
+            break
+        order = await db.billing_orders.find_one({"id": order["id"]}, {"_id": 0})
+        if not order:
+            raise RefundError("Der Auftrag ist nicht mehr da.")
+    else:
+        raise RefundError("Gerade wurden mehrere Erstattungen gleichzeitig erfasst. Bitte neu laden und nochmals prüfen.")
     await db.audit_logs.insert_one({"id": new_id(), "action": "billing.refund.record", "target_id": order["id"], "actor_id": actor_id,
                                     "data": {"registration_id": order.get("registration_id"), "amount_cents": amount, "paid_on": paid_on, "reason": refund["reason"]},
                                     "created_at": now_utc().isoformat()})

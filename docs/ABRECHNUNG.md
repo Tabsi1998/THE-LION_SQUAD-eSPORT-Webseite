@@ -202,7 +202,10 @@ der Abgleich den Fall von selbst. Die Website gibt **nie** eine Gutschrift frei.
 
 **Gutschrift ≠ Erstattung.** Die Gutschrift gleicht den Beleg in Dolibarr aus. Erstattet ist erst,
 was tatsächlich zurücküberwiesen (oder bar zurückgegeben) wurde – das haltet ihr im Detail des
-Auftrags fest: Betrag, Tag, Referenz, Grund. Nie mehr als bezahlt abzüglich schon erstattet; die
+Auftrags fest: Betrag, Tag, Referenz, Grund. Nie mehr als bezahlt abzüglich schon erstattet – das
+gilt auch, wenn zwei Leute im selben Moment eintragen: zusammen kommen sie nie über den bezahlten
+Betrag (#1034). Wird dieselbe Eingabe nochmals abgeschickt (Antwort ging verloren, erneut
+geklickt), bleibt es bei einem Eintrag; jede geänderte Eingabe ist eine neue Erstattung. Die
 Website löst keine Überweisung aus. Der Verlauf je Auftrag zeigt beides getrennt: Zahlungen,
 Gutschriften, Erstattungen, Storno, Prüffälle, Freigaben.
 

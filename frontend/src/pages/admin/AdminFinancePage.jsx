@@ -433,11 +433,20 @@ function CaseFacts({ item }) {
   return <div className="mt-1 text-[11px] text-white/50" data-testid={`finance-case-facts-${item.id}`}>{bits.join(" · ")}</div>;
 }
 
+// Kennung einer Erstattungs-Erfassung (#1034): Wer dieselbe Eingabe nochmals abschickt (Antwort verloren, Netz
+// weg), bekommt keinen zweiten Eintrag. Jede Änderung im Formular ist eine neue Erfassung.
+const newRefundRequestId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 // Detail (#322): Positionen, Summen, die Zeitleiste und die zwei Handgriffe, die es nach dem Beleg
 // noch gibt - nachlesen und eine Erstattung festhalten. Alles andere passiert in Dolibarr.
 function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund }) {
   const { order, positions = [], sums = {}, timeline = [], cases = [], registration } = detail;
-  const [refund, setRefund] = useState({ amount: "", paid_on: new Date().toISOString().slice(0, 10), reference: "", reason: "", case_id: "" });
+  const [refund, setRefund] = useState(() => ({ amount: "", paid_on: new Date().toISOString().slice(0, 10), reference: "", reason: "", case_id: "", request_id: newRefundRequestId() }));
+  const editRefund = (patch) => setRefund((r) => ({ ...r, ...patch, request_id: newRefundRequestId() }));
+  const saveRefund = async () => {
+    const saved = await onRefund({ amount_cents: amountCents, paid_on: refund.paid_on, reference: refund.reference.trim(), reason: refund.reason.trim(), case_id: refund.case_id || null, request_id: refund.request_id });
+    if (saved) editRefund({ amount: "", reference: "", reason: "", case_id: "" });
+  };
   const amountCents = parseEuro(refund.amount);
   const openCases = cases.filter((c) => c.status === "open");
   const canRefund = order.status === "invoiced" && (sums.refundable_cents || 0) > 0;
@@ -501,18 +510,18 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
           <div className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Erstattung festhalten</div>
           <p className="mt-1 text-xs text-white/50">Erst überweisen (oder bar zurückgeben), dann hier eintragen. Höchstens {formatCents(sums.refundable_cents, order.currency)} – bezahlt abzüglich schon erstattet. Die Gutschrift dazu legt ihr in Dolibarr an.</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5 text-xs">
-            <input value={refund.amount} onChange={(ev) => setRefund((r) => ({ ...r, amount: ev.target.value }))} placeholder="Betrag, z. B. 20,00" inputMode="decimal" className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" aria-label="Erstattungsbetrag in Euro" />
-            <input type="date" value={refund.paid_on} onChange={(ev) => setRefund((r) => ({ ...r, paid_on: ev.target.value }))} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" aria-label="Tag der Rückzahlung" />
-            <input value={refund.reference} onChange={(ev) => setRefund((r) => ({ ...r, reference: ev.target.value }))} placeholder="Referenz (Überweisung, Gutschrift)" className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" aria-label="Referenz der Rückzahlung" />
-            <input value={refund.reason} onChange={(ev) => setRefund((r) => ({ ...r, reason: ev.target.value }))} placeholder="Grund (Pflicht)" className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" aria-label="Grund der Rückzahlung" />
+            <input value={refund.amount} onChange={(ev) => editRefund({ amount: ev.target.value })} placeholder="Betrag, z. B. 20,00" inputMode="decimal" className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" aria-label="Erstattungsbetrag in Euro" />
+            <input type="date" value={refund.paid_on} onChange={(ev) => editRefund({ paid_on: ev.target.value })} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" aria-label="Tag der Rückzahlung" />
+            <input value={refund.reference} onChange={(ev) => editRefund({ reference: ev.target.value })} placeholder="Referenz (Überweisung, Gutschrift)" className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" aria-label="Referenz der Rückzahlung" />
+            <input value={refund.reason} onChange={(ev) => editRefund({ reason: ev.target.value })} placeholder="Grund (Pflicht)" className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" aria-label="Grund der Rückzahlung" />
             {openCases.length ? (
-              <select value={refund.case_id} onChange={(ev) => setRefund((r) => ({ ...r, case_id: ev.target.value }))} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" aria-label="Prüffall damit erledigen">
+              <select value={refund.case_id} onChange={(ev) => editRefund({ case_id: ev.target.value })} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" aria-label="Prüffall damit erledigen">
                 <option value="">Prüffall offen lassen</option>
                 {openCases.map((c) => <option key={c.id} value={c.id}>erledigt damit: {c.label}</option>)}
               </select>
             ) : <span />}
           </div>
-          <button type="button" disabled={!!busy || !refundOk} onClick={() => onRefund({ amount_cents: amountCents, paid_on: refund.paid_on, reference: refund.reference.trim(), reason: refund.reason.trim(), case_id: refund.case_id || null })} className="mt-2 px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40" data-testid="finance-refund-save">
+          <button type="button" disabled={!!busy || !refundOk} onClick={saveRefund} className="mt-2 px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40" data-testid="finance-refund-save">
             Erstattung eintragen
           </button>
         </div>
