@@ -16,6 +16,8 @@ const REFRESH_KEY = "tls.mobile.refreshToken";
 const REMEMBER_KEY = "tls.mobile.rememberSession";
 // Das Konto der Sitzung (#942): damit die App offline mit der gemerkten Sitzung startet statt sich abzumelden.
 const USER_KEY = "tls.mobile.user";
+// Wann das Zugangs-Token ankam (Geräteuhr, #1519): seine Laufzeit zählt ab hier, nicht gegen die Uhr des Geräts.
+const RECEIVED_KEY = "tls.mobile.accessReceivedAt";
 
 type RegisterPayload = {
   username: string;
@@ -77,9 +79,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   // Die Tokens für den API-Client (#1519): sofort gültig, nicht erst nach dem nächsten Rendern. Sonst trug der Aufruf,
   // der nach dem Erneuern wiederholt wird, noch das alte Token, fiel erneut mit 401 durch - und die App meldete ab.
-  const tokensRef = useRef<{ accessToken: string | null; refreshToken: string | null }>({ accessToken: null, refreshToken: null });
-  const applyTokens = useCallback((access: string | null, refresh: string | null) => {
-    tokensRef.current = { accessToken: access, refreshToken: refresh };
+  const tokensRef = useRef<{ accessToken: string | null; refreshToken: string | null; accessReceivedAt: number | null }>(
+    { accessToken: null, refreshToken: null, accessReceivedAt: null },
+  );
+  // Sitzungs-Generation (#1519): Anmelden, Kontowechsel und Abmelden zählen weiter. Eine Erneuerung, die noch für die
+  // vorige Sitzung lief, darf danach weder Tokens ablegen noch abmelden.
+  const generationRef = useRef(0);
+  const applyTokens = useCallback((access: string | null, refresh: string | null, receivedAt: number | null = null) => {
+    tokensRef.current = { accessToken: access, refreshToken: refresh, accessReceivedAt: access ? receivedAt : null };
     setAccessToken(access);
     setRefreshToken(refresh);
   }, []);
@@ -101,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [rememberActiveUser]);
 
   const persistSession = useCallback(async (session: AuthResponse, remember?: boolean) => {
+    const receivedAt = Date.now();
     const shouldRemember = remember ?? rememberSessionRef.current;
     const previousId = activeUserIdRef.current;
     if (previousId && previousId !== session.user.id) {
@@ -117,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     rememberActiveUser(session.user.id);
     setUser(session.user);
-    applyTokens(session.access_token, session.refresh_token);
+    applyTokens(session.access_token, session.refresh_token, receivedAt);
     setRememberSession(shouldRemember);
     rememberSessionRef.current = shouldRemember;
     if (shouldRemember) {
@@ -126,19 +134,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         SecureStore.setItemAsync(REFRESH_KEY, session.refresh_token),
         SecureStore.setItemAsync(REMEMBER_KEY, "true"),
         SecureStore.setItemAsync(USER_KEY, JSON.stringify(session.user)),
+        SecureStore.setItemAsync(RECEIVED_KEY, String(receivedAt)),
       ]);
     } else {
       await Promise.all([
         SecureStore.deleteItemAsync(ACCESS_KEY),
         SecureStore.deleteItemAsync(REFRESH_KEY),
         SecureStore.deleteItemAsync(USER_KEY),
+        SecureStore.deleteItemAsync(RECEIVED_KEY),
         SecureStore.setItemAsync(REMEMBER_KEY, "false"),
       ]);
     }
   }, [applyTokens, rememberActiveUser]);
 
+  // Eine neue Anmeldung (#1519): zuerst die Generation weiterzählen - eine noch laufende Erneuerung der vorigen Sitzung
+  // überschreibt sie dann nicht, auch wenn sie während des Kontowechsels ankommt.
+  const startSession = useCallback(async (session: AuthResponse, remember: boolean) => {
+    generationRef.current += 1;
+    await persistSession(session, remember);
+  }, [persistSession]);
+
   const clearSession = useCallback(async () => {
     // Abgemeldet oder Sitzung abgelaufen (#918): zurück in den Gastmodus statt auf den Anmeldebildschirm.
+    generationRef.current += 1;
     enterGuest();
     setPasskeyOffer(null);
     applyTokens(null, null);
@@ -146,6 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       SecureStore.deleteItemAsync(ACCESS_KEY),
       SecureStore.deleteItemAsync(REFRESH_KEY),
       SecureStore.deleteItemAsync(USER_KEY),
+      SecureStore.deleteItemAsync(RECEIVED_KEY),
       forgetAccountData(),
     ]);
   }, [applyTokens, enterGuest]);
@@ -161,7 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     configureAuthBridge({
-      readTokens: () => ({ ...tokensRef.current, userId: activeUserIdRef.current }),
+      readTokens: () => ({ ...tokensRef.current, userId: activeUserIdRef.current, generation: generationRef.current }),
       persistSession,
       clearSession: endSession,
     });
@@ -176,9 +195,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Kein Konto zurück, obwohl eine Sitzung da ist (#1519): erneuern statt still zum Gast zu werden.
     const token = tokensRef.current.refreshToken;
     if (!token) return;
+    const generation = generationRef.current;
     try {
-      await persistSession(await refreshSession(token));
+      const session = await refreshSession(token);
+      if (generationRef.current === generation) await persistSession(session);
     } catch (error) {
+      if (generationRef.current !== generation) return;
       if (isSessionRejected(error)) await endSession();
       else throw error;
     }
@@ -200,6 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           SecureStore.getItemAsync(REFRESH_KEY),
           SecureStore.getItemAsync(REMEMBER_KEY),
           SecureStore.getItemAsync(USER_KEY),
+          SecureStore.getItemAsync(RECEIVED_KEY),
         ]);
       } catch {
         // Der sichere Speicher war nicht lesbar (#1519): nichts löschen - der nächste Start stellt die Sitzung wieder her.
@@ -210,7 +233,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const [access, refresh, storedRemember, userJson] = stored;
+        const [access, refresh, storedRemember, userJson, receivedJson] = stored;
+        const receivedAt = receivedJson && Number.isFinite(Number(receivedJson)) ? Number(receivedJson) : null;
         if (!mounted) return;
         storedAccess = access;
         storedRefresh = refresh;
@@ -233,8 +257,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        applyTokens(storedAccess, storedRefresh);
-        if (storedAccess && !accessTokenExpired(storedAccess)) {
+        applyTokens(storedAccess, storedRefresh, receivedAt);
+        if (storedAccess && !accessTokenExpired(storedAccess, Date.now(), 30, receivedAt)) {
           try {
             const { data } = await api.get<User | null>("/auth/me", { headers: { Authorization: `Bearer ${storedAccess}` } });
             // Ohne Konto (#1519) kennt der Server das Token nicht mehr: erneuern statt als angemeldet ohne Konto zu starten.
@@ -290,19 +314,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data } = await api.post<AuthResponse>("/auth/mobile/login", { email, password, remember });
       const challenge = data as AuthResponse & { mfa_required?: boolean; mfa_ticket?: string };
       if (challenge.mfa_required) return { mfaRequired: true, ticket: challenge.mfa_ticket };
-      await persistSession(data, remember);
+      await startSession(data, remember);
       offerPasskey(data, noDevicePasskey);
       return { mfaRequired: false };
     },
-    [offerPasskey, persistSession]
+    [offerPasskey, startSession]
   );
 
   // Passkey-Anmeldung (#217 Stufe 2): derselbe Passkey wie auf der Website, Gerätesperre statt Passwort.
   const loginWithPasskey = useCallback(async (remember = true, silent = false) => {
     const session = await signInWithPasskey(remember, silent);
-    await persistSession(session, remember);
+    await startSession(session, remember);
     setPasskeyOffer(null);
-  }, [persistSession]);
+  }, [startSession]);
 
   const register = useCallback(
     async (payload: RegisterPayload) => {
@@ -314,9 +338,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const completeMfa = useCallback(async (ticket: string, code: string, remember = true, noDevicePasskey = false) => {
     const { data } = await api.post<AuthResponse>("/auth/mfa/complete", { ticket, code, client: "mobile" });
-    await persistSession(data, remember);
+    await startSession(data, remember);
     offerPasskey(data, noDevicePasskey);
-  }, [offerPasskey, persistSession]);
+  }, [offerPasskey, startSession]);
 
   const clearPasskeyOffer = useCallback(() => setPasskeyOffer(null), []);
 

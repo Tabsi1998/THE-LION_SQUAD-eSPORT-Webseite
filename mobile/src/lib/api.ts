@@ -4,24 +4,30 @@ import type { AuthResponse } from "../types";
 import { buildCacheKey, getStaleEntry, setCached } from "./cache";
 import { noteFresh, noteOffline } from "./network";
 import { deviceHeaders } from "./deviceIdentity";
-import { isSessionRejected, tokenExpiry } from "./session";
+import { accessTokenExpired, isSessionRejected, tokenExpiry } from "./session";
 
 type TokenSnapshot = {
   accessToken: string | null;
   refreshToken: string | null;
   userId: string | null;
+  /** Zeitpunkt des Erhalts des Zugangs-Tokens auf der Geräteuhr (#1519) - die Laufzeit zählt ab hier. */
+  accessReceivedAt?: number | null;
+  /** Sitzungs-Generation (#1519): Anmelden, Kontowechsel und Abmelden zählen weiter, Erneuern nicht. */
+  generation?: number;
 };
 
 type CacheAwareConfig = InternalAxiosRequestConfig & {
   _cacheKey?: string;
   _retry?: boolean;
   _offlineFallback?: boolean;
+  /** Die Sitzungs-Generation beim Senden (#1519) - ein Aufruf der alten Sitzung wird nie mit der neuen wiederholt. */
+  _generation?: number;
 };
 
 let readTokens: () => TokenSnapshot = () => ({ accessToken: null, refreshToken: null, userId: null });
 let persistSession: (session: AuthResponse) => Promise<void> = async () => {};
 let clearSession: () => Promise<void> = async () => {};
-let refreshPromise: Promise<AuthResponse> | null = null;
+let refreshInFlight: { token: string; promise: Promise<AuthResponse> } | null = null;
 
 /**
  * Die Sitzung erneuern (#942) - ein Weg für alle: der 401-Nachschlag und der App-Start teilen sich eine laufende
@@ -31,21 +37,30 @@ let refreshPromise: Promise<AuthResponse> | null = null;
 export function refreshSession(token?: string | null): Promise<AuthResponse> {
   const refreshToken = token || readTokens().refreshToken;
   if (!refreshToken) return Promise.reject(new Error("Kein Erneuerungs-Token"));
-  refreshPromise =
-    refreshPromise ||
-    api
+  // Geteilt nur für denselben Erneuerungs-Token (#1519): eine neue Sitzung hängt sich nie an die Erneuerung einer alten.
+  if (refreshInFlight?.token === refreshToken) return refreshInFlight.promise;
+  const entry = {
+    token: refreshToken,
+    promise: api
       .post<AuthResponse>("/auth/mobile/refresh", { refresh_token: refreshToken })
       .then(({ data }) => data)
       .finally(() => {
-        refreshPromise = null;
-      });
-  return refreshPromise;
+        if (refreshInFlight === entry) refreshInFlight = null;
+      }),
+  };
+  refreshInFlight = entry;
+  return entry.promise;
 }
 
-/** Läuft das Zugangs-Token gleich ab (#1519)? Nur bei lesbarem Ablauf - sonst entscheidet wie bisher der Server. */
-function accessTokenDue(token: string | null, marginSeconds = 30): boolean {
-  const exp = tokenExpiry(token);
-  return exp !== null && exp * 1000 <= Date.now() + marginSeconds * 1000;
+/** Die Sitzung hat während der Erneuerung gewechselt (#1519): abgemeldet oder ein anderes Konto angemeldet. */
+const SESSION_CHANGED = "Sitzung inzwischen gewechselt";
+
+/**
+ * Läuft das Zugangs-Token gleich ab (#1519)? Gerechnet ab Erhalt mit der Laufzeit aus dem Token - nicht gegen die
+ * Geräteuhr. Ohne lesbaren Ablauf entscheidet wie bisher der Server.
+ */
+function accessTokenDue(token: string | null, receivedAt: number | null | undefined): boolean {
+  return tokenExpiry(token) !== null && accessTokenExpired(token, Date.now(), 30, receivedAt ?? null);
 }
 
 /**
@@ -54,12 +69,17 @@ function accessTokenDue(token: string | null, marginSeconds = 30): boolean {
  * lassen sie stehen, der nächste Aufruf versucht es wieder. Liefert das neue Zugangs-Token.
  */
 async function renewAccess(refreshToken: string): Promise<string> {
+  // Ergebnis und Fehler gelten nur, solange dieselbe Sitzung aktiv ist: ein Abmelden oder Kontowechsel währenddessen
+  // darf weder von der alten Sitzung überschrieben noch von ihrer abgelehnten Erneuerung abgemeldet werden.
+  const generation = readTokens().generation;
+  const stillCurrent = () => readTokens().generation === generation;
   try {
     const session = await refreshSession(refreshToken);
+    if (!stillCurrent()) throw new Error(SESSION_CHANGED);
     await persistSession(session);
     return session.access_token;
   } catch (error) {
-    if (isSessionRejected(error)) await clearSession();
+    if (isSessionRejected(error) && stillCurrent()) await clearSession();
     throw error;
   }
 }
@@ -87,17 +107,20 @@ export function configureAuthBridge(bridge: {
 // ─── Request Interceptor: Auth-Token + Cache-Check ───────────────────────────
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   let { accessToken, userId } = readTokens();
-  const { refreshToken } = readTokens();
+  const { refreshToken, accessReceivedAt, generation } = readTokens();
   // Abgelaufenes Zugangs-Token (#1519): erst erneuern, dann senden. Öffentliche Aufrufe (Dashboard, /auth/me) antworten
   // sonst mit 200 als Gast statt mit 401 - die App hielt sich dann still für abgemeldet, obwohl die Sitzung noch galt.
-  if (accessToken && refreshToken && accessTokenDue(accessToken) && !config.url?.includes("/auth/mobile/")) {
+  if (accessToken && refreshToken && accessTokenDue(accessToken, accessReceivedAt) && !config.url?.includes("/auth/mobile/")) {
     try {
       accessToken = await renewAccess(refreshToken);
       userId = readTokens().userId;
     } catch (error) {
-      // Abgelehnt: die Sitzung ist zu Ende, der Aufruf geht als Gast weiter. Sonst (Netz, Störung) mit dem alten Token -
-      // der Server entscheidet, der 401-Nachschlag versucht es dann noch einmal.
-      if (isSessionRejected(error)) {
+      // Hat die Sitzung inzwischen gewechselt (abgemeldet, anderes Konto), gilt die neue. Abgelehnt: die Sitzung ist zu
+      // Ende, der Aufruf geht als Gast weiter. Sonst (Netz, Störung) mit dem alten Token - der Server entscheidet, der
+      // 401-Nachschlag versucht es dann noch einmal.
+      if (readTokens().generation !== generation) {
+        ({ accessToken, userId } = readTokens());
+      } else if (isSessionRejected(error)) {
         accessToken = null;
         userId = readTokens().userId;
       }
@@ -106,6 +129,7 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
+  (config as CacheAwareConfig)._generation = readTokens().generation;
   // Gerät je Installation (#942): Kennung und Name als Kopfzeilen - der Server zeigt das Gerät in der Sitzungsliste
   // und schließt beim Neu-Login die alte Sitzung desselben Geräts.
   for (const [name, value] of Object.entries(await deviceHeaders())) {
@@ -141,7 +165,8 @@ api.interceptors.response.use(
     // ── 401: Token-Refresh ──────────────────────────────────────────────────
     // Einmal erneuern und wiederholen. Endet die Sitzung, dann nur, weil der Server die Erneuerung ablehnt (#1519) - ein
     // zweiter 401 nach erfolgreicher Erneuerung oder ein 401 beim Anmelden betrifft nur diesen Aufruf, nicht die Sitzung.
-    if (error.response?.status === 401 && original && !original._retry && refreshToken && !isAuthCall) {
+    const sameSession = original?._generation === readTokens().generation;
+    if (error.response?.status === 401 && original && !original._retry && refreshToken && !isAuthCall && sameSession) {
       original._retry = true;
       try {
         const access = await renewAccess(refreshToken);

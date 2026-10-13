@@ -433,7 +433,13 @@ describe("Kontowechsel", () => {
 // „Angemeldet bleiben“ hält (#1519): die Sitzung geht nur, wenn der Server sie wirklich beendet - und dann mit Hinweis.
 describe("Angemeldet bleiben hält (#1519)", () => {
   type Bridge = {
-    readTokens: () => { accessToken: string | null; refreshToken: string | null; userId: string | null };
+    readTokens: () => {
+      accessToken: string | null;
+      refreshToken: string | null;
+      userId: string | null;
+      accessReceivedAt?: number | null;
+      generation?: number;
+    };
     persistSession: (session: unknown) => Promise<void>;
     clearSession: () => Promise<void>;
   };
@@ -453,9 +459,72 @@ describe("Angemeldet bleiben hält (#1519)", () => {
   test("nach dem Erneuern kennt der API-Client sofort die neuen Tokens - nicht erst nach dem nächsten Rendern", async () => {
     await signedIn();
     const current = bridge();
+    const before = current.readTokens().generation;
     await current.persistSession({ user: USER, access_token: "access-2", refresh_token: "refresh-2" });
     // Der wiederholte Aufruf liest die Tokens gleich danach: mit den alten fiele er erneut mit 401 durch.
-    expect(current.readTokens()).toEqual({ accessToken: "access-2", refreshToken: "refresh-2", userId: "u-1" });
+    expect(current.readTokens()).toMatchObject({ accessToken: "access-2", refreshToken: "refresh-2", userId: "u-1" });
+    // Erneuern ist keine neue Sitzung: die Generation bleibt, der Erhalt ist vermerkt.
+    expect(current.readTokens().generation).toBe(before);
+    expect(typeof current.readTokens().accessReceivedAt).toBe("number");
+  });
+
+  test("Anmelden und Abmelden beginnen eine neue Sitzungs-Generation", async () => {
+    const { result } = await signedIn();
+    const start = bridge().readTokens().generation as number;
+    await act(async () => {
+      await result.current.login("fan@lionsquad.at", "geheim", true);
+    });
+    expect(bridge().readTokens().generation).toBe(start + 1);
+    mockApi.post.mockResolvedValue({ data: { ok: true } });
+    await act(async () => {
+      await result.current.logout();
+    });
+    expect(bridge().readTokens().generation).toBe(start + 2);
+  });
+
+  test("Abmelden während refreshMe erneuert: die alte Sitzung kommt nicht zurück und meldet nicht ab", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    const { result } = await signedIn();
+    let release: (value: unknown) => void = () => {};
+    mockApi.get.mockResolvedValue({ data: null });
+    mockApi.post.mockImplementation((url: string) => {
+      if (url === "/auth/mobile/refresh") return new Promise((resolve) => { release = resolve; });
+      return Promise.resolve({ data: { ok: true } });
+    });
+
+    let pending: Promise<void> = Promise.resolve();
+    await act(async () => {
+      pending = result.current.refreshMe();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await result.current.logout();
+    });
+    await act(async () => {
+      release({ data: SESSION });
+      await pending;
+    });
+
+    expect(isGuestUser(result.current.user)).toBe(true);
+    expect(await SecureStore.getItemAsync(REFRESH_KEY)).toBeNull();
+    expect(bridge().readTokens().refreshToken).toBeNull();
+    expect(alert).not.toHaveBeenCalled();
+    alert.mockRestore();
+  });
+
+  test("Kaltstart: die Laufzeit zählt ab Erhalt - eine nachgehende Uhr hält ein abgelaufenes Token nicht für gültig", async () => {
+    // Laut Geräteuhr gilt das Token noch eine Stunde (exp), seit Erhalt sind aber schon 13 von 12 Stunden vergangen.
+    const now = Math.floor(Date.now() / 1000);
+    const payload = Buffer.from(JSON.stringify({ sub: "u-1", iat: now - 11 * 3600, exp: now + 3600 })).toString("base64")
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    await SecureStore.setItemAsync(ACCESS_KEY, `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`);
+    await SecureStore.setItemAsync(REFRESH_KEY, "refresh-alt");
+    await SecureStore.setItemAsync(REMEMBER_KEY, "true");
+    await SecureStore.setItemAsync("tls.mobile.accessReceivedAt", String(Date.now() - 13 * 3600 * 1000));
+
+    const { result } = await renderAuth();
+
+    expect(mockApi.get).not.toHaveBeenCalled();
+    expect(mockApi.post).toHaveBeenCalledWith("/auth/mobile/refresh", { refresh_token: "refresh-alt" });
+    expect(result.current.user).toEqual(USER);
   });
 
   test("/auth/me ohne Konto (Token abgelaufen oder vom Server nicht erkannt) macht nicht still zum Gast", async () => {
