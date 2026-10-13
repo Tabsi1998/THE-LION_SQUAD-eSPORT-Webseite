@@ -4,6 +4,8 @@ Es gibt keinen zweiten, schwächeren Weg. Fehler sind Sätze mit dem HTTP-Status
 steht, über welchen Weg die Anmeldung kam (``via``)."""
 from __future__ import annotations
 
+from pymongo.errors import DuplicateKeyError
+
 from models import new_id, now_utc
 from services import billing_orders, pricing
 from services.access_links import record_access_link_use
@@ -101,6 +103,7 @@ async def register(db, event: dict, me: dict, *, companion_count: int | None = 0
     requested_seats = 1 + companions
     existing = await existing_registration(db, event, me)
     if existing and existing.get("status") not in {"cancelled", "no_show"}:
+        await repair_order(db, event, existing)
         raise RegistrationError(409, "Du bist für dieses Event bereits angemeldet")
 
     # Preis (#315, #318): vor der Buchung rechnen, damit eine unbekannte Position sauber scheitert.
@@ -141,7 +144,15 @@ async def register(db, event: dict, me: dict, *, companion_count: int | None = 0
     else:
         doc["id"] = new_id()
         doc["created_at"] = now
-        await db.event_registrations.insert_one(doc)
+        try:
+            await db.event_registrations.insert_one(doc)
+        except DuplicateKeyError:
+            # Zwei gleichzeitige Anmeldungen (Doppelklick, Website und Discord): der eindeutige Index lässt nur eine
+            # durch. Die andere antwortet wie jede Wiederholung - und holt einen fehlenden Auftrag nach (#1491).
+            current = await existing_registration(db, event, me)
+            if current:
+                await repair_order(db, event, current)
+            raise RegistrationError(409, "Du bist für dieses Event bereits angemeldet")
         doc.pop("_id", None)
     await db.audit_logs.insert_one({
         "id": new_id(),
@@ -158,6 +169,28 @@ async def register(db, event: dict, me: dict, *, companion_count: int | None = 0
     if register_access:
         await record_access_link_use(db, register_access, me)
     return doc
+
+
+async def repair_order(db, event: dict, registration: dict) -> dict | None:
+    """Nachholen (#1491, wie ``tournament_fees.repair_order``): eine verbindliche, kostenpflichtige Anmeldung mit
+    eingefrorenem Preis, aber ohne Rechnungsauftrag, bekommt ihn bei der Wiederholung.
+
+    Anmeldung, Preis und Auftrag werden nacheinander gespeichert. Bricht der Auftrag danach ab, antwortet die
+    Wiederholung sonst nur „bereits angemeldet“, und es entstünde nie eine Rechnung. Genau einmal: ein vorhandener
+    Auftrag zum selben Preis (auch ein stornierter) bleibt, und gleichzeitige Wiederholungen fängt der eindeutige
+    ``booking_key`` ab. Gibt den neuen Auftrag zurück, sonst ``None``."""
+    snapshot = registration.get("price_snapshot")
+    if registration.get("status") not in ACTIVE_STATUSES or not snapshot or not pricing.is_paid(event.get("billing") or {}):
+        return None
+    if registration.get("billing_status") not in (None, "pending"):
+        return None
+    key = billing_orders.booking_key("event", registration["id"], snapshot)
+    known = {"booking_key": key} if key else {"kind": "event", "registration_id": registration["id"], "status": {"$nin": ["cancelled", "failed"]}}
+    if await db.billing_orders.find_one(known, {"_id": 0, "id": 1}):
+        return None
+    offer = event.get("billing") or {}
+    return await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=registration["id"],
+                                             user_id=registration["user_id"], snapshot=snapshot, timing=offer.get("invoice_timing") or "on_confirm")
 
 
 CANCELLABLE_STATUSES = {"registered", "waitlist"}
