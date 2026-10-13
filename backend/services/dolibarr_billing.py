@@ -479,7 +479,9 @@ async def _mark_invoiced(db, order: dict, state: dict, *, payments: list[dict] |
         "status": "invoiced", "note": "", **fields, "invoiced_at": order.get("invoiced_at") or now, "synced_at": now, "updated_at": now,
         **({"payments": payments} if payments is not None else {}),
         **({"paid_at": now} if state.get("paid") and not order.get("paid_at") else {}),
-    }, "$unset": {"sync_error": "", "sync_error_at": ""}})
+    }, "$unset": {"sync_error": "", "sync_error_at": ""},
+        # Zahlungen neu gelesen: eine schon vorbereitete Erstattung rechnet neu (#1034, ``billing_orders.add_refund``).
+        "$inc": {"money_rev": 1}})
     billing_status = "paid" if state.get("paid") else "invoiced"
     collection = {"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
     if collection is not None:
