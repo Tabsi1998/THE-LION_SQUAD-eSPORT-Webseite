@@ -894,6 +894,14 @@ async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
     return u
 
 
+@router.get("/me/duty")
+async def get_my_duty(me: dict = Depends(get_current_user)):
+    """„Mein Dienst“ (#1352): eigene Helfer-Einsätze (heute zuerst), offene Meldungen für die Moderation und - für die
+    Turnierleitung - die Turniere von heute. Spieler ohne Dienst bekommen leere Listen."""
+    from services.duty import duty_overview
+    return await duty_overview(get_db(), me)
+
+
 @router.get("/me/level")
 async def get_my_level(me: dict = Depends(get_current_user)):
     """Der eigene Level-Stand (#617): XP, Level 1–60, Titel, Prestige - für Profil, Dashboard und Level-up."""

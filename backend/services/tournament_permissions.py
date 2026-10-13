@@ -73,6 +73,29 @@ async def has_tournament_staff_permission(
     return False
 
 
+# Stationen automatisch verteilen (routes/station_routes.py): Organisation, Schiedsrichter, Stationsleitung.
+STATION_ASSIGN_ROLES = {"organizer", "referee", "station_manager"}
+
+
+async def tournament_rights(user: dict | None, tournament_id: str) -> dict[str, bool]:
+    """Was die Person in diesem Turnier darf (#1353) - dieselben Rollen wie die Wächter der Routen. Die Verwaltung zeigt
+    Knöpfe nur nach diesen Feldern, nicht nach „irgendein Adminbereich“: Ergebnisse, Aufbau, Check-in, Teilnehmer,
+    Stationen und die Werkzeuge zum Lesen (Planung prüfen, Matchplan)."""
+    lead = is_global_tournament_admin(user)
+
+    async def allowed(roles: set[str], scope: str | None = None) -> bool:
+        return lead or await has_tournament_staff_permission(user, tournament_id, roles, scope)
+
+    return {
+        "can_manage_results": await allowed(RESULT_STAFF_ROLES),
+        "can_manage_structure": await allowed(STRUCTURE_STAFF_ROLES, "tournament"),
+        "can_check_in": await allowed(CHECKIN_STAFF_ROLES),
+        "can_manage_participants": await allowed(PARTICIPANT_STAFF_ROLES),
+        "can_assign_stations": await allowed(STATION_ASSIGN_ROLES, "tournament"),
+        "can_use_staff_tools": await allowed(READ_STAFF_ROLES),
+    }
+
+
 async def has_match_result_permission(user: dict | None, match: dict) -> bool:
     """Return whether a user may enter the result for one concrete match.
 

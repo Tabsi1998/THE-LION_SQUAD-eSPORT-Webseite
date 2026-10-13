@@ -19,10 +19,8 @@ from services.access_links import (
 )
 from services.public_phase import derive_public_phase
 from services.tournament_permissions import (
-    RESULT_STAFF_ROLES,
-    STRUCTURE_STAFF_ROLES,
     assigned_tournament_ids,
-    has_tournament_staff_permission,
+    tournament_rights,
 )
 from services.competition_versions import (
     apply_competition_version_read_defaults,
@@ -219,14 +217,8 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
         suffix = f"?{urlencode({'access': access})}" if access else ""
         return RedirectResponse(url=f"/api/tournaments/{quote(str(t['slug']), safe='')}{suffix}", status_code=301)
     await _enrich_tournament(t, user)
-    t["can_manage_results"] = bool(
-        is_admin
-        or await has_tournament_staff_permission(user, t["id"], RESULT_STAFF_ROLES)
-    )
-    t["can_manage_structure"] = bool(
-        is_admin
-        or await has_tournament_staff_permission(user, t["id"], STRUCTURE_STAFF_ROLES, "tournament")
-    )
+    # Was die Person hier darf (#1353): die Verwaltung zeigt Knöpfe nur nach diesen Feldern.
+    t.update(await tournament_rights(user, t["id"]))
     if access_link:
         await touch_access_link(db, access_link, user)
         t["access_link"] = public_access_link_payload(access_link)

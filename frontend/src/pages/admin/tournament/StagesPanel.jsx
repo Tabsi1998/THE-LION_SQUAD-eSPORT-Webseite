@@ -12,8 +12,10 @@ import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUnd
 import { SelectField, modeLabel } from "./TournamentEditForm";
 import { DEFAULT_FFA_SCHEMA, EVENT_MODE_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, applyStageType, matchSectionKey, sectionSortIndex, sortMatchesForPlan, stageConfigFor, stationDisplay } from "./shared";
 
-export function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], tournamentStartDate = null, isAdmin, isModerator, canRecordResults = false, onChanged, onSaveMatchMeta, mode = "operations" }) {
-  const showSettings = isAdmin && mode === "settings";
+// Rechte je Turnier (#1353), wie sie der Server schickt: Einstellungen der Phasen nur für die Turnierleitung über alle
+// Turniere, Erzeugen mit dem Aufbau-Recht, Termin und Station mit dem Check-in-Recht, Ergebnisse mit dem Ergebnis-Recht.
+export function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], tournamentStartDate = null, canEditSettings = false, canManageStructure = false, canPlanMatches = false, canRecordResults = false, onChanged, onSaveMatchMeta, mode = "operations" }) {
+  const showSettings = canEditSettings && mode === "settings";
   const showMatchList = mode !== "settings";
   const [createOpen, setCreateOpen] = useState(stages.length === 0);
   const [form, setForm] = useState({
@@ -136,7 +138,8 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
             regById={regById}
             stations={stations}
             tournamentStartDate={tournamentStartDate}
-            isModerator={isModerator}
+            canManageStructure={canManageStructure}
+            canPlanMatches={canPlanMatches}
             canRecordResults={canRecordResults}
             showSettings={showSettings}
             showMatchList={showMatchList}
@@ -155,7 +158,7 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
   );
 }
 
-function StageCard({ tournamentId, stage, matches, regById, stations = [], tournamentStartDate = null, isModerator, canRecordResults = false, showSettings = false, showMatchList = true, onChanged, onDelete, onSaveMatchMeta }) {
+function StageCard({ tournamentId, stage, matches, regById, stations = [], tournamentStartDate = null, canManageStructure = false, canPlanMatches = false, canRecordResults = false, showSettings = false, showMatchList = true, onChanged, onDelete, onSaveMatchMeta }) {
   const settings = stage.settings || {};
   const [activeSection, setActiveSection] = useState("all");
   const [form, setForm] = useState({
@@ -285,7 +288,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
             {Object.entries(statusCounts).map(([status, count]) => <span key={status}>· {count} {formatMatchStatus(status)}</span>)}
           </div>
         </div>
-        {(isModerator || showSettings) && (
+        {(canManageStructure || showSettings) && (
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => generate({ preview: true })} disabled={!config.canGenerate} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Vorschau</button>
             <button type="button" onClick={() => generate({ preview: false })} disabled={!config.canGenerate} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Mit Teilnehmern generieren</button>
@@ -360,7 +363,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
                   regById={regById}
                   stations={stations}
                   tournamentStartDate={tournamentStartDate}
-                  canEdit={isModerator}
+                  canEdit={canPlanMatches}
                   canRecordResults={canRecordResults}
                   onChanged={onChanged}
                   onSaveMatchMeta={onSaveMatchMeta}
@@ -421,7 +424,7 @@ function MatchV2Card({ match, regById, stations = [], tournamentStartDate = null
         </div>
       )}
       {canEdit && <MatchScheduleControls match={match} stations={stations} defaultScheduledAt={tournamentStartDate} onSave={onSaveMatchMeta} />}
-      {canEdit && canRecordResults && filledSlots.length > 1 && (
+      {canRecordResults && filledSlots.length > 1 && (
         <div className="mt-4 border-t border-white/10 pt-3 flex flex-wrap items-center gap-3">
           <button type="button" onClick={() => setResultOpen(true)} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase" data-testid={`matchplan-result-${match.id}`}>
             {(match.results || []).length ? "Ergebnis korrigieren" : "Ergebnis eintragen"}

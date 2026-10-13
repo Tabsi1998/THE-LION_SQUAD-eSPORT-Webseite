@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminLayout, canOpenAdminLink } from "@/components/tls/AdminLayout";
+import { canUseArea, hasHelperAssignment } from "@/lib/permissions";
+import { DutyList } from "@/pages/admin/duty/DutyList";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2, TrendingUp, ClipboardCheck, MessageCircleWarning, Clock, Wallet, Star } from "lucide-react";
@@ -17,8 +19,16 @@ function StatusDot({ ok }) {
 
 export default function AdminDashboardPage() {
   const auth = useAuth();
-  const canFinance = typeof auth?.can === "function" && auth.can("finance");
-  const canContent = typeof auth?.can === "function" && auth.can("content");
+  const user = auth?.user || null;
+  // Nur, was die Person auch tun darf (#1353): jeder Knopf, jede Aufgabe und jede Anfrage hängt an dem Bereich, den
+  // auch die Seite dahinter und der Server verlangen - dieselbe Liste wie das Menü (`canOpenAdminLink`).
+  const canFinance = canUseArea(user, "finance");
+  const canContent = canUseArea(user, "content");
+  const canSystem = canUseArea(user, "system");
+  const isSuperAdmin = user?.role === "superadmin";
+  const helper = hasHelperAssignment(user);
+  const may = (to) => canOpenAdminLink(user, to);
+  const [duty, setDuty] = useState(null);
   const [data, setData] = useState(null);
   const [setupStatus, setSetupStatus] = useState(null);
   const [sys, setSys] = useState(null);
@@ -30,13 +40,18 @@ export default function AdminDashboardPage() {
   const [refreshedAt, setRefreshedAt] = useState(null);
   const load = useCallback(() => {
     api.get("/admin/dashboard").then(({ data }) => { setData(data); setRefreshedAt(new Date()); });
-    api.get("/setup/status").then(({ data }) => setSetupStatus(data)).catch(() => {});
-    api.get("/admin/system-status").then(({ data }) => setSys(data)).catch(() => {});
-    api.get("/settings/auth").then(({ data }) => setAuthFlags(data)).catch(() => {});
-    api.get("/me/platform-links").then(({ data }) => setLinkAvail(data?.available || null)).catch(() => {});
-    api.get("/settings/public").then(({ data }) => setPublicCfg(data)).catch(() => {});
     api.get("/admin/growth-stats?days=30").then(({ data }) => setGrowth(data)).catch(() => {});
-  }, []);
+    // Systemstand, Setup und Einstellungen nur für System - die Login-Schalter nur für den Superadmin, wie im Server.
+    if (canSystem) {
+      api.get("/setup/status").then(({ data }) => setSetupStatus(data)).catch(() => {});
+      api.get("/admin/system-status").then(({ data }) => setSys(data)).catch(() => {});
+      api.get("/me/platform-links").then(({ data }) => setLinkAvail(data?.available || null)).catch(() => {});
+      api.get("/settings/public").then(({ data }) => setPublicCfg(data)).catch(() => {});
+    }
+    if (isSuperAdmin) api.get("/settings/auth").then(({ data }) => setAuthFlags(data)).catch(() => {});
+    // Eigene Helfer-Einsätze stehen oben (#1352) - aus demselben Dienst wie „Mein Dienst“.
+    if (helper) api.get("/users/me/duty").then(({ data }) => setDuty(data)).catch(() => {});
+  }, [canSystem, isSuperAdmin, helper]);
   useEffect(() => { load(); }, [load]);
   useLiveRefresh(load, [], { fallbackMs: 30000 });
 
@@ -49,7 +64,7 @@ export default function AdminDashboardPage() {
     { label: "Scheduler", ok: sys?.scheduler?.running, detail: sys?.scheduler?.running ? `${(sys?.scheduler?.jobs || []).length} Jobs` : "gestoppt", icon: Activity, to: "/admin/settings/status" },
     { label: "Mail-Queue", ok: queueFailed ? false : queuePending ? null : true, detail: `${queuePending} offen · ${queueFailed} Fehler`, icon: Server, to: "/admin/settings/mail-queue" },
     { label: "Push-Tokens", ok: Number(data?.mobile_push?.active_tokens || 0) > 0 ? true : null, detail: `${data?.mobile_push?.active_tokens ?? 0} aktiv`, icon: BellRing, to: "/admin/mobile-push" },
-  ];
+  ].filter((chip) => may(chip.to));
 
   const onFlag = (v) => v === true ? "an" : v === false ? "aus" : "—";
   const settingsHub = [
@@ -66,7 +81,7 @@ export default function AdminDashboardPage() {
     { label: "Vereinsdaten", detail: "Impressum & Datenschutz", to: "/admin/club", icon: ShieldCheck, ok: undefined },
     { label: "Navigation", detail: "Menüs steuern", to: "/admin/nav", icon: SettingsIcon, ok: undefined },
     { label: "Systemstatus", detail: "Queue, Uploads, Scheduler", to: "/admin/settings/status", icon: Activity, ok: undefined },
-  ];
+  ].filter((entry) => may(entry.to));
 
 
   // Nur Zahlen zum Nachschauen. Alles, wo jemand etwas tun muss - Einsprüche,
@@ -261,6 +276,9 @@ export default function AdminDashboardPage() {
   const taskIsActive = (item) => {
     if (item.key === "reported-results") return reportedResults > 0;
     if (item.key === "schedule-deadlines") return scheduleDeadlines > 0;
+    // Aufgaben des Kassiers (#992): Prüffälle und Belege, die hängen.
+    if (item.key === "billing-cases") return billingCases > 0;
+    if (item.key === "finance-attention") return Boolean(financeFirst) || Number(financeAttention?.overdue || 0) > 0;
     if (item.to === "/admin/moderation") return moderationReports > 0;
     if (item.to === "/admin/contact") return contactMessages > 0;
     if (item.to === "/setup") return Boolean(setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100));
@@ -279,8 +297,17 @@ export default function AdminDashboardPage() {
   };
   // Steht nichts an, wird das gesagt. Früher rückten hier vier Routinelinks
   // nach und sahen aus wie echte offene Aufgaben.
-  const activeTaskItems = taskItems.filter(taskIsActive);
-  const secondaryTaskItems = taskItems.filter((item) => !activeTaskItems.includes(item));
+  const allowedTaskItems = taskItems.filter((item) => may(item.to));
+  const activeTaskItems = allowedTaskItems.filter(taskIsActive);
+  const secondaryTaskItems = allowedTaskItems.filter((item) => !activeTaskItems.includes(item));
+  // Schnellzugriff (#1353): nur mit Turnierleitung - „+ Turnier“, „+ Fast Lap“, Events und Stationen.
+  const quickActions = [
+    { to: "/admin/tournaments/new", label: "+ Turnier", testId: "quick-new-tournament", primary: true },
+    { to: "/admin/f1/new", label: "+ Fast-Lap-Challenge", testId: "quick-new-f1", primary: true },
+    { to: "/admin/events", label: "Events", testId: "quick-events" },
+    { to: "/admin/stations", label: "Stationen", testId: "quick-stations" },
+  ].filter((action) => may(action.to));
+  const dutyRows = duty?.assignments || [];
 
   const growthData = (growth?.days || []).map((d) => ({
     ...d,
@@ -308,7 +335,19 @@ export default function AdminDashboardPage() {
         </button>
       </div>
 
-      {/* Live system health strip */}
+      {/* Eigene Helfer-Einsätze (#1352): stehen oben, vor allem anderen. */}
+      {dutyRows.length > 0 && (
+        <section className="mb-6" data-testid="dashboard-duty" aria-labelledby="dashboard-duty-heading">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 id="dashboard-duty-heading" className="font-heading font-bold uppercase text-lg">Deine Einsätze</h2>
+            <Link to="/admin/dienst" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Mein Dienst</Link>
+          </div>
+          <DutyList rows={dutyRows} testId="dashboard-duty-list" />
+        </section>
+      )}
+
+      {/* Live system health strip - nur für System, die Seiten dahinter gehören dorthin. */}
+      {liveChips.length > 0 && (
       <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3" data-testid="dashboard-live-status">
         {liveChips.map((c) => (
           <Link key={c.label} to={c.to} className="border border-white/10 bg-[#121212] rounded-sm p-3 hover:border-[#29B6E8]/40 transition group">
@@ -322,8 +361,9 @@ export default function AdminDashboardPage() {
           </Link>
         ))}
       </div>
+      )}
 
-      {setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100) && (
+      {canSystem && setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100) && (
         <Link to="/setup" data-testid="dashboard-setup-cta" className="block mb-6 border border-[#29B6E8]/40 bg-gradient-to-r from-[#29B6E8]/10 to-transparent rounded-sm p-4 hover:border-[#29B6E8] transition group">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -385,7 +425,11 @@ export default function AdminDashboardPage() {
                   <span className="shrink-0 text-[10px] uppercase tracking-widest font-bold" style={{ color: item.kind === "event" ? "#9F7AEA" : item.kind === "check_in" ? "#FFD700" : "#29B6E8" }}>
                     {item.kind === "event" ? "Event" : item.kind === "check_in" ? "Check-in" : "Match"}
                   </span>
-                  <Link to={item.url} className="min-w-0 flex-1 truncate text-white hover:text-[#29B6E8]">{item.title}</Link>
+                  {may(item.url) ? (
+                    <Link to={item.url} className="min-w-0 flex-1 truncate text-white hover:text-[#29B6E8]">{item.title}</Link>
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate text-white">{item.title}</span>
+                  )}
                   {item.detail && <span className="text-xs text-white/40 shrink-0">{item.detail}</span>}
                 </li>
               ))}
@@ -415,15 +459,25 @@ export default function AdminDashboardPage() {
         )}
       </div>
 
-      <div className="mb-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-quick-actions">
-        <h2 className="font-heading font-bold uppercase text-lg mb-3">Schnellzugriff</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <Link to="/admin/tournaments/new" data-testid="quick-new-tournament" className="px-4 py-3 border border-[#29B6E8]/40 text-[#29B6E8] text-sm uppercase tracking-wider font-bold rounded-sm hover:bg-[#29B6E8]/10">+ Turnier</Link>
-          <Link to="/admin/f1/new" data-testid="quick-new-f1" className="px-4 py-3 border border-[#29B6E8]/40 text-[#29B6E8] text-sm uppercase tracking-wider font-bold rounded-sm hover:bg-[#29B6E8]/10">+ Fast-Lap-Challenge</Link>
-          <Link to="/admin/events" className="px-4 py-3 border border-white/10 text-white text-sm uppercase tracking-wider font-bold rounded-sm hover:border-[#29B6E8]/40">Events</Link>
-          <Link to="/admin/stations" className="px-4 py-3 border border-white/10 text-white text-sm uppercase tracking-wider font-bold rounded-sm hover:border-[#29B6E8]/40">Stationen</Link>
+      {quickActions.length > 0 && (
+        <div className="mb-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-quick-actions">
+          <h2 className="font-heading font-bold uppercase text-lg mb-3">Schnellzugriff</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {quickActions.map((action) => (
+              <Link
+                key={action.to}
+                to={action.to}
+                data-testid={action.testId}
+                className={action.primary
+                  ? "px-4 py-3 border border-[#29B6E8]/40 text-[#29B6E8] text-sm uppercase tracking-wider font-bold rounded-sm hover:bg-[#29B6E8]/10"
+                  : "px-4 py-3 border border-white/10 text-white text-sm uppercase tracking-wider font-bold rounded-sm hover:border-[#29B6E8]/40"}
+              >
+                {action.label}
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div data-testid="dashboard-kpis">
         <h2 className="font-heading font-bold uppercase text-lg mb-3">Zahlen im Überblick</h2>
@@ -498,13 +552,14 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
+      {settingsHub.length > 0 && (
       <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-settings-hub">
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
             <div className="text-[10px] uppercase tracking-[0.28em] text-[#29B6E8] font-bold">Einstellungen-Zentrale</div>
             <h2 className="font-heading font-bold uppercase text-lg mt-1">Alles konfigurieren</h2>
           </div>
-          <Link to="/admin/integrations" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Einstellungen</Link>
+          {may("/admin/integrations") && <Link to="/admin/integrations" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Einstellungen</Link>}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
           {settingsHub.map((s) => (
@@ -519,11 +574,12 @@ export default function AdminDashboardPage() {
           ))}
         </div>
       </div>
+      )}
 
       <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-audit-log">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="font-heading font-bold uppercase text-lg flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Letzte Adminaktionen</h2>
-          <Link to="/admin/ops?tab=events" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Logs</Link>
+          {may("/admin/ops") && <Link to="/admin/ops?tab=events" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Logs</Link>}
         </div>
         <div className="space-y-2 text-sm">
           {(data?.recent_audit_logs || []).slice(0, 8).map((l, i) => (

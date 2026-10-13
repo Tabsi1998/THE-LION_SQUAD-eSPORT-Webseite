@@ -372,6 +372,12 @@ def require_any_admin():
     return require_area("tournaments", "content", "club", "system")
 
 
+def require_dashboard():
+    """Startseite der Verwaltung (#1353, #992): jeder Verwaltungsbereich - auch Finanzen (Kassier), mit Zwei-Faktor.
+    Spiegel von ``ADMIN_AREAS`` im Web (Menüeintrag „Dashboard“, Seiten-Schutz von /admin)."""
+    return require_area("tournaments", "content", "club", "finance", "system")
+
+
 def require_admin():
     """Turnierleitung: Turniere, Events, Stationen, Fast Lap, Saisons, Gewinne (#288)."""
     return require_area("tournaments")

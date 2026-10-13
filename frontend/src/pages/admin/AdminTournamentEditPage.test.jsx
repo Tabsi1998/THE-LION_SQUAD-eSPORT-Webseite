@@ -25,9 +25,9 @@ vi.mock("@/lib/api", () => ({
 }));
 
 // Der Bereich Finanzen (#322) entscheidet, ob das Startgeld (#319) im Formular steht.
-const authState = { areas: [] };
+const authState = { areas: [], lead: true };
 vi.mock("@/context/AuthContext", () => ({
-  useAuth: () => ({ isAdmin: true, isTournamentLead: true, isModerator: true, user: { id: "admin-1", display_name: "Admin" }, can: (area) => authState.areas.includes(area) }),
+  useAuth: () => ({ isTournamentLead: authState.lead, user: { id: "admin-1", display_name: "Admin" }, can: (area) => authState.areas.includes(area) }),
 }));
 
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
@@ -57,7 +57,13 @@ const TOURNAMENT = {
   team_size: 3,
   max_teams: 16,
   registration_enabled: true,
+  // Rechte je Turnier (#1353), wie sie der Server der Turnierleitung schickt.
   can_manage_structure: true,
+  can_manage_results: true,
+  can_check_in: true,
+  can_manage_participants: true,
+  can_assign_stations: true,
+  can_use_staff_tools: true,
 };
 
 function routeFor(url) {
@@ -89,6 +95,7 @@ function renderPage() {
 
 beforeEach(() => {
   authState.areas = [];
+  authState.lead = true;
   apiMock.get.mockImplementation((url) => Promise.resolve(routeFor(String(url))));
   apiMock.post.mockResolvedValue({ data: {} });
   apiMock.patch.mockImplementation((_url, body) => Promise.resolve({ data: { ...TOURNAMENT, ...body } }));
@@ -426,4 +433,58 @@ test("Teilnehmer über die Personensuche: die Anmeldung geht mit der Kennung des
   expect(screen.getByTestId("participant-add-user-selected")).toHaveTextContent("Erika Beispiel");
   await user.click(screen.getByTestId("participant-add-submit"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/registrations", expect.objectContaining({ user_id: "u-9" })));
+});
+
+// Knöpfe nach den Rechten je Turnier (#1353): eine Stream-Betreuung sieht keine Check-in-, Entfernen- oder Aufbau-Knöpfe
+// und keinen Reiter „Team“; eine Redaktion (kein Recht in diesem Turnier) gar keine Werkzeuge.
+const NO_RIGHTS = {
+  can_manage_structure: false, can_manage_results: false, can_check_in: false, can_manage_participants: false,
+  can_assign_stations: false, can_use_staff_tools: false,
+};
+
+function serveTournament(rights) {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/registrations")) return Promise.resolve({ data: [{ id: "r-1", status: "approved", display_name: "Max Muster" }] });
+    if (path.includes("/tournaments/t-1") && !path.includes("/", 15)) return Promise.resolve({ data: { ...TOURNAMENT, ...NO_RIGHTS, ...rights } });
+    return Promise.resolve(routeFor(path));
+  });
+}
+
+test("Stream-Betreuung: nur die Werkzeuge zum Lesen, kein Check-in, kein Entfernen, kein Team", async () => {
+  authState.lead = false;
+  serveTournament({ can_use_staff_tools: true });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await screen.findAllByText("Max Muster");
+  expect(screen.queryByRole("button", { name: "Check-in" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Entfernen" })).toBeNull();
+  expect(screen.queryByTestId("participant-add-submit")).toBeNull();
+  expect(screen.queryByTestId("admin-tr-reset")).toBeNull();
+  expect(screen.getByTestId("admin-tr-planning-check")).toBeInTheDocument();
+  expect(screen.queryByTestId("admin-tr-tab-staff")).toBeNull();
+  expect(apiMock.get.mock.calls.map(([url]) => String(url))).not.toContain("/admin/choices/teams");
+});
+
+test("Ergebnisdienst: Check-in und Teilnehmer ja, Turnierbaum zurücksetzen nein", async () => {
+  authState.lead = false;
+  serveTournament({ can_use_staff_tools: true, can_check_in: true, can_manage_participants: true, can_manage_results: true });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect((await screen.findAllByRole("button", { name: "Check-in" })).length).toBeGreaterThan(0);
+  expect(screen.getAllByRole("button", { name: "Entfernen" }).length).toBeGreaterThan(0);
+  expect(screen.queryByTestId("admin-tr-reset")).toBeNull();
+});
+
+test("Redaktion ohne Recht in diesem Turnier: keine Werkzeuge", async () => {
+  authState.lead = false;
+  serveTournament({});
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await screen.findAllByText("Max Muster");
+  expect(screen.queryByRole("button", { name: "Check-in" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Entfernen" })).toBeNull();
+  expect(screen.queryByTestId("admin-tr-tools")).toBeNull();
+  expect(screen.queryByTestId("admin-tr-tab-staff")).toBeNull();
+  expect(apiMock.get.mock.calls.map(([url]) => String(url)).some((url) => url.startsWith("/stations"))).toBe(false);
 });
