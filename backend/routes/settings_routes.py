@@ -1359,22 +1359,69 @@ MAIL_RETRY_REFUSALS = {
 }
 
 
+async def _mail_queue_rows(status: Optional[str], limit: int, address: str = "") -> list[dict]:
+    """Die Liste der Warteschlange (#1418): Empfänger nur gekürzt (``to_masked``), keine ganze Adresse - auch nicht im
+    Betreff oder in der Meldung des Mailservers. Die Suche nach einer Adresse trifft die ganze Adresse, zeigt aber
+    ebenfalls nur gekürzt."""
+    from services.mail_catalog import CATALOG
+    from services.mail_queue import masked_job
+    from services.query_filters import safe_regex
+    db = get_db()
+    q: dict = {}
+    if status in MAIL_JOB_STATES:
+        q["status"] = status
+    term = safe_regex(address, max_len=254)
+    if term:
+        q["to"] = {"$regex": term, "$options": "i"}
+    safe_limit = max(1, min(int(limit or 100), 500))
+    jobs = await db.mail_jobs.find(q, {"_id": 0, "html": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    rows = []
+    for job in jobs:
+        row = masked_job(job)
+        # Die Vorlage mit ihrem deutschen Namen aus dem Mail-Katalog - keine Kennungen in der Liste.
+        name = (CATALOG.get(str(job.get("template_key") or "")) or {}).get("name")
+        if name:
+            row["template_label"] = name
+        rows.append(row)
+    return rows
+
+
 @settings_router.get("/mail-queue")
 async def list_mail_queue(status: Optional[str] = None, limit: int = 100,
                           me: dict = Depends(require_club_admin())):
-    from services.mail_catalog import CATALOG
+    return await _mail_queue_rows(status, limit)
+
+
+class MailQueueSearchBody(BaseModel):
+    q: str = Field(default="", max_length=254)
+    status: Optional[str] = None
+    limit: int = Field(default=100, ge=1, le=500)
+
+
+@settings_router.post("/mail-queue/search")
+async def search_mail_queue(body: MailQueueSearchBody, me: dict = Depends(require_club_admin())):
+    """Nach Adresse suchen (#1418) - als POST, damit die gesuchte Adresse nicht in Adresszeile und Zugriffsprotokoll
+    landet. Die Treffer stehen gekürzt da wie in der Liste."""
+    return await _mail_queue_rows(body.status, body.limit, body.q)
+
+
+@settings_router.post("/mail-queue/{job_id}/recipient")
+async def reveal_mail_recipient(job_id: str, me: dict = Depends(require_club_admin())):
+    """„Adresse zeigen“ (#1418): die ganze Empfänger-Adresse einer Zeile, nur für den Bereich System. Jedes Aufdecken
+    steht im Protokoll (wer, wann, welche Mail) - die Adresse selbst nicht. POST, weil das Aufdecken etwas schreibt."""
     db = get_db()
-    q = {}
-    if status in MAIL_JOB_STATES:
-        q["status"] = status
-    safe_limit = max(1, min(int(limit or 100), 500))
-    jobs = await db.mail_jobs.find(q, {"_id": 0, "html": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
-    # Die Vorlage mit ihrem deutschen Namen aus dem Mail-Katalog - keine Kennungen in der Liste.
-    for job in jobs:
-        name = (CATALOG.get(str(job.get("template_key") or "")) or {}).get("name")
-        if name:
-            job["template_label"] = name
-    return jobs
+    job = await db.mail_jobs.find_one({"id": job_id}, {"_id": 0, "id": 1, "to": 1, "template_key": 1})
+    if not job:
+        raise HTTPException(404, "Diese Mail gibt es nicht mehr.")
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "mail_queue.recipient_revealed",
+        "actor_id": me.get("id"),
+        "target_id": job_id,
+        "data": {"template_key": job.get("template_key")},
+        "created_at": now_utc().isoformat(),
+    })
+    return {"id": job_id, "to": job.get("to") or ""}
 
 
 @settings_router.get("/mail-queue/stats")

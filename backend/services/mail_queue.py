@@ -22,6 +22,41 @@ from services.log_safe import log_safe, mask_addresses
 logger = logging.getLogger("tls.mailqueue")
 
 # Backoff schedule in minutes for retry attempts (1m, 5m, 30m, 2h, 12h)
+# Felder, die die Liste der Warteschlange nie zeigt (#1418): die ganze Adresse, der Mailtext und der Schlüssel gegen
+# doppelten Versand. Die Adresse steht gekürzt in ``to_masked``; ganz nur über „Adresse zeigen“ (mit Protokoll).
+LIST_HIDDEN_FIELDS = ("to", "html", "dedupe_key")
+
+
+def masked_recipient(address) -> str:
+    """Die Empfänger-Adresse gekürzt (#1418): erster Buchstabe, Domain sichtbar - ``paula@gmail.com`` → ``p***@gmail.com``.
+    Was keine Adresse ist, wird ganz verdeckt."""
+    text = str(address or "").strip()
+    local, at, domain = text.rpartition("@")
+    if not at or not local or not domain:
+        return "***" if text else ""
+    return f"{local[0]}***@{domain}"
+
+
+def _mask_value(value):
+    if isinstance(value, str):
+        return mask_addresses(value)
+    if isinstance(value, dict):
+        return {key: _mask_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_mask_value(item) for item in value]
+    return value
+
+
+def masked_job(job: dict | None) -> dict | None:
+    """Ein Eintrag der Warteschlange ohne ganze Adresse (#1418) - auch nicht in Betreff, Fehlermeldung oder Zusatzdaten:
+    der Mailserver nennt die Adresse oft in seiner Antwort („550 … <paula@…> unknown“)."""
+    if not job:
+        return job
+    shown = {key: _mask_value(value) for key, value in job.items() if key not in LIST_HIDDEN_FIELDS}
+    shown["to_masked"] = masked_recipient(job.get("to"))
+    return shown
+
+
 RETRY_BACKOFF_MIN = [1, 5, 30, 120, 720]
 MAX_ATTEMPTS = len(RETRY_BACKOFF_MIN) + 1
 SENDING_STALE_MINUTES = 15
@@ -603,8 +638,8 @@ async def mail_queue_stats() -> dict:
         "counts": counts,
         "due_pending": due_pending,
         "stale_sending": stale_sending,
-        "latest_problem": latest_problem,
-        "next_pending": next_pending,
+        "latest_problem": masked_job(latest_problem),
+        "next_pending": masked_job(next_pending),
         "max_attempts": MAX_ATTEMPTS,
         "stale_after_minutes": SENDING_STALE_MINUTES,
     }
