@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { API, api, formatRequestError, parseTimeStr, resolveMediaUrl } from "@/lib/api";
 import { formatLapTime, parseLapTime } from "@/lib/laptime";
+import { safeHttpUrl } from "@/lib/safeLink";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -338,7 +339,7 @@ export default function AdminF1EditPage() {
                       {(t.score_scope || "official") === "club_reference" && <span className="text-[#FFD700] border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm">Referenz</span>}
                       {t.penalty_seconds > 0 && <span className="text-[#FF3B30] text-xs">+{t.penalty_seconds}s</span>}
                       {t.is_invalid && <span className="text-[#FF3B30] text-[10px] font-bold uppercase tracking-widest">INVALID</span>}
-                      {t.proof_url && <a href={t.proof_url} target="_blank" rel="noreferrer" className="text-[10px] text-[#29B6E8] uppercase tracking-widest hover:underline">Proof</a>}
+                      {safeHttpUrl(t.proof_url) && <a href={safeHttpUrl(t.proof_url)} target="_blank" rel="noreferrer" className="text-[10px] text-[#29B6E8] uppercase tracking-widest hover:underline">Proof</a>}
                       <button
                         onClick={() => setEditTime({
                           ...t,

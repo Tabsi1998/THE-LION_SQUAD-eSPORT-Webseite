@@ -327,7 +327,8 @@ async def confirm(db, discord_user_id, kind: str, item_id: str, then: str | None
             await event_registration.ensure_can_register(db, event, user)
             doc = await event_registration.register(db, event, user, via="discord")
         except RegistrationError as exc:
-            return answer(DOUBLE if exc.status == 409 else exc.detail, buttons=link)
+            # Eine belegte Platzsperre ist keine Doppelanmeldung (#1037): dann „gleich nochmal versuchen“.
+            return answer(DOUBLE if exc.status == 409 and not isinstance(exc, event_registration.SeatsBusy) else exc.detail, buttons=link)
         name = event.get("name") or "Event"
         if doc.get("status") == "waitlist":
             counts = await event_registration.summary(db, event)

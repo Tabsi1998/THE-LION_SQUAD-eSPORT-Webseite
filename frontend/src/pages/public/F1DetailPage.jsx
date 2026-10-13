@@ -16,6 +16,7 @@ import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { Award, Tv, Trophy, Flag, Calendar, Trash2, FileDown } from "lucide-react";
 import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
+import { safeHttpUrl } from "@/lib/safeLink";
 import { seoTextPreview } from "@/lib/textPreview";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
@@ -527,7 +528,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
                   <span>#{time.attempt_number || "-"}</span>
                   {(time.score_scope || "official") === "club_reference" && <span className="text-[#FFD700]">Referenz</span>}
                   {time.penalty_seconds > 0 && <span className="text-[#FF3B30]">+{time.penalty_seconds}s</span>}
-                  {time.proof_url && <a href={time.proof_url} target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">Proof</a>}
+                  {safeHttpUrl(time.proof_url) && <a href={safeHttpUrl(time.proof_url)} target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">Proof</a>}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
