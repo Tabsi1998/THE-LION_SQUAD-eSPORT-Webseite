@@ -11,7 +11,7 @@ from pymongo.errors import DuplicateKeyError
 from starlette.concurrency import run_in_threadpool
 from database import get_db
 from auth import (
-    hash_password, verify_password, create_access_token, create_refresh_token,
+    password_fields, verify_user_password, verify_and_upgrade_password, create_access_token, create_refresh_token,
     set_auth_cookies, clear_auth_cookies, get_current_user, get_optional_user, _decode,
     hash_token, refresh_expires_at, as_utc_datetime, token_remembers,
 )
@@ -647,7 +647,7 @@ async def register(body: UserRegister, request: Request, response: Response):
         "id": user_id,
         "email": email,
         "username": username,
-        "password_hash": hash_password(body.password),
+        **password_fields(body.password),
         "display_name": username,
         "avatar_url": None, "banner_url": None,
         "role": "player",
@@ -708,7 +708,7 @@ async def login(body: UserLogin, request: Request, response: Response):
     if user and user.get("password_setup_required"):
         await _record_failed(db, identifier)
         raise HTTPException(status_code=403, detail="Bitte zuerst den Einladungslink verwenden und ein Passwort erstellen.")
-    if not user or not verify_password(body.password, user["password_hash"]):
+    if not user or not await verify_and_upgrade_password(db, user, body.password):
         await _record_failed(db, identifier)
         raise HTTPException(status_code=401, detail="Ungültige Zugangsdaten")
     if user.get("is_active") is False:
@@ -759,7 +759,7 @@ def _google_user_doc(email: str, name: str, picture: str | None, google_id: str 
         "email": email,
         "username": username,
         # Random unusable password; the account signs in via Google (or via reset).
-        "password_hash": hash_password(secrets.token_urlsafe(32)),
+        **password_fields(secrets.token_urlsafe(32)),
         "display_name": display,
         "avatar_url": picture or None, "banner_url": None,
         "role": "player", "roles": ["player"], "user_type": "community_user",
@@ -934,7 +934,7 @@ async def mobile_register(body: UserRegister, request: Request):
         "id": new_id(),
         "email": email,
         "username": username,
-        "password_hash": hash_password(body.password),
+        **password_fields(body.password),
         "display_name": username,
         "avatar_url": None, "banner_url": None,
         "role": "player",
@@ -993,7 +993,7 @@ async def mobile_login(body: UserLogin, request: Request):
     if user and user.get("password_setup_required"):
         await _record_failed(db, identifier)
         raise HTTPException(status_code=403, detail="Bitte zuerst den Einladungslink verwenden und ein Passwort erstellen.")
-    if not user or not verify_password(body.password, user["password_hash"]):
+    if not user or not await verify_and_upgrade_password(db, user, body.password):
         await _record_failed(db, identifier)
         raise HTTPException(status_code=401, detail="Ungültige Zugangsdaten")
     if user.get("is_active") is False:
@@ -1360,7 +1360,7 @@ async def setup_mfa(body: MfaPasswordBody, request: Request, user: dict = Depend
     full = await db.users.find_one({"id": user["id"]})
     if not full or not full.get("password_login_available", full.get("auth_provider") != "google"):
         raise HTTPException(status_code=400, detail="Bitte zuerst ein eigenes Passwort über Passwort vergessen setzen.")
-    if not verify_password(body.current_password, full.get("password_hash") or ""):
+    if not verify_user_password(full, body.current_password):
         raise HTTPException(status_code=400, detail="Aktuelles Passwort falsch")
     secret = generate_totp_secret()
     now = now_utc()
@@ -1417,7 +1417,7 @@ async def disable_mfa(body: MfaDisableBody, request: Request, user: dict = Depen
     full = await db.users.find_one({"id": user["id"]})
     if not full or not full.get("mfa_enabled"):
         raise HTTPException(status_code=400, detail="MFA ist nicht aktiviert.")
-    if not verify_password(body.current_password, full.get("password_hash") or ""):
+    if not verify_user_password(full, body.current_password):
         raise HTTPException(status_code=400, detail="Aktuelles Passwort falsch")
     if not await _verify_mfa_code(db, full, body.code):
         raise HTTPException(status_code=400, detail="MFA- oder Wiederherstellungscode ist ungültig.")
@@ -1497,7 +1497,7 @@ async def _set_password_from_link(db, doc: dict, body: ResetPasswordBody, now: d
     """Das neue Passwort (bei einer Einladung samt Zustimmung) setzen - schlägt fehl, wenn das Konto fehlt."""
     is_invite = doc.get("purpose") == "admin_invite"
     updates = {
-        "password_hash": hash_password(body.new_password),
+        **password_fields(body.new_password),
         "password_setup_required": False,
         "password_login_available": True,
         "auth_provider": "hybrid",
@@ -1522,11 +1522,11 @@ async def _set_password_from_link(db, doc: dict, body: ResetPasswordBody, now: d
 async def change_password(body: ChangePasswordBody, user: dict = Depends(get_current_user)):
     db = get_db()
     full = await db.users.find_one({"id": user["id"]})
-    if not full or not verify_password(body.current_password, full["password_hash"]):
+    if not full or not verify_user_password(full, body.current_password):
         raise HTTPException(status_code=400, detail="Aktuelles Passwort falsch")
     await db.users.update_one(
         {"id": user["id"]},
-        {"$set": {"password_hash": hash_password(body.new_password),
+        {"$set": {**password_fields(body.new_password),
                   "updated_at": now_utc().isoformat()}},
     )
     await db.refresh_tokens.update_many(

@@ -7,6 +7,7 @@ import os
 from database import close_client
 from runtime_config import is_placeholder_secret, resolve_app_environment
 from seed import seed_admin
+from services.password_policy import password_problem
 
 
 async def main() -> None:
@@ -17,6 +18,10 @@ async def main() -> None:
         raise RuntimeError("BOOTSTRAP_ADMIN_EMAIL must be a valid email address.")
     if len(password) < 12 or is_placeholder_secret(password):
         raise RuntimeError("BOOTSTRAP_ADMIN_PASSWORD must be a real password with at least 12 characters.")
+    # Passwortvertrag (#1033): dieselbe Regel wie bei jedem anderen neuen Passwort.
+    problem = password_problem(password)
+    if problem:
+        raise RuntimeError(f"BOOTSTRAP_ADMIN_PASSWORD: {problem}")
     try:
         created = await seed_admin(email, password)
         if created:

@@ -10,6 +10,8 @@ durch ``strip_private``.
 
 PRIVATE_USER_FIELDS = frozenset({
     "password_hash",
+    # Passwortvertrag (#1033): Markierung, nach welcher Form der Hash entstand.
+    "password_contract",
     "google_id",
     "mfa_secret",
     "mfa_pending_secret",

@@ -6,6 +6,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { AuthFormAlert, AuthPasswordField, AuthTextField } from "@/components/tls/AuthFormFields";
 import { toast } from "sonner";
+import { MIN_PASSWORD_LENGTH, PASSWORD_RULE_HINT, passwordProblem } from "@/lib/passwordRules";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -108,7 +109,7 @@ export function ResetPasswordPage() {
   const validate = () => {
     const errors = {};
     if (!password) errors.password = "Bitte vergib ein neues Passwort.";
-    else if (password.length < 10) errors.password = "Das Passwort braucht mindestens 10 Zeichen.";
+    else if (passwordProblem(password)) errors.password = passwordProblem(password);
     if (!confirm) errors.confirm = "Bitte wiederhole dein Passwort.";
     else if (password !== confirm) errors.confirm = "Die Passwörter stimmen nicht überein.";
     if (isInvite && !acceptPrivacy) errors.acceptPrivacy = "Bitte akzeptiere die Datenschutzerklärung.";
@@ -159,9 +160,9 @@ export function ResetPasswordPage() {
             show={showPassword}
             onToggle={() => setShowPassword((value) => !value)}
             required
-            minLength={10}
+            minLength={MIN_PASSWORD_LENGTH}
             autoComplete="new-password"
-            description="Mindestens 10 Zeichen."
+            description={PASSWORD_RULE_HINT}
             error={fieldErrors.password}
             testId="reset-password"
           />
