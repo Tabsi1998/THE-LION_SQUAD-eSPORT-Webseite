@@ -4,7 +4,7 @@ Nur mit dem Bereich Turnierleitung (Rolle oder Freigabe) - wie Liste und Ändern
 die Moderation und Angemeldete bekommen 403. Geändert wird über ``PATCH /api/events/{id}/registrations/{rid}``;
 die Logik steht in ``services/event_lead.py``.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from auth import require_admin
@@ -30,7 +30,10 @@ async def _event(slug_or_id: str) -> dict:
 
 
 @router.get("/{slug_or_id}/lead")
-async def event_lead_view(slug_or_id: str, q: str = "", filter: str = "open", me: dict = Depends(require_admin())):
+async def event_lead_view(slug_or_id: str, response: Response, q: str = "", filter: str = "open",
+                          me: dict = Depends(require_admin())):
+    # Namen und Notizen der Angemeldeten: nie in einem gemeinsamen Zwischenspeicher.
+    response.headers["Cache-Control"] = "private, no-store"
     event = await _event(slug_or_id)
     try:
         return await event_lead.lead_view(get_db(), event, query=q[:100], filter_key=filter)

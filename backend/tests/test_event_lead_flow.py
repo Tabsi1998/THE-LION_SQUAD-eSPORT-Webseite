@@ -90,7 +90,9 @@ async def test_only_tournament_lead_sees_the_list(flow):
 
     # Turnierleitung als Rolle und als Freigabe.
     flow.act_as(leitung)
-    view = await lead(flow, event)
+    response = await flow.get(f"/api/events/{event['slug']}/lead")
+    assert response.status_code == 200 and response.headers["cache-control"] == "private, no-store"
+    view = response.json()
     assert view["event"]["id"] == event["id"] and view["can_message"] is True
     freigabe = await person(flow, "freigabe", areas=["tournaments"])
     flow.act_as(freigabe)
