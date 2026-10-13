@@ -105,6 +105,27 @@ def is_confirmed_tournament_lead(user: dict | None) -> bool:
     return is_tournament_lead(user) and not needs_mfa(user)
 
 
+def is_confirmed_admin_role(user: dict | None, roles) -> bool:
+    """Eine Rollenliste für die angemeldete Person einer Anfrage (#1469): Teams, News-Entwürfe, Suche, Erfolge,
+    Dokumente, Admin-Medien und die Live-Aktualisierungen fragen nach Rollen. Eine Rolle mit Adminbereich zählt dort
+    wie in ``require_area`` nur mit bestätigter Zwei-Faktor-Anmeldung; ohne geht nur eine Rolle, deren Bereiche alle
+    ohne Zwei-Faktor gelten (Moderator, ``MFA_AREAS``). Eine unbekannte Rolle braucht sie immer. Für Konten aus der
+    Datenbank - Empfänger einer Nachricht, Filter - gilt die Rolle allein, wie bei ``is_tournament_lead``."""
+    role = str((user or {}).get("role") or "")
+    if not role or role not in roles:
+        return False
+    role_areas = ROLE_AREAS.get(role)
+    if role_areas is not None and not (role_areas & MFA_AREAS):
+        return True
+    return not needs_mfa(user)
+
+
+def admin_role_without_second_factor(user: dict | None, roles) -> bool:
+    """Die Rolle steht in der Liste, aber die Zwei-Faktor-Anmeldung fehlt - Hinweis darauf statt „keine Berechtigung“."""
+    role = str((user or {}).get("role") or "")
+    return bool(role) and role in roles and not is_confirmed_admin_role(user, roles)
+
+
 def lead_without_second_factor(user: dict | None) -> bool:
     """Turnierleitung über alle Turniere, aber noch ohne bestätigte Zwei-Faktor-Anmeldung - sie bekommt den Hinweis
     auf die Zwei-Faktor-Anmeldung statt „keine Berechtigung“."""

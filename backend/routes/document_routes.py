@@ -14,13 +14,15 @@ from models import DocumentCreate, DocumentUpdate, new_id, now_utc
 from services import dolibarr_identity
 from services.dolibarr_client import DolibarrError
 from services.member_activity import note_document_open
+from services.permissions import MFA_MESSAGE, admin_role_without_second_factor, is_confirmed_admin_role
 from services.visibility import user_can_see
 from storage import PRIVATE_DOC_DIR, UPLOAD_DIR
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 logger = logging.getLogger("tls.documents")
 # Vereinsdokumente: Mitglieder und wer die Vereinsverwaltung oder System hat (#1350, services/visibility.py);
-# Moderatoren und die Turnierleitung sehen sie als Mitglied. Gesperrte Downloads öffnen Club-Admin und Superadmin.
+# Moderatoren und die Turnierleitung sehen sie als Mitglied. Gesperrte Downloads öffnen Club-Admin und Superadmin,
+# wie jeder Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung (#1469).
 ADMIN_ROLES = {"club_admin", "superadmin"}
 
 
@@ -29,7 +31,14 @@ def _normalise_visibility(value: str | None) -> str:
 
 
 def _is_admin(user: dict | None) -> bool:
-    return bool(user and user.get("role") in ADMIN_ROLES)
+    return is_confirmed_admin_role(user, ADMIN_ROLES)
+
+
+def _refuse_locked_download(user: dict | None) -> None:
+    """Gesperrter Download - mit dem Hinweis auf die Zwei-Faktor-Anmeldung, wenn nur sie fehlt (#1469)."""
+    if admin_role_without_second_factor(user, ADMIN_ROLES):
+        raise HTTPException(403, MFA_MESSAGE)
+    raise HTTPException(403, "Download ist für dieses Dokument deaktiviert.")
 
 
 async def _user_can_see(user: dict | None, visibility: str | None) -> bool:
@@ -325,7 +334,7 @@ async def download_document(doc_id: str, request: Request, user: dict | None = D
         return response
     doc, path = await _load_authorized_doc(doc_id, user)
     if not doc.get("allow_download") and not _is_admin(user):
-        raise HTTPException(403, "Download ist für dieses Dokument deaktiviert.")
+        _refuse_locked_download(user)
     await db.documents.update_one({"id": doc_id}, {"$inc": {"download_count": 1}})
     await note_document_open(db, user, doc_id)
     return _file_response(doc, path, "attachment")
@@ -341,6 +350,6 @@ async def track_download(doc_id: str, user: dict | None = Depends(get_optional_u
     if not await _user_can_see(user, doc.get("visibility") or "members"):
         raise HTTPException(403, "Kein Zugriff.")
     if not doc.get("allow_download") and not _is_admin(user):
-        raise HTTPException(403, "Download ist für dieses Dokument deaktiviert.")
+        _refuse_locked_download(user)
     await db.documents.update_one({"id": doc_id}, {"$inc": {"download_count": 1}})
     return {"ok": True, "url": _document_url(doc_id)}

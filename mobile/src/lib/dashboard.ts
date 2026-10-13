@@ -19,6 +19,9 @@ export type HomeItem = {
   bannerUrl?: string | null;
   targetId?: string;
   registrationStatus?: string | null;
+  /** Das Event, zu dem ein Turnier gehört (#1182) - auf der Startseite steht es dann in der Karte des Events. */
+  eventId?: string | null;
+  children?: HomeItem[];
 };
 
 const LIVE_PHASES = new Set(["live", "check_in"]);

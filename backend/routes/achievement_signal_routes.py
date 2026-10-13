@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user, get_optional_user
 from database import get_db
 from models import new_id, now_utc
+from services.permissions import is_confirmed_admin_role
 from services import achievement_counters as counters
 from services.log_safe import log_safe
 from services.rate_limit import enforce_rate_limit
@@ -80,7 +81,8 @@ async def my_collectibles(me: dict = Depends(get_current_user)):
     return await collectibles.overview(db, me["id"], stored, founded)
 
 
-# Wer fremde Fundstücke immer sieht - dieselben Rollen wie bei den Erfolgen (badge_routes.py).
+# Wer fremde Fundstücke immer sieht - dieselben Rollen wie bei den Erfolgen (badge_routes.py), mit bestätigter
+# Zwei-Faktor-Anmeldung (#1469).
 STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
 
@@ -96,7 +98,7 @@ async def public_collectibles(user_id: str, viewer: dict | None = Depends(get_op
     if not user:
         raise HTTPException(404, "Nutzer nicht gefunden.")
     viewer_is_owner = bool(viewer and viewer.get("id") == user_id)
-    viewer_is_staff = bool(viewer and viewer.get("role") in STAFF_ROLES)
+    viewer_is_staff = is_confirmed_admin_role(viewer, STAFF_ROLES)
     if not user.get("privacy_public_profile") and not (viewer_is_owner or viewer_is_staff):
         raise HTTPException(404, "Nutzer nicht gefunden.")
     if user.get("privacy_season_finds_public") is not True and not (viewer_is_owner or viewer_is_staff):

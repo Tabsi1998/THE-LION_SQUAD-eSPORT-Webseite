@@ -20,6 +20,7 @@ import { api, errorMessage } from "../../lib/api";
 import { API_BASE_URL } from "../../config";
 import { compareByNearestDate } from "../../lib/contentSort";
 import { seasonLine, splitHomeTimeline, type HomeItem } from "../../lib/dashboard";
+import { childSummary, nestUnderEvents } from "../../lib/eventGroups";
 import { displayName, formatEventType, formatNewsCategory, formatStatus, formatWhen, placeParts, upperDe } from "../../lib/format";
 import { stationText } from "../../lib/matchText";
 import { isGuestUser } from "../../live";
@@ -142,7 +143,8 @@ export function DashboardScreen({ navigation, route }: Props) {
           ...data.me.tournaments.map(tournamentToTimeline),
           ...data.me.events.map(eventToTimeline),
       ];
-    return source.sort((a, b) => compareByNearestDate(a.date, b.date, a.status, b.status, a.phaseLabel, b.phaseLabel));
+    // Ein Event mit seinen Turnieren ist eine Karte (#1182): aus drei Karten für die LAN wird eine.
+    return nestUnderEvents(source.sort((a, b) => compareByNearestDate(a.date, b.date, a.status, b.status, a.phaseLabel, b.phaseLabel)));
   }, [data, isGuest]);
   // Jeder Termin steht nur einmal: entweder unter "Heute und Live" oder unter
   // "nächste Termine". Vorbei und Abgesagtes filtert schon der Server.
@@ -438,6 +440,7 @@ function tournamentToTimeline(tournament: Tournament): TimelineItem {
     bannerUrl: tournament.banner_url || tournament.game?.cover_url || tournament.game?.logo_url,
     targetId: tournament.slug || tournament.id,
     registrationStatus: tournament.my_registration?.status,
+    eventId: tournament.event?.id || tournament.event_id || null,
   };
 }
 
@@ -534,7 +537,7 @@ function TimelineCard({ item, onPress, perch }: { item: TimelineItem; onPress: (
       label={item.phaseLabel}
       status={item.status}
       secondaryLabel={item.registrationStatus ? formatStatus(item.registrationStatus) : null}
-      detail={item.detail}
+      detail={item.children?.length ? [item.detail, `${childSummary(item.children)}: ${item.children.map((child) => child.title).join(", ")}`].filter(Boolean).join(" · ") : item.detail}
       onPress={onPress}
       perch={perch}
     />

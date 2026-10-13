@@ -19,6 +19,7 @@ from database import get_db
 from models import new_id, now_utc
 from services.image_variants import schedule_variants
 from services.photo_cutout import is_cutout
+from services.permissions import MFA_MESSAGE, admin_role_without_second_factor, is_confirmed_admin_role
 from services.rate_limit import enforce_rate_limit, get_client_ip
 from storage import PRIVATE_DOC_DIR, PUBLIC_UPLOAD_DIR, ensure_directory
 from services.media_formats import (
@@ -47,7 +48,8 @@ ALLOWED_IMAGE = {"image/png", "image/jpeg", "image/webp"}
 ALLOWED_VIDEO = {"video/mp4", "video/webm", "video/quicktime", "video/x-m4v"}
 SUPPORTED_VIDEO_LABEL = "MP4, WebM, MOV oder M4V"
 # Admin-Medien (Galerie, Sponsoren, Branding, Videos, Originaldateien, Upload-Protokoll); Moderatoren
-# laden wie alle Konten eigene Bilder hoch und prüfen fremde in der Bildprüfung.
+# laden wie alle Konten eigene Bilder hoch und prüfen fremde in der Bildprüfung. Wie jeder Adminbereich nur mit
+# bestätigter Zwei-Faktor-Anmeldung (#1469); eigene Bilder gehen ohne.
 ADMIN_MEDIA_ROLES = {"admin", "tournament_admin", "club_admin", "superadmin"}
 ALLOWED_MEDIA_SCOPES = {"user", "admin", "sponsor", "branding", "gallery"}
 IMAGE_MIME_BY_EXT = BROWSER_IMAGE_MIME_BY_EXT
@@ -296,13 +298,20 @@ def _clean_media_scope(value: str | None, me: dict) -> str:
     scope = str(value or "user").strip().lower()
     if scope not in ALLOWED_MEDIA_SCOPES:
         scope = "user"
-    if scope != "user" and me.get("role") not in ADMIN_MEDIA_ROLES:
-        raise HTTPException(status_code=403, detail="Admin-Medienupload nicht erlaubt.")
+    if scope != "user" and not _is_admin_media_user(me):
+        _refuse_admin_media(me, "Admin-Medienupload nicht erlaubt.")
     return scope
 
 
 def _is_admin_media_user(me: dict) -> bool:
-    return me.get("role") in ADMIN_MEDIA_ROLES
+    return is_confirmed_admin_role(me, ADMIN_MEDIA_ROLES)
+
+
+def _refuse_admin_media(me: dict, detail: str) -> None:
+    """403 für Admin-Medien - mit dem Hinweis auf die Zwei-Faktor-Anmeldung, wenn nur sie fehlt (#1469)."""
+    if admin_role_without_second_factor(me, ADMIN_MEDIA_ROLES):
+        raise HTTPException(status_code=403, detail=MFA_MESSAGE)
+    raise HTTPException(status_code=403, detail=detail)
 
 
 async def _enforce_upload_rate_limit(request: Request, me: dict, bucket: str, media_scope: str = "user") -> None:
@@ -714,7 +723,7 @@ async def _upload_original_file_impl(
     """Store a supported original media file that cannot be browser-previewed as an image."""
     media_scope = _clean_media_scope(media_scope, me)
     if not _is_admin_media_user(me):
-        raise HTTPException(status_code=403, detail="Originaldateien dürfen nur Admins hochladen.")
+        _refuse_admin_media(me, "Originaldateien dürfen nur Admins hochladen.")
     suffix = pathlib.Path(file.filename or "").suffix.lower()
     if suffix not in ORIGINAL_MEDIA_MIME_BY_EXT:
         raise HTTPException(status_code=400, detail=f"Dieses Dateiformat wird nicht als Medien-Original unterstützt. Erlaubt: {ORIGINAL_MEDIA_LABEL}.")
@@ -866,7 +875,7 @@ async def upload_media(
             result = await _upload_image_impl(file, me, media_scope=scope_for_log)
         elif kind == "video":
             if not _is_admin_media_user(me):
-                raise HTTPException(status_code=403, detail="Video-Uploads sind nur im Admin-/CMS-Bereich erlaubt.")
+                _refuse_admin_media(me, "Video-Uploads sind nur im Admin-/CMS-Bereich erlaubt.")
             result = await _upload_video_impl(file, me, media_scope=scope_for_log)
         elif kind == "file":
             result = await _upload_original_file_impl(file, me, media_scope=scope_for_log)
@@ -940,7 +949,7 @@ async def list_upload_events(
     me: dict = Depends(get_current_user),
 ):
     if not _is_admin_media_user(me):
-        raise HTTPException(status_code=403, detail="Upload-Protokoll nur für Admin/CMS-Rollen.")
+        _refuse_admin_media(me, "Upload-Protokoll nur für Admin/CMS-Rollen.")
     limit = max(1, min(int(limit or 80), 200))
     query = {}
     if status:
@@ -960,7 +969,7 @@ async def record_upload_client_failure(
     me: dict = Depends(get_current_user),
 ):
     if not _is_admin_media_user(me):
-        raise HTTPException(status_code=403, detail="Upload-Protokoll nur für Admin/CMS-Rollen.")
+        _refuse_admin_media(me, "Upload-Protokoll nur für Admin/CMS-Rollen.")
     media_scope = _clean_media_scope(payload.media_scope, me)
     await _record_upload_event(
         request,

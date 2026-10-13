@@ -42,3 +42,27 @@ def test_messages_name_the_area_in_german():
     assert missing_area_message(["content"]) == "Dafür fehlt der Bereich „Redaktion“. Vergeben kann ihn der Superadmin unter Admin → Alle Benutzer."
     assert missing_area_message(["tournaments", "moderation"]).startswith("Dafür fehlt der Bereich „Turnierleitung“ oder „Moderation“")
     assert area_labels({"club", "content"}) == "Redaktion, Vereinsverwaltung"
+
+
+def test_admin_role_lists_count_only_with_the_confirmed_second_factor():
+    # #1469: Rollenlisten außerhalb der Turniere (Teams, News, Suche, Erfolge) folgen demselben Vertrag wie
+    # ``require_area`` - eine Rolle mit Adminbereich zählt erst mit bestätigter Zwei-Faktor-Anmeldung.
+    from services.permissions import admin_role_without_second_factor, is_confirmed_admin_role
+
+    roles = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+    confirmed = {"mfa_enabled": True, "auth_mfa_verified": True}
+    for role in ("tournament_admin", "club_admin", "superadmin"):
+        assert is_confirmed_admin_role({"role": role, **confirmed}, roles) is True
+        assert is_confirmed_admin_role({"role": role, "mfa_enabled": True}, roles) is False
+        assert is_confirmed_admin_role({"role": role}, roles) is False
+        assert admin_role_without_second_factor({"role": role}, roles) is True
+        assert admin_role_without_second_factor({"role": role, **confirmed}, roles) is False
+    # Moderation geht laut MFA_AREAS bewusst ohne Zwei-Faktor.
+    assert is_confirmed_admin_role({"role": "moderator"}, roles) is True
+    assert admin_role_without_second_factor({"role": "moderator"}, roles) is False
+    # Nicht in der Liste, keine Rolle, unbekannte Altrolle ohne Zwei-Faktor: nein.
+    assert is_confirmed_admin_role({"role": "club_admin", **confirmed}, {"tournament_admin"}) is False
+    assert admin_role_without_second_factor({"role": "club_admin"}, {"tournament_admin"}) is False
+    assert is_confirmed_admin_role(None, roles) is False
+    assert is_confirmed_admin_role({"role": "admin"}, {"admin"}) is False
+    assert is_confirmed_admin_role({"role": "admin", **confirmed}, {"admin"}) is True

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 
 from auth import get_optional_user
 from database import get_db
-from services.permissions import is_confirmed_tournament_lead
+from services.permissions import is_confirmed_admin_role, is_confirmed_tournament_lead
 from models import now_utc
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
@@ -12,7 +12,8 @@ from services.visibility import lead_can_see
 from services.query_filters import safe_regex
 
 router = APIRouter(prefix="/api/search", tags=["search"])
-# Entwürfe und nicht öffentliche Turniere findet nur, wer sie auch verwaltet.
+# Entwürfe und nicht öffentliche Turniere findet nur, wer sie auch verwaltet - mit bestätigter Zwei-Faktor-Anmeldung
+# (#291, #1469).
 STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
 
@@ -119,7 +120,7 @@ async def _search_news(db, pattern: str, user: dict | None, limit: int) -> list[
         {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "published": 1, "published_at": 1, "created_at": 1, "visibility": 1, "banner_url": 1, "category": 1},
     ).sort([("published_at", -1), ("created_at", -1)]).to_list(limit * 3)
     out = []
-    is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    is_staff = is_confirmed_admin_role(user, STAFF_ROLES)
     for row in rows:
         if not is_staff and (row.get("published") is False or not _published_now(row)):
             continue

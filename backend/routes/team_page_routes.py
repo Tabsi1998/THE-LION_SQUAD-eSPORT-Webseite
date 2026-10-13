@@ -15,7 +15,9 @@ from pydantic import BaseModel, Field
 from auth import get_current_user, get_optional_user
 from database import get_db
 from models import new_id, now_utc
-from routes.team_routes import _add_team_member, _can_manage, _is_member, _is_staff, _user_label
+from routes.team_routes import (
+    TEAM_OWNER_ADMIN_ROLES, _add_team_member, _can_manage, _is_member, _is_staff, _refuse, _team_admin, _user_label,
+)
 from services import team_page
 from services.team_dissolve import dissolve_preview
 from services.user_notifications import build_public_url, create_user_notification
@@ -75,7 +77,7 @@ async def get_invite_link(team_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
     team = await _team_or_404(db, team_id)
     if not _can_manage(team, me):
-        raise HTTPException(status_code=403, detail="Einladen dürfen Kapitän und Co-Kapitän.")
+        _refuse(me, "Einladen dürfen Kapitän und Co-Kapitän.")
     return await _invite_payload(await team_page.ensure_invite(db, team_id, me["id"]))
 
 
@@ -84,7 +86,7 @@ async def renew_invite_link(team_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
     team = await _team_or_404(db, team_id)
     if not _can_manage(team, me):
-        raise HTTPException(status_code=403, detail="Einladen dürfen Kapitän und Co-Kapitän.")
+        _refuse(me, "Einladen dürfen Kapitän und Co-Kapitän.")
     row = await team_page.renew_invite(db, team_id, me["id"])
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "team.invite_link.renew", "target_id": team_id,
@@ -137,6 +139,6 @@ async def team_dissolve_preview(team_id: str, me: dict = Depends(get_current_use
     """Für den Satz im Bearbeiten-Blatt: Mitglieder, Chat, kommende Anmeldungen - und was das Auflösen gerade sperrt."""
     db = get_db()
     team = await _team_or_404(db, team_id)
-    if team.get("leader_id") != me["id"] and me.get("role") not in ("club_admin", "superadmin"):
-        raise HTTPException(status_code=403, detail="Auflösen darf nur der Kapitän.")
+    if team.get("leader_id") != me["id"] and not _team_admin(me, TEAM_OWNER_ADMIN_ROLES):
+        _refuse(me, "Auflösen darf nur der Kapitän.", TEAM_OWNER_ADMIN_ROLES)
     return await dissolve_preview(db, team)

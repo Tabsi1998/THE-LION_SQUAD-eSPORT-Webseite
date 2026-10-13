@@ -10,7 +10,7 @@ from database import get_db
 from services.permissions import MFA_MESSAGE, is_confirmed_tournament_lead, lead_without_second_factor
 from auth import get_current_user, require_admin, get_optional_user, require_area
 from services.visibility import user_can_see
-from services.visibility import lead_can_see
+from services.visibility import hide_unseen_event_links, lead_can_see
 from services.access_links import public_access_link_payload, touch_access_link, validate_access_link
 from services.public_phase import derive_public_phase
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
@@ -83,6 +83,9 @@ def _compact_challenge(challenge: dict) -> dict:
         "visibility": challenge.get("visibility"),
         "public_phase": challenge.get("public_phase"),
         "start_date": challenge.get("start_date"),
+        # Das Event als Klammer (#1182): Liste und Startseite stellen die Fast Lap unter ihr Event.
+        "end_date": challenge.get("end_date"),
+        "event_id": challenge.get("event_id"),
         "platform": challenge.get("platform"),
         "registration_enabled": challenge.get("registration_enabled"),
         "online_registration_enabled": challenge.get("online_registration_enabled"),
@@ -341,7 +344,7 @@ async def list_challenges(
     if compact:
         projection = {
             "_id": 0, "id": 1, "title": 1, "slug": 1, "description": 1,
-            "banner_url": 1, "status": 1, "visibility": 1, "start_date": 1,
+            "banner_url": 1, "status": 1, "visibility": 1, "start_date": 1, "end_date": 1, "event_id": 1,
             "platform": 1, "registration_enabled": 1, "online_registration_enabled": 1,
             "registration_open_from": 1, "registration_open_until": 1,
             "is_championship": 1, "block_club_member_results": 1,
@@ -358,6 +361,8 @@ async def list_challenges(
         c["track_count"] = await db.f1_tracks.count_documents({"challenge_id": c["id"]})
         c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", _official_time_query({"challenge_id": c["id"]})))
         visible.append(c)
+    # Das Event als Klammer (#1182): die Kennung des Events nur, wenn es für die Person sichtbar ist (#1473).
+    await hide_unseen_event_links(db, user, visible)
     if compact:
         visible = [_compact_challenge(c) for c in visible]
         return _page_items(visible, limit, offset, paged)

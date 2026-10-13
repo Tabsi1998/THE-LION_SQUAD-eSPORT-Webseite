@@ -162,8 +162,11 @@ export function useResultUndo(onDone?: () => void) {
   }, [now, pending]);
 
   const start = useCallback((saved: SavedHold) => {
-    setNow(Date.now());
-    setPending({ matchId: saved.matchId, holdId: saved.hold?.id || null, sentence: saved.sentence, until: Date.now() + UNDO_SECONDS * 1000 });
+    // Ein Zeitpunkt für beides: zwei Aufrufe von Date.now() liegen manchmal eine Millisekunde auseinander, dann stand
+    // „Rückgängig (11)“ statt (10) da.
+    const at = Date.now();
+    setNow(at);
+    setPending({ matchId: saved.matchId, holdId: saved.hold?.id || null, sentence: saved.sentence, until: at + UNDO_SECONDS * 1000 });
     doneRef.current?.();
   }, []);
 
