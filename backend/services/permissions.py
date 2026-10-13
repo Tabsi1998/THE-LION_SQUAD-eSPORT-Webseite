@@ -208,15 +208,26 @@ async def user_has_area(user: dict | None, *areas: str, db=None) -> bool:
     return bool(set(areas) & await areas_for(user, db))
 
 
+async def area_refusal(user: dict | None, areas, db=None) -> str | None:
+    """Die eine Entscheidung für Bereiche bei einer Anfrage (#287, #291, #1479) - ``None`` heißt erlaubt, sonst der
+    Grund. Erlaubt ist, wer einen der verlangten Bereiche hat (Rolle, Freigabe, Vorstand, Dolibarr). Sobald die Liste
+    einen Bereich aus ``MFA_AREAS`` enthält, braucht es zusätzlich die bestätigte Zwei-Faktor-Anmeldung - auch wenn die
+    Person nur einen Bereich ohne Zwei-Faktor (Moderation) aus der Liste hat. ``require_area`` und ``can_use_area``
+    fragen beide hier, damit sie nie auseinanderlaufen."""
+    wanted = tuple(areas)
+    if not user or not (set(wanted) & await areas_for(user, db)):
+        return missing_area_message(wanted)
+    if (set(wanted) & MFA_AREAS) and needs_mfa(user):
+        return MFA_MESSAGE
+    return None
+
+
 async def can_use_area(user: dict | None, *areas: str, db=None) -> bool:
-    """Darf die angemeldete Person einer Anfrage einen der Bereiche jetzt benutzen (#1479)? Wie ``require_area``, aber
-    als Frage statt Wächter - für Routen, die allen antworten und Verwaltenden mehr zeigen (Kostenangaben, leere Alben).
-    Ein Bereich aus ``MFA_AREAS`` zählt nur mit bestätigter Zwei-Faktor-Anmeldung. Für Konten aus der Datenbank gilt
+    """Darf die angemeldete Person einer Anfrage einen der Bereiche jetzt benutzen (#1479)? Genau dann, wenn
+    ``require_area`` mit derselben Liste nicht ablehnt (``area_refusal``) - als Frage statt Wächter, für Routen, die
+    allen antworten und Verwaltenden mehr zeigen (Kostenangaben, leere Alben). Für Konten aus der Datenbank gilt
     ``user_has_area``. Spiegel von ``canUseArea`` im Web."""
-    if not user:
-        return False
-    held = set(areas) & await areas_for(user, db)
-    return any(area not in MFA_AREAS or not needs_mfa(user) for area in held)
+    return await area_refusal(user, areas, db) is None
 
 
 async def board_holder_ids(db, user_ids) -> set[str]:

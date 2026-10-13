@@ -45,21 +45,49 @@ OFFER = {
 
 @pytest.mark.asyncio
 async def test_can_use_area_follows_require_area(flow):
+    """``can_use_area`` ist genau dann wahr, wenn ``require_area`` mit derselben Liste nicht ablehnt - auch bei
+    Listen, die Moderation mit einem Bereich mit Zwei-Faktor mischen."""
+    from fastapi import HTTPException
+
+    from auth import require_area
     from services.permissions import can_use_area
 
     admin = await flow.add_user(role="club_admin", name="clubadmin")
     moderator = await flow.add_user(role="moderator", name="moderation")
+    lead = await flow.add_user(role="tournament_admin", name="turnierleitung")
     granted = await flow.add_user(role="player", name="kassier")
     granted["areas"] = ["finance"]
+    player = await flow.add_user(role="player", name="spieler")
+    people = {
+        "admin": admin, "admin ohne 2FA": without_second_factor(admin),
+        "moderator": moderator, "moderator ohne 2FA": without_second_factor(moderator),
+        "turnierleitung ohne 2FA": without_second_factor(lead),
+        "freigabe": granted, "freigabe ohne 2FA": without_second_factor(granted),
+        "spieler": player,
+    }
+    lists = [
+        ("finance",), ("content",), ("moderation",), ("finance", "moderation"), ("moderation", "finance"),
+        ("tournaments", "moderation"), ("club", "system"), ("finance", "content"),
+    ]
 
-    assert await can_use_area(admin, "finance") is True
-    assert await can_use_area(without_second_factor(admin), "finance") is False
-    assert await can_use_area(without_second_factor(admin), "finance", "moderation") is True, "Moderation geht ohne"
+    async def required(user, areas):
+        try:
+            await require_area(*areas)(user)
+        except HTTPException as exc:
+            assert exc.status_code == 403
+            return False
+        return True
+
+    for label, user in people.items():
+        for areas in lists:
+            expected = await required(user, areas)
+            assert await can_use_area(user, *areas) is expected, (label, areas)
+    assert await can_use_area(None, "moderation") is False
+
+    # Die Fälle, um die es geht: Moderation in der Liste öffnet keinen Bereich mit Zwei-Faktor.
+    assert await can_use_area(without_second_factor(admin), "finance", "moderation") is False
     assert await can_use_area(without_second_factor(moderator), "moderation") is True
-    assert await can_use_area(granted, "finance") is True
-    assert await can_use_area(without_second_factor(granted), "finance") is False
-    assert await can_use_area(granted, "content") is False
-    assert await can_use_area(None, "finance") is False
+    assert await can_use_area(admin, "finance", "moderation") is True
 
 
 # ------------------------------------------------------------------ Kostenangaben (Bereich Finanzen)
