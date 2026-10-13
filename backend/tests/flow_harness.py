@@ -17,6 +17,7 @@ transactions or aggregation pipelines.
 """
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import os
 import uuid
@@ -248,3 +249,51 @@ def make_flow():
         database._db = previous_db
 
     return flow, shutdown
+
+
+class InterleavedReads:
+    """Lässt gleichzeitige Anfragen beim Lesen einer Sammlung aufeinander warten.
+
+    mongomock antwortet sofort - zwei Anfragen per ``asyncio.gather`` liefen sonst brav nacheinander. Hier lesen
+    die ersten ``parties`` Zugriffe auf ``collection`` alle den alten Stand, bevor eine weiterschreibt: so wie
+    mehrere Worker auf echtem MongoDB. Wer statt Lesen-dann-Schreiben atomar bedingt schreibt, merkt davon nichts.
+    Einsatz: ``monkeypatch.setattr(routes.modul, "get_db", lambda: gate)`` mit ``gate = InterleavedReads(...)``.
+    """
+
+    def __init__(self, db, collection: str, parties: int = 2, timeout: float = 1.0):
+        self._db = db
+        self._collection = collection
+        self._parties = parties
+        self._barrier = asyncio.Barrier(parties)
+        self._timeout = timeout
+        self._gated = 0
+
+    def __getattr__(self, name):
+        target = getattr(self._db, name)
+        return _InterleavedCollection(target, self) if name == self._collection else target
+
+    def __getitem__(self, name):
+        return self.__getattr__(name)
+
+    async def meet(self) -> None:
+        if self._gated >= self._parties:
+            return
+        self._gated += 1
+        try:
+            await asyncio.wait_for(self._barrier.wait(), self._timeout)
+        except (asyncio.TimeoutError, asyncio.BrokenBarrierError):
+            pass
+
+
+class _InterleavedCollection:
+    def __init__(self, collection, gate: InterleavedReads):
+        self._collection = collection
+        self._gate = gate
+
+    def __getattr__(self, name):
+        return getattr(self._collection, name)
+
+    async def find_one(self, *args, **kwargs):
+        document = await self._collection.find_one(*args, **kwargs)
+        await self._gate.meet()
+        return document

@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user, require_area
 from database import get_db
 from services import year_review
-from services.permissions import areas_for
+from services.permissions import can_use_area
 
 router = APIRouter(prefix="/api/year-review", tags=["year-review"])
 admin_router = APIRouter(prefix="/api/admin/year-review", tags=["year-review"])
@@ -26,9 +26,11 @@ NOT_AVAILABLE = "Gerade gibt es keinen Jahresrückblick für dich."
 
 
 async def _year_for(db, me: dict, preview: bool) -> int | None:
+    """Das Jahr im Zeitraum - außerhalb davon als Vorschau nur für die Redaktion, mit bestätigter Zwei-Faktor-Anmeldung
+    wie jeder Adminbereich (#1479)."""
     settings = await year_review.load_settings(db)
     year = year_review.window_year(settings)
-    if year is None and preview and "content" in await areas_for(me):
+    if year is None and preview and await can_use_area(me, "content", db=db):
         year = year_review.window_info(settings)["year"]
     return year
 

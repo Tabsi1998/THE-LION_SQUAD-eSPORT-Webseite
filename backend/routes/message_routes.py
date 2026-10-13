@@ -130,7 +130,7 @@ async def _message_permission(db, sender: dict, recipient: dict) -> tuple[bool, 
 async def _get_active_user(db, user_id: str) -> dict:
     user = await db.users.find_one(
         {"id": user_id, "is_active": True, "is_banned": {"$ne": True}},
-        {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0},
+        {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0},
     )
     if not user:
         raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
@@ -156,7 +156,7 @@ async def search_message_users(q: str | None = None, me: dict = Depends(get_curr
                 {"display_name": {"$regex": pattern, "$options": "i"}},
             ],
         },
-        {"_id": 0, "password_hash": 0, "email": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0},
+        {"_id": 0, "password_hash": 0, "email": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0},
     ).sort("display_name", 1).to_list(25)
     for user in users:
         membership = await db.memberships.find_one({"user_id": user["id"]}, {"_id": 0})
