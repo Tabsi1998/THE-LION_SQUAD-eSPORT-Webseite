@@ -20,6 +20,7 @@ const { default: PublicProfilePage } = await import("../PublicProfilePage");
 const { AchievementCatchUp } = await import("@/components/tls/AchievementCatchUp");
 const { LevelUpCelebration } = await import("@/components/tls/LevelUpCelebration");
 const { ConfirmDialogProvider } = await import("@/components/tls/ConfirmDialog");
+const { emitApiInvalidation } = await import("@/lib/apiInvalidation");
 
 const PROFILE = {
   id: "u1", username: "paula", display_name: "Paula B.", role: "member", created_at: "2025-03-01T00:00:00Z", privacy_public_profile: true,
@@ -37,10 +38,14 @@ const ME = {
 };
 
 const calls = [];
+const failing = new Set();
 function respond(config) {
   const method = (config.method || "get").toUpperCase();
   const url = config.url || "";
   calls.push(`${method} ${url}`);
+  if (failing.has(url)) {
+    return new Promise((_, reject) => { setTimeout(() => reject(Object.assign(new Error("500"), { config, response: { status: 500, data: {}, headers: {}, config } })), 20); });
+  }
   let data = [];
   if (url === "/users/public/paula") data = PROFILE;
   else if (url === "/achievements/me") data = ME;
@@ -58,6 +63,7 @@ const originalAdapter = api.defaults.adapter;
 
 beforeEach(() => {
   calls.length = 0;
+  failing.clear();
   api.defaults.adapter = respond;
   localStorage.clear();
   // Ein schon gesehener Stand: Catch-up und Level-up haben etwas zu feiern.
@@ -89,4 +95,28 @@ test("Profil → Erfolge: einmal auswerten, dann bleibt es ruhig - kein Neuladen
   // Die Änderung darf die Seite einmal still nachladen - aber nicht immer wieder.
   expect(count("GET /users/public/paula")).toBeLessThanOrEqual(2);
   expect(count("GET /achievements/me")).toBeLessThanOrEqual(3);
+}, 10000);
+
+test("stilles Nachladen scheitert: der bisherige Stand bleibt stehen, kein „Spieler nicht gefunden“", async () => {
+  render(
+    <ConfirmDialogProvider>
+      <MemoryRouter initialEntries={["/u/paula?tab=achievements"]}>
+        <Routes><Route path="/u/:username" element={<PublicProfilePage />} /></Routes>
+      </MemoryRouter>
+    </ConfirmDialogProvider>
+  );
+  expect(await screen.findByTestId("profile-own-achievements")).toBeInTheDocument();
+  await new Promise((resolve) => { setTimeout(resolve, 500); });
+  const before = count("GET /users/public/paula");
+  failing.add("/users/public/paula");
+  failing.add("/achievements/user/u1");
+  // Eine Änderung aus dem Strom des Servers, wie sie Staff-Konten bekommen.
+  emitApiInvalidation({ source: "server", event_id: "evt-quiet-1", method: "POST", path: "/api/achievements/evaluate", resource: "achievements" });
+  await new Promise((resolve) => { setTimeout(resolve, 500); });
+
+  expect(count("GET /users/public/paula")).toBe(before + 1);
+  expect(screen.queryByText("Spieler nicht gefunden")).toBeNull();
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Paula B.");
+  expect(screen.getByTestId("profile-own-achievements")).toBeInTheDocument();
+  expect(count("POST /achievements/evaluate")).toBe(1);
 }, 10000);

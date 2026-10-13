@@ -369,20 +369,21 @@ export default function PublicProfilePage() {
 
   // `quiet`: Nachladen nach einer gemeldeten Änderung ohne „LADE PROFIL …“. Sonst hängt die Seite ihre Reiter aus und
   // wieder ein - die eigenen Erfolge werten beim Einhängen aus, der POST meldet wieder eine Änderung, und das Profil
-  // lädt ohne Ende neu.
+  // lädt ohne Ende neu. Scheitert ein stilles Nachladen (kurz kein Netz, Serverfehler), bleibt der bisherige Stand stehen -
+  // sonst stünde „Spieler nicht gefunden“ da.
   const load = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) setLoading(true);
     try {
       const { data } = await api.get(`/users/public/${username}`, asOthers ? { params: { view_as: "public" } } : undefined);
       setProfile(data);
-      api.get("/streams/live").then(({ data: streams }) => setLiveStreams(Array.isArray(streams) ? streams : [])).catch(() => setLiveStreams([]));
+      api.get("/streams/live").then(({ data: streams }) => setLiveStreams(Array.isArray(streams) ? streams : [])).catch(() => { if (!quiet) setLiveStreams([]); });
       if (data?.id) {
         try {
           const { data: ach } = await api.get(`/achievements/user/${data.id}`);
           setAchievementsData(ach);
-        } catch { setAchievementsData(null); }
+        } catch { if (!quiet) setAchievementsData(null); }
       }
-    } catch { setProfile(null); }
+    } catch { if (!quiet) setProfile(null); }
     setLoading(false);
   }, [asOthers, username]);
   useEffect(() => { load(); }, [load]);
