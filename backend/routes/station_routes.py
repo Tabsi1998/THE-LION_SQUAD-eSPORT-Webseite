@@ -6,6 +6,7 @@ from database import get_db
 from auth import get_current_user, require_admin
 from models import StationCreate, StationUpdate, now_utc, new_id
 from services.tournament_permissions import (
+    STATION_ASSIGN_ROLES,
     has_tournament_staff_permission,
     is_global_tournament_admin,
     require_tournament_staff_permission,
@@ -22,7 +23,6 @@ async def _ensure_tournament_unlocked(db, tournament_id: str) -> None:
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "locked_at": 1})
     if tournament and tournament.get("locked_at"):
         raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
-STATION_ASSIGN_ROLES = {"organizer", "referee", "station_manager"}
 
 
 async def _require_station_permission(user: dict, tournament_id: str, station_id: str | None = None) -> None:

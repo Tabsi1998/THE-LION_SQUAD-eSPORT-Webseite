@@ -6,7 +6,7 @@ const { test, expect } = require("@playwright/test");
 
 const json = (body, status = 200) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
 
-const TOURNAMENT = { id: "t1", slug: "rl-cup", title: "Rocket League 2v2", status: "live", format: "single_elim", team_mode: "solo", max_participants: 8, can_manage_structure: true, can_manage_results: true };
+const TOURNAMENT = { id: "t1", slug: "rl-cup", title: "Rocket League 2v2", status: "live", format: "single_elim", team_mode: "solo", max_participants: 8, can_manage_structure: true, can_manage_results: true, can_manage_all_results: true, can_plan_matches: true, can_check_in: true, can_use_staff_tools: true, staff_scopes: [] };
 const REGS = [{ id: "r1", tournament_id: "t1", display_name: "Lions Rocket", status: "checked_in" }, { id: "r2", tournament_id: "t1", display_name: "Boost und Burger", status: "checked_in" }];
 const MATCH = {
   id: "m1", tournament_id: "t1", stage_id: "s1", match_key: "VF-1", round: 1, round_name: "Viertelfinale", section: "main", status: "in_progress",
