@@ -525,6 +525,15 @@ class EventRegistrationCreate(BaseModel):
     selected_positions: List[str] = []
 
 
+class EventPlayAlongCreate(BaseModel):
+    """„Spielst du auch mit?“ (#1184): die gewählten Turniere des Events - je Turnier eine normale Anmeldung."""
+    tournament_ids: List[str] = Field(default_factory=list, max_length=20)
+    accept_rules: bool = False
+    accept_privacy: bool = False
+    # Startgeld (#319): wie auf der Turnierseite übernimmt die anmeldende Person die Kosten ausdrücklich.
+    accept_costs: bool = False
+
+
 class EventRegistrationUpdate(BaseModel):
     status: Optional[EventRegistrationStatus] = None
     companion_count: Optional[int] = Field(default=None, ge=0, le=20)
