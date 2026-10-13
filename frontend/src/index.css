@@ -1266,98 +1266,53 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .tls-lvf--card .tls-lvf-tag { font-size: 10px; padding: 1px 8px; }
 .tls-lvf--card .tls-lvf-pip { width: 6px; height: 6px; }
 
-/* Crowns — rank based (gold/silver/bronze) + obsidian, big & loud */
-.tls-lvf-crown {
+/* Signatur des Rangs (#1455, LoewenRangSignature.jsx): zwei Leinwände um die Fläche, nur im Profilkopf. Die hintere
+   liegt unter Foto und Rahmen (Licht, Nebel, Wolken), die vordere über dem Rahmen und unter Krone und Schild; über dem
+   Foto zeichnet sie nichts. Keine Klicks; die Ränder laufen weich aus, damit nichts hart abgeschnitten wirkt. */
+.tls-lvf-sig {
   position: absolute;
-  /* sitzt auf der Oberkante der Rahmen-Grafik (Löwen-Rang, #1454) */
-  top: calc(var(--lvf-d) * var(--lvf-pt, 0.5) * -1 - 30px);
+  display: block;
+  max-width: none;
+  pointer-events: none;
+  -webkit-mask: radial-gradient(closest-side, #000 72%, transparent);
+  mask: radial-gradient(closest-side, #000 72%, transparent);
+}
+.tls-lvf-sig--back { z-index: 0; }
+.tls-lvf-sig--front { z-index: 3; }
+@media (prefers-reduced-motion: reduce) {
+  .tls-lvf-sig { display: none; }
+}
+
+/* Kronen der Punktewertung (#1458): Platz 1–3 und Onyx ab Level 30. Klein (etwa ein Drittel von früher) und ruhig -
+   kein Dauer-Leuchten, kein Schweben. Sie sitzen über der Oberkante der Rahmen-Grafik und verdecken sie nicht; die
+   Größe folgt der Fläche (Profil 33 px, am Handy 25 px, Karte und Listen mindestens 14 px). Nur beim Erscheinen fallen
+   sie einmal kurz herein. */
+.tls-lvf-crown {
+  --crown-w: max(14px, calc(var(--lvf-s) * 0.115));
+  position: absolute;
+  top: calc(var(--lvf-d) * var(--lvf-pt, 0.5) * -1 - var(--crown-w) * 0.72 - 2px);
   left: 50%;
   z-index: 4;
-  width: 96px;
-  margin-left: -48px;
+  width: var(--crown-w);
+  margin-left: calc(var(--crown-w) / -2);
+  line-height: 0;
   pointer-events: auto;
-  animation: tls-lvf-crown-drop 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) both, tls-lvf-crown-float 3.2s ease-in-out 0.7s infinite;
+  animation: tls-lvf-crown-drop var(--tls-motion-slow) var(--tls-ease) both;
 }
-.tls-lvf-crown-rays {
-  position: absolute;
-  inset: -46% -34%;
-  z-index: -2;
-  pointer-events: none;
-  background: repeating-conic-gradient(
-    from 0deg,
-    var(--crown-glow, rgba(255, 215, 0, 0.8)) 0deg 7deg,
-    transparent 7deg 30deg
-  );
-  -webkit-mask: radial-gradient(closest-side, transparent 28%, #000 34%, transparent 78%);
-  mask: radial-gradient(closest-side, transparent 28%, #000 34%, transparent 78%);
-  opacity: 0.7;
-  animation: tls-lvf-crown-rays-spin 9s linear infinite;
-}
-@keyframes tls-lvf-crown-rays-spin {
-  to { transform: rotate(360deg); }
-}
+.tls-lvf-crown svg { display: block; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
 @keyframes tls-lvf-crown-drop {
-  0% { transform: translateY(-26px) scale(0.6); opacity: 0; }
-  60% { transform: translateY(4px) scale(1.08); opacity: 1; }
-  100% { transform: translateY(0) scale(1); opacity: 1; }
+  0% { transform: translateY(-6px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
 }
-.tls-lvf-crown::before {
-  content: "";
-  position: absolute;
-  inset: -30% -22%;
-  z-index: -1;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, var(--crown-glow, rgba(255,215,0,0.85)), transparent 72%);
-  opacity: 0.55;
-  animation: tls-lvf-crown-burst 2.4s ease-in-out infinite;
-}
-.tls-lvf-crown::after {
-  content: "";
-  position: absolute;
-  top: -6px;
-  right: 2px;
-  width: 7px;
-  height: 7px;
-  background: #fff;
-  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
-  filter: drop-shadow(0 0 6px var(--crown-glow, rgba(255,215,0,0.9)));
-  animation: tls-lvf-crown-twinkle 1.9s ease-in-out infinite;
-}
-.tls-lvf-crown svg { filter: drop-shadow(0 0 10px var(--crown-glow, rgba(255,215,0,0.8))) drop-shadow(0 4px 14px rgba(0,0,0,0.6)); }
-.tls-lvf-crown--gold { animation-duration: 2.7s; }
-.tls-lvf-crown--gold::before { opacity: 0.75; }
-.tls-lvf-crown--obsidian {
-  animation: tls-lvf-crown-float 2.4s ease-in-out infinite, tls-lvf-crown-surge 2s ease-in-out infinite;
-}
-.tls-lvf-crown--obsidian::before { opacity: 0.9; inset: -42% -30%; }
+.tls-lvf--still .tls-lvf-crown { animation: none; }
+/* Schweben und Strahlen gibt es nur noch in der Kronen-Feier (CrownCelebration), nicht am Rahmen. */
 @keyframes tls-lvf-crown-float {
   0%, 100% { transform: translateY(0) rotate(-2deg); }
   50% { transform: translateY(-7px) rotate(2.5deg); }
 }
-@keyframes tls-lvf-crown-burst {
-  0%, 100% { transform: scale(0.92); opacity: 0.4; }
-  50% { transform: scale(1.12); opacity: 0.85; }
+@keyframes tls-lvf-crown-rays-spin {
+  to { transform: rotate(360deg); }
 }
-@keyframes tls-lvf-crown-twinkle {
-  0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
-  50% { opacity: 1; transform: scale(1.15) rotate(45deg); }
-}
-@keyframes tls-lvf-crown-surge {
-  0%, 100% { filter: drop-shadow(0 0 8px rgba(41, 182, 232, 0.7)); }
-  50% { filter: drop-shadow(0 0 22px rgba(41, 182, 232, 1)) drop-shadow(0 0 40px rgba(41, 182, 232, 0.65)); }
-}
-.tls-lvf--still .tls-lvf-crown {
-  top: calc(var(--lvf-d) * var(--lvf-pt, 0.5) * -1 - 8px);
-  width: 38px;
-  margin-left: -19px;
-}
-/* Listen bleiben ruhig: die Krone steht still, ohne Schweben, Pulsen und Funkeln. */
-.tls-lvf--still .tls-lvf-crown,
-.tls-lvf--still .tls-lvf-crown::before,
-.tls-lvf--still .tls-lvf-crown::after,
-.tls-lvf--still .tls-lvf-crown-rays { animation: none; }
-.tls-lvf--still .tls-lvf-crown::after { display: none; }
-.tls-lvf--still .tls-lvf-crown-rays { display: none; }
 
 /* profile quick-stat highlight for strong performances */
 .tls-stat-glory {
@@ -1371,8 +1326,6 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 
 @media (prefers-reduced-motion: reduce) {
   .tls-lvf-crown,
-  .tls-lvf-crown::before,
-  .tls-lvf-crown::after,
   .tls-stat-glory {
     animation: none !important;
   }
@@ -1444,7 +1397,6 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tls-lvf-crown-rays,
   .tls-crown-celebration-rays,
   .tls-crown-celebration-crown {
     animation: none !important;

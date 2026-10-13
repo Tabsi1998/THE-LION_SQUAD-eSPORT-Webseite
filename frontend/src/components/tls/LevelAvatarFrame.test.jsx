@@ -1,13 +1,20 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import RING from "@/lib/loewenRangRing.json";
 import { frameFit } from "@/lib/loewenRang";
-import { LevelAvatarFrame, levelFrameConfig } from "./LevelAvatarFrame";
+import { CROWN_LABELS, LevelAvatarFrame, crownVariant, levelFrameConfig } from "./LevelAvatarFrame";
 
 // Löwen-Rang (#1454): der Rahmen des Rangs als Grafik, am gemessenen Ring ausgerichtet, Schild mit Rauten.
 
 vi.mock("@/lib/api", () => ({ api: { get: vi.fn(() => Promise.resolve({ data: { crowns: {} } })) } }));
+
+// jsdom zeichnet nicht: die Signatur im Profil bekommt einen leeren Kontext und keine Kantenpunkte.
+beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => null);
+  vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: false, json: () => Promise.resolve({}) })));
+});
+afterEach(() => vi.unstubAllGlobals());
 
 function frame(props = {}, testId = "f") {
   render(<LevelAvatarFrame testId={testId} {...props}><span>Foto</span></LevelAvatarFrame>);
@@ -113,10 +120,54 @@ test("feste Fläche: jeder Rang dieselbe Größe, das Foto passt sich an", () =>
   expect(frame({ level: 60, prestige: 1 }, "sterne").className).toContain("tls-lvf--stars");
 });
 
-test("Listen: die Krone steht still (CSS)", () => {
+test("Kronen (#1458): klein, ohne Dauer-Leuchten und ohne Schweben (CSS)", () => {
   const css = readFileSync(path.join(process.cwd(), "src/index.css"), "utf8").replace(/\r\n/g, "\n");
-  const rule = css.match(/\.tls-lvf--still \.tls-lvf-crown,\n\.tls-lvf--still \.tls-lvf-crown::before,\n\.tls-lvf--still \.tls-lvf-crown::after,\n\.tls-lvf--still \.tls-lvf-crown-rays \{ animation: none; \}/);
-  expect(rule).not.toBeNull();
+  const start = css.indexOf("/* Kronen der Punktewertung (#1458)");
+  const block = css.slice(start, css.indexOf("/* profile quick-stat highlight", start));
+  const crown = block.match(/\.tls-lvf-crown \{[^}]*\}/)[0];
+  // etwa ein Drittel von früher (96 px im Profil): 11,5 % der Fläche, mindestens 14 px
+  expect(crown).toContain("--crown-w: max(14px, calc(var(--lvf-s) * 0.115));");
+  expect(crown).not.toMatch(/infinite/);
+  expect(block).not.toMatch(/tls-lvf-crown::before|tls-lvf-crown::after|tls-lvf-crown-rays \{/);
+  expect(block).toContain(".tls-lvf--still .tls-lvf-crown { animation: none; }");
+});
+
+test("Kronen: kein Strahlenkranz mehr, Onyx statt Obsidian (Rang 10 heißt Obsidian)", () => {
+  const el = frame({ level: 31, crown: "onyx" }, "onyx");
+  const crown = el.querySelector("[data-testid='avatar-crown']");
+  expect(crown.getAttribute("title")).toBe("Onyx · Level 30+");
+  expect(crown.className).toContain("tls-lvf-crown--onyx");
+  expect(el.querySelector(".tls-lvf-crown-rays")).toBeNull();
+  expect(Object.values(CROWN_LABELS).join(" ")).not.toMatch(/Obsidian/);
+  // ältere Antworten mit „obsidian“ zeigen ebenfalls die Onyx-Krone
+  expect(crownVariant("obsidian")).toBe("onyx");
+  expect(crownVariant("gold")).toBe("gold");
+  expect(crownVariant(null)).toBeNull();
+  const legacy = frame({ level: 31, crown: "obsidian" }, "alt").querySelector("[data-testid='avatar-crown']");
+  expect(legacy.getAttribute("title")).toBe("Onyx · Level 30+");
+});
+
+test("Signatur (#1455): nur im Profil und ab dem zweiten Level im Rang", async () => {
+  const profile = frame({ level: 58 }, "profil-58");
+  const canvas = await screen.findByTestId("loewen-signature");
+  expect(profile.contains(canvas)).toBe(true);
+  expect(canvas.dataset.signature).toBe("storm");
+  expect(frame({ level: 55 }, "profil-55").querySelector("canvas")).toBeNull();
+  for (const [props, id] of [[{ level: 58, compact: true }, "liste"], [{ level: 58, size: "card" }, "karte"], [{ level: 58, size: "mini" }, "mini"]]) {
+    expect(frame(props, id).querySelector("canvas")).toBeNull();
+  }
+  await waitFor(() => expect(screen.getAllByTestId("loewen-signature")).toHaveLength(1));
+});
+
+test("Signatur: mit „Bewegung reduzieren“ kein Canvas", async () => {
+  window.matchMedia = vi.fn().mockImplementation((query) => ({ matches: query.includes("reduce"), media: query, addEventListener() {}, removeEventListener() {} }));
+  try {
+    const el = frame({ level: 60 }, "ruhig");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(el.querySelector("canvas")).toBeNull();
+  } finally {
+    delete window.matchMedia;
+  }
 });
 
 test("mini (Podest): klein, still, ohne Schild", () => {

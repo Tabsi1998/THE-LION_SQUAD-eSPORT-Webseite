@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { FRAME_SIZES, PROFILE_SMALL, frameFit, frameLayout, framePadding, frameSources, rankInfo, ringOf } from "@/lib/loewenRang";
 
 const TLS_BLUE = "#29B6E8";
 const MAX_PRESTIGE = 5;
+// Signatur des Rangs (#1455): Partikel-Canvas nur im Profilkopf, erst bei Bedarf geladen.
+const LoewenRangSignature = lazy(() => import("./LoewenRangSignature"));
 
 /* Löwen-Rang (#1454): 12 gezeichnete Rahmen statt der 30 Code-Looks. Jede Größe hat eine feste Fläche für Rahmen und
    Foto; das Foto wird je Rang so groß, dass die ganze Grafik hineinpasst, und der Rahmen so skaliert und verschoben,
@@ -16,7 +19,7 @@ export function levelFrameConfig(levelInput) {
   return { ...info, ring, scale, ox, oy, fit: frameFit(ring), pad: framePadding(ring) };
 }
 
-/* ---- Dynamic crowns (points leaderboard rank 1-3 + obsidian for level 30+) ---- */
+/* ---- Kronen: Platz 1–3 der Punktewertung (Gold, Silber, Bronze) und Onyx ab Level 30 (#1458) ---- */
 let crownsCache = null;
 let crownsPromise = null;
 const crownsListeners = new Set();
@@ -64,17 +67,24 @@ const CROWN_STYLES = {
   bronze: { from: "#F0B27A", to: "#8C5A2B", stroke: "#5C3A18", gem: "#FFDCB0", glow: "rgba(205,127,50,0.9)" },
   silver: { from: "#FFFFFF", to: "#97A6B5", stroke: "#5F6E7D", gem: "#EAF3FB", glow: "rgba(221,229,238,0.95)" },
   gold: { from: "#FFE97A", to: "#C9A100", stroke: "#8A6D00", gem: "#FFF7CE", glow: "rgba(255,215,0,1)" },
-  obsidian: { from: "#2A333D", to: "#05070A", stroke: TLS_BLUE, gem: TLS_BLUE, glow: "rgba(41,182,232,1)" },
+  onyx: { from: "#2A333D", to: "#05070A", stroke: TLS_BLUE, gem: TLS_BLUE, glow: "rgba(41,182,232,1)" },
 };
+
+/** Ältere Antworten kennen die Onyx-Krone noch als „obsidian“ - der Name gehört heute Rang 10 (#1458). */
+export function crownVariant(crown) {
+  if (!crown) return null;
+  return crown === "obsidian" ? "onyx" : crown;
+}
 
 export const CROWN_LABELS = {
   gold: "Punkte-König · Platz 1",
   silver: "Platz 2 der Punktewertung",
   bronze: "Platz 3 der Punktewertung",
-  obsidian: "Obsidian · Level 30+",
+  onyx: "Onyx · Level 30+",
 };
 
-export function CrownIcon({ variant, className = "" }) {
+export function CrownIcon({ variant: rawVariant, className = "" }) {
+  const variant = crownVariant(rawVariant) || "gold";
   const c = CROWN_STYLES[variant] || CROWN_STYLES.gold;
   const gid = `tls-lvf-crown-grad-${variant}`;
   return (
@@ -103,9 +113,10 @@ const STILL = new Set(["list", "mini"]);
  * Profilbild mit dem Rahmen seines Löwen-Rangs, in einer festen Fläche für alle Ränge.
  * size: "profile" (285 px, auf dem Handy 220), "card" (150), "list" (92) oder "mini" (64, etwa das Podest);
  * `compact` heißt "list". In Listen und klein bleibt nur die Grafik, ohne Glanz und ohne Schild.
+ * Nur im Profil läuft die Signatur des Rangs (#1455) - ab dem zweiten Level im Rang, nicht mit „Bewegung reduzieren“.
  * Die Kinder füllen das runde Foto.
  */
-export function LevelAvatarFrame({ level, prestige = 0, crown = null, size, className = "", compact = false, showBadge = true, team = false, testId, children }) {
+export function LevelAvatarFrame({ level, prestige = 0, crown: rawCrown = null, size, className = "", compact = false, showBadge = true, team = false, testId, children }) {
   const cfg = useMemo(() => levelFrameConfig(level), [level]);
   const variant = FRAME_SIZES[size] ? size : compact ? "list" : "profile";
   const still = STILL.has(variant);
@@ -115,8 +126,12 @@ export function LevelAvatarFrame({ level, prestige = 0, crown = null, size, clas
   const [loaded, setLoaded] = useState(false);
   const stars = Math.max(0, Math.min(MAX_PRESTIGE, Math.floor(Number(prestige) || 0)));
   const shown = Math.max(1, Math.floor(Number(level) || 1));
-  const crownStyle = crown ? CROWN_STYLES[crown] : null;
+  const crown = crownVariant(rawCrown);
   const plate = showBadge && !still;
+  const reducedMotion = useReducedMotion();
+  // Gleiche Regel wie signatureEnabled (lib/loewenSignatur.js), ohne die Datei ins Haupt-Bundle zu ziehen: beim ersten
+  // Level eines Rangs glänzt nur der Rahmen.
+  const signature = variant === "profile" && !reducedMotion && cfg.progress > 0;
   // In Listen gibt es kein Schild - dort trägt der Rahmen selbst Level und Rang als zugänglichen Namen.
   const label = `${team ? "Team-Level" : "Level"} ${shown}, Rang ${cfg.name}${stars > 0 ? `, Prestige ${stars}` : ""}`;
   useEffect(() => { setLoaded(false); }, [cfg.key]);
@@ -164,12 +179,10 @@ export function LevelAvatarFrame({ level, prestige = 0, crown = null, size, clas
         {crown && (
           <span
             className={`tls-lvf-crown tls-lvf-crown--${crown}`}
-            style={{ "--crown-glow": crownStyle?.glow }}
             title={CROWN_LABELS[crown]}
             data-testid="avatar-crown"
             aria-hidden="true"
           >
-            <span className="tls-lvf-crown-rays" />
             <CrownIcon variant={crown} />
           </span>
         )}
@@ -185,6 +198,11 @@ export function LevelAvatarFrame({ level, prestige = 0, crown = null, size, clas
           </span>
         )}
       </div>
+      {signature && (
+        <Suspense fallback={null}>
+          <LoewenRangSignature level={shown} fit={cfg.fit} scale={cfg.scale} ox={cfg.ox} oy={cfg.oy} ring={cfg.ring} />
+        </Suspense>
+      )}
     </div>
   );
 }

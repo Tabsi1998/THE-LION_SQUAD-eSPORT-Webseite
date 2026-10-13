@@ -11,6 +11,8 @@ Technische Hintergründe für die Entwicklung stehen in den Dateien unter [`docs
 
 | Kapitel | Worum es geht |
 | --- | --- |
+| [Erste Schritte im Admin](admin.md) | Menü je Rolle, Suche, Kommandozentrale, Zwei-Faktor, Freigaben vergeben, Helfer und Moderation, wo welches Thema steht |
+| [Turniere](turniere.md) | Anlegen, Formate, Anmeldung und Startgeld, Check-in, Aufstellung, Ergebnis-Fenster, Dispute, Stationen, Abschluss, Turniertag mit wenig Helfern |
 | [Verein und Mitglieder](verein.md) | Mitglied werden, Anträge und Einladungen, Mitgliederbereich, Mitgliedskarte, Vorstand und Stellvertretungen, Statuten, Versammlungen, Helferdienste, persönliche Unterlagen |
 | [Inhalte: News, Galerie und Seiten](inhalte.md) | News schreiben und verteilen, Galerie und Event-Fotos, Medien-Bibliothek, Über uns, Sponsoren, Partner, Referenzen |
 | [Mails und Benachrichtigungen](mails.md) | Mail-Versand (Resend, SMTP), Vorlagen, Mail-Queue, Newsletter, Push und Kanäle, Discord-Direktnachrichten, Themen und Kanäle der Mitglieder |

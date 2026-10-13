@@ -25,7 +25,7 @@ module.exports = defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: process.env.E2E_BASE_URL ? undefined : {
-    command: `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${localPort}`,
+    command: `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${localPort} --strictPort`,
     url: baseURL,
     reuseExistingServer: !process.env.CI && process.env.E2E_ISOLATED !== "1",
     timeout: 120_000,
