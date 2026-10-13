@@ -64,7 +64,7 @@ const SPARK_COLORS = {
  * Startet nichts von selbst: `frame(now)` zeichnet ein Bild, `resize()` passt die Leinwände an, `reset()` leert die
  * Partikel. Die Schleife (requestAnimationFrame, Sichtbarkeit) steuert die Komponente.
  */
-export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 1 }) {
+export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 1, onJolt = null }) {
   const layers = new Set(signatureLayers(fx, k));
   const on = (name) => layers.has(name);
   const bctx = back?.getContext?.("2d") || null;
@@ -83,6 +83,9 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
   let waves = [];
   let flash = 0;
   let last = 0;
+  // Uhr der Engine (Sekunden, läuft nur mit Bildern) und Teile des Aufstiegs-Moments, die später kommen.
+  let clock = 0;
+  let later = [];
   const timers = { spark: 0, crack: 0, bolt: 2, twink: 0, paw: 0, wave: 0, slash: 1 };
   const orbit = Array.from({ length: 220 }, () => ({ a: rnd(0, TAU), r: rnd(0.33, 0.52), w: rnd(0.12, 0.42), s: rnd(0.8, 2.2), p: rnd(0, TAU) }));
   const dust = Array.from({ length: 60 }, () => ({ a: rnd(0, TAU), r: rnd(0.9, 2.6), v: rnd(0.02, 0.08), s: rnd(0.5, 1.6), p: rnd(0, TAU) }));
@@ -189,6 +192,138 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
     const cy = g.ay + rnd(-0.25, 0.15) * g.F;
     parts.push({ t: "slash", x1: cx - (Math.cos(ang) * len) / 2, y1: cy - (Math.sin(ang) * len) / 2, x2: cx + (Math.cos(ang) * len) / 2, y2: cy + (Math.sin(ang) * len) / 2, life: 0.35, max: 0.35 });
     emitSpark(cx, cy, 10, Math.PI, "bronze");
+  }
+
+  // ---- Aufstiegs-Moment (#1456): jeder Rang zeigt seine Signatur am stärksten. Optik aus dem Prototyp
+  // (lsw-art/vorlage, signatureBurst). Läuft auch beim ersten Level eines Rangs, wenn die Signatur selbst noch ruht;
+  // alles zählt zur selben Obergrenze MAX_PARTICLES. Was später kommt (zweiter Hieb, Explosion), läuft nach der Uhr
+  // der Engine - steht die Schleife (Seite verdeckt, außer Bild), wartet auch der Moment.
+  function schedule(delay, fn) {
+    later.push({ at: clock + Math.max(0, delay), fn });
+  }
+  function ring(col, grow) {
+    if (room()) waves.push({ t: 0, d: 0.8, x: g.ax, y: g.ay, r0: g.P, grow: grow * g.sc, col, w: 10, full: true });
+  }
+  function around(n, col) {
+    for (let i = 0; i < n && room(); i++) {
+      const p = edgePoint();
+      emitSpark(p.x, p.y, 1, Math.PI, col);
+    }
+  }
+  function jolt() {
+    if (typeof onJolt === "function") onJolt();
+  }
+  function bigBurst(strong) {
+    const n = strong ? 1 : 0.5;
+    switch (fx) {
+      case "spark": {
+        // Funkenregen aus der Pfote unten.
+        const p = edgePoint(pawEdge.length ? pawEdge : edge);
+        emitSpark(p.x, p.y, Math.round(70 * n), 1.3, "steel");
+        ring("230,236,242", 120);
+        break;
+      }
+      case "paw":
+        // Pfoten-Kranz: 14 Spuren rundum, nacheinander verblassend.
+        for (let i = 0; i < 14 && room(); i++) {
+          const ang = (i / 14) * TAU;
+          const rr = g.F * 0.53;
+          parts.push({ t: "paw", x: g.ax + Math.cos(ang) * rr, y: g.ay + Math.sin(ang) * rr * 0.92, rot: ang + Math.PI / 2, life: 1.4 + i * 0.05, max: 1.4 + i * 0.05, cyan: true });
+        }
+        ring("120,220,255", 160);
+        break;
+      case "ember": {
+        // Glut-Ausbruch aus dem Wappen.
+        const p = at(0.5, 0.9);
+        for (let i = 0; i < 90 * n; i++) emitMote(p.x, p.y, rnd(-120, 120), rnd(-260, -60), rnd(0.8, 1.6), "ember");
+        ring("255,150,60", 200);
+        break;
+      }
+      case "hunt":
+        // Krallen-Dreifachhieb.
+        slash();
+        schedule(0.12, slash);
+        schedule(0.24, slash);
+        around(40 * n, "bronze");
+        break;
+      case "frost":
+        // Frost-Kranz: Eissterne rundum, kalter Lichtschein.
+        for (let i = 0; i < 26; i++) {
+          const p = edgePoint();
+          emitStar(p.x, p.y, rnd(6, 14), true, 0.9);
+        }
+        ring("190,235,255", 280);
+        flash = Math.max(flash, 0.18);
+        break;
+      case "gold": {
+        // Goldstaub saugt sich in den Edelstein oben und explodiert.
+        const gem = at(0.5, 0.085);
+        for (let i = 0; i < 120 * n && room(); i++) {
+          const ang = rnd(0, TAU);
+          const rr = rnd(0.35, 0.55) * g.F;
+          parts.push({ t: "implode", x: g.ax + Math.cos(ang) * rr, y: g.ay + Math.sin(ang) * rr, tx: gem.x, ty: gem.y, life: 0.45, max: 0.45 });
+        }
+        schedule(0.45, () => {
+          const p = at(0.5, 0.085);
+          emitSpark(p.x, p.y, Math.round(90 * n), Math.PI, "gold");
+          ring("255,215,90", 260);
+          flash = Math.max(flash, 0.2);
+        });
+        break;
+      }
+      case "fire":
+        // Feuerkranz rundum.
+        for (let i = 0; i < 220 * n; i++) emitFlame("fire");
+        ring("255,140,30", 300);
+        break;
+      case "roar":
+        // Schallwellen-Salve aus dem Maul, der Rahmen bebt.
+        for (let i = 0; i < 4; i++) {
+          schedule(i * 0.11, () => {
+            const m = at(0.5, 0.27);
+            if (room()) waves.push({ t: 0, d: 1.1, x: m.x, y: m.y, r0: 6 * g.sc, grow: g.F * 1.2, col: "255,225,120", w: 12 });
+          });
+        }
+        jolt();
+        break;
+      case "feather":
+        // Federexplosion über dem Kopf.
+        for (let i = 0; i < 40 * n && room(); i++) {
+          const ang = rnd(0, TAU);
+          const v = rnd(40, 160) * g.sc;
+          parts.push({ t: "feather", x: g.ax, y: g.ay - g.P * 0.4, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v, life: rnd(1.6, 2.6), max: 2.6, rot: rnd(0, TAU), spin: rnd(-4, 4), cyan: Math.random() < 0.5 });
+        }
+        ring("255,240,170", 240);
+        break;
+      case "lava":
+        // Vulkan: Glut schießt rundum aus dem Rahmen, der Rahmen bebt.
+        for (let i = 0; i < 140 * n; i++) {
+          const p = edgePoint();
+          emitMote(p.x, p.y, rnd(-80, 80), rnd(-220, -60), rnd(0.8, 1.6), "ember");
+        }
+        ring("255,100,20", 260);
+        jolt();
+        break;
+      case "sun": {
+        // Sonnenblitz: heller Stern auf der Krone, Lichtschein, Goldfunken rundum.
+        ring("255,230,140", 360);
+        flash = Math.max(flash, 0.4);
+        const p = at(0.5, 0.12);
+        emitStar(p.x, p.y, 60, false, 1);
+        around(60 * n, "gold");
+        break;
+      }
+      case "storm":
+        // Doppelter Blitzeinschlag mit Druckwelle.
+        lightning(true);
+        schedule(0.14, () => lightning(true));
+        for (let i = 0; i < 160 * n; i++) emitFlame("cyan");
+        ring("41,182,232", 340);
+        jolt();
+        break;
+      default:
+        break;
+    }
   }
 
   // Hintere Leinwand: Licht und Nebel liegen hinter Foto und Rahmen und scheinen nur außen und durch Lücken.
@@ -559,6 +694,13 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
         f.beginPath();
         f.arc(p.x, p.y, 1.6 * Math.max(0.75, g.sc), 0, TAU);
         f.fill();
+      } else if (p.t === "implode") {
+        // Goldstaub, der sich immer schneller in den Edelstein zieht.
+        const e = 1 - q;
+        f.fillStyle = "rgba(255,220,110,0.9)";
+        f.beginPath();
+        f.arc(p.x + (p.tx - p.x) * e * e, p.y + (p.ty - p.y) * e * e, 1.8 * Math.max(0.75, g.sc), 0, TAU);
+        f.fill();
       }
     }
     bolts = bolts.filter((b) => (b.life -= dt) > 0);
@@ -582,7 +724,9 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
       f.strokeStyle = `rgba(${wave.col},${((1 - q) * 0.85).toFixed(2)})`;
       f.lineWidth = (wave.w * (1 - q) + 1) * g.sc;
       f.beginPath();
-      f.arc(wave.x, wave.y, wave.r0 + q * wave.grow, Math.PI * 1.1, Math.PI * 1.9);
+      // Die Ringe des Aufstiegs-Moments laufen rundum, die Schallwellen nur nach oben.
+      if (wave.full) f.arc(wave.x, wave.y, wave.r0 + q * wave.grow, 0, TAU);
+      else f.arc(wave.x, wave.y, wave.r0 + q * wave.grow, Math.PI * 1.1, Math.PI * 1.9);
       f.stroke();
     }
     if (flash > 0) {
@@ -600,6 +744,12 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
     const dt = last ? Math.min(0.05, Math.max(0, (now - last) / 1000)) : 0.016;
     last = now;
     const t = now / 1000;
+    clock += dt;
+    if (later.length) {
+      const due = later.filter((item) => item.at <= clock);
+      later = later.filter((item) => item.at > clock);
+      due.forEach((item) => item.fn());
+    }
     drawn = 0;
     if (bctx) {
       bctx.clearRect(0, 0, w, h);
@@ -621,10 +771,20 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
     resume() {
       last = 0;
     },
+    /**
+     * Der Aufstiegs-Moment (#1456): `strong` ist der große beim Rangwechsel, sonst der kleine beim Level im Rang.
+     * `delay` (Sekunden) wartet, bis der neue Rahmen eingerastet ist.
+     */
+    burst(strong = true, { delay = 0 } = {}) {
+      if (!g) resize();
+      if (delay > 0) schedule(delay, () => bigBurst(strong));
+      else bigBurst(strong);
+    },
     reset() {
       parts = [];
       bolts = [];
       waves = [];
+      later = [];
       flash = 0;
     },
     get particles() {

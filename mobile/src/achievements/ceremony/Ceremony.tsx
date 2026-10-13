@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { AccessibilityInfo, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from "react-native-reanimated";
+import { LoewenRangFrame } from "../../components/LoewenRangFrame";
+import { type AscentMoment, ascentMoment } from "../../lib/loewenAufstieg";
 import { openTab } from "../../navigation/rootNavigation";
 import { useSeasonOverlay } from "../../seasons/anchors";
 import { colors, radius } from "../../theme";
@@ -9,7 +11,7 @@ import { Badge } from "../Badge";
 import { MATERIAL_LOOKS } from "../badgeArt.generated";
 import { lookFor, materialName } from "../badgeArt";
 import { shareAchievement } from "../share";
-import { playHaptics } from "./haptics";
+import { playAscentHaptics, playHaptics } from "./haptics";
 import { playCeremonySound, readCeremonySoundPrefs, writeCeremonyMuted } from "./sounds";
 import { Motion } from "./motions";
 import { CeremonyParticles } from "./particles";
@@ -121,6 +123,27 @@ function LevelUpStage({ plan, reduced }: { plan: CeremonyPlan; reduced: boolean 
   );
 }
 
+/**
+ * Löwen-Rang (#1456): der Aufstiegs-Moment im eigenen Rahmen. Level im Rang - die neuen Rauten springen auf, dazu ein
+ * kleiner Moment der Signatur. Rangwechsel - der alte Rahmen blitzt weg, der neue rastet ein, dazu der große Moment
+ * und Haptik. „Bewegung reduzieren“ und „dezent“ blenden nur aus und ein.
+ */
+function AscentStage({ plan, moment, avatar }: { plan: CeremonyPlan; moment: AscentMoment; avatar?: string | null }) {
+  const levelUp = plan.levelUp || { level: moment.level };
+  return (
+    <View style={styles.levelStage} testID="ceremony-levelup">
+      <View testID={`loewen-ascent-${moment.kind}`} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <LoewenRangFrame level={moment.level} size="card" ascent={moment} decorative>
+          {avatar ? <Image source={{ uri: avatar }} style={styles.avatar} /> : <Ionicons name="person" size={40} color="rgba(255,255,255,0.25)" />}
+        </LoewenRangFrame>
+      </View>
+      {levelUp.titleChanged && levelUp.title ? (
+        <Text style={[styles.titleBanner, { borderColor: plan.accent, color: plan.accent }]} testID="ceremony-title-banner">Neuer Titel: {levelUp.title}</Text>
+      ) : null}
+    </View>
+  );
+}
+
 /** Die alte Zahl bricht auf: zwei Hälften kippen auseinander und verblassen, kurz bevor die neue fällt. */
 function LevelBreak({ left, right, accent }: { left: string; right: string; accent: string }) {
   const t = useEnter(0, (v) => { v.value = withDelay(480, withTiming(1, { duration: 400, easing: Easing.in(Easing.quad) })); });
@@ -209,11 +232,18 @@ export function ceremonyTexts(plan: CeremonyPlan, count: number) {
   else if (plan.sequence === "diamond") heading = "Diamant";
   else heading = count === 1 ? "Neues Achievement!" : `${count} neue Achievements!`;
   const rank = Number(plan.top?.rank || 0);
-  const sub = plan.sub || (isLevelOnly ? levelTexts(plan.levelUp).sub : plan.catchUp ? "Nachgeholte Erfolge" : `${look.name}${rank && rank <= 7 ? ` ${ROMAN[rank]}` : ""} freigeschaltet`);
+  const rankText = ascentRankText(plan);
+  const sub = plan.sub || (isLevelOnly ? rankText || levelTexts(plan.levelUp).sub : plan.catchUp ? "Nachgeholte Erfolge" : `${look.name}${rank && rank <= 7 ? ` ${ROMAN[rank]}` : ""} freigeschaltet`);
   return { heading, sub };
 }
 
-type SoundUser = { ceremony_sound?: boolean | null; ceremony_volume?: number | null } | null;
+/** „Neuer Rang: Goldmähne“, wenn der Aufstieg einen neuen Löwen-Rang bringt (#1456) - sonst null. */
+export function ascentRankText(plan: CeremonyPlan): string | null {
+  const moment = ascentMoment(plan.levelUp);
+  return moment?.kind === "rank" ? `Neuer Rang: ${moment.to.name}` : null;
+}
+
+type SoundUser = { ceremony_sound?: boolean | null; ceremony_volume?: number | null; avatar_url?: string | null } | null;
 
 export function Ceremony({ plan, onClose, reduced = false, autoClose = true, user = null }: { plan: CeremonyPlan; onClose: () => void; reduced?: boolean; autoClose?: boolean; user?: SoundUser }) {
   useSeasonOverlay("achievement-ceremony", true);
@@ -227,11 +257,14 @@ export function Ceremony({ plan, onClose, reduced = false, autoClose = true, use
   const [particles, setParticles] = useState(!reduced);
   const duration = reduced ? Math.min(plan.duration, 4500) : plan.duration;
   const look = useMemo(() => lookFor(plan.material), [plan.material]);
+  // Der Aufstiegs-Moment des Löwen-Rangs (#1456) - nicht bei Prestige; ruhig bei reduzierter Bewegung.
+  const moment = useMemo(() => ascentMoment(plan.levelUp, { reduced }), [plan.levelUp, reduced]);
 
   // Haptik und Klang je Material, einmal je Zeremonie - der Klang nur, wenn er weder am Gerät noch im Profil aus ist.
   const [muted, setMuted] = useState(false);
   useEffect(() => {
-    playHaptics(look);
+    // Ein reiner Level-Aufstieg mit Rahmen-Moment hat seine eigene Haptik im Takt des Rahmens (unten).
+    if (!(isLevelOnly && moment)) playHaptics(look);
     let alive = true;
     void readCeremonySoundPrefs(user).then((prefs) => { if (alive) setMuted(prefs.muted); });
     void playCeremonySound(plan.sound, { user });
@@ -245,6 +278,20 @@ export function Ceremony({ plan, onClose, reduced = false, autoClose = true, use
     void writeCeremonyMuted(next);
     if (!next) void playCeremonySound(plan.sound, { user, force: true });
   };
+
+  // Haptik zum Aufstiegs-Moment, sobald der Rahmen auf der Bühne steht - einmal je Zeremonie.
+  const momentKind = moment?.kind;
+  useEffect(() => {
+    if (phase !== "level" || !momentKind) return undefined;
+    return playAscentHaptics(momentKind);
+  }, [phase, momentKind]);
+
+  // Vorleser: der neue Rang steht nur im Bild - sobald die Level-Bühne steht, wird er angesagt (einmal je Zeremonie).
+  const rankAnnouncement = moment?.kind === "rank" ? `Level ${moment.level} erreicht. Neuer Rang: ${moment.to.name}` : null;
+  useEffect(() => {
+    if (phase !== "level" || !rankAnnouncement) return;
+    AccessibilityInfo.announceForAccessibility?.(rankAnnouncement);
+  }, [phase, rankAnnouncement]);
 
   // Die Partikel verglühen nach gut vier Sekunden - dann steht auch ihr Takt.
   useEffect(() => {
@@ -296,7 +343,8 @@ export function Ceremony({ plan, onClose, reduced = false, autoClose = true, use
         accessibilityViewIsModal
       >
         {!reduced ? <SpecialLight plan={plan} /> : null}
-        {(showBadge || isLevelOnly) && particles && !reduced ? (
+        {/* Mit Aufstiegs-Moment übernimmt der Rahmen das Glitzern. */}
+        {(showBadge || (isLevelOnly && !moment)) && particles && !reduced ? (
           <CeremonyParticles kind={isLevelOnly ? "glint" : particleKind(plan.material)} count={plan.particles} width={width} height={height} origin={{ x: width / 2, y: height * 0.38 }} />
         ) : null}
         <Animated.View style={[styles.card, { borderColor: plan.accent, shadowColor: plan.accent }, cardStyle]} onStartShouldSetResponder={() => true} testID="ceremony-card">
@@ -308,7 +356,7 @@ export function Ceremony({ plan, onClose, reduced = false, autoClose = true, use
             <Ionicons name="close" size={22} color="rgba(255,255,255,0.5)" />
           </Pressable>
 
-          <View style={[styles.stage, plan.sequence === "legendary" && styles.stageLegendary]} testID="ceremony-stage">
+          <View style={[styles.stage, plan.sequence === "legendary" && styles.stageLegendary, moment && !showBadge && styles.stageAscent]} testID="ceremony-stage">
             {plan.sequence === "category" ? <Vitrine reduced={reduced} /> : null}
             {showBadge ? (
               <>
@@ -321,13 +369,15 @@ export function Ceremony({ plan, onClose, reduced = false, autoClose = true, use
                   badge={<Badge material={current?.material || plan.material} level={current?.level} rank={current?.rank} art={current?.art || current?.group_art} icon={current?.group_icon || current?.icon} size={128} title={current?.name} testID="ceremony-badge" />}
                 />
               </>
+            ) : moment ? (
+              <AscentStage plan={plan} moment={moment} avatar={user?.avatar_url} />
             ) : (
               <LevelUpStage plan={plan} reduced={reduced} />
             )}
           </View>
 
           <View style={styles.texts}>
-            <Text style={[styles.sub, { color: plan.accent }]} testID="ceremony-sub">{levelPhase ? levelTexts(plan.levelUp).phaseSub : sub}</Text>
+            <Text style={[styles.sub, { color: plan.accent }]} testID="ceremony-sub">{levelPhase ? ascentRankText(plan) || levelTexts(plan.levelUp).phaseSub : sub}</Text>
             <Text style={styles.heading} testID="ceremony-heading">{levelPhase ? levelTexts(plan.levelUp).phaseHeading : heading}</Text>
             {plan.sequence === "first" && showBadge ? (
               <Text style={styles.firstText} testID="ceremony-first-text">
@@ -385,6 +435,9 @@ const styles = StyleSheet.create({
   close: { position: "absolute", top: 12, right: 12, zIndex: 10 },
   mute: { position: "absolute", top: 13, right: 48, zIndex: 10 },
   stage: { height: 210, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  // Löwen-Rang (#1456): Platz für Rahmen, Schild und Titel-Banner.
+  stageAscent: { height: 236 },
+  avatar: { width: "100%", height: "100%" },
   stageLegendary: { marginTop: 34 },
   fanned: { position: "absolute" },
   texts: { paddingHorizontal: 20, paddingBottom: 10, alignItems: "center" },

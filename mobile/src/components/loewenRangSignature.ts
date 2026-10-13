@@ -155,3 +155,55 @@ export function drawSignature(canvas: SkCanvas, scene: SignatureScene, t: number
   if (image) drawShine(canvas, scene, t, image);
   drawParticles(canvas, scene, t);
 }
+
+// ---- Aufstiegs-Moment (#1456) ----
+// Vereinfachte Fassung des Web-Moments: eine Druckwelle in der Farbe des Rangs und Teilchen, die von der Kante des
+// Rahmens nach außen fliegen - Glut steigt dabei auf, Frost sinkt, beim Blitz (Brüller, Sturm) blitzt der Ring kurz
+// hell. Höchstens BURST_PARTICLES (24 groß, 12 klein); nach BURST_SECONDS ist alles verglüht.
+
+export const BURST_SECONDS = 1.6;
+export const BURST_PARTICLES = { strong: 24, small: 12 } as const;
+
+/** Wie viele Teilchen der Moment zeichnet. */
+export function burstCount(strong: boolean): number {
+  "worklet";
+  return strong ? BURST_PARTICLES.strong : BURST_PARTICLES.small;
+}
+
+/** Zeigt der Moment zum Zeitpunkt `t` (Sekunden ab seinem Start) etwas? */
+export function burstVisible(t: number): boolean {
+  "worklet";
+  return t >= 0 && t <= BURST_SECONDS;
+}
+
+/** Ein Bild des Aufstiegs-Moments zum Zeitpunkt `t` (Sekunden ab seinem Start). */
+export function drawBurst(canvas: SkCanvas, scene: SignatureScene, t: number, strong: boolean) {
+  "worklet";
+  if (!burstVisible(t)) return;
+  const { ringX, ringY, ringR, color, kind, edge } = scene;
+  // Druckwelle: ein Ring läuft vom Rahmen nach außen und verblasst.
+  const wave = t / 0.8;
+  if (wave < 1) {
+    const ring = rgba(color, (1 - wave) * 0.85);
+    ring.setStyle(PaintStyle.Stroke);
+    ring.setStrokeWidth(Math.max(1.5, ringR * 0.09 * (1 - wave)));
+    canvas.drawCircle(ringX, ringY, ringR * (1.05 + wave * (strong ? 0.95 : 0.55)), ring);
+  }
+  // Blitz-Ränge: kurz ein heller Schein.
+  if (kind === "blitz" && strong && t < 0.25) {
+    canvas.drawCircle(ringX, ringY, ringR * 1.7, rgba(color, 0.3 * (1 - t / 0.25)));
+  }
+  const n = burstCount(strong);
+  for (let i = 0; i < n && edge.length; i += 1) {
+    const seed = i + 1;
+    const life = 0.9 + noise(seed * 3) * 0.6;
+    const p = t / life;
+    if (p >= 1) continue;
+    const [ex, ey] = edge[Math.floor((i / n) * edge.length + noise(seed) * 3) % edge.length];
+    const angle = Math.atan2(ey - ringY, ex - ringX) + (noise(seed * 5) - 0.5) * 0.7;
+    const reach = ringR * (strong ? 0.95 : 0.55) * (0.6 + 0.4 * noise(seed * 7));
+    const dist = reach * (1 - (1 - p) * (1 - p));
+    const drift = kind === "glut" ? -p * ringR * 0.45 : kind === "frost" ? p * ringR * 0.25 : 0;
+    dot(canvas, ex + Math.cos(angle) * dist, ey + Math.sin(angle) * dist + drift, 1.4 + noise(seed * 11) * 1.2, color, 1 - p);
+  }
+}

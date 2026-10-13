@@ -27,6 +27,7 @@ from services.secret_store import decrypt_secret, encrypt_secret
 from services.totp import generate_recovery_codes, generate_totp_secret, matching_totp_counter, provisioning_uri
 from services.return_path import safe_next_path
 from services.log_safe import log_safe
+from services.private_fields import strip_private
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 logger = logging.getLogger("tls.auth")
@@ -368,18 +369,7 @@ async def with_areas(user: dict) -> dict:
 
 
 def _public_user(user: dict) -> dict:
-    doc = dict(user)
-    for field in (
-        "_id",
-        "password_hash",
-        "google_id",
-        "mfa_secret",
-        "mfa_pending_secret",
-        "mfa_pending_created_at",
-        "mfa_recovery_code_hashes",
-        "mfa_totp_last_counter",
-    ):
-        doc.pop(field, None)
+    doc = strip_private(dict(user))
     privacy_version = os.environ.get("PRIVACY_POLICY_VERSION", "2026-08-26")
     terms_version = os.environ.get("TERMS_VERSION", "2026-08-26")
     doc["consent_required"] = bool(

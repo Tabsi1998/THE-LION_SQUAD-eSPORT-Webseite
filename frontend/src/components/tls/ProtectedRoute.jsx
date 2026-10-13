@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { ADMIN_AREAS, MFA_AREAS, hasArea, isAnyAdmin, leadWithoutSecondFactor, mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
+import { ADMIN_AREAS, MFA_AREAS, adminHome, hasArea, isAnyAdmin, leadWithoutSecondFactor, mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 
 // Rechte nach Bereichen (#287): `requireArea` verlangt einen der genannten
@@ -12,8 +12,11 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 // Adminbereich allein nicht. Die Turnierleitung braucht dafür, wie im Server, die bestätigte
 // Zwei-Faktor-Anmeldung (#1028); Helfer nicht - auch eine Turnierleitung mit eigenem Einsatz
 // (`has_staff_assignment`) kommt ohne Zwei-Faktor in diesen Einsatz, die Seiten zeigen ihr dann nur dessen Aktionen.
+// `adminHome` ist der Eingang /admin (#1352): die Startseite für Verwaltungsbereiche, „Mein Dienst“ für Helfer, die
+// Meldungen für Moderation, sonst „Kein Zugriff“ mit dem freundlichen Satz (`adminHome` in lib/permissions).
+// `requireDuty` öffnet „Mein Dienst“ für alle mit einem Dienst - Helfer, Moderation oder Verwaltung.
 
-export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireTournamentStaff = false }) {
+export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireTournamentStaff = false, adminHome: entrance = false, requireDuty = false }) {
   const { user } = useAuth();
   const loc = useLocation();
   const wantedAreas = requireArea ? [requireArea].flat() : requireClubAdmin ? ["system"] : requireAdmin ? ADMIN_AREAS : [];
@@ -27,6 +30,14 @@ export function ProtectedRoute({ children, requireArea = null, requireAdmin = fa
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname)}`} replace />;
   if (user.consent_required && loc.pathname !== "/consent") {
     return <Navigate to="/consent" replace />;
+  }
+  if (entrance || requireDuty) {
+    const home = adminHome(user);
+    if (home === "none") return <Navigate to="/403" replace state={{ noDuty: true, from: loc.pathname }} />;
+    if (home === "mfa") return <Navigate to={mfaSetupPath(loc.pathname)} replace />;
+    if (entrance && home === "duty") return <Navigate to="/admin/dienst" replace />;
+    if (entrance && home === "moderation") return <Navigate to="/admin/moderation" replace />;
+    return children;
   }
   if (wantedAreas.length && !hasArea(user, ...wantedAreas)) {
     return <Navigate to="/403" replace state={{ areas: wantedAreas, from: loc.pathname }} />;

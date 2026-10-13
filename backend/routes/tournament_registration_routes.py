@@ -8,7 +8,7 @@ from pymongo.errors import DuplicateKeyError
 from database import get_db
 from services.permissions import is_confirmed_tournament_lead
 from auth import get_current_user, get_optional_user
-from services.access_links import record_access_link_use, validate_access_link
+from services.access_links import AccessLinkUsedUp, claim_access_link_use, release_access_link_use, validate_access_link
 from services.match_audience import responsible_registration
 from services.registration_notifications import notify_registration_status
 from services.tournament_rules import self_checkin_allowed
@@ -24,6 +24,7 @@ from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_w
 from models import RegistrationCreate, RegistrationUpdate, RegistrationAdminCreate, now_utc, new_id
 from services import tournament_event_gate, tournament_fees
 from services.query_filters import safe_regex
+from services.private_fields import private_projection
 from routes.tournament_common import (
     TOURNAMENT_MUTATION_LOCKED_DETAIL,
     _apply_match_plan,
@@ -349,7 +350,7 @@ async def list_registrations(tid: str, access: str | None = None, user=Depends(g
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     team_ids = list({r["team_id"] for r in regs if r.get("team_id")})
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0}).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
     teams = {t["id"]: t for t in await db.teams.find(
         {"id": {"$in": team_ids}}, {"_id": 0}).to_list(500)}
     # Turnier nur mit Event-Anmeldung (#875): die Turnierleitung sieht, wer (noch) beim Event angemeldet ist.
@@ -468,9 +469,18 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
     }
     if count >= tournament.get("max_participants", 32):
         reg["status"] = "waitlist"
+    # Zugangslink mit Limit (#1036): die Nutzung atomar belegen, bevor die Anmeldung geschrieben wird.
+    try:
+        claimed = await claim_access_link_use(db, register_access, me)
+    except AccessLinkUsedUp as exc:
+        raise HTTPException(status_code=409, detail=exc.detail)
     try:
         await db.tournament_registrations.insert_one(reg)
-    except DuplicateKeyError:
+    except Exception as exc:
+        if claimed:
+            await release_access_link_use(db, register_access, me)
+        if not isinstance(exc, DuplicateKeyError):
+            raise
         existing = await db.tournament_registrations.find_one(
             {"identity_key": reg["identity_key"]},
             {"_id": 0},
@@ -499,8 +509,6 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
         await on_tournament_registered(me["id"], tid)
     except Exception:
         logger.warning("[achievements] Anmeldung zu %s nicht ausgewertet", _log_safe(tid), exc_info=True)
-    if register_access:
-        await record_access_link_use(db, register_access, me)
     return reg
 
 
@@ -563,7 +571,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
     payload = body.model_dump()
     user = None
     if payload.get("user_id"):
-        user = await db.users.find_one({"id": payload["user_id"]}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0})
+        user = await db.users.find_one({"id": payload["user_id"]}, private_projection())
         if not user:
             raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
         existing = await db.tournament_registrations.find_one(
