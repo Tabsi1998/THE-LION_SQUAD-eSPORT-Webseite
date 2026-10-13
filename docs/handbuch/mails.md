@@ -115,6 +115,12 @@ Einige Mails sind feste Vorlagen: Dort ist der gerenderte Standard der Ausgangsp
 **Admin → E-Mail → Mail-Queue.** Jede Mail wird zuerst eingereiht und dann versendet. Stände: **Wartet**, **Sendet**, **Gesendet**,
 **Fehlgeschlagen**, **Übersprungen**. Oben ein Filter **Nach Stand filtern**, darunter die Liste mit Mail, Stand und Zeitpunkt.
 
+- Empfänger stehen **gekürzt** da: erster Buchstabe und Domain, zum Beispiel `m***@gmail.com` – auch in der Meldung des
+  Mailservers. **Adresse zeigen** in der Zeile zeigt die ganze Adresse dieser einen Mail, **Verbergen** kürzt wieder. Jedes
+  Aufdecken steht im Protokoll (**Betrieb & Logs → Ereignisse**, Adminaktionen: wer, wann, welche Mail – ohne die Adresse).
+  Mehr als 30 Adressen in einer Stunde deckt eine Person nicht auf; danach heißt es kurz warten.
+- **Adresse suchen** findet Mails an eine bestimmte Adresse (auch nur ein Teil davon); die Treffer stehen ebenfalls gekürzt da.
+  **Suche leeren** zeigt wieder alle.
 - Bei **Fehlgeschlagen** erscheint **Nochmal versuchen**; eine gesendete Mail geht nie ein zweites Mal hinaus. **Löschen** steht unter „Mehr“.
 - Oben: **Jetzt verarbeiten** (Warteschlange sofort abarbeiten), **Hängende Mails neu anstoßen** (stellt Mails zurück, die lange beim Senden
   hängen), **Alle fehlgeschlagenen nochmal versuchen** und **Aufräumen** (löscht Einträge älter als 30 Tage).

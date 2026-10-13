@@ -60,7 +60,7 @@ test("Raster mit Punkten, Tag antippen zeigt seine Termine, Abo-Adresse und Logi
   expect(screen.getByTestId("calendar-dot-2099-10-05-event")).toBeInTheDocument();
   expect(screen.getByTestId("calendar-dot-2099-10-05-tournament")).toBeInTheDocument();
   expect(screen.queryByTestId("calendar-dot-2099-10-06-event")).toBeNull();
-  expect(screen.getByTestId("calendar-day-2099-10-12").className).toContain("border-[#FFD700]");
+  expect(screen.getByTestId("calendar-day-2099-10-12").className).toContain("border-brand");
 
   await userEvent.click(screen.getByTestId("calendar-day-2099-10-05"));
   const day = screen.getByTestId("calendar-day-items");
@@ -152,11 +152,11 @@ test("am Handy startet die Liste; die letzte Wahl bleibt am Gerät", async () =>
   expect(window.localStorage.getItem("tls_calendar_view")).toBe("month");
 });
 
-test("Mitglieder sehen Versammlungen und eigene Schichten grün, der Tipp führt in den Mitgliederbereich", async () => {
+test("Mitglieder sehen Versammlungen und eigene Schichten in Vereinsgold (#1305), der Tipp führt in den Mitgliederbereich", async () => {
   respond([...ITEMS, ...CLUB], true);
   await renderPage("Oktober 2099");
 
-  expect(screen.getByTestId("calendar-dot-2099-10-24-club").style.backgroundColor).toBe("rgb(16, 185, 129)");
+  expect(screen.getByTestId("calendar-dot-2099-10-24-club").style.backgroundColor).toBe("rgb(255, 215, 0)");
   expect(screen.getByTestId("calendar-kind-club")).toHaveTextContent("Verein");
 
   await userEvent.click(screen.getByTestId("calendar-day-2099-10-24"));

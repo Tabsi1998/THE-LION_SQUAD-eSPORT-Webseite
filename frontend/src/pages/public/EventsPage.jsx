@@ -14,7 +14,8 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { plainTextPreview } from "@/lib/textPreview";
 import { FILTERS, LIST_MODES, LIST_MODE_STORAGE_KEY, buildCards, childSummary, isPast, listMode, playLabel } from "@/lib/eventGroups";
 import { Calendar, ChevronDown, Flag, MapPin, Trophy, Users as UsersIcon, Crown, Lock } from "lucide-react";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { KIND_COLORS } from "@/lib/categoryColors";
 import { scheduleLine } from "@/lib/eventDays";
 
 // Events (#1182): das Event als Klammer um seine Turniere und Fast Laps - eine Karte für die Herbst-LAN, darin jedes
@@ -209,11 +210,12 @@ export default function EventsPage() {
 function MineChip({ state, testId }) {
   if (!state) return null;
   const text = [state.label || "Dabei", state.team_name].filter(Boolean).join(" · ");
-  return <span data-testid={testId} className="inline-flex max-w-full truncate rounded-sm border border-[#FFD700]/50 bg-[#FFD700]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#FFD700]">{text}</span>;
+  return <span data-testid={testId} className="inline-flex max-w-full truncate rounded-sm border border-brand/50 bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">{text}</span>;
 }
 
+// Ein Datumsformat (#1307): „Sa 23. Mai · 18:00“, „heute 18:00“.
 function whenLine(item) {
-  return item.start_date ? viennaDateTime(item.start_date, { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "Termin folgt";
+  return formatWhen(item.start_date, { fallback: "Termin folgt" });
 }
 
 function EventCard({ card, meta }) {
@@ -246,14 +248,14 @@ function EventCard({ card, meta }) {
         <div className="flex items-center gap-2 flex-wrap text-[10px] uppercase tracking-widest font-bold">
           <span className="text-[#9F7AEA]">{typeLabel}</span>
           <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status} />
-          {VIcon && <VIcon className="w-3 h-3 text-[#FFD700]" />}
+          {VIcon && <VIcon className="w-3 h-3 text-honor" />}
         </div>
         <h3 className="tls-card__title mt-2 font-heading font-black text-lg break-words">{e.name}</h3>
         {card.mine && <div className="mt-2"><MineChip state={card.mine} testId={`event-card-mine-${e.slug}`} /></div>}
         {e.start_date && (
           <div className="mt-2 inline-flex min-w-0 items-center gap-1.5 text-xs text-white/60">
             <Calendar className="w-3 h-3" />
-            <span className="min-w-0 truncate" data-testid={e.schedule?.multi_day ? "event-card-days" : undefined}>{scheduleLine(e.schedule) || viennaDateTime(e.start_date, { dateStyle: "medium", timeStyle: "short" })}</span>
+            <span className="min-w-0 truncate" data-testid={e.schedule?.multi_day ? "event-card-days" : undefined}>{scheduleLine(e.schedule) || formatWhen(e.start_date)}</span>
           </div>
         )}
         {e.location && (
@@ -286,7 +288,7 @@ function EventCard({ card, meta }) {
           <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} data-testid={`event-card-toggle-${e.slug}`} className="tls-btn tls-btn--quiet w-full rounded-none border-0 px-5 py-3 flex items-center justify-between gap-2 text-xs font-bold">
             <span className="min-w-0 truncate">{childSummary(card.children)}</span>
             <span className="inline-flex items-center gap-2 shrink-0">
-              {ownChild && !open && <span className="text-[#FFD700]">Du bist dabei</span>}
+              {ownChild && !open && <span className="text-brand">Du bist dabei</span>}
               <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
             </span>
           </button>
@@ -308,7 +310,7 @@ function ChildRow({ row }) {
   const play = playLabel(row);
   return (
     <Link to={path} data-testid={`event-child-${row.kind}-${item.id}`} className="flex items-start gap-2.5 rounded-sm border border-white/5 bg-black/20 hover:border-white/25 px-3 py-2 transition min-w-0">
-      <Icon className={`mt-0.5 w-3.5 h-3.5 shrink-0 ${row.kind === "fastlap" ? "text-[#29B6E8]" : "text-[#FFD700]"}`} />
+      <Icon className="mt-0.5 w-3.5 h-3.5 shrink-0" style={{ color: KIND_COLORS[row.kind === "fastlap" ? "fastlap" : "tournament"] }} />
       <span className="min-w-0 flex-1">
         <span className="block text-[10px] uppercase tracking-widest text-white/45 font-bold truncate">{[whenLine(item), play].filter(Boolean).join(" · ")}</span>
         <span className="block text-sm font-bold truncate">{item.title}</span>
@@ -332,7 +334,7 @@ function SingleCard({ card }) {
       className={`tls-card tls-reveal-item ${isLap ? "" : "tls-card--gold"} group min-w-0 border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col p-5`}
     >
       <div className="flex items-center gap-2 flex-wrap text-[10px] uppercase tracking-widest font-bold">
-        <span className={`inline-flex items-center gap-1 ${isLap ? "text-[#29B6E8]" : "text-[#FFD700]"}`}><Icon className="w-3 h-3" /> {isLap ? "Fast Lap" : "Turnier"}</span>
+        <span className="inline-flex items-center gap-1" style={{ color: KIND_COLORS[isLap ? "fastlap" : "tournament"] }}><Icon className="w-3 h-3" /> {isLap ? "Fast Lap" : "Turnier"}</span>
         <PhaseBadge phase={item.public_phase} status={item.status} />
       </div>
       <h3 className="tls-card__title mt-2 font-heading font-black text-lg break-words">{item.title}</h3>

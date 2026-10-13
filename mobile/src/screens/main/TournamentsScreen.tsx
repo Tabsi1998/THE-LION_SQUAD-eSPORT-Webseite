@@ -422,7 +422,7 @@ function Chip({ label, on, onPress, testID }: { label: string; on: boolean; onPr
   );
 }
 
-/** Eine Versammlung oder eigene Schicht (#1190) - grün; ein Tipp öffnet sie im Mitgliederbereich, Details bleiben dort. */
+/** Eine Versammlung oder eigene Schicht (#1190) - in der Vereinsfarbe Gold (#1305); ein Tipp öffnet sie im Mitgliederbereich, Details bleiben dort. */
 function ClubRow({ item }: { item: CalendarItem }) {
   const when = item.allDay ? "ganztägig" : viennaTime(item.start, { hour: "2-digit", minute: "2-digit" });
   return (

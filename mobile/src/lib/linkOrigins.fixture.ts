@@ -13,6 +13,8 @@ export const OWN_ARTICLE_LINKS = [
   `https://lionsquad.at/news/${ARTICLE}`,
   `https://www.lionsquad.at/news/${ARTICLE}`,
   `HTTPS://LIONSQUAD.AT/news/${ARTICLE}`,
+  // Der Standard-Port gehört zur Origin dazu.
+  `https://lionsquad.at:443/news/${ARTICLE}`,
 ];
 
 /** Fremde Herkunft mit demselben Pfad - nie ein Screen der App. */
@@ -32,6 +34,16 @@ export const FOREIGN_ARTICLE_LINKS = [
   `https://lionsquad.at@evil.example/news/${ARTICLE}`,
   `https://evil.example\\@lionsquad.at/news/${ARTICLE}`,
   `https://evil.example/?u=https://lionsquad.at/news/${ARTICLE}`,
+  // Eigener Host, aber andere Origin (Codex-Prüfung #1512): fremder Port, http statt https, Anmeldedaten.
+  `https://lionsquad.at:4444/news/${ARTICLE}`,
+  `https://www.lionsquad.at:8443/news/${ARTICLE}`,
+  `http://lionsquad.at/news/${ARTICLE}`,
+  `http://www.lionsquad.at/news/${ARTICLE}`,
+  `http://lionsquad.at:443/news/${ARTICLE}`,
+  `https://gast:geheim@lionsquad.at/news/${ARTICLE}`,
+  // Die Server-Adresse nur mit genau ihrem Schema und Port.
+  `${WEB_BASE_URL.replace(/:\d+$/, "")}:9999/news/${ARTICLE}`,
+  `${WEB_BASE_URL.startsWith("http:") ? WEB_BASE_URL.replace(/^http:/, "https:") : WEB_BASE_URL.replace(/^https:/, "http:")}/news/${ARTICLE}`,
   // Andere Schemata.
   `javascript:alert(1)//news/${ARTICLE}`,
   `lionsquad://news/${ARTICLE}`,

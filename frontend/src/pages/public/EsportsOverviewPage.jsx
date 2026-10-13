@@ -10,7 +10,7 @@ import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { GamesShelf } from "@/components/tls/GamesShelf";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { formatDate } from "@/lib/datetime";
+import { formatWhen } from "@/lib/datetime";
 import { compareByNearestDate, sortByNearestDate } from "@/lib/contentSort";
 import { ArrowRight, CalendarDays, Flag, Medal, Radio, Trophy, Users } from "lucide-react";
 
@@ -241,7 +241,7 @@ function ActivityMeta({ item, compact = false }) {
   const classes = compact ? "mt-1 gap-3 text-[11px]" : "mt-4 gap-4 text-xs";
   return (
     <div className={`flex flex-wrap items-center ${classes} text-white/55`}>
-      {item.start_date && <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-[#29B6E8]" />{formatDate(item.start_date)}</span>}
+      {item.start_date && <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-[#29B6E8]" />{formatWhen(item.start_date)}</span>}
       {item.kind === "fastlap" ? (
         <>
           <span className="inline-flex items-center gap-1.5"><Flag className="h-3.5 w-3.5 text-[#29B6E8]" />{item.track_count || 0} Strecken</span>

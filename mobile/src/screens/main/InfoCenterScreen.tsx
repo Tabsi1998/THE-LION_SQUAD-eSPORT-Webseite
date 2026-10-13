@@ -5,6 +5,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-n
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
 import { platformColor, platformIcon } from "../../components/LinkedAccounts";
+import { PlatformIcon } from "../../components/PlatformIcon";
 import { API_BASE_URL } from "../../config";
 import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
@@ -249,7 +250,7 @@ function Partners({ items }: { items: any[] }) {
                         testID={`partner-channel-${partner.id}-${channel.key}`}
                         style={({ pressed }) => [styles.channelChip, { borderColor: platformColor(channel.key) }, pressed && styles.pressed]}
                       >
-                        <Ionicons name={channel.key === "website" ? "globe-outline" : platformIcon(channel.key)} color={platformColor(channel.key)} size={14} />
+                        <PlatformIcon name={channel.key === "website" ? "globe-outline" : platformIcon(channel.key)} color={platformColor(channel.key)} size={14} />
                         <Muted style={styles.channelText}>{channel.label}</Muted>
                       </Pressable>
                     ))}
