@@ -1,21 +1,14 @@
 {
-  "version": "1.5.0",
-  "build": 91,
-  "date": "2026-10-12",
+  "version": "1.6.0",
+  "build": 92,
+  "date": "2026-10-13",
   "items": [
-    "Ergebnisse am Handy: Wer ein Turnier leitet, trägt Ergebnisse mit großen Knöpfen ein, sieht vorher in einem Satz, was daraus folgt, und hat 10 Sekunden „Rückgängig“. Spieler melden ihr Ergebnis selbst, auf Wunsch mit Foto, und die Gegenseite bestätigt mit einem Tipp: „Stimmt“ oder „Stimmt nicht“.",
-    "Problem melden: Bei falschem Ergebnis, Regelverstoß oder Technik-Ärger meldest du das mit Grund, kurzem Text und Foto – auch gegen ein Ergebnis der Turnierleitung. Die Turnierleitung sieht alle offenen Fälle unter „Braucht Aufmerksamkeit“ und entscheidet.",
-    "Du bist dran: Reserviert die Turnierleitung deine Station, kommt der Aufruf aufs Handy, und die Matchseite zählt bis zum Antreten herunter. Bei Vor-Ort-Turnieren steht „Check-in vor Ort“ statt eines Knopfs.",
-    "Eigene Benachrichtigungs-Kanäle: „Aufrufe & Spielstart“ mit Gong, „Turniere & Events“, „Chats“, „Verein“ und „Erfolge“ – schaltest du Chats stumm, verpasst du trotzdem keinen Aufruf.",
-    "Turnier- und Matchseiten im Klartext: „Sieger aus A“, „Freilos“, „noch offen“ statt Kürzeln, Zeiten als „geplant ca. 15:20“, Terminvorschläge mit Datum- und Uhrzeit-Auswahl.",
-    "Neue Event-Seite: Banner oben, darunter ein Kasten mit Wann, Wo, Eintritt und Mitbringen, dann „Was läuft beim Event“, Live, Fotos und News – in derselben Reihenfolge wie auf der Website.",
-    "Ein Knopf „In den Kalender“, jetzt auch an Versammlungen und deinen Helferschichten; nach „Ich komme“ oder „Ich helfe“ fragt die App einmal nach. Ist ein Event, Turnier oder Fast Lap vorbei, verschwindet der Knopf.",
-    "Teams: Kopf in der Team-Farbe mit Wappen und Rollen, Einladungs-Link mit QR-Code, „Angemeldet für“ und „Letzte Spiele“. Bei Team-Turnieren stellt der Kapitän die Aufstellung auf und jeder tippt „Ich bin da“. „Team auflösen“ steht jetzt unten im Bearbeiten-Blatt.",
-    "Dein Jahr und mehr: Jahresrückblick, Ergebnis-Bild zum Teilen nach einem Turnier, dein Turnier-Weg und die Bilanz gegen andere im Profil, Rückmeldung nach Turnier oder Event und der Helfer-Aufruf für offene Schichten.",
-    "Verein: „Über uns, Vorstand, Kontakt“ als erste Zeile im Tab „Verein“. Die Mitgliedskarte zeigt ohne Netz den letzten Stand, der Mitgliederbereich deine Karte mit Beitrag und offenen Punkten, deine persönlichen Schreiben liegen im Profil unter „Deine Unterlagen“. Wer noch nicht Mitglied ist, sieht die Beiträge.",
-    "Bilder vom Handy und Teilen: Profilbild, Banner und Team-Logo wählst du direkt in der App; Events, Turniere, Fast Laps, News, Teams und Alben haben einen Teilen-Knopf.",
-    "Klare Zustände: Leere Seiten, Fehler und fehlendes Netz zeigen den Vereinslöwen mit einem Satz und einem Knopf, die Offline-Leiste kommt nur, wenn du wirklich offline bist, und beim Laden steht ein ruhiges Gerüst der Seite statt eines Kreisels. Knöpfe und Farben wie auf der Website.",
-    "Große Schrift: Alle Screens sind mit 1,5- und 2-facher Schrift geprüft – nichts wird abgeschnitten, Namen brechen um, Tippflächen sind groß genug, und der gewählte Tab wird vorgelesen.",
-    "Kleinigkeiten: Bilder laden in passender Größe und sparen Daten, leere Alben sind ausgeblendet, Saison-Deko hängt nur dort, wo Platz ist."
+    "Events mit ihren Turnieren: Im Tab Events und auf der Startseite ist ein Event eine Karte, seine Turniere und Fast Laps klappen darunter auf. Mit „Nur meine“ siehst du in Liste und Kalender nur das, wofür du oder dein Team angemeldet seid.",
+    "Spielst du auch mit? Nach der Anmeldung zu einem Event hakst du die Turniere des Events an und bist in einem Schritt dabei. Ist ein Turnier voll, kommst du auf die Warteliste.",
+    "Kalender: Der Monat startet bei heute und hat einen Knopf „Heute“, mehrtägige Events laufen als Balken über ihre Tage. Als Mitglied siehst du Versammlungen und deine Helferschichten in Grün. Mit „Abonnieren“ holst du den Vereinskalender in deine Kalender-App oder in Google Kalender.",
+    "Fotos vom Event: Die Alben auf der Event-Seite öffnen sich mit einem Tipp, und warst du dabei, bekommst du Bescheid, sobald die Fotos online sind. Als Mitglied schickst du bis eine Woche nach dem Event eigene Fotos aus der Galerie oder direkt von der Kamera; der Vorstand gibt sie frei.",
+    "Löwen-Rang: Dein Profilbild trägt den Rahmen deines Rangs – zwölf Ränge vom Jungtier bis zum Löwenkönig, mit Level-Schild und einem Glanz, der mit jedem Level stärker wird. Den Rahmen siehst du auch in der Spielerliste und auf dem Podest der Bestenliste.",
+    "App-Sperre und Kontowechsel: Ist die App gesperrt, steht auf dem Sperrbildschirm nur „Neue Benachrichtigung“ – den Inhalt siehst du erst nach dem Entsperren. Wechselst du das Konto, verschwinden Benachrichtigungen und Zähler des vorigen Kontos, und Pushes kommen nur noch für das neue.",
+    "Mehr Schutz für Teams: Fremde Teams bearbeiten oder auflösen geht für Admins nur noch mit bestätigter Zwei-Faktor-Anmeldung, sonst steht dort „2FA einrichten“. Für Kapitäne ändert sich nichts."
   ]
 }
