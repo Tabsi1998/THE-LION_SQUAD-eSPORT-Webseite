@@ -31,13 +31,21 @@ def current_totp(secret: str, at_time: int | None = None) -> str:
     return _counter_code(secret, timestamp // PERIOD_SECONDS)
 
 
-def verify_totp(secret: str, code: str, at_time: int | None = None, window: int = 1) -> bool:
+def matching_totp_counter(secret: str, code: str, at_time: int | None = None, window: int = 1) -> int | None:
+    """Das Zeitfenster, zu dem der Code passt - damit ein Code nur einmal zählt (#1032). ``None``, wenn keins passt."""
     normalized = "".join(ch for ch in str(code or "") if ch.isdigit())
     if len(normalized) != DIGITS:
-        return False
+        return None
     timestamp = int(time.time() if at_time is None else at_time)
     counter = timestamp // PERIOD_SECONDS
-    return any(hmac.compare_digest(_counter_code(secret, counter + offset), normalized) for offset in range(-window, window + 1))
+    for offset in range(-window, window + 1):
+        if hmac.compare_digest(_counter_code(secret, counter + offset), normalized):
+            return counter + offset
+    return None
+
+
+def verify_totp(secret: str, code: str, at_time: int | None = None, window: int = 1) -> bool:
+    return matching_totp_counter(secret, code, at_time, window) is not None
 
 
 def provisioning_uri(secret: str, account: str, issuer: str = "THE LION SQUAD") -> str:

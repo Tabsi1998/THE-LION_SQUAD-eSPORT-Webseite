@@ -161,6 +161,8 @@ async def init_indexes():
     await db.competition_write_usage.create_index("created_at", expireAfterSeconds=180 * 24 * 3600)
     # Auth helpers
     await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
+    await db.password_reset_tokens.create_index("token_hash")
+    await db.password_reset_tokens.create_index([("user_id", 1), ("used", 1)])
     await db.email_verification_tokens.create_index("token_hash", unique=True)
     await db.email_verification_tokens.create_index("expires_at", expireAfterSeconds=0)
     await db.email_verification_tokens.create_index([("user_id", 1), ("used", 1)])

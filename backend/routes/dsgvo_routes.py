@@ -118,7 +118,8 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
         },
         "$unset": {
             "google_id": "", "google_email": "", "mfa_secret": "", "mfa_pending_secret": "",
-            "mfa_pending_created_at": "", "mfa_recovery_code_hashes": "", "platform_verified": "",
+            "mfa_pending_created_at": "", "mfa_recovery_code_hashes": "", "mfa_totp_last_counter": "",
+            "platform_verified": "",
         },
     })
     for collection in (db.refresh_tokens, db.auth_sessions, db.email_verification_tokens,

@@ -24,7 +24,7 @@ from services.rate_limit import enforce_rate_limit, get_client_ip
 from services.auth_settings import load_auth_settings
 from services.google_identity import GoogleIdentityError, verify_google_credential
 from services.secret_store import decrypt_secret, encrypt_secret
-from services.totp import generate_recovery_codes, generate_totp_secret, provisioning_uri, verify_totp
+from services.totp import generate_recovery_codes, generate_totp_secret, matching_totp_counter, provisioning_uri
 from services.return_path import safe_next_path
 from services.log_safe import log_safe
 
@@ -197,6 +197,10 @@ def _eligible_session_user(user: dict | None) -> dict:
     return user
 
 
+MFA_ATTEMPTS_PER_LOGIN = 5
+MFA_ATTEMPTS_PER_ACCOUNT = 10  # je Viertelstunde, über alle offenen Anmeldungen eines Kontos
+
+
 def _requires_admin_mfa(user: dict) -> bool:
     """Wer Zwei-Faktor eingerichtet hat, wird beim Anmelden danach gefragt - egal mit welcher Rolle.
 
@@ -228,15 +232,30 @@ async def _create_mfa_login_challenge(db, user: dict, request: Request, client: 
 
 
 async def _verify_mfa_code(db, user: dict, code: str) -> bool:
+    """Jeder Code zählt genau einmal (#1032) - auch wenn zwei Anmeldungen gleichzeitig denselben schicken.
+
+    Beides entscheidet ein bedingtes Schreiben in der Datenbank, nicht der vorher gelesene Stand: ein Code aus der
+    App nur, wenn sein Zeitfenster neuer ist als das zuletzt verbrauchte, ein Wiederherstellungscode nur, wenn sein
+    Hash noch in der Liste steht.
+    """
     normalized = str(code or "").replace("-", "").replace(" ", "").upper()
     secret = decrypt_secret(user.get("mfa_secret"))
-    if secret and verify_totp(secret, normalized):
-        return True
+    counter = matching_totp_counter(secret, normalized) if secret else None
+    if counter is not None:
+        claimed = await db.users.update_one(
+            {"id": user["id"], "$or": [
+                {"mfa_totp_last_counter": {"$exists": False}},
+                {"mfa_totp_last_counter": {"$lt": counter}},
+            ]},
+            {"$set": {"mfa_totp_last_counter": counter}},
+        )
+        return claimed.modified_count == 1
     recovery_hash = hash_token(normalized)
-    if recovery_hash in (user.get("mfa_recovery_code_hashes") or []):
-        await db.users.update_one({"id": user["id"]}, {"$pull": {"mfa_recovery_code_hashes": recovery_hash}})
-        return True
-    return False
+    consumed = await db.users.update_one(
+        {"id": user["id"], "mfa_recovery_code_hashes": recovery_hash},
+        {"$pull": {"mfa_recovery_code_hashes": recovery_hash}},
+    )
+    return consumed.modified_count == 1
 
 
 async def _security_audit(db, user_id: str, action: str, request: Request) -> None:
@@ -357,6 +376,7 @@ def _public_user(user: dict) -> dict:
         "mfa_pending_secret",
         "mfa_pending_created_at",
         "mfa_recovery_code_hashes",
+        "mfa_totp_last_counter",
     ):
         doc.pop(field, None)
     privacy_version = os.environ.get("PRIVACY_POLICY_VERSION", "2026-08-26")
@@ -1176,6 +1196,11 @@ async def forgot_password(body: ForgotPasswordBody, request: Request):
     # Always return ok to prevent user enumeration
     if user:
         token = secrets.token_urlsafe(32)
+        # Nur der neueste Link gilt (#1031). Eine offene Einladung des Vorstands bleibt davon unberührt.
+        await db.password_reset_tokens.update_many(
+            {"user_id": user["id"], "used": False, "purpose": {"$ne": "admin_invite"}},
+            {"$set": {"used": True, "used_at": now_utc(), "invalidated_reason": "superseded"}},
+        )
         await db.password_reset_tokens.insert_one({
             "id": new_id(),
             "token_hash": hash_token(token),
@@ -1243,7 +1268,7 @@ async def complete_mfa_login(body: MfaLoginBody, request: Request, response: Res
             "ticket_hash": hash_token(body.ticket.strip()),
             "used": False,
             "expires_at": {"$gt": now},
-            "attempts": {"$lt": 5},
+            "attempts": {"$lt": MFA_ATTEMPTS_PER_LOGIN},
         },
     )
     if not challenge:
@@ -1252,15 +1277,28 @@ async def complete_mfa_login(body: MfaLoginBody, request: Request, response: Res
     if challenge.get("ip") != ip or challenge.get("user_agent") != user_agent:
         raise HTTPException(status_code=401, detail="MFA-Anmeldung gehört zu einem anderen Gerät.")
     user = _eligible_session_user(await db.users.find_one({"id": challenge["user_id"]}))
+    # Je Konto begrenzt (#1032): sonst brächte jede neue Anmeldung wieder fünf frische Versuche.
+    await enforce_rate_limit(
+        request, "auth:mfa:user", limit=MFA_ATTEMPTS_PER_ACCOUNT, window_seconds=900, subject=user["id"],
+    )
+    # Den Versuch zählen, bevor der Code geprüft wird - so bleiben es fünf, auch wenn viele gleichzeitig ankommen.
+    attempt = await db.mfa_login_challenges.find_one_and_update(
+        {
+            "_id": challenge["_id"],
+            "used": False,
+            "expires_at": {"$gt": now},
+            "attempts": {"$lt": MFA_ATTEMPTS_PER_LOGIN},
+        },
+        {"$inc": {"attempts": 1}},
+    )
+    if not attempt:
+        raise HTTPException(status_code=401, detail="MFA-Anmeldung ist ungültig oder abgelaufen.")
     if not await _verify_mfa_code(db, user, body.code):
-        await db.mfa_login_challenges.update_one(
-            {"_id": challenge["_id"], "used": False},
-            {"$inc": {"attempts": 1}, "$set": {"last_failed_at": now}},
-        )
+        await db.mfa_login_challenges.update_one({"_id": challenge["_id"]}, {"$set": {"last_failed_at": now}})
         await _security_audit(db, user["id"], "auth.mfa.failed", request)
         raise HTTPException(status_code=401, detail="Ungültiger MFA- oder Wiederherstellungscode.")
     claimed = await db.mfa_login_challenges.find_one_and_update(
-        {"_id": challenge["_id"], "used": False, "attempts": {"$lt": 5}},
+        {"_id": challenge["_id"], "used": False},
         {"$set": {"used": True, "used_at": now}},
         return_document=ReturnDocument.BEFORE,
     )
@@ -1349,7 +1387,8 @@ async def enable_mfa(body: MfaCodeBody, request: Request, user: dict = Depends(g
     secret = decrypt_secret((full or {}).get("mfa_pending_secret"))
     if not secret or not pending_at or pending_at < datetime.now(timezone.utc) - timedelta(minutes=10):
         raise HTTPException(status_code=400, detail="MFA-Einrichtung ist abgelaufen. Bitte neu starten.")
-    if not verify_totp(secret, body.code):
+    counter = matching_totp_counter(secret, body.code)
+    if counter is None:
         raise HTTPException(status_code=400, detail="Der Bestätigungscode ist ungültig.")
     recovery_codes = generate_recovery_codes()
     now = now_utc()
@@ -1358,6 +1397,8 @@ async def enable_mfa(body: MfaCodeBody, request: Request, user: dict = Depends(g
             "mfa_enabled": True,
             "mfa_secret": encrypt_secret(secret),
             "mfa_recovery_code_hashes": [hash_token(code) for code in recovery_codes],
+            # Der Code der Einrichtung ist damit verbraucht und meldet nicht auch noch an (#1032).
+            "mfa_totp_last_counter": counter,
             "mfa_enabled_at": now,
             "updated_at": now.isoformat(),
         },
@@ -1380,7 +1421,7 @@ async def disable_mfa(body: MfaDisableBody, request: Request, user: dict = Depen
     now = now_utc()
     await db.users.update_one({"id": user["id"]}, {
         "$set": {"mfa_enabled": False, "updated_at": now.isoformat()},
-        "$unset": {"mfa_secret": "", "mfa_recovery_code_hashes": "", "mfa_enabled_at": ""},
+        "$unset": {"mfa_secret": "", "mfa_recovery_code_hashes": "", "mfa_totp_last_counter": "", "mfa_enabled_at": ""},
     })
     await _revoke_all_auth_sessions(db, user["id"], "mfa_disabled")
     await _security_audit(db, user["id"], "auth.mfa.disabled", request)
@@ -1402,6 +1443,14 @@ async def reset_password(body: ResetPasswordBody, request: Request):
     if is_invite and not (body.accept_privacy and body.accept_terms):
         raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen für die Account-Aktivierung akzeptiert werden.")
     now = now_utc()
+    # Genau einmal (#1031): erst den Link atomar verbrauchen, dann das Passwort setzen. Kommt derselbe Link zweimal
+    # gleichzeitig an, gewinnt nur eine Anfrage - die andere sieht ihn schon verbraucht.
+    claimed = await db.password_reset_tokens.find_one_and_update(
+        {"id": doc["id"], "used": False},
+        {"$set": {"used": True, "used_at": now}},
+    )
+    if not claimed:
+        raise HTTPException(status_code=400, detail="Ungültiger oder abgelaufener Token")
     updates = {
         "password_hash": hash_password(body.new_password),
         "password_setup_required": False,
@@ -1424,7 +1473,11 @@ async def reset_password(body: ResetPasswordBody, request: Request):
         await _record_registration_consents(
             db, doc["user_id"], privacy=True, terms=True, newsletter=False, source="admin_invitation",
         )
-    await db.password_reset_tokens.update_one({"id": doc["id"]}, {"$set": {"used": True}})
+    # Das Passwort ist neu gesetzt: weitere offene Links desselben Kontos (auch eine Einladung) gelten nicht mehr.
+    await db.password_reset_tokens.update_many(
+        {"user_id": doc["user_id"], "used": False},
+        {"$set": {"used": True, "used_at": now, "invalidated_reason": "password_set"}},
+    )
     await db.refresh_tokens.update_many(
         {"user_id": doc["user_id"], "revoked": {"$ne": True}},
         {"$set": {
