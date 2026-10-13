@@ -380,7 +380,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
       )}
 
       {/* Freunde beim Event (#1188): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}
-      <FriendsAtEvent event={e} user={user} over={over} />
+      <FriendsAtEvent event={e} user={user} over={over} accessToken={accessToken} />
 
       {/* 2. Was läuft beim Event: jedes Turnier und jede Fast Lap mit Tag, Uhrzeit, Spielart und dem eigenen Stand. */}
       {!recap && !!rows.length && (

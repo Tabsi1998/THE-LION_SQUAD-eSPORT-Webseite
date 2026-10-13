@@ -859,7 +859,8 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
         except pricing.PricingError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
         recipient = await db.users.find_one({"id": current["user_id"]}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1}) or {"id": current["user_id"]}
-        updates["price_snapshot"] = pricing.snapshot(price, recipient=recipient, source={"kind": "event", "id": event["id"], "slug": event.get("slug"), "by_admin": me["id"]})
+        updates["price_snapshot"] = pricing.snapshot(price, recipient=recipient, source={"kind": "event", "id": event["id"], "slug": event.get("slug"), "by_admin": me["id"]},
+                                                     invoice_timing=offer.get("invoice_timing") or "on_confirm")
         updates["billing_status"] = "pending"
         if seats_changed:
             await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration_id, reason="Begleitpersonen geändert")
@@ -878,7 +879,7 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
     await db.event_registrations.update_one({"id": registration_id}, {"$set": updates})
     if updates.get("price_snapshot") and proposed_status == "registered":
         await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=registration_id, user_id=current["user_id"],
-                                          snapshot=updates["price_snapshot"], timing=offer.get("invoice_timing") or "on_confirm")
+                                          snapshot=updates["price_snapshot"], timing=pricing.order_timing(updates["price_snapshot"], offer))
     await db.audit_logs.insert_one({
         "id": new_id(),
         "action": "event.registration.update",

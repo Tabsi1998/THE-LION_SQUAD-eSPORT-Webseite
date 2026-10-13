@@ -75,28 +75,38 @@ async def event_recap_view(event_id: str, response: Response, access: str | None
 
 
 @router.get("/api/events/{event_id}/friends")
-async def event_friends_view(event_id: str, response: Response, me: dict = Depends(get_current_user)):
+async def event_friends_view(event_id: str, response: Response, access: str | None = None, me: dict = Depends(get_current_user)):
     _private(response)
-    event = await _visible_event(event_id, me, None)
+    event = await _visible_event(event_id, me, access)
     return await event_friends.friends_at_event(get_db(), event, await _viewer(me))
 
 
 @router.get("/api/tournaments/{tournament_id}/friends")
-async def tournament_friends_view(tournament_id: str, response: Response, me: dict = Depends(get_current_user)):
+async def tournament_friends_view(tournament_id: str, response: Response, access: str | None = None,
+                                  me: dict = Depends(get_current_user)):
     from routes.tournament_common import _get_visible_tournament, _resolve_tid
 
     _private(response)
+    db = get_db()
     tid = await _resolve_tid(tournament_id)
-    tournament = await _get_visible_tournament(tid, me)
+    # Mit gültigem Zugangslink sieht die Person das Turnier wie auf der Turnierseite (#1500, Codex-Prüfung 2) -
+    # sonst derselbe Wächter wie dort.
+    if await validate_access_link(db, access, "tournament", tid, me, "view"):
+        tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    else:
+        tournament = await _get_visible_tournament(tid, me)
     return await event_friends.friends_at_tournament(get_db(), tournament, await _viewer(me))
 
 
 @router.get("/api/f1/challenges/{challenge_id}/friends")
-async def challenge_friends_view(challenge_id: str, response: Response, me: dict = Depends(get_current_user)):
+async def challenge_friends_view(challenge_id: str, response: Response, access: str | None = None,
+                                 me: dict = Depends(get_current_user)):
     from routes.f1_routes import _get_visible_challenge_record
 
     _private(response)
-    challenge, _ = await _get_visible_challenge_record(challenge_id, me)
+    challenge, _ = await _get_visible_challenge_record(challenge_id, me, access=access)
     return await event_friends.friends_at_challenge(get_db(), challenge, await _viewer(me))
 
 

@@ -334,7 +334,7 @@ function TournamentDetailView() {
           {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
           <TournamentTimeline tournament={t} calendarItem={tournamentIsOver(t) ? null : calendarItem} />
           {/* Freunde beim Turnier (#1188 Teil 2): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}
-          <FriendsAtEvent user={user} path={`/tournaments/${t.slug || t.id}/friends`} scope="tournament" over={tournamentIsOver(t)} />
+          <FriendsAtEvent user={user} path={`/tournaments/${t.slug || t.id}/friends`} scope="tournament" over={tournamentIsOver(t)} accessToken={accessToken} />
           {t.rules && (
             <section>
               <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-[#29B6E8]" /> Regeln</h2>

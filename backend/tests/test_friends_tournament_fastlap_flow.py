@@ -15,6 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow  # noqa: E402
 from models import new_id  # noqa: E402
 from services import event_friends  # noqa: E402
+from test_access_link_limits_flow import access_link  # noqa: E402
 from test_event_friends_flow import befriend  # noqa: E402
 
 PRIVATE = "private, no-store"
@@ -278,3 +279,26 @@ async def test_refusals_before_the_handler_are_private_too(flow):
     flow.act_as(None)
     assert (await flow.get("/api/events/herbst-lan/recap")).headers["cache-control"] == "no-store"
     assert (await flow.get("/api/tournaments/mk")).headers["cache-control"] == "no-store"
+
+
+@pytest.mark.asyncio
+async def test_access_link_opens_the_friends_row_like_the_page(flow):
+    """Codex-Prüfung #1500 (2): mit gültigem Zugangslink lädt die Seite das private Turnier bzw. die private Fast Lap -
+    die Freunde-Abfrage nimmt denselben Link und prüft ihn wie die Seite. Gegenproben: ohne Link, mit falschem Link und
+    mit dem Link eines anderen Ziels bleibt es bei 403 ohne Namen."""
+    viewer, friend = await seed(flow)
+    await befriend(flow, viewer, friend)
+    await flow.db.events.update_one({"id": "e-lan"}, {"$set": {"visibility": "members"}})
+    t_token, _ = await access_link(flow, "tournament", "t-intern", max_uses=None)
+    c_token, _ = await access_link(flow, "fastlap", "c-intern", max_uses=None)
+    e_token, _ = await access_link(flow, "event", "e-lan", max_uses=None)
+    flow.act_as(viewer)
+    for url, token in (("/api/tournaments/intern/friends", t_token), ("/api/f1/challenges/intern-lap/friends", c_token),
+                       ("/api/events/herbst-lan/friends", e_token)):
+        assert (await flow.get(url)).status_code == 403, url
+        refused = await flow.get(url, params={"access": "falsch"})
+        assert refused.status_code == 403 and "Finn" not in refused.text, url
+        res = await flow.get(url, params={"access": token})
+        assert res.status_code == 200 and res.headers["cache-control"] == PRIVATE, (url, res.text)
+        assert [f["id"] for f in res.json()["friends"]] == [friend["id"]], url
+    assert (await flow.get("/api/tournaments/intern/friends", params={"access": c_token})).status_code == 403, "Link eines anderen Ziels"

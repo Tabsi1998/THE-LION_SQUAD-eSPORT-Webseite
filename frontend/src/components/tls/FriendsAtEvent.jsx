@@ -27,7 +27,7 @@ function FriendAvatar({ friend }) {
   return <SizedImage src={friend.avatar_url || ""} size={32} round alt="" className="shrink-0" fallback={fallback} />;
 }
 
-export function FriendsAtEvent({ event, user, over = false, path = "", scope = "event" }) {
+export function FriendsAtEvent({ event, user, over = false, path = "", scope = "event", accessToken = "" }) {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const key = event?.slug || event?.id;
@@ -38,11 +38,12 @@ export function FriendsAtEvent({ event, user, over = false, path = "", scope = "
     let alive = true;
     setData(null);
     if (!userId || !url) return undefined;
-    api.get(url)
+    // Mit Zugangslink (?access=) fragt die Zeile wie die Seite selbst - sonst sähe sie ein privates Turnier nicht.
+    (accessToken ? api.get(url, { params: { access: accessToken } }) : api.get(url))
       .then(({ data: body }) => { if (alive) setData(body && Array.isArray(body.friends) ? body : null); })
       .catch(() => { if (alive) setData(null); });
     return () => { alive = false; };
-  }, [url, userId]);
+  }, [url, userId, accessToken]);
 
   if (!userId || !data) return null;
   const friends = data.friends;

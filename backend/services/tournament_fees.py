@@ -87,10 +87,10 @@ async def freeze_price(db, registration: dict, tournament: dict, *, payer: dict,
     snapshot = pricing.snapshot(price, recipient=payer, source={
         "kind": "tournament", "id": tournament["id"], "slug": tournament.get("slug"), "registration_id": registration["id"],
         "team_id": registration.get("team_id"), "display_name": registration.get("display_name"),
-    })
+    }, invoice_timing=offer.get("invoice_timing") or "on_confirm")
     await db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {"price_snapshot": snapshot, "billing_status": "pending", "updated_at": now_utc().isoformat()}})
     await billing_orders.create_order(db, kind="tournament", source_id=tournament["id"], registration_id=registration["id"], user_id=payer["id"],
-                                      snapshot=snapshot, timing=offer.get("invoice_timing") or "on_confirm")
+                                      snapshot=snapshot, timing=pricing.order_timing(snapshot, offer))
     return snapshot
 
 
@@ -122,7 +122,7 @@ async def repair_order(db, registration: dict, tournament: dict, *, actor: dict 
     if not payer_id:
         return None
     await billing_orders.create_order(db, kind="tournament", source_id=tournament["id"], registration_id=registration["id"], user_id=payer_id,
-                                      snapshot=snapshot, timing=offer.get("invoice_timing") or "on_confirm")
+                                      snapshot=snapshot, timing=pricing.order_timing(snapshot, offer))
     return snapshot
 
 

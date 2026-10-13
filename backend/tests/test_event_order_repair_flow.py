@@ -276,3 +276,36 @@ async def test_simultaneous_registration_with_access_link_keeps_one_use_and_repa
         await event_registration.register(flow.db, stored, paula, register_access=link)
     assert len(await orders(flow, paula)) == 1
     assert (await flow.db.access_links.find_one({"id": link["id"]}, {"_id": 0}))["use_count"] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("frozen, today, status", [("manual", "on_confirm", "held"), ("on_confirm", "manual", "pending")])
+async def test_the_repaired_order_keeps_the_invoice_timing_of_the_frozen_price(flow, monkeypatch, frozen, today, status):
+    """Codex-Prüfung #1500 (2): der Rechnungszeitpunkt wird mit dem Preis eingefroren. Ändert die Verwaltung ihn nach
+    dem Abbruch, rechnet der nachgeholte Auftrag trotzdem wie bei der Zusage ab - in beide Richtungen."""
+    event = await paid_event(flow, billing={**FEE, "invoice_timing": frozen})
+    paula = await person(flow, "paula")
+    fail_once(monkeypatch)
+    flow.act_as(paula)
+    with pytest.raises(RuntimeError):
+        await register(flow, event)
+    reg = await flow.db.event_registrations.find_one({"user_id": paula["id"]}, {"_id": 0})
+    assert reg["price_snapshot"]["invoice_timing"] == frozen
+    await flow.db.events.update_one({"id": event["id"]}, {"$set": {"billing.invoice_timing": today}})
+    assert (await register(flow, event)).status_code == 409
+    rows = await orders(flow, paula)
+    assert len(rows) == 1 and rows[0]["timing"] == frozen and rows[0]["status"] == status
+
+
+@pytest.mark.asyncio
+async def test_an_old_price_without_timing_uses_todays_setting(flow):
+    """Gegenprobe für alte Preise ohne eingefrorenen Zeitpunkt: dann gilt der heutige Wert."""
+    event = await paid_event(flow, billing={**FEE, "invoice_timing": "manual"})
+    paula = await person(flow, "paula")
+    flow.act_as(paula)
+    assert (await register(flow, event)).status_code == 200
+    await flow.db.billing_orders.delete_many({})
+    await flow.db.event_registrations.update_one({"user_id": paula["id"]}, {"$unset": {"price_snapshot.invoice_timing": ""}})
+    assert (await register(flow, event)).status_code == 409
+    rows = await orders(flow, paula)
+    assert len(rows) == 1 and rows[0]["timing"] == "manual" and rows[0]["status"] == "held"

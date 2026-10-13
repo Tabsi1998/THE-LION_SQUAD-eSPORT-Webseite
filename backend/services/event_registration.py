@@ -180,7 +180,8 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
     # Eingefroren wird nur eine verbindliche Anmeldung - die Warteliste bekommt ihren Preis beim
     # Nachrücken (Admin setzt „registered“), nicht jetzt.
     if status == "registered" and not price.get("free"):
-        doc["price_snapshot"] = pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")})
+        doc["price_snapshot"] = pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")},
+                                                 invoice_timing=offer.get("invoice_timing") or "on_confirm")
         doc["billing_status"] = "pending"
     # Zugangslink mit Limit (#1036): die Nutzung atomar belegen, bevor die Anmeldung geschrieben wird.
     try:
@@ -220,7 +221,7 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
     })
     if doc.get("price_snapshot"):
         await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=doc["id"], user_id=me["id"],
-                                          snapshot=doc["price_snapshot"], timing=offer.get("invoice_timing") or "on_confirm")
+                                          snapshot=doc["price_snapshot"], timing=pricing.order_timing(doc["price_snapshot"], offer))
     return doc
 
 
@@ -246,7 +247,7 @@ async def repair_order(db, event: dict, registration: dict) -> dict | None:
         return None
     offer = event.get("billing") or {}
     return await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=registration["id"],
-                                             user_id=registration["user_id"], snapshot=snapshot, timing=offer.get("invoice_timing") or "on_confirm")
+                                             user_id=registration["user_id"], snapshot=snapshot, timing=pricing.order_timing(snapshot, offer))
 
 
 CANCELLABLE_STATUSES = {"registered", "waitlist"}
