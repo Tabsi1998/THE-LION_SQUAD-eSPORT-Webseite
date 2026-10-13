@@ -3,6 +3,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("local_check", ROOT / "scripts/local_check.py")
 local_check = importlib.util.module_from_spec(spec)
@@ -15,7 +17,33 @@ FREE = lambda port: False  # noqa: E731
 
 def test_environment_value_wins():
     assert pick("lsw-2", {"E2E_PORT": "4321"}, FREE) == 4321
-    assert pick(local_check.MAIN_FOLDER, {"E2E_PORT": "4321"}, lambda port: True) == 4321
+    assert pick(local_check.MAIN_FOLDER, {"E2E_PORT": "4321"}, FREE) == 4321
+
+
+def test_taken_environment_port_aborts_clearly():
+    with pytest.raises(local_check.StepFailed, match="E2E_PORT=4321 is already in use"):
+        pick("lsw-2", {"E2E_PORT": "4321"}, lambda port: port == 4321)
+
+
+def test_backend_port_is_never_accepted():
+    with pytest.raises(local_check.StepFailed, match="already in use"):
+        pick("lsw-2", {"E2E_PORT": str(local_check.BACKEND_PORT)}, FREE)
+
+
+def test_folders_with_colliding_hash_get_different_ports():
+    names = {}
+    for number in range(5000):
+        name = f"lsw-{number}"
+        names.setdefault(pick(name, {}, FREE), []).append(name)
+    first, second = next(group for group in names.values() if len(group) > 1)[:2]
+    port = pick(first, {}, FREE)
+    assert pick(second, {}, FREE) == port  # same start port ...
+    assert pick(second, {}, lambda candidate: candidate == port) != port  # ... the later one moves on
+
+
+def test_playwright_config_uses_strict_port():
+    config = (ROOT / "frontend/playwright.config.js").read_text(encoding="utf-8")
+    assert "--strictPort" in config
 
 
 def test_invalid_environment_value_is_ignored():

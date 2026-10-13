@@ -339,7 +339,11 @@ def pick_e2e_port(folder: str, environ: dict, is_open: Callable[[int], bool] = p
     """
     given = str(environ.get("E2E_PORT", "")).strip()
     if given.isdigit() and 0 < int(given) < 65536:
-        return int(given)
+        chosen = int(given)
+        if chosen == BACKEND_PORT or is_open(chosen):
+            raise StepFailed(f"E2E_PORT={chosen} is already in use (the backend of the local run uses "
+                             f"{BACKEND_PORT}, another check may be running). Choose a free port or unset E2E_PORT.")
+        return chosen
     if folder == MAIN_FOLDER and not is_open(FRONTEND_PORT):
         return FRONTEND_PORT
     start = E2E_PORT_BASE + zlib.crc32(folder.lower().encode("utf-8")) % E2E_PORT_SPAN
@@ -1149,6 +1153,9 @@ def frontend_e2e(context: Context) -> str:
     text = completed.stdout + completed.stderr
     path = context.log("frontend-e2e", f"E2E_PORT={port} E2E_ISOLATED=1\n{text}")
     if completed.returncode != 0:
+        if re.search(r"already in use|EADDRINUSE|Port \d+ is in use", text):
+            raise StepFailed(f"Port {port} is taken, another check is probably running. Wait for it or set "
+                             f"E2E_PORT to a free port. Full output: {path}\n" + tail(completed, 30))
         raise StepFailed(f"the browser smoke tests failed. Report: {FRONTEND / 'playwright-report'}. "
                          f"Full output: {path}\n" + tail(completed, 30))
     passed = re.search(r"(\d+) passed", text)
