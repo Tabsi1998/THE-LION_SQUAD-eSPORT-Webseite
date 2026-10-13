@@ -61,6 +61,8 @@ export function EventProgramPanel({ eventId, program, failed, reload, onEmbed })
       await reload();
     } catch (err) {
       toast.error(formatRequestError(err, "Konnte nicht hinzugefügt werden."));
+      // Schon woanders verbunden (409): die Liste neu laden, damit sie den Stand zeigt.
+      if (err?.response?.status === 409) await reload();
     } finally {
       setBusy(false);
     }

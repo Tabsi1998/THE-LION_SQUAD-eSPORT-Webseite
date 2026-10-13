@@ -687,6 +687,10 @@ async def create_event_recap_draft(event_id: str, me: dict = Depends(require_adm
     event, _ = await _find_event(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    # Rückblick erst nach dem Event (#1373) - dieselbe Regel wie die Eventliste und die Event-Seite.
+    from services.event_recap import is_over
+    if not is_over(event):
+        raise HTTPException(status_code=400, detail="Einen Rückblick gibt es erst, wenn das Event vorbei ist.")
     existing = await db.news_posts.find_one(
         {"linked_event_ids": event["id"], "category": "recap", "recap_source_event_id": event["id"]},
         {"_id": 0},

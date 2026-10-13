@@ -3,6 +3,7 @@ das Turnier- und das Fast-Lap-Formular verbinden nicht mehr. Neu Angelegtes übe
 Discord-Einstellungen des Events; der Tag muss im Zeitraum des Events liegen. Event-Sponsoren legt nur noch die
 Redaktion beim Sponsor fest. Alles nur für die Turnierleitung mit Zwei-Faktor - die Organisation eines Turniers darf
 nichts zuordnen."""
+import asyncio
 import pathlib
 import sys
 
@@ -11,7 +12,7 @@ import pytest_asyncio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-from flow_harness import make_flow, new_id  # noqa: E402
+from flow_harness import InterleavedReads, make_flow, new_id  # noqa: E402
 
 DAY_1 = "2026-11-14T10:00:00+01:00"
 DAY_2_EVENING = "2026-11-15T19:00:00+01:00"
@@ -199,3 +200,66 @@ async def test_visibility_words_for_the_list(flow):
     assert {row["k"]: row["short"] for row in meta["visibilities"]} == {
         "public": "Alle", "community": "Community", "members": "Mitglieder", "internal": "Intern",
     }
+
+
+# ---------------------------------------------------------------- Nach Codex-Prüfung
+
+@pytest.mark.asyncio
+async def test_finished_items_are_not_linked_even_by_direct_request(flow):
+    _, event = await setup(flow)
+    lap = (await flow.post("/api/f1/challenges", json={"title": "Alte Lap", "start_date": DAY_1})).json()
+    for status in ("completed", "archived", "cancelled"):
+        await flow.db.f1_challenges.update_one({"id": lap["id"]}, {"$set": {"status": status}})
+        refused = await flow.post(f"/api/events/{event['id']}/program", json={"kind": "fastlap", "item_id": lap["id"]})
+        assert refused.status_code == 400, status
+        assert "nicht mehr ins Programm" in refused.json()["detail"]
+    assert (await flow.db.f1_challenges.find_one({"id": lap["id"]}))["event_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_a_tournament_with_registrations_stays_in_the_event(flow):
+    _, event = await setup(flow)
+    cup = (await in_event(flow, event)).json()
+    await flow.db.tournament_registrations.insert_one({"id": new_id(), "tournament_id": cup["id"], "user_id": "u1", "status": "pending"})
+    refused = await flow.delete(f"/api/events/{event['id']}/program/tournament/{cup['id']}")
+    assert refused.status_code == 409
+    assert "Anmeldungen" in refused.json()["detail"]
+    assert (await flow.db.tournaments.find_one({"id": cup["id"]}))["event_id"] == event["id"]
+
+    await flow.db.tournament_registrations.update_many({"tournament_id": cup["id"]}, {"$set": {"status": "cancelled"}})
+    freed = await flow.delete(f"/api/events/{event['id']}/program/tournament/{cup['id']}")
+    assert freed.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_two_events_grabbing_the_same_item_at_once_one_wins(flow, monkeypatch):
+    import routes.event_program_routes as program_routes
+
+    _, event = await setup(flow)
+    other = (await flow.post("/api/events", json={"name": "Parallel-LAN", "start_date": DAY_1, "end_date": END})).json()
+    lap = (await flow.post("/api/f1/challenges", json={"title": "Begehrte Lap", "start_date": DAY_1})).json()
+    gate = InterleavedReads(flow.db, "f1_challenges")
+    monkeypatch.setattr(program_routes, "get_db", lambda: gate)
+    first, second = await asyncio.gather(
+        flow.post(f"/api/events/{event['id']}/program", json={"kind": "fastlap", "item_id": lap["id"]}),
+        flow.post(f"/api/events/{other['id']}/program", json={"kind": "fastlap", "item_id": lap["id"]}),
+    )
+    assert sorted([first.status_code, second.status_code]) == [200, 409]
+    winner = event["id"] if first.status_code == 200 else other["id"]
+    assert (await flow.db.f1_challenges.find_one({"id": lap["id"]}))["event_id"] == winner
+
+
+@pytest.mark.asyncio
+async def test_recap_draft_only_after_the_event(flow):
+    _, event = await setup(flow)
+    early = await flow.post(f"/api/events/{event['id']}/recap-draft")
+    assert early.status_code == 400
+    assert "vorbei" in early.json()["detail"]
+    assert await flow.db.news_posts.count_documents({}) == 0
+
+    past = (await flow.post("/api/events", json={
+        "name": "Sommer-LAN", "status": "scheduled", "start_date": "2026-07-10T10:00:00+02:00", "end_date": "2026-07-12T16:00:00+02:00",
+    })).json()
+    made = await flow.post(f"/api/events/{past['id']}/recap-draft")
+    assert made.status_code == 200, made.text
+    assert made.json()["created"] is True

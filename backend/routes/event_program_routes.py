@@ -24,6 +24,9 @@ from services.slug_utils import find_by_slug_or_history
 router = APIRouter(prefix="/api/events", tags=["events"])
 
 ENDED = {"completed", "results_published", "archived", "cancelled"}
+# Wer so angemeldet ist, hängt am Event (Event-Pflicht #875) - solange es solche Anmeldungen gibt, wird nicht gelöst.
+ACTIVE_REGISTRATIONS = ("pending", "approved", "checked_in", "waitlist")
+FREE = {"$in": [None, ""]}
 ITEM_FIELDS = {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "start_date": 1, "end_date": 1, "event_id": 1}
 
 
@@ -68,7 +71,7 @@ async def event_program_view(event_id: str, me: dict = Depends(require_admin()))
     for kind in event_program.KINDS:
         own = await _collection(db, kind).find({"event_id": event["id"]}, ITEM_FIELDS).sort("start_date", 1).to_list(200)
         free = await _collection(db, kind).find(
-            {"event_id": {"$in": [None, ""]}, "status": {"$nin": list(ENDED)}}, ITEM_FIELDS,
+            {"event_id": FREE, "status": {"$nin": list(ENDED)}}, ITEM_FIELDS,
         ).sort("start_date", 1).to_list(200)
         lists[kind] = ([_row(item) for item in own], [_row(item) for item in free])
     return {
@@ -100,10 +103,18 @@ async def add_to_event_program(event_id: str, body: ProgramLink, me: dict = Depe
         other = await db.events.find_one({"id": current}, {"_id": 0, "name": 1})
         name = (other or {}).get("name") or "einem anderen Event"
         raise HTTPException(409, f"Gehört schon zu „{name}“ – erst dort im Programm lösen.")
+    if item.get("status") in ENDED:
+        raise HTTPException(400, "Beendete, archivierte oder abgesagte Turniere und Fast Laps kommen nicht mehr ins Programm.")
     problem = event_program.fits(event, body.kind, item)
     if problem:
         raise HTTPException(400, problem)
-    await collection.update_one({"id": item["id"]}, {"$set": {"event_id": event["id"], "updated_at": now_utc().isoformat()}})
+    # Nur verbinden, solange es noch frei ist - kommen zwei Anfragen gleichzeitig, gewinnt eine, die andere hört 409.
+    result = await collection.update_one(
+        {"id": item["id"], "event_id": FREE, "status": {"$nin": list(ENDED)}},
+        {"$set": {"event_id": event["id"], "updated_at": now_utc().isoformat()}},
+    )
+    if not result.matched_count:
+        raise HTTPException(409, "Inzwischen gehört es schon zu einem Event – lade das Programm neu.")
     return {"ok": True, "item": _row(item)}
 
 
@@ -112,6 +123,10 @@ async def remove_from_event_program(event_id: str, kind: Literal["tournament", "
                                     me: dict = Depends(require_admin())):
     db = get_db()
     event = await _event(event_id)
+    if kind == "tournament" and await db.tournament_registrations.count_documents(
+        {"tournament_id": item_id, "status": {"$in": list(ACTIVE_REGISTRATIONS)}}, limit=1,
+    ):
+        raise HTTPException(409, "Das Turnier hat schon Anmeldungen – lösen geht erst, wenn niemand mehr angemeldet ist.")
     result = await _collection(db, kind).update_one(
         {"id": item_id, "event_id": event["id"]}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}},
     )
