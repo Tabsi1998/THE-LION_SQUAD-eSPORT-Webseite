@@ -1,5 +1,5 @@
 """Admin API for special access links."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -146,6 +146,14 @@ async def cleanup_access_links(
     return {"ok": True, "deactivated": len(stale_ids)}
 
 
+def _utc_iso(moment: datetime | None) -> str | None:
+    """Ablauf immer in UTC speichern (#1036): Die Nutzung wird atomar gegen ``expires_at`` geprüft, und das geht nur,
+    wenn alle Zeitpunkte dieselbe Schreibweise haben. Ohne Zeitzone gilt UTC."""
+    if not moment:
+        return None
+    return (moment.replace(tzinfo=timezone.utc) if moment.tzinfo is None else moment.astimezone(timezone.utc)).isoformat()
+
+
 @router.post("")
 async def create_access_link(body: AccessLinkCreate, me: dict = Depends(require_admin())):
     db = get_db()
@@ -168,7 +176,7 @@ async def create_access_link(body: AccessLinkCreate, me: dict = Depends(require_
         "target_id": body.target_id,
         "grants": grants,
         "token_hash": hash_access_token(token),
-        "expires_at": body.expires_at.isoformat() if body.expires_at else None,
+        "expires_at": _utc_iso(body.expires_at),
         "max_uses": body.max_uses,
         "use_count": 0,
         "user_id": body.user_id or None,

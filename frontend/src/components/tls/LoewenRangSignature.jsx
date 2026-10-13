@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import RING from "@/lib/loewenRangRing.json";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { canvasDpr, signatureFor } from "@/lib/loewenSignatur";
@@ -42,14 +42,33 @@ const boxStyle = {
 /**
  * `level` bestimmt Rang, Signatur und Stärke; `fit`, `scale`, `ox`, `oy` und `ring` kommen aus levelFrameConfig - dieselbe
  * Geometrie wie der Rahmen, damit die Partikel an seiner Außenkante entstehen.
+ * `burst` ({ id, strong, delay }) spielt einmal den Aufstiegs-Moment (#1456) - auch beim ersten Level eines Rangs, wenn
+ * die Signatur selbst noch ruht. `onJolt` meldet, wenn der Moment den Rahmen beben lässt (Brüller, Obsidian, Sturm).
  */
-export default function LoewenRangSignature({ level, fit, scale, ox, oy, ring }) {
+export default function LoewenRangSignature({ level, fit, scale, ox, oy, ring, burst = null, onJolt = null }) {
   const backRef = useRef(null);
   const frontRef = useRef(null);
   const reduced = useReducedMotion();
   const sig = useMemo(() => signatureFor(level), [level]);
   const [edges, setEdges] = useState(null);
-  const active = !reduced && sig.layers.length > 0;
+  const active = !reduced && (sig.layers.length > 0 || Boolean(burst));
+  const engineRef = useRef(null);
+  const burstRef = useRef(burst);
+  burstRef.current = burst;
+  const joltRef = useRef(onJolt);
+  joltRef.current = onJolt;
+  // Je Engine spielt jeder Moment höchstens einmal - auch wenn React die Wirkung doppelt ansetzt.
+  const playedRef = useRef(new WeakMap());
+  const playBurst = useCallback(() => {
+    const engine = engineRef.current;
+    const next = burstRef.current;
+    if (!engine || !next?.id) return;
+    const played = playedRef.current.get(engine) || new Set();
+    if (played.has(next.id)) return;
+    played.add(next.id);
+    playedRef.current.set(engine, played);
+    engine.burst(next.strong !== false, { delay: Number(next.delay) || 0 });
+  }, []);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -72,7 +91,9 @@ export default function LoewenRangSignature({ level, fit, scale, ox, oy, ring })
       edge: edges,
       dpr: canvasDpr(window.devicePixelRatio),
       layout: (width) => signatureGeometry({ width, box: SIGNATURE_BOX, fit, scale, ox, oy }),
+      onJolt: () => joltRef.current?.(),
     });
+    engineRef.current = engine;
     let raf = 0;
     // Mit Beobachter erst laufen, wenn er „im Bild“ meldet - ein Kopf außerhalb des Bildes animiert nie, auch nicht kurz.
     const canObserve = typeof IntersectionObserver === "function";
@@ -105,15 +126,22 @@ export default function LoewenRangSignature({ level, fit, scale, ox, oy, ring })
       : null;
     viewObserver?.observe(front);
     engine.resize();
+    playBurst();
     run();
     return () => {
+      engineRef.current = null;
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
       resizeObserver?.disconnect();
       viewObserver?.disconnect();
       engine.reset();
     };
-  }, [active, edges, sig.fx, sig.k, fit, scale, ox, oy]);
+  }, [active, edges, sig.fx, sig.k, fit, scale, ox, oy, playBurst]);
+
+  // Ein neuer Moment auf einer laufenden Engine.
+  useEffect(() => {
+    playBurst();
+  }, [burst?.id, playBurst]);
 
   if (!active) return null;
   return (
@@ -128,6 +156,7 @@ export default function LoewenRangSignature({ level, fit, scale, ox, oy, ring })
         data-signature={sig.fx}
         data-intensity={sig.k.toFixed(2)}
         data-layers={sig.layers.join(" ")}
+        data-burst={burst?.id ? (burst.strong === false ? "small" : "strong") : undefined}
       />
     </>
   );
