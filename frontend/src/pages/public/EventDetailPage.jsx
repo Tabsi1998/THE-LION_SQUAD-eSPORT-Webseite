@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, Link, useSearchParams } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -12,6 +12,7 @@ import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { FactsBox } from "@/components/tls/FactsBox";
 import { EventBanner } from "@/components/tls/EventBanner";
+import { PlayAlongSheet } from "@/components/tls/PlayAlongSheet";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -22,6 +23,7 @@ import { formatWhen } from "@/lib/datetime";
 import { eventIsOver, photosComingWindow } from "@/lib/afterEnd";
 import { countText, ownSeatsSentence, seatsLabel } from "@/lib/eventSeats";
 import { eventFacts, eventTabs, stripHeadingEmoji, visibilityChip, whatsOnRows } from "@/lib/eventPage";
+import { RETURN_PARAM, offersPlayAlong, returnTournamentPath } from "@/lib/playAlong";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { hasArea } from "@/lib/permissions";
 import { eventTypeLabel, normalizeEventType } from "@/lib/eventTypes";
@@ -151,6 +153,11 @@ export default function EventDetailPage() {
   // „Anmelden“ im Fakten-Kasten öffnet das Formular unter „Dein Event“ und springt dorthin.
   const [registerOpen, setRegisterOpen] = useState(false);
   const yoursRef = useRef(null);
+  // „Spielst du auch mit?“ (#1184): nach der Event-Anmeldung die Turniere des Events. Kam man von einem Turnier mit
+  // Event-Pflicht (#875, ?turnier=…), geht es danach dorthin zurück.
+  const [playAlong, setPlayAlong] = useState(false);
+  const returnFrom = searchParams.get(RETURN_PARAM) || "";
+  const navigate = useNavigate();
   const { hasConsent } = useCookieConsent();
   const seoDescription = seoTextPreview(e?.description || e?.program, "Gaming Event von THE LION SQUAD eSports in Tirol.");
   useDocumentTitle(e?.name || "Event", seoDescription, {
@@ -197,6 +204,15 @@ export default function EventDetailPage() {
       return next;
     }, { replace: true });
   };
+  const finishPlayAlong = () => {
+    setPlayAlong(false);
+    const back = returnTournamentPath(returnFrom);
+    if (back) navigate(back);
+  };
+  const afterRegistration = () => {
+    if (offersPlayAlong(e, user)) setPlayAlong(true);
+    else finishPlayAlong();
+  };
   const openRegistration = () => {
     setRegisterOpen(true);
     if (tab !== "overview") selectTab("overview");
@@ -217,11 +233,12 @@ export default function EventDetailPage() {
           ) : (
             <EventOverview
               e={e} user={user} over={over} accessToken={accessToken} hasConsent={hasConsent} onChanged={load}
-              registerOpen={registerOpen} yoursRef={yoursRef} onLive={() => selectTab("live")}
+              registerOpen={registerOpen} yoursRef={yoursRef} onLive={() => selectTab("live")} onRegistered={afterRegistration}
             />
           )}
         </div>
       </div>
+      {playAlong && <PlayAlongSheet event={e} from={returnFrom} onClose={finishPlayAlong} />}
     </PublicLayout>
   );
 }
@@ -321,7 +338,7 @@ function EventFactsBox({ e, user, over, onRegister }) {
   );
 }
 
-function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, registerOpen, yoursRef, onLive }) {
+function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, registerOpen, yoursRef, onLive, onRegistered }) {
   const eventSponsors = uniqueLogoSponsors(e.sponsors || []);
   const organizerName = e.organizer_name || (e.owned_by_club ? "THE LION SQUAD - eSports" : "");
   const photosComing = Boolean(e.photos_coming) && (e.albums || []).every((album) => album.is_empty) && photosComingWindow(e);
@@ -349,7 +366,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
       {/* 1. Dein Event: der eigene Stand (später mit Ticket) - oder die Anmeldung, solange sie offen ist. */}
       {e.has_registration && (
         <section id="dein-event" ref={yoursRef} className="scroll-mt-24" data-section="yours" data-testid="event-yours">
-          <EventRegistrationPanel event={e} user={user} accessToken={accessToken} onChanged={onChanged} open={registerOpen} />
+          <EventRegistrationPanel event={e} user={user} accessToken={accessToken} onChanged={onChanged} open={registerOpen} onRegistered={onRegistered} />
         </section>
       )}
 
@@ -573,7 +590,7 @@ const EVENT_REGISTRATION_LABELS = {
   no_show: "Nicht erschienen",
 };
 
-function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open = false }) {
+function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open = false, onRegistered }) {
   const [companionCount, setCompanionCount] = useState(0);
   const [note, setNote] = useState("");
   // Kosten (#318): Positionen und Summe vor dem Absenden; wählbare Positionen als Haken.
@@ -620,6 +637,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
       }, { params: accessToken ? { access: accessToken } : undefined });
       toast.success("Anmeldung gespeichert.");
       await onChanged();
+      onRegistered?.();
     });
     if (attempt.started && attempt.error) {
       const message = formatRequestError(attempt.error, "Anmeldung konnte nicht gespeichert werden.");

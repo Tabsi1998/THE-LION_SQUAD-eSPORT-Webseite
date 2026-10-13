@@ -166,6 +166,13 @@ Person selbst sehen darf und wofür sie angemeldet ist, dazu ihre zugesagten Ver
 Sitzung gilt dort keine Zwei-Faktor-Ausnahme der Turnierleitung. Gesperrte oder abgeschaltete Konten bekommen nichts,
 beim Löschen des Kontos fällt der Link weg. Code: `services/personal_calendar.py`.
 
+**„Spielst du auch mit?“ (#1184):** nach der Event-Anmeldung meldet `POST /api/events/{id}/play-along` die gewählten
+Einzel-Turniere des Events an – nur mit Konto, nur für die Person selbst. Je Turnier läuft die normale Selbstanmeldung
+mit allen Regeln (Sichtbarkeit, Frist, Event-Pflicht #875, Startgeld #319, voll → Warteliste); es gibt keine Abkürzung.
+Team-Turniere meldet weiter die Teamleitung auf der Turnierseite an, Turniere anderer Events lehnt der Weg ab. Die
+Auswahl (`GET …/play-along`) zeigt nur Turniere und Fast Laps, die die Person sehen darf. Code:
+`services/event_play_along.py`.
+
 In der App fragt die Team-Seite dieselben Rollen wie der Server: Team bearbeiten und Squads dürfen Leitung,
 Co-Leitung, Turnierleitung, Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und
 Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen dabei –
