@@ -367,8 +367,11 @@ export default function PublicProfilePage() {
   });
   const { hasConsent } = useCookieConsent();
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // `quiet`: Nachladen nach einer gemeldeten Änderung ohne „LADE PROFIL …“. Sonst hängt die Seite ihre Reiter aus und
+  // wieder ein - die eigenen Erfolge werten beim Einhängen aus, der POST meldet wieder eine Änderung, und das Profil
+  // lädt ohne Ende neu.
+  const load = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) setLoading(true);
     try {
       const { data } = await api.get(`/users/public/${username}`, asOthers ? { params: { view_as: "public" } } : undefined);
       setProfile(data);
@@ -383,7 +386,8 @@ export default function PublicProfilePage() {
     setLoading(false);
   }, [asOthers, username]);
   useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["users", "achievements", "tournaments", "f1", "teams"]);
+  const reload = useCallback(() => load({ quiet: true }), [load]);
+  useApiInvalidation(reload, ["users", "achievements", "tournaments", "f1", "teams"]);
   const crown = useCrownFor(profile?.id);
   const [showHighlight, setShowHighlight] = useState(false);
 
