@@ -6,6 +6,7 @@ import { formatCents } from "@/lib/pricing";
 import { initialSelection, playAlongRows, resultSentence, selectionTotal } from "@/lib/playAlong";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
+import { offerFriendsHint } from "@/lib/friendsHint";
 
 // „Spielst du auch mit?“ (#1184): nach der Event-Anmeldung die Turniere des Events in einem Schritt. Am Handy ein Blatt
 // von unten, ab 640 px mittig. Haken nur bei Einzel-Turnieren; Team-Turniere sagen, dass der Kapitän anmeldet (Kapitäne
@@ -114,6 +115,8 @@ export function PlayAlongSheet({ event, from = "", onClose }) {
         tournament_ids: selected, accept_rules: true, accept_privacy: true, accept_costs: acceptCosts,
       });
       setResult(data);
+      // Erste Turnier-Anmeldung über „Spielst du auch mit?“: der einmalige Hinweis (#1188 Teil 2).
+      if ((data?.results || []).some((entry) => entry.state === "registered")) void offerFriendsHint();
     });
     if (attempt.started && attempt.error) setError(formatRequestError(attempt.error, "Die Anmeldung hat nicht geklappt."));
   };
