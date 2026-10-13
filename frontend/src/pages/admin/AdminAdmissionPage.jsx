@@ -104,7 +104,7 @@ export default function AdminAdmissionPage() {
     <AdminLayout>
       <div className="max-w-3xl space-y-5" data-testid="admission-page">
         <div>
-          <h1 className="font-heading text-3xl font-black uppercase flex items-center gap-3"><ScanLine className="w-7 h-7 text-[#29B6E8]" /> Einlass</h1>
+          <h1 className="font-heading text-3xl font-black uppercase flex items-center gap-3"><ScanLine className="w-7 h-7 text-[#29B6E8]" /> Einlass (Versammlung)</h1>
           <p className="text-sm text-white/55 mt-1">
             Generalversammlung: Mitgliedskarte am Eingang scannen – die Anwesenheit steht sofort in Dolibarr, mit Stimmrecht und Beschlussfähigkeit.
             Einlassen darf, wer am Tag im Vorstand ist.

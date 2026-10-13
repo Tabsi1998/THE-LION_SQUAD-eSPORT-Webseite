@@ -308,7 +308,7 @@ Dolibarr zeitnah wirkt; die Vereinsdaten selbst bleiben.
 
 **Kanäle:** Pflegt der Verein seine öffentlichen Kanäle im Modul unter *Einrichtung > Vereine >
 Kanäle und Konten* (Twitch, YouTube, Discord, Instagram …), nimmt die Website sie mit dem Haken
-**„Kanäle aus Dolibarr übernehmen“** (Einstellungen → Social Links) für den Footer und die
+**„Kanäle aus Dolibarr übernehmen“** (Admin → Auftritt → Socials) für den Footer und die
 Social-Erkennung der Suchmaschinen – in der Reihenfolge des Vereins, stündlich nachgelesen. Stehen
 dort keine Kanäle, gilt weiter die Liste von Hand; sie bleibt auch der Rückfall bei einem Ausfall.
 
@@ -324,7 +324,7 @@ Datenschutzhinweise“.
 beschlossen am, gültig seit) mit PDF sowie frühere und künftige Fassungen. Das PDF holt die Website
 aus Dolibarr und prüft es gegen die Prüfsumme der Vereinsakte – passt es nicht, gibt es die Datei
 nicht (Fehler 502). Den Entwurf, an dem der Vorstand arbeitet, kennt die Website nie. Ohne Freigabe
-oder mit einem Modul vor 0.11 bleibt der Hinweis auf den Mitgliederbereich; im Reiter Rechtliches
+oder mit einem Modul vor 0.11 bleibt der Hinweis auf den Mitgliederbereich; unter Admin → Verein → Vereinsdaten
 steht, was Sache ist.
 
 **Statuten öffentlich zeigen (#1252):** ein eigener Schalter unter *Dolibarr → Funktionen*, ab Werk **an**.

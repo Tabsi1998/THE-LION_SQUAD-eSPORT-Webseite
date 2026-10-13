@@ -151,7 +151,7 @@ export default function AdminTournamentsPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Turniere</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Turniere verwalten</h1>
+          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Turniere</h1>
         </div>
         {isAdmin && (
           <Link to="/admin/tournaments/new" data-testid="admin-new-tournament" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">

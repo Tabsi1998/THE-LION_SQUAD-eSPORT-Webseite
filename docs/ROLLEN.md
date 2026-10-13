@@ -131,7 +131,7 @@ schaltet weiter System.
 Event-Tag bis sieben Tage nach dem letzten, höchstens 20 Bilder je Person und Album und nur mit dem Haken „Die Personen
 auf den Fotos sind einverstanden“. Gäste sehen den Knopf nicht. Jedes Bild wird neu gespeichert (ohne EXIF und GPS-Ort),
 liegt bis zur Freigabe privat und geht durch die Bildprüfung. **Freigeben oder ablehnen** dürfen Redaktion und
-Vereinsverwaltung (also auch der Vorstand) – an einem Ort, Admin → Galerie; wer nur die Vereinsverwaltung hat, sieht
+Vereinsverwaltung (also auch der Vorstand) – an einem Ort, Admin → Content → Galerie (Kasten „Eingesandte Fotos“); wer nur die Vereinsverwaltung hat, sieht
 dort nur die Einsendungen, nicht die Alben-Verwaltung. Freigeben geht erst, wenn die Bildprüfung nichts gefunden hat;
 abgelehnte Bilder werden gleich gelöscht. Jede Entscheidung steht im Protokoll (`gallery.submission_approve`,
 `gallery.submission_reject`). **„Die Fotos sind da“** geht einmal je Album an die Angemeldeten des Events (Event und
