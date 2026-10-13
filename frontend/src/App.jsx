@@ -70,6 +70,8 @@ const EsportsOverviewPage = lazy(() => import("@/pages/public/EsportsOverviewPag
 const F1ListPage = lazy(() => import("@/pages/public/F1ListPage"));
 const F1DetailPage = lazy(() => import("@/pages/public/F1DetailPage"));
 const EventsPage = lazy(() => import("@/pages/public/EventsPage"));
+// Anmeldungen & Einlass (#1372): Suche, „noch nicht da“, Einchecken und Nachricht an alle - nur für die Turnierleitung.
+const EventLeadPage = lazy(() => import("@/pages/public/EventLeadPage"));
 const CalendarPage = lazy(() => import("@/pages/public/CalendarPage"));
 const AdventCalendarPage = lazy(() => import("@/pages/public/AdventCalendarPage"));
 const EventDetailPage = lazy(() => import("@/pages/public/EventDetailPage"));
@@ -265,6 +267,7 @@ function App() {
           <Route path="/events" element={<EventsPage />} />
           <Route path="/events/:slug" element={<EventDetailPage />} />
           <Route path="/events/:slug/live" element={<EventLivePage />} />
+          <Route path="/events/:slug/leitung" element={<EventLeadPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/advent" element={<AdventCalendarPage />} />
           <Route path="/ostern" element={<EasterHuntPage />} />

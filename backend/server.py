@@ -40,6 +40,7 @@ from routes.access_link_routes import router as access_link_router
 from routes.admin_picker_routes import router as admin_picker_router
 from routes.tv_routes import router as tv_router
 from routes.event_routes import router as event_router
+from routes.event_lead_routes import router as event_lead_router
 from routes.event_recap_routes import router as event_recap_router
 from routes.tournament_routes import router as tournament_router
 from routes.match_routes import router as match_router
@@ -273,6 +274,7 @@ app.include_router(access_link_router)
 app.include_router(admin_picker_router)
 app.include_router(tv_router)
 app.include_router(event_router)
+app.include_router(event_lead_router)
 app.include_router(event_recap_router)
 app.include_router(tournament_router)
 app.include_router(match_router)

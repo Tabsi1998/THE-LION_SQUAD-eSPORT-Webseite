@@ -789,6 +789,12 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
         </form>
       )}
       {actionError && <div className="mt-4"><AuthFormAlert id="event-registration-error">{actionError}</AuthFormAlert></div>}
+      {/* Die Arbeitsseite der Turnierleitung (#1372): Suche, Einlass, Nachricht an alle. */}
+      {event.can_check_in && (
+        <Link to={`/events/${event.slug || event.id}/leitung`} className="tls-btn tls-btn--secondary mt-4 inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-lead-link">
+          Anmeldungen &amp; Einlass
+        </Link>
+      )}
       {!!event.registrations?.length && (
         <div className="mt-6 border-t border-white/10 pt-4">
           <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">Angemeldet</div>

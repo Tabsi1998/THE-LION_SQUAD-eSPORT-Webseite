@@ -125,6 +125,19 @@ oben auf der eigenen Seite ein und aus und wählt, wo sie erscheinen (Website, A
 Auftritt → Jahreszeiten stehen beide nur noch zum Lesen; den Hauptschalter, Deko, Wetter und alle anderen Jahreszeiten
 schaltet weiter System.
 
+## Anmeldungen & Einlass (#1372)
+
+Die Arbeitsseite `/events/<slug>/leitung` (`GET /api/events/{id}/lead`) und **„Nachricht an alle Angemeldeten“**
+(`POST /api/events/{id}/lead/message`) sind **Turnierleitung** mit Zwei-Faktor – wie Liste und Ändern der Anmeldungen
+bisher. Vorstand (Vereinsverwaltung), Moderation und Angemeldete bekommen 403; der Vorstand sieht die Teilnehmer weiter
+auf der Event-Seite (#397). Eine Zeile trägt Name, Status, Plätze, Begleitpersonen, Notizen und die Mail-Adresse nur
+gekürzt (`p***@…`) – keine Konto-Kennung, kein Geld. Geändert wird über den vorhandenen Weg
+`PATCH /api/events/{id}/registrations/{rid}` (Plätze, Preis, Belohnung). Die Nachricht geht nur mit der bestätigten
+Empfängerzahl hinaus, je Person einmal an alle mit „angemeldet“ oder „da“, als Benachrichtigung und – wenn die Person
+Mails zu „Turnier-Updates“ zulässt – als Mail über die Warteschlange; höchstens eine je Minute und Event. Protokoll:
+`event_messages` und Audit `event.message.send`. Ein Einlass-Helfer mit eingeschränkter Sicht (nur Suchen und
+Einchecken) folgt mit #1375. Code: `services/event_lead.py`.
+
 ## Fotos vom Event (#1185, #1186)
 
 **Einsenden** dürfen Mitglieder (wer Mitglieder-Inhalte sieht, siehe unten) – nur ins Album eines Events, vom ersten
