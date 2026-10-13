@@ -54,3 +54,9 @@ test("zurück zum Turnier nur mit einem einfachen Kurznamen", () => {
   expect(returnTournamentPath("https://evil.example")).toBe("");
   expect(returnTournamentPath("")).toBe("");
 });
+
+test("geschlossene Turniere ohne Haken: Grund statt freier Plätze", () => {
+  const closed = { ...SOLO, id: "t9", selectable: false, reason: "Anmeldung ist bereits beendet." };
+  expect(playAlongRows([closed])[0].line).toBe("Einzel · Rocket League · 10,00 € Startgeld");
+  expect(initialSelection([closed], "t9")).toEqual([]);
+});

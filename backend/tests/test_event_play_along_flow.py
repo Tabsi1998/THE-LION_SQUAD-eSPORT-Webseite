@@ -233,3 +233,31 @@ async def test_step_only_with_tournaments_or_fast_laps_and_captains_get_the_team
     entries = by_id((await flow.get(f"/api/events/{event['id']}/play-along")).json()["entries"])
     assert entries[team_cup["id"]]["captain"] is True
     assert entries[team_cup["id"]]["reason"] == "Melde dein Team auf der Turnierseite an."
+
+
+@pytest.mark.asyncio
+async def test_closed_or_disabled_tournaments_stay_visible_without_a_tick_and_with_the_reason(flow):
+    admin = await person(flow, "chef", role="superadmin")
+    event = await lan_event(flow, admin)
+    closed = await cup(flow, admin, event, "Zu-Cup")
+    disabled = await cup(flow, admin, event, "Aus-Cup")
+    late = await cup(flow, admin, event, "Spaet-Cup")
+    team_closed = await cup(flow, admin, event, "Team-Zu", team_mode="team", team_size=2)
+    over = await cup(flow, admin, event, "Vorbei-Cup")
+    await flow.db.tournaments.update_one({"id": closed["id"]}, {"$set": {"status": "registration_closed"}})
+    await flow.db.tournaments.update_one({"id": team_closed["id"]}, {"$set": {"status": "registration_closed"}})
+    await flow.db.tournaments.update_one({"id": disabled["id"]}, {"$set": {"registration_enabled": False}})
+    await flow.db.tournaments.update_one({"id": late["id"]}, {"$set": {"registration_open_until": (now_utc() - timedelta(hours=1)).isoformat()}})
+    await flow.db.tournaments.update_one({"id": over["id"]}, {"$set": {"status": "completed"}})
+    paula = await person(flow, "paula")
+    await join_event(flow, paula, event)
+    flow.act_as(paula)
+    entries = by_id((await flow.get(f"/api/events/{event['id']}/play-along")).json()["entries"])
+    assert over["id"] not in entries, "Vorbei fällt weg"
+    assert (entries[closed["id"]]["selectable"], entries[closed["id"]]["reason"]) == (False, "Anmeldung für dieses Turnier geschlossen.")
+    assert (entries[disabled["id"]]["selectable"], entries[disabled["id"]]["reason"]) == (False, "Anmeldung für dieses Turnier ist deaktiviert.")
+    assert (entries[late["id"]]["selectable"], entries[late["id"]]["reason"]) == (False, "Anmeldung ist bereits beendet.")
+    assert entries[team_closed["id"]]["reason"] == "Anmeldung für dieses Turnier geschlossen.", "geschlossen geht vor dem Kapitäns-Hinweis"
+    result = (await flow.post(f"/api/events/{event['id']}/play-along", json={**ACCEPT, "tournament_ids": [closed["id"], late["id"]]})).json()
+    assert [row["state"] for row in result["results"]] == ["error", "error"]
+    assert not await own_registrations(flow, paula)

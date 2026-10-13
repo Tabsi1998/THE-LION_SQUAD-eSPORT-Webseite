@@ -2,8 +2,9 @@
 
 - **Die Auswahl** (``options``): je Einzel-Turnier ein Haken mit Tag, Uhrzeit, Spielart, Startgeld und freien Plätzen;
   Team-Turniere nur als Hinweis (der Kapitän meldet das Team auf der Turnierseite an), Fast Laps als Hinweis ohne Haken
-  - für eine Fast Lap gibt es keine Anmeldung, man fährt seine Zeit. Gezeigt wird, was gerade offen ist oder wo die
-  Person schon dabei ist. Ohne Einträge gibt es den Schritt nicht.
+  - für eine Fast Lap gibt es keine Anmeldung, man fährt seine Zeit. Geschlossene oder deaktivierte Turniere stehen
+  ohne Haken mit dem Grund da („Anmeldung ist bereits beendet“); vorbei, abgesagt oder Entwurf fällt weg. Ohne Einträge
+  gibt es den Schritt nicht.
 - **Die Anmeldung** (``register_many``): je Haken die normale Selbstanmeldung (``self_register``) mit allen Regeln - Sperre,
   Frist, Vereinsmitglieder, Event-Pflicht (#875), Startgeld (#319), voll → Warteliste, Doppelanmeldung. Es gibt keine
   zweite Anmeldelogik. Je Eintrag kommt „angemeldet“, „Warteliste“, „schon dabei“ oder der Fehler mit Grund zurück; die
@@ -94,9 +95,9 @@ async def _tournament_entry(db, event: dict, tournament: dict, user: dict, *, ow
     from routes.tournament_common import _is_tournament_locked
     from routes.tournament_registration_routes import _registration_error
 
-    problem = _registration_error(tournament)
-    if problem and not own:
+    if tournament.get("status") in TERMINAL_STATUSES or tournament.get("status") == "draft":
         return None
+    problem = _registration_error(tournament)
     team = _is_team(tournament)
     limit = _limit(tournament)
     taken = await db.tournament_registrations.count_documents({"tournament_id": tournament["id"], "status": {"$in": list(ACTIVE_REGISTRATION)}})
@@ -104,6 +105,9 @@ async def _tournament_entry(db, event: dict, tournament: dict, user: dict, *, ow
     reason = None
     if own:
         reason = own.get("label")
+    elif problem:
+        # Geschlossen, deaktiviert oder noch nicht offen: derselbe Satz wie auf der Turnierseite, kein Haken.
+        reason = problem.rstrip(".") + "."
     elif team:
         reason = CAPTAIN_HINT if captain else TEAM_HINT
     elif _is_tournament_locked(tournament):
@@ -183,6 +187,10 @@ async def options(db, event: dict, user: dict) -> dict:
     return {"show": bool(entries), "entries": entries}
 
 
+def _price(snapshot: dict | None) -> dict | None:
+    return {"total_cents": int(snapshot.get("total_cents") or 0), "currency": snapshot.get("currency") or "EUR"} if snapshot else None
+
+
 def _result(tournament_id: str, title: str | None, state: str, *, detail: str | None = None, price: dict | None = None) -> dict:
     return {"id": tournament_id, "title": title, "state": state, "label": STATE_LABELS[state], "detail": detail, "price": price}
 
@@ -203,12 +211,15 @@ async def _register_one(db, event: dict, tournament_id: str, user: dict, body: R
         reg = await self_register(db, tournament, body, user, None, via="event")
     except HTTPException as exc:
         return _result(tournament_id, title, "error", detail=str(exc.detail))
+    except Exception:  # noqa: BLE001 - ein Abbruch bei einem Turnier hält die anderen nicht auf
+        logger.exception("Play-along registration failed event=%s tournament=%s", log_safe(event.get("id")), log_safe(tournament_id))
+        return _result(tournament_id, title, "error", detail="Das hat nicht geklappt – bitte versuch es gleich noch einmal.")
     if reg.get("idempotent_replay"):
-        return _result(tournament_id, title, "already", detail=event_facts.OWN_STATE_LABELS.get(reg.get("status")))
+        # Holte die Wiederholung einen fehlenden Rechnungsauftrag nach, zählt sein Betrag in die Summe dieses Schritts.
+        return _result(tournament_id, title, "already", detail=event_facts.OWN_STATE_LABELS.get(reg.get("status")),
+                       price=_price(reg.get("price_snapshot")) if reg.get("order_repaired") else None)
     state = {"waitlist": "waitlist", "pending": "pending"}.get(reg.get("status"), "registered")
-    snapshot = reg.get("price_snapshot") if state == "registered" else None
-    price = {"total_cents": int(snapshot.get("total_cents") or 0), "currency": snapshot.get("currency") or "EUR"} if snapshot else None
-    return _result(tournament_id, title, state, price=price)
+    return _result(tournament_id, title, state, price=_price(reg.get("price_snapshot")) if state == "registered" else None)
 
 
 async def register_many(db, event: dict, user: dict, tournament_ids: list[str], *, accept_rules: bool, accept_privacy: bool,

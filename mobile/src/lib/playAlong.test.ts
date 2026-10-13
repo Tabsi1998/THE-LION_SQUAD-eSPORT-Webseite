@@ -35,3 +35,9 @@ test("Vorauswahl, Summe und Ergebnissatz", () => {
     { id: "a", state: "registered", label: "" }, { id: "b", state: "waitlist", label: "" }, { id: "c", state: "error", label: "" },
   ])).toBe("1 angemeldet, 1 auf der Warteliste, 1 nicht angemeldet");
 });
+
+test("geschlossene Turniere ohne Haken: Grund statt freier Plätze", () => {
+  const closed: PlayAlongEntry = { ...SOLO, id: "t9", selectable: false, reason: "Anmeldung ist bereits beendet." };
+  expect(playAlongRows([closed])[0].line).toBe("Einzel · Rocket League · 10,00 € Startgeld");
+  expect(initialSelection([closed], "t9")).toEqual([]);
+});

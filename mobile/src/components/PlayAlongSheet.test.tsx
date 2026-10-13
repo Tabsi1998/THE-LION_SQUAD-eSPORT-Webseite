@@ -103,3 +103,11 @@ test("ein Fehler steht mit Grund beim Eintrag", async () => {
   expect(screen.queryByTestId("play-along-total")).toBeNull();
   expect(screen.getByText("Fertig")).toBeTruthy();
 });
+
+test("geschlossene oder deaktivierte Turniere stehen ohne Haken mit Grund da", async () => {
+  await renderSheet([SOLO, { ...SOLO, id: "t9", title: "Zu-Cup", selectable: false, reason: "Anmeldung für dieses Turnier geschlossen." }]);
+  expect(await screen.findByTestId("play-along-check-t1")).toBeTruthy();
+  expect(screen.queryByTestId("play-along-check-t9")).toBeNull();
+  expect(screen.getByTestId("play-along-note-t9")).toHaveTextContent("Anmeldung für dieses Turnier geschlossen.");
+  expect(screen.getByTestId("play-along-row-t9")).not.toHaveTextContent(/Plätze frei/);
+});

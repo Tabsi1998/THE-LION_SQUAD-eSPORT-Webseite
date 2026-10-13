@@ -54,7 +54,8 @@ function placesLabel(count: number): string {
 export function playAlongRows(entries: PlayAlongEntry[] | null | undefined, { multiDay = false } = {}): PlayAlongRow[] {
   return (entries || []).map((entry) => {
     const fee = entry.fee ? `${formatCents(entry.fee.total_cents, entry.fee.currency || "EUR")} Startgeld` : entry.kind === "tournament" && !entry.team ? "kostenlos" : "";
-    const places = entry.kind !== "tournament" || entry.team || entry.my_status ? ""
+    // Freie Plätze nur, wo man sich gerade anmelden kann - bei geschlossenen Turnieren stünde sonst „3 Plätze frei“.
+    const places = entry.kind !== "tournament" || entry.team || entry.my_status || !entry.selectable ? ""
       : entry.full ? "voll – Warteliste" : entry.spots_left != null ? placesLabel(entry.spots_left) : "";
     return {
       ...entry,

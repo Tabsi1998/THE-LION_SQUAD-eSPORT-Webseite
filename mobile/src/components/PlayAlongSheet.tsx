@@ -176,7 +176,7 @@ export function PlayAlongSheet({ eventId, multiDay = false, from = null, onClose
                     </Pressable>
                   ) : (
                     <View key={row.id} style={styles.row} testID={`play-along-row-${row.id}`}>
-                      <Ionicons name={row.kind === "fastlap" ? "flag" : "people"} size={20} color={row.kind === "fastlap" ? colors.cyan : colors.gold} />
+                      <Ionicons name={row.kind === "fastlap" ? "flag" : row.team ? "people" : "trophy"} size={20} color={row.kind === "fastlap" ? colors.cyan : colors.gold} />
                       <When row={row} />
                       <View style={styles.flex}>
                         <Body style={styles.title}>{row.title}</Body>
