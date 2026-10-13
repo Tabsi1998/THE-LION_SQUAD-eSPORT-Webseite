@@ -1,6 +1,7 @@
 import { Linking } from "react-native";
 import { openLink } from "./openLink";
 import { WEB_BASE_URL } from "./siteUrls";
+import { ARTICLE, FOREIGN_ARTICLE_LINKS, OWN_ARTICLE_LINKS } from "./linkOrigins.fixture";
 
 // Ein Weg für alle Links (#921): eigene Seite mit Screen → Screen; eigene Seite ohne Screen und fremde Adressen →
 // Browser; was keine Webadresse ist, wird nicht geöffnet.
@@ -43,4 +44,16 @@ test("was keine Webadresse ist, wird nicht geöffnet; ein Fehler des Browsers bl
   openUrl.mockRejectedValueOnce(new Error("kein Browser"));
   expect(openLink("https://example.test/")).toBe("browser");
   await Promise.resolve();
+});
+
+test("gemeinsame Herkunfts-Matrix (#998): eigene Adressen gehen als Pfad an die Navigation, fremde nie", () => {
+  mockNavigateToUrl.mockReturnValue(true);
+  for (const url of OWN_ARTICLE_LINKS) {
+    mockNavigateToUrl.mockClear();
+    expect([url, openLink(url)]).toEqual([url, "screen"]);
+    expect(mockNavigateToUrl).toHaveBeenLastCalledWith(`/news/${ARTICLE}`);
+  }
+  mockNavigateToUrl.mockClear();
+  for (const url of FOREIGN_ARTICLE_LINKS) expect([url, openLink(url)]).not.toEqual([url, "screen"]);
+  expect(mockNavigateToUrl).not.toHaveBeenCalled();
 });

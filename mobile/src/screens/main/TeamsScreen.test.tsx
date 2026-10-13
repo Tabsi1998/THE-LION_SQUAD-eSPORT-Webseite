@@ -95,3 +95,28 @@ test("ein Fehler beim Nachladen nimmt die Teams nicht weg", async () => {
   expect(screen.getByText("Meine Teams")).toBeTruthy();
   expect(screen.getByText("Lions")).toBeTruthy();
 });
+
+test("Fehler beim Nachladen: die Teams bleiben, ausdrücklich als letzter Stand mit „Nochmal“ (#1001)", async () => {
+  const lions = { id: "t1", name: "Lions", tag: "TLS", member_count: 12, squad_count: 0 };
+  mockGet.mockImplementation((path: string) => answer(path, [lions], [lions]));
+  await render(<TeamsSection navigation={navigation} />);
+  await waitFor(() => expect(screen.getByText("Meine Teams")).toBeTruthy());
+  expect(screen.queryByTestId("teams-partial-load")).toBeNull();
+  mockGet.mockImplementation(() => Promise.reject(Object.assign(new Error("Network Error"), { isAxiosError: true })));
+  const [list] = screen.container.queryAll((node) => Boolean(node.props.refreshControl));
+  await act(async () => {
+    await list.props.refreshControl.props.onRefresh();
+  });
+  await waitFor(() => expect(screen.getByTestId("teams-partial-load")).toBeTruthy());
+  expect(screen.getByText("Lions")).toBeTruthy();
+  mockGet.mockImplementation((path: string) => answer(path, [lions], [lions]));
+  await fireEvent.press(screen.getByTestId("teams-partial-load-retry"));
+  await waitFor(() => expect(screen.queryByTestId("teams-partial-load")).toBeNull());
+});
+
+test("403 ist kein „Noch kein Team“, sondern „nicht freigegeben“ (#1001)", async () => {
+  mockGet.mockImplementation(() => Promise.reject(Object.assign(new Error("403"), { isAxiosError: true, response: { status: 403, data: {} } })));
+  await render(<TeamsSection navigation={navigation} />);
+  await waitFor(() => expect(screen.getByTestId("teams-error")).toBeTruthy());
+  expect(screen.queryByTestId("teams-empty")).toBeNull();
+});

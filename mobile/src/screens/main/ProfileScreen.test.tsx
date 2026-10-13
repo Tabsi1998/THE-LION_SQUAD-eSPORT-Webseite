@@ -186,3 +186,35 @@ test("erst auswerten, dann die Erfolge laden - einmal je Öffnen, die anderen Ab
   expect(order.indexOf("post /achievements/evaluate")).toBeLessThan(order.indexOf("get /achievements/me"));
   expect(order.filter((entry) => entry === "post /achievements/evaluate")).toHaveLength(1);
 });
+
+test("eigenes Profil ohne Netz: Teams, Referenzen und Auszeichnungen sagen „nicht geladen“, nicht „noch keine“ (#1001)", async () => {
+  const offline = () => Object.assign(new Error("Network Error"), { isAxiosError: true });
+  mockGet.mockImplementation((path: string, config?: { params?: Record<string, string> }) => (
+    ["/teams/my", "/mobile/profile/references", "/me/awards"].includes(path) ? Promise.reject(offline()) : answer(path, config)
+  ));
+  await renderOwn();
+  await waitFor(() => expect(screen.getByTestId("profile-partial-load")).toBeTruthy());
+  await fireEvent.press(screen.getByText("Teams"));
+  await waitFor(() => expect(screen.getByTestId("profile-teams-error")).toBeTruthy());
+  expect(screen.queryByText("Noch kein Team")).toBeNull();
+  await fireEvent.press(screen.getByText("Referenzen"));
+  await waitFor(() => expect(screen.getByTestId("profile-references-error")).toBeTruthy());
+  expect(screen.queryByText("Noch keine Referenzen")).toBeNull();
+  await fireEvent.press(screen.getByText("Auszeichnungen"));
+  await waitFor(() => expect(screen.getByTestId("profile-awards-error")).toBeTruthy());
+  expect(screen.queryByText("Noch keine Auszeichnungen")).toBeNull();
+  // Nochmal versuchen: jetzt klappt es - und leer ist wirklich leer.
+  mockGet.mockImplementation(answer);
+  await fireEvent.press(screen.getByTestId("profile-awards-error-retry"));
+  await waitFor(() => expect(screen.getByText("Noch keine Auszeichnungen")).toBeTruthy());
+  expect(screen.queryByTestId("profile-partial-load")).toBeNull();
+});
+
+test("eigenes Profil: wirklich keine Teams heißt „Noch kein Team“ (#1001)", async () => {
+  mockGet.mockImplementation((path: string, config?: { params?: Record<string, string> }) => (path === "/teams/my" ? Promise.resolve({ data: [] }) : answer(path, config)));
+  await renderOwn();
+  await waitFor(() => expect(screen.getByTestId("profile-private-box")).toBeTruthy());
+  await fireEvent.press(screen.getByText("Teams"));
+  await waitFor(() => expect(screen.getByText("Noch kein Team")).toBeTruthy());
+  expect(screen.queryByTestId("profile-teams-error")).toBeNull();
+});

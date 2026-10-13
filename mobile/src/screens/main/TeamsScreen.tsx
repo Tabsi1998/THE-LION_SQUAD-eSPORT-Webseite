@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
-import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { useTabScrollToTop } from "../../components/TabHeader";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -108,6 +108,8 @@ export function TeamsSection({ navigation }: Props) {
           <View style={styles.header}>
             {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
+            {/* Nachladen gescheitert (#1001): die Liste ist der letzte Stand - das steht hier, mit „Nochmal“. */}
+            {problem && rows.length ? <PartialLoadNotice problem={problem} onRetry={() => { void load(); }} testID="teams-partial-load" /> : null}
             {statTeams.length ? (
               <View style={styles.stats}>
                 <Stat icon="shield-outline" label="Teams" value={statTeams.length} />

@@ -3,6 +3,7 @@ import { openLink } from "../lib/openLink";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { isImageUrl, parseContentTarget, type ContentTarget } from "../lib/contentLinks";
+import { ownPath } from "../lib/siteUrls";
 import { colors, radius } from "../theme";
 import type { ContentEmbed } from "../types";
 import { ContentCard, type ContentCardKind } from "./ContentCard";
@@ -187,8 +188,7 @@ function renderInline(value: string, blockIndex: number, onOpenContent?: (target
               onOpenContent(target);
               return;
             }
-            const url = /^https?:\/\//i.test(token.url) ? token.url : `https://${token.url}`;
-            openLink(url);
+            openLink(linkAddress(token.url));
           }}
         >
           {token.label}
@@ -231,6 +231,17 @@ function tokenizeInline(value: string): InlineToken[] {
   }
   if (last < value.length) tokens.push({ type: "text", value: value.slice(last) });
   return tokens;
+}
+
+/**
+ * Wohin ein Link im Text zeigt (#998): eine volle Webadresse bleibt, ein Pfad der eigenen Seite geht als Pfad an
+ * `openLink`, eine protokoll-relative Adresse („//host/…“) ist ein fremder Host und bekommt https davor - so wie
+ * „www.…“ und jede andere nackte Adresse. Ob daraus ein Screen der App wird, entscheidet allein `openLink`.
+ */
+function linkAddress(url: string) {
+  if (/^https?:\/\//i.test(url)) return url;
+  if (ownPath(url) !== null) return url;
+  return url.startsWith("//") ? `https:${url}` : `https://${url}`;
 }
 
 function normalizeBlocks(text?: string | null) {

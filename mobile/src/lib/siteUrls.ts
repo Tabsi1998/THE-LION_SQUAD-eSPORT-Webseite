@@ -25,11 +25,28 @@ export function isOwnUrl(url?: string | null): boolean {
   return Boolean(host && OWN_HOSTS.has(host));
 }
 
+// Ein Platzhalter-Ursprung, gegen den relative Pfade aufgelöst werden (#998): bleibt er gleich, ist es ein Pfad auf der
+// eigenen Seite. „//host/…“, „/\host/…“, „\\host/…“ oder ein Tab zwischen den Schrägstrichen liest jeder URL-Parser als
+// fremden Host - der Platzhalter ändert sich dann, und der Pfad zählt nicht.
+const LOCAL_ORIGIN = "https://pfad.invalid";
+
+/** Ist das ein Pfad ohne eigene Herkunft, der beim Auflösen auf der eigenen Seite bleibt (#998)? Ohne Schema. */
+export function isLocalPath(value?: string | null): boolean {
+  const text = String(value || "").trim();
+  if (!text || /^[a-z][a-z0-9+.-]*:/i.test(text)) return false;
+  try {
+    return new URL(text, LOCAL_ORIGIN).origin === LOCAL_ORIGIN;
+  } catch {
+    return false;
+  }
+}
+
 /** Der Pfad (mit Abfrage) auf der eigenen Website - oder null, wenn die Adresse woanders hinführt. */
 export function ownPath(url?: string | null): string | null {
   const text = String(url || "").trim();
   if (!text) return null;
-  if (text.startsWith("/")) return text.startsWith("//") ? null : text;
+  // Ein relativer Pfad nur, wenn er wirklich auf der eigenen Seite bleibt - protokoll-relativ ist fremd (#998).
+  if (text.startsWith("/") || text.startsWith("\\")) return text.startsWith("/") && isLocalPath(text) ? text : null;
   if (!isOwnUrl(text)) return null;
   const parsed = new URL(text);
   return `${parsed.pathname || "/"}${parsed.search}`;

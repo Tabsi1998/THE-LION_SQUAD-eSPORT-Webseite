@@ -1,7 +1,7 @@
 import React from "react";
 import { Text } from "react-native";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
-import { AppNavigator } from "./AppNavigator";
+import { AppNavigator, detailRouteId } from "./AppNavigator";
 import { currentTab, navigateToNotification, navigateToUrl, navigationRef, openSignIn, openTab } from "./rootNavigation";
 import type { LooseNavigation } from "./types";
 
@@ -200,4 +200,52 @@ test("über Anmelden: ein Link geht zurück in die Tabs - keine zweite Ebene dar
   });
   expect([currentTab(), current()]).toEqual(["VereinTab", "VereinHub"]);
   expect(navigationRef.getRootState()?.routes.map((route) => route.name)).toEqual(["Main"]);
+});
+
+test("News A → News B legt B als eigene Seite darüber, Zurück führt zu A - kein Inhalt von A unter B (#1000)", async () => {
+  await renderApp();
+  const params = () => navigationRef.getCurrentRoute()?.params as { id?: string; username?: string } | undefined;
+  const key = () => navigationRef.getCurrentRoute()?.key;
+  await act(async () => {
+    nav.navigate("NewsDetail", { id: "a" });
+  });
+  const keyA = key();
+  await act(async () => {
+    nav.navigate("NewsDetail", { id: "b" });
+  });
+  expect(params()?.id).toBe("b");
+  expect(key()).not.toBe(keyA);
+  // Dieselbe Kennung noch einmal: keine zweite Seite.
+  await act(async () => {
+    nav.navigate("NewsDetail", { id: "b" });
+  });
+  await act(async () => {
+    navigationRef.goBack();
+  });
+  expect(params()?.id).toBe("a");
+  expect(key()).toBe(keyA);
+  // Ebenso Profile - und jeder andere Detail-Screen mit Kennung (siehe unten).
+  await act(async () => {
+    nav.navigate("PublicProfile", { username: "kiwikomet" });
+  });
+  const profileKey = key();
+  await act(async () => {
+    nav.navigate("PublicProfile", { username: "neonfalke" });
+  });
+  expect(key()).not.toBe(profileKey);
+  await act(async () => {
+    navigationRef.goBack();
+  });
+  expect(params()?.username).toBe("kiwikomet");
+});
+
+test("jeder Detail-Screen mit Kennung hat eine eigene Seite je Kennung (#1000)", () => {
+  expect(detailRouteId("NewsDetail", { id: "a" })).toBe("a");
+  expect(detailRouteId("EventDetail", { id: "e-1", returnTournament: "t" })).toBe("e-1");
+  expect(detailRouteId("TournamentLead", { id: "t-1", spiel: "m-2" })).toBe("t-1");
+  expect(detailRouteId("PublicProfile", { username: "kiwi" })).toBe("kiwi");
+  expect(detailRouteId("DirectThread", { userId: "u-9" })).toBe("u-9");
+  expect(detailRouteId("GalleryViewer", { albumId: "al-1", index: 3 })).toBe("al-1");
+  expect(detailRouteId("Settings", undefined)).toBeUndefined();
+  expect(detailRouteId("NewsDetail", undefined)).toBeUndefined();
 });
