@@ -303,6 +303,8 @@ class RefundRecord(BaseModel):
     reference: str = Field("", max_length=billing_orders.MAX_REFUND_REFERENCE)
     reason: str = Field(..., min_length=3, max_length=billing_orders.MAX_REASON)
     case_id: str | None = Field(None, max_length=64)
+    # Kennung dieser einen Erfassung (#1034): kommt sie noch einmal an, entsteht kein zweiter Eintrag.
+    request_id: str | None = Field(None, max_length=64)
 
 
 @router.post("/orders/{order_id}/refunds")
@@ -316,7 +318,10 @@ async def record_refund(order_id: str, body: RefundRecord, me: dict = Depends(re
     if order.get("status") != "invoiced":
         raise HTTPException(409, "Erstattet wird nur, was über einen Beleg bezahlt wurde.")
     try:
-        refund = await billing_orders.add_refund(db, order, me["id"], amount_cents=body.amount_cents, paid_on=body.paid_on, reference=body.reference, reason=body.reason)
+        refund = await billing_orders.add_refund(
+            db, order, me["id"], amount_cents=body.amount_cents, paid_on=body.paid_on,
+            reference=body.reference, reason=body.reason, request_id=body.request_id,
+        )
     except billing_orders.RefundError as exc:
         raise HTTPException(400, str(exc))
     resolved = None
