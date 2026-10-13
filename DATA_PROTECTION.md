@@ -39,7 +39,7 @@ alle Sammlungen im Code und verlangt jede dort – eine neue Sammlung ohne Entsc
 | Turnier-Ergebnisse, Ergebnismeldungen, Terminvorschläge, Rundenzeiten, Saisonpunkte und -tabellen | bleiben ohne Namen (sportliche Integrität); Nachweis-Link und Notiz einer Rundenzeit gelöscht |
 | Gewinne | der Nachweis der Übergabe bleibt, die Notiz ist gelöscht |
 | Eigene Chatnachrichten, gehaltene Texte der Moderation | als „gelöscht“ markiert; die Entscheidung der Moderation bleibt |
-| Meldungen, Verwarnungen und Sperren | bleiben als Nachweis der Moderation; die Kennung zeigt auf „Gelöschter User“. Verwarnungen und Sperren werden drei Jahre nach der Löschung endgültig gelöscht |
+| Meldungen, Verwarnungen und Sperren | bleiben als Nachweis der Moderation; die Kennung zeigt auf „Gelöschter User“. Meldungen von und über die Person, Verwarnungen und Sperren werden drei Jahre nach der Löschung endgültig gelöscht |
 | Kontaktanfragen, die angemeldet geschrieben wurden | bleiben als Vorgang – Name, E-Mail-Adresse, Betreff und Text überschrieben; nach drei Jahren gelöscht |
 | Kontaktanfragen ohne Anmeldung mit derselben E-Mail-Adresse | bleiben unberührt: ob die Adresse damals zu diesem Konto gehörte, hält niemand fest. Ihre Zahl steht im Protokoll der Löschung (`unlinked_contact_messages`); der Vorstand prüft sie bei einem Löschwunsch per Hand |
 | Mails, die noch in der Warteschlange stehen | gelöscht; im Versandprotokoll ist der Empfänger überschrieben |
@@ -64,8 +64,8 @@ Migration 5 für #1029). Sie nimmt nur Konten im vollständigen Löschzustand: Z
 | Anmeldeversuche, Zähler gegen zu viele Anfragen | eine Stunde bzw. höchstens ein Tag | Schutz vor Durchprobieren |
 | Entfernte Bilder in der Quarantäne der Bildprüfung | 90 Tage, einstellbar | Nachprüfung einer Entscheidung |
 | Fotos zu Ergebnismeldungen | 30 Tage nach dem Anhängen | Nachweis bei Einsprüchen |
-| Nach einer Kontolöschung: Einwilligungsnachweise (Website und Mitgliederverwaltung), Verwarnungen und Sperren, Ergebnismeldungen, angemeldet geschriebene Kontaktanfragen als Vorgang | drei Jahre ab der Löschung (Entscheidung des Vereins zu #1029). Die Löschung setzt `erase_after`, der tägliche Job `ops_retention` löscht Abgelaufenes (`purge_expired_records`). Für früher gelöschte Konten setzt Migration 5 die Frist ab dem damaligen `anonymized_at`. Einträge aktiver Konten laufen nicht ab | Nachweis |
-| Meldungen (`user_reports`), Ergebnisse und Tabellen | derzeit ohne Frist | Nachweis bzw. sportliche Integrität |
+| Nach einer Kontolöschung: Einwilligungsnachweise (Website und Mitgliederverwaltung), Moderationsfälle (Meldungen von und über die Person, Verwarnungen, Sperren), Ergebnismeldungen, angemeldet geschriebene Kontaktanfragen als Vorgang | drei Jahre ab der Löschung (Entscheidung des Vereins zu #1029). Die Löschung setzt `erase_after`, der tägliche Job `ops_retention` löscht Abgelaufenes (`purge_expired_records`). Für früher gelöschte Konten setzt Migration 5 die Frist ab dem damaligen `anonymized_at`. Einträge aktiver Konten laufen nicht ab | Nachweis |
+| Ergebnisse und Tabellen | ohne Frist | sportliche Integrität, Teil des Turnierverlaufs |
 
 Betriebsdaten ohne Personenbezug (`ops_errors`, `ops_slow_requests`, `ops_vitals`: nur „angemeldet“ oder „anonym“)
 laufen nach 30 Tagen ab.

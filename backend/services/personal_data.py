@@ -74,7 +74,7 @@ PERSONAL: dict[str, Entry] = {
     "match_chat_messages": Entry(OVERWRITTEN, note="steht unter chat_messages"),
     "tournament_chat_messages": Entry(OVERWRITTEN, note="steht unter chat_messages"),
     "chat_attachments": Entry(DELETED, ("chat_attachments",)),
-    "user_reports": Entry(KEPT, ("moderation_reports",), MODERATION),
+    "user_reports": Entry(KEPT, ("moderation_reports",), f"{MODERATION}; {THREE_YEARS} (Meldungen von und über die Person)"),
     "moderation_items": Entry(OVERWRITTEN, ("moderation_items",)),
     "moderation_strikes": Entry(KEPT, ("moderation_strikes",), f"{MODERATION}; {THREE_YEARS}"),
     "moderation_sanctions": Entry(KEPT, ("moderation_sanctions",), f"{MODERATION}; {THREE_YEARS}"),

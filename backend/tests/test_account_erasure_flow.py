@@ -18,7 +18,12 @@ from services import account_erasure, migrations, personal_data  # noqa: E402
 UPLOADS = "/api/static/uploads/"
 # Nachweise mit Frist nach der Löschung: (Sammlung, Zeile aus fill/fill_contract).
 RETAINED_ROWS = (("consent_records", "einwilligung-1"), ("consent_decisions", "einwilligung-akte"), ("moderation_strikes", "strike-1"),
-                 ("moderation_sanctions", "sanktion-1"), ("match_reports_v2", "meldung-match"), ("contact_messages", "kontakt-konto"))
+                 ("moderation_sanctions", "sanktion-1"), ("match_reports_v2", "meldung-match"), ("contact_messages", "kontakt-konto"),
+                 ("user_reports", "meldung-eigen"), ("user_reports", "meldung-fremd"))
+
+
+RETAINED_NAMES = ("consent_records", "consent_decisions", "moderation_strikes", "moderation_sanctions", "user_reports", "match_reports_v2",
+                  "contact_messages")
 
 
 def _aware(value: datetime) -> datetime:
@@ -367,12 +372,12 @@ async def test_records_of_deleted_accounts_expire_after_three_years(flow):
     Zeilen aktiver Konten tragen keine Frist und bleiben."""
     db = flow.db
     now = datetime(2030, 1, 1, tzinfo=timezone.utc)
-    for name in ("consent_records", "consent_decisions", "moderation_strikes", "moderation_sanctions", "match_reports_v2", "contact_messages"):
+    for name in RETAINED_NAMES:
         await getattr(db, name).insert_one({"id": f"{name}-alt", "user_id": "geloescht", "erase_after": datetime(2029, 12, 31, tzinfo=timezone.utc)})
         await getattr(db, name).insert_one({"id": f"{name}-frisch", "user_id": "geloescht", "erase_after": datetime(2030, 1, 2, tzinfo=timezone.utc)})
         await getattr(db, name).insert_one({"id": f"{name}-aktiv", "user_id": "aktiv"})
-    assert await account_erasure.purge_expired_records(db, now=now) == 6
-    for name in ("consent_records", "consent_decisions", "moderation_strikes", "moderation_sanctions", "match_reports_v2", "contact_messages"):
+    assert await account_erasure.purge_expired_records(db, now=now) == len(RETAINED_NAMES)
+    for name in RETAINED_NAMES:
         assert {row["id"] async for row in getattr(db, name).find({}, {"_id": 0, "id": 1})} == {f"{name}-frisch", f"{name}-aktiv"}, name
 
 

@@ -26,6 +26,7 @@ EXPECTED = {
     "consent_decisions": {"erase_after_1"},
     "match_reports_v2": {"erase_after_1"},
     "contact_messages": {"erase_after_1"},
+    "user_reports": {"erase_after_1"},
     "team_members": {"team_id_1_user_id_1", "user_id_1"},
     "membership_applications": {"user_id_1_status_1", "status_1"},
     "media_scans": {"state_1", "owner_id_1"},

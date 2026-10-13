@@ -48,14 +48,15 @@ PURGED = (
 # Angaben zur Person, die in den Daten des Adminprotokolls stehen können (#1029). Der Vorgang bleibt, die Angaben nicht.
 AUDIT_PERSONAL_KEYS = ("display_name", "username", "real_name", "first_name", "last_name", "nickname", "email", "phone", "address",
                        "birth_date")
-# Nachweise, die nach der Löschung bleiben, aber nicht ewig (Entscheidung zu #1029): Einwilligungen, Verwarnungen und
-# Sperren, Ergebnismeldungen und angemeldet geschriebene Kontaktanfragen. Die Löschung setzt ``erase_after`` auf drei
+# Nachweise, die nach der Löschung bleiben, aber nicht ewig (Entscheidung zu #1029): Einwilligungen, Moderationsfälle
+# (Meldungen von und über die Person, Verwarnungen, Sperren), Ergebnismeldungen und angemeldet geschriebene Kontaktanfragen. Die Löschung setzt ``erase_after`` auf drei
 # Jahre danach; der tägliche Job ``purge_expired_records`` löscht, was abgelaufen ist. Zeilen aktiver Konten tragen das
 # Feld nie und laufen nicht ab. (Sammlung, Feld mit der Konto-ID)
 RETENTION_YEARS = 3
 RETAINED = (("consent_records", "user_id"), ("consent_decisions", "user_id"), ("moderation_strikes", "user_id"),
-            ("moderation_sanctions", "user_id"), ("match_reports_v2", "reporter_user_id"))
-RETAINED_COLLECTIONS = tuple(name for name, _field in RETAINED) + ("contact_messages",)
+            ("moderation_sanctions", "user_id"), ("user_reports", "reporter_id"), ("user_reports", "target_user_id"),
+            ("match_reports_v2", "reporter_user_id"))
+RETAINED_COLLECTIONS = tuple(dict.fromkeys(name for name, _field in RETAINED)) + ("contact_messages",)
 # Ein Antrag in diesen Zuständen läuft noch - ohne Konto ist er zurückgezogen (der Abgleich mit der
 # Mitgliederverwaltung fasst ihn dann nicht mehr an).
 OPEN_APPLICATIONS = ("pending", "submitting", "failed")

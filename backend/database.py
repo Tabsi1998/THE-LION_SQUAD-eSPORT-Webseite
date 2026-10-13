@@ -424,6 +424,7 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("consent_decisions", "erase_after"),
     ("moderation_strikes", "erase_after"),
     ("moderation_sanctions", "erase_after"),
+    ("user_reports", "erase_after"),
     ("match_reports_v2", "erase_after"),
     ("contact_messages", "erase_after"),
     ("moderation_strikes", [("source", 1), ("ref_id", 1)]),
