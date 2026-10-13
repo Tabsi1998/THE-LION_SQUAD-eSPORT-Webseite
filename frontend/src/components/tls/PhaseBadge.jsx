@@ -1,21 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 
+// Phasen nach Farb-Rolle (#1305) - wie StatusBadge: Rot nur „läuft gerade“, Grün offen, Cyan angekündigt, Grau vorbei.
 const PHASE_STYLES = {
   // LIVE (#1076): der Chip steht ruhig, nur der Punkt pulsiert leise (index.css, .tls-live-dot).
-  live: "bg-[#FF3B30]/20 text-[#FF3B30] border-[#FF3B30]/50",
+  live: "bg-live/20 text-live border-live/50",
   // Mehrtägig (#884): zwischen zwei Tagen - ruhig, mit Countdown bis zum nächsten Tag.
-  day_break: "bg-[#9F7AEA]/15 text-[#C4B5FD] border-[#9F7AEA]/50",
-  registration_open: "bg-[#00FF88]/15 text-[#00FF88] border-[#00FF88]/50",
-  registration_pending: "bg-[#29B6E8]/10 text-[#29B6E8] border-[#29B6E8]/40",
+  day_break: "bg-event/15 text-[#C4B5FD] border-event/50",
+  registration_open: "bg-ok/15 text-ok border-ok/50",
+  registration_pending: "bg-brand/10 text-brand border-brand/40",
   registration_closed: "bg-white/10 text-white/70 border-white/20",
-  check_in: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/50",
-  announced: "bg-[#29B6E8]/10 text-[#29B6E8] border-[#29B6E8]/40",
+  check_in: "bg-ok/15 text-ok border-ok/50",
+  announced: "bg-brand/10 text-brand border-brand/40",
   draft: "bg-white/5 text-white/60 border-white/10",
   paused: "bg-white/10 text-white/80 border-white/20",
   completed: "bg-white/10 text-white/70 border-white/20",
-  results_published: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/40",
+  results_published: "bg-white/5 text-muted-text border-white/20",
   archived: "bg-white/5 text-white/40 border-white/10",
-  cancelled: "bg-[#FF3B30]/15 text-[#FF3B30] border-[#FF3B30]/40",
+  cancelled: "bg-white/5 text-quiet border-white/10",
 };
 
 const FALLBACK_LABELS = {

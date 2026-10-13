@@ -29,25 +29,71 @@ export function formatDateTime(value?: string | null) {
 
 const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+
+type DateInput = string | number | Date | null | undefined;
+type WhenOptions = { now?: Date; fallback?: string; time?: boolean };
+
+const nextDay = (day: string) => new Date(dayNoon(day).getTime() + DAY_MS).toISOString().slice(0, 10);
+
+/** Ein Wiener Kalendertag als „Sa 23. Mai“ - ohne Monat („Sa 23.“) für den Anfang eines Zeitraums, mit Jahr auf Wunsch. */
+function dayText(day: string, { withMonth = true, withYear = false }: { withMonth?: boolean; withYear?: boolean } = {}) {
+  const noon = dayNoon(day);
+  const [year, , date] = day.split("-").map(Number);
+  const month = withMonth ? ` ${viennaDate(noon, { month: "long" })}` : "";
+  return `${WEEKDAYS[noon.getUTCDay()]} ${date}.${month}${withMonth && withYear ? ` ${year}` : ""}`;
+}
 
 /**
- * Wann etwas ist - ganz und kurz, wie auf der Website (frontend/src/lib/datetime.js → formatWhen, #1220): „Sa 23. Mai ·
- * 18:00“, heute „heute 18:00“, morgen „morgen 18:00“; das Jahr nur, wenn es nicht das laufende ist. Wiener Zeit.
+ * Wann etwas ist - ganz und kurz, wie auf der Website (frontend/src/lib/datetime.js → formatWhen, #1220, #1307): „Sa 23.
+ * Mai · 18:00“, heute „heute 18:00“, morgen „morgen 18:00“; das Jahr nur, wenn es nicht das laufende ist. Mit
+ * `time: false` nur der Tag („Sa 23. Mai“, „heute“). Wiener Zeit; dieselben Fälle wie das Web (docs/date-cases.json).
  */
-export function formatWhen(value?: string | null, { now = new Date(), fallback = "" }: { now?: Date; fallback?: string } = {}) {
+export function formatWhen(value?: DateInput, { now = new Date(), fallback = "", time = true }: WhenOptions = {}) {
   if (value == null || value === "") return fallback;
   const day = viennaDay(value);
   if (!day) return fallback;
-  const time = viennaTime(value, { hour: "2-digit", minute: "2-digit" });
+  const clock = time ? viennaTime(value, { hour: "2-digit", minute: "2-digit" }) : "";
   const today = viennaDay(now);
-  if (day === today) return `heute ${time}`;
-  if (day === new Date(dayNoon(today).getTime() + DAY_MS).toISOString().slice(0, 10)) return `morgen ${time}`;
-  const [year, , date] = day.split("-").map(Number);
-  const noon = dayNoon(day);
-  const weekday = WEEKDAYS[noon.getUTCDay()];
-  const monthName = viennaDate(noon, { month: "long" });
-  const yearPart = today.slice(0, 4) === String(year) ? "" : ` ${year}`;
-  return `${weekday} ${date}. ${monthName}${yearPart} · ${time}`;
+  if (day === today) return time ? `heute ${clock}` : "heute";
+  if (day === nextDay(today)) return time ? `morgen ${clock}` : "morgen";
+  const text = dayText(day, { withYear: day.slice(0, 4) !== today.slice(0, 4) });
+  return time ? `${text} · ${clock}` : text;
+}
+
+/**
+ * Ein Zeitraum nach Tagen (#1307): „Fr 19. – Sa 20. Juni“, über den Monat „Mo 30. November – Mi 2. Dezember“, über den
+ * Jahreswechsel mit beiden Jahren. An einem Tag oder ohne Ende nur der Tag. Wiener Tage.
+ */
+export function formatRange(start?: DateInput, end?: DateInput, { now = new Date(), fallback = "" }: { now?: Date; fallback?: string } = {}) {
+  const first = start == null || start === "" ? "" : viennaDay(start);
+  if (!first) return fallback;
+  const last = end == null || end === "" ? first : viennaDay(end) || first;
+  const thisYear = viennaDay(now).slice(0, 4);
+  if (last <= first) return dayText(first, { withYear: first.slice(0, 4) !== thisYear });
+  const sameYear = first.slice(0, 4) === last.slice(0, 4);
+  const sameMonth = first.slice(0, 7) === last.slice(0, 7);
+  return `${dayText(first, { withMonth: !sameMonth, withYear: !sameYear })} – ${dayText(last, { withYear: !sameYear || last.slice(0, 4) !== thisYear })}`;
+}
+
+/**
+ * Vergangenes in Listen (#1307) - Chats, Benachrichtigungen: „gerade eben“, „vor 12 Min.“, am selben Tag „vor 3 Std.“,
+ * „gestern“, danach der Tag („Sa 16. Mai“). Was deutlich in der Zukunft liegt, steht wie bei formatWhen.
+ */
+export function formatAgo(value?: DateInput, { now = new Date(), fallback = "" }: { now?: Date; fallback?: string } = {}) {
+  if (value == null || value === "") return fallback;
+  const date = asInstant(value);
+  if (Number.isNaN(date.getTime())) return fallback;
+  const diff = asInstant(now).getTime() - date.getTime();
+  if (diff < -MINUTE_MS) return formatWhen(date, { now });
+  if (diff < MINUTE_MS) return "gerade eben";
+  if (diff < HOUR_MS) return `vor ${Math.floor(diff / MINUTE_MS)} Min.`;
+  const day = viennaDay(date);
+  const today = viennaDay(now);
+  if (day === today) return `vor ${Math.floor(diff / HOUR_MS)} Std.`;
+  if (day === dayBefore(today)) return "gestern";
+  return formatWhen(date, { now, time: false });
 }
 
 /**
