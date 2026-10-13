@@ -6,6 +6,7 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { OpsAlertsPanel } from "./ops/OpsAlertsPanel";
 import { OpsEventsTab } from "./ops/OpsEventsTab";
+import { FileCleanupsPanel } from "./ops/FileCleanupsPanel";
 import { OpsOverview } from "./ops/OpsOverview";
 import { AppLogsTab } from "./ops/AppLogsTab";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -404,6 +405,7 @@ function ChecksTab({ checks, loading, running, onRun }) {
           <div className="p-6 text-center text-white/50">Noch kein Lauf – der Scheduler prüft alle {checks?.interval_minutes ?? 5} Minuten, oder „Jetzt prüfen“.</div>
         ) : null}
       </div>
+      <FileCleanupsPanel onChanged={onRun} />
       {history.length ? (
         <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="ops-checks-history">
           <div className="text-[10px] uppercase tracking-widest text-white/40 mb-2">Verlauf {checks?.history_days ?? 7} Tage · Läufe mit rot / gelb</div>

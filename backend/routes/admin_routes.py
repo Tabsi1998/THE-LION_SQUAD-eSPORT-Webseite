@@ -331,6 +331,32 @@ async def ops_checks_run(me: dict = Depends(require_club_admin())):
     return run
 
 
+# ---------------------------------------------------------------- Datei-Nacharbeit (#1046)
+
+@router.get("/ops/file-cleanups")
+async def ops_file_cleanups(me: dict = Depends(require_club_admin())):
+    """Dateien, deren Löschung scheiterte - offen und aufgegeben, ohne Konto."""
+    from services.account_erasure import file_cleanup_overview
+
+    return await file_cleanup_overview(get_db())
+
+
+@router.post("/ops/file-cleanups/retry")
+async def ops_file_cleanups_retry(me: dict = Depends(require_club_admin())):
+    """Nach dem Beheben am Server: aufgegebene Einträge bekommen eine neue Runde, alles Offene wird gleich versucht.
+    Idempotent - was schon weg ist, gilt als gelöscht."""
+    from services.account_erasure import file_cleanup_overview, requeue_file_cleanups, retry_file_cleanups
+
+    db = get_db()
+    requeued = await requeue_file_cleanups(db)
+    removed = await retry_file_cleanups(db)
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "ops.file_cleanups.retry", "actor_id": me.get("id"), "target_id": None,
+        "data": {"requeued": requeued, "removed": removed}, "created_at": now_utc().isoformat(),
+    })
+    return {"requeued": requeued, "removed": removed, **await file_cleanup_overview(db)}
+
+
 # ---------------------------------------------------------------- Alarme (#517): Regeln je Ereignisart, Testalarm
 
 class OpsAlertSettingsBody(BaseModel):

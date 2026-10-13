@@ -24,6 +24,7 @@ CHATS = "die Chat-Sammlungen aus chat_attachments.MESSAGE_COLLECTIONS bzw. word_
 MEDIA = "die Verwendungsstellen von Bildern aus media_audit (TARGETS, TEXT_TARGETS, USAGE_*)"
 DYNAMIC = {
     "database.py:init_audit_indexes:getattr(db, collection)": "Indexliste in database.py; jede Sammlung steht dort als Text",
+    "database.py:blocked_unique_indexes:getattr(db, collection)": "Indexliste in database.py; jede Sammlung steht dort als Text",
     "reset_data.py:reset_database:db[collection]": "RESET_COLLECTIONS, nur für Entwicklung und Tests",
     "routes/chat_routes.py:_chat_summary:getattr(db, collection)": CHATS,
     "routes/chat_routes.py:mark_chat_read:getattr(db, collection)": CHATS,
@@ -54,6 +55,9 @@ DYNAMIC = {
     "services/ops_alerts.py:purge_old_logs:getattr(db, source)": "email_logs und audit_logs (Fristen)",
     "services/scheduler.py:_safe_status_transitions:db[collection_name]": "tournaments, f1_challenges und events",
     "services/station_runtime.py:release_station_for_match:db[collection_name]": MATCHES,
+    "services/unique_duplicates.py:_groups:getattr(db, collection)": "database.AUDIT_UNIQUE_INDEXES (Altdubletten, #1043)",
+    "services/unique_duplicates.py:_unique_active:getattr(db, collection)": "database.AUDIT_UNIQUE_INDEXES (Altdubletten, #1043)",
+    "services/unique_duplicates.py:apply:getattr(db, collection)": "database.AUDIT_UNIQUE_INDEXES (Altdubletten, #1043)",
     "services/uploads_inventory.py:collect_references:db[collection]": MEDIA,
     "services/word_filter.py:review:db[collection]": CHATS,
 }
