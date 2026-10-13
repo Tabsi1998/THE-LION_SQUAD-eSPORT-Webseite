@@ -66,3 +66,131 @@ test("Abgleich im Profil: die vollständige Liste vom Server geht an den Passwor
   delete window.PublicKeyCredential.signalAllAcceptedCredentials;
   expect(await reconcilePasskeys()).toBe(false);
 });
+
+// #1520: der Vorschlag im E-Mail-Feld ersetzt den Knopf. Er startet still, bricht sauber ab, meldet nur echte Fehler
+// und meldet doppelt nichts an.
+describe("startPasskeyAutofill", () => {
+  let autofill;
+  const credential = { id: "AAE", rawId: new Uint8Array([0, 1]), type: "public-key",
+    response: { clientDataJSON: new Uint8Array([2]), authenticatorData: new Uint8Array([3]), signature: new Uint8Array([4]), userHandle: null },
+    getClientExtensionResults: () => ({}) };
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const named = (name) => Object.assign(new Error(name), { name });
+
+  // navigator.credentials.get gibt eine Anfrage zurück, die der Test selbst auflöst oder abbricht.
+  function pendingGets() {
+    const calls = [];
+    navigator.credentials = { get: vi.fn((request) => new Promise((resolve, reject) => {
+      const call = { request, resolve, reject };
+      request.signal?.addEventListener("abort", () => reject(named("AbortError")));
+      calls.push(call);
+    })) };
+    return calls;
+  }
+
+  beforeEach(async () => {
+    autofill = (await import("./passkeys")).startPasskeyAutofill;
+    api.post.mockReset();
+    api.post.mockImplementation(async (url) => {
+      if (url === "/auth/passkeys/login/options") return { data: { challenge: "AQID", rpId: "club.example" } };
+      return { data: { id: "u1" } };
+    });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  test("holt Optionen ohne E-Mail und fragt den Browser bedingt, mit Abbruchsignal", async () => {
+    const calls = pendingGets();
+    const stop = autofill({ onSignedIn: vi.fn() });
+    await flush();
+    expect(api.post).toHaveBeenCalledWith("/auth/passkeys/login/options", {}, { skipInvalidation: true });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].request.mediation).toBe("conditional");
+    expect(calls[0].request.publicKey.allowCredentials).toBeUndefined();
+    expect(calls[0].request.signal.aborted).toBe(false);
+    stop();
+    expect(calls[0].request.signal.aborted).toBe(true);
+  });
+
+  test("Erfolg meldet einmal an, mit „Angemeldet bleiben“ zum Zeitpunkt der Auswahl", async () => {
+    const calls = pendingGets();
+    const onSignedIn = vi.fn();
+    let remember = true;
+    autofill({ remember: () => remember, onSignedIn });
+    await flush();
+    remember = false;
+    calls[0].resolve(credential);
+    await flush();
+    expect(api.post).toHaveBeenCalledWith("/auth/passkeys/login/verify", expect.objectContaining({ remember: false }), { skipInvalidation: true });
+    expect(onSignedIn).toHaveBeenCalledTimes(1);
+    expect(onSignedIn).toHaveBeenCalledWith({ id: "u1" });
+    expect(calls).toHaveLength(1);
+  });
+
+  test("läuft schon eine andere Anmeldung, prüft der Vorschlag nicht zusätzlich", async () => {
+    const calls = pendingGets();
+    const onSignedIn = vi.fn();
+    autofill({ onSignedIn, exclusive: async () => ({ started: false }) });
+    await flush();
+    calls[0].resolve(credential);
+    await flush();
+    expect(api.post).not.toHaveBeenCalledWith("/auth/passkeys/login/verify", expect.anything(), expect.anything());
+    expect(onSignedIn).not.toHaveBeenCalled();
+  });
+
+  test("Abbruch und abgelehnte Auswahl bleiben still; eine sofortige Ablehnung beendet den Vorschlag", async () => {
+    const calls = pendingGets();
+    const onError = vi.fn();
+    const onEnd = vi.fn();
+    const stop = autofill({ onSignedIn: vi.fn(), onError, onEnd });
+    await flush();
+    calls[0].reject(named("NotAllowedError"));
+    await flush();
+    expect(onError).not.toHaveBeenCalled();
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(1);
+    stop();
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+
+  test("eine spätere Ablehnung (Zeitablauf) holt still eine neue Anfrage", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const calls = pendingGets();
+    const onError = vi.fn();
+    const stop = autofill({ onSignedIn: vi.fn(), onError });
+    await flush();
+    vi.setSystemTime(Date.now() + 90_000);
+    calls[0].reject(named("NotAllowedError"));
+    await flush();
+    expect(onError).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(2);
+    stop();
+  });
+
+  test("lehnt der Server ab, steht der Grund da und der Browser darf neu vorschlagen", async () => {
+    const calls = pendingGets();
+    const onError = vi.fn();
+    api.post.mockImplementation(async (url) => {
+      if (url === "/auth/passkeys/login/options") return { data: { challenge: "AQID", rpId: "club.example" } };
+      throw { response: { status: 401, headers: {}, data: { detail: "nein" } } };
+    });
+    const stop = autofill({ onSignedIn: vi.fn(), onError });
+    await flush();
+    calls[0].resolve(credential);
+    await flush();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(2);
+    stop();
+  });
+
+  test("scheitern die Optionen, endet der Vorschlag still", async () => {
+    pendingGets();
+    api.post.mockRejectedValue(new Error("offline"));
+    const onError = vi.fn();
+    const onEnd = vi.fn();
+    autofill({ onSignedIn: vi.fn(), onError, onEnd });
+    await flush();
+    expect(onError).not.toHaveBeenCalled();
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(navigator.credentials.get).not.toHaveBeenCalled();
+  });
+});

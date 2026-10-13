@@ -2,8 +2,8 @@ const { test, expect } = require("@playwright/test");
 const { generateKeyPairSync, randomBytes } = require("node:crypto");
 
 // Passkey-Anmeldung im echten Browser mit dem virtuellen Authenticator von Chromium. Zwei Wege:
-// der Knopf „Mit Passkey anmelden“ und – seit #348 – der Vorschlag im E-Mail-Feld, den der
-// Browser von selbst anbietet. Der virtuelle Authenticator bestätigt sofort; ein Mensch wählt
+// der Vorschlag im E-Mail-Feld, den der Browser von selbst anbietet (#348, seit #1520 ohne eigenen
+// Knopf), und der Link „Mit Passkey anmelden“ für Browser, die das nicht können. Der virtuelle Authenticator bestätigt sofort; ein Mensch wählt
 // den Passkey im echten Browser erst aus der Vorschlagsliste.
 
 async function virtualPasskey(page, context) {
@@ -53,7 +53,7 @@ test("native browser passkey login reaches the server and follows its answer", a
   const { session, authenticatorId, identifier } = await virtualPasskey(page, context);
   const seen = [];
   await mockApi(page, identifier, seen);
-  // Dieser Fall prüft den Knopf: der Vorschlag im E-Mail-Feld bleibt aus.
+  // Dieser Fall prüft den Link: der Browser kann keinen Vorschlag im E-Mail-Feld.
   await page.addInitScript(() => {
     if (window.PublicKeyCredential) window.PublicKeyCredential.isConditionalMediationAvailable = async () => false;
   });

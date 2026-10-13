@@ -38,9 +38,14 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(readRemember);
   const [offerPasskey, setOfferPasskey] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
+  // Vorschlag im E-Mail-Feld (#1520): "checking" bis klar ist, ob der Browser das kann, "on" solange er läuft,
+  // "off" ohne ihn - dann zeigt die Seite den Link „Mit Passkey anmelden“.
+  const [autofill, setAutofill] = useState("checking");
+  const [autofillRound, setAutofillRound] = useState(0);
   const rememberRef = useRef(remember);
   const stopAutofillRef = useRef(null);
   rememberRef.current = remember;
+  const passwordForm = settings.password_login_enabled !== false;
   useEffect(() => {
     if (passkeysSupported()) api.get("/auth/passkeys/status").then(({ data }) => setPasskeysEnabled(data.enabled === true)).catch(() => {});
   }, []);
@@ -55,25 +60,41 @@ export default function LoginPage() {
     }
   };
 
-  // Gespeicherte Passkeys schlägt der Browser im E-Mail-Feld von selbst vor (#348).
+  const stopAutofill = () => {
+    stopAutofillRef.current?.();
+    stopAutofillRef.current = null;
+  };
+
+  // Gespeicherte Passkeys schlägt der Browser im E-Mail-Feld von selbst vor (#348, #1520). Die Prüfung am Server
+  // läuft über dieselbe Sperre wie das Formular - so gibt es nie zwei Anmeldungen zugleich.
   useEffect(() => {
-    if (!passkeysEnabled || mfaTicket) return undefined;
+    if (!passkeysEnabled || mfaTicket || !passwordForm) {
+      setAutofill("off");
+      return undefined;
+    }
     let cancelled = false;
+    setAutofill("checking");
     passkeyAutofillAvailable().then((available) => {
-      if (cancelled || !available) return;
+      if (cancelled) return;
+      if (!available) { setAutofill("off"); return; }
+      setAutofill("on");
       stopAutofillRef.current = startPasskeyAutofill({
         remember: () => rememberRef.current,
+        exclusive: submitOnce,
         onSignedIn: finishPasskeySignIn,
         onError: (error) => setErr(passkeyError(error)),
+        onEnd: () => {
+          stopAutofillRef.current = null;
+          setAutofill("off");
+        },
       });
     });
     return () => {
       cancelled = true;
-      stopAutofillRef.current?.();
-      stopAutofillRef.current = null;
+      stopAutofill();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [passkeysEnabled, mfaTicket]);
+  }, [passkeysEnabled, mfaTicket, passwordForm, autofillRound]);
 
   const changeRemember = (value) => {
     setRemember(value);
@@ -83,8 +104,7 @@ export default function LoginPage() {
   const passkeyLogin = async () => {
     setErr(null);
     // Es darf nur eine Passkey-Anfrage geben: erst die stille beenden.
-    stopAutofillRef.current?.();
-    stopAutofillRef.current = null;
+    stopAutofill();
     const attempt = await submitOnce(() => signInWithPasskey({ remember }));
     if (!attempt.started) return;
     if (attempt.error) { setErr(passkeyError(attempt.error)); return; }
@@ -166,12 +186,15 @@ export default function LoginPage() {
     if (!validate()) return;
 
     setErr(null);
-    stopAutofillRef.current?.();
-    stopAutofillRef.current = null;
-    const attempt = await submitOnce(() => login(email.trim(), pw, { remember }));
+    // Erst innerhalb der Sperre beenden: prüft der Server gerade einen gewählten Passkey, bleibt der stehen.
+    const attempt = await submitOnce(() => {
+      stopAutofill();
+      return login(email.trim(), pw, { remember });
+    });
     if (!attempt.started) return;
     if (attempt.error) {
       setErr("Login konnte nicht abgeschlossen werden. Bitte versuche es erneut.");
+      setAutofillRound((round) => round + 1);
       return;
     }
     const res = attempt.value;
@@ -187,6 +210,8 @@ export default function LoginPage() {
     } else {
       setErr(res.error);
       setVerificationRequired(!!res.verificationRequired);
+      // Das Passwort hat nicht gereicht: der Browser darf seine Passkeys wieder vorschlagen.
+      setAutofillRound((round) => round + 1);
     }
   };
 
@@ -248,6 +273,7 @@ export default function LoginPage() {
             onChange={setField("login-email", setEmail)}
             required
             autoComplete="username webauthn"
+            description={autofill === "on" ? "Passkey gespeichert? Dann schlägt dein Browser ihn hier vor." : undefined}
             error={fieldErrors["login-email"]}
             testId="login-email"
           />
@@ -288,15 +314,20 @@ export default function LoginPage() {
           </div>
         )}
         {!mfaTicket && <GoogleAuthButton label="Mit Google einloggen" returnPath={next} intent="login" remember={remember} />}
-        {!mfaTicket && passkeysEnabled && (
+        {/* Ohne Passwort-Formular gibt es kein Feld für den Vorschlag: dann bleibt der Passkey ein eigener Knopf. */}
+        {!mfaTicket && passkeysEnabled && !passwordForm && (
           <div className="mt-4 space-y-2">
             <button type="button" disabled={loading} onClick={passkeyLogin} data-testid="login-passkey"
               className="tls-btn tls-btn--secondary w-full min-h-11 py-3 rounded-sm font-bold disabled:opacity-50">Mit Passkey anmelden</button>
-            <p className="text-xs text-white/60 text-center">Bereits im Profil eingerichtet? Verwende deinen gespeicherten Passkey.</p>
-            {settings.password_login_enabled === false && err && <AuthFormAlert id="passkey-error">{err}</AuthFormAlert>}
+            {err && <AuthFormAlert id="passkey-error">{err}</AuthFormAlert>}
           </div>
         )}
         <div className="mt-6 text-sm text-white/60 text-center space-y-2">
+          {/* Browser ohne Vorschlag im E-Mail-Feld (#1520): ein unauffälliger Weg zum Passkey. */}
+          {!mfaTicket && passkeysEnabled && passwordForm && autofill === "off" && (
+            <div><button type="button" disabled={loading} onClick={passkeyLogin} data-testid="login-passkey"
+              className="min-h-11 text-white/60 hover:text-[#29B6E8] underline-offset-4 hover:underline disabled:opacity-50">Mit Passkey anmelden</button></div>
+          )}
           {settings.registration_enabled !== false && (
             <div>Kein Account? <Link to={`/register${nextQuery(next)}`} className="text-[#29B6E8] hover:text-white font-bold" data-testid="login-register-link">Registrieren</Link></div>
           )}
