@@ -187,6 +187,8 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("mobile_devices", _rows(db.mobile_push_tokens, me, lambda row: _clean(row, "token"))),
         ("mobile_client_logs", _rows(db.mobile_client_logs, me)),
         ("audit_trail", _rows(db.audit_logs, {"$or": [{"actor_id": user_id}, {"target_id": user_id}]}, _audit_entry(user_id))),
+        # Nachrichten an alle Angemeldeten eines Events (#1372), die die Person als Turnierleitung geschickt hat.
+        ("event_messages_sent", _rows(db.event_messages, {"actor_id": user_id}, _pick("id", "event_id", "text", "recipient_count", "created_at"))),
         # Seit Fassung 3 (#928): was bisher weder in der Auskunft stand noch beim Löschen aufgeräumt wurde.
         ("xp", _value(lambda: one(db.user_xp, me))),
         ("xp_events", _rows(db.xp_events, me)),

@@ -48,6 +48,7 @@ alle Sammlungen im Code und verlangt jede dort – eine neue Sammlung ohne Entsc
 | Kontaktanfragen ohne Anmeldung mit derselben E-Mail-Adresse | bleiben unberührt: ob die Adresse damals zu diesem Konto gehörte, hält niemand fest. Ihre Zahl steht im Protokoll der Löschung (`unlinked_contact_messages`); der Vorstand prüft sie bei einem Löschwunsch per Hand |
 | Mails, die noch in der Warteschlange stehen | gelöscht; im Versandprotokoll ist der Empfänger überschrieben |
 | Gespeicherte Namen: Autorin oder Autor eines News-Beitrags, Protokoll der Erfolge, Angaben zur Person in den Daten des Adminprotokolls | überschrieben bzw. entfernt; Beitrag und Vorgang bleiben |
+| Absender einer „Nachricht an alle Angemeldeten“ eines Events (`event_messages`) | Name überschrieben; die Nachricht bleibt bis zur Frist des Adminprotokolls |
 | Einwilligungen (Website und Mitgliederverwaltung) | bleiben als Nachweis, drei Jahre nach der Löschung endgültig gelöscht |
 | Rechnungen | Belege bleiben sieben Jahre in der Buchhaltung; der Auftrag auf der Website behält Betrag und Belegnummer |
 
@@ -61,6 +62,7 @@ Migration 5 für #1029). Sie nimmt nur Konten im vollständigen Löschzustand: Z
 | --- | --- | --- |
 | Belege in der Buchhaltung (Dolibarr) | sieben Jahre | Steuerrecht |
 | Adminprotokoll (`audit_logs`) | 730 Tage, einstellbar unter Betrieb → Alarme (Job `ops_retention`) | Nachvollziehbarkeit; enthält Kennungen, Namen werden erst beim Lesen aufgelöst; Angaben zur Person in den Daten entfernt die Kontolöschung |
+| Nachrichten an alle Angemeldeten eines Events (`event_messages`: Absender, Text, Zahl der Empfänger) | wie das Adminprotokoll (Job `ops_retention`); in der Auskunft des Absenders unter `event_messages_sent` | Nachweis, was die Turnierleitung wann an wie viele geschickt hat |
 | Versandprotokoll (`email_logs`) | 90 Tage, einstellbar wie oben | Zustellnachweis; Empfänger bei der Kontolöschung überschrieben |
 | Versandte Mails der Warteschlange (`mail_jobs`) | 30 Tage | Doppelversand verhindern |
 | Upload-Protokoll mit IP-Adresse (`upload_events`) | 60 Tage (`UPLOAD_EVENT_RETENTION_DAYS`), läuft auch nach einer Kontolöschung ab | Missbrauch und Fehler bei Uploads nachvollziehen |
