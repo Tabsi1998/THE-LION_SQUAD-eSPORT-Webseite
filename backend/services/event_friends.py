@@ -27,6 +27,7 @@ from services.event_roster import registration_players
 from services.visibility import lead_can_see
 
 VIENNA = ZoneInfo("Europe/Vienna")
+# Projektionen auf ``users`` nennen die beiden Felder wörtlich: Der Wächter (#1492) prüft nur feste Schlüssel.
 SETTING = "privacy_friends_see_registrations"
 HINT_FIELD = "friends_registrations_hint_seen_at"
 YOUTH_AGE = 14
@@ -135,7 +136,8 @@ async def friends_at_event(db, event: dict, viewer: dict) -> dict:
         return result
     users = await db.users.find(
         {"id": {"$in": list(candidates)}, "is_active": {"$ne": False}, "is_banned": {"$ne": True}, "anonymized_at": {"$exists": False}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "birth_date": 1, "privacy_public_profile": 1, SETTING: 1},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "birth_date": 1, "privacy_public_profile": 1,
+         "privacy_friends_see_registrations": 1},
     ).to_list(MAX_FRIENDS * 5)
     allowed = {user["id"]: user for user in users if shares_registrations(user)}
     if not allowed:
