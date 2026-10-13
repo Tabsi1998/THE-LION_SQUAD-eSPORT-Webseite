@@ -13,8 +13,6 @@ const SEVERITIES = Object.keys(SEVERITY_RANK);
 const GHSA = /^GHSA(-[0-9A-Z]{4}){3}$/;
 // Ab so vielen Tagen vor dem Ablauf kündigt das Gate eine Ausnahme an.
 const WARN_DAYS = 30;
-// Länger als ein Jahr darf keine Ausnahme gelten, sonst wäre das Ablaufdatum nur Zierde.
-const MAX_DAYS = 366;
 
 class AuditReportError extends Error {}
 
@@ -124,10 +122,11 @@ function parseNpmAudit(stdout, threshold) {
   for (const [name, item] of Object.entries(relevant)) {
     for (const source of item.via) {
       if (!source || typeof source === "string") continue;
+      requireSeverity(source.severity, `npm audit, Meldung zu ${name}`);
       advisories.push({
         id: ghsaFromUrl(source.url) || `npm:${source.source || name}`,
         module: source.name || name,
-        severity: SEVERITY_RANK[source.severity] === undefined ? item.severity : source.severity,
+        severity: source.severity,
         title: source.title || "ohne Titel",
       });
     }
@@ -160,6 +159,15 @@ function isIsoDate(value) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
+// Länger als ein Kalenderjahr darf keine Ausnahme gelten, sonst wäre das Ablaufdatum nur Zierde. Heute plus ein Jahr;
+// vom 29. Februar aus ist es der 28. Februar des Folgejahres.
+function latestExpiry(today) {
+  const [year, month, day] = today.split("-").map(Number);
+  const limit = new Date(Date.UTC(year + 1, month - 1, day));
+  if (limit.getUTCMonth() !== month - 1) limit.setUTCDate(0);
+  return limit.toISOString().slice(0, 10);
+}
+
 // Jede Ausnahme braucht eine GHSA-Kennung, das Paket, ein echtes Ablaufdatum (höchstens ein Jahr) und eine Begründung.
 function validateAllowlist(allowlist, today) {
   const problems = [];
@@ -178,8 +186,8 @@ function validateAllowlist(allowlist, today) {
     }
     if (!isIsoDate(entry.expires)) {
       problems.push(`${id}: Ablaufdatum (expires) fehlt oder ist kein Datum JJJJ-MM-TT`);
-    } else if (daysBetween(today, entry.expires) > MAX_DAYS) {
-      problems.push(`${id}: Ablaufdatum ${entry.expires} liegt mehr als ${MAX_DAYS} Tage in der Zukunft`);
+    } else if (entry.expires > latestExpiry(today)) {
+      problems.push(`${id}: Ablaufdatum ${entry.expires} liegt nach ${latestExpiry(today)} (mehr als ein Jahr voraus)`);
     }
   }
   return problems;
@@ -299,7 +307,7 @@ function runGate(options) {
 
 module.exports = {
   AuditReportError,
-  MAX_DAYS,
+  latestExpiry,
   WARN_DAYS,
   evaluate,
   parseNpmAudit,

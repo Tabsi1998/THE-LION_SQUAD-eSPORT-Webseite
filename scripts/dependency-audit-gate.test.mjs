@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { parseNpmAudit, parseYarnAudit, runGate, validateAllowlist } = require("./dependency-audit-gate.cjs");
+const { latestExpiry, parseNpmAudit, parseYarnAudit, runGate, validateAllowlist } = require("./dependency-audit-gate.cjs");
 
 const TODAY = "2026-10-13";
 const REASON = "Keine reparierte Version, nur Entwicklungswerkzeug, nicht im App-Paket.";
@@ -165,6 +165,16 @@ test("npm: unbekannte Schwere ist ein Formatfehler", () => {
   assert.match(result.err, /unbekannte Schwere/);
 });
 
+test("npm: unbekannte oder fehlende Schwere in einer Meldung (via) ist ein Formatfehler, nicht die Paket-Schwere", () => {
+  for (const severity of ["urgent", undefined]) {
+    const finding = direct("node-forge", "high", "GHSA-86w9-cpqp-85rv");
+    finding.via[0].severity = severity;
+    const result = npm(npmReport({ "node-forge": finding }), { allowlist: appAllowlist() });
+    assert.equal(result.code, 1, String(severity));
+    assert.match(result.err, /Meldung zu node-forge: unbekannte Schwere/);
+  }
+});
+
 test("npm: abgelaufene Ausnahme blockiert mit Datum", () => {
   const result = npm(npmReport(appFinding), { allowlist: appAllowlist("2026-10-12") });
   assert.equal(result.code, 1);
@@ -223,6 +233,20 @@ test("Ausnahmen brauchen Paket, Ablaufdatum (höchstens ein Jahr) und Begründun
   const result = npm(npmReport({}), { status: 0, allowlist: { "GHSA-AAAA-BBBB-CCCC": { module: "a", expires: "2027-01-02" } } });
   assert.equal(result.code, 1);
   assert.match(result.err, /\[Ausnahmeliste\] GHSA-AAAA-BBBB-CCCC: Begründung/);
+});
+
+test("Ablaufdatum höchstens ein Kalenderjahr voraus, auch über Schaltjahre", () => {
+  const entry = (expires) => ({ "GHSA-AAAA-BBBB-CCCC": { module: "a", expires, reason: REASON } });
+  assert.equal(latestExpiry("2026-10-13"), "2027-10-13");
+  assert.deepEqual(validateAllowlist(entry("2027-10-13"), "2026-10-13"), []);
+  // 2027 ist kein Schaltjahr: 366 Tage wären ein Jahr plus einen Tag.
+  assert.match(validateAllowlist(entry("2027-10-14"), "2026-10-13").join(), /liegt nach 2027-10-13/);
+  // Über den 29. Februar 2028 hinweg ist das Jahr 366 Tage lang.
+  assert.deepEqual(validateAllowlist(entry("2028-03-01"), "2027-03-01"), []);
+  assert.equal(validateAllowlist(entry("2028-03-02"), "2027-03-01").length, 1);
+  // Vom 29. Februar aus endet das Jahr am 28. Februar.
+  assert.equal(latestExpiry("2028-02-29"), "2029-02-28");
+  assert.equal(validateAllowlist(entry("2029-03-01"), "2028-02-29").length, 1);
 });
 
 test("die echten Ausnahmelisten von Website und App sind gültig", () => {
