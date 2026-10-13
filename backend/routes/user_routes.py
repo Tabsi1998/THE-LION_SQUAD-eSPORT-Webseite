@@ -38,12 +38,13 @@ PRIVATE_AUTH_FIELDS = {
     "mfa_secret": 0,
     "mfa_pending_secret": 0,
     "mfa_pending_created_at": 0,
-    "mfa_recovery_code_hashes": 0,
+    "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0,
 }
 
 
 def _clean(u: dict) -> dict:
-    for field in ("_id", "password_hash", "google_id", "mfa_secret", "mfa_pending_secret", "mfa_pending_created_at", "mfa_recovery_code_hashes"):
+    for field in ("_id", "password_hash", "google_id", "mfa_secret", "mfa_pending_secret", "mfa_pending_created_at",
+                  "mfa_recovery_code_hashes", "mfa_totp_last_counter"):
         u.pop(field, None)
     return u
 

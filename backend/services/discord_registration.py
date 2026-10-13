@@ -45,7 +45,7 @@ async def linked_user(db, discord_user_id) -> dict | None:
     link = await db.platform_links.find_one({"platform": "discord", "external_id": str(discord_user_id)}, {"_id": 0, "user_id": 1})
     if not link or not link.get("user_id"):
         return None
-    return await db.users.find_one({"id": link["user_id"]}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0})
+    return await db.users.find_one({"id": link["user_id"]}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0})
 
 
 def vienna(value) -> str:
