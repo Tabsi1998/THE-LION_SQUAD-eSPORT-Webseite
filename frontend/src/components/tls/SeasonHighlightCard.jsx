@@ -3,7 +3,7 @@ import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import { Download, Share2, X, Trophy, Medal, Zap, Flag } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
-import { LevelAvatarFrame, CROWN_LABELS } from "@/components/tls/LevelAvatarFrame";
+import { LevelAvatarFrame, CROWN_LABELS, crownVariant } from "@/components/tls/LevelAvatarFrame";
 import { accountLevelTier } from "@/components/tls/AccountLevel";
 import { viennaDate } from "@/lib/vienna";
 
@@ -103,7 +103,7 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
             <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-sm text-[10px] font-bold uppercase tracking-widest" style={{ color: tier.color, borderColor: `${tier.color}66`, backgroundColor: `${tier.color}12` }}>
               <Zap className="w-3 h-3" /> Level {level?.level || 1} · {tier.title}
             </div>
-            {crown && <div className="mt-1.5 text-[10px] uppercase tracking-widest font-bold text-white/50">{CROWN_LABELS[crown]}</div>}
+            {crown && <div className="mt-1.5 text-[10px] uppercase tracking-widest font-bold text-white/50">{CROWN_LABELS[crownVariant(crown)]}</div>}
           </div>
 
           <div className="relative mt-6 grid grid-cols-4 gap-2 text-center">

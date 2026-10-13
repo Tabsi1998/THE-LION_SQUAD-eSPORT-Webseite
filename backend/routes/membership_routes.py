@@ -745,7 +745,7 @@ async def list_memberships(
     user_map = {
         u["id"]: u for u in await db.users.find(
             {"id": {"$in": user_ids}},
-            {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0},
+            {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0},
         ).to_list(2000)
     }
     out = []
@@ -782,7 +782,7 @@ async def update_user_membership(
     me: dict = Depends(require_area("club")),
 ):
     db = get_db()
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0})
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0})
     if not user:
         raise HTTPException(404, "Benutzer nicht gefunden.")
     payload = body.model_dump(exclude_unset=True)
@@ -1174,7 +1174,7 @@ async def public_members_directory():
     users = await db.users.find(
         {"id": {"$in": user_ids}, "is_active": True, "is_banned": {"$ne": True},
          "privacy_public_profile": True},
-        {"_id": 0, "password_hash": 0, "email": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0},
+        {"_id": 0, "password_hash": 0, "email": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0},
     ).to_list(2000)
     user_map = {u["id"]: u for u in users}
     out = []

@@ -101,8 +101,6 @@ PERSONAL_PLACES = (
 # Dateien, deren Löschung scheiterte (gesperrt, Rechte): die Verwaltungszeilen bleiben, der Aufräum-Job versucht es
 # stündlich erneut (``retry_file_cleanups``).
 PENDING = "pending_file_cleanups"
-BATCH = 100
-VARIANT_NAME = re.compile(r"^(?P<stem>.+)-(?P<width>\d{3,4})\.webp$")
 
 
 def _id_forms(user_id: str) -> list:
@@ -113,72 +111,23 @@ def _id_forms(user_id: str) -> list:
     return forms
 
 
-def _canonical(value, candidates: dict[str, str]) -> str | None:
-    """Der Dateiname hinter einer Adresse - ohne Query und Fragment, auch absolut; eine kleinere Fassung
-    (``variants/<name>-400.webp``) zählt als ihr Original. ``candidates``: Stamm → Dateiname."""
-    name = uploads_inventory.upload_filename(str(value or ""))
-    if not name or name in candidates.values():
-        return name
-    variant = VARIANT_NAME.match(name)
-    if variant and variant.group("stem") in candidates:
-        return candidates[variant.group("stem")]
-    return name
-
-
-def _values(document, path: str) -> list:
-    """Alle Werte unter einem Feldpfad mit Punkten - auch durch Listen hindurch (``tools.image_url``)."""
-    current = [document]
-    for key in path.split("."):
-        found = []
-        for item in current:
-            for entry in (item if isinstance(item, list) else [item]):
-                if isinstance(entry, dict) and key in entry:
-                    found.append(entry[key])
-        current = found
-    flat = []
-    for item in current:
-        flat.extend(item if isinstance(item, list) else [item])
-    return flat
-
-
-def _urls_in_text(text) -> list[str]:
-    if not isinstance(text, str) or "uploads/" not in text:
-        return []
-    urls = [match.group("md") or match.group("html") or "" for match in media_audit.TEXT_IMAGE_RE.finditer(text)]
-    return urls + uploads_inventory.URL_IN_TEXT_RE.findall(text)
-
-
 def _personal(collection: str, document: dict) -> bool:
     return any(name == collection and all(document.get(key) == value for key, value in base.items())
                for name, base, _fields in PERSONAL_PLACES)
 
 
 async def _usage(db, names: set[str]) -> tuple[set[str], dict[str, list]]:
-    """Wo die Dateien noch stehen - je Sammlung eine Abfrage für viele Dateien statt je Datei.
+    """Wo die Dateien noch stehen (``media_audit.iter_usages``, dieselbe Liste wie die Mediathek).
 
     Liefert die Dateien, die außerhalb persönlicher Profile verwendet werden, und je Datei die Stellen in persönlichen
     Profilen als ``(Sammlung, _id, Feld)``."""
     elsewhere: set[str] = set()
     personal: dict[str, list] = {}
-    places = [(collection, fields, False) for collection, fields in media_audit.TARGETS + media_audit.USAGE_TARGETS]
-    places += [(collection, fields, True) for collection, fields in media_audit.TEXT_TARGETS + media_audit.USAGE_TEXT_TARGETS]
-    ordered = sorted(names)
-    for offset in range(0, len(ordered), BATCH):
-        candidates = {pathlib.PurePosixPath(name).stem: name for name in ordered[offset:offset + BATCH]}
-        pattern = "|".join(re.escape(stem) for stem in sorted(candidates))
-        for collection, fields, text in places:
-            query = {"$or": [{field: {"$regex": pattern}} for field in fields]}
-            projection = {"_id": 1, "source": 1, **{field: 1 for field in fields}}
-            async for document in getattr(db, collection).find(query, projection):
-                is_personal = _personal(collection, document)
-                for field in fields:
-                    for value in _values(document, field):
-                        found = {_canonical(url, candidates) for url in (_urls_in_text(value) if text else [value])}
-                        for name in found & names:
-                            if not is_personal:
-                                elsewhere.add(name)
-                            elif not text:
-                                personal.setdefault(name, []).append((collection, document["_id"], field))
+    async for collection, document, field, name, text in media_audit.iter_usages(db, names):
+        if not _personal(collection, document):
+            elsewhere.add(name)
+        elif not text:
+            personal.setdefault(name, []).append((collection, document["_id"], field))
     return elsewhere, personal
 
 
@@ -212,10 +161,32 @@ async def _scans(db, owner_id: str, names: set[str]) -> dict[str, list[dict]]:
     query = {"owner_id": {"$in": _id_forms(owner_id)}, "url": {"$regex": "|".join(re.escape(stem) for stem in sorted(stems))}}
     found: dict[str, list[dict]] = {}
     async for scan in db.media_scans.find(query, {"_id": 1, "url": 1, "quarantine_key": 1}):
-        name = _canonical(scan.get("url"), stems)
+        name = media_audit.canonical_name(scan.get("url"), stems)
         if name in names:
             found.setdefault(name, []).append(scan)
     return found
+
+
+async def _remember(db, name: str, owner_id: str, owned: bool, error: str) -> None:
+    """Zum Nachholen vermerken: der stündliche Aufräum-Job (``retry_file_cleanups``) versucht es erneut."""
+    logger.warning("[media] Datei %s nicht gelöscht, wird nachgeholt: %s", name, error)
+    now = now_utc().isoformat()
+    await db[PENDING].update_one({"filename": name}, {
+        "$set": {"owner_id": str(owner_id), "owned": owned, "last_error": error, "updated_at": now},
+        "$inc": {"attempts": 1}, "$setOnInsert": {"created_at": now},
+    }, upsert=True)
+
+
+async def remove_upload(db, name: str) -> str | None:
+    """Eine Datei samt kleineren Fassungen und Verwaltungszeilen löschen - für die Mediathek (#1471), nachdem sie die
+    Verweise geleert hat. Scheitert das Löschen der Datei, bleibt die Verwaltungszeile und der Aufräum-Job holt es
+    nach; er prüft vorher erneut, ob die Datei inzwischen wieder verwendet wird. Liefert den Fehler."""
+    error = await _remove(db, name, [])
+    if error:
+        await _remember(db, name, "", True, error)
+    else:
+        await db[PENDING].delete_many({"filename": name})
+    return error
 
 
 async def _clean(db, owner_id: str, owned: set[str], untracked: set[str]) -> int:
@@ -232,12 +203,7 @@ async def _clean(db, owner_id: str, owned: set[str], untracked: set[str]) -> int
             continue
         error = await _remove(db, name, scans.get(name, []))
         if error:
-            logger.warning("[dsgvo] Bild %s nicht gelöscht, wird nachgeholt: %s", name, error)
-            now = now_utc().isoformat()
-            await db[PENDING].update_one({"filename": name}, {
-                "$set": {"owner_id": str(owner_id), "owned": name in owned, "last_error": error, "updated_at": now},
-                "$inc": {"attempts": 1}, "$setOnInsert": {"created_at": now},
-            }, upsert=True)
+            await _remember(db, name, owner_id, name in owned, error)
             continue
         for collection, row_id, field in personal.get(name, []):
             await getattr(db, collection).update_one({"_id": row_id}, {"$set": {field: None}})

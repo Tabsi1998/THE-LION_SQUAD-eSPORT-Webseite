@@ -21,7 +21,7 @@ async def list_audit(action: Optional[str] = None, limit: int = 200, me: dict = 
     # Enrich actor
     ids = list({l.get("actor_id") for l in logs if l.get("actor_id")})
     users = {u["id"]: u for u in await db.users.find({"id": {"$in": ids}},
-                                                      {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0}).to_list(500)}
+                                                      {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0}).to_list(500)}
     for l in logs:
         if l.get("actor_id"):
             u = users.get(l["actor_id"], {})

@@ -168,23 +168,30 @@ jest.mock("react-native-reanimated", () => {
 jest.mock("@shopify/react-native-skia", () => {
   const React = require("react");
   const { View } = require("react-native");
-  const draws = { circles: 0, rects: 0, paths: 0 };
+  const draws = { circles: 0, rects: 0, paths: 0, images: 0 };
   const canvas = {
     drawCircle: () => { draws.circles += 1; },
     drawRect: () => { draws.rects += 1; },
     drawPath: () => { draws.paths += 1; },
+    drawImageRect: () => { draws.images += 1; },
+    saveLayer() {},
     save() {},
     restore() {},
     translate() {},
     rotate() {},
     scale() {},
   };
-  const paint = () => ({ setColor() {}, setAlphaf() {}, setBlendMode() {}, setAntiAlias() {} });
+  const paint = () => ({ setColor() {}, setAlphaf() {}, setBlendMode() {}, setAntiAlias() {}, setShader() {}, setStyle() {}, setStrokeWidth() {}, setMaskFilter() {} });
   return {
     __esModule: true,
     Canvas: ({ children, ...props }) => React.createElement(View, props, children),
     Picture: () => null,
-    BlendMode: { Plus: 12 },
+    BlendMode: { Plus: 12, SrcIn: 5 },
+    // Löwen-Rang (#1457): Glanz über dem Rahmen - im Test lädt kein Bild, `useImage` bleibt leer.
+    BlurStyle: { Normal: 0 },
+    PaintStyle: { Fill: 0, Stroke: 1 },
+    TileMode: { Clamp: 0 },
+    useImage: () => null,
     createPicture: () => ({ kind: "picture" }),
     Skia: {
       PictureRecorder: () => ({ beginRecording: () => canvas, finishRecordingAsPicture: () => ({ kind: "picture" }) }),
@@ -192,6 +199,9 @@ jest.mock("@shopify/react-native-skia", () => {
       Color: (value) => value,
       XYWHRect: (x, y, width, height) => ({ x, y, width, height }),
       Path: { Make: () => ({ moveTo() {}, lineTo() {}, close() {} }) },
+      Point: (x, y) => ({ x, y }),
+      Shader: { MakeLinearGradient: () => ({ kind: "shader" }) },
+      MaskFilter: { MakeBlur: () => ({ kind: "blur" }) },
     },
     __skiaDraws: draws,
   };

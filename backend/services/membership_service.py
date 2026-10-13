@@ -221,7 +221,7 @@ async def upsert_membership(
 
 async def get_user_with_membership(user_id: str) -> dict | None:
     db = get_db()
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0})
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0})
     if not user:
         return None
     user["membership"] = await get_membership(user_id)

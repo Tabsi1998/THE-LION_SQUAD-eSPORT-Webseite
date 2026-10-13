@@ -552,8 +552,11 @@ def _banner_active(doc: dict, user: dict | None, member_view: bool = False) -> b
     if ends_at and ends_at < now:
         return False
     audience = doc.get("audience") or "all"
-    # „Admins“ ist das Admin-Team samt Moderation (wie „Nur Admins“ im Profil); „Vereinsmitglieder“
-    # folgt der Regel für Mitglieder-Inhalte (services/visibility.py).
+    # „Admins“ ist das Admin-Team samt Moderation (wie „Nur Admins“ im Profil) - eine Rolle mit Adminbereich wie dort
+    # nur mit bestätigter Zwei-Faktor-Anmeldung (#1479); „Vereinsmitglieder“ folgt der Regel für Mitglieder-Inhalte
+    # (services/visibility.py).
+    from services.permissions import is_confirmed_admin_role
+
     admin_roles = {"moderator", "tournament_admin", "club_admin", "superadmin"}
     if audience == "all":
         return True
@@ -563,7 +566,7 @@ def _banner_active(doc: dict, user: dict | None, member_view: bool = False) -> b
         # ``member_view`` rechnet der Aufrufer einmal je Anfrage aus (Bereiche brauchen die Datenbank).
         return bool(user and member_view)
     if audience == "admins":
-        return bool(user and user.get("role") in admin_roles)
+        return is_confirmed_admin_role(user, admin_roles)
     return False
 
 

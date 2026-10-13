@@ -17,7 +17,7 @@ async def _user_data_export(db, user_id: str) -> dict:
     user = await db.users.find_one(
         {"id": user_id},
         {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0,
-         "mfa_recovery_code_hashes": 0},
+         "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0},
     )
     if not user:
         raise HTTPException(404, "Account nicht gefunden")
@@ -118,7 +118,8 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
         },
         "$unset": {
             "google_id": "", "google_email": "", "mfa_secret": "", "mfa_pending_secret": "",
-            "mfa_pending_created_at": "", "mfa_recovery_code_hashes": "", "platform_verified": "",
+            "mfa_pending_created_at": "", "mfa_recovery_code_hashes": "", "mfa_totp_last_counter": "",
+            "platform_verified": "",
             # Freunde beim Event (#1188): Wahl und Hinweis gehören zum Konto.
             "privacy_friends_see_registrations": "", "friends_registrations_hint_seen_at": "",
         },
