@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Card } from "../../components/Card";
+import { LoewenRangFrame } from "../../components/LoewenRangFrame";
 import { MediaImage } from "../../components/MediaImage";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { achievementIcon } from "../../lib/achievements";
@@ -20,15 +21,24 @@ function Kicker({ children, color }: { children: React.ReactNode; color: string 
   return <Text style={[styles.kicker, { color }]}>{children}</Text>;
 }
 
-export function Avatar({ user, size = 32 }: { user?: PublicUser | null; size?: number }) {
+export function Avatar({ user, size = 32, fill = false }: { user?: PublicUser | null; size?: number; fill?: boolean }) {
   const initial = String(user?.display_name || user?.username || "?").trim().charAt(0).toUpperCase() || "?";
   return (
     <MediaImage
       uri={user?.avatar_url || undefined}
-      style={[styles.avatar, { width: size, height: size, borderRadius: radius.sm }]}
+      style={fill ? styles.avatarFill : [styles.avatar, { width: size, height: size, borderRadius: radius.sm }]}
       fallback={<Text style={[styles.avatarText, { fontSize: Math.round(size * 0.42) }]}>{initial}</Text>}
     />
   );
+}
+
+/** Level fürs Podest: aus der Level-Wertung, sonst aus den Punkten wie im Web (AchievementsShowcasePage, PodiumCard). */
+export function podiumLevel(entry: { level?: number | null; points?: number | null }): number {
+  if (Number(entry.level || 0) > 0) return Number(entry.level);
+  const points = Math.max(0, Number(entry.points || 0));
+  let level = 1;
+  while (points >= level * level * 100) level += 1;
+  return level;
 }
 
 /** Erfolg der Woche: die seltenste Freischaltung der vergangenen Woche auf einem öffentlichen Profil. */
@@ -232,7 +242,10 @@ export function Leaderboard({ board, onBoard, entries, loading, categories, onOp
                   testID={`podium-${entry.rank}`}
                 >
                   <View style={[styles.rankCircle, { borderColor: color }]}><Text style={[styles.rankText, { color }]}>{entry.rank}</Text></View>
-                  <Avatar user={entry} size={44} />
+                  {/* Löwen-Rang (#1457): Podest mit der kleinen Fläche „mini“, ohne Bewegung - wie im Web. */}
+                  <LoewenRangFrame level={podiumLevel(entry)} prestige={entry.prestige} size="mini" testID={`podium-frame-${entry.rank}`}>
+                    <Avatar user={entry} fill />
+                  </LoewenRangFrame>
                   <Text style={styles.podiumName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>{entry.display_name}</Text>
                   {Number(entry.prestige || 0) > 0 ? <Text style={styles.stars}>{prestigeStars(entry.prestige)}</Text> : null}
                   <Text style={[styles.podiumValue, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{byLevel ? `Level ${entry.level}` : Number(entry.points || 0).toLocaleString("de-DE")}</Text>
@@ -284,6 +297,7 @@ const styles = StyleSheet.create({
   userRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
   userName: { color: colors.white, fontWeight: "700", fontSize: 13, flexShrink: 1 },
   avatar: { backgroundColor: colors.surface, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  avatarFill: { width: "100%", height: "100%", backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
   avatarText: { color: "rgba(255,255,255,0.6)", fontWeight: "900", textAlign: "center" },
   statGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   statTile: { flexGrow: 1, flexBasis: "45%", borderWidth: 1, backgroundColor: colors.surface, borderRadius: radius.sm, padding: 12, gap: 4 },

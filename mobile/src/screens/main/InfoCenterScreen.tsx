@@ -8,6 +8,7 @@ import { platformColor, platformIcon } from "../../components/LinkedAccounts";
 import { API_BASE_URL } from "../../config";
 import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { LoewenRangFrame } from "../../components/LoewenRangFrame";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
@@ -394,11 +395,14 @@ function Profiles({ items, onOpen }: { items: any[]; onOpen: (profile: any) => v
         <Pressable key={profile.id} onPress={() => onOpen(profile)} style={({ pressed }) => [pressed && styles.pressed]}>
           <Card style={styles.card}>
             <View style={styles.profileRow}>
-            <MediaImage
-              uri={profile.avatar_url}
-              style={styles.avatar}
-              fallback={<Body style={styles.avatarText}>{(profile.name || profile.display_name || profile.username || "?").slice(0, 1).toUpperCase()}</Body>}
-            />
+            {/* Löwen-Rang (#1457): der Rahmen des Rangs, in Listen ruhig und ohne Schild. */}
+            <LoewenRangFrame level={profile.achievement_level?.level} prestige={profile.achievement_level?.prestige} rankName={profile.achievement_level?.rank_name} size="list">
+              <MediaImage
+                uri={profile.avatar_url}
+                style={styles.framedAvatar}
+                fallback={<Body style={styles.avatarText}>{(profile.name || profile.display_name || profile.username || "?").slice(0, 1).toUpperCase()}</Body>}
+              />
+            </LoewenRangFrame>
             <View style={styles.profileText}>
               <Heading>{profile.name || profile.display_name || profile.username}</Heading>
               {/* "community_user" stand vorher roh neben dem Namen (#246). */}
@@ -610,15 +614,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
   },
-  avatar: {
+  framedAvatar: {
     alignItems: "center",
     backgroundColor: "rgba(255, 255, 255, 0.06)",
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    height: 44,
+    height: "100%",
     justifyContent: "center",
-    width: 44,
+    width: "100%",
   },
   pressed: {
     opacity: 0.72,

@@ -6,6 +6,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { Card } from "../../components/Card";
 import { FriendsCard } from "../../components/FriendsCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
+import { LoewenRangFrame } from "../../components/LoewenRangFrame";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
@@ -69,7 +70,7 @@ export function CommunityScreen({ navigation, route }: Props) {
 }
 
 type Navigation = { navigate: (screen: never, params?: never) => void };
-type PublicPlayer = { id: string; username?: string; display_name?: string; name?: string; avatar_url?: string | null; favorite_games?: string[]; games?: string[]; achievement_level?: { title?: string; level?: number } };
+type PublicPlayer = { id: string; username?: string; display_name?: string; name?: string; avatar_url?: string | null; favorite_games?: string[]; games?: string[]; achievement_level?: { title?: string; level?: number; prestige?: number; rank_name?: string } };
 
 /** Spieler und Freunde: oben die eigenen Freunde mit offenen Anfragen, darunter alle öffentlichen Profile mit Suche. */
 function PlayersSection({ navigation, guest }: { navigation: Navigation; guest: boolean }) {
@@ -112,7 +113,10 @@ function PlayersSection({ navigation, guest }: { navigation: Navigation; guest: 
         const games = player.games || player.favorite_games || [];
         return (
           <Pressable key={player.id} onPress={() => openProfile(player.username)} accessibilityRole="button" style={({ pressed }) => [styles.playerRow, pressed && styles.pressed]} testID={`player-${player.username}`}>
-            <MediaImage uri={player.avatar_url} style={styles.playerAvatar} fallback={<Body style={styles.playerInitial}>{name.slice(0, 1).toUpperCase()}</Body>} />
+            {/* Löwen-Rang (#1457): in Listen der Rahmen ohne Schild und ohne Bewegung, wie im Web. */}
+            <LoewenRangFrame level={player.achievement_level?.level} prestige={player.achievement_level?.prestige} rankName={player.achievement_level?.rank_name} size="list" testID={`player-frame-${player.username}`}>
+              <MediaImage uri={player.avatar_url} style={styles.playerAvatar} fallback={<Body style={styles.playerInitial}>{name.slice(0, 1).toUpperCase()}</Body>} />
+            </LoewenRangFrame>
             <View style={styles.playerText}>
               <Body style={styles.strong}>{name}</Body>
               <Muted numberOfLines={2}>{[player.achievement_level?.title, games.slice(0, 2).join(", ")].filter(Boolean).join(" · ") || `@${player.username || ""}`}</Muted>
@@ -238,10 +242,9 @@ const styles = StyleSheet.create({
   playerAvatar: {
     alignItems: "center",
     backgroundColor: "rgba(41,182,232,0.14)",
-    borderRadius: 21,
-    height: 42,
+    height: "100%",
     justifyContent: "center",
-    width: 42,
+    width: "100%",
   },
   playerInitial: {
     color: colors.cyan,

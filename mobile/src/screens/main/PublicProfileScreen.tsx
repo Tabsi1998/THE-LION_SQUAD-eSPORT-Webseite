@@ -8,6 +8,7 @@ import { HonourList, type Honour } from "../../components/Honours";
 import { FriendButton } from "../../components/FriendButton";
 import type { Relationship } from "../../lib/friends";
 import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { LoewenRangFrame } from "../../components/LoewenRangFrame";
 import { MediaImage } from "../../components/MediaImage";
 import { AccountsCard, accountGroups, type LinkedAccount } from "../../components/LinkedAccounts";
 import { ReportSheet, type ReportDraft } from "../../components/ReportSheet";
@@ -97,7 +98,7 @@ export type PublicProfilePayload = {
   can_message?: boolean;
   relationship?: Relationship | null;
   stats?: Record<string, number | string | undefined>;
-  achievement_level?: { level?: number; title?: string; points?: number; progress?: number; prestige?: number };
+  achievement_level?: { level?: number; title?: string; points?: number; progress?: number; prestige?: number; rank_name?: string };
   badges?: any[];
   tournaments?: any[];
   f1_bests?: any[];
@@ -336,15 +337,23 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
             fallback={<Ionicons name="person-circle-outline" color={colors.cyan} size={52} />}
           />
           <View style={styles.heroShade} />
-          <View style={styles.identityCard}>
-            <View style={styles.levelRing} testID="profile-level-ring">
+          {/* Löwen-Rang (#1457): das Profilbild im Rahmen seines Rangs, mit Schild, Glanz und Signatur - wie im Web. */}
+          <View style={styles.frameStage}>
+            <LoewenRangFrame
+              level={Number(shown.achievement_level?.level || stats.level || 1)}
+              prestige={shown.achievement_level?.prestige}
+              rankName={shown.achievement_level?.rank_name}
+              size="profile"
+              testID="profile-level-ring"
+            >
               <MediaImage
                 uri={shown.avatar_url}
                 style={styles.avatar}
-                fallback={<Body style={styles.avatarText}>{display.slice(0, 1).toUpperCase()}</Body>}
+                fallback={<Body style={styles.avatarInitial}>{display.slice(0, 1).toUpperCase()}</Body>}
               />
-              <View style={styles.levelChip}><Body style={styles.levelChipText}>LVL {shown.achievement_level?.level || stats.level || 1}</Body></View>
-            </View>
+            </LoewenRangFrame>
+          </View>
+          <View style={styles.identityCard}>
             <View style={styles.identityText}>
               <Muted>@{shown.username}{shown.created_at ? ` · dabei seit ${formatDate(shown.created_at)}` : ""}</Muted>
               <Title>{display}</Title>
@@ -635,27 +644,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  levelRing: {
+  // Der Rahmen steht mittig über der Kante des Kopfbilds; oben ragen Krone und Schwingen ins Bild.
+  frameStage: {
     alignItems: "center",
-    borderColor: colors.gold,
-    borderRadius: 44,
-    borderWidth: 3,
-    height: 82,
-    justifyContent: "center",
-    width: 82,
-  },
-  levelChip: {
-    backgroundColor: colors.gold,
-    borderRadius: radius.lg,
-    bottom: -9,
-    paddingHorizontal: 6,
-    position: "absolute",
-  },
-  levelChipText: {
-    color: colors.black,
-    fontSize: 10,
-    fontWeight: "900",
-    lineHeight: 15,
+    marginTop: -120,
   },
   statBar: {
     backgroundColor: colors.surface,
@@ -699,14 +691,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(10,10,10,0.92)",
     flexDirection: "row",
     gap: 12,
-    marginTop: -36,
     padding: 14,
   },
   avatar: {
-    borderRadius: 35,
-    height: 70,
-    overflow: "hidden",
-    width: 70,
+    height: "100%",
+    width: "100%",
   },
   barStat: {
     alignItems: "center",
@@ -722,6 +711,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
     textTransform: "uppercase",
+  },
+  avatarInitial: {
+    color: colors.cyan,
+    fontSize: 44,
+    fontWeight: "900",
+    lineHeight: 52,
   },
   avatarText: {
     color: colors.cyan,
