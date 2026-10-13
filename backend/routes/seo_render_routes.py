@@ -597,7 +597,7 @@ async def member_profile_meta(db, slug: str, base: dict, origin: str) -> dict:
 
 
 async def user_profile_meta(db, username: str, base: dict, origin: str) -> dict:
-    user = await db.users.find_one({"username": username, "privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}}, {"_id": 0, "password_hash": 0, "email": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0})
+    user = await db.users.find_one({"username": username, "privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}}, {"_id": 0, "password_hash": 0, "email": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0})
     if not user:
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     label = user.get("display_name") or user.get("username")

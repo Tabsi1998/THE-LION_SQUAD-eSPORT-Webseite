@@ -146,6 +146,11 @@ export type Team = {
   co_leader_ids?: string[];
   member_ids?: string[];
   can_manage?: boolean;
+  // Was die Person am Team darf (#1479) - der Server rechnet es mit denselben Regeln wie die Aktionen, für Admin-Rollen
+  // also nur mit bestätigter Zwei-Faktor-Anmeldung. `admin_needs_second_factor`: nur die fehlt.
+  can_remove_members?: boolean;
+  can_dissolve?: boolean;
+  admin_needs_second_factor?: boolean;
   my_role?: string;
   // Team-Farbe (#1347): einer der acht Schlüssel aus lib/teamColors oder „auto“ (Farbe des Spiels).
   color?: string | null;

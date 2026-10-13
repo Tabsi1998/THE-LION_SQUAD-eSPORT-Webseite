@@ -140,10 +140,11 @@ def _compact_album(album: dict) -> dict:
 async def _without_empty_albums(albums: list[dict], user: dict | None) -> list[dict]:
     """Leere Alben (#1224): ein Album ohne Fotos und Videos sieht nur, wer Inhalte pflegt (Bereich „content“) - mit dem
     Hinweis ``is_empty``, damit die Verwaltung weiß, dass Besucher es nicht sehen. Sobald Medien da sind, erscheint es
-    von selbst. Erwartet die Zähler aus ``_attach_gallery_counts``."""
-    from services.permissions import user_has_area
+    von selbst. Erwartet die Zähler aus ``_attach_gallery_counts``. Der Bereich zählt wie jeder Adminbereich nur mit
+    bestätigter Zwei-Faktor-Anmeldung (#1479)."""
+    from services.permissions import can_use_area
 
-    if await user_has_area(user, "content"):
+    if await can_use_area(user, "content"):
         for album in albums:
             album["is_empty"] = not album.get("media_count")
         return albums

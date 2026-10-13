@@ -6,6 +6,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useAuth } from "@/context/AuthContext";
+import { canUseArea } from "@/lib/permissions";
 import { HelperCallPanel } from "@/pages/user/helper/HelperCallPanel";
 import { AddToCalendar } from "@/components/tls/AddToCalendar";
 import { calendarAskDue, rememberCalendarAsked, shiftCalendarItem } from "@/lib/clubCalendar";
@@ -105,7 +106,7 @@ function ShiftCalendar({ event, shift, ask, onAskDone }) {
 
 export default function MemberHelperShiftsPage() {
   const confirm = useConfirm();
-  const { can } = useAuth();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const wanted = Number(searchParams.get("event") || 0);
   const [view, setView] = useState(null);
@@ -170,7 +171,8 @@ export default function MemberHelperShiftsPage() {
         <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Helferdienste</h1>
         <p className="mt-2 text-sm text-white/60 max-w-2xl">Wo der Verein Hände braucht: Schichten mit Plätzen, dein Stand je Dienst. Angefragt heißt: der Vorstand bestätigt. Gezählt wird, was der Verein als geleistet bestätigt.</p>
 
-        {can("club") ? <HelperCallPanel /> : null}
+        {/* Helfer-Aufruf (#1197): Vorstand - wie jeder Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung (#1479). */}
+        {canUseArea(user, "club") ? <HelperCallPanel /> : null}
 
         {view === null ? <p className="mt-8 text-sm text-white/45" data-testid="helper-shifts-loading">Wird geladen …</p> : null}
 

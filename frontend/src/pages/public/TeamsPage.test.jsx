@@ -242,3 +242,59 @@ test("die Anmeldung lädt erst nach der Seite: kein zweiter Aufbau der Teamseite
   expect(upcoming.isConnected).toBe(true);
   expect(apiMock.get.mock.calls.filter(([url]) => url === "/teams/t-1")).toHaveLength(loads);
 });
+
+// Verwaltung nur mit bestätigter Zwei-Faktor-Anmeldung (#1479): was eine Admin-Rolle am fremden Team darf, sagt der
+// Server (`can_manage`, `can_remove_members`, `can_dissolve`). Fehlt nur die Zwei-Faktor-Anmeldung, steht statt der
+// Knöpfe „2FA einrichten“ da - mit dem Weg zurück zum Team.
+const FOREIGN = { ...TEAM, is_member: false, can_manage: false, can_remove_members: false, can_dissolve: false, admin_needs_second_factor: false };
+
+describe("Admin-Rollen am fremden Team (#1479)", () => {
+  afterEach(() => { authState.isAdmin = false; });
+
+  test("Club-Admin ohne Zwei-Faktor: keine Verwaltungs-Knöpfe, dafür „2FA einrichten“", async () => {
+    authState.user = { id: "u-admin", username: "clubadmin", role: "club_admin", mfa_enabled: true, auth_mfa_verified: false };
+    authState.isAdmin = true;
+    serve({ ...FOREIGN, admin_needs_second_factor: true });
+    renderAt("/teams/t-1");
+    const hint = await screen.findByTestId("team-mfa-setup");
+    expect(hint).toHaveTextContent("2FA einrichten");
+    expect(hint).toHaveAttribute("href", "/profile?tab=security&mfa=required&next=%2Fteams%2Ft-1");
+    expect(screen.queryByTestId("team-edit-open")).toBeNull();
+    expect(screen.queryByTestId("team-invite-open")).toBeNull();
+    expect(screen.queryByTestId("team-manage-members")).toBeNull();
+  });
+
+  test("Club-Admin mit Zwei-Faktor: Bearbeiten, Mitglieder entfernen und Auflösen - kein Hinweis", async () => {
+    authState.user = { id: "u-admin", username: "clubadmin", role: "club_admin", mfa_enabled: true, auth_mfa_verified: true };
+    authState.isAdmin = true;
+    serve({ ...FOREIGN, can_manage: true, can_remove_members: true, can_dissolve: true }, {
+      "/teams/t-1/dissolve-preview": { member_count: 3, chat_messages: 0, withdraw: [], blocked: [], can_dissolve: true },
+    });
+    renderAt("/teams/t-1");
+    expect(await screen.findByTestId("team-edit-open")).toBeInTheDocument();
+    expect(screen.queryByTestId("team-mfa-setup")).toBeNull();
+    expect(screen.getByTestId("team-kick-u-3")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("team-edit-open"));
+    expect(await screen.findByTestId("team-dissolve")).toBeInTheDocument();
+  });
+
+  test("Turnierleitung mit Zwei-Faktor: bearbeiten ja, Mitglieder entfernen und Auflösen nicht", async () => {
+    authState.user = { id: "u-lead", username: "turnierleitung", role: "tournament_admin", mfa_enabled: true, auth_mfa_verified: true };
+    authState.isAdmin = true;
+    serve({ ...FOREIGN, can_manage: true });
+    renderAt("/teams/t-1");
+    fireEvent.click(await screen.findByTestId("team-edit-open"));
+    await screen.findByTestId("team-edit-sheet");
+    expect(screen.queryByTestId("team-kick-u-3")).toBeNull();
+    expect(screen.queryByTestId("team-dissolve")).toBeNull();
+  });
+
+  test("Besucher und Spieler: keine Knöpfe und kein Hinweis", async () => {
+    authState.user = { id: "u-9", username: "kiwikomet", role: "player" };
+    serve(FOREIGN);
+    renderAt("/teams/t-1");
+    await screen.findByTestId("team-header-actions");
+    expect(screen.queryByTestId("team-edit-open")).toBeNull();
+    expect(screen.queryByTestId("team-mfa-setup")).toBeNull();
+  });
+});

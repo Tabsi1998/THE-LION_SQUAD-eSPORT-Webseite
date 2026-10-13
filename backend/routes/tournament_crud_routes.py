@@ -37,7 +37,7 @@ from services.slug_utils import (
 )
 from models import TournamentCreate, TournamentUpdate, now_utc, new_id
 from services import pricing, tournament_fees
-from services.permissions import user_has_area
+from services.permissions import can_use_area, user_has_area
 from routes.tournament_common import (
     _create_initial_stage_bracket_preview,
     _enrich_game_identity,
@@ -186,7 +186,7 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
             elif t.get("is_public") is not False and await lead_can_see(user, t.get("visibility") or "public"):
                 visible.append(t)
         tournaments = visible
-    finance = bool(user) and await user_has_area(user, "finance")
+    finance = await can_use_area(user, "finance")
     for t in tournaments:
         await _enrich_tournament(t, user)
         _expose_offer(t, finance)
@@ -248,7 +248,7 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
         else:
             for c in t["related_f1_challenges"]:
                 c["public_phase"] = derive_public_phase(c, "f1")
-    _expose_offer(t, bool(user) and await user_has_area(user, "finance"))
+    _expose_offer(t, await can_use_area(user, "finance"))
     # Turnier nur mit Event-Anmeldung (#875): die Seite zeigt den Weg über das Event, bevor jemand scheitert.
     from services import tournament_event_gate
     t["event_gate"] = await tournament_event_gate.viewer_state(db, t, user)

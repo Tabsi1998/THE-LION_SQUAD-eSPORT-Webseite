@@ -1,4 +1,6 @@
 """Small Mongo-backed rate limits for public or abuse-prone endpoints."""
+import hashlib
+import hmac
 from datetime import datetime, timezone, timedelta
 
 from fastapi import HTTPException, Request
@@ -18,6 +20,17 @@ def _format_wait(seconds: int) -> str:
     return f"{minutes} Minuten {rest} Sekunden"
 
 
+def keyed_subject(value: str) -> str:
+    """Eine Konto-Kennung für den Zählerschlüssel - nur als Schlüssel-Hash gespeichert (#1032).
+
+    HMAC mit dem Server-Geheimnis: der Zähler nennt das Konto nicht, und ohne das Geheimnis lässt er sich keinem
+    Konto zuordnen.
+    """
+    from auth import get_jwt_secret
+
+    return hmac.new(get_jwt_secret().encode("utf-8"), str(value).encode("utf-8"), hashlib.sha256).hexdigest()[:32]
+
+
 def get_client_ip(request: Request) -> str:
     """Return Uvicorn's validated peer/client IP, never raw forwarding headers."""
     return (request.client.host if request.client else "unknown")[:120]
@@ -29,8 +42,11 @@ async def enforce_rate_limit(
     limit: int,
     window_seconds: int,
     subject: str | None = None,
-):
-    """Raise 429 if the bucket+subject exceeds limit inside the time window."""
+) -> str:
+    """Raise 429 if the bucket+subject exceeds limit inside the time window.
+
+    Returns the counter document id; ``release_rate_limit`` hands the counted request back (e.g. a successful try).
+    """
     db = get_db()
     identity = subject or get_client_ip(request)
     key = f"{bucket}:{identity}"
@@ -63,3 +79,9 @@ async def enforce_rate_limit(
             detail=f"Zu viele Anfragen. Bitte warte noch {_format_wait(retry_after)}.",
             headers={"Retry-After": str(retry_after)},
         )
+    return document_id
+
+
+async def release_rate_limit(document_id: str) -> None:
+    """Give one counted request back - for limits that should only count failures."""
+    await get_db().rate_limits.update_one({"_id": document_id, "count": {"$gt": 0}}, {"$inc": {"count": -1}})
