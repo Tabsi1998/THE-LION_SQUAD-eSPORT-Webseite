@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException, Request, Depends, Response
 from database import get_db
+from services import password_policy
 from services.private_fields import private_projection
 
 JWT_ALGORITHM = "HS256"
@@ -42,14 +43,24 @@ def get_jwt_secret() -> str:
 
 
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    """Hash eines neuen Passworts nach dem Passwortvertrag (#1033); außerhalb des Vertrags ``ValueError``."""
+    return bcrypt.hashpw(password_policy.new_password_bytes(password), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
+    """Prüft eine Eingabe gegen den gespeicherten Hash - auch Hashes von vor dem Passwortvertrag (#1033)."""
     try:
-        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+        stored = hashed.encode("utf-8")
+        candidates = password_policy.verification_candidates(plain)
     except Exception:
         return False
+    for candidate in candidates:
+        try:
+            if bcrypt.checkpw(candidate, stored):
+                return True
+        except Exception:
+            return False
+    return False
 
 
 def create_access_token(user_id: str, email: str, role: str, session_id: str, family_id: str | None = None, *, mfa_verified: bool = False) -> str:

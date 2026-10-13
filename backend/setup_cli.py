@@ -17,8 +17,8 @@ ROOT = Path(__file__).parent
 load_dotenv(ROOT / ".env")
 
 from motor.motor_asyncio import AsyncIOMotorClient
-import bcrypt
 from runtime_config import is_placeholder_secret, resolve_app_environment
+from services.password_policy import password_problem
 from services.secret_store import encrypt_secret
 
 
@@ -57,10 +57,14 @@ def ask(prompt: str, default: str = "", validator=None) -> str:
         return val
 
 
-def ask_secret(prompt: str, validator=None) -> str:
-    """Read a secret without sharing the public-input data flow or echoing it."""
+def ask_secret(prompt: str, validator=None, *, strip: bool = True) -> str:
+    """Read a secret without sharing the public-input data flow or echoing it.
+
+    Passwörter mit ``strip=False``: der Passwortvertrag (#1033) lässt Leerzeichen unverändert."""
     while True:
-        val = getpass.getpass(f"{CYAN}▸{RESET} {prompt}: ").strip()
+        val = getpass.getpass(f"{CYAN}▸{RESET} {prompt}: ")
+        if strip:
+            val = val.strip()
         if not val:
             print(f"{RED}  ✕ Pflichtfeld{RESET}")
             continue
@@ -68,6 +72,11 @@ def ask_secret(prompt: str, validator=None) -> str:
             print(f"{RED}  ✕ Ungültige Eingabe{RESET}")
             continue
         return val
+
+
+def _valid_setup_password(value: str) -> bool:
+    """Passwortvertrag (#1033), für Einrichtungskonten zusätzlich mindestens 12 Zeichen."""
+    return password_problem(value) is None and len(value) >= 12
 
 
 def ask_yes_no(prompt: str, default=True) -> bool:
@@ -123,9 +132,9 @@ async def main():
     print(f"\n{BOLD}[2/6]{RESET} Superadmin Account")
     admin_email = ask("Admin E-Mail", os.environ.get("ADMIN_EMAIL", "admin@lionsquad.at"))
     while True:
-        admin_pw = ask_secret("Admin Passwort (min. 12 Zeichen)",
-                              validator=lambda v: len(v) >= 12)
-        admin_pw2 = ask_secret("Passwort bestätigen")
+        admin_pw = ask_secret("Admin Passwort (min. 12 Zeichen, höchstens 72 Byte)",
+                              validator=_valid_setup_password, strip=False)
+        admin_pw2 = ask_secret("Passwort bestätigen", strip=False)
         if admin_pw == admin_pw2:
             break
         print(f"{RED}  ✕ Passwörter stimmen nicht überein.{RESET}")
@@ -153,10 +162,10 @@ async def main():
     if seed_demo:
         while True:
             demo_password = ask_secret(
-                "Eigenes Demo-Passwort (min. 12 Zeichen)",
-                validator=lambda value: len(value) >= 12,
+                "Eigenes Demo-Passwort (min. 12 Zeichen, höchstens 72 Byte)",
+                validator=_valid_setup_password, strip=False,
             )
-            confirmation = ask_secret("Demo-Passwort bestätigen")
+            confirmation = ask_secret("Demo-Passwort bestätigen", strip=False)
             if demo_password == confirmation:
                 break
             print(f"{RED}  ✕ Passwörter stimmen nicht überein.{RESET}")
@@ -167,7 +176,8 @@ async def main():
     print(f"\n{YELLOW}Konfiguration schreiben …{RESET}")
 
     # --- Save admin user ---
-    pw_hash = bcrypt.hashpw(admin_pw.encode(), bcrypt.gensalt()).decode()
+    from auth import hash_password
+    pw_hash = hash_password(admin_pw)
     from datetime import datetime, timezone
     now_iso = datetime.now(timezone.utc).isoformat()
     if existing_super:

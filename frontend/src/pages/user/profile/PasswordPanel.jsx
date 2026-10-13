@@ -4,12 +4,12 @@ import { KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { MESSAGE_TOO_SHORT, MIN_PASSWORD_LENGTH, PASSWORD_RULE_HINT, passwordLength, passwordProblem } from "@/lib/passwordRules";
 
 // Passwort ändern im Reiter Sicherheit (#258). Der Endpunkt gab es schon,
 // eine Oberfläche dafür nicht. Das Backend meldet danach alle Geräte ab,
 // deshalb führt der Weg direkt zur Anmeldung. Kein eigenes <form>, weil das
-// Profil schon in einem Formular steckt.
-export const MIN_PASSWORD_LENGTH = 10;
+// Profil schon in einem Formular steckt. Die Regeln kommen aus dem Passwortvertrag (#1033).
 
 const inputClass = "w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white";
 
@@ -21,9 +21,10 @@ export function PasswordPanel({ googleOnly = false }) {
   const [repeat, setRepeat] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const tooShort = next.length > 0 && next.length < MIN_PASSWORD_LENGTH;
+  const problem = next.length > 0 ? passwordProblem(next) : null;
+  const problemText = problem === MESSAGE_TOO_SHORT ? `Noch ${MIN_PASSWORD_LENGTH - passwordLength(next)} Zeichen.` : problem;
   const mismatch = repeat.length > 0 && repeat !== next;
-  const ready = !googleOnly && current.length > 0 && next.length >= MIN_PASSWORD_LENGTH && repeat === next && !busy;
+  const ready = !googleOnly && current.length > 0 && next.length > 0 && !problem && repeat === next && !busy;
 
   const submit = async () => {
     if (!ready) return;
@@ -64,7 +65,7 @@ export function PasswordPanel({ googleOnly = false }) {
           <p className="text-xs text-white/50">
             {googleOnly
               ? "Dein Konto meldet sich über Google an und hat kein Passwort. Ein Passwort setzt du über „Passwort vergessen“ auf der Anmeldeseite."
-              : `Mindestens ${MIN_PASSWORD_LENGTH} Zeichen. Nach dem Wechsel werden alle Geräte abgemeldet, auch dieses.`}
+              : `${PASSWORD_RULE_HINT} Nach dem Wechsel werden alle Geräte abgemeldet, auch dieses.`}
           </p>
         </div>
       </div>
@@ -77,7 +78,7 @@ export function PasswordPanel({ googleOnly = false }) {
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Neues Passwort</div>
             <input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} onKeyDown={onEnter} data-testid="profile-password-new" className={inputClass} />
-            {tooShort ? <div className="text-[11px] text-[#FFD700] mt-1">Noch {MIN_PASSWORD_LENGTH - next.length} Zeichen.</div> : null}
+            {problemText ? <div className="text-[11px] text-[#FFD700] mt-1">{problemText}</div> : null}
           </label>
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Neues Passwort wiederholen</div>

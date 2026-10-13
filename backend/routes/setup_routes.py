@@ -6,11 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timezone
-import bcrypt
 
 from database import get_db
-from auth import require_super, require_any_admin
-from models import MIN_PASSWORD_LENGTH, now_utc, new_id
+from auth import hash_password, require_super, require_any_admin
+from models import now_utc, new_id
+from services.password_policy import NewPassword
 from services.public_site_settings import build_public_legal_settings
 from services.secret_store import encrypt_secret
 
@@ -148,7 +148,7 @@ class SetupWizardBody(BaseModel):
     privacy_policy: Optional[str] = None
     discord_invite_url: Optional[str] = None
     twitch_channel: Optional[str] = None
-    new_admin_password: Optional[str] = None
+    new_admin_password: Optional[NewPassword] = None
     # Email config
     mail_provider: Optional[str] = None  # smtp | resend
     smtp_host: Optional[str] = None
@@ -238,9 +238,8 @@ async def complete_setup(body: SetupWizardBody, me: dict = Depends(require_super
 
     # Admin password change
     if body.new_admin_password:
-        if len(body.new_admin_password) < MIN_PASSWORD_LENGTH:
-            raise HTTPException(400, f"Passwort muss mindestens {MIN_PASSWORD_LENGTH} Zeichen lang sein.")
-        pw_hash = bcrypt.hashpw(body.new_admin_password.encode(), bcrypt.gensalt()).decode()
+        # Die Regeln prüft schon das Modell (Passwortvertrag #1033).
+        pw_hash = hash_password(body.new_admin_password)
         await db.users.update_one({"id": me["id"]}, {"$set": {
             "password_hash": pw_hash, "updated_at": now_iso,
         }})
