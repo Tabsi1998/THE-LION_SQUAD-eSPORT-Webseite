@@ -152,7 +152,7 @@ async def test_a_channel_the_bot_may_not_write_to_is_a_failed_attempt_with_a_cli
     status = (await flow.get("/api/settings/discord")).json()["target_status"]["community"]
     assert status["last"]["reason"] == "forbidden"
     flow.act_as(await flow.add_user(role="tournament_admin"))
-    assert (await flow.get("/api/admin/dashboard")).json()["discord_broken"] == []
+    assert "discord_broken" not in (await flow.get("/api/admin/dashboard")).json(), "nur System (#1353)"
 
 
 @pytest.mark.asyncio

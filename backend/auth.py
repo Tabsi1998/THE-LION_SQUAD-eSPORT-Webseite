@@ -123,12 +123,15 @@ async def verify_and_upgrade_password(db, user: dict, plain: str) -> bool:
 
 
 def create_access_token(user_id: str, email: str, role: str, session_id: str, family_id: str | None = None, *, mfa_verified: bool = False) -> str:
+    # `iat` (#1519): die App rechnet die Laufzeit (exp - iat) ab Erhalt, statt `exp` mit der Geräteuhr zu vergleichen.
+    issued_at = datetime.now(timezone.utc)
     payload = {
         "sub": user_id,
         "email": email,
         "role": role,
         "sid": session_id,
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_MINUTES),
+        "iat": issued_at,
+        "exp": issued_at + timedelta(minutes=ACCESS_TOKEN_MINUTES),
         "type": "access",
         "mfa": bool(mfa_verified),
     }
@@ -430,6 +433,12 @@ def require_area(*areas: str):
 def require_any_admin():
     """Irgendein Adminbereich – für Tageszentrale, Systemstatus und Downloads."""
     return require_area("tournaments", "content", "club", "system")
+
+
+def require_dashboard():
+    """Startseite der Verwaltung (#1353, #992): jeder Verwaltungsbereich - auch Finanzen (Kassier), mit Zwei-Faktor.
+    Spiegel von ``ADMIN_AREAS`` im Web (Menüeintrag „Dashboard“, Seiten-Schutz von /admin)."""
+    return require_area("tournaments", "content", "club", "finance", "system")
 
 
 def require_admin():

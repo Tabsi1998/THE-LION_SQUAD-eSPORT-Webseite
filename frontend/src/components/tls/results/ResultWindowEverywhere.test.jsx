@@ -85,7 +85,7 @@ test("Matchplan: „Ergebnis eintragen“ öffnet das Fenster - ohne Zahlenfelde
   };
   render(
     <TournamentStagesPanel tournamentId="t1" stages={[{ id: "s1", name: "K.-o.", stage_type: "single_elimination", stage_number: 1, settings: {} }]} matches={[match]}
-      registrations={[{ id: "r1", display_name: "Lions Rocket" }, { id: "r2", display_name: "Boost und Burger" }]} isAdmin={false} isModerator canRecordResults onChanged={() => {}} onSaveMatchMeta={() => {}} />,
+      registrations={[{ id: "r1", display_name: "Lions Rocket" }, { id: "r2", display_name: "Boost und Burger" }]} rightsForMatch={() => ({ plan: true, results: true })} onChanged={() => {}} onSaveMatchMeta={() => {}} />,
   );
   expect(screen.queryByText(/DNF|Forfeit/)).toBeNull();
   fireEvent.click(await screen.findByTestId("matchplan-result-m1"));

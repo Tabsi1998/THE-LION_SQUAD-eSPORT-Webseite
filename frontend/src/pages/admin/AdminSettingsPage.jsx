@@ -39,6 +39,10 @@ export default function AdminSettingsPage() {
   const [queue, setQueue] = useState([]);
   const [queueStats, setQueueStats] = useState(null);
   const [queueFilter, setQueueFilter] = useState("");
+  // Suche nach Adresse (#1418): als POST, die Treffer kommen gekürzt wie die Liste. Der Stand liegt auch im Ref, damit
+  // das Nachladen alle 15 s die Suche nicht wieder durch die ganze Liste ersetzt.
+  const [queueSearch, setQueueSearch] = useState("");
+  const queueSearchRef = useRef("");
   const [brand, setBrand] = useState({
     club_name: "", tagline: "", site_title: "THE LION SQUAD - eSPORTS", site_description: "", primary_color: "#29B6E8",
     logo_url: "", logo_light_url: "", logo_dark_url: "", share_banner_url: "", mascot_url: "", qr_logo_url: "",
@@ -100,7 +104,9 @@ export default function AdminSettingsPage() {
       { key: "email", label: "E-Mail", critical: true, request: () => api.get("/settings/email") },
       { key: "branding", label: "Branding", critical: true, request: () => api.get("/settings/branding") },
       { key: "smtp", label: "SMTP", critical: true, request: () => api.get("/settings/smtp") },
-      { key: "queue", label: "Mail-Queue", critical: false, request: () => api.get("/settings/mail-queue?limit=100") },
+      { key: "queue", label: "Mail-Queue", critical: false, request: () => (queueSearchRef.current
+        ? api.post("/settings/mail-queue/search", { q: queueSearchRef.current, limit: 100 })
+        : api.get("/settings/mail-queue?limit=100")) },
       { key: "queue_stats", label: "Mail-Queue-Statistik", critical: false, request: () => api.get("/settings/mail-queue/stats") },
       { key: "system", label: "Systemstatus", critical: false, request: () => api.get("/admin/system-status") },
       { key: "site_banners", label: "Hinweisleisten", critical: false, request: () => api.get("/settings/site-banners/admin") },
@@ -473,6 +479,22 @@ export default function AdminSettingsPage() {
     try { const { data } = await api.delete("/settings/mail-queue/cleanup?days=30"); toast.success(`${data.deleted || 0} alte Einträge gelöscht.`); load(); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
+  const searchQueue = (term) => {
+    const next = String(term || "").trim();
+    queueSearchRef.current = next;
+    setQueueSearch(next);
+    load();
+  };
+  // „Adresse zeigen“ (#1418): die ganze Adresse einer Zeile, nur für System; der Server schreibt es ins Protokoll.
+  const revealRecipient = async (id) => {
+    try {
+      const { data } = await api.post(`/settings/mail-queue/${id}/recipient`);
+      return data?.to || "";
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Die Adresse lässt sich gerade nicht zeigen.");
+      return "";
+    }
+  };
   // #1361: „Nochmal versuchen“ gibt es nur bei fehlgeschlagenen Mails; der Server lehnt alles andere mit einem Satz ab.
   const retryJob = async (id) => {
     try { await api.post(`/settings/mail-queue/${id}/retry`); toast.success("Die Mail ist wieder in der Warteschlange."); load(); }
@@ -548,7 +570,7 @@ export default function AdminSettingsPage() {
 
       {tab === "newsletter" && <NewsletterSection />}
 
-      {tab === "queue" && <MailQueueSection queue={queue} queueStats={queueStats} queueFilter={queueFilter} setQueueFilter={setQueueFilter} processQueueNow={processQueueNow} recoverQueue={recoverQueue} retryFailedQueue={retryFailedQueue} cleanupQueue={cleanupQueue} retryJob={retryJob} deleteJob={deleteJob} filteredQueue={filteredQueue} queueCounts={queueCounts} />}
+      {tab === "queue" && <MailQueueSection queue={queue} queueStats={queueStats} queueFilter={queueFilter} setQueueFilter={setQueueFilter} processQueueNow={processQueueNow} recoverQueue={recoverQueue} retryFailedQueue={retryFailedQueue} cleanupQueue={cleanupQueue} retryJob={retryJob} deleteJob={deleteJob} filteredQueue={filteredQueue} queueCounts={queueCounts} queueSearch={queueSearch} searchQueue={searchQueue} revealRecipient={revealRecipient} />}
 
       {tab === "brand" && <BrandSection email={email} brand={brand} siteBanners={siteBanners} bannerForm={bannerForm} editingBannerId={editingBannerId} savingBanner={savingBanner} savingBrand={savingBrand} generatingFavicon={generatingFavicon} imageUploadBusy={imageUploadBusy} setBrandField={setBrandField} saveBrand={saveBrand} setBannerField={setBannerField} applyBannerTemplate={applyBannerTemplate} editBanner={editBanner} resetBannerForm={resetBannerForm} saveSiteBanner={saveSiteBanner} deleteSiteBanner={deleteSiteBanner} faviconDarkOnly={faviconDarkOnly} generateUniversalFavicon={generateUniversalFavicon} />}
 

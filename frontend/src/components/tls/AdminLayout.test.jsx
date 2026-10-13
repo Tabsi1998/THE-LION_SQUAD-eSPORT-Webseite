@@ -8,7 +8,7 @@ const authState = { user: null, logout: () => {} };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 vi.mock("@/hooks/usePublicSiteSettings", () => ({ usePublicSiteSettings: () => ({}) }));
 
-const { ADMIN_GROUPS, AdminLayout, navGroupsFor } = await import("./AdminLayout");
+const { ADMIN_GROUPS, AdminLayout, canOpenAdminLink, linkAreas, navGroupsFor } = await import("./AdminLayout");
 
 // jsdom kennt kein scrollIntoView; das Menü führt damit zum aktiven Eintrag.
 beforeAll(() => {
@@ -141,7 +141,7 @@ test("die Turnierleitung ohne Zwei-Faktor sieht keine Verwaltungs-Einträge - au
 test("ein Helfer sieht ohne Zwei-Faktor nur seine Turnierseiten", () => {
   const helper = { role: "player", areas: [], is_tournament_staff: true, mfa_enabled: false };
   const targets = navGroupsFor(helper, "").flatMap((entry) => entry.items).map((item) => item.to);
-  expect(targets).toEqual(["/admin/tournaments", "/admin/f1", "/admin/stations"]);
+  expect(targets).toEqual(["/admin/dienst", "/admin/tournaments", "/admin/f1", "/admin/stations"]);
 });
 
 function renderLayout(path = "/admin/moderation") {
@@ -179,11 +179,54 @@ test("statt der Verwaltung steht im Menü „2FA einrichten“ - mit dem Weg zur
 test("eine Turnierleitung ohne Zwei-Faktor mit Helfer-Einsatz sieht ihre Turnierseiten und den Hinweis", () => {
   const leadAndHelper = { ...LEAD_WITHOUT_MFA, has_staff_assignment: true };
   const targets = navGroupsFor(leadAndHelper, "").flatMap((entry) => entry.items).map((item) => item.to);
-  expect(targets).toEqual(["/admin/tournaments", "/admin/f1", "/admin/stations", "/admin/moderation"]);
+  expect(targets).toEqual(["/admin/dienst", "/admin/tournaments", "/admin/f1", "/admin/stations", "/admin/moderation"]);
   authState.user = leadAndHelper;
   renderLayout("/admin/tournaments");
   expect(screen.getByTestId("admin-nav-mfa-setup")).toBeInTheDocument();
   expect(screen.getByTestId("admin-nav-tournaments")).toBeInTheDocument();
   expect(screen.queryByTestId("admin-nav-seasons")).toBeNull();
   authState.user = null;
+});
+
+// Menü je Rolle (#1352, #1353): jeder sieht genau seine Einträge - der Kassier das Dashboard und die Finanzübersicht,
+// Helfer und Moderation „Mein Dienst“, Redaktion keine Turnierseiten.
+const MFA = { mfa_enabled: true, auth_mfa_verified: true };
+const visible = (user) => navGroupsFor(user, "").flatMap((entry) => entry.items).map((item) => item.to);
+
+test.each([
+  ["Kassier (nur Finanzen)", { role: "player", areas: ["finance"], ...MFA }, ["/admin", "/admin/finance"]],
+  ["Moderator", { role: "moderator" }, ["/admin/dienst", "/admin/moderation"]],
+  ["Helfer", { role: "player", has_staff_assignment: true, is_tournament_staff: true }, ["/admin/dienst", "/admin/tournaments", "/admin/f1", "/admin/stations"]],
+  ["Spieler", { role: "player" }, []],
+])("%s sieht genau seine Einträge", (_name, user, expected) => {
+  expect(visible(user)).toEqual(expected);
+});
+
+test("Redaktion und Vereinsverwaltung sehen keine Turnierseiten, auch nicht „Mein Dienst“", () => {
+  for (const areas of [["content"], ["club"], ["finance"]]) {
+    const targets = visible({ role: "player", areas, ...MFA });
+    expect(targets).toContain("/admin");
+    for (const to of ["/admin/tournaments", "/admin/f1", "/admin/stations", "/admin/dienst", "/admin/moderation"]) expect(targets).not.toContain(to);
+  }
+  // „Downloads & QR“ nicht für den Kassier (#1353) - Menü und Seiten-Schutz gleich.
+  expect(visible({ role: "player", areas: ["finance"], ...MFA })).not.toContain("/admin/downloads");
+});
+
+test("ein Admin mit Helfer-Einsatz behält das Dashboard und bekommt „Mein Dienst“ dazu", () => {
+  const targets = visible({ role: "player", areas: ["content"], has_staff_assignment: true, is_tournament_staff: true, ...MFA });
+  expect(targets).toEqual(expect.arrayContaining(["/admin", "/admin/dienst", "/admin/tournaments", "/admin/news"]));
+});
+
+test("Knöpfe außerhalb des Menüs fragen dieselbe Liste (canOpenAdminLink)", () => {
+  expect(linkAreas("/admin/tournaments/new")).toEqual(["tournaments"]);
+  expect(linkAreas("/admin/ops?tab=app")).toEqual(["system"]);
+  expect(linkAreas("/admin/settings/google")).toEqual(["system"]);
+  expect(linkAreas("/admin/integrations/discord")).toEqual(["system"]);
+  expect(linkAreas("/setup")).toEqual(["system"]);
+  expect(linkAreas("/admin/gibt-es-nicht")).toBeNull();
+  const editor = { role: "player", areas: ["content"], ...MFA };
+  expect(canOpenAdminLink(editor, "/admin/sponsors")).toBe(true);
+  expect(canOpenAdminLink(editor, "/admin/tournaments/new")).toBe(false);
+  expect(canOpenAdminLink(editor, "/admin/gibt-es-nicht")).toBe(false);
+  expect(canOpenAdminLink(editor, "/events/sommerfest")).toBe(true);
 });
