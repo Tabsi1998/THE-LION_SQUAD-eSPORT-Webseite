@@ -82,7 +82,9 @@ export type Tournament = {
     effective_player_id_fields?: Array<{ key: string; label?: string; required?: boolean; help_text?: string }>;
     player_id_fields?: Array<{ key: string; label?: string; required?: boolean; help_text?: string }>;
   };
-  event?: { name?: string; location?: string; start_date?: string | null } | null;
+  // Das Event als Klammer (#1182): zu welchem Event das Turnier gehört.
+  event_id?: string | null;
+  event?: { id?: string; name?: string; location?: string; start_date?: string | null } | null;
   description?: string | null;
   platform?: string | null;
   max_participants?: number | null;
@@ -527,6 +529,8 @@ export type F1Track = {
 
 export type F1Challenge = {
   id: string;
+  // Das Event als Klammer (#1182): zu welchem Event die Fast Lap gehört.
+  event_id?: string | null;
   // Event-Seite als Startpunkt (#1183): der eigene Stand (auch mit dem Team) und der Tag des Events.
   my_status?: { state?: string; label: string; team_name?: string | null } | null;
   event_day?: { index: number; count: number; label?: string; date?: string } | null;

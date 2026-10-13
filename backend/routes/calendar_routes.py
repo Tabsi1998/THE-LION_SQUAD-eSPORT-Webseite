@@ -11,6 +11,10 @@ im Text; ein mehrtägiges Event liefert mit `?day=2` nur diesen Tag.
 Versammlungen und eigene Helferschichten (#1272) gibt es nur für die Person selbst: `.../meetings/{id}.ics`
 für eine Sitzung, zu der sie eingeladen ist, `.../shifts/{veranstaltung}/{schicht}.ics` für eine Schicht,
 für die sie eingetragen ist - ohne Namen anderer, ohne Zugangslink.
+
+„Nur meine“ und der persönliche Link (#1189): `GET /api/calendar/mine` sagt der angemeldeten Person, wofür sie dabei ist
+(Event, Turnier auch mit dem Team, Fast Lap gefahren). `GET|POST|DELETE /api/calendar/personal` verwaltet ihren privaten
+Abo-Link; `GET /api/calendar/personal/{token}.ics` liefert nur ihre eigenen Termine (`services/personal_calendar.py`).
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
@@ -18,7 +22,8 @@ from fastapi.responses import Response
 from auth import get_current_user, get_optional_user
 from database import get_db
 from routes.seo_render_routes import public_origin
-from services import calendar_items, club_calendar
+from services import calendar_items, club_calendar, personal_calendar
+from services.rate_limit import enforce_rate_limit
 from services.slug_utils import find_by_slug_or_history
 from services.visibility import user_can_see
 
@@ -146,3 +151,61 @@ async def shift_ics(event_id: int, shift_id: int, request: Request, me: dict = D
     pair = next(((event, shift) for event, shift in await club_calendar.own_shifts_for(db, me)
                  if int(event.get("id") or 0) == event_id and int(shift.get("id") or 0) == shift_id), None)
     return await _private_ics(request, db, club_calendar.shift_item(*pair) if pair else None)
+
+
+# ---------------------------------------------------------------- „Nur meine“ und persönlicher Link (#1189)
+
+# Ein Kalender ruft ein Abo alle paar Stunden ab; Google holt viele Abos von denselben Adressen. Darum zählt die Bremse
+# je Link eng und je Adresse weit - wer Adressen errät, stößt an die zweite.
+PERSONAL_PER_LINK = (20, 600)
+PERSONAL_PER_ADDRESS = (120, 600)
+NOT_FOUND = "Diesen Kalender gibt es nicht (mehr)."
+
+
+@router.get("/mine")
+async def calendar_mine(response: Response, me: dict = Depends(get_current_user)):
+    """Wofür die Person dabei ist - Kennung → Stand je Art; Grundlage für „Nur meine“ in Web und App."""
+    response.headers["Cache-Control"] = PRIVATE_CACHE
+    return await calendar_items.own_entries(get_db(), me)
+
+
+@router.get("/personal")
+async def personal_status(response: Response, me: dict = Depends(get_current_user)):
+    response.headers["Cache-Control"] = PRIVATE_CACHE
+    return await personal_calendar.status(get_db(), me["id"])
+
+
+@router.post("/personal")
+async def personal_issue(request: Request, response: Response, me: dict = Depends(get_current_user)):
+    """Neuer Link (ersetzt den alten). Die Adresse steht nur in dieser Antwort - gespeichert ist nur ihr Hash."""
+    await enforce_rate_limit(request, "calendar-personal:issue", 10, 3600, subject=me["id"])
+    response.headers["Cache-Control"] = PRIVATE_CACHE
+    return await personal_calendar.issue(get_db(), me["id"])
+
+
+@router.delete("/personal")
+async def personal_revoke(response: Response, me: dict = Depends(get_current_user)):
+    response.headers["Cache-Control"] = PRIVATE_CACHE
+    await personal_calendar.revoke(get_db(), me["id"])
+    return {"active": False, "created_at": None, "last_used_at": None}
+
+
+@router.get("/personal/{token}.ics")
+async def personal_feed(token: str, request: Request):
+    """Der persönliche Feed: nur eigene Termine, in keinem Zwischenspeicher. Unbekannt, falsch oder abgeschaltet sieht
+    gleich aus (404)."""
+    await enforce_rate_limit(request, "calendar-personal:address", *PERSONAL_PER_ADDRESS)
+    await enforce_rate_limit(request, "calendar-personal:link", *PERSONAL_PER_LINK, subject=personal_calendar.token_hash(token)[:24])
+    db = get_db()
+    owner = await personal_calendar.owner_for(db, token)
+    if not owner:
+        raise HTTPException(404, NOT_FOUND, headers={"Cache-Control": PRIVATE_CACHE})
+    items = await personal_calendar.personal_items(db, owner)
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "domain": 1}) or {}
+    text = calendar_items.ics_feed(items, origin=public_origin(request, branding), name="THE LION SQUAD – meine Termine")
+    return Response(
+        content=text,
+        media_type="text/calendar; charset=utf-8",
+        headers={"Content-Disposition": 'inline; filename="lionsquad-meine-termine.ics"', "Cache-Control": PRIVATE_CACHE,
+                 "Referrer-Policy": "no-referrer"},
+    )

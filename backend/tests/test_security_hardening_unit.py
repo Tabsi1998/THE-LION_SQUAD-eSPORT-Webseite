@@ -146,7 +146,8 @@ def test_internal_nginx_uses_one_nonce_based_csp_without_external_fonts():
     assert "map $request_id $tls_content_security_policy" in nginx
     assert "script-src 'self' 'nonce-$request_id'" in nginx
     assert "script-src 'self' 'unsafe-inline'" not in nginx
-    # 7 Blöcke plus die zwei für Uploads von der Platte und ihren Rückfall (#232) und der für die Teilen-Bilder (#1412).
-    assert nginx.count("add_header Content-Security-Policy $tls_content_security_policy always;") == 10
+    # 7 Blöcke plus die zwei für Uploads von der Platte und ihren Rückfall (#232), der für die Teilen-Bilder (#1412) und der
+    # für den persönlichen Kalender-Link ohne Zugriffsprotokoll (#1189).
+    assert nginx.count("add_header Content-Security-Policy $tls_content_security_policy always;") == 11
     assert 'meta name="csp-nonce" content="$request_id"' in nginx
     assert "fonts.googleapis.com" not in css

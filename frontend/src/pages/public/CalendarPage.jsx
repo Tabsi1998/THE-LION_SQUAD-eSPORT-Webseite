@@ -6,19 +6,20 @@ import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
-  KINDS, KIND_COLORS, KIND_LABELS, VIEW_STORAGE_KEY, WEEKDAY_LABELS, agenda, currentMonth, dayLabel, feedUrls, filterKinds, itemsByDay,
+  KINDS, KIND_COLORS, KIND_LABELS, VIEW_STORAGE_KEY, WEEKDAY_LABELS, agenda, currentMonth, dayLabel, feedUrls, filterKinds, filterMine, itemsByDay,
   monthLabel, monthMatrix, nextAfter, parseDay, preferredView, shiftMonth, spanLabel, splitSpans, startPhrase, timeLabel, upcomingItems,
   weekBars,
 } from "@/lib/calendar";
-import { CalendarDays, ChevronLeft, ChevronRight, Copy, Check, ExternalLink, LogIn } from "lucide-react";
-import { viennaDay } from "@/lib/vienna";
+import { CalendarDays, ChevronLeft, ChevronRight, Copy, Check, ExternalLink, KeyRound, LogIn } from "lucide-react";
+import { viennaDateTime, viennaDay } from "@/lib/vienna";
 
 // Kalender (#402): dieselbe Monatsansicht wie in der App (#216) - Punkte je Tag in der Farbe der
 // Art, ein goldener Rahmen um Tage mit eigener Anmeldung, darunter die Termine des gewählten Tags.
 // Was jemand sieht, entscheidet der Server (/api/calendar); der Abo-Feed ist die öffentliche Sicht.
 // Seit #1271: öffnet im aktuellen Monat mit „Heute“, Mehrtägiges ist ein Balken über die Tage und in Listen eine Zeile,
 // am Handy startet die Liste (letzte Wahl je Gerät). Seit #1190 stehen für Mitglieder Versammlungen und die eigenen
-// Helferschichten grün dabei; ein Tipp führt in den Mitgliederbereich.
+// Helferschichten grün dabei; ein Tipp führt in den Mitgliederbereich. Seit #1189 mit „Nur meine“ und dem persönlichen
+// Abo-Link (nur eigene Termine; die Adresse gibt es nur beim Erzeugen, „neu erzeugen“ sperrt die alte).
 
 const CLUB_LABELS = { meeting: "Versammlung", shift: "Helferschicht" };
 
@@ -45,6 +46,7 @@ export default function CalendarPage() {
   const [month, setMonth] = useState(() => currentMonth());
   const [selectedDay, setSelectedDay] = useState(null);
   const [kinds, setKinds] = useState(KINDS);
+  const [onlyMine, setOnlyMine] = useState(false);
   const [view, setView] = useState(() => preferredView(storedView(), typeof window !== "undefined" ? window.innerWidth : 0));
 
   const load = useCallback(() => {
@@ -58,7 +60,8 @@ export default function CalendarPage() {
 
   const allItems = useMemo(() => payload?.items || [], [payload]);
   const shownKinds = useMemo(() => KINDS.filter((kind) => kind !== "club" || allItems.some((item) => item.kind === "club")), [allItems]);
-  const items = useMemo(() => filterKinds(allItems, kinds), [allItems, kinds]);
+  const signedIn = Boolean(payload?.signed_in);
+  const items = useMemo(() => filterMine(filterKinds(allItems, kinds), signedIn && onlyMine), [allItems, kinds, onlyMine, signedIn]);
   const byDay = useMemo(() => itemsByDay(items), [items]);
   const { spans, singles } = useMemo(() => splitSpans(items), [items]);
   const dotsByDay = useMemo(() => itemsByDay(singles), [singles]);
@@ -114,6 +117,11 @@ export default function CalendarPage() {
             ))}
             <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm border-[1.5px] border-[#FFD700]" /> angemeldet</span>
           </div>
+          {signedIn && (
+            <button type="button" onClick={() => setOnlyMine((value) => !value)} aria-pressed={onlyMine} data-testid="calendar-only-mine" className={`tls-btn ${onlyMine ? "tls-btn--honor" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-wider`}>
+              Nur meine
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -129,7 +137,7 @@ export default function CalendarPage() {
                       <ul className="mt-3 space-y-2">{group.items.map((item) => <li key={`${item.kind}-${item.id}`}><ItemRow item={item} withDate /></li>)}</ul>
                     </div>
                   )) : (
-                    <p className="text-sm text-white/50">{payload?.failed ? "Die Termine konnten gerade nicht geladen werden." : "Aktuell steht nichts an."}</p>
+                    <p className="text-sm text-white/50">{payload?.failed ? "Die Termine konnten gerade nicht geladen werden." : onlyMine && signedIn ? "Du bist gerade bei nichts angemeldet." : "Aktuell steht nichts an."}</p>
                   )}
                 </div>
               ) : (
@@ -231,6 +239,8 @@ export default function CalendarPage() {
                 <p className="mt-3 text-xs text-white/40">Google Kalender: „Weitere Kalender“ → „Per URL“ → Adresse einfügen. Apple, Outlook, Thunderbird: „Kalender abonnieren“ → Adresse einfügen.</p>
               </div>
 
+              {signedIn && <PersonalFeed origin={typeof window !== "undefined" ? window.location.origin : "https://lionsquad.at"} />}
+
               {!payload?.signed_in && (
                 <div className="border border-white/10 rounded-sm p-5 text-sm text-white/65" data-testid="calendar-login-hint">
                   <LogIn className="w-4 h-4 text-[#FFD700]" />
@@ -294,7 +304,7 @@ function ItemRow({ item, withDate = false }) {
   );
 }
 
-function FeedAddress({ url }) {
+function FeedAddress({ url, testId = "calendar-feed" }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -307,10 +317,91 @@ function FeedAddress({ url }) {
   };
   return (
     <div className="mt-3 flex gap-2 min-w-0">
-      <input readOnly value={url} onFocus={(ev) => ev.target.select()} data-testid="calendar-feed-url" className="flex-1 min-w-0 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-xs font-mono" />
-      <button type="button" onClick={copy} data-testid="calendar-feed-copy" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+      <input readOnly value={url} onFocus={(ev) => ev.target.select()} data-testid={`${testId}-url`} aria-label="Abo-Adresse" className="flex-1 min-w-0 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-xs font-mono" />
+      <button type="button" onClick={copy} data-testid={`${testId}-copy`} className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
         {copied ? <Check className="w-3.5 h-3.5 text-[#10B981]" /> : <Copy className="w-3.5 h-3.5" />} {copied ? "Kopiert" : "Kopieren"}
       </button>
+    </div>
+  );
+}
+
+/**
+ * Der persönliche Abo-Link (#1189): nur die eigenen Termine, für die Kalender-App. Gespeichert ist nur ein Hash - die
+ * Adresse steht nur direkt nach dem Erzeugen da. „Neu erzeugen“ sperrt die alte Adresse, „Abschalten“ alle.
+ */
+function PersonalFeed({ origin }) {
+  const [status, setStatus] = useState(null);
+  const [fresh, setFresh] = useState(null);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+
+  useEffect(() => {
+    api.get("/calendar/personal")
+      .then(({ data }) => setStatus({ active: Boolean(data?.active), created_at: data?.created_at || null, last_used_at: data?.last_used_at || null }))
+      .catch(() => setStatus({ active: false }));
+  }, []);
+
+  const run = async (action) => {
+    setBusy(true);
+    setProblem("");
+    try {
+      await action();
+      setConfirming(false);
+    } catch {
+      setProblem("Das hat gerade nicht geklappt. Bitte später noch einmal.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const issue = () => run(async () => {
+    const { data } = await api.post("/calendar/personal");
+    setFresh(feedUrls(origin, data.path));
+    setStatus({ active: true, created_at: data.created_at, last_used_at: null });
+  });
+  const revoke = () => run(async () => {
+    await api.delete("/calendar/personal");
+    setFresh(null);
+    setStatus({ active: false });
+  });
+
+  if (!status) return null;
+  return (
+    <div className="border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-5" data-testid="calendar-personal">
+      <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest font-bold text-[#FFD700]"><KeyRound className="w-3.5 h-3.5" /> Mein persönlicher Link</div>
+      <p className="mt-2 text-sm text-white/65">Nur deine Termine: Anmeldungen (auch mit deinem Team), gefahrene Fast Laps, zugesagte Versammlungen und deine Schichten. Die Adresse ist privat – gib sie nicht weiter.</p>
+      {fresh ? (
+        <>
+          <FeedAddress url={fresh.https} testId="calendar-personal-feed" />
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <a href={fresh.webcal} data-testid="calendar-personal-webcal" className="tls-btn tls-btn--primary inline-flex items-center gap-1.5 px-3 py-2 font-bold uppercase tracking-wider rounded-sm">
+              <ExternalLink className="w-3.5 h-3.5" /> Im Kalender öffnen
+            </a>
+          </div>
+          <p className="mt-3 text-xs text-white/50" data-testid="calendar-personal-once">Kopier sie jetzt: Wir zeigen sie nur dieses eine Mal.</p>
+        </>
+      ) : status.active ? (
+        <p className="mt-3 text-xs text-white/55" data-testid="calendar-personal-active">
+          Dein Link ist aktiv{status.created_at ? ` seit ${viennaDateTime(status.created_at, { dateStyle: "medium" })}` : ""}{status.last_used_at ? `, zuletzt abgerufen ${viennaDateTime(status.last_used_at, { dateStyle: "medium", timeStyle: "short" })}` : ""}. Die Adresse zeigen wir nur beim Erzeugen – brauchst du sie wieder, erzeug eine neue.
+        </p>
+      ) : null}
+      {problem && <p className="mt-3 text-xs text-[#FF3B30]" role="alert">{problem}</p>}
+      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+        {!status.active ? (
+          <button type="button" onClick={issue} disabled={busy} data-testid="calendar-personal-create" className="tls-btn tls-btn--honor px-3 py-2 rounded-sm font-bold uppercase tracking-wider">Link erzeugen</button>
+        ) : confirming ? (
+          <>
+            <button type="button" onClick={issue} disabled={busy} data-testid="calendar-personal-renew-confirm" className="tls-btn tls-btn--danger px-3 py-2 rounded-sm font-bold uppercase tracking-wider">Ja, neu erzeugen</button>
+            <button type="button" onClick={() => setConfirming(false)} disabled={busy} className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm font-bold uppercase tracking-wider">Abbrechen</button>
+            <span className="basis-full text-white/50">Die alte Adresse gilt danach nicht mehr – Kalender damit bekommen keine Termine mehr.</span>
+          </>
+        ) : (
+          <>
+            <button type="button" onClick={() => setConfirming(true)} disabled={busy} data-testid="calendar-personal-renew" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm font-bold uppercase tracking-wider">Neu erzeugen</button>
+            <button type="button" onClick={revoke} disabled={busy} data-testid="calendar-personal-revoke" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm font-bold uppercase tracking-wider">Abschalten</button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

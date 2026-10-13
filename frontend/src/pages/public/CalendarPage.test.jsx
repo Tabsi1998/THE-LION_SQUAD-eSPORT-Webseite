@@ -6,7 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 // ohne Login der Hinweis, mit Login das „Angemeldet“ vom Server. Seit #1271 öffnet er im aktuellen Monat mit „Heute“,
 // Mehrtägiges ist ein Balken bzw. eine Zeile, am Handy startet die Liste; seit #1190 stehen Vereinstermine grün dabei.
 
-const apiMock = { get: vi.fn() };
+const apiMock = { get: vi.fn(), post: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
@@ -166,4 +166,68 @@ test("Mitglieder sehen Versammlungen und eigene Schichten grün, der Tipp führt
   const shift = within(screen.getByTestId("calendar-upcoming")).getByTestId("calendar-item-club-shift-5-52");
   expect(shift).toHaveAttribute("href", "/members/helfen?event=5");
   expect(shift).toHaveTextContent("Helferschicht");
+});
+
+// „Nur meine“ und der persönliche Link (#1189).
+function respondSignedIn(items, personal = { active: false, created_at: null, last_used_at: null }) {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/calendar/personal") return { data: personal };
+    return { data: { items, signed_in: true, feed_path: "/api/calendar/feed.ics" } };
+  });
+}
+
+test("ohne Login weder „Nur meine“ noch persönlicher Link", async () => {
+  respond([...ITEMS, ...CLUB]);
+  await renderPage("Oktober 2099");
+  expect(screen.queryByTestId("calendar-only-mine")).toBeNull();
+  expect(screen.queryByTestId("calendar-personal")).toBeNull();
+  expect(apiMock.get).not.toHaveBeenCalledWith("/calendar/personal");
+});
+
+test("„Nur meine“ zeigt nur, wofür man angemeldet ist - auch bei den Vereinsterminen", async () => {
+  respondSignedIn([...ITEMS, ...CLUB]);
+  window.localStorage.setItem("tls_calendar_view", "list");
+  render(<MemoryRouter><CalendarPage /></MemoryRouter>);
+  await screen.findByTestId("calendar-only-mine");
+  const list = screen.getByTestId("calendar-list");
+  expect(within(list).getByTestId("calendar-item-event-e-fest")).toBeInTheDocument();
+  await userEvent.click(screen.getByTestId("calendar-only-mine"));
+  expect(screen.getByTestId("calendar-only-mine")).toHaveAttribute("aria-pressed", "true");
+  expect(within(list).queryByTestId("calendar-item-event-e-fest")).toBeNull();
+  expect(within(list).getByTestId("calendar-item-tournament-t-cup")).toBeInTheDocument();
+  expect(within(list).getByTestId("calendar-item-club-shift-5-52")).toBeInTheDocument();
+  expect(within(list).queryByTestId("calendar-item-club-meeting-7")).toBeNull();
+});
+
+test("Persönlicher Link: erzeugen zeigt die Adresse einmal, neu erzeugen fragt nach, abschalten", async () => {
+  respondSignedIn(ITEMS);
+  apiMock.post.mockResolvedValue({ data: { active: true, path: "/api/calendar/personal/geheim-123.ics", created_at: "2099-10-01T10:00:00+00:00", last_used_at: null } });
+  apiMock.delete.mockResolvedValue({ data: { active: false } });
+  render(<MemoryRouter><CalendarPage /></MemoryRouter>);
+  const panel = await screen.findByTestId("calendar-personal");
+  await userEvent.click(within(panel).getByTestId("calendar-personal-create"));
+  expect(apiMock.post).toHaveBeenCalledWith("/calendar/personal");
+  expect(screen.getByTestId("calendar-personal-feed-url")).toHaveValue(`${window.location.origin}/api/calendar/personal/geheim-123.ics`);
+  expect(screen.getByTestId("calendar-personal-webcal").getAttribute("href")).toMatch(/^webcal:\/\/.*\/api\/calendar\/personal\/geheim-123\.ics$/);
+  expect(screen.getByTestId("calendar-personal-once")).toBeInTheDocument();
+  // Der öffentliche Feed bleibt daneben unverändert.
+  expect(screen.getByTestId("calendar-feed-url")).toHaveValue(`${window.location.origin}/api/calendar/feed.ics`);
+
+  await userEvent.click(screen.getByTestId("calendar-personal-renew"));
+  expect(apiMock.post).toHaveBeenCalledTimes(1);
+  await userEvent.click(screen.getByTestId("calendar-personal-renew-confirm"));
+  expect(apiMock.post).toHaveBeenCalledTimes(2);
+
+  await userEvent.click(screen.getByTestId("calendar-personal-revoke"));
+  expect(apiMock.delete).toHaveBeenCalledWith("/calendar/personal");
+  expect(screen.queryByTestId("calendar-personal-feed-url")).toBeNull();
+  expect(screen.getByTestId("calendar-personal-create")).toBeInTheDocument();
+});
+
+test("Persönlicher Link schon aktiv: keine Adresse, nur der Stand", async () => {
+  respondSignedIn(ITEMS, { active: true, created_at: "2099-09-01T10:00:00+00:00", last_used_at: "2099-09-30T08:00:00+00:00" });
+  render(<MemoryRouter><CalendarPage /></MemoryRouter>);
+  const active = await screen.findByTestId("calendar-personal-active");
+  expect(active).toHaveTextContent("Dein Link ist aktiv");
+  expect(screen.queryByTestId("calendar-personal-feed-url")).toBeNull();
 });

@@ -5,6 +5,9 @@ Server, damit Website, Feed und Startseite dieselbe Liste bekommen. Was jemand s
 entscheidet `user_can_see` (public/community/members/internal, #342); ein nicht-öffentliches
 Turnier bleibt draußen. Der Abo-Feed ist immer die anonyme Sicht: keine Personendaten, keine
 internen Termine, kein „angemeldet“.
+
+„Angemeldet“ (`mine`) heißt seit #1189: selbst beim Event, selbst oder mit einem eigenen Team beim Turnier, in der
+Fast Lap schon gefahren - dieselbe Regel wie der eigene Stand auf der Event-Seite (#1183, `own_entries`).
 """
 from __future__ import annotations
 
@@ -12,13 +15,12 @@ import re
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from services import event_days
+from services import event_days, event_facts
 from services.public_phase import derive_public_phase
 from services.visibility import lead_can_see
 
 KIND_LABELS = {"event": "Event", "tournament": "Turnier", "fastlap": "Fast Lap", "club": "Verein"}
 ACTIVE_EVENT_REGISTRATION = ("registered", "checked_in", "waitlist")
-INACTIVE_TOURNAMENT_REGISTRATION = ("cancelled", "rejected", "withdrawn", "no_show")
 FINISHED = {"completed", "results_published", "archived", "cancelled"}
 # Ein Termin ohne Ende dauert im Feed zwei Stunden - wie „In meinen Kalender“ (#216).
 DEFAULT_DURATION = timedelta(hours=2)
@@ -134,19 +136,35 @@ def check_in_note(doc: dict) -> str | None:
     return note
 
 
+EVENT_STATE_LABELS = {"registered": "Angemeldet", "checked_in": "Eingecheckt", "waitlist": "Warteliste"}
+
+
+async def own_entries(db, user: dict | None) -> dict[str, dict[str, dict]]:
+    """Wofür die Person dabei ist, je Art: Kennung → Stand (``state``, ``label``, beim Turnier ``team_name``).
+
+    Event: die eigene Anmeldung. Turnier: die eigene oder die eines eigenen Teams. Fast Lap: schon eine Zeit gefahren.
+    Für „Nur meine“ in Liste und Kalender und für den persönlichen Kalender (#1189) - immer nur die eigene Sicht.
+    """
+    out: dict[str, dict[str, dict]] = {"events": {}, "tournaments": {}, "fastlaps": {}}
+    if not user or not user.get("id"):
+        return out
+    async for reg in db.event_registrations.find({"user_id": user["id"], "status": {"$in": list(ACTIVE_EVENT_REGISTRATION)}},
+                                                {"_id": 0, "event_id": 1, "status": 1}):
+        if reg.get("event_id"):
+            out["events"][reg["event_id"]] = {"state": reg.get("status"), "label": EVENT_STATE_LABELS.get(reg.get("status"), "Angemeldet")}
+    out["tournaments"] = await event_facts.own_tournament_states(db, user["id"])
+    out["fastlaps"] = {challenge_id: dict(event_facts.DRIVEN) for challenge_id in await event_facts.driven_challenge_ids(db, user["id"])}
+    return out
+
+
 async def collect(db, user: dict | None) -> list[dict]:
     """Alle sichtbaren Termine, nach Beginn sortiert - Vergangenes bleibt drin (Vormonat)."""
     events = await db.events.find({"status": {"$ne": "draft"}}, _EVENT_FIELDS).to_list(2000)
     tournaments = await db.tournaments.find({"status": {"$ne": "draft"}, "is_public": {"$ne": False}}, _TOURNAMENT_FIELDS).to_list(2000)
     fastlaps = await db.f1_challenges.find({"status": {"$ne": "draft"}}, _FASTLAP_FIELDS).to_list(2000)
 
-    my_events: set[str] = set()
-    my_tournaments: set[str] = set()
-    if user:
-        async for reg in db.event_registrations.find({"user_id": user["id"], "status": {"$in": list(ACTIVE_EVENT_REGISTRATION)}}, {"_id": 0, "event_id": 1}):
-            my_events.add(reg.get("event_id"))
-        async for reg in db.tournament_registrations.find({"user_id": user["id"], "status": {"$nin": list(INACTIVE_TOURNAMENT_REGISTRATION)}}, {"_id": 0, "tournament_id": 1}):
-            my_tournaments.add(reg.get("tournament_id"))
+    own = await own_entries(db, user)
+    my_events, my_tournaments, my_fastlaps = set(own["events"]), set(own["tournaments"]), set(own["fastlaps"])
 
     items: list[dict] = []
     for ev in events:
@@ -171,7 +189,7 @@ async def collect(db, user: dict | None) -> list[dict]:
     for c in fastlaps:
         if not await lead_can_see(user, c.get("visibility")):
             continue
-        item = fastlap_item(c)
+        item = fastlap_item(c, mine=c.get("id") in my_fastlaps)
         if item:
             items.append(item)
     items.sort(key=lambda item: (item["start"], item["kind"], item["title"]))
@@ -259,7 +277,7 @@ def _calendar(lines: list[str], *, name: str | None = None) -> str:
 
 
 def ics_feed(items: list[dict], *, origin: str, now: datetime | None = None, name: str = "THE LION SQUAD Termine") -> str:
-    """Der öffentliche Feed - nur was `collect(db, None)` liefert, ohne `mine`."""
+    """Ein Abo-Feed: der öffentliche (`collect(db, None)`) oder der persönliche (#1189, nur eigene Termine) - ohne `mine`."""
     now = now or datetime.now(timezone.utc)
     lines: list[str] = []
     for item in items:

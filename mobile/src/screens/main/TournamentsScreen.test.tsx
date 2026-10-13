@@ -83,14 +83,13 @@ test("die Karten blenden nacheinander ein - Live-Aktualisieren und Filter starte
   expect(screen.getByText("Neuer Cup")).toBeTruthy();
   expect(fadeDelays()).toEqual([0]);
 
-  // Filter „Turniere“ (der erste Treffer ist der Reiter): dieselben Karten ohne Kennzahlen und Abschnitte - schon
-  // gezeigt, also sofort da.
+  // Filter „Turniere“ (der erste Treffer ist der Reiter): dieselben Karten ohne Kennzahlen - seit #1182 eine Liste ohne
+  // Abschnitte, die Karten bleiben stehen und blenden nicht noch einmal ein.
   timing.mockClear();
   await fireEvent.press(screen.getAllByText("Turniere")[0]);
   expect(screen.getAllByText("Turniere")).toHaveLength(1);
   expect(screen.getByText("Cup 9")).toBeTruthy();
   expect(fadeDelays()).toEqual([]);
-  expect(fadeStyle("Cup 9")).toEqual({ opacity: 1, transform: [{ translateY: 0 }] });
 
   // „Vergangene anzeigen“ ist eine neue Liste: sie baut sich wieder nacheinander auf.
   await fireEvent.press(screen.getByTestId("events-past-toggle"));
@@ -126,7 +125,7 @@ test("die Filterknöpfe werden oben nicht abgeschnitten - kein negativer Rand in
   tournaments = [cup(1)];
   await render(<TournamentsScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByText("Cup 1")).toBeTruthy());
-  for (const label of ["Alle", "Fast Laps", "Kalender"]) {
+  for (const label of ["Alle", "Fast Laps", "Turniere"]) {
     for (const match of screen.getAllByText(label)) {
       let node = match.parent;
       for (let depth = 0; node && depth < 6; depth += 1, node = node.parent) {
@@ -149,7 +148,7 @@ test("der Kalender öffnet im aktuellen Monat und zeigt Mitgliedern ihre Versamm
   mockGet.mockImplementation(async (path: string) => ({ data: path === "/calendar" ? { items: [meeting, { id: "e1", kind: "event", title: "Öffentlich", start: `${today}T10:00:00Z` }] } : [] }));
   await render(<TournamentsScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/calendar"));
-  await fireEvent.press(screen.getByText("Kalender"));
+  await fireEvent.press(screen.getByTestId("events-view-toggle"));
   const { year, month } = currentMonth();
   expect(screen.getByTestId("calendar-title").props.children).toBe(monthLabel(year, month));
   expect(screen.getByTestId(`calendar-dot-${today}-club`)).toBeTruthy();
@@ -187,7 +186,7 @@ test("ein Event mit Lücke zwischen den Tagen sind im Monat zwei Balken", async 
   mockGet.mockImplementation(async (path: string) => ({ data: path === "/events" ? [event] : [] }));
   await render(<TournamentsScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getAllByText("Herbst-LAN").length).toBeGreaterThan(0));
-  await fireEvent.press(screen.getByText("Kalender"));
+  await fireEvent.press(screen.getByTestId("events-view-toggle"));
   expect(screen.getAllByTestId("calendar-bar-event-lan")).toHaveLength(2);
   expect(screen.queryByTestId(`calendar-dot-${key(first + 1)}-event`)).toBeNull();
 
@@ -196,4 +195,77 @@ test("ein Event mit Lücke zwischen den Tagen sind im Monat zwei Balken", async 
   expect(screen.getByTestId("calendar-day-empty")).toBeTruthy();
   await fireEvent.press(screen.getByTestId(`calendar-day-${key(first + 2)}`));
   expect(screen.getByTestId("calendar-day-items")).toBeTruthy();
+});
+
+// Das Event als Klammer (#1182) und „Nur meine“ (#1189).
+const LAN = { id: "e-lan", slug: "herbst-lan", name: "Herbst-LAN", start_date: "2099-10-17T08:00:00Z", status: "registration_open" };
+const ROCKET = { id: "t-rocket", slug: "rocket-cup", title: "Rocket Cup", event_id: "e-lan", start_date: "2099-10-18T12:00:00Z", status: "registration_open", team_mode: "team", game: { name: "Rocket League" } };
+const ONLINE = { id: "t-online", slug: "online-cup", title: "Online-Cup", start_date: "2099-10-10T17:00:00Z", status: "registration_open" };
+const LAP = { id: "f-lan", slug: "lan-lap", title: "LAN Fast Lap", event_id: "e-lan", start_date: "2099-10-17T08:00:00Z", status: "scheduled" };
+
+function respondBracket(mine: unknown = null) {
+  mockGet.mockImplementation(async (path: string) => {
+    if (path === "/events") return { data: [LAN] };
+    if (path === "/tournaments") return { data: [ROCKET, ONLINE] };
+    if (path === "/f1/challenges") return { data: [LAP] };
+    if (path === "/calendar/mine") return { data: mine };
+    if (path === "/calendar") return { data: { items: [] } };
+    return { data: [] };
+  });
+}
+
+test("ein Turnier der LAN steht aufklappbar in ihrer Karte und nicht noch einmal einzeln", async () => {
+  respondBracket();
+  await render(<TournamentsScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Herbst-LAN")).toBeTruthy());
+  expect(screen.getByText("Online-Cup")).toBeTruthy();
+  expect(screen.queryByText("Rocket Cup")).toBeNull();
+  const toggle = screen.getByTestId("event-toggle-e-lan");
+  expect(screen.getByText("1 Turnier · 1 Fast Lap")).toBeTruthy();
+  await fireEvent.press(toggle);
+  expect(screen.getByTestId("event-child-tournament-t-rocket")).toBeTruthy();
+  expect(screen.getByText("Rocket Cup")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("event-child-tournament-t-rocket"));
+  expect((navigation as unknown as { navigate: jest.Mock }).navigate).toHaveBeenCalledWith("TournamentDetail", { id: "rocket-cup" });
+  // Gäste: kein „Nur meine“, kein eigener Stand.
+  expect(screen.queryByTestId("events-only-mine")).toBeNull();
+  expect(mockGet).not.toHaveBeenCalledWith("/calendar/mine");
+});
+
+test("„Turniere auch einzeln“ zeigt das Turnier zusätzlich als Karte und bleibt am Gerät", async () => {
+  respondBracket();
+  await render(<TournamentsScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Herbst-LAN")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("events-mode-separate"));
+  expect(screen.getByText("Rocket Cup")).toBeTruthy();
+  const SecureStore = jest.requireMock("expo-secure-store") as { setItemAsync: jest.Mock };
+  expect(SecureStore.setItemAsync).toHaveBeenCalledWith("tls_events_list_mode", "separate");
+});
+
+test("„Nur meine“ zeigt nur, wobei man selbst oder das Team dabei ist - mit dem eigenen Stand", async () => {
+  mockAuth.user = { id: "u-1", username: "paula" };
+  respondBracket({ events: {}, tournaments: { "t-rocket": { state: "approved", label: "Du bist dabei", team_name: "Lions Rocket" } }, fastlaps: {} });
+  await render(<TournamentsScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/calendar/mine"));
+  await fireEvent.press(screen.getByTestId("events-only-mine"));
+  expect(screen.queryByText("Online-Cup")).toBeNull();
+  expect(screen.getByText("Herbst-LAN")).toBeTruthy();
+  expect(screen.getByText("1 Turnier")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("event-toggle-e-lan"));
+  expect(screen.getByTestId("event-child-own-t-rocket").props.children).toBe("Du bist dabei · Lions Rocket");
+  expect(screen.queryByTestId("event-child-fastlap-f-lan")).toBeNull();
+});
+
+test("Abonnieren im Kalender öffnet den webcal-Link oder Google Kalender", async () => {
+  const { Linking } = jest.requireActual("react-native") as typeof import("react-native");
+  const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+  respondBracket();
+  await render(<TournamentsScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Herbst-LAN")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("events-view-toggle"));
+  await fireEvent.press(screen.getByTestId("calendar-subscribe-webcal"));
+  expect(openURL).toHaveBeenLastCalledWith(expect.stringMatching(/^webcal:\/\/.+\/api\/calendar\/feed\.ics$/));
+  await fireEvent.press(screen.getByTestId("calendar-subscribe-google"));
+  expect(openURL).toHaveBeenLastCalledWith(expect.stringMatching(/^https:\/\/calendar\.google\.com\/calendar\/render\?cid=webcal%3A%2F%2F/));
+  openURL.mockRestore();
 });

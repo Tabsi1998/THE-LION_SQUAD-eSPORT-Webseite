@@ -1,4 +1,4 @@
-import { calendarWindow, currentMonth, dayKey, googleCalendarUrl, icsFor, itemsByDay, monthMatrix, shiftMonth, splitSpans, weekBars } from "./calendar";
+import { calendarWindow, currentMonth, dayKey, googleCalendarUrl, icsFor, itemsByDay, monthMatrix, shiftMonth, splitSpans, subscribeUrls, weekBars } from "./calendar";
 
 // Kalender in der App (#216): Raster ab Montag, Termine je Tag, „In meinen Kalender“.
 
@@ -96,4 +96,11 @@ test("ics und Google-Link tragen Zeitfenster, Ort und Text - ohne Ende zwei Stun
   expect(url).toContain("dates=20261212T170000Z%2F20261212T190000Z");
   expect(url).toContain("location=Vereinsheim");
   expect(icsFor({ ...item, start: "x" })).toBe("");
+});
+
+test("Abonnieren (#1189): webcal für Kalender-Apps, Google über „cid“", () => {
+  const urls = subscribeUrls("https://lionsquad.at/");
+  expect(urls.https).toBe("https://lionsquad.at/api/calendar/feed.ics");
+  expect(urls.webcal).toBe("webcal://lionsquad.at/api/calendar/feed.ics");
+  expect(urls.google).toBe("https://calendar.google.com/calendar/render?cid=webcal%3A%2F%2Flionsquad.at%2Fapi%2Fcalendar%2Ffeed.ics");
 });
