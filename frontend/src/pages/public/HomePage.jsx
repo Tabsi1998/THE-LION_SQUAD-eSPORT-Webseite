@@ -21,7 +21,8 @@ import { useChangedKeys, useCountdown } from "@/hooks/useLiveChanges";
 import { liveCountLine, nextCountdownTarget, timelineSignature } from "@/lib/liveChanges";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatAgo, formatWhen } from "@/lib/datetime";
+import { KIND_COLORS } from "@/lib/categoryColors";
 import { eventSortTime, scheduleLine } from "@/lib/eventDays";
 import { childSummary, nestUnderEvents } from "@/lib/eventGroups";
 import { PublicErrorState } from "@/components/tls/PublicEmptyState";
@@ -384,7 +385,7 @@ function FeaturedNews({ news }) {
       </div>
       <div className="p-5 md:p-7 lg:p-8 flex flex-col justify-center min-w-0">
         <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
-          <Newspaper className="w-3 h-3" /> Neueste News {news.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
+          <Newspaper className="w-3 h-3" /> Neueste News {news.pinned && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
         </div>
         <h2 className="mt-3 max-w-2xl font-heading text-2xl md:text-3xl xl:text-[2.2rem] font-black uppercase leading-[1.03] tls-card__title break-words line-clamp-4">{news.title}</h2>
         {news.excerpt && <p className="mt-4 max-w-2xl text-white/65 text-sm md:text-base leading-relaxed line-clamp-3">{news.excerpt}</p>}
@@ -455,7 +456,7 @@ function NextUp({ items }) {
               </div>
               {/* Einzeilig (#832): die Plakette brach in der schmalen Spalte um - jetzt so breit wie nötig. */}
               <div className="w-full sm:w-auto sm:shrink-0 sm:min-w-[12rem] flex flex-col gap-2 sm:items-start">
-                {item.start_date && <div className="text-xs text-white/45">{scheduleLine(item.schedule) || viennaDateTime(item.start_date, { dateStyle: "medium", timeStyle: "short" })}</div>}
+                {item.start_date && <div className="text-xs text-white/45">{scheduleLine(item.schedule) || formatWhen(item.start_date)}</div>}
                 {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} className="self-start max-w-full sm:whitespace-nowrap" />}
               </div>
             </Link>
@@ -531,10 +532,10 @@ function NewsCard({ news, featured = false, index = 0, count = 1 }) {
       <div className={`p-4 ${tall ? "" : "flex-1"}`}>
         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
           {newsCategoryLabel(news.category)}
-          {news.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
+          {news.pinned && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
         </div>
         <h3 className={`tls-card__title mt-2 font-heading font-black uppercase leading-tight break-words line-clamp-3 ${featured ? "text-xl md:text-2xl" : ""}`}>{news.title}</h3>
-        {(news.published_at || news.created_at) && <div className="mt-2 text-[11px] text-white/40">{viennaDate(news.published_at || news.created_at, { dateStyle: "medium" })}</div>}
+        {(news.published_at || news.created_at) && <div className="mt-2 text-[11px] text-white/40">{formatAgo(news.published_at || news.created_at)}</div>}
         {news.excerpt && <p className="mt-2 text-xs text-white/60 line-clamp-3">{news.excerpt}</p>}
       </div>
     </Link>
@@ -546,9 +547,10 @@ function timelineKey(item) {
 }
 
 function KindIcon({ kind }) {
-  if (kind === "tournament") return <Trophy className="w-3.5 h-3.5 text-[#FFD700]" />;
-  if (kind === "fastlap") return <Flag className="w-3.5 h-3.5 text-[#29B6E8]" />;
-  return <Calendar className="w-3.5 h-3.5 text-[#9F7AEA]" />;
+  // Farbe je Art (#1305): Turnier Cyan, Fast Lap Türkis, Event Violett - wie im Kalender.
+  if (kind === "tournament") return <Trophy className="w-3.5 h-3.5" style={{ color: KIND_COLORS.tournament }} />;
+  if (kind === "fastlap") return <Flag className="w-3.5 h-3.5" style={{ color: KIND_COLORS.fastlap }} />;
+  return <Calendar className="w-3.5 h-3.5" style={{ color: KIND_COLORS.event }} />;
 }
 
 function SectionHeader({ icon: Icon, accent, title, actionLabel, actionTo }) {

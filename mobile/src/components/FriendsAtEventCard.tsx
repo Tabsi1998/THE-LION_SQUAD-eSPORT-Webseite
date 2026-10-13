@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { api, errorMessage } from "../lib/api";
-import { friendPlaces, friendsSentence, type EventFriend, type EventFriendsData } from "../lib/eventRecap";
+import { friendPlaces, friendsSentence, type EventFriend, type EventFriendsData, type FriendScope } from "../lib/eventRecap";
 import { colors, radius } from "../theme";
 import { Button } from "./Button";
 import { Card } from "./Card";
@@ -11,9 +11,12 @@ import { Body, Heading, Muted } from "./Text";
 
 // Freunde beim Event (#1188): wie im Web (FriendsAtEvent) - nur mit Konto, nur bestätigte Freunde, die es erlauben; was
 // gezeigt wird, entscheidet allein der Server. Dazu einmal der Hinweis mit „Ausschalten“.
+// Seit Teil 2 auch auf Turnier- und Fast-Lap-Screen: ``path`` nennt dann die Abfrage, ``scope`` die Ortsangabe.
 
 type Props = {
-  eventKey: string;
+  eventKey?: string;
+  path?: string;
+  scope?: FriendScope;
   signedIn: boolean;
   over?: boolean;
   onOpenProfile?: (username: string) => void;
@@ -26,7 +29,7 @@ function initials(name: string): string {
   return String(name || "?").trim().split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase() || "?";
 }
 
-function FriendRow({ friend, onOpenProfile }: { friend: EventFriend; onOpenProfile?: (username: string) => void }) {
+function FriendRow({ friend, scope, onOpenProfile }: { friend: EventFriend; scope: FriendScope; onOpenProfile?: (username: string) => void }) {
   const content = (
     <>
       <MediaImage
@@ -36,7 +39,7 @@ function FriendRow({ friend, onOpenProfile }: { friend: EventFriend; onOpenProfi
       />
       <View style={styles.flex}>
         <Body style={styles.strong}>{friend.display_name}</Body>
-        <Muted>{friendPlaces(friend).join(" · ")}</Muted>
+        <Muted>{friendPlaces(friend, { scope }).join(" · ")}</Muted>
       </View>
     </>
   );
@@ -50,20 +53,21 @@ function FriendRow({ friend, onOpenProfile }: { friend: EventFriend; onOpenProfi
   return <View style={styles.row} testID={`event-friend-${friend.id}`}>{content}</View>;
 }
 
-export function FriendsAtEventCard({ eventKey, signedIn, over = false, onOpenProfile }: Props) {
+export function FriendsAtEventCard({ eventKey, path, scope = "event", signedIn, over = false, onOpenProfile }: Props) {
   const [data, setData] = useState<EventFriendsData | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const url = path || (eventKey ? `/events/${eventKey}/friends` : "");
 
   useEffect(() => {
     let alive = true;
     setData(null);
-    if (!signedIn) return undefined;
-    api.get<EventFriendsData>(`/events/${eventKey}/friends`)
+    if (!signedIn || !url) return undefined;
+    api.get<EventFriendsData>(url)
       .then(({ data: body }) => { if (alive) setData(body && Array.isArray(body.friends) ? body : null); })
       .catch(() => { if (alive) setData(null); });
     return () => { alive = false; };
-  }, [eventKey, signedIn]);
+  }, [url, signedIn]);
 
   if (!signedIn || !data || (!data.friends.length && !data.hint && !message)) return null;
 
@@ -100,7 +104,7 @@ export function FriendsAtEventCard({ eventKey, signedIn, over = false, onOpenPro
             <Heading>{over ? "Deine Freunde waren dabei" : "Von deinen Freunden dabei"}</Heading>
           </View>
           <Muted testID="event-friends-sentence">{friendsSentence(data.friends, { over })}.</Muted>
-          {data.friends.slice(0, SHOWN).map((friend) => <FriendRow key={friend.id} friend={friend} onOpenProfile={onOpenProfile} />)}
+          {data.friends.slice(0, SHOWN).map((friend) => <FriendRow key={friend.id} friend={friend} scope={scope} onOpenProfile={onOpenProfile} />)}
           {data.friends.length > SHOWN ? <Muted>und {data.friends.length - SHOWN} weitere</Muted> : null}
         </>
       ) : null}

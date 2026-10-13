@@ -48,10 +48,16 @@ export function buildCacheKey(url: string, params: unknown, accountScope: string
 }
 
 // Persönliche Antworten, die der Server mit „Cache-Control: private, no-store“ schickt und die keinen Offline-Stand
-// brauchen (#1187, #1188): der Rückblick mit „Du warst dabei“ und die Freunde beim Event. Bewusst eine Liste statt
+// brauchen (#1187, #1188): der Rückblick mit „Du warst dabei“, die Freunde bei Event, Turnier und Fast Lap und ob der
+// einmalige Hinweis fällig ist. Bewusst eine Liste statt
 // der Kopfzeile - „no-store“ trägt fast jede API-Antwort (Middleware im Server), und „private“ tragen auch Kalender
 // und Adventkalender, deren Offline-Stand gewollt ist.
-const NO_CACHE_PATHS = [/^\/?events\/[^/?#]+\/(recap|friends)(?:[?#]|$)/];
+const NO_CACHE_PATHS = [
+  /^\/?events\/[^/?#]+\/(recap|friends)(?:[?#]|$)/,
+  /^\/?tournaments\/[^/?#]+\/friends(?:[?#]|$)/,
+  /^\/?f1\/challenges\/[^/?#]+\/friends(?:[?#]|$)/,
+  /^\/?users\/me\/friends-hint(?:[?#]|$)/,
+];
 
 export function shouldCache(url: string): boolean {
   const path = url.replace(/^https?:\/\/[^/]+/, "").replace(/^\/?api(?=\/)/, "");

@@ -4,21 +4,47 @@
 
 /** Ablauf aus dem JWT lesen (Sekunden seit 1970) - null, wenn das Token keins ist. */
 export function tokenExpiry(token: string | null | undefined): number | null {
+  return tokenClaim(token, "exp");
+}
+
+function tokenClaim(token: string | null | undefined, name: "exp" | "iat"): number | null {
   if (!token) return null;
   const parts = token.split(".");
   if (parts.length < 2) return null;
   try {
     const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
     const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-    const payload = JSON.parse(decodeBase64(padded)) as { exp?: unknown };
-    return typeof payload.exp === "number" && Number.isFinite(payload.exp) ? payload.exp : null;
+    const value = (JSON.parse(decodeBase64(padded)) as Record<string, unknown>)[name];
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
   } catch {
     return null;
   }
 }
 
-/** Gilt das Zugangs-Token noch mindestens `marginSeconds`? Ohne lesbaren Ablauf gilt es als abgelaufen - lieber einmal erneuern. */
-export function accessTokenExpired(token: string | null | undefined, now: number = Date.now(), marginSeconds = 30): boolean {
+/** Laufzeit des Tokens in Sekunden (exp - iat, #1519) - unabhängig von jeder Uhr; null ohne beide Angaben. */
+export function tokenLifetime(token: string | null | undefined): number | null {
+  const exp = tokenClaim(token, "exp");
+  const iat = tokenClaim(token, "iat");
+  return exp !== null && iat !== null && exp > iat ? exp - iat : null;
+}
+
+/**
+ * Gilt das Zugangs-Token noch mindestens `marginSeconds`? Mit dem Zeitpunkt des Erhalts (`receivedAt`, Geräteuhr) und
+ * der Laufzeit aus dem Token rechnet die App ab Erhalt (#1519) - eine vor- oder nachgehende Geräteuhr verschiebt das
+ * Ende dann nicht. Wurde die Uhr seit dem Erhalt zurückgestellt, lieber einmal erneuern. Ohne diese Angaben (ältere
+ * Tokens) wie bisher gegen `exp`; ohne lesbaren Ablauf gilt es als abgelaufen.
+ */
+export function accessTokenExpired(
+  token: string | null | undefined,
+  now: number = Date.now(),
+  marginSeconds = 30,
+  receivedAt: number | null = null,
+): boolean {
+  const lifetime = tokenLifetime(token);
+  if (lifetime !== null && receivedAt !== null && Number.isFinite(receivedAt)) {
+    if (now < receivedAt) return true;
+    return receivedAt + lifetime * 1000 <= now + marginSeconds * 1000;
+  }
   const exp = tokenExpiry(token);
   if (exp === null) return true;
   return exp * 1000 <= now + marginSeconds * 1000;

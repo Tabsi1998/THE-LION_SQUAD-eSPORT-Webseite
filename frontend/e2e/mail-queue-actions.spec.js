@@ -6,11 +6,14 @@ const { test, expect } = require("@playwright/test");
 const WIDTHS = [["handy", 390, 844], ["tablet", 768, 1024], ["pc", 1440, 900]];
 const ADMIN = { id: "u-sys", username: "sam", display_name: "Sam System", role: "club_admin", mfa_enabled: true, auth_mfa_verified: true };
 const JOBS = [
-  { id: "m-failed", to: "anna@example.test", subject: "Deine Anmeldung ist eingegangen", template_key: "registration_received", template_label: "Turnier: Anmeldung eingegangen",
+  { id: "m-failed", to_masked: "a***@example.test", subject: "Deine Anmeldung ist eingegangen", template_key: "registration_received", template_label: "Turnier: Anmeldung eingegangen",
     status: "failed", attempts: 5, last_error: "(550, b'5.1.1 user unknown')", created_at: "2026-10-08T07:00:00+00:00", updated_at: "2026-10-08T07:40:00+00:00" },
-  { id: "m-sent", to: "ben@example.test", subject: "Dein Gewinn liegt bereit", template_key: "prize_ready", template_label: "Gewinn abholbereit", status: "sent", attempts: 1,
+  { id: "m-sent", to_masked: "b***@example.test", subject: "Dein Gewinn liegt bereit", template_key: "prize_ready", template_label: "Gewinn abholbereit", status: "sent", attempts: 1,
     sent_at: "2026-10-08T17:00:00+00:00", created_at: "2026-10-08T16:59:00+00:00", updated_at: "2026-10-08T17:00:00+00:00" },
 ];
+
+// Die ganzen Adressen kennt nur der Server - die Liste schickt sie gekürzt (#1418).
+const FULL = { "m-failed": "anna.beispiel@example.test", "m-sent": "ben.beispiel@example.test" };
 
 async function mockApi(page, state) {
   await page.addInitScript(() => {
@@ -21,6 +24,11 @@ async function mockApi(page, state) {
     const url = new URL(request.url());
     const json = (body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     const retry = url.pathname.match(/^\/api\/settings\/mail-queue\/([^/]+)\/retry$/);
+    const reveal = url.pathname.match(/^\/api\/settings\/mail-queue\/([^/]+)\/recipient$/);
+    if (request.method() === "POST" && reveal) {
+      state.revealed = [...(state.revealed || []), reveal[1]];
+      return json({ id: reveal[1], to: FULL[reveal[1]] });
+    }
     if (request.method() === "POST" && retry) {
       state.retried.push(retry[1]);
       state.jobs = state.jobs.map((job) => (job.id === retry[1] ? { ...job, status: "pending", attempts: 0, last_error: null, next_attempt_at: "2026-10-08T18:00:00+00:00" } : job));
@@ -68,5 +76,26 @@ for (const [label, width, height] of WIDTHS) {
       const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(2);
     });
+  });
+}
+
+// #1418: ohne Klick keine ganze Adresse im HTML; „Adresse zeigen“ deckt genau eine Zeile auf.
+for (const [label, width, height] of WIDTHS) {
+  test(`${label} (${width} px): Adresse gekürzt, „Adresse zeigen“ je Zeile`, async ({ page, isMobile }) => {
+    test.skip(isMobile, "nur im Desktop-Projekt - die Breite wird hier selbst gesetzt");
+    await page.setViewportSize({ width, height });
+    const state = { jobs: JOBS.map((job) => ({ ...job })), retried: [] };
+    await mockApi(page, state);
+    await page.goto("/admin/settings/mail-queue");
+    const prefix = width >= 1024 ? "queue-to" : "queue-card-to";
+    await expect(page.getByTestId(`${prefix}-m-failed`)).toHaveText("a***@example.test");
+    expect(await page.content()).not.toContain(FULL["m-failed"]);
+
+    await page.getByTestId(`${prefix}-reveal-m-failed`).click();
+    await expect(page.getByTestId(`${prefix}-m-failed`)).toHaveText(FULL["m-failed"]);
+    await expect(page.getByTestId(`${prefix}-m-sent`)).toHaveText("b***@example.test");
+    expect(state.revealed).toEqual(["m-failed"]);
+    const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(2);
   });
 }

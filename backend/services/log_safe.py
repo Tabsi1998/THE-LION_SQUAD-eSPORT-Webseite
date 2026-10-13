@@ -21,9 +21,14 @@ def log_safe(value: Any, limit: int = 200) -> str:
     return text.translate(_OTHER_LINE_BREAKS).replace("\r", " ").replace("\n", " ")[:limit]
 
 
-# Eine Mail-Adresse in einer Meldung (etwa „550 <paula@example.test>: unbekannt“): erster Buchstabe, Rest bis zum @,
-# Domain. Feste Höchstlängen halten die Suche auch bei langen Texten schnell.
-_ADDRESS = re.compile(r"([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]{0,63}@([A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,8})")
+# Eine Mail-Adresse in einem Text (#1418, nach Codex-Prüfung): der zentrale Redactor für Protokoll und Verwaltung. Jede
+# Adresse wird gekürzt - erster Buchstabe, „***“, Domain -, auch mehrere in einem Text („a@x.test, bob@x.test“), mit
+# Anzeigenamen („"Bob" <bob@x.test>“), „mailto:“, Plus-Adressen, Großschreibung und Unicode. Lokaler Teil und Domain
+# sind alles außer Leerraum und den Trennzeichen von Adresslisten. Der Anfang muss ein Wortanfang sein - das hält die
+# Suche linear.
+_ADDRESS_CHAR = r"[^\s@<>()\[\]{},;:\"'`\\/]"
+# Nur am Anfang eines Wortes beginnen (kein Adresszeichen davor): sonst bliebe bei sehr langen Adressen der Anfang stehen.
+_ADDRESS = re.compile(rf"(?<!{_ADDRESS_CHAR})({_ADDRESS_CHAR}){_ADDRESS_CHAR}*@({_ADDRESS_CHAR}+)")
 
 
 def mask_addresses(value: Any) -> str:
@@ -31,6 +36,18 @@ def mask_addresses(value: Any) -> str:
     Für Protokollzeilen zusammen mit ``log_safe`` - erst die Adressen kürzen, dann auf eine Zeile bringen."""
     text = "" if value is None else str(value)
     return _ADDRESS.sub(lambda match: f"{match.group(1)}***@{match.group(2)}", text)
+
+
+def mask_addresses_deep(value: Any) -> Any:
+    """Wie ``mask_addresses``, aber durch ganze Daten: Texte, Listen und Dicts - auch die Schlüssel eines Dicts (eine
+    Zuordnung „Adresse → Stand“ verrät die Adresse sonst im Schlüssel)."""
+    if isinstance(value, str):
+        return mask_addresses(value)
+    if isinstance(value, dict):
+        return {mask_addresses(key) if isinstance(key, str) else key: mask_addresses_deep(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [mask_addresses_deep(item) for item in value]
+    return value
 
 
 # Adressen, deren Pfad selbst ein Schlüssel ist (#1189: der persönliche Kalender-Link) - im Zugriffsprotokoll steht
