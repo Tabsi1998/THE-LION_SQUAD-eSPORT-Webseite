@@ -45,6 +45,14 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
         testId="profile-privacy-season-finds"
       />
 
+      <SwitchRow
+        label="Freunde sehen, wo ich angemeldet bin"
+        description="Wenn aktiv, sehen deine bestätigten Freunde auf der Event-Seite, bei welchen Events und Turnieren du angemeldet bist. Fremde und Gäste sehen das nie. Wenn aus, sieht es niemand."
+        checked={form.privacy_friends_see_registrations !== false}
+        onCheckedChange={(checked) => set("privacy_friends_see_registrations", checked)}
+        testId="profile-privacy-friends-registrations"
+      />
+
       <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]">
         <div className="flex items-start gap-3 mb-4">
           <MessageSquare className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />

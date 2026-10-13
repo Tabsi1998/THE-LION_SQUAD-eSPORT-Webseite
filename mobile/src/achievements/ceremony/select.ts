@@ -54,6 +54,25 @@ export function isLevelGain(prev?: { level?: number; prestige?: number } | null,
   if (nextStars !== prevStars) return nextStars > prevStars;
   return Number(next?.level || 0) > Number(prev?.level || 0);
 }
+
+export type LevelState = { level: number; title: string; prestige: number };
+
+/**
+ * Das Paket für die Zeremonie, wenn seit dem zuletzt gesehenen Stand (`prev`) ein Aufstieg dazukam - sonst null. Ohne
+ * gemerkten Stand (erster Start) wird nichts gefeiert. Weil der neue Stand gleich danach gemerkt wird, feiert die App
+ * jeden Aufstieg genau einmal - auch den Aufstiegs-Moment des Löwen-Rangs (#1456), der an diesem Paket hängt.
+ */
+export function levelUpFrom(prev: Partial<LevelState> | null | undefined, next: LevelState): LevelUp | null {
+  if (!prev || !Number(prev.level) || !isLevelGain(prev, next)) return null;
+  return {
+    level: next.level,
+    previous: Number(prev.level),
+    title: next.title,
+    titleChanged: Boolean(next.title) && next.title !== String(prev.title || "") && next.prestige <= Number(prev.prestige || 0),
+    prestige: next.prestige,
+    prestigeGained: next.prestige > Number(prev.prestige || 0),
+  };
+}
 export type CeremonyContext = { firstEver?: boolean; groupCompleted?: string | null; categoryCompleted?: string | null; catchUp?: boolean; heading?: string | null; sub?: string | null };
 export type CeremonyPackage = { id?: string; tiers?: CeremonyTier[]; context?: CeremonyContext; levelUp?: LevelUp | null };
 

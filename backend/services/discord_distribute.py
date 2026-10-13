@@ -12,6 +12,7 @@ Knopf „Senden“, im Admin als Liste „geht an …“ vor dem zweiten Klick.
 from __future__ import annotations
 
 from models import new_id, now_utc
+from services.private_fields import private_projection
 
 # Wer verteilen darf: Turnierleitung, Vereinsverwaltung (Vorstand) und System.
 STAFF_AREAS = frozenset({"tournaments", "club", "system"})
@@ -35,7 +36,7 @@ async def staff_user(db, discord_user_id) -> dict | None:
     from services.permissions import areas_for
 
     user_id = (await linked_discord_ids(db)).get(str(discord_user_id))
-    user = await db.users.find_one({"id": user_id}, {"_id": 0}) if user_id else None
+    user = await db.users.find_one({"id": user_id}, private_projection()) if user_id else None
     if not user or user.get("is_active") is False or user.get("is_banned"):
         return None
     return user if STAFF_AREAS & await areas_for(user, db) else None

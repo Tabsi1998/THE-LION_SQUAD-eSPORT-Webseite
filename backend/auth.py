@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException, Request, Depends, Response
 from database import get_db
+from services.private_fields import private_projection
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_MINUTES = 60 * 12  # 12h
@@ -262,18 +263,7 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Session expired")
     if family_id:
         await touch_session_activity(db, user_id, family_id, now)
-    user = await db.users.find_one(
-        {"id": user_id},
-        {
-            "_id": 0,
-            "password_hash": 0,
-            "google_id": 0,
-            "mfa_secret": 0,
-            "mfa_pending_secret": 0,
-            "mfa_pending_created_at": 0,
-            "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0,
-        },
-    )
+    user = await db.users.find_one({"id": user_id}, private_projection())
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     if user.get("is_active") is False:
@@ -370,6 +360,12 @@ def require_area(*areas: str):
 def require_any_admin():
     """Irgendein Adminbereich – für Tageszentrale, Systemstatus und Downloads."""
     return require_area("tournaments", "content", "club", "system")
+
+
+def require_dashboard():
+    """Startseite der Verwaltung (#1353, #992): jeder Verwaltungsbereich - auch Finanzen (Kassier), mit Zwei-Faktor.
+    Spiegel von ``ADMIN_AREAS`` im Web (Menüeintrag „Dashboard“, Seiten-Schutz von /admin)."""
+    return require_area("tournaments", "content", "club", "finance", "system")
 
 
 def require_admin():

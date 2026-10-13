@@ -13,7 +13,16 @@ const TOURNAMENT = {
   format: "single_elim",
   team_mode: "solo",
   max_participants: 16,
+  // Rechte je Turnier (#1353), wie sie der Server der Turnierleitung schickt.
   can_manage_structure: true,
+  can_manage_results: true,
+  can_manage_all_results: true,
+  can_plan_matches: true,
+  staff_scopes: [],
+  can_check_in: true,
+  can_manage_participants: true,
+  can_assign_stations: true,
+  can_use_staff_tools: true,
 };
 
 async function mockAdminSession(page) {
