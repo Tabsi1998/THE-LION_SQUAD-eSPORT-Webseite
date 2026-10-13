@@ -61,6 +61,8 @@ MIGRATIONS = (
     (2, "team_leader_role_to_player", migrate_team_leader_role),
     (3, "discord_webhooks_to_bot", migrate_discord_webhooks_to_bot),
     (4, "deleted_account_leftovers", migrate_deleted_account_leftovers),
+    # #1029: dieselben Schritte noch einmal - die Löschung räumt seither mehr Sammlungen auf (services/personal_data.py).
+    (5, "deleted_account_leftovers_1029", migrate_deleted_account_leftovers),
 )
 
 

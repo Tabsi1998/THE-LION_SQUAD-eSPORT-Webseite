@@ -10,24 +10,42 @@ from models import now_utc, new_id
 
 dsgvo_router = APIRouter(prefix="/api/dsgvo", tags=["dsgvo"])
 
+# Auskunft (#1030): was in keine Auskunft gehört - Prüfwerte, Schlüssel und Speicherorte sagen über die Person nichts
+# aus und wären außerhalb des Systems ein Werkzeug. Welche Sammlung wo steht, legt services/personal_data.py fest.
+HIDDEN = {"_id": 0, "password_hash": 0, "token_hash": 0, "storage_key": 0, "poster_key": 0}
+USER_HIDDEN = {**HIDDEN, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0}
+# Meldungen über die Person: Art und Stand - wer gemeldet hat und was er schrieb, bleibt bei ihm (Art. 15 Abs. 4).
+REPORT_ABOUT_ME = ("id", "category", "status", "created_at", "reviewed_at")
+# Einträge im Adminprotokoll, in denen die Person gehandelt hat: nur der Vorgang - der Inhalt betrifft andere.
+AUDIT_FIELDS = ("id", "action", "target_type", "created_at")
+
+
+def _audit_entry(row: dict, user_id: str) -> dict:
+    entry = {key: row.get(key) for key in AUDIT_FIELDS}
+    if row.get("target_id") == user_id:
+        entry["data"] = row.get("data")
+    return entry
+
 
 async def _user_data_export(db, user_id: str) -> dict:
     from services.event_photos import export_for_user as export_gallery_submissions
 
-    user = await db.users.find_one(
-        {"id": user_id},
-        {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0,
-         "mfa_recovery_code_hashes": 0},
-    )
+    user = await db.users.find_one({"id": user_id}, USER_HIDDEN)
     if not user:
         raise HTTPException(404, "Account nicht gefunden")
     email = user.get("email", "")
-    async def rows(collection, query, limit=5000):
-        return await collection.find(query, {"_id": 0}).to_list(limit)
+
+    async def rows(collection, query, limit=5000, projection=None):
+        return await collection.find(query, projection or HIDDEN).to_list(limit)
 
     registrations = await rows(db.tournament_registrations, {"user_id": user_id})
+    reports = await rows(db.user_reports, {"$or": [{"reporter_id": user_id}, {"target_user_id": user_id}]})
+    chats = []
+    for name in ("team_chat_messages", "match_chat_messages", "tournament_chat_messages"):
+        chats += [{"chat": name.removesuffix("_chat_messages"), **row} for row in await rows(getattr(db, name), {"user_id": user_id})]
+    contact_query = [{"user_id": user_id}] + ([{"email": email}] if email else [])
     return {
-        "format_version": 4,
+        "format_version": 5,
         "exported_at": now_utc().isoformat(),
         "user": user,
         "consent_records": await rows(db.consent_records, {"user_id": user_id}),
@@ -40,7 +58,7 @@ async def _user_data_export(db, user_id: str) -> dict:
         ),
         "event_registrations": await rows(db.event_registrations, {"user_id": user_id}),
         "f1_lap_times": await rows(db.f1_lap_times, {"user_id": user_id}),
-        "teams": await rows(db.teams, {"$or": [{"member_ids": user_id}, {"leader_id": user_id}]}),
+        "teams": await rows(db.teams, {"$or": [{"member_ids": user_id}, {"leader_id": user_id}]}, projection={**HIDDEN, "join_code": 0}),
         "team_memberships": await rows(db.team_members, {"user_id": user_id}),
         "team_invites": await rows(db.team_invites, {"user_id": user_id}),
         "achievements": await rows(db.user_achievements, {"user_id": user_id}),
@@ -63,12 +81,14 @@ async def _user_data_export(db, user_id: str) -> dict:
         "notifications": await rows(db.notifications, {"user_id": user_id}),
         "direct_messages": await rows(db.direct_messages, {"$or": [{"sender_id": user_id}, {"recipient_id": user_id}]}),
         "friendships": await rows(db.friendships, {"$or": [{"requester_id": user_id}, {"recipient_id": user_id}]}),
-        "blocks": await rows(db.user_blocks, {"$or": [{"blocker_id": user_id}, {"blocked_id": user_id}]}),
-        "moderation_reports": await rows(db.user_reports, {"$or": [{"reporter_id": user_id}, {"target_user_id": user_id}]}),
+        # Seit Fassung 5 nur, wen die Person blockiert hat - wer sie blockiert, erfährt sie auch sonst nicht.
+        "blocks": await rows(db.user_blocks, {"blocker_id": user_id}),
+        "moderation_reports": [{key: value for key, value in row.items() if key != "reviewed_by"} if row.get("reporter_id") == user_id
+                               else {**{key: row.get(key) for key in REPORT_ABOUT_ME}, "about_me": True} for row in reports],
         "email_logs": await rows(db.email_logs, {"to": email}),
-        "mobile_devices": await rows(db.mobile_push_tokens, {"user_id": user_id}),
+        "mobile_devices": await rows(db.mobile_push_tokens, {"user_id": user_id}, projection={**HIDDEN, "token": 0}),
         "mobile_client_logs": await rows(db.mobile_client_logs, {"user_id": user_id}),
-        "audit_trail": await rows(db.audit_logs, {"$or": [{"actor_id": user_id}, {"target_id": user_id}]}),
+        "audit_trail": [_audit_entry(row, user_id) for row in await rows(db.audit_logs, {"$or": [{"actor_id": user_id}, {"target_id": user_id}]})],
         # Seit Fassung 3 (#928): was bisher weder in der Auskunft stand noch beim Löschen aufgeräumt wurde.
         "xp": await db.user_xp.find_one({"user_id": user_id}, {"_id": 0}),
         "xp_events": await rows(db.xp_events, {"user_id": user_id}),
@@ -91,6 +111,41 @@ async def _user_data_export(db, user_id: str) -> dict:
         "uploads": await rows(db.media_uploads, {"owner_id": user_id}),
         # Eingesandte Galerie-Fotos (#1186): Album, Stand, „Foto: Name“ gewünscht und wann eingewilligt - ohne Datei.
         "gallery_submissions": await export_gallery_submissions(db, user_id),
+        # Seit Fassung 5 (#1030): alles, was services/personal_data.py als Daten über die Person führt.
+        # Sitzungen mit Gerät, Browser und IP-Adresse - ohne die Kennungen der Anmeldetokens.
+        "sessions": await rows(db.auth_sessions, {"user_id": user_id}, projection={**HIDDEN, "current_jti": 0, "family_id": 0}),
+        "passkeys": await rows(db.passkeys, {"user_id": user_id},
+                               projection={"_id": 0, "id": 1, "name": 1, "kind": 1, "created_at": 1, "last_used_at": 1}),
+        "access_links": await rows(db.access_links, {"$or": contact_query}),
+        "consent_decisions": await rows(db.consent_decisions, {"user_id": user_id}),
+        "chat_reads": await rows(db.chat_reads, {"user_id": user_id}),
+        "document_opens": await rows(db.document_opens, {"user_id": user_id}),
+        "year_review_notices": await rows(db.year_review_notices, {"user_id": user_id}),
+        "feedback_answered": await rows(db.feedback_receipts, {"user_id": user_id}),
+        "chat_messages": chats,
+        "chat_attachments": await rows(db.chat_attachments, {"owner_id": user_id}),
+        "moderation_strikes": await rows(db.moderation_strikes, {"user_id": user_id}, projection={**HIDDEN, "moderator_id": 0, "revoked_by": 0}),
+        "moderation_sanctions": await rows(db.moderation_sanctions, {"user_id": user_id},
+                                           projection={**HIDDEN, "created_by": 0, "lifted_by": 0, "appeal.decided_by": 0}),
+        "contact_messages": await rows(db.contact_messages, {"$or": contact_query}, projection={**HIDDEN, "internal_note": 0, "answered_by": 0}),
+        # Was die Verwaltung bei den Erfolgen für die Person vermerkt hat - ohne den Namen der Verwalterin.
+        "achievement_log": await rows(db.achievement_events, {"user_id": user_id},
+                                      projection={"_id": 0, "id": 1, "kind": 1, "at": 1, "tier_code": 1, "tier_name": 1, "note": 1}),
+        "stickers": await rows(db.user_stickers, {"user_id": user_id}),
+        "stream_sessions": await rows(db.twitch_stream_sessions, {"user_id": user_id}),
+        "stream_announcements": await rows(db.tournament_stream_announcements, {"user_id": user_id}),
+        "dolibarr_links": await rows(db.dolibarr_links, {"user_id": user_id}, projection={**HIDDEN, "member_key": 0}),
+        "dolibarr_identities": await rows(db.dolibarr_identities, {"user_id": user_id}),
+        "dolibarr_honours": await rows(db.dolibarr_honours, {"user_id": user_id}),
+        "billing_orders": await rows(db.billing_orders, {"user_id": user_id}),
+        "billing_customers": await rows(db.billing_customers, {"user_id": user_id}),
+        "match_reports": await rows(db.match_reports_v2, {"reporter_user_id": user_id}),
+        "schedule_proposals": await rows(db.match_schedule_proposals, {"actor_user_id": user_id}),
+        "match_proof_photos": await rows(db.match_proof_photos, {"owner_id": user_id}),
+        "f1_staff": await rows(db.f1_staff_assignments, {"user_id": user_id}),
+        "season_standings": await rows(db.season_standings, {"user_id": user_id}),
+        "season_rank_history": await rows(db.season_rank_snapshots, {"user_id": user_id}),
+        "upload_events": await rows(db.upload_events, {"owner_id": user_id}, projection={**HIDDEN, "expires_at": 0}),
     }
 
 

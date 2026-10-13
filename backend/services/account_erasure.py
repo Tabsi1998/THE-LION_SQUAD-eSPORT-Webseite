@@ -1,13 +1,16 @@
 """Was beim Löschen eines Kontos über das Konto selbst hinaus aufgeräumt wird (#928).
 
-Je Sammlung eine Entscheidung - sie steht für Betroffene in der Datenschutzerklärung (``site_texts``, Abschnitt
-„Konto löschen“) und für den Betreiber in ``DATA_PROTECTION.md``:
+Je Sammlung eine Entscheidung - die vollständige Liste führt ``services/personal_data.py`` (ein Test verlangt jede
+Sammlung dort, #1029). Sie steht für Betroffene in der Datenschutzerklärung (``site_texts``, Abschnitt „Konto löschen“)
+und für den Betreiber in ``DATA_PROTECTION.md``:
 
-- **Gelöscht**, weil ohne Konto ohne Zweck: XP und ihre Ereignisse, Einladungen zur Mitgliedschaft, die Tokens der
-  Mitgliedskarte, der persönliche Kalender-Link (#1189), Discord-Aktivität und -Zugehörigkeit, die Warteschlange der Erfolge, Stream-Zustände, Aufgaben im
-  Turnier-Team, der selbst angelegte Eintrag im Mitgliederverzeichnis und die eigenen Bilder.
+- **Gelöscht**, weil ohne Konto ohne Zweck: XP und ihre Ereignisse, Erfolge, Einladungen zur Mitgliedschaft und in
+  Teams, die Tokens der Mitgliedskarte, der persönliche Kalender-Link (#1189), Discord-Aktivität und -Zugehörigkeit,
+  die Warteschlangen der Erfolge, Stream-Zustände, Aufgaben im Turnier- und F1-Team, Lesestände, Sticker, die
+  Verbindung zur Mitgliederakte, der selbst angelegte Eintrag im Mitgliederverzeichnis und die eigenen Bilder.
 - **Überschrieben**, weil die Zeile als Zählung oder Nachweis bleibt: Anmeldungen zu Events und Turnieren,
-  Mitgliedsanträge, Rundenzeiten, Gewinne, die Textauszüge der Moderation, Zugangslinks.
+  Mitgliedsanträge, Rundenzeiten, Gewinne, die Textauszüge der Moderation, Zugangslinks, Kontaktanfragen und
+  gespeicherte Namen (News-Beitrag, Protokoll der Erfolge, Daten im Adminprotokoll).
 - **Gelöst**, nicht gelöscht: Vorstandsposten sowie redaktionelle und aus der Mitgliederverwaltung stammende
   Einträge im Verzeichnis verlieren nur die Verknüpfung zum Konto - sie gehören dem Verein. Ebenso der Einlass bei
   einer Generalversammlung (``meeting_admissions``, #845): die Anwesenheit ist Sache des Vereins; wer als Vorstand
@@ -35,7 +38,15 @@ DELETED_TEXT = "[Nachricht gelöscht]"
 PURGED = (
     "user_xp", "xp_events", "membership_invitations", "member_card_tokens", "discord_activity", "discord_guild_active", "discord_memberships",
     "achievement_eval_queue", "live_streams", "twitch_stream_sessions", "tournament_staff_assignments", "calendar_feed_tokens",
+    # Seit #1029: Lesestände, Einladungen in Teams, Erfolge samt Warteschlange, Sticker, Verlauf der Saisonränge, Merker zu
+    # Jahresrückblick, Feedback und Stream-Ankündigungen, F1-Aufgaben und die Verbindung zur Mitgliederakte samt Ehrungen.
+    "chat_reads", "document_opens", "team_invites", "user_achievements", "achievement_outbox", "user_stickers", "season_rank_snapshots",
+    "year_review_notices", "feedback_receipts", "tournament_stream_announcements", "f1_staff_assignments", "dolibarr_identities",
+    "dolibarr_honours",
 )
+# Angaben zur Person, die in den Daten des Adminprotokolls stehen können (#1029). Der Vorgang bleibt, die Angaben nicht.
+AUDIT_PERSONAL_KEYS = ("display_name", "username", "real_name", "first_name", "last_name", "nickname", "email", "phone", "address",
+                       "birth_date")
 # Ein Antrag in diesen Zuständen läuft noch - ohne Konto ist er zurückgezogen (der Abgleich mit der
 # Mitgliederverwaltung fasst ihn dann nicht mehr an).
 OPEN_APPLICATIONS = ("pending", "submitting", "failed")
@@ -90,6 +101,18 @@ async def _records(db, user: dict, now: str) -> None:
     email = str(user.get("email") or "").strip().lower()
     bound = [{"user_id": user_id}] + ([{"email": email}] if email else [])
     await db.access_links.update_many({"$or": bound}, {"$set": {"is_active": False, "email": None, "note": None, "updated_at": now}})
+    # Kontaktanfragen (#1029) bleiben als Vorgang des Vereins - ohne Name, Adresse und Text, auch ohne Anmeldung geschriebene.
+    await db.contact_messages.update_many({"$or": bound}, {"$set": {
+        "name": GONE, "email": None, "user_id": None, "message": DELETED_TEXT, "anonymized_at": now}})
+    if email:
+        # Was noch in der Warteschlange steht, geht nicht mehr raus; Versandtes steht überschrieben in email_logs.
+        await db.mail_jobs.delete_many({"to": email})
+    # Gespeicherte Namen: am News-Beitrag, im Protokoll der Erfolge und in den Daten des Adminprotokolls.
+    await db.news_posts.update_many({"author_id": user_id}, {"$set": {"author_name": GONE}})
+    await db.achievement_events.update_many({"user_id": user_id}, {"$set": {"username": None, "user_name": GONE}})
+    await db.achievement_events.update_many({"actor_id": user_id}, {"$set": {"actor_name": GONE}})
+    await db.audit_logs.update_many({"$or": [{"actor_id": user_id}, {"target_id": user_id}], "data": {"$type": "object"}},
+                                    {"$unset": {f"data.{key}": "" for key in AUDIT_PERSONAL_KEYS}})
 
 
 # Persönliche Profile (#1039): Steht eine eigene Datei im Profil einer anderen Person, hält das sie nicht fest - sie geht

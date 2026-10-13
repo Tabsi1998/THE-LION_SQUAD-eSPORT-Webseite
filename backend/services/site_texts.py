@@ -349,11 +349,12 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                   "Ein Login ist dafür nötig, damit niemand ein fremdes Konto löscht; wer sich nicht mehr anmelden kann, schreibt an "
                   f"{_contact_or_form(legal)}."),
                 p("Gelöscht bzw. überschrieben werden Name, E-Mail-Adresse, Profiltexte, deine Bilder (Avatar, Banner und was du sonst für dein "
-                  "Profil hochgeladen hast), verknüpfte Konten, Push-Geräte, Freundschaften, XP und Level, die Zählerstände hinter den Erfolgen, "
+                  "Profil hochgeladen hast), verknüpfte Konten, Push-Geräte, Freundschaften, XP und Level, Erfolge und die Zählerstände hinter den Erfolgen, "
                   "ein selbst angelegter Eintrag im Mitgliederverzeichnis, die Angaben in Mitgliedsanträgen und Anmeldedaten; eigene "
                   "Chatnachrichten werden als „gelöscht“ markiert. Erhalten bleiben "
                   "Turnier-Ergebnisse, Rundenzeiten und Anmeldungen ohne Namen "
-                  "(sportliche Integrität und Zählung), der Nachweis über einen übergebenen Gewinn und – wenn du Rechnungen hattest – die Belege "
+                  "(sportliche Integrität und Zählung), Meldungen und Entscheidungen der Moderation, Kontaktanfragen als Vorgang ohne Name, "
+                  "Adresse und Text, der Nachweis über einen übergebenen Gewinn und – wenn du Rechnungen hattest – die Belege "
                   "in der Vereinsbuchhaltung, weil das Steuerrecht sieben "
                   "Jahre Aufbewahrung verlangt; der Auftrag auf der Website behält dann nur Betrag und Belegnummer. Die Löschung wirkt sofort und "
                   "lässt sich nicht rückgängig machen."),
