@@ -40,6 +40,7 @@ from routes.access_link_routes import router as access_link_router
 from routes.admin_picker_routes import router as admin_picker_router
 from routes.tv_routes import router as tv_router
 from routes.event_routes import router as event_router
+from routes.event_recap_routes import router as event_recap_router
 from routes.tournament_routes import router as tournament_router
 from routes.match_routes import router as match_router
 from routes.f1_routes import router as f1_router
@@ -272,6 +273,7 @@ app.include_router(access_link_router)
 app.include_router(admin_picker_router)
 app.include_router(tv_router)
 app.include_router(event_router)
+app.include_router(event_recap_router)
 app.include_router(tournament_router)
 app.include_router(match_router)
 app.include_router(f1_router)
@@ -462,6 +464,11 @@ async def security_headers(request, call_next):
             # Kalender (#1190, Codex-Prüfung #1460): die Route entscheidet selbst - öffentliche Liste, Feed und Dateien
             # kurz zwischenspeicherbar, alles Persönliche „private, no-store“. Ohne eigene Regel (Fehler) gilt no-store.
             pass
+        elif response.headers.get("Cache-Control") == "private, no-store":
+            # Persönliche Antworten (Rückblick mit „Du warst dabei“, Freunde beim Event, #1187/#1188) sagen zusätzlich
+            # „private“ - strenger als das bloße no-store, deshalb bleibt es stehen.
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         else:
             response.headers["Cache-Control"] = "no-store"
             response.headers["Pragma"] = "no-cache"
