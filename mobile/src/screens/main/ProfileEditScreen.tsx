@@ -126,16 +126,16 @@ export function ProfileEditScreen() {
       setSaving(false);
     }
   }, [report, saver]);
-  // Bilder vom Handy (#1153): hochgeladen wird sofort gespeichert - scheitert das Speichern, bleibt das alte Bild.
+  // Bilder vom Handy (#1153): hochgeladen wird sofort gespeichert. Scheitert nur das Speichern, ist das Bild schon
+  // hochgeladen - die neue Adresse bleibt als ungespeicherte Änderung stehen, und „Erneut versuchen“ speichert sie.
   const saveImage = useCallback(async (key: "avatar_url" | "banner_url", url: string) => {
-    const before = queue.getState().confirmed[key];
     queue.edit({ [key]: url });
     const result = await saver.save();
     if (!result.ok) {
-      queue.edit((current) => (current[key] === url ? { ...current, [key]: before } : current));
+      report(result, "");
       throw result.error instanceof Error ? result.error : new Error(saveProblem(result));
     }
-  }, [queue, saver]);
+  }, [queue, report, saver]);
   const initials = String(form.display_name || user?.username || "?").trim().slice(0, 2).toUpperCase();
 
   return (

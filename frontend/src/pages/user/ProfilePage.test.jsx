@@ -9,6 +9,7 @@ import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 // ein privates Profil oeffentlich.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
+const keepaliveMock = vi.fn();
 const toastMock = { success: vi.fn(), error: vi.fn(), info: vi.fn(), message: vi.fn() };
 const refreshMock = vi.fn();
 
@@ -29,6 +30,7 @@ const USER = {
 vi.mock("@/lib/api", () => ({
   api: apiMock,
   formatRequestError: (error, fallback) => fallback || String(error),
+  keepaliveRequest: (...args) => keepaliveMock(...args),
   resolveMediaUrl: (value) => value || "",
 }));
 // Das angemeldete Konto ist veränderlich, damit ein Kontowechsel geprüft werden kann (#1048).
@@ -432,6 +434,58 @@ test("ein Fehler beim Speichern zeigt in der Leiste Erneut versuchen", async () 
   await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Profil gespeichert."));
   expect(apiMock.patch.mock.calls[1][1]).toEqual({ bio: "Kurze Vorstellung. Mehr." });
   expect(screen.queryByTestId("profile-save-error")).toBeNull();
+});
+
+// Tab schließen oder neu laden (#1048, nach Codex-Prüfung): ein wartender Autosave geht sofort per keepalive-fetch,
+// offene Änderungen ohne laufende Anfrage lösen die Warnung des Browsers aus.
+test("Tab wird verborgen: ein wartender Autosave geht sofort per keepalive, nicht per axios", async () => {
+  const user = userEvent.setup();
+  keepaliveMock.mockResolvedValueOnce({ ...USER, privacy_public_profile: true });
+  renderPage();
+  await waitForForm();
+  await user.click(await openPrivacyTab(user));
+  expect(keepaliveMock).not.toHaveBeenCalled();
+
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+  document.dispatchEvent(new Event("visibilitychange"));
+  expect(keepaliveMock).toHaveBeenCalledTimes(1);
+  expect(keepaliveMock).toHaveBeenCalledWith("PATCH", "/users/me", { privacy_public_profile: true }, { "X-Expected-User-Id": "u-1" });
+  await screen.findByText("Gespeichert.");
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+});
+
+test("pagehide schickt den wartenden Autosave ebenfalls per keepalive", async () => {
+  const user = userEvent.setup();
+  keepaliveMock.mockResolvedValueOnce({ ...USER, privacy_public_profile: true });
+  renderPage();
+  await waitForForm();
+  await user.click(await openPrivacyTab(user));
+  window.dispatchEvent(new Event("pagehide"));
+  expect(keepaliveMock).toHaveBeenCalledTimes(1);
+});
+
+test("beforeunload warnt bei offenen Änderungen, die nicht unterwegs sind - sonst nicht", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await waitForForm();
+  const clean = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(clean);
+  expect(clean.defaultPrevented).toBe(false);
+
+  await user.type(screen.getByTestId("profile-bio"), " Mehr.");
+  const dirty = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(dirty);
+  expect(dirty.defaultPrevented).toBe(true);
+
+  // Läuft das Speichern, ist die Änderung unterwegs - keine Warnung.
+  const first = deferredPatch();
+  await user.click(screen.getByTestId("profile-save"));
+  const saving = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(saving);
+  expect(saving.defaultPrevented).toBe(false);
+  first.resolve({ ...USER, bio: "Kurze Vorstellung. Mehr." });
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Profil gespeichert."));
 });
 
 // Freunde stehen seit #1143 unter Community → Spieler (/players); die Tafel ist dieselbe.

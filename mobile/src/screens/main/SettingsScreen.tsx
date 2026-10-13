@@ -92,11 +92,14 @@ function AccountSettings() {
   const appLock = useAppLock();
   const [discordDm, setDiscordDm] = useState<DiscordDmState | null>(null);
   const [showTopics, setShowTopics] = useState(false);
-  // Die vollständigen Benachrichtigungs-Vorgaben vom Server; das Konto selbst speichert nur Abweichungen.
-  const preferenceDefaults = useRef<Record<string, boolean>>({});
+  // Die vollständigen Benachrichtigungs-Vorgaben vom Server; das Konto selbst speichert nur Abweichungen. Sie gehören
+  // genau einem Konto - für jedes andere gelten sie nicht (nach Codex-Prüfung von #1528).
+  const preferenceDefaults = useRef<{ account: string | null; prefs: Record<string, boolean> }>({ account: null, prefs: {} });
   const fromServer = useCallback((data: Record<string, any>) => {
     const next = settingsForm(data);
-    return { ...next, notification_preferences: { ...preferenceDefaults.current, ...next.notification_preferences } };
+    const owner = data?.id != null ? String(data.id) : null;
+    const defaults = owner != null && preferenceDefaults.current.account === owner ? preferenceDefaults.current.prefs : {};
+    return { ...next, notification_preferences: { ...defaults, ...next.notification_preferences } };
   }, []);
   // Speicher-Warteschlange (#1061): ein PATCH zur Zeit, nur Geändertes, nie ins falsche Konto.
   const saver = useProfileSaveQueue<SettingsForm>({
@@ -107,20 +110,29 @@ function AccountSettings() {
   const form = saver.form;
   const { queue } = saver;
 
+  // Je Konto neu laden. Kommt die Antwort erst, nachdem schon gespeichert wurde, verwirft die Warteschlange sie
+  // (Stempel); was inzwischen umgeschaltet wurde, bleibt ohnehin stehen. Eine Antwort für ein Konto, das nicht mehr
+  // angemeldet ist, wird ganz verworfen.
+  const account = user?.id != null ? String(user.id) : null;
   useEffect(() => {
-    // Kommt die Antwort erst, nachdem schon gespeichert wurde, verwirft die Warteschlange sie (Stempel); was
-    // inzwischen umgeschaltet wurde, bleibt ohnehin stehen.
+    setDiscordDm(null);
+    if (account == null) return undefined;
+    let current = true;
     const stamp = queue.stamp();
     api.get<{ preferences?: Record<string, boolean>; discord?: DiscordDmState } | Record<string, boolean>>("/users/me/notification-preferences")
       .then(({ data }) => {
+        if (!current || queue.getState().account !== account) return;
         setDiscordDm(((data as any)?.discord as DiscordDmState | undefined) || null);
         const preferences = ((data as any)?.preferences || data || {}) as Record<string, boolean>;
-        preferenceDefaults.current = preferences;
+        preferenceDefaults.current = { account, prefs: preferences };
         const confirmed = queue.getState().confirmed;
         queue.merge({ notification_preferences: { ...(confirmed.notification_preferences || {}), ...preferences } }, stamp);
       })
       .catch(() => {});
-  }, [queue]);
+    return () => {
+      current = false;
+    };
+  }, [account, queue]);
 
   const change = useCallback((key: keyof SettingsForm, value: unknown) => {
     queue.edit({ [key]: value } as Partial<SettingsForm>);

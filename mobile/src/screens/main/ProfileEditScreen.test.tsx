@@ -20,7 +20,14 @@ jest.mock("../../lib/api", () => ({
   },
   errorMessage: (_error: unknown, fallback: string) => fallback,
 }));
-jest.mock("../../components/ImagePickField", () => ({ ImagePickField: () => null }));
+// Die Bildfelder merken sich ihre Props, damit ein fertiger Upload nachgestellt werden kann.
+const mockImageFields: Record<string, { onUploaded: (url: string) => Promise<void> | void }> = {};
+jest.mock("../../components/ImagePickField", () => ({
+  ImagePickField: (props: { testID: string; onUploaded: (url: string) => Promise<void> | void }) => {
+    mockImageFields[props.testID] = props;
+    return null;
+  },
+}));
 jest.mock("../../components/LinkedAccounts", () => ({ LINKABLE_PLATFORMS: [], PlatformLinkRows: () => null }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 jest.mock("../../seasons/SeasonStage", () => ({ SeasonBackdropSlot: () => null, appNamesSeason: () => true }));
@@ -60,4 +67,20 @@ test("ein Fehler lässt die Eingabe stehen, Erneut versuchen speichert sie", asy
   await waitFor(() => expect(screen.getByTestId("profile-edit-message")).toHaveTextContent("Profil gespeichert."));
   expect((mockPatch.mock.calls[1] as unknown as [string, Record<string, unknown>])[1]).toEqual({ bio: "Bleibt da." });
   expect(screen.queryByTestId("profile-edit-retry")).toBeNull();
+});
+
+// Nach Codex-Prüfung: scheitert nach einem erfolgreichen Upload das Speichern, bleibt die neue Bild-URL als
+// ungespeicherte Änderung stehen - „Erneut versuchen“ speichert sie.
+test("Bild hochgeladen, Speichern scheitert: Erneut versuchen speichert die neue Bild-URL", async () => {
+  mockPatch.mockImplementationOnce(async () => { throw new Error("offline"); });
+  await render(<ProfileEditScreen />);
+  const url = "https://cdn.example.test/neu.png";
+  await act(async () => {
+    await expect(Promise.resolve(mockImageFields["profile-avatar"].onUploaded(url))).rejects.toThrow();
+  });
+  expect(screen.getByTestId("profile-edit-message")).toHaveTextContent("Profil konnte nicht gespeichert werden.");
+  await fireEvent.press(screen.getByTestId("profile-edit-retry"));
+  await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(2));
+  expect((mockPatch.mock.calls[1] as unknown as [string, Record<string, unknown>])[1]).toEqual({ avatar_url: url });
+  await waitFor(() => expect(screen.getByTestId("profile-edit-message")).toHaveTextContent("Profil gespeichert."));
 });

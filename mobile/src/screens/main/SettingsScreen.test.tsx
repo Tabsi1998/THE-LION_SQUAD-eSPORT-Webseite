@@ -1,5 +1,6 @@
 import React from "react";
 import { NavigationContext } from "@react-navigation/native";
+import { AppState } from "react-native";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { GUEST_SETTINGS_GROUPS, SETTINGS_GROUPS, SettingsScreen } from "./SettingsScreen";
 
@@ -207,4 +208,75 @@ test("Konto: Profil bearbeiten öffnet die eigene Seite, Abmelden meldet ab", as
   expect(navigate).toHaveBeenCalledWith("ProfileEdit");
   await fireEvent.press(screen.getByTestId("settings-logout"));
   expect(mockLogout).toHaveBeenCalledTimes(1);
+});
+
+// Nach Codex-Prüfung: die Benachrichtigungs-Vorgaben gehören einem Konto. Nach einem Kontowechsel werden sie neu
+// geladen, und weder ein alter Stand noch eine späte Antwort des alten Kontos geht ins neue.
+function rerenderSettings(view: Awaited<ReturnType<typeof render>>) {
+  return view.rerender(
+    <NavigationContext.Provider value={navigation}>
+      <SettingsScreen />
+    </NavigationContext.Provider>,
+  );
+}
+
+test("Kontowechsel: die Benachrichtigungs-Vorgaben des alten Kontos landen nicht im PATCH des neuen", async () => {
+  jest.useFakeTimers();
+  const prefAnswers: Array<(value: unknown) => void> = [];
+  mockGet.mockImplementation((path: string) => (path === "/users/me/notification-preferences"
+    ? new Promise((resolve) => { prefAnswers.push(resolve); })
+    : Promise.resolve({ data: [] })));
+  const view = await renderSettings();
+  await act(async () => { prefAnswers[0]({ data: { preferences: { push: false, email: false }, discord: { linked: false } } }); });
+  expect(screen.getByLabelText("Push").props.value).toBe(false);
+
+  mockUser.value = { id: "u-2", username: "zweites", privacy_public_profile: true, dm_privacy: "everyone", notification_preferences: {} };
+  await rerenderSettings(view);
+  expect(prefAnswers).toHaveLength(2);
+  expect(screen.getByLabelText("Push").props.value).toBe(true);
+  await fireEvent(screen.getByLabelText("In-App"), "valueChange", false);
+  await act(async () => { jest.advanceTimersByTime(800); });
+  expect(mockPatch).toHaveBeenCalledTimes(1);
+  expect((mockPatch.mock.calls[0] as unknown as [string, Record<string, unknown>])[1]).toEqual({ notification_preferences: { in_app: false } });
+  jest.useRealTimers();
+});
+
+test("Kontowechsel: eine späte Antwort der Vorgaben des alten Kontos wird verworfen", async () => {
+  jest.useFakeTimers();
+  const prefAnswers: Array<(value: unknown) => void> = [];
+  mockGet.mockImplementation((path: string) => (path === "/users/me/notification-preferences"
+    ? new Promise((resolve) => { prefAnswers.push(resolve); })
+    : Promise.resolve({ data: [] })));
+  const view = await renderSettings();
+  mockUser.value = { id: "u-2", username: "zweites", privacy_public_profile: true, dm_privacy: "everyone", notification_preferences: {} };
+  await rerenderSettings(view);
+  await act(async () => { prefAnswers[0]({ data: { preferences: { push: false, email: false }, discord: { linked: true } } }); });
+  expect(screen.getByLabelText("Push").props.value).toBe(true);
+  expect(screen.queryByLabelText("Discord")).toBeNull();
+  await act(async () => { prefAnswers[1]({ data: { preferences: { push: true, email: true, in_app: true }, discord: { linked: false } } }); });
+  await fireEvent(screen.getByLabelText("In-App"), "valueChange", false);
+  await act(async () => { jest.advanceTimersByTime(800); });
+  expect((mockPatch.mock.calls[0] as unknown as [string, Record<string, unknown>])[1]).toEqual({ notification_preferences: { push: true, email: true, in_app: false } });
+  jest.useRealTimers();
+});
+
+// Nach Codex-Prüfung: geht die App in den Hintergrund, wartet ein Schalter nicht mehr auf seinen Zeitpunkt.
+test("App geht in den Hintergrund: ein wartender Schalter speichert sofort", async () => {
+  jest.useFakeTimers();
+  const handlers: Array<(state: string) => void> = [];
+  const spy = jest.spyOn(AppState, "addEventListener").mockImplementation(((_type: string, handler: (state: string) => void) => {
+    handlers.push(handler);
+    return { remove: jest.fn() };
+  }) as never);
+  await renderSettings();
+  await fireEvent(screen.getByLabelText("Öffentliches Profil"), "valueChange", false);
+  expect(mockPatch).not.toHaveBeenCalled();
+  await act(async () => { handlers.forEach((handler) => handler("background")); });
+  expect(mockPatch).toHaveBeenCalledTimes(1);
+  expect((mockPatch.mock.calls[0] as unknown as [string, Record<string, unknown>])[1]).toEqual({ privacy_public_profile: false });
+  // Der Zeitgeber ist weg - kein zweiter Lauf.
+  await act(async () => { jest.advanceTimersByTime(800); });
+  expect(mockPatch).toHaveBeenCalledTimes(1);
+  spy.mockRestore();
+  jest.useRealTimers();
 });

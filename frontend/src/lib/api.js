@@ -87,6 +87,33 @@ export const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+/**
+ * Ein Schreibaufruf, der das Schließen oder Neuladen des Tabs überlebt (#1048): fetch mit keepalive, mit Cookies und
+ * CSRF-Header wie bei `api`. Liefert die Antwortdaten; ein Fehler trägt `response` ({ status, data }) wie bei axios.
+ */
+export async function keepaliveRequest(method, path, body, headers = {}) {
+  const csrf = decodeCookieValue(getCookie("csrf_token"));
+  const response = await fetch(`${API}${path}`, {
+    method,
+    keepalive: true,
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": csrf } : {}), ...headers },
+    body: JSON.stringify(body ?? {}),
+  });
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+  if (!response.ok) {
+    const error = new Error(`Anfrage fehlgeschlagen (${response.status})`);
+    error.response = { status: response.status, data };
+    throw error;
+  }
+  return data;
+}
+
 export const uploadApi = axios.create({
   baseURL: UPLOAD_API,
   withCredentials: true,

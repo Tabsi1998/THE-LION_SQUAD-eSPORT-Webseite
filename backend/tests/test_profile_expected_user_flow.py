@@ -51,3 +51,14 @@ async def test_ohne_header_wie_bisher(flow):
     res = await flow.patch("/api/users/me", json={"bio": "Alt"})
     assert res.status_code == 200, res.text
     assert res.json()["bio"] == "Alt"
+
+
+@pytest.mark.asyncio
+async def test_leerer_header_wird_abgelehnt(flow):
+    """Ein leerer Wert ist kein fehlender Header: der Client wollte ein Konto nennen und hat keins - nichts schreiben."""
+    anna = await flow.add_user(name="anna")
+    flow.act_as(anna)
+    res = await flow.patch("/api/users/me", json={"bio": "Leer"}, headers={"X-Expected-User-Id": ""})
+    assert res.status_code == 409, res.text
+    stored = await flow.db.users.find_one({"id": anna["id"]}, {"_id": 0, "bio": 1})
+    assert (stored or {}).get("bio") in (None, "")

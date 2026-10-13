@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { api, formatRequestError } from "@/lib/api";
+import { api, formatRequestError, keepaliveRequest } from "@/lib/api";
 import { createSaveQueue, EXPECTED_USER_HEADER } from "@/lib/profileSaveQueue";
 import { profileFormPayload, profileToForm } from "./form";
 
@@ -18,11 +18,15 @@ export function useProfileSave({ user, refresh }) {
   useEffect(() => {
     refreshRef.current = refresh;
   });
+  // Beim Verlassen des Tabs geht der Lauf per keepalive-fetch, damit der Browser ihn nicht abbricht.
+  const keepaliveRef = useRef(false);
   const [queue] = useState(() => {
     const created = createSaveQueue({
-      send: (payload, { account }) => api
-        .patch("/users/me", payload, { headers: { [EXPECTED_USER_HEADER]: account } })
-        .then(({ data }) => data),
+      send: (payload, { account }) => {
+        const headers = { [EXPECTED_USER_HEADER]: account };
+        if (keepaliveRef.current) return keepaliveRequest("PATCH", "/users/me", payload, headers);
+        return api.patch("/users/me", payload, { headers }).then(({ data }) => data);
+      },
       fromServer: profileToForm,
       toPayload: profileFormPayload,
       onSaved: () => {
@@ -79,6 +83,43 @@ export function useProfileSave({ user, refresh }) {
       void queue.flush();
     }
   }, [queue]);
+
+  // Tab verbergen, schließen oder neu laden: ein wartender Autosave geht sofort, und zwar per keepalive-fetch - einen
+  // axios-Aufruf bricht der Browser beim Entladen ab. Die Warteschlange ruft send dabei synchron auf.
+  const flushBeforeLeaving = useCallback(() => {
+    if (!timer.current) return;
+    clearTimeout(timer.current);
+    timer.current = null;
+    setTimerActive(false);
+    keepaliveRef.current = true;
+    try {
+      void queue.flush();
+    } finally {
+      keepaliveRef.current = false;
+    }
+  }, [queue]);
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flushBeforeLeaving();
+    };
+    // Offene Änderungen, die nicht unterwegs sind (etwa Text ohne „Speichern“, oder ein Fehler): der Browser fragt nach.
+    const onBeforeUnload = (event) => {
+      flushBeforeLeaving();
+      const current = queue.getState();
+      if (current.dirty && !current.busy) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("pagehide", flushBeforeLeaving);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flushBeforeLeaving);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [flushBeforeLeaving, queue]);
 
   const setForm = useCallback((action) => {
     queue.edit(typeof action === "function" ? action : () => action);

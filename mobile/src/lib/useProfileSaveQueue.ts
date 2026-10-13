@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 import { api } from "./api";
 import { createSaveQueue, createSerialLock, EXPECTED_USER_HEADER, type SaveQueue, type SaveResult, type SaveState } from "./profileSaveQueue";
 
@@ -103,6 +104,20 @@ export function useProfileSaveQueue<F extends Data>({
       timer.current = null;
       void queue.flush();
     }
+  }, [queue]);
+
+  // App in den Hintergrund (oder kurz inaktiv, etwa beim App-Wechsel): ein wartender Autosave geht sofort, statt auf
+  // seinen Zeitpunkt zu warten - danach kann das System die App jederzeit beenden (nach Codex-Prüfung von #1528).
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next !== "background" && next !== "inactive") return;
+      if (!timer.current) return;
+      clearTimeout(timer.current);
+      timer.current = null;
+      setPending(false);
+      void queue.flush();
+    });
+    return () => subscription.remove();
   }, [queue]);
 
   const setForm = useCallback((action: F | ((current: F) => F)) => {
