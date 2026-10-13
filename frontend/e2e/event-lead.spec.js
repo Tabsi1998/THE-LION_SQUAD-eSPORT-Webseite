@@ -12,7 +12,7 @@ function rows() {
   return NAMES.map((name, index) => ({
     id: `r${index + 1}`, display_name: name, status: index < 2 ? "checked_in" : index === 7 ? "waitlist" : "registered",
     companion_count: index === 0 ? 1 : index === 4 ? 2 : 0, seat_count: index === 0 ? 2 : index === 4 ? 3 : 1,
-    email_masked: `${name[0].toLowerCase()}***@example.test`, note: index === 2 ? "komme etwas später" : null, created_at: "2026-10-01T16:00:00+00:00",
+    email_masked: `${name[0].toLowerCase()}***@example.test`, has_note: index === 2, created_at: "2026-10-01T16:00:00+00:00",
   })).sort((a, b) => a.display_name.localeCompare(b.display_name, "de"));
 }
 

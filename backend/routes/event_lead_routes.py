@@ -41,6 +41,17 @@ async def event_lead_view(slug_or_id: str, response: Response, q: str = "", filt
         raise HTTPException(status_code=exc.status, detail=exc.detail)
 
 
+@router.get("/{slug_or_id}/lead/registrations/{registration_id}")
+async def event_lead_registration(slug_or_id: str, registration_id: str, response: Response, me: dict = Depends(require_admin())):
+    """Eine Anmeldung mit Notizen - die Liste trägt nur den Merker „hat Notiz“."""
+    response.headers["Cache-Control"] = "private, no-store"
+    event = await _event(slug_or_id)
+    try:
+        return await event_lead.registration_detail(get_db(), event, registration_id)
+    except LeadError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
+
+
 @router.post("/{slug_or_id}/lead/message")
 async def event_lead_message(slug_or_id: str, body: EventLeadMessage, me: dict = Depends(require_admin())):
     event = await _event(slug_or_id)

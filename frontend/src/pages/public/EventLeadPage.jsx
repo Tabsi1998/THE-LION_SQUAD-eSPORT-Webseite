@@ -166,8 +166,9 @@ export default function EventLeadPage() {
               {shown.map((row) => (
                 <div key={row.id}>
                   <RegistrationRow row={row} busy={busyId === row.id} selected={selectedId === row.id} showStatus={filter === "all"}
+                    undoable={undo?.row?.id === row.id}
                     onSelect={() => setSelectedId(selectedId === row.id ? "" : row.id)} onCheckIn={() => checkIn(row)}
-                    onUndo={() => change(row, { status: "registered" })} onMoveUp={() => change(row, { status: "registered" })} />
+                    onUndo={undoLast} onMoveUp={() => change(row, { status: "registered" })} />
                   {selectedId === row.id ? (
                     <div className="lg:hidden mt-1"><Details row={row} event={event} busy={busyId === row.id} onChange={(payload) => change(row, payload)} /></div>
                   ) : null}
@@ -194,9 +195,11 @@ export default function EventLeadPage() {
   );
 }
 
-function RegistrationRow({ row, busy, selected, showStatus, onSelect, onCheckIn, onUndo, onMoveUp }) {
+// „Rückgängig“ gibt es nur im 10-Sekunden-Fenster nach dem Einchecken (Codex-Prüfung #1517); danach ändert man den Status
+// in den Details der Person.
+function RegistrationRow({ row, busy, selected, showStatus, undoable, onSelect, onCheckIn, onUndo, onMoveUp }) {
   const here = row.status === "checked_in";
-  const sub = [companionsText(row), showStatus ? STATUS_LABELS[row.status] || row.status : ""].filter(Boolean).join(" · ");
+  const sub = [companionsText(row), row.has_note ? "Notiz" : "", showStatus ? STATUS_LABELS[row.status] || row.status : ""].filter(Boolean).join(" · ");
   return (
     <div className={`flex items-center gap-3 rounded-sm border p-3 ${selected ? "border-[#29B6E8]/60 bg-[#29B6E8]/5" : "border-white/10 bg-[#121212]"}`} data-testid={`event-lead-row-${row.id}`} data-status={row.status}>
       <button type="button" onClick={onSelect} aria-expanded={selected} className="min-w-0 flex-1 text-left" data-testid={`event-lead-name-${row.id}`}>
@@ -208,7 +211,7 @@ function RegistrationRow({ row, busy, selected, showStatus, onSelect, onCheckIn,
       </button>
       {row.status === "registered" ? (
         <button type="button" disabled={busy} onClick={onCheckIn} className="tls-btn tls-btn--primary shrink-0 min-h-[48px] min-w-[84px] px-5 py-2 rounded-sm text-sm uppercase tracking-wider font-black" data-testid={`event-lead-checkin-${row.id}`}>Da</button>
-      ) : here ? (
+      ) : here && undoable ? (
         <button type="button" disabled={busy} onClick={onUndo} className="tls-btn tls-btn--quiet shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-[11px] uppercase tracking-wider font-bold" data-testid={`event-lead-undo-${row.id}`}>Rückgängig</button>
       ) : row.status === "waitlist" ? (
         <button type="button" disabled={busy} onClick={onMoveUp} className="tls-btn tls-btn--secondary shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-[11px] uppercase tracking-wider font-bold" data-testid={`event-lead-moveup-${row.id}`}>Nachrücken</button>
@@ -221,6 +224,17 @@ function RegistrationRow({ row, busy, selected, showStatus, onSelect, onCheckIn,
 
 function Details({ row, event, busy, onChange, onClose }) {
   const maxCompanions = event.allow_companions ? event.max_companions_per_registration || 0 : 0;
+  // Notizen stehen nicht in der Liste (Codex-Prüfung #1517) - die Detailansicht holt sie je Person.
+  const [notes, setNotes] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    setNotes(null);
+    if (!row.has_note || !event.id) return undefined;
+    api.get(`/events/${event.id}/lead/registrations/${row.id}`)
+      .then(({ data }) => { if (alive) setNotes({ note: data.note, internal_note: data.internal_note }); })
+      .catch(() => { if (alive) setNotes({ error: true }); });
+    return () => { alive = false; };
+  }, [event.id, row.id, row.has_note]);
   return (
     <div className="rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="event-lead-details">
       <div className="flex items-start justify-between gap-3">
@@ -249,16 +263,18 @@ function Details({ row, event, busy, onChange, onClose }) {
             ) : null}
           </dd>
         </div>
-        {row.note ? (
+        {row.has_note && !notes ? <div className="text-xs text-white/40">Notiz wird geladen …</div> : null}
+        {notes?.error ? <div className="text-xs text-white/40">Notiz konnte nicht geladen werden.</div> : null}
+        {notes?.note ? (
           <div>
             <dt className="text-white/50">Notiz der Person</dt>
-            <dd className="mt-0.5 whitespace-pre-line text-white/80 [overflow-wrap:anywhere]">{row.note}</dd>
+            <dd className="mt-0.5 whitespace-pre-line text-white/80 [overflow-wrap:anywhere]">{notes.note}</dd>
           </div>
         ) : null}
-        {row.internal_note ? (
+        {notes?.internal_note ? (
           <div>
             <dt className="text-white/50">Interne Notiz</dt>
-            <dd className="mt-0.5 whitespace-pre-line text-white/80 [overflow-wrap:anywhere]">{row.internal_note}</dd>
+            <dd className="mt-0.5 whitespace-pre-line text-white/80 [overflow-wrap:anywhere]">{notes.internal_note}</dd>
           </div>
         ) : null}
       </dl>

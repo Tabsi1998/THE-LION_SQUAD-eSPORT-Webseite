@@ -26,6 +26,7 @@ from pymongo.errors import DuplicateKeyError
 from models import new_id, now_utc
 from services.event_registration import seats
 from services.log_safe import log_safe, mask_addresses
+from services.mutation_lock import MutationLockBusy, mutation_lock
 
 logger = logging.getLogger("tls.events.lead")
 
@@ -74,14 +75,26 @@ def registration_row(registration: dict, *, full: bool = True) -> dict:
     }
     if full:
         email = str(registration.get("email") or "")
+        # Notizen stehen nicht in der Liste (Codex-Prüfung #1517): nur der Merker; den Text holt die Detailansicht je Person.
         row.update({
             "email_masked": mask_addresses(email) if "@" in email else "",
-            "note": registration.get("note"),
-            "internal_note": registration.get("internal_note"),
+            "has_note": bool(registration.get("note") or registration.get("internal_note")),
             "created_at": registration.get("created_at"),
             "updated_at": registration.get("updated_at"),
         })
     return row
+
+
+async def registration_detail(db, event: dict, registration_id: str) -> dict:
+    """Eine Anmeldung mit ihren Notizen - für die Detailansicht der Leitung, eine Person je Abruf."""
+    registration = await db.event_registrations.find_one(
+        {"id": registration_id, "event_id": event["id"]},
+        {"_id": 0, "id": 1, "display_name": 1, "status": 1, "companion_count": 1, "seat_count": 1, "email": 1, "note": 1,
+         "internal_note": 1, "created_at": 1, "updated_at": 1},
+    )
+    if not registration:
+        raise LeadError(404, "Anmeldung nicht gefunden")
+    return {**registration_row(registration), "note": registration.get("note"), "internal_note": registration.get("internal_note")}
 
 
 def counts(registrations: list[dict]) -> dict:
@@ -114,13 +127,25 @@ async def _registrations(db, event: dict) -> list[dict]:
     ).to_list(5000)
 
 
-async def recipient_ids(db, event: dict) -> list[str]:
-    """Die Angemeldeten des Events - je Person einmal, ohne Warteliste und Abgemeldete."""
+async def recipients(db, event: dict) -> list[dict]:
+    """Die Angemeldeten des Events - je Person einmal, ohne Warteliste und Abgemeldete. Gesperrte, deaktivierte und
+    gelöschte (anonymisierte) Konten bekommen nichts und zählen nicht mit (Codex-Prüfung #1517)."""
     rows = await db.event_registrations.find(
-        {"event_id": event["id"], "status": {"$in": list(RECIPIENT_STATUSES)}},
+        {"event_id": event["id"], "status": {"$in": list(RECIPIENT_STATUSES)}, "anonymized_at": None},
         {"_id": 0, "user_id": 1},
     ).to_list(5000)
-    return sorted({row["user_id"] for row in rows if row.get("user_id")})
+    ids = sorted({row["user_id"] for row in rows if row.get("user_id")})
+    if not ids:
+        return []
+    users = await db.users.find(
+        {"id": {"$in": ids}, "is_active": {"$ne": False}, "is_banned": {"$ne": True}, "anonymized_at": None},
+        {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1},
+    ).to_list(len(ids))
+    return sorted(users, key=lambda user: user["id"])
+
+
+async def recipient_ids(db, event: dict) -> list[str]:
+    return [user["id"] for user in await recipients(db, event)]
 
 
 async def message_log(db, event: dict) -> list[dict]:
@@ -153,6 +178,18 @@ async def lead_view(db, event: dict, *, query: str = "", filter_key: str = "open
     return view
 
 
+async def _claim_event_gate(db, event: dict, now: str, since: str) -> None:
+    """Je Event ein Eintrag (Schlüssel ist die Event-Kennung), bedingt in einem Zug geschrieben: von zwei Tipps im selben
+    Moment kommt nur einer durch."""
+    try:
+        await db.event_message_gates.update_one({"_id": event["id"]}, {"$setOnInsert": {"last_at": ""}}, upsert=True)
+    except DuplicateKeyError:
+        pass
+    gate = await db.event_message_gates.update_one({"_id": event["id"], "last_at": {"$lt": since}}, {"$set": {"last_at": now}})
+    if not gate.modified_count:
+        raise LeadError(429, "Gerade ist schon eine Nachricht an alle hinausgegangen. Bitte kurz warten.")
+
+
 async def send_message(db, event: dict, me: dict, *, text: str, confirm_count: int) -> dict:
     """„Nachricht an alle Angemeldeten“ - nur mit bestätigter Empfängerzahl, je Person einmal, mit Protokoll."""
     from services.notification_preferences import send_user_template
@@ -163,34 +200,36 @@ async def send_message(db, event: dict, me: dict, *, text: str, confirm_count: i
         raise LeadError(400, "Bitte einen Text eingeben.")
     if len(message) > MESSAGE_MAX:
         raise LeadError(400, f"Die Nachricht ist zu lang (höchstens {MESSAGE_MAX} Zeichen).")
-    recipients = await recipient_ids(db, event)
-    if not recipients:
+    users = await recipients(db, event)
+    if not users:
         raise LeadError(400, "Für dieses Event ist niemand angemeldet.")
-    if int(confirm_count) != len(recipients):
-        raise LeadError(409, f"Die Zahl der Empfänger hat sich geändert: jetzt {len(recipients)}. Bitte noch einmal bestätigen.")
-    now = now_utc().isoformat()
-    since = (now_utc() - timedelta(seconds=MESSAGE_COOLDOWN_SECONDS)).isoformat()
-    # Ein bedingtes Schreiben in einem Zug (je Event ein Eintrag, Schlüssel ist die Event-Kennung): von zwei Tipps im
-    # selben Moment kommt nur einer durch.
-    try:
-        await db.event_message_gates.update_one({"_id": event["id"]}, {"$setOnInsert": {"last_at": ""}}, upsert=True)
-    except DuplicateKeyError:
-        pass
-    gate = await db.event_message_gates.update_one({"_id": event["id"], "last_at": {"$lt": since}}, {"$set": {"last_at": now}})
-    if not gate.modified_count:
-        raise LeadError(429, "Gerade ist schon eine Nachricht an alle hinausgegangen. Bitte kurz warten.")
+    if int(confirm_count) != len(users):
+        raise LeadError(409, f"Die Zahl der Empfänger hat sich geändert: jetzt {len(users)}. Bitte noch einmal bestätigen.")
 
     message_id = new_id()
     name = event.get("name") or "Event"
     path = f"/events/{event.get('slug') or event['id']}"
-    await db.event_messages.insert_one({
-        "id": message_id, "event_id": event["id"], "actor_id": me["id"],
-        "actor_name": me.get("display_name") or me.get("username"), "text": message,
-        "recipient_count": len(recipients), "created_at": now,
-    })
+    # Höchstens eine Nachricht je Minute - je Absender (über alle Events, Codex-Prüfung #1517) und je Event. Die Sperre
+    # je Absender hält ein kurzer Lease; darin wird geprüft und der Protokolleintrag geschrieben, den die nächste
+    # Prüfung findet.
+    try:
+        async with mutation_lock(db, f"event-message-sender:{me['id']}", wait_seconds=0):
+            now = now_utc().isoformat()
+            since = (now_utc() - timedelta(seconds=MESSAGE_COOLDOWN_SECONDS)).isoformat()
+            if await db.event_messages.find_one({"actor_id": me["id"], "created_at": {"$gte": since}}, {"_id": 0, "id": 1}):
+                raise LeadError(429, "Du hast gerade schon eine Nachricht an alle geschickt. Bitte kurz warten.")
+            await _claim_event_gate(db, event, now, since)
+            await db.event_messages.insert_one({
+                "id": message_id, "event_id": event["id"], "actor_id": me["id"],
+                "actor_name": me.get("display_name") or me.get("username"), "text": message,
+                "recipient_count": len(users), "created_at": now,
+            })
+    except MutationLockBusy:
+        raise LeadError(429, "Du hast gerade schon eine Nachricht an alle geschickt. Bitte kurz warten.")
 
+    recipient_list = [user["id"] for user in users]
     notified = 0
-    for user_id in recipients:
+    for user_id in recipient_list:
         try:
             doc = await create_user_notification(
                 user_id, f"{name}: Nachricht der Turnierleitung", message, path, kind=MESSAGE_KIND,
@@ -204,10 +243,6 @@ async def send_message(db, event: dict, me: dict, *, text: str, confirm_count: i
 
     url = await build_public_url(path)
     mails = 0
-    users = await db.users.find(
-        {"id": {"$in": recipients}, "is_active": {"$ne": False}},
-        {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1},
-    ).to_list(len(recipients))
     for user in users:
         try:
             result = await send_user_template(
@@ -224,8 +259,8 @@ async def send_message(db, event: dict, me: dict, *, text: str, confirm_count: i
         "action": "event.message.send",
         "target_id": event["id"],
         "actor_id": me["id"],
-        "data": {"message_id": message_id, "recipient_count": len(recipients), "notified": notified, "mails": mails,
+        "data": {"message_id": message_id, "recipient_count": len(users), "notified": notified, "mails": mails,
                  "length": len(message)},
         "created_at": now,
     })
-    return {"message_id": message_id, "recipient_count": len(recipients), "notified": notified, "mails": mails}
+    return {"message_id": message_id, "recipient_count": len(users), "notified": notified, "mails": mails}

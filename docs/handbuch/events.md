@@ -178,8 +178,8 @@ diese eine Liste der Anmeldungen.
 - **Oben, fest beim Scrollen:** der Zähler **„84 von 120 da“** (Personen; darunter die Plätze mit Begleitpersonen), das Suchfeld und
   die Filter **Noch nicht da** (Start), **Da**, **Warteliste**, **Alle** – jeweils mit Anzahl.
 - **An der Tür (Handy):** Namen tippen (Groß/klein und Umlaute egal, „zoe“ findet „Zoë“), dann **Da**. Der Zähler stimmt sofort, das
-  Suchfeld ist wieder leer für den nächsten Namen. Unten steht 10 Sekunden lang **Rückgängig**; danach geht es über **Rückgängig** in
-  der Zeile der Person.
+  Suchfeld ist wieder leer für den nächsten Namen. Unten und in der Zeile steht 10 Sekunden lang **Rückgängig**; danach ändert ihr den **Status** in den
+  Details der Person.
 - **Nachrücken:** Unter **Warteliste** der Knopf **Nachrücken**. Ist kein Platz frei, kommt „Kapazität wäre überschritten“.
 - **Details:** Ein Tipp auf den Namen zeigt Plätze, **Begleitpersonen** (mit − und +), die Notiz der Person, die Mail-Adresse **gekürzt**
   (`p***@…`) und den **Status** zum Ändern: **Angemeldet**, **Da**, **Warteliste**, **Nicht erschienen**, **Storniert**. Am Handy
@@ -193,11 +193,13 @@ diese eine Liste der Anmeldungen.
 gesperrt – bitte den Hintereingang nehmen.“), höchstens 1000 Zeichen. Darunter steht, an wie viele Personen sie geht. **Weiter**
 zeigt die Nachricht noch einmal mit der Zahl; erst **An … senden** schickt sie.
 
-- Empfänger sind alle mit **Angemeldet** oder **Da** – je Person einmal. Warteliste, Stornierte und Nicht erschienene bekommen nichts.
+- Empfänger sind alle mit **Angemeldet** oder **Da** – je Person einmal. Warteliste, Stornierte, Nicht erschienene sowie gesperrte,
+  deaktivierte und gelöschte Konten bekommen nichts.
 - Sie kommt als Benachrichtigung (Glocke, App, Push, Discord-Direktnachricht nach Einstellung) und als Mail, wenn die Person Mails zu
   **Turnier-Updates** zulässt. Die Mail-Vorlage heißt **Event: Nachricht an alle** (System → E-Mail-Vorlagen).
 - Hat sich die Zahl der Angemeldeten zwischen Vorschau und Senden geändert, geht nichts hinaus – die Seite zeigt die neue Zahl, ihr
-  bestätigt noch einmal. Gleich nach einer Nachricht (1 Minute) geht keine zweite.
+  bestätigt noch einmal. Gleich nach einer Nachricht (1 Minute) geht keine zweite – weder beim selben Event noch von derselben
+  Person bei einem anderen Event.
 - Jede Nachricht steht unter der Liste bei **Nachrichten an alle** (wann, wer, an wie viele) und im Protokoll.
 
 ### 3.6 Kosten und Rechnung

@@ -108,7 +108,22 @@ async def test_list_carries_only_needed_fields_and_masked_mail(flow):
     paula = rows["Paula Brünner"]
     assert paula["email_masked"] == "p***@lionsquad-test.at"
     assert "email" not in paula and "user_id" not in paula and "price" not in paula
-    assert paula["companion_count"] == 1 and paula["seat_count"] == 2 and paula["note"] == "komme später"
+    assert paula["companion_count"] == 1 and paula["seat_count"] == 2 and paula["has_note"] is True
+    # Notizen stehen nicht in der Liste - nur der Merker (Codex-Prüfung #1517).
+    assert all("note" not in row and "internal_note" not in row for row in view["registrations"])
+    assert rows["Max Mustermann"]["has_note"] is False
+
+    # Die Notiz holt die Detailansicht - je Anmeldung, nur für die Turnierleitung.
+    detail = await flow.get(f"/api/events/{event['id']}/lead/registrations/{paula['id']}")
+    assert detail.status_code == 200 and detail.headers["cache-control"] == "private, no-store"
+    assert detail.json()["note"] == "komme später" and detail.json()["email_masked"] == "p***@lionsquad-test.at"
+    assert "email" not in detail.json()
+    missing = await flow.get(f"/api/events/{event['id']}/lead/registrations/gibt-es-nicht")
+    assert missing.status_code == 404
+    vorstand = await person(flow, "vorstand", areas=["club"])
+    flow.act_as(vorstand)
+    denied = await flow.get(f"/api/events/{event['id']}/lead/registrations/{paula['id']}")
+    assert denied.status_code == 403
     # Sortiert nach Namen - an der Tür sucht man nach dem Namen.
     assert [row["display_name"] for row in view["registrations"]] == ["Max Mustermann", "Paula Brünner", "Zoë Adler"]
     assert all("@" not in str(value) or key == "email_masked" for row in view["registrations"] for key, value in row.items())
@@ -122,7 +137,8 @@ def test_door_rows_leave_out_notes_and_mail():
     assert set(door) == {"id", "display_name", "status", "companion_count", "seat_count"}
     assert door["seat_count"] == 3
     full = event_lead.registration_row(reg, full=True)
-    assert full["email_masked"] == "p***@example.test" and full["internal_note"] == "intern" and "email" not in full
+    assert full["email_masked"] == "p***@example.test" and full["has_note"] is True and "email" not in full
+    assert "note" not in full and "internal_note" not in full
 
 
 # --------------------------------------------------------------------------- Suche und Filter
@@ -271,3 +287,65 @@ async def test_message_without_registrations_is_refused(flow):
     flow.act_as(leitung)
     response = await flow.post(f"/api/events/{event['id']}/lead/message", json={"text": "Hallo", "confirm_count": 0})
     assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_blocked_deactivated_and_erased_accounts_get_nothing(flow):
+    """Codex-Prüfung #1517: gesperrte, deaktivierte und gelöschte Konten zählen nicht und bekommen nichts."""
+    leitung, event, people = await setup_event(flow)
+    gesperrt = await person(flow, "gesperrt", display_name="Gesperrt")
+    aus = await person(flow, "aus", display_name="Deaktiviert")
+    weg = await person(flow, "weg", display_name="Gelöscht")
+    for who in (gesperrt, aus, weg):
+        await register(flow, event, who)
+    await flow.db.users.update_one({"id": gesperrt["id"]}, {"$set": {"is_banned": True}})
+    await flow.db.users.update_one({"id": aus["id"]}, {"$set": {"is_active": False}})
+    await flow.db.users.update_one({"id": weg["id"]}, {"$set": {"anonymized_at": now_utc().isoformat()}})
+
+    flow.act_as(leitung)
+    assert (await lead(flow, event))["message_recipients"] == 3
+    response = await flow.post(f"/api/events/{event['id']}/lead/message", json={"text": "Hallo", "confirm_count": 3})
+    assert response.status_code == 200, response.text
+    reached = {note["user_id"] for note in await flow.db.notifications.find({"kind": "event_message"}, {"_id": 0}).to_list(50)}
+    assert reached == {people[name]["id"] for name in ("paula", "max", "zoe")}
+    mails = {mail["to"] for mail in await flow.db.mail_jobs.find({"template_key": "event_message"}, {"_id": 0, "to": 1}).to_list(50)}
+    assert not mails & {gesperrt["email"], aus["email"], weg["email"]}
+
+
+@pytest.mark.asyncio
+async def test_one_message_per_minute_per_sender_across_events(flow):
+    """Codex-Prüfung #1517: die Sperre gilt auch je Absender - ein zweites Event umgeht sie nicht."""
+    leitung, event, people = await setup_event(flow)
+    second = await create_event(flow, leitung, name="Winter-LAN")
+    await register(flow, second, people["paula"])
+    flow.act_as(leitung)
+    first = await flow.post(f"/api/events/{event['id']}/lead/message", json={"text": "Hallo", "confirm_count": 3})
+    assert first.status_code == 200
+    other = await flow.post(f"/api/events/{second['id']}/lead/message", json={"text": "Hallo", "confirm_count": 1})
+    assert other.status_code == 429
+    # Eine andere Leitung darf beim zweiten Event schreiben.
+    kollegin = await person(flow, "kollegin", role="tournament_admin")
+    flow.act_as(kollegin)
+    allowed = await flow.post(f"/api/events/{second['id']}/lead/message", json={"text": "Hallo", "confirm_count": 1})
+    assert allowed.status_code == 200, allowed.text
+
+
+@pytest.mark.asyncio
+async def test_stored_false_per_channel_is_respected(flow):
+    """Punkt 5 der Codex-Prüfung: die Nachricht folgt den Einstellungen - ein gespeichertes false je Kanal greift."""
+    leitung, event, people = await setup_event(flow)
+    # Paula: Postfach und Push für Turnier-Updates aus - keine Benachrichtigung, die Mail kommt.
+    off_inbox = {"in_app:tournament_updates": False, "push:tournament_updates": False}
+    await flow.db.users.update_one({"id": people["paula"]["id"]}, {"$set": {"notification_preferences": off_inbox}})
+    # Max: Mail ganz aus - Benachrichtigung ja, Mail nein.
+    off_mail = {"email": False}
+    await flow.db.users.update_one({"id": people["max"]["id"]}, {"$set": {"notification_preferences": off_mail}})
+
+    flow.act_as(leitung)
+    response = await flow.post(f"/api/events/{event['id']}/lead/message", json={"text": "Hallo", "confirm_count": 3})
+    assert response.status_code == 200
+    assert response.json()["notified"] == 2 and response.json()["mails"] == 2
+    reached = {note["user_id"] for note in await flow.db.notifications.find({"kind": "event_message"}, {"_id": 0}).to_list(50)}
+    assert reached == {people["max"]["id"], people["zoe"]["id"]}
+    mails = {mail["to"] for mail in await flow.db.mail_jobs.find({"template_key": "event_message"}, {"_id": 0, "to": 1}).to_list(50)}
+    assert mails == {people["paula"]["email"], people["zoe"]["email"]}

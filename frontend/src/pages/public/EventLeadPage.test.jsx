@@ -17,7 +17,7 @@ const EventLeadPage = (await import("./EventLeadPage")).default;
 
 const ROWS = [
   { id: "r1", display_name: "Max Mustermann", status: "checked_in", companion_count: 0, seat_count: 1, email_masked: "m***@example.test" },
-  { id: "r2", display_name: "Paula Brünner", status: "registered", companion_count: 1, seat_count: 2, email_masked: "p***@example.test", note: "komme später" },
+  { id: "r2", display_name: "Paula Brünner", status: "registered", companion_count: 1, seat_count: 2, email_masked: "p***@example.test", has_note: true },
   { id: "r3", display_name: "Zoë Adler", status: "registered", companion_count: 0, seat_count: 1, email_masked: "z***@example.test" },
   { id: "r4", display_name: "Ella Wartend", status: "waitlist", companion_count: 0, seat_count: 1, email_masked: "e***@example.test" },
 ];
@@ -85,12 +85,38 @@ test("Nachrücken ohne freien Platz: der Server lehnt ab, die Liste bleibt", asy
   expect(screen.getByTestId("event-lead-row-r4")).toHaveAttribute("data-status", "waitlist");
 });
 
-test("Details zeigen die Adresse nur gekürzt", async () => {
+test("Details zeigen die Adresse nur gekürzt und holen die Notiz je Person", async () => {
   renderLead();
+  const view = { data: VIEW };
+  apiMock.get.mockImplementation((url) => Promise.resolve(url.endsWith("/lead/registrations/r2") ? { data: { id: "r2", note: "komme später", internal_note: null } } : view));
+  expect(screen.queryByText("komme später")).toBeNull();
   fireEvent.click(await screen.findByTestId("event-lead-name-r2"));
   const [details] = screen.getAllByTestId("event-lead-details");
   expect(within(details).getByTestId("event-lead-mail")).toHaveTextContent("p***@example.test");
-  expect(details).toHaveTextContent("komme später");
+  await waitFor(() => expect(details).toHaveTextContent("komme später"));
+  expect(apiMock.get).toHaveBeenCalledWith("/events/e1/lead/registrations/r2");
+});
+
+test("„Rückgängig“ nur im Fenster nach dem Einchecken - danach nicht mehr in der Zeile", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    apiMock.patch.mockResolvedValue({ data: {} });
+    renderLead();
+    // Schon vorher Eingecheckte haben keinen Knopf „Rückgängig“.
+    fireEvent.click(await screen.findByTestId("event-lead-filter-here"));
+    expect(screen.queryByTestId("event-lead-undo-r1")).toBeNull();
+    fireEvent.click(screen.getByTestId("event-lead-filter-open"));
+    apiMock.get.mockResolvedValue({ data: { ...VIEW, registrations: ROWS.map((row) => (row.id === "r3" ? { ...row, status: "checked_in" } : row)) } });
+    fireEvent.click(screen.getByTestId("event-lead-checkin-r3"));
+    await screen.findByTestId("event-lead-undo-bar");
+    fireEvent.click(screen.getByTestId("event-lead-filter-here"));
+    expect(screen.getByTestId("event-lead-undo-r3")).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(11000);
+    await waitFor(() => expect(screen.queryByTestId("event-lead-undo-bar")).toBeNull());
+    expect(screen.queryByTestId("event-lead-undo-r3")).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test("Nachricht an alle: Vorlage, Vorschau der Empfänger, erst nach Bestätigung senden", async () => {
