@@ -61,7 +61,7 @@ export default function AdminDocumentsPage() {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">VEREINS-CMS</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Dokumente & Downloads</h1>
+          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Dokumente</h1>
         </div>
         <button onClick={() => setEditing({})} data-testid="docs-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#e8c200] transition">
           <Plus className="w-3.5 h-3.5" /> Neues Dokument
