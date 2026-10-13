@@ -42,7 +42,8 @@ export type TabRootParamList = {
 /** Detail-Screens, die in jedem Tab-Stapel liegen (#1144). */
 export type DetailParamList = {
   TournamentDetail: { id: string };
-  EventDetail: { id: string };
+  // returnTournament (#1184): vom Turnier mit Event-Pflicht (#875) gekommen - nach der Anmeldung geht es dorthin zurück.
+  EventDetail: { id: string; returnTournament?: string };
   FastLapDetail: { id: string };
   MatchDetail: { id: string };
   // Turnierleitung am Handy (#1156): offene Spiele eines Turniers; `spiel` öffnet gleich das Ergebnis-Fenster.

@@ -73,7 +73,8 @@ test("ohne Event-Anmeldung: der Hinweis und „Zuerst beim Event anmelden“ fü
   expect(screen.getByTestId("tournament-event-gate")).toHaveTextContent("Anmeldung nur mit Event-Anmeldung: Melde dich zuerst beim Event „Vereins-LAN“ an.");
   expect(screen.queryByText("Zum Turnier anmelden")).toBeNull();
   await fireEvent.press(screen.getByTestId("tournament-event-first"));
-  expect(navigate).toHaveBeenCalledWith("EventDetail", { id: "vereins-lan" });
+  // Mit returnTournament geht es nach der Event-Anmeldung hierher zurück (#1184).
+  expect(navigate).toHaveBeenCalledWith("EventDetail", { id: "vereins-lan", returnTournament: "cup" });
 });
 
 test("beim Event angemeldet: die Turnieranmeldung ist frei", async () => {
@@ -167,4 +168,21 @@ test("leere Plätze im Klartext, geplante Zeit mit Dauer", async () => {
   } finally {
     jest.useRealTimers();
   }
+});
+
+// Zurück vom Event (#1184): nach Event-Anmeldung und „Spielst du auch mit?“ lädt die Turnierseite frisch - der Weg zum
+// Event wird zur Turnieranmeldung (bzw. zum eigenen Stand).
+test("zurück vom Event: die Seite lädt neu und zeigt die freie Anmeldung", async () => {
+  const handlers: Record<string, () => void> = {};
+  const listening = { ...(navigation as object), addListener: (name: string, handler: () => void) => { handlers[name] = handler; return () => undefined; } } as never;
+  answer(TOURNAMENT);
+  await render(<TournamentDetailScreen navigation={listening} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("tournament-event-first")).toBeTruthy());
+  handlers.focus();
+  expect(mockGet.mock.calls.filter(([path]) => path === "/tournaments/cup")).toHaveLength(1);
+  answer({ ...TOURNAMENT, event_gate: { ...GATE, registered: true } });
+  handlers.blur();
+  handlers.focus();
+  await waitFor(() => expect(screen.queryByTestId("tournament-event-first")).toBeNull());
+  expect(screen.getByText("Zum Turnier anmelden")).toBeTruthy();
 });
