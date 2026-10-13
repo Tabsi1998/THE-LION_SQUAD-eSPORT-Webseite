@@ -219,12 +219,11 @@ class RefundError(ValueError):
 REFUND_ATTEMPTS = 5
 
 
-def _same_refunds(order: dict) -> dict:
-    """Bedingung „die Erstattungen sind noch die, die ich gelesen habe“ - über ihre Anzahl, denn Einträge kommen nur dazu."""
-    count = len(order.get("refunds") or [])
-    if count:
-        return {"refunds": {"$size": count}}
-    return {"$or": [{"refunds": {"$exists": False}}, {"refunds": {"$size": 0}}]}
+def _same_money(order: dict) -> dict:
+    """Bedingung „Zahlungen und Erstattungen sind noch die, die ich gelesen habe“ (#1034): ``money_rev`` steigt bei
+    jedem Abgleich der Zahlungen und jeder Erstattung. Aufträge von vorher haben das Feld nicht - sie gelten als 0."""
+    rev = int(order.get("money_rev") or 0)
+    return {"money_rev": rev} if rev else {"money_rev": {"$in": [None, 0]}}
 
 
 async def add_refund(db, order: dict, actor_id: str, *, amount_cents: int, paid_on: str, reference: str, reason: str,
@@ -232,8 +231,8 @@ async def add_refund(db, order: dict, actor_id: str, *, amount_cents: int, paid_
     """Rückzahlung erfassen, nachdem sie außerhalb der Website passiert ist (Überweisung, bar).
     Nie mehr als bezahlt, nie ohne Grund; kein Auslöser für irgendetwas in Dolibarr.
 
-    Gleichzeitig und wiederholt sicher (#1034): Geschrieben wird nur, wenn seit dem Lesen keine andere Erstattung
-    dazukam - sonst neu lesen und neu rechnen. Kommt dieselbe Erfassung (``request_id``) ein zweites Mal an, gilt
+    Gleichzeitig und wiederholt sicher (#1034): Geschrieben wird nur, wenn seit dem Lesen weder eine andere
+    Erstattung dazukam noch der Abgleich die Zahlungen geändert hat - sonst neu lesen und neu rechnen. Kommt dieselbe Erfassung (``request_id``) ein zweites Mal an, gilt
     der schon gespeicherte Eintrag."""
     amount = int(amount_cents)
     if amount <= 0:
@@ -257,8 +256,9 @@ async def add_refund(db, order: dict, actor_id: str, *, amount_cents: int, paid_
             "reason": reason.strip()[:MAX_REASON], "recorded_by": actor_id, "recorded_at": now_utc().isoformat(),
             **({"request_id": request_id} if request_id else {}),
         }
-        written = await db.billing_orders.update_one({"id": order["id"], **_same_refunds(order)},
-                                                     {"$push": {"refunds": refund}, "$set": {"updated_at": now_utc().isoformat()}})
+        written = await db.billing_orders.update_one({"id": order["id"], **_same_money(order)},
+                                                     {"$push": {"refunds": refund}, "$set": {"updated_at": now_utc().isoformat()},
+                                                      "$inc": {"money_rev": 1}})
         if written.modified_count:
             break
         order = await db.billing_orders.find_one({"id": order["id"]}, {"_id": 0})

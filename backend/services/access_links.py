@@ -116,15 +116,22 @@ async def claim_access_link_use(db, link: dict | None, user: dict | None = None)
     """
     if not link or not link.get("id"):
         return False
+    now = now_utc()
+    expires_at = parse_dt(link.get("expires_at"))
+    if expires_at and now >= expires_at:
+        raise AccessLinkUsedUp()
     user_id = (user or {}).get("id")
-    query = {"id": link["id"], "is_active": {"$ne": False}}
+    # Abgelaufen zählt wie widerrufen - auch wenn der Link zwischen Prüfung und Anmeldung abläuft. Gespeichert wird
+    # der Ablauf in UTC (``access_link_routes``), so lässt er sich im Filter direkt vergleichen.
+    query = {"id": link["id"], "is_active": {"$ne": False},
+             "$or": [{"expires_at": None}, {"expires_at": {"$gt": now.isoformat()}}]}
     max_uses = link.get("max_uses")
     if max_uses is not None:
         query["max_uses"] = max_uses
         query["use_count"] = {"$lt": int(max_uses)}
     if user_id:
         query["used_by"] = {"$ne": user_id}
-    update = {"$inc": {"use_count": 1}, "$set": {"last_used_at": now_utc().isoformat(), "last_used_by": user_id}}
+    update = {"$inc": {"use_count": 1}, "$set": {"last_used_at": now.isoformat(), "last_used_by": user_id}}
     if user_id:
         update["$addToSet"] = {"used_by": user_id}
     if (await db.access_links.update_one(query, update)).modified_count:

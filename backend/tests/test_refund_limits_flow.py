@@ -106,3 +106,31 @@ async def test_the_same_refund_sent_twice_is_recorded_once(flow, fake, monkeypat
     # Eine neue Erfassung mit demselben Betrag ist eine zweite Erstattung.
     assert (await refund(flow, order, 1000, request_id="erfassung-3")).status_code == 200
     assert billing_orders.refunded_cents(await order_of(flow, booked)) == 2500
+
+
+ENTRY = {"paid_on": "2026-10-13", "reference": "", "reason": "Rest"}
+
+
+@pytest.mark.asyncio
+async def test_a_refund_prepared_before_the_payment_shrank_is_not_written(flow, fake):
+    booked, order = await paid_order(flow, fake)
+    before = order  # So hat die Kassierin den Auftrag gelesen: 40 € bezahlt.
+
+    # Dazwischen meldet Dolibarr nur noch 10 € Zahlung, der Abgleich übernimmt das.
+    fake.core_invoices[order["invoice_id"]].update(
+        payments=[{"amount": "10.00", "date": "2026-09-23", "type": "VIR", "ref": "PAY-1", "num": ""}],
+        remaintopay=30.0, statut=1, paye=0)
+    assert (await flow.post(f"/api/admin/finance/orders/{order['id']}/resync")).status_code == 200
+    synced = await order_of(flow, booked)
+    assert billing_orders.paid_cents(synced) == 1000
+
+    with pytest.raises(billing_orders.RefundError):
+        await billing_orders.add_refund(flow.db, before, "kassier", amount_cents=3000, **ENTRY)
+    assert billing_orders.refunded_cents(await order_of(flow, booked)) == 0
+
+    await billing_orders.add_refund(flow.db, before, "kassier", amount_cents=1000, **ENTRY)
+    stored = await order_of(flow, booked)
+    assert billing_orders.refunded_cents(stored) == 1000
+    # Abgleich und Erstattung zählen beide die Revision hoch.
+    assert int(synced.get("money_rev") or 0) > int(before.get("money_rev") or 0)
+    assert stored["money_rev"] == synced["money_rev"] + 1

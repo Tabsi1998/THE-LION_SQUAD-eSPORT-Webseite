@@ -149,3 +149,44 @@ async def test_a_link_revoked_in_the_meantime_carries_no_registration(flow):
     assert refused.value.status == 409
     assert await flow.db.event_registrations.count_documents({"event_id": event["id"]}) == 0
     assert (await stored_link(flow, link))["use_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_a_link_that_expires_in_the_meantime_carries_no_registration(flow, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    from services import access_links, event_registration
+
+    event = await draft_event(flow)
+    token, link = await access_link(flow, "event", event["id"], max_uses=None)
+    start = datetime(2026, 10, 13, 12, 0, tzinfo=timezone.utc)
+    until = (start + timedelta(minutes=1)).isoformat()
+    await flow.db.access_links.update_one({"id": link["id"]}, {"$set": {"expires_at": until}})
+    anna = await flow.add_user(name="Anna")
+
+    # Geprüft wird der Link eine Sekunde vor Ablauf, angekommen ist die Anmeldung erst danach.
+    monkeypatch.setattr(access_links, "now_utc", lambda: start)
+    checked = await access_links.validate_access_link(flow.db, token, "event", event["id"], anna, "register")
+    assert checked
+    monkeypatch.setattr(access_links, "now_utc", lambda: start + timedelta(minutes=2))
+
+    with pytest.raises(event_registration.RegistrationError) as refused:
+        await event_registration.register(flow.db, event, anna, register_access=checked)
+
+    assert refused.value.status == 409
+    assert await flow.db.event_registrations.count_documents({"event_id": event["id"]}) == 0
+    assert (await stored_link(flow, link))["use_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_an_expiry_sent_with_another_time_zone_is_stored_in_utc(flow):
+    from routes.access_link_routes import AccessLinkCreate, create_access_link
+
+    event = await draft_event(flow)
+    staff = await flow.add_staff()
+    body = AccessLinkCreate(target_type="event", target_id=event["id"], grants=["view", "register"],
+                            expires_at="2026-10-20T12:00:00+02:00")
+
+    created = await create_access_link(body, me=staff)
+
+    assert (await flow.db.access_links.find_one({"id": created["id"]}))["expires_at"] == "2026-10-20T10:00:00+00:00"
