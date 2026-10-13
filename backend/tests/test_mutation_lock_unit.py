@@ -142,3 +142,50 @@ def test_mutation_lock_validates_arguments():
                 pass
 
     asyncio.run(scenario())
+
+
+class _FlakyMutationLocks(_FakeMutationLocks):
+    """Die Erneuerung scheitert ``failures``-mal mit einem Datenbankfehler, danach klappt sie wieder."""
+
+    def __init__(self, failures: int):
+        super().__init__()
+        self.failures = failures
+        self.renew_calls = 0
+
+    async def update_one(self, query, update):
+        self.renew_calls += 1
+        if self.failures > 0:
+            self.failures -= 1
+            raise ConnectionError("mongo kurz weg")
+        return await super().update_one(query, update)
+
+
+def test_mutation_lock_keeps_renewing_after_a_failed_renewal(caplog):
+    async def scenario():
+        db = _FakeDb()
+        db.mutation_locks = _FlakyMutationLocks(failures=1)
+        with caplog.at_level("WARNING", logger="tls.mutation_lock"):
+            async with mutation_lock(db, "resource-1", wait_seconds=0, lease_seconds=0.06) as owner:
+                await asyncio.sleep(0.2)
+                document = db.mutation_locks.document
+                assert document["owner"] == owner
+                assert document["expires_at"] > datetime.now(timezone.utc), "die Sperre läuft nach einem Fehler nicht aus"
+        assert db.mutation_locks.renew_calls >= 3
+        assert db.mutation_locks.document is None
+        assert any("nicht erneuert" in record.getMessage() for record in caplog.records)
+
+    asyncio.run(scenario())
+
+
+def test_mutation_lock_reports_a_lost_lease(caplog):
+    async def scenario():
+        db = _FakeDb()
+        with caplog.at_level("WARNING", logger="tls.mutation_lock"):
+            async with mutation_lock(db, "resource-1", wait_seconds=0, lease_seconds=0.03):
+                # Ein anderer Worker hat übernommen (etwa nach einer Pause dieses Workers).
+                db.mutation_locks.document["owner"] = "anderer-worker"
+                await asyncio.sleep(0.05)
+        assert db.mutation_locks.document["owner"] == "anderer-worker", "die fremde Sperre bleibt unangetastet"
+        assert any("verloren" in record.getMessage() for record in caplog.records)
+
+    asyncio.run(scenario())

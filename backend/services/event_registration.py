@@ -12,6 +12,7 @@ from services.access_links import AccessLinkUsedUp, claim_access_link_use, relea
 from services.permissions import is_confirmed_tournament_lead
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
+from services.mutation_lock import MutationLockBusy, mutation_lock
 
 # Wer sich auch für einen Event-Entwurf anmelden darf: die Turnierleitung (Events gehören zu ihr) - seit #1350 nach
 # Bereich (Rolle oder Freigabe); die Rollenliste bleibt nur als Auskunft.
@@ -26,6 +27,13 @@ class RegistrationError(Exception):
         super().__init__(detail)
         self.status = status
         self.detail = detail
+
+
+class SeatsBusy(RegistrationError):
+    """Die Platzsperre war zu lange belegt (#1037) - kein „schon angemeldet“, sondern „gleich nochmal versuchen“."""
+
+    def __init__(self):
+        super().__init__(409, SEAT_BUSY)
 
 
 def registration_open(event: dict) -> bool:
@@ -54,24 +62,37 @@ def validated_companion_count(event: dict, value: int | None) -> int:
 
 async def summary(db, event: dict, exclude_registration_id: str | None = None) -> dict:
     """Plätze, Warteliste und Zähler - dieselbe Rechnung für Formular, Teilnehmerliste und Discord-Zusammenfassung."""
-    regs = await db.event_registrations.find({"event_id": event["id"]}, {"_id": 0}).to_list(2000)
+    # In der Datenbank gezählt, über alle Anmeldungen (#1037): Eine gelesene Liste hätte eine Obergrenze, und was darüber
+    # liegt, zählte nicht mit. Je Status Anzahl und Begleitpersonen (nicht negativ; was keine Zahl ist, zählt 0).
+    match = {"event_id": event["id"]}
     if exclude_registration_id:
-        regs = [r for r in regs if r.get("id") != exclude_registration_id]
-    active = [r for r in regs if r.get("status") in ACTIVE_STATUSES]
-    waitlist = [r for r in regs if r.get("status") == "waitlist"]
-    reserved_seats = sum(seats(r) for r in active)
-    waitlist_seats = sum(seats(r) for r in waitlist)
-    companion_count = sum(max(0, int(r.get("companion_count") or 0)) for r in active)
+        match["id"] = {"$ne": exclude_registration_id}
+    rows = await db.event_registrations.aggregate([
+        {"$match": match},
+        {"$group": {"_id": "$status", "count": {"$sum": 1},
+                    "companions": {"$sum": {"$max": [0, {"$ifNull": ["$companion_count", 0]}]}}}},
+    ]).to_list(None)
+    by_status = {row["_id"]: (int(row.get("count") or 0), int(row.get("companions") or 0)) for row in rows}
+
+    def count(*statuses: str) -> int:
+        return sum(by_status.get(status, (0, 0))[0] for status in statuses)
+
+    def companions(*statuses: str) -> int:
+        return sum(by_status.get(status, (0, 0))[1] for status in statuses)
+
+    companion_count = companions(*ACTIVE_STATUSES)
+    reserved_seats = count(*ACTIVE_STATUSES) + companion_count
+    waitlist_seats = count("waitlist") + companions("waitlist")
     max_participants = event.get("max_participants")
     spots_left = None
     if max_participants:
         spots_left = max(int(max_participants) - reserved_seats, 0)
     return {
-        "registered_count": len(active),
-        "waitlist_count": len(waitlist),
-        "checked_in_count": len([r for r in regs if r.get("status") == "checked_in"]),
-        "no_show_count": len([r for r in regs if r.get("status") == "no_show"]),
-        "cancelled_count": len([r for r in regs if r.get("status") == "cancelled"]),
+        "registered_count": count(*ACTIVE_STATUSES),
+        "waitlist_count": count("waitlist"),
+        "checked_in_count": count("checked_in"),
+        "no_show_count": count("no_show"),
+        "cancelled_count": count("cancelled"),
         "reserved_seats": reserved_seats,
         "waitlist_seats": waitlist_seats,
         "companion_count": companion_count,
@@ -96,8 +117,31 @@ async def existing_registration(db, event: dict, me: dict) -> dict | None:
     return await db.event_registrations.find_one({"event_id": event["id"], "user_id": me["id"]}, {"_id": 0})
 
 
+# Die Platzsperre des Events (#1037): Zählen und Schreiben einer Anmeldung geschehen in einem Zug - bei der Anmeldung
+# wie beim Nachrücken, Einchecken oder Ändern der Begleitpersonen durch die Turnierleitung. Ohne sie sähen zwei
+# gleichzeitige Anfragen denselben freien Platz und bekämen ihn beide. Wer ansteht, wartet kurz; dauert es zu lange,
+# kommt ein Satz zum Wiederholen.
+SEAT_WAIT_SECONDS = 5.0
+SEAT_BUSY = "Gerade melden sich viele gleichzeitig an – bitte versuch es gleich noch einmal."
+
+
+def seat_resource(event_id: str) -> str:
+    return f"event:{event_id}:seats"
+
+
 async def register(db, event: dict, me: dict, *, companion_count: int | None = 0, note: str | None = None,
                    selected_positions: list[str] | None = None, register_access: dict | None = None, via: str = "web") -> dict:
+    """Anmelden unter der Platzsperre - jeder Weg (Website, App, Discord, Zugangslink) kommt hier durch (#1037)."""
+    try:
+        async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
+            return await _register(db, event, me, companion_count=companion_count, note=note,
+                                   selected_positions=selected_positions, register_access=register_access, via=via)
+    except MutationLockBusy:
+        raise SeatsBusy()
+
+
+async def _register(db, event: dict, me: dict, *, companion_count: int | None, note: str | None,
+                    selected_positions: list[str] | None, register_access: dict | None, via: str) -> dict:
     """Anmelden - Platz oder Warteliste, Preis eingefroren und Auftrag angelegt, Audit mit dem Weg (``via``)."""
     companions = validated_companion_count(event, companion_count)
     requested_seats = 1 + companions
