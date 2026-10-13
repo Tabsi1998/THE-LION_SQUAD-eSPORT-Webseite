@@ -178,9 +178,12 @@ async def repair_order(db, event: dict, registration: dict) -> dict | None:
     Anmeldung, Preis und Auftrag werden nacheinander gespeichert. Bricht der Auftrag danach ab, antwortet die
     Wiederholung sonst nur „bereits angemeldet“, und es entstünde nie eine Rechnung. Genau einmal: ein vorhandener
     Auftrag zum selben Preis (auch ein stornierter) bleibt, und gleichzeitige Wiederholungen fängt der eindeutige
-    ``booking_key`` ab. Gibt den neuen Auftrag zurück, sonst ``None``."""
+    ``booking_key`` ab. Gibt den neuen Auftrag zurück, sonst ``None``.
+
+    Grundlage ist der eingefrorene Preis, nicht die heutige Abrechnung des Events (Codex-Prüfung #1500): wurde die
+    Abrechnung nach dem Abbruch abgeschaltet, gilt der vereinbarte Preis trotzdem."""
     snapshot = registration.get("price_snapshot")
-    if registration.get("status") not in ACTIVE_STATUSES or not snapshot or not pricing.is_paid(event.get("billing") or {}):
+    if registration.get("status") not in ACTIVE_STATUSES or not snapshot or int(snapshot.get("total_cents") or 0) <= 0:
         return None
     if registration.get("billing_status") not in (None, "pending"):
         return None

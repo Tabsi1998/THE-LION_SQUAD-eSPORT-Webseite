@@ -259,3 +259,22 @@ async def test_hint_never_due_for_under_14_without_own_choice(flow):
     assert (await flow.get("/api/users/me/friends-hint")).json() == {"due": False, "sharing": False}
     await flow.db.users.update_one({"id": viewer["id"]}, {"$set": {event_friends.SETTING: True}})
     assert (await flow.get("/api/users/me/friends-hint")).json() == {"due": True, "sharing": True}, "Gegenprobe: selbst eingeschaltet"
+
+
+@pytest.mark.asyncio
+async def test_refusals_before_the_handler_are_private_too(flow):
+    """Codex-Prüfung #1500: auch die 401 ohne Konto (vor dem Handler) und Absagen der Seiten-Wächter tragen
+    „private, no-store“. Gegenprobe: der Rückblick ohne Konto bleibt beim gewöhnlichen „no-store“."""
+    await seed(flow)
+    flow.act_as(None)
+    for url in ("/api/events/herbst-lan/friends", "/api/tournaments/mk/friends", "/api/f1/challenges/monza/friends", "/api/users/me/friends-hint"):
+        res = await flow.get(url)
+        assert res.status_code == 401 and res.headers["cache-control"] == PRIVATE, url
+    viewer = await flow.add_user(role="player", name="gustav")
+    flow.act_as(viewer)
+    for url, status in (("/api/tournaments/gibts-nicht/friends", 404), ("/api/f1/challenges/intern-lap/friends", 403)):
+        res = await flow.get(url)
+        assert res.status_code == status and res.headers["cache-control"] == PRIVATE, url
+    flow.act_as(None)
+    assert (await flow.get("/api/events/herbst-lan/recap")).headers["cache-control"] == "no-store"
+    assert (await flow.get("/api/tournaments/mk")).headers["cache-control"] == "no-store"

@@ -10,6 +10,8 @@
 - ``GET /api/users/me/friends-hint``: ob der einmalige Hinweis direkt nach der ersten Anmeldung fällig ist.
 - ``POST /api/users/me/friends-hint``: den einmaligen Hinweis bestätigen oder dabei gleich ausschalten.
 """
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
@@ -25,6 +27,13 @@ from services.visibility import lead_can_see
 router = APIRouter(tags=["events"])
 
 PRIVATE_CACHE = "private, no-store"
+# Die persönlichen Freunde-Pfade: „private, no-store“ in jeder Antwort, auch bei 401/403/404 vor oder im Handler
+# (Codex-Prüfung #1500) - die Middleware in ``server.py`` setzt es für genau diese Pfade.
+PRIVATE_PATHS = re.compile(r"^/api/(?:events/[^/]+/friends|tournaments/[^/]+/friends|f1/challenges/[^/]+/friends|users/me/friends-hint)/?$")
+
+
+def is_private_path(path: str) -> bool:
+    return bool(PRIVATE_PATHS.match(path or ""))
 VIEWER_FIELDS = {"_id": 0, "id": 1, "role": 1, "roles": 1, "birth_date": 1, event_friends.SETTING: 1, event_friends.HINT_FIELD: 1}
 
 
@@ -70,21 +79,13 @@ async def event_friends_view(event_id: str, response: Response, me: dict = Depen
     return await event_friends.friends_at_event(get_db(), event, await _viewer(me))
 
 
-async def _guarded(lookup):
-    """Absagen der Seiten-Wächter (404, 403) ebenfalls mit „private, no-store“ - auch eine Absage ist persönlich."""
-    try:
-        return await lookup
-    except HTTPException as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail, headers={**(exc.headers or {}), "Cache-Control": PRIVATE_CACHE}) from exc
-
-
 @router.get("/api/tournaments/{tournament_id}/friends")
 async def tournament_friends_view(tournament_id: str, response: Response, me: dict = Depends(get_current_user)):
     from routes.tournament_common import _get_visible_tournament, _resolve_tid
 
     _private(response)
-    tid = await _guarded(_resolve_tid(tournament_id))
-    tournament = await _guarded(_get_visible_tournament(tid, me))
+    tid = await _resolve_tid(tournament_id)
+    tournament = await _get_visible_tournament(tid, me)
     return await event_friends.friends_at_tournament(get_db(), tournament, await _viewer(me))
 
 
@@ -93,7 +94,7 @@ async def challenge_friends_view(challenge_id: str, response: Response, me: dict
     from routes.f1_routes import _get_visible_challenge_record
 
     _private(response)
-    challenge, _ = await _guarded(_get_visible_challenge_record(challenge_id, me))
+    challenge, _ = await _get_visible_challenge_record(challenge_id, me)
     return await event_friends.friends_at_challenge(get_db(), challenge, await _viewer(me))
 
 

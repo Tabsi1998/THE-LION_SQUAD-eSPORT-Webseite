@@ -99,16 +99,20 @@ async def repair_order(db, registration: dict, tournament: dict, *, actor: dict 
 
     Scheitert der Auftrag nach gespeicherter Anmeldung (oder nach gespeichertem Preis), antwortet die Wiederholung sonst
     nur „schon angemeldet“, und es entstünde nie eine Rechnung. Ohne Preis friert die Wiederholung ihn ein - aber nur für
-    die Person, die die Kosten übernommen hat. Gibt den Preis zurück, wenn jetzt ein Auftrag entstand."""
+    die Person, die die Kosten übernommen hat. Gibt den Preis zurück, wenn jetzt ein Auftrag entstand.
+
+    Mit eingefrorenem Preis zählt nur dieser, nicht die heutige Abrechnung des Turniers (Codex-Prüfung #1500): wurde
+    das Startgeld nach dem Abbruch abgeschaltet, gilt der vereinbarte Preis trotzdem. Nur das Einfrieren selbst fragt
+    das heutige Angebot."""
     offer = tournament.get("billing") or {}
-    if registration.get("status") not in BILLABLE_STATUSES or not charges(tournament, offer):
+    if registration.get("status") not in BILLABLE_STATUSES:
         return None
     snapshot = registration.get("price_snapshot")
     if not snapshot:
-        if not actor or registration.get("costs_accepted_by") != actor.get("id"):
+        if not charges(tournament, offer) or not actor or registration.get("costs_accepted_by") != actor.get("id"):
             return None
         return await freeze_price(db, registration, tournament, payer=actor)
-    if registration.get("billing_status") not in (None, "pending"):
+    if int(snapshot.get("total_cents") or 0) <= 0 or registration.get("billing_status") not in (None, "pending"):
         return None
     key = billing_orders.booking_key("tournament", registration["id"], snapshot)
     known = {"booking_key": key} if key else {"kind": "tournament", "registration_id": registration["id"], "status": {"$nin": ["cancelled", "failed"]}}

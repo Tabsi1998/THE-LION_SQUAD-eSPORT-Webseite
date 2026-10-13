@@ -198,3 +198,21 @@ async def test_a_cancelled_order_for_the_same_price_is_not_revived(flow):
     assert (await register(flow, event)).status_code == 409
     rows = await orders(flow, paula)
     assert len(rows) == 1 and rows[0]["status"] == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_switching_billing_off_after_the_gap_still_repairs_the_frozen_price(flow, monkeypatch):
+    """Codex-Prüfung #1500: Grundlage ist der eingefrorene Preis, nicht die heutige Abrechnung. Wird sie nach dem
+    Abbruch abgeschaltet, bekommt die schon bepreiste Anmeldung ihren Auftrag trotzdem - genau einmal."""
+    event = await paid_event(flow)
+    paula = await person(flow, "paula")
+    fail_once(monkeypatch)
+    flow.act_as(paula)
+    with pytest.raises(RuntimeError):
+        await register(flow, event)
+    await flow.db.events.update_one({"id": event["id"]}, {"$set": {"billing.enabled": False, "billing.positions": []}})
+    assert (await register(flow, event)).status_code == 409
+    rows = await orders(flow, paula)
+    assert len(rows) == 1 and rows[0]["total_cents"] == 2000
+    assert (await register(flow, event)).status_code == 409
+    assert len(await orders(flow, paula)) == 1

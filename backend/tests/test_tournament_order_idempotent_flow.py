@@ -85,6 +85,31 @@ async def test_a_failed_order_is_created_exactly_once_by_the_retry(flow, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_switching_the_fee_off_after_the_gap_still_repairs_the_frozen_price(flow, monkeypatch):
+    """Codex-Prüfung #1500: mit eingefrorenem Preis zählt nur dieser, nicht das heutige Startgeld. Gegenprobe: ohne
+    eingefrorenen Preis friert ein abgeschaltetes Startgeld nichts mehr ein."""
+    _, cup = await paid_cup(flow)
+    paula = await person(flow, "paula")
+    other = await person(flow, "other")
+    fail_once(monkeypatch)
+    flow.act_as(paula)
+    with pytest.raises(RuntimeError):
+        await flow.post(f"/api/tournaments/{cup['id']}/register", json=BODY)
+    await flow.db.tournaments.update_one({"id": cup["id"]}, {"$set": {"billing.enabled": False, "billing.positions": []}})
+    retry = await flow.post(f"/api/tournaments/{cup['id']}/register", json=BODY)
+    assert retry.json()["order_repaired"] is True
+    rows = await orders(flow, paula)
+    assert len(rows) == 1 and rows[0]["total_cents"] == 1000
+    assert (await flow.post(f"/api/tournaments/{cup['id']}/register", json=BODY)).json()["order_repaired"] is False
+
+    await flow.db.tournament_registrations.insert_one({"id": "r-other", "identity_key": f"{cup['id']}:user:{other['id']}", "tournament_id": cup["id"],
+                                                       "user_id": other["id"], "status": "approved", "registration_type": "solo", "costs_accepted_by": other["id"]})
+    flow.act_as(other)
+    assert (await flow.post(f"/api/tournaments/{cup['id']}/register", json=BODY)).json()["order_repaired"] is False
+    assert await orders(flow, other) == []
+
+
+@pytest.mark.asyncio
 async def test_without_frozen_price_the_retry_freezes_it_for_the_payer_only(flow):
     _, cup = await paid_cup(flow)
     paula = await person(flow, "paula")
