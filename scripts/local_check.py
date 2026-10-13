@@ -19,7 +19,11 @@ Groups:
                 coverage floor
     frontend    a frozen install, the dependency audit, ESLint, the production
                 build, the unit suite with coverage, and the Playwright smoke
-                on desktop and mobile
+                on desktop and mobile. The browser tests serve the app on a
+                port of their own per working folder (the main checkout 3000,
+                any other folder 3100-3899, or E2E_PORT from the environment),
+                so two folders never test each other's code. The port is named
+                in the step result and at the top of the frontend-e2e log.
     mobile      Node 20, a locked install, the audit, the type check, the
                 security and release regressions, the unit suite, the release
                 preflight and the Expo configuration
@@ -53,6 +57,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import zlib
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -91,8 +96,8 @@ FRONTEND_PORT = 3000
 # worktrees such as C:\lsb) runs its own check. The main checkout keeps the
 # CI's names; any other folder gets its own database name and compose project,
 # so two folders can be checked at the same time without touching each other's
-# data. Only the container group still binds fixed ports - run it in one folder
-# at a time.
+# data, and the browser tests pick their own port (pick_e2e_port). Only the
+# container group still binds fixed ports - run it in one folder at a time.
 MAIN_FOLDER = "THE-LION_SQUAD-eSPORT-Webseite"
 FOLDER_SLUG = "" if ROOT.name == MAIN_FOLDER else re.sub(r"[^a-z0-9]+", "_", ROOT.name.lower()).strip("_")
 
@@ -320,6 +325,32 @@ def port_open(port: int) -> bool:
         return probe.connect_ex(("127.0.0.1", port)) == 0
 
 
+E2E_PORT_BASE = 3100
+E2E_PORT_SPAN = 800
+
+
+def pick_e2e_port(folder: str, environ: dict, is_open: Callable[[int], bool] = port_open) -> int:
+    """The port the browser tests of one working folder serve the app on.
+
+    An E2E_PORT in the environment wins. The main checkout keeps 3000 while it
+    is free. Any other folder gets a port derived from its name, so it stays the
+    same from run to run, and the next free one if that is taken. A folder never
+    ends up on a port where another folder's server already answers.
+    """
+    given = str(environ.get("E2E_PORT", "")).strip()
+    if given.isdigit() and 0 < int(given) < 65536:
+        return int(given)
+    if folder == MAIN_FOLDER and not is_open(FRONTEND_PORT):
+        return FRONTEND_PORT
+    start = E2E_PORT_BASE + zlib.crc32(folder.lower().encode("utf-8")) % E2E_PORT_SPAN
+    for step in range(E2E_PORT_SPAN):
+        port = E2E_PORT_BASE + (start - E2E_PORT_BASE + step) % E2E_PORT_SPAN
+        if not is_open(port):
+            return port
+    raise StepFailed(f"no free port for the browser tests between {E2E_PORT_BASE} and "
+                     f"{E2E_PORT_BASE + E2E_PORT_SPAN - 1}")
+
+
 def docker(context: Context) -> str:
     if "docker" in context.cache:
         return context.cache["docker"]
@@ -410,13 +441,13 @@ def node_path_env(context: Context, node: str) -> dict:
 
 
 def run_yarn(context: Context, cwd: Path, *arguments, node: str, check: bool = True,
-             timeout: int = 3600) -> subprocess.CompletedProcess:
+             timeout: int = 3600, extra_env: dict | None = None) -> subprocess.CompletedProcess:
     """Yarn 1.22 through Corepack, with the chosen Node first on PATH.
 
     The lockfile is yarn.lock, so npm must never stand in: it would resolve a
     different tree than the one the deployment installs.
     """
-    env = node_path_env(context, node)
+    env = {**node_path_env(context, node), **(extra_env or {})}
     direct = shutil.which("yarn", path=env["PATH"])
     if direct:
         command = [direct]
@@ -1060,9 +1091,10 @@ def backend_steps() -> list:
 
 # ------------------------------------------------------------------ frontend
 
-def yarn(context: Context, *arguments: str, check: bool = True, timeout: int = 3600) -> subprocess.CompletedProcess:
+def yarn(context: Context, *arguments: str, check: bool = True, timeout: int = 3600,
+         extra_env: dict | None = None) -> subprocess.CompletedProcess:
     return run_yarn(context, FRONTEND, *arguments, node=node_of(context, FRONTEND_NODE_MAJOR),
-                    check=check, timeout=timeout)
+                    check=check, timeout=timeout, extra_env=extra_env)
 
 
 def yarn_step(name: str, describe: str, *arguments: str, failure: str, needs: tuple = ("install",),
@@ -1110,14 +1142,17 @@ def frontend_unit(context: Context) -> str:
 
 
 def frontend_e2e(context: Context) -> str:
-    completed = yarn(context, "test:e2e", check=False, timeout=5400)
+    port = pick_e2e_port(ROOT.name, context.env)
+    print(f"      browser tests: app on port {port} (E2E_PORT), no server of another folder is reused", flush=True)
+    completed = yarn(context, "test:e2e", check=False, timeout=5400,
+                     extra_env={"E2E_PORT": str(port), "E2E_ISOLATED": "1"})
     text = completed.stdout + completed.stderr
-    path = context.log("frontend-e2e", text)
+    path = context.log("frontend-e2e", f"E2E_PORT={port} E2E_ISOLATED=1\n{text}")
     if completed.returncode != 0:
         raise StepFailed(f"the browser smoke tests failed. Report: {FRONTEND / 'playwright-report'}. "
                          f"Full output: {path}\n" + tail(completed, 30))
     passed = re.search(r"(\d+) passed", text)
-    return f"{passed.group(1) if passed else '?'} browser tests passed"
+    return f"{passed.group(1) if passed else '?'} browser tests passed on port {port}"
 
 
 def frontend_steps() -> list:
