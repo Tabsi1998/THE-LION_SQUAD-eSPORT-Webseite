@@ -22,7 +22,10 @@ export function PasswordPanel({ googleOnly = false }) {
   const [busy, setBusy] = useState(false);
 
   const problem = next.length > 0 ? passwordProblem(next) : null;
-  const problemText = problem === MESSAGE_TOO_SHORT ? `Noch ${MIN_PASSWORD_LENGTH - passwordLength(next)} Zeichen.` : problem;
+  // Derselbe Regeltext wie Server und übrige Formulare; „Noch X Zeichen.“ nur als Zusatz.
+  const problemText = problem === MESSAGE_TOO_SHORT
+    ? `${MESSAGE_TOO_SHORT} Noch ${MIN_PASSWORD_LENGTH - passwordLength(next)} Zeichen.`
+    : problem;
   const mismatch = repeat.length > 0 && repeat !== next;
   const ready = !googleOnly && current.length > 0 && next.length > 0 && !problem && repeat === next && !busy;
 

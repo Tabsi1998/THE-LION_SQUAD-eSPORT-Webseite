@@ -48,4 +48,17 @@ describe("passwordProblem", () => {
   ])("lehnt %j ab", (value, message) => {
     expect(passwordProblem(value)).toBe(message);
   });
+
+  // Gleiche Fälle wie BLANK_CASES in backend/tests/test_password_contract_unit.py.
+  it.each([
+    [" ".repeat(12), true],
+    ["\u00a0".repeat(10), true],
+    ["\u3000".repeat(10), true],
+    ["\u2028".repeat(10), true],
+    ["\ufeff".repeat(10), false],
+    ["\u200b".repeat(10), false],
+  ])("prüft „nur Leerzeichen“ mit derselben Zeichenklasse wie der Server: %j", (value, blank) => {
+    expect(passwordProblem(value) === "Das Passwort darf nicht nur aus Leerzeichen bestehen.").toBe(blank);
+    if (!blank) expect(passwordProblem(value)).toBeNull();
+  });
 });

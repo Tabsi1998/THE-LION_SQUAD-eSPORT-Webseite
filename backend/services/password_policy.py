@@ -22,6 +22,9 @@ from pydantic import AfterValidator
 from pydantic_core import PydanticCustomError
 
 MIN_PASSWORD_LENGTH = 10
+# „Nur Leerzeichen“ heißt: jedes Zeichen gehört zu den Unicode-Kategorien Zs, Zl oder Zp. Dieselbe Klasse prüft
+# frontend/src/lib/passwordRules.js; str.strip() und String.trim() zählen unterschiedliche Zeichen als Leerraum.
+BLANK_CATEGORIES = ("Zs", "Zl", "Zp")
 MAX_PASSWORD_BYTES = 72
 
 MESSAGE_CONTROL = "Das Passwort darf keine Steuerzeichen wie Tabulator oder Zeilenumbruch enthalten."
@@ -43,7 +46,7 @@ def password_problem(value: str) -> Optional[str]:
     normalized = normalize_password(value)
     if any(unicodedata.category(char) in ("Cc", "Cs") for char in normalized):
         return MESSAGE_CONTROL
-    if normalized and not normalized.strip():
+    if normalized and all(unicodedata.category(char) in BLANK_CATEGORIES for char in normalized):
         return MESSAGE_BLANK
     if len(normalized) < MIN_PASSWORD_LENGTH:
         return MESSAGE_TOO_SHORT

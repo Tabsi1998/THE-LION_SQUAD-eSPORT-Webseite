@@ -17,6 +17,8 @@ const MESSAGE_TOO_LONG =
   `Das Passwort ist zu lang: höchstens ${MAX_PASSWORD_BYTES} Byte. Umlaute zählen doppelt, Emojis vierfach.`;
 
 const CONTROL_OR_LONE_SURROGATE = /[\p{Cc}\p{Cs}]/u;
+// „Nur Leerzeichen“: dieselbe Klasse wie BLANK_CATEGORIES im Backend (Zs, Zl, Zp) - nicht String.trim().
+const ONLY_BLANK = /^[\p{Zs}\p{Zl}\p{Zp}]+$/u;
 
 export function normalizePassword(value) {
   return String(value ?? "").normalize("NFC");
@@ -34,7 +36,7 @@ export function passwordBytes(value) {
 export function passwordProblem(value) {
   const normalized = normalizePassword(value);
   if (CONTROL_OR_LONE_SURROGATE.test(normalized)) return MESSAGE_CONTROL;
-  if (normalized && !normalized.trim()) return MESSAGE_BLANK;
+  if (ONLY_BLANK.test(normalized)) return MESSAGE_BLANK;
   if (passwordLength(normalized) < MIN_PASSWORD_LENGTH) return MESSAGE_TOO_SHORT;
   if (passwordBytes(normalized) > MAX_PASSWORD_BYTES) return MESSAGE_TOO_LONG;
   return null;

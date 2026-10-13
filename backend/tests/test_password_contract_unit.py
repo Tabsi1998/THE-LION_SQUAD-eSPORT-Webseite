@@ -76,6 +76,24 @@ def test_rejected_passwords(value):
     assert policy.password_problem(value)
 
 
+BLANK_CASES = [
+    (" " * 12, True),
+    ("\u00a0" * 10, True),
+    ("\u3000" * 10, True),
+    ("\u2028" * 10, True),
+    ("\ufeff" * 10, False),
+    ("\u200b" * 10, False),
+]
+
+
+@pytest.mark.parametrize(("value", "blank"), BLANK_CASES)
+def test_blank_check_uses_the_same_explicit_class_as_the_web(value, blank):
+    # Gleiche Fälle wie in frontend/src/lib/passwordRules.test.js.
+    assert (policy.password_problem(value) == policy.MESSAGE_BLANK) is blank
+    if not blank:
+        assert policy.password_problem(value) is None
+
+
 def test_length_is_counted_after_normalization():
     # Neun zusammengesetzte Zeichen bleiben neun Zeichen, egal wie das Gerät sie schickt.
     assert policy.password_problem("ä" * 9) == policy.password_problem("a\u0308" * 9)
