@@ -8,7 +8,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services import billing_orders, pricing
-from services.access_links import record_access_link_use
+from services.access_links import AccessLinkUsedUp, claim_access_link_use, release_access_link_use
 from services.permissions import is_confirmed_tournament_lead
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
@@ -138,22 +138,34 @@ async def register(db, event: dict, me: dict, *, companion_count: int | None = 0
     if status == "registered" and not price.get("free"):
         doc["price_snapshot"] = pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")})
         doc["billing_status"] = "pending"
-    if existing:
-        await db.event_registrations.update_one({"id": existing["id"]}, {"$set": doc})
-        doc = await db.event_registrations.find_one({"id": existing["id"]}, {"_id": 0})
-    else:
-        doc["id"] = new_id()
-        doc["created_at"] = now
-        try:
+    # Zugangslink mit Limit (#1036): die Nutzung atomar belegen, bevor die Anmeldung geschrieben wird.
+    try:
+        claimed = await claim_access_link_use(db, register_access, me)
+    except AccessLinkUsedUp as exc:
+        raise RegistrationError(409, exc.detail)
+    try:
+        if existing:
+            await db.event_registrations.update_one({"id": existing["id"]}, {"$set": doc})
+            doc = await db.event_registrations.find_one({"id": existing["id"]}, {"_id": 0})
+        else:
+            doc["id"] = new_id()
+            doc["created_at"] = now
             await db.event_registrations.insert_one(doc)
-        except DuplicateKeyError:
-            # Zwei gleichzeitige Anmeldungen (Doppelklick, Website und Discord): der eindeutige Index lässt nur eine
-            # durch. Die andere antwortet wie jede Wiederholung - und holt einen fehlenden Auftrag nach (#1491).
-            current = await existing_registration(db, event, me)
-            if current:
-                await repair_order(db, event, current)
-            raise RegistrationError(409, "Du bist für dieses Event bereits angemeldet")
-        doc.pop("_id", None)
+            doc.pop("_id", None)
+    except DuplicateKeyError:
+        # Zwei gleichzeitige Anmeldungen (Doppelklick, Website und Discord): der eindeutige Index lässt nur eine
+        # durch. Die andere gibt die Link-Nutzung zurück und antwortet wie jede Wiederholung - und holt einen
+        # fehlenden Auftrag nach (#1491).
+        if claimed:
+            await release_access_link_use(db, register_access, me)
+        current = await existing_registration(db, event, me)
+        if current:
+            await repair_order(db, event, current)
+        raise RegistrationError(409, "Du bist für dieses Event bereits angemeldet")
+    except Exception:
+        if claimed:
+            await release_access_link_use(db, register_access, me)
+        raise
     await db.audit_logs.insert_one({
         "id": new_id(),
         "action": "event.registration.create",
@@ -166,8 +178,6 @@ async def register(db, event: dict, me: dict, *, companion_count: int | None = 0
     if doc.get("price_snapshot"):
         await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=doc["id"], user_id=me["id"],
                                           snapshot=doc["price_snapshot"], timing=offer.get("invoice_timing") or "on_confirm")
-    if register_access:
-        await record_access_link_use(db, register_access, me)
     return doc
 
 

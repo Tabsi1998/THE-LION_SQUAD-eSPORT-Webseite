@@ -3,15 +3,14 @@ import React, { useCallback, useEffect, useRef } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { CeremonyHost } from "../achievements/ceremony/CeremonyHost";
 import { enqueueCeremony, enqueueLevelUp } from "../achievements/ceremony/queue";
-import { describePackage, isLevelGain } from "../achievements/ceremony/select";
+import { type LevelState, describePackage } from "../achievements/ceremony/select";
 import { type AchievementGroup, freshTiers, onAchievementUnlocked, onLevelChanged } from "../lib/achievements";
 import { api } from "../lib/api";
+import { claimLevelUp } from "../lib/levelSeen";
 
 // SecureStore keys must be alphanumeric + ".-_"; hash the user id into a safe key.
 const seenKey = (id: string) => `tls_ach_seen_${id.replace(/[^a-zA-Z0-9._-]/g, "")}`;
 const levelKey = (id: string) => `tls_level_seen_${id.replace(/[^a-zA-Z0-9._-]/g, "")}`;
-
-type LevelState = { level: number; title: string; prestige: number };
 
 /**
  * Der Freischalt-Moment (#218, Erfolge II E13 #623). Beim Start holt er nach, was seit dem letzten Blick dazukam
@@ -25,6 +24,12 @@ export function AchievementCatchUpOverlay() {
   const ranForRef = useRef<string | null>(null);
   const shownRef = useRef<Set<string>>(new Set());
   const userId = user?.id;
+  // Das gerade angemeldete Konto: eine Antwort, die noch für das vorige Konto unterwegs war, wird verworfen - sonst
+  // landet der Stand von Konto B im Merker von Konto A.
+  const currentRef = useRef(userId);
+  useEffect(() => {
+    currentRef.current = userId;
+  }, [userId]);
 
   const remember = useCallback((key: string) => {
     SecureStore.setItemAsync(key, new Date().toISOString()).catch(() => {});
@@ -32,27 +37,15 @@ export function AchievementCatchUpOverlay() {
 
   const checkLevel = useCallback(async () => {
     if (!userId) return;
+    const forUser = userId;
+    const sameUser = () => currentRef.current === forUser;
     try {
       const { data } = await api.get<{ level?: number; title?: string; prestige?: number }>("/users/me/level");
+      if (!sameUser()) return;
       const next: LevelState = { level: Number(data?.level || 1), title: String(data?.title || ""), prestige: Number(data?.prestige || 0) };
-      const key = levelKey(userId);
-      let prev: LevelState | null = null;
-      try {
-        prev = JSON.parse((await SecureStore.getItemAsync(key)) || "null");
-      } catch {
-        prev = null;
-      }
-      if (prev && Number(prev.level) && isLevelGain(prev, next)) {
-        enqueueLevelUp({
-          level: next.level,
-          previous: Number(prev.level),
-          title: next.title,
-          titleChanged: Boolean(next.title) && next.title !== String(prev.title || "") && next.prestige <= Number(prev.prestige || 0),
-          prestige: next.prestige,
-          prestigeGained: next.prestige > Number(prev.prestige || 0),
-        });
-      }
-      await SecureStore.setItemAsync(key, JSON.stringify(next));
+      // Lesen, vergleichen und merken unter einer Sperre: zwei gleichzeitige Prüfungen zeigen denselben Aufstieg nur einmal.
+      const levelUp = await claimLevelUp(levelKey(forUser), next, sameUser);
+      if (levelUp && sameUser()) enqueueLevelUp(levelUp);
     } catch {
       /* rein kosmetisch */
     }

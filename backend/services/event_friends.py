@@ -33,6 +33,7 @@ from services.fastlap_standings import official_query
 from services.visibility import lead_can_see
 
 VIENNA = ZoneInfo("Europe/Vienna")
+# Projektionen auf ``users`` nennen die beiden Felder wörtlich: Der Wächter (#1492) prüft nur feste Schlüssel.
 SETTING = "privacy_friends_see_registrations"
 HINT_FIELD = "friends_registrations_hint_seen_at"
 YOUTH_AGE = 14
