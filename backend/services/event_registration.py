@@ -10,6 +10,7 @@ from services.access_links import record_access_link_use
 from services.permissions import is_confirmed_tournament_lead
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
+from services.mutation_lock import MutationLockBusy, mutation_lock
 
 # Wer sich auch für einen Event-Entwurf anmelden darf: die Turnierleitung (Events gehören zu ihr) - seit #1350 nach
 # Bereich (Rolle oder Freigabe); die Rollenliste bleibt nur als Auskunft.
@@ -94,8 +95,31 @@ async def existing_registration(db, event: dict, me: dict) -> dict | None:
     return await db.event_registrations.find_one({"event_id": event["id"], "user_id": me["id"]}, {"_id": 0})
 
 
+# Die Platzsperre des Events (#1037): Zählen und Schreiben einer Anmeldung geschehen in einem Zug - bei der Anmeldung
+# wie beim Nachrücken, Einchecken oder Ändern der Begleitpersonen durch die Turnierleitung. Ohne sie sähen zwei
+# gleichzeitige Anfragen denselben freien Platz und bekämen ihn beide. Wer ansteht, wartet kurz; dauert es zu lange,
+# kommt ein Satz zum Wiederholen.
+SEAT_WAIT_SECONDS = 5.0
+SEAT_BUSY = "Gerade melden sich viele gleichzeitig an – bitte versuch es gleich noch einmal."
+
+
+def seat_resource(event_id: str) -> str:
+    return f"event:{event_id}:seats"
+
+
 async def register(db, event: dict, me: dict, *, companion_count: int | None = 0, note: str | None = None,
                    selected_positions: list[str] | None = None, register_access: dict | None = None, via: str = "web") -> dict:
+    """Anmelden unter der Platzsperre - jeder Weg (Website, App, Discord, Zugangslink) kommt hier durch (#1037)."""
+    try:
+        async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
+            return await _register(db, event, me, companion_count=companion_count, note=note,
+                                   selected_positions=selected_positions, register_access=register_access, via=via)
+    except MutationLockBusy:
+        raise RegistrationError(409, SEAT_BUSY)
+
+
+async def _register(db, event: dict, me: dict, *, companion_count: int | None, note: str | None,
+                    selected_positions: list[str] | None, register_access: dict | None, via: str) -> dict:
     """Anmelden - Platz oder Warteliste, Preis eingefroren und Auftrag angelegt, Audit mit dem Weg (``via``)."""
     companions = validated_companion_count(event, companion_count)
     requested_seats = 1 + companions
