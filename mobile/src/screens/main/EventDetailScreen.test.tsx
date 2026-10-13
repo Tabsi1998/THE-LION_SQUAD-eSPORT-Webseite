@@ -264,3 +264,46 @@ test("Album-Kacheln öffnen das Album", async () => {
   await fireEvent.press(screen.getByTestId("event-album-a2"));
   expect(navigate).toHaveBeenCalledWith("GalleryAlbum", { id: "a2" });
 });
+
+// „Spielst du auch mit?“ (#1184): nach der Event-Anmeldung kommt der zweite Schritt - nur mit Turnieren oder Fast Laps.
+// Kam man vom Turnier mit Event-Pflicht (#875), geht es danach dorthin zurück.
+const PLAY_ALONG = { show: true, entries: [{ kind: "tournament", id: "t1", slug: "lan-cup", title: "LAN-Cup", start_date: "2099-10-05T20:00:00Z", mode: "Einzel",
+  team: false, fee: null, spots_left: 7, full: false, selectable: true, reason: null, captain: false, my_status: null }] };
+
+function mockEventWith(extra: Record<string, unknown>) {
+  mockGet.mockImplementation(async (url: string) => (url.endsWith("/play-along") ? { data: PLAY_ALONG } : { data: { ...EVENT, offer: null, ...extra } }));
+}
+
+test("Spielst du auch mit? nach der Anmeldung - „Nein danke“ schließt, ohne Turniere kein zweiter Schritt", async () => {
+  mockEventWith({ tournaments: [{ id: "t1", slug: "lan-cup", title: "LAN-Cup", team_mode: "solo", status: "registration_open" }] });
+  const { unmount } = await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await fireEvent.press(await screen.findByTestId("event-register-submit"));
+  expect(await screen.findByTestId("play-along-check-t1")).toBeTruthy();
+  expect(mockGet).toHaveBeenCalledWith("/events/e1/play-along");
+  await fireEvent.press(screen.getByTestId("play-along-skip"));
+  await waitFor(() => expect(screen.queryByTestId("play-along-check-t1")).toBeNull());
+  expect(navigate).not.toHaveBeenCalled();
+  await unmount();
+
+  jest.clearAllMocks();
+  mockPost.mockResolvedValue({ data: {} });
+  mockEventWith({ tournaments: [], f1_challenges: [] });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await fireEvent.press(await screen.findByTestId("event-register-submit"));
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/events/e1/registrations", expect.anything()));
+  await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(2));
+  expect(mockGet.mock.calls.some(([url]) => String(url).endsWith("/play-along"))).toBe(false);
+  expect(screen.queryByTestId("play-along-sheet")).toBeNull();
+});
+
+test("vom Turnier mit Event-Pflicht gekommen: vorausgewählt, danach zurück zum Turnier", async () => {
+  mockEventWith({ tournaments: [{ id: "t1", slug: "lan-cup", title: "LAN-Cup", team_mode: "solo", status: "registration_open" }] });
+  const goBack = jest.fn();
+  const back = { navigate, goBack, canGoBack: () => true, getParent: () => ({ navigate }) } as never;
+  const fromTournament = { key: "e", name: "EventDetail", params: { id: "vereinsabend", returnTournament: "lan-cup" } } as never;
+  await render(<EventDetailScreen navigation={back} route={fromTournament} />);
+  await fireEvent.press(await screen.findByTestId("event-register-submit"));
+  expect((await screen.findByTestId("play-along-check-t1")).props.accessibilityState).toEqual({ checked: true });
+  await fireEvent.press(screen.getByTestId("play-along-skip"));
+  expect(goBack).toHaveBeenCalledTimes(1);
+});

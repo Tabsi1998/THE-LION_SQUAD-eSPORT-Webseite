@@ -177,7 +177,8 @@ function TournamentDetailView() {
   // Turnier nur mit Event-Anmeldung (#875): wer einzeln antritt, sieht den Weg über das Event, bevor er scheitert. Bei
   // Teams prüft der Server die Mitglieder und nennt, wer fehlt.
   const eventGate = t.event_gate || null;
-  const eventHref = eventGate?.event ? `/events/${eventGate.event.slug || eventGate.event.id}` : "";
+  // Mit ?turnier=… führt die Event-Seite nach der Anmeldung und „Spielst du auch mit?“ (#1184) hierher zurück.
+  const eventHref = eventGate?.event ? `/events/${eventGate.event.slug || eventGate.event.id}?turnier=${encodeURIComponent(t.slug || t.id)}` : "";
   const eventBlocked = !!eventGate && !isTeamTournament && !eventGate.registered;
   const hasRegisterAccess = t.access_link?.grants?.includes("register");
   const canSelfRegister = (registration.canRegister || hasRegisterAccess) && !clubMemberBlocked && !eventBlocked;

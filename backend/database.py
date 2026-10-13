@@ -414,6 +414,9 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     ("discord_activity", [("user_id", 1), ("day", 1)], "user_day", {}),
     ("discord_guild_stats", [("guild_id", 1), ("day", 1)], "guild_day", {}),
     ("discord_guild_active", [("guild_id", 1), ("day", 1), ("user_id", 1)], "guild_day_user", {}),
+    # Je eingefrorenem Preis höchstens ein Rechnungsauftrag (#1184). Nur Aufträge mit Schlüssel zählen - ältere haben
+    # keinen und können den Aufbau nie blockieren; Dubletten ließen ohnehin nur einen gewöhnlichen Index zurück.
+    ("billing_orders", "booking_key", "booking_key", {"partialFilterExpression": {"booking_key": {"$exists": True}}}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("platform_links", "user_id"),

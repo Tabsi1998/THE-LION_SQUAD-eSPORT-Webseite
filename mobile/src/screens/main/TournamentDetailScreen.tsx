@@ -105,6 +105,22 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Zurück vom Event (#1184): nach Event-Anmeldung und „Spielst du auch mit?“ hat sich der Stand geändert - beim
+  // Wiederkommen frisch laden (nur nach einem Weggehen; das erste Öffnen lädt der Effekt oben).
+  useEffect(() => {
+    let away = false;
+    const offBlur = navigation.addListener?.("blur", () => { away = true; });
+    const offFocus = navigation.addListener?.("focus", () => {
+      if (!away) return;
+      away = false;
+      void load();
+    });
+    return () => {
+      offBlur?.();
+      offFocus?.();
+    };
+  }, [load, navigation]);
   useLiveRefresh(load, TOURNAMENT_LIVE_RESOURCES, { fallbackMs: 10000 });
 
   const registrations = bracket.registrations || [];
@@ -361,7 +377,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                     ) : null}
                   </>
                 ) : eventBlocked && eventGate && registration.canRegister && !clubMemberBlocked ? (
-                  <Button label="Zuerst beim Event anmelden" onPress={() => navigation.navigate("EventDetail", { id: eventGate.event.slug || eventGate.event.id })} testID="tournament-event-first" />
+                  <Button label="Zuerst beim Event anmelden" onPress={() => navigation.navigate("EventDetail", { id: eventGate.event.slug || eventGate.event.id, returnTournament: tournament.slug || tournament.id })} testID="tournament-event-first" />
                 ) : canSelfRegister ? (
                   <>
                     <Muted>Mit der Anmeldung akzeptierst du Regeln und Datenschutz für dieses Turnier.</Muted>

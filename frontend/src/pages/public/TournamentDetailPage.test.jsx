@@ -210,7 +210,7 @@ test("Turnier nur mit Event-Anmeldung (#875): ohne Event-Anmeldung führt die Ha
   const { unmount } = renderPage();
   const first = await screen.findByTestId("tournament-event-first");
   expect(first).toHaveTextContent("Zuerst beim Event anmelden");
-  expect(first).toHaveAttribute("href", "/events/vereins-lan");
+  expect(first).toHaveAttribute("href", "/events/vereins-lan?turnier=cup");
   expect(screen.queryByTestId("tournament-register-btn")).toBeNull();
   expect(screen.getByTestId("tournament-event-gate")).toHaveTextContent("Melde dich zuerst beim Event „Vereins-LAN“ an.");
   unmount();
