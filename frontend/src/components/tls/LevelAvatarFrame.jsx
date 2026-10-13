@@ -1,7 +1,8 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { FRAME_SIZES, PROFILE_SMALL, frameFit, frameLayout, framePadding, frameSources, rankInfo, ringOf } from "@/lib/loewenRang";
+import { ASCENT_TIMING, burstDelay } from "@/lib/loewenAufstieg";
 
 const TLS_BLUE = "#29B6E8";
 const MAX_PRESTIGE = 5;
@@ -114,9 +115,12 @@ const STILL = new Set(["list", "mini"]);
  * size: "profile" (285 px, auf dem Handy 220), "card" (150), "list" (92) oder "mini" (64, etwa das Podest);
  * `compact` heißt "list". In Listen und klein bleibt nur die Grafik, ohne Glanz und ohne Schild.
  * Nur im Profil läuft die Signatur des Rangs (#1455) - ab dem zweiten Level im Rang, nicht mit „Bewegung reduzieren“.
+ * `ascent` (aus ascentMoment, lib/loewenAufstieg.js) spielt einmal den Aufstiegs-Moment (#1456): beim Level im Rang
+ * springen die neuen Rauten auf und ein Glanz läuft durch, beim Rangwechsel blitzt der alte Rahmen weg und der neue
+ * rastet ein - dazu der kleine bzw. große Moment der Signatur. Mit reduzierter Bewegung nur Ein- und Ausblenden.
  * Die Kinder füllen das runde Foto.
  */
-export function LevelAvatarFrame({ level, prestige = 0, crown: rawCrown = null, size, className = "", compact = false, showBadge = true, team = false, testId, children }) {
+export function LevelAvatarFrame({ level, prestige = 0, crown: rawCrown = null, size, className = "", compact = false, showBadge = true, team = false, ascent = null, testId, children }) {
   const cfg = useMemo(() => levelFrameConfig(level), [level]);
   const variant = FRAME_SIZES[size] ? size : compact ? "list" : "profile";
   const still = STILL.has(variant);
@@ -131,13 +135,31 @@ export function LevelAvatarFrame({ level, prestige = 0, crown: rawCrown = null, 
   const reducedMotion = useReducedMotion();
   // Gleiche Regel wie signatureEnabled (lib/loewenSignatur.js), ohne die Datei ins Haupt-Bundle zu ziehen: beim ersten
   // Level eines Rangs glänzt nur der Rahmen.
-  const signature = variant === "profile" && !reducedMotion && cfg.progress > 0;
+  const moment = ascent && !still && Number(ascent.level) === cfg.level ? ascent : null;
+  const motion = Boolean(moment?.particles) && !reducedMotion;
+  const signature = (variant === "profile" && !reducedMotion && cfg.progress > 0) || motion;
+  const oldCfg = useMemo(() => (moment?.kind === "rank" ? levelFrameConfig(moment.previous) : null), [moment?.kind, moment?.previous]);
+  const oldSources = oldCfg ? frameSources(oldCfg.key, artPx(FRAME_SIZES[variant], oldCfg)) : null;
+  const pops = useMemo(() => new Map((moment?.pops || []).map((index, order) => [index, order])), [moment]);
+  // Beim Rangwechsel wartet der Moment, bis der alte Rahmen weggeblitzt ist; beim Level im Rang kommt er gleich.
+  const burst = useMemo(() => (motion ? { id: moment.id, strong: moment.strong, delay: burstDelay(moment.kind) } : null), [motion, moment]);
+  const [jolt, setJolt] = useState(false);
+  const joltTimer = useRef(0);
+  const onJolt = useCallback(() => {
+    setJolt(true);
+    window.clearTimeout(joltTimer.current);
+    joltTimer.current = window.setTimeout(() => setJolt(false), 400);
+  }, []);
+  useEffect(() => () => window.clearTimeout(joltTimer.current), []);
   // In Listen gibt es kein Schild - dort trägt der Rahmen selbst Level und Rang als zugänglichen Namen.
   const label = `${team ? "Team-Level" : "Level"} ${shown}, Rang ${cfg.name}${stars > 0 ? `, Prestige ${stars}` : ""}`;
   useEffect(() => { setLoaded(false); }, [cfg.key]);
   return (
     <div
-      className={["tls-lvf", `tls-lvf--${variant}`, still ? "tls-lvf--still" : "", plate ? "tls-lvf--plate" : "", plate && stars > 0 ? "tls-lvf--stars" : "", team ? "tls-lvf--team" : "", className].filter(Boolean).join(" ")}
+      className={[
+        "tls-lvf", `tls-lvf--${variant}`, still ? "tls-lvf--still" : "", plate ? "tls-lvf--plate" : "", plate && stars > 0 ? "tls-lvf--stars" : "", team ? "tls-lvf--team" : "",
+        moment ? `tls-lvf--ascent tls-lvf--ascent-${moment.kind}` : "", moment && !motion ? "tls-lvf--ascent-calm" : "", jolt ? "tls-lvf--jolt" : "", className,
+      ].filter(Boolean).join(" ")}
       role={still ? "img" : undefined}
       aria-label={still ? label : undefined}
       style={{
@@ -151,15 +173,29 @@ export function LevelAvatarFrame({ level, prestige = 0, crown: rawCrown = null, 
         "--lvf-pb": cfg.pad[2].toFixed(4),
         "--lvf-rc": cfg.color,
         "--lvf-shine": (0.35 + 0.55 * cfg.progress).toFixed(2),
+        ...(moment ? { "--lvf-hold": `${ASCENT_TIMING.hold}ms` } : null),
       }}
       data-level={shown}
       data-rank={cfg.rank}
       data-rank-name={cfg.name}
       data-crown={crown || undefined}
+      data-ascent={moment?.kind}
       data-testid={testId}
     >
       <div className="tls-lvf-core">
         <div className="tls-lvf-photo">{children}</div>
+        {oldCfg && (
+          <span
+            className="tls-lvf-art tls-lvf-art--old"
+            data-loaded="1"
+            data-rank={oldCfg.rank}
+            data-testid="loewen-ascent-old"
+            aria-hidden="true"
+            style={{ "--lvf-scale": oldCfg.scale.toFixed(4), "--lvf-ox": oldCfg.ox.toFixed(4), "--lvf-oy": oldCfg.oy.toFixed(4) }}
+          >
+            <img className="tls-lvf-img" src={oldSources.src} srcSet={oldSources.srcSet} sizes={sizes} alt="" draggable="false" decoding="async" />
+          </span>
+        )}
         <span className="tls-lvf-art" data-loaded={loaded ? "1" : undefined} aria-hidden="true">
           <img
             className="tls-lvf-img"
@@ -192,7 +228,7 @@ export function LevelAvatarFrame({ level, prestige = 0, crown: rawCrown = null, 
             <span className="tls-lvf-tag">{team ? `TEAM LVL ${shown}` : cfg.max ? "LVL 60 · MAX" : `LVL ${shown}`}</span>
             <span className="tls-lvf-pips" role="img" aria-label={`${cfg.name}: ${cfg.filled} von ${cfg.pips}`}>
               {Array.from({ length: cfg.pips }, (_, i) => (
-                <i key={i} className={`tls-lvf-pip${i < cfg.filled ? " is-on" : ""}`} />
+                <i key={i} className={`tls-lvf-pip${i < cfg.filled ? " is-on" : ""}${pops.has(i) ? " is-pop" : ""}`} style={pops.has(i) ? { "--lvf-pop": pops.get(i) } : undefined} />
               ))}
             </span>
           </span>
@@ -200,7 +236,7 @@ export function LevelAvatarFrame({ level, prestige = 0, crown: rawCrown = null, 
       </div>
       {signature && (
         <Suspense fallback={null}>
-          <LoewenRangSignature level={shown} fit={cfg.fit} scale={cfg.scale} ox={cfg.ox} oy={cfg.oy} ring={cfg.ring} />
+          <LoewenRangSignature level={shown} fit={cfg.fit} scale={cfg.scale} ox={cfg.ox} oy={cfg.oy} ring={cfg.ring} burst={burst} onJolt={burst ? onJolt : null} />
         </Suspense>
       )}
     </div>

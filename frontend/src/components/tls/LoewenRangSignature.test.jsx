@@ -192,3 +192,72 @@ test("Ersatz-Kante: Punkte knapp außerhalb des Rings, solange die Kantenpunkte 
   expect(edge).toHaveLength(12);
   for (const [u, v] of edge) expect(Math.hypot(u - ring.cx, v - ring.cy)).toBeGreaterThan(ring.r);
 });
+
+// ---- Aufstiegs-Moment (#1456) ----
+
+test("Aufstiegs-Moment: jeder Rang zeichnet seinen großen Moment, auch beim ersten Level, unter MAX_PARTICLES", () => {
+  for (const fx of SIGNATURE_FX) {
+    const jolts = vi.fn();
+    const cfg = levelFrameConfig(30);
+    const engine = createSignatureEngine({
+      back: fakeCanvas(), front: fakeCanvas(), fx, k: 0, edge: fallbackEdge(cfg.ring), onJolt: jolts,
+      layout: (width) => signatureGeometry({ width, box: SIGNATURE_BOX, fit: cfg.fit, scale: cfg.scale, ox: cfg.ox, oy: cfg.oy }),
+    });
+    engine.burst(true);
+    let max = 0;
+    for (let i = 1; i <= 90; i++) {
+      engine.frame(i * 16);
+      max = Math.max(max, engine.drawn);
+    }
+    expect(max, `${fx} zeichnet den Moment`).toBeGreaterThan(0);
+    expect(max, `${fx} bleibt unter der Obergrenze`).toBeLessThanOrEqual(MAX_PARTICLES);
+    // Brüller, Obsidian und Sturm lassen den Rahmen beben.
+    expect(jolts.mock.calls.length > 0, fx).toBe(["roar", "lava", "storm"].includes(fx));
+    // Danach ist alles verglüht - die Signatur selbst ruht beim ersten Level.
+    for (let i = 91; i <= 400; i++) engine.frame(i * 16);
+    expect(engine.particles, `${fx} verglüht`).toBe(0);
+  }
+});
+
+test("Aufstiegs-Moment: der kleine ist kleiner, der große wartet auf den neuen Rahmen", () => {
+  const sizes = {};
+  for (const strong of [false, true]) {
+    const engine = engineFor(30, "fire", 0);
+    engine.burst(strong);
+    engine.frame(16);
+    sizes[strong ? "strong" : "small"] = engine.particles;
+  }
+  expect(sizes.small).toBeGreaterThan(0);
+  expect(sizes.small).toBeLessThan(sizes.strong);
+
+  const delayed = engineFor(30, "fire", 0);
+  delayed.burst(true, { delay: 0.24 });
+  delayed.frame(16);
+  delayed.frame(32);
+  expect(delayed.particles).toBe(0);
+  for (let i = 3; i <= 20; i++) delayed.frame(i * 16);
+  expect(delayed.particles).toBeGreaterThan(0);
+});
+
+test("Aufstiegs-Moment: Goldstaub saugt sich zuerst ein und explodiert dann", () => {
+  const engine = engineFor(25, "gold", 0);
+  engine.burst(true);
+  engine.frame(16);
+  const sucked = engine.particles;
+  expect(sucked).toBeGreaterThan(50);
+  for (let i = 2; i <= 40; i++) engine.frame(i * 16);
+  // Nach 0,45 s ist der Staub im Edelstein, die Explosion bringt neue Funken.
+  expect(engine.particles).toBeGreaterThan(0);
+});
+
+test("Aufstiegs-Moment im Rahmen: erstes Level eines Rangs bekommt die Leinwand, mit Bewegung reduzieren nicht", async () => {
+  const { unmount } = render(<LoewenRangSignature {...props(55)} burst={{ id: "54>55", strong: true, delay: 0.24 }} />);
+  const front = await screen.findByTestId("loewen-signature");
+  expect(front.dataset.signature).toBe("storm");
+  expect(front.dataset.burst).toBe("strong");
+  expect(front.dataset.layers).toBe("");
+  unmount();
+  setReducedMotion(true);
+  const { container } = render(<LoewenRangSignature {...props(55)} burst={{ id: "54>55", strong: true }} />);
+  expect(container.querySelector("canvas")).toBeNull();
+});
