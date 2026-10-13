@@ -626,6 +626,18 @@ async def _safe_chat_attachment_cleanup():
         _log_task_failure("chat_attachment_cleanup", exc)
 
 
+async def _safe_erasure_file_cleanup():
+    """Kontolöschung (#1039): Dateien, deren Löschung beim ersten Mal scheiterte, erneut versuchen."""
+    try:
+        from database import get_db
+        from services.account_erasure import retry_file_cleanups
+        removed = await retry_file_cleanups(get_db())
+        if removed:
+            logger.info(f"[scheduler] erasure_file_cleanup removed={removed}")
+    except Exception as exc:
+        _log_task_failure("erasure_file_cleanup", exc)
+
+
 async def _safe_result_holds():
     """Ergebnisse mit „Rückgängig“ (#1156): veröffentlicht, was der Zeitgeber im Server verpasst hat (Neustart)."""
     try:
@@ -945,6 +957,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("status_transitions", _safe_status_transitions), IntervalTrigger(seconds=60), id="status_transitions",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("chat_attachment_cleanup", _safe_chat_attachment_cleanup), IntervalTrigger(hours=1), id="chat_attachment_cleanup",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("erasure_file_cleanup", _safe_erasure_file_cleanup), IntervalTrigger(hours=1), id="erasure_file_cleanup",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("proof_photo_retention", _safe_proof_photo_retention, lease_seconds=300.0), IntervalTrigger(hours=1),
                   id="proof_photo_retention", max_instances=1, coalesce=True)

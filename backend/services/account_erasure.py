@@ -16,9 +16,13 @@ Je Sammlung eine Entscheidung - sie steht für Betroffene in der Datenschutzerkl
 from __future__ import annotations
 
 import logging
+import pathlib
 import re
 
-from services import media_audit
+from bson import ObjectId
+
+from models import now_utc
+from services import media_audit, uploads_inventory
 from services.image_variants import VARIANT_WIDTHS, variant_path
 from storage import PUBLIC_UPLOAD_DIR, QUARANTINE_DIR, UPLOAD_DIR
 
@@ -88,51 +92,191 @@ async def _records(db, user: dict, now: str) -> None:
     await db.access_links.update_many({"$or": bound}, {"$set": {"is_active": False, "email": None, "note": None, "updated_at": now}})
 
 
-async def _still_used(db, filename: str) -> bool:
-    """Ob ein Bild noch irgendwo steht - als Teamlogo etwa gehört es längst dem Team."""
-    ending = re.escape(filename) + "$"
-    for collection, fields in media_audit.TARGETS:
-        if await getattr(db, collection).find_one({"$or": [{field: {"$regex": ending}} for field in fields]}, {"_id": 1}):
-            return True
-    anywhere = re.escape(filename)
-    for collection, fields in media_audit.TEXT_TARGETS:
-        if await getattr(db, collection).find_one({"$or": [{field: {"$regex": anywhere}} for field in fields]}, {"_id": 1}):
-            return True
-    return False
+# Persönliche Profile (#1039): Steht eine eigene Datei im Profil einer anderen Person, hält das sie nicht fest - sie geht
+# mit dem Konto, und das andere Profil verliert nur den Eintrag. Einträge des Vereins im Verzeichnis zählen nicht dazu.
+PERSONAL_PLACES = (
+    ("users", {}, ("avatar_url", "banner_url")),
+    ("club_member_profiles", {"source": "member"}, ("photo_url", "cover_url")),
+)
+# Dateien, deren Löschung scheiterte (gesperrt, Rechte): die Verwaltungszeilen bleiben, der Aufräum-Job versucht es
+# stündlich erneut (``retry_file_cleanups``).
+PENDING = "pending_file_cleanups"
+BATCH = 100
+VARIANT_NAME = re.compile(r"^(?P<stem>.+)-(?P<width>\d{3,4})\.webp$")
 
 
-def _filename(url: str | None) -> str | None:
-    path = media_audit._upload_path(url or "")
-    return media_audit._filename_from_upload_path(path) if path else None
+def _id_forms(user_id: str) -> list:
+    """Die Kennung als Text und - wenn sie so aussieht - als ObjectId, damit Zeilen beider Art gefunden werden."""
+    forms: list = [str(user_id)]
+    if ObjectId.is_valid(str(user_id)):
+        forms.append(ObjectId(str(user_id)))
+    return forms
+
+
+def _canonical(value, candidates: dict[str, str]) -> str | None:
+    """Der Dateiname hinter einer Adresse - ohne Query und Fragment, auch absolut; eine kleinere Fassung
+    (``variants/<name>-400.webp``) zählt als ihr Original. ``candidates``: Stamm → Dateiname."""
+    name = uploads_inventory.upload_filename(str(value or ""))
+    if not name or name in candidates.values():
+        return name
+    variant = VARIANT_NAME.match(name)
+    if variant and variant.group("stem") in candidates:
+        return candidates[variant.group("stem")]
+    return name
+
+
+def _values(document, path: str) -> list:
+    """Alle Werte unter einem Feldpfad mit Punkten - auch durch Listen hindurch (``tools.image_url``)."""
+    current = [document]
+    for key in path.split("."):
+        found = []
+        for item in current:
+            for entry in (item if isinstance(item, list) else [item]):
+                if isinstance(entry, dict) and key in entry:
+                    found.append(entry[key])
+        current = found
+    flat = []
+    for item in current:
+        flat.extend(item if isinstance(item, list) else [item])
+    return flat
+
+
+def _urls_in_text(text) -> list[str]:
+    if not isinstance(text, str) or "uploads/" not in text:
+        return []
+    urls = [match.group("md") or match.group("html") or "" for match in media_audit.TEXT_IMAGE_RE.finditer(text)]
+    return urls + uploads_inventory.URL_IN_TEXT_RE.findall(text)
+
+
+def _personal(collection: str, document: dict) -> bool:
+    return any(name == collection and all(document.get(key) == value for key, value in base.items())
+               for name, base, _fields in PERSONAL_PLACES)
+
+
+async def _usage(db, names: set[str]) -> tuple[set[str], dict[str, list]]:
+    """Wo die Dateien noch stehen - je Sammlung eine Abfrage für viele Dateien statt je Datei.
+
+    Liefert die Dateien, die außerhalb persönlicher Profile verwendet werden, und je Datei die Stellen in persönlichen
+    Profilen als ``(Sammlung, _id, Feld)``."""
+    elsewhere: set[str] = set()
+    personal: dict[str, list] = {}
+    places = [(collection, fields, False) for collection, fields in media_audit.TARGETS + media_audit.USAGE_TARGETS]
+    places += [(collection, fields, True) for collection, fields in media_audit.TEXT_TARGETS + media_audit.USAGE_TEXT_TARGETS]
+    ordered = sorted(names)
+    for offset in range(0, len(ordered), BATCH):
+        candidates = {pathlib.PurePosixPath(name).stem: name for name in ordered[offset:offset + BATCH]}
+        pattern = "|".join(re.escape(stem) for stem in sorted(candidates))
+        for collection, fields, text in places:
+            query = {"$or": [{field: {"$regex": pattern}} for field in fields]}
+            projection = {"_id": 1, "source": 1, **{field: 1 for field in fields}}
+            async for document in getattr(db, collection).find(query, projection):
+                is_personal = _personal(collection, document)
+                for field in fields:
+                    for value in _values(document, field):
+                        found = {_canonical(url, candidates) for url in (_urls_in_text(value) if text else [value])}
+                        for name in found & names:
+                            if not is_personal:
+                                elsewhere.add(name)
+                            elif not text:
+                                personal.setdefault(name, []).append((collection, document["_id"], field))
+    return elsewhere, personal
+
+
+def _unlink(path: pathlib.Path) -> None:
+    path.unlink(missing_ok=True)
+
+
+async def _remove(db, name: str, scans: list[dict]) -> str | None:
+    """Datei, kleinere Fassungen und Quarantäne-Kopien weg; erst danach die Verwaltungszeilen. Liefert den Fehler."""
+    try:
+        for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
+            path = base / name
+            for width in VARIANT_WIDTHS:
+                _unlink(variant_path(path, width))
+            _unlink(path)
+        for scan in scans:
+            key = media_audit._filename_from_upload_path(str(scan.get("quarantine_key") or ""))
+            if key:
+                _unlink(QUARANTINE_DIR / key)
+    except OSError as exc:  # die Löschung des Kontos darf an einer gesperrten Datei nicht scheitern
+        return str(exc)[:300] or exc.__class__.__name__
+    if scans:
+        await db.media_scans.delete_many({"_id": {"$in": [scan["_id"] for scan in scans]}})
+    await db.media_uploads.delete_many({"filename": name})
+    return None
+
+
+async def _scans(db, owner_id: str, names: set[str]) -> dict[str, list[dict]]:
+    """Die Einträge der Bildprüfung zu diesen Dateien - eine Abfrage für alle."""
+    stems = {pathlib.PurePosixPath(name).stem: name for name in names}
+    query = {"owner_id": {"$in": _id_forms(owner_id)}, "url": {"$regex": "|".join(re.escape(stem) for stem in sorted(stems))}}
+    found: dict[str, list[dict]] = {}
+    async for scan in db.media_scans.find(query, {"_id": 1, "url": 1, "quarantine_key": 1}):
+        name = _canonical(scan.get("url"), stems)
+        if name in names:
+            found.setdefault(name, []).append(scan)
+    return found
+
+
+async def _clean(db, owner_id: str, owned: set[str], untracked: set[str]) -> int:
+    """Löscht, was nirgends mehr steht. Eigene Dateien: persönliche Profile anderer verlieren den Eintrag."""
+    names = owned | untracked
+    if not names:
+        return 0
+    elsewhere, personal = await _usage(db, names)
+    scans = await _scans(db, owner_id, names)
+    removed = 0
+    for name in sorted(names):
+        if name in elsewhere or (name in untracked and name in personal):
+            await db[PENDING].delete_many({"filename": name})
+            continue
+        error = await _remove(db, name, scans.get(name, []))
+        if error:
+            logger.warning("[dsgvo] Bild %s nicht gelöscht, wird nachgeholt: %s", name, error)
+            now = now_utc().isoformat()
+            await db[PENDING].update_one({"filename": name}, {
+                "$set": {"owner_id": str(owner_id), "owned": name in owned, "last_error": error, "updated_at": now},
+                "$inc": {"attempts": 1}, "$setOnInsert": {"created_at": now},
+            }, upsert=True)
+            continue
+        for collection, row_id, field in personal.get(name, []):
+            await getattr(db, collection).update_one({"_id": row_id}, {"$set": {field: None}})
+        await db[PENDING].delete_many({"filename": name})
+        removed += 1
+    return removed
 
 
 async def _own_images(db, user_id: str, urls: list[str | None]) -> int:
     """Avatar, Banner und alles, was das Konto für sich hochgeladen hat: Datei, kleinere Fassungen, eine Kopie in der
-    Quarantäne der Bildprüfung und die Verwaltungszeilen. Was noch verwendet wird, bleibt."""
-    names = {name for name in (_filename(url) for url in urls) if name}
-    async for row in db.media_uploads.find({"owner_id": user_id, "media_scope": "user"}, {"_id": 0, "filename": 1}):
-        if _filename(f"/api/static/uploads/{row.get('filename') or ''}"):
-            names.add(row["filename"])
+    Quarantäne der Bildprüfung und die Verwaltungszeilen. Was noch verwendet wird, bleibt.
+
+    Eigen ist, was das Konto hochgeladen hat (#1039). Eine Datei im eigenen Profil, die einem anderen Konto oder dem
+    Verein gehört, bleibt; eine ältere ohne Verwaltungszeile geht, wenn sie sonst nirgends steht."""
+    owned: set[str] = set()
+    query = {"owner_id": {"$in": _id_forms(user_id)}, "media_scope": "user"}
+    async for row in db.media_uploads.find(query, {"_id": 0, "filename": 1}):
+        if media_audit._filename_from_upload_path(str(row.get("filename") or "")):
+            owned.add(row["filename"])
+    profile = {uploads_inventory.upload_filename(str(url or "")) for url in urls} - {None}
+    profile = {name for name in profile if media_audit._filename_from_upload_path(name)} - owned
+    owners: dict[str, set[str]] = {name: set() for name in profile}
+    if profile:
+        async for row in db.media_uploads.find({"filename": {"$in": sorted(profile)}}, {"_id": 0, "filename": 1, "owner_id": 1}):
+            if row.get("owner_id"):
+                owners[row["filename"]].add(str(row["owner_id"]))
+    untracked = {name for name in profile if not owners[name]}
+    owned |= {name for name in profile if owners[name] == {str(user_id)}}
+    return await _clean(db, user_id, owned, untracked)
+
+
+async def retry_file_cleanups(db, limit: int = 200) -> int:
+    """Der Aufräum-Job: Dateien gelöschter Konten, deren Löschung beim ersten Mal scheiterte, erneut versuchen."""
     removed = 0
-    for name in sorted(names):
-        if await _still_used(db, name):
-            continue
-        for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
-            path = base / name
-            try:
-                for width in VARIANT_WIDTHS:
-                    variant_path(path, width).unlink(missing_ok=True)
-                path.unlink(missing_ok=True)
-            except OSError as exc:  # die Löschung des Kontos darf an einer gesperrten Datei nicht scheitern
-                logger.warning("[dsgvo] Bild %s nicht gelöscht: %s", name, exc)
-        scans = {"owner_id": user_id, "url": {"$regex": re.escape(name) + "$"}}
-        async for scan in db.media_scans.find(scans, {"_id": 0, "quarantine_key": 1}):
-            key = media_audit._filename_from_upload_path(str(scan.get("quarantine_key") or ""))
-            if key:
-                (QUARANTINE_DIR / key).unlink(missing_ok=True)
-        await db.media_scans.delete_many(scans)
-        await db.media_uploads.delete_many({"filename": name})
-        removed += 1
+    async for row in db[PENDING].find({}, {"_id": 0}).limit(limit):
+        name = row.get("filename")
+        if name:
+            owned, untracked = ({name}, set()) if row.get("owned") else (set(), {name})
+            removed += await _clean(db, row.get("owner_id") or "", owned, untracked)
     return removed
 
 

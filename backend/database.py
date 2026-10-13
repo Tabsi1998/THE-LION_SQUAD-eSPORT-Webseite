@@ -278,6 +278,8 @@ async def init_indexes():
     await db.media_uploads.create_index("filename", unique=True)
     await db.media_uploads.create_index("owner_id")
     await db.media_uploads.create_index("media_scope")
+    await db.media_uploads.create_index([("owner_id", 1), ("media_scope", 1)])
+    await db.pending_file_cleanups.create_index("filename", unique=True)
     await db.upload_events.create_index("id", unique=True)
     await db.upload_events.create_index("created_at")
     await db.upload_events.create_index([("status", 1), ("created_at", -1)])

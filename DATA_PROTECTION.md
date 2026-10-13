@@ -23,7 +23,7 @@ kann es für jemanden tun. Die Entscheidung je Art von Daten (`backend/routes/ds
 | Was | Entscheidung |
 | --- | --- |
 | Name, E-Mail, Profilangaben, verknüpfte Konten, Sitzungen, Passkeys, Push-Geräte, Freundschaften, Blockierungen | gelöscht oder überschrieben |
-| Avatar, Banner und alles, was das Konto für sein Profil hochgeladen hat (samt kleinerer Fassungen und einer Kopie in der Quarantäne der Bildprüfung) | gelöscht – außer ein Bild wird noch verwendet, etwa als Teamlogo |
+| Avatar, Banner und alles, was das Konto für sein Profil hochgeladen hat (samt kleinerer Fassungen und einer Kopie in der Quarantäne der Bildprüfung) | gelöscht – außer ein Bild wird vom Team oder Verein verwendet, etwa als Teamlogo. Ein Profil einer anderen Person hält es nicht fest, es verliert nur den Eintrag. Dateien eines anderen Kontos oder des Vereins bleiben, auch wenn sie im gelöschten Profil eingetragen waren (#1039). Lässt sich eine Datei nicht löschen (etwa gesperrt), holt das der stündliche Job `erasure_file_cleanup` nach |
 | XP und Level, Zählerstände und Signale der Erfolge, Adventkalender, Ostereier, Verlosungen, Discord-Aktivität | gelöscht |
 | Selbst angelegter Eintrag im Mitgliederverzeichnis | gelöscht |
 | Eintrag im Mitgliederverzeichnis aus der Mitgliederverwaltung oder von der Redaktion, Vorstandsposten | bleibt beim Verein, verliert nur die Verknüpfung zum Konto |
