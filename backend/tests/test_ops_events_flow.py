@@ -85,3 +85,46 @@ async def test_events_merge_all_sources_and_filters_work_as_json_and_csv(flow):
     player = await flow.add_user(role="player")
     flow.act_as(player)
     assert (await flow.get("/api/admin/ops/events")).status_code in (401, 403)
+
+
+@pytest.mark.asyncio
+async def test_events_never_carry_a_full_address_in_json_csv_or_search(flow):
+    """#1505: wie die Mail-Warteschlange (#1418) - keine ganze Adresse in Liste, CSV und Suche, auch nicht in Betreff,
+    Fehlertext, verschachtelten Zusatzdaten oder dem Freitext anderer Quellen."""
+    import json
+
+    fresh = now_utc().isoformat()
+    full = ("paula.beispiel@gmail.com", "max@lionsquad.example", "tom@club.example", "eva@club.example", "ina@club.example")
+    db = flow.db
+    await db.email_logs.insert_one({"id": "m1", "to": full[0], "subject": f"Hallo {full[0]}", "status": "failed", "template_key": "", "channel": "email",
+                                    "error": f"550 <{full[0]}> unknown", "created_at": fresh})
+    await db.mail_jobs.insert_one({"id": "j1", "to": full[1], "subject": f"Für {full[1]}", "html": f"<p>{full[1]}</p>", "status": "failed", "attempts": 5,
+                                   "last_error": f"550 5.1.1 <{full[1]}> user unknown", "meta": {"reply_to": full[1], "nested": [{"cc": full[2]}]},
+                                   "created_at": fresh, "updated_at": fresh})
+    await db.audit_logs.insert_one({"id": "au1", "action": "user.email.change", "actor_id": "admin", "target_id": full[3],
+                                    "data": {"old": full[3], "deep": {"new": [full[4]]}}, "created_at": fresh})
+    await db.ops_errors.insert_one({"fingerprint": "f1", "error_type": "SMTPError", "route": "/api/x", "method": "POST", "status_code": 500, "count": 1,
+                                    "message": f"Zustellung an {full[0]} fehlgeschlagen", "first_seen_at": fresh, "last_seen_at": fresh, "resolved_at": None})
+    await db.mobile_client_logs.insert_one({"id": "c1", "level": "error", "status": "open", "message": f"Login mit {full[2]} schlug fehl",
+                                            "received_at": fresh, "priority_rank": 1})
+    admin = await flow.add_user(role="superadmin")
+    flow.act_as(admin)
+
+    response = await flow.get("/api/admin/ops/events", params={"hours": 0, "limit": 100})
+    assert response.status_code == 200
+    body = response.text
+    csv_text = (await flow.get("/api/admin/ops/events", params={"hours": 0, "format": "csv", "limit": 100})).text
+    logs_text = (await flow.get("/api/admin/logs")).text
+    for address in full:
+        assert address not in body and address not in csv_text and address not in logs_text, address
+        assert address not in json.dumps(response.json(), ensure_ascii=True)
+    items = {item["id"]: item for item in response.json()["items"]}
+    assert items["j1"]["subtitle"].startswith("m***@lionsquad.example")
+    assert "m***@lionsquad.example" in items["j1"]["title"]
+    assert "p***@gmail.com" in items["m1"]["detail"]
+
+    # Die Suche trifft nur, was angezeigt wird: die ganze Adresse findet nichts, die gekürzte schon.
+    assert (await flow.get("/api/admin/ops/events", params={"hours": 0, "q": full[0]})).json()["items"] == []
+    masked_hits = (await flow.get("/api/admin/ops/events", params={"hours": 0, "q": "p***@gmail.com"})).json()["items"]
+    assert any(item["id"] == "m1" for item in masked_hits)
+    assert full[0] not in (await flow.get("/api/admin/ops/events", params={"hours": 0, "q": full[0]})).text

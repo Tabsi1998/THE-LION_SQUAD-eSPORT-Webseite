@@ -18,6 +18,7 @@ from services.ops_alerts import ALERT_KINDS, alert_red_checks, load_alert_settin
 from services.ops_checks import checks_overview, run_checks
 from services.ops_vitals import vitals_overview
 from services import github_releases
+from services.log_safe import mask_addresses
 from services.app_releases import delete_release, list_releases, public_release, set_updater_settings, store_release, update_release, updater_settings, upload_token_matches, upload_token_problem, upload_token_status
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -71,18 +72,27 @@ def _log_time(row: dict, *keys: str) -> str:
     return ""
 
 
+def _masked_log_text(value, limit: int) -> str:
+    """Text für die Ereignis-Liste (#1505): jede Mail-Adresse darin gekürzt (``p***@gmail.com``, wie in der Mail-Warteschlange
+    #1418) - erst kürzen, dann auf die Länge bringen, damit keine halbe Adresse stehen bleibt."""
+    return _clip_log_text(mask_addresses(_clip_log_text(value, 100000)), limit)
+
+
 def _log_item(source: str, label: str, href: str, row: dict, *, severity: str, title: str, subtitle: str = "", detail="", status: str = "", time_keys=("created_at",)) -> dict:
+    """Ein Ereignis. Titel, Untertitel, Details und Status laufen durch die Adress-Kürzung: Ereignisse sind Betriebsprotokoll,
+    die ganze Adresse gibt es nur über den protokollierten Weg der Mail-Warteschlange (``href``)."""
+    safe_title = _masked_log_text(title, 180)
     return {
-        "id": row.get("id") or f"{source}:{_log_time(row, *time_keys)}:{title}",
+        "id": row.get("id") or f"{source}:{_log_time(row, *time_keys)}:{safe_title}",
         "source": source,
         "source_label": label,
         "href": href,
         "severity": severity,
-        "status": status,
+        "status": _masked_log_text(status, 120),
         "time": _log_time(row, *time_keys),
-        "title": _clip_log_text(title, 180),
-        "subtitle": _clip_log_text(subtitle, 260),
-        "detail": _clip_log_text(detail, 1200),
+        "title": safe_title,
+        "subtitle": _masked_log_text(subtitle, 260),
+        "detail": _masked_log_text(detail, 1200),
     }
 
 
@@ -589,7 +599,7 @@ async def ops_events(source: str = "all", severity: str = "all", hours: int = Qu
             "problem_count": sum(source["problem_count"] for source in sources),
             "latest_at": max((source["latest_at"] for source in sources), default=""),
         },
-        "filters": {"source": sorted(wanted) or ["all"], "severity": severity, "hours": hours, "q": q, "limit": limit, "guild": guild},
+        "filters": {"source": sorted(wanted) or ["all"], "severity": severity, "hours": hours, "q": mask_addresses(q), "limit": limit, "guild": guild},
         # Server für den Filter (#627) - erst ab zwei Servern sinnvoll.
         "guilds": [{"guild_id": guild_id, "name": name} for guild_id, name in sorted((await _discord_guild_names(db)).items(), key=lambda pair: pair[1].lower())],
     }

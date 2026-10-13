@@ -167,7 +167,7 @@ export function OpsEventsTab() {
         ) : null}
         <label className="relative min-w-[220px] flex-1 max-w-lg">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-          <input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Ereignisse suchen …" data-testid="ops-events-search"
+          <input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Ereignisse suchen … (Adressen sind gekürzt)" data-testid="ops-events-search"
             className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2 pl-9 pr-3 text-sm text-white" />
         </label>
         <button type="button" onClick={exportCsv} disabled={exporting || !rows.length} data-testid="ops-events-export"
