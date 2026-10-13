@@ -123,6 +123,27 @@ async def _finish_result_side_effects(db, match: dict, force: bool, dispute_reso
         )
 
 
+def _withdrawn_walkovers(match: dict, application: dict, reset_matches: list[dict]) -> list[dict]:
+    """Welche Wertungen „nicht erschienen“ mit diesem Ergebnis wegfallen. Am Spiel selbst werden die Felder der Wertung
+    gleich mit dem Ergebnis geleert; ``apply_forfeit`` setzt sie danach neu, wenn die Korrektur wieder eine Wertung ist."""
+    withdrawn = []
+    previous = match.get("forfeit_registration_id")
+    still_forfeit = {row.get("registration_id") for row in application["results"] if row.get("forfeit")}
+    if previous and previous not in still_forfeit:
+        application["match_set"].update({
+            "forfeit_registration_id": None,
+            "admin_decision_note": None,
+            "admin_decision_by": None,
+            "admin_decision_at": None,
+        })
+        withdrawn.append({"match_id": match["id"], "registration_id": previous})
+    withdrawn.extend(
+        {"match_id": row["id"], "registration_id": row["forfeit_registration_id"]}
+        for row in reset_matches if row.get("forfeit_registration_id")
+    )
+    return withdrawn
+
+
 async def submit_v2_result(
     db,
     match: dict,
@@ -187,10 +208,14 @@ async def submit_v2_result(
     )
     advanced_match_ids = list(application["target_sets"].keys())
     reset_matches = application.get("reset_matches") or []
+    # Eine Wertung „nicht erschienen“, die nicht mehr gilt (#1035): die Korrektur nimmt Wertung, Begründung und den
+    # Eintrag bei der Person zurück - am Spiel selbst und in zurückgesetzten Folgespielen.
+    withdrawn = _withdrawn_walkovers(match, application, reset_matches)
     previous_report_id = (match.get("result_meta") or {}).get("report_id")
     history = {
         **({"replaces_report_id": previous_report_id} if previous_report_id else {}),
         **({"reset_matches": [row["id"] for row in reset_matches]} if reset_matches else {}),
+        **({"withdrawn_walkovers": withdrawn} if withdrawn else {}),
     }
     application["match_set"]["result_meta"].update({
         "report_id": report_id,
@@ -229,6 +254,10 @@ async def submit_v2_result(
     for target_id, update in application["target_sets"].items():
         await db.matches_v2.update_one({"id": target_id}, {"$set": update})
     await db.matches_v2.update_one({"id": match["id"]}, {"$set": application["match_set"]})
+    if withdrawn:
+        from services.match_forfeit import revoke_walkover_incident
+        for row in withdrawn:
+            await revoke_walkover_incident(db, row["match_id"], row["registration_id"])
 
     await _upsert_result_audit(
         db,

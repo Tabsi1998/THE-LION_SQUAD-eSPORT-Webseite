@@ -11,13 +11,24 @@ RESULT_OPEN_TOURNAMENT_STATUSES = {"live", "paused"}
 RESULT_STATES = {"completed", "forfeit", "disputed"}
 
 
+def _has_result_state(match: dict) -> bool:
+    return (str(match.get("status") or "") in RESULT_STATES or bool(match.get("results"))
+            or isinstance(match.get("pending_result"), dict))
+
+
 def ensure_plan_keeps_result_state(match: dict, updates: dict) -> None:
-    """Die Planung (Termin, Station, Dauer, Stand des Ablaufs) ändert nichts am Ergebnis-Stand eines Spiels."""
+    """Die Planung (Termin, Station, Dauer, Stand des Ablaufs) ändert nichts am Ergebnis-Stand eines Spiels - und
+    nichts an den Regeln, nach denen ein vorhandenes Ergebnis geprüft wurde (Best-of)."""
+    if "best_of" in updates and updates["best_of"] != match.get("best_of") and _has_result_state(match):
+        raise HTTPException(
+            status_code=409,
+            detail="Best-of lässt sich nicht mehr ändern: dieses Spiel hat schon ein Ergebnis oder ist in Klärung.",
+        )
     if "status" not in updates or updates["status"] == match.get("status"):
         return
     if updates["status"] in RESULT_STATES:
         raise HTTPException(status_code=422, detail="Ergebnis, Wertung und Einspruch laufen über das Ergebnis-Fenster.")
-    if str(match.get("status") or "") in RESULT_STATES or match.get("results") or isinstance(match.get("pending_result"), dict):
+    if _has_result_state(match):
         raise HTTPException(
             status_code=409,
             detail="Dieses Spiel hat schon ein Ergebnis oder ist in Klärung - bitte über Korrigieren, Rückgängig oder die Entscheidung ändern.",

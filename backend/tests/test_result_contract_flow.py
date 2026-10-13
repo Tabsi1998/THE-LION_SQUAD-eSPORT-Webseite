@@ -210,3 +210,69 @@ async def test_two_entries_at_the_same_time_leave_exactly_one_result(flow):
     assert sorted(answer.status_code for answer in answers) == [200, 409]
     assert await publish_due_holds(flow.db, now=now_utc() + timedelta(seconds=13)) == 1
     assert (await flow.reload(match2))["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_best_of_is_fixed_once_the_match_has_a_result(flow):
+    staff, tournament, match, first, second, player = await bracket(flow, best_of=3)
+    assert (await flow.patch(f"/api/matches/{match['id']}", json={"best_of": 5})).status_code == 200
+    assert (await flow.patch(f"/api/matches/{match['id']}", json={"best_of": 3})).status_code == 200
+    assert (await flow.post(f"/api/matches/{match['id']}/result", json=duel(first, second, (2, 1)))).status_code == 200
+    refused = await flow.patch(f"/api/matches/{match['id']}", json={"best_of": 5})
+    assert refused.status_code == 409, refused.text
+    assert (await flow.reload(match))["best_of"] == 3
+    assert (await flow.patch(f"/api/matches/{match['id']}", json={"best_of": 3})).status_code == 200, "unverändert geht"
+
+
+@pytest.mark.asyncio
+async def test_a_walkover_corrected_to_a_played_result_is_withdrawn_everywhere(flow):
+    staff, tournament, match, first, second, player = await bracket(flow)
+    gone = await flow.post(f"/api/matches/{match['id']}/forfeit",
+                           json={"forfeit_registration_id": second, "note": "Nicht erschienen zur Startzeit"})
+    assert gone.status_code == 200, gone.text
+    assert (await flow.reload(match))["forfeit_registration_id"] == second
+    # Der Eintrag „nicht erschienen“ bei der Person - aus diesem Spiel und einer aus einem anderen.
+    loser = player[second]["id"]
+    await flow.db.user_achievements.insert_one({"id": "a1", "user_id": loser, "tier_code": "neg_no_show",
+                                                "context": {"match_id": match["id"], "reason": "forfeit"}})
+    await flow.db.user_achievements.insert_one({"id": "a2", "user_id": loser, "tier_code": "neg_no_show",
+                                                "context": {"match_id": "anderes-spiel", "reason": "forfeit"}})
+
+    corrected = await flow.post(f"/api/matches/{match['id']}/result?force=true",
+                                json=duel(first, second, (2, 1), reason="Doch gespielt, Stand 2:1"))
+    assert corrected.status_code == 200, corrected.text
+    stored = await flow.reload(match)
+    assert stored["status"] == "completed"
+    assert stored.get("forfeit_registration_id") is None
+    assert stored.get("admin_decision_note") is None and stored.get("admin_decision_at") is None
+    assert not any(row.get("forfeit") for row in stored["results"])
+    left = {row["id"] for row in await flow.db.user_achievements.find({"user_id": loser}, {"_id": 0}).to_list(10)}
+    assert left == {"a2"}, "nur der Eintrag aus diesem Spiel fällt weg"
+    flow.act_as(player[second])
+    penalties = (await flow.get("/api/penalties/me")).json()
+    assert not any((row.get("match_id") == match["id"]) for row in (penalties if isinstance(penalties, list) else penalties.get("items", [])))
+    logged = [row for row in await audit(flow, "match.result.submit") if row["data"].get("force")]
+    assert logged[0]["data"]["withdrawn_walkovers"] == [{"match_id": match["id"], "registration_id": second}]
+
+
+@pytest.mark.asyncio
+async def test_a_reset_follow_up_loses_what_belonged_to_the_old_pairing(flow):
+    staff, tournament, match, first, second, player = await bracket(flow)
+    assert (await flow.post(f"/api/matches/{match['id']}/result", json=duel(first, second))).status_code == 200
+    final = await flow.match_for(tournament, first, after_round=match["round"])
+    await flow.db.matches_v2.update_one({"id": final["id"]}, {"$set": {
+        "status": "disputed", "started_at": "2026-10-13T10:00:00+00:00", "called_at": "2026-10-13T09:55:00+00:00",
+        "status_before_dispute": "in_progress",
+        "disputes": [{"user_id": player[first]["id"], "reason": "Lag", "at": "2026-10-13T10:05:00+00:00"}],
+    }})
+    corrected = await flow.post(f"/api/matches/{match['id']}/result?force=true",
+                                json=duel(second, first, reason="Stand vertauscht"))
+    assert corrected.status_code == 200, corrected.text
+    assert corrected.json()["reset_match_ids"] == [final["id"]]
+    reset = await flow.reload(final)
+    assert reset["status"] not in {"disputed", "in_progress"}
+    assert reset.get("started_at") is None and reset.get("called_at") is None
+    assert reset.get("status_before_dispute") is None
+    assert len(reset["disputes"]) == 1, "der Einspruch bleibt in der Historie"
+    assert reset["disputes"][0]["resolved_at"] and reset["disputes"][0]["decision"] == "void"
+    assert reset["disputes"][0]["decision_note"] == "Paarung geändert"

@@ -247,7 +247,29 @@ def test_a_correction_lists_the_follow_up_it_resets_with_the_result_it_had():
     assert application["reset_matches"] == [{
         "id": "m-b", "match_key": "B", "status": "completed",
         "results": [{"registration_id": "r1", "rank": 1}, {"registration_id": "r9", "rank": 2}],
+        "forfeit_registration_id": "r9",
     }]
+
+
+def test_a_reset_follow_up_drops_start_call_and_marks_open_disputes_void():
+    follow_up = _next(status="disputed", started_at="2026-10-13T10:00:00+00:00", called_at="2026-10-13T09:55:00+00:00",
+                      status_before_dispute="in_progress", admin_decision_note="alt",
+                      disputes=[{"reason": "alt", "resolved_at": "2026-10-13T09:00:00+00:00"}, {"reason": "offen"}])
+    application = build_v2_result_application(_source(), [_source(), follow_up], CORRECTED, actor_id="lead",
+                                              now_iso="2026-10-13T12:00:00+00:00", force=True)
+    reset = application["target_sets"]["m-b"]
+    assert reset["started_at"] is None and reset["called_at"] is None and reset["status_before_dispute"] is None
+    assert reset["admin_decision_note"] is None and reset["status"] == "ready"
+    assert reset["disputes"][0] == {"reason": "alt", "resolved_at": "2026-10-13T09:00:00+00:00"}
+    assert reset["disputes"][1] == {"reason": "offen", "resolved_at": "2026-10-13T12:00:00+00:00", "decision": "void",
+                                    "decision_note": "Paarung geändert"}
+
+
+def test_a_new_pairing_before_the_start_also_drops_a_call():
+    follow_up = _next(called_at="2026-10-13T09:55:00+00:00")
+    application = build_v2_result_application(_source(), [_source(), follow_up], CORRECTED, actor_id="lead",
+                                              now_iso="2026-10-13T12:00:00+00:00", force=True)
+    assert application["target_sets"]["m-b"]["called_at"] is None
 
 
 def test_a_new_pairing_drops_reports_of_the_old_one_even_before_it_started():

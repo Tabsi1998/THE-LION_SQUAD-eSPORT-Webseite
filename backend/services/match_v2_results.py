@@ -525,10 +525,36 @@ def _ensure_no_pending_result(match: dict) -> None:
         raise MatchV2ResultError(f"{name}: dort wird gerade ein Ergebnis eingetragen. Bitte kurz warten.", 409)
 
 
+PAIRING_CHANGED_REASON = "Paarung geändert"
+
+
+def _pairing_reset_fields(match: dict, now_iso: str) -> dict:
+    """Was zur alten Paarung eines Folgespiels gehörte (#1035): Meldungen, Beginn, Aufruf, Wertung und Einsprüche.
+    Einsprüche verschwinden nicht - sie bleiben als erledigt mit Grund „Paarung geändert“ in der Historie."""
+    disputes = [
+        row if not isinstance(row, dict) or row.get("resolved_at") else {
+            **row, "resolved_at": now_iso, "decision": "void", "decision_note": PAIRING_CHANGED_REASON,
+        }
+        for row in match.get("disputes") or []
+    ]
+    return {
+        "reports": [],
+        "started_at": None,
+        "called_at": None,
+        "forfeit_registration_id": None,
+        "admin_decision_note": None,
+        "admin_decision_by": None,
+        "admin_decision_at": None,
+        "status_before_dispute": None,
+        **({"disputes": disputes} if match.get("disputes") else {}),
+    }
+
+
 def _reset_match_result_state(match: dict, target_sets: dict[str, dict], now_iso: str,
                               reset_log: list[dict] | None = None) -> None:
     """Ein Folgespiel verliert sein Ergebnis, weil sich seine Paarung geändert hat. Was es vorher hatte, kommt in
-    ``reset_log`` - für die Antwort und die Historie (#1035). Meldungen gehörten zur alten Paarung und fallen weg."""
+    ``reset_log`` - für die Antwort und die Historie (#1035). Was zur alten Paarung gehörte, fällt weg
+    (``_pairing_reset_fields``)."""
     if reset_log is not None and (match.get("results") or str(match.get("status") or "") in LOCKED_DOWNSTREAM_STATUSES) \
             and all(row["id"] != match["id"] for row in reset_log):
         reset_log.append({
@@ -536,6 +562,7 @@ def _reset_match_result_state(match: dict, target_sets: dict[str, dict], now_iso
             "match_key": match.get("match_key"),
             "status": match.get("status"),
             "results": match.get("results") or [],
+            **({"forfeit_registration_id": match["forfeit_registration_id"]} if match.get("forfeit_registration_id") else {}),
         })
     target_sets.setdefault(match["id"], {})
     target_sets[match["id"]].update({
@@ -543,8 +570,7 @@ def _reset_match_result_state(match: dict, target_sets: dict[str, dict], now_iso
         "result_meta": None,
         "completed_at": None,
         "completed_by": None,
-        "reports": [],
-        "forfeit_registration_id": None,
+        **_pairing_reset_fields(match, now_iso),
         "status": _status_after_slot_fill(match, preserve_terminal=False),
         "updated_at": now_iso,
     })
@@ -681,9 +707,9 @@ def build_v2_result_application(
             target = by_id[target_id]
             if target.get("status") in LOCKED_DOWNSTREAM_STATUSES or target.get("results"):
                 _reset_match_result_state(target, target_sets, now_iso, reset_matches)
-            elif target.get("reports"):
-                # Neue Paarung: Meldungen der alten gelten nicht mehr.
-                target_sets[target_id]["reports"] = []
+            else:
+                # Neue Paarung ohne Ergebnis: was zur alten gehörte, gilt nicht mehr.
+                target_sets[target_id].update(_pairing_reset_fields(target, now_iso))
             _cascade_clear_downstream(target_id, by_id, downstream, target_sets, now_iso, reset_log=reset_matches)
 
     match_set = {
