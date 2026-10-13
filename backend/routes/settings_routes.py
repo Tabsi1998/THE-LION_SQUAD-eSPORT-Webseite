@@ -1405,10 +1405,17 @@ async def search_mail_queue(body: MailQueueSearchBody, me: dict = Depends(requir
     return await _mail_queue_rows(body.status, body.limit, body.q)
 
 
+REVEAL_LIMIT = 30
+REVEAL_WINDOW_SECONDS = 3600
+
+
 @settings_router.post("/mail-queue/{job_id}/recipient")
-async def reveal_mail_recipient(job_id: str, me: dict = Depends(require_club_admin())):
+async def reveal_mail_recipient(job_id: str, request: Request, me: dict = Depends(require_club_admin())):
     """„Adresse zeigen“ (#1418): die ganze Empfänger-Adresse einer Zeile, nur für den Bereich System. Jedes Aufdecken
     steht im Protokoll (wer, wann, welche Mail) - die Adresse selbst nicht. POST, weil das Aufdecken etwas schreibt."""
+    # Nach Codex-Prüfung: gedrosselt je Person, vor dem ersten Datenbankzugriff - wer Adressen der Reihe nach aufdeckt,
+    # bekommt nach 30 in einer Stunde 429.
+    await enforce_rate_limit(request, "mail_recipient_reveal", REVEAL_LIMIT, REVEAL_WINDOW_SECONDS, subject=me.get("id"))
     db = get_db()
     job = await db.mail_jobs.find_one({"id": job_id}, {"_id": 0, "id": 1, "to": 1, "template_key": 1})
     if not job:
@@ -1682,10 +1689,8 @@ async def indexnow_key_file():
     return Response(content=key, media_type="text/plain")
 
 
-@settings_router.get("/email/logs")
-async def email_logs(me: dict = Depends(require_club_admin())):
-    db = get_db()
-    return await db.email_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+# „/email/logs“ entfernt (#1418, nach Codex-Prüfung): das Web nutzte die Liste nicht mehr, sie gab Empfänger ungekürzt
+# aus. Den Versand je Mail zeigt „Betrieb & Logs → Ereignisse“, Quelle E-Mail.
 
 
 # ---- Discord: Meldungen über den Bot (#566) ----
