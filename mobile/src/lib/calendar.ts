@@ -254,3 +254,13 @@ export function googleCalendarUrl(item: CalendarItem): string {
   if (item.location) params.set("location", item.location);
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
+
+/**
+ * Den Vereinskalender abonnieren (#1189): https zum Kopieren, webcal für Kalender-Apps, Google Kalender über „cid“ -
+ * Google kennt auf Android kein webcal. Der Feed ist der öffentliche, ohne Personendaten.
+ */
+export function subscribeUrls(webBase: string, feedPath = "/api/calendar/feed.ics"): { https: string; webcal: string; google: string } {
+  const https = `${String(webBase || "").replace(/\/+$/, "")}${feedPath}`;
+  const webcal = https.replace(/^https?:\/\//, "webcal://");
+  return { https, webcal, google: `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcal)}` };
+}

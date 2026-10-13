@@ -1,5 +1,5 @@
 import {
-  agenda, currentMonth, dayKey, dayLabel, feedUrls, filterKinds, itemsByDay, mergeEventDays, monthMatrix, nextAfter, preferredView, shiftMonth,
+  agenda, currentMonth, dayKey, dayLabel, feedUrls, filterKinds, filterMine, itemsByDay, mergeEventDays, monthMatrix, nextAfter, preferredView, shiftMonth,
   spanLabel, splitSpans, startPhrase, upcomingItems, weekBars,
 } from "./calendar";
 
@@ -133,4 +133,11 @@ test("am Handy startet die Liste, sonst der Monat; die letzte Wahl gewinnt", () 
 test("Abo-Adressen: https zum Kopieren, webcal zum Öffnen", () => {
   expect(feedUrls("https://lionsquad.at/")).toEqual({ https: "https://lionsquad.at/api/calendar/feed.ics", webcal: "webcal://lionsquad.at/api/calendar/feed.ics" });
   expect(feedUrls("http://localhost:3000").webcal).toBe("webcal://localhost:3000/api/calendar/feed.ics");
+});
+
+test("„Nur meine“ (#1189) behält nur, was der Server als „angemeldet“ kennzeichnet", () => {
+  const rows = [{ id: "a", kind: "event", mine: true }, { id: "b", kind: "tournament", mine: false }, { id: "c", kind: "club", mine: true }];
+  expect(filterMine(rows, true).map((row) => row.id)).toEqual(["a", "c"]);
+  expect(filterMine(rows, false)).toBe(rows);
+  expect(filterMine(null, true)).toEqual([]);
 });

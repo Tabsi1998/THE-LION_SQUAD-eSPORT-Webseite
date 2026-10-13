@@ -164,10 +164,56 @@ def banner_view(event: dict) -> dict | None:
 
 # ---------------------------------------------------------------- Eigener Stand je Turnier und Fast Lap
 
-async def _team_ids(db, user_id: str) -> list[str]:
+async def team_ids(db, user_id: str) -> list[str]:
+    """Die Teams der Person - aus der Mitgliederliste des Teams und aus ``team_members``."""
     ids = {row.get("team_id") async for row in db.team_members.find({"user_id": user_id}, {"_id": 0, "team_id": 1})}
     ids |= {row.get("id") async for row in db.teams.find({"member_ids": user_id}, {"_id": 0, "id": 1})}
     return [team_id for team_id in ids if team_id]
+
+
+DRIVEN = {"state": "driven", "label": "Du bist gefahren", "team_name": None}
+
+
+async def own_tournament_states(db, user_id: str, tournament_ids: list[str] | None = None) -> dict[str, dict]:
+    """Der eigene Stand je Turnier: die eigene Anmeldung oder die eines eigenen Teams (dann mit Teamname).
+
+    Ohne ``tournament_ids`` für alle Turniere - die Liste „Nur meine“ und der persönliche Kalender (#1189) brauchen sie.
+    """
+    if tournament_ids is not None and not tournament_ids:
+        return {}
+    teams = await team_ids(db, user_id)
+    query: dict = {"status": {"$in": list(ACTIVE_TOURNAMENT_STATES)}}
+    if tournament_ids is not None:
+        query["tournament_id"] = {"$in": list(tournament_ids)}
+    query["$or"] = [{"user_id": user_id}] + ([{"team_id": {"$in": teams}}] if teams else [])
+    by_tournament: dict[str, dict] = {}
+    async for reg in db.tournament_registrations.find(query, {"_id": 0, "tournament_id": 1, "status": 1, "team_id": 1, "display_name": 1, "user_id": 1}):
+        current = by_tournament.get(reg["tournament_id"])
+        # Die eigene Anmeldung zählt vor der des Teams; „dabei“ vor „Warteliste“.
+        rank = (reg.get("user_id") == user_id and not reg.get("team_id"), reg.get("status") in ("approved", "checked_in"))
+        if not current or rank > current["_rank"]:
+            by_tournament[reg["tournament_id"]] = {**reg, "_rank": rank}
+    team_names: dict[str, str] = {}
+    wanted = [reg["team_id"] for reg in by_tournament.values() if reg.get("team_id")]
+    if wanted:
+        async for team in db.teams.find({"id": {"$in": wanted}}, {"_id": 0, "id": 1, "name": 1}):
+            team_names[team["id"]] = team.get("name") or ""
+    states: dict[str, dict] = {}
+    for tournament_id, reg in by_tournament.items():
+        team_name = team_names.get(reg.get("team_id") or "") or (reg.get("display_name") if reg.get("team_id") else "")
+        label = OWN_STATE_LABELS.get(reg.get("status"), "Angemeldet")
+        states[tournament_id] = {"state": reg.get("status"), "label": label, "team_name": team_name or None}
+    return states
+
+
+async def driven_challenge_ids(db, user_id: str, challenge_ids: list[str] | None = None) -> set[str]:
+    """Die Fast Laps, in denen die Person schon eine Zeit gefahren ist - dort ist sie dabei."""
+    if challenge_ids is not None and not challenge_ids:
+        return set()
+    query: dict = {"user_id": user_id}
+    if challenge_ids is not None:
+        query["challenge_id"] = {"$in": list(challenge_ids)}
+    return {row.get("challenge_id") async for row in db.f1_lap_times.find(query, {"_id": 0, "challenge_id": 1}) if row.get("challenge_id")}
 
 
 async def attach_own_states(db, event: dict, user: dict | None) -> None:
@@ -183,33 +229,11 @@ async def attach_own_states(db, event: dict, user: dict | None) -> None:
     if not user or not (tournaments or challenges):
         return
     if tournaments:
-        team_ids = await _team_ids(db, user["id"])
-        query = {"tournament_id": {"$in": [t["id"] for t in tournaments]}, "status": {"$in": list(ACTIVE_TOURNAMENT_STATES)}}
-        query["$or"] = [{"user_id": user["id"]}] + ([{"team_id": {"$in": team_ids}}] if team_ids else [])
-        by_tournament: dict[str, dict] = {}
-        async for reg in db.tournament_registrations.find(query, {"_id": 0, "tournament_id": 1, "status": 1, "team_id": 1, "display_name": 1, "user_id": 1}):
-            current = by_tournament.get(reg["tournament_id"])
-            # Die eigene Anmeldung zählt vor der des Teams; „dabei“ vor „Warteliste“.
-            rank = (reg.get("user_id") == user["id"] and not reg.get("team_id"), reg.get("status") in ("approved", "checked_in"))
-            if not current or rank > current["_rank"]:
-                by_tournament[reg["tournament_id"]] = {**reg, "_rank": rank}
-        team_names: dict[str, str] = {}
-        wanted = [reg["team_id"] for reg in by_tournament.values() if reg.get("team_id")]
-        if wanted:
-            async for team in db.teams.find({"id": {"$in": wanted}}, {"_id": 0, "id": 1, "name": 1}):
-                team_names[team["id"]] = team.get("name") or ""
+        states = await own_tournament_states(db, user["id"], [t["id"] for t in tournaments])
         for tournament in tournaments:
-            reg = by_tournament.get(tournament["id"])
-            if not reg:
-                continue
-            team_name = team_names.get(reg.get("team_id") or "") or (reg.get("display_name") if reg.get("team_id") else "")
-            label = OWN_STATE_LABELS.get(reg.get("status"), "Angemeldet")
-            tournament["my_status"] = {"state": reg.get("status"), "label": label, "team_name": team_name or None}
+            tournament["my_status"] = states.get(tournament["id"])
     if challenges:
-        driven = set()
-        async for row in db.f1_lap_times.find({"challenge_id": {"$in": [c["id"] for c in challenges]}, "user_id": user["id"]},
-                                              {"_id": 0, "challenge_id": 1}):
-            driven.add(row.get("challenge_id"))
+        driven = await driven_challenge_ids(db, user["id"], [c["id"] for c in challenges])
         for challenge in challenges:
             if challenge["id"] in driven:
-                challenge["my_status"] = {"state": "driven", "label": "Du bist gefahren", "team_name": None}
+                challenge["my_status"] = dict(DRIVEN)

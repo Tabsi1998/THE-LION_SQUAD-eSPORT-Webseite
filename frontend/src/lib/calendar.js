@@ -271,6 +271,11 @@ export function filterKinds(items, kinds) {
   return (items || []).filter((item) => wanted.has(item.kind));
 }
 
+/** „Nur meine“ (#1189): nur, wofür man selbst oder das eigene Team angemeldet ist - der Server setzt `mine`. */
+export function filterMine(items, onlyMine) {
+  return onlyMine ? (items || []).filter((item) => item.mine) : items || [];
+}
+
 /** Die Abo-Adressen: https für Kopieren und Google, webcal für „im Kalender öffnen“. */
 export function feedUrls(origin, feedPath = "/api/calendar/feed.ics") {
   const base = String(origin || "").replace(/\/+$/, "");

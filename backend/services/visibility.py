@@ -93,6 +93,22 @@ async def lead_can_see(user: dict | None, visibility: str | None) -> bool:
     return await user_can_see(user, visibility)
 
 
+async def hide_unseen_event_links(db, user: dict | None, rows: list[dict]) -> None:
+    """``event_id`` an Turnieren und Fast Laps einer Liste nur, wenn die Person das Event sehen darf (Codex-Prüfung #1473) -
+    sonst verriete ein öffentliches Turnier die Kennung eines internen Events. Eine Abfrage für die ganze Liste; sichtbar
+    heißt wie beim Event selbst: kein Entwurf und ``lead_can_see``."""
+    ids = sorted({row.get("event_id") for row in rows if row.get("event_id")})
+    if not ids:
+        return
+    seen: set[str] = set()
+    async for event in db.events.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "status": 1, "visibility": 1}):
+        if event.get("status") != "draft" and await lead_can_see(user, event.get("visibility") or "public"):
+            seen.add(event["id"])
+    for row in rows:
+        if row.get("event_id") and row["event_id"] not in seen:
+            row["event_id"] = None
+
+
 async def filter_visible(items: list[dict], user: dict | None) -> list[dict]:
     """Filter a list of dicts by their `visibility` field.
 
