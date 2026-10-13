@@ -23,6 +23,7 @@ from services.notification_preferences import (
     public_preferences_payload,
 )
 from services.query_filters import safe_regex
+from services.private_fields import private_projection, strip_private
 from models import (
     AreasUpdate,
     AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate,
@@ -31,22 +32,10 @@ from models import (
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
-PRIVATE_AUTH_FIELDS = {
-    "_id": 0,
-    "password_hash": 0,
-    "google_id": 0,
-    "mfa_secret": 0,
-    "mfa_pending_secret": 0,
-    "mfa_pending_created_at": 0,
-    "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0,
-}
-
 
 def _clean(u: dict) -> dict:
-    for field in ("_id", "password_hash", "google_id", "mfa_secret", "mfa_pending_secret", "mfa_pending_created_at",
-                  "mfa_recovery_code_hashes", "mfa_totp_last_counter"):
-        u.pop(field, None)
-    return u
+    """Private Kontofelder stehen zentral in services/private_fields.py (#1492)."""
+    return strip_private(u)
 
 
 # Level (#617): eine Kurve für alles in services/levels.py, der Stand je Person in services/xp.py.
@@ -315,7 +304,7 @@ async def list_users(q: str | None = None, role: str | None = None,
         query["role"] = role
     if user_type:
         query["user_type"] = user_type
-    users = await db.users.find(query, PRIVATE_AUTH_FIELDS).to_list(500)
+    users = await db.users.find(query, private_projection()).to_list(500)
     # Bulk fetch memberships
     user_ids = [u["id"] for u in users]
     members = {
@@ -422,7 +411,7 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
         raise HTTPException(422, "Administrativ angelegte Konten müssen per E-Mail eingeladen werden, damit die Person selbst Passwort und Einwilligungen festlegt.")
     username = body.username.strip()
     email = str(body.email).lower().strip()
-    if await db.users.find_one({"$or": [{"username": username}, {"email": email}]}):
+    if await db.users.find_one({"$or": [{"username": username}, {"email": email}]}, {"_id": 0, "id": 1}):
         raise HTTPException(status_code=409, detail="Username oder E-Mail bereits vergeben")
     user_id = new_id()
     password_setup_required = True
@@ -476,7 +465,7 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
 @router.post("/{user_id}/invite")
 async def resend_user_invite(user_id: str, me: dict = Depends(require_super())):
     db = get_db()
-    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    user = await db.users.find_one({"id": user_id}, private_projection())
     if not user:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
     invite = await _send_user_invite(user, me)
@@ -519,7 +508,7 @@ async def list_public_users(
     safe_offset = max(0, int(offset or 0))
     cursor = db.users.find(
         query,
-        {"_id": 0},
+        private_projection(),
     ).sort("created_at", -1)
     if paged:
         cursor = cursor.skip(safe_offset).limit(safe_limit)
@@ -589,7 +578,7 @@ async def list_public_users(
 @router.get("/public/{username}")
 async def get_public_profile(username: str, view_as: str | None = None, viewer: dict | None = Depends(get_optional_user)):
     db = get_db()
-    u = await db.users.find_one({"username": username}, {**PRIVATE_AUTH_FIELDS, "email": 0})
+    u = await db.users.find_one({"username": username}, private_projection("email"))
     if not u or u.get("is_active") is False or u.get("is_banned") is True:
         raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
     # „So sehen dich andere“ (#1149): das eigene Profil so, wie es jemand ohne Anmeldung sieht - nur was die
@@ -849,7 +838,7 @@ async def get_user(user_id: str, me: dict = Depends(get_current_user)):
         # die Vereinsverwaltung, etwa beim Verknüpfen in der Mitgliederliste. Alle anderen nutzen das öffentliche
         # Profil. Die Prüfung kommt vor der Suche, damit die Antwort nicht verrät, ob es das Konto gibt.
         await require_area("club", "system")(me)
-    u = await db.users.find_one({"id": user_id}, PRIVATE_AUTH_FIELDS)
+    u = await db.users.find_one({"id": user_id}, private_projection())
     if not u:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
     await _attach_membership(u)
@@ -889,7 +878,7 @@ async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
     # Lese-Abruf der Vollständigkeit vergibt seit #1296 nichts mehr.
     from services.achievement_queue import request_evaluation
     await request_evaluation([me["id"]], "profile_update", sources={"profile"})
-    u = await db.users.find_one({"id": me["id"]}, PRIVATE_AUTH_FIELDS)
+    u = await db.users.find_one({"id": me["id"]}, private_projection())
     await _attach_membership(u)
     return u
 
@@ -921,7 +910,7 @@ async def undo_prestige_me(me: dict = Depends(get_current_user)):
 @router.get("/me/notification-preferences")
 async def get_my_notification_preferences(me: dict = Depends(get_current_user)):
     db = get_db()
-    user = await db.users.find_one({"id": me["id"]}, {"_id": 0})
+    user = await db.users.find_one({"id": me["id"]}, private_projection())
     if not user:
         raise HTTPException(404, "Nutzer nicht gefunden.")
     payload = public_preferences_payload(user)
@@ -989,7 +978,7 @@ async def admin_update_user(user_id: str, body: UserUpdate,
         updates["notification_preferences"] = _normalize_notification_preferences(updates.get("notification_preferences"))
     updates["updated_at"] = now_utc().isoformat()
     await db.users.update_one({"id": user_id}, {"$set": updates})
-    u = await db.users.find_one({"id": user_id}, PRIVATE_AUTH_FIELDS)
+    u = await db.users.find_one({"id": user_id}, private_projection())
     return u
 
 
@@ -1071,7 +1060,7 @@ async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_su
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.role_change", "target_id": user_id,
                                      "actor_id": me["id"], "data": {"role": body.role},
                                      "created_at": now_utc().isoformat()})
-    u = await db.users.find_one({"id": user_id}, PRIVATE_AUTH_FIELDS)
+    u = await db.users.find_one({"id": user_id}, private_projection())
     return u
 
 
@@ -1092,7 +1081,7 @@ async def set_areas(user_id: str, body: AreasUpdate, me: dict = Depends(require_
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.areas_change", "target_id": user_id,
                                      "actor_id": me["id"], "data": {"areas": areas, "from": target.get("areas") or []},
                                      "created_at": now_utc().isoformat()})
-    u = await db.users.find_one({"id": user_id}, PRIVATE_AUTH_FIELDS)
+    u = await db.users.find_one({"id": user_id}, private_projection())
     return u
 
 
@@ -1101,7 +1090,7 @@ async def delete_user(user_id: str, me: dict = Depends(require_super())):
     db = get_db()
     if user_id == me["id"]:
         raise HTTPException(status_code=400, detail="Nutze für den eigenen Account die Datenschutzseite.")
-    user = await db.users.find_one({"id": user_id})
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1})
     if not user:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
     if user.get("role") == "superadmin":

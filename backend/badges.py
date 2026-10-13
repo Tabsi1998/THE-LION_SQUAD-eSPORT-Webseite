@@ -27,6 +27,7 @@ from achievement_catalog import (
 )
 from services.membership_service import get_membership, is_active_member
 from services import xp
+from services.private_fields import private_projection
 from services.competition_read import load_competition_read_model, load_registration_matches
 from services.competition_standings import (
     registration_badge_match_progress,
@@ -325,7 +326,7 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     season_rows = await db.season_points.find({"user_id": user_id}, {"_id": 0, "total_points": 1}).to_list(2000)
     p["season_points_total"] = int(sum(float(r.get("total_points") or 0) for r in season_rows))
 
-    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    user = await db.users.find_one({"id": user_id}, private_projection())
     plats = set()
     if user:
         for x in (user.get("main_platforms") or []):
