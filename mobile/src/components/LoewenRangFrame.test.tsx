@@ -4,6 +4,7 @@ import { act, render, screen } from "@testing-library/react-native";
 import { auditTree, findingLines, type A11yNode } from "../a11y/audit";
 import { LoewenRangFrame } from "./LoewenRangFrame";
 import { frameImage } from "./loewenRangImages";
+import { ascentMoment } from "../lib/loewenAufstieg";
 
 // Löwen-Rang in der App (#1457): Rahmen, Schild mit Rauten und Prestige-Sternen; Glanz und Signatur nur im Profil und
 // nie bei „Bewegung reduzieren“, Listen ganz ruhig.
@@ -205,4 +206,54 @@ test("Karte: Schild in klein, aber keine Bewegung", async () => {
   expect(screen.getByTestId("card").props.style).toMatchObject({ width: 150, height: 150, marginBottom: 35 });
   expect(screen.getByText("LVL 14")).toBeTruthy();
   expect(screen.queryByTestId("loewen-rang-signature")).toBeNull();
+});
+
+test("Aufstiegs-Moment (#1456): einmal nach dem Einrasten, danach steht die Bildschleife; keine Dauer-Signatur", async () => {
+  reduceMotion(false);
+  frameCallbacks.clear();
+  const moment = ascentMoment({ level: 25, previous: 24 });
+  await render(<LoewenRangFrame level={25} size="card" ascent={moment} />);
+  await settle();
+  expect(screen.getByTestId("loewen-ascent-burst")).toBeTruthy();
+  expect(screen.getByTestId("loewen-ascent-old")).toBeTruthy();
+  expect(screen.queryByTestId("loewen-rang-signature")).toBeNull();
+  expect(frameCallbacks.size).toBe(1);
+  const [entry] = [...frameCallbacks];
+  const before = skia.__skiaDraws.circles;
+  // Vor dem Einrasten (hold + out) zeichnet der Moment nichts.
+  await act(async () => { entry.callback({ timeSinceFirstFrame: 300 }); });
+  expect(skia.__skiaDraws.circles).toBe(before);
+  await act(async () => { entry.callback({ timeSinceFirstFrame: 1100 }); });
+  expect(skia.__skiaDraws.circles).toBeGreaterThan(before);
+  // Nach dem Moment: leeres Bild, die Schleife hält an.
+  await act(async () => { entry.callback({ timeSinceFirstFrame: 3000 }); });
+  await settle();
+  const [after] = [...frameCallbacks];
+  expect((after as unknown as { handle: { isActive: boolean } }).handle.isActive).toBe(false);
+});
+
+test("Aufstiegs-Moment (#1456) mit reduzierter Bewegung: nur Aus- und Einblenden, keine Zeichenfläche", async () => {
+  reduceMotion(true);
+  frameCallbacks.clear();
+  await render(<LoewenRangFrame level={13} size="card" ascent={ascentMoment({ level: 13, previous: 11 }, { reduced: true })} />);
+  await settle();
+  expect(screen.queryByTestId("loewen-ascent-burst")).toBeNull();
+  expect(screen.queryAllByTestId("loewen-rang-pip-pop")).toHaveLength(0);
+  expect(screen.getAllByTestId("loewen-rang-pip-on")).toHaveLength(3);
+  expect(frameCallbacks.size).toBe(0);
+});
+
+test("Profil-Signatur ruht, solange eine Zeremonie oder ein Dialog darüber liegt (#1456)", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const quiet = require("../seasons/quiet");
+  reduceMotion(false);
+  frameCallbacks.clear();
+  await render(<LoewenRangFrame level={9} size="profile" />);
+  await settle();
+  const [entry] = [...frameCallbacks] as unknown as Array<{ handle: { isActive: boolean } }>;
+  expect(entry.handle.isActive).toBe(true);
+  await act(async () => { quiet.setOverlay("achievement-ceremony", true); });
+  expect(entry.handle.isActive).toBe(false);
+  await act(async () => { quiet.setOverlay("achievement-ceremony", false); });
+  expect(entry.handle.isActive).toBe(true);
 });

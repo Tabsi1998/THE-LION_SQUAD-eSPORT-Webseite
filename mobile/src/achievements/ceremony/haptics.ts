@@ -33,3 +33,28 @@ export async function playHaptics(look: Pick<Look, "key" | "rank">): Promise<voi
     /* Haptik fehlt auf diesem Gerät */
   }
 }
+
+// Löwen-Rang (#1456): Haptik zum Aufstiegs-Moment, im Takt der Bewegung - beim Rangwechsel ein Stoß, wenn der alte
+// Rahmen wegblitzt, ein Erfolg, wenn der neue einrastet, und ein schwerer Nachschlag zum großen Moment; beim Level im
+// Rang ein mittlerer Stoß, wenn die Raute aufspringt. Auch bei „Bewegung reduzieren“ (Haptik ist keine Bewegung).
+export type AscentHapticStep = { at: number; kind: "success" | "heavy" | "medium" };
+
+export function ascentHapticSteps(kind: "level" | "rank", { hold = 550, out = 240 }: { hold?: number; out?: number } = {}): AscentHapticStep[] {
+  if (kind === "rank") return [{ at: hold, kind: "medium" }, { at: hold + out, kind: "success" }, { at: hold + out + 160, kind: "heavy" }];
+  return [{ at: hold + 200, kind: "medium" }];
+}
+
+/** Spielt die Haptik eines Aufstiegs; die Rückgabe bricht noch ausstehende Stöße ab (Zeremonie geschlossen). */
+export function playAscentHaptics(kind: "level" | "rank", timing?: { hold?: number; out?: number }): () => void {
+  const timers = ascentHapticSteps(kind, timing).map((step) => setTimeout(() => {
+    try {
+      const run = step.kind === "success"
+        ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+        : Haptics.impactAsync(step.kind === "heavy" ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Medium);
+      Promise.resolve(run).catch(() => {});
+    } catch {
+      /* Haptik fehlt auf diesem Gerät */
+    }
+  }, step.at));
+  return () => timers.forEach((timer) => clearTimeout(timer));
+}
