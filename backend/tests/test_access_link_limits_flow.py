@@ -125,7 +125,8 @@ async def test_the_same_person_uses_a_link_only_once_even_after_signing_off_and_
 
     await event_routes.register_for_event(event["id"], EventRegistrationCreate(), access=token, me=anna)
     flow.act_as(anna)
-    assert (await flow.client.delete(f"/api/events/{event['id']}/registrations/me")).status_code == 200
+    signed_off = await flow.client.delete(f"/api/events/{event['id']}/registrations/me")
+    assert signed_off.status_code == 200
     await event_routes.register_for_event(event["id"], EventRegistrationCreate(), access=token, me=anna)
     assert (await stored_link(flow, link))["use_count"] == 1, "Anna zählt einmal"
 

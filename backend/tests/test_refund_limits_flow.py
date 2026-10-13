@@ -43,7 +43,8 @@ async def paid_order(flow, fake):
     kassier = await person(flow, "kassier", role="club_admin")
     _, _, booked, order = await invoiced_booking(flow, fake, kassier)
     fake.pay(order["invoice_id"])
-    assert (await billing_orders.sync_due())["paid"] == 1
+    synced = await billing_orders.sync_due()
+    assert synced["paid"] == 1
     flow.act_as(kassier)
     return booked, await order_of(flow, booked)
 
@@ -104,7 +105,8 @@ async def test_the_same_refund_sent_twice_is_recorded_once(flow, fake, monkeypat
     assert await flow.db.audit_logs.count_documents({"action": "billing.refund.record", "target_id": order["id"]}) == 2
 
     # Eine neue Erfassung mit demselben Betrag ist eine zweite Erstattung.
-    assert (await refund(flow, order, 1000, request_id="erfassung-3")).status_code == 200
+    third = await refund(flow, order, 1000, request_id="erfassung-3")
+    assert third.status_code == 200
     assert billing_orders.refunded_cents(await order_of(flow, booked)) == 2500
 
 
@@ -120,7 +122,8 @@ async def test_a_refund_prepared_before_the_payment_shrank_is_not_written(flow, 
     fake.core_invoices[order["invoice_id"]].update(
         payments=[{"amount": "10.00", "date": "2026-09-23", "type": "VIR", "ref": "PAY-1", "num": ""}],
         remaintopay=30.0, statut=1, paye=0)
-    assert (await flow.post(f"/api/admin/finance/orders/{order['id']}/resync")).status_code == 200
+    resynced = await flow.post(f"/api/admin/finance/orders/{order['id']}/resync")
+    assert resynced.status_code == 200
     synced = await order_of(flow, booked)
     assert billing_orders.paid_cents(synced) == 1000
 
