@@ -120,3 +120,39 @@ test("403 ist kein „Noch kein Team“, sondern „nicht freigegeben“ (#1001)
   await waitFor(() => expect(screen.getByTestId("teams-error")).toBeTruthy());
   expect(screen.queryByTestId("teams-empty")).toBeNull();
 });
+
+// Codex-Prüfung #1512: die Einladungen sind ein Teil der Seite - scheitern sie, ist das kein „keine Einladungen“.
+const inviteFails = (lions: unknown[]) => (path: string) => (path === "/teams/invites/my"
+  ? Promise.reject(Object.assign(new Error("Network Error"), { isAxiosError: true }))
+  : answer(path, lions, lions));
+
+test("Einladungen kommen nicht: die Teams stehen, die Seite sagt „nicht alles geladen“ (#1001)", async () => {
+  const lions = { id: "t1", name: "Lions", tag: "TLS", member_count: 12, squad_count: 0 };
+  mockGet.mockImplementation(inviteFails([lions]));
+  await render(<TeamsSection navigation={navigation} />);
+  await waitFor(() => expect(screen.getByTestId("teams-partial-load")).toBeTruthy());
+  expect(screen.getByText("Lions")).toBeTruthy();
+  expect(screen.queryByTestId("teams-error")).toBeNull();
+});
+
+test("Einladungen kommen nicht, Teams wirklich leer: „Noch kein Team“ plus Hinweis - kein Teams-Fehler (#1001)", async () => {
+  mockGet.mockImplementation(inviteFails([]));
+  await render(<TeamsSection navigation={navigation} />);
+  await waitFor(() => expect(screen.getByTestId("teams-partial-load")).toBeTruthy());
+  expect(screen.getByTestId("teams-empty")).toBeTruthy();
+  expect(screen.queryByTestId("teams-error")).toBeNull();
+});
+
+test("Einladungen beim Nachladen nicht da: die bisherigen bleiben, gekennzeichnet (#1001)", async () => {
+  const invite = { id: "i1", team: { id: "t9", name: "Tigers" }, team_name: "Tigers" };
+  mockGet.mockImplementation((path: string) => (path === "/teams/invites/my" ? Promise.resolve({ data: [invite] }) : answer(path, [], [])));
+  await render(<TeamsSection navigation={navigation} />);
+  await waitFor(() => expect(screen.getByText("Offene Einladungen")).toBeTruthy());
+  mockGet.mockImplementation(inviteFails([]));
+  const [list] = screen.container.queryAll((node) => Boolean(node.props.refreshControl));
+  await act(async () => {
+    await list.props.refreshControl.props.onRefresh();
+  });
+  await waitFor(() => expect(screen.getByTestId("teams-partial-load")).toBeTruthy());
+  expect(screen.getByText("Offene Einladungen")).toBeTruthy();
+});
