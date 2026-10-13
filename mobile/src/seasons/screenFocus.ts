@@ -1,5 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { NavigationContext } from "@react-navigation/native";
+import { anyOverlayOpen, subscribeQuiet } from "./quiet";
 
 /**
  * Ist der Screen, auf dem die Komponente liegt, gerade im Blick? Tabs bleiben geladen, wenn man woanders hinwechselt -
@@ -20,4 +21,17 @@ export function useScreenFocused(): boolean {
     };
   }, [navigation]);
   return focused;
+}
+
+/**
+ * Liegt gerade ein Dialog, Sheet oder eine Zeremonie über dem Screen (`useSeasonOverlay`, quiet.ts)? Dann ruht eine
+ * Dauer-Bewegung darunter (Löwen-Rang-Signatur im Profil, #1456) - der Screen ist im Fokus, aber verdeckt.
+ */
+export function useOverlayOpen(): boolean {
+  const [open, setOpen] = useState(() => anyOverlayOpen());
+  useEffect(() => {
+    setOpen(anyOverlayOpen());
+    return subscribeQuiet((snapshot) => setOpen(snapshot.overlays.length > 0));
+  }, []);
+  return open;
 }

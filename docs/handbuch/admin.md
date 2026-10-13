@@ -239,6 +239,9 @@ Jedes Thema hat genau **einen** Ort:
 | Welches Turnierformat passt? | Admin → eSports → Turnier-Leitfaden | [Turniere](turniere.md) |
 | Fernseher und Beamer | Admin → eSports → TV & Beamer | [TV und Beamer](tv.md) |
 | Fast-Lap-Challenge | Admin → eSports → Fast Lap | [Fast Lap](fastlap.md) |
+| Event anlegen, Anmeldung, Kalender | Admin → Content → Events | [Events](events.md) |
+| Erfolge vergeben, Level, Jahresrückblick | Admin → Content → Erfolge | [Erfolge, Level und Jahreswertung](erfolge.md) |
+| Jahreswertung (Saison, Punkte) | Admin → eSports → Jahreswertung | [Erfolge, Level und Jahreswertung](erfolge.md) |
 | Logo, Farbe, Hinweisleisten | Admin → Auftritt → Branding | [Auftritt](auftritt.md) |
 | Impressum, Datenschutz, Vereinsdaten | Admin → Verein → Vereinsdaten | [Auftritt](auftritt.md) |
 | Jahreszeiten, Adventkalender, Ostereiersuche | Auftritt → Jahreszeiten, Content → Adventkalender / Ostereiersuche | [Auftritt](auftritt.md) |
