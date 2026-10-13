@@ -13,6 +13,10 @@
 - Integrationsgeheimnisse werden mit `SETTINGS_ENCRYPTION_KEY` verschlüsselt; Passwörter werden
   ausschließlich gehasht gespeichert.
 - Öffentliche Benutzerobjekte enthalten weder Passwort-/MFA-Daten noch stabile Google-Konto-IDs.
+- Freunde beim Event (#1188): Wo jemand angemeldet ist (Event, Turniere des Events), sehen nur bestätigte Freunde –
+  nie Fremde oder Gäste, nicht bei Blockierung, nicht bei gesperrten oder gelöschten Konten. Die Person schaltet es unter
+  Privatsphäre selbst ab („Freunde sehen, wo ich angemeldet bin“); mit Geburtsdatum unter 14 Jahren ist es von Anfang an
+  aus. Die Antworten tragen `Cache-Control: private, no-store` (`backend/services/event_friends.py`).
 
 ## Konto löschen: was mit welchen Daten passiert
 
