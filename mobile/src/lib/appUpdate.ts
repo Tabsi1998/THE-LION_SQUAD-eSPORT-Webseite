@@ -51,8 +51,6 @@ export type AppVersionInfo = {
   update_available: boolean;
   mandatory: boolean;
   next_check_after?: string;
-  /** Vom Server noch geliefert; seit der Play-Fassung (#593) ohne Wirkung in der App. */
-  server_updater_enabled?: boolean;
   play_store_url?: string | null;
 };
 

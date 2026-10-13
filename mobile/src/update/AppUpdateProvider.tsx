@@ -53,6 +53,8 @@ async function writeText(key: string, value: string) {
 export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
   const [info, setInfo] = useState<AppVersionInfo | null>(null);
   const [snooze, setSnooze] = useState<UpdateSnooze | null>(null);
+  // Erst wenn der gespeicherte Aufschub gelesen ist, darf der Hinweis erscheinen - sonst blitzt er beim Start kurz auf.
+  const [snoozeLoaded, setSnoozeLoaded] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   // Installationsquelle (#421, #593): Play-Installationen bekommen Googles Dialog, alle anderen den Store-Link.
   const [play, setPlay] = useState<PlayUpdateState | null>(null);
@@ -76,7 +78,9 @@ export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     void readSnooze().then((stored) => {
-      if (!cancelled && stored) setSnooze((current) => current ?? stored);
+      if (cancelled) return;
+      if (stored) setSnooze((current) => current ?? stored);
+      setSnoozeLoaded(true);
     });
     return () => {
       cancelled = true;
@@ -135,7 +139,7 @@ export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
       {children}
       <WhatsNewCard entry={entry} visible={whatsNewOpen} onClose={() => setWhatsNewOpen(false)} />
       {/* Eigener Hinweis nur für die Server-APK und Geräte ohne Play (#926) - aus Google Play kommt nur Googles Dialog. */}
-      {decision.release && showOwnUpdateHint(decision, play?.source, whatsNewOpen) ? (
+      {snoozeLoaded && decision.release && showOwnUpdateHint(decision, play?.source, whatsNewOpen) ? (
         <AppUpdateBanner
           release={decision.release}
           mandatory={decision.mandatory}

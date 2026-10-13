@@ -146,6 +146,46 @@ describe("#1003 – „Später“ gilt auch nach einem Neustart", () => {
     expect(screen.queryByTestId("update-banner")).toBeNull();
   });
 
+  test("der Hinweis wartet, bis der gespeicherte Aufschub gelesen ist - kein kurzes Aufblitzen beim Start", async () => {
+    await SecureStore.setItemAsync(SNOOZE_KEY, JSON.stringify({ build: 64, at: Date.now() }));
+    const getItem = SecureStore.getItemAsync as jest.Mock;
+    const original = getItem.getMockImplementation() as (key: string) => Promise<string | null>;
+    let releaseSnooze: () => void = () => {};
+    const snoozeRead = new Promise<void>((resolve) => {
+      releaseSnooze = resolve;
+    });
+    getItem.mockImplementation(async (key: string) => {
+      if (key === SNOOZE_KEY) await snoozeRead;
+      return original(key);
+    });
+    try {
+      await mount();
+      // Versionsantwort und Installationsquelle sind da, der Aufschub noch nicht: noch kein Hinweis.
+      expect(mockGet).toHaveBeenCalled();
+      expect(screen.queryByTestId("update-banner")).toBeNull();
+      releaseSnooze();
+      await flush();
+      expect(screen.queryByTestId("update-banner")).toBeNull();
+    } finally {
+      getItem.mockImplementation(original);
+    }
+  });
+
+  test("kann der Speicher den Aufschub nicht lesen, kommt der Hinweis trotzdem", async () => {
+    const getItem = SecureStore.getItemAsync as jest.Mock;
+    const original = getItem.getMockImplementation() as (key: string) => Promise<string | null>;
+    getItem.mockImplementation(async (key: string) => {
+      if (key === SNOOZE_KEY) throw new Error("Speicher gesperrt");
+      return original(key);
+    });
+    try {
+      await mount();
+      expect(screen.getByText("Build 64")).toBeTruthy();
+    } finally {
+      getItem.mockImplementation(original);
+    }
+  });
+
   test("ein neuerer Build zeigt den Hinweis wieder", async () => {
     await SecureStore.setItemAsync(SNOOZE_KEY, JSON.stringify({ build: 64, at: Date.now() }));
     mockGet.mockResolvedValue({ data: versionInfo(65) });

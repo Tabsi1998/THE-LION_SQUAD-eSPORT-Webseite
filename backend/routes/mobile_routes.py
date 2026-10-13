@@ -23,7 +23,7 @@ from services import event_days
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
 from services.visibility import lead_can_see
-from services.app_releases import app_version_release, current_release, next_check_after, public_release, release_file, update_decision, updater_settings
+from services.app_releases import app_version_release, current_release, next_check_after, public_release, release_file, update_decision
 from services.rate_limit import enforce_rate_limit
 
 PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=at.lionsquad.app"
@@ -736,14 +736,11 @@ async def app_version(request: Request, response: Response, build: int | None = 
     db = get_db()
     current = await current_release(db)
     decision = update_decision(build, current)
-    settings = await updater_settings(db)
+    # Ohne den Server-Updater-Schalter (#421): eine interne Einstellung, die öffentliche Antwort braucht ihn nicht (#1002).
     return {
         "current": app_version_release(current),
         "own_build": int(build or 0) or None,
         "next_check_after": next_check_after(),
-        # Play-Installationen nehmen Googles Dialog; ob die Server-APK überhaupt angeboten wird,
-        # entscheidet der Betreiber (#421).
-        "server_updater_enabled": settings["server_updater_enabled"],
         "play_store_url": PLAY_STORE_URL,
         **decision,
     }
