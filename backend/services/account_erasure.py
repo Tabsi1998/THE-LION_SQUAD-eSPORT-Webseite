@@ -90,6 +90,9 @@ async def _records(db, user: dict, now: str) -> None:
     email = str(user.get("email") or "").strip().lower()
     bound = [{"user_id": user_id}] + ([{"email": email}] if email else [])
     await db.access_links.update_many({"$or": bound}, {"$set": {"is_active": False, "email": None, "note": None, "updated_at": now}})
+    # Wer einen Zugangslink schon genutzt hat (#1036), steht nicht mehr daran - gezählt bleibt die Nutzung.
+    await db.access_links.update_many({"used_by": user_id}, {"$pull": {"used_by": user_id}})
+    await db.access_links.update_many({"last_used_by": user_id}, {"$set": {"last_used_by": None}})
 
 
 # Persönliche Profile (#1039): Steht eine eigene Datei im Profil einer anderen Person, hält das sie nicht fest - sie geht

@@ -99,19 +99,53 @@ async def validate_access_link(
     return link
 
 
-async def record_access_link_use(db, link: dict | None, user: dict | None = None) -> None:
+class AccessLinkUsedUp(Exception):
+    """Der Link trägt keine weitere Anmeldung mehr: aufgebraucht oder inzwischen widerrufen."""
+
+    detail = "Dieser Zugangslink ist aufgebraucht oder nicht mehr gültig."
+
+
+async def claim_access_link_use(db, link: dict | None, user: dict | None = None) -> bool:
+    """Eine Nutzung des Links belegen, bevor die Anmeldung geschrieben wird (#1036).
+
+    Prüfen und Hochzählen sind ein einziger bedingter Schreibzugriff: Nur ein aktiver Link mit freier Nutzung wird
+    hochgezählt - zwei gleichzeitige Anmeldungen können ein Limit nicht gemeinsam überschreiten. Dieselbe Person zählt
+    nur einmal (``used_by``), auch nach Abmelden und erneutem Anmelden. ``True``: neu gezählt (bei einem Fehler danach
+    mit ``release_access_link_use`` zurückgeben), ``False``: diese Person war schon gezählt. Kein Platz mehr oder
+    widerrufen: ``AccessLinkUsedUp``.
+    """
+    if not link or not link.get("id"):
+        return False
+    user_id = (user or {}).get("id")
+    query = {"id": link["id"], "is_active": {"$ne": False}}
+    max_uses = link.get("max_uses")
+    if max_uses is not None:
+        query["max_uses"] = max_uses
+        query["use_count"] = {"$lt": int(max_uses)}
+    if user_id:
+        query["used_by"] = {"$ne": user_id}
+    update = {"$inc": {"use_count": 1}, "$set": {"last_used_at": now_utc().isoformat(), "last_used_by": user_id}}
+    if user_id:
+        update["$addToSet"] = {"used_by": user_id}
+    if (await db.access_links.update_one(query, update)).modified_count:
+        return True
+    counted = {"id": link["id"], "is_active": {"$ne": False}, "used_by": user_id}
+    if user_id and await db.access_links.find_one(counted, {"_id": 1}):
+        return False
+    raise AccessLinkUsedUp()
+
+
+async def release_access_link_use(db, link: dict | None, user: dict | None = None) -> None:
+    """Eine belegte Nutzung zurückgeben, wenn die Anmeldung danach doch nicht zustande kam."""
     if not link or not link.get("id"):
         return
-    await db.access_links.update_one(
-        {"id": link["id"]},
-        {
-            "$inc": {"use_count": 1},
-            "$set": {
-                "last_used_at": now_utc().isoformat(),
-                "last_used_by": (user or {}).get("id"),
-            },
-        },
-    )
+    user_id = (user or {}).get("id")
+    query = {"id": link["id"], "use_count": {"$gt": 0}}
+    update = {"$inc": {"use_count": -1}}
+    if user_id:
+        query["used_by"] = user_id
+        update["$pull"] = {"used_by": user_id}
+    await db.access_links.update_one(query, update)
 
 
 async def touch_access_link(db, link: dict | None, user: dict | None = None, min_interval_seconds: int = 300) -> None:
