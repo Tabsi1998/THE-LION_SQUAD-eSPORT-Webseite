@@ -71,3 +71,16 @@ test("ein fremdes Ziel geht nicht mit", async () => {
   expect(await screen.findByTestId("where")).toHaveTextContent("/verify-email?sent=1&email=neonfalke%40lionsquad-test.at");
   expect(screen.getByTestId("where")).not.toHaveTextContent("next=");
 });
+
+test("Passwortvertrag (#1033): dieselbe Regel wie der Server, vor dem Absenden gemeldet", async () => {
+  const user = userEvent.setup();
+  renderAt("/register");
+  await user.type(screen.getByTestId("register-username"), "neonfalke");
+  await user.type(screen.getByTestId("register-email"), "neonfalke@lionsquad-test.at");
+  await user.type(screen.getByTestId("register-password"), "ä".repeat(37));
+  await user.click(screen.getByTestId("register-accept"));
+  await user.click(screen.getByTestId("register-accept-terms"));
+  await user.click(screen.getByTestId("register-submit"));
+  expect(await screen.findByText(/höchstens 72 Byte\. Umlaute zählen doppelt/)).toBeInTheDocument();
+  expect(authState.register).not.toHaveBeenCalled();
+});

@@ -205,8 +205,16 @@ def quote(offer: dict | None, *, seats: int = 1, selected: list[str] | None = No
     }
 
 
-def snapshot(quote_result: dict, *, recipient: dict, source: dict) -> dict:
-    """Der eingefrorene Preis einer bestätigten Buchung. Wird nie geändert, nur ersetzt."""
+def order_timing(price_snapshot: dict | None, offer: dict | None) -> str:
+    """Rechnungszeitpunkt eines Auftrags: der mit dem Preis eingefrorene, bei älteren Preisen ohne ihn der heutige."""
+    return (price_snapshot or {}).get("invoice_timing") or (offer or {}).get("invoice_timing") or "on_confirm"
+
+
+def snapshot(quote_result: dict, *, recipient: dict, source: dict, invoice_timing: str | None = None) -> dict:
+    """Der eingefrorene Preis einer bestätigten Buchung. Wird nie geändert, nur ersetzt.
+
+    ``invoice_timing`` friert den Rechnungszeitpunkt mit ein (Codex-Prüfung #1500): Ein später nachgeholter Auftrag
+    wird so abgerechnet, wie es bei der Zusage galt - nicht nach einer inzwischen geänderten Einstellung."""
     body = {
         "currency": quote_result["currency"],
         "positions": quote_result["positions"],
@@ -219,6 +227,7 @@ def snapshot(quote_result: dict, *, recipient: dict, source: dict) -> dict:
         },
         "source": source,   # z. B. {"kind": "event", "id": ..., "registration_id": ...}
         "accepted_at": now_utc().isoformat(),
+        **({"invoice_timing": invoice_timing} if invoice_timing else {}),
     }
     digest = hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
     return {**body, "hash": digest}

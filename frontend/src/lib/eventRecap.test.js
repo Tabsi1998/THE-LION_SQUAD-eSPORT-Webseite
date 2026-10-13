@@ -36,6 +36,14 @@ test("Freunde: ein Satz mit Namen, nach dem Event in der Vergangenheit; Orte mit
     .toEqual(["Event", "Rocket League 2v2 (Lions Rocket)"]);
 });
 
+test("Orte je Seite (#1188 Teil 2): Fast Lap mit Titel; Turnierseite nur Team bzw. „angemeldet“; Fast-Lap-Seite „Zeit gefahren“", () => {
+  const friend = { where: [{ kind: "event" }, { kind: "fastlap", title: "Monza-Hotlap" }] };
+  expect(friendPlaces(friend)).toEqual(["Event", "Monza-Hotlap"]);
+  expect(friendPlaces({ where: [{ kind: "tournament", title: "RL", team_name: "Lions Rocket" }] }, { scope: "tournament" })).toEqual(["mit Lions Rocket"]);
+  expect(friendPlaces({ where: [{ kind: "tournament", title: "Mario Kart Cup", team_name: null }] }, { scope: "tournament" })).toEqual(["angemeldet"]);
+  expect(friendPlaces({ where: [{ kind: "fastlap", title: "Monza-Hotlap" }] }, { scope: "fastlap" })).toEqual(["Zeit gefahren"]);
+});
+
 test("Schalter „Freunde sehen, wo ich angemeldet bin“: Standard an, unter 14 Jahren aus, eigene Wahl zählt", () => {
   const now = new Date("2026-10-13T10:00:00Z");
   expect(friendsSharingDefault({}, now)).toBe(true);

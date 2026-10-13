@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { PhaseBadge } from "./PhaseBadge";
 import { ArrowRight, Calendar, Users, Trophy } from "lucide-react";
-import { formatDate, getRegistrationState } from "@/lib/datetime";
+import { formatWhen, getRegistrationState } from "@/lib/datetime";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { LazyImg } from "@/components/tls/LazyImg";
 
@@ -75,7 +75,7 @@ export function TournamentCard({ tournament, index = 0 }) {
           {t.start_date && (
             <span className="inline-flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
-              {formatDate(t.start_date)}
+              {formatWhen(t.start_date)}
             </span>
           )}
           <span className="inline-flex items-center gap-1">

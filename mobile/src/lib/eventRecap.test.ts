@@ -25,6 +25,14 @@ test("Freunde: Satz und Orte", () => {
     .toEqual(["Event", "RL 2v2 (Lions)"]);
 });
 
+test("Orte je Screen (#1188 Teil 2): Fast Lap mit Titel; Turnier nur Team bzw. „angemeldet“; Fast Lap „Zeit gefahren“", () => {
+  const friend = { id: "f", display_name: "Finn", where: [{ kind: "event" as const }, { kind: "fastlap" as const, id: "c", title: "Monza-Hotlap" }] };
+  expect(friendPlaces(friend)).toEqual(["Event", "Monza-Hotlap"]);
+  expect(friendPlaces({ id: "f", display_name: "Finn", where: [{ kind: "tournament", id: "t", title: "RL", team_name: "Lions" }] }, { scope: "tournament" })).toEqual(["mit Lions"]);
+  expect(friendPlaces({ id: "f", display_name: "Finn", where: [{ kind: "tournament", id: "t", title: "MK", team_name: null }] }, { scope: "tournament" })).toEqual(["angemeldet"]);
+  expect(friendPlaces({ id: "f", display_name: "Finn", where: [{ kind: "fastlap", id: "c", title: "Monza" }] }, { scope: "fastlap" })).toEqual(["Zeit gefahren"]);
+});
+
 test("Schalter: Standard an, unter 14 Jahren aus, eigene Wahl zählt", () => {
   const now = new Date("2026-10-13T10:00:00Z");
   expect(friendsSharingDefault({}, now)).toBe(true);

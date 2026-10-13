@@ -51,7 +51,9 @@ module.exports = {
   			},
   			muted: {
   				DEFAULT: 'hsl(var(--muted))',
-  				foreground: 'hsl(var(--muted-foreground))'
+  				foreground: 'hsl(var(--muted-foreground))',
+  				// Nebentext (#1305, #1232): text-muted-text
+  				text: 'rgb(var(--tls-text-muted-rgb) / <alpha-value>)'
   			},
   			accent: {
   				DEFAULT: 'hsl(var(--accent))',
@@ -61,8 +63,23 @@ module.exports = {
   				DEFAULT: 'hsl(var(--destructive))',
   				foreground: 'hsl(var(--destructive-foreground))'
   			},
-  			// „läuft gerade“ (#1116): eine Quelle für die Live-Farbe, index.css --tls-live-rgb.
+  			// Farb-Rollen (#1305): jede Farbe eine Aufgabe - Werte in src/styles/system.css. „live“ (#1116) nur für
+  			// „läuft gerade“; Rohwerte wie #FFD700 bewacht src/styles/colors.test.js.
+  			brand: 'rgb(var(--tls-brand-rgb) / <alpha-value>)',
   			live: 'rgb(var(--tls-live-rgb) / <alpha-value>)',
+  			warn: 'rgb(var(--tls-warn-rgb) / <alpha-value>)',
+  			ok: 'rgb(var(--tls-ok-rgb) / <alpha-value>)',
+  			honor: 'rgb(var(--tls-honor-rgb) / <alpha-value>)',
+  			event: 'rgb(var(--tls-event-rgb) / <alpha-value>)',
+  			quiet: 'rgb(var(--tls-quiet-rgb) / <alpha-value>)',
+  			silver: 'rgb(var(--tls-silver-rgb) / <alpha-value>)',
+  			bronze: 'rgb(var(--tls-bronze-rgb) / <alpha-value>)',
+  			surface: {
+  				'0': 'var(--tls-surface-0)',
+  				'1': 'var(--tls-surface-1)',
+  				'2': 'var(--tls-surface-2)',
+  				'3': 'var(--tls-surface-3)'
+  			},
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',
