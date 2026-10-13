@@ -25,7 +25,7 @@ const groups = (earnedAt: string | null, extra: Array<Record<string, unknown>> =
   ...extra,
 ] }] } });
 
-let level = { level: 4, title: "Rookie", prestige: 0 };
+let level = { level: 4, title: "Jungtier", prestige: 0 };
 function route(achievements: unknown) {
   mockGet.mockImplementation(async (url: string) => (url === "/users/me/level" ? { data: level } : achievements));
 }
@@ -33,7 +33,7 @@ function route(achievements: unknown) {
 beforeEach(() => {
   mockGet.mockReset();
   Object.keys(mockStore).forEach((key) => delete mockStore[key]);
-  level = { level: 4, title: "Rookie", prestige: 0 };
+  level = { level: 4, title: "Jungtier", prestige: 0 };
   // Noch ist nichts gerendert - leeren ohne act.
   ceremonyQueue.clear();
 });
@@ -73,33 +73,33 @@ test("beim allerersten Start gibt es keinen Rückblick über alles je Erreichte"
 
 test("Prestige im Profil wird sofort gefeiert, seine Rücknahme nicht", async () => {
   mockStore["tls_ach_seen_user-1"] = "2026-09-21T10:00:00.000Z";
-  mockStore["tls_level_seen_user-1"] = JSON.stringify({ level: 60, title: "Legende", prestige: 0 });
-  level = { level: 60, title: "Legende", prestige: 0 };
+  mockStore["tls_level_seen_user-1"] = JSON.stringify({ level: 60, title: "Löwenkönig", prestige: 0 });
+  level = { level: 60, title: "Löwenkönig", prestige: 0 };
   route(groups(null));
   await render(<AchievementCatchUpOverlay />);
   await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/users/me/level"));
   expect(screen.queryByTestId("achievement-unlock-overlay")).toBeNull();
 
-  level = { level: 1, title: "Rookie", prestige: 1 };
+  level = { level: 1, title: "Jungtier", prestige: 1 };
   await act(async () => { announceLevelChanged(); });
   await waitFor(() => expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Prestige"));
   expect(screen.queryByTestId("ceremony-title-banner")).toBeNull();
   await act(async () => { ceremonyQueue.advance(); });
   await waitFor(() => expect(screen.queryByTestId("achievement-unlock-overlay")).toBeNull());
 
-  level = { level: 60, title: "Legende", prestige: 0 };
+  level = { level: 60, title: "Löwenkönig", prestige: 0 };
   await act(async () => { announceLevelChanged(); });
-  await waitFor(() => expect(JSON.parse(mockStore["tls_level_seen_user-1"])).toEqual({ level: 60, title: "Legende", prestige: 0 }));
+  await waitFor(() => expect(JSON.parse(mockStore["tls_level_seen_user-1"])).toEqual({ level: 60, title: "Löwenkönig", prestige: 0 }));
   expect(screen.queryByTestId("achievement-unlock-overlay")).toBeNull();
 });
 
 test("ein neues Level seit dem letzten Blick wird gefeiert, ein gleiches nicht", async () => {
   mockStore["tls_ach_seen_user-1"] = "2026-09-21T10:00:00.000Z";
-  mockStore["tls_level_seen_user-1"] = JSON.stringify({ level: 4, title: "Rookie", prestige: 0 });
-  level = { level: 5, title: "Kämpfer", prestige: 0 };
+  mockStore["tls_level_seen_user-1"] = JSON.stringify({ level: 4, title: "Jungtier", prestige: 0 });
+  level = { level: 5, title: "Fährte", prestige: 0 };
   route(groups(null));
   await render(<AchievementCatchUpOverlay />);
   await waitFor(() => expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Level 5 erreicht"));
-  expect(screen.getByTestId("ceremony-title-banner")).toHaveTextContent("Neuer Titel: Kämpfer");
-  expect(JSON.parse(mockStore["tls_level_seen_user-1"])).toEqual({ level: 5, title: "Kämpfer", prestige: 0 });
+  expect(screen.getByTestId("ceremony-title-banner")).toHaveTextContent("Neuer Titel: Fährte");
+  expect(JSON.parse(mockStore["tls_level_seen_user-1"])).toEqual({ level: 5, title: "Fährte", prestige: 0 });
 });

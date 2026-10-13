@@ -569,9 +569,11 @@ export default function PublicProfilePage() {
           {/* Leichtes 3D (#1078): Bild und Name neigen sich mit der Maus um höchstens 3 Grad - nur hier, nur am PC. */}
           {/* Am Tablet (bis 1279 px) stehen die Knöpfe in einer eigenen Zeile unter Bild und Name - sonst bliebe für den
               Namen nur ein schmaler Streifen mit einem Buchstaben je Zeile (#1218). */}
-          <div ref={tiltRef} className="tls-tilt relative -mt-14 sm:-mt-16 lg:-mt-20 flex flex-col md:flex-row md:flex-wrap xl:flex-nowrap md:items-end gap-4 md:gap-6" data-testid="profile-tilt">
+          {/* Der Kopf ragt in den Banner. Er nimmt dort keine Klicks an, damit die Auszeichnung im Banner bedienbar bleibt
+              (#1454); Name und Knöpfe schon. */}
+          <div ref={tiltRef} className="tls-tilt pointer-events-none relative -mt-14 sm:-mt-16 lg:-mt-20 flex flex-col md:flex-row md:flex-wrap xl:flex-nowrap md:items-end gap-4 md:gap-6" data-testid="profile-tilt">
             <div className="tls-tilt__deep shrink-0">
-              <LevelAvatarFrame level={level.level} crown={crown} className="w-28 h-28 sm:w-32 sm:h-32 lg:w-40 lg:h-40" testId="profile-avatar-frame">
+              <LevelAvatarFrame level={level.level} prestige={level.prestige} crown={crown} size="profile" testId="profile-avatar-frame">
                 {profile.avatar_url ? (
                   <img src={resolveMediaUrl(profile.avatar_url)} alt={displayName} className="w-full h-full object-cover" />
                 ) : (
@@ -581,7 +583,7 @@ export default function PublicProfilePage() {
                 )}
               </LevelAvatarFrame>
             </div>
-            <div className="tls-tilt__mid flex-1 min-w-0 md:pb-1">
+            <div className="tls-tilt__mid pointer-events-auto flex-1 min-w-0 md:pb-1">
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">
                 <span>THE LION SQUAD · Spieler</span>
                 {isPrivate && <span className="inline-flex items-center gap-1 text-white/40"><Lock className="w-3 h-3" /> Privat</span>}
@@ -607,7 +609,7 @@ export default function PublicProfilePage() {
                 {joinedDate && <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />Dabei seit {viennaDate(joinedDate, { month: "long", year: "numeric" })}</span>}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 md:pb-1 md:basis-full xl:basis-auto xl:justify-end shrink-0" data-testid="profile-actions">
+            <div className="pointer-events-auto flex flex-wrap gap-2 md:pb-1 md:basis-full xl:basis-auto xl:justify-end shrink-0" data-testid="profile-actions">
               {!isOwnProfile && (
                 <>
                   <button

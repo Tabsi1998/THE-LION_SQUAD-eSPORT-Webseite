@@ -76,8 +76,8 @@ const chats = {
   ],
   unread_total: 2,
 };
-const publicList = people.map((person) => ({ ...person, favorite_games: ["EA SPORTS FC 26", "Rocket League"], achievement_level: { title: "Rudelführer", level: 12 } }));
-const leaders = people.map((person, index) => ({ ...person, rank: index + 1, points: 900 - index * 70, level: 20 - index, title: "Rudelführer" }));
+const publicList = people.map((person) => ({ ...person, favorite_games: ["EA SPORTS FC 26", "Rocket League"], achievement_level: { title: "Rudel", level: 12 } }));
+const leaders = people.map((person, index) => ({ ...person, rank: index + 1, points: 900 - index * 70, level: 20 - index, title: index ? "Jäger" : "Silbermähne" }));
 const publicProfile = { id: "p1", username: "spieler1", display_name: NAMES[0], role: "player", bio: "Spielt am liebsten FC 26.", awards: [], honours: [] };
 const dashboard = {
   me: { tournaments: [tournament], events: [event], matches: [], staff_matches: [], actions: [] },

@@ -10,7 +10,7 @@ vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 const { AchievementsTile } = await import("./AchievementsTile");
 
 const SUMMARY = {
-  level: { level: 12, xp: 4000, next_level_xp: 4600, progress: 30, title: "Kämpfer", prestige: 2 },
+  level: { level: 12, xp: 4000, next_level_xp: 4600, progress: 30, title: "Rudel", prestige: 2 },
   next_up: { code: "matches_played_3", name: "Spielmacher III", current: 60, target: 75, group_accent: "#29B6E8" },
   last_award: { code: "matches_played_2", name: "Spielmacher II", material_name: "Eisen", material_color: "#9AA0A6", icon: "swords" },
   count: 2, points: 15, hidden: { total: 13, earned: 0 },
@@ -23,7 +23,7 @@ describe("AchievementsTile", () => {
     expect(await screen.findByTestId("dashboard-achievements-level")).toHaveTextContent("Level 12");
     const tile = screen.getByTestId("dashboard-achievements");
     expect(tile).toHaveAttribute("href", "/u/me?tab=achievements");
-    expect(tile).toHaveTextContent("Kämpfer");
+    expect(tile).toHaveTextContent("Rudel");
     expect(screen.getByTestId("dashboard-achievements-prestige").querySelectorAll("svg")).toHaveLength(2);
     expect(screen.getByTestId("dashboard-achievements-count")).toHaveTextContent("2 Erfolge · 15 Pkt.");
     expect(screen.getByTestId("dashboard-achievements-next")).toHaveTextContent("Spielmacher III");

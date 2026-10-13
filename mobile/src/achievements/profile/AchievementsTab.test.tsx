@@ -49,7 +49,7 @@ const DATA: AchievementsMe = {
   pinned: [AWARDS[1]],
   pinned_codes: ["matches_played_2"],
   privacy_achievements_public: true,
-  level: { level: 7, xp: 1234, next_level_xp: 1500, progress: 40, title: "Anwärter", next_title_at: 10, prestige: 1, max_level: 60, prestige_available: false, prestige_undo_until: null },
+  level: { level: 7, xp: 1234, next_level_xp: 1500, progress: 40, title: "Fährte", next_title_at: 10, prestige: 1, max_level: 60, prestige_available: false, prestige_undo_until: null },
 };
 
 const mockOpen = jest.fn();
@@ -86,7 +86,7 @@ afterEach(() => {
 
 test("Kopf mit Level, Titel, Sternen und XP; Sichtbarkeit, Zahlen und „Als Nächstes“ mit Link", async () => {
   await render(<Harness initial={DATA} />);
-  expect(screen.getByTestId("achievement-level-title")).toHaveTextContent("Level 7 · Anwärter", { exact: false });
+  expect(screen.getByTestId("achievement-level-title")).toHaveTextContent("Level 7 · Fährte", { exact: false });
   expect(screen.getByTestId("achievement-prestige").props.accessibilityLabel).toBe("Prestige 1");
   expect(screen.getByText("Nächster Titel ab Level 10.")).toBeTruthy();
   expect(screen.getByTestId("achievement-level-xp")).toHaveTextContent("Bis Level 8", { exact: false });
@@ -208,7 +208,7 @@ test("Teilen öffnet das Teilen-Menü mit dem Text des Webs - private Erfolge la
 test("Prestige ab Level 60 nur nach Bestätigung; danach neuer Stand, Level-Erkennung und Rücknahme", async () => {
   const levelChanged = jest.fn();
   const stop = onLevelChanged(levelChanged);
-  const top = { ...DATA.level, level: 60, title: "Legende", prestige: 0, prestige_available: true, xp: 99000, next_level_xp: 99000, progress: 100 };
+  const top = { ...DATA.level, level: 60, title: "Löwenkönig", prestige: 0, prestige_available: true, xp: 99000, next_level_xp: 99000, progress: 100 };
   await render(<Harness initial={{ ...DATA, level: top }} />);
   expect(screen.getByTestId("achievement-prestige-panel")).toHaveTextContent("Level 60 erreicht", { exact: false });
   expect(screen.getByTestId("achievement-level-xp")).toHaveTextContent("Höchstes Level99.000 XP");
@@ -220,18 +220,18 @@ test("Prestige ab Level 60 nur nach Bestätigung; danach neuer Stand, Level-Erke
   expect(mockPost).not.toHaveBeenCalled();
 
   // Bestätigen: der neue Stand ersetzt den alten, die Level-Erkennung sieht nach (Zeremonie für den Stern).
-  const after = { level: 1, xp: 0, next_level_xp: 125, progress: 0, title: "Rookie", prestige: 1, max_level: 60, prestige_available: false, prestige_undo_until: "2099-01-01T12:00:00+00:00" };
+  const after = { level: 1, xp: 0, next_level_xp: 125, progress: 0, title: "Jungtier", prestige: 1, max_level: 60, prestige_available: false, prestige_undo_until: "2099-01-01T12:00:00+00:00" };
   mockPost.mockResolvedValueOnce({ data: after });
   alertSpy.mockImplementation((_title, _message, buttons) => buttons?.[1]?.onPress?.());
   await fireEvent.press(screen.getByTestId("achievement-prestige-start"));
-  await waitFor(() => expect(screen.getByTestId("achievement-level-title")).toHaveTextContent("Level 1 · Rookie", { exact: false }));
+  await waitFor(() => expect(screen.getByTestId("achievement-level-title")).toHaveTextContent("Level 1 · Jungtier", { exact: false }));
   expect(mockPost).toHaveBeenCalledWith("/users/me/prestige");
   expect(levelChanged).toHaveBeenCalledTimes(1);
   expect(screen.getByTestId("achievement-prestige-panel")).toHaveTextContent("1. Prestige-Stern – bis", { exact: false });
 
   mockPost.mockResolvedValueOnce({ data: top });
   await fireEvent.press(screen.getByTestId("achievement-prestige-undo"));
-  await waitFor(() => expect(screen.getByTestId("achievement-level-title")).toHaveTextContent("Level 60 · Legende", { exact: false }));
+  await waitFor(() => expect(screen.getByTestId("achievement-level-title")).toHaveTextContent("Level 60 · Löwenkönig", { exact: false }));
   expect(mockPost).toHaveBeenLastCalledWith("/users/me/prestige/undo");
   expect(alertSpy).toHaveBeenLastCalledWith("Prestige zurückgenommen", "Level und XP sind wieder da.");
   expect(levelChanged).toHaveBeenCalledTimes(2);

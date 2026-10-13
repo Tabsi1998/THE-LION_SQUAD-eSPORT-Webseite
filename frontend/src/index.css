@@ -350,20 +350,11 @@ img, video, canvas, svg {
 .tls-account-frame {
   box-shadow: 0 0 0 1px rgba(41,182,232,0.18), 0 0 18px rgba(41,182,232,0.08);
 }
-.tls-account-frame-challenger {
-  box-shadow: 0 0 0 1px rgba(0,255,136,0.20), 0 0 20px rgba(0,255,136,0.10);
-}
 .tls-account-frame-pro {
   box-shadow: 0 0 0 1px rgba(41,182,232,0.28), 0 0 26px rgba(41,182,232,0.16);
 }
-.tls-account-frame-veteran {
-  box-shadow: 0 0 0 1px rgba(168,85,247,0.28), 0 0 30px rgba(168,85,247,0.15);
-}
 .tls-account-frame-elite {
   box-shadow: 0 0 0 1px rgba(255,215,0,0.28), 0 0 34px rgba(255,215,0,0.16), inset 0 0 18px rgba(255,215,0,0.05);
-}
-.tls-account-frame-champion {
-  animation: tls-level-champion 4.6s ease-in-out infinite;
 }
 .tls-account-frame-legendary {
   animation: tls-level-prestige 3.8s ease-in-out infinite;
@@ -371,20 +362,11 @@ img, video, canvas, svg {
 .tls-account-avatar-frame {
   box-shadow: 0 0 0 1px rgba(41,182,232,0.14);
 }
-.tls-account-avatar-frame-challenger {
-  box-shadow: 0 0 0 1px rgba(0,255,136,0.20), 0 0 14px rgba(0,255,136,0.10);
-}
 .tls-account-avatar-frame-pro {
   box-shadow: 0 0 0 1px rgba(41,182,232,0.22), 0 0 18px rgba(41,182,232,0.13);
 }
-.tls-account-avatar-frame-veteran {
-  box-shadow: 0 0 0 1px rgba(168,85,247,0.26), 0 0 18px rgba(168,85,247,0.14);
-}
 .tls-account-avatar-frame-elite {
   box-shadow: 0 0 0 1px rgba(255,215,0,0.26), 0 0 20px rgba(255,215,0,0.14);
-}
-.tls-account-avatar-frame-champion {
-  animation: tls-level-champion 4.6s ease-in-out infinite;
 }
 .tls-account-avatar-frame-legendary {
   animation: tls-level-prestige 3.8s ease-in-out infinite;
@@ -429,28 +411,13 @@ img, video, canvas, svg {
   animation: tls-profile-spark 4.8s ease-in-out infinite;
 }
 
-.tls-profile-aura--challenger {
-  --tls-profile-aura: rgba(0,255,136,0.22);
-  --tls-profile-aura-strong: rgba(0,255,136,0.48);
-}
-
 .tls-profile-aura--pro {
   --tls-profile-aura: rgba(41,182,232,0.30);
   --tls-profile-aura-strong: rgba(41,182,232,0.62);
 }
 
-.tls-profile-aura--veteran {
-  --tls-profile-aura: rgba(168,85,247,0.32);
-  --tls-profile-aura-strong: rgba(168,85,247,0.68);
-}
-
 .tls-profile-aura--elite {
   --tls-profile-aura: rgba(255,215,0,0.36);
-  --tls-profile-aura-strong: rgba(255,215,0,0.78);
-}
-
-.tls-profile-aura--champion {
-  --tls-profile-aura: rgba(255,59,48,0.40);
   --tls-profile-aura-strong: rgba(255,215,0,0.78);
 }
 
@@ -460,24 +427,18 @@ img, video, canvas, svg {
 }
 
 .tls-profile-aura--pro::before,
-.tls-profile-aura--veteran::before,
 .tls-profile-aura--elite::before,
-.tls-profile-aura--champion::before,
 .tls-profile-aura--legendary::before {
   opacity: 0.58;
 }
 
-.tls-profile-aura--challenger::after,
 .tls-profile-aura--pro::after,
-.tls-profile-aura--veteran::after,
 .tls-profile-aura--elite::after,
-.tls-profile-aura--champion::after,
 .tls-profile-aura--legendary::after {
   opacity: 0.34;
 }
 
 .tls-profile-aura--elite::before,
-.tls-profile-aura--champion::before,
 .tls-profile-aura--legendary::before {
   inset: -0.65rem;
   opacity: 0.82;
@@ -485,7 +446,6 @@ img, video, canvas, svg {
   animation-duration: 5.8s;
 }
 
-.tls-profile-aura--champion::after,
 .tls-profile-aura--legendary::after {
   opacity: 0.62;
   animation-duration: 3.4s;
@@ -538,11 +498,6 @@ img, video, canvas, svg {
   78% { transform: translateX(45%); opacity: 0.9; }
 }
 
-@keyframes tls-level-champion {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(255,59,48,0.26), 0 0 28px rgba(255,59,48,0.12), 0 0 0 rgba(255,215,0,0); }
-  50% { box-shadow: 0 0 0 1px rgba(255,59,48,0.52), 0 0 38px rgba(255,59,48,0.20), 0 0 16px rgba(255,215,0,0.12); }
-}
-
 @keyframes tls-level-prestige {
   0%, 100% { box-shadow: 0 0 0 1px rgba(255,215,0,0.30), 0 0 28px rgba(255,215,0,0.14), 0 0 0 rgba(255,59,48,0); }
   50% { box-shadow: 0 0 0 1px rgba(255,215,0,0.58), 0 0 44px rgba(255,215,0,0.24), 0 0 22px rgba(255,59,48,0.14); }
@@ -558,9 +513,7 @@ img, video, canvas, svg {
 }
 @media (prefers-reduced-motion: reduce) {
   .tls-account-frame-legendary,
-  .tls-account-frame-champion,
   .tls-account-avatar-frame-legendary,
-  .tls-account-avatar-frame-champion,
   .tls-account-progress-prestige,
   .tls-profile-aura::before,
   .tls-profile-aura::after,
@@ -1179,214 +1132,145 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
   }
 }
 
-
-/* ===== Level Avatar Frames (LevelAvatarFrame.jsx) ===== */
-@property --lvf-a {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-
+/* ===== Löwen-Rang: Profilrahmen (LevelAvatarFrame.jsx, #1454) =====
+   Jede Größe hat eine feste Fläche --lvf-s für Rahmen und Foto, gleich für alle Ränge - der Kopf springt beim
+   Rangwechsel nicht. Das Foto (--lvf-d = Fläche × --lvf-fit) wird je Rang so groß, dass die Grafik seitlich und unten
+   hineinpasst; oben dürfen Krone und Schwingen bis 15 % hinausragen (in Banner oder Hintergrund). Es sitzt bei
+   --lvf-left/--lvf-top (lib/loewenRang.js: frameFit). Der Rahmen nimmt keine Klicks an - was darunter liegt, bleibt
+   bedienbar; nur die Krone der Punktewertung zeigt ihren Titel. Die Grafik ist --lvf-scale mal
+   so groß wie das Foto und um --lvf-ox/--lvf-oy verschoben, damit ihr gemessener Ring genau auf dem Foto liegt.
+   Listen und klein: nur das Bild, ohne Bewegung. */
 .tls-lvf {
+  --lvf-s: 285px;
+  --lvf-plate: 0px;
   position: relative;
-  display: block;
-  border-radius: 6px;
+  flex: none;
+  width: var(--lvf-s);
+  height: var(--lvf-s);
+  margin-bottom: var(--lvf-plate);
   isolation: isolate;
-  --lvf-c: #29b6e8;
-  --lvf-c2: #7fdbff;
-  --lvf-speed: 8s;
-}
-.tls-lvf-inner {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  height: 100%;
-  border-radius: 4px;
-  overflow: hidden;
-  background: #0a0a0a;
-  border: 2px solid color-mix(in srgb, var(--lvf-c) 62%, transparent);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--lvf-c) 26%, transparent);
-}
-.tls-lvf-inner--breathe {
-  animation: tls-lvf-breathe 3.4s ease-in-out infinite;
-}
-@keyframes tls-lvf-breathe {
-  0%, 100% { box-shadow: 0 0 8px color-mix(in srgb, var(--lvf-c) 18%, transparent); }
-  50% { box-shadow: 0 0 24px color-mix(in srgb, var(--lvf-c) 48%, transparent); }
-}
-
-/* Aura glow behind the frame */
-.tls-lvf::before {
-  content: "";
-  position: absolute;
-  inset: -14px;
-  z-index: 0;
-  border-radius: 12px;
-  pointer-events: none;
-  opacity: 0;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--lvf-c) 42%, transparent), transparent 78%);
-  filter: blur(10px);
-}
-.tls-lvf-aura-1::before { opacity: 0.5; }
-.tls-lvf-aura-2::before { opacity: 0.8; animation: tls-lvf-aura-pulse 3.2s ease-in-out infinite; }
-.tls-lvf-aura-3::before { opacity: 1; inset: -20px; animation: tls-lvf-aura-pulse 2.2s ease-in-out infinite; }
-@keyframes tls-lvf-aura-pulse {
-  0%, 100% { transform: scale(1); opacity: 0.55; }
-  50% { transform: scale(1.07); opacity: 1; }
-}
-
-/* Rotating energy ring (conic sweep) */
-.tls-lvf-ring {
-  position: absolute;
-  inset: -6px;
-  z-index: 1;
-  border-radius: 9px;
-  padding: 2.5px;
-  pointer-events: none;
-  background: conic-gradient(
-    from var(--lvf-a),
-    transparent 0 8%,
-    var(--lvf-c) 16%,
-    #ffffff 20%,
-    var(--lvf-c) 24%,
-    transparent 34% 52%,
-    var(--lvf-c2) 62%,
-    var(--lvf-c) 68%,
-    transparent 78% 100%
-  );
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: tls-lvf-rot var(--lvf-speed) linear infinite;
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--lvf-c) 65%, transparent));
-}
-.tls-lvf-ring--rev {
-  inset: -11px;
-  border-radius: 13px;
-  opacity: 0.65;
-  padding: 1.8px;
-  animation-direction: reverse;
-  animation-duration: calc(var(--lvf-speed) * 1.6);
-}
-@keyframes tls-lvf-rot {
-  to { --lvf-a: 360deg; }
-}
-
-/* Laser scan lines along the edges */
-.tls-lvf-lasers {
-  position: absolute;
-  inset: -7px;
-  z-index: 1;
-  border-radius: 11px;
-  overflow: hidden;
   pointer-events: none;
 }
-.tls-lvf-lasers i {
+.tls-lvf--profile { --lvf-s: 220px; }
+@media (min-width: 640px) {
+  .tls-lvf--profile { --lvf-s: 285px; }
+}
+.tls-lvf--card { --lvf-s: 150px; }
+.tls-lvf--list { --lvf-s: 92px; }
+.tls-lvf--mini { --lvf-s: 64px; }
+.tls-lvf-core {
+  --lvf-d: calc(var(--lvf-s) * var(--lvf-fit, 0.5));
   position: absolute;
-  display: block;
-  filter: drop-shadow(0 0 6px var(--lvf-c));
+  left: calc(var(--lvf-s) * var(--lvf-left, 0.25));
+  top: calc(var(--lvf-s) * var(--lvf-top, 0.25));
+  width: var(--lvf-d);
+  height: var(--lvf-d);
 }
-.tls-lvf-lasers i:nth-child(1),
-.tls-lvf-lasers i:nth-child(2) {
-  height: 2.5px;
-  width: 42%;
-  background: linear-gradient(90deg, transparent, var(--lvf-c), #ffffff, var(--lvf-c), transparent);
-}
-.tls-lvf-lasers i:nth-child(1) { top: 0; left: 0; animation: tls-lvf-laser-h calc(var(--lvf-speed) * 0.6) linear infinite; }
-.tls-lvf-lasers i:nth-child(2) { bottom: 0; left: 0; animation: tls-lvf-laser-h calc(var(--lvf-speed) * 0.6) linear infinite reverse; animation-delay: calc(var(--lvf-speed) * -0.3); }
-.tls-lvf-lasers i:nth-child(3),
-.tls-lvf-lasers i:nth-child(4) {
-  width: 2.5px;
-  height: 42%;
-  background: linear-gradient(180deg, transparent, var(--lvf-c), #ffffff, var(--lvf-c), transparent);
-}
-.tls-lvf-lasers i:nth-child(3) { left: 0; top: 0; animation: tls-lvf-laser-v calc(var(--lvf-speed) * 0.6) linear infinite reverse; animation-delay: calc(var(--lvf-speed) * -0.15); }
-.tls-lvf-lasers i:nth-child(4) { right: 0; top: 0; animation: tls-lvf-laser-v calc(var(--lvf-speed) * 0.6) linear infinite; animation-delay: calc(var(--lvf-speed) * -0.45); }
-@keyframes tls-lvf-laser-h {
-  from { transform: translateX(-110%); }
-  to { transform: translateX(280%); }
-}
-@keyframes tls-lvf-laser-v {
-  from { transform: translateY(-110%); }
-  to { transform: translateY(280%); }
-}
-
-/* Lightning bolts flickering around the frame */
-.tls-lvf-boltwrap {
+/* Das Schild ragt unter der Grafik heraus (10 px überlappen): Platz für Schild und Rauten, mit Prestige für die Sterne. */
+.tls-lvf--plate { --lvf-plate: 26px; }
+.tls-lvf--card.tls-lvf--plate { --lvf-plate: 21px; }
+.tls-lvf--plate.tls-lvf--stars { --lvf-plate: 41px; }
+.tls-lvf--card.tls-lvf--plate.tls-lvf--stars { --lvf-plate: 35px; }
+.tls-lvf-photo {
   position: absolute;
   inset: 0;
-  z-index: 3;
-  pointer-events: none;
-}
-.tls-lvf-bolt {
-  position: absolute;
-  width: 17px;
-  height: 26px;
-  color: var(--lvf-c);
-  opacity: 0;
-  filter: drop-shadow(0 0 5px var(--lvf-c)) drop-shadow(0 0 12px color-mix(in srgb, var(--lvf-c) 70%, transparent));
-  animation: tls-lvf-bolt-flicker 2.6s linear infinite;
-}
-@keyframes tls-lvf-bolt-flicker {
-  0%, 6.5%, 100% { opacity: 0; transform: scale(0.85) rotate(0deg); }
-  1% { opacity: 1; transform: scale(1.05); }
-  2.2% { opacity: 0.25; }
-  3.4% { opacity: 1; transform: scale(1.14); }
-  5.2% { opacity: 0; transform: scale(0.9); }
-  48% { opacity: 0; }
-  49% { opacity: 0.9; transform: scale(1.02); }
-  50.5% { opacity: 0; }
-}
-
-/* Orbiting spark */
-.tls-lvf-orbit {
-  position: absolute;
   z-index: 1;
-  border-radius: 9999px;
-  pointer-events: none;
-  animation: tls-lvf-orbit-spin 3.6s linear infinite;
-}
-.tls-lvf-orbit::before {
-  content: "";
-  position: absolute;
-  top: -3px;
-  left: 50%;
-  width: 6px;
-  height: 6px;
-  margin-left: -3px;
-  border-radius: 50%;
-  background: var(--lvf-c);
-  box-shadow: 0 0 8px var(--lvf-c), 0 0 18px var(--lvf-c);
-}
-@keyframes tls-lvf-orbit-spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Diagonal sheen sweep over the avatar */
-.tls-lvf-sheen {
-  position: absolute;
-  inset: 2px;
-  z-index: 3;
-  border-radius: 4px;
   overflow: hidden;
+  border-radius: 50%;
+  background: #0c1216;
+}
+.tls-lvf-photo > img { width: 100%; height: 100%; object-fit: cover; }
+.tls-lvf-art {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: calc(var(--lvf-d) * var(--lvf-scale));
+  height: calc(var(--lvf-d) * var(--lvf-scale));
+  transform: translate(calc(-50% + var(--lvf-d) * var(--lvf-ox)), calc(-50% + var(--lvf-d) * var(--lvf-oy)));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--tls-motion-slow) var(--tls-ease);
+}
+.tls-lvf-art[data-loaded="1"], .tls-lvf--still .tls-lvf-art { opacity: 1; }
+.tls-lvf--still .tls-lvf-art { transition: none; }
+.tls-lvf-img { display: block; width: 100%; height: 100%; max-width: none; user-select: none; }
+/* Glanz, der nur über das Metall läuft: die Grafik selbst ist die Maske. Stärke --lvf-shine wächst mit dem Level im Rang. */
+.tls-lvf-shine {
+  position: absolute;
+  inset: 0;
+  -webkit-mask: var(--lvf-mask) center / contain no-repeat;
+  mask: var(--lvf-mask) center / contain no-repeat;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 250, 225, 0.8) 50%, transparent 60%) 0 0 / 300% 100% no-repeat;
+  mix-blend-mode: screen;
+  opacity: var(--lvf-shine, 0.5);
+  animation: tls-lvf-shine 5.5s var(--tls-ease) infinite;
+}
+@keyframes tls-lvf-shine {
+  0% { background-position: 120% 0; }
+  45%, 100% { background-position: -20% 0; }
+}
+/* Bewegung reduzieren: kein wandernder Glanz, nur ein ruhiges Ein- und Ausblenden über dem Metall. */
+@keyframes tls-lvf-glint {
+  0%, 100% { opacity: 0; }
+  50% { opacity: calc(var(--lvf-shine, 0.5) * 0.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-lvf-shine {
+    background: linear-gradient(115deg, transparent 30%, rgba(255, 250, 225, 0.55) 50%, transparent 70%);
+    animation: tls-lvf-glint 6s ease-in-out infinite;
+  }
+}
+/* Level-Schild unter der Grafik: Prestige-Sterne, „LVL n“ (bei 60 „MAX“), Rauten für die Level im Rang. */
+.tls-lvf-plate {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + var(--lvf-d) * var(--lvf-pb, 0.5) - 10px);
+  z-index: 4;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  transform: translateX(-50%);
   pointer-events: none;
 }
-.tls-lvf-sheen::before {
-  content: "";
-  position: absolute;
-  inset: -40%;
-  background: linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.28) 50%, transparent 58%);
-  animation: tls-lvf-sheen-sweep 4.6s ease-in-out infinite;
+.tls-lvf-stars {
+  order: -1;
+  color: #FFD700;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.6);
 }
-@keyframes tls-lvf-sheen-sweep {
-  0%, 55% { transform: translateX(-70%); }
-  85%, 100% { transform: translateX(70%); }
+.tls-lvf-tag {
+  padding: 2px 10px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--lvf-rc) 55%, #fff), var(--lvf-rc));
+  color: #0a0a0a;
+  font-family: "Rajdhani", "Bahnschrift", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
 }
+.tls-lvf-pips { display: flex; gap: 5px; }
+.tls-lvf-pip {
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  border: 1.5px solid color-mix(in srgb, var(--lvf-rc) 70%, #000);
+  background: rgba(0, 0, 0, 0.6);
+}
+.tls-lvf-pip.is-on { background: var(--lvf-rc); box-shadow: 0 0 6px var(--lvf-rc); }
+.tls-lvf--card .tls-lvf-tag { font-size: 10px; padding: 1px 8px; }
+.tls-lvf--card .tls-lvf-pip { width: 6px; height: 6px; }
 
 /* Crowns — rank based (gold/silver/bronze) + obsidian, big & loud */
 .tls-lvf-crown {
   position: absolute;
-  top: -52px;
+  /* sitzt auf der Oberkante der Rahmen-Grafik (Löwen-Rang, #1454) */
+  top: calc(var(--lvf-d) * var(--lvf-pt, 0.5) * -1 - 30px);
   left: 50%;
   z-index: 4;
   width: 96px;
@@ -1462,179 +1346,18 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
   0%, 100% { filter: drop-shadow(0 0 8px rgba(41, 182, 232, 0.7)); }
   50% { filter: drop-shadow(0 0 22px rgba(41, 182, 232, 1)) drop-shadow(0 0 40px rgba(41, 182, 232, 0.65)); }
 }
-
-/* Level badge */
-.tls-lvf-badge {
-  position: absolute;
-  bottom: -12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 5;
-  padding: 2px 9px;
-  border-radius: 3px;
-  border: 1px solid color-mix(in srgb, var(--lvf-c) 70%, transparent);
-  background: #0a0a0a;
-  color: var(--lvf-c);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  box-shadow: 0 0 10px color-mix(in srgb, var(--lvf-c) 35%, transparent);
-}
-
-/* MAX level (25+): full storm */
-.tls-lvf--max .tls-lvf-inner {
-  border-color: color-mix(in srgb, var(--lvf-c) 85%, transparent);
-  animation: tls-lvf-max-pulse 2.2s ease-in-out infinite;
-}
-.tls-lvf--max .tls-lvf-badge {
-  background: linear-gradient(180deg, #0e2a36, #0a0a0a);
-  border-color: var(--lvf-c);
-  color: #dff5ff;
-  text-shadow: 0 0 8px var(--lvf-c);
-}
-@keyframes tls-lvf-max-pulse {
-  0%, 100% { box-shadow: 0 0 16px rgba(41, 182, 232, 0.4), inset 0 0 12px rgba(41, 182, 232, 0.12); }
-  50% { box-shadow: 0 0 36px rgba(41, 182, 232, 0.85), inset 0 0 20px rgba(41, 182, 232, 0.22); }
-}
-
-/* Compact frames (player cards, member lists) */
-.tls-lvf--compact { border-radius: 4px; }
-.tls-lvf--compact .tls-lvf-inner { border-width: 1.5px; }
-.tls-lvf--compact .tls-lvf-ring { inset: -3.5px; border-radius: 6px; padding: 1.6px; }
-.tls-lvf--compact::before { inset: -7px; filter: blur(6px); }
-.tls-lvf--compact .tls-lvf-crown {
-  top: -20px;
+.tls-lvf--still .tls-lvf-crown {
+  top: calc(var(--lvf-d) * var(--lvf-pt, 0.5) * -1 - 8px);
   width: 38px;
   margin-left: -19px;
-  animation-duration: 0.7s, 3s;
 }
-.tls-lvf--compact .tls-lvf-crown::after { display: none; }
-.tls-lvf--compact .tls-lvf-crown-rays { display: none; }
-.tls-lvf--compact .tls-lvf-dashed { inset: -3.5px; border-radius: 6px; padding: 1.4px; }
-.tls-lvf--compact .tls-lvf-corners i { width: 8px; height: 8px; border-width: 1.5px; }
-/* In Listenkarten (p-4) reicht das Sechseck sonst beim Pulsieren an den Kartenrand (#888). */
-.tls-lvf--compact .tls-lvf-hexa { inset: -9px; width: calc(100% + 18px); height: calc(100% + 18px); }
-
-/* --- extra effect primitives for the 30-level system --- */
-.tls-lvf-corners { position: absolute; inset: -8px; z-index: 1; pointer-events: none; }
-.tls-lvf-corners i {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  border: 2.5px solid var(--lvf-c);
-  filter: drop-shadow(0 0 5px var(--lvf-c));
-  animation: tls-lvf-corner-pulse calc(var(--lvf-speed) * 0.5) ease-in-out infinite;
-}
-.tls-lvf-corners i:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; }
-.tls-lvf-corners i:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; animation-delay: 0.4s; }
-.tls-lvf-corners i:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; animation-delay: 0.8s; }
-.tls-lvf-corners i:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; animation-delay: 1.2s; }
-@keyframes tls-lvf-corner-pulse {
-  0%, 100% { opacity: 0.45; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.18); }
-}
-
-.tls-lvf-echo {
-  position: absolute;
-  inset: -4px;
-  z-index: 0;
-  border-radius: 8px;
-  border: 2px solid var(--lvf-c);
-  pointer-events: none;
-  animation: tls-lvf-echo-pulse calc(var(--lvf-speed) * 0.55) ease-out infinite;
-}
-@keyframes tls-lvf-echo-pulse {
-  0% { transform: scale(1); opacity: 0.7; }
-  80%, 100% { transform: scale(1.22); opacity: 0; }
-}
-
-.tls-lvf-dashed {
-  position: absolute;
-  inset: -6px;
-  z-index: 1;
-  border-radius: 9px;
-  padding: 2px;
-  pointer-events: none;
-  background: repeating-conic-gradient(from var(--lvf-a), var(--lvf-c) 0deg 7deg, transparent 7deg 16deg);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: tls-lvf-rot calc(var(--lvf-speed) * 1.4) linear infinite;
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--lvf-c) 55%, transparent));
-}
-
-.tls-lvf-scan {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 2px;
-  z-index: 3;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lvf-c) 85%, #fff), transparent);
-  box-shadow: 0 0 10px var(--lvf-c);
-  animation: tls-lvf-scan-move calc(var(--lvf-speed) * 0.7) linear infinite;
-}
-@keyframes tls-lvf-scan-move {
-  0% { top: -2%; opacity: 0; }
-  8% { opacity: 0.9; }
-  92% { opacity: 0.9; }
-  100% { top: 101%; opacity: 0; }
-}
-
-.tls-lvf-flames {
-  position: absolute;
-  left: -8%;
-  right: -8%;
-  bottom: -12px;
-  height: 34%;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(58% 100% at 50% 100%, color-mix(in srgb, var(--lvf-c) 65%, transparent), transparent 72%),
-    radial-gradient(24% 80% at 30% 100%, color-mix(in srgb, var(--lvf-c2) 70%, transparent), transparent 70%),
-    radial-gradient(24% 80% at 72% 100%, color-mix(in srgb, var(--lvf-c2) 70%, transparent), transparent 70%);
-  filter: blur(6px);
-  animation: tls-lvf-flame-flicker 1.7s ease-in-out infinite;
-}
-@keyframes tls-lvf-flame-flicker {
-  0%, 100% { opacity: 0.55; transform: scaleY(0.9); }
-  30% { opacity: 0.95; transform: scaleY(1.12) translateX(-2px); }
-  65% { opacity: 0.75; transform: scaleY(1.02) translateX(2px); }
-}
-
-.tls-lvf-inner--glitch { animation: tls-lvf-glitch-jump 4.2s steps(1) infinite; }
-@keyframes tls-lvf-glitch-jump {
-  0%, 91%, 100% { transform: translate(0, 0); filter: none; }
-  92% { transform: translate(-2px, 1px); filter: hue-rotate(24deg) saturate(1.6); }
-  93.5% { transform: translate(2px, -1px); filter: hue-rotate(-28deg); }
-  95% { transform: translate(-1px, 0); filter: none; }
-}
-
-.tls-lvf-stars { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-.tls-lvf-stars i {
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  background: var(--lvf-c2);
-  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
-  filter: drop-shadow(0 0 5px var(--lvf-c));
-  animation: tls-lvf-star-twinkle 2.6s ease-in-out infinite;
-}
-.tls-lvf-stars i:nth-child(1) { top: 12%; left: 14%; }
-.tls-lvf-stars i:nth-child(2) { top: 26%; right: 12%; animation-delay: 0.9s; }
-.tls-lvf-stars i:nth-child(3) { bottom: 16%; left: 30%; animation-delay: 1.7s; }
-@keyframes tls-lvf-star-twinkle {
-  0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
-  50% { opacity: 1; transform: scale(1.2) rotate(45deg); }
-}
-
-.tls-lvf--hue .tls-lvf-ring { animation: tls-lvf-rot var(--lvf-speed) linear infinite, tls-lvf-hue-shift 6s linear infinite; }
-@keyframes tls-lvf-hue-shift {
-  to { filter: hue-rotate(360deg) drop-shadow(0 0 6px color-mix(in srgb, var(--lvf-c) 65%, transparent)); }
-}
+/* Listen bleiben ruhig: die Krone steht still, ohne Schweben, Pulsen und Funkeln. */
+.tls-lvf--still .tls-lvf-crown,
+.tls-lvf--still .tls-lvf-crown::before,
+.tls-lvf--still .tls-lvf-crown::after,
+.tls-lvf--still .tls-lvf-crown-rays { animation: none; }
+.tls-lvf--still .tls-lvf-crown::after { display: none; }
+.tls-lvf--still .tls-lvf-crown-rays { display: none; }
 
 /* profile quick-stat highlight for strong performances */
 .tls-stat-glory {
@@ -1647,310 +1370,12 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tls-lvf-ring,
-  .tls-lvf-ring--rev,
-  .tls-lvf-lasers i,
-  .tls-lvf-bolt,
-  .tls-lvf-orbit,
-  .tls-lvf-sheen::before,
   .tls-lvf-crown,
   .tls-lvf-crown::before,
   .tls-lvf-crown::after,
-  .tls-lvf-corners i,
-  .tls-lvf-echo,
-  .tls-lvf-dashed,
-  .tls-lvf-scan,
-  .tls-lvf-flames,
-  .tls-lvf-inner--glitch,
-  .tls-lvf-stars i,
-  .tls-stat-glory,
-  .tls-lvf--max .tls-lvf-inner,
-  .tls-lvf-inner--breathe,
-  .tls-lvf-aura-2::before,
-  .tls-lvf-aura-3::before {
+  .tls-stat-glory {
     animation: none !important;
   }
-  .tls-lvf-bolt { opacity: 0.65; }
-}
-
-/* ===== Level Frame v3 — archetype effect primitives ===== */
-
-/* Reticle: rotating dashed target circle + crosshair ticks */
-.tls-lvf-reticle {
-  position: absolute;
-  inset: -9px;
-  z-index: 1;
-  pointer-events: none;
-  border: 1.6px dashed color-mix(in srgb, var(--lvf-c) 75%, transparent);
-  border-radius: 50%;
-  animation: tls-lvf-orbit-spin calc(var(--lvf-speed) * 1.3) linear infinite;
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--lvf-c) 55%, transparent));
-}
-.tls-lvf-reticle i {
-  position: absolute;
-  background: var(--lvf-c);
-  box-shadow: 0 0 6px var(--lvf-c);
-}
-.tls-lvf-reticle i:nth-child(1) { top: -5px; left: 50%; width: 2px; height: 10px; margin-left: -1px; }
-.tls-lvf-reticle i:nth-child(2) { bottom: -5px; left: 50%; width: 2px; height: 10px; margin-left: -1px; }
-.tls-lvf-reticle i:nth-child(3) { left: -5px; top: 50%; width: 10px; height: 2px; margin-top: -1px; }
-.tls-lvf-reticle i:nth-child(4) { right: -5px; top: 50%; width: 10px; height: 2px; margin-top: -1px; }
-
-/* Radar: sweeping wedge over the avatar */
-.tls-lvf-radar {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  pointer-events: none;
-  background: conic-gradient(from 0deg, color-mix(in srgb, var(--lvf-c) 45%, transparent), transparent 24%);
-  mix-blend-mode: screen;
-  animation: tls-lvf-orbit-spin calc(var(--lvf-speed) * 0.9) linear infinite;
-  opacity: 0.75;
-}
-
-/* Comet: orbiting head with a fading tail */
-.tls-lvf-comet {
-  position: absolute;
-  inset: -12px;
-  z-index: 1;
-  pointer-events: none;
-  animation: tls-lvf-orbit-spin calc(var(--lvf-speed) * 0.55) linear infinite;
-}
-.tls-lvf-comet i {
-  position: absolute;
-  top: -3px;
-  left: 50%;
-  width: 34px;
-  height: 7px;
-  margin-left: -30px;
-  border-radius: 9999px;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lvf-c) 80%, transparent), #ffffff);
-  filter: drop-shadow(0 0 8px var(--lvf-c));
-}
-
-/* Runes: glowing tick ring, slow ceremonial rotation */
-.tls-lvf-runes {
-  position: absolute;
-  inset: -8px;
-  z-index: 1;
-  border-radius: 11px;
-  padding: 3px;
-  pointer-events: none;
-  background: repeating-conic-gradient(from var(--lvf-a), var(--lvf-c2) 0deg 2.4deg, transparent 2.4deg 12deg, var(--lvf-c) 12deg 13.6deg, transparent 13.6deg 24deg);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: tls-lvf-rot calc(var(--lvf-speed) * 2.2) linear infinite;
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--lvf-c) 70%, transparent));
-}
-
-/* Hexagon shield outline pulsing. max-width: none - die globale Regel svg { max-width: 100% } kappte die Breite auf das
-   Bild, die Höhe blieb: schmal, hoch und 12 px zu weit links (#888). */
-.tls-lvf-hexa {
-  position: absolute;
-  inset: -12px;
-  z-index: 1;
-  width: calc(100% + 24px);
-  height: calc(100% + 24px);
-  max-width: none;
-  pointer-events: none;
-  filter: drop-shadow(0 0 6px var(--lvf-c));
-  animation: tls-lvf-hexa-pulse calc(var(--lvf-speed) * 0.5) ease-in-out infinite;
-}
-@keyframes tls-lvf-hexa-pulse {
-  0%, 100% { opacity: 0.5; transform: scale(1) rotate(0deg); }
-  50% { opacity: 1; transform: scale(1.05) rotate(2deg); }
-}
-
-/* RGB split border flicker */
-.tls-lvf-inner--rgb { animation: tls-lvf-rgb-split 3.6s steps(1) infinite; }
-@keyframes tls-lvf-rgb-split {
-  0%, 86%, 100% { box-shadow: 0 0 14px color-mix(in srgb, var(--lvf-c) 26%, transparent); }
-  88% { box-shadow: -3px 0 0 rgba(255, 0, 80, 0.8), 3px 0 0 rgba(0, 220, 255, 0.8); }
-  91% { box-shadow: 3px 0 0 rgba(255, 0, 80, 0.7), -3px 0 0 rgba(0, 220, 255, 0.7); }
-  94% { box-shadow: 0 0 14px color-mix(in srgb, var(--lvf-c) 26%, transparent); }
-}
-
-/* Rising particles (embers / stardust) */
-.tls-lvf-rise { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
-.tls-lvf-rise i {
-  position: absolute;
-  bottom: -6px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--lvf-c2);
-  box-shadow: 0 0 6px var(--lvf-c);
-  animation: tls-lvf-rise-up 3s linear infinite;
-}
-@keyframes tls-lvf-rise-up {
-  0% { transform: translateY(0) scale(1); opacity: 0; }
-  12% { opacity: 1; }
-  100% { transform: translateY(-110px) scale(0.4); opacity: 0; }
-}
-
-/* Falling particles (frost / snow) */
-.tls-lvf-fall { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
-.tls-lvf-fall i {
-  position: absolute;
-  top: -6px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 0 6px var(--lvf-c);
-  animation: tls-lvf-fall-down 3.6s linear infinite;
-}
-@keyframes tls-lvf-fall-down {
-  0% { transform: translateY(0) translateX(0); opacity: 0; }
-  10% { opacity: 0.95; }
-  50% { transform: translateY(55px) translateX(5px); }
-  100% { transform: translateY(115px) translateX(-4px); opacity: 0; }
-}
-
-/* Solar flare: rotating rays behind the frame */
-.tls-lvf-flare {
-  position: absolute;
-  inset: -22%;
-  z-index: 0;
-  pointer-events: none;
-  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--lvf-c) 55%, transparent) 0deg 6deg, transparent 6deg 32deg);
-  -webkit-mask: radial-gradient(closest-side, transparent 48%, #000 56%, transparent 88%);
-  mask: radial-gradient(closest-side, transparent 48%, #000 56%, transparent 88%);
-  opacity: 0.75;
-  animation: tls-lvf-orbit-spin calc(var(--lvf-speed) * 3) linear infinite;
-}
-
-/* Eclipse: crescent glow arcing around the frame */
-.tls-lvf-eclipse {
-  position: absolute;
-  inset: -8px;
-  z-index: 1;
-  border-radius: 50%;
-  pointer-events: none;
-  background: conic-gradient(from var(--lvf-a), transparent 0 55%, color-mix(in srgb, var(--lvf-c) 85%, transparent) 72%, var(--lvf-c2) 80%, color-mix(in srgb, var(--lvf-c) 85%, transparent) 88%, transparent 100%);
-  -webkit-mask: radial-gradient(closest-side, transparent 78%, #000 82%);
-  mask: radial-gradient(closest-side, transparent 78%, #000 82%);
-  filter: blur(1px) drop-shadow(0 0 8px var(--lvf-c));
-  animation: tls-lvf-rot calc(var(--lvf-speed) * 1.6) linear infinite;
-}
-
-/* Speed streaks racing across */
-.tls-lvf-speed { position: absolute; inset: 0; z-index: 3; overflow: hidden; pointer-events: none; mix-blend-mode: screen; }
-.tls-lvf-speed i {
-  position: absolute;
-  left: -60%;
-  height: 2px;
-  width: 55%;
-  background: linear-gradient(90deg, transparent, var(--lvf-c), #ffffff);
-  filter: drop-shadow(0 0 5px var(--lvf-c));
-  animation: tls-lvf-speed-dash 1.4s linear infinite;
-}
-.tls-lvf-speed i:nth-child(1) { top: 22%; }
-.tls-lvf-speed i:nth-child(2) { top: 52%; animation-delay: 0.45s; }
-.tls-lvf-speed i:nth-child(3) { top: 78%; animation-delay: 0.9s; }
-@keyframes tls-lvf-speed-dash {
-  0% { transform: translateX(0); opacity: 0; }
-  15% { opacity: 1; }
-  100% { transform: translateX(320%); opacity: 0; }
-}
-
-/* Plasma orbs drifting inside */
-.tls-lvf-plasma { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
-.tls-lvf-plasma i {
-  position: absolute;
-  width: 46%;
-  height: 46%;
-  border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--lvf-c) 55%, transparent), transparent 70%);
-  filter: blur(6px);
-  mix-blend-mode: screen;
-  animation: tls-lvf-plasma-drift 4.4s ease-in-out infinite;
-}
-.tls-lvf-plasma i:nth-child(1) { top: -8%; left: -8%; }
-.tls-lvf-plasma i:nth-child(2) { bottom: -8%; right: -8%; animation-delay: -2.2s; }
-@keyframes tls-lvf-plasma-drift {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(55%, 55%) scale(1.25); }
-}
-
-/* Vortex: spiraling energy behind the avatar content */
-.tls-lvf-vortex {
-  position: absolute;
-  inset: -30%;
-  z-index: 0;
-  pointer-events: none;
-  background: conic-gradient(from 0deg, transparent 0 12%, color-mix(in srgb, var(--lvf-c) 45%, transparent) 22%, transparent 34%, transparent 46%, color-mix(in srgb, var(--lvf-c2) 40%, transparent) 60%, transparent 72%, color-mix(in srgb, var(--lvf-c) 35%, transparent) 88%, transparent 100%);
-  border-radius: 50%;
-  mix-blend-mode: screen;
-  filter: blur(4px);
-  animation: tls-lvf-orbit-spin calc(var(--lvf-speed) * 1.4) linear infinite;
-}
-
-/* Aurora: drifting light bands at the top */
-.tls-lvf-aurora {
-  position: absolute;
-  left: -10%;
-  right: -10%;
-  top: -6%;
-  height: 55%;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    radial-gradient(60% 100% at 30% 0%, color-mix(in srgb, #22d3ee 55%, transparent), transparent 70%),
-    radial-gradient(55% 90% at 70% 0%, color-mix(in srgb, #a855f7 50%, transparent), transparent 70%),
-    radial-gradient(40% 80% at 50% 0%, color-mix(in srgb, #00ff88 45%, transparent), transparent 70%);
-  filter: blur(8px);
-  mix-blend-mode: screen;
-  animation: tls-lvf-aurora-wave 5s ease-in-out infinite;
-}
-@keyframes tls-lvf-aurora-wave {
-  0%, 100% { transform: translateX(-6%) skewX(-6deg); opacity: 0.65; }
-  50% { transform: translateX(6%) skewX(6deg); opacity: 1; }
-}
-
-/* Prism: rainbow conic ring */
-.tls-lvf-prism {
-  position: absolute;
-  inset: -7px;
-  z-index: 1;
-  border-radius: 10px;
-  padding: 2.6px;
-  pointer-events: none;
-  background: conic-gradient(from var(--lvf-a), #ff5f6d, #ffc371, #fffb7d, #6ef195, #22d3ee, #a855f7, #ff5f6d);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: tls-lvf-rot calc(var(--lvf-speed) * 1.8) linear infinite;
-  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.55)) saturate(1.4);
-}
-
-/* Storm shake: subtle frame tremor */
-.tls-lvf--shake { animation: tls-lvf-shake 5s steps(2) infinite; }
-@keyframes tls-lvf-shake {
-  0%, 89%, 100% { transform: translate(0, 0); }
-  90% { transform: translate(-1.5px, 1px); }
-  92% { transform: translate(1.5px, -1px); }
-  94% { transform: translate(-1px, -1px); }
-  96% { transform: translate(1px, 1px); }
-}
-
-/* Counter-rotating dashed ring */
-.tls-lvf-dashed--rev {
-  inset: -11px;
-  border-radius: 13px;
-  opacity: 0.6;
-  animation-direction: reverse;
-  animation-duration: calc(var(--lvf-speed) * 2);
-}
-
-/* Team frames: octagon-ish clip vibe via bigger radius + tag styling */
-.tls-lvf--team .tls-lvf-inner { border-radius: 10px; }
-.tls-lvf--team { border-radius: 12px; }
-.tls-lvf--team .tls-lvf-badge {
-  border-radius: 9999px;
-  padding: 2px 12px;
-  letter-spacing: 0.2em;
 }
 
 /* ===== Crown celebration overlay + confetti ===== */
@@ -2019,22 +1444,6 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tls-lvf-reticle,
-  .tls-lvf-radar,
-  .tls-lvf-comet,
-  .tls-lvf-runes,
-  .tls-lvf-hexa,
-  .tls-lvf-inner--rgb,
-  .tls-lvf-rise i,
-  .tls-lvf-fall i,
-  .tls-lvf-flare,
-  .tls-lvf-eclipse,
-  .tls-lvf-speed i,
-  .tls-lvf-plasma i,
-  .tls-lvf-vortex,
-  .tls-lvf-aurora,
-  .tls-lvf-prism,
-  .tls-lvf--shake,
   .tls-lvf-crown-rays,
   .tls-crown-celebration-rays,
   .tls-crown-celebration-crown {
@@ -3209,6 +2618,10 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 }
 .tls-tilt__mid {
   transform: perspective(1100px) rotateX(calc(var(--tls-tilt-x, 0deg) * 0.6 * var(--tls-motion-on))) rotateY(calc(var(--tls-tilt-y, 0deg) * 0.6 * var(--tls-motion-on))) translateZ(calc(6px * var(--tls-tilt-on, 0) * var(--tls-motion-on)));
+}
+/* Das Bild nimmt die Maus für die Neigung nur am PC an - dort liegt die Auszeichnung im Banner rechts, nicht darunter. */
+@media (hover: hover) and (min-width: 768px) {
+  .tls-tilt .tls-lvf-photo { pointer-events: auto; }
 }
 
 /* Galerie (#1079): das Bild zoomt beim Drüberfahren leicht, die Beschriftung kommt aus einer Maske von unten; das

@@ -110,7 +110,7 @@ export default function PlayersPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <LevelAvatarFrame level={accountLevel} crown={crowns?.[p.id] || null} compact className="w-12 h-12">
+                        <LevelAvatarFrame level={accountLevel} crown={crowns?.[p.id] || null} compact>
                           {p.avatar_url ? (
                             <img src={resolveMediaUrl(p.avatar_url)} alt={p.display_name} className="w-full h-full object-cover" />
                           ) : (
