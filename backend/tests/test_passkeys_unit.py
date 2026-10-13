@@ -69,7 +69,7 @@ def make_setup(monkeypatch):
     db = SimpleNamespace(users=Documents([user]), passkeys=Documents(), passkey_challenges=Documents())
     monkeypatch.setattr(routes, "get_db", lambda: db)
     monkeypatch.setattr(routes, "enforce_rate_limit", AsyncMock())
-    monkeypatch.setattr(routes, "verify_password", lambda password, _stored: password == "correct-password")
+    monkeypatch.setattr(routes, "verify_user_password", lambda _user, password: password == "correct-password")
     monkeypatch.setattr(routes, "_current_session_family", AsyncMock(return_value="session-1"))
     monkeypatch.setattr(routes, "_security_audit", AsyncMock())
     monkeypatch.setattr(routes, "_attach_membership", AsyncMock())

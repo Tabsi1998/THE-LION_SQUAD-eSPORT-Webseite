@@ -17,6 +17,7 @@ import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { toast } from "sonner";
 import { DEFAULT_RETURN_PATH, nextQuery, safeNextPath } from "@/lib/returnPath";
 import { useReturnPurpose } from "@/hooks/useReturnPurpose";
+import { MIN_PASSWORD_LENGTH, PASSWORD_RULE_HINT, passwordProblem } from "@/lib/passwordRules";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -82,7 +83,7 @@ export default function RegisterPage() {
     if (!form.email.trim()) errors.email = "Bitte gib deine E-Mail-Adresse ein.";
     else if (!EMAIL_RE.test(form.email.trim())) errors.email = "Bitte gib eine gültige E-Mail-Adresse ein.";
     if (!form.password) errors.password = "Bitte vergib ein Passwort.";
-    else if (form.password.length < 10) errors.password = "Das Passwort braucht mindestens 10 Zeichen.";
+    else if (passwordProblem(form.password)) errors.password = passwordProblem(form.password);
     if (!accept) errors.accept = "Bitte akzeptiere die Datenschutzbestimmungen.";
     if (!acceptTerms) errors.acceptTerms = "Bitte akzeptiere die Nutzungsbedingungen.";
 
@@ -194,9 +195,9 @@ export default function RegisterPage() {
               show={showPw}
               onToggle={() => setShowPw((value) => !value)}
               required
-              minLength={10}
+              minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
-              description="Mindestens 10 Zeichen. Gross-/Kleinbuchstaben, Zahlen und Sonderzeichen erhoehen die Sicherheit."
+              description={`${PASSWORD_RULE_HINT} Gross-/Kleinbuchstaben, Zahlen und Sonderzeichen erhoehen die Sicherheit.`}
               error={fieldErrors.password}
               testId="register-password"
             />
