@@ -15,6 +15,7 @@ from fastapi import HTTPException
 
 from models import new_id, now_utc
 from services import seasons
+from services.private_fields import private_projection
 from services.prize_service import DEFAULT_PICKUP_WINDOW_DAYS
 
 logger = logging.getLogger("tls.raffles")
@@ -227,7 +228,7 @@ async def _eligible(db, raffle: dict, exclude: set[str]) -> tuple[int, list[dict
     fällt heraus; bei einer Verlosung für Mitglieder zählt die Mitgliedschaft am Tag der Ziehung."""
     entries = await db[ENTRIES].find({"raffle_id": raffle["id"]}, {"_id": 0}).sort("entered_at", 1).to_list(100000)
     ids = [entry["user_id"] for entry in entries]
-    users = {row["id"]: row async for row in db.users.find({"id": {"$in": ids}}, {"_id": 0, "password_hash": 0})} if ids else {}
+    users = {row["id"]: row async for row in db.users.find({"id": {"$in": ids}}, private_projection())} if ids else {}
     fit = []
     for entry in entries:
         user = users.get(entry["user_id"])

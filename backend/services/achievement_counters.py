@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 
 from database import get_db
 from models import now_utc
+from services.private_fields import private_projection
 
 logger = logging.getLogger("tls.achievements.counters")
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -92,7 +93,7 @@ class Context:
         return self._cache[name]
 
     async def user(self) -> dict:
-        return await self._memo("user", lambda: self.db.users.find_one({"id": self.user_id}, {"_id": 0})) or {}
+        return await self._memo("user", lambda: self.db.users.find_one({"id": self.user_id}, private_projection())) or {}
 
     async def registrations(self) -> list[dict]:
         return await self._memo("registrations", lambda: self.db.tournament_registrations.find({"user_id": self.user_id}, {"_id": 0}).to_list(2000))

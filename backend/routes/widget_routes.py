@@ -7,6 +7,7 @@ from database import get_db
 from services.visibility import user_can_see
 from services.slug_utils import find_by_slug_or_history
 from services.access_links import validate_access_link
+from services.private_fields import private_projection
 from services.competition_read import load_competition_read_model, observe_structure_read
 
 widget_router = APIRouter(prefix="/api/widgets", tags=["widgets"])
@@ -114,7 +115,7 @@ async def widget_f1(slug_or_id: str, track_id: Optional[str] = None):
             best_per_user[t["user_id"]] = {**t, "effective_ms": eff}
     user_ids = list(best_per_user.keys())
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "email": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0}).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection("email")).to_list(500)}
     entries = []
     for uid, tr in best_per_user.items():
         u = users.get(uid, {})

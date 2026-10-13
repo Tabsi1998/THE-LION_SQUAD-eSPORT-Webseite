@@ -11,7 +11,7 @@ import { errorMessage } from "../../lib/api";
 import { passkeyError, passkeysSupported, silentPasskeyMiss, type PasskeyMiss } from "../../lib/passkeys";
 import { colors } from "../../theme";
 
-// Anmelden (#918, #919): die Seite erreicht man aus dem Mehr-Menü oder dem Hinweis beim ersten Start - die App selbst
+// Anmelden (#918, #919): die Seite erreicht man über Profil → Anmelden oder den Hinweis beim ersten Start - die App selbst
 // läuft ohne Konto. Einen Passkey bietet die Seite beim Öffnen selbst an (Fingerabdruck oder Gesicht); gibt es keinen
 // oder bricht man ab, bleibt still das Formular. Nach der Anmeldung geht es zurück, woher man kam.
 
