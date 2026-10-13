@@ -10,7 +10,8 @@ export const colors = {
   border: "rgba(255,255,255,0.1)",
   gold: "#FFD700",
   live: "#FF3B30",
-  success: "#00FF88",
+  // Grün heißt „offen und frei“ (#1305) - das weichere #1FD08E statt Neon, wie `roles.ok`.
+  success: "#1FD08E",
 };
 
 // Ecken wie im Web (#1151): dort ist der Grundwert `--radius: 0.125rem` - 2 Punkte (frontend/src/index.css). Karten,
@@ -22,15 +23,48 @@ export const radius = {
   lg: 2,
 };
 
-// Farben je Art an einer Stelle (#1151) - dieselben wie im Web (frontend/src/lib/categoryColors.js): Kalender, Karten
-// und Etiketten nehmen sie von hier. Die neue Zuordnung aus #1305 (Turnier Cyan, Fast Lap Türkis, Verein Gold) ändert
-// beide Stellen zugleich; der Gleichheits-Test hält sie zusammen.
+// Farb-Rollen (#1305) - dieselben Werte wie im Web (frontend/src/lib/categoryColors.js, styles/system.css): jede Farbe
+// hat genau eine Aufgabe. Cyan Marke und „du“, Rot nur „läuft gerade“, Orange Achtung, Grün offen und frei, Gold Ehre
+// (Platz 1, Pokal, Mitgliedschaft, Verein), Violett Events, Grau Nebentext und Vorbei. Silber und Bronze nur für Platz 2/3.
+export const roles = {
+  brand: "#29B6E8",
+  live: "#FF3B30",
+  warn: "#FF9F43",
+  ok: "#1FD08E",
+  honor: "#FFD700",
+  event: "#9F7AEA",
+  muted: "#B4B4BD",
+  quiet: "#8E8E99",
+  silver: "#C9CED6",
+  bronze: "#D08A4E",
+};
+
+// Flächen (#1305): Schwarz als Grund, darauf drei Stufen - wie --tls-surface-0 bis -3 im Web.
+export const surfaces = {
+  base: "#0A0A0A",
+  s1: "#121214",
+  s2: "#18181C",
+  s3: "#1F1F24",
+};
+
+// Farben je Art an einer Stelle (#1151, #1305) - dieselben wie im Web (frontend/src/lib/categoryColors.js): Event
+// Violett, Turnier Cyan, Fast Lap Türkis, Verein Gold. Kalender, Karten und Etiketten nehmen sie von hier; der
+// Gleichheits-Test im Web hält beide Seiten zusammen.
 export const kindColors = {
   event: "#9F7AEA",
-  tournament: "#FFD700",
-  fastlap: "#29B6E8",
-  // Versammlungen und eigene Helferschichten im Kalender (#1190) - grün, nur für Mitglieder.
-  club: "#10B981",
+  tournament: "#29B6E8",
+  fastlap: "#2DD4BF",
+  // Versammlungen und eigene Helferschichten im Kalender (#1190), nur für Mitglieder.
+  club: "#FFD700",
+};
+
+// Dunkle Fassungen je Art für Flächen mit weißer Schrift (Kopf der Datums-Kachel, #1318): Weiß erreicht darauf
+// mindestens 4,5 : 1.
+export const kindColorsDark = {
+  event: "#7655CC",
+  tournament: "#1A7AA3",
+  fastlap: "#0E7F73",
+  club: "#85690A",
 };
 
 // Die vier Knöpfe wie im Web (#1082, #1151; frontend/src/index.css `tls-btn--…`): wichtig (blau gefüllt, mit Pfeil),

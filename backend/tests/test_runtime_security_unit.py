@@ -163,7 +163,7 @@ def test_admin_bootstrap_creates_once_without_logging_password(monkeypatch):
     )
     memberships = SimpleNamespace(insert_one=AsyncMock())
     monkeypatch.setattr(seed, "get_db", lambda: SimpleNamespace(users=users, memberships=memberships))
-    monkeypatch.setattr(seed, "hash_password", lambda value: f"hash:{len(value)}")
+    monkeypatch.setattr(seed, "password_fields", lambda value: {"password_hash": f"hash:{len(value)}", "password_contract": 2})
 
     created = asyncio.run(seed.seed_admin("First.Admin@Example.com", "long-test-password"))
 
@@ -171,5 +171,6 @@ def test_admin_bootstrap_creates_once_without_logging_password(monkeypatch):
     user = users.insert_one.await_args.args[0]
     assert user["email"] == "first.admin@example.com"
     assert user["password_hash"] == "hash:18"
+    assert user["password_contract"] == 2
     assert user["role"] == "superadmin"
     memberships.insert_one.assert_awaited_once()

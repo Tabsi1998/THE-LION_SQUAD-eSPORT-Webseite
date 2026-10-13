@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, Crown, LogOut, Shield, ShieldCheck } from "lucide-react";
+import { ChevronDown, ClipboardList, Crown, LogOut, Shield, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { resolveMediaUrl } from "@/lib/api";
 import { useUserMenu } from "@/lib/mobileMenu";
-import { mfaSetupPath } from "@/lib/permissions";
+import { mfaSetupPath, showsDutyEntry } from "@/lib/permissions";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { userMenuEntries, userMenuTestId } from "@/pages/user/profile/constants";
 
@@ -103,6 +103,10 @@ export function UserMenu() {
             <Link to={mfaSetupPath("/admin")} role="menuitem" onClick={close} data-testid="nav-mfa-setup" className={adminClass}><ShieldCheck className="w-3.5 h-3.5" /> 2FA einrichten</Link>
           ) : isAdmin ? (
             <Link to="/admin" role="menuitem" onClick={close} data-testid="nav-admin" className={adminClass}><Shield className="w-3.5 h-3.5" /> Admin</Link>
+          ) : null}
+          {/* „Mein Dienst“ (#1352): Helfer und Moderation ohne Verwaltungsbereich - /admin führt auf ihre Arbeit. */}
+          {showsDutyEntry(user) ? (
+            <Link to="/admin" role="menuitem" onClick={close} data-testid="nav-duty" className={adminClass}><ClipboardList className="w-3.5 h-3.5" /> Mein Dienst</Link>
           ) : null}
           <button type="button" role="menuitem" onClick={doLogout} data-testid="nav-logout" className={logoutClass}>
             <LogOut className="w-3.5 h-3.5" /> Abmelden

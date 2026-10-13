@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { API, api, formatRequestError, parseTimeStr, resolveMediaUrl } from "@/lib/api";
 import { formatLapTime, parseLapTime } from "@/lib/laptime";
+import { safeHttpUrl } from "@/lib/safeLink";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -31,7 +32,7 @@ const F1_STATUS_OPTIONS = [
 
 export default function AdminF1EditPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
-  const { isTournamentLead: isAdmin } = useAuth();
+  const { isTournamentLead } = useAuth();
   const { id } = useParams();
   const [challenge, setChallenge] = useState(null);
   const [tracks, setTracks] = useState([]);
@@ -55,7 +56,7 @@ export default function AdminF1EditPage() {
     setTracks(c.tracks || []);
     setActiveTrack((current) => (c.tracks || []).some((track) => track.id === current) ? current : c.tracks?.[0]?.id || null);
     // Jede Liste lädt für sich (#1354): fehlt ein Recht, steht an der Stelle ein Satz und der Rest geht weiter.
-    if (!isAdmin) return;
+    if (!isTournamentLead) return;
     try {
       const { data: rows } = await api.get(`/f1/challenges/${c.id}/staff`);
       setStaff(Array.isArray(rows) ? rows : []);
@@ -66,7 +67,7 @@ export default function AdminF1EditPage() {
         ? formatRequestError(failure, "Dafür fehlt dir das Recht, das Fast-Lap-Team zu sehen.")
         : "Das Fast-Lap-Team lässt sich gerade nicht laden.");
     }
-  }, [id, isAdmin]);
+  }, [id, isTournamentLead]);
 
   const loadTimes = useCallback(async () => {
     if (!activeTrack) return;
@@ -216,7 +217,7 @@ export default function AdminF1EditPage() {
           <div className="mt-2 flex items-center gap-3"><StatusBadge status={challenge.status} /></div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {isAdmin && (
+          {isTournamentLead && (
             <div>
               <select value={challenge.status} onChange={(e) => setStatus(e.target.value)} data-testid="f1-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
                 {F1_STATUS_OPTIONS.map(([s, label]) => <option key={s} value={s}>{label}</option>)}
@@ -233,9 +234,9 @@ export default function AdminF1EditPage() {
         </div>
       </div>
 
-      {isAdmin && <div className="mb-5"><AccessLinksPanel targetType="fastlap" targetId={challenge.id} /></div>}
-      {isAdmin && <ChallengeSettingsForm key={challenge.updated_at || challenge.id} challenge={challenge} onSaved={load} />}
-      {isAdmin && <F1StaffPanel challengeId={challenge.id} staff={staff} staffError={staffError} onChanged={load} />}
+      {isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="fastlap" targetId={challenge.id} /></div>}
+      {isTournamentLead && <ChallengeSettingsForm key={challenge.updated_at || challenge.id} challenge={challenge} onSaved={load} />}
+      {isTournamentLead && <F1StaffPanel challengeId={challenge.id} staff={staff} staffError={staffError} onChanged={load} />}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Tracks */}
@@ -248,12 +249,12 @@ export default function AdminF1EditPage() {
                   {tr.image_url && <img src={resolveMediaUrl(tr.image_url)} className="w-10 h-7 object-cover rounded-sm" alt="" />}
                   <div className="min-w-0"><div className="text-sm font-bold truncate">{tr.name}</div><div className="text-[10px] text-white/50">{tr.country}</div></div>
                 </button>
-                {isAdmin && <button onClick={() => setEditTrack({ ...tr, target_time: formatLapTime(tr.target_time_ms) })} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Strecke bearbeiten"><Pencil className="w-3.5 h-3.5" /></button>}
-                {isAdmin && <button onClick={() => delTrack(tr.id)} className="p-1 text-white/40 hover:text-[#FF3B30]" title="Strecke löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
+                {isTournamentLead && <button onClick={() => setEditTrack({ ...tr, target_time: formatLapTime(tr.target_time_ms) })} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Strecke bearbeiten"><Pencil className="w-3.5 h-3.5" /></button>}
+                {isTournamentLead && <button onClick={() => delTrack(tr.id)} className="p-1 text-white/40 hover:text-[#FF3B30]" title="Strecke löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
               </div>
             ))}
           </div>
-          {isAdmin && editTrack && (
+          {isTournamentLead && editTrack && (
             <form onSubmit={saveTrack} className="mt-4 space-y-2 border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-3">
               <div className="flex items-center justify-between">
                 <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Strecke bearbeiten</div>
@@ -269,7 +270,7 @@ export default function AdminF1EditPage() {
               </button>
             </form>
           )}
-          {isAdmin && <form onSubmit={addTrack} className="mt-4 space-y-2 border-t border-white/5 pt-4">
+          {isTournamentLead && <form onSubmit={addTrack} className="mt-4 space-y-2 border-t border-white/5 pt-4">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Neue Strecke</div>
             <input placeholder="Name" value={newTrack.name} onChange={(e) => setNewTrackField("name", e.target.value)} required data-testid="f1-new-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             <ImageUpload value={newTrack.image_url} onChange={(v) => setNewTrackField("image_url", v)} label="Streckenbild" testId="f1-new-track-image-upload" variant="wide" allowLibrary />
@@ -338,7 +339,7 @@ export default function AdminF1EditPage() {
                       {(t.score_scope || "official") === "club_reference" && <span className="text-[#FFD700] border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm">Referenz</span>}
                       {t.penalty_seconds > 0 && <span className="text-[#FF3B30] text-xs">+{t.penalty_seconds}s</span>}
                       {t.is_invalid && <span className="text-[#FF3B30] text-[10px] font-bold uppercase tracking-widest">INVALID</span>}
-                      {t.proof_url && <a href={t.proof_url} target="_blank" rel="noreferrer" className="text-[10px] text-[#29B6E8] uppercase tracking-widest hover:underline">Proof</a>}
+                      {safeHttpUrl(t.proof_url) && <a href={safeHttpUrl(t.proof_url)} target="_blank" rel="noreferrer" className="text-[10px] text-[#29B6E8] uppercase tracking-widest hover:underline">Proof</a>}
                       <button
                         onClick={() => setEditTime({
                           ...t,

@@ -18,8 +18,16 @@ import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload, PublicUser 
 import { Button } from "../../components/Button";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
+import { FriendsAtEventCard } from "../../components/FriendsAtEventCard";
+import { isGuestUser } from "../../live";
 
-type Props = { route: { params: { id: string } }; navigation?: { setOptions?: (options: { headerRight?: () => React.ReactNode }) => void } };
+type Props = {
+  route: { params: { id: string } };
+  navigation?: {
+    setOptions?: (options: { headerRight?: () => React.ReactNode }) => void;
+    navigate?: (screen: "PublicProfile", params: { username: string }) => void;
+  };
+};
 
 export function FastLapDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
@@ -227,6 +235,15 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
             {challenge.show_club_reference_times === false ? <Muted>Referenzzeiten sind aktuell nur intern sichtbar.</Muted> : null}
           </Card>
         ) : null}
+
+        {/* Freunde bei der Fast Lap (#1188 Teil 2): „dabei“ heißt hier eine gültige Zeit - eine eigene Anmeldung gibt es nicht. */}
+        <FriendsAtEventCard
+          path={`/f1/challenges/${challenge.slug || challenge.id}/friends`}
+          scope="fastlap"
+          signedIn={Boolean(user) && !isGuestUser(user)}
+          over={challengeIsOver(challenge)}
+          onOpenProfile={navigation?.navigate ? (username) => navigation.navigate?.("PublicProfile", { username }) : undefined}
+        />
 
         {prizes.length ? (
           <Card style={styles.infoCard}>
