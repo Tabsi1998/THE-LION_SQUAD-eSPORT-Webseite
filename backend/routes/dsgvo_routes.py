@@ -1,6 +1,10 @@
 """GDPR endpoints: data export and account anonymisation."""
 
+import json
+from datetime import date, datetime
+
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 
 from database import get_db
 from auth import require_super, get_current_user
@@ -10,88 +14,266 @@ from models import now_utc, new_id
 
 dsgvo_router = APIRouter(prefix="/api/dsgvo", tags=["dsgvo"])
 
+# Auskunft (#1030). Welche Sammlung wo steht, legt services/personal_data.py fest; ein Test vergleicht beide Listen.
+# Nie in die Auskunft: Prüfwerte, Schlüssel und Speicherorte - sie sagen über die Person nichts aus und wären außerhalb
+# des Systems ein Werkzeug.
+HIDDEN_KEYS = frozenset({"_id", "password_hash", "token_hash", "storage_key", "poster_key", "mfa_secret", "mfa_pending_secret",
+                         "mfa_recovery_code_hashes", "mfa_totp_last_counter"})
+# Seitenweise lesen statt einer Obergrenze: jede Liste kommt vollständig, sortiert nach dem Zeitpunkt des Anlegens (_id).
+EXPORT_PAGE = 500
+# Meldungen über die Person: Art und Stand - wer gemeldet hat und was er schrieb, bleibt bei ihm (Art. 15 Abs. 4).
+REPORT_ABOUT_ME = ("id", "category", "status", "created_at", "reviewed_at")
+# Einträge im Adminprotokoll, in denen die Person gehandelt hat: nur der Vorgang - der Inhalt betrifft andere.
+AUDIT_FIELDS = ("id", "action", "target_type", "created_at")
+# Nachrichten: eigene mit Inhalt; empfangene nur als Vorgang (wann, in welchem Gespräch, gelesen) - der Inhalt ist der der
+# anderen Person. Gruppen-Chats (Team, Match, Turnier) nennen nur die eigenen Nachrichten.
+OWN_MESSAGE = ("id", "message", "sticker", "type", "created_at", "updated_at", "deleted_at", "read_at")
+RECEIVED_MESSAGE = ("id", "created_at", "read_at")
+CHAT_PLACE = ("team_id", "match_id", "stage_id", "tournament_id")
+# Terminvorschläge: der eigene Vorschlag - wer auf der anderen Seite entschieden hat und was er dazu schrieb, nicht.
+PROPOSAL = ("id", "match_id", "match_collection", "tournament_id", "stage_id", "kind", "status", "scheduled_at", "note",
+            "parent_proposal_id", "created_at", "updated_at")
+# Dateien: was die Datei ist und wie sie geprüft wurde - ohne Dateinamen, Adresse oder Ablageort.
+UPLOAD = ("id", "media_scope", "media_type", "kind", "mime", "size", "width", "height", "scan_state", "status", "created_at",
+          "updated_at")
+UPLOAD_EVENT = ("id", "created_at", "endpoint", "media_scope", "kind", "mime", "size", "status", "status_code", "duration_ms",
+                "ip", "user_agent")
+ATTACHMENT = ("id", "kind", "mime", "size", "width", "height", "status", "context", "created_at", "updated_at")
+PROOF_PHOTO = ("id", "match_id", "tournament_id", "registration_id", "mime", "size", "width", "height", "status", "created_at",
+               "updated_at")
 
-async def _user_data_export(db, user_id: str) -> dict:
-    from services.event_photos import export_for_user as export_gallery_submissions
 
-    user = await db.users.find_one(
-        {"id": user_id},
-        {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0,
-         "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0},
-    )
+def _clean(row: dict, *drop: str) -> dict:
+    return {key: value for key, value in row.items() if key not in HIDDEN_KEYS and key not in drop}
+
+
+def _pick(*keys: str):
+    return lambda row: {key: row.get(key) for key in keys}
+
+
+def _audit_entry(user_id: str):
+    def shape(row: dict) -> dict:
+        entry = {key: row.get(key) for key in AUDIT_FIELDS}
+        if row.get("target_id") == user_id:
+            entry["data"] = row.get("data")
+        return entry
+    return shape
+
+
+def _report(user_id: str):
+    def shape(row: dict) -> dict:
+        if row.get("reporter_id") == user_id:
+            return _clean(row, "reviewed_by")
+        return {**{key: row.get(key) for key in REPORT_ABOUT_ME}, "about_me": True}
+    return shape
+
+
+def _direct_message(user_id: str):
+    def shape(row: dict) -> dict:
+        if row.get("sender_id") == user_id:
+            return {**{key: row.get(key) for key in OWN_MESSAGE}, "conversation": row.get("recipient_id"),
+                    "attachments": len(row.get("attachments") or [])}
+        return {**{key: row.get(key) for key in RECEIVED_MESSAGE}, "conversation": row.get("sender_id"), "received": True}
+    return shape
+
+
+def _sanction(row: dict) -> dict:
+    out = _clean(row, "created_by", "lifted_by")
+    if isinstance(out.get("appeal"), dict):
+        out["appeal"] = {key: value for key, value in out["appeal"].items() if key != "decided_by"}
+    return out
+
+
+async def _paged(collection, query: dict):
+    """Alle Zeilen, seitenweise nach ``_id`` - ohne Obergrenze und ohne alles auf einmal im Speicher."""
+    last = None
+    while True:
+        page_query = query if last is None else {"$and": [query, {"_id": {"$gt": last}}]}
+        page = await collection.find(page_query).sort("_id", 1).limit(EXPORT_PAGE).to_list(EXPORT_PAGE)
+        for row in page:
+            yield row
+        if len(page) < EXPORT_PAGE or "_id" not in page[-1]:
+            return
+        last = page[-1]["_id"]
+
+
+def _rows(collection, query: dict, shape=_clean):
+    async def produce():
+        async for row in _paged(collection, query):
+            yield shape(row)
+    return ("list", produce)
+
+
+def _value(make):
+    return ("value", make)
+
+
+def _chat_rows(db, user_id: str):
+    async def own_chat_messages():
+        for name in ("team_chat_messages", "match_chat_messages", "tournament_chat_messages"):
+            async for row in _paged(getattr(db, name), {"user_id": user_id}):
+                place = {key: row[key] for key in CHAT_PLACE if row.get(key)}
+                yield {"chat": name.removesuffix("_chat_messages"), **place, **{key: row.get(key) for key in OWN_MESSAGE if key != "read_at"},
+                       "attachments": len(row.get("attachments") or [])}
+    return ("list", own_chat_messages)
+
+
+async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
+    """Die Auskunft als Abschnitte. Der Aufbau ist billig; gelesen wird erst beim Schreiben (``_stream``)."""
+    from services.event_photos import EXPORT_FIELDS as GALLERY_FIELDS
+
+    user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(404, "Account nicht gefunden")
+    user = _clean(user)
     email = user.get("email", "")
-    async def rows(collection, query, limit=5000):
-        return await collection.find(query, {"_id": 0}).to_list(limit)
+    me = {"user_id": user_id}
 
-    registrations = await rows(db.tournament_registrations, {"user_id": user_id})
-    return {
-        "format_version": 4,
-        "exported_at": now_utc().isoformat(),
-        "user": user,
-        "consent_records": await rows(db.consent_records, {"user_id": user_id}),
-        "membership": await db.memberships.find_one({"user_id": user_id}, {"_id": 0}),
-        "social_accounts": await rows(db.user_socials, {"user_id": user_id}),
-        "platform_links": await rows(db.platform_links, {"user_id": user_id}),
-        "tournament_registrations": registrations,
-        "competition_matches": await registration_match_snapshot(
-            db, [row.get("id") for row in registrations if row.get("id")],
-        ),
-        "event_registrations": await rows(db.event_registrations, {"user_id": user_id}),
-        "f1_lap_times": await rows(db.f1_lap_times, {"user_id": user_id}),
-        "teams": await rows(db.teams, {"$or": [{"member_ids": user_id}, {"leader_id": user_id}]}),
-        "team_memberships": await rows(db.team_members, {"user_id": user_id}),
-        "team_invites": await rows(db.team_invites, {"user_id": user_id}),
-        "achievements": await rows(db.user_achievements, {"user_id": user_id}),
+    async def matches():
+        registration_ids = [row["id"] async for row in _paged(db.tournament_registrations, me) if row.get("id")]
+        return await registration_match_snapshot(db, registration_ids, limit=None)
+
+    async def stamp():
+        return now_utc().isoformat()
+
+    async def one(collection, query):
+        row = await collection.find_one(query)
+        return _clean(row) if row else None
+
+    async def static(value):
+        return value
+
+    return [
+        ("format_version", _value(lambda: static(5))),
+        ("exported_at", _value(stamp)),
+        ("user", _value(lambda: static(user))),
+        ("consent_records", _rows(db.consent_records, me)),
+        ("membership", _value(lambda: one(db.memberships, me))),
+        ("social_accounts", _rows(db.user_socials, me)),
+        ("platform_links", _rows(db.platform_links, me)),
+        ("tournament_registrations", _rows(db.tournament_registrations, me)),
+        ("competition_matches", _value(matches)),
+        ("event_registrations", _rows(db.event_registrations, me)),
+        ("f1_lap_times", _rows(db.f1_lap_times, me)),
+        ("teams", _rows(db.teams, {"$or": [{"member_ids": user_id}, {"leader_id": user_id}]}, lambda row: _clean(row, "join_code"))),
+        ("team_memberships", _rows(db.team_members, me)),
+        ("team_invites", _rows(db.team_invites, me)),
+        ("achievements", _rows(db.user_achievements, me)),
         # Was für die Erfolge gezählt wurde (#616, #678): der Stand aller Zähler, die Signale je Tag (Kürbis,
         # Fledermäuse, Schneeflocken …), gelesene News, geöffnete Streams und gegebenes GG - nur Zahlen und Zeitpunkte.
-        "achievement_counters": await db.user_achievement_stats.find_one({"user_id": user_id}, {"_id": 0}),
-        "achievement_signals": await rows(db.user_signals, {"user_id": user_id}),
-        "news_reads": await rows(db.news_reads, {"user_id": user_id}),
-        "stream_watches": await rows(db.stream_watches, {"user_id": user_id}),
+        ("achievement_counters", _value(lambda: one(db.user_achievement_stats, me))),
+        ("achievement_signals", _rows(db.user_signals, me)),
+        ("news_reads", _rows(db.news_reads, me)),
+        ("stream_watches", _rows(db.stream_watches, me)),
         # Adventkalender (#641): welches Türchen wann geöffnet wurde - beim Quiz nur, dass mitgemacht wurde.
-        "advent_openings": await rows(db.advent_openings, {"user_id": user_id}),
+        ("advent_openings", _rows(db.advent_openings, me)),
         # Ostereiersuche (#646): welche Eier wann gefunden wurden und der Korb.
-        "easter_finds": await rows(db.easter_finds, {"user_id": user_id}),
-        "easter_progress": await rows(db.easter_progress, {"user_id": user_id}),
+        ("easter_finds", _rows(db.easter_finds, me)),
+        ("easter_progress", _rows(db.easter_progress, me)),
         # Verlosungen (#641): wo die Person mitmacht. Ein Gewinn steht bei ``prize_pickups``.
-        "raffle_entries": await rows(db.season_raffle_entries, {"user_id": user_id}),
-        "commendations_given": await rows(db.match_commendations, {"from_user_id": user_id}),
-        "season_points": await rows(db.season_points, {"user_id": user_id}),
-        "prize_pickups": await rows(db.prize_pickups, {"user_id": user_id}),
-        "notifications": await rows(db.notifications, {"user_id": user_id}),
-        "direct_messages": await rows(db.direct_messages, {"$or": [{"sender_id": user_id}, {"recipient_id": user_id}]}),
-        "friendships": await rows(db.friendships, {"$or": [{"requester_id": user_id}, {"recipient_id": user_id}]}),
-        "blocks": await rows(db.user_blocks, {"$or": [{"blocker_id": user_id}, {"blocked_id": user_id}]}),
-        "moderation_reports": await rows(db.user_reports, {"$or": [{"reporter_id": user_id}, {"target_user_id": user_id}]}),
-        "email_logs": await rows(db.email_logs, {"to": email}),
-        "mobile_devices": await rows(db.mobile_push_tokens, {"user_id": user_id}),
-        "mobile_client_logs": await rows(db.mobile_client_logs, {"user_id": user_id}),
-        "audit_trail": await rows(db.audit_logs, {"$or": [{"actor_id": user_id}, {"target_id": user_id}]}),
+        ("raffle_entries", _rows(db.season_raffle_entries, me)),
+        ("commendations_given", _rows(db.match_commendations, {"from_user_id": user_id})),
+        ("season_points", _rows(db.season_points, me)),
+        ("prize_pickups", _rows(db.prize_pickups, me)),
+        ("notifications", _rows(db.notifications, me)),
+        ("direct_messages", _rows(db.direct_messages, {"$or": [{"sender_id": user_id}, {"recipient_id": user_id}]},
+                                  _direct_message(user_id))),
+        ("friendships", _rows(db.friendships, {"$or": [{"requester_id": user_id}, {"recipient_id": user_id}]})),
+        # Seit Fassung 5 nur, wen die Person blockiert hat - wer sie blockiert, erfährt sie auch sonst nicht.
+        ("blocks", _rows(db.user_blocks, {"blocker_id": user_id})),
+        ("moderation_reports", _rows(db.user_reports, {"$or": [{"reporter_id": user_id}, {"target_user_id": user_id}]},
+                                     _report(user_id))),
+        ("email_logs", _rows(db.email_logs, {"to": email})),
+        ("mobile_devices", _rows(db.mobile_push_tokens, me, lambda row: _clean(row, "token"))),
+        ("mobile_client_logs", _rows(db.mobile_client_logs, me)),
+        ("audit_trail", _rows(db.audit_logs, {"$or": [{"actor_id": user_id}, {"target_id": user_id}]}, _audit_entry(user_id))),
         # Seit Fassung 3 (#928): was bisher weder in der Auskunft stand noch beim Löschen aufgeräumt wurde.
-        "xp": await db.user_xp.find_one({"user_id": user_id}, {"_id": 0}),
-        "xp_events": await rows(db.xp_events, {"user_id": user_id}),
-        "directory_profiles": await rows(db.club_member_profiles, {"user_id": user_id}),
-        "membership_applications": await rows(db.membership_applications, {"user_id": user_id}),
-        "membership_invitations": await rows(db.membership_invitations, {"user_id": user_id}),
-        "board_positions": await rows(db.board_positions, {"$or": [{"user_id": user_id}, {"deputy_user_id": user_id}]}),
-        "tournament_staff": await rows(db.tournament_staff_assignments, {"user_id": user_id}),
-        "moderation_items": await rows(db.moderation_items, {"user_id": user_id}),
-        "discord_activity": await rows(db.discord_activity, {"user_id": user_id}),
+        ("xp", _value(lambda: one(db.user_xp, me))),
+        ("xp_events", _rows(db.xp_events, me)),
+        ("directory_profiles", _rows(db.club_member_profiles, me)),
+        ("membership_applications", _rows(db.membership_applications, me)),
+        ("membership_invitations", _rows(db.membership_invitations, me)),
+        ("board_positions", _rows(db.board_positions, {"$or": [me, {"deputy_user_id": user_id}]})),
+        ("tournament_staff", _rows(db.tournament_staff_assignments, me)),
+        ("moderation_items", _rows(db.moderation_items, me)),
+        ("discord_activity", _rows(db.discord_activity, me)),
         # Statistik je Server (#631): an welchen Tagen das Konto auf welchem Server geschrieben hat - höchstens 35 Tage zurück.
-        "discord_activity_servers": await rows(db.discord_guild_active, {"user_id": user_id}),
-        "discord_memberships": await rows(db.discord_memberships, {"user_id": user_id}),
+        ("discord_activity_servers", _rows(db.discord_guild_active, me)),
+        ("discord_memberships", _rows(db.discord_memberships, me)),
         # Seit Fassung 4: der Einlass bei der Generalversammlung (#845) - die eigene Anwesenheit, und wo man als
         # Vorstand selbst eingelassen hat (nur der Vorgang, nie der Name der anderen Person).
-        "meeting_admissions": [{key: row.get(key) for key in ("meeting_id", "name", "state", "voting", "reason", "arrived", "updated_at")}
-                               for row in await rows(db.meeting_admissions, {"user_id": user_id})],
-        "meeting_admissions_recorded": [{key: row.get(key) for key in ("meeting_id", "state", "updated_at")}
-                                        for row in await rows(db.meeting_admissions, {"by": user_id})],
-        "uploads": await rows(db.media_uploads, {"owner_id": user_id}),
+        ("meeting_admissions", _rows(db.meeting_admissions, me,
+                                     _pick("meeting_id", "name", "state", "voting", "reason", "arrived", "updated_at"))),
+        ("meeting_admissions_recorded", _rows(db.meeting_admissions, {"by": user_id}, _pick("meeting_id", "state", "updated_at"))),
+        ("uploads", _rows(db.media_uploads, {"owner_id": user_id}, _pick(*UPLOAD))),
         # Eingesandte Galerie-Fotos (#1186): Album, Stand, „Foto: Name“ gewünscht und wann eingewilligt - ohne Datei.
-        "gallery_submissions": await export_gallery_submissions(db, user_id),
-    }
+        ("gallery_submissions", _rows(db.gallery_submissions, {"owner_id": user_id}, _pick(*GALLERY_FIELDS))),
+        # Seit Fassung 5 (#1030): alles, was services/personal_data.py als Daten über die Person führt.
+        # Sitzungen mit Gerät, Browser und IP-Adresse - ohne die Kennungen der Anmeldetokens.
+        ("sessions", _rows(db.auth_sessions, me, lambda row: _clean(row, "current_jti", "family_id"))),
+        ("passkeys", _rows(db.passkeys, me, _pick("id", "name", "kind", "created_at", "last_used_at"))),
+        ("access_links", _rows(db.access_links, {"$or": [me] + ([{"email": email}] if email else [])})),
+        ("consent_decisions", _rows(db.consent_decisions, me)),
+        ("chat_reads", _rows(db.chat_reads, me)),
+        ("document_opens", _rows(db.document_opens, me)),
+        ("year_review_notices", _rows(db.year_review_notices, me)),
+        ("feedback_answered", _rows(db.feedback_receipts, me)),
+        ("chat_messages", _chat_rows(db, user_id)),
+        ("chat_attachments", _rows(db.chat_attachments, {"owner_id": user_id}, _pick(*ATTACHMENT))),
+        ("moderation_strikes", _rows(db.moderation_strikes, me, lambda row: _clean(row, "moderator_id", "revoked_by"))),
+        ("moderation_sanctions", _rows(db.moderation_sanctions, me, _sanction)),
+        # Nur, was angemeldet geschrieben wurde: eine Anfrage ohne Konto lässt sich der Person nicht sicher zuordnen.
+        ("contact_messages", _rows(db.contact_messages, me, lambda row: _clean(row, "internal_note", "answered_by"))),
+        # Was die Verwaltung bei den Erfolgen für die Person vermerkt hat - ohne den Namen der Verwalterin.
+        ("achievement_log", _rows(db.achievement_events, me, _pick("id", "kind", "at", "tier_code", "tier_name", "note"))),
+        ("stickers", _rows(db.user_stickers, me)),
+        ("stream_sessions", _rows(db.twitch_stream_sessions, me)),
+        ("stream_announcements", _rows(db.tournament_stream_announcements, me)),
+        ("dolibarr_links", _rows(db.dolibarr_links, me, lambda row: _clean(row, "member_key"))),
+        ("dolibarr_identities", _rows(db.dolibarr_identities, me)),
+        ("dolibarr_honours", _rows(db.dolibarr_honours, me)),
+        ("billing_orders", _rows(db.billing_orders, me)),
+        ("billing_customers", _rows(db.billing_customers, me)),
+        ("match_reports", _rows(db.match_reports_v2, {"reporter_user_id": user_id})),
+        ("schedule_proposals", _rows(db.match_schedule_proposals, {"actor_user_id": user_id}, _pick(*PROPOSAL))),
+        ("match_proof_photos", _rows(db.match_proof_photos, {"owner_id": user_id}, _pick(*PROOF_PHOTO))),
+        ("f1_staff", _rows(db.f1_staff_assignments, me)),
+        ("season_standings", _rows(db.season_standings, me)),
+        ("season_rank_history", _rows(db.season_rank_snapshots, me)),
+        ("upload_events", _rows(db.upload_events, {"owner_id": user_id}, _pick(*UPLOAD_EVENT))),
+    ]
+
+
+def _json_default(value):
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    return str(value)
+
+
+def _dumps(value) -> str:
+    return json.dumps(value, ensure_ascii=False, default=_json_default)
+
+
+async def _stream(sections):
+    """Die Auskunft als ein JSON-Objekt, Zeile für Zeile geschrieben - auch tausende Einträge je Liste."""
+    yield b"{"
+    for index, (key, (kind, make)) in enumerate(sections):
+        yield f"{',' if index else ''}{_dumps(key)}:".encode()
+        if kind == "value":
+            yield _dumps(await make()).encode()
+            continue
+        yield b"["
+        first = True
+        async for row in make():
+            yield f"{'' if first else ','}{_dumps(row)}".encode()
+            first = False
+        yield b"]"
+    yield b"}"
+
+
+async def _user_data_export(db, user_id: str) -> dict:
+    """Die ganze Auskunft als ``dict`` - für Tests und Aufrufe im Haus; die Route streamt."""
+    return json.loads(b"".join([chunk async for chunk in _stream(await _user_data_sections(db, user_id))]))
 
 
 async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> None:
@@ -160,17 +342,19 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     from services.billing_orders import anonymize_user as anonymize_billing
     await anonymize_billing(db, user_id)
     # Alles außerhalb des Kontos (#928): Verzeichnis, Anträge, Anmeldungen, XP, Zugänge und die eigenen Bilder.
-    await account_erasure.erase_related(db, user, now)
+    erased = await account_erasure.erase_related(db, user, now)
+    # Kontaktanfragen ohne Konto mit derselben Adresse bleiben unberührt (nicht sicher zuzuordnen) - die Zahl steht hier,
+    # damit der Vorstand sie bei einem Löschwunsch per Hand prüfen kann.
     await db.audit_logs.insert_one({
         "id": new_id(), "action": action, "actor_id": actor_id, "target_id": user_id,
-        "data": {"personal_data_removed": True}, "created_at": now,
+        "data": {"personal_data_removed": True, "unlinked_contact_messages": erased["unlinked_contact_messages"]}, "created_at": now,
     })
 
 
 @dsgvo_router.get("/export-my-data")
 async def export_my_data(me: dict = Depends(get_current_user)):
-    db = get_db()
-    return await _user_data_export(db, me["id"])
+    sections = await _user_data_sections(get_db(), me["id"])
+    return StreamingResponse(_stream(sections), media_type="application/json")
 
 
 @dsgvo_router.post("/anonymize-me")
