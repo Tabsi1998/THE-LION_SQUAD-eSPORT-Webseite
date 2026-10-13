@@ -544,6 +544,76 @@ test("profile head: the featured award in the banner stays clickable under the b
   }
 });
 
+test("rank signature: canvas only in the profile head, face stays free, none in lists or with reduced motion (#1455)", async ({ page }) => {
+  await mockPublicChrome(page);
+  const profileRoutes = async (level) => {
+    await page.route("**/api/users/public/tabsi98", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({
+      id: "user-1", username: "tabsi98", display_name: "Tabsi98", bio: "", created_at: "2025-01-01T00:00:00Z", privacy_public_profile: true, stats: {},
+      achievement_level: { level, xp: 1000, next_level_xp: 2000, progress: 40, prestige: 0 }, tournaments: [], f1_bests: [], teams: [],
+      references: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0, season_points: 0 } } }) }));
+    await page.route("**/api/streams/live", (route) => route.fulfill({ contentType: "application/json", body: "[]" }));
+    await page.route("**/api/achievements/user/user-1", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ groups: [], awards: [] }) }));
+    await page.route("**/api/achievements/crowns", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ crowns: {} }) }));
+  };
+  await profileRoutes(59);
+  await page.goto("/u/tabsi98");
+  await acceptCookies(page);
+  const frame = page.getByTestId("profile-avatar-frame");
+  await expect(frame).toHaveAttribute("data-level", "59");
+  const canvas = frame.getByTestId("loewen-signature");
+  await expect(canvas).toBeVisible();
+  await expect(canvas).toHaveAttribute("data-signature", "storm");
+  expect(await canvas.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe("none");
+  await expect(frame.locator("canvas.tls-lvf-sig")).toHaveCount(2);
+  // Es wird wirklich gezeichnet - aber nie über dem Foto.
+  const photo = await frame.locator(".tls-lvf-photo").boundingBox();
+  await expect.poll(async () => canvas.evaluate((el, box) => {
+    const ctx = el.getContext("2d");
+    const { data } = ctx.getImageData(0, 0, el.width, el.height);
+    let drawn = 0;
+    for (let i = 3; i < data.length; i += 4) if (data[i] > 0) drawn++;
+    const rect = el.getBoundingClientRect();
+    const sx = el.width / rect.width;
+    const sy = el.height / rect.height;
+    const cx = (box.x + box.width / 2 - rect.left) * sx;
+    const cy = (box.y + box.height / 2 - rect.top) * sy;
+    const r = (box.width / 2) * 0.9 * sx;
+    let onFace = 0;
+    for (let y = -r; y <= r; y += 3) for (let x = -r; x <= r; x += 3) {
+      if (x * x + y * y > r * r) continue;
+      if (data[((Math.round(cy + y) * el.width + Math.round(cx + x)) * 4) + 3] > 0) onFace++;
+    }
+    return drawn > 50 && onFace === 0 ? "ok" : `drawn ${drawn}, onFace ${onFace}`;
+  }, photo), { timeout: 5000 }).toBe("ok");
+
+  // Erstes Level im Rang: nur Glanz, kein Canvas.
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await mockPublicChrome(page);
+  await profileRoutes(55);
+  await page.goto("/u/tabsi98");
+  await expect(page.getByTestId("profile-avatar-frame")).toHaveAttribute("data-level", "55");
+  await expect(page.getByTestId("loewen-signature")).toHaveCount(0);
+
+  // Listen (Spieler): Rahmen ohne Signatur.
+  await page.route("**/api/users/public-list**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ total: 1, items: [
+    { id: "u59", username: "kingly", display_name: "Kingly", achievement_level: { level: 59 }, achievements_count: 40 },
+  ] }) }));
+  await page.route("**/api/membership/public", (route) => route.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.goto("/players");
+  await expect(page.getByTestId("player-card-kingly").locator(".tls-lvf")).toHaveAttribute("data-rank", "12");
+  await expect(page.locator("canvas.tls-lvf-sig")).toHaveCount(0);
+
+  // Bewegung reduzieren: auch im Profil kein Effekt.
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await mockPublicChrome(page);
+  await profileRoutes(60);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/u/tabsi98");
+  await expect(page.getByTestId("profile-avatar-frame")).toHaveAttribute("data-level", "60");
+  await page.waitForTimeout(300);
+  await expect(page.locator("canvas.tls-lvf-sig")).toHaveCount(0);
+});
+
 test("public profile social links render as icons without raw values", async ({ page }) => {
   await mockPublicChrome(page);
   await page.route("**/api/users/public/tabsi98", async (route) => {

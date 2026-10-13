@@ -26,45 +26,16 @@ from pydantic import BaseModel
 
 from database import get_db
 from auth import get_current_user, require_area
-from models import now_utc
+from models import new_id, now_utc
+from services import account_erasure, media_audit
 from services.media_formats import PUBLIC_IMAGE_EXTS, PUBLIC_MEDIA_EXTS, PUBLIC_ORIGINAL_EXTS, PUBLIC_VIDEO_EXTS
 
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
 ADMIN_MEDIA_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin", "superadmin"}
-IMAGE_REFERENCE_FIELDS = [
-    ("settings", {"id": "branding"}, ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "qr_logo_url", "favicon_url", "favicon_light_url", "favicon_dark_url"]),
-    ("settings", {"id": "discord"}, ["avatar_url"]),
-    ("users", {}, ["avatar_url", "banner_url"]),
-    ("teams", {}, ["logo_url", "banner_url"]),
-    ("sponsors", {}, ["logo_url"]),
-    ("partners", {}, ["logo_url"]),
-    ("news_posts", {}, ["banner_url", "cover_url"]),
-    ("events", {}, ["banner_url", "cover_url"]),
-    ("games", {}, ["cover_url", "logo_url"]),
-    ("tournaments", {}, ["banner_url", "cover_url"]),
-    ("f1_challenges", {}, ["banner_url", "cover_url"]),
-    ("f1_tracks", {}, ["image_url"]),
-    ("seasons", {}, ["banner_url"]),
-    ("gallery_albums", {}, ["cover_url"]),
-    ("gallery_photos", {}, ["image_url", "thumbnail_url", "video_url"]),
-    ("member_benefits", {}, ["image_url"]),
-    ("club_member_profiles", {}, ["photo_url", "cover_url"]),
-]
-
-TEXT_IMAGE_REFERENCE_FIELDS = [
-    ("news_posts", ["content"]),
-    ("events", ["description", "program"]),
-    ("tournaments", ["description"]),
-    ("f1_challenges", ["description"]),
-    ("club_member_profiles", ["bio"]),
-]
-
-TEXT_IMAGE_RE = re.compile(
-    r"!\[[^\]\n]*\]\((?P<md>[^)\s]+)\)|<img\b[^>]*\bsrc=[\"'](?P<html>[^\"']+)[\"']",
-    re.IGNORECASE,
-)
-
+# Wo eine Datei verwendet wird, weiß ``services.media_audit`` (#1471): dieselbe Liste wie Kontolöschung und
+# Bild-Migration, auch verschachtelte Felder, Adressen mit Zusatz und kleinere Fassungen.
+MAX_REFERENCES = 20
 
 # ============= Media Browser =============
 media_router = APIRouter(prefix="/api/media", tags=["media"])
@@ -107,17 +78,6 @@ def _media_type_from_ext(ext: str) -> str:
     return "file"
 
 
-def _iter_text_media_values(value: Any) -> list[str]:
-    if not isinstance(value, str) or not value:
-        return []
-    out: list[str] = []
-    for match in TEXT_IMAGE_RE.finditer(value):
-        url = match.group("md") or match.group("html")
-        if url:
-            out.append(url)
-    return out
-
-
 def _file_digest(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -127,45 +87,22 @@ def _file_digest(path: Path) -> str:
 
 
 async def _collect_media_usage(filenames: set[str]) -> dict[str, list[dict[str, Any]]]:
-    if not filenames:
-        return {}
-    db = get_db()
+    """Dateiname → Verwendungen (höchstens ``MAX_REFERENCES`` je Datei) - ein Durchgang für alle Dateien."""
     usage: dict[str, list[dict[str, Any]]] = {name: [] for name in filenames}
-
-    def add_ref(filename: str | None, ref: dict[str, Any]) -> None:
-        if filename in usage and len(usage[filename]) < 20:
-            usage[filename].append(ref)
-
-    for collection, base_filter, fields in IMAGE_REFERENCE_FIELDS:
-        col = getattr(db, collection)
-        projection = {"_id": 0, "id": 1, "slug": 1, "name": 1, "title": 1, **{field: 1 for field in fields}}
-        async for doc in col.find(base_filter, projection):
-            doc_id = doc.get("id") or doc.get("slug")
-            for field in fields:
-                filename = _filename_from_media_value(doc.get(field))
-                add_ref(filename, {
-                    "collection": collection,
-                    "id": doc_id,
-                    "field": field,
-                    "label": doc.get("title") or doc.get("name") or doc_id,
-                })
-
-    for collection, fields in TEXT_IMAGE_REFERENCE_FIELDS:
-        col = getattr(db, collection)
-        projection = {"_id": 0, "id": 1, "slug": 1, "name": 1, "title": 1, **{field: 1 for field in fields}}
-        async for doc in col.find({}, projection):
-            doc_id = doc.get("id") or doc.get("slug")
-            for field in fields:
-                for value in _iter_text_media_values(doc.get(field)):
-                    filename = _filename_from_media_value(value)
-                    add_ref(filename, {
-                        "collection": collection,
-                        "id": doc_id,
-                        "field": field,
-                        "label": doc.get("title") or doc.get("name") or doc_id,
-                        "text_reference": True,
-                    })
-
+    async for collection, doc, field, name, text in media_audit.iter_usages(get_db(), set(filenames)):
+        if len(usage[name]) >= MAX_REFERENCES:
+            continue
+        doc_id = doc.get("id") or doc.get("slug")
+        ref = {
+            "collection": collection,
+            "id": doc_id,
+            "field": field,
+            "place": media_audit.place_label(collection, field),
+            "label": doc.get("title") or doc.get("name") or doc.get("display_name") or doc_id,
+        }
+        if text:
+            ref["text_reference"] = True
+        usage[name].append(ref)
     return usage
 
 
@@ -341,18 +278,24 @@ async def admin_media_audit(me: dict = Depends(require_area("content"))):
     }
 
 
-async def _clear_media_references(url: str) -> int:
+async def _clear_media_references(filename: str) -> tuple[int, int]:
+    """Leert jedes Feld, das auf die Datei zeigt, auch verschachtelt. Bilder in Texten bleiben stehen und werden nur
+    gezählt - einen Text schreibt die Mediathek nicht um."""
     db = get_db()
-    cleared = 0
-    for collection, base_filter, fields in IMAGE_REFERENCE_FIELDS:
-        col = getattr(db, collection)
-        for field in fields:
-            res = await col.update_many(
-                {**base_filter, field: {"$regex": f"{re.escape(url)}$"}},
-                {"$set": {field: None, "updated_at": now_utc().isoformat()}},
-            )
-            cleared += res.modified_count
-    return cleared
+    candidates = {Path(filename).stem: filename}
+    stamp = {"updated_at": now_utc().isoformat()}
+
+    def change(value: Any) -> Any:
+        return None if media_audit.canonical_name(value, candidates) == filename else value
+
+    cleared = in_text = 0
+    hits = [hit async for hit in media_audit.iter_usages(db, {filename})]
+    for collection, doc, field, _name, text in hits:
+        if text:
+            in_text += 1
+        elif await media_audit.rewrite_field(getattr(db, collection), doc["_id"], field, change, stamp):
+            cleared += 1
+    return cleared, in_text
 
 
 def _media_file_path(filename: str) -> Path:
@@ -424,16 +367,30 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
 
 
 @admin_media_router.delete("/{filename}")
-async def admin_delete_media(filename: str, me: dict = Depends(require_area("content"))):
-    """Delete a file from upload dir. Path-traversal protected."""
-    p = _media_file_path(filename)
-    try:
-        p.unlink()
-    except OSError as e:
-        raise HTTPException(500, "Löschen fehlgeschlagen.")
-    cleared_refs = await _clear_media_references(f"/api/static/uploads/{filename}")
-    meta = await get_db().media_uploads.delete_many({"filename": filename})
-    return {"ok": True, "cleared_references": cleared_refs, "deleted_metadata": meta.deleted_count}
+async def admin_delete_media(filename: str, force: bool = False, me: dict = Depends(require_area("content"))):
+    """Delete a file from upload dir. Path-traversal protected.
+
+    Eine verwendete Datei nur mit ``force`` (#1471): Die Mediathek fragt vorher nach. Erst werden die Bildfelder
+    geleert, die auf sie zeigen, dann die Datei gelöscht - scheitert das, holt der Aufräum-Job es nach. Jede Löschung
+    steht im Protokoll."""
+    _media_file_path(filename)
+    if not force:
+        usage = (await _collect_media_usage({filename}))[filename]
+        if usage:
+            places = ", ".join(sorted({ref["place"] for ref in usage}))
+            raise HTTPException(409, f"Die Datei wird noch verwendet ({places}). Zum Löschen bitte bestätigen.")
+    db = get_db()
+    cleared_refs, text_refs = await _clear_media_references(filename)
+    error = await account_erasure.remove_upload(db, filename)
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "media.delete", "actor_id": me.get("id"), "target_id": filename,
+        "data": {"filename": filename, "force": force, "cleared_references": cleared_refs,
+                 "text_references": text_refs, "file_pending": bool(error)},
+        "created_at": now_utc().isoformat(),
+    })
+    return {
+        "ok": True, "cleared_references": cleared_refs, "text_references": text_refs, "file_pending": bool(error),
+    }
 
 
 # ============= Navigation Editor =============
