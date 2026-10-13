@@ -166,7 +166,8 @@ export default function AdminMediaPage() {
       const { data } = await api.delete(`/admin/media/${encodeURIComponent(it.filename)}${used ? "?force=true" : ""}`);
       const cleared = data?.cleared_references ? `, ${data.cleared_references} Verknüpfung(en) bereinigt` : "";
       const inText = data?.text_references ? `, ${data.text_references} Verweis(e) in Texten bitte von Hand anpassen` : "";
-      toast.success(`Datei gelöscht${cleared}${inText}`);
+      const later = data?.file_pending ? " (die Datei selbst wird beim nächsten Aufräumen entfernt)" : "";
+      toast.success(`Datei gelöscht${later}${cleared}${inText}`);
       load();
     } catch (e) {
       setItems(previous);

@@ -167,6 +167,28 @@ async def _scans(db, owner_id: str, names: set[str]) -> dict[str, list[dict]]:
     return found
 
 
+async def _remember(db, name: str, owner_id: str, owned: bool, error: str) -> None:
+    """Zum Nachholen vermerken: der stündliche Aufräum-Job (``retry_file_cleanups``) versucht es erneut."""
+    logger.warning("[media] Datei %s nicht gelöscht, wird nachgeholt: %s", name, error)
+    now = now_utc().isoformat()
+    await db[PENDING].update_one({"filename": name}, {
+        "$set": {"owner_id": str(owner_id), "owned": owned, "last_error": error, "updated_at": now},
+        "$inc": {"attempts": 1}, "$setOnInsert": {"created_at": now},
+    }, upsert=True)
+
+
+async def remove_upload(db, name: str) -> str | None:
+    """Eine Datei samt kleineren Fassungen und Verwaltungszeilen löschen - für die Mediathek (#1471), nachdem sie die
+    Verweise geleert hat. Scheitert das Löschen der Datei, bleibt die Verwaltungszeile und der Aufräum-Job holt es
+    nach; er prüft vorher erneut, ob die Datei inzwischen wieder verwendet wird. Liefert den Fehler."""
+    error = await _remove(db, name, [])
+    if error:
+        await _remember(db, name, "", True, error)
+    else:
+        await db[PENDING].delete_many({"filename": name})
+    return error
+
+
 async def _clean(db, owner_id: str, owned: set[str], untracked: set[str]) -> int:
     """Löscht, was nirgends mehr steht. Eigene Dateien: persönliche Profile anderer verlieren den Eintrag."""
     names = owned | untracked
@@ -181,12 +203,7 @@ async def _clean(db, owner_id: str, owned: set[str], untracked: set[str]) -> int
             continue
         error = await _remove(db, name, scans.get(name, []))
         if error:
-            logger.warning("[dsgvo] Bild %s nicht gelöscht, wird nachgeholt: %s", name, error)
-            now = now_utc().isoformat()
-            await db[PENDING].update_one({"filename": name}, {
-                "$set": {"owner_id": str(owner_id), "owned": name in owned, "last_error": error, "updated_at": now},
-                "$inc": {"attempts": 1}, "$setOnInsert": {"created_at": now},
-            }, upsert=True)
+            await _remember(db, name, owner_id, name in owned, error)
             continue
         for collection, row_id, field in personal.get(name, []):
             await getattr(db, collection).update_one({"_id": row_id}, {"$set": {field: None}})

@@ -14,7 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from routes import phase_fg_routes  # noqa: E402
-from services import image_migrate, media_audit  # noqa: E402
+from services import account_erasure, image_migrate, media_audit  # noqa: E402
 
 UPLOADS = "/api/static/uploads/"
 NAME = "genutzt.webp"
@@ -36,6 +36,8 @@ def public(tmp_path, monkeypatch):
     (folder / "variants").mkdir(parents=True)
     monkeypatch.setattr(phase_fg_routes, "PUBLIC_UPLOAD_DIR", folder)
     monkeypatch.setattr(phase_fg_routes, "UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(account_erasure, "PUBLIC_UPLOAD_DIR", folder)
+    monkeypatch.setattr(account_erasure, "UPLOAD_DIR", tmp_path)
     (folder / NAME).write_bytes(b"bild")
     (folder / "frei.webp").write_bytes(b"frei")
     return folder
@@ -105,7 +107,7 @@ async def test_a_used_file_is_not_deleted_without_confirmation(flow, public):
     assert deleted.status_code == 200, deleted.text
     body = deleted.json()
     assert not (public / NAME).exists()
-    assert body["cleared_references"] == 3 and body["text_references"] == 1
+    assert body["cleared_references"] == 3 and body["text_references"] == 1 and body["file_pending"] is False
     tournament = await flow.db.tournaments.find_one({"id": "t-1"})
     assert tournament["award_images"] == {"1": None, "2": UPLOADS + "anderes.webp"}
     partner = await flow.db.partners.find_one({"id": "p-1"})
@@ -163,3 +165,54 @@ async def test_migration_rewrites_nested_references(flow, monkeypatch):
     assert (await flow.db.gallery_photos.find_one({"id": "g-1"}))["video_url"] == "https://cdn.example/film.mp4"
     assert downloads == [external]
     assert summary["tournaments"]["updated"] == 1 and summary["partners"]["updated"] == 1
+
+
+@pytest.mark.asyncio
+async def test_every_deletion_is_logged_with_actor_and_counts(flow, public):
+    chef = await admin(flow)
+    await flow.db.partners.insert_one({"id": "p-1", "tools": [{"name": "Tool", "image_url": URL}]})
+    await flow.db.news_posts.insert_one({"id": "n-1", "content": f"![Bild]({URL})"})
+
+    unused = await flow.delete("/api/admin/media/frei.webp")
+    used = await flow.delete(f"/api/admin/media/{NAME}?force=true")
+    assert unused.status_code == 200 and used.status_code == 200
+
+    logs = {row["target_id"]: row async for row in flow.db.audit_logs.find({"action": "media.delete"})}
+    assert logs["frei.webp"]["actor_id"] == chef["id"]
+    assert logs["frei.webp"]["data"] == {"filename": "frei.webp", "force": False, "cleared_references": 0,
+                                         "text_references": 0, "file_pending": False}
+    assert logs[NAME]["actor_id"] == chef["id"]
+    assert logs[NAME]["data"] == {"filename": NAME, "force": True, "cleared_references": 1,
+                                  "text_references": 1, "file_pending": False}
+
+
+@pytest.mark.asyncio
+async def test_references_are_cleared_first_and_a_locked_file_is_cleaned_later(flow, public, monkeypatch):
+    await admin(flow)
+    await flow.db.media_uploads.insert_one({"id": "up-1", "filename": NAME, "url": URL, "media_scope": "admin"})
+    await flow.db.partners.insert_one({"id": "p-1", "tools": [{"name": "Tool", "image_url": URL}]})
+    real_unlink = account_erasure._unlink
+
+    def locked(path):
+        if path.name == NAME:
+            raise PermissionError("Datei ist in Verwendung")
+        real_unlink(path)
+
+    monkeypatch.setattr(account_erasure, "_unlink", locked)
+    response = await flow.delete(f"/api/admin/media/{NAME}?force=true")
+
+    # Die Verweise sind leer, auch wenn die Datei selbst noch nicht weg ist; sie ist zum Nachholen vermerkt.
+    assert response.status_code == 200, response.text
+    assert response.json()["file_pending"] is True
+    assert (await flow.db.partners.find_one({"id": "p-1"}))["tools"] == [{"name": "Tool", "image_url": None}]
+    assert (public / NAME).exists()
+    pending = await flow.db[account_erasure.PENDING].find_one({"filename": NAME})
+    assert pending["attempts"] == 1 and pending["owned"] is True
+    assert await flow.db.media_uploads.count_documents({"filename": NAME}) == 1
+
+    monkeypatch.setattr(account_erasure, "_unlink", real_unlink)
+    removed = await account_erasure.retry_file_cleanups(flow.db)
+    assert removed == 1
+    assert not (public / NAME).exists()
+    assert await flow.db.media_uploads.count_documents({"filename": NAME}) == 0
+    assert await flow.db[account_erasure.PENDING].count_documents({}) == 0

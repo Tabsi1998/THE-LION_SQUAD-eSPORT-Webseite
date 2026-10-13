@@ -26,9 +26,8 @@ from pydantic import BaseModel
 
 from database import get_db
 from auth import get_current_user, require_area
-from models import now_utc
-from services import media_audit
-from services.image_variants import VARIANT_WIDTHS, variant_path
+from models import new_id, now_utc
+from services import account_erasure, media_audit
 from services.media_formats import PUBLIC_IMAGE_EXTS, PUBLIC_MEDIA_EXTS, PUBLIC_ORIGINAL_EXTS, PUBLIC_VIDEO_EXTS
 
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
@@ -371,25 +370,26 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
 async def admin_delete_media(filename: str, force: bool = False, me: dict = Depends(require_area("content"))):
     """Delete a file from upload dir. Path-traversal protected.
 
-    Eine verwendete Datei nur mit ``force`` (#1471): Die Mediathek fragt vorher nach; danach werden die Bildfelder
-    geleert, die auf sie zeigen."""
-    p = _media_file_path(filename)
+    Eine verwendete Datei nur mit ``force`` (#1471): Die Mediathek fragt vorher nach. Erst werden die Bildfelder
+    geleert, die auf sie zeigen, dann die Datei gelöscht - scheitert das, holt der Aufräum-Job es nach. Jede Löschung
+    steht im Protokoll."""
+    _media_file_path(filename)
     if not force:
         usage = (await _collect_media_usage({filename}))[filename]
         if usage:
             places = ", ".join(sorted({ref["place"] for ref in usage}))
             raise HTTPException(409, f"Die Datei wird noch verwendet ({places}). Zum Löschen bitte bestätigen.")
-    try:
-        p.unlink()
-        for width in VARIANT_WIDTHS:
-            variant_path(p, width).unlink(missing_ok=True)
-    except OSError:
-        raise HTTPException(500, "Löschen fehlgeschlagen.")
+    db = get_db()
     cleared_refs, text_refs = await _clear_media_references(filename)
-    meta = await get_db().media_uploads.delete_many({"filename": filename})
+    error = await account_erasure.remove_upload(db, filename)
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "media.delete", "actor_id": me.get("id"), "target_id": filename,
+        "data": {"filename": filename, "force": force, "cleared_references": cleared_refs,
+                 "text_references": text_refs, "file_pending": bool(error)},
+        "created_at": now_utc().isoformat(),
+    })
     return {
-        "ok": True, "cleared_references": cleared_refs, "text_references": text_refs,
-        "deleted_metadata": meta.deleted_count,
+        "ok": True, "cleared_references": cleared_refs, "text_references": text_refs, "file_pending": bool(error),
     }
 
 
