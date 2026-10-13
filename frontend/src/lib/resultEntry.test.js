@@ -17,6 +17,7 @@ import {
 
 const outcome = (result, { results, error }) => expect(result).toEqual(error ? { error } : { results });
 
+test.each(cases.kind)("Eingabe: $name", ({ entry, heatMode, kind }) => expect(inputKind(entry, heatMode)).toBe(kind));
 test.each(cases.score)("1 gegen 1: $name", ({ input, ...want }) => outcome(scoreResults(input), want));
 test.each(cases.bestof)("Best-of: $name", ({ input, ...want }) => outcome(bestOfResults(input), want));
 test.each(cases.winner)("Zeitduell: $name", ({ input, ...want }) => outcome(winnerResults(input), want));

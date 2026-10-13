@@ -46,7 +46,8 @@ async def apply_forfeit(db, match: dict, forfeiting_registration_id: str, *, not
         note=note,
         force=force,
         audit_action="match.forfeit",
-        reason=reason,
+        # Eine Wertung als Korrektur (#1035): ihre Pflicht-Begründung ist zugleich der Grund der Korrektur.
+        reason=reason or (note if force else None),
         hold_id=hold_id,
     )
     updated = outcome.get("match") or match

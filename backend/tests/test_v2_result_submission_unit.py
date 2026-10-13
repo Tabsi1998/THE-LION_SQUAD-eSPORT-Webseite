@@ -48,12 +48,18 @@ class _Inserts:
         if existing is None and upsert:
             self.docs.append(deepcopy(update.get("$setOnInsert") or {}))
 
+    async def find_one(self, query, _projection=None):
+        return next((deepcopy(doc) for doc in self.docs if all(doc.get(k) == v for k, v in query.items())), None)
+
 
 class _Db:
     def __init__(self, rows):
         self.matches_v2 = _Matches(rows)
         self.match_reports_v2 = _Inserts()
         self.audit_logs = _Inserts()
+        # Für das Best-of der Prüfung (#1035): Phase und Turnier ohne Angabe.
+        self.tournament_stages = _Inserts()
+        self.tournaments = _Inserts()
 
 
 def _source_match():

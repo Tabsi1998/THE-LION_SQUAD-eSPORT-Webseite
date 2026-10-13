@@ -1,5 +1,13 @@
 {
-  "_hinweis": "Ergebnis-Fenster (#1156, #1370): dieselben Fälle prüfen frontend/src/lib/resultEntry.test.js und mobile/src/lib/resultEntry.test.ts. Namen sind erfunden.",
+  "_hinweis": "Ergebnis-Fenster (#1156, #1370): dieselben Fälle prüfen frontend/src/lib/resultEntry.test.js und mobile/src/lib/resultEntry.test.ts - und der Server (backend/tests/test_result_contract_unit.py, #1035): was hier als results steht, nimmt er an. Namen sind erfunden.",
+  "kind": [
+    { "name": "Duell ohne Best-of: Stand", "entry": { "kind": "duel", "best_of": 1 }, "kind": "score" },
+    { "name": "Duell Best-of-3: Spiele antippen", "entry": { "kind": "duel", "best_of": 3 }, "kind": "bestof" },
+    { "name": "Zeitduell: Sieger antippen", "entry": { "kind": "duel", "best_of": 3, "ranking_mode": "time" }, "kind": "winner" },
+    { "name": "niedrigster Stand gewinnt: Stand, kein Best-of", "entry": { "kind": "duel", "best_of": 3, "ranking_mode": "lower_score" }, "kind": "score" },
+    { "name": "Durchgang: Reihenfolge", "entry": { "kind": "heat" }, "kind": "order" },
+    { "name": "Durchgang mit Punkten", "entry": { "kind": "heat" }, "heatMode": "points", "kind": "points" }
+  ],
   "score": [
     {
       "name": "höherer Stand gewinnt",

@@ -19,9 +19,9 @@ from services.match_attention import attention_items
 from services.match_disputes import category_label, open_dispute
 from services.match_notifications import results_summary
 from services.match_proofs import visible_proofs
-from services.match_timing import MISSING_AFTER_MINUTES, OPEN_STATUSES, RUNNING_STATUSES, as_int, filled_slots, registration_name, timing
-from services.match_v2_results import _advancement_result_rank, _ranking_mode
-from services.result_hold import has_result, hold_view
+from services.match_timing import MISSING_AFTER_MINUTES, OPEN_STATUSES, RUNNING_STATUSES, filled_slots, registration_name, timing
+from services.match_v2_results import _advancement_result_rank, _ranking_mode, has_result, resolve_best_of
+from services.result_hold import hold_view
 from services.round_labels import round_label, rounds_by_section, stage_kind
 from services.station_labels import attach_station_info
 from services.tournament_permissions import RESULT_STAFF_ROLES, is_global_tournament_staff
@@ -31,9 +31,8 @@ RECENT_LIMIT = 6
 
 
 def best_of(match: dict, stage: dict | None, tournament: dict | None) -> int:
-    value = match.get("best_of") or (match.get("settings") or {}).get("best_of") \
-        or ((stage or {}).get("settings") or {}).get("best_of") or (tournament or {}).get("best_of") or 1
-    return max(1, as_int(value, 1))
+    # Dieselbe Stelle wie die Prüfung des Ergebnisses (#1035): das Fenster zeigt, was der Server annimmt.
+    return resolve_best_of(match, stage, tournament)
 
 
 def into(label: str) -> str:

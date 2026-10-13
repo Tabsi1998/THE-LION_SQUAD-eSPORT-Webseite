@@ -7,7 +7,13 @@ import logging
 
 from models import now_utc
 from services.match_notifications import notify_match_result_confirmed
-from services.match_v2_results import build_v2_result_application, is_v2_result_replay, normalize_v2_results
+from services.match_v2_results import (
+    build_v2_result_application,
+    checked_results,
+    ensure_correction_allowed,
+    is_v2_result_replay,
+    normalize_v2_results,
+)
 from services.station_runtime import release_station_for_match
 from services.competition_usage import GRAPH, record_write
 
@@ -50,6 +56,7 @@ async def _upsert_result_audit(
     created_at: str,
     reason: str | None = None,
     hold_id: str | None = None,
+    history: dict | None = None,
 ) -> None:
     # Gegenstueck zur Messung im klassischen Pfad: hier laeuft die Graph-Engine.
     await record_write(GRAPH, audit_action, tournament_id=match.get("tournament_id"))
@@ -70,6 +77,8 @@ async def _upsert_result_audit(
                 # Korrektur mit Grund (#1156) und ob das Ergebnis erst nach „Rückgängig“ rausging.
                 **({"reason": reason} if reason else {}),
                 **({"held": True, "hold_id": hold_id} if hold_id else {}),
+                # Historie (#1035): welcher Eintrag ersetzt wurde und welche Folgespiele dabei zurückgesetzt wurden.
+                **(history or {}),
             },
             "created_at": created_at,
         }},
@@ -130,7 +139,10 @@ async def submit_v2_result(
     """Persist one v2 result while the caller owns the tournament write lease.
 
     ``reason``: warum die Turnierleitung ein fertiges Ergebnis korrigiert (#1156) - steht am Ergebnis und im Protokoll.
-    ``hold_id``: das Ergebnis lag 10 Sekunden für „Rückgängig“ bereit (services/result_hold) - unter dieser Kennung."""
+    ``hold_id``: das Ergebnis lag 10 Sekunden für „Rückgängig“ bereit (services/result_hold) - unter dieser Kennung.
+
+    Jeder Weg schreibt hier und prüft hier denselben Vertrag (services/match_v2_results): die Werte samt Best-of und,
+    hat das Spiel schon ein Ergebnis, Korrektur nur mit ``force`` und Grund."""
     if is_v2_result_replay(match, raw_results, proof_url=proof_url, note=note):
         meta = match.get("result_meta") or {}
         report_id = meta.get("report_id")
@@ -155,6 +167,8 @@ async def submit_v2_result(
             "idempotent_replay": True,
         }
 
+    ensure_correction_allowed(match, force=force, reason=reason)
+    await checked_results(db, match, raw_results)
     stage_matches = await db.matches_v2.find(
         {"stage_id": match["stage_id"]},
         {"_id": 0},
@@ -172,6 +186,12 @@ async def submit_v2_result(
         force=force,
     )
     advanced_match_ids = list(application["target_sets"].keys())
+    reset_matches = application.get("reset_matches") or []
+    previous_report_id = (match.get("result_meta") or {}).get("report_id")
+    history = {
+        **({"replaces_report_id": previous_report_id} if previous_report_id else {}),
+        **({"reset_matches": [row["id"] for row in reset_matches]} if reset_matches else {}),
+    }
     application["match_set"]["result_meta"].update({
         "report_id": report_id,
         "advanced_match_ids": advanced_match_ids,
@@ -189,12 +209,17 @@ async def submit_v2_result(
             "tournament_id": match["tournament_id"],
             "stage_id": match["stage_id"],
             "reporter_user_id": actor_id,
-            "source": "staff",
+            "source": "players" if audit_action == "match.result.auto_resolution" else "staff",
             "results": application["results"],
             "proof_url": (proof_url or "").strip() or None,
             "note": (note or "").strip() or None,
             "force": force,
             "created_at": now_iso,
+            # Historie (#1035): was vorher galt, warum es sich ändert und welche Folgespiele dabei zurückgesetzt wurden.
+            **({"reason": reason.strip()} if (reason or "").strip() else {}),
+            **({"replaces_report_id": previous_report_id} if previous_report_id else {}),
+            **({"previous_results": match.get("results")} if match.get("results") else {}),
+            **({"reset_matches": reset_matches} if reset_matches else {}),
         }},
         upsert=True,
     )
@@ -216,6 +241,7 @@ async def submit_v2_result(
         created_at=now_iso,
         reason=(reason or "").strip() or None,
         hold_id=hold_id,
+        history=history,
     )
     dispute_resolved = match.get("status") == "disputed"
     if dispute_resolved:
@@ -227,5 +253,6 @@ async def submit_v2_result(
         "match": updated,
         "advanced_match_ids": advanced_match_ids,
         "report_id": report_id,
+        "reset_match_ids": [row["id"] for row in reset_matches],
         "idempotent_replay": False,
     }
