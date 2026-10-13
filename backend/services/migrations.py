@@ -53,8 +53,9 @@ async def migrate_deleted_account_leftovers(db) -> str:
     # Konto, bei dem zufällig ``anonymized_at`` steht, bleibt unberührt (#1029).
     deleted = {"anonymized_at": {"$exists": True, "$ne": None}, "is_active": False, "display_name": "Gelöschter User",
                "email": {"$regex": r"^deleted_[^@]*@deleted\.(invalid|local)$"}}
-    async for user in db.users.find(deleted, {"_id": 0, "id": 1}):
-        result = await account_erasure.erase_related(db, user, now)
+    async for user in db.users.find(deleted, {"_id": 0, "id": 1, "anonymized_at": 1}):
+        # Die Frist der Nachweise (drei Jahre) zählt ab der damaligen Löschung.
+        result = await account_erasure.erase_related(db, user, now, erased_at=user["anonymized_at"])
         accounts += 1
         images += result["images"]
     return f"{accounts} deleted accounts cleaned, {images} images removed"

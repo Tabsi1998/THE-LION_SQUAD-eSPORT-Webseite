@@ -692,6 +692,11 @@ async def _safe_ops_retention():
         removed = await purge_old_logs(get_db())
         if any(removed.values()):
             logger.info(f"[scheduler] ops_retention removed={removed}")
+        # Nachweise gelöschter Konten (#1029): drei Jahre nach der Löschung endgültig weg.
+        from services.account_erasure import purge_expired_records
+        expired = await purge_expired_records(get_db())
+        if expired:
+            logger.info(f"[scheduler] erased_account_records removed={expired}")
         # Statistik je Server (#631): wer wann aktiv war, bleibt nur für die 30-Tage-Zahl.
         from services.discord_stats import purge_old as purge_discord_activity
         gone = await purge_discord_activity(get_db())

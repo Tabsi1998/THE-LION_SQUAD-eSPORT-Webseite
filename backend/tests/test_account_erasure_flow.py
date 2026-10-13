@@ -4,6 +4,7 @@ Vorstandsposten) bleibt und verliert nur die Verknüpfung."""
 import pathlib
 import re
 import sys
+from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio
@@ -15,6 +16,16 @@ from routes import dsgvo_routes  # noqa: E402
 from services import account_erasure, migrations, personal_data  # noqa: E402
 
 UPLOADS = "/api/static/uploads/"
+# Nachweise mit Frist nach der Löschung: (Sammlung, Zeile aus fill/fill_contract).
+RETAINED_ROWS = (("consent_records", "einwilligung-1"), ("consent_decisions", "einwilligung-akte"), ("moderation_strikes", "strike-1"),
+                 ("moderation_sanctions", "sanktion-1"), ("match_reports_v2", "meldung-match"), ("contact_messages", "kontakt-konto"))
+
+
+def _aware(value: datetime) -> datetime:
+    """mongomock liefert Zeitpunkte ohne Zeitzone zurück (wie MongoDB ohne ``tz_aware``) - als UTC lesen."""
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
 INTERNAL = re.compile(r"hash|secret|token$|^token|storage_key|poster_key|join_code|public_key|credential|member_key|user_handle", re.I)
 
 
@@ -131,6 +142,10 @@ async def fill_contract(flow, user: dict) -> None:
                                       "created_at": "2026-05-05T11:00:00+00:00"})
     await db.moderation_strikes.insert_one({"id": "strike-1", "user_id": uid, "kind": "chat", "moderator_id": "moderatorin", "note": "Beleidigung"})
     await db.moderation_sanctions.insert_one({"id": "sanktion-1", "user_id": uid, "action": "chat_block", "status": "active", "reason": "Beleidigung"})
+    # Nachweise, die nach der Löschung drei Jahre bleiben (Entscheidung zu #1029).
+    await db.consent_records.insert_one({"id": "einwilligung-1", "user_id": uid, "consent_type": "privacy", "granted": True})
+    await db.consent_decisions.insert_one({"id": "einwilligung-akte", "user_id": uid, "member_id": 7, "code": "foto", "decision": "given"})
+    await db.match_reports_v2.insert_one({"id": "meldung-match", "match_id": "m-1", "reporter_user_id": uid, "results": [], "note": "3:1"})
     await db.team_chat_messages.insert_one({"id": "teamchat-1", "team_id": "team-1", "user_id": uid, "message": "bin dabei"})
     await db.team_chat_messages.insert_one({"id": "teamchat-2", "team_id": "team-1", "user_id": "anderer", "message": "Otto schreibt"})
     # Direktnachrichten: die eigene mit Inhalt, die empfangene nur als Vorgang. Terminvorschlag ohne die Antwort der anderen Seite.
@@ -273,6 +288,12 @@ async def test_the_export_names_everything_and_deleting_leaves_no_personal_copy(
     assert deletion["data"] == {"personal_data_removed": True, "unlinked_contact_messages": 1}
     assert (await db.contact_messages.find_one({"id": "kontakt-fremd"}))["email"] == "gast@example.test"
     assert {row["id"] async for row in db.mail_jobs.find({}, {"_id": 0, "id": 1})} == {"mail-gast"}
+    # Frist (Entscheidung zu #1029): Nachweise gelöschter Konten laufen drei Jahre nach der Löschung ab.
+    erased_at = _aware(datetime.fromisoformat(deletion["created_at"])).replace(microsecond=0)
+    for name, row_id in RETAINED_ROWS:
+        row = await getattr(db, name).find_one({"id": row_id})
+        assert _aware(row["erase_after"]) == erased_at.replace(year=erased_at.year + 3), name
+    assert "erase_after" not in await db.contact_messages.find_one({"id": "kontakt-mail"}), "nicht zugeordnet, also ohne Frist"
     # Gespeicherte Namen: im News-Beitrag, im Protokoll der Erfolge und in den Daten des Adminprotokolls.
     assert (await db.news_posts.find_one({"id": "news-1"}))["author_name"] == "Gelöschter User"
     granted, granted_by = await db.achievement_events.find_one({"id": "erfolg-fuer"}), await db.achievement_events.find_one({"id": "erfolg-von"})
@@ -314,6 +335,7 @@ async def test_accounts_deleted_before_this_fix_are_cleaned_once(flow, folders):
     await fill(flow, paula, public, quarantine)
     await flow.db.user_xp.insert_one({"user_id": bleibt["id"], "total": 7, "level": 1, "prestige": 0})
     await flow.db.event_registrations.insert_one({"id": "ev-bleibt", "event_id": "ev-1", "user_id": bleibt["id"], "display_name": "bleibt", "status": "registered"})
+    await flow.db.consent_records.insert_one({"id": "einwilligung-bleibt", "user_id": bleibt["id"], "consent_type": "privacy", "granted": True})
     # So sah ein gelöschtes Konto vor dem Fix aus: überschrieben, aber mit allem drumherum.
     await flow.db.users.update_one({"id": paula["id"]}, {"$set": {
         "email": "deleted_x@deleted.invalid", "display_name": "Gelöschter User", "avatar_url": None, "anonymized_at": "2026-09-30T10:00:00+00:00",
@@ -331,7 +353,27 @@ async def test_accounts_deleted_before_this_fix_are_cleaned_once(flow, folders):
     # Wer sein Konto hat, behält alles.
     assert (await flow.db.user_xp.find_one({"user_id": bleibt["id"]}))["total"] == 7
     assert (await flow.db.event_registrations.find_one({"id": "ev-bleibt"}))["display_name"] == "bleibt"
+    assert "erase_after" not in await flow.db.consent_records.find_one({"id": "einwilligung-bleibt"})
+    # Die Frist zählt ab der damaligen Löschung, nicht ab dem Nachzug.
+    for name, row_id in RETAINED_ROWS:
+        row = await getattr(flow.db, name).find_one({"id": row_id})
+        assert _aware(row["erase_after"]) == datetime(2029, 9, 30, 10, 0, tzinfo=timezone.utc), name
     assert [row[0] for row in migrations.MIGRATIONS] == [1, 2, 3, 4, 5]
+
+
+@pytest.mark.asyncio
+async def test_records_of_deleted_accounts_expire_after_three_years(flow):
+    """Entscheidung zu #1029: der tägliche Aufräum-Job löscht Nachweise gelöschter Konten, deren Frist abgelaufen ist.
+    Zeilen aktiver Konten tragen keine Frist und bleiben."""
+    db = flow.db
+    now = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    for name in ("consent_records", "consent_decisions", "moderation_strikes", "moderation_sanctions", "match_reports_v2", "contact_messages"):
+        await getattr(db, name).insert_one({"id": f"{name}-alt", "user_id": "geloescht", "erase_after": datetime(2029, 12, 31, tzinfo=timezone.utc)})
+        await getattr(db, name).insert_one({"id": f"{name}-frisch", "user_id": "geloescht", "erase_after": datetime(2030, 1, 2, tzinfo=timezone.utc)})
+        await getattr(db, name).insert_one({"id": f"{name}-aktiv", "user_id": "aktiv"})
+    assert await account_erasure.purge_expired_records(db, now=now) == 6
+    for name in ("consent_records", "consent_decisions", "moderation_strikes", "moderation_sanctions", "match_reports_v2", "contact_messages"):
+        assert {row["id"] async for row in getattr(db, name).find({}, {"_id": 0, "id": 1})} == {f"{name}-frisch", f"{name}-aktiv"}, name
 
 
 @pytest.mark.asyncio
@@ -349,3 +391,25 @@ async def test_the_export_has_no_upper_limit_and_streams(flow, monkeypatch):
     export = response.json()
     assert [row["id"] for row in export["notifications"]] == [f"n-{index:05d}" for index in range(5001)], "vollständig und in Reihenfolge"
     assert [row["message"] for row in export["chat_messages"]] == ["0", "1", "2", "3", "4"]
+
+
+def test_the_daily_retention_job_runs_the_expiry(monkeypatch):
+    """Der Job ``ops_retention`` (täglich) ruft die Frist der Nachweise gelöschter Konten auf."""
+    import asyncio
+
+    import database
+    from services import auth_sessions, discord_stats, ops_alerts, scheduler
+
+    calls = []
+
+    async def counted(name, result):
+        calls.append(name)
+        return result
+
+    monkeypatch.setattr(database, "get_db", lambda: "db")
+    monkeypatch.setattr(ops_alerts, "purge_old_logs", lambda db: counted("logs", {}))
+    monkeypatch.setattr(discord_stats, "purge_old", lambda db: counted("discord", 0))
+    monkeypatch.setattr(auth_sessions, "purge_stale_app_sessions", lambda db: counted("sessions", 0))
+    monkeypatch.setattr(account_erasure, "purge_expired_records", lambda db: counted("erase_after", 2))
+    asyncio.run(scheduler._safe_ops_retention())
+    assert "erase_after" in calls

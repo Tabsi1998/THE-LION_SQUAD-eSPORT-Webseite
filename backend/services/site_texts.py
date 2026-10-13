@@ -356,7 +356,9 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                   "(sportliche Integrität und Zählung), Meldungen und Entscheidungen der Moderation, Kontaktanfragen, die du angemeldet "
                   "geschickt hast, als Vorgang ohne Name, Adresse, Betreff und Text, der Nachweis über einen übergebenen Gewinn und – wenn du Rechnungen hattest – die Belege "
                   "in der Vereinsbuchhaltung, weil das Steuerrecht sieben "
-                  "Jahre Aufbewahrung verlangt; der Auftrag auf der Website behält dann nur Betrag und Belegnummer. Die Löschung wirkt sofort und "
+                  "Jahre Aufbewahrung verlangt; der Auftrag auf der Website behält dann nur Betrag und Belegnummer. Nachweise über deine "
+                  "Einwilligungen, Verwarnungen und Sperren, deine Ergebnismeldungen und Kontaktanfragen löschen wir drei Jahre nach der "
+                  "Löschung des Kontos endgültig. Die Löschung wirkt sofort und "
                   "lässt sich nicht rückgängig machen."),
                 p("Was der Verein in seiner Mitgliederverwaltung über dich als Mitglied führt, berührt die Löschung des Kontos nicht – auch nicht "
                   "einen Eintrag im Mitgliederverzeichnis, der von dort kommt, und nicht deine Anwesenheit bei einer Generalversammlung. "

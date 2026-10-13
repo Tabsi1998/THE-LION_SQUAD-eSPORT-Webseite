@@ -32,6 +32,9 @@ class Entry(NamedTuple):
 
 TOKEN = "nur ein Prüfwert (Hash) für einen Link oder eine Anmeldung - für die Person ohne Aussage"
 MODERATION = "Nachweis der Moderation; die Kennung zeigt danach auf „Gelöschter User“"
+# Entscheidung zu #1029: diese Nachweise bleiben nach der Kontolöschung drei Jahre (``erase_after``), dann löscht sie der
+# tägliche Job (``account_erasure.purge_expired_records``). Zeilen aktiver Konten laufen nicht ab.
+THREE_YEARS = "drei Jahre nach der Kontolöschung endgültig gelöscht"
 SPORT = "sportliche Integrität: Ergebnisse und Tabellen bleiben, ohne Namen"
 
 PERSONAL: dict[str, Entry] = {
@@ -49,8 +52,8 @@ PERSONAL: dict[str, Entry] = {
     "access_links": Entry(OVERWRITTEN, ("access_links",)),
     "login_attempts": Entry(EXPIRES, note="Schutz vor dem Durchprobieren von Passwörtern; nach einer Stunde gelöscht"),
     "rate_limits": Entry(EXPIRES, note="Zähler gegen zu viele Anfragen; nach höchstens einem Tag gelöscht"),
-    "consent_records": Entry(KEPT, ("consent_records",), "Nachweis, wann welcher Fassung zugestimmt wurde"),
-    "consent_decisions": Entry(KEPT, ("consent_decisions",), "Nachweis einer Einwilligung gegenüber der Mitgliederverwaltung"),
+    "consent_records": Entry(KEPT, ("consent_records",), f"Nachweis, wann welcher Fassung zugestimmt wurde; {THREE_YEARS}"),
+    "consent_decisions": Entry(KEPT, ("consent_decisions",), f"Nachweis einer Einwilligung gegenüber der Mitgliederverwaltung; {THREE_YEARS}"),
     # Profil, Verknüpfungen, Geräte
     "user_socials": Entry(DELETED, ("social_accounts",)),
     "platform_links": Entry(DELETED, ("platform_links",)),
@@ -73,10 +76,11 @@ PERSONAL: dict[str, Entry] = {
     "chat_attachments": Entry(DELETED, ("chat_attachments",)),
     "user_reports": Entry(KEPT, ("moderation_reports",), MODERATION),
     "moderation_items": Entry(OVERWRITTEN, ("moderation_items",)),
-    "moderation_strikes": Entry(KEPT, ("moderation_strikes",), MODERATION),
-    "moderation_sanctions": Entry(KEPT, ("moderation_sanctions",), MODERATION),
+    "moderation_strikes": Entry(KEPT, ("moderation_strikes",), f"{MODERATION}; {THREE_YEARS}"),
+    "moderation_sanctions": Entry(KEPT, ("moderation_sanctions",), f"{MODERATION}; {THREE_YEARS}"),
     "contact_messages": Entry(OVERWRITTEN, ("contact_messages",),
-                              "nur angemeldet geschriebene; ohne Konto mit derselben Adresse nicht sicher zuzuordnen - gezählt"),
+                              f"nur angemeldet geschriebene, {THREE_YEARS}; ohne Konto mit derselben Adresse nicht sicher "
+                              "zuzuordnen - gezählt"),
     "email_logs": Entry(OVERWRITTEN, ("email_logs",)),
     "mail_jobs": Entry(DELETED, note="Warteschlange des Versands; was versandt wurde, steht unter email_logs"),
     # Erfolge, XP, Mitmachaktionen
@@ -128,7 +132,7 @@ PERSONAL: dict[str, Entry] = {
     "team_squads": Entry(KEPT, note="Aufstellung des Teams, nur Kennungen"),
     "tournament_registrations": Entry(OVERWRITTEN, ("tournament_registrations",)),
     "matches_v2": Entry(KEPT, ("competition_matches",), SPORT),
-    "match_reports_v2": Entry(KEPT, ("match_reports",), "Ergebnismeldung als Nachweis des Ergebnisses"),
+    "match_reports_v2": Entry(KEPT, ("match_reports",), f"Ergebnismeldung als Nachweis des Ergebnisses; {THREE_YEARS}"),
     "match_schedule_proposals": Entry(KEPT, ("schedule_proposals",), "Terminvereinbarung zum Match als Nachweis"),
     "match_commendations": Entry(KEPT, ("commendations_given",), "das GG gehört zum Match wie das Ergebnis"),
     "match_proof_photos": Entry(DELETED, ("match_proof_photos",)),

@@ -39,6 +39,8 @@ DYNAMIC = {
     "routes/station_routes.py:clear_station:db[collection_name]": MATCHES,
     "services/account_erasure.py:_clean:getattr(db, collection)": MEDIA,
     "services/account_erasure.py:erase_related:getattr(db, name)": "account_erasure.PURGED",
+    "services/account_erasure.py:_retention:getattr(db, name)": "account_erasure.RETAINED (Nachweise mit Frist)",
+    "services/account_erasure.py:purge_expired_records:getattr(db, name)": "account_erasure.RETAINED_COLLECTIONS",
     "services/achievement_counters.py:_stickers:ctx.db[name]": CHATS,
     "services/chat_attachments.py:delete_user_attachments:db[collection]": CHATS,
     "services/image_migrate.py:migrate_all:db[coll_name]": MEDIA,
@@ -178,6 +180,12 @@ def test_every_decision_is_known_and_explained_where_needed():
 def test_export_keys_are_unique():
     keys = [key for entry in personal_data.PERSONAL.values() for key in entry.export]
     assert len(keys) == len(set(keys))
+
+
+def test_records_with_a_deadline_say_so():
+    """Entscheidung zu #1029: was nach der Löschung drei Jahre bleibt, nennt die Frist auch in der Liste."""
+    for name in account_erasure.RETAINED_COLLECTIONS:
+        assert personal_data.THREE_YEARS in personal_data.PERSONAL[name].note, name
 
 
 def test_what_the_erasure_purges_is_registered_as_deleted():

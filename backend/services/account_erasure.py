@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 import pathlib
 import re
+from datetime import datetime, timezone
 
 from bson import ObjectId
 
@@ -47,6 +48,14 @@ PURGED = (
 # Angaben zur Person, die in den Daten des Adminprotokolls stehen können (#1029). Der Vorgang bleibt, die Angaben nicht.
 AUDIT_PERSONAL_KEYS = ("display_name", "username", "real_name", "first_name", "last_name", "nickname", "email", "phone", "address",
                        "birth_date")
+# Nachweise, die nach der Löschung bleiben, aber nicht ewig (Entscheidung zu #1029): Einwilligungen, Verwarnungen und
+# Sperren, Ergebnismeldungen und angemeldet geschriebene Kontaktanfragen. Die Löschung setzt ``erase_after`` auf drei
+# Jahre danach; der tägliche Job ``purge_expired_records`` löscht, was abgelaufen ist. Zeilen aktiver Konten tragen das
+# Feld nie und laufen nicht ab. (Sammlung, Feld mit der Konto-ID)
+RETENTION_YEARS = 3
+RETAINED = (("consent_records", "user_id"), ("consent_decisions", "user_id"), ("moderation_strikes", "user_id"),
+            ("moderation_sanctions", "user_id"), ("match_reports_v2", "reporter_user_id"))
+RETAINED_COLLECTIONS = tuple(name for name, _field in RETAINED) + ("contact_messages",)
 # Ein Antrag in diesen Zuständen läuft noch - ohne Konto ist er zurückgezogen (der Abgleich mit der
 # Mitgliederverwaltung fasst ihn dann nicht mehr an).
 OPEN_APPLICATIONS = ("pending", "submitting", "failed")
@@ -87,7 +96,32 @@ async def _registrations(db, user_id: str, now: str) -> None:
     )
 
 
-async def _records(db, user: dict, now: str) -> int:
+def erase_after(erased_at: str) -> datetime:
+    """Drei Jahre nach der Löschung - am 29. Februar gelöscht heißt: am 28. Februar abgelaufen."""
+    base = datetime.fromisoformat(str(erased_at))
+    base = (base if base.tzinfo else base.replace(tzinfo=timezone.utc)).replace(microsecond=0)
+    try:
+        return base.replace(year=base.year + RETENTION_YEARS)
+    except ValueError:
+        return base.replace(year=base.year + RETENTION_YEARS, day=28)
+
+
+async def _retention(db, user_id: str, until: datetime) -> None:
+    """Frist für die Nachweise dieses Kontos - eine schon gesetzte bleibt (der Nachzug verschiebt sie nicht)."""
+    for name, field in RETAINED:
+        await getattr(db, name).update_many({field: user_id, "erase_after": {"$exists": False}}, {"$set": {"erase_after": until}})
+
+
+async def purge_expired_records(db, now: datetime | None = None) -> int:
+    """Der tägliche Job: Nachweise gelöschter Konten, deren Frist abgelaufen ist, endgültig löschen."""
+    now = now or now_utc()
+    removed = 0
+    for name in RETAINED_COLLECTIONS:
+        removed += (await getattr(db, name).delete_many({"erase_after": {"$lte": now}})).deleted_count
+    return removed
+
+
+async def _records(db, user: dict, now: str, until: datetime) -> int:
     """Überschreibt Nachweise und Kopien; liefert die Zahl der Kontaktanfragen ohne Konto mit derselben Adresse."""
     user_id = user["id"]
     await db.f1_lap_times.update_many({"user_id": user_id}, {"$set": {"proof_url": None, "admin_note": None}})
@@ -106,7 +140,8 @@ async def _records(db, user: dict, now: str) -> int:
     # geschriebene: eine Anfrage ohne Konto lässt sich nicht sicher zuordnen, denn ob die Adresse damals schon zu diesem
     # Konto gehörte, hält niemand fest. Solche bleiben unberührt und werden gezählt (Protokoll der Löschung).
     await db.contact_messages.update_many({"user_id": user_id}, {"$set": {
-        "name": GONE, "email": None, "user_id": None, "subject": DELETED_TEXT, "message": DELETED_TEXT, "anonymized_at": now}})
+        "name": GONE, "email": None, "user_id": None, "subject": DELETED_TEXT, "message": DELETED_TEXT, "anonymized_at": now,
+        "erase_after": until}})
     unlinked = await db.contact_messages.count_documents({"user_id": None, "email": email}) if email else 0
     if email:
         # Was noch in der Warteschlange steht, geht nicht mehr raus; Versandtes steht überschrieben in email_logs.
@@ -274,15 +309,18 @@ async def retry_file_cleanups(db, limit: int = 200) -> int:
     return removed
 
 
-async def erase_related(db, user: dict, now: str) -> dict:
-    """Alles außerhalb des Kontos selbst. ``user`` ist der Stand **vor** dem Überschreiben (E-Mail, Avatar, Banner)."""
+async def erase_related(db, user: dict, now: str, erased_at: str | None = None) -> dict:
+    """Alles außerhalb des Kontos selbst. ``user`` ist der Stand **vor** dem Überschreiben (E-Mail, Avatar, Banner).
+    ``erased_at``: Zeitpunkt der Löschung, ab dem die Frist der Nachweise zählt (beim Nachzug die damalige Löschung)."""
     user_id = user["id"]
+    until = erase_after(erased_at or now)
     purged = 0
     for name in PURGED:
         purged += (await getattr(db, name).delete_many({"user_id": user_id})).deleted_count
     directory_images = await _directory(db, user_id, now)
     await _applications(db, user_id, now)
     await _registrations(db, user_id, now)
-    unlinked_contacts = await _records(db, user, now)
+    unlinked_contacts = await _records(db, user, now, until)
+    await _retention(db, user_id, until)
     images = await _own_images(db, user_id, [user.get("avatar_url"), user.get("banner_url"), *directory_images])
     return {"purged_rows": purged, "images": images, "unlinked_contact_messages": unlinked_contacts}
