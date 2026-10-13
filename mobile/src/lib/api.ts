@@ -4,6 +4,7 @@ import type { AuthResponse } from "../types";
 import { buildCacheKey, getStaleEntry, setCached } from "./cache";
 import { noteFresh, noteOffline } from "./network";
 import { deviceHeaders } from "./deviceIdentity";
+import { isSessionRejected, tokenExpiry } from "./session";
 
 type TokenSnapshot = {
   accessToken: string | null;
@@ -41,6 +42,28 @@ export function refreshSession(token?: string | null): Promise<AuthResponse> {
   return refreshPromise;
 }
 
+/** Läuft das Zugangs-Token gleich ab (#1519)? Nur bei lesbarem Ablauf - sonst entscheidet wie bisher der Server. */
+function accessTokenDue(token: string | null, marginSeconds = 30): boolean {
+  const exp = tokenExpiry(token);
+  return exp !== null && exp * 1000 <= Date.now() + marginSeconds * 1000;
+}
+
+/**
+ * Erneuern und ablegen (#1519) - für den Nachschlag nach einem 401 und das Erneuern vor dem Aufruf. Nur eine vom Server
+ * abgelehnte Erneuerung (401/403) beendet die Sitzung; Netzfehler, Zeitüberschreitung oder eine Störung des Servers
+ * lassen sie stehen, der nächste Aufruf versucht es wieder. Liefert das neue Zugangs-Token.
+ */
+async function renewAccess(refreshToken: string): Promise<string> {
+  try {
+    const session = await refreshSession(refreshToken);
+    await persistSession(session);
+    return session.access_token;
+  } catch (error) {
+    if (isSessionRejected(error)) await clearSession();
+    throw error;
+  }
+}
+
 export const api = axios.create({
   baseURL: API_URL,
   headers: { "Content-Type": "application/json" },
@@ -63,7 +86,23 @@ export function configureAuthBridge(bridge: {
 
 // ─── Request Interceptor: Auth-Token + Cache-Check ───────────────────────────
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  const { accessToken, userId } = readTokens();
+  let { accessToken, userId } = readTokens();
+  const { refreshToken } = readTokens();
+  // Abgelaufenes Zugangs-Token (#1519): erst erneuern, dann senden. Öffentliche Aufrufe (Dashboard, /auth/me) antworten
+  // sonst mit 200 als Gast statt mit 401 - die App hielt sich dann still für abgemeldet, obwohl die Sitzung noch galt.
+  if (accessToken && refreshToken && accessTokenDue(accessToken) && !config.url?.includes("/auth/mobile/")) {
+    try {
+      accessToken = await renewAccess(refreshToken);
+      userId = readTokens().userId;
+    } catch (error) {
+      // Abgelehnt: die Sitzung ist zu Ende, der Aufruf geht als Gast weiter. Sonst (Netz, Störung) mit dem alten Token -
+      // der Server entscheidet, der 401-Nachschlag versucht es dann noch einmal.
+      if (isSessionRejected(error)) {
+        accessToken = null;
+        userId = readTokens().userId;
+      }
+    }
+  }
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
@@ -100,22 +139,17 @@ api.interceptors.response.use(
     const isAuthCall = original?.url?.includes("/auth/mobile/");
 
     // ── 401: Token-Refresh ──────────────────────────────────────────────────
+    // Einmal erneuern und wiederholen. Endet die Sitzung, dann nur, weil der Server die Erneuerung ablehnt (#1519) - ein
+    // zweiter 401 nach erfolgreicher Erneuerung oder ein 401 beim Anmelden betrifft nur diesen Aufruf, nicht die Sitzung.
     if (error.response?.status === 401 && original && !original._retry && refreshToken && !isAuthCall) {
       original._retry = true;
       try {
-        const session = await refreshSession(refreshToken);
-        await persistSession(session);
-        original.headers.Authorization = `Bearer ${session.access_token}`;
+        const access = await renewAccess(refreshToken);
+        original.headers.Authorization = `Bearer ${access}`;
         return api(original);
       } catch {
-        await clearSession();
         return Promise.reject(error);
       }
-    }
-
-    if (error.response?.status === 401 && refreshToken) {
-      await clearSession();
-      return Promise.reject(error);
     }
 
     // ── Offline-Fallback: Netzwerkfehler oder Timeout ──────────────────────

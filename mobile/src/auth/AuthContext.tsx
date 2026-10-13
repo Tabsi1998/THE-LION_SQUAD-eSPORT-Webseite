@@ -2,6 +2,7 @@ import * as SecureStore from "expo-secure-store";
 import { clearRecentSearches } from "../lib/recentSearches";
 import { clearOfflineCard } from "../lib/memberCardOffline";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Alert } from "react-native";
 import { api, configureAuthBridge, refreshSession } from "../lib/api";
 import { clearAllCache } from "../lib/cache";
 import { signInWithPasskey } from "../lib/passkeys";
@@ -74,6 +75,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  // Die Tokens für den API-Client (#1519): sofort gültig, nicht erst nach dem nächsten Rendern. Sonst trug der Aufruf,
+  // der nach dem Erneuern wiederholt wird, noch das alte Token, fiel erneut mit 401 durch - und die App meldete ab.
+  const tokensRef = useRef<{ accessToken: string | null; refreshToken: string | null }>({ accessToken: null, refreshToken: null });
+  const applyTokens = useCallback((access: string | null, refresh: string | null) => {
+    tokensRef.current = { accessToken: access, refreshToken: refresh };
+    setAccessToken(access);
+    setRefreshToken(refresh);
+  }, []);
   const [rememberSession, setRememberSession] = useState(true);
   const rememberSessionRef = useRef(true);
   const activeUserIdRef = useRef<string | null>(null);
@@ -108,8 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     rememberActiveUser(session.user.id);
     setUser(session.user);
-    setAccessToken(session.access_token);
-    setRefreshToken(session.refresh_token);
+    applyTokens(session.access_token, session.refresh_token);
     setRememberSession(shouldRemember);
     rememberSessionRef.current = shouldRemember;
     if (shouldRemember) {
@@ -127,34 +135,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         SecureStore.setItemAsync(REMEMBER_KEY, "false"),
       ]);
     }
-  }, [rememberActiveUser]);
+  }, [applyTokens, rememberActiveUser]);
 
   const clearSession = useCallback(async () => {
     // Abgemeldet oder Sitzung abgelaufen (#918): zurück in den Gastmodus statt auf den Anmeldebildschirm.
     enterGuest();
     setPasskeyOffer(null);
-    setAccessToken(null);
-    setRefreshToken(null);
+    applyTokens(null, null);
     await Promise.all([
       SecureStore.deleteItemAsync(ACCESS_KEY),
       SecureStore.deleteItemAsync(REFRESH_KEY),
       SecureStore.deleteItemAsync(USER_KEY),
       forgetAccountData(),
     ]);
-  }, [enterGuest]);
+  }, [applyTokens, enterGuest]);
+
+  // Der Server hat die Sitzung beendet (#1519): abmelden und es sagen - einmal, auch wenn mehrere Aufrufe es merken.
+  const endSession = useCallback(async () => {
+    const hadSession = Boolean(tokensRef.current.refreshToken);
+    await clearSession();
+    if (hadSession) {
+      Alert.alert("Abgemeldet", "Deine Anmeldung ist abgelaufen oder wurde beendet. Bitte melde dich neu an.");
+    }
+  }, [clearSession]);
 
   useEffect(() => {
     configureAuthBridge({
-      readTokens: () => ({ accessToken, refreshToken, userId: user?.id || null }),
+      readTokens: () => ({ ...tokensRef.current, userId: activeUserIdRef.current }),
       persistSession,
-      clearSession,
+      clearSession: endSession,
     });
-  }, [accessToken, clearSession, persistSession, refreshToken, user?.id]);
+  }, [endSession, persistSession]);
 
   const refreshMe = useCallback(async () => {
-    const { data } = await api.get<User>("/auth/me");
-    setUser(data);
-  }, []);
+    const { data } = await api.get<User | null>("/auth/me");
+    if (data?.id) {
+      setUser(data);
+      return;
+    }
+    // Kein Konto zurück, obwohl eine Sitzung da ist (#1519): erneuern statt still zum Gast zu werden.
+    const token = tokensRef.current.refreshToken;
+    if (!token) return;
+    try {
+      await persistSession(await refreshSession(token));
+    } catch (error) {
+      if (isSessionRejected(error)) await endSession();
+      else throw error;
+    }
+  }, [endSession, persistSession]);
 
   useEffect(() => {
     let mounted = true;
@@ -165,13 +193,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let storedAccess: string | null = null;
       let storedRefresh: string | null = null;
       let storedUser: User | null = null;
+      let stored: Array<string | null>;
       try {
-        const [access, refresh, storedRemember, userJson] = await Promise.all([
+        stored = await Promise.all([
           SecureStore.getItemAsync(ACCESS_KEY),
           SecureStore.getItemAsync(REFRESH_KEY),
           SecureStore.getItemAsync(REMEMBER_KEY),
           SecureStore.getItemAsync(USER_KEY),
         ]);
+      } catch {
+        // Der sichere Speicher war nicht lesbar (#1519): nichts löschen - der nächste Start stellt die Sitzung wieder her.
+        if (mounted) {
+          enterGuest();
+          setLoading(false);
+        }
+        return;
+      }
+      try {
+        const [access, refresh, storedRemember, userJson] = stored;
         if (!mounted) return;
         storedAccess = access;
         storedRefresh = refresh;
@@ -194,17 +233,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        setAccessToken(storedAccess);
-        setRefreshToken(storedRefresh);
+        applyTokens(storedAccess, storedRefresh);
         if (storedAccess && !accessTokenExpired(storedAccess)) {
           try {
-            const { data } = await api.get<User>("/auth/me", { headers: { Authorization: `Bearer ${storedAccess}` } });
-            if (mounted) {
-              setUser(data);
-              rememberActiveUser(data.id);
-              await SecureStore.setItemAsync(USER_KEY, JSON.stringify(data));
+            const { data } = await api.get<User | null>("/auth/me", { headers: { Authorization: `Bearer ${storedAccess}` } });
+            // Ohne Konto (#1519) kennt der Server das Token nicht mehr: erneuern statt als angemeldet ohne Konto zu starten.
+            if (data?.id) {
+              if (mounted) {
+                setUser(data);
+                rememberActiveUser(data.id);
+                await SecureStore.setItemAsync(USER_KEY, JSON.stringify(data));
+              }
+              return;
             }
-            return;
           } catch (error) {
             if (isNetworkError(error)) throw error;
             // Vom Server abgelehnt oder gestört: einmal erneuern, das entscheidet.
@@ -215,8 +256,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (mounted) await persistSession(session, true);
       } catch (error) {
         if (!mounted) return;
-        if (isSessionRejected(error) || (!isNetworkError(error) && !storedUser)) {
-          await clearSession();
+        // Nur eine vom Server abgelehnte Sitzung endet (#1519) - mit Hinweis, wenn eine gespeichert war.
+        if (isSessionRejected(error)) {
+          await endSession();
           return;
         }
         // Offline oder Server gestört: angemeldet bleiben, mit dem gemerkten Konto - der nächste Aufruf erneuert.
@@ -224,6 +266,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(storedUser);
           rememberActiveUser(storedUser.id);
         } else {
+          // Ohne gemerktes Konto vorerst als Gast - die gespeicherte Sitzung bleibt für den nächsten Start.
+          applyTokens(null, null);
           enterGuest();
         }
       } finally {
@@ -234,7 +278,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [clearSession, enterGuest, persistSession, rememberActiveUser]);
+  }, [applyTokens, clearSession, endSession, enterGuest, persistSession, rememberActiveUser]);
 
   const offerPasskey = useCallback((session: AuthResponse & { passkey_ticket?: string | null }, deviceWithout = false) => {
     setPasskeyOffer(session.passkey_ticket ? { ticket: session.passkey_ticket, userId: session.user.id, deviceWithout } : null);

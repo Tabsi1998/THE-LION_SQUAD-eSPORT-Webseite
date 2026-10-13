@@ -1,6 +1,7 @@
 import React from "react";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import * as SecureStore from "expo-secure-store";
+import { Alert } from "react-native";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { isGuestUser } from "../live";
 
@@ -426,6 +427,107 @@ describe("Kontowechsel", () => {
 
     expect(mockUnregisterPushToken).not.toHaveBeenCalled();
     expect(result.current.user?.id).toBe("u-1");
+  });
+});
+
+// „Angemeldet bleiben“ hält (#1519): die Sitzung geht nur, wenn der Server sie wirklich beendet - und dann mit Hinweis.
+describe("Angemeldet bleiben hält (#1519)", () => {
+  type Bridge = {
+    readTokens: () => { accessToken: string | null; refreshToken: string | null; userId: string | null };
+    persistSession: (session: unknown) => Promise<void>;
+    clearSession: () => Promise<void>;
+  };
+  function bridge(): Bridge {
+    const calls = (jest.requireMock("../lib/api") as { configureAuthBridge: jest.Mock }).configureAuthBridge.mock.calls;
+    return calls[calls.length - 1][0] as Bridge;
+  }
+  async function signedIn() {
+    await SecureStore.setItemAsync(ACCESS_KEY, accessToken(3600));
+    await SecureStore.setItemAsync(REFRESH_KEY, "refresh-alt");
+    await SecureStore.setItemAsync(REMEMBER_KEY, "true");
+    await SecureStore.setItemAsync(USER_KEY, JSON.stringify(USER));
+    mockApi.get.mockResolvedValue({ data: USER });
+    return renderAuth();
+  }
+
+  test("nach dem Erneuern kennt der API-Client sofort die neuen Tokens - nicht erst nach dem nächsten Rendern", async () => {
+    await signedIn();
+    const current = bridge();
+    await current.persistSession({ user: USER, access_token: "access-2", refresh_token: "refresh-2" });
+    // Der wiederholte Aufruf liest die Tokens gleich danach: mit den alten fiele er erneut mit 401 durch.
+    expect(current.readTokens()).toEqual({ accessToken: "access-2", refreshToken: "refresh-2", userId: "u-1" });
+  });
+
+  test("/auth/me ohne Konto (Token abgelaufen oder vom Server nicht erkannt) macht nicht still zum Gast", async () => {
+    const { result } = await signedIn();
+    mockApi.get.mockResolvedValue({ data: null });
+    mockApi.post.mockResolvedValue({ data: { ...SESSION, user: { ...USER, display_name: "Neu" } } });
+
+    await act(async () => {
+      await result.current.refreshMe();
+    });
+
+    expect(mockApi.post).toHaveBeenCalledWith("/auth/mobile/refresh", { refresh_token: "refresh-alt" });
+    expect(result.current.user?.id).toBe("u-1");
+    expect(await SecureStore.getItemAsync(REFRESH_KEY)).toBe("refresh-neu");
+  });
+
+  test("lässt sich der sichere Speicher beim Kaltstart nicht lesen, bleibt die gespeicherte Sitzung erhalten", async () => {
+    await SecureStore.setItemAsync(ACCESS_KEY, accessToken(3600));
+    await SecureStore.setItemAsync(REFRESH_KEY, "refresh-alt");
+    await SecureStore.setItemAsync(REMEMBER_KEY, "true");
+    (SecureStore.getItemAsync as jest.Mock).mockRejectedValueOnce(new Error("Keystore nicht bereit"));
+
+    const { result } = await renderAuth();
+
+    expect(isGuestUser(result.current.user)).toBe(true);
+    expect(await SecureStore.getItemAsync(REFRESH_KEY)).toBe("refresh-alt");
+    expect(await SecureStore.getItemAsync(ACCESS_KEY)).not.toBeNull();
+  });
+
+  test("ein Serverfehler beim Start ohne gemerktes Konto löscht die Sitzung nicht", async () => {
+    await SecureStore.setItemAsync(ACCESS_KEY, accessToken(-60));
+    await SecureStore.setItemAsync(REFRESH_KEY, "refresh-alt");
+    await SecureStore.setItemAsync(REMEMBER_KEY, "true");
+    mockApi.post.mockRejectedValue(rejected(502));
+
+    await renderAuth();
+
+    expect(await SecureStore.getItemAsync(REFRESH_KEY)).toBe("refresh-alt");
+  });
+
+  test("beendet der Server die Sitzung, sagt die App das klar - einmal, auch bei mehreren Aufrufen", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    const { result } = await signedIn();
+
+    await act(async () => {
+      await Promise.all([bridge().clearSession(), bridge().clearSession()]);
+    });
+
+    expect(isGuestUser(result.current.user)).toBe(true);
+    expect(await SecureStore.getItemAsync(REFRESH_KEY)).toBeNull();
+    expect(alert).toHaveBeenCalledTimes(1);
+    expect(alert.mock.calls[0][0]).toBe("Abgemeldet");
+    alert.mockRestore();
+  });
+
+  test("ein abgelehnter Refresh beim Start zeigt den Hinweis, selbst abmelden nicht", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+    await SecureStore.setItemAsync(REFRESH_KEY, "refresh-ungueltig");
+    await SecureStore.setItemAsync(REMEMBER_KEY, "true");
+    mockApi.post.mockRejectedValueOnce(rejected(401));
+    const first = await renderAuth();
+    expect(alert).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    alert.mockClear();
+    const { result } = await signedIn();
+    mockApi.post.mockResolvedValue({ data: { ok: true } });
+    await act(async () => {
+      await result.current.logout();
+    });
+    expect(alert).not.toHaveBeenCalled();
+    alert.mockRestore();
   });
 });
 
