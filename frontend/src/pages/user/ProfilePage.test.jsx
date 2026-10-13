@@ -257,6 +257,16 @@ test("Passwort aendern schickt aktuelles und neues Passwort und meldet den Wechs
   expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Passwort geändert"));
 });
 
+test("Passwort aendern: zu kurz zeigt denselben Regeltext wie Server und uebrige Formulare (#1033)", async () => {
+  const user = userEvent.setup();
+  renderPage(["/profile?tab=security"]);
+  await screen.findByTestId("profile-password-panel");
+
+  await user.type(screen.getByTestId("profile-password-new"), "kurz");
+  expect(screen.getByText("Das Passwort braucht mindestens 10 Zeichen. Noch 6 Zeichen.")).toBeInTheDocument();
+  expect(screen.getByTestId("profile-password-submit")).toBeDisabled();
+});
+
 test("Socials: eine eingefuegte Adresse wird zum Nutzernamen mit Vorschau-Link", async () => {
   const user = userEvent.setup();
   renderPage(["/profile?tab=socials"]);
