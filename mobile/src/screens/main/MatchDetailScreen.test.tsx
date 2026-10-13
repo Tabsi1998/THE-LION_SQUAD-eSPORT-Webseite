@@ -1,6 +1,7 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { MatchDetailScreen } from "./MatchDetailScreen";
+import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
 // Matchseite der App. Ergebnis melden (#1132): wer selbst im Spiel steht und melden darf, bekommt das Meldeformular -
 // online melden die Spieler, die Gegenseite bestätigt mit „Ja, stimmt“. Ohne das Recht kein Formular; die
@@ -268,5 +269,19 @@ describe("Bestätigen mit einem Tipp (#1159)", () => {
     await render(<MatchDetailScreen navigation={navigation} route={route} />);
     await waitFor(() => expect(screen.getByTestId("match-report-lead-confirms")).toBeTruthy());
     expect(screen.queryByTestId("match-report-confirm")).toBeNull();
+  });
+});
+
+test("eine verspätete Antwort für das vorige Match wird verworfen (#1000)", async () => {
+  answer(PAGE);
+  await expectLateAnswerDiscarded({
+    mockGet,
+    renderFor: (id) => <MatchDetailScreen navigation={navigation} route={{ key: "m", name: "MatchDetail", params: { id } } as never} />,
+    newId: "m1",
+    oldPrefix: "/matches/alt",
+    latePath: "/matches/alt/page",
+    oldAnswer: (path) => (path.endsWith("/page") ? { ...PAGE, matchday_label: "Altes Viertelfinale", match: { ...PAGE.match, id: "alt", round_name: "Altes Viertelfinale" } } : []),
+    newText: "Halbfinale",
+    oldText: "Altes Viertelfinale",
   });
 });

@@ -28,7 +28,7 @@ test("erst laden, dann die Daten der Kennung", async () => {
     await pending.promise;
   });
   expect(result.current).toMatchObject({ data: { id: "a" }, loading: false, problem: null, stale: false });
-  expect(fetcher).toHaveBeenCalledWith("a");
+  expect(fetcher).toHaveBeenCalledWith("a", null);
 });
 
 test.each([404, 403, 500])("A → B mit %s: kein Inhalt von A als B", async (status) => {
@@ -123,4 +123,29 @@ test("nach dem Verlassen wird keine Antwort mehr angewendet", async () => {
     await slow.promise;
   });
   expect(result.current.data).toBeNull();
+});
+
+test("der Abruf bekommt den letzten Stand derselben Kennung - für Teile, die nicht kamen (#1000)", async () => {
+  const fetcher = jest.fn(async (id: string, previous: { id: string; round: number } | null) => ({ id, round: (previous?.round || 0) + 1 }));
+  const { result, rerender } = await renderHook(({ id }: { id: string }) => useKeyedLoad(id, fetcher), { initialProps: { id: "a" } });
+  await waitFor(() => expect(result.current.data).toEqual({ id: "a", round: 1 }));
+  await act(async () => {
+    await result.current.reload();
+  });
+  expect(result.current.data).toEqual({ id: "a", round: 2 });
+  expect(fetcher).toHaveBeenLastCalledWith("a", { id: "a", round: 1 });
+  // Eine andere Kennung bekommt nie den Stand der vorigen.
+  await rerender({ id: "b" });
+  await waitFor(() => expect(result.current.data).toEqual({ id: "b", round: 1 }));
+  expect(fetcher).toHaveBeenLastCalledWith("b", null);
+});
+
+test("mutate ändert nur den Stand der aktuellen Kennung", async () => {
+  const fetcher = jest.fn(async (id: string) => ({ id, name: "alt" }));
+  const { result } = await renderHook(() => useKeyedLoad("a", fetcher));
+  await waitFor(() => expect(result.current.data).toEqual({ id: "a", name: "alt" }));
+  await act(async () => {
+    result.current.mutate((current) => ({ ...current, name: "neu" }));
+  });
+  expect(result.current.data).toEqual({ id: "a", name: "neu" });
 });

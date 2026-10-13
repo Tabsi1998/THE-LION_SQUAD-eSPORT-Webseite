@@ -1,6 +1,7 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { TournamentDetailScreen } from "./TournamentDetailScreen";
+import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
 // Turnier nur mit Event-Anmeldung (#875): wer einzeln antritt und nicht beim Event angemeldet ist, bekommt statt
 // „Zum Turnier anmelden“ den Weg zum Event; angemeldet geht es normal weiter. Teams sehen, wie viele beim Event sein
@@ -185,4 +186,28 @@ test("zurück vom Event: die Seite lädt neu und zeigt die freie Anmeldung", asy
   handlers.focus();
   await waitFor(() => expect(screen.queryByTestId("tournament-event-first")).toBeNull());
   expect(screen.getByText("Zum Turnier anmelden")).toBeTruthy();
+});
+
+test("eine verspätete Antwort für das vorige Turnier wird verworfen (#1000)", async () => {
+  answer({ ...TOURNAMENT, event_gate: null });
+  await expectLateAnswerDiscarded({
+    mockGet,
+    renderFor: (id) => <TournamentDetailScreen navigation={navigation} route={{ key: "t", name: "TournamentDetail", params: { id } } as never} />,
+    newId: "cup",
+    oldPrefix: "/tournaments/alt",
+    oldAnswer: (path) => (path === "/tournaments/alt" ? { ...TOURNAMENT, event_gate: null, id: "t0", slug: "alt", title: "Altes Turnier" } : path.endsWith("/bracket") ? {} : []),
+    newText: "LAN-Cup",
+    oldText: "Altes Turnier",
+  });
+});
+
+test("Bracket oder Tabelle kommen nicht: das Turnier steht, die Seite sagt es (#1000)", async () => {
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...TOURNAMENT, event_gate: null } });
+    if (path.endsWith("/bracket") || path.endsWith("/standings")) return Promise.reject(Object.assign(new Error("Network Error"), { isAxiosError: true }));
+    return Promise.resolve({ data: [] });
+  });
+  await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("tournament-partial-load")).toBeTruthy());
+  expect(screen.getAllByText("LAN-Cup").length).toBeGreaterThan(0);
 });

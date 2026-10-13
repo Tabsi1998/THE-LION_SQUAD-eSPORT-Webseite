@@ -15,6 +15,7 @@ import { colors, radius } from "../../theme";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
 import { PhotoSubmitCard } from "../../components/PhotoSubmitCard";
+import { idSegment } from "../../lib/apiIds";
 import { useKeyedLoad } from "../../lib/useKeyedLoad";
 
 // Album (#236): Raster aus 400-px-Kacheln, drei je Zeile; Abschnitte wie im Web. Antippen
@@ -27,7 +28,7 @@ export function GalleryAlbumScreen({ navigation, route }: Props) {
   const { id } = route.params;
   const { width } = useWindowDimensions();
   // Laden je Kennung (#1000): ein anderes Album zeigt nie kurz das vorige, eine verspätete Antwort wird verworfen.
-  const fetchAlbum = useCallback(async (albumId: string) => (await api.get<GalleryAlbum>(`/gallery/${encodeURIComponent(albumId)}`)).data || null, []);
+  const fetchAlbum = useCallback(async (albumId: string) => (await api.get<GalleryAlbum>(`/gallery/${idSegment(albumId)}`)).data || null, []);
   const { data: album, loading, error, problem, stale, reload } = useKeyedLoad(id, fetchAlbum);
   const [refreshing, setRefreshing] = useState(false);
   const refresh = useCallback(async () => {

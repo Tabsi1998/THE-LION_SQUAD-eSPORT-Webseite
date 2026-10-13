@@ -4,6 +4,7 @@ import { LionArt, type LionArtKind } from "./LionArt";
 import axios from "axios";
 import { ActivityIndicator, Animated, StyleSheet, View } from "react-native";
 import { offlineLabel, useNetwork } from "../lib/network";
+import { InvalidIdError } from "../lib/apiIds";
 import { colors, radius } from "../theme";
 import { Button } from "./Button";
 import { useReduceMotion } from "./FadeIn";
@@ -69,6 +70,8 @@ export type LoadProblem = { kind: "offline" | "notFound" | "denied" | "error"; m
 
 /** Aus einem Fehler des API-Clients: kein Netz, nicht gefunden (404), nicht erlaubt (401/403) oder etwas anderes. */
 export function loadProblem(error: unknown): LoadProblem {
+  // Eine Kennung, die nicht in einen API-Pfad taugt (#1000), gibt es nicht - kein Abruf, sondern „nicht gefunden“.
+  if (error instanceof InvalidIdError) return { kind: "notFound", message: "" };
   if (axios.isAxiosError(error)) {
     const status = error.response?.status;
     const detail = error.response?.data?.detail;

@@ -3,6 +3,7 @@ import { NavigationContext } from "@react-navigation/native";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { ProfileScreen } from "./ProfileScreen";
 import { PublicProfileScreen, profileTabs } from "./PublicProfileScreen";
+import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
 // Ein Profil, ein Aufbau (#1149): eigenes und fremdes Profil haben dieselben Reiter in derselben Reihenfolge. Was nur dich
 // angeht, steht im Kasten „Nur für dich“ (Rechnungen, Gewinne, was noch fehlt); der Schalter „So sehen dich andere“
@@ -217,4 +218,16 @@ test("eigenes Profil: wirklich keine Teams heißt „Noch kein Team“ (#1001)",
   await fireEvent.press(screen.getByText("Teams"));
   await waitFor(() => expect(screen.getByText("Noch kein Team")).toBeTruthy());
   expect(screen.queryByTestId("profile-teams-error")).toBeNull();
+});
+
+test("eine verspätete Antwort für das vorige Profil wird verworfen (#1000)", async () => {
+  await expectLateAnswerDiscarded({
+    mockGet,
+    renderFor: (username) => <PublicProfileScreen navigation={navigation} route={{ key: "p", name: "PublicProfile", params: { username } } as never} />,
+    newId: "kiwikomet",
+    oldPrefix: "/users/public/alt",
+    oldAnswer: () => ({ id: "u-alt", username: "alt", display_name: "Altes Profil", stats: {}, teams: [], awards: [], references: { items: [] } }),
+    newText: "KiwiKomet",
+    oldText: "Altes Profil",
+  });
 });

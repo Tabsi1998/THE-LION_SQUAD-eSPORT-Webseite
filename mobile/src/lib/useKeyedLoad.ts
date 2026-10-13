@@ -21,18 +21,26 @@ export type KeyedLoad<T> = {
   stale: boolean;
   /** Nochmal laden (Nochmal versuchen, Ziehen zum Aktualisieren). */
   reload: () => Promise<void>;
+  /** Den Stand der aktuellen Kennung ändern (etwa nach einer Aktion) - ohne neuen Abruf. */
+  mutate: (update: (current: T) => T) => void;
 };
 
 type State<T> = { key: string; data: T | null; loading: boolean; error: unknown; failed: boolean };
 
 const fresh = <T,>(key: string): State<T> => ({ key, data: null, loading: true, error: null, failed: false });
 
-export function useKeyedLoad<T>(key: string, fetcher: (key: string) => Promise<T>): KeyedLoad<T> {
+/**
+ * `fetcher(key, previous)` lädt die Daten der Kennung. `previous` ist der letzte Stand derselben Kennung (sonst null) -
+ * damit behält ein Teil, der diesmal nicht kam, seinen Stand, statt still leer zu werden.
+ */
+export function useKeyedLoad<T>(key: string, fetcher: (key: string, previous: T | null) => Promise<T>): KeyedLoad<T> {
   const [state, setState] = useState<State<T>>(() => fresh<T>(key));
   const generation = useRef(0);
   const fetcherRef = useRef(fetcher);
+  const stateRef = useRef(state);
   useEffect(() => {
     fetcherRef.current = fetcher;
+    stateRef.current = state;
   });
 
   const reload = useCallback(async () => {
@@ -40,7 +48,8 @@ export function useKeyedLoad<T>(key: string, fetcher: (key: string) => Promise<T
     const mine = generation.current;
     setState((current) => (current.key === key ? { ...current, loading: true } : fresh<T>(key)));
     try {
-      const data = await fetcherRef.current(key);
+      const last = stateRef.current;
+      const data = await fetcherRef.current(key, last.key === key ? last.data : null);
       if (generation.current !== mine) return;
       setState({ key, data, loading: false, error: null, failed: false });
     } catch (error) {
@@ -52,6 +61,10 @@ export function useKeyedLoad<T>(key: string, fetcher: (key: string) => Promise<T
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  const mutate = useCallback((update: (current: T) => T) => {
+    setState((current) => (current.key === key && current.data !== null ? { ...current, data: update(current.data) } : current));
+  }, [key]);
 
   // Nach dem Verlassen gilt keine Antwort mehr.
   useEffect(() => () => {
@@ -67,5 +80,6 @@ export function useKeyedLoad<T>(key: string, fetcher: (key: string) => Promise<T
     problem: current.failed ? loadProblem(current.error) : null,
     stale: current.failed && current.data !== null,
     reload,
+    mutate,
   };
 }

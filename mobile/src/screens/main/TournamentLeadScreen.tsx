@@ -1,17 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { ErrorState, SkeletonList } from "../../components/ListState";
+import { ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Muted, Title } from "../../components/Text";
 import { ResultEntrySheet, ResultUndoBar, useResultUndo } from "../../components/results/ResultEntrySheet";
 import { DisputeCard } from "../../components/results/DisputeCard";
 import { api, errorMessage } from "../../lib/api";
+import { idSegment } from "../../lib/apiIds";
+import { useKeyedLoad } from "../../lib/useKeyedLoad";
 import { formatWhen } from "../../lib/format";
 import type { ResultEntry } from "../../lib/resultEntry";
 import { leadFilter, leadLine, leadNames, type LeadFilter } from "../../lib/tournamentLead";
@@ -51,9 +53,11 @@ type LeadView = {
 const LIVE = ["matches", "matches-v2", "tournaments", "stations"];
 
 export function TournamentLeadScreen({ route }: Props) {
-  const [view, setView] = useState<LeadView | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  // Laden je Turnier (#1000): eine verspätete Antwort (auch vom Live-Nachladen) wird verworfen, ein gescheitertes
+  // Nachladen lässt den letzten Stand gekennzeichnet stehen.
+  const fetchLead = useCallback(async (id: string) => (await api.get<LeadView>(`/tournaments/${idSegment(id)}/lead`)).data || null, []);
+  const { data: view, loading, error: loadError, problem, stale, reload: load } = useKeyedLoad(route.params.id, fetchLead);
+  const error = loadError ? errorMessage(loadError, "Diese Ansicht ist nur für die Turnierleitung dieses Turniers.") : "";
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<LeadFilter>("all");
   const [openId, setOpenId] = useState(route.params?.spiel || "");
@@ -64,21 +68,22 @@ export function TournamentLeadScreen({ route }: Props) {
   // Eigene Adresse je Fall (#1158, #1160): fall=ds-<spiel> hebt den Streitfall hervor.
   const fall = route.params?.fall || "";
 
-  const load = useCallback(async () => {
-    try {
-      const { data } = await api.get<LeadView>(`/tournaments/${encodeURIComponent(route.params.id)}/lead`);
-      setView(data || null);
-      setError("");
-    } catch (err) {
-      setError(errorMessage(err, "Diese Ansicht ist nur für die Turnierleitung dieses Turniers."));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [route.params.id]);
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   const isFocused = useIsFocused();
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  // Beim Wiederkommen frisch laden; das erste Öffnen lädt schon useKeyedLoad.
+  const focusedBefore = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (!focusedBefore.current) {
+      focusedBefore.current = true;
+      return;
+    }
+    void load();
+  }, [load]));
   useLiveRefresh(() => load(), LIVE, { enabled: isFocused, fallbackMs: 15000 });
   const undo = useResultUndo(() => { void load(); });
 
@@ -119,11 +124,11 @@ export function TournamentLeadScreen({ route }: Props) {
     }
   };
 
-  if (loading) {
+  if (!view && loading) {
     return <Screen><SkeletonList count={4} hasImage={false} /></Screen>;
   }
   if (!view) {
-    return <Screen><ErrorState title="Turnierleitung" detail={error || "Diese Ansicht ist nur für die Turnierleitung dieses Turniers."} /></Screen>;
+    return <Screen><ErrorState title="Turnierleitung" detail={error || "Diese Ansicht ist nur für die Turnierleitung dieses Turniers."} problem={problem} onRetry={() => { void load(); }} /></Screen>;
   }
 
   const counts = view.counts || {};
@@ -131,8 +136,10 @@ export function TournamentLeadScreen({ route }: Props) {
     <Screen padded={false}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} tintColor={colors.cyan} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={colors.cyan} />}
       >
+        {/* Nachladen gescheitert (#1000): die Liste ist ausdrücklich der letzte Stand. */}
+        {stale && problem ? <PartialLoadNotice problem={problem} onRetry={() => { void load(); }} testID="lead-stale" /> : null}
         <View style={styles.header}>
           <Muted style={styles.eyebrow}>Turnierleitung</Muted>
           <Title>{view.tournament?.title || "Turnier"}</Title>

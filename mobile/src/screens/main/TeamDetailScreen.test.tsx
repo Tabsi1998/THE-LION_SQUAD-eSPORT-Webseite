@@ -1,6 +1,7 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { TeamDetailScreen } from "./TeamDetailScreen";
+import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
 // Gast zuerst (#918): Team-Chat und Beitritt brauchen ein Konto - als Gast statt eines Fehlers gleich der Weg dorthin.
 
@@ -280,4 +281,46 @@ test("Logo und Banner vom Handy: nur Kapitän und Co-Kapitän sehen die Bildausw
   await waitFor(() => expect(screen.getByText(CREW.name)).toBeTruthy());
   expect(screen.queryByTestId("team-edit-open")).toBeNull();
   expect(screen.queryByTestId("team-logo-open")).toBeNull();
+});
+
+test("eine verspätete Antwort für das vorige Team wird verworfen (#1000)", async () => {
+  await expectLateAnswerDiscarded({
+    mockGet,
+    renderFor: (id) => <TeamDetailScreen navigation={navigation} route={{ key: "team", name: "TeamDetail", params: { id } } as never} />,
+    newId: "t1",
+    oldPrefix: "/teams/alt",
+    oldAnswer: (path) => (path.endsWith("/squads") ? [] : { ...TEAM, id: "alt", name: "Altes Team" }),
+    newText: "Lions",
+    oldText: "Altes Team",
+  });
+});
+
+test("Squads, Termine oder Level kommen nicht: die Seite sagt es, statt „keine Squads“ vorzutäuschen (#1000)", async () => {
+  const offline = () => Object.assign(new Error("Network Error"), { isAxiosError: true });
+  mockGet.mockImplementation((path: string) => (
+    /\/(squads|overview|level)$/.test(path) ? Promise.reject(offline()) : Promise.resolve({ data: TEAM })
+  ));
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-partial-load")).toBeTruthy());
+  expect(screen.getAllByText("Lions").length).toBeGreaterThan(0);
+  // Nochmal: jetzt kommt alles - der Hinweis geht.
+  mockGet.mockImplementation((path: string) => Promise.resolve({ data: path.endsWith("/squads") ? [] : path.endsWith("/overview") || path.endsWith("/level") ? null : TEAM }));
+  await fireEvent.press(screen.getByTestId("team-partial-load-retry"));
+  await waitFor(() => expect(screen.queryByTestId("team-partial-load")).toBeNull());
+});
+
+test("Squads beim Nachladen nicht da: die bisherigen bleiben stehen (#1000)", async () => {
+  const squad = { id: "s1", name: "Rocket Squad", member_ids: [], status: "active" };
+  mockGet.mockImplementation((path: string) => Promise.resolve({ data: path.endsWith("/squads") ? [squad] : path.endsWith("/overview") || path.endsWith("/level") ? null : TEAM }));
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getAllByText("Rocket Squad").length).toBeGreaterThan(0));
+  mockGet.mockImplementation((path: string) => (path.endsWith("/squads")
+    ? Promise.reject(Object.assign(new Error("boom"), { isAxiosError: true, response: { status: 500, data: {} } }))
+    : Promise.resolve({ data: path.endsWith("/overview") || path.endsWith("/level") ? null : TEAM })));
+  const [scroll] = screen.container.queryAll((node) => Boolean(node.props.refreshControl));
+  await act(async () => {
+    await scroll.props.refreshControl.props.onRefresh();
+  });
+  await waitFor(() => expect(screen.getByTestId("team-partial-load")).toBeTruthy());
+  expect(screen.getAllByText("Rocket Squad").length).toBeGreaterThan(0);
 });

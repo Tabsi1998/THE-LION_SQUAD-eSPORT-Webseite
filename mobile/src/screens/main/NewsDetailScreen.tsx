@@ -20,6 +20,7 @@ import { colors, radius } from "../../theme";
 import type { NewsPost } from "../../types";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
+import { idSegment } from "../../lib/apiIds";
 import { useKeyedLoad } from "../../lib/useKeyedLoad";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "NewsDetail">;
@@ -28,7 +29,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
   const readerId = user?.id && !isGuestUser(user) ? user.id : null;
   // Laden je Kennung (#1000): wechselt die Kennung, ist der alte Beitrag sofort weg, und eine verspätete Antwort für den
   // vorigen Beitrag überschreibt den neuen nicht. Was beim Laden schiefging (#1152), sagt `problem` - nie „nichts da“.
-  const fetchPost = useCallback(async (id: string) => (await api.get<NewsPost>(`/news/${id}`)).data || null, []);
+  const fetchPost = useCallback(async (id: string) => (await api.get<NewsPost>(`/news/${idSegment(id)}`)).data || null, []);
   const { data: post, loading, error, problem, stale, reload } = useKeyedLoad(route.params.id, fetchPost);
   // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
   const share = useMemo(() => (post ? () => { void sharePage({ kind: "news", id: String(post.slug || post.id), title: post.title }); } : null), [post]);
