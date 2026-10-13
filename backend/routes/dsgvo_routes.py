@@ -18,7 +18,7 @@ dsgvo_router = APIRouter(prefix="/api/dsgvo", tags=["dsgvo"])
 # Nie in die Auskunft: Prüfwerte, Schlüssel und Speicherorte - sie sagen über die Person nichts aus und wären außerhalb
 # des Systems ein Werkzeug.
 HIDDEN_KEYS = frozenset({"_id", "password_hash", "token_hash", "storage_key", "poster_key", "mfa_secret", "mfa_pending_secret",
-                         "mfa_recovery_code_hashes"})
+                         "mfa_recovery_code_hashes", "mfa_totp_last_counter"})
 # Seitenweise lesen statt einer Obergrenze: jede Liste kommt vollständig, sortiert nach dem Zeitpunkt des Anlegens (_id).
 EXPORT_PAGE = 500
 # Meldungen über die Person: Art und Stand - wer gemeldet hat und was er schrieb, bleibt bei ihm (Art. 15 Abs. 4).
@@ -300,7 +300,8 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
         },
         "$unset": {
             "google_id": "", "google_email": "", "mfa_secret": "", "mfa_pending_secret": "",
-            "mfa_pending_created_at": "", "mfa_recovery_code_hashes": "", "platform_verified": "",
+            "mfa_pending_created_at": "", "mfa_recovery_code_hashes": "", "mfa_totp_last_counter": "",
+            "platform_verified": "",
         },
     })
     for collection in (db.refresh_tokens, db.auth_sessions, db.email_verification_tokens,

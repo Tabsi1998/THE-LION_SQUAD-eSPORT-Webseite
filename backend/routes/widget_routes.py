@@ -114,7 +114,7 @@ async def widget_f1(slug_or_id: str, track_id: Optional[str] = None):
             best_per_user[t["user_id"]] = {**t, "effective_ms": eff}
     user_ids = list(best_per_user.keys())
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "email": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0}).to_list(500)}
+        {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "email": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0, "mfa_totp_last_counter": 0}).to_list(500)}
     entries = []
     for uid, tr in best_per_user.items():
         u = users.get(uid, {})

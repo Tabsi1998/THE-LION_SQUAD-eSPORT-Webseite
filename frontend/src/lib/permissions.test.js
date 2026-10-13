@@ -47,3 +47,20 @@ test("Bereiche außer Moderation zählen erst mit bestätigter Zwei-Faktor-Anmel
   expect(mfaSetupPath("/admin/f1")).toBe("/profile?tab=security&mfa=required&next=%2Fadmin%2Ff1");
   expect(mfaSetupPath()).toBe("/profile?tab=security&mfa=required");
 });
+
+// Derselbe Vertrag wie `require_area` im Server (#1479): enthält die Liste einen Bereich mit Zwei-Faktor, braucht es
+// die Bestätigung - auch wenn die Person aus der Liste nur Moderation hat.
+test("canUseArea wie require_area: Moderation in der Liste öffnet keinen Bereich mit Zwei-Faktor", () => {
+  const admin = { role: "club_admin", mfa_enabled: true, auth_mfa_verified: true };
+  const adminWithout = { ...admin, auth_mfa_verified: false };
+  const moderator = { role: "moderator" };
+  expect(canUseArea(adminWithout, "finance", "moderation")).toBe(false);
+  expect(canUseArea(adminWithout, ["moderation", "finance"])).toBe(false);
+  expect(canUseArea(moderator, "tournaments", "moderation")).toBe(false);
+  expect(canUseArea(adminWithout, "moderation")).toBe(true);
+  expect(canUseArea(moderator, "moderation")).toBe(true);
+  expect(canUseArea(admin, "finance", "moderation")).toBe(true);
+  expect(canUseArea({ role: "player", areas: ["finance"], mfa_enabled: true, auth_mfa_verified: true }, "finance", "content")).toBe(true);
+  expect(canUseArea({ role: "player" }, "moderation")).toBe(false);
+  expect(canUseArea(null, "moderation")).toBe(false);
+});
