@@ -5,6 +5,7 @@ Website und App tragen über ``POST /api/f1/challenges/{id}/times`` ein, Korrekt
 Strafsekunden zwischen 0 und einer Stunde (keine Gutschrift, keine NaN), Nachweis-Link nur mit http(s), Begründung
 bei Strafe oder ungültiger Runde, Vereins-Referenz nur wenn erlaubt, und die Versuchsgrenze auch dann, wenn eine
 Korrektur die Zeit in die offizielle Wertung verschiebt."""
+import asyncio
 import pathlib
 import sys
 
@@ -15,6 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from models import new_id  # noqa: E402
+from routes import f1_routes  # noqa: E402
 
 NOTE = "Track Limits in Kurve 4"
 
@@ -22,6 +24,8 @@ NOTE = "Track Limits in Kurve 4"
 @pytest_asyncio.fixture
 async def flow():
     instance, shutdown = make_flow()
+    # Wie database.py beim Start: eine Sperre je Ressource.
+    await instance.db.mutation_locks.create_index("resource", unique=True)
     try:
         yield instance
     finally:
@@ -58,6 +62,7 @@ BAD_VALUES = [
     pytest.param({"penalty_seconds": -5}, id="strafe-negativ"),
     pytest.param({"penalty_seconds": 3601, "admin_note": NOTE}, id="strafe-zu-gross"),
     pytest.param({"proof_url": "javascript:alert(1)"}, id="nachweis-ohne-http"),
+    pytest.param({"proof_url": "http://[::1"}, id="nachweis-kaputte-adresse"),
 ]
 
 
@@ -158,3 +163,76 @@ async def test_correcting_needs_the_same_fast_lap_rights_as_entering(flow):
     assert (await enter(flow, challenge_id, track_id, driver)).status_code == 403
     assert (await correct(flow, lap["id"], time_ms=1000)).status_code == 403
     assert (await stored(flow, lap["id"]))["time_ms"] == 81234
+
+
+def meet_after_the_check(monkeypatch, parties: int = 2, timeout: float = 0.3):
+    """Die ersten ``parties`` Prüfungen warten nach dem Zählen der Versuche aufeinander - erst dann schreibt eine.
+    Wer unter einer Sperre prüft und schreibt, wartet hier höchstens ``timeout`` und kommt dann einzeln durch."""
+    barrier = asyncio.Barrier(parties)
+    original = f1_routes.check_lap_time
+    state = {"gated": 0}
+
+    async def gated(*args, **kwargs):
+        result = await original(*args, **kwargs)
+        if state["gated"] < parties:
+            state["gated"] += 1
+            try:
+                await asyncio.wait_for(barrier.wait(), timeout)
+            except (asyncio.TimeoutError, asyncio.BrokenBarrierError):
+                pass
+        return result
+
+    monkeypatch.setattr(f1_routes, "check_lap_time", gated)
+
+
+@pytest.mark.asyncio
+async def test_two_entries_at_the_same_moment_do_not_pass_the_attempt_limit(flow, monkeypatch):
+    challenge_id, track_id, driver = await setup_challenge(flow, unlimited_attempts=False, max_attempts=1)
+    meet_after_the_check(monkeypatch)
+
+    first, second = await asyncio.gather(
+        enter(flow, challenge_id, track_id, driver, time_ms=81000),
+        enter(flow, challenge_id, track_id, driver, time_ms=80000),
+    )
+
+    assert sorted([first.status_code, second.status_code]) == [200, 400]
+    assert await flow.db.f1_lap_times.count_documents({"challenge_id": challenge_id}) == 1
+    assert await flow.db.mutation_locks.count_documents({}) == 0, "die Sperre bleibt nicht liegen"
+
+
+@pytest.mark.asyncio
+async def test_a_correction_into_the_official_ranking_and_a_new_entry_at_once_keep_the_limit(flow, monkeypatch):
+    challenge_id, track_id, driver = await setup_challenge(flow, unlimited_attempts=False, max_attempts=1)
+    reference = await enter(flow, challenge_id, track_id, driver, score_scope="club_reference")
+    assert reference.status_code == 200, reference.text
+    meet_after_the_check(monkeypatch)
+
+    moved, entered = await asyncio.gather(
+        correct(flow, reference.json()["id"], score_scope="official"),
+        enter(flow, challenge_id, track_id, driver, time_ms=80000),
+    )
+
+    assert sorted([moved.status_code, entered.status_code]) == [200, 400]
+    official = await flow.db.f1_lap_times.count_documents({"challenge_id": challenge_id, "score_scope": "official"})
+    assert official == 1
+
+
+@pytest.mark.asyncio
+async def test_old_proof_links_without_http_are_not_handed_out(flow):
+    challenge_id, track_id, driver = await setup_challenge(flow)
+    lap = (await enter(flow, challenge_id, track_id, driver, proof_url="https://example.test/clip")).json()
+    old_id = new_id()
+    await flow.db.f1_lap_times.insert_one({"id": old_id, "challenge_id": challenge_id, "track_id": track_id, "user_id": driver["id"],
+                                           "time_ms": 90000, "penalty_seconds": 0, "is_invalid": False, "score_scope": "club_reference",
+                                           "proof_url": "javascript:alert(1)", "created_at": "2026-01-01T00:00:00+00:00"})
+
+    listed = await flow.get(f"/api/f1/challenges/{challenge_id}/times?track_id={track_id}")
+    assert listed.status_code == 200, listed.text
+    links = {row["id"]: row["proof_url"] for row in listed.json()}
+    assert links == {lap["id"]: "https://example.test/clip", old_id: None}
+
+    # Eine Korrektur des alten Eintrags muss den Link mit richten; die Antwort trägt nur noch sichere Links.
+    assert (await correct(flow, old_id, time_ms=89000)).status_code == 400
+    fixed = await correct(flow, old_id, time_ms=89000, proof_url=None)
+    assert fixed.status_code == 200, fixed.text
+    assert fixed.json()["proof_url"] is None
