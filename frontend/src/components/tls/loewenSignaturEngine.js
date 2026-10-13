@@ -87,8 +87,20 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
   const orbit = Array.from({ length: 220 }, () => ({ a: rnd(0, TAU), r: rnd(0.33, 0.52), w: rnd(0.12, 0.42), s: rnd(0.8, 2.2), p: rnd(0, TAU) }));
   const dust = Array.from({ length: 60 }, () => ({ a: rnd(0, TAU), r: rnd(0.9, 2.6), v: rnd(0.02, 0.08), s: rnd(0.5, 1.6), p: rnd(0, TAU) }));
   const clouds = Array.from({ length: 9 }, (_, i) => ({ a: (i / 9) * TAU + rnd(-0.3, 0.3), r: rnd(1.6, 2.6), s: rnd(1.1, 1.9), v: rnd(0.02, 0.05) }));
+  // Was dauerhaft gezeichnet wird (Staub, Goldwirbel, Wolken, Rauch, Strahlen), zählt zur Obergrenze: Zusammen mit
+  // Funken, Flammen, Blitzen und Wellen bleiben es höchstens MAX_PARTICLES. Der Goldwirbel nimmt höchstens 140, der
+  // Rest bleibt für Funkeln und Goldströme.
+  const ambient = {
+    dust: fx === "spark" && on("dust") ? Math.round(8 + 40 * Math.min(1, k * 1.5)) : 0,
+    orbit: fx === "gold" && on("orbit") ? Math.min(orbit.length, Math.round(30 + 110 * k)) : 0,
+    clouds: fx === "storm" && on("clouds") ? clouds.length : 0,
+    smoke: fx === "lava" && on("smoke") ? Math.round(2 + 6 * k) : 0,
+    rays: fx === "sun" && on("rays") ? 18 + Math.round(18 * k) : 0,
+  };
+  const reserved = Object.values(ambient).reduce((sum, n) => sum + n, 0);
+  const room = () => reserved + parts.length + bolts.length + waves.length < MAX_PARTICLES;
+  let drawn = 0;
 
-  const room = () => parts.length < MAX_PARTICLES;
   const at = (u, v) => ({ x: g.fx + u * g.F, y: g.fy + v * g.F });
   const edgePoint = (list = edge) => {
     const [u, v] = pick(list);
@@ -129,6 +141,7 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
   }
   // Knistern: kurze Entladung von der Kante nach außen.
   function crackle() {
+    if (!room()) return;
     const p = edgePoint();
     const ang = Math.atan2(p.y - g.ay, p.x - g.ax) + rnd(-0.6, 0.6);
     const pts = [[p.x, p.y]];
@@ -143,6 +156,7 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
   }
   // Blitz: vom oberen Rand der Leinwand in die Oberkante des Rahmens, mit Verästelungen.
   function lightning(strong) {
+    if (!room()) return;
     const end = edgePoint(upper.length ? upper : edge);
     const sx = end.x + rnd(-80, 80) * g.sc;
     const pts = [[sx, 0]];
@@ -152,7 +166,7 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
       pts.push([sx + (end.x - sx) * t + (i < segs ? rnd(-22, 22) * (1 - t * 0.4) * g.sc : 0), end.y * t]);
     }
     bolts.push({ pts, life: strong ? 0.38 : 0.26, max: strong ? 0.38 : 0.26, w: strong ? 3.6 : 2.4 });
-    for (let b = 0; b < (strong ? 3 : 1); b++) {
+    for (let b = 0; b < (strong ? 3 : 1) && room(); b++) {
       const i0 = 3 + ((Math.random() * 8) | 0);
       const branch = [pts[i0]];
       let [x, y] = pts[i0];
@@ -181,12 +195,12 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
   function drawBack(a, dt, t) {
     if (fx === "spark" && on("dust")) {
       a.globalCompositeOperation = "lighter";
-      const nd = Math.round(8 + 40 * Math.min(1, k * 1.5));
-      for (let i = 0; i < nd; i++) {
+      for (let i = 0; i < ambient.dust; i++) {
         const d = dust[i];
         d.a += d.v * dt;
         const x = g.ax + Math.cos(d.a) * d.r * g.P;
         const y = g.ay + Math.sin(d.a) * d.r * g.P * 0.8 - Math.sin(t * 0.3 + d.p) * 10 * g.sc;
+        drawn++;
         a.fillStyle = `rgba(220,228,236,${0.12 + 0.14 * Math.sin(t + d.p) ** 2})`;
         a.beginPath();
         a.arc(x, y, d.s * g.sc, 0, TAU);
@@ -203,12 +217,13 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
     }
     if (fx === "storm" && on("clouds")) {
       const cl = Math.min(1, (k - 0.5) * 2.2);
-      for (const c of clouds) {
+      for (const c of clouds.slice(0, ambient.clouds)) {
         c.a += c.v * dt;
         const x = g.ax + Math.cos(c.a) * c.r * g.P;
         const y = g.ay + Math.sin(c.a) * c.r * g.P * 0.6 - g.P * 0.3;
         const rad = c.s * g.P;
         const lit = flash * 1.4;
+        drawn++;
         const gr = a.createRadialGradient(x, y, 0, x, y, rad);
         gr.addColorStop(0, `rgba(${(30 + lit * 120) | 0},${(55 + lit * 150) | 0},${(70 + lit * 160) | 0},${0.38 * cl})`);
         gr.addColorStop(1, "rgba(10,20,26,0)");
@@ -219,13 +234,13 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
       }
     }
     if (fx === "lava") {
-      const n = Math.round(2 + 6 * k);
-      for (let i = 0; i < n; i++) {
+      for (let i = 0; i < ambient.smoke; i++) {
         const c = clouds[i];
         c.a += c.v * dt * 0.6;
         const x = g.ax + Math.cos(c.a) * c.r * g.P * 0.8;
         const y = g.ay - g.P * 1.1 - ((t * 12 + i * 37) % 80) * g.sc;
         const rad = c.s * g.P * 0.6;
+        drawn++;
         const gr = a.createRadialGradient(x, y, 0, x, y, rad);
         gr.addColorStop(0, `rgba(40,36,34,${0.25 + 0.2 * k})`);
         gr.addColorStop(1, "rgba(20,18,16,0)");
@@ -246,10 +261,11 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
     }
     if (fx === "sun" && on("rays")) {
       a.globalCompositeOperation = "lighter";
-      const nr = 18 + Math.round(18 * k);
+      const nr = ambient.rays;
       const len = g.F * (0.55 + 0.35 * k);
       for (let i = 0; i < nr; i++) {
         const ang = (i / nr) * TAU + t * 0.08;
+        drawn++;
         const x2 = g.ax + Math.cos(ang) * len;
         const y2 = g.ay + Math.sin(ang) * len;
         const gr = a.createLinearGradient(g.ax, g.ay, x2, y2);
@@ -343,7 +359,7 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
           }
         }
         if (on("stream")) {
-          for (let i = 0; i < 3; i++) {
+          for (let n = count(120, dt); n > 0; n--) {
             const p = at(0.5 + rnd(-0.04, 0.04), 0.1);
             emitMote(p.x, p.y, rnd(-12, 12), rnd(-90, -50), rnd(0.8, 1.5), "gold");
           }
@@ -365,7 +381,7 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
         if (timers.wave <= 0) {
           timers.wave = 2.6 - 1.9 * k;
           const m = at(0.5, 0.27);
-          waves.push({ t: 0, d: 1.1, x: m.x, y: m.y, r0: 6 * g.sc, grow: g.F * (on("quake") ? 1.05 : 0.9), col: "255,215,90", w: on("quake") ? 12 : 10 });
+          if (room()) waves.push({ t: 0, d: 1.1, x: m.x, y: m.y, r0: 6 * g.sc, grow: g.F * (on("quake") ? 1.05 : 0.9), col: "255,215,90", w: on("quake") ? 12 : 10 });
         }
         break;
       case "feather":
@@ -429,11 +445,11 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
     f.clip("evenodd");
     f.globalCompositeOperation = "lighter";
     if (fx === "gold" && on("orbit")) {
-      const n = Math.round(30 + 190 * k);
-      for (let i = 0; i < n; i++) {
+      for (let i = 0; i < ambient.orbit; i++) {
         const o = orbit[i];
         o.a += o.w * dt * (1 + k);
         const rr = o.r + 0.02 * Math.sin(t * 1.3 + o.p);
+        drawn++;
         const x = g.ax + Math.cos(o.a) * rr * g.F * 0.98;
         const y = g.ay + Math.sin(o.a) * rr * g.F * 0.98;
         f.strokeStyle = `rgba(255,${(205 + 40 * Math.sin(o.p)) | 0},90,${0.3 + 0.5 * Math.sin(t * 2 + o.p) ** 2})`;
@@ -445,6 +461,7 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
       }
     }
     parts = parts.filter((p) => (p.life -= dt) > 0);
+    drawn += parts.length;
     for (const p of parts) {
       const q = p.life / p.max;
       if (p.t === "flame") {
@@ -546,6 +563,7 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
     }
     bolts = bolts.filter((b) => (b.life -= dt) > 0);
     f.lineJoin = "round";
+    drawn += bolts.length;
     for (const b of bolts) {
       const q = b.life / b.max;
       for (const [lw, col] of [[b.w * 5, `rgba(41,182,232,${0.25 * q})`], [b.w * 2, `rgba(140,225,255,${0.7 * q})`], [b.w * 0.7, `rgba(255,255,255,${q})`]]) {
@@ -558,6 +576,7 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
     }
     // Schallwellen gehen vom Maul nach oben und außen - weg vom Gesicht.
     waves = waves.filter((wave) => (wave.t += dt) < wave.d);
+    drawn += waves.length;
     for (const wave of waves) {
       const q = wave.t / wave.d;
       f.strokeStyle = `rgba(${wave.col},${((1 - q) * 0.85).toFixed(2)})`;
@@ -581,6 +600,7 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
     const dt = last ? Math.min(0.05, Math.max(0, (now - last) / 1000)) : 0.016;
     last = now;
     const t = now / 1000;
+    drawn = 0;
     if (bctx) {
       bctx.clearRect(0, 0, w, h);
       drawBack(bctx, dt, t);
@@ -609,6 +629,10 @@ export function createSignatureEngine({ back, front, fx, k, edge, layout, dpr = 
     },
     get particles() {
       return parts.length;
+    },
+    /** Wie viele Teile das letzte Bild gezeichnet hat - Partikel, Staub, Wirbel, Wolken, Rauch, Strahlen, Blitze, Wellen. */
+    get drawn() {
+      return drawn;
     },
     get layers() {
       return [...layers];

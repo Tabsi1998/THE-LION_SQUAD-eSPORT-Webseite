@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import RING from "@/lib/loewenRangRing.json";
 import { frameLayout } from "@/lib/loewenRang";
-import { MAX_PARTICLES } from "@/lib/loewenSignatur";
+import { MAX_PARTICLES, SIGNATURE_FX } from "@/lib/loewenSignatur";
 import { levelFrameConfig } from "./LevelAvatarFrame";
 import LoewenRangSignature, { SIGNATURE_BOX } from "./LoewenRangSignature";
 import { createSignatureEngine, fallbackEdge, signatureGeometry } from "./loewenSignaturEngine";
@@ -118,6 +118,61 @@ test("Obergrenze: auch volles Sturmfeuer bleibt unter MAX_PARTICLES", () => {
   }
   expect(max).toBeGreaterThan(50);
   expect(max).toBeLessThanOrEqual(MAX_PARTICLES);
+});
+
+function engineFor(level, fx, k) {
+  const cfg = levelFrameConfig(level);
+  return createSignatureEngine({
+    back: fakeCanvas(), front: fakeCanvas(), fx, k, edge: fallbackEdge(cfg.ring),
+    layout: (width) => signatureGeometry({ width, box: SIGNATURE_BOX, fit: cfg.fit, scale: cfg.scale, ox: cfg.ox, oy: cfg.oy }),
+  });
+}
+
+test("Obergrenze Goldmähne: Goldwirbel, Funkeln und Goldströme zusammen höchstens MAX_PARTICLES", () => {
+  const engine = engineFor(29, "gold", 1);
+  let max = 0;
+  // 60 Bilder je Sekunde, 8 Sekunden: die Goldströme laufen voll
+  for (let i = 1; i <= 480; i++) {
+    engine.frame(i * 16);
+    max = Math.max(max, engine.drawn);
+  }
+  expect(max).toBeGreaterThan(150);
+  expect(max).toBeLessThanOrEqual(MAX_PARTICLES);
+});
+
+test("Obergrenze für alle Ränge: alles Gezeichnete zusammen bleibt unter MAX_PARTICLES", () => {
+  for (const fx of SIGNATURE_FX) {
+    for (const step of [16, 50]) {
+      const engine = engineFor(60, fx, 1);
+      let max = 0;
+      for (let i = 1; i <= 300; i++) {
+        engine.frame(i * step);
+        max = Math.max(max, engine.drawn);
+      }
+      expect(max, `${fx} bei ${step} ms je Bild`).toBeLessThanOrEqual(MAX_PARTICLES);
+      expect(max, `${fx} zeichnet etwas`).toBeGreaterThan(0);
+    }
+  }
+});
+
+test("außerhalb des Bildes: keine Schleife, bis der Beobachter „im Bild“ meldet", async () => {
+  const observers = [];
+  vi.stubGlobal("IntersectionObserver", class {
+    constructor(callback) { this.callback = callback; observers.push(this); }
+    observe() {}
+    disconnect() {}
+  });
+  const raf = vi.fn(() => 7);
+  const cancel = vi.fn();
+  vi.stubGlobal("requestAnimationFrame", raf);
+  vi.stubGlobal("cancelAnimationFrame", cancel);
+  render(<LoewenRangSignature {...props(58)} />);
+  await waitFor(() => expect(observers).toHaveLength(1));
+  expect(raf).not.toHaveBeenCalled();
+  act(() => observers[0].callback([{ isIntersecting: true }]));
+  expect(raf).toHaveBeenCalledTimes(1);
+  act(() => observers[0].callback([{ isIntersecting: false }]));
+  expect(cancel).toHaveBeenCalledWith(7);
 });
 
 test("Stärke 0: die Signatur zeichnet nichts", () => {

@@ -74,7 +74,9 @@ export default function LoewenRangSignature({ level, fit, scale, ox, oy, ring })
       layout: (width) => signatureGeometry({ width, box: SIGNATURE_BOX, fit, scale, ox, oy }),
     });
     let raf = 0;
-    let inView = true;
+    // Mit Beobachter erst laufen, wenn er „im Bild“ meldet - ein Kopf außerhalb des Bildes animiert nie, auch nicht kurz.
+    const canObserve = typeof IntersectionObserver === "function";
+    let inView = !canObserve;
     const tick = (now) => {
       raf = 0;
       if (document.hidden || !inView) return;
@@ -94,9 +96,9 @@ export default function LoewenRangSignature({ level, fit, scale, ox, oy, ring })
     document.addEventListener("visibilitychange", onVisibility);
     const resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(() => engine.resize()) : null;
     resizeObserver?.observe(front);
-    const viewObserver = typeof IntersectionObserver === "function"
+    const viewObserver = canObserve
       ? new IntersectionObserver(([entry]) => {
-        inView = entry?.isIntersecting !== false;
+        inView = Boolean(entry?.isIntersecting);
         if (inView) run();
         else stop();
       })
