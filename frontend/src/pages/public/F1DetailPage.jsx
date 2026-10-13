@@ -23,6 +23,8 @@ import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { ShareButton } from "@/components/tls/ShareButton";
+import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
+import { tournamentIsOver } from "@/lib/afterEnd";
 
 const PUBLIC_RESULT_STATUSES = new Set(["completed", "results_published", "archived"]);
 
@@ -194,6 +196,8 @@ export default function F1DetailPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+        {/* Freunde bei der Fast Lap (#1188 Teil 2): „dabei“ heißt hier eine gültige Zeit - eine eigene Anmeldung gibt es nicht. */}
+        <FriendsAtEvent user={user} path={`/f1/challenges/${challenge.slug || challenge.id}/friends`} scope="fastlap" over={tournamentIsOver(challenge)} accessToken={accessToken} />
         {(challenge.has_live_stream || (challenge.twitch_enabled && challenge.twitch_channel)) && (
           <section data-testid="f1-stream"><StreamEmbed source={challenge} /></section>
         )}

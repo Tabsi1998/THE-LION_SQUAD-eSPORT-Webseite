@@ -65,7 +65,8 @@ export function RegisterScreen({ navigation }: Props) {
             <Toggle label="Nutzungsbedingungen akzeptieren" value={acceptTerms} onValueChange={setAcceptTerms} />
             <Pressable onPress={() => void Linking.openURL(`${API_BASE_URL}/terms`)}><Text style={styles.link}>Nutzungsbedingungen öffnen</Text></Pressable>
             <Toggle label="Newsletter erhalten" value={newsletter} onValueChange={setNewsletter} />
-            <Muted>Passwort: mindestens 10 Zeichen.</Muted>
+            {/* Passwortvertrag (#1033): derselbe Hinweis wie auf der Website (frontend/src/lib/passwordRules.js). */}
+            <Muted>Passwort: mindestens 10 Zeichen, höchstens 72 Byte (Umlaute zählen doppelt, Emojis vierfach).</Muted>
             {error ? <Text style={styles.error}>{error}</Text> : null}
             {success ? <Text style={styles.success}>{success}</Text> : null}
             <Button

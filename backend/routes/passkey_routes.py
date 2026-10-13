@@ -24,7 +24,7 @@ from webauthn.helpers.structs import (
     ResidentKeyRequirement, UserVerificationRequirement,
 )
 
-from auth import get_current_user, hash_token, verify_password
+from auth import get_current_user, hash_token, verify_user_password
 from database import get_db
 from models import now_utc
 from routes.auth_routes import (
@@ -193,7 +193,7 @@ async def _management_proof(db, user, password, request):
         raise HTTPException(403, "Bitte zuerst deine E-Mail-Adresse bestätigen.")
     if _requires_admin_mfa(current) and not user.get("auth_mfa_verified"):
         raise HTTPException(403, "Bitte zuerst deine Admin-Anmeldung mit MFA bestätigen.")
-    if not current.get("password_hash") or not await run_in_threadpool(verify_password, password, current["password_hash"]):
+    if not current.get("password_hash") or not await run_in_threadpool(verify_user_password, current, password):
         raise HTTPException(401, "Bitte bestätige dein aktuelles Passwort.")
     return current
 
