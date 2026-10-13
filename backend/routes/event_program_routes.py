@@ -39,6 +39,11 @@ async def _event(event_id: str) -> dict:
     return event
 
 
+def _collection(db, kind: str):
+    """Die Sammlung je Art - fest benannt, damit die Karte der Personendaten jeden Zugriff kennt."""
+    return db.tournaments if kind == "tournament" else db.f1_challenges
+
+
 def _row(item: dict) -> dict:
     return {key: item.get(key) for key in ("id", "title", "slug", "status", "start_date", "end_date")}
 
@@ -60,9 +65,9 @@ async def event_program_view(event_id: str, me: dict = Depends(require_admin()))
     db = get_db()
     event = await _event(event_id)
     lists = {}
-    for kind, collection in event_program.KINDS.items():
-        own = await db[collection].find({"event_id": event["id"]}, ITEM_FIELDS).sort("start_date", 1).to_list(200)
-        free = await db[collection].find(
+    for kind in event_program.KINDS:
+        own = await _collection(db, kind).find({"event_id": event["id"]}, ITEM_FIELDS).sort("start_date", 1).to_list(200)
+        free = await _collection(db, kind).find(
             {"event_id": {"$in": [None, ""]}, "status": {"$nin": list(ENDED)}}, ITEM_FIELDS,
         ).sort("start_date", 1).to_list(200)
         lists[kind] = ([_row(item) for item in own], [_row(item) for item in free])
@@ -84,7 +89,7 @@ async def event_program_view(event_id: str, me: dict = Depends(require_admin()))
 async def add_to_event_program(event_id: str, body: ProgramLink, me: dict = Depends(require_admin())):
     db = get_db()
     event = await _event(event_id)
-    collection = db[event_program.KINDS[body.kind]]
+    collection = _collection(db, body.kind)
     item = await collection.find_one({"id": body.item_id}, ITEM_FIELDS)
     if not item:
         raise HTTPException(404, "Turnier nicht gefunden." if body.kind == "tournament" else "Fast Lap nicht gefunden.")
@@ -107,7 +112,7 @@ async def remove_from_event_program(event_id: str, kind: Literal["tournament", "
                                     me: dict = Depends(require_admin())):
     db = get_db()
     event = await _event(event_id)
-    result = await db[event_program.KINDS[kind]].update_one(
+    result = await _collection(db, kind).update_one(
         {"id": item_id, "event_id": event["id"]}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}},
     )
     if not result.matched_count:

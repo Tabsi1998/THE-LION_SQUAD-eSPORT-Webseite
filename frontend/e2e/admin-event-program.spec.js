@@ -15,6 +15,9 @@ const WIDTHS = [
   ["handy", 390, 844],
 ];
 
+// Die Zeitfelder zeigen die Uhr des Geräts - der Lauf tut so, als stünde der Rechner in Wien (CI läuft in UTC).
+test.use({ timezoneId: "Europe/Vienna" });
+
 const json = (body) => ({ contentType: "application/json", body: JSON.stringify(body) });
 
 const EVENTS = [

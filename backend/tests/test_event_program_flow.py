@@ -155,7 +155,8 @@ async def test_only_tournament_leads_with_second_factor_may_link(flow):
         flow.act_as(actor)
         assert (await flow.get(f"/api/events/{event['id']}/program")).status_code == 403
         assert (await flow.post(f"/api/events/{event['id']}/program", json={"kind": "tournament", "item_id": loose["id"]})).status_code == 403
-        assert (await flow.delete(f"/api/events/{event['id']}/program/tournament/{cup['id']}")).status_code == 403
+        refused = await flow.delete(f"/api/events/{event['id']}/program/tournament/{cup['id']}")
+        assert refused.status_code == 403
         assert (await in_event(flow, event, title="Heimlich")).status_code == 403
     assert (await flow.db.tournaments.find_one({"id": loose["id"]})).get("event_id") is None
 

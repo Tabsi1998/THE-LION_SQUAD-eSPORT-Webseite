@@ -14,6 +14,7 @@ vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const AdminTournamentNewPage = (await import("./AdminTournamentNewPage")).default;
+const { toDateTimeLocalInput } = await import("@/lib/datetime");
 
 function renderAt(search) {
   return render(
@@ -71,7 +72,8 @@ test("im Event: Vorbelegung vom Event, Ort nur als Zeile, Anlegen über das Even
   renderAt("?event=ev-1");
   expect(await screen.findByTestId("new-tr-event-hint")).toHaveTextContent("Herbst-LAN");
   expect(screen.getByTestId("new-tr-event")).toHaveTextContent("Gehört zu Herbst-LAN");
-  await waitFor(() => expect(screen.getByTestId("new-tr-start")).toHaveValue("2026-11-14T10:00"));
+  // Das Feld zeigt die Uhrzeit des Geräts (wie überall in der Verwaltung) - erwartet wird daher dieselbe Umrechnung.
+  await waitFor(() => expect(screen.getByTestId("new-tr-start")).toHaveValue(toDateTimeLocalInput("2026-11-14T10:00:00+01:00")));
   expect(screen.getByTestId("new-tr-discord-skip")).toBeChecked();
   expect(screen.getByTestId("new-tr-event-mode")).toHaveValue("local");
   expect(screen.getByTestId("new-tr-location-event")).toHaveTextContent("Vereinsheim · Telfs");
