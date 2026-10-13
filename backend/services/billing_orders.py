@@ -34,6 +34,8 @@ import logging
 import re
 from datetime import timedelta
 
+from pymongo.errors import DuplicateKeyError
+
 from database import get_db
 from models import new_id, now_utc
 from services.billing_amounts import credited_cents, paid_cents, refunded_cents
@@ -67,15 +69,32 @@ MAX_REFUND_REFERENCE = 120
 MAX_REASON = 500
 
 
+def booking_key(kind: str, registration_id: str, snapshot: dict | None) -> str | None:
+    """Ein eingefrorener Preis ergibt höchstens einen Auftrag (#1184): Art, Buchung und der Hash des Snapshots. Ein neuer
+    Preis (nach Storno neu bestätigt) hat einen neuen Hash und damit seinen eigenen Auftrag. Der eindeutige Index steht in
+    database.AUDIT_UNIQUE_INDEXES."""
+    digest = (snapshot or {}).get("hash")
+    return f"{kind}:{registration_id}:{digest}" if digest else None
+
+
 async def create_order(db, *, kind: str, source_id: str, registration_id: str, user_id: str, snapshot: dict, timing: str) -> dict | None:
-    """Ein Auftrag je Buchung. Gibt es schon einen offenen oder erledigten, bleibt er."""
+    """Ein Auftrag je Buchung. Gibt es schon einen offenen oder erledigten, bleibt er.
+
+    Idempotent (#1184): derselbe eingefrorene Preis legt auch bei Wiederholung oder gleichzeitigen Anfragen nur einen
+    Auftrag an - der eindeutige ``booking_key`` fängt das Rennen ab, dann gilt der vorhandene Auftrag."""
     if int(snapshot.get("total_cents") or 0) <= 0:
         return None
+    key = booking_key(kind, registration_id, snapshot)
+    if key:
+        same = await db.billing_orders.find_one({"booking_key": key}, {"_id": 0})
+        if same:
+            return same
     existing = await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": {"$nin": ["cancelled", "failed"]}}, {"_id": 0})
     if existing:
         return existing
     order = {
         "id": new_id(),
+        **({"booking_key": key} if key else {}),
         "kind": kind,
         "source_id": source_id,
         "registration_id": registration_id,
@@ -89,7 +108,13 @@ async def create_order(db, *, kind: str, source_id: str, registration_id: str, u
         "created_at": now_utc().isoformat(),
         "updated_at": now_utc().isoformat(),
     }
-    await db.billing_orders.insert_one(order)
+    try:
+        await db.billing_orders.insert_one(order)
+    except DuplicateKeyError:
+        same = await db.billing_orders.find_one({"booking_key": key}, {"_id": 0}) if key else None
+        if same:
+            return same
+        raise
     order.pop("_id", None)
     return order
 

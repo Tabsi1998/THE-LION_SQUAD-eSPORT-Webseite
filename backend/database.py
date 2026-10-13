@@ -414,11 +414,22 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     ("discord_activity", [("user_id", 1), ("day", 1)], "user_day", {}),
     ("discord_guild_stats", [("guild_id", 1), ("day", 1)], "guild_day", {}),
     ("discord_guild_active", [("guild_id", 1), ("day", 1), ("user_id", 1)], "guild_day_user", {}),
+    # Je eingefrorenem Preis höchstens ein Rechnungsauftrag (#1184). Nur Aufträge mit Schlüssel zählen - ältere haben
+    # keinen und können den Aufbau nie blockieren; Dubletten ließen ohnehin nur einen gewöhnlichen Index zurück.
+    ("billing_orders", "booking_key", "booking_key", {"partialFilterExpression": {"booking_key": {"$exists": True}}}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("platform_links", "user_id"),
     ("moderation_sanctions", [("user_id", 1), ("status", 1)]),  # bei jeder Chat-Nachricht gelesen
     ("moderation_strikes", "user_id"),
+    # Frist nach der Kontolöschung (#1029): der tägliche Job sucht danach.
+    ("consent_records", "erase_after"),
+    ("consent_decisions", "erase_after"),
+    ("moderation_strikes", "erase_after"),
+    ("moderation_sanctions", "erase_after"),
+    ("user_reports", "erase_after"),
+    ("match_reports_v2", "erase_after"),
+    ("contact_messages", "erase_after"),
     ("moderation_strikes", [("source", 1), ("ref_id", 1)]),
     ("team_members", [("team_id", 1), ("user_id", 1)]),
     ("team_members", "user_id"),

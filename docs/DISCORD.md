@@ -133,7 +133,7 @@ Gemeldet wird nur, was ab dann veröffentlicht wird (und nichts, was älter als
 - Erfolge werden vergeben, **sobald etwas passiert** (bestätigtes Ergebnis,
   Turnierabschluss, Bestzeit …) – nicht erst beim Profilbesuch. Dazu alle 15
   Minuten eine Runde über die zuletzt Aktiven und einmal am Tag über alle.
-  Stand und „Alle jetzt auswerten“: Admin → Achievements.
+  Stand und „Alle jetzt auswerten“: Admin → Content → Erfolge.
 - Die Person selbst erfährt es **gebündelt**: mehrere Erfolge innerhalb einer
   Minute ergeben eine Benachrichtigung („3 Erfolge freigeschaltet“) – in der
   App, per Push und, mit Discord als Kanal, als **Gratulation vom Bot** (#568):

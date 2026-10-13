@@ -131,7 +131,7 @@ schaltet weiter System.
 Event-Tag bis sieben Tage nach dem letzten, höchstens 20 Bilder je Person und Album und nur mit dem Haken „Die Personen
 auf den Fotos sind einverstanden“. Gäste sehen den Knopf nicht. Jedes Bild wird neu gespeichert (ohne EXIF und GPS-Ort),
 liegt bis zur Freigabe privat und geht durch die Bildprüfung. **Freigeben oder ablehnen** dürfen Redaktion und
-Vereinsverwaltung (also auch der Vorstand) – an einem Ort, Admin → Galerie; wer nur die Vereinsverwaltung hat, sieht
+Vereinsverwaltung (also auch der Vorstand) – an einem Ort, Admin → Content → Galerie (Kasten „Eingesandte Fotos“); wer nur die Vereinsverwaltung hat, sieht
 dort nur die Einsendungen, nicht die Alben-Verwaltung. Freigeben geht erst, wenn die Bildprüfung nichts gefunden hat;
 abgelehnte Bilder werden gleich gelöscht. Jede Entscheidung steht im Protokoll (`gallery.submission_approve`,
 `gallery.submission_reject`). **„Die Fotos sind da“** geht einmal je Album an die Angemeldeten des Events (Event und
@@ -173,6 +173,18 @@ dabei – wie überall – nur mit bestätigter Zwei-Faktor-Anmeldung (#1469); L
 Team nicht. Seit #1479 schickt der Server das fertige Ergebnis mit (`can_manage`, `can_remove_members`,
 `can_dissolve`); fehlt einer Admin-Rolle nur die Zwei-Faktor-Anmeldung (`admin_needs_second_factor`), steht statt der
 Knöpfe „2FA einrichten“ da.
+
+**„Spielst du auch mit?“ (#1184):** nach der Event-Anmeldung meldet `POST /api/events/{id}/play-along` die gewählten
+Einzel-Turniere des Events an – nur mit Konto, nur für die Person selbst. Je Turnier läuft die normale Selbstanmeldung
+mit allen Regeln (Sichtbarkeit, Frist, Event-Pflicht #875, Startgeld #319, voll → Warteliste); es gibt keine Abkürzung.
+Team-Turniere meldet weiter die Teamleitung auf der Turnierseite an, Turniere anderer Events lehnt der Weg ab. Die
+Auswahl (`GET …/play-along`) zeigt nur Turniere und Fast Laps, die die Person sehen darf. Code:
+`services/event_play_along.py`.
+
+In der App fragt die Team-Seite dieselben Rollen wie der Server: Team bearbeiten und Squads dürfen Leitung,
+Co-Leitung, Turnierleitung, Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und
+Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen dabei –
+wie überall – nur mit bestätigter Zwei-Faktor-Anmeldung (#1469); Leitung und Co-Leitung brauchen sie für ihr Team nicht.
 
 ## Personen, Teams und Sponsoren wählen (#1354)
 

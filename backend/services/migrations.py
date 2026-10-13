@@ -49,8 +49,13 @@ async def migrate_deleted_account_leftovers(db) -> str:
 
     now = datetime.now(timezone.utc).isoformat()
     accounts = images = 0
-    async for user in db.users.find({"anonymized_at": {"$exists": True, "$ne": None}}, {"_id": 0, "id": 1}):
-        result = await account_erasure.erase_related(db, user, now)
+    # Nur, was wirklich gelöscht ist: Zeitpunkt, abgeschaltet, überschriebener Name und Ersatzadresse - ein lebendes
+    # Konto, bei dem zufällig ``anonymized_at`` steht, bleibt unberührt (#1029).
+    deleted = {"anonymized_at": {"$exists": True, "$ne": None}, "is_active": False, "display_name": "Gelöschter User",
+               "email": {"$regex": r"^deleted_[^@]*@deleted\.(invalid|local)$"}}
+    async for user in db.users.find(deleted, {"_id": 0, "id": 1, "anonymized_at": 1}):
+        # Die Frist der Nachweise (drei Jahre) zählt ab der damaligen Löschung.
+        result = await account_erasure.erase_related(db, user, now, erased_at=user["anonymized_at"])
         accounts += 1
         images += result["images"]
     return f"{accounts} deleted accounts cleaned, {images} images removed"
@@ -61,6 +66,8 @@ MIGRATIONS = (
     (2, "team_leader_role_to_player", migrate_team_leader_role),
     (3, "discord_webhooks_to_bot", migrate_discord_webhooks_to_bot),
     (4, "deleted_account_leftovers", migrate_deleted_account_leftovers),
+    # #1029: dieselben Schritte noch einmal - die Löschung räumt seither mehr Sammlungen auf (services/personal_data.py).
+    (5, "deleted_account_leftovers_1029", migrate_deleted_account_leftovers),
 )
 
 

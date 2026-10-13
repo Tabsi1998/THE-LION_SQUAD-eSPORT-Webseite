@@ -218,7 +218,7 @@ export default function AdminBoardPage() {
 }
 
 // „Wir suchen …“ (#1252): ein Satz zum Aufwand je offener Funktion - auch für Funktionen aus Dolibarr. Offene
-// Stellvertretungen werden nicht gesucht und erscheinen gar nicht (Fabian, 08.10.2026) - dafür gibt es keinen Satz.
+// Stellvertretungen werden nicht gesucht und erscheinen gar nicht (Wunsch des Betreibers, 08.10.2026) - dafür gibt es keinen Satz.
 export function vacancyPayload(slug, vacancy) {
   return { texts: { [slug]: vacancy || "" } };
 }

@@ -7,6 +7,12 @@ class FakeCursor:
     def __init__(self, rows):
         self.rows = list(rows)
 
+    def sort(self, *_args):
+        return self
+
+    def limit(self, _count):
+        return self
+
     async def to_list(self, limit):
         return self.rows[:limit]
 
@@ -75,14 +81,19 @@ class FakeDb:
             "meeting_admissions",
             # Eingesandte Galerie-Fotos (#1186)
             "gallery_submissions",
+            # Auskunft Fassung 5 (#1030): alles aus services/personal_data.py
+            "auth_sessions", "passkeys", "access_links", "consent_decisions", "chat_reads", "document_opens", "year_review_notices",
+            "feedback_receipts", "team_chat_messages", "match_chat_messages", "tournament_chat_messages", "chat_attachments",
+            "moderation_strikes", "moderation_sanctions", "contact_messages", "achievement_events", "user_stickers",
+            "twitch_stream_sessions", "tournament_stream_announcements", "dolibarr_links", "dolibarr_identities",
+            "dolibarr_honours", "billing_orders", "billing_customers", "match_reports_v2", "match_schedule_proposals",
+            "match_proof_photos", "f1_staff_assignments", "season_standings", "season_rank_snapshots", "upload_events",
         ):
             setattr(self, name, FakeCollection())
 
 
 def test_dsgvo_export_includes_canonical_stage_match_references(monkeypatch):
-    monkeypatch.setattr(dsgvo_routes, "get_db", FakeDb)
-
-    payload = asyncio.run(dsgvo_routes.export_my_data({"id": "u1"}))
+    payload = asyncio.run(dsgvo_routes._user_data_export(FakeDb(), "u1"))
 
     assert payload["user"]["id"] == "u1"
     assert [registration["id"] for registration in payload["tournament_registrations"]] == ["r1"]

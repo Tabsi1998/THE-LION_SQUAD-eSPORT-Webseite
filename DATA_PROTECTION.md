@@ -17,26 +17,76 @@
 ## Konto löschen: was mit welchen Daten passiert
 
 Ein Mitglied löscht sein Konto selbst (Website: Datenschutz → Meine Daten, App: Profil → Einstellungen); ein Superadmin
-kann es für jemanden tun. Die Entscheidung je Art von Daten (`backend/routes/dsgvo_routes.py`,
-`backend/services/account_erasure.py`, Test `test_account_erasure_flow.py`):
+kann es für jemanden tun. Die vollständige Liste je Sammlung führt `backend/services/personal_data.py`: was beim Löschen
+passiert, wo die Sammlung in der Auskunft steht und warum etwas bleibt. Der Wächter `test_personal_data_map_unit.py` sucht
+alle Sammlungen im Code und verlangt jede dort – eine neue Sammlung ohne Entscheidung lässt die CI scheitern (#1029,
+#1030). Umgesetzt in `backend/routes/dsgvo_routes.py` und `backend/services/account_erasure.py`, geprüft in
+`test_account_erasure_flow.py`. Im Überblick:
 
 | Was | Entscheidung |
 | --- | --- |
 | Name, E-Mail, Profilangaben, verknüpfte Konten, Sitzungen, Passkeys, Push-Geräte, Freundschaften, Blockierungen | gelöscht oder überschrieben |
 | Avatar, Banner und alles, was das Konto für sein Profil hochgeladen hat (samt kleinerer Fassungen und einer Kopie in der Quarantäne der Bildprüfung) | gelöscht – außer ein Bild wird vom Team oder Verein verwendet, etwa als Teamlogo. Ein Profil einer anderen Person hält es nicht fest, es verliert nur den Eintrag. Dateien eines anderen Kontos oder des Vereins bleiben, auch wenn sie im gelöschten Profil eingetragen waren (#1039). Lässt sich eine Datei nicht löschen (etwa gesperrt), holt das der stündliche Job `erasure_file_cleanup` nach |
-| XP und Level, Zählerstände und Signale der Erfolge, Adventkalender, Ostereier, Verlosungen, Discord-Aktivität | gelöscht |
+| XP und Level, Erfolge, Zählerstände und Signale der Erfolge, Sticker, Adventkalender, Ostereier, Verlosungen, Discord-Aktivität, Verlauf der Saisonränge | gelöscht |
+| Lesestände (Chats, Dokumente), Merker zu Jahresrückblick, Feedback und Stream-Ankündigungen | gelöscht |
 | Selbst angelegter Eintrag im Mitgliederverzeichnis | gelöscht |
 | Eintrag im Mitgliederverzeichnis aus der Mitgliederverwaltung oder von der Redaktion, Vorstandsposten | bleibt beim Verein, verliert nur die Verknüpfung zum Konto |
 | Einlass bei der Generalversammlung (Anwesenheit am Eingang) | bleibt beim Verein, verliert nur die Verknüpfung zum Konto; wer als Vorstand selbst eingelassen hat, steht dort danach ohne Namen |
 | Mitgliedsanträge | Motivation und Angaben zur Person gelöscht, ein laufender Antrag gilt als zurückgezogen; der Datensatz in der Mitgliederverwaltung bleibt Sache des Vereins |
-| Einladungen zur Mitgliedschaft, Tokens der Mitgliedskarte, persönlicher Kalender-Link, Zugangslinks, Aufgaben im Turnier-Team | gelöscht bzw. abgeschaltet |
+| Einladungen zur Mitgliedschaft und in Teams, Tokens der Mitgliedskarte, persönlicher Kalender-Link, Zugangslinks, Aufgaben im Turnier- und F1-Team, Verbindung zur Mitgliederakte samt zwischengespeicherter Ehrungen | gelöscht bzw. abgeschaltet |
+| Teamzugehörigkeit | bleibt für Teamhistorie und Aufstellungen; das Konto heißt dort „Gelöschter User“ |
 | Anmeldungen zu Events und Turnieren | bleiben als Zählung und für den Turnierbaum – ohne Name, E-Mail, Notiz, Discord- und Plattform-Kennung |
-| Turnier-Ergebnisse, Rundenzeiten, Saisonpunkte | bleiben ohne Namen (sportliche Integrität); Nachweis-Link und Notiz einer Rundenzeit gelöscht |
+| Turnier-Ergebnisse, Ergebnismeldungen, Terminvorschläge, Rundenzeiten, Saisonpunkte und -tabellen | bleiben ohne Namen (sportliche Integrität); Nachweis-Link und Notiz einer Rundenzeit gelöscht |
 | Gewinne | der Nachweis der Übergabe bleibt, die Notiz ist gelöscht |
 | Eigene Chatnachrichten, gehaltene Texte der Moderation | als „gelöscht“ markiert; die Entscheidung der Moderation bleibt |
+| Meldungen, Verwarnungen und Sperren | bleiben als Nachweis der Moderation; die Kennung zeigt auf „Gelöschter User“. Meldungen von und über die Person, Verwarnungen und Sperren werden drei Jahre nach der Löschung endgültig gelöscht |
+| Kontaktanfragen, die angemeldet geschrieben wurden | bleiben als Vorgang – Name, E-Mail-Adresse, Betreff und Text überschrieben; nach drei Jahren gelöscht |
+| Kontaktanfragen ohne Anmeldung mit derselben E-Mail-Adresse | bleiben unberührt: ob die Adresse damals zu diesem Konto gehörte, hält niemand fest. Ihre Zahl steht im Protokoll der Löschung (`unlinked_contact_messages`); der Vorstand prüft sie bei einem Löschwunsch per Hand |
+| Mails, die noch in der Warteschlange stehen | gelöscht; im Versandprotokoll ist der Empfänger überschrieben |
+| Gespeicherte Namen: Autorin oder Autor eines News-Beitrags, Protokoll der Erfolge, Angaben zur Person in den Daten des Adminprotokolls | überschrieben bzw. entfernt; Beitrag und Vorgang bleiben |
+| Einwilligungen (Website und Mitgliederverwaltung) | bleiben als Nachweis, drei Jahre nach der Löschung endgültig gelöscht |
 | Rechnungen | Belege bleiben sieben Jahre in der Buchhaltung; der Auftrag auf der Website behält Betrag und Belegnummer |
 
-Die Auskunft (`GET /api/dsgvo/export-my-data`, Fassung 3) enthält dieselben Bereiche.
+Konten, die vor einer Erweiterung gelöscht wurden, zieht eine Migration auf demselben Weg nach (Migration 4 für #928,
+Migration 5 für #1029). Sie nimmt nur Konten im vollständigen Löschzustand: Zeitpunkt der Löschung, abgeschaltet,
+„Gelöschter User“ und Ersatzadresse `deleted_…@deleted.invalid`.
+
+### Was bleibt und wie lange
+
+| Daten | Frist | Grund |
+| --- | --- | --- |
+| Belege in der Buchhaltung (Dolibarr) | sieben Jahre | Steuerrecht |
+| Adminprotokoll (`audit_logs`) | 730 Tage, einstellbar unter Betrieb → Alarme (Job `ops_retention`) | Nachvollziehbarkeit; enthält Kennungen, Namen werden erst beim Lesen aufgelöst; Angaben zur Person in den Daten entfernt die Kontolöschung |
+| Versandprotokoll (`email_logs`) | 90 Tage, einstellbar wie oben | Zustellnachweis; Empfänger bei der Kontolöschung überschrieben |
+| Versandte Mails der Warteschlange (`mail_jobs`) | 30 Tage | Doppelversand verhindern |
+| Upload-Protokoll mit IP-Adresse (`upload_events`) | 60 Tage (`UPLOAD_EVENT_RETENTION_DAYS`), läuft auch nach einer Kontolöschung ab | Missbrauch und Fehler bei Uploads nachvollziehen |
+| Fehlerprotokoll der App (`mobile_client_logs`) | 90 Tage, bei der Kontolöschung sofort | Fehlersuche |
+| Anmeldeversuche, Zähler gegen zu viele Anfragen | eine Stunde bzw. höchstens ein Tag | Schutz vor Durchprobieren |
+| Entfernte Bilder in der Quarantäne der Bildprüfung | 90 Tage, einstellbar | Nachprüfung einer Entscheidung |
+| Fotos zu Ergebnismeldungen | 30 Tage nach dem Anhängen | Nachweis bei Einsprüchen |
+| Nach einer Kontolöschung: Einwilligungsnachweise (Website und Mitgliederverwaltung), Moderationsfälle (Meldungen von und über die Person, Verwarnungen, Sperren), Ergebnismeldungen, angemeldet geschriebene Kontaktanfragen als Vorgang | drei Jahre ab der Löschung (Entscheidung des Vereins zu #1029). Die Löschung setzt `erase_after`, der tägliche Job `ops_retention` löscht Abgelaufenes (`purge_expired_records`). Für früher gelöschte Konten setzt Migration 5 die Frist ab dem damaligen `anonymized_at`. Einträge aktiver Konten laufen nicht ab | Nachweis |
+| Ergebnisse und Tabellen | ohne Frist | sportliche Integrität, Teil des Turnierverlaufs |
+
+Betriebsdaten ohne Personenbezug (`ops_errors`, `ops_slow_requests`, `ops_vitals`: nur „angemeldet“ oder „anonym“)
+laufen nach 30 Tagen ab.
+
+## Auskunft: was die Datei enthält
+
+`GET /api/dsgvo/export-my-data` (Website: Datenschutz → Meine Daten → Export) liefert eine JSON-Datei, Fassung 5. Je
+Sammlung aus `personal_data.py` steht ein Schlüssel drin; der Test vergleicht beide Listen. Jede Liste ist vollständig:
+Der Server liest seitenweise in der Reihenfolge des Anlegens und schreibt die Datei fortlaufend, ohne Obergrenze und
+ohne alles auf einmal im Speicher. Bewusst nicht enthalten:
+
+- Prüfwerte und Schlüssel: Passwort- und Token-Hashes, MFA-Geheimnisse, Push-Token, Schlüssel der Passkeys,
+  Dateinamen, Adressen und Ablageorte hochgeladener Dateien (Uploads, Anhänge, Ergebnisfotos, Upload-Protokoll: nur
+  Art, Größe, Datum und Prüfstand), Beitrittscodes von Teams, der Schlüssel der Mitgliederakte.
+- Daten Dritter: wer die Person blockiert oder gemeldet hat und was dabei geschrieben wurde (Meldungen über die Person
+  nur mit Art und Stand), Namen von Moderatorinnen, Vorstand und Verwaltung, und bei Einträgen im Adminprotokoll, in
+  denen die Person selbst gehandelt hat, nur der Vorgang ohne Inhalt. Nachrichten: eigene mit Inhalt; empfangene
+  Direktnachrichten nur als Vorgang (wann, in welchem Gespräch, gelesen), ohne den Text der anderen Person; Chats in
+  Team, Match und Turnier nur die eigenen Nachrichten. Terminvorschläge ohne Antwort und Kennung der anderen Seite.
+  Kontaktanfragen nur, wenn sie angemeldet geschrieben wurden.
+- Reine Technik: Anmelde-Zwischenschritte und interne Warteschlangen.
 
 ## Betreiberpflichten
 

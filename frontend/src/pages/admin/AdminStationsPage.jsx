@@ -247,7 +247,7 @@ export default function AdminStationsPage() {
   return (
     <AdminLayout>
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Event-Einrichtung</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Stationen &amp; Spiel-Zuweisung</h1>
+      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Stationen</h1>
       {pageError && (
         <div className="mb-4 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FFB3B3] px-4 py-3 rounded-sm text-sm">
           {pageError}

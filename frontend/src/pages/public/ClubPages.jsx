@@ -22,7 +22,7 @@ import { isDeputyPosition } from "@/lib/boardSeats";
 const CORE = ["obmann", "kassier", "schriftfuehrer"];
 
 /** Was auf „Vorstand“ steht: Vorsitz (groß), Stellvertretungen und weitere Funktionen (kleiner).
- * Offene Funktionen erscheinen als Einladung („Wir suchen …“) - offene Stellvertretungen gar nicht (Fabian, 08.10.2026). */
+ * Offene Funktionen erscheinen als Einladung („Wir suchen …“) - offene Stellvertretungen gar nicht (Wunsch des Betreibers, 08.10.2026). */
 export function boardSections(positions) {
   const list = Array.isArray(positions) ? positions : [];
   const core = CORE.map((slug) => list.find((p) => p.slug === slug)).filter(Boolean);

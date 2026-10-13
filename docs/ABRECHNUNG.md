@@ -50,6 +50,10 @@ Admin → Finanzen mit ihrem Status:
 Nichts davon geht verloren: Ein Auftrag bleibt stehen, bis die Voraussetzung da ist. „Jetzt
 prüfen“ in der Finanzübersicht läuft sofort statt in zwei Minuten.
 
+Je eingefrorenem Preis gibt es höchstens einen Auftrag, auch wenn eine Anmeldung doppelt oder gleichzeitig ankommt
+(#1184). Bricht der Auftrag einer Turnier-Anmeldung nach dem Speichern ab, legt die nächste Anmeldung derselben Person
+ihn nach – genau einmal.
+
 **Was beim Anlegen passiert (Teil 2):**
 
 1. **Geschäftspartner.** Mitglieder mit bestätigter Zuordnung bekommen den Geschäftspartner, der
