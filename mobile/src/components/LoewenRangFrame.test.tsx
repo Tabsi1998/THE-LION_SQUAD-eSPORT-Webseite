@@ -242,3 +242,18 @@ test("Aufstiegs-Moment (#1456) mit reduzierter Bewegung: nur Aus- und Einblenden
   expect(screen.getAllByTestId("loewen-rang-pip-on")).toHaveLength(3);
   expect(frameCallbacks.size).toBe(0);
 });
+
+test("Profil-Signatur ruht, solange eine Zeremonie oder ein Dialog darüber liegt (#1456)", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const quiet = require("../seasons/quiet");
+  reduceMotion(false);
+  frameCallbacks.clear();
+  await render(<LoewenRangFrame level={9} size="profile" />);
+  await settle();
+  const [entry] = [...frameCallbacks] as unknown as Array<{ handle: { isActive: boolean } }>;
+  expect(entry.handle.isActive).toBe(true);
+  await act(async () => { quiet.setOverlay("achievement-ceremony", true); });
+  expect(entry.handle.isActive).toBe(false);
+  await act(async () => { quiet.setOverlay("achievement-ceremony", false); });
+  expect(entry.handle.isActive).toBe(true);
+});

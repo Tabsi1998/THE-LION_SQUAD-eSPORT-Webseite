@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
-import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { AccessibilityInfo, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from "react-native-reanimated";
 import { LoewenRangFrame } from "../../components/LoewenRangFrame";
 import { type AscentMoment, ascentMoment } from "../../lib/loewenAufstieg";
@@ -285,6 +285,13 @@ export function Ceremony({ plan, onClose, reduced = false, autoClose = true, use
     if (phase !== "level" || !momentKind) return undefined;
     return playAscentHaptics(momentKind);
   }, [phase, momentKind]);
+
+  // Vorleser: der neue Rang steht nur im Bild - sobald die Level-Bühne steht, wird er angesagt (einmal je Zeremonie).
+  const rankAnnouncement = moment?.kind === "rank" ? `Level ${moment.level} erreicht. Neuer Rang: ${moment.to.name}` : null;
+  useEffect(() => {
+    if (phase !== "level" || !rankAnnouncement) return;
+    AccessibilityInfo.announceForAccessibility?.(rankAnnouncement);
+  }, [phase, rankAnnouncement]);
 
   // Die Partikel verglühen nach gut vier Sekunden - dann steht auch ihr Takt.
   useEffect(() => {

@@ -19,7 +19,7 @@ import {
   type FrameBox,
   type FrameVariant,
 } from "../lib/loewenRang";
-import { useScreenFocused } from "../seasons/screenFocus";
+import { useOverlayOpen, useScreenFocused } from "../seasons/screenFocus";
 import { colors } from "../theme";
 import { frameImage } from "./loewenRangImages";
 import { BURST_SECONDS, drawBurst, drawSignature, signatureVisible, type SignatureScene } from "./loewenRangSignature";
@@ -302,10 +302,12 @@ function useAppActive(): boolean {
 
 function Signature({ box, level, source }: { box: FrameBox; level?: number | null; source: number }) {
   const image = useImage(source);
-  // Nur solange App und Screen vorne sind - ein Profil unter einem anderen Screen bleibt geladen, aber still.
+  // Nur solange App und Screen vorne sind - ein Profil unter einem anderen Screen bleibt geladen, aber still. Liegt
+  // eine Zeremonie, ein Dialog oder Sheet darüber, ruht die Signatur ebenfalls (#1456).
   const appActive = useAppActive();
   const focused = useScreenFocused();
-  const running = appActive && focused;
+  const covered = useOverlayOpen();
+  const running = appActive && focused && !covered;
   const picture = useSharedValue<SkPicture>(EMPTY_PICTURE);
   const last = useSharedValue(-FRAME_MS);
   const blank = useSharedValue(true);

@@ -46,30 +46,52 @@ export function levelUpFrom(prev, next) {
 }
 
 /**
+ * Den Aufstieg „beanspruchen“: gemerkten Stand lesen, vergleichen und den neuen Stand schreiben - in einem Zug, auch
+ * über mehrere Tabs desselben Browsers. Mit der Web-Locks-API (alle aktuellen Browser) wartet ein zweiter Tab, bis der
+ * erste fertig ist, und findet dann schon den neuen Stand - derselbe Aufstieg wird auf diesem Gerät nur einmal gezeigt.
+ * Ohne Locks (alte Browser) läuft dasselbe ohne Sperre; Lesen und Schreiben folgen dann direkt aufeinander.
+ * Bewusste Grenze: auf einem anderen Gerät (oder in der App) erscheint der Aufstieg dort noch einmal - der Stand liegt
+ * nur im Gerät, nicht auf dem Server.
+ */
+export async function claimLevelUp(key, next, locks = typeof navigator !== "undefined" ? navigator.locks : undefined) {
+  const run = () => {
+    const levelUp = levelUpFrom(readSeen(key), next);
+    try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* egal */ }
+    return levelUp;
+  };
+  if (locks && typeof locks.request === "function") {
+    try { return await locks.request(key, { mode: "exclusive" }, run); } catch { /* Sperre nicht verfügbar - ohne weiter */ }
+  }
+  return run();
+}
+
+/**
  * Level-Aufstieg erkennen (#617) und als Zeremonie feiern (E8, #618): die Zahl bricht auf, die neue
  * fällt ein, alle fünf Level ein Titel-Banner, Sterne bei Prestige. Gemerkt wird je Konto im Browser,
  * damit derselbe Aufstieg nicht zweimal gefeiert wird.
  */
 export function LevelUpCelebration() {
   const { user } = useAuth();
-  const busyRef = useRef(false);
+  // Läuft gerade eine Prüfung - je Konto, damit ein Kontowechsel nicht auf die alte wartet.
+  const busyRef = useRef(null);
+  const userId = user?.id;
+  // Das gerade angemeldete Konto: eine Antwort, die noch für das vorige Konto unterwegs war, wird verworfen - sonst
+  // landet der Stand von Konto B im Merker von Konto A.
+  const currentRef = useRef(userId);
+  useEffect(() => { currentRef.current = userId; }, [userId]);
 
   const check = useCallback(async () => {
-    if (!user?.id || busyRef.current) return;
-    busyRef.current = true;
+    if (!userId || busyRef.current === userId) return;
+    busyRef.current = userId;
     try {
       const { data } = await api.get("/users/me/level");
-      const nextLevel = Number(data?.level || 1);
-      const nextTitle = String(data?.title || "");
-      const nextPrestige = Number(data?.prestige || 0);
-      const key = storeKey(user.id);
-      const next = { level: nextLevel, title: nextTitle, prestige: nextPrestige };
-      const levelUp = levelUpFrom(readSeen(key), next);
-      if (levelUp) enqueueLevelUp(levelUp);
-      try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* egal */ }
+      if (currentRef.current !== userId) return;
+      const next = { level: Number(data?.level || 1), title: String(data?.title || ""), prestige: Number(data?.prestige || 0) };
+      const levelUp = await claimLevelUp(storeKey(userId), next);
+      if (levelUp && currentRef.current === userId) enqueueLevelUp(levelUp);
     } catch { /* rein kosmetisch */ }
-    finally { busyRef.current = false; }
-  }, [user?.id]);
+    finally { if (busyRef.current === userId) busyRef.current = null; }
+  }, [userId]);
 
   useEffect(() => { check(); }, [check]);
   // Prestige (und seine Rücknahme) im Profil ändert das Level sofort - dann gleich nachsehen.

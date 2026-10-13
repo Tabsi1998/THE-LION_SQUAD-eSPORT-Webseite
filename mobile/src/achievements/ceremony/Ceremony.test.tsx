@@ -138,6 +138,19 @@ test("Löwen-Rang (#1456): Rangwechsel - alter Rahmen blitzt weg, großer Moment
   expect(Haptics.impactAsync).toHaveBeenCalledWith("heavy");
 });
 
+test("Löwen-Rang (#1456): Vorleser hören den neuen Rang, beim Level im Rang keine Extra-Ansage", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { AccessibilityInfo } = require("react-native");
+  const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockImplementation(() => {});
+  const { rendered } = await show({ tiers: [], levelUp: { level: 25, previous: 24, title: "Goldmähne" } });
+  expect(announce).toHaveBeenCalledWith("Level 25 erreicht. Neuer Rang: Goldmähne");
+  await rendered.unmount();
+  announce.mockClear();
+  await show({ tiers: [], levelUp: { level: 27, previous: 26, title: "Goldmähne" } });
+  expect(announce).not.toHaveBeenCalled();
+  announce.mockRestore();
+});
+
 test("Löwen-Rang (#1456): Level im Rang - die neuen Rauten springen, kleiner Moment", async () => {
   await show({ tiers: [], levelUp: { level: 13, previous: 11, title: "Rudel" } });
   expect(screen.getByTestId("loewen-ascent-level", HIDDEN)).toBeTruthy();
