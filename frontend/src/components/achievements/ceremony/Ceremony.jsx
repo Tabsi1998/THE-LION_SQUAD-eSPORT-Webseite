@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Camera, ChevronLeft, ChevronRight, Star, Trophy, Volume2, VolumeX, X } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, Star, Trophy, User as UserIcon, Volume2, VolumeX, X } from "lucide-react";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
+import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
+import { ascentMoment } from "@/lib/loewenAufstieg";
 import { Badge } from "../Badge";
 import { MATERIAL_LOOKS } from "../materials";
 import { Motion, StageBadge } from "./motions";
@@ -81,6 +83,58 @@ function GroupPedestal({ plan, reduced }) {
   );
 }
 
+// Titel-Banner alle fünf Level und Prestige-Sterne - gleich für beide Level-Bühnen.
+function LevelExtras({ levelUp, reduced }) {
+  return (
+    <>
+      {levelUp?.titleChanged && levelUp?.title && (
+        <motion.div className="mt-2 px-4 py-1 border rounded-sm text-[11px] font-black uppercase tracking-[0.35em]" style={{ borderColor: "var(--cer-accent)", color: "var(--cer-accent)" }} initial={{ opacity: 0, y: reduced ? 0 : 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0 : 1.3 }} data-testid="ceremony-title-banner">
+          Neuer Titel: {levelUp.title}
+        </motion.div>
+      )}
+      {Number(levelUp?.prestige || 0) > 0 && levelUp?.prestigeGained && (
+        <div className="mt-2 flex gap-1 text-[#FFD700]" data-testid="ceremony-prestige-stars" aria-label={`Prestige ${levelUp.prestige}`}>
+          {Array.from({ length: Math.min(5, Number(levelUp.prestige)) }).map((_, i) => (
+            <motion.span key={i} initial={{ y: reduced ? 0 : -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: reduced ? 0 : 1.4 + i * 0.12 }}><Star className="w-4 h-4 fill-current" /></motion.span>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * Löwen-Rang (#1456): der Aufstiegs-Moment im eigenen Rahmen. Level im Rang - die neuen Rauten springen auf, ein Glanz
+ * läuft durch, ein kleiner Effekt der Signatur. Rangwechsel - der alte Rahmen blitzt weg, der neue rastet ein, der große
+ * Moment des neuen Rangs läuft. Die Zeremonie selbst zeigt einen Aufstieg nur einmal (LevelUpCelebration merkt sich den
+ * gesehenen Stand); „Bewegung reduzieren“ und „dezent“ blenden nur ein und aus.
+ */
+function AscentStage({ moment, levelUp, user, reduced }) {
+  return (
+    <div className="relative flex flex-col items-center justify-center h-full" data-testid="ceremony-levelup">
+      <div
+        className="relative"
+        data-testid="loewen-ascent"
+        data-kind={moment.kind}
+        data-fx={moment.fx}
+        data-rank={moment.to.rank}
+        data-from-rank={moment.from.rank}
+        data-motion={moment.particles ? "full" : "calm"}
+        aria-hidden="true"
+      >
+        <LevelAvatarFrame level={moment.level} size="card" ascent={moment}>
+          {user?.avatar_url ? (
+            <img src={user.avatar_url} alt="" className="w-full h-full object-cover" draggable="false" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-white/25"><UserIcon className="w-1/3 h-1/3" /></div>
+          )}
+        </LevelAvatarFrame>
+      </div>
+      <LevelExtras levelUp={levelUp} reduced={reduced} />
+    </div>
+  );
+}
+
 // Level-up: die alte Zahl bricht auf, die neue fällt ein; Titel alle fünf Level, Sterne bei Prestige.
 function LevelUpStage({ levelUp, reduced }) {
   const level = Number(levelUp?.level || 1);
@@ -107,18 +161,7 @@ function LevelUpStage({ levelUp, reduced }) {
           )}
         </AnimatePresence>
       </div>
-      {levelUp?.titleChanged && levelUp?.title && (
-        <motion.div className="mt-2 px-4 py-1 border rounded-sm text-[11px] font-black uppercase tracking-[0.35em]" style={{ borderColor: "var(--cer-accent)", color: "var(--cer-accent)" }} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0 : 1.3 }} data-testid="ceremony-title-banner">
-          Neuer Titel: {levelUp.title}
-        </motion.div>
-      )}
-      {Number(levelUp?.prestige || 0) > 0 && levelUp?.prestigeGained && (
-        <div className="mt-2 flex gap-1 text-[#FFD700]" data-testid="ceremony-prestige-stars" aria-label={`Prestige ${levelUp.prestige}`}>
-          {Array.from({ length: Math.min(5, Number(levelUp.prestige)) }).map((_, i) => (
-            <motion.span key={i} initial={{ y: -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: reduced ? 0 : 1.4 + i * 0.12 }}><Star className="w-4 h-4 fill-current" /></motion.span>
-          ))}
-        </div>
-      )}
+      <LevelExtras levelUp={levelUp} reduced={reduced} />
     </div>
   );
 }
@@ -134,6 +177,9 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
   const isLevelOnly = plan.sequence === "levelup";
   const [phase, setPhase] = useState(isLevelOnly ? "level" : "badge");
   const duration = reduced ? Math.min(plan.duration, 4500) : plan.duration;
+  // Der Aufstiegs-Moment des Löwen-Rangs (#1456) - nicht bei Prestige; ruhig bei reduzierter Bewegung.
+  const moment = useMemo(() => ascentMoment(plan.levelUp, { reduced }), [plan.levelUp, reduced]);
+  const rankText = moment?.kind === "rank" ? `Neuer Rang: ${moment.to.name}` : null;
 
   // Klang beim Öffnen, wie bisher einmal je Zeremonie - in der Admin-Vorschau fest an oder aus.
   useEffect(() => {
@@ -178,8 +224,8 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
     if (plan.sequence === "diamond") return "Diamant";
     return tiers.length === 1 ? "Neuer Erfolg!" : `${tiers.length} neue Erfolge!`;
   }, [plan, tiers.length, isLevelOnly]);
-  const sub = plan.sub || (isLevelOnly ? levelTexts(plan.levelUp).sub : plan.catchUp ? "Nachgeholte Erfolge" : `${look.name}${plan.top?.rank && plan.top.rank <= 7 ? ` ${ROMAN[plan.top.rank]}` : ""} freigeschaltet`);
-  const liveText = `${heading}. ${tiers.map((t) => `${t.name}, ${t.material_name || look.name}, plus ${t.points} Punkte`).join(". ")}${plan.levelUp ? `. Level ${plan.levelUp.level}` : ""}`;
+  const sub = plan.sub || (isLevelOnly ? rankText || levelTexts(plan.levelUp).sub : plan.catchUp ? "Nachgeholte Erfolge" : `${look.name}${plan.top?.rank && plan.top.rank <= 7 ? ` ${ROMAN[plan.top.rank]}` : ""} freigeschaltet`);
+  const liveText = `${heading}. ${tiers.map((t) => `${t.name}, ${t.material_name || look.name}, plus ${t.points} Punkte`).join(". ")}${plan.levelUp ? `. Level ${plan.levelUp.level}` : ""}${rankText ? `. ${rankText}` : ""}`;
   const showBadge = phase === "badge" && !isLevelOnly;
   const shareTo = plan.shareId ? `/achievements/a/${encodeURIComponent(plan.shareId)}` : "/u/me?tab=achievements";
 
@@ -204,7 +250,8 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
       {plan.sequence === "diamond" && !reduced && <span className="tls-ceremony__prism" data-testid="ceremony-prism" aria-hidden="true" />}
       {plan.sequence === "category" && !reduced && <span className="tls-ceremony__flood" data-testid="ceremony-flood" aria-hidden="true" />}
       {(plan.sequence === "diamond" || plan.sequence === "legendary" || plan.sequence === "category") && !reduced && <span className="tls-ceremony__flash" aria-hidden="true" />}
-      {(showBadge || isLevelOnly) && <Particles plan={plan} reduced={reduced} />}
+      {/* Mit Aufstiegs-Moment übernimmt der Rahmen das Glitzern - so bleibt es bei einer Partikel-Obergrenze. */}
+      {(showBadge || (isLevelOnly && !moment)) && <Particles plan={plan} reduced={reduced} />}
       <span className="tls-ceremony__live-text" aria-live="polite" data-testid="ceremony-live">{liveText}</span>
 
       <motion.div
@@ -231,7 +278,7 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
           <X className="w-5 h-5" />
         </button>
 
-        <div className={`tls-ceremony__stage ${plan.sequence === "legendary" ? "pt-10" : ""}`} data-testid="ceremony-stage" data-phase={phase}>
+        <div className={`tls-ceremony__stage ${plan.sequence === "legendary" ? "pt-10" : ""} ${moment && !showBadge ? "tls-ceremony__stage--ascent" : ""}`} data-testid="ceremony-stage" data-phase={phase}>
           {plan.sequence === "category" && <motion.span className="tls-ceremony__vitrine" data-testid="ceremony-vitrine" initial={{ scaleX: 1.15, opacity: 0 }} animate={{ scaleX: 1, opacity: 1 }} transition={{ duration: reduced ? 0.2 : 1.2, delay: 0.3 }} aria-hidden="true" />}
           {showBadge ? (
             <>
@@ -242,6 +289,8 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
               ))}
               <Motion key={`${plan.id}-${current?.code || index}`} motion={plan.motion} reduced={reduced} badge={<StageBadge tier={current} material={current?.material || plan.material} animate={!reduced} />} />
             </>
+          ) : moment ? (
+            <AscentStage moment={moment} levelUp={plan.levelUp} user={user} reduced={reduced} />
           ) : (
             <LevelUpStage levelUp={plan.levelUp || {}} reduced={reduced} />
           )}
@@ -249,7 +298,7 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
 
         <div className="relative px-6 pb-3 text-center">
           <motion.div className="text-[11px] font-bold uppercase tracking-[0.4em]" style={{ color: plan.accent, textShadow: `0 0 12px ${plan.accent}66` }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0 : 0.5 }} data-testid="ceremony-sub">
-            {phase === "level" && !isLevelOnly ? levelTexts(plan.levelUp).phaseSub : sub}
+            {phase === "level" && !isLevelOnly ? rankText || levelTexts(plan.levelUp).phaseSub : sub}
           </motion.div>
           <motion.h2 className="font-heading text-2xl md:text-3xl font-black uppercase mt-1" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0 : 0.58 }} data-testid="ceremony-heading">
             {phase === "level" && !isLevelOnly ? levelTexts(plan.levelUp).phaseHeading : heading}

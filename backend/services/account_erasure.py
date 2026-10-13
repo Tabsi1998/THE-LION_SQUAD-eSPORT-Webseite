@@ -137,6 +137,9 @@ async def _records(db, user: dict, now: str, until: datetime) -> int:
     email = str(user.get("email") or "").strip().lower()
     bound = [{"user_id": user_id}] + ([{"email": email}] if email else [])
     await db.access_links.update_many({"$or": bound}, {"$set": {"is_active": False, "email": None, "note": None, "updated_at": now}})
+    # Wer einen Zugangslink schon genutzt hat (#1036), steht nicht mehr daran - gezählt bleibt die Nutzung.
+    await db.access_links.update_many({"used_by": user_id}, {"$pull": {"used_by": user_id}})
+    await db.access_links.update_many({"last_used_by": user_id}, {"$set": {"last_used_by": None}})
     # Kontaktanfragen (#1029) bleiben als Vorgang des Vereins - ohne Name, Adresse, Betreff und Text. Nur angemeldet
     # geschriebene: eine Anfrage ohne Konto lässt sich nicht sicher zuordnen, denn ob die Adresse damals schon zu diesem
     # Konto gehörte, hält niemand fest. Solche bleiben unberührt und werden gezählt (Protokoll der Löschung).
