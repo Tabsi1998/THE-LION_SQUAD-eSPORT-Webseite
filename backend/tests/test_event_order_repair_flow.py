@@ -15,6 +15,7 @@ import database  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import billing_orders, event_registration  # noqa: E402
+from test_access_link_limits_flow import access_link  # noqa: E402
 from test_billing_invoice_terms_flow import person  # noqa: E402
 
 FEE = {"enabled": True, "positions": [{"key": "beitrag", "label": "Kostenbeitrag", "amount": "20", "basis": "per_person"}]}
@@ -216,3 +217,62 @@ async def test_switching_billing_off_after_the_gap_still_repairs_the_frozen_pric
     assert len(rows) == 1 and rows[0]["total_cents"] == 2000
     assert (await register(flow, event)).status_code == 409
     assert len(await orders(flow, paula)) == 1
+
+
+class _LoserWaits:
+    """Die erste Anfrage am Schreiben wartet, bis die andere ganz fertig ist - so verliert genau sie das Rennen am
+    eindeutigen Index, nachdem sie die Link-Nutzung belegt hat."""
+
+    def __init__(self, collection, go: asyncio.Event):
+        self._collection = collection
+        self._go = go
+        self._inserts = 0
+
+    async def find_one(self, *args, **kwargs):
+        if self._inserts:
+            return await self._collection.find_one(*args, **kwargs)
+        await asyncio.sleep(0)
+        return None
+
+    async def insert_one(self, document):
+        self._inserts += 1
+        if self._inserts == 1:
+            await asyncio.wait_for(self._go.wait(), 2.0)
+        return await self._collection.insert_one(document)
+
+    def __getattr__(self, name):
+        return getattr(self._collection, name)
+
+
+@pytest.mark.asyncio
+async def test_simultaneous_registration_with_access_link_keeps_one_use_and_repairs_the_order_once(flow, monkeypatch):
+    """Gleichzeitige zweite Anmeldung über einen Zugangslink (#1495 + #1491): Die andere Anfrage hat die Anmeldung
+    geschrieben, ihr Auftrag ist abgebrochen. Die unterlegene antwortet „bereits angemeldet“, holt den Auftrag genau
+    einmal nach, und der Link zählt die Person genau einmal - die Nutzung geht nicht verloren."""
+    event = await paid_event(flow)
+    stored = await flow.db.events.find_one({"id": event["id"]}, {"_id": 0})
+    _token, link = await access_link(flow, "event", event["id"], max_uses=1)
+    paula = await person(flow, "paula")
+    fail_once(monkeypatch)
+    go = asyncio.Event()
+    racing = _RacingDb(flow.db)
+    racing.event_registrations = _LoserWaits(flow.db.event_registrations, go)
+
+    tasks = [asyncio.create_task(event_registration.register(racing, stored, paula, register_access=link)) for _ in range(2)]
+    for task in tasks:
+        task.add_done_callback(lambda _task: go.set())
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    winner, loser = results[1], results[0]
+    assert isinstance(winner, RuntimeError), results
+    assert isinstance(loser, event_registration.RegistrationError) and loser.status == 409 and loser.detail == TAKEN, results
+    assert await flow.db.event_registrations.count_documents({"user_id": paula["id"]}) == 1
+    rows = await orders(flow, paula)
+    assert len(rows) == 1 and rows[0]["total_cents"] == 2000, "fehlender Auftrag genau einmal nachgeholt"
+    used = await flow.db.access_links.find_one({"id": link["id"]}, {"_id": 0})
+    assert used["use_count"] == 1 and used["used_by"] == [paula["id"]], "die Person zählt genau einmal"
+    # Gegenprobe: die Wiederholung legt weder einen Auftrag noch eine Nutzung dazu.
+    with pytest.raises(event_registration.RegistrationError):
+        await event_registration.register(flow.db, stored, paula, register_access=link)
+    assert len(await orders(flow, paula)) == 1
+    assert (await flow.db.access_links.find_one({"id": link["id"]}, {"_id": 0}))["use_count"] == 1

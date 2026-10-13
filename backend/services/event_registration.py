@@ -153,11 +153,10 @@ async def register(db, event: dict, me: dict, *, companion_count: int | None = 0
             await db.event_registrations.insert_one(doc)
             doc.pop("_id", None)
     except DuplicateKeyError:
-        # Zwei gleichzeitige Anmeldungen (Doppelklick, Website und Discord): der eindeutige Index lässt nur eine
-        # durch. Die andere gibt die Link-Nutzung zurück und antwortet wie jede Wiederholung - und holt einen
-        # fehlenden Auftrag nach (#1491).
-        if claimed:
-            await release_access_link_use(db, register_access, me)
+        # Zwei gleichzeitige Anmeldungen derselben Person (Doppelklick, Website und Discord): der eindeutige Index
+        # lässt nur eine durch. Die andere antwortet wie jede Wiederholung und holt einen fehlenden Auftrag nach
+        # (#1491). Die Link-Nutzung bleibt: sie gilt je Person (``used_by``), und die Person ist angemeldet - gäbe
+        # die unterlegene Anfrage ihre Zählung zurück, stünde die Anmeldung ohne Nutzung da.
         current = await existing_registration(db, event, me)
         if current:
             await repair_order(db, event, current)
