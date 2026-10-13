@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, ClipboardCheck, X } from "lucide-react";
 import { chatAttachmentSrc } from "@/lib/chatAttachments";
 import { viennaDateTime } from "@/lib/vienna";
@@ -55,7 +55,13 @@ export function MatchReportForm({ participants = [], match = {}, entry: serverEn
   const sentence = outcome.results ? resultSentence({ ...entry, advance: {} }, outcome.results) : "";
 
   // Ein neuer Stand vom Server (gemeldet, bestätigt, abgewichen) schließt das Formular - außer, es ist noch nichts da.
-  useEffect(() => { setEditing(status === "open"); }, [status]);
+  // Abgeleitet beim Rendern statt in einem Effekt: der Effekt lief auch beim ersten Aufbau und konnte, wenn er spät kam,
+  // ein schnelles „Meldung ändern“ gleich wieder schließen.
+  const [seenStatus, setSeenStatus] = useState(status);
+  if (seenStatus !== status) {
+    setSeenStatus(status);
+    setEditing(status === "open");
+  }
 
   const submit = async (event) => {
     event.preventDefault();
