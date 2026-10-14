@@ -3,6 +3,7 @@
 //
 // Linien kommen aus den echten Quellen der Plätze („W:A:1“ im Ziel, `advancement` in der Quelle), nicht aus der
 // Reihenfolge der Spiele - so stimmen sie auch zwischen Winner und Loser Bracket, ins Grand Final und in den Reset.
+import { matchName } from "@/lib/bracketNames";
 import { absoluteRank, finderFor, normalizeSource } from "@/lib/slotSource";
 
 const DONE = new Set(["completed", "finished", "reported", "confirmed", "forfeit"]);
@@ -203,7 +204,7 @@ export function heatExits(match, edges = [], matches = [], rails = drawRails(mat
   const keys = (flow) => [...new Set([
     ...edges.filter((edge) => edge.from === match.id && edge.flow === flow && !edge.void && !edge.rail).map((edge) => edge.to),
     ...railTargets(flow),
-  ].filter((id) => !isCancelled(byId.get(id))).map((id) => byId.get(id)?.match_key).filter(Boolean))].sort();
+  ].filter((id) => !isCancelled(byId.get(id))).map((id) => byId.get(id)).filter((row) => row?.match_key).map(matchName))].sort();
   return { advance: keys("W"), drop: keys("L"), qualifiers: Number(match?.settings?.qualifiers_per_match || 0) };
 }
 
@@ -223,7 +224,8 @@ export function heatText(match, edges, matches, finalId) {
   const field = filled === seats ? `${filled} Spieler` : filled ? `${filled} von ${seats} Spielern` : `${seats} ${seats === 1 ? "Platz" : "Plätze"}`;
   const onward = last ? "Platz 1 gewinnt" : exits.qualifiers ? count(exits.qualifiers) : "";
   return {
-    name: match.match_type === "ffa" ? `Lauf ${match.match_key || ""}`.trim() : match.match_key || "Spiel",
+    // Ein Wort als Kürzel (#1591): „Grand Final“ statt „Lauf FINAL“.
+    name: matchName(match) !== String(match.match_key || "") ? matchName(match) : match.match_type === "ffa" ? `Lauf ${match.match_key || ""}`.trim() : match.match_key || "Spiel",
     meta: [field, onward].filter(Boolean).join(" · "),
     cut: exits.qualifiers && exits.advance.length ? `${count(exits.qualifiers)} → ${exits.advance.join(", ")}` : "",
     rest: exits.drop.length ? `Die anderen → ${exits.drop.join(", ")}` : exits.advance.length ? "Die anderen scheiden aus" : "",

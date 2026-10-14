@@ -45,7 +45,9 @@ function inspectTree(page) {
     // Linien (#1564, wie im Web-Baum): Anfang an der rechten Kante der einen Karte (auf ihrer Höhe), Ende an der Kante der
     // nächsten - in der Zeile des Platzes, in den der Spieler kommt (ohne Zeile auf halber Höhe der Karte).
     const badLines = [];
-    const paths = [...stage.querySelectorAll("[data-testid='bracket-connectors'] path")];
+    // Gabel und Eingang (#1591) prüft e2e/bracket-lines.spec.js; hier zählen die Linien der Spiele, die zu sehen sind.
+    const paths = [...stage.querySelectorAll("[data-testid='bracket-connectors'] path:not([data-fork]):not([data-stub])")]
+      .filter((path) => Number(getComputedStyle(path).opacity) > 0.05);
     for (const path of paths) {
       const matrix = path.getScreenCTM();
       const length = path.getTotalLength();

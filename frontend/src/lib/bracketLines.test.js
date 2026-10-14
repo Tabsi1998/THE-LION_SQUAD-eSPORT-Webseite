@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { doubleElimination, decide } from "../../e2e/fixtures/tvBrackets.mjs";
 import FFA from "../../e2e/fixtures/ffaGenerated.json";
+import LINES from "../../e2e/fixtures/bracketLines.json";
+import { auditLines } from "./bracketLineAudit.mjs";
 import { bracketEdges, drawRails, isCancelled, sectionGroup } from "./bracketGraph";
-import { laneCounter, pathHits, routeBus, routeEdge, segmentHitsRect } from "./bracketLines";
+import { laneCounter, pathHits, routeBus, routeEdge, segmentHitsRect, stageLines } from "./bracketLines";
 
 // Linienführung (#1561): keine Strecke schneidet eine Karte - auch nicht der Abstieg vom Winner ins Loser Bracket.
 // Die Rechtecke bilden die Leinwand nach (BracketTree, StageCanvas): Spalten 232 px breit, Gassen 48 px, Abschnitte
@@ -168,4 +170,137 @@ describe("routeBus: Sammelschiene in der Gasse", () => {
       }
     });
   }
+});
+
+// Übersicht (#1591): Fälle aus dem echten Generator (bracketLines.json). Sichtbar ist nur, was ohne Zeigen gilt - jede
+// Linie hängt an Karte, Schiene oder Marker, nichts doppelt, nichts gedrängt, nichts außerhalb, je Gruppe eine Schiene.
+// Abstiege und die Einzelwege einer Gabel kommen erst beim Zeigen (`demand`).
+function stageOf(bracket) {
+  const { rects, sectionRects, heads } = layout(bracket, GAP);
+  const byId = new Map(bracket.matches_v2.map((match) => [match.id, match]));
+  const slotY = (id, slot) => {
+    const rect = rects.get(id);
+    const count = (byId.get(id)?.slots || []).length || 1;
+    return rect.top + 30 + ((slot - 0.5) * (rect.height - 30)) / count;
+  };
+  const columnOf = new Map();
+  for (const match of bracket.matches_v2) {
+    const rounds = [...new Set(bracket.matches_v2.filter((row) => row.section === match.section).map((row) => row.round))].sort((p, q) => p - q);
+    columnOf.set(match.id, rounds.indexOf(match.round));
+  }
+  const lines = stageLines({
+    edges: bracketEdges(bracket.matches_v2),
+    rails: drawRails(bracket.matches_v2),
+    nodes: rects,
+    slotY,
+    corridors: sectionRects.flatMap((rect) => [rect.top - 20, rect.bottom + 20]).filter((y) => y > 2),
+    obstacles: [...rects.values(), ...heads],
+    gap: GAP,
+    columnOf,
+    matchOf: (id) => byId.get(id),
+    isVoid: (id) => isCancelled(byId.get(id)),
+  });
+  const all = [...rects.values(), ...sectionRects];
+  const bounds = { w: Math.max(...all.map((rect) => rect.right)) + GAP, h: Math.max(...all.map((rect) => rect.bottom)) + GAP };
+  return { lines, rects, heads, byId, bounds };
+}
+
+const visibleAudit = ({ lines, rects, heads, bounds }) => auditLines({
+  lines: lines.filter((line) => !line.demand),
+  boxes: [...rects.values()],
+  obstacles: heads,
+  markers: lines.filter((line) => line.marker && !line.demand).map((line) => line.marker),
+  bounds,
+});
+
+describe("stageLines: übersichtlich (#1591)", () => {
+  for (const state of ["ffa16de_start", "ffa16de_round1", "se8_fixed", "de8_fixed", "ffa8_merged"]) {
+    it(`${state}: sichtbare Linien hängen an, nichts doppelt, nichts gedrängt, nichts außerhalb, eine Schiene je Gruppe`, () => {
+      expect(visibleAudit(stageOf(structuredClone(LINES[state])))).toEqual([]);
+    });
+  }
+
+  it("Abstiege ins Loser Bracket kommen erst beim Zeigen - am Ziel steht ein Eingang mit Marker", () => {
+    const { lines, byId } = stageOf(structuredClone(LINES.de8_fixed));
+    const drops = lines.filter((line) => line.flow === "L" && line.cross && !line.stub);
+    expect(drops.length).toBeGreaterThan(0);
+    expect(drops.every((line) => line.demand)).toBe(true);
+    const stubs = lines.filter((line) => line.stub && !line.demand);
+    for (const drop of drops) {
+      expect(stubs.some((stub) => stub.to === drop.to && stub.toSlot === drop.toSlot), `Eingang in ${byId.get(drop.to).match_key}`).toBe(true);
+    }
+    for (const stub of stubs) {
+      expect(stub.marker).toEqual(stub.points[0]);
+      expect(stub.points[1].x - stub.points[0].x).toBeGreaterThan(0);
+    }
+  });
+
+  it("gemischt: Äste aus einem anderen Abschnitt kommen erst beim Zeigen, die Schiene bekommt einen Eingang", () => {
+    const { lines, byId } = stageOf(structuredClone(LINES.ffa16de_start));
+    const crossIn = lines.filter((line) => line.scaffold === "in" && line.cross);
+    expect(crossIn.length).toBeGreaterThan(0);
+    expect(crossIn.every((line) => line.demand)).toBe(true);
+    const keyOf = (key) => lines.find((line) => line.spine && byId.get(drawRails(LINES.ffa16de_start.matches_v2).find((rail) => rail.key === line.spine)?.targets[0])?.match_key === key)?.spine;
+    for (const key of ["LA", "LC"]) {
+      const spine = lines.find((line) => line.spine === keyOf(key));
+      const entry = lines.find((line) => line.stub && line.to === `rail:${spine.spine}`);
+      expect(entry, `Eingang der Schiene vor ${key}`).toBeTruthy();
+      expect(entry.points[1]).toEqual(spine.points[0]);
+    }
+    // Die Weiterkommer aus der eigenen Runde (LA, LB → LC/LD) bleiben als Ast sichtbar.
+    expect(lines.filter((line) => line.scaffold === "in" && !line.cross && !line.demand).length).toBeGreaterThan(0);
+  });
+
+  it("mehrere Plätze aus einem Spiel in dasselbe Ziel: eine Gabel statt doppelter Strecken, die Einzelwege beim Zeigen", () => {
+    const { lines, byId } = stageOf(structuredClone(LINES.ffa16de_start));
+    const g = [...byId.values()].find((match) => match.match_key === "G");
+    const final = [...byId.values()].find((match) => match.match_key === "FINAL");
+    const members = lines.filter((line) => line.from === g.id && line.to === final.id && !line.fork);
+    expect(members).toHaveLength(2);
+    expect(members.every((line) => line.demand)).toBe(true);
+    const fork = lines.filter((line) => line.fork && line.from === g.id);
+    expect(fork.length).toBeGreaterThanOrEqual(3);
+    expect(fork.some((line) => line.demand)).toBe(false);
+  });
+
+  it("liegt das Ziel direkt unter der Quelle (Grand Final → Sieger), führt die Linie kurz und gerade hinunter", () => {
+    const a = { left: 100, right: 332, top: 0, bottom: 200, width: 232, height: 200 };
+    const b = { left: 100, right: 332, top: 240, bottom: 300, width: 232, height: 60 };
+    const points = routeEdge({ a, b, obstacles: [a, b], corridors: [400], gap: GAP });
+    expect(points).toHaveLength(2);
+    expect(points[0].x).toBe(points[1].x);
+    expect(points[0].y).toBe(200);
+    expect(points[1].y).toBe(240);
+    // Mit Reset steht das letzte Spiel rechts daneben: aus der Unterkante hinunter, in der Lücke hinüber, hinein.
+    const reset = { left: 380, right: 612, top: 0, bottom: 200, width: 232, height: 200 };
+    const bent = routeEdge({ a: reset, b, obstacles: [reset, b], corridors: [400], gap: GAP });
+    expect(bent).toEqual([{ x: 496, y: 200 }, { x: 496, y: 220 }, { x: 216, y: 220 }, { x: 216, y: 240 }]);
+  });
+
+  it("die Weiterkommer verlassen einen Lauf auf der Höhe der Zeile „kommen weiter“", () => {
+    const bracket = structuredClone(LINES.se8_fixed);
+    const { rects, byId } = stageOf(bracket);
+    const a = [...byId.values()].find((match) => match.match_key === "A");
+    const lines = stageLines({
+      edges: bracketEdges(bracket.matches_v2), rails: [], nodes: rects, gap: GAP,
+      exitY: (id, flow) => (id === a.id && flow === "W" ? rects.get(id).top + 77 : undefined),
+      matchOf: (id) => byId.get(id),
+    });
+    const out = lines.find((line) => line.from === a.id && !line.demand);
+    expect(out.points[0].y).toBe(rects.get(a.id).top + 77);
+  });
+});
+
+describe("stageLines: Schiene ohne Knick", () => {
+  it("liegt ein Ast fast auf der Höhe eines Ziels, läuft er gerade durch statt mit kleinem Versatz", () => {
+    const rect = (left, top) => ({ left, top, right: left + 232, bottom: top + 200, width: 232, height: 200 });
+    const nodes = new Map([["la", rect(0, 0)], ["lb", rect(0, 240)], ["lc", rect(280, 0)], ["ld", rect(280, 240)]]);
+    const matches = new Map([["la", { section: "LB" }], ["lb", { section: "LB" }], ["lc", { section: "LB" }], ["ld", { section: "LB" }]]);
+    const rails = [{ key: "s/LB:2", group: "LB:2", sources: [{ id: "la", flow: "W" }, { id: "lb", flow: "W" }], targets: ["lc", "ld"] }];
+    const lines = stageLines({ rails, nodes, gap: GAP, exitY: (id) => nodes.get(id).top + 106, matchOf: (id) => matches.get(id) });
+    const into = lines.find((line) => line.id === "rail:s/LB:2:in:la");
+    const out = lines.find((line) => line.id === "rail:s/LB:2:out:lc");
+    expect(out.points[0].y).toBe(into.points.at(-1).y);
+    expect(auditLines({ lines, boxes: [...nodes.values()] })).toEqual([]);
+  });
 });
