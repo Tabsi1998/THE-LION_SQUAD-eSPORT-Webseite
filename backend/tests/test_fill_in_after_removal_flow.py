@@ -96,3 +96,22 @@ async def test_no_no_show_proposal_for_a_removed_participant(flow):
     await sweep(flow.db, now=now_utc() + timedelta(minutes=20))
     assert not (await flow.reload(other)).get("no_show_proposal")
     assert (await flow.reload(first_round[2])).get("no_show_proposal"), "die anderen Spiele bekommen ihn weiter"
+
+
+@pytest.mark.asyncio
+async def test_a_removal_drops_an_open_no_show_proposal_and_its_extension(flow):
+    _staff, tournament, regs = await eight(flow, event_mode="online")
+    match = sorted((m for m in await flow.matches(tournament) if m["round"] == 1), key=lambda m: m["order"])[0]
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"scheduled_at": ago(30)}})
+    await sweep(flow.db, now=now_utc() + timedelta(minutes=20))
+    extended = await flow.post(f"/api/tournaments/{tournament['id']}/lead/no-show/{match['id']}", json={"action": "extend", "minutes": 5})
+    assert extended.status_code == 200, extended.text
+    await sweep(flow.db, now=now_utc() + timedelta(minutes=40))
+    stored = await flow.reload(match)
+    assert stored.get("no_show_proposal") and stored.get("no_show_extended_until")
+
+    await remove(flow, tournament, next(reg for reg in regs if reg["id"] == filled(match)[0]))
+    after = await flow.reload(match)
+    assert not after.get("no_show_proposal") and not after.get("no_show_extended_until"), "der Fall gehörte zur alten Paarung"
+    lead = (await flow.get(f"/api/tournaments/{tournament['id']}/lead")).json()
+    assert not [row for row in lead["attention"] if row["kind"] == "no_show" and row["match_id"] == match["id"]], "kein offener Fall"
