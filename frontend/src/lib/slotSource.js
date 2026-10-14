@@ -2,8 +2,10 @@
 // Turnierseite, den Turnierbaum-TV, den Event-TV und die Spiel-QR-Codes.
 //   „W:A:1“ → „Sieger aus A“   im Duell Platz 2 → „Verlierer aus A“   im Durchgang → „Platz 2 aus A“
 // Setzplätze bleiben vor dem Start leer (Entscheidung des Betreibers vom 23.09.), „Freilos“ bleibt.
+// Gemischt (#1548) steht bis zur Auslosung „Platz aus Runde 1“ (`source.draw`), danach der Name.
 // „L“ zählt wie am Server ab den Weiterkommern: L:A:1 ist der Beste, der nicht weiterkommt (services/match_v2_results).
 import { viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
+import { effectiveMatchDuration } from "@/lib/matchDuration";
 
 const RAW_RANK = /^([WLR]):([A-Za-z0-9_.-]+):([1-9][0-9]*)$/;
 const RAW_BYE = new Set(["bye", "-", "null", "none"]);
@@ -49,6 +51,8 @@ export function sourceLabel(source, findMatch = () => undefined) {
   if (!normalized) return "";
   if (normalized.type === "bye") return "Freilos";
   if (normalized.type !== "rank" || !normalized.match_key) return "";
+  // Gemischt (#1548): bis zur Auslosung ist offen, wer aus welchem Spiel kommt - nur die Runde steht fest.
+  if (normalized.draw) return `Platz aus ${normalized.draw.label || "der Vorrunde"}`;
   const from = findMatch(normalized.match_key);
   const rank = absoluteRank(normalized, from);
   const key = normalized.match_key;
@@ -106,9 +110,10 @@ export function stationLabel(match) {
  * „geplant ca. 14:20 · 30 Minuten“ (#1113) statt „Keine Station · 30 Min.“ - an einem anderen Tag mit Datum, für
  * fertige Spiele nichts.
  */
-export function plannedText(match, now = new Date()) {
+export function plannedText(match, now = new Date(), context = {}) {
   if (!match || isMatchDone(match)) return "";
-  const duration = Number(match.duration_minutes || match.settings?.duration_minutes || 0);
+  // Dauer aus der einen Kette (#1554); `context`: { stage, tournament, game }, wenn bekannt.
+  const duration = effectiveMatchDuration(match, context);
   const parts = [];
   if (match.scheduled_at) {
     const time = viennaTime(match.scheduled_at, { hour: "2-digit", minute: "2-digit" });

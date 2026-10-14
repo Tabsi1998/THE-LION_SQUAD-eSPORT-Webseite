@@ -636,6 +636,88 @@ test("ein Online-Turnier bekommt beim Planen keine Stationen, nur den Hinweis", 
   expect(apiMock.post.mock.calls.some(([url]) => String(url).includes("/schedule/apply"))).toBe(false);
 });
 
+// Spiel-Daten (#1554): ohne eigene Matchdauer plant das Turnier mit dem Spiel - das Formular sagt es, und die
+// Wahl des Spiels füllt Best-of und Laufgröße vor.
+const KART = {
+  id: "g-kart", name: "Mario Kart 8 Deluxe", slug: "mk8",
+  match_modes: [
+    { mode: "gp4", label: "Grand Prix 4 Rennen", minutes: 12, per_game: false },
+    { mode: "race", label: "Einzelrennen", minutes: 4, per_game: true },
+  ],
+  setup_minutes: 3, default_best_of: 3, players_per_run_local: 4, players_per_run_online: 12,
+};
+const OTHER_GAME = { id: "g-other", name: "Rocket League", slug: "rl" };
+
+function renderWithGames(tournament) {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path === "/games") return Promise.resolve({ data: [KART, OTHER_GAME] });
+    if (path.includes("/tournaments/t-1") && !path.includes("/registrations") && !path.includes("/bracket")
+      && !path.includes("/stages") && !path.includes("/matches-v2") && !path.includes("/groups")
+      && !path.includes("/staff") && !path.includes("/stations")) {
+      return Promise.resolve({ data: { ...TOURNAMENT, ...tournament } });
+    }
+    return Promise.resolve(routeFor(path));
+  });
+  return renderPage();
+}
+
+test("ohne eigene Matchdauer steht „vom Spiel: 15 Min.“ - mit Modus und Aufbauzeit", async () => {
+  const user = userEvent.setup();
+  renderWithGames({ game_id: "g-kart", match_duration_minutes: null, best_of: 1 });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+
+  const duration = await screen.findByTestId("tr-edit-duration");
+  expect(duration).toHaveValue(null);
+  await waitFor(() => expect(screen.getByTestId("tr-edit-duration-source")).toHaveTextContent("vom Spiel: 15 Min. (Grand Prix 4 Rennen)"));
+
+  await user.selectOptions(screen.getByTestId("tr-edit-game-mode"), "race");
+  await user.clear(screen.getByTestId("tr-edit-bo"));
+  await user.type(screen.getByTestId("tr-edit-bo"), "3");
+  // Einzelrennen 4 Min. × 2,5 (Bo3) = 10, plus 3 Min. Aufbau.
+  expect(screen.getByTestId("tr-edit-duration-source")).toHaveTextContent("vom Spiel: 13 Min. (Einzelrennen)");
+  await user.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ game_mode: "race", best_of: 3 })));
+  expect(apiMock.patch.mock.calls.at(-1)[1]).not.toHaveProperty("match_duration_minutes");
+});
+
+test("eine eigene Matchdauer schlägt das Spiel, leeren heißt wieder „vom Spiel“", async () => {
+  const user = userEvent.setup();
+  renderWithGames({ game_id: "g-kart", match_duration_minutes: 40 });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+
+  const duration = await screen.findByTestId("tr-edit-duration");
+  expect(duration).toHaveValue(40);
+  await waitFor(() => expect(screen.getByTestId("tr-edit-duration-source")).toHaveTextContent("Leer lassen: vom Spiel: 15 Min."));
+  await user.clear(duration);
+  await user.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ match_duration_minutes: null })));
+});
+
+test("die Wahl des Spiels füllt Best-of und Laufgröße vor", async () => {
+  const user = userEvent.setup();
+  renderWithGames({ game_id: "g-other", format: "ffa_custom_bracket", best_of: 1, event_mode: "local" });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  await screen.findByRole("option", { name: "Mario Kart 8 Deluxe" });
+
+  await user.selectOptions(screen.getByLabelText("Spiel"), "g-kart");
+  expect(screen.getByTestId("tr-edit-bo")).toHaveValue(3);
+  expect(screen.getByTestId("tr-edit-stage-size")).toHaveValue(4);
+  expect(screen.getByTestId("tr-edit-bo-source")).toHaveTextContent("vom Spiel: Best of 3");
+  expect(screen.getByTestId("tr-edit-stage-size-source")).toHaveTextContent("vom Spiel: 4 je Lauf vor Ort");
+});
+
+test("der Neuaufbau schreibt die Matchdauer nicht mehr in die Phase", async () => {
+  const user = userEvent.setup();
+  renderWithGames({ game_id: "g-kart", match_duration_minutes: 40 });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  const body = await applyStructure(user);
+  expect(body.settings).not.toHaveProperty("duration_minutes");
+});
+
 // Grand Final (#1549): im Bearbeiten-Formular nur beim Doppel-K.-o., mit dem gespeicherten Wert.
 test("Bearbeiten: Grand Final nur beim Doppel-K.-o., gespeicherter Wert vorbelegt", async () => {
   const user = userEvent.setup();
@@ -670,4 +752,43 @@ test("Bearbeiten: „Läufe umbauen“ nur beim FFA-Turnierbaum, und der Vorschl
   await user.selectOptions(select, "suggest");
   await user.click(screen.getByTestId("tr-edit-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ heat_rebuild_mode: "suggest" })));
+});
+
+// Gegner der nächsten Runde (#1548): Auswahl statt Haken, gespeicherter Wert vorbelegt, geht als Ja/Nein mit.
+test("Bearbeiten: Gegner der nächsten Runde – fester Baum oder zufällig mischen", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  const select = await screen.findByTestId("tr-edit-advancement");
+  expect(select).toHaveValue("fixed");
+  expect(screen.getByText(/alle Weiterkommer in einen Topf/)).toBeInTheDocument();
+  await user.selectOptions(select, "shuffle");
+  await user.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ randomize_advancement_rounds: true })));
+});
+
+// Neu auslosen (#1548): im Betriebs-Reiter mit Aufbau-Recht, solange die Runde nicht begonnen hat.
+test("Betrieb: Neu auslosen für eine ausgeloste Runde", async () => {
+  const user = userEvent.setup();
+  const drawn = (id) => ({
+    id, match_key: id, stage_id: "s-1", section: "WB", round: 2, round_name: "Runde 2", status: "ready",
+    settings: { draw_group: "WB:2", randomize_advancement_rounds: true },
+    draw: { id: "d-1", group: "WB:2", drawn_at: "2026-10-14T10:00:00+00:00" },
+    slots: [{ slot: 1, status: "filled", registration_id: "r1", source: { type: "rank", flow: "W", match_key: "A", rank: 1 } }],
+  });
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/tournaments/t-1") && !path.includes("/t-1/")) return Promise.resolve({ data: { ...TOURNAMENT, can_manage_structure: true } });
+    if (path.includes("/stages")) return Promise.resolve({ data: [{ id: "s-1", name: "Turnierbaum", stage_type: "single_elimination", settings: {} }] });
+    if (path.includes("/matches-v2")) return Promise.resolve({ data: [drawn("E"), drawn("F")] });
+    return Promise.resolve(routeFor(path));
+  });
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-stages"));
+  await user.click(await screen.findByTestId("redraw-WB:2"));
+  await user.click(await screen.findByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/stages/s-1/redraw", { group: "WB:2" }));
 });

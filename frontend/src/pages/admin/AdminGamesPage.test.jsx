@@ -95,3 +95,63 @@ test("Discord-Rolle: Vorgabe in Worten, Speichern schickt den Namen, leer heißt
   fireEvent.change(screen.getByTestId("game-kind"), { target: { value: "edition" } });
   expect(screen.queryByTestId("game-role")).toBeNull();
 });
+
+// Spiel-Daten für Turniere (#1554): Dauer je Modus, Spieler je Lauf, Geräte, Aufbauzeit, Punktetabelle, Best-of.
+test("ein altes Spiel ohne Spiel-Daten: leere Modus-Liste mit Hinweis, Speichern schickt „keine Vorgabe“", async () => {
+  render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("game-edit-mario-kart-8"));
+  expect(screen.getByTestId("game-edit-match-data")).toHaveTextContent("Für Turniere");
+  expect(screen.getByTestId("game-edit-modes-empty")).toHaveTextContent("Noch kein Modus");
+  fireEvent.submit(screen.getByTestId("game-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({
+    match_modes: [], station_devices: [], points_table: [], players_per_run_local: null, setup_minutes: null, default_best_of: null,
+  })));
+});
+
+test("Modi, Laufgröße, Geräte, Aufbauzeit, Punkte und Best-of gehen beim Speichern mit", async () => {
+  render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("game-edit-mario-kart-8"));
+  fireEvent.click(screen.getByTestId("game-edit-mode-add"));
+  fireEvent.change(screen.getByTestId("game-edit-mode-label-0"), { target: { value: "Grand Prix 4 Rennen" } });
+  fireEvent.change(screen.getByTestId("game-edit-mode-minutes-0"), { target: { value: "12" } });
+  fireEvent.click(screen.getByTestId("game-edit-mode-add"));
+  fireEvent.change(screen.getByTestId("game-edit-mode-label-1"), { target: { value: "Einzelrennen" } });
+  fireEvent.change(screen.getByTestId("game-edit-mode-minutes-1"), { target: { value: "4" } });
+  fireEvent.click(screen.getByTestId("game-edit-mode-per-game-1"));
+  fireEvent.change(screen.getByTestId("game-edit-run-local"), { target: { value: "4" } });
+  fireEvent.change(screen.getByTestId("game-edit-run-online"), { target: { value: "12" } });
+  fireEvent.click(screen.getByTestId("game-edit-device-switch"));
+  fireEvent.change(screen.getByTestId("game-edit-setup"), { target: { value: "3" } });
+  fireEvent.change(screen.getByTestId("game-edit-points"), { target: { value: "15-12-10-9" } });
+  expect(screen.getByTestId("game-edit-points-preview")).toHaveTextContent("4 Plätze");
+  fireEvent.change(screen.getByTestId("game-edit-best-of"), { target: { value: "3" } });
+  fireEvent.submit(screen.getByTestId("game-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({
+    match_modes: [
+      { label: "Grand Prix 4 Rennen", minutes: 12, per_game: false },
+      { label: "Einzelrennen", minutes: 4, per_game: true },
+    ],
+    players_per_run_local: 4, players_per_run_online: 12, station_devices: ["switch"], setup_minutes: 3,
+    points_table: [15, 12, 10, 9], default_best_of: 3,
+  })));
+});
+
+test("eine kaputte Punktetabelle wird genannt und nicht gespeichert", async () => {
+  render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("game-edit-mario-kart-8"));
+  fireEvent.change(screen.getByTestId("game-edit-points"), { target: { value: "15, zwölf" } });
+  expect(screen.getByTestId("game-edit-points-error")).toHaveTextContent("„zwölf“ ist keine ganze Zahl.");
+  fireEvent.submit(screen.getByTestId("game-sheet"));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+});
+
+test("ein Modus lässt sich wieder entfernen", async () => {
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/games/discord-servers" ? [] : [{ ...GAMES[0], match_modes: [{ mode: "gp4", label: "Grand Prix", minutes: 12 }] }] }));
+  render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("game-edit-mario-kart-8"));
+  expect(screen.getByTestId("game-edit-mode-label-0")).toHaveValue("Grand Prix");
+  fireEvent.click(screen.getByTestId("game-edit-mode-remove-0"));
+  fireEvent.submit(screen.getByTestId("game-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ match_modes: [] })));
+});

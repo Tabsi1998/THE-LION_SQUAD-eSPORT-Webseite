@@ -9,7 +9,7 @@ import { MOTION, motionAllowed } from "@/lib/motion";
 import { heatText, isDone, isLive, isOut, isWalkover, matchFate, soloAdvance } from "@/lib/bracketGraph";
 import { useBracketMotionState, useRowFlight } from "./bracketMotion";
 import {
-  FinderContext, FinishedContext, GraphContext, MatchLinkContext, MineContext, PathContext, nodePathState, useMatchChanged,
+  DurationContext, FinderContext, FinishedContext, GraphContext, MatchLinkContext, MineContext, PathContext, nodePathState, useMatchChanged,
 } from "./context";
 
 // Die Karten des Web-Baums (#1340, #1178, #1259, #1561): ruhig - Setzplatz, Name, Ergebnis. Zeit, Station und Kennung
@@ -110,7 +110,7 @@ function MatchLink({ match, children, className }) {
 function MatchSheet({ match, id }) {
   const time = formatNodeDateTime(match?.scheduled_at);
   const station = getStationLabel(match);
-  const duration = match?.duration_minutes || match?.settings?.duration_minutes;
+  const duration = useContext(DurationContext)(match);
   return (
     <div id={id} className="tls-bracket-sheet" role="group" aria-label={`Spiel ${match.match_key || ""}`.trim()}>
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-text">

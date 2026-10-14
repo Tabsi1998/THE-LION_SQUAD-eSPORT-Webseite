@@ -16,7 +16,6 @@ import random
 import uuid
 from datetime import datetime, timezone
 
-from services.match_duration import effective_match_duration
 
 WIN_POINTS = 1.0
 DRAW_POINTS = 0.5
@@ -179,7 +178,6 @@ def swiss_round_documents(
         return []
 
     settings = stage.get("settings") or {}
-    duration = effective_match_duration(stage=stage, tournament=tournament)
     now = datetime.now(timezone.utc).isoformat()
     round_name = f"Swiss Runde {round_number}"
 
@@ -223,14 +221,12 @@ def swiss_round_documents(
                 "qualifiers_per_match": 1,
                 "score_type": settings.get("score_type") or "points",
                 "calculation": settings.get("calculation") or "points",
-                "duration_minutes": duration,
                 "randomize_advancement_rounds": False,
             },
             "status": "ready",
             "is_preview": False,
             "generation_mode": "swiss_pairing",
             "scheduled_at": None,
-            "duration_minutes": duration,
             "station_id": None,
             "created_at": now,
             "updated_at": now,

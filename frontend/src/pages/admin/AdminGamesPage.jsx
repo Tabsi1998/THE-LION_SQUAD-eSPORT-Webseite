@@ -9,6 +9,8 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
+import { gameMatchDataPayload, gameMatchDataProblem, gameMatchDataToForm } from "@/lib/gameMatchData";
+import { GameMatchDataFields } from "./GameMatchDataFields";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
@@ -217,6 +219,8 @@ function toForm(game) {
     player_id_fields: game.player_id_fields || [],
     discord_guild_id: game.discord_guild_id || "",
     discord_role_name: game.discord_role_name || "",
+    // Spiel-Daten für Turniere (#1554) - eigener Teil des Formulars, beim Speichern umgerechnet.
+    match_data: gameMatchDataToForm(game),
   };
 }
 
@@ -233,8 +237,10 @@ function normalizePlayerIdFields(fields = []) {
 
 function gamePayload(form) {
   const isEdition = form.kind === "edition";
+  const { match_data: matchData, ...rest } = form;
   return {
-    ...form,
+    ...rest,
+    ...(matchData ? gameMatchDataPayload(matchData) : {}),
     slug: slugFrom(form.slug),
     parent_game_id: isEdition ? (form.parent_game_id || null) : null,
     identity_source_game_id: isEdition ? (form.identity_source_game_id || null) : null,
@@ -256,6 +262,8 @@ function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault();
+    const problem = gameMatchDataProblem(form.match_data);
+    if (problem) { toast.error(problem); return; }
     setSaving(true);
     try {
       await api.patch(`/games/${form.id}`, gamePayload(form));
@@ -304,6 +312,7 @@ function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
         <Input placeholder="Teamgröße Standard" value={form.default_team_size} onChange={(v) => set("default_team_size", v)} testId="game-edit-team-size" />
         <SelectField label="Standardformat" value={form.default_format} onChange={(v) => set("default_format", v)} options={TOURNAMENT_FORMAT_OPTIONS} testId="game-edit-format" />
       </FormGrid>
+      <GameMatchDataFields value={form.match_data} onChange={(v) => set("match_data", v)} />
     </AdminSheet>
   );
 }

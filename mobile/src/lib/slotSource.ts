@@ -2,10 +2,19 @@
 // und am TV (frontend/src/lib/slotSource.js, #1113). Dieselben Fälle prüfen beide (frontend/src/lib/slotSource.cases.json).
 //   „W:A:1“ → „Sieger aus A“   im Duell Platz 2 → „Verlierer aus A“   im Durchgang → „Platz 2 aus A“
 // Setzplätze bleiben vor dem Start leer (Entscheidung des Betreibers vom 23.09.), „Freilos“ bleibt.
+// Gemischt (#1548) steht bis zur Auslosung „Platz aus Runde 1“ (`source.draw`), danach der Name.
 // „L“ zählt wie am Server ab den Weiterkommern: L:A:1 ist der Beste, der nicht weiterkommt (services/match_v2_results).
 import { viennaDate, viennaDay, viennaTime } from "./vienna";
 
-export type SlotSource = { type?: string; flow?: string; match_key?: string; rank?: number; seed?: number; raw?: string } | null | undefined;
+export type SlotSource = {
+  type?: string;
+  flow?: string;
+  match_key?: string;
+  rank?: number;
+  seed?: number;
+  raw?: string;
+  draw?: { group?: string; label?: string } | null;
+} | null | undefined;
 type MatchLike = {
   match_key?: string | null;
   stage_id?: string | null;
@@ -16,6 +25,8 @@ type MatchLike = {
   settings?: Record<string, any> | null;
   scheduled_at?: string | null;
   duration_minutes?: number | null;
+  // Die Dauer, die gilt (#1554) - der Server rechnet die Kette (Spiel, Phase, Turnier, Spiel-Modus).
+  effective_duration_minutes?: number | null;
 };
 export type SlotView = { kind: "player" | "bye" | "pending" | "empty"; label: string };
 
@@ -60,6 +71,8 @@ export function sourceLabel(source: SlotSource, findMatch: (key: string) => Matc
   if (!normalized) return "";
   if (normalized.type === "bye") return "Freilos";
   if (normalized.type !== "rank" || !normalized.match_key) return "";
+  // Gemischt (#1548): bis zur Auslosung ist offen, wer aus welchem Spiel kommt - nur die Runde steht fest.
+  if (normalized.draw) return `Platz aus ${normalized.draw.label || "der Vorrunde"}`;
   const from = findMatch(normalized.match_key);
   const rank = absoluteRank(normalized, from);
   const key = normalized.match_key;
@@ -108,7 +121,8 @@ export function isMatchDone(match: MatchLike | null | undefined) {
 /** „geplant ca. 14:20 · 30 Minuten“ statt „Zeit noch offen“ - an einem anderen Tag mit Datum, für fertige Spiele nichts. */
 export function plannedText(match: MatchLike | null | undefined, now: Date = new Date()) {
   if (!match || isMatchDone(match)) return "";
-  const duration = Number(match.duration_minutes || match.settings?.duration_minutes || 0);
+  // Ältere Server kennen effective_duration_minutes nicht - dann zählt, was am Spiel steht.
+  const duration = Number(match.effective_duration_minutes || match.duration_minutes || match.settings?.duration_minutes || 0);
   const parts: string[] = [];
   if (match.scheduled_at) {
     const time = viennaTime(match.scheduled_at, { hour: "2-digit", minute: "2-digit" });

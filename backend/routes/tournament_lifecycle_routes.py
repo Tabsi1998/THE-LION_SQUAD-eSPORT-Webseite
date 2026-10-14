@@ -13,6 +13,7 @@ from services.tournament_permissions import (
     require_tournament_staff_permission,
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
+from services.draw_records import record_build_draws
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.heat_rebuild import evaluate_after_write
 from services.competition_standings import placement_rows_for_structure
@@ -95,6 +96,8 @@ async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: s
                 await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
             await db.matches_v2.delete_many({"stage_id": stage["id"]})
         await db.matches_v2.insert_many(matches)
+        # Gemischt (#1548): schon beim Bau entschiedene Auslosungen (Liga, kampflose Runde) ins Protokoll.
+        await record_build_draws(db, matches, actor_id=actor_id)
         await db.tournament_stages.update_one(
             {"id": stage["id"]},
             {"$set": {"status": "ready", "updated_at": now_utc().isoformat()}},

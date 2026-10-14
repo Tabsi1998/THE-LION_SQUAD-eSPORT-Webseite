@@ -10,10 +10,11 @@ import { bracketEdges, drawRails, isCancelled, isDone, isLive, orderEdges, pathF
 import { motionTransition } from "@/lib/motion";
 import { laneCounter, routeBus, routeEdge, toPath } from "@/lib/bracketLines";
 import { TV_LINE, treeBlockUnits, treeBox, treeScale } from "@/lib/tvType";
+import { effectiveMatchDuration } from "@/lib/matchDuration";
 import { BracketMotionContext, useBracketMotion, useBracketMotionState } from "./bracket/bracketMotion";
 import { LiveClock, MatchCard, getStationLabel, slotLabel, formatNodeDateTime } from "./bracket/BracketCards";
 import {
-  ChangedMatchesContext, EMPTY_SET, FinderContext, FinishedContext, GraphContext, MatchLinkContext, MineContext, PathContext,
+  ChangedMatchesContext, DurationContext, EMPTY_SET, FinderContext, FinishedContext, GraphContext, MatchLinkContext, MineContext, PathContext,
 } from "./bracket/context";
 
 /**
@@ -147,6 +148,13 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
     textSize: tvTextSize,
   }), [tvColumns, tvViewportW, tvViewportH, tvMinZoom, tvTextSize]);
   const linkValue = useMemo(() => ({ onMatchClick: onMatchClick || null }), [onMatchClick]);
+  // Die Dauer-Kette (#1554): ohne eigenen Wert am Spiel gelten Phase, Turnier und Spiel (Modus) aus der Antwort.
+  const durationTournament = data?.tournament;
+  const durationGame = data?.duration_game;
+  const duration = useMemo(() => {
+    const stageById = new Map(stages.map((stage) => [stage?.id, stage]));
+    return (match) => effectiveMatchDuration(match, { stage: stageById.get(match?.stage_id), tournament: durationTournament, game: durationGame });
+  }, [stages, durationTournament, durationGame]);
 
   const tree = isTv ? (
     <TvStageTree stages={stages} matches={matches_v2} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} />
@@ -169,9 +177,11 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
                   <GraphContext.Provider value={graph}>
                     <PathContext.Provider value={path}>
                       <MatchLinkContext.Provider value={linkValue}>
-                        <BracketMotionContext.Provider value={motionValue}>
-                          {tree}
-                        </BracketMotionContext.Provider>
+                        <DurationContext.Provider value={duration}>
+                          <BracketMotionContext.Provider value={motionValue}>
+                            {tree}
+                          </BracketMotionContext.Provider>
+                        </DurationContext.Provider>
                       </MatchLinkContext.Provider>
                     </PathContext.Provider>
                   </GraphContext.Provider>

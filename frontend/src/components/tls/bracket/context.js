@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import { effectiveMatchDuration } from "@/lib/matchDuration";
 
 // Kontexte des Turnierbaums: damit Kennungen nicht durch Stufe → Abschnitt → Runde → Karte gereicht werden müssen.
 export const EMPTY_SET = new Set();
@@ -17,6 +18,8 @@ export const GraphContext = createContext({ edges: [], byId: new Map(), decisive
 export const PathContext = createContext({ active: null, selected: null, toggle() {}, preview() {}, clear() {} });
 // Wohin „Zum Spiel“ führt - und ob es einen eigenen Klick gibt (Verwaltung).
 export const MatchLinkContext = createContext({ onMatchClick: null });
+// Die Spieldauer je Spiel (#1554) - eine Funktion aus lib/matchDuration.js mit Phase, Turnier und Spiel der Antwort.
+export const DurationContext = createContext((match) => effectiveMatchDuration(match));
 
 export function useMatchChanged(matchId) {
   return useContext(ChangedMatchesContext).has(matchId);

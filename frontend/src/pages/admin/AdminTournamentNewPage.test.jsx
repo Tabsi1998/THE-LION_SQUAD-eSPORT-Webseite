@@ -116,3 +116,17 @@ test("Doppel-K.-o.: Grand Final wählbar, Vorgabe mit Reset, wird mitgeschickt",
   fireEvent.submit(screen.getByTestId("new-tr-form"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ format: "double_elim", grand_final_mode: "single" })));
 });
+
+// Gegner der nächsten Runde (#1548): Vorgabe fester Baum, „Zufällig mischen“ geht als randomize_advancement_rounds mit.
+test("Gegner der nächsten Runde: Vorgabe fester Baum, zufällig mischen wird mitgeschickt", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  renderAt("");
+  const select = await screen.findByTestId("new-tr-advancement");
+  expect(select).toHaveValue("fixed");
+  fireEvent.change(select, { target: { value: "shuffle" } });
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Kart-Cup" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ randomize_advancement_rounds: true })));
+});

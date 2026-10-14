@@ -24,7 +24,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from services.match_duration import effective_match_duration
+from services.advancement_draw import (
+    DRAW_RNG,
+    advancement_shuffle_enabled,
+    mark_draw_groups,
+    shuffle_league_rounds,
+)
 from services.match_v2_results import resolve_walkovers
 
 
@@ -530,16 +535,20 @@ def _auto_groups_schema(slot_count: int, group_count: int) -> str:
     return "\n".join(lines).strip()
 
 
-def _auto_league_schema(slot_count: int) -> str:
+def _auto_league_schema(slot_count: int, rng=None) -> str:
     """Build a league: everyone against everyone, home and away.
 
     The second half repeats the first with the sides swapped, which is what
     makes it a league rather than a round robin - and it keeps the fixture list
     fair, because the home side of a duel decides who is listed first and who
     fills slot two.
+
+    Mit ``rng`` (gemischt, #1548) sind Reihenfolge der Spieltage und Heimrecht gelost; die Paarungen bleiben.
     """
     seeds = list(range(1, max(2, int(slot_count or 2)) + 1))
     first_leg = _round_robin_rounds(seeds)
+    if rng is not None:
+        first_leg = shuffle_league_rounds(first_leg, rng)
     return_leg = [[(away, home) for home, away in pairs] for pairs in first_leg]
 
     lines = ["[LIGA]"]
@@ -628,7 +637,8 @@ def _with_custom_bronze_match(schema: str) -> str:
     ])
 
 
-def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], preview: bool) -> str | None:
+def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], preview: bool,
+                    league_rng=None) -> str | None:
     settings = stage.get("settings") or {}
     schema = settings.get("schema") or settings.get("custom_schema") or settings.get("bracket_schema")
     if schema:
@@ -656,7 +666,7 @@ def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], pr
         return _auto_groups_schema(size, int(settings.get("group_count") or 2))
     if (stage.get("stage_type") or "") == "league":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
-        return _auto_league_schema(size)
+        return _auto_league_schema(size, league_rng)
     if (stage.get("stage_type") or "") == "simple":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
         return _auto_ffa_single_match_schema(size)
@@ -806,13 +816,14 @@ def _compact_entry_seed_slots(docs: list[dict], preview: bool) -> None:
                 doc["status"] = _ready_status_for_slots(doc.get("slots") or [], int((doc.get("settings") or {}).get("min_players") or 2))
 
 
-def _apply_auto_byes(docs: list[dict]) -> None:
+def _apply_auto_byes(docs: list[dict], draw_rng=None, draw_now: bool = True) -> None:
     """Freilose beim Bau (#1549): ein Spiel mit genau einem Teilnehmer und keinem offenen Zufluss ist kampflos
     entschieden - der Sieger geht nur den Sieger-Weg weiter, nie ins Loser Bracket oder Spiel um Platz 3. Dieselbe
-    Kette läuft später nach jedem Ergebnis (services/match_v2_results.resolve_walkovers)."""
+    Kette läuft später nach jedem Ergebnis (services/match_v2_results.resolve_walkovers). Gemischt (#1548): ist eine
+    ganze Runde schon beim Bau kampflos entschieden, wird ihre Folgerunde gleich ausgelost."""
     by_id = {doc["id"]: doc for doc in docs}
     ordered = sorted(docs, key=lambda item: (item.get("round") or 0, item.get("order") or 0))
-    resolve_walkovers([doc["id"] for doc in ordered], by_id, {}, _now_utc().isoformat())
+    resolve_walkovers([doc["id"] for doc in ordered], by_id, {}, _now_utc().isoformat(), rng=draw_rng, draw_now=draw_now)
 
 
 def _reset_rule(spec: BracketMatchSpec, by_key: dict[str, BracketMatchSpec]) -> dict | None:
@@ -841,9 +852,18 @@ def _effective_qualifiers(doc: dict, default: int) -> int:
 
 def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: list[dict],
                                  preview: bool = False,
-                                 rng: random.Random | None = None) -> list[dict]:
+                                 rng: random.Random | None = None,
+                                 draw_rng=None,
+                                 defer_draws: bool = False) -> list[dict]:
+    """``rng``: Setzliste bei zufälligem Seeding. ``draw_rng``: das Los beim Mischen (#1548), sonst ``secrets``.
+    ``defer_draws``: kein Los beim Bau (Strukturplan) - gelost wird beim Anwenden (``apply_deferred_draws``)."""
     settings = stage.get("settings") or {}
-    schema = _resolve_schema(tournament, stage, registrations, preview)
+    shuffle = advancement_shuffle_enabled(tournament, settings)
+    draw_rng = draw_rng or DRAW_RNG
+    custom_schema = settings.get("schema") or settings.get("custom_schema") or settings.get("bracket_schema")
+    league_draw = (shuffle and not preview and not defer_draws
+                   and (stage.get("stage_type") or "") == "league" and not custom_schema)
+    schema = _resolve_schema(tournament, stage, registrations, preview, draw_rng if league_draw else None)
     specs = parse_custom_bracket_schema(schema)
     _validate_stage_flow(tournament, stage, specs)
     rounds = infer_rounds(specs)
@@ -913,14 +933,12 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
                 **({"bracket_reset": reset_rule} if (reset_rule := _reset_rule(spec, spec_by_key)) else {}),
                 "score_type": settings.get("score_type") or "points",
                 "calculation": settings.get("calculation") or "points",
-                "duration_minutes": effective_match_duration(stage=stage, tournament=tournament),
-                "randomize_advancement_rounds": bool(settings.get("randomize_advancement_rounds") or tournament.get("randomize_advancement_rounds")),
+                "randomize_advancement_rounds": shuffle,
             },
             "status": "preview" if preview else ("ready" if not has_ref and filled_count >= min(min_players, len(slots)) else "pending"),
             "is_preview": bool(preview),
             "generation_mode": "preview" if preview else "seeded",
             "scheduled_at": None,
-            "duration_minutes": effective_match_duration(stage=stage, tournament=tournament),
             "station_id": None,
             "created_at": now,
             "updated_at": now,
@@ -945,10 +963,17 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
             })
     for doc in docs:
         doc["settings"]["qualifiers_per_match"] = _effective_qualifiers(doc, qualifiers_per_match)
+    if shuffle:
+        mark_draw_groups(docs)
+    if league_draw:
+        # Liga (#1548): die Spieltage sind beim Bau gelost - das steht an jeder Partie.
+        draw = {"id": _new_id(), "group": specs[0].section, "kind": "league", "trigger": "build", "drawn_at": now}
+        for doc in docs:
+            doc["draw"] = dict(draw)
 
     _compact_entry_seed_slots(docs, preview)
 
     if not preview:
-        _apply_auto_byes(docs)
+        _apply_auto_byes(docs, draw_rng, draw_now=not defer_draws)
 
     return sorted(docs, key=lambda m: (m["round"], m["order"]))
