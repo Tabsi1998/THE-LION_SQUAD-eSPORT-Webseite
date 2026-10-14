@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
+import { StationNowNext } from "@/components/tls/live/StationNowNext";
+import { queueSummaryLine } from "@/lib/liveQueue";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
@@ -57,6 +60,7 @@ export default function TournamentSchedulePage() {
   const [activeMatchday, setActiveMatchday] = useState(null);
   const [view, setView] = useState("rounds");
   const [mineOnly, setMineOnly] = useState(false);
+  const [queue, setQueue] = useState(null);
 
   const load = useCallback(async () => {
     const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
@@ -71,12 +75,20 @@ export default function TournamentSchedulePage() {
     } catch {
       setPlan({ applies: false, matchdays: [] });
     }
+    // Live-Warteschlange je Station (#1556): nur vor Ort; online gibt es sie nicht. Fehlt sie, bleibt der Plan.
+    if (tournament.event_mode === "online") return setQueue(null);
+    try {
+      const { data: live } = await api.get(`/tournaments/${tournament.id}/live-queue`, accessConfig);
+      setQueue(live?.applies ? live : null);
+    } catch {
+      setQueue(null);
+    }
   }, [slug, accessToken]);
 
   useEffect(() => {
     load();
   }, [load]);
-  useLiveRefresh(load, ["tournaments", "matches", "matches-v2"], { fallbackMs: 7000 });
+  useLiveRefresh(load, ["tournaments", "matches", "matches-v2", "stations"], { fallbackMs: 7000 });
 
   // Frisch eingetragene Ergebnisse tragen kurz „gerade eingetragen“, und unten steht ein
   // Hinweis mit dem Ergebnis - auch für Zuschauer (#225). Beim ersten Laden nichts davon.
@@ -168,6 +180,9 @@ export default function TournamentSchedulePage() {
         <p className="mt-3 text-white/60 max-w-2xl">Alle Runden, Zeiten und Stationen. Ein Spiel antippen öffnet seine Spielseite mit Chat und Ergebnis.</p>
         <TournamentTabs tournament={tournament} accessToken={accessToken} className="mt-5" />
 
+        {/* Mein nächstes Spiel vor Ort (#1556): „Du bist als Nächstes an Station 2 · ca. 18:40“. */}
+        {hasMine && queue ? <LiveQueueStatus tournamentId={tournament.id} className="mt-6" /> : null}
+
         {(hasMine || showViews) && (
           <div className="mt-8 flex flex-wrap items-center gap-2" data-testid="schedule-toolbar">
             {showViews && (
@@ -235,7 +250,7 @@ export default function TournamentSchedulePage() {
             </div>
           </div>
         ) : activeView === "stations" ? (
-          <StationView entries={filtered} changedMatches={changedMatches} />
+          <StationView entries={filtered} changedMatches={changedMatches} queue={queue} />
         ) : (
           <div className="mt-8 space-y-10">
             {groupByRound(filtered).map((group) => (
@@ -335,9 +350,13 @@ function ScheduleCard({ entry, resolved, changed = false }) {
 }
 
 /** Je Station eine einfache Liste nach Zeit - keine Zeitleiste der Verwaltung. */
-function StationView({ entries, changedMatches }) {
+function StationView({ entries, changedMatches, queue = null }) {
   const stations = groupByStation(entries);
+  const live = Object.fromEntries((queue?.stations || []).map((row) => [row.id, row]));
+  const summary = queueSummaryLine(queue?.summary);
   return (
+    <>
+    {summary ? <p className="mt-8 text-sm font-bold text-white" data-testid="schedule-live-summary">{summary}</p> : null}
     <div className="mt-8 grid gap-8 lg:grid-cols-2" data-testid="schedule-stations">
       {stations.map((station) => (
         <section key={station.key} className="min-w-0" aria-labelledby={`station-${station.key}`} data-testid={`schedule-station-group-${station.key}`}>
@@ -348,8 +367,8 @@ function StationView({ entries, changedMatches }) {
             </span>
             <span className="shrink-0 font-body text-xs font-semibold normal-case tracking-normal text-white/45">{station.entries.length} {station.entries.length === 1 ? "Spiel" : "Spiele"}</span>
           </h2>
-          {/* Platz für die Live-Warteschlange je Station (#1556): „jetzt dran“, „danach“ und Verzug kommen hier hin -
-              aus dem Server, sobald es sie gibt. Die Liste darunter bleibt der Plan. */}
+          {/* Live-Warteschlange je Station (#1556): „Jetzt“ und „Als Nächstes“ aus dem Server. Die Liste darunter bleibt der Plan. */}
+          <StationNowNext station={live[station.key]} stationKey={station.key} />
           <ol className="mt-3 rounded-md border border-white/10 bg-[var(--tls-surface-1)] divide-y divide-white/5">
             {station.entries.map((entry) => (
               <li key={entry.id}>
@@ -385,5 +404,6 @@ function StationView({ entries, changedMatches }) {
         </section>
       ))}
     </div>
+    </>
   );
 }

@@ -28,8 +28,9 @@ function conflict(detail) {
   return Object.assign(new Error("409"), { response: { status: 409, data: { detail } } });
 }
 
-function setup(state, { plan = state.plan, now = fixture.generated_at, extra = {}, lead = true } = {}) {
+function setup(state, { plan = state.plan, now = fixture.generated_at, extra = {}, lead = true, queue = null } = {}) {
   apiMock.get.mockImplementation((url) => {
+    if (queue && String(url).endsWith("/live-queue")) return Promise.resolve({ data: queue });
     if (String(url).includes("/schedule/deadlines")) return Promise.resolve({ data: state.deadlines || { matches: [] } });
     if (String(url).includes("/matchdays")) return Promise.resolve({ data: state.matchdays || { applies: false, matchdays: [] } });
     return Promise.resolve({ data: [] });
@@ -514,5 +515,67 @@ describe("online und Liga: keine Stationen, keine Zeitleiste je Station", () => 
     expect(weeks).toHaveTextContent("Frist");
     expect(weeks).toHaveTextContent("Standardzeit");
     expect(screen.queryByTestId("mp-timeline")).toBeNull();
+  });
+});
+
+// Live vor Ort (#1556): die Warteschlange des Servers ist die Wahrheit - „Als Nächstes“ je Station, Aufruf und Frist,
+// Verzug; „Nachrücken planen“ schreibt keine Zeiten mehr, sondern zeigt die Prognose.
+describe("live: Warteschlange je Station", () => {
+  function liveQueue(state) {
+    const [one, two] = state.stations;
+    const byKey = Object.fromEntries(state.matches.map((match) => [match.match_key, match]));
+    return {
+      applies: true, operate: { all: true, station_ids: [] },
+      summary: { delay_minutes: 11, last: { match_id: byKey.FINAL.id, label: "Finale", forecast_at: "2026-10-31T19:51:00Z" } },
+      stations: [
+        { id: one.id, name: one.name, station_text: one.name, status: "busy", waiting: 1,
+          running: { match_id: byKey.C.id, state: "running", names: ["NeonFalke", "Jo"], label: "C", started_at: state.now, duration_minutes: 30 },
+          next: { match_id: byKey.E.id, state: "queued", position: 1, names: ["LuckyLion", "Ω"], label: "E", ready: true, forecast_at: "2026-10-31T17:40:00Z" } },
+        { id: two.id, name: two.name, station_text: two.name, status: "reserved", waiting: 1, running: null,
+          next: { match_id: byKey.D.id, state: "called", position: 1, names: ["PixelPaula", "DriftDaniel"], label: "D", ready: true,
+            called_at: "2026-10-31T16:28:00Z", report_by: "2026-10-31T16:30:00Z", no_show_due_at: "2026-10-31T16:38:00Z" } },
+      ],
+      matches: {},
+    };
+  }
+
+  function setupLive() {
+    const state = fixture.live;
+    const queue = liveQueue(state);
+    setup(state, { now: state.now, queue });
+    return { state, queue };
+  }
+
+  it("„Als Nächstes“, Aufruf und Frist je Station kommen aus der Warteschlange; der Verzug auch", async () => {
+    const { state, queue } = setupLive();
+    const board = await screen.findByTestId("mp-live-queue");
+    expect(within(board).getByTestId(`live-next-${state.stations[1].id}`)).toHaveTextContent("nicht erschienen ab 17:38");
+    const banner = await screen.findByTestId("mp-delay");
+    await waitFor(() => expect(banner).toHaveTextContent("Finale jetzt ca. 20:51"));
+    expect(banner).toHaveTextContent("+11 Min.");
+    const agenda = screen.getByTestId("mp-agenda");
+    const marked = agenda.querySelectorAll("[data-next='true']");
+    expect([...marked].map((row) => row.getAttribute("data-match"))).toEqual(expect.arrayContaining([queue.stations[0].next.match_id]));
+  });
+
+  it("„Gestartet“ startet über den Server; an der belegten Station gibt es kein „Aufrufen“", async () => {
+    const { state } = setupLive();
+    await screen.findByTestId("mp-live-queue");
+    // Station 1 spielt noch - dort wird erst nach dem laufenden Spiel aufgerufen; an Station 2 ist schon aufgerufen.
+    expect(screen.queryByTestId(`live-call-${state.stations[0].id}`)).toBeNull();
+    fireEvent.click(await screen.findByTestId(`live-start-${state.stations[1].id}`));
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`/tournaments/${state.tournament.id}/live-queue/start`,
+      { station_id: state.stations[1].id, match_id: state.matches.find((match) => match.match_key === "D").id }));
+  });
+
+  it("„Nachrücken planen“ schreibt im laufenden Turnier nichts: nur die Prognose, ohne „Übernehmen“", async () => {
+    setupLive();
+    const banner = await screen.findByTestId("mp-delay");
+    await waitFor(() => expect(banner).toHaveTextContent("rückt die Warteschlange von selbst nach"));
+    expect(within(banner).queryByRole("button", { name: "Nachrücken planen" })).toBeNull();
+    fireEvent.click(within(banner).getByRole("button", { name: "Prognose ansehen" }));
+    const preview = await screen.findByTestId("mp-preview");
+    expect(preview).toHaveTextContent("Nur Prognose");
+    expect(within(preview).queryByRole("button", { name: /Übernehmen/ })).toBeNull();
   });
 });

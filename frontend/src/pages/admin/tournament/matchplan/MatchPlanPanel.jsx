@@ -14,12 +14,16 @@ import { StationTimeline } from "./StationTimeline";
 import { FlowGraph } from "./FlowGraph";
 import { DelayBanner, MatchEditor, OrderList, PlanNotice, PlanPreview, PlanSettings, PlanWarnings, StationAgenda } from "./MatchPlanParts";
 import { LeagueWeeks, OnlineRounds } from "./MatchPlanRemote";
+import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
 
 // Matchplan-Seite (#1557) - das Werkzeug der Turnierleitung am Turniertag. Oben die Einstellungen, darunter „Wer wartet
 // auf wen“, die Zeitleiste je Station und die Reihenfolge. Gerechnet wird nur im Planer (services/match_scheduler.py):
 // „Automatisch planen“ holt seine Vorschau, „Übernehmen“ schreibt sie mit Fingerabdruck; Ziehen setzt einen festen
 // Termin über den bestehenden Weg. Live hält eine stille Vorschau den Verzug aktuell (Änderungsstrom über
 // useLiveRefresh, dazu jede Minute, weil die Prognose mit der Uhr wandert). Online und Liga: keine Stationen.
+// Live vor Ort (#1556): Die Warteschlange des Servers (GET …/live-queue) ist die Wahrheit - je Station „Als Nächstes“,
+// Aufruf und Frist „nicht erschienen“, der Verzug. Der Matchplan schreibt dann keine Zeiten mehr: „Prognose ansehen“
+// zeigt die Vorschau ohne „Übernehmen“; geplante Zeiten bleiben als Vergleich stehen.
 
 const LIVE_STATUSES = new Set(["live", "paused"]);
 const CLOCK_MS = 30_000;
@@ -55,6 +59,8 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const [matchdays, setMatchdays] = useState(null);
   const [planError, setPlanError] = useState("");
   const [remoteError, setRemoteError] = useState("");
+  const [queue, setQueue] = useState(null);
+  const [busyStation, setBusyStation] = useState("");
   const request = useRef(0);
 
   useEffect(() => {
@@ -98,7 +104,20 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
     }
   }, [mode, tid]);
 
+  const liveLocal = live && mode === "local";
+  const refreshQueue = useCallback(async () => {
+    if (!liveLocal) return setQueue(null);
+    try {
+      const { data } = await api.get(`/tournaments/${encodeURIComponent(tid)}/live-queue`);
+      setQueue(data?.applies ? data : null);
+    } catch {
+      setQueue(null);
+    }
+  }, [liveLocal, tid]);
+
   useEffect(() => { refreshPlan(); }, [refreshPlan]);
+  useEffect(() => { refreshQueue(); }, [refreshQueue]);
+  useLiveRefresh(refreshQueue, ["matches", "stations", "tournaments"], { enabled: liveLocal, pollMs: 60_000 });
   useEffect(() => { refreshRemote(); }, [refreshRemote]);
   useLiveRefresh(refreshPlan, ["matches", "stations", "tournaments"], { enabled: canPlan, pollMs: live ? 60_000 : 0 });
   useLiveRefresh(refreshRemote, ["matches", "tournaments"], { enabled: mode !== "local", pollMs: live ? 60_000 : 0 });
@@ -119,7 +138,26 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const graph = useMemo(() => dependencyGraph(matches), [matches]);
   const itemsById = useMemo(() => Object.fromEntries([...timeline.items, ...timeline.unscheduled].map((item) => [item.id, item])), [timeline]);
   const laneNames = useMemo(() => Object.fromEntries(timeline.lanes.map((lane) => [lane.id, lane.name])), [timeline]);
-  const delay = live && !preview ? scheduleDelay(background) : null;
+  // Der Verzug kommt live aus der Warteschlange (Prognose ab jetzt); ohne sie aus der Vorschau des Planers.
+  const queueDelay = queue?.summary?.last && queue.summary.delay_minutes
+    ? { minutes: queue.summary.delay_minutes, label: queue.summary.last.label, at: Date.parse(queue.summary.last.forecast_at), matchId: queue.summary.last.match_id }
+    : null;
+  const delay = live && !preview ? (queue ? queueDelay : scheduleDelay(background)) : null;
+  const nextIds = useMemo(() => (queue ? new Set((queue.stations || []).map((row) => row.next?.match_id).filter(Boolean)) : null), [queue]);
+
+  // Aufrufen und Gestartet aus der Warteschlange - derselbe Weg wie in der Turnierleitung am Handy.
+  const operateStation = async (kind, station, entry) => {
+    setBusyStation(station.id);
+    try {
+      await api.post(`/tournaments/${encodeURIComponent(tid)}/live-queue/${kind}`, { station_id: station.id, match_id: entry.match_id });
+      toast.success(kind === "call" ? `Aufgerufen an ${station.station_text || station.name}.` : `Gestartet an ${station.station_text || station.name}.`);
+    } catch (error) {
+      toast.error(formatRequestError(error, "Das hat nicht geklappt. Bitte neu laden."));
+    } finally {
+      setBusyStation("");
+      await Promise.all([refreshQueue(), onChanged?.()]);
+    }
+  };
 
   const startPreview = async () => {
     setBusy(true);
@@ -209,7 +247,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
 
   const planButton = mode === "local" && canPlan ? (
     <button type="button" className="tls-btn tls-btn--primary mp-btn" onClick={startPreview} disabled={busy}>
-      <Wand2 className="h-4 w-4" aria-hidden="true" /> Automatisch planen
+      <Wand2 className="h-4 w-4" aria-hidden="true" /> {liveLocal ? "Prognose ansehen" : "Automatisch planen"}
     </button>
   ) : null;
 
@@ -230,7 +268,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
 
   return (
     <div className="mp" data-mode={mode}>
-      <DelayBanner delay={delay} canPlan={canPlan} onReplan={startPreview} />
+      <DelayBanner delay={delay} canPlan={canPlan} onReplan={startPreview} forecastOnly={liveLocal} />
       {planError && <PlanNotice tone="error" testId="mp-plan-error">Der Planer hat nicht geantwortet: {planError} Gezeigt wird der gespeicherte Plan.</PlanNotice>}
       {note && <PlanNotice testId="mp-plan-note">{note}</PlanNotice>}
       <PlanSettings
@@ -244,7 +282,13 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
       />
       {mode === "local" && (
         <>
-          <PlanPreview plan={preview} stale={stale} busy={busy} onApply={apply} onDiscard={() => { setPreview(null); setStale(""); }} />
+          <PlanPreview plan={preview} stale={stale} busy={busy} onApply={apply} onDiscard={() => { setPreview(null); setStale(""); }} forecastOnly={liveLocal} />
+          {queue && (
+            <Section title="Warteschlange je Station" note="Live: läuft, als Nächstes, danach - aus dem Server" testId="mp-live-queue">
+              <StationQueueBoard queue={{ ...queue, summary: null }} busyKey={busyStation} onCall={(station, entry) => operateStation("call", station, entry)}
+                onStart={(station, entry) => operateStation("start", station, entry)} />
+            </Section>
+          )}
           <PlanWarnings items={timeline.items} warnings={shownPlan?.warnings} />
           <Section title="Wer wartet auf wen" note="Durchgezogen kommt weiter, gestrichelt fällt ins Loser Bracket. Gestrichelter Rahmen: Prognose." testId="mp-flow-card">
             <FlowGraph graph={graph} itemsById={itemsById} laneNames={laneNames} selectedId={selectedId} onSelect={setSelectedId} />
@@ -256,7 +300,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
                   <StationTimeline timeline={timeline} editable={canMove} canMoveItem={canMoveItem} onMove={move} onSelect={setSelectedId} selectedId={selectedId} showNow={live} />
                 </div>
                 <div className="mp-mobile-only">
-                  <StationAgenda timeline={timeline} canEdit={canMoveItem} onRelease={release} editor={editor} />
+                  <StationAgenda timeline={timeline} canEdit={canMoveItem} onRelease={release} editor={editor} nextIds={nextIds} />
                 </div>
               </>
             ) : (
