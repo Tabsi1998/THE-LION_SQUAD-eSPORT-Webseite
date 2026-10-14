@@ -140,7 +140,7 @@ describe("OptionalBoundary", () => {
     return <p>Popup auf {pathname}</p>;
   }
 
-  it("blendet nur den kaputten Teil aus, die Seite daneben bleibt, der Fehler wird gemeldet", () => {
+  it("ersetzt nur den kaputten Teil durch einen kurzen Hinweis, die Seite daneben bleibt, der Fehler wird gemeldet", () => {
     render(
       <MemoryRouter initialEntries={["/news"]}>
         <OptionalBoundary name="BallotPopup"><Broken /></OptionalBoundary>
@@ -149,8 +149,44 @@ describe("OptionalBoundary", () => {
     );
     expect(screen.getByTestId("seite")).toHaveTextContent("News");
     expect(screen.queryByTestId("page-error")).toBeNull();
+    const hint = screen.getByTestId("optional-error");
+    expect(hint).toHaveAttribute("role", "status");
+    expect(hint).toHaveTextContent("Dieser Teil konnte nicht geladen werden.");
+    expect(hint).not.toHaveTextContent("list.filter");
     expect(report).toHaveBeenCalledTimes(1);
     expect(report.mock.calls[0][0].message).toBe("list.filter is not a function");
+  });
+
+  it("„Nochmal versuchen“ setzt die Grenze zurück und zeigt den Teil, wenn er jetzt klappt", () => {
+    const state = { fail: true };
+    function Once() {
+      if (state.fail) throw new Error("ballots.filter is not a function");
+      return <p>Abstimmung offen</p>;
+    }
+    render(<MemoryRouter><OptionalBoundary><Once /></OptionalBoundary></MemoryRouter>);
+    expect(screen.getByTestId("optional-error")).toBeInTheDocument();
+    state.fail = false;
+    fireEvent.click(screen.getByRole("button", { name: /Nochmal versuchen/ }));
+    expect(screen.getByText("Abstimmung offen")).toBeInTheDocument();
+    expect(screen.queryByTestId("optional-error")).toBeNull();
+  });
+
+  it("der Hinweis lässt sich schließen", () => {
+    render(<MemoryRouter><OptionalBoundary><Broken /></OptionalBoundary></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "Hinweis schließen" }));
+    expect(screen.queryByTestId("optional-error")).toBeNull();
+  });
+
+  it("still für reine Deko und Hintergrund-Teile: kein Hinweis, gemeldet wird trotzdem", () => {
+    render(
+      <MemoryRouter>
+        <OptionalBoundary quiet><Broken /></OptionalBoundary>
+        <main data-testid="seite">News</main>
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("seite")).toBeInTheDocument();
+    expect(screen.queryByTestId("optional-error")).toBeNull();
+    expect(report).toHaveBeenCalledTimes(1);
   });
 
   it("versucht es auf der nächsten Seite wieder", () => {

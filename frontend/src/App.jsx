@@ -216,14 +216,16 @@ function App() {
             <ScrollManager />
             {/* Seitenwechsel mit der Übergangs-Funktion des Browsers (#1073) - nach ScrollManager, siehe dort. */}
             <ViewTransitions />
-            <OptionalBoundary><AchievementCatchUp /></OptionalBoundary>
+            {/* Still (#986): Erfolge-Nachholen und Saison-Signale arbeiten im Hintergrund und zeigen selbst nichts. */}
+            <OptionalBoundary quiet><AchievementCatchUp /></OptionalBoundary>
             {/* Saison-Signale (#678): was gesammelt wurde, geht an den Server - nach dem Login auch das von vorher. */}
-            <OptionalBoundary><SignalSync /></OptionalBoundary>
+            <OptionalBoundary quiet><SignalSync /></OptionalBoundary>
             <OptionalBoundary><CeremonyHost /></OptionalBoundary>
             {/* Abstimmung live (#844): offene Abstimmung mit eigenem Stimmrecht als Popup auf jeder Seite, nie im Admin. */}
             <OptionalBoundary><BallotPopup /></OptionalBoundary>
-            {/* Jahreszeiten (#634): Deko-Ebenen über der ganzen Website, nie im Admin, nie klickbar. */}
-            <OptionalBoundary><SeasonStage /></OptionalBoundary>
+            {/* Jahreszeiten (#634): Deko-Ebenen über der ganzen Website, nie im Admin, nie klickbar. Still (#986): reine
+                Deko - der Adventkalender darin hat eine eigene Grenze mit Hinweis (seasons/adventCalendar). */}
+            <OptionalBoundary quiet><SeasonStage /></OptionalBoundary>
             <Toaster theme="dark" position="top-right" richColors />
             <StartSplashGate />
             <AppErrorBoundary>
