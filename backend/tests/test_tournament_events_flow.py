@@ -14,7 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import change_events  # noqa: E402
+from services import change_events, scheduler  # noqa: E402
 from services.matchday_schedule import schedule_writes  # noqa: E402
 from services.result_hold import publish_due_holds  # noqa: E402
 
@@ -40,6 +40,12 @@ async def bracket(flow, count: int, *, fmt: str = "single_elim", stage_type: str
     flow.act_as(staff)
     response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "check_in"})
     assert response.status_code == 200, response.text
+    # Der Baum entsteht mit dem Ende des Check-ins aus den Eingecheckten (#1551) - alle sind da, der Check-in endet.
+    await flow.db.tournament_registrations.update_many({"tournament_id": tournament["id"]}, {"$set": {"status": "checked_in"}})
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {
+        "check_in_until": (now_utc() - timedelta(minutes=1)).isoformat()}})
+    await scheduler._safe_status_transitions()
+    assert (await stored(flow, tournament))["check_in_closed_at"]
     await flow.start(tournament)
     return tournament, regs, staff
 
@@ -107,7 +113,7 @@ async def test_a_removal_is_proposed_in_words_and_needs_the_confirmation(flow):
     assert any("Spieler" in op["text"] for op in plan["ops"]), "die Namen stehen im Vorschlag für die Turnierleitung"
     assert (await stored(flow, tournament))["participant_removal_plan"]["id"] == plan["id"]
     # Noch nichts passiert: die Anmeldung und das Spiel sind wie vorher.
-    assert (await registration(flow, victim))["status"] == "approved"
+    assert (await registration(flow, victim))["status"] == "checked_in", "unverändert eingecheckt"
     assert (await by_key(flow, tournament))["E"]["status"] == "ready"
     actions = await audit_actions(flow, tournament)
     assert actions.count("tournament.participant.removal_proposed") == 1
@@ -197,7 +203,7 @@ async def test_a_stale_proposal_is_refused_and_replaced(flow):
     await play(flow, keys["B"], filled(keys["B"]))  # jetzt ist E bereit - der Plan hätte einen Walkover mehr
     response = await flow.post(removal_url(tournament, victim), json={"kind": "withdrawn", "plan_id": plan["id"]})
     assert response.status_code == 409, response.text
-    assert (await registration(flow, victim))["status"] == "approved"
+    assert (await registration(flow, victim))["status"] == "checked_in", "unverändert eingecheckt"
     fresh = (await stored(flow, tournament))["participant_removal_plan"]
     assert fresh["id"] != plan["id"] and [op["kind"] for op in fresh["ops"]] == ["slot_cleared", "walkover"]
     confirmed = await flow.post(removal_url(tournament, victim), json={"kind": "withdrawn", "plan_id": fresh["id"]})

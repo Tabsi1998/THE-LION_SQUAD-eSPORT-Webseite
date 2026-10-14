@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from database import get_db
 from services.visibility import user_can_see
 from services.station_labels import attach_station_info
-from services.match_duration import effective_match_duration
+from services.match_duration import effective_match_duration, load_duration_game
 from services.tournament_permissions import READ_STAFF_ROLES, has_tournament_staff_permission
 from services.tournament_rules import match_policy, tournament_modes
 from services.permissions import is_confirmed_tournament_lead
@@ -158,8 +158,11 @@ def _parse_plan_dt(value) -> datetime | None:
         return None
 
 
-def _plan_duration(match: dict, tournament: dict | None = None, stage: dict | None = None) -> int:
-    return effective_match_duration(match, stage=stage, tournament=tournament)
+def _plan_duration(match: dict, tournament: dict | None = None, stage: dict | None = None, game: dict | None = None) -> int:
+    """Die Dauer für Planungsprüfung und Export - ``_collect_plan_matches`` rechnet sie mit Phase und Game vor."""
+    if match.get("_planned_minutes"):
+        return match["_planned_minutes"]
+    return effective_match_duration(match, stage=stage, tournament=tournament, game=game)
 
 
 def _plan_match_label(match: dict) -> str:
@@ -212,8 +215,14 @@ def _match_has_minimum_players(match: dict, allow_preview: bool = True) -> bool:
 async def _collect_plan_matches(db, tid: str) -> tuple[list[dict], dict]:
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
     matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    # Die Dauer aus der ganzen Kette (Phase, Turnier, Game; #1554) - vorher fehlten hier Phase und Game.
+    stages = {stage["id"]: stage for stage in await db.tournament_stages.find(
+        {"tournament_id": tid}, {"_id": 0, "id": 1, "settings": 1}).to_list(200)}
+    game = await load_duration_game(db, tournament)
     for match in matches:
         match["_collection"] = "matches_v2"
+        match["_planned_minutes"] = effective_match_duration(
+            match, stage=stages.get(match.get("stage_id") or ""), tournament=tournament, game=game)
     await attach_station_info(db, matches)
     return sorted(matches, key=_plan_match_sort), tournament
 
@@ -360,7 +369,6 @@ def _stage_defaults_for_tournament_format(tournament: dict, body: TournamentBrac
         # Eine Gruppe ist ein Round Robin, mehrere sind eine Gruppenphase.
         settings.setdefault("group_count", _default_group_count(tournament) if fmt == "groups" else 1)
     settings.setdefault("qualifiers_per_match", 2 if match_type == "ffa" else 1)
-    settings.setdefault("duration_minutes", effective_match_duration(tournament=tournament))
     settings.setdefault("score_type", "points")
     settings.setdefault("calculation", "points")
     return {

@@ -422,6 +422,11 @@ def plan_removal(matches: list[dict], registration_id: str, *, kind: str, now_is
     summary = next((outcome for outcome, had_live in outcomes if had_live), outcomes[-1][0] if outcomes else {"mode": "bracket"})
     if summary.get("mode") == "table":
         summary["mode"] = "forfeit"
+    # Ein offener Vorschlag „nicht erschienen“ (#1551) samt Verlängerung gehörte zur alten Besetzung - wie beim
+    # Paarungswechsel einer Korrektur (_pairing_reset_fields).
+    for match in live:
+        if _fingerprint(match) != before[match["id"]] and (match.get("no_show_proposal") or match.get("no_show_extended_until")):
+            match.update({"no_show_proposal": None, "no_show_extended_until": None})
     changed = [m["id"] for m in live if _fingerprint(m) != before[m["id"]]]
     for op in ops:
         op["display_event"] = DISPLAY_BY_OP.get(op.get("kind"), "slot_cleared")

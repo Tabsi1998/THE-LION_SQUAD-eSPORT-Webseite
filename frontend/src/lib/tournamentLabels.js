@@ -170,6 +170,8 @@ export const DEVICE_TYPE_LABELS = {
   switch: "Switch",
   switch2: "Switch 2",
   pc: "PC",
+  ps5: "PS5",
+  xbox: "Xbox",
   racing_rig: "Renn-Setup",
   beamer: "Beamer",
   stream_setup: "Übertragungsplatz",

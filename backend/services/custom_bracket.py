@@ -30,7 +30,6 @@ from services.advancement_draw import (
     mark_draw_groups,
     shuffle_league_rounds,
 )
-from services.match_duration import effective_match_duration
 from services.match_v2_results import resolve_walkovers
 
 
@@ -934,14 +933,12 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
                 **({"bracket_reset": reset_rule} if (reset_rule := _reset_rule(spec, spec_by_key)) else {}),
                 "score_type": settings.get("score_type") or "points",
                 "calculation": settings.get("calculation") or "points",
-                "duration_minutes": effective_match_duration(stage=stage, tournament=tournament),
                 "randomize_advancement_rounds": shuffle,
             },
             "status": "preview" if preview else ("ready" if not has_ref and filled_count >= min(min_players, len(slots)) else "pending"),
             "is_preview": bool(preview),
             "generation_mode": "preview" if preview else "seeded",
             "scheduled_at": None,
-            "duration_minutes": effective_match_duration(stage=stage, tournament=tournament),
             "station_id": None,
             "created_at": now,
             "updated_at": now,

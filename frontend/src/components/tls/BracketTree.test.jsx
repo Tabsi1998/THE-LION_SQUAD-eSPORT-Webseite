@@ -97,6 +97,19 @@ describe("BracketTree", () => {
     expect(screen.getByTestId("bracket-match-v2-m2")).toHaveTextContent("Station A");
   });
 
+  it("Spieldauer ohne eigenen Wert: aus Turnier, sonst aus dem Spiel (#1554)", () => {
+    const data = knockout();
+    render(<BracketTree data={{ ...data, tournament: { match_duration_minutes: 45 } }} />);
+    expect(screen.getByTestId("bracket-match-v2-m2")).toHaveTextContent("45 Min.");
+  });
+
+  it("Spieldauer aus dem Modus des Spiels, wenn das Turnier keine nennt (#1554)", () => {
+    const data = knockout();
+    const game = { match_modes: [{ mode: "gp4", label: "Grand Prix", minutes: 12 }], setup_minutes: 3 };
+    render(<BracketTree data={{ ...data, tournament: {}, duration_game: game }} />);
+    expect(screen.getByTestId("bracket-match-v2-m2")).toHaveTextContent("15 Min.");
+  });
+
   it("Sieger-Schimmer nur, wenn das Ergebnis gerade eintrifft - und nur über die Siegerzeile (#1076)", () => {
     const { unmount } = render(<BracketTree data={knockout()} />);
     expect(screen.getByTestId("bracket-match-v2-m1").querySelector("[data-sweep]")).toBeNull();

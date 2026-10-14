@@ -25,6 +25,8 @@ type MatchLike = {
   settings?: Record<string, any> | null;
   scheduled_at?: string | null;
   duration_minutes?: number | null;
+  // Die Dauer, die gilt (#1554) - der Server rechnet die Kette (Spiel, Phase, Turnier, Spiel-Modus).
+  effective_duration_minutes?: number | null;
 };
 export type SlotView = { kind: "player" | "bye" | "pending" | "empty"; label: string };
 
@@ -119,7 +121,8 @@ export function isMatchDone(match: MatchLike | null | undefined) {
 /** „geplant ca. 14:20 · 30 Minuten“ statt „Zeit noch offen“ - an einem anderen Tag mit Datum, für fertige Spiele nichts. */
 export function plannedText(match: MatchLike | null | undefined, now: Date = new Date()) {
   if (!match || isMatchDone(match)) return "";
-  const duration = Number(match.duration_minutes || match.settings?.duration_minutes || 0);
+  // Ältere Server kennen effective_duration_minutes nicht - dann zählt, was am Spiel steht.
+  const duration = Number(match.effective_duration_minutes || match.duration_minutes || match.settings?.duration_minutes || 0);
   const parts: string[] = [];
   if (match.scheduled_at) {
     const time = viennaTime(match.scheduled_at, { hour: "2-digit", minute: "2-digit" });

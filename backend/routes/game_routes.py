@@ -159,7 +159,10 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
     if not current:
         raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
     nullable_fields = {"short_name", "logo_url", "cover_url", "genre", "parent_game_id", "identity_source_game_id", "discord_guild_id",
-                       "discord_role_name"}
+                       "discord_role_name",
+                       # Spiel-Daten (#1554): leer heißt „keine Vorgabe“.
+                       "match_modes", "players_per_run_local", "players_per_run_online", "station_devices", "setup_minutes",
+                       "points_table", "default_best_of"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     slug_source = slug_source_for_update(raw, current, "name", fallback="spiel")

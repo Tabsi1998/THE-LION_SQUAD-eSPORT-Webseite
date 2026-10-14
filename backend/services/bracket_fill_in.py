@@ -180,7 +180,8 @@ def reopened_bye(place: dict, matches: list[dict], new_reg: dict, now_iso: str) 
             _reset_match_result_state(target, sets, now_iso)
             _cascade_clear_downstream(target["id"], by_id, downstream, sets, now_iso)
     slots = [
-        {**slot, "registration_id": new_reg["id"], "user_id": new_reg.get("user_id"), "status": "filled"}
+        # Neu besetzt: ein Freilos-Grund (leerer Platz, Austritt #1553) gehört nicht mehr dazu.
+        {**slot, "registration_id": new_reg["id"], "user_id": new_reg.get("user_id"), "status": "filled", "source_result": None}
         if slot.get("slot") == place["slot"] else dict(slot)
         for slot in match.get("slots") or []
     ]
