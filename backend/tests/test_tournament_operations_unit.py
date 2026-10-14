@@ -520,7 +520,8 @@ def _patch_bracket_rebuild_dependencies(monkeypatch, db):
 
 @pytest.mark.parametrize(("tournament_format", "stage_type", "match_type", "match_count"), [
     ("custom_bracket", "custom_bracket", "duel", 63),
-    ("ffa_custom_bracket", "ffa_custom_bracket", "ffa", 17),
+    # 64 Spieler in 4er-Läufen (#1549): 16 + 8 + 4 + 2 Läufe und ein Finale mit höchstens 4.
+    ("ffa_custom_bracket", "ffa_custom_bracket", "ffa", 31),
 ])
 def test_rebuild_from_format_supports_64_player_custom_brackets(
     monkeypatch,

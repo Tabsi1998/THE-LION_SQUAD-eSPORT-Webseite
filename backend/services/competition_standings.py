@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from services.round_labels import section_kind
+
 
 TERMINAL_MATCH_STATUSES = {"completed", "forfeit"}
 
@@ -46,7 +48,70 @@ def _duel_entries(match: dict) -> tuple[dict | None, dict | None, dict | None, d
     return slot_a, slot_b, result_a, result_b
 
 
+def _section_kind(match: dict) -> str:
+    return section_kind(match.get("section"))
+
+
+def decided_places(matches: list[dict]) -> dict[str, int]:
+    """Welche Plätze der Baum selbst schon vergeben hat (#1549): das entscheidende Spiel schlägt jede Zählung.
+
+    Grand Final (das letzte gespielte - ein nicht nötiger Reset zählt nicht) vergibt Platz 1 und 2, sonst das Finale
+    der Siegerrunde; im Doppel-K.-o. ist der Sieger der Verliererrunde Zweiter, wenn es kein Grand Final gibt, und
+    ihr Finalverlierer Dritter. Ein Finale mit mehreren Plätzen (FFA) vergibt alle seine Plätze, das Spiel um Platz 3
+    die Plätze 3 und 4. Nur die letzte Phase zählt."""
+    decided = [match for match in matches if match.get("status") in TERMINAL_MATCH_STATUSES and match.get("results")]
+    if not decided:
+        return {}
+    last_stage = max(_safe_int(match.get("stage_number")) for match in decided)
+    decided = [match for match in decided if _safe_int(match.get("stage_number")) == last_stage]
+    by_kind: dict[str, list[dict]] = {}
+    for match in decided:
+        by_kind.setdefault(_section_kind(match), []).append(match)
+    # Nur das Loser Bracket derselben Phase zählt - eines aus einer Vorrunde ändert nichts am Finale danach.
+    has_loser_bracket = any(
+        _section_kind(match) == "loser" and _safe_int(match.get("stage_number")) == last_stage for match in matches
+    )
+
+    def last_of(kind: str) -> dict | None:
+        rows = by_kind.get(kind) or []
+        if not rows:
+            return None
+        top_round = max(_safe_int(row.get("round")) for row in rows)
+        final_round = [row for row in rows if _safe_int(row.get("round")) == top_round]
+        return final_round[0] if len(final_round) == 1 else None
+
+    def ranked(match: dict | None) -> list[str]:
+        rows = sorted((row for row in (match or {}).get("results") or [] if row.get("registration_id")),
+                      key=lambda row: _safe_int(row.get("rank"), 999))
+        return [row["registration_id"] for row in rows]
+
+    places: dict[str, int] = {}
+
+    def place(registration_id: str | None, rank: int) -> None:
+        if registration_id and registration_id not in places and rank not in places.values():
+            places[registration_id] = rank
+
+    grand_final = ranked(last_of("grand_final"))
+    main_final = ranked(last_of("main"))
+    loser_final = ranked(last_of("loser"))
+    if grand_final:
+        for index, registration_id in enumerate(grand_final[:2], start=1):
+            place(registration_id, index)
+    elif has_loser_bracket:
+        place(main_final[0] if main_final else None, 1)
+        place(loser_final[0] if loser_final else None, 2)
+    else:
+        for index, registration_id in enumerate(main_final, start=1):
+            place(registration_id, index)
+    if has_loser_bracket and len(loser_final) > 1:
+        place(loser_final[1], 3)
+    for index, registration_id in enumerate(ranked(last_of("bronze"))[:2], start=3):
+        place(registration_id, index)
+    return places
+
+
 def stage_standings(matches: list[dict], registrations: list[dict]) -> list[dict]:
+    places = decided_places(matches)
     rank_map = {
         registration["id"]: {
             "registration_id": registration["id"],
@@ -92,6 +157,8 @@ def stage_standings(matches: list[dict], registrations: list[dict]) -> list[dict
         row["avg_rank"] = round(row["rank_sum"] / row["played"], 2) if row["played"] else None
     rows.sort(
         key=lambda row: (
+            # Vom Baum vergebene Plätze zuerst (Platz 1 vor Platz 2), dann die Zählung.
+            -places.get(row["registration_id"], 10_000),
             row["furthest_round"],
             row["won"],
             row["top2"],

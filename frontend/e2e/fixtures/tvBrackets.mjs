@@ -55,7 +55,7 @@ function build(specs, count, { matchType = "duel", qualifiers = 1, title = "Lion
     return {
       id: `m-${spec.key}`, match_key: spec.key, section: spec.section, round: depthOf(spec.key), round_name: spec.roundName, order,
       stage_id: "stage-1", stage_number: 1, stage_type: stageType, match_type: matchType, slots, results: [],
-      settings: { match_size: slots.length, qualifiers_per_match: qualifiers, duration_minutes: 30 }, duration_minutes: 30,
+      settings: { match_size: slots.length, qualifiers_per_match: qualifiers, duration_minutes: 30, ...(spec.settings || {}) }, duration_minutes: 30,
       status: filled === slots.length ? "ready" : "pending",
     };
   });
@@ -96,7 +96,7 @@ export function singleElimination(count, { bronze = false, title } = {}) {
 }
 
 /** Doppel-K.-o. mit Duellen wie `_auto_double_elim_schema`. */
-export function doubleElimination(count, { title } = {}) {
+export function doubleElimination(count, { title, reset = false } = {}) {
   let sources = seedPositions(count).map(String);
   const specs = [];
   const wbRounds = [];
@@ -146,6 +146,8 @@ export function doubleElimination(count, { title } = {}) {
     }
   }
   specs.push({ section: "GF", roundName: "Grand Final", key: "GF", sources: [`W:${wbRounds[wbRounds.length - 1][0]}:1`, `W:${previous[0]}:1`] });
+  // Grand Final Reset (#1549) wie `_auto_double_elim_schema`: nur gespielt, wenn Platz 2 (Loser Bracket) das Finale gewinnt.
+  if (reset) specs.push({ section: "GF", roundName: "Grand Final Reset", key: "GFR", sources: ["W:GF:1", "W:GF:2"], settings: { bracket_reset: { of_match_key: "GF", upper_slot: 1 } } });
   return build(specs, count, { title, stageType: "double_elimination" });
 }
 
@@ -234,6 +236,13 @@ export function decide(bracket, key, ranking = null) {
       slot.status = "filled";
     });
     if (other.status === "pending" && other.slots.every((slot) => slot.registration_id)) other.status = "ready";
+    // Reset-Regel wie der Server (#1549): nicht nötig, wenn der Spieler aus Platz 1 (Siegerrunde) gewinnt.
+    const rule = other.settings?.bracket_reset;
+    if (rule && rule.of_match_key === key) {
+      const winnerSlot = match.slots.find((slot) => slot.registration_id === order[0])?.slot;
+      other.status = winnerSlot === (rule.upper_slot || 1) ? "cancelled" : "ready";
+      if (other.status === "cancelled") other.result_meta = { source: "bracket_reset", needed: false };
+    }
   }
   return bracket;
 }

@@ -1033,10 +1033,23 @@ async def _dispute_free_streak(ctx):
     return best
 
 
+def _forced_the_reset(match: dict, mine: set) -> bool:
+    """Im Reset-Spiel (#1549) steht auf dem Platz aus „Platz 1 des Grand Finals“, wer den Reset erzwungen hat - der
+    Spieler aus der Verliererrunde. Nur sein Sieg ist der Bracket Reset; ältere Spiele ohne Herkunft zählen wie bisher."""
+    for slot in match.get("slots") or []:
+        if slot.get("registration_id") in mine:
+            source = slot.get("source_result") or {}
+            return source.get("rank") is None or int(source.get("rank") or 0) == 1
+    return True
+
+
 @counter("bracket_resets_won", "match")
 async def _bracket_resets(ctx):
     mine = await ctx.registration_ids()
-    return sum(1 for match, won, _when, _o in _completed_matches(await ctx.matches(), mine) if won and "reset" in str(match.get("round_name") or "").lower())
+    return sum(
+        1 for match, won, _when, _o in _completed_matches(await ctx.matches(), mine)
+        if won and "reset" in str(match.get("round_name") or "").lower() and _forced_the_reset(match, mine)
+    )
 
 
 @counter("streamed_matches", "match", "tournament")

@@ -69,7 +69,8 @@ def _estimated_match_count(tournament: dict) -> int:
             loser_matches += max(1, current)
             if round_index % 2 == 1:
                 current = max(1, current // 2)
-        return max(1, count - 1) + loser_matches + 2
+        grand_finals = {"none": 0, "single": 1}.get(str(tournament.get("grand_final_mode") or "reset"), 2)
+        return max(1, count - 1) + loser_matches + grand_finals
     if fmt == "round_robin":
         return (count * (count - 1)) // 2
     if fmt == "league":
