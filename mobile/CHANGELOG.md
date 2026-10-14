@@ -10,7 +10,6 @@
 - Mobile: Bewegung und Vibration: Wer weiterkommt, gleitet in seine Zeile und leuchtet kurz auf, frische Ergebnisse zählen hoch, der Pokal hebt sich beim Finale. Das Handy vibriert beim Aufruf, beim Einchecken, bei einem eingetragenen Ergebnis, wenn du weiterkommst und beim Turniersieg. Mit „Bewegung reduzieren“ steht alles sofort am Ende (#1563, #1168).
 - Mobile: Check-in und Status: Ist der Check-in vorbei, steht statt „Jetzt einchecken“ ein Hinweis, dass du dich bei der Turnierleitung melden sollst. „Ausgetreten“ und „Disqualifiziert“ stehen auf Deutsch, und die eigene Anmeldung sagt „Du bist ausgeschieden“. Die Turnierleitung kann „nicht erschienen“ eintragen oder die Frist um 5 Minuten verlängern (#1563).
 - Mobile: Fast Lap: Zeiten tippst du wie auf der Website ein – mit Komma oder Punkt, als „1:24,587“ oder „84.587“; eine Zahl ohne Doppelpunkt sind Sekunden („90“ ist 1:30.000, vorher 90 Millisekunden). Ist eine Zeit unwahrscheinlich schnell oder langsam, fragt die App nach, bevor sie speichert. Fahrer suchst du über die Personensuche statt in einer langen Liste. Sind die Ergebnisse veröffentlicht, steht ein Hinweis, dass die Zeiten gesperrt sind (#1584).
-- Mobile: Technik: Expo-Pakete auf die aktuellen SDK-57-Korrekturstände angehoben (expo 57.0.29, expo-asset, expo-constants, expo-notifications).
 
 ## 1.6.1 - 2026-10-14
 
