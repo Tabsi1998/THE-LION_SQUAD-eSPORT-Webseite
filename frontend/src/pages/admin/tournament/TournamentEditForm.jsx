@@ -21,7 +21,7 @@ import { gamePresets } from "@/lib/gameMatchData";
 import { PrizeEditor, Txt } from "./PrizeEditor";
 import { DeadlineFields } from "./DeadlineFields";
 import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
-import { ADVANCEMENT_MODE_HINT, ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, MATCHDAY_FORMATS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, TOURNAMENT_STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
+import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, MATCHDAY_FORMATS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, TOURNAMENT_STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
 
 export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat }) {
   const dt = toDateTimeLocalInput;
@@ -76,7 +76,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     grand_final_mode: source.grand_final_mode || "reset",
     heat_rebuild_mode: source.heat_rebuild_mode || "suggest",
     seeding_mode: source.seeding_mode || "random",
-    randomize_advancement_rounds: !!source.randomize_advancement_rounds,
+    advancement_mode: advancementModeOf(source),
+    draw_show_minutes: source.draw_show_minutes ?? "",
     is_public: source.is_public !== false,
     visibility: source.visibility || "public",
     site_banner_enabled: !!source.site_banner_enabled,
@@ -142,7 +143,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     grand_final_mode: tournament.grand_final_mode || "reset",
     heat_rebuild_mode: tournament.heat_rebuild_mode || "suggest",
     seeding_mode: tournament.seeding_mode || "random",
-    randomize_advancement_rounds: !!tournament.randomize_advancement_rounds,
+    advancement_mode: advancementModeOf(tournament),
+    draw_show_minutes: tournament.draw_show_minutes ?? "",
     is_public: tournament.is_public !== false,
     visibility: tournament.visibility || "public",
     site_banner_enabled: !!tournament.site_banner_enabled,
@@ -235,6 +237,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     payload.game_mode = payload.game_mode || null;
     payload.format_label = (payload.format_label || "").trim() || null;
     if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
+    // Show-Auslosung (#1590): leer heißt Vorgabe; die Minuten zählen nur in diesem Modus.
+    payload.draw_show_minutes = payload.advancement_mode === "draw_show" ? drawShowMinutesPayload(payload.draw_show_minutes) : null;
     normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
     ["team_size", "max_participants", "min_participants", "best_of",
       "matchday_days", "default_match_weekday", "match_schedule_response_hours", "match_break_minutes"].forEach((key) => {
@@ -395,9 +399,12 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <FormGrid cols={3}>
               <SelectInput label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />
               <div className="md:col-span-2">
-                {/* Gegner der nächsten Runde (#1548): fester Baum oder echtes Los nach jeder Runde. */}
-                <SelectInput label="Gegner der nächsten Runde" value={advancementModeOf(f.randomize_advancement_rounds)} onChange={(v)=>set("randomize_advancement_rounds", v === "shuffle")} options={ADVANCEMENT_MODE_OPTIONS} hint={ADVANCEMENT_MODE_HINT} testId="tr-edit-advancement" />
+                {/* Weiterkommen in vier Modi (#1548, #1590): fester Baum, Auslosung nach der Runde, Show, sofort zufällig. */}
+                <SelectInput label="Weiterkommen (Gegner der nächsten Runde)" value={f.advancement_mode} onChange={(v)=>set("advancement_mode", v)} options={ADVANCEMENT_MODE_OPTIONS} hint={<span data-testid="tr-edit-advancement-hint">{advancementModeHint(f.advancement_mode)}</span>} testId="tr-edit-advancement" />
               </div>
+              {f.advancement_mode === "draw_show" && (
+                <TextField label="Show-Auslosung: Erinnerung nach Minuten" type="number" min="1" max="240" value={f.draw_show_minutes} onChange={(v)=>set("draw_show_minutes", v)} placeholder={String(DRAW_SHOW_MINUTES_DEFAULT)} hint={DRAW_SHOW_MINUTES_HINT} testId="tr-edit-draw-show-minutes" />
+              )}
               {modes.length > 0 && (
                 <SelectInput label="Spielmodus" value={f.game_mode} onChange={(v)=>set("game_mode", v)} testId="tr-edit-game-mode"
                   options={[["", `Erster Modus (${modes[0].label || "ohne Namen"})`], ...modes.map((mode) => [mode.mode, `${mode.label || mode.mode}${mode.minutes ? ` · ${mode.minutes} Min.${mode.per_game ? " je Spiel" : ""}` : ""}`])]}

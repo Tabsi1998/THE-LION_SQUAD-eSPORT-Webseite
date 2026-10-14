@@ -28,8 +28,9 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
-from services.advancement_draw import draw_group_of, prerequisite_ids
+from services.advancement_draw import draw_group_of, match_mode, prerequisite_ids
 from services.match_audience import playing_ids, teams_by_id
+from services.match_v2_results import group_awaits_draw
 from services.match_duration import effective_match_duration, load_duration_game, load_duration_games
 from services.matchday_schedule import plays_in_matchdays, schedule_writes
 from services.tournament_rules import match_policy
@@ -172,7 +173,10 @@ def _predecessors(match: dict, by_key: dict[tuple, dict]) -> list[dict]:
 
 def _predecessor_map(matches: list[dict], by_key: dict[tuple, dict]) -> dict[str, list[dict]]:
     """Worauf jedes Spiel wartet. Gemischt (#1548) wartet eine Folgerunde auf **alle** Spiele der Runde davor - die
-    Auslosung passiert erst, wenn sie fertig ist (``advancement_draw.prerequisite_ids``); sonst die Platz-Herkunft."""
+    Auslosung passiert erst, wenn sie fertig ist (``advancement_draw.prerequisite_ids``); sonst die Platz-Herkunft.
+    Sofort zufällig (#1590): je Zielspiel die Prognose-Regel (``advancement_draw.instant_prerequisites``) - die
+    Zielspiele in Schlüssel-Reihenfolge füllen sich mit den Quellen in Schlüssel-Reihenfolge; die Platz-Herkunft aus dem
+    Schema zählt dort nicht, denn der Platz wird erst beim Ergebnis gezogen."""
     by_id = {match["id"]: match for match in matches}
     direct = {match["id"]: _predecessors(match, by_key) for match in matches}
     groups: dict[tuple, list[dict]] = {}
@@ -181,9 +185,15 @@ def _predecessor_map(matches: list[dict], by_key: dict[tuple, dict]) -> dict[str
         if group:
             groups.setdefault((match.get("stage_id"), group), []).append(match)
     group_needs: dict[tuple, dict[str, dict]] = {}
+    instant_needs: dict[str, dict[str, dict]] = {}
     for (stage_id, group), mates in groups.items():
-        needed: dict[str, dict] = {}
         stage_rows = [row for row in matches if row.get("stage_id") == stage_id]
+        if match_mode(mates[0]) == "instant":
+            for mate in mates:
+                instant_needs[mate["id"]] = {match_id: by_id[match_id] for match_id in prerequisite_ids(mate, stage_rows)
+                                             if match_id in by_id}
+            continue
+        needed: dict[str, dict] = {}
         for match_id in prerequisite_ids(mates[0], stage_rows):
             if match_id in by_id:
                 needed[match_id] = by_id[match_id]
@@ -193,13 +203,25 @@ def _predecessor_map(matches: list[dict], by_key: dict[tuple, dict]) -> dict[str
         group_needs[(stage_id, group)] = needed
     result: dict[str, list[dict]] = {}
     for match in matches:
-        found = {previous["id"]: previous for previous in direct[match["id"]]}
-        group = draw_group_of(match)
-        if group:
-            found.update(group_needs[(match.get("stage_id"), group)])
+        if match["id"] in instant_needs:
+            found = dict(instant_needs[match["id"]])
+        else:
+            found = {previous["id"]: previous for previous in direct[match["id"]]}
+            group = draw_group_of(match)
+            if group:
+                found.update(group_needs[(match.get("stage_id"), group)])
         found.pop(match["id"], None)
         result[match["id"]] = list(found.values())
     return result
+
+
+def _draw_state(match: dict, matches: list[dict]) -> dict:
+    """Für Matchplan und Prognose (#1590): wartet das Spiel auf ein Los je Runde - und steht der Topf schon (Show)?"""
+    group = draw_group_of(match)
+    if not group or match_mode(match) == "instant":
+        return {"waiting_for_draw": False, "draw_ready": False}
+    waiting = group_awaits_draw(matches, group, match.get("stage_id"))
+    return {"waiting_for_draw": waiting, "draw_ready": waiting and isinstance(match.get("draw_ready"), dict)}
 
 
 def _chain_lengths(matches: list[dict], predecessors: dict[str, list[dict]]) -> dict[str, int]:
@@ -368,6 +390,7 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                 "station_name": station.get("name"),
                 "duration_minutes": minutes,
                 "forecast": forecast,
+                **_draw_state(match, matches),
                 "schedule_source": "planner",
                 "changed": previous_at != moment or match.get("station_id") != station["id"] or match.get("schedule_source") != "planner",
                 "previous": {"scheduled_at": match.get("scheduled_at"), "station_id": match.get("station_id"),

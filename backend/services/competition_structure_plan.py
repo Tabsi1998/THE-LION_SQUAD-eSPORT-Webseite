@@ -22,6 +22,8 @@ _TOURNAMENT_PLAN_FIELDS = (
     "seeding_mode",
     "match_duration_minutes",
     "randomize_advancement_rounds",
+    # Weiterkommen in vier Modi (#1590): ein anderer Modus ist ein anderer Plan.
+    "advancement_mode",
     "engine_version",
     "ruleset_version",
 )

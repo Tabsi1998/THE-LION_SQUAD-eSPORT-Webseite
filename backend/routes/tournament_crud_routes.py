@@ -35,6 +35,7 @@ from services.slug_utils import (
 )
 from models import TournamentCreate, TournamentUpdate, now_utc, new_id
 from services import pricing, tournament_fees
+from services.advancement_draw import MODE_KEY, SETTING_KEY as LEGACY_MODE_KEY, advancement_mode_of, sync_advancement_fields
 from services.permissions import can_use_area, user_has_area
 from routes.tournament_common import (
     _create_initial_stage_bracket_preview,
@@ -117,6 +118,8 @@ async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     db = get_db()
     t.pop("creation_key", None)
     apply_competition_version_read_defaults(t)
+    # Weiterkommen (#1590): ältere Turniere kennen nur den Schalter - gelesen wird immer der Modus.
+    t[MODE_KEY] = advancement_mode_of(t, None)
     t["public_phase"] = derive_public_phase(t, "tournament")
     if t.get("game_id"):
         g = await db.games.find_one({"id": t["game_id"]}, {"_id": 0})
@@ -293,6 +296,7 @@ async def create_tournament_doc(body: TournamentCreate, me: dict) -> dict:
             if not await db.games.find_one({"id": body.game_id}):
                 raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
             doc = body.model_dump()
+            sync_advancement_fields(doc)
             doc["partner_ids"] = await partner_pages.clean_partner_ids(db, doc.get("partner_ids"))
             doc["creation_key"] = creation_key
             billing = await tournament_fees.billing_updates(body.model_dump(exclude_unset=True), None, me)
@@ -359,6 +363,9 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     if "award_images" in raw_updates:
         from services.awards import clean_award_images
         raw_updates["award_images"] = clean_award_images(raw_updates.get("award_images"))
+    if MODE_KEY in raw_updates or LEGACY_MODE_KEY in raw_updates:
+        # Modus und alter Schalter bleiben im Gleichschritt (#1590); fehlt der Modus, folgt er dem Schalter.
+        sync_advancement_fields(raw_updates)
     effective_format = raw_updates.get("format", existing.get("format"))
     if effective_format != "single_elim":
         raw_updates["bronze_match"] = False
@@ -373,6 +380,8 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         "match_duration_minutes", "game_mode",
         # Fristen (#1551): leer heißt wieder Standard.
         "no_show_minutes_on_site", "no_show_minutes_online", "result_confirm_minutes_online", "result_confirm_hours_league",
+        # Show-Auslosung (#1590): leer heißt wieder Vorgabe (10 Minuten).
+        "draw_show_minutes",
     }
     updates = {k: v for k, v in raw_updates.items() if v is not None or k in nullable_fields}
     billing = await tournament_fees.billing_updates(raw_updates, existing, me)

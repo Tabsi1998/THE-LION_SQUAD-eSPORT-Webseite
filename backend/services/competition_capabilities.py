@@ -192,7 +192,13 @@ CAPABILITIES: tuple[Capability, ...] = (
     _c("structure.redraw", "Gegner der nächsten Runde neu auslosen",
        ["POST /api/tournaments/{tid}/stages/{stage_id}/redraw"], [GRAPH],
        note="#1548: gemischt lost der Server nach jeder fertigen Runde von selbst aus; die Turnierleitung lost eine "
-            "Runde (oder bei der Liga die Spieltage) neu aus, bis eines der Spiele beginnt."),
+            "Runde (oder bei der Liga die Spieltage) neu aus, bis eines der Spiele beginnt. Sofort zufällig (#1590): "
+            "nur die Spiele, die noch nicht begonnen haben."),
+    _c("structure.draw_show", "Show-Auslosung: Jetzt auslosen",
+       ["POST /api/tournaments/{tid}/stages/{stage_id}/draw"], [GRAPH],
+       note="#1590: Weiterkommen in vier Modi (fest, Auslosung nach der Runde, Show, sofort zufällig). Bei der Show "
+            "steht der Topf, bis die Turnierleitung mit Aufbau-Recht lost; nach der Frist lost der Server selbst "
+            "(services/draw_show)."),
 )
 
 

@@ -1,5 +1,5 @@
 {
- "_info": "Gemeinsame Erwartungen für den Turnierbaum (#1561 Web, #1563 App) auf den echten Bäumen aus docs/bracket-trees.json (scripts/make_app_bracket_fixture.py). Spiele stehen als Kürzel, Personen als Name. Linie: \"Quelle>Ziel:Platz Fluss\", dahinter \" quer\" (über die Grenze eines Abschnitts) und \" entfällt\" (Quelle oder Ziel abgesagt). App: mobile/src/lib/bracketGraph.test.ts. Web: frontend/src/lib/bracketGraph.js rechnet dieselben Fälle (nach #1581). Gemischte Runden (#1548/#1580): „rails“ = Sammelschiene je Auslosungs-Gruppe (Quellen mit Fluss, Zielspiele, ausgelost ja/nein); vor der Auslosung keine Einzel-Linien in die Zielspiele, danach Linien aus der echten Herkunft (source_result.from_match_key) - die prüft der Test gegen die Plätze, weil das Los zufällig ist.",
+ "_info": "Gemeinsame Erwartungen für den Turnierbaum (#1561 Web, #1563 App) auf den echten Bäumen aus docs/bracket-trees.json (scripts/make_app_bracket_fixture.py). Spiele stehen als Kürzel, Personen als Name. Linie: \"Quelle>Ziel:Platz Fluss\", dahinter \" quer\" (über die Grenze eines Abschnitts) und \" entfällt\" (Quelle oder Ziel abgesagt). App: mobile/src/lib/bracketGraph.test.ts. Web: frontend/src/lib/bracketGraph.js rechnet dieselben Fälle (nach #1581). Gemischte Runden (#1548/#1580): „rails“ = Sammelschiene je Auslosungs-Gruppe (Quellen mit Fluss, Zielspiele, ausgelost ja/nein); vor der Auslosung keine Einzel-Linien in die Zielspiele, danach Linien aus der echten Herkunft (source_result.from_match_key) - die prüft der Test gegen die Plätze, weil das Los zufällig ist. Vier Modi (#1590): die Fälle railsModes und diffInstant liegen auf den Bäumen aus frontend/e2e/fixtures/ffaGenerated.json (scripts/make_ffa_bracket_fixture.py, Los mit secrets - deshalb ohne Namen).",
  "edges": [
   {
    "state": "se6_live",
@@ -650,6 +650,221 @@
      "1 WB:2:A"
     ]
    }
+  }
+ ],
+ "railsModes": [
+  {
+   "state": "se8_instant_0",
+   "fixture": "ffaGenerated",
+   "rails": [
+    {
+     "group": "WB:2",
+     "mode": "instant",
+     "drawn": false,
+     "ready": false,
+     "assigned": 0,
+     "open": 4
+    }
+   ]
+  },
+  {
+   "state": "se8_instant_1",
+   "fixture": "ffaGenerated",
+   "rails": [
+    {
+     "group": "WB:2",
+     "mode": "instant",
+     "drawn": true,
+     "ready": false,
+     "assigned": 1,
+     "open": 3
+    }
+   ]
+  },
+  {
+   "state": "se8_instant_2",
+   "fixture": "ffaGenerated",
+   "rails": [
+    {
+     "group": "WB:2",
+     "mode": "instant",
+     "drawn": true,
+     "ready": false,
+     "assigned": 2,
+     "open": 2
+    }
+   ]
+  },
+  {
+   "state": "se8_instant_4",
+   "fixture": "ffaGenerated",
+   "rails": [
+    {
+     "group": "WB:2",
+     "mode": "instant",
+     "drawn": true,
+     "ready": false,
+     "assigned": 4,
+     "open": 0
+    }
+   ]
+  },
+  {
+   "state": "ffa16_instant_1",
+   "fixture": "ffaGenerated",
+   "rails": [
+    {
+     "group": "WB:2",
+     "mode": "instant",
+     "drawn": true,
+     "ready": false,
+     "assigned": 2,
+     "open": 6
+    }
+   ]
+  },
+  {
+   "state": "ffa16_instant_4",
+   "fixture": "ffaGenerated",
+   "rails": [
+    {
+     "group": "WB:2",
+     "mode": "instant",
+     "drawn": true,
+     "ready": false,
+     "assigned": 8,
+     "open": 0
+    }
+   ]
+  },
+  {
+   "state": "se8_show_ready",
+   "fixture": "ffaGenerated",
+   "rails": [
+    {
+     "group": "WB:2",
+     "mode": "draw_show",
+     "drawn": false,
+     "ready": true,
+     "assigned": 0,
+     "open": 4
+    }
+   ]
+  },
+  {
+   "state": "se8_show_drawn",
+   "fixture": "ffaGenerated",
+   "rails": [
+    {
+     "group": "WB:2",
+     "mode": "draw_show",
+     "drawn": true,
+     "ready": false,
+     "assigned": 4,
+     "open": 0
+    }
+   ]
+  },
+  {
+   "state": "se8_draw_before",
+   "fixture": "ffaGenerated",
+   "rails": [
+    {
+     "group": "WB:2",
+     "mode": "draw_round",
+     "drawn": false,
+     "ready": false,
+     "assigned": 0,
+     "open": 4
+    }
+   ]
+  }
+ ],
+ "diffInstant": [
+  {
+   "from": "se8_instant_0",
+   "to": "se8_instant_1",
+   "fixture": "ffaGenerated",
+   "types": [
+    "result",
+    "draw"
+   ],
+   "drawIndexes": [
+    0
+   ],
+   "railEdgesAfter": 1
+  },
+  {
+   "from": "se8_instant_1",
+   "to": "se8_instant_2",
+   "fixture": "ffaGenerated",
+   "types": [
+    "result",
+    "draw"
+   ],
+   "drawIndexes": [
+    0
+   ],
+   "railEdgesAfter": 2
+  },
+  {
+   "from": "se8_instant_2",
+   "to": "se8_instant_4",
+   "fixture": "ffaGenerated",
+   "types": [
+    "result",
+    "result",
+    "draw",
+    "draw"
+   ],
+   "drawIndexes": [
+    0,
+    1
+   ],
+   "railEdgesAfter": 4
+  },
+  {
+   "from": "se8_show_ready",
+   "to": "se8_show_drawn",
+   "fixture": "ffaGenerated",
+   "types": [
+    "draw",
+    "draw",
+    "draw",
+    "draw"
+   ],
+   "drawIndexes": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "railEdgesAfter": 4
+  },
+  {
+   "from": "ffa16_instant_1",
+   "to": "ffa16_instant_4",
+   "fixture": "ffaGenerated",
+   "types": [
+    "result",
+    "result",
+    "result",
+    "draw",
+    "draw",
+    "draw",
+    "draw",
+    "draw",
+    "draw"
+   ],
+   "drawIndexes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "railEdgesAfter": 8
   }
  ]
 }

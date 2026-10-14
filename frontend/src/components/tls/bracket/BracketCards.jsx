@@ -56,9 +56,12 @@ export function slotLabel(slot, regMap) {
   return "";
 }
 
-function pendingLabel(slot, findMatch) {
+function pendingLabel(slot, findMatch, match = null) {
   const info = describeSlot(slot, () => "", findMatch);
-  return info.kind === "pending" ? info.label : "";
+  if (info.kind !== "pending") return "";
+  // Show-Auslosung (#1590): der Topf steht, die Turnierleitung lost gleich - das steht statt „Platz aus Runde 1“.
+  if (slot?.source?.draw && match?.draw_ready && typeof match.draw_ready === "object") return "Auslosung bereit";
+  return info.label;
 }
 
 function isByeSlot(slot) {
@@ -193,7 +196,7 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
   const reg = regMap.get(regId);
   const label = slotLabel(slot, regMap);
   const bye = !reg && isByeSlot(slot);
-  const pending = reg || bye ? "" : pendingLabel(slot, findMatch);
+  const pending = reg || bye ? "" : pendingLabel(slot, findMatch, match);
   const rowMotion = regId ? state.rows.get(`${match.id}:${regId}`) || null : null;
   useRowFlight(ref, rowMotion, done, slot?.slot ?? null);
   const podium = podiumMeta(podiumRank);

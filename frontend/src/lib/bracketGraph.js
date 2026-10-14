@@ -74,6 +74,27 @@ export function slotDraw(slot) {
 
 export const drawGroupOf = (match) => (match?.settings?.draw_group ? String(match.settings.draw_group) : null);
 
+// Weiterkommen in vier Modi (#1590): am Spiel `settings.advancement_mode`; ältere Bäume kennen nur den Schalter.
+const ADVANCEMENT_MODES = new Set(["fixed", "draw_round", "draw_show", "instant"]);
+export function advancementModeOf(match) {
+  const settings = match?.settings || {};
+  if (ADVANCEMENT_MODES.has(settings.advancement_mode)) return settings.advancement_mode;
+  return settings.randomize_advancement_rounds ? "draw_round" : "fixed";
+}
+
+/** Hat dieser Platz sein Los schon (#1590, je Platz statt je Gruppe)? Ein Freilos-Platz, dessen Quelle der Umbau
+ * gestrichen hat (`source_result.skipped` ohne Los-Kennung, #1575), zählt nicht - der wartet weiter aufs Los. */
+export function slotDrawn(slot) {
+  if (!slotDraw(slot)) return false;
+  const origin = slot?.source_result;
+  if (!origin?.from_match_key) return false;
+  if (origin.draw_id) return true;
+  return Boolean(slot.registration_id) && !origin.skipped;
+}
+
+/** Ein Platz der Gruppe, der noch auf sein Los wartet. */
+export const slotOpen = (slot) => Boolean(slotDraw(slot)) && String(slot?.status || "").toLowerCase() === "pending" && !slot?.registration_id && !slot?.source_result;
+
 /**
  * Der eindeutige Schlüssel einer Sammelschiene: Phase und Gruppe (#1561). Gruppen heißen je Phase gleich („WB:2“) - mit
  * mehreren K.-o.-Phasen in einem Turnier dürfen sie sich nie vermischen.
@@ -134,8 +155,10 @@ export function bracketEdges(matches = []) {
  * Die Sammelschienen der gemischten Runden (#1548): je Auslosungs-Gruppe die Quellspiele (mit Fluss - Sieger oder ins
  * Loser Bracket), die Zielspiele, der Klartext („Runde 1“) und ob schon gelost ist. Quellen wie am Server
  * (advancement_draw.group_sources): alle Spiele, die in ein Zielspiel der Gruppe weiterleiten.
- * `[{ key, stageId, group, label, sources: [{ id, flow }], targets: [id], drawn }]`, nach Gruppe (dann Phase) sortiert -
- * wie die App. Je Phase getrennt: `key` = Phase und Gruppe (railKey).
+ * `[{ key, stageId, group, label, sources: [{ id, flow }], targets: [id], drawn, mode, ready, assigned, open }]`, nach
+ * Gruppe (dann Phase) sortiert - wie die App. Je Phase getrennt: `key` = Phase und Gruppe (railKey).
+ * Vier Modi (#1590): `mode` des Ziels; `ready` - Show-Auslosung, der Topf steht; `assigned`/`open` - Plätze mit und noch
+ * ohne Los (sofort zufällig: `drawn`, sobald der erste Platz gezogen ist - die Schiene bleibt, bis alle gezogen sind).
  */
 export function drawRails(matches = []) {
   const list = (matches || []).filter(Boolean);
@@ -170,10 +193,14 @@ export function drawRails(matches = []) {
       }
     }
     const label = targets.flatMap((target) => (target.slots || []).map(slotDraw)).find((draw) => draw?.label)?.label || "";
-    // Gelost ist, wenn ein Ziel `draw` trägt oder ein Spieler schon einen Platz aus dem Los hat. Ein Freilos-Platz,
-    // dessen Quelle der Umbau gestrichen hat (`source_result.skipped`, #1575), zählt nicht - der wartet weiter aufs Los.
-    const drawn = targets.some((target) => target.draw || (target.slots || []).some((slot) => slotDraw(slot) && slot.source_result?.from_match_key && !slot.source_result?.skipped));
-    return { key, stageId, group, label, sources: [...sources.values()], targets: targets.map((match) => match.id), drawn };
+    const slots = targets.flatMap((target) => target.slots || []);
+    const assigned = slots.filter(slotDrawn).length;
+    const open = slots.filter(slotOpen).length;
+    const mode = advancementModeOf(targets[0]);
+    // Gelost ist, wenn ein Ziel `draw` trägt oder ein Platz schon sein Los hat (sofort zufällig: je Platz, #1590).
+    const drawn = targets.some((target) => target.draw) || assigned > 0;
+    const ready = mode === "draw_show" && !drawn && targets.some((target) => target.draw_ready && typeof target.draw_ready === "object");
+    return { key, stageId, group, label, sources: [...sources.values()], targets: targets.map((match) => match.id), drawn, mode, ready, assigned, open };
   });
 }
 

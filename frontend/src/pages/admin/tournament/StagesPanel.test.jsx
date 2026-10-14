@@ -60,6 +60,31 @@ test("Matchplan: eine eigene Dauer steht im Feld", () => {
   expect(screen.getByTestId("matchplan-duration-source-m1")).toHaveTextContent("Leer lassen: vom Turnier: 45 Min.");
 });
 
+// Weiterkommen je Phase (#1590): leer erbt; ein Modus geht mit Schalter-Spiegel mit, die Show-Minuten nur bei der Show.
+test("Phase: Weiterkommen mit vier Modi, Show-Minuten nur bei der Show-Auslosung", async () => {
+  panel({ mode: "settings", canEditSettings: true, tournament: {}, durationGame: GAME });
+  const select = screen.getByTestId("stage-advancement-s1");
+  expect(select).toHaveValue("");
+  expect(screen.queryByTestId("stage-advancement-s1-hint")).toBeNull();
+  fireEvent.click(screen.getByTestId("stage-save-s1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1].settings).toMatchObject({ advancement_mode: null, randomize_advancement_rounds: null, draw_show_minutes: null });
+
+  fireEvent.change(select, { target: { value: "instant" } });
+  expect(screen.getByTestId("stage-advancement-s1-hint")).toHaveTextContent(/sofort auf einen zufälligen freien Platz/);
+  expect(screen.queryByTestId("stage-advancement-s1-minutes")).toBeNull();
+  fireEvent.change(select, { target: { value: "draw_show" } });
+  fireEvent.change(screen.getByTestId("stage-advancement-s1-minutes"), { target: { value: "7" } });
+  fireEvent.click(screen.getByTestId("stage-save-s1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
+  expect(apiMock.patch.mock.calls[1][1].settings).toMatchObject({ advancement_mode: "draw_show", randomize_advancement_rounds: true, draw_show_minutes: 7 });
+});
+
+test("Phase: der alte Schalter wird als Modus vorbelegt", () => {
+  panel({ mode: "settings", canEditSettings: true, tournament: {}, durationGame: GAME, stages: [{ ...STAGE, settings: { match_size: 4, randomize_advancement_rounds: true } }] });
+  expect(screen.getByTestId("stage-advancement-s1")).toHaveValue("draw_round");
+});
+
 test("Phase: leere Spieldauer erbt und geht als null an den Server", async () => {
   panel({ mode: "settings", canEditSettings: true, tournament: {}, durationGame: GAME });
   const duration = screen.getByTestId("stage-duration-s1");

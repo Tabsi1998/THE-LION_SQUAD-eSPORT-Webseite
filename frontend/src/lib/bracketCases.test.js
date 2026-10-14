@@ -13,9 +13,11 @@ import {
 const root = path.join(process.cwd(), "..");
 const TREES = JSON.parse(readFileSync(path.join(root, "docs/bracket-trees.json"), "utf8"));
 const CASES = JSON.parse(readFileSync(path.join(root, "docs/bracket-cases.json"), "utf8"));
+// Vier Modi (#1590): diese Bäume kommen aus scripts/make_ffa_bracket_fixture.py (Los mit secrets).
+const FFA = JSON.parse(readFileSync(path.join(root, "frontend/e2e/fixtures/ffaGenerated.json"), "utf8"));
 
-function helpers(state) {
-  const tree = TREES[state];
+function helpers(state, fixture = "") {
+  const tree = fixture === "ffaGenerated" ? FFA[state] : TREES[state];
   const keyOf = new Map(tree.matches_v2.map((match) => [match.id, match.match_key]));
   const byKey = new Map(tree.matches_v2.map((match) => [match.match_key, match]));
   const nameOf = new Map(tree.registrations.map((reg) => [reg.id, reg.display_name]));
@@ -144,6 +146,23 @@ describe("gemeinsame Fälle (docs/bracket-cases.json)", () => {
       const source = entry.slice(rail.key.length + 1);
       return `${phaseOf(rail.targets[0])} ${rail.group}:${keyOf.get(source)}`;
     })).toEqual(expectedPath.rails);
+  });
+
+  // Vier Modi (#1590): Schiene je Platz (sofort zufällig zählt gezogene und offene Plätze, die Show meldet den Topf) und
+  // je Zuweisung ein eigener Moment - ohne Namen, denn das Los kommt aus secrets.
+  it.each(CASES.railsModes || [])("Schiene je Platz: $state", ({ state, fixture, rails }) => {
+    const { tree } = helpers(state, fixture);
+    expect(drawRails(tree.matches_v2).map(({ group, mode, drawn, ready, assigned, open }) => ({ group, mode, drawn, ready, assigned, open }))).toEqual(rails);
+  });
+
+  it.each(CASES.diffInstant || [])("je Zuweisung ein Moment: $from → $to", ({ from, to, fixture, types, drawIndexes, railEdgesAfter }) => {
+    const before = helpers(from, fixture);
+    const after = helpers(to, fixture);
+    const events = diffBracket(before.tree.matches_v2, after.tree.matches_v2);
+    expect(events.map((event) => event.type)).toEqual(types);
+    expect(events.filter((event) => event.type === "draw").map((event) => event.index)).toEqual(drawIndexes);
+    expect(bracketEdges(after.tree.matches_v2).filter((edge) => edge.rail)).toHaveLength(railEdgesAfter);
+    expect(new Set(events.map((event) => event.key)).size).toBe(events.length);
   });
 
   it("der erste Stand bewegt nichts, jede Bewegung hat einen eigenen Schlüssel", () => {

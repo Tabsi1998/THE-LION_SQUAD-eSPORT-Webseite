@@ -4,7 +4,7 @@ import { clone, decide, doubleElimination, find, singleElimination } from "../..
 import FFA from "../../e2e/fixtures/ffaGenerated.json";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { LOSER_SECTIONS, bracketEdges, diffBracket, drawRails, heatExits, matchFate, orderEdges, pathFor, railKey, sectionGroup, soloAdvance } from "./bracketGraph";
+import { LOSER_SECTIONS, advancementModeOf, bracketEdges, diffBracket, drawRails, heatExits, matchFate, orderEdges, pathFor, railKey, sectionGroup, slotDrawn, slotOpen, soloAdvance } from "./bracketGraph";
 
 // Turnierbaum neu (#1561): die Linien kommen aus den echten Quellen der Plätze („W:A:1“, `advancement`), nicht aus der
 // Reihenfolge der Spiele. Dazu: was mit einem Spiel geschah (entfällt, zusammengelegt), dein Weg und die Bewegungen,
@@ -218,7 +218,7 @@ describe("Gemischte Runden: Sammelschiene", () => {
   };
 
   it("die Schiene: alle Quellen mit Fluss, die Ziele, Klartext, noch nicht gelost", () => {
-    expect(rail(ffa("se8_draw_before"))).toEqual([{ group: "WB:2", label: "Runde 1", sources: ["A W", "B W", "C W", "D W"], targets: ["E", "F"], drawn: false }]);
+    expect(rail(ffa("se8_draw_before"))).toEqual([{ group: "WB:2", label: "Runde 1", sources: ["A W", "B W", "C W", "D W"], targets: ["E", "F"], drawn: false, mode: "draw_round", ready: false, assigned: 0, open: 4 }]);
   });
 
   it("Doppel-K.-o.: je Loser-Runde eine eigene Schiene, Abstiege als Quellen mit Fluss L", () => {
@@ -282,13 +282,73 @@ describe("Gemischte Runden: Sammelschiene", () => {
   });
 
   it("gemischt und zusammengelegt (8 von 16): entfallene Läufe sind keine Quellen, die Schiene bleibt im Hauptfeld", () => {
-    expect(rail(ffa("ffa8_shuffle_merged"))).toEqual([{ group: "WB:2", label: "Runde 1", sources: ["A W", "B W"], targets: ["E", "F"], drawn: false }]);
+    expect(rail(ffa("ffa8_shuffle_merged"))).toEqual([{ group: "WB:2", label: "Runde 1", sources: ["A W", "B W"], targets: ["E", "F"], drawn: false, mode: "draw_round", ready: false, assigned: 0, open: 4 }]);
   });
 
   it("fester Baum ohne Mischen: keine Schienen", () => {
     const bracket = ffa("ffa16");
     expect(drawRails(bracket.matches_v2)).toEqual([]);
     expect(bracketEdges(bracket.matches_v2).some((edge) => edge.rail)).toBe(false);
+  });
+});
+
+// Vier Modi (#1590), echte Daten aus dem Generator: sofort zufällig zieht je Platz, die Show-Auslosung wartet mit
+// stehendem Topf auf „Jetzt auslosen“.
+describe("Vier Modi: Schiene je Platz", () => {
+  const brief = (bracket) => drawRails(bracket.matches_v2).map(({ group, mode, drawn, ready, assigned, open }) => ({ group, mode, drawn, ready, assigned, open }));
+
+  it("sofort zufällig: die Schiene zählt gezogene und offene Plätze - gelost ist, sobald der erste Platz steht", () => {
+    expect(brief(ffa("se8_instant_0"))).toEqual([{ group: "WB:2", mode: "instant", drawn: false, ready: false, assigned: 0, open: 4 }]);
+    expect(brief(ffa("se8_instant_1"))).toEqual([{ group: "WB:2", mode: "instant", drawn: true, ready: false, assigned: 1, open: 3 }]);
+    expect(brief(ffa("se8_instant_2"))).toEqual([{ group: "WB:2", mode: "instant", drawn: true, ready: false, assigned: 2, open: 2 }]);
+    expect(brief(ffa("se8_instant_4"))).toEqual([{ group: "WB:2", mode: "instant", drawn: true, ready: false, assigned: 4, open: 0 }]);
+    expect(brief(ffa("ffa16_instant_1"))).toEqual([{ group: "WB:2", mode: "instant", drawn: true, ready: false, assigned: 2, open: 6 }]);
+  });
+
+  it("sofort zufällig: je gezogenem Platz die echte Linie, die offenen Plätze bleiben ohne Linie", () => {
+    const bracket = ffa("se8_instant_2");
+    const key = keyOf(bracket);
+    const rails = bracketEdges(bracket.matches_v2).filter((edge) => edge.rail);
+    expect(rails).toHaveLength(2);
+    expect(rails.map((edge) => key(edge.from)).sort()).toEqual(["A", "B"]);
+    for (const target of bracket.matches_v2.filter((match) => match.settings?.draw_group)) {
+      for (const slot of target.slots) {
+        expect(slotDrawn(slot)).toBe(Boolean(slot.registration_id));
+        expect(slotOpen(slot)).toBe(!slot.registration_id);
+      }
+    }
+    expect(bracketEdges(ffa("se8_instant_0").matches_v2).some((edge) => edge.rail)).toBe(false);
+  });
+
+  it("sofort zufällig: jede Zuweisung ist ein eigener Moment - genau eine Bewegung „draw“ je Ergebnis", () => {
+    const one = diffBracket(ffa("se8_instant_0").matches_v2, ffa("se8_instant_1").matches_v2);
+    expect(one.map((event) => event.type)).toEqual(["result", "draw"]);
+    expect(one[1].index).toBe(0);
+    const two = diffBracket(ffa("se8_instant_1").matches_v2, ffa("se8_instant_2").matches_v2);
+    expect(two.filter((event) => event.type === "draw")).toHaveLength(1);
+    const rest = diffBracket(ffa("se8_instant_2").matches_v2, ffa("se8_instant_4").matches_v2);
+    expect(rest.filter((event) => event.type === "draw").map((event) => event.index)).toEqual([0, 1]);
+    // Der Weg des Gezogenen: die echte Linie über die Schiene, nicht mehr die Schiene selbst.
+    const after = ffa("se8_instant_1");
+    const landed = after.matches_v2.find((match) => match.settings?.draw_group && match.slots.some((slot) => slot.registration_id));
+    const player = landed.slots.find((slot) => slot.registration_id).registration_id;
+    const edges = bracketEdges(after.matches_v2);
+    const path = pathFor(player, after.matches_v2, edges);
+    expect(path.rails).toBeUndefined();
+    expect(edges.some((edge) => edge.rail && path.edges.has(edge.id))).toBe(true);
+  });
+
+  it("Show-Auslosung: der Topf steht (ready), bis gelost ist - danach wie jede Auslosung", () => {
+    expect(brief(ffa("se8_show_ready"))).toEqual([{ group: "WB:2", mode: "draw_show", drawn: false, ready: true, assigned: 0, open: 4 }]);
+    expect(brief(ffa("se8_show_drawn"))).toEqual([{ group: "WB:2", mode: "draw_show", drawn: true, ready: false, assigned: 4, open: 0 }]);
+    expect(brief(ffa("se8_draw_before"))).toEqual([{ group: "WB:2", mode: "draw_round", drawn: false, ready: false, assigned: 0, open: 4 }]);
+    expect(diffBracket(ffa("se8_show_ready").matches_v2, ffa("se8_show_drawn").matches_v2).filter((event) => event.type === "draw")).toHaveLength(4);
+  });
+
+  it("alte Bäume ohne Modus: der Schalter zählt als Auslosung nach der Runde", () => {
+    expect(advancementModeOf({ settings: { randomize_advancement_rounds: true } })).toBe("draw_round");
+    expect(advancementModeOf({ settings: {} })).toBe("fixed");
+    expect(advancementModeOf({ settings: { advancement_mode: "instant", randomize_advancement_rounds: true } })).toBe("instant");
   });
 });
 

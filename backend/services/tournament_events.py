@@ -44,7 +44,7 @@ from services.competition_usage import GRAPH, record_write
 from services.competition_versions import persist_competition_versions
 from services.heat_rebuild import STALE_DETAIL, _doc_fields, _replan_schedule, _unchanged_filter, evaluate_after_write
 from services.match_notifications import notify_match_result_confirmed
-from services.advancement_draw import draw_group_of, group_targets
+from services.advancement_draw import draw_group_of, group_targets, match_mode
 from services.match_v2_results import (
     _status_after_slot_fill,
     build_v2_result_application,
@@ -269,16 +269,26 @@ def _readvance(heat: dict, by_id: dict[str, dict], registration_id: str, now_iso
     früher schon ausgeschieden ist, kommt nicht zurück. Erst werden alle Plätze dieses Laufs im Folgelauf frei, dann
     neu besetzt (wer von Platz 2 auf Platz 1 rückt, wechselt den Sitz)."""
     gone = eliminated | {registration_id}
+    # Wer über seinen Platz aus diesem Lauf schon weitergespielt hat (der Folgelauf ist nicht mehr umbaubar: gefahren,
+    # aufgerufen oder gestartet), bleibt dort - sonst säße er in zwei Läufen zugleich. Nachrücken kann nur, wer noch
+    # keinen festen Sitz hat.
+    settled = {
+        slot.get("registration_id")
+        for target in by_id.values() if not _rebuildable(target) and int(target.get("round") or 0) > int(heat.get("round") or 0)
+        for slot in target.get("slots") or [] if slot.get("registration_id")
+    }
     survivors = [row for row in sorted(heat.get("results") or [], key=lambda row: int(row.get("rank") or 0))
-                 if row.get("registration_id") and row["registration_id"] not in gone and not row.get("forfeit")]
+                 if row.get("registration_id") and row["registration_id"] not in gone and not row.get("forfeit")
+                 and row["registration_id"] not in settled]
     entries = []
     drawn_seats: dict[tuple, list[tuple[dict, dict]]] = {}
     for entry in sorted((e for e in heat.get("advancement") or [] if e.get("flow") == "W"), key=lambda e: int(e.get("rank") or 0)):
         target = by_id.get(entry.get("to_match_id"))
         group = draw_group_of(target)
-        if group:
+        if group and match_mode(target) != "instant":
             # Gemischt (#1548): ausgelost sitzt der Weiterkommer nicht auf dem Platz aus dem Schema, sondern auf seinem
             # ausgelosten Platz - der k-te Weiterkommer dieses Laufs auf dem k-ten Platz, den der Lauf in der Gruppe hat.
+            # (Sofort zufällig, #1590: das Schema folgt dem Los - der Platz aus dem Eintrag ist der gezogene Platz.)
             scope = (target.get("stage_id"), group)
             seats = drawn_seats.setdefault(scope, _drawn_seats(by_id, group, target.get("stage_id"), heat["id"]))
             if not seats:
@@ -316,15 +326,17 @@ def _readvance(heat: dict, by_id: dict[str, dict], registration_id: str, now_iso
                             "registration_id": wanted["registration_id"], "rank": int(wanted.get("rank") or 0),
                             "replaced": current})
             continue
-        if draw_group_of(target):
+        if draw_group_of(target) and match_mode(target) != "instant":
             # Ausgelost: der Platz bleibt ein Freilos. Quelle und Weiterleitung aus dem Schema bleiben, wie sie sind -
-            # ein ausgeloster Platz gehört nicht zu der Weiterleitung, die im Schema auf ihn zeigt.
+            # ein ausgeloster Platz gehört nicht zu der Weiterleitung, die im Schema auf ihn zeigt. (Sofort zufällig,
+            # #1590: dort folgt das Schema dem Los - der Eintrag gehört zum Platz und wird wie im festen Baum gestrichen.)
             continue
         # Niemand rückt nach: der Platz ist „Quelle unerfüllbar“ wie beim Lauf-Umbau - der Lauf schickt für diesen
         # Rang niemanden mehr, damit ein Platz genau dann eine Lauf-Quelle hat, wenn ein Eintrag auf ihn zeigt.
         source = slot.get("source") or {}
         slot["source"] = {"type": "bye", "raw": source.get("raw"),
-                          "was": {key: source.get(key) for key in ("flow", "match_key", "rank")}}
+                          "was": {key: source.get(key) for key in ("flow", "match_key", "rank")},
+                          **({"draw": source["draw"]} if source.get("draw") else {})}
         if current:
             slot["source_result"] = {**(slot.get("source_result") or {}),
                                      "reason": "eliminated" if current == registration_id else "bye"}
