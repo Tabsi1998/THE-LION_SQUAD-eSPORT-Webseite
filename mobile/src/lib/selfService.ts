@@ -146,7 +146,7 @@ export function websiteStateLine(profile: WebsiteProfile): string {
   if (!profile.consent) return "Der Verein hat noch keine Einwilligung für das Website-Profil gewählt – dein Profil bleibt vorerst intern.";
   return profile.given
     ? "Du hast der Nennung zugestimmt: Der Verein zeigt dieses Profil im Mitgliederverzeichnis."
-    : "Sichtbar wird das Profil erst, wenn du der Nennung zugestimmt hast (siehe Einwilligungen).";
+    : "Sichtbar wird das Profil erst, wenn du der Nennung zugestimmt hast – unter „Meine Einwilligungen“ weiter oben.";
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);

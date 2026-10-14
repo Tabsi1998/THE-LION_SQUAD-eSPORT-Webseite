@@ -563,6 +563,17 @@ gibt der Vorstand es in Dolibarr an der Mitgliedskarte für **eine** direkte Än
 Daten“ steht dann grün: „Deine nächste Änderung gilt sofort – auch eine neue E-Mail-Adresse.“ Diese eine
 Änderung ist gleich übernommen; danach liegt wieder alles beim Vorstand.
 
+**Meine Einwilligungen (#329, #1537):** *Meine Mitgliedschaft* zeigt im Web und in der App je Zweck den Stand aus
+Dolibarr. Gelesen wird über `GET /vereine/me/consents` – mit der Zuordnung ab Vereine 1.4.0 (Recht „Über die API im
+Namen jedes Mitglieds handeln“), mit einer Bindung per Einladungscode nur mit der Fähigkeit **„Einwilligungen“**.
+Kennt die Website die Modulversion noch nicht, liest sie für eine bestätigte Zuordnung wie bisher
+`members/{id}/consents`. Zustimmen und Widerrufen gehen über `POST /vereine/members/{id}/consents` mit fester
+`reference`: Bleibt eine Antwort aus, schickt der nächste Versuch denselben Auftrag mit derselben Kennung und
+demselben Zeitpunkt – das Modul speichert keinen zweiten Nachweis. Den Text der zugestimmten Fassung zeigt die
+Website immer; ändert der Verein den Text, stehen beide Fassungen da, die alte aber nur, wenn die Website sie
+schon einmal gelesen hat (das Modul liefert nur die aktuelle; die Website legt jede gelesene Fassung in
+`consent_text_versions` ab).
+
 ## Sponsoren und Partner: Logo und Banner aus Dolibarr (Vereine ab 1.9.0, #880)
 
 Sind Sponsoren und Partner aus Dolibarr eingeschaltet (*Dolibarr → Funktionen*, #405), holt die Website
