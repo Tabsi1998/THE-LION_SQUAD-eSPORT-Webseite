@@ -154,13 +154,16 @@ def _apply_application(match: dict, by_id: dict[str, dict], application: dict) -
 
 
 def _forfeit(match: dict, matches: list[dict], by_id: dict[str, dict], registration_id: str, kind: str,
-             now_iso: str, ops: list[dict], eliminated: set[str]) -> None:
+             now_iso: str, ops: list[dict], eliminated: set[str], draws: list[dict] | None = None) -> None:
     """Die Wertung über den Ergebnis-Anwender: Person zuletzt, kein Weg führt sie weiter (``eliminated``)."""
     application = build_v2_result_application(
         match, matches, results_for_forfeit(match, registration_id), actor_id="system", now_iso=now_iso,
         note=REMOVAL_LABELS[kind], force=has_result(match), eliminated=eliminated | {registration_id},
     )
     _apply_application(match, by_id, application)
+    if draws is not None:
+        # Gemischt (#1548): entscheidet die Wertung die Runde, ist die Folgerunde ausgelost - fürs Protokoll.
+        draws.extend(application.get("draws") or [])
     match.update({
         "status": "forfeit",
         "forfeit_registration_id": registration_id,
@@ -193,7 +196,7 @@ def _cancel(match: dict, kind: str, registration_id: str, now_iso: str, *, annul
 
 
 def _plan_table(stage_matches: list[dict], matches: list[dict], by_id: dict[str, dict], registration_id: str,
-                kind: str, now_iso: str, ops: list[dict], eliminated: set[str]) -> dict:
+                kind: str, now_iso: str, ops: list[dict], eliminated: set[str], draws: list[dict] | None = None) -> dict:
     """50-Prozent-Regel (E12): gespielt sind entschiedene Spiele, gesamt alle noch gültigen der Person."""
     mine = [m for m in stage_matches if _seats(m, registration_id) and str(m.get("status") or "") != "cancelled"
             and not m.get("is_preview")]
@@ -210,17 +213,17 @@ def _plan_table(stage_matches: list[dict], matches: list[dict], by_id: dict[str,
             if len(_filled(match)) < 2:
                 _cancel(match, kind, registration_id, now_iso, annulled=False, ops=ops)
             else:
-                _forfeit(match, matches, by_id, registration_id, kind, now_iso, ops, eliminated)
+                _forfeit(match, matches, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
     return {"mode": "forfeit", "played": len(played), "total": total}
 
 
 def _plan_swiss(stage_matches: list[dict], matches: list[dict], by_id: dict[str, dict], registration_id: str,
-                kind: str, now_iso: str, ops: list[dict], eliminated: set[str]) -> dict:
+                kind: str, now_iso: str, ops: list[dict], eliminated: set[str], draws: list[dict] | None = None) -> dict:
     for match in sorted((m for m in stage_matches if _seats(m, registration_id) and _is_live(m)), key=_sort_key):
         if len(_filled(match)) < 2:
             _cancel(match, kind, registration_id, now_iso, annulled=False, ops=ops)
         else:
-            _forfeit(match, matches, by_id, registration_id, kind, now_iso, ops, eliminated)
+            _forfeit(match, matches, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
     return {"mode": "swiss"}
 
 
@@ -330,7 +333,7 @@ def _readvance(heat: dict, by_id: dict[str, dict], registration_id: str, now_iso
 
 
 def _plan_bracket(stage_matches: list[dict], matches: list[dict], by_id: dict[str, dict], registration_id: str,
-                  kind: str, now_iso: str, ops: list[dict], eliminated: set[str]) -> dict:
+                  kind: str, now_iso: str, ops: list[dict], eliminated: set[str], draws: list[dict] | None = None) -> dict:
     # Erst die gefahrenen Läufe: wer dort weitergekommen ist, macht seinen Platz im Folgelauf für den Nächsten frei.
     for heat in sorted(stage_matches, key=_sort_key):
         if str(heat.get("status") or "") not in {"completed", "forfeit"} \
@@ -358,7 +361,7 @@ def _plan_bracket(stage_matches: list[dict], matches: list[dict], by_id: dict[st
                         "round_name": match.get("round_name"), "remaining": _filled(match)})
             continue
         if _started(match) and len(_filled(match)) >= 2:
-            _forfeit(match, matches, by_id, registration_id, kind, now_iso, ops, eliminated)
+            _forfeit(match, matches, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
             continue
         for slot in _seats(match, registration_id):
             _clear_seat(slot, registration_id, kind, now_iso)
@@ -370,10 +373,14 @@ def _plan_bracket(stage_matches: list[dict], matches: list[dict], by_id: dict[st
     if chain:
         before = {match_id: str(by_id[match_id].get("status") or "") for match_id in by_id}
         target_sets: dict[str, dict] = {}
-        resolve_walkovers(chain, by_id, target_sets, now_iso)
+        drawn_before = len(draws) if draws is not None else 0
+        resolve_walkovers(chain, by_id, target_sets, now_iso, draws=draws)
+        # Was das Los entschieden hat (kampflose Spiele der neu ausgelosten Runde), steht in der Auslosung - nicht als
+        # Umbauschritt: sonst hinge der Vorschlag am Zufall und wäre beim Bestätigen „nicht mehr aktuell“.
+        drawn_ids = {row.get("match_id") for draw in (draws or [])[drawn_before:] for row in draw.get("assignments") or []}
         for match_id in target_sets:
             match = by_id.get(match_id)
-            if not match or before.get(match_id) == match.get("status"):
+            if not match or before.get(match_id) == match.get("status") or match_id in drawn_ids:
                 continue
             if match.get("status") == "completed":
                 ops.append({"kind": "walkover", "match_id": match_id, "match_key": match.get("match_key"),
@@ -403,6 +410,7 @@ def plan_removal(matches: list[dict], registration_id: str, *, kind: str, now_is
     for match in live:
         stages[str(match.get("stage_id") or "")].append(match)
     ops: list[dict] = []
+    draws: list[dict] = []
     outcomes: list[tuple[dict, bool]] = []
     for _stage_id, stage_matches in sorted(stages.items(), key=lambda item: int((item[1][0]).get("stage_number") or 0)):
         involved = [m for m in stage_matches if _seats(m, registration_id)
@@ -412,11 +420,11 @@ def plan_removal(matches: list[dict], registration_id: str, *, kind: str, now_is
         had_live = any(_is_live(m) for m in involved)
         stage_kind = _stage_kind(stage_matches)
         if stage_kind == "table":
-            outcome = _plan_table(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated)
+            outcome = _plan_table(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
         elif stage_kind == "swiss":
-            outcome = _plan_swiss(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated)
+            outcome = _plan_swiss(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
         else:
-            outcome = _plan_bracket(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated)
+            outcome = _plan_bracket(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
         outcomes.append((outcome, had_live))
     # Mehrere Phasen (Gruppen, dann K.-o.): der Modus der Phase, in der die Person noch offene Spiele hatte.
     summary = next((outcome for outcome, had_live in outcomes if had_live), outcomes[-1][0] if outcomes else {"mode": "bracket"})
@@ -431,7 +439,9 @@ def plan_removal(matches: list[dict], registration_id: str, *, kind: str, now_is
     for op in ops:
         op["display_event"] = DISPLAY_BY_OP.get(op.get("kind"), "slot_cleared")
     return {"registration_id": registration_id, "kind": kind, "ops": ops, "changed_ids": changed,
-            "mode": summary.get("mode") or "bracket", "played": summary.get("played"), "total": summary.get("total")}
+            "mode": summary.get("mode") or "bracket", "played": summary.get("played"), "total": summary.get("total"),
+            # Auslosungen, die der Umbau auslöst (#1548) - geschrieben werden sie erst mit der Bestätigung.
+            "draws": draws}
 
 
 # ---------------------------------------------------------------------------------------------- Texte und Hash
@@ -687,6 +697,11 @@ async def _apply(db, tournament: dict, registration: dict, fresh: dict, matches:
     for op in fresh["ops"]:
         if op.get("kind") in {"walkover", "forfeit", "readvanced"}:
             await publish_tournament_event(tid, op["display_event"], match_ids=[op.get("match_id")])
+    # Gemischt (#1548): hat der Umbau eine Runde entschieden, steht die Auslosung im Protokoll (Person: wer bestätigt
+    # hat) und geht als Anzeige-Ereignis ``draw_done`` raus - wie beim Ergebnis.
+    if fresh.get("draws"):
+        from services.draw_records import record_draws
+        await record_draws(db, fresh["draws"], actor_id=actor_id, tournament_id=tid)
     await publish_api_change("POST", f"/api/matches-v2/{tid}/removal", 200)
     await publish_api_change("POST", f"/api/tournaments/{tid}/registrations/{registration['id']}/removal", 200)
     # Ein 409 im Lauf-Planer wird dort abgefangen; der nächste Auslöser prüft neu.

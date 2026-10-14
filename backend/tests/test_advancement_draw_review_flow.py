@@ -191,3 +191,41 @@ async def test_redraw_rolls_back_when_a_later_write_misses(flow, monkeypatch):
              for m in await flow.matches(tournament) if m["id"] in before}
     assert state["writes"] == 1
     assert after == before
+
+
+# ---------------------------------------------------------------------------------------------- Austritt (Codex 2)
+
+@pytest.mark.asyncio
+async def test_removal_that_decides_the_last_match_of_a_round_records_the_draw(flow):
+    """Austritt im letzten offenen Spiel einer gemischten Runde: das Spiel ist kampflos entschieden, die Folgerunde
+    wird ausgelost - mit Protokoll (Person: wer bestätigt hat) und genau einem Anzeige-Ereignis ``draw_done``."""
+    from services import change_events
+
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, regs = await flow.with_participants(8, randomize_advancement_rounds=True)
+    built = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false")
+    assert built.status_code == 200, built.text
+    await flow.start(tournament)
+    first = sorted((m for m in await flow.matches(tournament) if m["round"] == 1 and m["section"] == "WB"),
+                   key=lambda m: m["order"])
+    for match in first[:-1]:
+        seats = [s["registration_id"] for s in match["slots"]]
+        response = await flow.post(f"/api/matches/{match['id']}/result", json={"results": [
+            {"registration_id": seats[0], "rank": 1, "score": 2}, {"registration_id": seats[1], "rank": 2, "score": 0}]})
+        assert response.status_code == 200, response.text
+    last = first[-1]
+    victim = next(reg for reg in regs if reg["id"] == last["slots"][1]["registration_id"])
+    url = f"/api/tournaments/{tournament['id']}/registrations/{victim['id']}/removal"
+    plan = (await flow.post(url, json={"kind": "withdrawn"})).json()["plan"]
+    before = len(change_events._event_buffer)
+    confirmed = await flow.post(url, json={"kind": "withdrawn", "plan_id": plan["id"]})
+    assert confirmed.status_code == 200, confirmed.text
+    second = [m for m in await flow.matches(tournament) if m["round"] == 2 and m["section"] == "WB"]
+    assert all(m.get("draw") for m in second)
+    assert victim["id"] not in {s.get("registration_id") for m in second for s in m["slots"]}
+    entry = await flow.db.audit_logs.find_one({"action": "tournament.draw.done"}, {"_id": 0})
+    assert entry and entry["actor_id"] == staff["id"] and entry["data"]["draw_id"] == second[0]["draw"]["id"]
+    drawn = [e for e in list(change_events._event_buffer)[before:]
+             if (e.get("tournament_event") or {}).get("type") == "draw_done"]
+    assert len(drawn) == 1
