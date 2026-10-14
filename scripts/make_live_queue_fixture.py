@@ -16,6 +16,7 @@ Nach einer Änderung an Planer oder Warteschlange neu erzeugen (Backend-Umgebung
 
     python scripts/make_live_queue_fixture.py
 """
+
 import asyncio
 import json
 import pathlib
@@ -30,9 +31,26 @@ sys.path.insert(0, str(ROOT / "backend" / "tests"))
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
 
-NAMES = ["NeonFalke", "KartKönigin", "LuckyLion", "PixelPaula", "DriftDaniel", "BoostBerta", "TurboTom", "SchnellSchnecke"]
-WORST = ["Der unglaublich lange Spielername Nummer Eins mit noch mehr Text dahinter", "Aleksandra Wiśniewska-Kowalczyk",
-         "🦁 Löwenherz", "Nguyễn Thị Thanh Hương", "bartholomew.fitzgerald@northwind-industries.example", "Jo", "Ω", "ØrjanÅsbø"]
+NAMES = [
+    "NeonFalke",
+    "KartKönigin",
+    "LuckyLion",
+    "PixelPaula",
+    "DriftDaniel",
+    "BoostBerta",
+    "TurboTom",
+    "SchnellSchnecke",
+]
+WORST = [
+    "Der unglaublich lange Spielername Nummer Eins mit noch mehr Text dahinter",
+    "Aleksandra Wiśniewska-Kowalczyk",
+    "🦁 Löwenherz",
+    "Nguyễn Thị Thanh Hương",
+    "bartholomew.fitzgerald@northwind-industries.example",
+    "Jo",
+    "Ω",
+    "ØrjanÅsbø",
+]
 
 
 async def on_site(flow, names: list[str]) -> tuple[dict, list[dict], list[dict], list[dict]]:
@@ -40,8 +58,14 @@ async def on_site(flow, names: list[str]) -> tuple[dict, list[dict], list[dict],
     flow.act_as(staff)
     start = (now_utc() - timedelta(minutes=40)).replace(second=0, microsecond=0)
     tournament = await flow.create_tournament(
-        title="Herbst-LAN Mario Kart Cup", slug="herbst-lan-cup", max_participants=len(names), event_mode="local",
-        schedule_mode="fixed_by_staff", result_entry_mode="staff_only", start_date=start.isoformat())
+        title="Herbst-LAN Mario Kart Cup",
+        slug="herbst-lan-cup",
+        max_participants=len(names),
+        event_mode="local",
+        schedule_mode="fixed_by_staff",
+        result_entry_mode="staff_only",
+        start_date=start.isoformat(),
+    )
     users, registrations = [], []
     for seed, name in enumerate(names, start=1):
         user = await flow.add_user(name=name)
@@ -52,13 +76,22 @@ async def on_site(flow, names: list[str]) -> tuple[dict, list[dict], list[dict],
     await flow.start(tournament)
     stations = []
     for name in ("1", "2", "3"):
-        doc = {"id": f"st{name}", "name": name, "device_type": "switch2", "tournament_id": tournament["id"], "status": "free",
-               "current_match_id": None, "notes": None}
+        doc = {
+            "id": f"st{name}",
+            "name": name,
+            "device_type": "switch2",
+            "tournament_id": tournament["id"],
+            "status": "free",
+            "current_match_id": None,
+            "notes": None,
+        }
         await flow.db.stations.insert_one(dict(doc))
         stations.append(doc)
     planned = (await flow.post(f"/api/tournaments/{tournament['id']}/schedule/plan")).json()
-    applied = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply",
-                              json={"fingerprint": planned["fingerprint"], "planned_at": planned["planned_at"]})
+    applied = await flow.post(
+        f"/api/tournaments/{tournament['id']}/schedule/apply",
+        json={"fingerprint": planned["fingerprint"], "planned_at": planned["planned_at"]},
+    )
     assert applied.status_code == 200, applied.text
     return tournament, users, registrations, stations
 
@@ -70,7 +103,9 @@ async def queue(flow, tournament) -> dict:
 
 
 async def go_live(flow, tournament, users, registrations, stations) -> dict:
-    """QF1 läuft seit 25 Minuten an Station 1, QF2 ist an Station 2 aufgerufen, Station 3 defekt, alles 15 Min. zu spät."""
+    """QF1 läuft seit 25 Minuten an Station 1, QF2 ist an Station 2 aufgerufen, Station 3 defekt.
+
+    Alles liegt 15 Minuten hinter dem Plan."""
     rows = sorted(await flow.matches(tournament), key=lambda row: (row.get("round") or 0, row.get("order") or 0))
     first_round = [row for row in rows if row.get("round") == 1]
     by_station: dict[str, dict] = {}
@@ -78,13 +113,24 @@ async def go_live(flow, tournament, users, registrations, stations) -> dict:
         by_station.setdefault(row.get("station_id"), row)
     one = by_station.get("st1") or first_round[0]
     two = by_station.get("st2") or first_round[1]
-    response = await flow.post(f"/api/tournaments/{tournament['id']}/live-queue/start", json={"station_id": "st1", "match_id": one["id"]})
+    response = await flow.post(
+        f"/api/tournaments/{tournament['id']}/live-queue/start", json={"station_id": "st1", "match_id": one["id"]}
+    )
     assert response.status_code == 200, response.text
-    response = await flow.post(f"/api/tournaments/{tournament['id']}/live-queue/call", json={"station_id": "st2", "match_id": two["id"]})
+    response = await flow.post(
+        f"/api/tournaments/{tournament['id']}/live-queue/call", json={"station_id": "st2", "match_id": two["id"]}
+    )
     assert response.status_code == 200, response.text
     now = now_utc()
-    await flow.db.matches_v2.update_one({"id": one["id"]}, {"$set": {"started_at": (now - timedelta(minutes=25)).isoformat(),
-                                                                   "scheduled_at": (now - timedelta(minutes=40)).isoformat()}})
+    await flow.db.matches_v2.update_one(
+        {"id": one["id"]},
+        {
+            "$set": {
+                "started_at": (now - timedelta(minutes=25)).isoformat(),
+                "scheduled_at": (now - timedelta(minutes=40)).isoformat(),
+            }
+        },
+    )
     for row in rows:
         if row.get("scheduled_at") and row["id"] != one["id"]:
             shifted = (datetime.fromisoformat(row["scheduled_at"]) - timedelta(minutes=15)).isoformat()
@@ -94,7 +140,9 @@ async def go_live(flow, tournament, users, registrations, stations) -> dict:
     # Ein Spieler, dessen Spiel als Nächstes kommt (nicht aufgerufen, nicht laufend).
     waiting = next(entry for entry in view["matches"].values() if entry["state"] == "queued" and entry["ready"])
     match = next(row for row in rows if row["id"] == waiting["match_id"])
-    player = next(users[index] for index, reg in enumerate(registrations) if reg["id"] == match["slots"][0]["registration_id"])
+    player = next(
+        users[index] for index, reg in enumerate(registrations) if reg["id"] == match["slots"][0]["registration_id"]
+    )
     flow.act_as(player)
     me = (await flow.get(f"/api/tournaments/{tournament['id']}/live-queue/me")).json()
     page = (await flow.get(f"/api/matches/{match['id']}/page")).json()
@@ -108,7 +156,12 @@ async def build() -> dict:
     flow, shutdown = make_flow()
     try:
         tournament, users, registrations, stations = await on_site(flow, NAMES)
-        out["tournament"] = {"id": tournament["id"], "slug": tournament["slug"], "title": tournament["title"], "event_mode": "local"}
+        out["tournament"] = {
+            "id": tournament["id"],
+            "slug": tournament["slug"],
+            "title": tournament["title"],
+            "event_mode": "local",
+        }
         out["states"]["start"] = await queue(flow, tournament)
         live = await go_live(flow, tournament, users, registrations, stations)
         out["states"]["live"] = live["view"]
@@ -126,7 +179,9 @@ async def build() -> dict:
         out["states"]["worst"] = live["view"]
         out["worst_now"] = live["now"]
         flow.act_as(await flow.add_staff())
-        online = await flow.create_tournament(title="Online Cup", event_mode="online", schedule_mode="player_proposal", status="live")
+        online = await flow.create_tournament(
+            title="Online Cup", event_mode="online", schedule_mode="player_proposal", status="live"
+        )
         out["states"]["online"] = await queue(flow, online)
     finally:
         await shutdown()
@@ -135,7 +190,9 @@ async def build() -> dict:
 
 def main() -> None:
     data = asyncio.run(build())
-    OUT.write_text(json.dumps(data, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+    OUT.write_text(
+        json.dumps(data, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
+    )
     print(f"geschrieben: {OUT.relative_to(ROOT)} ({len(data['states'])} Zustände)")
 
 

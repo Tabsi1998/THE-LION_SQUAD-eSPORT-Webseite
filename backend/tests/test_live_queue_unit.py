@@ -4,6 +4,7 @@ Entscheidung E1: Der Plan ist die Prognose, die Warteschlange entscheidet. Je St
 Nächstes kommt und was danach; je Spiel die Prognose („ca. 18:40“) und der Verzug gegenüber der geplanten Zeit.
 Gerechnet wird mit dem Spielplaner selbst (``plan_schedule``) ab jetzt - es gibt keine zweite Planlogik.
 """
+
 from datetime import datetime, timedelta, timezone
 
 from services.live_queue import build_live_queue
@@ -14,25 +15,58 @@ PAUSE = DEFAULT_BREAK_MINUTES
 
 
 def tournament(**extra):
-    return {"id": "t1", "format": "single_elim", "event_mode": "local", "schedule_mode": "fixed_by_staff",
-            "start_date": T0.isoformat(), "match_duration_minutes": 30, **extra}
+    return {
+        "id": "t1",
+        "format": "single_elim",
+        "event_mode": "local",
+        "schedule_mode": "fixed_by_staff",
+        "start_date": T0.isoformat(),
+        "match_duration_minutes": 30,
+        **extra,
+    }
 
 
 def station(sid, name, **extra):
-    return {"id": sid, "name": name, "device_type": "switch2", "tournament_id": "t1", "status": "free",
-            "current_match_id": None, "notes": "Kabel hinten", **extra}
+    return {
+        "id": sid,
+        "name": name,
+        "device_type": "switch2",
+        "tournament_id": "t1",
+        "status": "free",
+        "current_match_id": None,
+        "notes": "Kabel hinten",
+        **extra,
+    }
 
 
 def slot(index, value):
     if isinstance(value, dict):
         return {"slot": index, "source": value, "registration_id": None, "status": "pending"}
-    return {"slot": index, "source": {"type": "seed", "seed": index}, "registration_id": value, "user_id": f"u-{value}", "status": "filled"}
+    return {
+        "slot": index,
+        "source": {"type": "seed", "seed": index},
+        "registration_id": value,
+        "user_id": f"u-{value}",
+        "status": "filled",
+    }
 
 
 def duel(key, a, b, *, round_number=1, order=1, status="scheduled", **extra):
-    return {"id": f"id-{key}", "tournament_id": "t1", "stage_id": "s1", "stage_number": 1, "match_key": key, "section": "MAIN",
-            "round": round_number, "order": order, "status": status, "match_type": "duel",
-            "slots": [slot(1, a), slot(2, b)], "settings": {"min_players": 2}, **extra}
+    return {
+        "id": f"id-{key}",
+        "tournament_id": "t1",
+        "stage_id": "s1",
+        "stage_number": 1,
+        "match_key": key,
+        "section": "MAIN",
+        "round": round_number,
+        "order": order,
+        "status": status,
+        "match_type": "duel",
+        "slots": [slot(1, a), slot(2, b)],
+        "settings": {"min_players": 2},
+        **extra,
+    }
 
 
 def winner(key):
@@ -50,12 +84,39 @@ def eight():
         duel("QF2", "r2", "r7", order=2, scheduled_at=at(0), station_id="st2", schedule_source="planner"),
         duel("QF3", "r3", "r6", order=3, scheduled_at=at(35), station_id="st1", schedule_source="planner"),
         duel("QF4", "r4", "r5", order=4, scheduled_at=at(35), station_id="st2", schedule_source="planner"),
-        duel("SF1", winner("QF1"), winner("QF3"), round_number=2, order=1, status="pending", scheduled_at=at(70),
-             station_id="st1", schedule_source="planner"),
-        duel("SF2", winner("QF2"), winner("QF4"), round_number=2, order=2, status="pending", scheduled_at=at(70),
-             station_id="st2", schedule_source="planner"),
-        duel("F", winner("SF1"), winner("SF2"), round_number=3, order=1, status="pending", scheduled_at=at(105),
-             station_id="st1", schedule_source="planner"),
+        duel(
+            "SF1",
+            winner("QF1"),
+            winner("QF3"),
+            round_number=2,
+            order=1,
+            status="pending",
+            scheduled_at=at(70),
+            station_id="st1",
+            schedule_source="planner",
+        ),
+        duel(
+            "SF2",
+            winner("QF2"),
+            winner("QF4"),
+            round_number=2,
+            order=2,
+            status="pending",
+            scheduled_at=at(70),
+            station_id="st2",
+            schedule_source="planner",
+        ),
+        duel(
+            "F",
+            winner("SF1"),
+            winner("SF2"),
+            round_number=3,
+            order=1,
+            status="pending",
+            scheduled_at=at(105),
+            station_id="st1",
+            schedule_source="planner",
+        ),
     ]
 
 
@@ -68,6 +129,7 @@ def queue(matches, stations, now, **extra):
 
 # ---------------------------------------------------------------- Planer: ein Aufruf bleibt an seiner Station
 
+
 def test_the_planner_keeps_a_called_match_at_its_station():
     """Ist ein Spiel an Station 2 aufgerufen, verschiebt kein „Planen“ es an eine andere Station."""
     matches = [duel("A", "r1", "r2", order=1, station_id="st2", called_at=at(0)), duel("B", "r3", "r4", order=2)]
@@ -78,11 +140,15 @@ def test_the_planner_keeps_a_called_match_at_its_station():
 
 # ---------------------------------------------------------------- Läuft, als Nächstes, danach
 
+
 def test_each_station_shows_running_next_and_after():
     matches = eight()
     matches[0].update(status="in_progress", started_at=at(0))
     matches[1].update(status="in_progress", started_at=at(0))
-    stations = [station("st1", "1", status="busy", current_match_id="id-QF1"), station("st2", "2", status="busy", current_match_id="id-QF2")]
+    stations = [
+        station("st1", "1", status="busy", current_match_id="id-QF1"),
+        station("st2", "2", status="busy", current_match_id="id-QF2"),
+    ]
     view = queue(matches, stations, T0 + timedelta(minutes=10))
     assert view["applies"] is True
     first, second = view["stations"]
@@ -112,15 +178,19 @@ def test_the_next_match_depends_only_on_its_own_lines_not_on_the_whole_round():
     assert sf1["ready"] is True and sf1["forecast_at"] == now.isoformat(), "SF1 kann sofort an eine freie Station"
     assert sf1["position"] == 1
     sf2 = view["matches"]["id-SF2"]
-    assert sf2["ready"] is False and sf2["forecast_at"] >= at(60 + PAUSE), "SF2 wartet auf seine eigenen Linien (QF2, QF4)"
+    assert sf2["ready"] is False and sf2["forecast_at"] >= at(
+        60 + PAUSE
+    ), "SF2 wartet auf seine eigenen Linien (QF2, QF4)"
 
 
 def test_a_called_match_is_next_with_its_report_time():
     matches = eight()
     matches[0].update(status="in_progress", started_at=at(0))
     matches[1].update(status="scheduled", called_at=at(1))
-    stations = [station("st1", "1", status="busy", current_match_id="id-QF1"),
-                station("st2", "2", status="reserved", current_match_id="id-QF2", called_at=at(1))]
+    stations = [
+        station("st1", "1", status="busy", current_match_id="id-QF1"),
+        station("st2", "2", status="reserved", current_match_id="id-QF2", called_at=at(1)),
+    ]
     view = queue(matches, stations, T0 + timedelta(minutes=2), report_minutes=2)
     called = view["stations"][1]["next"]
     assert called["match_id"] == "id-QF2" and called["state"] == "called"
@@ -130,12 +200,16 @@ def test_a_called_match_is_next_with_its_report_time():
 
 # ---------------------------------------------------------------- Verzug
 
+
 def test_delay_moves_every_later_forecast_and_names_the_final():
     """Die Viertelfinale haben 20 Minuten zu spät begonnen: alles danach rückt nach, das Finale auch."""
     matches = eight()
     matches[0].update(status="in_progress", started_at=at(20))
     matches[1].update(status="in_progress", started_at=at(20))
-    stations = [station("st1", "1", status="busy", current_match_id="id-QF1"), station("st2", "2", status="busy", current_match_id="id-QF2")]
+    stations = [
+        station("st1", "1", status="busy", current_match_id="id-QF1"),
+        station("st2", "2", status="busy", current_match_id="id-QF2"),
+    ]
     view = queue(matches, stations, T0 + timedelta(minutes=25))
     assert view["matches"]["id-QF1"]["delay_minutes"] == 20
     assert view["matches"]["id-QF3"]["forecast_at"] == at(50) and view["matches"]["id-QF3"]["delay_minutes"] == 15
@@ -158,7 +232,9 @@ def test_a_running_match_over_its_time_pushes_the_queue_to_now():
 
 
 def test_a_time_set_by_hand_in_the_past_is_forecast_from_now():
-    """Ein von Hand gesetzter Termin, der vorbei ist, ohne dass das Spiel begann: Prognose „jetzt“, nicht die alte Zeit."""
+    """Ein von Hand gesetzter Termin, der vorbei ist, ohne dass das Spiel begann.
+
+    Prognose „jetzt“, nicht die alte Zeit."""
     matches = [duel("A", "r1", "r2", scheduled_at=at(0), station_id="st1", schedule_source="manual")]
     now = T0 + timedelta(minutes=12)
     view = queue(matches, [station("st1", "1")], now)
@@ -168,8 +244,11 @@ def test_a_time_set_by_hand_in_the_past_is_forecast_from_now():
 
 # ---------------------------------------------------------------- Online und ohne Stationen
 
+
 def test_online_has_no_queue():
-    view = queue(eight(), [station("st1", "1")], T0, tournament={"event_mode": "online", "schedule_mode": "player_proposal"})
+    view = queue(
+        eight(), [station("st1", "1")], T0, tournament={"event_mode": "online", "schedule_mode": "player_proposal"}
+    )
     assert view["applies"] is False and view["stations"] == [] and view["matches"] == {}
 
 

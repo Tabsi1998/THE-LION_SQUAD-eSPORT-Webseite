@@ -16,6 +16,7 @@ Fristen (``match_deadlines``).
 öffentliche Seite zeigen darf: Namen der Anmeldungen, Station im Klartext, Zeiten - keine Konto-Kennungen, keine
 Notizen der Stationen oder der Turnierleitung.
 """
+
 from __future__ import annotations
 
 import re
@@ -83,8 +84,13 @@ def _filled(match: dict) -> list[str]:
 
 
 def _open_slots(match: dict) -> int:
-    return sum(1 for slot in match.get("slots") or []
-               if not slot.get("registration_id") and (slot.get("source") or {}).get("type") != "bye" and slot.get("status") != "bye")
+    return sum(
+        1
+        for slot in match.get("slots") or []
+        if not slot.get("registration_id")
+        and (slot.get("source") or {}).get("type") != "bye"
+        and slot.get("status") != "bye"
+    )
 
 
 def _live_copy(match: dict, now: datetime) -> dict:
@@ -99,40 +105,84 @@ def _live_copy(match: dict, now: datetime) -> dict:
 
 
 def _empty(now: datetime, reason: str) -> dict:
-    return {"applies": False, "reason": reason, "now": now.isoformat(), "stations": [], "matches": {}, "unplaced": [],
-            "summary": None}
+    return {
+        "applies": False,
+        "reason": reason,
+        "now": now.isoformat(),
+        "stations": [],
+        "matches": {},
+        "unplaced": [],
+        "summary": None,
+    }
 
 
 def _rows(plan: dict) -> list[dict]:
     """Was der Planer festhält (läuft, aufgerufen, fester Termin) und was er neu verteilt, in einer Form."""
     rows = []
     for item in plan.get("held") or []:
-        rows.append({"match_id": item["match_id"], "station_id": item.get("station_id"), "start": _parse(item["start"]),
-                     "minutes": int(item["minutes"]), "state": "queued" if item["kind"] == "kept" else item["kind"],
-                     "forecast": False})
+        rows.append(
+            {
+                "match_id": item["match_id"],
+                "station_id": item.get("station_id"),
+                "start": _parse(item["start"]),
+                "minutes": int(item["minutes"]),
+                "state": "queued" if item["kind"] == "kept" else item["kind"],
+                "forecast": False,
+            }
+        )
     for item in plan.get("assignments") or []:
-        rows.append({"match_id": item["match_id"], "station_id": item.get("station_id"), "start": _parse(item["scheduled_at"]),
-                     "minutes": int(item.get("duration_minutes") or 0), "state": "queued", "forecast": bool(item.get("forecast"))})
+        rows.append(
+            {
+                "match_id": item["match_id"],
+                "station_id": item.get("station_id"),
+                "start": _parse(item["scheduled_at"]),
+                "minutes": int(item.get("duration_minutes") or 0),
+                "state": "queued",
+                "forecast": bool(item.get("forecast")),
+            }
+        )
     return rows
 
 
-def build_live_queue(tournament: dict, matches, stations, *, now: datetime, stages=(), busy_elsewhere=(),
-                     participant_keys: dict[str, set[str]] | None = None, game: dict | None = None,
-                     names: dict[str, str] | None = None, report_minutes: int = 2) -> dict:
+def build_live_queue(
+    tournament: dict,
+    matches,
+    stations,
+    *,
+    now: datetime,
+    stages=(),
+    busy_elsewhere=(),
+    participant_keys: dict[str, set[str]] | None = None,
+    game: dict | None = None,
+    names: dict[str, str] | None = None,
+    report_minutes: int = 2,
+) -> dict:
     """Die Warteschlange eines Turniers vor Ort: je Station läuft/als Nächstes/danach, je Spiel Prognose und Verzug."""
     now = _aware(now)
     names = names or {}
     stage_by_id = {(stage or {}).get("id"): stage for stage in stages or []}
-    local = [match for match in matches or [] if not match.get("is_preview")
-             and match_policy(match, tournament, stage_by_id.get(match.get("stage_id")))["event_mode"] == "local"]
+    local = [
+        match
+        for match in matches or []
+        if not match.get("is_preview")
+        and match_policy(match, tournament, stage_by_id.get(match.get("stage_id")))["event_mode"] == "local"
+    ]
     if not local:
         return _empty(now, OFFLINE_REASON)
     usable = _usable_stations(tournament, stations, game)
     if not usable:
         return _empty(now, NO_STATION_REASON)
 
-    plan = plan_schedule(tournament, [_live_copy(match, now) for match in local], usable, stages=stages, now=now,
-                         busy_elsewhere=busy_elsewhere, participant_keys=participant_keys, game=game)
+    plan = plan_schedule(
+        tournament,
+        [_live_copy(match, now) for match in local],
+        usable,
+        stages=stages,
+        now=now,
+        busy_elsewhere=busy_elsewhere,
+        participant_keys=participant_keys,
+        game=game,
+    )
     by_id = {match["id"]: match for match in local}
     station_by_id = {station["id"]: station for station in stations or [] if station.get("id")}
 
@@ -198,28 +248,41 @@ def build_live_queue(tournament: dict, matches, stations, *, now: datetime, stag
             continue
         lane = lanes.get(station["id"], [])
         waiting = [entry for entry in lane if entry["state"] != "running"]
-        station_rows.append({
-            "id": station["id"],
-            "name": station.get("name") or station.get("label") or "Station",
-            "station_text": _station_text(station),
-            "status": station.get("status") or "free",
-            "running": next((entry for entry in lane if entry["state"] == "running"), None),
-            "next": waiting[0] if waiting else None,
-            "after": waiting[1] if len(waiting) > 1 else None,
-            "waiting": len(waiting),
-        })
+        station_rows.append(
+            {
+                "id": station["id"],
+                "name": station.get("name") or station.get("label") or "Station",
+                "station_text": _station_text(station),
+                "status": station.get("status") or "free",
+                "running": next((entry for entry in lane if entry["state"] == "running"), None),
+                "next": waiting[0] if waiting else None,
+                "after": waiting[1] if len(waiting) > 1 else None,
+                "waiting": len(waiting),
+            }
+        )
 
     summary = None
     if entries:
         last = max(entries.values(), key=lambda entry: (entry["forecast_at"], entry["planned_at"] or ""))
         summary = {
             "delay_minutes": last["delay_minutes"],
-            "last": {"match_id": last["match_id"], "label": last["label"], "planned_at": last["planned_at"],
-                     "forecast_at": last["forecast_at"]},
+            "last": {
+                "match_id": last["match_id"],
+                "label": last["label"],
+                "planned_at": last["planned_at"],
+                "forecast_at": last["forecast_at"],
+            },
             "ends_at": max(entry["ends_at"] for entry in entries.values()),
         }
-    return {"applies": True, "reason": None, "now": now.isoformat(), "stations": station_rows, "matches": entries,
-            "unplaced": unplaced, "summary": summary}
+    return {
+        "applies": True,
+        "reason": None,
+        "now": now.isoformat(),
+        "stations": station_rows,
+        "matches": entries,
+        "unplaced": unplaced,
+        "summary": summary,
+    }
 
 
 def my_entries(view: dict, participant_keys: dict[str, set[str]], user_id: str | None) -> list[dict]:
@@ -227,7 +290,11 @@ def my_entries(view: dict, participant_keys: dict[str, set[str]], user_id: str |
     if not user_id:
         return []
     key = f"user:{user_id}"
-    mine = [entry for match_id, entry in (view.get("matches") or {}).items() if key in (participant_keys.get(match_id) or set())]
+    mine = [
+        entry
+        for match_id, entry in (view.get("matches") or {}).items()
+        if key in (participant_keys.get(match_id) or set())
+    ]
     return sorted(mine, key=lambda entry: (_STATE_ORDER[entry["state"]], entry["forecast_at"]))
 
 
@@ -237,11 +304,24 @@ async def load_live_queue(db, tournament: dict, now: datetime | None = None) -> 
     inputs = await load_plan_inputs(db, tournament)
     attach_round_labels(inputs["matches"], inputs["stages"], tournament)
     registrations = await db.tournament_registrations.find(
-        {"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1},
+        {"tournament_id": tournament["id"]},
+        {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1},
     ).to_list(3000)
-    names = {row["id"]: row.get("display_name") or row.get("ingame_name") or row.get("team_name") or "Teilnehmer"
-             for row in registrations if row.get("id")}
-    view = build_live_queue(tournament, inputs["matches"], inputs["stations"], now=now, stages=inputs["stages"],
-                            busy_elsewhere=inputs["busy_elsewhere"], participant_keys=inputs["participant_keys"],
-                            game=inputs["game"], names=names, report_minutes=await report_minutes(db))
+    names = {
+        row["id"]: row.get("display_name") or row.get("ingame_name") or row.get("team_name") or "Teilnehmer"
+        for row in registrations
+        if row.get("id")
+    }
+    view = build_live_queue(
+        tournament,
+        inputs["matches"],
+        inputs["stations"],
+        now=now,
+        stages=inputs["stages"],
+        busy_elsewhere=inputs["busy_elsewhere"],
+        participant_keys=inputs["participant_keys"],
+        game=inputs["game"],
+        names=names,
+        report_minutes=await report_minutes(db),
+    )
     return view, inputs["participant_keys"]

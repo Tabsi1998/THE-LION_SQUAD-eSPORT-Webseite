@@ -12,6 +12,7 @@ diese Stelle, was der Helfer gesehen hat, frisch nach: Ein Spiel, das schon an e
 wird nicht still umgelegt; eine belegte Station nimmt kein zweites Spiel. Derselbe Aufruf noch einmal ist ein
 harmloses Wiederholen (``idempotent_replay``) - „aufgerufen um“ bleibt, es geht keine zweite Nachricht hinaus.
 """
+
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -60,13 +61,18 @@ async def _operate(user: dict | None, tournament_id: str, stations: list[dict]) 
         return None
     if await has_tournament_staff_permission(user, tournament_id, STATION_ASSIGN_ROLES, "tournament"):
         return {"all": True, "station_ids": []}
-    own = [row["id"] for row in stations
-           if await has_tournament_staff_permission(user, tournament_id, STATION_ASSIGN_ROLES, "station", row["id"])]
+    own = [
+        row["id"]
+        for row in stations
+        if await has_tournament_staff_permission(user, tournament_id, STATION_ASSIGN_ROLES, "station", row["id"])
+    ]
     return {"all": False, "station_ids": own} if own else None
 
 
 @router.get("/{tid}/live-queue")
-async def live_queue(tid: str, access: str | None = None, key: str | None = None, user: dict | None = Depends(get_optional_user)):
+async def live_queue(
+    tid: str, access: str | None = None, key: str | None = None, user: dict | None = Depends(get_optional_user)
+):
     db = get_db()
     tournament_id = await _resolve_tid(tid)
     tournament = await _queue_tournament(db, tournament_id, None if key else user, access, key)
@@ -82,12 +88,18 @@ async def my_live_queue(tid: str, me: dict = Depends(get_current_user)):
     tournament_id = await _resolve_tid(tid)
     tournament = await _get_visible_tournament(tournament_id, me)
     view, keys = await load_live_queue(db, tournament)
-    return {"applies": view["applies"], "reason": view["reason"], "now": view["now"], "summary": view["summary"],
-            "entries": my_entries(view, keys, me.get("id"))}
+    return {
+        "applies": view["applies"],
+        "reason": view["reason"],
+        "now": view["now"],
+        "summary": view["summary"],
+        "entries": my_entries(view, keys, me.get("id")),
+    }
 
 
 class QueueAction(BaseModel):
     """Aufrufen oder Starten: welches Spiel an welcher Station."""
+
     model_config = ConfigDict(extra="forbid")
 
     station_id: str = Field(min_length=1, max_length=120)
@@ -98,8 +110,9 @@ async def _context(tid: str, body: QueueAction, me: dict) -> tuple:
     """Recht, Turnier, Station und Spiel - erst das Recht, dann was es gibt."""
     db = get_db()
     tournament_id = await _resolve_tid(tid)
-    allowed = (await has_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "tournament")
-               or await has_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "station", body.station_id))
+    allowed = await has_tournament_staff_permission(
+        me, tournament_id, STATION_ASSIGN_ROLES, "tournament"
+    ) or await has_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "station", body.station_id)
     if not allowed:
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "creation_key": 0, "billing": 0})
@@ -107,14 +120,24 @@ async def _context(tid: str, body: QueueAction, me: dict) -> tuple:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     await _ensure_tournament_unlocked(db, tournament_id)
     station = await db.stations.find_one({"id": body.station_id}, {"_id": 0})
-    own_station = station and (station.get("tournament_id") == tournament_id or (
-        not station.get("tournament_id") and tournament.get("event_id") and station.get("event_id") == tournament.get("event_id")))
+    own_station = station and (
+        station.get("tournament_id") == tournament_id
+        or (
+            not station.get("tournament_id")
+            and tournament.get("event_id")
+            and station.get("event_id") == tournament.get("event_id")
+        )
+    )
     if not own_station:
         raise HTTPException(status_code=404, detail="Station nicht gefunden")
     match = await db.matches_v2.find_one({"id": body.match_id, "tournament_id": tournament_id}, {"_id": 0})
     if not match or match.get("is_preview"):
         raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
-    stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
+    stage = (
+        await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0})
+        if match.get("stage_id")
+        else None
+    )
     if match_policy(match, tournament, stage)["event_mode"] != "local":
         raise HTTPException(status_code=409, detail=ONLINE_DETAIL)
     return db, tournament_id, station
@@ -150,11 +173,16 @@ def _check_station(station: dict, match: dict) -> None:
 
 
 async def _audit(db, action: str, tournament_id: str, match: dict, station_id: str, actor_id: str) -> None:
-    await db.audit_logs.insert_one({
-        "id": new_id(), "action": action, "target_id": tournament_id, "actor_id": actor_id,
-        "data": {"match_id": match.get("id"), "match_key": match.get("match_key"), "station_id": station_id},
-        "created_at": now_utc().isoformat(),
-    })
+    await db.audit_logs.insert_one(
+        {
+            "id": new_id(),
+            "action": action,
+            "target_id": tournament_id,
+            "actor_id": actor_id,
+            "data": {"match_id": match.get("id"), "match_key": match.get("match_key"), "station_id": station_id},
+            "created_at": now_utc().isoformat(),
+        }
+    )
 
 
 @router.post("/{tid}/live-queue/call")
@@ -170,7 +198,10 @@ async def call_next(tid: str, body: QueueAction, me: dict = Depends(get_current_
             return {"ok": True, "idempotent_replay": True, "called_at": match["called_at"]}
         elsewhere = await _held_elsewhere(db, station["id"], match)
         if elsewhere:
-            where = station_text(elsewhere.get("name") or elsewhere.get("label"), elsewhere.get("device_type")) or "einer anderen Station"
+            where = (
+                station_text(elsewhere.get("name") or elsewhere.get("label"), elsewhere.get("device_type"))
+                or "einer anderen Station"
+            )
             raise HTTPException(status_code=409, detail=f"Das Spiel ist schon an {where} aufgerufen.")
         _check_station(station, match)
         await _assign_match_to_station(db, station, match, "matches_v2", start_now=False)
@@ -191,7 +222,9 @@ async def start_match(tid: str, body: QueueAction, me: dict = Depends(get_curren
             raise HTTPException(status_code=409, detail="Das Spiel läuft schon an einer anderen Station.")
         _check_open(match)
         if await _held_elsewhere(db, station["id"], match):
-            raise HTTPException(status_code=409, detail="Das Spiel ist an einer anderen Station aufgerufen. Bitte neu laden.")
+            raise HTTPException(
+                status_code=409, detail="Das Spiel ist an einer anderen Station aufgerufen. Bitte neu laden."
+            )
         _check_station(station, match)
         await _assign_match_to_station(db, station, match, "matches_v2", start_now=True)
     stored = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0, "started_at": 1}) or {}

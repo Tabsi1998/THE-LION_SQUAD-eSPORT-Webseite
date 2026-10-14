@@ -7,6 +7,7 @@
   mit Compare-and-Set an der Station; zwei Helfer zugleich ergeben genau einen Aufruf und genau eine Nachricht.
 - „Ergebnis fehlt“ zählt ab dem echten Start, nicht ab der Planzeit.
 """
+
 import asyncio
 import json
 import pathlib
@@ -37,19 +38,34 @@ async def on_site(flow, count=4, **fields):
     flow.act_as(staff)
     start = (now_utc() - timedelta(minutes=5)).replace(microsecond=0)
     tournament, users, registrations = await flow.with_participants(
-        count, event_mode="local", schedule_mode="fixed_by_staff", result_entry_mode="staff_only", start_date=start.isoformat(), **fields)
+        count,
+        event_mode="local",
+        schedule_mode="fixed_by_staff",
+        result_entry_mode="staff_only",
+        start_date=start.isoformat(),
+        **fields,
+    )
     built = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false")
     assert built.status_code == 200, built.text
     await flow.start(tournament)
     stations = []
     for name in ("1", "2"):
-        doc = {"id": new_id(), "name": name, "device_type": "switch2", "tournament_id": tournament["id"], "status": "free",
-               "current_match_id": None, "notes": "Kabel intern"}
+        doc = {
+            "id": new_id(),
+            "name": name,
+            "device_type": "switch2",
+            "tournament_id": tournament["id"],
+            "status": "free",
+            "current_match_id": None,
+            "notes": "Kabel intern",
+        }
         await flow.db.stations.insert_one(dict(doc))
         stations.append(doc)
     planned = (await flow.post(f"/api/tournaments/{tournament['id']}/schedule/plan")).json()
-    applied = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply",
-                              json={"fingerprint": planned["fingerprint"], "planned_at": planned["planned_at"]})
+    applied = await flow.post(
+        f"/api/tournaments/{tournament['id']}/schedule/apply",
+        json={"fingerprint": planned["fingerprint"], "planned_at": planned["planned_at"]},
+    )
     assert applied.status_code == 200, applied.text
     players = {reg["id"]: users[index] for index, reg in enumerate(registrations)}
     return staff, tournament, stations, players
@@ -71,11 +87,17 @@ async def calls(flow) -> list[dict]:
 
 
 async def call(flow, tournament, station, match):
-    return await flow.post(f"/api/tournaments/{tournament['id']}/live-queue/call", json={"station_id": station["id"], "match_id": match["id"]})
+    return await flow.post(
+        f"/api/tournaments/{tournament['id']}/live-queue/call",
+        json={"station_id": station["id"], "match_id": match["id"]},
+    )
 
 
 async def start(flow, tournament, station, match):
-    return await flow.post(f"/api/tournaments/{tournament['id']}/live-queue/start", json={"station_id": station["id"], "match_id": match["id"]})
+    return await flow.post(
+        f"/api/tournaments/{tournament['id']}/live-queue/start",
+        json={"station_id": station["id"], "match_id": match["id"]},
+    )
 
 
 @pytest.mark.asyncio
@@ -144,7 +166,9 @@ async def test_two_helpers_calling_at_once_give_exactly_one_call(flow):
 
 @pytest.mark.asyncio
 async def test_two_helpers_who_both_saw_a_free_station_still_give_one_call(flow, monkeypatch):
-    """Wie zwei Worker auf echtem MongoDB: beide lesen „Station frei“, bevor einer schreibt - trotzdem genau ein Aufruf."""
+    """Wie zwei Worker auf echtem MongoDB: beide lesen „Station frei“, bevor einer schreibt.
+
+    Trotzdem gibt es genau einen Aufruf."""
     import routes.tournament_live_routes as live_routes
 
     _staff, tournament, stations, _players = await on_site(flow)
@@ -174,7 +198,9 @@ async def test_starting_sets_the_real_start_and_the_queue_shows_the_clock(flow):
     assert again.status_code == 200 and again.json()["idempotent_replay"] is True
     assert await flow.db.notifications.count_documents({"kind": "match_station"}) == starts
 
-    running = next(row for row in (await queue(flow, tournament))["stations"] if row["id"] == stations[0]["id"])["running"]
+    running = next(row for row in (await queue(flow, tournament))["stations"] if row["id"] == stations[0]["id"])[
+        "running"
+    ]
     assert running["match_id"] == match["id"] and running["started_at"] == stored["started_at"]
     assert running["duration_minutes"] == 30 and running["ends_at"]
 
@@ -192,9 +218,17 @@ async def test_only_staff_with_station_rights_may_call(flow):
     response = await call(flow, tournament, stations[0], match)
     assert response.status_code == 403
     helper = await flow.add_user(name="Helfer Station 2")
-    await flow.db.tournament_staff_assignments.insert_one({"id": new_id(), "tournament_id": tournament["id"], "user_id": helper["id"],
-                                                           "role": "station_manager", "scope": "station", "scope_id": stations[1]["id"],
-                                                           "is_active": True})
+    await flow.db.tournament_staff_assignments.insert_one(
+        {
+            "id": new_id(),
+            "tournament_id": tournament["id"],
+            "user_id": helper["id"],
+            "role": "station_manager",
+            "scope": "station",
+            "scope_id": stations[1]["id"],
+            "is_active": True,
+        }
+    )
     flow.act_as(helper)
     response = await call(flow, tournament, stations[0], match)
     assert response.status_code == 403, "nur die eigene Station"
@@ -232,8 +266,10 @@ async def test_planning_again_does_not_move_a_called_match(flow):
     assert called.status_code == 200, called.text
     planned = (await flow.post(f"/api/tournaments/{tournament['id']}/schedule/plan")).json()
     assert match["id"] not in {item["match_id"] for item in planned["assignments"]}
-    applied = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply",
-                              json={"fingerprint": planned["fingerprint"], "planned_at": planned["planned_at"]})
+    applied = await flow.post(
+        f"/api/tournaments/{tournament['id']}/schedule/apply",
+        json={"fingerprint": planned["fingerprint"], "planned_at": planned["planned_at"]},
+    )
     assert applied.status_code == 200, applied.text
     assert (await flow.reload(match))["station_id"] == target["id"]
 
@@ -242,14 +278,21 @@ async def test_planning_again_does_not_move_a_called_match(flow):
 async def test_online_has_no_queue_and_no_call(flow):
     staff = await flow.add_staff()
     flow.act_as(staff)
-    tournament, _users, _registrations = await flow.with_participants(4, event_mode="online", schedule_mode="player_proposal",
-                                                                      start_date=now_utc().isoformat())
+    tournament, _users, _registrations = await flow.with_participants(
+        4, event_mode="online", schedule_mode="player_proposal", start_date=now_utc().isoformat()
+    )
     response = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false")
     assert response.status_code == 200
     view = await queue(flow, tournament)
     assert view["applies"] is False and view["stations"] == []
     match = (await first_round(flow, tournament))[0]
-    station = {"id": new_id(), "name": "1", "tournament_id": tournament["id"], "status": "free", "current_match_id": None}
+    station = {
+        "id": new_id(),
+        "name": "1",
+        "tournament_id": tournament["id"],
+        "status": "free",
+        "current_match_id": None,
+    }
     await flow.db.stations.insert_one(dict(station))
     response = await call(flow, tournament, station, match)
     assert response.status_code == 409
@@ -268,8 +311,16 @@ async def test_missing_result_counts_from_the_real_start(flow):
     one, two = await first_round(flow, tournament)
     late = (now_utc() - timedelta(minutes=60)).isoformat()
     # Geplant vor einer Stunde, aber erst vor 10 Minuten gestartet (30 Min. Dauer): kein „Ergebnis fehlt“.
-    await flow.db.matches_v2.update_one({"id": one["id"]}, {"$set": {"scheduled_at": late, "status": "in_progress",
-                                                                   "started_at": (now_utc() - timedelta(minutes=10)).isoformat()}})
+    await flow.db.matches_v2.update_one(
+        {"id": one["id"]},
+        {
+            "$set": {
+                "scheduled_at": late,
+                "status": "in_progress",
+                "started_at": (now_utc() - timedelta(minutes=10)).isoformat(),
+            }
+        },
+    )
     # Geplant vor einer Stunde, wartet noch an seiner Station: Verzug, kein fehlendes Ergebnis.
     await flow.db.matches_v2.update_one({"id": two["id"]}, {"$set": {"scheduled_at": late}})
     lead = (await flow.get(f"/api/tournaments/{tournament['id']}/lead")).json()
@@ -278,6 +329,8 @@ async def test_missing_result_counts_from_the_real_start(flow):
     assert timing[two["id"]]["missing"] is False
     assert [item for item in lead["attention"] if item["kind"] == "result_missing"] == []
 
-    await flow.db.matches_v2.update_one({"id": one["id"]}, {"$set": {"started_at": (now_utc() - timedelta(minutes=40)).isoformat()}})
+    await flow.db.matches_v2.update_one(
+        {"id": one["id"]}, {"$set": {"started_at": (now_utc() - timedelta(minutes=40)).isoformat()}}
+    )
     lead = (await flow.get(f"/api/tournaments/{tournament['id']}/lead")).json()
     assert {item["id"]: item["timing"] for item in lead["matches"]}[one["id"]]["missing"] is True
