@@ -219,8 +219,9 @@ async def orphan_state(out):
             updated = await flow.patch(f"/api/matches/{by_key[key]['id']}", json={
                 "scheduled_at": vienna_31(clock), "station_id": station["id"] if on_station else None, "duration_minutes": duration})
             assert updated.status_code == 200, updated.text
-        deleted = await flow.delete(f"/api/stations/{station['id']}")
-        assert deleted.status_code == 200, deleted.text
+        # Altdaten wie vor #1611 herstellen: das Station-Dokument direkt entfernen, die Spiele behalten ihre station_id (die
+        # Route lehnt das Löschen ab, solange geplante Spiele daran hängen).
+        await flow.db.stations.delete_one({"id": station["id"]})
         out["orphan"] = await snapshot(flow, tournament)
         out["orphan"]["deleted_station_id"] = station["id"]
     finally:

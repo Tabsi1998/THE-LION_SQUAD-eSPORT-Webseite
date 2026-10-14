@@ -97,8 +97,9 @@ async def fabians_case(flow):
         response = await flow.patch(f"/api/matches/{matches[key]['id']}", json={
             "scheduled_at": vienna(clock), "station_id": station.json()["id"] if on_station else None, "duration_minutes": duration})
         assert response.status_code == 200, f"{key}: {response.text}"
-    deleted = await flow.delete(f"/api/stations/{station.json()['id']}")
-    assert deleted.status_code == 200, deleted.text
+    # Altdaten wie vor #1611 herstellen: das Station-Dokument direkt entfernen, die Spiele behalten ihre station_id (die
+    # Route lehnt das Löschen ab, solange geplante Spiele daran hängen).
+    await flow.db.stations.delete_one({"id": station.json()["id"]})
     return tournament, station.json(), await by_key(flow, tournament)
 
 
