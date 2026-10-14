@@ -17,6 +17,7 @@ from match_rules import match_allows_draw
 from models import now_utc
 from services.match_attention import attention_items
 from services.match_disputes import category_label, open_dispute
+from services.match_duration import load_duration_game
 from services.match_notifications import results_summary
 from services.match_proofs import visible_proofs
 from services.match_timing import MISSING_AFTER_MINUTES, OPEN_STATUSES, RUNNING_STATUSES, filled_slots, registration_name, timing
@@ -217,11 +218,13 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
         for row in await db.users.find({"id": {"$in": actor_ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}).to_list(len(actor_ids) + 1)
     } if actor_ids else {}
 
+    game = await load_duration_game(db, tournament)
+
     def describe(match: dict) -> dict:
         info = entry_info(match, tournament=tournament, stage=stages.get(match.get("stage_id") or ""),
                           stage_matches=by_stage.get(match.get("stage_id") or "", []), regs_by_id=regs_by_id,
                           viewer_id=user.get("id"))
-        info["timing"] = timing(match, tournament, now)
+        info["timing"] = timing(match, tournament, now, stage=stages.get(match.get("stage_id") or ""), game=game)
         info["can_enter"] = may_enter(match)
         if str(match.get("status") or "") == "disputed":
             info["dispute"] = dispute_card(match, regs_by_id, photos, names)
@@ -236,7 +239,7 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
     # „Braucht Aufmerksamkeit“ (#1160): dieselben Spiele, als Fälle mit Knopf; dazu die Stationen zum Umlegen.
 
     stations = await db.stations.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(500)
-    attention = attention_items(tournament, matches, stations, regs_by_id, now)
+    attention = attention_items(tournament, matches, stations, regs_by_id, now, stages=stages, game=game)
     recent = sorted(
         [match for match in matches if str(match.get("status") or "") in {"completed", "forfeit"} and match.get("completed_at")],
         key=lambda match: str(match.get("completed_at") or ""), reverse=True,

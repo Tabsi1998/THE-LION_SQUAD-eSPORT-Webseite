@@ -14,9 +14,10 @@ import { toast } from "sonner";
 import { ResultWindowLoader } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { planAndApplySchedule } from "@/lib/schedulePlan";
+import { effectiveMatchDuration } from "@/lib/matchDuration";
 
 const DEVICES = [
-  ["switch", "Switch"], ["switch2", "Switch 2"], ["pc", "PC"],
+  ["switch", "Switch"], ["switch2", "Switch 2"], ["pc", "PC"], ["ps5", "PS5"], ["xbox", "Xbox"],
   ["racing_rig", "Renn-Setup"], ["beamer", "Beamer"],
   ["stream_setup", "Übertragungsplatz"], ["admin_desk", "Orga-Tisch"],
 ];
@@ -103,7 +104,10 @@ export default function AdminStationsPage() {
       const { data } = await api.get(`/tournaments/${activeTid}/bracket`);
       if (matchesRequestRef.current !== requestId) return;
       const tournament = data?.tournament || {};
-      setMatches(safeArray(data?.matches_v2).map((m) => ({ ...m, is_multi_slot: true, tournament })));
+      // Die Dauer aus der einen Kette (#1554): Spiel, Phase, Turnier, Spiel-Modus - nichts ist mehr eingefroren.
+      const stageById = new Map(safeArray(data?.stages).map((stage) => [stage?.id, stage]));
+      const durationOf = (m) => effectiveMatchDuration(m, { stage: stageById.get(m.stage_id), tournament, game: data?.duration_game });
+      setMatches(safeArray(data?.matches_v2).map((m) => ({ ...m, is_multi_slot: true, tournament, planned_minutes: durationOf(m) })));
       setRegs(safeArray(data?.registrations));
       setPageError("");
     } catch (e) {
@@ -329,7 +333,7 @@ export default function AdminStationsPage() {
                 <div key={m.id} data-testid={`match-unassigned-${m.id}`} className="p-2 border border-white/10 rounded-sm text-xs bg-[#0A0A0A] hover:border-[#29B6E8]/40">
                   <div className="text-white/40 text-[10px] uppercase tracking-widest">{detailOfMatch(m)}</div>
                   <div className="text-white font-semibold mt-0.5 truncate">{nameOfMatch(m)}</div>
-                  <div className="mt-1 text-white/40">{m.scheduled_at ? formatDateTime(m.scheduled_at) : "Keine feste Zeit"}{m.duration_minutes ? ` · ${m.duration_minutes} Min.` : ""}</div>
+                  <div className="mt-1 text-white/40">{m.scheduled_at ? formatDateTime(m.scheduled_at) : "Keine feste Zeit"}{m.planned_minutes ? ` · ${m.planned_minutes} Min.` : ""}</div>
                 </div>
               ))}
               {loadingMatches && <div className="text-white/40 text-xs text-center py-6">Spiele werden geladen …</div>}

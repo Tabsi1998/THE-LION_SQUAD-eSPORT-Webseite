@@ -45,11 +45,11 @@ def registration_name(registration: dict | None) -> str:
     return (registration or {}).get("display_name") or (registration or {}).get("ingame_name") or (registration or {}).get("team_name") or "Teilnehmer"
 
 
-def duration_minutes(match: dict, tournament: dict | None, stage: dict | None = None) -> int:
-    return effective_match_duration(match, stage=stage, tournament=tournament)
+def duration_minutes(match: dict, tournament: dict | None, stage: dict | None = None, game: dict | None = None) -> int:
+    return effective_match_duration(match, stage=stage, tournament=tournament, game=game)
 
 
-def timing(match: dict, tournament: dict | None, now: datetime) -> dict:
+def timing(match: dict, tournament: dict | None, now: datetime, *, stage: dict | None = None, game: dict | None = None) -> dict:
     """Wie lange läuft das Spiel, und wie weit ist es über der Zeit? Ohne geplante Zeit (und ohne Start an einer
     Station) gibt es kein „Ergebnis fehlt“ (#1160)."""
     started = _parse(match.get("started_at"))
@@ -58,7 +58,7 @@ def timing(match: dict, tournament: dict | None, now: datetime) -> dict:
     if started and str(match.get("status") or "") in RUNNING_STATUSES | {"scheduled", "ready"}:
         out["running_minutes"] = max(0, int((now - started).total_seconds() // 60))
     if base:
-        planned_end = base + timedelta(minutes=duration_minutes(match, tournament))
+        planned_end = base + timedelta(minutes=duration_minutes(match, tournament, stage, game))
         due = planned_end + timedelta(minutes=MISSING_AFTER_MINUTES)
         out["due_at"] = due.isoformat()
         if now > planned_end:
