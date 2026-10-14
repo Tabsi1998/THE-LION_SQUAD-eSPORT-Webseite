@@ -31,7 +31,7 @@ function onlineState(match, deadline) {
 }
 
 /** Online: Runden untereinander, je Spiel der Stand und die nächste Frist. */
-export function OnlineRounds({ tournament, matches, registrations, deadlines }) {
+export function OnlineRounds({ tournament, matches, registrations, deadlines, error = "" }) {
   const rows = (matches || []).filter((match) => !match.is_preview);
   const findIn = finderFor(rows);
   const byId = new Map((deadlines?.matches || []).map((row) => [row.match_id, row]));
@@ -46,6 +46,8 @@ export function OnlineRounds({ tournament, matches, registrations, deadlines }) 
         <h3 className="mp-card__title">Runden und Fristen</h3>
         <span className="mp-card__note">Ein Spiel öffnet, sobald die Gegner feststehen. „Nicht erschienen“ und „Ergebnis gilt“ kommen erst nach der Frist.</span>
       </div>
+      {error && <p className="mp-notice" data-tone="error" role="alert" data-testid="mp-remote-error">Fristen konnten nicht geladen werden: {error}</p>}
+      {!rows.length && <p className="mp-empty">Noch keine Spiele.</p>}
       <div className="mp-rounds">
         {[...rounds.entries()].map(([label, list]) => (
           <div key={label} className="mp-round">
@@ -77,7 +79,7 @@ const SOURCE_TEXT = {
 };
 
 /** Liga: Spielwochen nebeneinander - Fenster, Frist, je Partie der geltende Termin und woher er kommt. */
-export function LeagueWeeks({ tournament, matches, registrations, matchdays }) {
+export function LeagueWeeks({ tournament, matches, registrations, matchdays, error = "" }) {
   const byId = new Map((matches || []).map((match) => [match.id, match]));
   const findIn = finderFor(matches || []);
   const weeks = matchdays?.matchdays || [];
@@ -87,6 +89,7 @@ export function LeagueWeeks({ tournament, matches, registrations, matchdays }) {
         <h3 className="mp-card__title">Spielwochen</h3>
         <span className="mp-card__note">Ohne Einigung gilt die Standardzeit. „Ergebnis fehlt“ meldet sich erst nach der Frist der Woche. Der Planer überschreibt vereinbarte Termine nie.</span>
       </div>
+      {error && <p className="mp-notice" data-tone="error" role="alert" data-testid="mp-remote-error">Spielwochen konnten nicht geladen werden: {error}</p>}
       <div className="mp-weeks-scroll">
         <ol className="mp-weeks">
           {weeks.map((week) => (

@@ -7,7 +7,6 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { TournamentFlowStepper } from "@/components/tls/TournamentFlowStepper";
-import { fromDateTimeLocal } from "@/lib/datetime";
 import { toast } from "sonner";
 import { Zap, RefreshCw, Eye, Search, Tv } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -26,7 +25,6 @@ import { HeatRebuildBar } from "./tournament/HeatRebuildBar";
 import { ParticipantRemovalActions } from "./tournament/ParticipantRemovalActions";
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
 import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
-import { planAndApplySchedule } from "@/lib/schedulePlan";
 import { MatchPlanPanel } from "./tournament/matchplan/MatchPlanPanel";
 
 export default function AdminTournamentEditPage() {
@@ -143,13 +141,6 @@ export default function AdminTournamentEditPage() {
 
   useEffect(() => { loadSafely(); }, [loadSafely]);
   useApiInvalidation(loadSafely, ["tournaments", "matches", "stations"]);
-
-  // Spielplaner (#1552): „Planen“ zeigt, was der Planer schreiben würde - Zeit und Station je Spiel, dazu
-  // Konflikte -, und erst „Übernehmen“ schreibt alles auf einmal. Nebenbei (Statuswechsel, An-/Abmeldung,
-  // Neuaufbau) wird nicht mehr still geplant; feste Termine bleiben, Konflikte stehen rot im Dialog.
-  const planSchedule = async () => {
-    if (await planAndApplySchedule({ tournamentId: id, confirm })) load();
-  };
 
   const reset = async () => {
     if (!await confirm({
@@ -361,19 +352,6 @@ export default function AdminTournamentEditPage() {
       toast.error(formatRequestError(e, locked ? "Turnier konnte nicht gesperrt werden." : "Turnier konnte nicht entsperrt werden."));
     }
   };
-  const updateMatchV2Schedule = async (match, payload) => {
-    try {
-      await api.patch(`/matches/${match.id}`, {
-        scheduled_at: payload.scheduled_at ? fromDateTimeLocal(payload.scheduled_at) : null,
-        duration_minutes: payload.duration_minutes === "" ? null : Number(payload.duration_minutes),
-        station_id: payload.station_id || null,
-      });
-      toast.success("Matchplanung gespeichert.");
-      load();
-    } catch (err) {
-      toast.error(formatRequestError(err, "Matchplanung konnte nicht gespeichert werden."));
-    }
-  };
   const generateGroups = async () => {
     const gc = await prompt({
       title: "Gruppen generieren",
@@ -466,7 +444,7 @@ export default function AdminTournamentEditPage() {
   const canLockTournament = isTournamentLead && ["completed", "results_published", "archived", "cancelled"].includes(t.status);
   const toolActions = [
     t.can_assign_stations && stations.length > 0 && (
-      <button key="stations" type="button" onClick={() => planSchedule()} data-testid="admin-tr-plan-schedule" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
+      <button key="stations" type="button" onClick={() => selectTab("matchplan")} data-testid="admin-tr-plan-schedule" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
         <Zap className="w-3.5 h-3.5" /> Planen
       </button>
     ),
@@ -742,11 +720,10 @@ export default function AdminTournamentEditPage() {
           matches={matchesV2}
           registrations={regs}
           stations={stations}
-          tournamentStartDate={t.start_date}
           canEditSettings={false}
           canManageStructure={Boolean(t.can_manage_structure)}
           onChanged={load}
-          onSaveMatchMeta={updateMatchV2Schedule}
+          onOpenMatchplan={() => selectTab("matchplan")}
           rightsForMatch={rightsForMatch}
           tournament={t}
           durationGame={bracket?.duration_game || null}

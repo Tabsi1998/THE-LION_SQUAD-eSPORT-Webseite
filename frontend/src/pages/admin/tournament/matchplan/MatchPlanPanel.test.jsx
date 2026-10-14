@@ -150,6 +150,105 @@ describe("vor Ort: Aufbau der Seite", () => {
   });
 });
 
+// Praxis-Fehler nach #1589: Ein Turnier vor Ort, dessen Baum noch Vorschau ist, bekam vom Planer „none“ - die Seite
+// sprang auf „online“ und war leer. „none“ heißt „nichts neu zu planen“, nicht „online“; vorhandene Spiele stehen da.
+describe("Ansicht springt nicht und bleibt nie leer", () => {
+  it("Baum noch Vorschau, Planer meldet „none“: bleibt vor Ort, zeigt alle Spiele und warum noch nicht geplant wird", async () => {
+    const state = fixture.draft;
+    expect(state.plan.mode).toBe("none");
+    setup(state);
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`/tournaments/${state.tournament.id}/schedule/plan`));
+    await act(async () => {});
+    expect(screen.queryByTestId("mp-online")).toBeNull();
+    expect(screen.queryByTestId("mp-league")).toBeNull();
+    expect(screen.getByLabelText("Puffer je Spiel (Min.)")).toBeInTheDocument();
+    expect(within(screen.getByTestId("mp-flow")).getAllByRole("button")).toHaveLength(14);
+    const rows = within(screen.getByTestId("mp-order")).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(14);
+    expect(rows[0]).toHaveTextContent("noch ohne Zeit");
+    expect(screen.getByTestId("mp-plan-note")).toHaveTextContent("Turnierbaum ist noch eine Vorschau");
+  });
+
+  it("scheitert die Anfrage an den Planer, steht eine Meldung da - die gespeicherten Spiele bleiben sichtbar", async () => {
+    const state = fixture.local.applied;
+    apiMock.get.mockResolvedValue({ data: [] });
+    apiMock.post.mockRejectedValue(Object.assign(new Error("403"), { response: { status: 403, data: { detail: "Keine Turnierberechtigung für diese Aktion" } } }));
+    apiMock.patch.mockResolvedValue({ data: {} });
+    render(
+      <MemoryRouter>
+        <MatchPlanPanel tournament={state.tournament} matches={state.matches} stages={state.stages} stations={state.stations}
+          registrations={state.registrations} durationGame={state.duration_game} now={new Date(fixture.generated_at)} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId("mp-plan-error")).toHaveTextContent("Keine Turnierberechtigung für diese Aktion");
+    expect(bar("A")).toBeInTheDocument();
+  });
+
+  it("ohne Recht zum Planen fragt die Seite den Planer nicht, sagt es und zeigt trotzdem den Plan", () => {
+    const state = fixture.local.applied;
+    setup({ ...state, tournament: { ...state.tournament, can_assign_stations: false, can_plan_matches: false } });
+    expect(apiMock.post).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Automatisch planen" })).toBeNull();
+    expect(screen.getByTestId("mp-plan-note")).toHaveTextContent("Planen und Verschieben");
+    expect(bar("A")).toBeInTheDocument();
+    expect(bar("A")).not.toHaveAttribute("data-movable");
+  });
+
+  it("Fristen nicht ladbar: Meldung in der Online-Ansicht statt leerer Fläche", async () => {
+    const state = fixture.online;
+    apiMock.get.mockRejectedValue(new Error("weg"));
+    apiMock.post.mockResolvedValue({ data: state.plan });
+    render(
+      <MemoryRouter>
+        <MatchPlanPanel tournament={state.tournament} matches={state.matches} stages={state.stages} stations={state.stations}
+          registrations={state.registrations} durationGame={state.duration_game} now={new Date(fixture.generated_at)} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId("mp-remote-error")).toHaveTextContent("Fristen");
+  });
+});
+
+describe("Spiel ändern: Zeit, Station und eigene Dauer (ersetzt die alte Matchplanung im Reiter „Spiele“)", () => {
+  it("ohne eigene Dauer steht da, woher sie kommt; Speichern schickt Wiener Zeit, Station und leer als null", async () => {
+    const user = userEvent.setup();
+    const state = fixture.local.applied;
+    const a = state.matches.find((row) => row.match_key === "A");
+    setup(state);
+    await user.click(within(screen.getByTestId("mp-order")).getByRole("button", { name: "A ändern" }));
+    const editor = screen.getByTestId("mp-editor");
+    const duration = within(editor).getByLabelText("Eigene Dauer (Min.)");
+    expect(duration).toHaveValue(null);
+    expect(duration).toHaveAttribute("placeholder", "20");
+    expect(editor).toHaveTextContent("Leer lassen: vom Spiel: 12 Min. (Grand Prix (4 Rennen)) + 8 Min. Puffer");
+    fireEvent.change(within(editor).getByLabelText("Start"), { target: { value: "2026-10-31T17:05" } });
+    await user.selectOptions(within(editor).getByLabelText("Station"), "Switch 2");
+    await user.click(within(editor).getByRole("button", { name: "Speichern" }));
+    const station = state.stations.find((row) => row.name === "Switch 2").id;
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith(`/matches/${a.id}`,
+      { scheduled_at: "2026-10-31T16:05:00.000Z", station_id: station, duration_minutes: null }));
+  });
+
+  it("eine eigene Dauer steht im Feld und geht als Zahl an den Server; leerer Start löst den Termin", async () => {
+    const user = userEvent.setup();
+    const state = fixture.local.applied;
+    const matches = state.matches.map((row) => (row.match_key === "A" ? { ...row, duration_minutes: 25 } : row));
+    const a = matches.find((row) => row.match_key === "A");
+    setup({ ...state, matches });
+    await user.click(within(screen.getByTestId("mp-order")).getByRole("button", { name: "A ändern" }));
+    const editor = screen.getByTestId("mp-editor");
+    expect(within(editor).getByLabelText("Eigene Dauer (Min.)")).toHaveValue(25);
+    fireEvent.change(within(editor).getByLabelText("Start"), { target: { value: "" } });
+    await user.click(within(editor).getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith(`/matches/${a.id}`,
+      { scheduled_at: null, station_id: a.station_id, duration_minutes: 25 }));
+  });
+
+  it("Spiele eines Vorschau-Baums lassen sich nicht ändern", () => {
+    setup(fixture.draft);
+    expect(within(screen.getByTestId("mp-order")).queryByRole("button", { name: /ändern$/ })).toBeNull();
+  });
+});
+
 describe("Automatisch planen: Vorschau und Übernehmen", () => {
   it("zeigt die Vorschau mit geänderten Spielen und schreibt erst nach „Übernehmen“ mit Fingerabdruck", async () => {
     const user = userEvent.setup();

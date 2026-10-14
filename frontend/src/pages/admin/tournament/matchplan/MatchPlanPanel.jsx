@@ -6,11 +6,12 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { buildTimeline, scheduleDelay } from "@/lib/matchTimeline";
 import { dependencyGraph } from "@/lib/matchFlow";
 import { matchDurationSource } from "@/lib/matchDuration";
-import { applySchedulePlan, moveMatch, requestSchedulePlan } from "@/lib/schedulePlan";
+import { applySchedulePlan, moveMatch, requestSchedulePlan, updateMatchPlan } from "@/lib/schedulePlan";
+import { matchRights } from "@/lib/tournamentRights";
 import { viennaTime } from "@/lib/vienna";
 import { StationTimeline } from "./StationTimeline";
 import { FlowGraph } from "./FlowGraph";
-import { DelayBanner, OrderList, PlanPreview, PlanSettings, PlanWarnings, StationAgenda } from "./MatchPlanParts";
+import { DelayBanner, MatchEditor, OrderList, PlanNotice, PlanPreview, PlanSettings, PlanWarnings, StationAgenda } from "./MatchPlanParts";
 import { LeagueWeeks, OnlineRounds } from "./MatchPlanRemote";
 
 // Matchplan-Seite (#1557) - das Werkzeug der Turnierleitung am Turniertag. Oben die Einstellungen, darunter „Wer wartet
@@ -20,7 +21,8 @@ import { LeagueWeeks, OnlineRounds } from "./MatchPlanRemote";
 // useLiveRefresh, dazu jede Minute, weil die Prognose mit der Uhr wandert). Online und Liga: keine Stationen.
 
 const LIVE_STATUSES = new Set(["live", "paused"]);
-const LEAGUE_FORMATS = new Set(["league", "round_robin"]);
+// Wie services/matchday_schedule.MATCHDAY_FORMATS: diese Formate spielen online in Spielwochen.
+const LEAGUE_FORMATS = new Set(["league", "round_robin", "groups"]);
 const CLOCK_MS = 30_000;
 
 function fallbackMode(tournament) {
@@ -29,10 +31,11 @@ function fallbackMode(tournament) {
   return LEAGUE_FORMATS.has(tournament?.format) ? "league" : "online";
 }
 
+// Die Ansicht folgt dem Turnier. Der Planer bestätigt sie („stations“, „matchdays“); „none“ heißt nur „nichts (neu) zu
+// planen“ - etwa solange der Baum Vorschau ist - und ist nie ein Grund, auf „online“ zu springen (Praxis-Fehler nach #1589).
 function modeOf(plan, tournament) {
   if (plan?.mode === "matchdays") return "league";
   if (plan?.mode === "stations" || plan?.mode === "mixed") return "local";
-  if (plan?.mode === "none") return fallbackMode(tournament) === "league" ? "league" : "online";
   return fallbackMode(tournament);
 }
 
@@ -52,7 +55,10 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   canEditSettings = false, onChanged, now: fixedNow }) {
   const tid = tournament.id;
   const canPlan = Boolean(tournament.can_assign_stations);
-  const canMove = Boolean(tournament.can_plan_matches ?? tournament.can_assign_stations);
+  const matchById = useMemo(() => new Map(matches.map((match) => [match.id, match])), [matches]);
+  // Termin und Station je Spiel: wie der Server (PATCH /matches) - turnierweit oder für genau dieses Spiel (#1353).
+  const canMoveItem = useCallback((item) => matchRights(tournament, matchById.get(item.id)).plan, [tournament, matchById]);
+  const canMove = Boolean(tournament.can_plan_matches) || (tournament.staff_scopes || []).some((scope) => scope?.plan);
   const live = LIVE_STATUSES.has(tournament.status);
   const [clock, setClock] = useState(() => Date.now());
   const [background, setBackground] = useState(null);
@@ -62,6 +68,8 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const [selectedId, setSelectedId] = useState(null);
   const [deadlines, setDeadlines] = useState(null);
   const [matchdays, setMatchdays] = useState(null);
+  const [planError, setPlanError] = useState("");
+  const [remoteError, setRemoteError] = useState("");
   const request = useRef(0);
 
   useEffect(() => {
@@ -79,19 +87,28 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
     request.current = id;
     try {
       const plan = await requestSchedulePlan(tid);
-      if (request.current === id) setBackground(plan);
+      if (request.current === id) {
+        setBackground(plan);
+        setPlanError("");
+      }
       return plan;
-    } catch {
+    } catch (error) {
+      // Nicht verschlucken: ohne Antwort des Planers fehlen Konflikte, Verzug und „Automatisch planen“ - das soll man sehen.
+      if (request.current === id) setPlanError(formatRequestError(error, "Der Planer ist gerade nicht erreichbar."));
       return null;
     }
   }, [canPlan, tid]);
 
   const refreshRemote = useCallback(async () => {
-    if (mode === "online") {
-      try { setDeadlines((await api.get(`/tournaments/${encodeURIComponent(tid)}/schedule/deadlines`)).data); } catch { setDeadlines(null); }
-    }
-    if (mode === "league") {
-      try { setMatchdays((await api.get(`/tournaments/${encodeURIComponent(tid)}/matchdays`)).data); } catch { setMatchdays(null); }
+    const path = mode === "online" ? "schedule/deadlines" : mode === "league" ? "matchdays" : "";
+    if (!path) return;
+    try {
+      const { data } = await api.get(`/tournaments/${encodeURIComponent(tid)}/${path}`);
+      if (mode === "online") setDeadlines(data);
+      else setMatchdays(data);
+      setRemoteError("");
+    } catch (error) {
+      setRemoteError(formatRequestError(error, "Der Server antwortet gerade nicht."));
     }
   }, [mode, tid]);
 
@@ -160,6 +177,25 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
     return result;
   };
 
+  const saveMatch = async (item, body) => {
+    const result = await updateMatchPlan(item.id, body);
+    if (result.ok) {
+      toast.success(`${item.key} gespeichert.`);
+      setPreview(null);
+      await onChanged?.();
+      refreshPlan();
+    }
+    return result;
+  };
+
+  const editor = (item, close) => {
+    const match = matchById.get(item.id);
+    return (
+      <MatchEditor item={item} match={match} stations={stations} stage={stages.find((stage) => stage.id === match?.stage_id) || null}
+        tournament={tournament} game={durationGame} onSave={saveMatch} onClose={close} />
+    );
+  };
+
   const release = async (item) => {
     const result = await moveMatch(item.id, { release: true });
     if (!result.ok) {
@@ -188,7 +224,17 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
     </button>
   ) : null;
 
-  const ordered = [...timeline.items];
+  // Erst nach Zeit, dahinter, was noch keine Zeit hat - so steht jedes Spiel da, auch solange der Baum Vorschau ist.
+  const ordered = [...timeline.items, ...timeline.unscheduled];
+  const allPreview = matches.length > 0 && matches.every((match) => match.is_preview);
+  let note = "";
+  if (!canPlan) {
+    note = "Planen und Verschieben darf, wer in diesem Turnier Stationen zuweisen darf (Turnierleitung, Schiedsrichter, Stationsleitung). Du siehst den Plan.";
+  } else if (mode === "local" && allPreview) {
+    note = "Der Turnierbaum ist noch eine Vorschau (bis zum Ende des Check-ins). Zeiten und Stationen plant der Planer, sobald er fix ist - die Spiele stehen unten schon da.";
+  } else if (mode === "local" && background?.mode === "none" && background?.reason) {
+    note = background.reason;
+  }
   const summary = timeline.items.length
     ? `Ende ca. ${viennaTime(Math.max(...timeline.items.map((item) => item.end)), { hour: "2-digit", minute: "2-digit" })}`
     : "";
@@ -196,6 +242,8 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   return (
     <div className="mp" data-mode={mode}>
       <DelayBanner delay={delay} canPlan={canPlan} onReplan={startPreview} />
+      {planError && <PlanNotice tone="error" testId="mp-plan-error">Der Planer hat nicht geantwortet: {planError} Gezeigt wird der gespeicherte Plan.</PlanNotice>}
+      {note && <PlanNotice testId="mp-plan-note">{note}</PlanNotice>}
       <PlanSettings
         tournament={tournament}
         mode={mode}
@@ -213,13 +261,13 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
             <FlowGraph graph={graph} itemsById={itemsById} laneNames={laneNames} selectedId={selectedId} onSelect={setSelectedId} />
           </Section>
           <Section title="Zeitleiste je Station" note={[summary, timeline.unscheduled.length ? `${timeline.unscheduled.length} ohne Zeit` : ""].filter(Boolean).join(" · ")} testId="mp-timeline-card">
-            {timeline.items.length || timeline.lanes.length ? (
+            {timeline.items.length || timeline.lanes.length || timeline.unscheduled.length ? (
               <>
                 <div className="mp-desktop-only">
-                  <StationTimeline timeline={timeline} editable={canMove} onMove={move} onSelect={setSelectedId} selectedId={selectedId} showNow={live} />
+                  <StationTimeline timeline={timeline} editable={canMove} canMoveItem={canMoveItem} onMove={move} onSelect={setSelectedId} selectedId={selectedId} showNow={live} />
                 </div>
                 <div className="mp-mobile-only">
-                  <StationAgenda timeline={timeline} canEdit={canMove} onRelease={release} />
+                  <StationAgenda timeline={timeline} canEdit={canMoveItem} onRelease={release} editor={editor} />
                 </div>
               </>
             ) : (
@@ -229,13 +277,13 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
           {/* Am Handy steht dieselbe Reihenfolge schon je Station in der Liste oben. */}
           <div className="mp-desktop-only">
             <Section title="Reihenfolge und Zeiten" note="Feste Termine bleiben, bis du sie löst." testId="mp-order-card">
-              <OrderList items={ordered} laneNames={laneNames} canEdit={canMove} onRelease={release} />
+              <OrderList items={ordered} laneNames={laneNames} canEdit={canMoveItem} onRelease={release} editor={editor} />
             </Section>
           </div>
         </>
       )}
-      {mode === "online" && <OnlineRounds tournament={tournament} matches={matches} registrations={registrations} deadlines={deadlines} />}
-      {mode === "league" && <LeagueWeeks tournament={tournament} matches={matches} registrations={registrations} matchdays={matchdays} />}
+      {mode === "online" && <OnlineRounds tournament={tournament} matches={matches} registrations={registrations} deadlines={deadlines} error={remoteError} />}
+      {mode === "league" && <LeagueWeeks tournament={tournament} matches={matches} registrations={registrations} matchdays={matchdays} error={remoteError} />}
     </div>
   );
 }

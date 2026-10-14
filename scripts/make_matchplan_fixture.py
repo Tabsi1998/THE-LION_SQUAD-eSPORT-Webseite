@@ -8,6 +8,7 @@ je 4 Fahrer) - gebaut vom echten Generator aus dem Schema.
 Zustände:
   local.preview   Baum gebaut, zwei Stationen, Vorschau vor dem ersten Übernehmen
   local.applied   nach „Übernehmen“: gespeicherter Plan, Vorschau ohne Änderung
+  draft           Baum noch Vorschau (vor dem Check-in-Ende): der Planer meldet „none“, die Spiele stehen trotzdem da
   local.conflict  eine Zeit von Hand zu früh gesetzt (Warnung „zu früh“), dazu die 409 beim Belegen einer Station und
                   die 409 einer veralteten Vorschau
   live            Turnier läuft seit 70 Minuten: zwei Läufe fertig, einer läuft an der Station, Vorschau mit Verzug
@@ -95,7 +96,7 @@ async def stations(flow, tournament, names, device="switch2", broken=()):
     return docs
 
 
-async def cup(flow, staff, start, title="Mario Kart 8 Autumn Cup"):
+async def cup(flow, staff, start, title="Mario Kart 8 Autumn Cup", preview=False):
     """Der Cup aus dem Prototyp: 16 Fahrer, je 4 im Lauf, zwei kommen weiter, Loser Bracket, Finale."""
     await flow.db.games.update_one({"id": MK8["id"]}, {"$set": MK8}, upsert=True)
     tournament, _users, regs = await flow.with_participants(
@@ -104,7 +105,7 @@ async def cup(flow, staff, start, title="Mario Kart 8 Autumn Cup"):
         match_duration_minutes=None, match_buffer_minutes=8, match_break_minutes=5)
     await named(flow, regs, NAMES)
     flow.act_as(staff)
-    response = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false", json={
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview={'true' if preview else 'false'}", json={
         "name": "Läufe", "stage_type": "ffa_custom_bracket", "match_type": "ffa",
         "settings": {"schema": CUP_SCHEMA, "match_size": 4, "qualifiers_per_match": 2, "min_players": 2}})
     assert response.status_code == 200, response.text
@@ -167,6 +168,19 @@ async def local_states(out):
         assert early.status_code == 200, early.text
         out["local"]["conflict"] = await snapshot(flow, tournament)
         out["local"]["errors"] = {"stale_apply": stale.json(), "station_taken": taken.json()}
+    finally:
+        await shutdown()
+
+
+async def draft_state(out):
+    """Vor dem Check-in-Ende: der Baum ist eine Vorschau (so steht der Cup bis zum Turniertag) - der Planer meldet „none“."""
+    flow, shutdown = make_flow()
+    try:
+        staff = await flow.add_staff()
+        start = quarter(now_utc() + timedelta(days=2))
+        tournament = await cup(flow, staff, start, title="Mario Kart 8 Autumn Cup (Vorschau)", preview=True)
+        await stations(flow, tournament, ["Switch 1", "Switch 2"])
+        out["draft"] = await snapshot(flow, tournament)
     finally:
         await shutdown()
 
@@ -270,6 +284,7 @@ INFO = ("Erzeugt von scripts/make_matchplan_fixture.py mit dem echten Generator,
 async def main():
     out = {"_info": INFO, "generated_at": now_utc().isoformat()}
     await local_states(out)
+    await draft_state(out)
     await live_state(out)
     await big_state(out)
     await online_state(out)
@@ -278,6 +293,7 @@ async def main():
     for key in ("preview", "applied", "conflict"):
         plan = out["local"][key]["plan"]
         print("local", key, plan["mode"], len(plan["assignments"]), [w["type"] for w in plan["warnings"]])
+    print("draft", out["draft"]["plan"]["mode"], out["draft"]["plan"]["reason"], sum(1 for m in out["draft"]["matches"] if m.get("is_preview")))
     print("live", len(out["live"]["plan"]["assignments"]), [w["type"] for w in out["live"]["plan"]["warnings"]])
     print("big", len(out["big"]["matches"]), out["big"]["plan"]["mode"], len(out["big"]["plan"]["assignments"]))
     print("online", out["online"]["plan"]["mode"], len(out["online"]["deadlines"]["matches"]))

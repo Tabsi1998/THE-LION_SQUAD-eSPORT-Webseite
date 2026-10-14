@@ -28,7 +28,7 @@ function barLabel(item, laneName) {
   return parts.join(", ");
 }
 
-export function StationTimeline({ timeline, editable = false, onMove, onSelect, selectedId = null, showNow = false }) {
+export function StationTimeline({ timeline, editable = false, canMoveItem = null, onMove, onSelect, selectedId = null, showNow = false }) {
   const scroller = useRef(null);
   const [room, setRoom] = useState(0);
   useEffect(() => {
@@ -66,7 +66,7 @@ export function StationTimeline({ timeline, editable = false, onMove, onSelect, 
     return () => clearTimeout(timer);
   }, [instant]);
 
-  const movable = (item) => editable && !busy && item.state === "planned";
+  const movable = (item) => editable && !busy && item.state === "planned" && !item.preview && (!canMoveItem || canMoveItem(item));
 
   const describe = (next, item) => {
     const blocking = dropConflicts(timeline, item.id, next.laneId, next.start);
