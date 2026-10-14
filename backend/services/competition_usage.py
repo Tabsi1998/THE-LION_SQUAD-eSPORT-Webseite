@@ -16,6 +16,7 @@ from datetime import timedelta
 
 from database import get_db
 from models import now_utc
+from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.competition.usage")
 
@@ -60,7 +61,7 @@ async def record_write(
             "created_at": now_utc(),
         })
     except Exception as exc:
-        logger.debug("[usage] not recorded capability=%s type=%s", capability, type(exc).__name__)
+        logger.debug("[usage] not recorded capability=%s type=%s", log_safe(capability, 80), type(exc).__name__)
 
 
 async def usage_summary(days: int = 30) -> dict:
