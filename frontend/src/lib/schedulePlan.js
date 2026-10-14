@@ -2,6 +2,47 @@ import { api, formatRequestError } from "@/lib/api";
 import { toast } from "sonner";
 import { countOf, describeSchedulePlan } from "@/lib/schedulePlanText";
 
+const STALE_TEXT = "Der Plan hat sich inzwischen geändert - bitte noch einmal Planen.";
+
+/** Die Vorschau des Planers (#1552): Zeit und Station je Spiel, Warnungen, Fingerabdruck - geschrieben wird nichts. */
+export async function requestSchedulePlan(tournamentId) {
+  const { data } = await api.post(`/tournaments/${encodeURIComponent(tournamentId)}/schedule/plan`);
+  return data;
+}
+
+/**
+ * „Übernehmen“ zu genau der gezeigten Vorschau (Matchplan-Seite, #1557): Fingerabdruck und Anker gehen mit. Antwortet
+ * der Server mit 409, hat sich der Plan inzwischen geändert oder die Vorschau ist zu alt - dann `stale: true`, und die
+ * Seite plant neu, statt etwas anderes zu schreiben als gezeigt.
+ */
+export async function applySchedulePlan(tournamentId, plan) {
+  try {
+    const { data } = await api.post(`/tournaments/${encodeURIComponent(tournamentId)}/schedule/apply`,
+      { fingerprint: plan.fingerprint, planned_at: plan.planned_at });
+    return { ok: true, written: Number(data?.written) || 0 };
+  } catch (error) {
+    if (error?.response?.status === 409) return { ok: false, stale: true, message: error.response?.data?.detail || STALE_TEXT };
+    return { ok: false, stale: false, message: formatRequestError(error, "Spielplan konnte nicht übernommen werden.") };
+  }
+}
+
+/**
+ * Ein Spiel auf eine Zeit und Station legen (Ziehen auf der Zeitleiste oder Tastatur, #1557) - über den bestehenden
+ * Weg PATCH /matches/:id. Der Server macht daraus einen festen Termin (`manual`) und lehnt eine belegte Station mit 409
+ * ab. `release: true` löst den festen Termin: ohne Zeit plant der Planer das Spiel beim nächsten Mal wieder.
+ */
+export async function moveMatch(matchId, { start, stationId, release = false } = {}) {
+  const body = release
+    ? { scheduled_at: null }
+    : { scheduled_at: new Date(start).toISOString(), station_id: stationId && stationId !== "none" ? stationId : null };
+  try {
+    await api.patch(`/matches/${encodeURIComponent(matchId)}`, body);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: formatRequestError(error, "Das Spiel konnte nicht verschoben werden.") };
+  }
+}
+
 // Spielplaner (#1552), ein Ablauf für Turnierseite und Stationsseite: „Planen“ holt die Vorschau, der Dialog zeigt
 // Zeit und Station je Spiel samt Konflikten, und erst „Übernehmen“ schreibt - mit dem Fingerabdruck der gesehenen
 // Vorschau, damit nie etwas anderes geschrieben wird als gezeigt. Gibt true zurück, wenn geschrieben wurde.

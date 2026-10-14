@@ -4,6 +4,8 @@
 // Game: Modus der Phase, sonst des Turniers, sonst der erste. Ist die Dauer pro Einzelspiel angegeben (per_game),
 // zählt Best-of als Erwartungswert (Mitte aus kürzestem und längstem Verlauf: Bo3 = 2,5, Bo5 = 4 Spiele), aufgerundet.
 // Dazu die Aufbau-/Wechselzeit des Games. Ein Wert an Turnier, Phase oder Spiel ist immer die ganze Dauer.
+// Puffer (#1557): `match_buffer_minutes` am Turnier kommt auf jede Dauer aus Phase, Turnier, Game oder Vorgabe - eine
+// Dauer am Spiel selbst bekommt keinen.
 // Ein Wächter in matchDuration.test.js hält Kopien der Kette fern.
 
 export const DEFAULT_MATCH_DURATION_MINUTES = 30;
@@ -60,22 +62,34 @@ export function gameDuration(game, { match, stage, tournament } = {}) {
   return minutes;
 }
 
-/** Dauer und Herkunft: { minutes, source: "match" | "stage" | "tournament" | "game" | "default", mode }. */
+/** Der Puffer je Spiel aus dem Turnier (#1557) - 0 ohne brauchbaren Wert. */
+export function bufferMinutes(tournament) {
+  return minutesOf(tournament?.match_buffer_minutes) || 0;
+}
+
+function withBuffer(result, tournament) {
+  const buffer = bufferMinutes(tournament);
+  return buffer ? { ...result, minutes: result.minutes + buffer, buffer } : result;
+}
+
+/** Dauer und Herkunft: { minutes, source: "match" | "stage" | "tournament" | "game" | "default", mode, buffer? }. */
 export function matchDurationSource(match, { stage, tournament, game, updates } = {}) {
   const own = updates && "duration_minutes" in updates ? updates.duration_minutes : match?.duration_minutes;
+  for (const value of [own, settingsOf(match).duration_minutes]) {
+    const minutes = minutesOf(value);
+    if (minutes !== null) return { minutes, source: "match", mode: null };
+  }
   const levels = [
-    ["match", own],
-    ["match", settingsOf(match).duration_minutes],
     ["stage", settingsOf(stage).duration_minutes],
     ["tournament", tournament?.match_duration_minutes],
   ];
   for (const [source, value] of levels) {
     const minutes = minutesOf(value);
-    if (minutes !== null) return { minutes, source, mode: null };
+    if (minutes !== null) return withBuffer({ minutes, source, mode: null }, tournament);
   }
   const fromGame = gameDuration(game, { match, stage, tournament });
-  if (fromGame !== null) return { minutes: fromGame, source: "game", mode: gameMode(game, { stage, tournament }) };
-  return { minutes: DEFAULT_MATCH_DURATION_MINUTES, source: "default", mode: null };
+  if (fromGame !== null) return withBuffer({ minutes: fromGame, source: "game", mode: gameMode(game, { stage, tournament }) }, tournament);
+  return withBuffer({ minutes: DEFAULT_MATCH_DURATION_MINUTES, source: "default", mode: null }, tournament);
 }
 
 /** Ein eigener Dauer-Wert für ein Eingabefeld: die Zahl als Text, leer heißt „erben“. */
@@ -91,10 +105,11 @@ export function ownDurationPayload(value) {
 
 const SOURCE_WORDS ={ match: "am Spiel", stage: "von der Phase", tournament: "vom Turnier", game: "vom Spiel", default: "Standard" };
 
-/** „vom Spiel: 12 Min. (Grand Prix 4 Rennen)“ - woher eine geerbte Dauer kommt, für Hinweise in Formularen. */
-export function durationSourceText({ minutes, source, mode } = {}) {
+/** „vom Spiel: 12 Min. (Grand Prix 4 Rennen) + 8 Min. Puffer“ - woher eine geerbte Dauer kommt, für Hinweise. */
+export function durationSourceText({ minutes, source, mode, buffer } = {}) {
   const label = String(mode?.label || "").trim();
-  return `${SOURCE_WORDS[source] || "Standard"}: ${minutes} Min.${source === "game" && label ? ` (${label})` : ""}`;
+  const base = buffer ? minutes - buffer : minutes;
+  return `${SOURCE_WORDS[source] || "Standard"}: ${base} Min.${source === "game" && label ? ` (${label})` : ""}${buffer ? ` + ${buffer} Min. Puffer` : ""}`;
 }
 
 /** Wie lange dieses Spiel geplant wird, in Minuten. */

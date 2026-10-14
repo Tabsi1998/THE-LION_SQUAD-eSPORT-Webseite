@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { asInstant, dayBefore, dayNoon, viennaDate, viennaDateTime, viennaDay, viennaTime } from "./vienna";
+import { asInstant, dayBefore, dayNoon, fromViennaInput, viennaDate, viennaDateTime, viennaDay, viennaInputValue, viennaTime } from "./vienna";
 
 // #943: Daten immer in de-AT und Wiener Zeit - egal, wo der Browser steht und wie der Prüfrechner tickt.
 
@@ -110,5 +110,49 @@ describe("keine Datumsanzeige an der Hilfe vorbei", () => {
       return dateOptions.test(text) || dateReceiver.test(text);
     }).map((file) => path.relative(root, file));
     expect(direct, "viennaDateTime aus @/lib/vienna nehmen").toEqual([]);
+  });
+});
+
+
+// Eingabefelder (datetime-local) in Wiener Uhr (#1557, Codex): der Turnierstart steht im Feld so, wie er in der Halle
+// gilt - egal, in welcher Zone das Gerät steht. Zeitumstellung: eine Uhrzeit, die es nicht gibt (29.03. 02:30), rückt
+// eine Stunde vor; eine Uhrzeit, die es zweimal gibt (25.10. 02:30), meint die erste (noch Sommerzeit).
+describe("Eingabefelder in Wiener Uhr", () => {
+  it("zeigt einen Zeitpunkt als Wiener Uhr im Feld - Winter und Sommer", () => {
+    expect(viennaInputValue("2026-10-31T16:30:00+00:00")).toBe("2026-10-31T17:30");
+    expect(viennaInputValue("2026-07-04T17:00:00Z")).toBe("2026-07-04T19:00");
+    expect(viennaInputValue(null)).toBe("");
+    expect(viennaInputValue("kaputt")).toBe("");
+  });
+
+  it("liest das Feld als Wiener Uhr zurück", () => {
+    expect(fromViennaInput("2026-10-31T17:30")).toBe("2026-10-31T16:30:00.000Z");
+    expect(fromViennaInput("2026-07-04T19:00")).toBe("2026-07-04T17:00:00.000Z");
+    expect(fromViennaInput("")).toBeNull();
+    expect(fromViennaInput("31.10.2026 17:30")).toBeNull();
+  });
+
+  it("die doppelte Stunde am 25.10.: 02:30 ist die erste, noch in Sommerzeit", () => {
+    expect(fromViennaInput("2026-10-25T02:30")).toBe("2026-10-25T00:30:00.000Z");
+    expect(viennaInputValue("2026-10-25T00:30:00Z")).toBe("2026-10-25T02:30");
+    expect(viennaInputValue("2026-10-25T01:30:00Z")).toBe("2026-10-25T02:30");
+    expect(fromViennaInput("2026-10-25T03:00")).toBe("2026-10-25T02:00:00.000Z");
+  });
+
+  it("die fehlende Stunde am 29.03.: 02:30 gibt es nicht, es gilt 03:30", () => {
+    expect(fromViennaInput("2026-03-29T02:30")).toBe("2026-03-29T01:30:00.000Z");
+    expect(viennaInputValue(fromViennaInput("2026-03-29T02:30"))).toBe("2026-03-29T03:30");
+    expect(fromViennaInput("2026-03-29T01:59")).toBe("2026-03-29T00:59:00.000Z");
+    expect(fromViennaInput("2026-03-29T03:00")).toBe("2026-03-29T01:00:00.000Z");
+  });
+
+  it("hin und zurück bleibt jede Viertelstunde des Jahres gleich (außer in der Lücke)", () => {
+    const start = Date.UTC(2026, 0, 1);
+    for (let at = start; at < start + 366 * 24 * 3600 * 1000; at += 15 * 60 * 1000) {
+      const text = viennaInputValue(at);
+      const back = Date.parse(fromViennaInput(text));
+      // In der doppelten Stunde meint das Feld die erste - der zweite Durchgang landet eine Stunde früher.
+      expect([at, at - 3600 * 1000]).toContain(back);
+    }
   });
 });

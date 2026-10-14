@@ -10,6 +10,8 @@ Die Ebene „Game“ (#1554) gilt nur, wenn Spiel, Phase und Turnier nichts sage
   (wie bei der Ergebnisprüfung), sonst 1. Die Best-of-Vorgabe des Games füllt nur das Turnierformular vor.
 - Dazu kommt die Aufbau-/Wechselzeit des Games (``setup_minutes``), einmal je Spiel.
 Ein Wert an Turnier, Phase oder Spiel ist immer die ganze Dauer - ohne Multiplikation und ohne Aufbauzeit.
+Puffer (#1557): ``match_buffer_minutes`` am Turnier kommt auf jede Dauer aus Phase, Turnier, Game oder Vorgabe - Luft,
+die die Turnierleitung je Spiel einplant. Eine Dauer am Spiel selbst ist die ganze Dauer und bekommt keinen Puffer.
 
 Bewusst ohne Importe aus dem Rest des Backends: Generatoren, Planer, Routen und Anzeigen rufen diese Funktion,
 und ein Wächtertest (``test_match_duration_unit``) hält neue Kopien der Kette fern. Erzeugte Spiele und Phasen
@@ -91,6 +93,11 @@ def game_duration(game: dict | None, *, match: dict | None = None, stage: dict |
     return minutes
 
 
+def buffer_minutes(tournament: dict | None) -> int:
+    """Der Puffer je Spiel aus dem Turnier (#1557) - 0 ohne brauchbaren Wert."""
+    return _minutes((tournament or {}).get("match_buffer_minutes")) or 0
+
+
 def effective_match_duration(match: dict | None = None, *, stage: dict | None = None, tournament: dict | None = None,
                              game: dict | None = None, updates: dict | None = None,
                              default: int = DEFAULT_MATCH_DURATION_MINUTES) -> int:
@@ -105,16 +112,17 @@ def effective_match_duration(match: dict | None = None, *, stage: dict | None = 
         own = _minutes(updates.get("duration_minutes"))
     else:
         own = _minutes(match.get("duration_minutes"))
+    for candidate in (own, _minutes(_settings(match).get("duration_minutes"))):
+        if candidate is not None:
+            return candidate
     for candidate in (
-        own,
-        _minutes(_settings(match).get("duration_minutes")),
         _minutes(_settings(stage).get("duration_minutes")),
         _minutes((tournament or {}).get("match_duration_minutes")),
         game_duration(game, match=match, stage=stage, tournament=tournament),
     ):
         if candidate is not None:
-            return candidate
-    return max(1, int(default))
+            return candidate + buffer_minutes(tournament)
+    return max(1, int(default)) + buffer_minutes(tournament)
 
 
 def with_effective_durations(matches, *, stages=(), tournament: dict | None = None, game: dict | None = None) -> list:
