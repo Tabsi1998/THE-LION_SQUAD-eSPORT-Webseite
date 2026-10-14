@@ -136,6 +136,14 @@ describe("BracketTree", () => {
     expect(screen.getByTestId("bracket-match-v2-m2")).toHaveAttribute("data-mine", "true");
   });
 
+  it("vorgeplant im Vorschau-Baum: „Dein nächstes Spiel“ und Runden-Kopf sagen „voraussichtlich“ (Fabian live 14.10.)", () => {
+    const data = knockout();
+    data.matches_v2 = data.matches_v2.map((match) => ({ ...match, is_preview: true, status: match.status === "completed" ? "completed" : "preview" }));
+    render(<BracketTree data={data} mineId="r3" />);
+    expect(screen.getByTestId("bracket-next-match")).toHaveTextContent(/voraussichtlich/i);
+    expect(screen.getAllByText(/voraussichtlich 18:30/i).length).toBeGreaterThan(0);
+  });
+
   it("Durchgang: Titel mit Spielerzahl, vor dem Spiel keine Plätze, danach sortiert", () => {
     const reg = (id, name) => ({ id, display_name: name, user: {} });
     const data = {

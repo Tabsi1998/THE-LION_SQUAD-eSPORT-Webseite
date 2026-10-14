@@ -277,8 +277,11 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   let note = "";
   if (!canPlan) {
     note = "Planen und Verschieben darf, wer in diesem Turnier Stationen zuweisen darf (Turnierleitung, Schiedsrichter, Stationsleitung). Du siehst den Plan.";
+  } else if (mode === "local" && (stages || []).some((stage) => stage?.schedule_hint === "tree_changed")) {
+    // Vom Check-in-Ende gesetzt, bis neu geplant und übernommen ist (Vorplanen, Fabian live 14.10.).
+    note = "Der Baum hat sich beim Check-in-Ende geändert - neu planen: einmal „Automatisch planen“ und übernehmen. Spiele, die es in der Vorschau nicht gab, haben noch keine Zeit.";
   } else if (mode === "local" && allPreview) {
-    note = "Der Turnierbaum ist noch eine Vorschau (bis zum Ende des Check-ins). Zeiten und Stationen plant der Planer, sobald er fix ist - die Spiele stehen unten schon da.";
+    note = "Vorschau: Du kannst schon vorplanen - alle sehen die Zeiten als „voraussichtlich“, wer gegen wen spielt, kann sich bis zum Check-in-Ende noch ändern. Nach dem Check-in einmal „Automatisch planen“.";
     // Das Check-in-Ende baut den Baum neu, übernimmt aber Zeit und Station je Spiel (_collect_match_plan) - alte
     // Termine verschwinden also nicht von selbst.
     if (manualCount > 0) note += " Feste Termine von Hand gehen dabei mit in den fixen Baum - alte Termine vorher lösen.";

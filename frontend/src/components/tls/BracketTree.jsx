@@ -234,6 +234,8 @@ function NextMatchBanner({ matches, regMap, mineId }) {
   const opponents = (match.slots || []).filter((slot) => slot.registration_id && slot.registration_id !== mineId).map((slot) => slotLabel(slot, regMap)).filter(Boolean);
   const live = LIVE_STATUSES.has(String(match.status || "").toLowerCase());
   const when = formatNodeDateTime(match.scheduled_at);
+  // Vorgeplant im Vorschau-Baum (oder vom Planer vorhergesagt): Orientierung, keine Zusage.
+  const forecast = !live && when && (match.is_preview || match.schedule_forecast);
   const station = getStationLabel(match);
   return (
     <button
@@ -245,7 +247,7 @@ function NextMatchBanner({ matches, regMap, mineId }) {
       <span className={`text-[11px] uppercase tracking-[0.25em] font-bold ${live ? "text-live" : "text-brand"}`}>{live ? "Dein Spiel läuft" : "Dein nächstes Spiel"}</span>
       <span className="font-heading text-lg font-black uppercase">{roundNameOf(match, match.round)} · {match.match_key || "Spiel"}</span>
       {opponents.length ? <span className="text-sm text-white/75">gegen {opponents.length > 3 ? `${opponents.length} Gegner` : opponents.join(", ")}</span> : <span className="text-sm text-muted-text">Gegner steht noch nicht fest</span>}
-      {(when || station) && <span className="text-xs uppercase tracking-wider text-muted-text">{[when, station].filter(Boolean).join(" · ")}</span>}
+      {(when || station) && <span className="text-xs uppercase tracking-wider text-muted-text">{[forecast ? `voraussichtlich ${when}` : when, station].filter(Boolean).join(" · ")}</span>}
     </button>
   );
 }
@@ -343,7 +345,8 @@ function roundHeading(list, number, sectionTitle) {
   if (!times.length || list.every((match) => isDone(match))) return title;
   const earliest = times.reduce((best, entry) => (entry.at < best.at ? entry : best));
   const time = viennaTime(earliest.value, { hour: "2-digit", minute: "2-digit" });
-  return [title, time].filter(Boolean).join(" · ");
+  const forecast = list.some((match) => match.is_preview || match.schedule_forecast);
+  return [title, forecast && time ? `voraussichtlich ${time}` : time].filter(Boolean).join(" · ");
 }
 
 function tableTitle(names, sections) {

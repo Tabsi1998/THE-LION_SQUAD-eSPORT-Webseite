@@ -362,7 +362,8 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                                                  int(item.get("order") or item.get("position") or 0), str(item.get("match_key") or item["id"])))
             del remaining[match["id"]]
             lower = stage_floor
-            forecast = _unresolved(match)
+            # Vorschau: wer gegen wen spielt, kann sich bis zum Check-in-Ende noch ändern - nur voraussichtlich.
+            forecast = _unresolved(match) or bool(match.get("is_preview"))
             for previous in predecessors.get(match["id"], []):
                 if str(previous.get("status") or "") not in DONE_STATUSES:
                     forecast = True
@@ -394,7 +395,8 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                 "duration_minutes": minutes,
                 "forecast": forecast,
                 "schedule_source": "planner",
-                "changed": previous_at != moment or match.get("station_id") != station["id"] or match.get("schedule_source") != "planner",
+                "changed": (previous_at != moment or match.get("station_id") != station["id"]
+                            or match.get("schedule_source") != "planner" or bool(match.get("schedule_forecast")) != forecast),
                 "previous": {"scheduled_at": match.get("scheduled_at"), "station_id": match.get("station_id"),
                              "schedule_source": match.get("schedule_source"), "status": match.get("status")},
             })
@@ -434,11 +436,13 @@ def plan_schedule(tournament: dict, matches, stations=(), *, stages=(), proposal
     local: list[dict] = []
     weekly: list[dict] = []
     for match in matches or []:
-        if match.get("is_preview"):
-            continue
         stage = stage_by_id.get(match.get("stage_id"))
         if match_policy(match, tournament, stage)["event_mode"] == "local":
+            # Auch der Vorschau-Baum (bis Check-in-Ende): Vorplanen, damit sich jede Person schon einplanen kann (Fabian
+            # live 14.10.). Dieselben Abhängigkeiten wie im fixen Baum; alles nur „voraussichtlich“ (siehe forecast).
             local.append(match)
+        elif match.get("is_preview"):
+            continue
         elif plays_in_matchdays(tournament, stage):
             weekly.append(match)
 
@@ -639,6 +643,10 @@ async def apply_plan(db, tournament: dict, plan: dict) -> dict:
                                before["id"], station_id)
         warnings.append({"type": "station_gone", "severity": "error", "station_id": station_id,
                          "message": "Eine Station wurde beim Übernehmen gelöscht - ihre Spiele sind nicht geplant. Bitte neu planen."})
+    if plan.get("assignments"):
+        # Neu geplant: der Hinweis vom Check-in-Ende („Baum hat sich geändert - neu planen“) ist erledigt.
+        await db.tournament_stages.update_many({"tournament_id": tournament["id"], "schedule_hint": {"$exists": True}},
+                                               {"$unset": {"schedule_hint": ""}})
     return {"written": written, "mode": plan.get("mode"), "warnings": warnings}
 
 
