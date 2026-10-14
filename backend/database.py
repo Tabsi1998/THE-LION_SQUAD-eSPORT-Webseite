@@ -92,6 +92,13 @@ async def init_indexes():
     await db.f1_tracks.create_index("challenge_id")
     await db.f1_lap_times.create_index("id", unique=True)
     await db.f1_lap_times.create_index([("challenge_id", 1), ("track_id", 1), ("user_id", 1)])
+    # Fast Lap vor Ort (#1585): Versuche je Gast, die Gäste einer Challenge und die Liste „Am Start / Als Nächstes“.
+    await db.f1_lap_times.create_index([("challenge_id", 1), ("track_id", 1), ("guest_id", 1)])
+    await db.f1_guests.create_index("id", unique=True)
+    await db.f1_guests.create_index([("challenge_id", 1), ("number", 1)])
+    await db.f1_guests.create_index([("created_at", 1), ("name_expired_at", 1)])
+    await db.f1_queue.create_index("id", unique=True)
+    await db.f1_queue.create_index([("challenge_id", 1), ("order", 1)])
     # Erfolge II (#613): festgeschriebene Saison-Ranglisten und die täglichen Rang-Schnappschüsse
     await db.season_standings.create_index([("season_id", 1), ("rank", 1)])
     await db.season_standings.create_index([("user_id", 1), ("season_id", 1)])

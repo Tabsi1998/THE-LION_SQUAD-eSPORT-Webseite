@@ -9,13 +9,17 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { PersonPicker } from "@/components/tls/PersonPicker";
 import { toast } from "sonner";
-import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
+import { Link2, Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ChallengeSettingsForm } from "./f1/ChallengeSettingsForm";
 import { F1StaffPanel } from "./f1/F1StaffPanel";
+import { FastLapQuickEntry } from "@/components/tls/fastlap/FastLapQuickEntry";
+import { FastLapQueuePanel } from "@/components/tls/fastlap/FastLapQueuePanel";
+import { FastLapGuestLinkDialog } from "@/components/tls/fastlap/FastLapGuestLinkDialog";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 // Nach „Ergebnisse veröffentlicht“ (#1584) ändert nur die Turnierleitung Zeiten - mit Begründung, die im Protokoll steht.
 const LOCKED_STATUSES = new Set(["results_published", "archived"]);
@@ -27,6 +31,9 @@ function trackLimits(track) {
   if (Number.isNaN(min) || Number.isNaN(max)) return null;
   return { min_plausible_ms: min, max_plausible_ms: max };
 }
+
+// „Einreichung offen/geschlossen“ nur, wenn es Online-Einreichen gibt (#1585) - bis dahin stehen sie nicht zur Wahl.
+const SUBMISSION_STATUSES = new Set(["registration_open", "registration_closed"]);
 
 const F1_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -57,6 +64,11 @@ export default function AdminF1EditPage() {
   const [editTrack, setEditTrack] = useState(null);
   const [newTime, setNewTime] = useState({ time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "", score_scope: "official" });
   const [editTime, setEditTime] = useState(null);
+  // Gast mit Konto verknüpfen (#1585) - nur die Turnierleitung.
+  const [linkGuest, setLinkGuest] = useState(null);
+  // Vor Ort (#1585): Gäste ohne Konto und die Liste „Am Start / Als Nächstes“.
+  const [guests, setGuests] = useState([]);
+  const [queue, setQueue] = useState(null);
   const confirm = useConfirm();
   const prompt = usePrompt();
   const setNewTrackField = (k, v) => setNewTrack((track) => ({ ...track, [k]: v }));
@@ -87,8 +99,31 @@ export default function AdminF1EditPage() {
     setTimes(data);
   }, [activeTrack, id]);
 
+  const challengeId = challenge?.id;
+  const loadGuests = useCallback(async () => {
+    if (!challengeId) return;
+    try {
+      const { data } = await api.get(`/f1/challenges/${challengeId}/guests`);
+      setGuests(Array.isArray(data) ? data : []);
+    } catch {
+      setGuests([]);
+    }
+  }, [challengeId]);
+  const loadQueue = useCallback(async () => {
+    if (!challengeId) return;
+    try {
+      const { data } = await api.get(`/f1/challenges/${challengeId}/queue`);
+      setQueue(data);
+    } catch {
+      setQueue(null);
+    }
+  }, [challengeId]);
+
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadTimes(); }, [loadTimes]);
+  useEffect(() => { loadGuests(); loadQueue(); }, [loadGuests, loadQueue]);
+  // Am Simulator arbeiten mehrere Helfer gleichzeitig: Liste und Zeiten folgen dem Änderungsstrom.
+  useLiveRefresh(loadQueue, ["f1"], { fallbackMs: 7000 });
   useApiInvalidation(load, ["f1"]);
   useApiInvalidation(loadTimes, ["f1"]);
 
@@ -278,7 +313,7 @@ export default function AdminF1EditPage() {
     })) return;
     try {
       await api.patch(`/f1/challenges/${id}`, { status });
-      toast.success(`Status: ${status}`);
+      toast.success(`Status: ${Object.fromEntries(F1_STATUS_OPTIONS)[status] || status}`);
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Challenge-Status konnte nicht gespeichert werden."));
@@ -299,7 +334,9 @@ export default function AdminF1EditPage() {
           {isTournamentLead && (
             <div>
               <select value={challenge.status} onChange={(e) => setStatus(e.target.value)} data-testid="f1-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
-                {F1_STATUS_OPTIONS.map(([s, label]) => <option key={s} value={s}>{label}</option>)}
+                {F1_STATUS_OPTIONS
+                  .filter(([s]) => !SUBMISSION_STATUSES.has(s) || challenge.online_registration_enabled || s === challenge.status)
+                  .map(([s, label]) => <option key={s} value={s}>{label}</option>)}
               </select>
               <div className="mt-1 text-[10px] text-white/40">Manuell nur für Ausnahmen; Zeitplan automatisiert.</div>
             </div>
@@ -326,6 +363,28 @@ export default function AdminF1EditPage() {
       {isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="fastlap" targetId={challenge.id} /></div>}
       {isTournamentLead && <ChallengeSettingsForm key={challenge.updated_at || challenge.id} challenge={challenge} onSaved={load} />}
       {isTournamentLead && <F1StaffPanel challengeId={challenge.id} staff={staff} staffError={staffError} onChanged={load} />}
+
+      {currentTrack && !locked && (
+        <div id="vor-ort" className="grid lg:grid-cols-2 gap-6 mb-6" data-testid="f1-on-site">
+          <FastLapQuickEntry
+            challenge={challenge}
+            track={currentTrack}
+            times={times}
+            guests={guests}
+            onGuestCreated={(guest) => setGuests((rows) => [...rows, guest])}
+            queue={queue}
+            onSaved={() => { loadTimes(); loadQueue(); }}
+          />
+          <FastLapQueuePanel
+            challenge={challenge}
+            track={currentTrack}
+            queue={queue}
+            guests={guests}
+            onGuestCreated={(guest) => setGuests((rows) => [...rows, guest])}
+            onChanged={loadQueue}
+          />
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Tracks */}
@@ -430,6 +489,12 @@ export default function AdminF1EditPage() {
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="text-white/50 text-xs w-6">#{t.attempt_number}</span>
                       <span className="text-white text-sm truncate">{t.user?.display_name || t.user?.username}</span>
+                      {t.user?.is_guest && <span className="text-[9px] font-bold uppercase tracking-widest text-honor border border-honor/40 rounded-sm px-1">Gast</span>}
+                      {t.user?.is_guest && isTournamentLead && (
+                        <button type="button" onClick={() => setLinkGuest({ id: t.guest_id, name: t.user?.display_name || "Gast" })} data-testid={`f1-link-guest-${t.id}`} title="Mit Konto verknüpfen" aria-label={`${t.user?.display_name || "Gast"} mit Konto verknüpfen`} className="p-1 text-white/40 hover:text-[#29B6E8]">
+                          <Link2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`font-display font-bold text-lg tabular-nums ${t.is_invalid ? "line-through text-white/40" : "text-white"}`}>{t.time_str}</span>
@@ -458,6 +523,10 @@ export default function AdminF1EditPage() {
           ) : <div className="text-white/40 text-sm">Bitte erst eine Strecke anlegen.</div>}
         </div>
       </div>
+
+      {linkGuest && (
+        <FastLapGuestLinkDialog challengeId={challenge.id} guest={linkGuest} onClose={() => setLinkGuest(null)} onLinked={() => { loadTimes(); loadGuests(); loadQueue(); }} />
+      )}
 
       {/* Edit Time Modal */}
       {editTime && (

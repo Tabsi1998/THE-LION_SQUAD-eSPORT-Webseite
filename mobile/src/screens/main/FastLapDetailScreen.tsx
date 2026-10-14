@@ -15,6 +15,7 @@ import { formatDate, formatDateTime } from "../../lib/format";
 import { getRegistrationState, hasOnlineRegistration } from "../../lib/registration";
 import { colors, radius } from "../../theme";
 import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload } from "../../types";
+import { attemptsText, entryKey } from "../../lib/fastLapAttempts";
 import { parseLapTime, plausibilityText } from "../../lib/laptime";
 import { Button } from "../../components/Button";
 import { useShareHeader } from "../../components/HeaderActions";
@@ -394,7 +395,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
               <Muted>Bestzeit</Muted>
               <Body style={styles.bestTime}>{best.time_str || "-"}</Body>
               <Body style={styles.strong}>{best.display_name || best.username || "Fahrer"}</Body>
-              <Muted>{best.attempts || 0} Versuche · {best.gap_str || "Führung"}</Muted>
+              <Muted>{attemptsText(best.attempts, leaderboard?.max_attempts)} · {best.gap_str || "Führung"}</Muted>
             </View>
           </Card>
         ) : null}
@@ -403,7 +404,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
           <Heading>Leaderboard</Heading>
           {error ? <Muted style={styles.error}>{error}</Muted> : null}
           {leaderboard?.entries?.length ? (
-            leaderboard.entries.map((entry) => <EntryRow key={`${entry.user_id}-${entry.rank}`} entry={entry} />)
+            leaderboard.entries.map((entry) => <EntryRow key={`${entryKey(entry)}-${entry.rank}`} entry={entry} maxAttempts={leaderboard.max_attempts} />)
           ) : (
             <EmptyState title="Noch keine Zeiten" detail="Sobald Zeiten eingetragen sind, stehen sie hier pro Strecke." />
           )}
@@ -412,7 +413,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
         {leaderboard?.club_reference_entries?.length ? (
           <View style={styles.section}>
             <Heading>Vereins-Referenzzeiten</Heading>
-            {leaderboard.club_reference_entries.map((entry) => <EntryRow key={`ref-${entry.user_id}-${entry.rank}`} entry={entry} reference />)}
+            {leaderboard.club_reference_entries.map((entry) => <EntryRow key={`ref-${entryKey(entry)}-${entry.rank}`} entry={entry} maxAttempts={leaderboard.max_attempts} reference />)}
           </View>
         ) : null}
       </ScrollView>
@@ -420,7 +421,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
   );
 }
 
-function EntryRow({ entry, reference = false }: { entry: F1LeaderboardEntry; reference?: boolean }) {
+function EntryRow({ entry, maxAttempts, reference = false }: { entry: F1LeaderboardEntry; maxAttempts?: number | null; reference?: boolean }) {
   return (
     <Card style={[styles.entry, reference && styles.referenceEntry]}>
       <View style={styles.rankBox}>
@@ -431,7 +432,7 @@ function EntryRow({ entry, reference = false }: { entry: F1LeaderboardEntry; ref
       </View>
       <View style={styles.entryText}>
         <Body style={styles.strong}>{entry.display_name || entry.username || "Fahrer"}</Body>
-        <Muted>{entry.attempts || 0} Versuche{entry.penalty_seconds ? ` · +${entry.penalty_seconds}s Penalty` : ""}</Muted>
+        <Muted>{entry.is_guest ? "Gast · " : ""}{attemptsText(entry.attempts, maxAttempts)}{entry.penalty_seconds ? ` · +${entry.penalty_seconds}s Penalty` : ""}</Muted>
       </View>
       <View style={styles.timeBox}>
         <Body style={styles.time}>{entry.time_str || "-"}</Body>

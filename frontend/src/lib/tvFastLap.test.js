@@ -83,3 +83,14 @@ test("Gleichstand (#1584): wer die Bestzeit vorher hatte, sagt der Rang vom Serv
   expect(change.best).toMatchObject({ userId: "carl" });
   expect(previousHolderText(change.best)).toBe("vorher Anna · 1:20.000");
 });
+
+test("Gäste ohne Konto (#1585): eigener Schlüssel, eigene Hinweise, auch die Bestzeit", () => {
+  const guestA = { user_id: null, participant_id: "guest-g1", is_guest: true, display_name: "Anna", rank: 1, time_ms: 80000, time_str: "1:20.000" };
+  const guestB = { user_id: null, participant_id: "guest-g2", is_guest: true, display_name: "Ben", rank: 2, time_ms: 81000, time_str: "1:21.000" };
+  const before = { track: { id: "t1" }, entries: [guestA, guestB] };
+  const after = { track: { id: "t1" }, entries: [{ ...guestB, rank: 1, time_ms: 79000, time_str: "1:19.000" }, { ...guestA, rank: 2 }] };
+  const change = compareBoards(before, after);
+  expect(change.improved.map((row) => row.userId)).toEqual(["guest-g2"]);
+  expect(change.best).toMatchObject({ userId: "guest-g2", gapMs: -1000 });
+  expect([...rowChips(change).keys()]).toEqual(["guest-g2"]);
+});
