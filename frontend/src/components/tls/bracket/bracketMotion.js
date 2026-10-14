@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { diffBracket } from "@/lib/bracketGraph";
+import { diffBracket, slotDraw } from "@/lib/bracketGraph";
+import { finderFor } from "@/lib/slotSource";
 import { EASE_MOVE, MOTION, motionAllowed } from "@/lib/motion";
 
 // Bewegungen im Turnierbaum (#1561), ausgelöst vom Vergleich alter/neuer Stand beim Live-Neuladen (wie useChangedKeys):
@@ -41,11 +42,11 @@ export function motionState(events, stamp = 1) {
     if (event.type === "result") state.pop.add(event.matchId);
     else if (event.type === "walkover") state.blink.add(event.matchId);
     else if (event.type === "fate") state.fade.add(event.matchId);
-    else if (event.type === "draw") state.rows.set(`${event.matchId}:${event.registrationId}`, { type: "draw", key: event.key, index: event.index });
-    else if (event.type === "advance" || event.type === "merge") {
+    else if (event.type === "draw" && !event.from) state.rows.set(`${event.matchId}:${event.registrationId}`, { type: "draw", key: event.key, index: event.index });
+    else if (event.type === "advance" || event.type === "merge" || event.type === "draw") {
       const delay = (popped.has(event.from.matchId) ? GLIDE_AFTER_POP_MS : 0) + glide * STAGGER_MS;
       glide += 1;
-      state.rows.set(`${event.matchId}:${event.registrationId}`, { type: event.type, key: event.key, from: event.from, delay, bus: event.bus || null });
+      state.rows.set(`${event.matchId}:${event.registrationId}`, { type: event.type, key: event.key, from: event.from, delay, rail: event.rail || null });
       // Die Linie zeichnet sich hinter dem Namen her: gleicher Start, gleiche Dauer, gleiche Kurve.
       state.fresh.set(`${event.from.matchId}>${event.matchId}`, { delay, duration: GLIDE_MS });
     }
@@ -58,6 +59,24 @@ const activeFlights = new Set();
 
 export function finishFlights() {
   for (const flight of [...activeFlights]) flight.finish();
+}
+
+/**
+ * Auslosung einer gemischten Runde (#1548): die Bewegung „draw“ (wie in der App) bekommt hier die echte Herkunft
+ * dazu - so fährt der Name aus seinem Quellspiel über die Sammelschiene an seinen gezogenen Platz.
+ */
+export function withDrawOrigins(events, matches) {
+  const byId = new Map((matches || []).map((match) => [match.id, match]));
+  const find = finderFor(matches || []);
+  return events.map((event) => {
+    if (event.type !== "draw") return event;
+    const match = byId.get(event.matchId);
+    const slot = (match?.slots || []).find((row) => row.registration_id === event.registrationId);
+    const origin = slot?.source_result?.from_match_key;
+    if (!slotDraw(slot) || !origin) return event;
+    const from = find(match)(origin);
+    return from ? { ...event, from: { matchId: from.id, registrationId: event.registrationId }, rail: slotDraw(slot).group || null } : event;
+  });
 }
 
 /** Vergleicht jeden neuen Stand mit dem vorigen und hält die Bewegungen für ein paar Sekunden bereit. */
@@ -73,7 +92,7 @@ export function useBracketMotion(matches, { quiet = false } = {}) {
     previous.current = matches;
     if (!before || !matches || before === matches) return undefined;
     finishFlights();
-    const events = diffBracket(before, matches).filter((event) => !seen.current.has(event.key));
+    const events = withDrawOrigins(diffBracket(before, matches), matches).filter((event) => !seen.current.has(event.key));
     for (const event of events) seen.current.add(event.key);
     const hidden = typeof document !== "undefined" && document.hidden;
     if (!events.length || quiet || hidden || events.length > MAX_EVENTS || !motionAllowed()) {
@@ -190,7 +209,7 @@ export function flyName(fromEl, toEl, { delay = 0, duration = GLIDE_MS, pathEl =
  */
 export function useRowFlight(ref, rowMotion, played, slotNo = null) {
   useLayoutEffect(() => {
-    if (!rowMotion || (rowMotion.type !== "advance" && rowMotion.type !== "merge")) return;
+    if (!rowMotion || !rowMotion.from || (rowMotion.type !== "advance" && rowMotion.type !== "merge" && rowMotion.type !== "draw")) return;
     if (played.has(rowMotion.key)) return;
     const target = ref.current;
     const root = target?.closest("[data-bracket-root]");
@@ -200,7 +219,7 @@ export function useRowFlight(ref, rowMotion, played, slotNo = null) {
     const source = (registrationId && root.querySelector(`[data-row="${matchId}:${registrationId}"]`))
       || root.querySelector(`[data-node="${matchId}"]`);
     const toMatch = target.closest("[data-node]")?.getAttribute("data-node");
-    const pathEl = rowMotion.type === "advance" && toMatch
+    const pathEl = rowMotion.type !== "merge" && toMatch
       ? (root.querySelector(`path[data-from="${matchId}"][data-to="${toMatch}"][data-to-slot="${slotNo}"]`)
         || root.querySelector(`path[data-from="${matchId}"][data-to="${toMatch}"]`))
       : null;

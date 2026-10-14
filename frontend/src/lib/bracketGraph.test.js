@@ -4,7 +4,7 @@ import { clone, decide, doubleElimination, find, singleElimination } from "../..
 import FFA from "../../e2e/fixtures/ffaGenerated.json";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { LOSER_SECTIONS, bracketEdges, diffBracket, drawGroupsOf, heatExits, matchFate, orderEdges, pathFor, sectionGroup, soloAdvance } from "./bracketGraph";
+import { LOSER_SECTIONS, bracketEdges, diffBracket, drawRails, heatExits, matchFate, orderEdges, pathFor, sectionGroup, soloAdvance } from "./bracketGraph";
 
 // Turnierbaum neu (#1561): die Linien kommen aus den echten Quellen der Plätze („W:A:1“, `advancement`), nicht aus der
 // Reihenfolge der Spiele. Dazu: was mit einem Spiel geschah (entfällt, zusammengelegt), dein Weg und die Bewegungen,
@@ -111,12 +111,12 @@ describe("heatExits", () => {
   it("sagt, wohin die Weiterkommer gehen und was mit den anderen geschieht", () => {
     const single = ffa("ffa16");
     const edges = bracketEdges(single.matches_v2);
-    expect(heatExits(find(single, "A"), edges, single.matches_v2)).toEqual({ advance: ["E"], drop: [], qualifiers: 2, lot: false });
+    expect(heatExits(find(single, "A"), edges, single.matches_v2)).toEqual({ advance: ["E"], drop: [], qualifiers: 2 });
     // Läufe mit Loser Bracket gibt es nur als eigenes Schema der Turnierleitung (der Server liest es wie dieses).
     const { heatDoubleElimination } = HEAT_DE;
     const de = heatDoubleElimination();
     const deEdges = bracketEdges(de.matches_v2);
-    expect(heatExits(find(de, "A"), deEdges, de.matches_v2)).toEqual({ advance: ["C"], drop: ["D"], qualifiers: 2, lot: false });
+    expect(heatExits(find(de, "A"), deEdges, de.matches_v2)).toEqual({ advance: ["C"], drop: ["D"], qualifiers: 2 });
   });
 });
 
@@ -209,92 +209,85 @@ describe("sectionGroup", () => {
   });
 });
 
-// Gegner mischen (#1548, #1580): echte Daten aus dem Generator, je vor und nach der Auslosung. Gemischte Gruppen hängen
-// an einer Sammelschiene in der Gasse; der feste Baum bleibt, wie er ist.
-describe("Gemischte Gruppen: Sammelschiene", () => {
-  const named = (bracket) => {
+// Gegner mischen (#1548, #1580): echte Daten aus dem Generator (scripts/make_ffa_bracket_fixture.py), je vor und nach
+// der Auslosung. Gemischte Gruppen hängen an einer Sammelschiene (drawRails); der feste Baum bleibt, wie er ist.
+describe("Gemischte Runden: Sammelschiene", () => {
+  const rail = (bracket) => {
     const key = keyOf(bracket);
-    return (edges) => edges.map((edge) => `${key(edge.from) || edge.from}>${key(edge.to) || edge.to}${edge.scaffold ? ` (${edge.scaffold})` : ""}`);
+    return drawRails(bracket.matches_v2).map((entry) => ({ ...entry, sources: entry.sources.map((source) => `${key(source.id)} ${source.flow}`).sort(), targets: entry.targets.map(key).sort() }));
   };
 
-  it("die Gruppe: alle Quellen und Ziele, Klartext, noch nicht gelost", () => {
+  it("die Schiene: alle Quellen mit Fluss, die Ziele, Klartext, noch nicht gelost", () => {
+    expect(rail(ffa("se8_draw_before"))).toEqual([{ group: "WB:2", label: "Runde 1", sources: ["A W", "B W", "C W", "D W"], targets: ["E", "F"], drawn: false }]);
+  });
+
+  it("Doppel-K.-o.: je Loser-Runde eine eigene Schiene, Abstiege als Quellen mit Fluss L", () => {
+    const rails = rail(ffa("de8_draw_after"));
+    expect(rails.map((entry) => `${entry.group} ${entry.drawn ? "gelost" : "offen"}`)).toEqual(["LB:2 gelost", "LB:3 offen", "WB:2 gelost"]);
+    expect(rails.find((entry) => entry.group === "LB:3").sources).toEqual(["E L", "F L", "LA W", "LB W"]);
+  });
+
+  it("vor der Auslosung: keine Linie in einen Platz, der gelost wird", () => {
     const bracket = ffa("se8_draw_before");
-    const groups = drawGroupsOf(bracket.matches_v2);
-    expect([...groups.keys()]).toEqual(["WB:2"]);
     const key = keyOf(bracket);
-    const group = groups.get("WB:2");
-    expect(group).toMatchObject({ id: "bus:WB:2", label: "Runde 1", drawn: false });
-    expect(group.sourceIds.map(key).sort()).toEqual(["A", "B", "C", "D"]);
-    expect(group.targetIds.map(key).sort()).toEqual(["E", "F"]);
+    expect(bracketEdges(bracket.matches_v2).map((edge) => `${key(edge.from)}>${key(edge.to)}`).sort()).toEqual(["E>G", "F>G"]);
   });
 
-  it("vor der Auslosung: keine festen Linien in die Gruppe - jede Quelle auf die Schiene, die Schiene in jedes Ziel", () => {
-    const bracket = ffa("se8_draw_before");
-    expect(named(bracket)(bracketEdges(bracket.matches_v2)).sort()).toEqual([
-      "A>bus:WB:2 (in)", "B>bus:WB:2 (in)", "C>bus:WB:2 (in)", "D>bus:WB:2 (in)",
-      "E>G", "F>G", "bus:WB:2>E (out)", "bus:WB:2>F (out)",
-    ]);
-  });
-
-  it("nach der Auslosung: das Gerüst bleibt, dazu je Platz die echte Linie aus dem Spiel, aus dem der Spieler kam", () => {
-    for (const state of ["se8_draw_after", "ffa16_draw_after"]) {
+  it("nach der Auslosung: je besetztem Platz die echte Linie aus dem Spiel, aus dem der Spieler kam", () => {
+    for (const state of ["se8_draw_after", "de8_draw_after", "ffa16_draw_after", "se6_draw_after"]) {
       const bracket = ffa(state);
       const byId = new Map(bracket.matches_v2.map((match) => [match.id, match]));
-      expect(drawGroupsOf(bracket.matches_v2).get("WB:2").drawn).toBe(true);
       const edges = bracketEdges(bracket.matches_v2);
-      expect(edges.filter((edge) => edge.scaffold === "out")).toHaveLength(2);
-      for (const target of bracket.matches_v2.filter((match) => match.settings?.draw_group)) {
+      for (const target of bracket.matches_v2.filter((match) => match.settings?.draw_group && match.draw)) {
         for (const slot of target.slots.filter((row) => row.registration_id)) {
           const into = edges.filter((edge) => edge.to === target.id && edge.toSlot === slot.slot);
           expect(into, `${state} ${target.match_key}:${slot.slot}`).toHaveLength(1);
-          expect(into[0].bus).toBe("WB:2");
+          expect(into[0].rail).toBe(target.settings.draw_group);
           expect(byId.get(into[0].from).match_key).toBe(slot.source_result.from_match_key);
         }
       }
     }
   });
 
-  it("dein Weg: vor der Auslosung auf die Schiene, danach die echte Linie über die Schiene", () => {
+  it("dein Weg: vor der Auslosung bis zur Schiene (nur wer weiterkommt), danach die echte Linie", () => {
     const before = ffa("se8_draw_before");
-    const winnerA = find(before, "A").results.find((row) => row.rank === 1).registration_id;
-    const loserA = find(before, "A").results.find((row) => row.rank === 2).registration_id;
+    const a = find(before, "A");
+    const winner = a.results.find((row) => row.rank === 1).registration_id;
+    const loser = a.results.find((row) => row.rank === 2).registration_id;
     const edgesBefore = bracketEdges(before.matches_v2);
-    const onBus = edgesBefore.find((edge) => edge.from === find(before, "A").id && edge.scaffold === "in");
-    expect(pathFor(winnerA, before.matches_v2, edgesBefore).edges.has(onBus.id)).toBe(true);
-    expect(pathFor(loserA, before.matches_v2, edgesBefore).edges.has(onBus.id)).toBe(false);
+    expect([...(pathFor(winner, before.matches_v2, edgesBefore).rails || [])]).toEqual([`WB:2:${a.id}`]);
+    expect(pathFor(loser, before.matches_v2, edgesBefore).rails).toBeUndefined();
     const after = ffa("se8_draw_after");
     const target = after.matches_v2.find((match) => match.slots.some((slot) => slot.source_result?.from_match_key === "C" && slot.registration_id));
     const player = target.slots.find((slot) => slot.source_result?.from_match_key === "C").registration_id;
     const edges = bracketEdges(after.matches_v2);
     const path = pathFor(player, after.matches_v2, edges);
     const real = edges.find((edge) => edge.from === find(after, "C").id && edge.to === target.id);
-    expect(real.bus).toBe("WB:2");
+    expect(real.rail).toBe("WB:2");
     expect(path.edges.has(real.id)).toBe(true);
-    // Das Gerüst leuchtet nach der Auslosung nicht mit - nur der echte Weg.
-    expect([...path.edges].some((id) => edges.find((edge) => edge.id === id)?.scaffold)).toBe(false);
+    expect(path.rails).toBeUndefined();
   });
 
-  it("die Auslosung bewegt jeden Weiterkommer über die Schiene an seinen gezogenen Platz - gestaffelt", () => {
+  it("die Auslosung ist eine Bewegung „draw“ je Spieler, gestaffelt - wie in der App", () => {
     const before = ffa("se8_draw_before");
     const after = ffa("se8_draw_after");
-    const moves = diffBracket(before.matches_v2, after.matches_v2).filter((event) => event.type === "advance");
-    expect(moves).toHaveLength(4);
-    for (const event of moves) {
-      const target = after.matches_v2.find((match) => match.id === event.matchId);
-      const slot = target.slots.find((row) => row.registration_id === event.registrationId);
-      expect(event).toMatchObject({ bus: "WB:2", from: { matchId: slot.source_result.from_match_id, registrationId: event.registrationId } });
-    }
+    const draws = diffBracket(before.matches_v2, after.matches_v2).filter((event) => event.type === "draw");
+    expect(draws).toHaveLength(4);
+    expect(draws.map((event) => event.index)).toEqual([0, 1, 2, 3]);
   });
 
-  it("Läufe in eine gemischte Gruppe: „2 kommen weiter → E, F (Los)“", () => {
+  it("Läufe in eine gemischte Gruppe führen in alle Ziele der Gruppe", () => {
     const bracket = ffa("ffa16_draw_before");
-    const edges = bracketEdges(bracket.matches_v2);
-    expect(heatExits(find(bracket, "D"), edges, bracket.matches_v2)).toMatchObject({ advance: ["E", "F"], drop: [], lot: true });
+    expect(heatExits(find(bracket, "D"), bracketEdges(bracket.matches_v2), bracket.matches_v2)).toEqual({ advance: ["E", "F"], drop: [], qualifiers: 2 });
   });
 
-  it("fester Baum ohne Mischen: keine Gruppen, keine Schienen", () => {
+  it("gemischt und zusammengelegt (8 von 16): entfallene Läufe sind keine Quellen, die Schiene bleibt im Hauptfeld", () => {
+    expect(rail(ffa("ffa8_shuffle_merged"))).toEqual([{ group: "WB:2", label: "Runde 1", sources: ["A W", "B W"], targets: ["E", "F"], drawn: false }]);
+  });
+
+  it("fester Baum ohne Mischen: keine Schienen", () => {
     const bracket = ffa("ffa16");
-    expect(drawGroupsOf(bracket.matches_v2).size).toBe(0);
-    expect(bracketEdges(bracket.matches_v2).some((edge) => edge.bus)).toBe(false);
+    expect(drawRails(bracket.matches_v2)).toEqual([]);
+    expect(bracketEdges(bracket.matches_v2).some((edge) => edge.rail)).toBe(false);
   });
 });

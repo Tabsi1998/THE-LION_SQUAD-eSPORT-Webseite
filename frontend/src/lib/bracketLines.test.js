@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { doubleElimination, decide } from "../../e2e/fixtures/tvBrackets.mjs";
 import FFA from "../../e2e/fixtures/ffaGenerated.json";
-import { bracketEdges, drawGroupsOf, sectionGroup } from "./bracketGraph";
+import { bracketEdges, drawRails, isCancelled, sectionGroup } from "./bracketGraph";
 import { laneCounter, pathHits, routeBus, routeEdge, segmentHitsRect } from "./bracketLines";
 
 // Linienführung (#1561): keine Strecke schneidet eine Karte - auch nicht der Abstieg vom Winner ins Loser Bracket.
@@ -133,19 +133,21 @@ describe("routeEdge: keine Linie schneidet eine Karte", () => {
 // Gemischte Gruppen (#1548): die Sammelschiene liegt in der Gasse vor den Zielen, bleibt in ihrem Abschnitt und kreuzt
 // keine Karte und keinen Kopf - auch die echten Linien über die Schiene nicht. Echte Daten aus dem Generator.
 describe("routeBus: Sammelschiene in der Gasse", () => {
-  for (const state of ["se8_draw_before", "se8_draw_after", "de8_draw_before", "de8_draw_after", "ffa16_draw_before", "ffa16_draw_after"]) {
+  for (const state of ["se8_draw_before", "se8_draw_after", "de8_draw_before", "de8_draw_after", "ffa16_draw_before", "ffa16_draw_after", "se6_draw_after", "ffa8_shuffle_merged"]) {
     it(`${state}: Schiene, Äste und echte Wege laufen nur durch Gassen und Lücken, die Schiene bleibt im Abschnitt`, () => {
       const bracket = structuredClone(FFA[state]);
       const { rects, sectionRects, heads } = layout(bracket, GAP);
       const obstacles = [...rects.values(), ...heads];
       const corridors = sectionRects.flatMap((rect) => [rect.top - 20, rect.bottom + 20]);
       const byId = new Map(bracket.matches_v2.map((match) => [match.id, match]));
-      const groups = drawGroupsOf(bracket.matches_v2);
-      expect(groups.size).toBeGreaterThan(0);
+      const rails = drawRails(bracket.matches_v2);
+      expect(rails.length).toBeGreaterThan(0);
       const lanes = laneCounter();
-      for (const group of groups.values()) {
+      for (const rail of rails) {
+        const group = { group: rail.group, targetIds: rail.targets.filter((id) => !isCancelled(byId.get(id))) };
         const targets = group.targetIds.map((id) => ({ id, rect: rects.get(id) }));
-        const sources = group.sourceIds.map((id) => ({ id, rect: rects.get(id), cross: byId.get(id).section !== byId.get(group.targetIds[0]).section }));
+        const sources = [...new Set(rail.sources.map((source) => source.id))].filter((id) => !isCancelled(byId.get(id)))
+          .map((id) => ({ id, rect: rects.get(id), cross: byId.get(id).section !== byId.get(group.targetIds[0]).section }));
         const bus = routeBus({ sources, targets, obstacles, corridors, gap: GAP, lanes });
         const own = (id) => obstacles.filter((rect) => rect !== rects.get(id));
         expect(pathHits(bus.spine, obstacles), `${group.group} Schiene`).toBe(false);

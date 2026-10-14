@@ -399,14 +399,14 @@ describe("Gemischte Gruppen im Baum", () => {
     const data = ffa("se8_draw_before");
     const id = (key) => idOf(data, key);
     render(<BracketTree data={data} layout="tree" />);
-    expect(document.querySelector("path[data-bus-spine='WB:2']")).not.toBeNull();
+    expect(document.querySelector("path[data-rail-spine='WB:2']")).not.toBeNull();
     for (const key of ["A", "B", "C", "D"]) {
-      expect(path(id(key), "bus:WB:2"), `Ast aus ${key}`).not.toBeNull();
+      expect(path(id(key), "rail:WB:2"), `Ast aus ${key}`).not.toBeNull();
       expect(path(id(key), id("E"))).toBeNull();
       expect(path(id(key), id("F"))).toBeNull();
     }
-    expect(path("bus:WB:2", id("E"))).not.toBeNull();
-    expect(path("bus:WB:2", id("F"))).not.toBeNull();
+    expect(path("rail:WB:2", id("E"))).not.toBeNull();
+    expect(path("rail:WB:2", id("F"))).not.toBeNull();
     expect(screen.getByTestId(`bracket-match-v2-${id("E")}`)).toHaveTextContent("Platz aus Runde 1");
   });
 
@@ -414,7 +414,7 @@ describe("Gemischte Gruppen im Baum", () => {
     const data = ffa("se8_draw_after");
     const id = (key) => idOf(data, key);
     render(<BracketTree data={data} layout="tree" />);
-    expect(document.querySelector("path[data-bus-spine='WB:2']")).not.toBeNull();
+    expect(document.querySelector("path[data-rail-spine='WB:2']")).not.toBeNull();
     const target = data.matches_v2.find((match) => match.slots.some((slot) => slot.source_result?.from_match_key === "C" && slot.registration_id));
     const player = target.slots.find((slot) => slot.source_result?.from_match_key === "C").registration_id;
     const real = path(id("C"), target.id);
@@ -448,14 +448,26 @@ describe("Gemischte Gruppen im Baum", () => {
 
   it("Doppel-K.-o.: jede Gruppe hat ihre Schiene in ihrem Abschnitt; vor der ersten Loser-Spalte ist Platz dafür", () => {
     render(<BracketTree data={ffa("de8_draw_before")} layout="tree" />);
-    const spines = [...document.querySelectorAll("path[data-bus-spine]")].map((node) => node.getAttribute("data-bus-spine")).sort();
+    const spines = [...document.querySelectorAll("path[data-rail-spine]")].map((node) => node.getAttribute("data-rail-spine")).sort();
     expect(spines).toEqual(["LB:2", "LB:3", "WB:2"]);
-    expect(screen.getByTestId("bracket-tree").querySelector("[data-bus-lead='1']")).not.toBeNull();
+    // Die Schienen bleiben in ihrem Abschnitt: Winner-Schiene im Winner Bracket, Loser-Schienen im Loser Bracket.
+    expect(screen.getByTestId("bracket-tree").querySelector("[data-rail-lead='1']")).not.toBeNull();
   });
 
-  it("Läufe in eine gemischte Gruppe sagen „2 kommen weiter → E, F (Los)“", () => {
+  it("Läufe in eine gemischte Gruppe sagen „2 kommen weiter → E, F“ (wie die App)", () => {
     const data = ffa("ffa16_draw_before");
     render(<BracketTree data={data} layout="tree" />);
-    expect(screen.getByTestId(`bracket-heat-cut-${idOf(data, "D")}`)).toHaveTextContent("2 kommen weiter → E, F (Los)");
+    expect(screen.getByTestId(`bracket-heat-cut-${idOf(data, "D")}`)).toHaveTextContent("2 kommen weiter → E, F");
+  });
+
+  it("vor der Auslosung leuchtet dein Weg bis zur Schiene - nur dein Ast und die Schiene", () => {
+    const data = ffa("se8_draw_before");
+    const a = find(data, "A");
+    const winner = data.registrations.find((reg) => reg.id === a.results.find((row) => row.rank === 1).registration_id).display_name;
+    render(<BracketTree data={data} layout="tree" />);
+    fireEvent.click(within(screen.getByTestId(`bracket-match-v2-${a.id}`)).getByText(winner));
+    expect(path(a.id, "rail:WB:2")).toHaveAttribute("data-path", "on");
+    expect(document.querySelector("path[data-rail-spine='WB:2']")).toHaveAttribute("data-path", "on");
+    expect(path(idOf(data, "B"), "rail:WB:2")).toHaveAttribute("data-path", "off");
   });
 });

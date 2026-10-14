@@ -203,7 +203,8 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
   const blink = walkover && isWinner && state.blink.has(match.id);
   const nameTone = out ? "text-quiet line-through" : podium?.text || (isWinner ? "text-white font-semibold" : isLoser ? "text-quiet" : qualified ? "text-white font-semibold" : label ? "text-white/85" : pending ? "text-muted-text italic" : "text-white/25");
   const seed = slot?.seed || reg?.seed || null;
-  const draw = rowMotion?.type === "draw";
+  // Setzplatz-Auslosung: die Namen kommen nacheinander herein. Gemischte Runde (mit Herkunft): der Name fährt.
+  const draw = rowMotion?.type === "draw" && !rowMotion.from;
   const motion = draw ? "draw" : blink ? "blink" : undefined;
   const style = draw ? { "--tls-i": rowMotion.index, "--tls-draw-step": `${state.drawStep}ms` } : undefined;
   const handlers = regId ? {

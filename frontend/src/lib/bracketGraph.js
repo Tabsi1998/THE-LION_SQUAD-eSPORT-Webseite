@@ -160,7 +160,9 @@ export function drawRails(matches = []) {
       }
     }
     const label = targets.flatMap((target) => (target.slots || []).map(slotDraw)).find((draw) => draw?.label)?.label || "";
-    const drawn = targets.some((target) => target.draw || (target.slots || []).some((slot) => slotDraw(slot) && slot.source_result?.from_match_key));
+    // Gelost ist, wenn ein Ziel `draw` trägt oder ein Spieler schon einen Platz aus dem Los hat. Ein Freilos-Platz,
+    // dessen Quelle der Umbau gestrichen hat (`source_result.skipped`, #1575), zählt nicht - der wartet weiter aufs Los.
+    const drawn = targets.some((target) => target.draw || (target.slots || []).some((slot) => slotDraw(slot) && slot.source_result?.from_match_key && !slot.source_result?.skipped));
     return { group, label, sources: [...sources.values()], targets: targets.map((match) => match.id), drawn };
   });
 }

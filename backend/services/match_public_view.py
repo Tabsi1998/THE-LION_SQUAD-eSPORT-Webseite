@@ -14,7 +14,9 @@ from __future__ import annotations
 # Nur für die Turnierleitung - oben im Datensatz, in `result_meta` und in jeder Ergebniszeile. Ein Ergebnis, das noch
 # 10 Sekunden für „Rückgängig“ bereitliegt (`pending_result`, #1156), sieht niemand sonst - sonst wäre es vor der
 # Zeit auf der Matchseite und am TV; ebenso der Grund einer Korrektur.
-INTERNAL_KEYS = frozenset({"admin_note", "admin_decision_note", "admin_decision_at", "pending_result"})
+INTERNAL_KEYS = frozenset({"admin_note", "admin_decision_note", "admin_decision_at", "pending_result",
+                           # Der Sperr-Schlüssel des Lauf-Umbaus (#1550) - Technik, kein Inhalt.
+                           "rebuild_token"})
 INTERNAL_META_KEYS = frozenset({"note", "correction_reason", "hold_id"})
 INTERNAL_RESULT_KEYS = frozenset({"user_id", "note"})
 
