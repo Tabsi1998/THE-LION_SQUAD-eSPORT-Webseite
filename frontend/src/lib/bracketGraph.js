@@ -10,7 +10,8 @@ const DONE = new Set(["completed", "finished", "reported", "confirmed", "forfeit
 const LIVE = new Set(["running", "in_progress"]);
 // Dieselben Namen wie der Server (services/round_labels.LOSER_SECTIONS) - bracketGraph.test.js hält beide gleich.
 export const LOSER_SECTIONS = new Set(["lb", "loser", "losers", "lower", "lower_bracket", "loser bracket", "looser"]);
-const FINAL_SECTIONS = new Set(["gf", "grand_final"]);
+// Wie der Server (services/round_labels.FINAL_SECTIONS, #1591): „[FINAL]“ im Schema ist das Grand Final.
+export const FINAL_SECTIONS = new Set(["gf", "grand_final", "grand final", "final"]);
 
 const statusOf = (match) => String(match?.status || "").toLowerCase();
 export const isDone = (match) => DONE.has(statusOf(match));

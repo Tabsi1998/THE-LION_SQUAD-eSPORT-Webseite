@@ -4,7 +4,7 @@ import { clone, decide, doubleElimination, find, singleElimination } from "../..
 import FFA from "../../e2e/fixtures/ffaGenerated.json";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { LOSER_SECTIONS, bracketEdges, diffBracket, drawRails, heatExits, matchFate, orderEdges, pathFor, railKey, sectionGroup, soloAdvance } from "./bracketGraph";
+import { FINAL_SECTIONS, LOSER_SECTIONS, bracketEdges, diffBracket, drawRails, heatExits, matchFate, orderEdges, pathFor, railKey, sectionGroup, soloAdvance } from "./bracketGraph";
 
 // Turnierbaum neu (#1561): die Linien kommen aus den echten Quellen der Plätze („W:A:1“, `advancement`), nicht aus der
 // Reihenfolge der Spiele. Dazu: was mit einem Spiel geschah (entfällt, zusammengelegt), dein Weg und die Bewegungen,
@@ -206,6 +206,14 @@ describe("sectionGroup", () => {
     expect(sectionGroup("lower_bracket")).toBe("loser");
     expect(sectionGroup("Loser Bracket")).toBe("loser");
     expect(sectionGroup("WB")).toBe("main");
+  });
+
+  it("kennt dieselben Namen für das Grand Final wie der Server - „[FINAL]“ im Schema ist das Grand Final (#1591)", () => {
+    const source = readFileSync(path.join(process.cwd(), "../backend/services/round_labels.py"), "utf8");
+    const set = /^FINAL_SECTIONS = \{([^}]*)\}/m.exec(source)[1];
+    const server = [...set.matchAll(/"([^"]+)"/g)].map((match) => match[1]).sort();
+    expect([...FINAL_SECTIONS].sort()).toEqual(server);
+    for (const name of server) expect(sectionGroup(name.toUpperCase()), name).toBe("final");
   });
 });
 

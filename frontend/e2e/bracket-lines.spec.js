@@ -122,6 +122,23 @@ function clipped(page) {
   });
 }
 
+// Wie im Abnahme-Cup geschrieben: „[FINAL]“ statt „[GF]“ ist ebenfalls das Grand Final (wie am Server) - es steht neben
+// dem Winner Bracket, nicht als eigener Abschnitt zwischen Winner und Loser Bracket.
+test("Web 1440: „[FINAL]“ im Schema - Grand Final neben dem Winner Bracket, alles passt, Linien sauber", async ({ page, isMobile }) => {
+  test.skip(Boolean(isMobile), "Desktop-Leinwand");
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const tournament = await mockWeb(page, "ffa16de_start", (data) => {
+    for (const match of data.matches_v2) if (match.section === "GF") match.section = "FINAL";
+    return data;
+  });
+  await page.goto(`/tournaments/${tournament.slug}/bracket`);
+  await expect(page.getByTestId("bracket-tree").first()).toBeVisible();
+  await page.waitForTimeout(1600);
+  await expect(page.getByTestId("bracket-tree").first().locator("[data-layout='compact']")).toHaveCount(1);
+  expect(await clipped(page)).toEqual([]);
+  expect(check(await collect(page, WEB))).toEqual([]);
+});
+
 test("Web 1100: zu breit - die Leinwand scrollt, der Hinweis steht da, der Rand blendet aus", async ({ page, isMobile }) => {
   test.skip(Boolean(isMobile), "Desktop-Leinwand");
   await page.setViewportSize({ width: 1100, height: 900 });
