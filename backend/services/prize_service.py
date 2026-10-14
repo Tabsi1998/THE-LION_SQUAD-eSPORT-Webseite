@@ -26,7 +26,7 @@ def _ordinal(rank: int) -> str:
     return f"{rank}."
 
 
-def _resolve_prize_place(raw_place, placements: dict[int, dict]) -> int | None:
+def _resolve_prize_place(raw_place, placements: dict[int, list[dict]]) -> int | None:
     try:
         if str(raw_place).lower() in {"last", "letzter", "-1"}:
             return max(placements.keys(), default=0) or None
@@ -54,14 +54,14 @@ async def auto_create_for_tournament(tid: str) -> int:
     snapshot = read_model.structure_snapshot()
     observe_structure_read(snapshot, surface="prize_pickups")
 
-    overall = placements_for_structure(snapshot, regs)
+    overall = placements_for_structure(snapshot, regs, tournament=t)
 
     winner_sections = {"wb", "winner", "main", "final", "gf", "grand_final"}
     loser_sections = {"lb", "loser"}
-    winner = placements_for_structure(snapshot, regs, sections=winner_sections)
+    winner = placements_for_structure(snapshot, regs, sections=winner_sections, tournament=t)
     if not winner:
         winner = overall
-    loser = placements_for_structure(snapshot, regs, sections=loser_sections)
+    loser = placements_for_structure(snapshot, regs, sections=loser_sections, tournament=t)
     placements_by_group = {
         "overall": overall,
         "winner": winner,
@@ -78,60 +78,59 @@ async def auto_create_for_tournament(tid: str) -> int:
         place = _resolve_prize_place(prize.get("place"), placement_by_rank)
         if not place:
             continue
-        winner = placement_by_rank.get(place)
-        if not winner:
-            continue
-        uid = winner.get("user_id")
-        team_id = winner.get("team_id")
-        if not (uid or team_id):
-            continue
-        # idempotent
-        existing = await db.prize_pickups.find_one({
-            "tournament_id": tid,
-            "place": place,
-            "user_id": uid,
-            "team_id": team_id,
-        })
-        if existing:
-            continue
-        doc = {
-            "id": new_id(),
-            "tournament_id": tid,
-            "tournament_title": t.get("title"),
-            "tournament_slug": t.get("slug"),
-            "user_id": uid,
-            "team_id": team_id,
-            "place": place,
-            "prize_group": prize_group,
-            "place_label": prize.get("label") or _ordinal(place),
-            "prize_label": prize.get("label") or "",
-            "prize_value": prize.get("value") or "",
-            "status": "pending",
-            "pickup_deadline": deadline,
-            "ready_at": None,
-            "picked_up_at": None,
-            "picked_up_by": None,
-            "notes": "",
-            "created_at": now_utc().isoformat(),
-            "updated_at": now_utc().isoformat(),
-        }
-        await db.prize_pickups.insert_one(doc)
-        created += 1
-        if uid:
-            try:
-                from services.user_notifications import create_user_notification
-                prize_text = doc.get("prize_value") or doc.get("prize_label") or "ein Preis"
-                await create_user_notification(
-                    uid,
-                    "Gewinn vorgemerkt",
-                    f"{doc.get('place_label') or _ordinal(place)} Platz bei {t.get('title') or 'dem Turnier'}: {prize_text}. Sobald der Gewinn abholbereit ist, bekommst du die nächste Meldung.",
-                    url="/me/prizes",
-                    kind="prize_pending",
-                    meta={"tournament_id": tid, "pickup_id": doc["id"], "place": place},
-                )
-            except Exception as exc:
-                logger.warning("[prizes] notification failed for pickup %s", _log_safe(doc.get("id")), exc_info=True)
-        logger.info("[prizes] created pickup %s place %s tournament %s", _log_safe(doc.get("id")), place, _log_safe(tid))
+        # Ein geteilter Platz (#1593): jeder, der ihn hält, bekommt den Preis - je Person höchstens einmal.
+        for winner in placement_by_rank.get(place) or []:
+            uid = winner.get("user_id")
+            team_id = winner.get("team_id")
+            if not (uid or team_id):
+                continue
+            # idempotent
+            existing = await db.prize_pickups.find_one({
+                "tournament_id": tid,
+                "place": place,
+                "user_id": uid,
+                "team_id": team_id,
+            })
+            if existing:
+                continue
+            doc = {
+                "id": new_id(),
+                "tournament_id": tid,
+                "tournament_title": t.get("title"),
+                "tournament_slug": t.get("slug"),
+                "user_id": uid,
+                "team_id": team_id,
+                "place": place,
+                "prize_group": prize_group,
+                "place_label": prize.get("label") or _ordinal(place),
+                "prize_label": prize.get("label") or "",
+                "prize_value": prize.get("value") or "",
+                "status": "pending",
+                "pickup_deadline": deadline,
+                "ready_at": None,
+                "picked_up_at": None,
+                "picked_up_by": None,
+                "notes": "",
+                "created_at": now_utc().isoformat(),
+                "updated_at": now_utc().isoformat(),
+            }
+            await db.prize_pickups.insert_one(doc)
+            created += 1
+            if uid:
+                try:
+                    from services.user_notifications import create_user_notification
+                    prize_text = doc.get("prize_value") or doc.get("prize_label") or "ein Preis"
+                    await create_user_notification(
+                        uid,
+                        "Gewinn vorgemerkt",
+                        f"{doc.get('place_label') or _ordinal(place)} Platz bei {t.get('title') or 'dem Turnier'}: {prize_text}. Sobald der Gewinn abholbereit ist, bekommst du die nächste Meldung.",
+                        url="/me/prizes",
+                        kind="prize_pending",
+                        meta={"tournament_id": tid, "pickup_id": doc["id"], "place": place},
+                    )
+                except Exception as exc:
+                    logger.warning("[prizes] notification failed for pickup %s", _log_safe(doc.get("id")), exc_info=True)
+            logger.info("[prizes] created pickup %s place %s tournament %s", _log_safe(doc.get("id")), place, _log_safe(tid))
     return created
 
 

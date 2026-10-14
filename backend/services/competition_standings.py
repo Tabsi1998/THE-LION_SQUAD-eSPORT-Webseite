@@ -471,13 +471,17 @@ def placements_for_structure(
     registrations: list[dict],
     *,
     sections: set[str] | None = None,
-) -> dict[int, dict]:
+    tournament: dict | None = None,
+) -> dict[int, list[dict]]:
     """Resolve prize/season placements through the canonical read contract.
 
     Explicit legacy ``final_position`` values remain authoritative for historical
     tournaments.  If none exist, Stage/FFA results use the shared standings
     projection.  This preserves the old fallback behaviour while giving every
     downstream consumer one engine-independent entry point.
+
+    Ein Platz kann geteilt sein (#1593): Liga, Jeder gegen jeden und Schweizer System (über ``tournament``) nehmen ihre
+    Tabelle mit Gleichstand - zwei Erste stehen beide auf Platz 1, der nächste ist 3. Darum je Platz eine Liste.
     """
 
     registration_map = {
@@ -499,7 +503,7 @@ def placements_for_structure(
         for match in snapshot.get("matches") or []
         if match.get("source", {}).get("engine") == "legacy" and wanted(match)
     ]
-    placements: dict[int, dict] = {}
+    placements: dict[int, list[dict]] = {}
     placed_registration_ids: set[str] = set()
     for match in legacy_matches:
         registration_id = next(
@@ -520,11 +524,11 @@ def placements_for_structure(
             or registration_id in placed_registration_ids
         ):
             continue
-        placements[rank] = {
+        placements[rank] = [{
             "registration_id": registration_id,
             "user_id": registration.get("user_id"),
             "team_id": registration.get("team_id"),
-        }
+        }]
         placed_registration_ids.add(registration_id)
     if placements:
         return placements
@@ -534,26 +538,34 @@ def placements_for_structure(
         for match in snapshot.get("matches") or []
         if match.get("source", {}).get("engine") == "stage" and wanted(match)
     ]
-    for row in stage_standings(stage_matches, registrations):
+    format_key = (tournament or {}).get("format")
+    if not wanted_sections and format_key in {"round_robin", "league"}:
+        rows = round_robin_standings(stage_matches, registrations)
+    elif not wanted_sections and format_key == "swiss":
+        rows = swiss_standings(stage_matches, registrations)
+    else:
+        rows = stage_standings(stage_matches, registrations)
+    for row in rows:
         registration_id = row.get("registration_id")
         rank = _safe_int(row.get("rank"))
         registration = registration_map.get(registration_id)
-        if not registration_id or not rank or not row.get("played") or not registration or rank in placements:
+        if not registration_id or not rank or not row.get("played") or not registration:
             continue
-        placements[rank] = {
+        placements.setdefault(rank, []).append({
             "registration_id": registration_id,
             "user_id": registration.get("user_id"),
             "team_id": registration.get("team_id"),
-        }
+        })
     return placements
 
 
-def placement_rows_for_structure(snapshot: dict, registrations: list[dict]) -> list[dict]:
-    """Return ordered placement rows suitable for season-point awards."""
+def placement_rows_for_structure(snapshot: dict, registrations: list[dict], *, tournament: dict | None = None) -> list[dict]:
+    """Return ordered placement rows suitable for season-point awards - a shared place appears once per holder."""
 
     return [
         {**placement, "rank": rank}
-        for rank, placement in sorted(placements_for_structure(snapshot, registrations).items())
+        for rank, group in sorted(placements_for_structure(snapshot, registrations, tournament=tournament).items())
+        for placement in group
     ]
 
 
@@ -614,7 +626,8 @@ def registration_tournament_achievement_progress(
 
     ranks = {
         rank
-        for rank, placement in placements_for_structure(snapshot, registrations).items()
+        for rank, group in placements_for_structure(snapshot, registrations).items()
+        for placement in group
         if placement.get("registration_id") in registration_ids
     }
     legacy_fourth = any(

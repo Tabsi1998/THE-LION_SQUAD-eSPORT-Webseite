@@ -37,6 +37,14 @@ test("vor dem Ende, ohne eigene Zeile oder bei Gruppentabellen gibt es keinen Mo
   expect(placementFor(fixture.groups.tournament, fixture.groups.standings)).toBeNull();
 });
 
+test("mehrere eigene Anmeldungen (zwei Teams): der beste eigene Podestplatz zählt, nicht die erste Zeile", () => {
+  // Abgeleitet aus der echten Rangliste: Platz 4 und Platz 2 gehören mir, Platz 4 steht vorne in der Liste.
+  const two = [...standings].reverse().map((row) => ({ ...row, is_mine: row.rank === 2 || row.rank === 4 }));
+  expect(placementFor(tournament, two)).toMatchObject({ rank: 2, metal: "silver" });
+  const podiumTwice = [...standings].reverse().map((row) => ({ ...row, is_mine: row.rank === 1 || row.rank === 3 }));
+  expect(placementFor(tournament, podiumTwice)).toMatchObject({ rank: 1, title: "Champion" });
+});
+
 test("einmal je Browser: gemerkt wird je Turnier und Anmeldung", () => {
   const storage = memoryStorage();
   const placement = placementFor(tournament, standings);

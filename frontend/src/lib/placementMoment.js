@@ -21,7 +21,10 @@ function flatRows(standings) {
 /** Der eigene Platz 1 bis 3 eines Turniers mit veröffentlichten Ergebnissen - oder `null`. */
 export function placementFor(tournament, standings) {
   if (!tournament || !CONFIRMED.has(String(tournament.status || ""))) return null;
-  const mine = flatRows(standings).find((row) => row.is_mine);
+  // Mehrere eigene Anmeldungen (etwa zwei Teams): der beste eigene Podestplatz zählt, nicht die erste Zeile.
+  const mine = flatRows(standings)
+    .filter((row) => row.is_mine && PLACEMENT_LOOKS[Number(row.rank)])
+    .sort((a, b) => Number(a.rank) - Number(b.rank))[0];
   const rank = Number(mine?.rank);
   const look = PLACEMENT_LOOKS[rank];
   if (!mine || !look) return null;

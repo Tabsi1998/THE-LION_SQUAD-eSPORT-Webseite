@@ -312,3 +312,40 @@ async def test_a_knockout_team_row_says_it_is_a_team(flow):
     mine = [row for row in rows.values() if row.get("is_mine")]
     assert len(mine) == 1 and mine[0]["team_id"] == team_ids[0]
     assert all(row.get("team_id") in team_ids for row in rows.values())
+
+
+# ---------------------------------------------------------------- Geteilte Plätze in Saison, Preisen, Auszeichnungen
+
+@pytest.mark.asyncio
+async def test_a_shared_place_counts_for_both_in_season_prizes_and_awards(flow):
+    """Ein geteiltes 1. ist für beide ein 1. - Saisonpunkte, Preis und Auszeichnung; der nächste Platz ist 3."""
+    await flow.db.seasons.insert_one({"id": "s1", "name": "Herbst", "status": "active", "start_date": "2026-09-01T00:00:00+00:00"})
+    staff, tournament, users, regs = await league_of(flow, prize_places=[
+        {"group": "overall", "place": 1, "label": "Gold", "value": "Pokal"},
+        {"group": "overall", "place": 3, "label": "Bronze", "value": "Medaille"},
+    ])
+    winners, losers = [], []
+    for match in round_matches(await flow.matches(tournament), 1):
+        first, second = await report(flow, staff, match, 3, 1)
+        winners.append(first)
+        losers.append(second)
+    user_of = {reg["id"]: user["id"] for reg, user in zip(regs, users)}
+    flow.act_as(staff)
+    for status in ("completed", "results_published"):
+        response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": status})
+        assert response.status_code == 200, response.text
+
+    points = {doc["user_id"]: doc for doc in await flow.db.season_points.find({"source_id": tournament["id"]}, {"_id": 0}).to_list(50)}
+    assert {points[user_of[rid]]["rank"] for rid in winners} == {1}
+    assert {points[user_of[rid]]["rank"] for rid in losers} == {3}
+    assert points[user_of[winners[0]]]["total_points"] == points[user_of[winners[1]]]["total_points"]
+
+    pickups = await flow.db.prize_pickups.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(50)
+    assert sorted((doc["place"], doc["user_id"]) for doc in pickups) == sorted(
+        [(1, user_of[rid]) for rid in winners] + [(3, user_of[rid]) for rid in losers])
+    # Noch einmal auslösen legt keinen zweiten Datensatz je Person an.
+    from services.prize_service import auto_create_for_tournament
+    assert await auto_create_for_tournament(tournament["id"]) == 0
+
+    awards = {doc["registration_id"]: doc["rank"] for doc in await flow.db.tournament_awards.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(50)}
+    assert {awards[rid] for rid in winners} == {1} and {awards[rid] for rid in losers} == {3}

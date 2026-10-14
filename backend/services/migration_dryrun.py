@@ -110,8 +110,10 @@ def tournament_fingerprint(
         "decided_count": len(decided),
         "results": {key: sorted(filter(None, value)) for key, value in sorted(results.items())},
         "standings": standings_order(standings),
-        "placements": {str(rank): entry.get("registration_id")
-                       for rank, entry in sorted(placements.items())},
+        # Ein Platz mit einem Halter bleibt eine Kennung (gleiche Prüfsumme wie bisher), ein geteilter wird eine Liste.
+        "placements": {str(rank): group[0].get("registration_id") if len(group) == 1
+                       else sorted(entry.get("registration_id") or "" for entry in group)
+                       for rank, group in sorted(placements.items())},
     }
 
 

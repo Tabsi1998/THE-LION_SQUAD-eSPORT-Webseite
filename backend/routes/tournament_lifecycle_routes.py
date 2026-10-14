@@ -403,7 +403,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             read_model = await load_competition_read_model(db, tid)
             snapshot = read_model.structure_snapshot()
             observe_structure_read(snapshot, surface="season_points")
-            placements = placement_rows_for_structure(snapshot, regs)
+            placements = placement_rows_for_structure(snapshot, regs, tournament=t)
             placed_reg_ids = {
                 placement["registration_id"]
                 for placement in placements
