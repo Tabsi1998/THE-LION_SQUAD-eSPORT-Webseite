@@ -709,6 +709,8 @@ class TournamentCreate(BaseModel):
     prize_places: Optional[List[dict]] = None  # [{"group":"overall|winner|loser","place":1,"label":"1. Platz","value":"…"}]
     best_of: int = 1
     bronze_match: bool = False
+    # Doppel-K.-o. (#1549): kein Grand Final, eines, oder mit Reset-Spiel (Vorgabe).
+    grand_final_mode: Literal["none", "single", "reset"] = "reset"
     # Leer: die Dauer kommt vom Spiel (Modus, #1554), sonst 30 Minuten - siehe services/match_duration.py.
     match_duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     # Spielmodus des Games (``games.match_modes[].mode``) - leer: der erste Modus.
@@ -788,6 +790,7 @@ class TournamentUpdate(BaseModel):
     prize_places: Optional[List[dict]] = None
     best_of: Optional[int] = None
     bronze_match: Optional[bool] = None
+    grand_final_mode: Optional[Literal["none", "single", "reset"]] = None
     match_duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     game_mode: Optional[str] = Field(default=None, max_length=40)
     stream_link: Optional[str] = None

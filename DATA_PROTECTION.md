@@ -76,7 +76,8 @@ Migration 5 für #1029). Sie nimmt nur Konten im vollständigen Löschzustand: Z
 | Ergebnisse und Tabellen | ohne Frist | sportliche Integrität, Teil des Turnierverlaufs |
 
 Betriebsdaten ohne Personenbezug (`ops_errors`, `ops_slow_requests`, `ops_vitals`: nur „angemeldet“ oder „anonym“)
-laufen nach 30 Tagen ab.
+laufen nach 30 Tagen ab. Die Ereignis-Kennungen signierter Webhooks der Mitgliederverwaltung (`dolibarr_webhook_events`:
+Kennung, Objektart, Zeitpunkt – ohne Mitgliedsnummer) laufen nach sieben Tagen ab.
 
 ## Auskunft: was die Datei enthält
 

@@ -180,9 +180,10 @@ def test_v2_ffa_custom_uses_default_schema_without_saved_schema():
     by_key = {match["match_key"]: match for match in matches}
 
     assert len(matches) == 3
-    assert [slot["source"]["seed"] for slot in by_key["A"]["slots"]] == [1, 2, 3, 4]
-    assert [slot["source"]["seed"] for slot in by_key["B"]["slots"]] == [5, 6, 7, 8]
-    assert [slot["source"]["match_key"] for slot in by_key["C"]["slots"]] == ["A", "A", "B", "B"]
+    # Setzung in Schlangenlinie (#1549): die Topgesetzten verteilen sich auf die Läufe wie bei Gruppen.
+    assert [slot["source"]["seed"] for slot in by_key["A"]["slots"]] == [1, 4, 5, 8]
+    assert [slot["source"]["seed"] for slot in by_key["B"]["slots"]] == [2, 3, 6, 7]
+    assert [slot["source"]["raw"] for slot in by_key["C"]["slots"]] == ["W:A:1", "W:B:1", "W:A:2", "W:B:2"]
 
 
 def test_v2_simple_ffa_uses_default_single_heat_schema():

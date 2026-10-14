@@ -77,12 +77,13 @@ async def test_connection_is_system_only_and_the_key_never_comes_back(flow, fake
     # Die Übersicht „was läuft, wo es steht“: jede Funktion mit Schalterort - hier ist noch nichts an.
     features = {row["key"]: row for row in status.json()["features"]}
     assert set(features) == {"members", "club_facts", "channels", "sponsors", "applications", "consents", "member_access", "directory", "participations",
-                             "invoices", "webhook", "statutes"}
+                             "invoices", "webhook", "legacy_webhook", "statutes"}
     assert features["participations"]["state"] == "aus" and features["participations"]["switch"] == {"on": False}
     # Alle Schalter an einem Ort (#510): jede schaltbare Funktion zeigt auf den Reiter Funktionen.
     assert features["club_facts"]["enabled"] is False and features["club_facts"]["where"] == "/admin/dolibarr?tab=features"
     assert features["members"]["state"].startswith("Modus Vorschau") and features["sponsors"]["where"] == "/admin/dolibarr?tab=features"
     assert features["club_facts"]["switch"] == {"on": False} and features["invoices"]["switch"]["system_only"] is True and "switch" not in features["webhook"]
+    assert features["legacy_webhook"]["switch"] == {"on": True, "system_only": True} and features["legacy_webhook"]["enabled"] is False
     assert all(row["where_label"] and row["hint"] for row in features.values())
     stored = await flow.db.settings.find_one({"id": "dolibarr"})
     assert stored["api_key"].startswith("enc:v1:")

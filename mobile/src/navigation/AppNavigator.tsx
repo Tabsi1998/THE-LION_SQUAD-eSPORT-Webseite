@@ -15,6 +15,7 @@ import { PasskeyInvite } from "../components/PasskeyInvite";
 import { markSignInNudgeSeen, SignInNudge } from "../components/SignInNudge";
 import { LoginScreen } from "../screens/auth/LoginScreen";
 import { DETAIL_SCREENS, TAB_ROOT_SCREENS } from "./screenRegistry";
+import { LoginHelpScreen } from "../screens/auth/LoginHelpScreen";
 import { RegisterScreen } from "../screens/auth/RegisterScreen";
 import { ConsentScreen } from "../screens/auth/ConsentScreen";
 import { SiteBannerTicker } from "../components/SiteBannerTicker";
@@ -94,6 +95,7 @@ function RootScreens() {
       <RootStack.Screen name="Main" component={MainScreen} options={{ headerShown: false }} />
       <RootStack.Screen name="Login" component={LoginScreen} options={{ title: "Anmelden" }} />
       <RootStack.Screen name="Register" component={RegisterScreen} options={{ title: "Registrieren" }} />
+      <RootStack.Screen name="LoginHelp" component={LoginHelpScreen} options={{ title: "Hilfe beim Anmelden" }} />
     </RootStack.Navigator>
   );
 }
