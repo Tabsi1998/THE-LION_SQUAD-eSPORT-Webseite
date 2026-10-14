@@ -6,6 +6,7 @@ import { formatDateTime } from "@/lib/datetime";
 import { formatCents } from "@/lib/pricing";
 import { TeamDayPanel } from "@/components/tls/tournament/TeamDayPanel";
 import { ResultShareButton } from "@/components/tls/ResultShareButton";
+import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 
 const FINISHED = new Set(["completed", "results_published", "archived"]);
 
@@ -50,6 +51,8 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
           <div className="flex items-start gap-2"><CalendarClock className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="text-[10px] font-bold uppercase tracking-widest text-white/50">Check-in</dt><dd data-testid="tournament-my-checkin">{t.check_in_from ? `ab ${formatDateTime(t.check_in_from)}` : ""}{t.check_in_until ? ` bis ${formatDateTime(t.check_in_until)}` : ""}{staffOnlyCheckIn ? " · vor Ort bei der Turnierleitung" : ""}</dd></div></div>
         ) : null}
       </dl>
+      {/* Vor Ort im laufenden Turnier (#1556): wo und wann dein nächstes Spiel ist - aus der Warteschlange je Station. */}
+      {t.status === "live" && t.event_mode && t.event_mode !== "online" ? <LiveQueueStatus tournamentId={t.id} className="mt-3" /> : null}
       {/* Team am Spieltag (#1192): Aufstellung und „Wer ist da“ - nur bei Team-Turnieren. */}
       {isTeamTournament ? <TeamDayPanel tournament={t} /> : null}
       {/* Ergebnis teilen (#1194): nach dem Turnier ein Bild für Status und Story. */}

@@ -345,6 +345,31 @@ im Protokoll und unter ihren Strafen) und **+5 Min. verlängern**. Die Fristen s
 Ein Spiel gilt auf dem Aufruf-TV als aufgerufen, sobald es einer Station zugewiesen und noch nicht gestartet ist. Mehr
 in [TV und Beamer](tv.md).
 
+**Live vor Ort: die Warteschlange je Station.** Vor Ort ist der Plan eine Prognose – während des Turniers zählt die
+Warteschlange. In der Turnierleitung am Handy (`/tournaments/<slug>/leitung`) steht dafür der Reiter **Stationen**
+(nur bei Turnieren vor Ort mit Stationen):
+
+- Je Station: was **läuft** (mit Spielzeit-Uhr „12:34 / 30 Min.“, gelb ab 80 %, rot ab der vollen Dauer), was **als
+  Nächstes** kommt und was **danach**. Oben steht der Verzug, zum Beispiel „+11 Min. · Finale jetzt ca. 20:51“.
+- Wird eine Station frei, rückt das nächste bereite Spiel nach – an die Station, die zuerst frei ist. Ein Spiel wartet
+  nur auf seine eigenen Vorspiele (die Linien im Baum), nicht auf die ganze Runde. Steht ein Platz noch nicht fest,
+  heißt es „wartet auf die Vorspiele“ und die Zeit „voraussichtlich“.
+- **Aufrufen** reserviert die Station und schickt den Spielern „Du bist dran“ (Postfach und Push, bei Teams an die
+  Aufgestellten). Danach steht dort „Aufgerufen · antreten bis … · nicht erschienen ab …“; die Frist „nicht erschienen“
+  (3.7) zählt ab dem Aufruf.
+- **Gestartet** setzt die echte Startzeit. Ab da läuft die Uhr, und **Ergebnis fehlt** zählt erst ab diesem Start
+  (Dauer plus 5 Minuten) – ein Spiel, das an seiner Station noch wartet, hat Verzug, aber kein fehlendes Ergebnis.
+- Rufen zwei Helfer gleichzeitig auf, gilt genau ein Aufruf; der andere bekommt „Die Station hält inzwischen ein anderes
+  Spiel“ und sieht den neuen Stand. Ein schon aufgerufenes Spiel lässt sich nicht still an eine andere Station rufen.
+  Knöpfe sieht, wer Stationen bedienen darf (Organisation, Schiedsrichter, Stationsleitung; Helfer mit einer Station nur
+  dort).
+- **Planen/Übernehmen** verschiebt ein aufgerufenes Spiel nicht. Die geplanten Zeiten bleiben stehen; der Verzug ist
+  der Abstand der Prognose zu ihnen.
+
+Spieler sehen auf der Turnierseite unter **Dein Stand** „Du bist als Nächstes an Station 2 · ca. 18:40“ (oder „Läuft“,
+„Du bist dran“), auf der Matchseite steht dasselbe für das Spiel. Online-Turniere haben keine Stationen und keine
+Warteschlange – dort gelten die Fristen.
+
 ### 3.9 TV
 
 Den Turnierbaum für Fernseher oder Beamer erstellt ihr im Turnier mit dem Link **TV-Link** (oben neben „Öffentliche

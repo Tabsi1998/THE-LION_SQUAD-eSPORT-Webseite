@@ -237,3 +237,28 @@ test("die Anmeldung lädt erst nach der Seite: kein zweiter Aufbau", async () =>
     authState.user = null;
   }
 });
+
+test("vor Ort (#1556): die Matchseite sagt, wann und wo das Spiel aus der Warteschlange dran ist", async () => {
+  const page = {
+    ...BASE,
+    match: { id: "m1", match_key: "C", status: "scheduled", round_name: "Viertelfinale", scheduled_at: "2026-05-20T10:30:00Z",
+      slots: [{ slot: 1, registration_id: "r1" }, { slot: 2, registration_id: "r2" }] },
+    participants: [NEON, LUNA],
+  };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/matches/m1/page") return { data: page };
+    if (url === "/tournaments/t1/live-queue") {
+      return { data: { applies: true, matches: { m1: { match_id: "m1", state: "queued", position: 1, station_text: "Station 2 · Switch 2", forecast_at: "2026-05-20T10:41:00Z", delay_minutes: 11 } } } };
+    }
+    return { data: [] };
+  });
+  render(
+    <MemoryRouter initialEntries={["/matches/m1"]}>
+      <Routes><Route path="/matches/:id" element={<MatchPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  const status = await screen.findByTestId("live-queue-status");
+  expect(status).toHaveTextContent("Als Nächstes an Station 2 · Switch 2");
+  expect(status).not.toHaveTextContent("Du bist");
+  expect(status).toHaveTextContent("ca. 12:41 · +11 Min.");
+});

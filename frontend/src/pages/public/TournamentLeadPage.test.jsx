@@ -70,3 +70,23 @@ test("„Nicht erschienen?“ (#1551): die Turnierleitung wählt die fehlende Se
   fireEvent.click(screen.getByTestId("lead-no-show-extend-ns-m8"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/lead/no-show/m8", { action: "extend", minutes: 5 }));
 });
+
+test("Stationen (#1556): vor Ort die Warteschlange je Station - „Aufrufen“ und „Gestartet“ gehen über den Server", async () => {
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  const next = { match_id: "QF2", label: "Viertelfinale", names: ["NeonFalke", "Jo"], ready: true, state: "queued", position: 1, forecast_at: "2026-10-31T16:40:00Z" };
+  const queue = {
+    applies: true, summary: null, operate: { all: true, station_ids: [] },
+    stations: [{ id: "st2", name: "2", station_text: "Station 2 · Switch 2", status: "free", waiting: 1, running: null, next, after: null }],
+  };
+  const lead = { tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup", event_mode: "local" }, matches: [ENTRY], recent: [], attention: [], stations: [], counts: { open: 1 } };
+  apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/live-queue") ? queue : lead }));
+  render(
+    <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+      <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  const tab = await screen.findByTestId("lead-tab-stations");
+  await waitFor(() => expect(tab).toHaveAttribute("aria-selected", "true"));
+  fireEvent.click(await screen.findByTestId("live-call-st2"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/live-queue/call", { station_id: "st2", match_id: "QF2" }));
+});

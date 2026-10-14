@@ -243,7 +243,7 @@ def _usable_stations(tournament: dict, stations, game: dict | None = None) -> li
 
 
 def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id: dict, now: datetime, busy_elsewhere,
-                   participant_keys: dict[str, set[str]] | None = None, game: dict | None = None) -> tuple[list[dict], list[dict]]:
+                   participant_keys: dict[str, set[str]] | None = None, game: dict | None = None) -> tuple[list[dict], list[dict], list[dict]]:
     warnings: list[dict] = []
 
     def players_of(match: dict) -> set[str]:
@@ -252,7 +252,7 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
     if not usable:
         warnings.append({"type": "no_stations", "severity": "warning",
                          "message": "Keine freie Station für dieses Turnier - ohne Stationen plant der Planer keine Zeiten."})
-        return [], warnings
+        return [], warnings, []
 
     pause = break_minutes(tournament)
     horizon = max(now, _parse(tournament.get("start_date")) or now)
@@ -276,6 +276,8 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
             board.block(current, station["id"], set(), now, now + timedelta(minutes=effective_match_duration(tournament=tournament, game=game)))
 
     fixed: list[tuple[dict, datetime, datetime]] = []
+    # Was der Planer nicht verschiebt, mit Zeit und Station - die Live-Warteschlange (#1556) liest es mit.
+    held: list[dict] = []
     candidates: list[dict] = []
     for match in matches:
         status = str(match.get("status") or "")
@@ -283,13 +285,24 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
             continue
         running = status in RUNNING_STATUSES or bool(match.get("started_at"))
         kept = match.get("schedule_source") in KEPT_SOURCES and _parse(match.get("scheduled_at")) is not None
-        if running or kept:
-            start = (_parse(match.get("started_at")) if running else None) or _parse(match.get("scheduled_at")) or now
+        # Aufgerufen (#1556): Station und Spieler sind schon unterwegs - das Spiel bleibt an seiner Station und beginnt
+        # frühestens jetzt; kein „Planen“ verteilt einen Aufruf neu.
+        called = not running and bool(match.get("called_at")) and bool(match.get("station_id"))
+        if running or kept or called:
+            if running:
+                start = _parse(match.get("started_at")) or _parse(match.get("scheduled_at")) or now
+            elif called:
+                start = max(now, _parse(match.get("scheduled_at")) or now)
+            else:
+                start = _parse(match.get("scheduled_at")) or now
             end = start + timedelta(minutes=duration(match))
             if running:
                 end = max(end, now)
             board.block(match["id"], match.get("station_id"), players_of(match), start, end)
             fixed.append((match, start, end))
+            held.append({"match_id": match["id"], "station_id": match.get("station_id"), "start": start.isoformat(),
+                         "end": end.isoformat(), "minutes": duration(match),
+                         "kind": "running" if running else "called" if called else "kept"})
             continue
         if status not in PLANNABLE_STATUSES:
             continue
@@ -388,7 +401,7 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                                  "message": f"{_label(match)} ist fest um {start.astimezone(timezone.utc).strftime('%H:%M')} UTC, "
                                             f"aber {_label(previous)} ist erst um {end.astimezone(timezone.utc).strftime('%H:%M')} UTC vorbei."})
                 break
-    return assignments, warnings
+    return assignments, warnings, held
 
 
 def _fingerprint(assignments: list[dict]) -> str:
@@ -418,8 +431,9 @@ def plan_schedule(tournament: dict, matches, stations=(), *, stages=(), proposal
 
     assignments: list[dict] = []
     warnings: list[dict] = []
+    held: list[dict] = []
     if local:
-        planned, found = _plan_stations(tournament, local, stations, stage_by_id, now, busy_elsewhere, participant_keys, game)
+        planned, found, held = _plan_stations(tournament, local, stations, stage_by_id, now, busy_elsewhere, participant_keys, game)
         assignments.extend(planned)
         warnings.extend(found)
     if weekly:
@@ -455,6 +469,7 @@ def plan_schedule(tournament: dict, matches, stations=(), *, stages=(), proposal
         "planned_at": now.isoformat(),
         "assignments": assignments,
         "warnings": warnings,
+        "held": held,
         "fingerprint": _fingerprint(assignments),
     }
 
@@ -571,6 +586,8 @@ async def apply_plan(db, tournament: dict, plan: dict) -> dict:
         }
         if item["schedule_source"] == "planner":
             guard["station_id"] = previous.get("station_id")
+            # Inzwischen aufgerufen (#1556): Station und Spieler sind unterwegs - der Plan schreibt nicht darüber.
+            guard["called_at"] = None
         if previous.get("schedule_source") in KEPT_SOURCES or previous.get("status") in RUNNING_STATUSES | DONE_STATUSES:
             continue
         result = await db.matches_v2.update_one(guard, {"$set": update})

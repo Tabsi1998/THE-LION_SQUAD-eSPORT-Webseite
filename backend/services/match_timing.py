@@ -51,9 +51,17 @@ def duration_minutes(match: dict, tournament: dict | None, stage: dict | None = 
 
 def timing(match: dict, tournament: dict | None, now: datetime, *, stage: dict | None = None, game: dict | None = None) -> dict:
     """Wie lange läuft das Spiel, und wie weit ist es über der Zeit? Ohne geplante Zeit (und ohne Start an einer
-    Station) gibt es kein „Ergebnis fehlt“ (#1160)."""
+    Station) gibt es kein „Ergebnis fehlt“ (#1160).
+
+    Live vor Ort (#1556): Gezählt wird ab dem echten Start. Ein Spiel, das an seiner Station noch wartet, hat Verzug
+    (den zeigt die Warteschlange), aber kein fehlendes Ergebnis."""
     started = _parse(match.get("started_at"))
-    base = _parse(match.get("scheduled_at")) or (started if match.get("station_id") else None)
+    if started:
+        base = started
+    elif match.get("station_id"):
+        base = None
+    else:
+        base = _parse(match.get("scheduled_at"))
     out: dict = {"running_minutes": None, "overdue_minutes": None, "missing": False, "due_at": None}
     if started and str(match.get("status") or "") in RUNNING_STATUSES | {"scheduled", "ready"}:
         out["running_minutes"] = max(0, int((now - started).total_seconds() // 60))
