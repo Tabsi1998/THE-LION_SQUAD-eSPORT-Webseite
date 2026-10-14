@@ -2,7 +2,7 @@ import { MultiSelect } from "@/components/tls/MultiSelect";
 import { INPUT_DEVICES, PLATFORMS, SUBSCRIPTIONS } from "./constants";
 import { Field, Input, Row, Section } from "./fields";
 
-export function GamingTab({ form, set, setGameId, gameIdGroups }) {
+export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) {
   return (
     <>
                 <Section>
@@ -10,13 +10,13 @@ export function GamingTab({ form, set, setGameId, gameIdGroups }) {
                     <Input value={form.favorite_games} onChange={(v) => set("favorite_games", v)} placeholder="Mario Kart, F1, Rocket League" testId="profile-fav-games" />
                   </Field>
                   <Field label="Plattformen (mehrere möglich)">
-                    <MultiSelect options={PLATFORMS} value={form.main_platforms} onChange={(v) => set("main_platforms", v)} testId="profile-platforms" />
+                    <MultiSelect options={PLATFORMS} value={form.main_platforms} onChange={(v) => setNow("main_platforms", v)} testId="profile-platforms" />
                   </Field>
                   <Field label="Eingabegeräte (mehrere möglich)">
-                    <MultiSelect options={INPUT_DEVICES} value={form.input_devices} onChange={(v) => set("input_devices", v)} testId="profile-input-devices" />
+                    <MultiSelect options={INPUT_DEVICES} value={form.input_devices} onChange={(v) => setNow("input_devices", v)} testId="profile-input-devices" />
                   </Field>
                   <Field label="Gaming-Abos (Game Pass, PS Plus, EA Play, …)">
-                    <MultiSelect options={SUBSCRIPTIONS} value={form.gaming_subscriptions} onChange={(v) => set("gaming_subscriptions", v)} testId="profile-subs" />
+                    <MultiSelect options={SUBSCRIPTIONS} value={form.gaming_subscriptions} onChange={(v) => setNow("gaming_subscriptions", v)} testId="profile-subs" />
                   </Field>
                   <Field label="Bevorzugte Rolle"><Input value={form.preferred_role} onChange={(v) => set("preferred_role", v)} placeholder="z.B. IGL, Support, Driver" /></Field>
                   {gameIdGroups.length > 0 && (
