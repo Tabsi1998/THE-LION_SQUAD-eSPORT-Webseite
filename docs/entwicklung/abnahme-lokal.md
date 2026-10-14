@@ -62,9 +62,17 @@ zwischen „Matchplan“ und „Spiele“ wechseln, die Ansicht bleibt stehen; �
 Konsolenfehler und keine Antwort 4xx/5xx. `tables-schedule-abnahme.spec.js`: Rangliste (Liga, Gruppen), Spielplan
 (nach Runden, nach Stationen, „Nur meine Spiele“), Podest und Sieger-Moment – nicht angemeldet, als Spieler und als
 Admin, bei 1440 und 375 px. Ohne `ABNAHME=1` überspringt der normale Testlauf diese Tests.
-`ABNAHME_SHOTS` legt Bilder ab (optional).
+`ABNAHME_SHOTS` legt Bilder ab (optional). Anmeldungen: Die Tests merken sich die Sitzung je Konto
+(`.local-testing/abnahme/sessions-…/`) und melden sich nur neu an, wenn sie nicht mehr gilt - nie zweimal mit einem
+Zwei-Faktor-Code aus demselben 30-Sekunden-Fenster. So läuft auch ein großer Lauf nicht in die Sperre gegen
+Rateversuche.
 
 ## Zwei Stände nebeneinander
+
+> **Regel: Jeder PR bekommt seinen eigenen Stand – eigener Projektname (`ABNAHME_PROJECT`), eigene Ports, eigene
+> Stand-Datei (`ABNAHME_STATE`). Den gemeinsamen Stand `lsw-abnahme` nie für einen anderen Zweig umbauen, solange
+> jemand anderes darauf prüft:** Wer ihn neu baut, tauscht dem anderen den Code unter den Füßen aus, und dessen
+> Ergebnis gilt nicht mehr (ist am 14.10. passiert). Im Zweifel: `docker ps --filter name=lsw-abnahme` zeigt, was läuft.
 
 Prüfen zwei Leute (oder zwei Agenten) gleichzeitig, bekommt jeder seinen eigenen Stand - sonst baut einer dem anderen den
 Server unter den Füßen um. Eigener Projektname, eigene Ports und Adressen, eigene Stand-Datei:

@@ -34,6 +34,11 @@ from datetime import datetime, timedelta, timezone
 
 # Mehrere Stände nebeneinander: eigener Projektname (ABNAHME_PROJECT) und eigene Stand-Datei (ABNAHME_STATE).
 PROJECT = os.environ.get("ABNAHME_PROJECT", "lsw-abnahme")
+# Der Seed schreibt nur in den Abnahme-Stand: Datenbankname wie in `.env.abnahme.example`, keine Produktion, Adressen nur
+# auf diesem Rechner. Zeigen ABNAHME_PROJECT oder der Compose-Ordner auf einen fremden Stack, bricht er ab (s. unten).
+ABNAHME_DB_NAME = "tls_abnahme"
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+PRODUCTION = {"production", "prod"}
 # Testwerte, nur für diesen lokalen Stack. Das TOTP-Geheimnis ist das Beispiel aus RFC 6238.
 TEST_PASSWORD = "Abnahme-Testpasswort-2026"
 TEST_TOTP_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
@@ -105,6 +110,34 @@ def host_main() -> int:
 
 
 # ------------------------------------------------------------------------------------------------ im Backend-Container
+
+def abnahme_target_problems(env) -> list[str]:
+    """Was dagegen spricht, in diese Umgebung zu schreiben - leer heißt: ein lokaler Abnahme-Stand."""
+    from urllib.parse import urlsplit
+
+    problems = []
+    if not str(env.get("DB_NAME") or "").startswith(ABNAHME_DB_NAME):
+        problems.append(f"Datenbank {env.get('DB_NAME')!r} ist nicht die der Abnahme ({ABNAHME_DB_NAME})")
+    if {str(env.get(key) or "").strip().lower() for key in ("APP_ENV", "ENV", "ENVIRONMENT")} & PRODUCTION:
+        problems.append("Umgebung ist Produktion")
+    # FRONTEND_URL setzt der Abnahme-Stand immer; PUBLIC_BACKEND_URL ist dort nur Build-Argument des Frontends und
+    # fehlt im Backend - geprüft wird sie nur, wenn sie gesetzt ist (wie guard_environment im Fast-Lap-Seed).
+    for key, required in (("FRONTEND_URL", True), ("PUBLIC_BACKEND_URL", False)):
+        value = str(env.get(key) or "")
+        if not value and not required:
+            continue
+        host = urlsplit(value).hostname
+        if host not in LOCAL_HOSTS:
+            problems.append(f"{key} zeigt auf {host or '(leer)'!r}, nicht auf diesen Rechner")
+    return problems
+
+
+def ensure_abnahme_target(env) -> None:
+    """Hart abbrechen, bevor irgendetwas geschrieben wird, wenn das kein lokaler Abnahme-Stand ist."""
+    problems = abnahme_target_problems(env)
+    if problems:
+        raise SystemExit("Seed abgebrochen, das ist kein lokaler Abnahme-Stand: " + "; ".join(problems))
+
 
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -273,11 +306,14 @@ CUP_FIELDS = {"format": "ffa_custom_bracket", "event_mode": "local", "schedule_m
 
 
 async def inside_main() -> None:
+    ensure_abnahme_target(os.environ)
     sys.path.insert(0, "/app")
     from database import get_db
     from services import scheduler
 
     db = get_db()
+    # Neu befüllen hebt die Sperre gegen Rateversuche bei der Anmeldung auf (nur hier, im geprüften Abnahme-Stand).
+    await db.rate_limits.delete_many({"bucket": {"$regex": "^auth:"}})
     users = await ensure_accounts(db)
     admin = await Session.login(ACCOUNTS["admin"]["email"], True)
     state = {"accounts": {key: {"email": ACCOUNTS[key]["email"], "password": TEST_PASSWORD, "totp": TEST_TOTP_SECRET if ACCOUNTS[key]["mfa"] else None}
