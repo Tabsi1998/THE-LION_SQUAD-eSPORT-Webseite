@@ -156,9 +156,9 @@ async def _tournament_rank_for_user(tournament_id: str, user_id: str, team_ids: 
         groups = await db.tournament_groups.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(100)
     structure = read_model.structure_snapshot()
     observe_structure_read(structure, surface="profile_references")
-    placements = placements_for_structure(structure, regs)
-    for rank, placement in sorted(placements.items()):
-        if placement.get("registration_id") in reg_ids:
+    placements = placements_for_structure(structure, regs, tournament=tournament)
+    for rank, group in sorted(placements.items()):
+        if any(placement.get("registration_id") in reg_ids for placement in group):
             return rank, participant_count
 
     rows = standings_for_structure(tournament, structure, regs, groups=groups)

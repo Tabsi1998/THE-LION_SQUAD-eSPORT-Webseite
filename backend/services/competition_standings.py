@@ -115,6 +115,8 @@ def stage_standings(matches: list[dict], registrations: list[dict]) -> list[dict
     rank_map = {
         registration["id"]: {
             "registration_id": registration["id"],
+            # Team-Kennung wie in der öffentlichen Anmeldung (#1593): „mit deinem Team“ auch im K.-o.
+            "team_id": registration.get("team_id"),
             "display_name": _display_name(registration),
             "played": 0,
             "won": 0,
@@ -176,6 +178,7 @@ def elimination_standings(matches: list[dict], registrations: list[dict]) -> lis
     rank_map = {
         registration["id"]: {
             "registration_id": registration["id"],
+            "team_id": registration.get("team_id"),
             "display_name": _display_name(registration),
             "furthest_round": 0,
             "wins": 0,
@@ -211,7 +214,7 @@ def elimination_standings(matches: list[dict], registrations: list[dict]) -> lis
     return rows
 
 
-def round_robin_standings(matches: list[dict], registrations: list[dict]) -> list[dict]:
+def _round_robin_rows(matches: list[dict], registrations: list[dict]) -> list[dict]:
     stats = {
         registration["id"]: {
             "registration_id": registration["id"],
@@ -266,16 +269,92 @@ def round_robin_standings(matches: list[dict], registrations: list[dict]) -> lis
                 stats[registration_b]["drawn"] += 1
                 stats[registration_b]["points"] += 1
     rows = list(stats.values())
-    rows.sort(key=lambda row: (row["points"], row["won"], row["score_for"] - row["score_against"]), reverse=True)
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
+    for row in rows:
+        row["score_diff"] = row["score_for"] - row["score_against"]
+    _rank_with_ties(rows, lambda row: (row["points"], row["won"], row["score_diff"]))
     return rows
 
 
+def round_robin_standings(matches: list[dict], registrations: list[dict]) -> list[dict]:
+    """Liga, Round Robin und jede Gruppe: Punkte, Differenz, Form und Bewegung seit dem letzten Spieltag."""
+    return _with_form_and_movement(_round_robin_rows, matches, registrations)
+
+
 def swiss_standings(matches: list[dict], registrations: list[dict]) -> list[dict]:
+    return _with_form_and_movement(_swiss_rows, matches, registrations)
+
+
+def _rank_with_ties(rows: list[dict], key) -> None:
+    """Wettbewerbsrang (#1593): wer in jedem Kriterium gleich steht, teilt den Platz - 1, 2, 2, 4.
+
+    Sonst hinge der Platz an der Reihenfolge der Anmeldungen, und Podest und Pfeile wären zufällig.
+    """
+    rows.sort(key=key, reverse=True)
+    previous = None
+    for index, row in enumerate(rows, start=1):
+        value = key(row)
+        if value != previous:
+            rank = index
+            previous = value
+        row["rank"] = rank
+
+
+FORM_LENGTH = 5
+
+
+def _played_in_order(matches: list[dict]) -> list[dict]:
+    terminal = [match for match in matches if match.get("status") in TERMINAL_MATCH_STATUSES]
+    return sorted(terminal, key=lambda match: (_safe_int(match.get("round")), _safe_int(match.get("order"))))
+
+
+def _form(matches: list[dict]) -> dict[str, list[str]]:
+    """Die letzten Spiele je Anmeldung als „W“ (Sieg), „D“ (Unentschieden), „L“ (Niederlage) - das jüngste rechts.
+
+    Ein Freilos zählt wie in der Tabelle als Sieg.
+    """
+    form: dict[str, list[str]] = {}
+    for match in _played_in_order(matches):
+        slot_a, slot_b, _result_a, _result_b = _duel_entries(match)
+        registration_a = (slot_a or {}).get("registration_id")
+        registration_b = (slot_b or {}).get("registration_id")
+        if registration_a and registration_b is None:
+            form.setdefault(registration_a, []).append("W")
+            continue
+        winner_id = _sole_winner(match)
+        for registration_id in (registration_a, registration_b):
+            if not registration_id:
+                continue
+            letter = "D" if winner_id is None else "W" if winner_id == registration_id else "L"
+            form.setdefault(registration_id, []).append(letter)
+    return {registration_id: letters[-FORM_LENGTH:] for registration_id, letters in form.items()}
+
+
+def _with_form_and_movement(compute, matches: list[dict], registrations: list[dict]) -> list[dict]:
+    """Pfeile in der Tabelle (#1179): der Platz nach dem vorigen Spieltag, solange der jüngste läuft.
+
+    Verglichen wird mit der Tabelle ohne den jüngsten Spieltag, an dem schon ein Ergebnis steht. Gibt es davor keinen
+    gespielten Spieltag, bleibt ``previous_rank`` leer - dann zeigt niemand einen Pfeil.
+    """
+    rows = compute(matches, registrations)
+    played_rounds = sorted({_safe_int(match.get("round")) for match in _played_in_order(matches)})
+    previous: dict[str, int] = {}
+    if len(played_rounds) > 1:
+        latest = played_rounds[-1]
+        earlier = [match for match in matches if _safe_int(match.get("round")) < latest]
+        previous = {row["registration_id"]: row["rank"] for row in compute(earlier, registrations)}
+    form = _form(matches)
+    for row in rows:
+        row["form"] = form.get(row["registration_id"], [])
+        row["previous_rank"] = previous.get(row["registration_id"])
+    return rows
+
+
+def _swiss_rows(matches: list[dict], registrations: list[dict]) -> list[dict]:
     stats = {
         registration["id"]: {
             "registration_id": registration["id"],
+            "user_id": registration.get("user_id"),
+            "team_id": registration.get("team_id"),
             "display_name": _display_name(registration),
             "points": 0,
             "played": 0,
@@ -323,9 +402,7 @@ def swiss_standings(matches: list[dict], registrations: list[dict]) -> list[dict
         row["buchholz"] = sum(stats[opponent]["points"] for opponent in row["opponents"] if opponent in stats)
         row.pop("opponents", None)
     rows = list(stats.values())
-    rows.sort(key=lambda row: (row["points"], row["buchholz"], row["won"]), reverse=True)
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
+    _rank_with_ties(rows, lambda row: (row["points"], row["buchholz"], row["won"]))
     return rows
 
 
@@ -394,13 +471,17 @@ def placements_for_structure(
     registrations: list[dict],
     *,
     sections: set[str] | None = None,
-) -> dict[int, dict]:
+    tournament: dict | None = None,
+) -> dict[int, list[dict]]:
     """Resolve prize/season placements through the canonical read contract.
 
     Explicit legacy ``final_position`` values remain authoritative for historical
     tournaments.  If none exist, Stage/FFA results use the shared standings
     projection.  This preserves the old fallback behaviour while giving every
     downstream consumer one engine-independent entry point.
+
+    Ein Platz kann geteilt sein (#1593): Liga, Jeder gegen jeden und Schweizer System (über ``tournament``) nehmen ihre
+    Tabelle mit Gleichstand - zwei Erste stehen beide auf Platz 1, der nächste ist 3. Darum je Platz eine Liste.
     """
 
     registration_map = {
@@ -422,7 +503,7 @@ def placements_for_structure(
         for match in snapshot.get("matches") or []
         if match.get("source", {}).get("engine") == "legacy" and wanted(match)
     ]
-    placements: dict[int, dict] = {}
+    placements: dict[int, list[dict]] = {}
     placed_registration_ids: set[str] = set()
     for match in legacy_matches:
         registration_id = next(
@@ -443,11 +524,11 @@ def placements_for_structure(
             or registration_id in placed_registration_ids
         ):
             continue
-        placements[rank] = {
+        placements[rank] = [{
             "registration_id": registration_id,
             "user_id": registration.get("user_id"),
             "team_id": registration.get("team_id"),
-        }
+        }]
         placed_registration_ids.add(registration_id)
     if placements:
         return placements
@@ -457,26 +538,34 @@ def placements_for_structure(
         for match in snapshot.get("matches") or []
         if match.get("source", {}).get("engine") == "stage" and wanted(match)
     ]
-    for row in stage_standings(stage_matches, registrations):
+    format_key = (tournament or {}).get("format")
+    if not wanted_sections and format_key in {"round_robin", "league"}:
+        rows = round_robin_standings(stage_matches, registrations)
+    elif not wanted_sections and format_key == "swiss":
+        rows = swiss_standings(stage_matches, registrations)
+    else:
+        rows = stage_standings(stage_matches, registrations)
+    for row in rows:
         registration_id = row.get("registration_id")
         rank = _safe_int(row.get("rank"))
         registration = registration_map.get(registration_id)
-        if not registration_id or not rank or not row.get("played") or not registration or rank in placements:
+        if not registration_id or not rank or not row.get("played") or not registration:
             continue
-        placements[rank] = {
+        placements.setdefault(rank, []).append({
             "registration_id": registration_id,
             "user_id": registration.get("user_id"),
             "team_id": registration.get("team_id"),
-        }
+        })
     return placements
 
 
-def placement_rows_for_structure(snapshot: dict, registrations: list[dict]) -> list[dict]:
-    """Return ordered placement rows suitable for season-point awards."""
+def placement_rows_for_structure(snapshot: dict, registrations: list[dict], *, tournament: dict | None = None) -> list[dict]:
+    """Return ordered placement rows suitable for season-point awards - a shared place appears once per holder."""
 
     return [
         {**placement, "rank": rank}
-        for rank, placement in sorted(placements_for_structure(snapshot, registrations).items())
+        for rank, group in sorted(placements_for_structure(snapshot, registrations, tournament=tournament).items())
+        for placement in group
     ]
 
 
@@ -532,12 +621,15 @@ def registration_tournament_achievement_progress(
     snapshot: dict,
     registrations: list[dict],
     registration_ids: set[str],
+    *,
+    tournament: dict | None = None,
 ) -> dict:
     """Return one tournament's win/podium/fourth-place badge flags."""
 
     ranks = {
         rank
-        for rank, placement in placements_for_structure(snapshot, registrations).items()
+        for rank, group in placements_for_structure(snapshot, registrations, tournament=tournament).items()
+        for placement in group
         if placement.get("registration_id") in registration_ids
     }
     legacy_fourth = any(

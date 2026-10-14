@@ -1,22 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
+import { LiveClock } from "@/components/tls/bracket/BracketCards";
 import { api } from "@/lib/api";
 import { describeResult, freshResults, matchResultSignature } from "@/lib/liveChanges";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useChangedKeys } from "@/hooks/useLiveChanges";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel, slotName, stationText } from "@/lib/tournamentLabels";
+import { formatMatchStatus } from "@/lib/tournamentLabels";
 import { formatWhen } from "@/lib/datetime";
 import { seoTextPreview } from "@/lib/textPreview";
 import { viennaDate } from "@/lib/vienna";
-import { finderFor, sourceLabel } from "@/lib/slotSource";
+import { groupByRound, groupByStation, hasStations, onlyMine, scheduleEntries } from "@/lib/scheduleView";
+
+// Öffentlicher Spielplan (#1562) im Bild des neuen Turnierbaums (#1561): ruhige Karten, Sieger mit Cyan-Strich, laufende
+// Spiele atmen in der Live-Farbe. Zwei Sichten - nach Runden und, vor Ort, je Station als einfache Liste nach Zeit -
+// und „Nur meine Spiele“ für Angemeldete. Zeit, Station und „voraussichtlich“ kommen vom Server; hier wird nichts
+// geplant. Ein Spiel antippen öffnet seine Spielseite.
 
 // Ein Spieltag ist eine Woche. Die Kopfzeile nennt deshalb den Zeitraum, nicht
 // nur die Nummer - "Spieltag 3" allein sagt niemandem, wann gespielt wird.
@@ -37,21 +43,10 @@ const SCHEDULE_SOURCE_LABELS = {
   manual: "von der Turnierleitung",
 };
 
-// Leere Plätze späterer Runden im Klartext (#1113): „Sieger aus A“ statt „W:A:1“. Ein Platz ohne Gegner heißt
-// „Freilos“, ein Setzplatz vor der Auslosung „noch offen“ (#1220).
-function participantLabel(slot, registrations, findMatch, match) {
-  const reg = registrations[slot.registration_id] || {};
-  return reg.display_name || reg.ingame_name || reg.user?.display_name || sourceLabel(slot.source, findMatch) || slotName("", slot, match);
-}
-
-function duelLabels(match, registrations) {
-  const a = registrations[match.participant_a_id] || {};
-  const b = registrations[match.participant_b_id] || {};
-  return [
-    slotName(a.display_name || a.ingame_name, { registration_id: match.participant_a_id }, match),
-    slotName(b.display_name || b.ingame_name, { registration_id: match.participant_b_id }, match),
-  ];
-}
+const VIEWS = [
+  { key: "rounds", label: "Nach Runden" },
+  { key: "stations", label: "Nach Stationen" },
+];
 
 export default function TournamentSchedulePage() {
   const { slug } = useParams();
@@ -60,6 +55,8 @@ export default function TournamentSchedulePage() {
   const [data, setData] = useState(null);
   const [plan, setPlan] = useState(null);
   const [activeMatchday, setActiveMatchday] = useState(null);
+  const [view, setView] = useState("rounds");
+  const [mineOnly, setMineOnly] = useState(false);
 
   const load = useCallback(async () => {
     const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
@@ -96,31 +93,11 @@ export default function TournamentSchedulePage() {
     }
   }, [allMatches, data]);
 
-  const groups = useMemo(() => {
-    const tournament = data?.tournament || {};
-    const registrations = Object.fromEntries((data?.registrations || []).map((r) => [r.id, r]));
-    const finder = finderFor(data?.matches_v2 || []);
-    const multiSlotRows = (data?.matches_v2 || []).map((match) => ({
-      ...match,
-      matchday: match.matchday_number || match.round || 0,
-      matchdayLabel: formatScheduleGroupLabel(match, tournament),
-      labels: (match.slots || []).map((slot) => participantLabel(slot, registrations, finder(match), match)),
-    }));
-    const duelRows = (data?.matches || []).map((match) => ({
-      ...match,
-      matchday: match.round || 0,
-      matchdayLabel: match.round_name || (match.round ? `Runde ${match.round}` : "Ohne Runde"),
-      labels: duelLabels(match, registrations),
-    }));
-    const rows = [...multiSlotRows, ...duelRows];
-    const byDay = new Map();
-    rows.forEach((match) => {
-      const key = `${match.matchday}:${match.matchdayLabel}`;
-      if (!byDay.has(key)) byDay.set(key, { key, label: match.matchdayLabel, matches: [] });
-      byDay.get(key).matches.push(match);
-    });
-    return [...byDay.values()].sort((a, b) => Number(a.key.split(":")[0]) - Number(b.key.split(":")[0]));
-  }, [data]);
+  const entries = useMemo(() => scheduleEntries(data), [data]);
+  const hasMine = entries.some((entry) => entry.mine);
+  const filtered = useMemo(() => (mineOnly && hasMine ? onlyMine(entries) : entries), [entries, mineOnly, hasMine]);
+  const stationsAvailable = hasStations(entries);
+  const activeView = view === "stations" && stationsAvailable ? "stations" : "rounds";
 
   const weeks = useMemo(() => (plan?.applies ? (plan.matchdays || []) : []), [plan]);
   const suggestedMatchday = plan?.current ?? null;
@@ -146,11 +123,11 @@ export default function TournamentSchedulePage() {
 
   const weekIndex = weeks.findIndex((week) => week.number === activeMatchday);
   const currentWeek = weekIndex >= 0 ? weeks[weekIndex] : null;
-  const weekMatches = useMemo(() => {
+  const weekEntries = useMemo(() => {
     if (!currentWeek) return [];
     const wanted = new Set((currentWeek.matches || []).map((entry) => entry.match_id));
-    return groups.flatMap((group) => group.matches).filter((match) => wanted.has(match.id));
-  }, [currentWeek, groups]);
+    return filtered.filter((entry) => wanted.has(entry.id));
+  }, [currentWeek, filtered]);
 
   const tournament = data?.tournament || {};
   const tournamentUrl = `/tournaments/${tournament.slug || tournament.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
@@ -172,6 +149,8 @@ export default function TournamentSchedulePage() {
     );
   }
 
+  const showViews = stationsAvailable && !currentWeek;
+
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -186,12 +165,31 @@ export default function TournamentSchedulePage() {
         />
         <Link to={tournamentUrl} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
         <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase">Spielplan</h1>
-        <p className="mt-3 text-white/60 max-w-2xl">Alle Runden, Heats, Zeiten und öffentlichen Matchseiten für Terminabstimmung, Chat und Ergebnisstatus.</p>
+        <p className="mt-3 text-white/60 max-w-2xl">Alle Runden, Zeiten und Stationen. Ein Spiel antippen öffnet seine Spielseite mit Chat und Ergebnis.</p>
         <TournamentTabs tournament={tournament} accessToken={accessToken} className="mt-5" />
 
+        {(hasMine || showViews) && (
+          <div className="mt-8 flex flex-wrap items-center gap-2" data-testid="schedule-toolbar">
+            {showViews && (
+              <div role="group" aria-label="Ansicht" className="flex flex-wrap gap-1" data-testid="schedule-view">
+                {VIEWS.map((option) => (
+                  <button key={option.key} type="button" onClick={() => setView(option.key)} aria-pressed={activeView === option.key} data-testid={`schedule-view-${option.key}`} className={`tls-btn ${activeView === option.key ? "tls-btn--secondary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-wider`}>
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {hasMine && (
+              <button type="button" onClick={() => setMineOnly((value) => !value)} aria-pressed={mineOnly} data-testid="schedule-only-mine" className={`tls-btn ${mineOnly ? "tls-btn--secondary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-wider sm:ml-auto`}>
+                Nur meine Spiele
+              </button>
+            )}
+          </div>
+        )}
+
         {currentWeek ? (
-          <div className="mt-10" data-testid="matchday-pager">
-            <div className="flex items-center justify-between gap-3 border border-white/10 bg-[#121212] rounded-sm px-3 py-3">
+          <div className="mt-8" data-testid="matchday-pager">
+            <div className="flex items-center justify-between gap-3 border border-white/10 bg-[var(--tls-surface-1)] rounded-md px-3 py-3">
               <button
                 type="button"
                 onClick={() => setActiveMatchday(weeks[weekIndex - 1].number)}
@@ -226,29 +224,31 @@ export default function TournamentSchedulePage() {
             </div>
 
             <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="matchday-matches">
-              {weekMatches.map((match) => (
-                <MatchCard key={match.id} match={match} resolved={resolvedByMatch[match.id]} changed={changedMatches.has(match.id)} />
+              {weekEntries.map((entry) => (
+                <ScheduleCard key={entry.id} entry={entry} resolved={resolvedByMatch[entry.id]} changed={changedMatches.has(entry.id)} />
               ))}
-              {weekMatches.length === 0 && (
-                <div className="md:col-span-2 xl:col-span-3 border border-dashed border-white/15 rounded-sm p-8 text-center text-white/45">
-                  Für diesen Spieltag liegen keine Partien vor.
+              {weekEntries.length === 0 && (
+                <div className="md:col-span-2 xl:col-span-3 border border-dashed border-white/15 rounded-md p-8 text-center text-white/45">
+                  {mineOnly && hasMine ? "An diesem Spieltag spielst du nicht." : "Für diesen Spieltag liegen keine Partien vor."}
                 </div>
               )}
             </div>
           </div>
+        ) : activeView === "stations" ? (
+          <StationView entries={filtered} changedMatches={changedMatches} />
         ) : (
-          <div className="mt-10 space-y-8">
-            {groups.map((group) => (
-              <section key={group.key}>
-                <h2 className="font-heading text-2xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> {group.label}</h2>
+          <div className="mt-8 space-y-10">
+            {groupByRound(filtered).map((group) => (
+              <section key={group.key} aria-labelledby={`runde-${group.key}`}>
+                <h2 id={`runde-${group.key}`} className="font-heading text-xl md:text-2xl font-black uppercase">{group.label}</h2>
                 <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {group.matches.map((match) => (
-                    <MatchCard key={match.id} match={match} resolved={resolvedByMatch[match.id]} changed={changedMatches.has(match.id)} />
+                  {group.entries.map((entry) => (
+                    <ScheduleCard key={entry.id} entry={entry} resolved={resolvedByMatch[entry.id]} changed={changedMatches.has(entry.id)} />
                   ))}
                 </div>
               </section>
             ))}
-            {groups.length === 0 && <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/45">Noch kein Spielplan generiert.</div>}
+            {entries.length === 0 && <div className="border border-dashed border-white/15 rounded-md p-12 text-center text-white/45">Noch kein Spielplan generiert.</div>}
           </div>
         )}
       </section>
@@ -256,40 +256,134 @@ export default function TournamentSchedulePage() {
   );
 }
 
-function MatchCard({ match, resolved, changed = false }) {
+/** Wie es steht - nur ein laufendes Spiel trägt die Live-Farbe, mit Spielzeit seit dem Start. */
+function StatusLabel({ entry, compact = false }) {
+  const { match, tone } = entry;
+  const label = tone === "live" ? "Läuft" : formatMatchStatus(match.schedule_status || match.status);
+  return (
+    <span className="tls-sched-status" data-tone={tone} data-testid={`schedule-status-${match.id}`}>
+      {tone === "live" && <span className="tls-sched-status__dot" aria-hidden="true" />}
+      <span>{label}</span>
+      {tone === "live" && entry.startedAt && !compact && <span className="tabular-nums opacity-80"><LiveClock startedAt={entry.startedAt} /></span>}
+    </span>
+  );
+}
+
+function When({ entry, resolved }) {
+  const { match } = entry;
   // Der berechnete Termin geht vor: bei Spielwochen steht er auch dann fest,
   // wenn noch niemand etwas vereinbart hat, weil dann die Standardzeit gilt.
   // Seit #235 steht der geltende Termin samt Quelle auch in der Partie selbst.
-  const scheduledAt = resolved?.scheduled_at || match.scheduled_at;
-  const sourceLabel = SCHEDULE_SOURCE_LABELS[match.schedule_source === "manual" ? "manual" : resolved?.schedule_source || match.schedule_source];
+  const scheduledAt = resolved?.scheduled_at || entry.scheduledAt;
+  const source = SCHEDULE_SOURCE_LABELS[match.schedule_source === "manual" ? "manual" : resolved?.schedule_source || match.schedule_source];
+  return (
+    <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
+      <span className="text-[13px] text-white/70 tabular-nums" data-testid={`schedule-when-${match.id}`}>{formatWhen(scheduledAt, { fallback: "Termin offen" })}</span>
+      {entry.forecast && scheduledAt && <span className="text-[11px] text-white/45" data-testid={`schedule-forecast-${match.id}`}>voraussichtlich</span>}
+      {source && !entry.forecast && (
+        <span className="text-[10px] uppercase tracking-widest text-white/35" data-testid={`schedule-source-${match.id}`}>{source}</span>
+      )}
+    </span>
+  );
+}
+
+function ScheduleCard({ entry, resolved, changed = false }) {
+  const { match, sides, tone } = entry;
+  const decided = sides.some((side) => side.winner);
+  const head = [entry.groupLabel, entry.roundLabel, match.match_key].filter(Boolean).join(" · ");
   return (
     <Link
       to={`/matches/${match.id}`}
       data-testid={`schedule-match-${match.id}`}
       data-changed={changed ? "true" : undefined}
-      className={`tls-match-edge relative overflow-hidden border border-white/10 hover:border-[#29B6E8]/50 bg-[#121212] rounded-sm p-4 transition ${changed ? "tls-changed" : ""}`}
+      data-tone={tone}
+      data-mine={entry.mine ? "true" : undefined}
+      className={`tls-bracket-node tls-sched-card block rounded-md border border-white/10 ${tone === "live" ? "tls-bracket-live" : ""} ${entry.mine ? "is-mine" : ""} ${changed ? "tls-changed" : ""}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-widest text-white/40">{formatMatchKind(match)} {match.match_key || ""}</div>
-          <div className="mt-1 font-heading font-bold uppercase line-clamp-2">{match.labels.join(" vs. ")}</div>
-        </div>
-        <span className="flex flex-col items-end gap-1 shrink-0">
-          <span className="text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">{formatMatchStatus(match.schedule_status || match.status)}</span>
+      <div className="tls-bracket-head">
+        <span className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">{head}</span>
+        <span className="flex shrink-0 items-center gap-2">
           {changed && <span className="tls-new-chip" data-testid={`schedule-fresh-${match.id}`}>gerade eingetragen</span>}
+          <StatusLabel entry={entry} />
         </span>
       </div>
-      <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-sm text-white/55" data-testid={`schedule-when-${match.id}`}>{formatWhen(scheduledAt, { fallback: "Termin offen" })}</span>
-        {sourceLabel && (
-          <span className="text-[10px] uppercase tracking-widest text-white/35" data-testid={`schedule-source-${match.id}`}>
-            {sourceLabel}
+      <div className="py-1">
+        {sides.map((side, index) => (
+          <div
+            // Plätze ohne Anmeldung haben keine eigene Kennung - ihre Stelle im Spiel ist der Schlüssel.
+            key={side.id || `slot-${index}`}
+            className={`tls-bracket-row ${side.winner ? "is-winner" : ""}`}
+            data-out={decided && !side.winner ? "1" : undefined}
+          >
+            <span className={`tls-sched-name min-w-0 flex-1 ${side.known ? "text-white" : "text-white/45 italic"} ${side.winner ? "font-semibold" : ""}`}>{side.label}</span>
+            {side.mine && <span className="tls-standing-me">Du</span>}
+            {side.score != null && <span className={`font-display text-base font-bold tabular-nums ${side.winner ? "text-white" : "text-white/55"}`}>{side.score}</span>}
+            {index < sides.length - 1 && <span className="sr-only">{entry.heat ? ", " : " gegen "}</span>}
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-white/5 px-2.5 py-2">
+        <When entry={entry} resolved={resolved} />
+        {entry.stationLabel && (
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[var(--tls-brand)]" data-testid={`schedule-station-${match.id}`}>
+            <MapPin className="h-3 w-3" aria-hidden="true" />{entry.stationLabel}
           </span>
         )}
       </div>
-      {stationText(match) && (
-        <div className="mt-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]" data-testid={`schedule-station-${match.id}`}>{stationText(match)}</div>
-      )}
     </Link>
+  );
+}
+
+/** Je Station eine einfache Liste nach Zeit - keine Zeitleiste der Verwaltung. */
+function StationView({ entries, changedMatches }) {
+  const stations = groupByStation(entries);
+  return (
+    <div className="mt-8 grid gap-8 lg:grid-cols-2" data-testid="schedule-stations">
+      {stations.map((station) => (
+        <section key={station.key} className="min-w-0" aria-labelledby={`station-${station.key}`} data-testid={`schedule-station-group-${station.key}`}>
+          <h2 id={`station-${station.key}`} className="flex items-baseline justify-between gap-3 font-heading text-lg md:text-xl font-black uppercase">
+            <span className="flex min-w-0 items-baseline gap-2">
+              <span className="min-w-0 truncate">{station.name}</span>
+              {station.device && <span className="shrink-0 font-body text-[11px] font-semibold normal-case tracking-normal text-white/50" data-testid={`schedule-station-device-${station.name}`}>{station.device}</span>}
+            </span>
+            <span className="shrink-0 font-body text-xs font-semibold normal-case tracking-normal text-white/45">{station.entries.length} {station.entries.length === 1 ? "Spiel" : "Spiele"}</span>
+          </h2>
+          {/* Platz für die Live-Warteschlange je Station (#1556): „jetzt dran“, „danach“ und Verzug kommen hier hin -
+              aus dem Server, sobald es sie gibt. Die Liste darunter bleibt der Plan. */}
+          <ol className="mt-3 rounded-md border border-white/10 bg-[var(--tls-surface-1)] divide-y divide-white/5">
+            {station.entries.map((entry) => (
+              <li key={entry.id}>
+                <Link
+                  to={`/matches/${entry.match.id}`}
+                  data-testid={`schedule-line-${entry.match.id}`}
+                  data-tone={entry.tone}
+                  data-mine={entry.mine ? "true" : undefined}
+                  className={`tls-sched-line ${changedMatches.has(entry.id) ? "tls-changed-row" : ""}`}
+                >
+                  <span className="tls-sched-line__time tabular-nums">
+                    {entry.scheduledAt ? formatWhen(entry.scheduledAt) : "offen"}
+                    {entry.forecast && <span className="block text-[10px] font-normal text-white/40">voraussichtlich</span>}
+                  </span>
+                  <span className="min-w-0">
+                    {entry.heat ? (
+                      <>
+                        <span className="block text-sm font-semibold text-white">{entry.heat.name} · {entry.heat.count}</span>
+                        <span className="tls-sched-name block text-[12px] text-white/70">{entry.sides.map((side) => side.label).join(", ")}</span>
+                      </>
+                    ) : (
+                      <span className="tls-sched-name block text-sm text-white">
+                        {entry.sides.map((side) => side.label).join(" gegen ")}
+                      </span>
+                    )}
+                    <span className="block truncate text-[11px] text-white/45">{[entry.groupLabel, entry.roundLabel].filter(Boolean).join(" · ")}</span>
+                  </span>
+                  <StatusLabel entry={entry} compact />
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
+    </div>
   );
 }
