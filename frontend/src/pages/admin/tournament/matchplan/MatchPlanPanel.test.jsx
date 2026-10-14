@@ -246,9 +246,9 @@ describe("Spiel ändern: Zeit, Station und eigene Dauer (ersetzt die alte Matchp
       { scheduled_at: null, station_id: a.station_id, duration_minutes: 25 }));
   });
 
-  it("Spiele eines Vorschau-Baums lassen sich nicht ändern", () => {
+  it("Spiele eines Vorschau-Baums lassen sich ändern - nie begonnen, Termine gehen mit in den fixen Baum (Fabian live 14.10.)", () => {
     setup(fixture.draft);
-    expect(within(screen.getByTestId("mp-order")).queryByRole("button", { name: /ändern$/ })).toBeNull();
+    expect(within(screen.getByTestId("mp-order")).getAllByRole("button", { name: /ändern$/ }).length).toBeGreaterThan(0);
   });
 });
 
@@ -480,14 +480,14 @@ describe("online, Liga, hybrid: dieselben Regeln wie der Planer", () => {
     expect(within(online).queryByRole("button", { name: /ändern$/ })).toBeNull();
   });
 
-  it("online mit Vorschau-Baum: die Spiele stehen da, als Vorschau gekennzeichnet, ohne „ändern“", async () => {
+  it("online mit Vorschau-Baum: die Spiele stehen da, als Vorschau gekennzeichnet, mit „ändern“ (Fabian live 14.10.)", async () => {
     const state = fixture.online_draft;
     expect(state.matches.every((row) => row.is_preview)).toBe(true);
     setup(state);
     const online = await screen.findByTestId("mp-online");
     expect(online).not.toHaveTextContent("Noch keine Spiele");
     expect(within(online).getAllByText(/Vorschau/).length).toBeGreaterThan(0);
-    expect(within(online).queryByRole("button", { name: /ändern$/ })).toBeNull();
+    expect(within(online).getAllByRole("button", { name: /ändern$/ }).length).toBeGreaterThan(0);
     expect(within(online).getAllByRole("listitem")).toHaveLength(state.matches.length);
   });
 
@@ -540,6 +540,17 @@ describe("Praxis 14.10.: Stationen und Reihenfolge - eine Wahrheit für Kopf und
   });
 });
 
+// Fabian live 14.10.: Baum noch Vorschau, alte Termine auf einer gelöschten Station. Der Planer plant Vorschau-Spiele nicht
+// und meldet darum auch kein „unknown_station“ - wie am Server: keine Zuordnungen, keine Warnung dazu, nur seine Stationen.
+function previewOrphan() {
+  const state = fixture.orphan;
+  return {
+    ...state,
+    matches: state.matches.map((match) => ({ ...match, is_preview: true })),
+    plan: { ...state.plan, mode: "none", assignments: [], warnings: [] },
+  };
+}
+
 describe("Alle Termine von Hand lösen - die alte Planung auf einmal zurück an den Planer", () => {
   it("mit Rückfrage: 14 Spiele verlieren Termin und Station, danach öffnet die Vorschau von „Automatisch planen“", async () => {
     const user = userEvent.setup();
@@ -572,6 +583,26 @@ describe("Alle Termine von Hand lösen - die alte Planung auf einmal zurück an 
     expect(dialog).toHaveTextContent("13 Spiele");
     await user.click(within(dialog).getByRole("button", { name: "Termine lösen" }));
     await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`/tournaments/${state.tournament.id}/schedule/release`, { scope: "missing_stations" }));
+  });
+
+  it("auch solange der Baum Vorschau ist (bis Check-in-Ende) - Vorschau-Spiele haben nie begonnen", async () => {
+    const state = previewOrphan();
+    setup(state);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Nur Spiele an gelöschten Stationen lösen" })).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Alle Termine von Hand lösen" })).toBeInTheDocument();
+    expect(screen.getByTestId("mp-plan-note")).toHaveTextContent("gehen dabei mit in den fixen Baum");
+  });
+
+  it("Vorschau-Spiele lassen sich ändern und ziehen - sonst kämen die 13 Spiele nicht von der gelöschten Station", async () => {
+    const user = userEvent.setup();
+    const state = previewOrphan();
+    setup(state);
+    const order = await screen.findByTestId("mp-order");
+    const buttons = await within(order).findAllByRole("button", { name: /ändern$/ });
+    expect(buttons.length).toBeGreaterThan(0);
+    expect(screen.getByTestId("mp-timeline").querySelectorAll("[data-movable=\"true\"]").length).toBeGreaterThan(0);
+    await user.click(buttons[0]);
+    expect(within(screen.getByTestId("mp-editor")).getByLabelText("Station")).toBeInTheDocument();
   });
 
   it("ohne feste Termine oder ohne Planungsrecht kein Knopf", () => {

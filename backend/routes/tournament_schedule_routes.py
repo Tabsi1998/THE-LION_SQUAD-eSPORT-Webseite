@@ -118,7 +118,9 @@ async def release_schedule(tid: str, body: ScheduleRelease, me: dict = Depends(g
     tid = await _resolve_tid(tid)
     tournament = await _planning_tournament(db, tid, me)
     await _ensure_tournament_unlocked(db, tid)
-    matches = await db.matches_v2.find({"tournament_id": tid, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
+    # Auch Vorschau-Spiele (Baum bis Check-in-Ende): sie haben nie begonnen, und das Check-in-Ende trägt ihre Termine und
+    # Stationen in den fixen Baum mit (_collect_match_plan) - Fabian live 14.10.
+    matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
     # Dieselben Stationen wie der Planer (station_query): was er als unbekannt meldet, wird hier auch gelöst.
     known = {station["id"] for station in await db.stations.find(station_query(tournament), {"_id": 0, "id": 1}).to_list(500)
              if station.get("id")}

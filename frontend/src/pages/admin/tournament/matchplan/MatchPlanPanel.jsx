@@ -188,7 +188,9 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   };
   // Online und Liga: ohne Station, nur Start und Dauer - mit denselben Rechten je Spiel.
   const remoteEditor = (match, close) => editor({ id: match.id, key: match.match_key || "Spiel" }, close, { withStation: false });
-  const canEditMatch = (match) => Boolean(match) && !match.is_preview && matchRights(tournament, match).plan;
+  // Auch Vorschau-Spiele (Baum bis Check-in-Ende, Fabian live 14.10.): nie begonnen, und ihre Termine gehen mit in den
+  // fixen Baum - wer sie nicht ändern kann, bekommt sie nicht von einer gelöschten Station.
+  const canEditMatch = (match) => Boolean(match) && matchRights(tournament, match).plan;
 
   const release = async (item) => {
     const result = await moveMatch(item.id, { release: true });
@@ -214,11 +216,18 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
 
   // Feste Termine auf einmal lösen (Praxis 14.10.): die alte Planung hatte jedes Spiel von Hand gesetzt, oft auf einer
   // Station, die es nicht mehr gibt. Gezählt wird wie am Server: von Hand gesetzt bzw. an der fehlenden Station, nicht
-  // begonnen.
-  const unstarted = (match) => !match.is_preview && !match.started_at
+  // begonnen - auch Vorschau-Spiele (Baum bis Check-in-Ende): sie haben nie begonnen, und ihre Termine gehen beim
+  // Check-in-Ende in den fixen Baum mit.
+  const unstarted = (match) => !match.started_at
     && !["completed", "forfeit", "cancelled", "archived", "bye", "no_show", "disputed", "in_progress", "running", "waiting_result"].includes(match.status);
   const manualCount = matches.filter((match) => unstarted(match) && match.schedule_source === "manual").length;
   const missingIds = new Set((background?.warnings || []).filter((row) => row.type === "unknown_station").flatMap((row) => row.match_ids || []));
+  // Vorschau-Spiele plant der Planer nicht, darum meldet er sie auch nicht als „unbekannte Station“ (Fabian live 14.10.).
+  // Gleiche Wahrheit wie am Server: die Stationen aus seiner Antwort (station_query) - was daneben liegt, fehlt.
+  if (Array.isArray(background?.stations)) {
+    const known = new Set(background.stations.map((station) => station.id));
+    for (const match of matches) if (match.station_id && !known.has(match.station_id)) missingIds.add(match.id);
+  }
   const missingCount = matches.filter((match) => missingIds.has(match.id) && unstarted(match)).length;
 
   const releaseAll = async (scope, count) => {
@@ -270,6 +279,9 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
     note = "Planen und Verschieben darf, wer in diesem Turnier Stationen zuweisen darf (Turnierleitung, Schiedsrichter, Stationsleitung). Du siehst den Plan.";
   } else if (mode === "local" && allPreview) {
     note = "Der Turnierbaum ist noch eine Vorschau (bis zum Ende des Check-ins). Zeiten und Stationen plant der Planer, sobald er fix ist - die Spiele stehen unten schon da.";
+    // Das Check-in-Ende baut den Baum neu, übernimmt aber Zeit und Station je Spiel (_collect_match_plan) - alte
+    // Termine verschwinden also nicht von selbst.
+    if (manualCount > 0) note += " Feste Termine von Hand gehen dabei mit in den fixen Baum - alte Termine vorher lösen.";
   } else if (mode === "local" && background?.mode === "none" && background?.reason) {
     note = background.reason;
   }
