@@ -152,18 +152,70 @@ describe("startPasskeyAutofill", () => {
     expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
-  test("eine spätere Ablehnung (Zeitablauf) holt still eine neue Anfrage", async () => {
+  const optionRequests = () => api.post.mock.calls.filter(([url]) => url === "/auth/passkeys/login/options").length;
+
+  test("ein Abbruch durch die Person - auch nach Minuten - beendet den Vorschlag ohne neue Optionen", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     const calls = pendingGets();
     const onError = vi.fn();
-    const stop = autofill({ onSignedIn: vi.fn(), onError });
+    const onEnd = vi.fn();
+    autofill({ onSignedIn: vi.fn(), onError, onEnd });
     await flush();
     vi.setSystemTime(Date.now() + 90_000);
     calls[0].reject(named("NotAllowedError"));
     await flush();
     expect(onError).not.toHaveBeenCalled();
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(1);
+    expect(optionRequests()).toBe(1);
+  });
+
+  test("ein fremder Abbruch beendet ebenfalls; nur der eigene Ablauf-Timer erneuert", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const calls = pendingGets();
+    const onEnd = vi.fn();
+    const stop = autofill({ onSignedIn: vi.fn(), onEnd });
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    // Der eigene Timer läuft ab: still erneuern, einmal je Ablauf.
+    vi.advanceTimersByTime(4 * 60 * 1000);
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    expect(optionRequests()).toBe(2);
+    expect(onEnd).not.toHaveBeenCalled();
+    // Ein Abbruch, den nicht der Timer auslöst, beendet endgültig.
+    calls[1].reject(named("AbortError"));
+    await vi.waitFor(() => expect(onEnd).toHaveBeenCalledTimes(1));
     expect(calls).toHaveLength(2);
+    expect(optionRequests()).toBe(2);
     stop();
+  });
+
+  test("Beenden wartet, bis der Browser die abgebrochene Anfrage abgeschlossen hat - höchstens eine Sekunde", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    // Wie ein echter Browser: die Ablehnung nach dem Abbruch kommt verzögert.
+    const lateReject = (delay) => vi.fn((request) => new Promise((_resolve, reject) => {
+      request.signal.addEventListener("abort", () => setTimeout(() => reject(named("AbortError")), delay));
+    }));
+    navigator.credentials = { get: lateReject(300) };
+    let stop = autofill({ onSignedIn: vi.fn() });
+    await vi.waitFor(() => expect(navigator.credentials.get).toHaveBeenCalledTimes(1));
+    let done = false;
+    stop().then(() => { done = true; });
+    await vi.advanceTimersByTimeAsync(299);
+    expect(done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(done).toBe(true);
+    expect(navigator.credentials.get).toHaveBeenCalledTimes(1);
+
+    // Hängt der Browser, gibt das Beenden nach einer Sekunde trotzdem frei.
+    navigator.credentials = { get: lateReject(60_000) };
+    stop = autofill({ onSignedIn: vi.fn() });
+    await vi.waitFor(() => expect(navigator.credentials.get).toHaveBeenCalledTimes(1));
+    done = false;
+    stop().then(() => { done = true; });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(done).toBe(true);
   });
 
   test("lehnt der Server ab, steht der Grund da und der Vorschlag endet - keine Schleife aus Optionen und Prüfung", async () => {

@@ -147,6 +147,23 @@ test("der Knopf beendet erst den Vorschlag, öffnet dann den Dialog; ein Abbruch
   await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(2));
 });
 
+test("der Knopf öffnet den Dialog erst, wenn der Browser die stille Anfrage abgeschlossen hat", async () => {
+  let settled;
+  const stop = vi.fn(() => new Promise((resolve) => { settled = resolve; }));
+  passkeys.passkeyAutofillAvailable.mockResolvedValue(true);
+  passkeys.startPasskeyAutofill.mockReturnValue(stop);
+  passkeys.signInWithPasskey.mockResolvedValue({ id: "u1" });
+  const user = userEvent.setup();
+  renderPage();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1));
+  await user.click(await screen.findByTestId("login-passkey"));
+  expect(stop).toHaveBeenCalledTimes(1);
+  expect(passkeys.signInWithPasskey).not.toHaveBeenCalled();
+  await act(async () => settled());
+  await waitFor(() => expect(passkeys.signInWithPasskey).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.getByText("mitgliederbereich")).toBeInTheDocument());
+});
+
 test("prüft der Server gerade einen Passkey aus dem Vorschlag, startet der Knopf keine zweite Anmeldung", async () => {
   autofillStarted();
   const user = userEvent.setup();

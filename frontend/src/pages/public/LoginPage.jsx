@@ -68,9 +68,11 @@ export default function LoginPage() {
     }
   };
 
+  // Beendet den Vorschlag; das Promise ist erfüllt, wenn der Browser die Anfrage abgeschlossen hat.
   const stopAutofill = () => {
-    stopAutofillRef.current?.();
+    const stop = stopAutofillRef.current;
     stopAutofillRef.current = null;
+    return stop ? Promise.resolve(stop()) : Promise.resolve();
   };
 
   // Gespeicherte Passkeys schlägt der Browser im E-Mail-Feld von selbst vor (#348, #1520). Die Anfrage startet
@@ -118,9 +120,11 @@ export default function LoginPage() {
 
   const passkeyLogin = async () => {
     setErr(null);
-    // Es darf nur eine Passkey-Anfrage geben: erst die stille beenden.
-    stopAutofill();
-    const attempt = await submitOnce(() => signInWithPasskey({ remember }));
+    // Es darf nur eine Passkey-Anfrage geben: erst die stille beenden und warten, bis der Browser sie abgeschlossen hat.
+    const attempt = await submitOnce(async () => {
+      await stopAutofill();
+      return signInWithPasskey({ remember });
+    });
     if (!attempt.started) return;
     if (attempt.error) {
       setErr(passkeyError(attempt.error));
