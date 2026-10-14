@@ -358,3 +358,54 @@ test("Team-Seite: ein gescheitertes Nachladen lässt das Team stehen und sagt es
   expect(screen.getByTestId("load-stale")).toBeInTheDocument();
   expect(screen.queryByTestId("public-error-state")).toBeNull();
 });
+
+// Nach Codex-Prüfung: Level und Übersicht sind Zusatzdaten - sie halten weder die Liste noch die Team-Seite auf, und
+// ein Ausfall zeigt sich nur an ihrem Bereich.
+function pending() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+test("Team-Liste: die Teams stehen sofort, die Level kommen nach; ein Level-Fehler bleibt im Level-Bereich", async () => {
+  authState.user = null;
+  const levels = pending();
+  apiMock.get.mockImplementation((url) => (url === "/teams/levels" ? levels.promise : Promise.resolve({ data: [TEAM] })));
+  renderList();
+  expect(await screen.findByTestId("team-card-LRK")).toBeInTheDocument();
+  expect(screen.queryByTestId("team-level-chip-LRK")).toBeNull();
+  await act(async () => levels.reject(serverError()));
+  expect(screen.getByTestId("team-card-LRK")).toBeInTheDocument();
+  expect(screen.getByTestId("teams-levels-error")).toBeInTheDocument();
+  expect(screen.queryByTestId("public-error-state")).toBeNull();
+});
+
+test("Team-Liste: Level kommen nach und erscheinen an der Karte", async () => {
+  authState.user = null;
+  const levels = pending();
+  apiMock.get.mockImplementation((url) => (url === "/teams/levels" ? levels.promise : Promise.resolve({ data: [TEAM] })));
+  renderList();
+  await screen.findByTestId("team-card-LRK");
+  await act(async () => levels.resolve({ data: { levels: { "t-1": { level: 3, points: 120 } }, crowns: {} } }));
+  expect(await screen.findByTestId("team-level-chip-LRK")).toHaveTextContent("LVL 3");
+});
+
+test("Team-Seite: das Team steht sofort, Level und Übersicht laden unabhängig; Ausfälle nur an ihrem Bereich", async () => {
+  const level = pending();
+  const overview = pending();
+  apiMock.get.mockImplementation((url) => {
+    if (url === "/teams/t-1") return Promise.resolve({ data: TEAM });
+    if (url === "/teams/t-1/level") return level.promise;
+    if (url === "/teams/t-1/overview") return overview.promise;
+    return Promise.resolve({ data: [] });
+  });
+  renderAt("/teams/t-1");
+  expect(await screen.findByText("Lions Rocket")).toBeInTheDocument();
+  await act(async () => overview.reject(serverError()));
+  expect(screen.getByTestId("team-overview-error")).toBeInTheDocument();
+  await act(async () => level.resolve({ data: { level: 4, points: 200, achievements: [] } }));
+  expect(await screen.findByTestId("team-level-panel")).toBeInTheDocument();
+  expect(screen.queryByTestId("team-level-error")).toBeNull();
+  expect(screen.queryByTestId("public-error-state")).toBeNull();
+});

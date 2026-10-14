@@ -128,3 +128,33 @@ test("markRead nennt, was gescheitert ist - für Stellen ohne eigene Liste (Toas
   await act(async () => { failed = await result.current.markRead({ ids: ["n-1"] }); });
   expect(failed).toEqual([]);
 });
+
+// Nach Codex-Prüfung: ein Nachladen während „gelesen“ unterwegs ist, überschreibt die Markierung nicht; nach dem
+// erfolgreichen POST bleibt sie gesetzt.
+test("Rennen: Nachladen während Gelesen-Markieren - die Markierung bleibt, auch nach dem POST", async () => {
+  const { result } = await loaded();
+  const post = deferred();
+  apiMock.post.mockReturnValueOnce(post.promise);
+  let marking;
+  act(() => { marking = result.current.markRead({ ids: ["n-1"] }); });
+  expect(readOf(result, "n-1")).toBe(true);
+  // Der Server liefert noch den alten Stand (n-1 ungelesen).
+  await act(async () => { await live.reload(); });
+  expect(readOf(result, "n-1")).toBe(true);
+  expect(result.current.unread).toBe(1);
+  await act(async () => { post.resolve({ data: {} }); await marking; });
+  expect(readOf(result, "n-1")).toBe(true);
+  expect(result.current.unread).toBe(1);
+});
+
+test("Rennen: Nachladen während „alle gelesen“ - alles bleibt gelesen, auch nach dem POST", async () => {
+  const { result } = await loaded();
+  const post = deferred();
+  apiMock.post.mockReturnValueOnce(post.promise);
+  let marking;
+  act(() => { marking = result.current.markAllRead(); });
+  await act(async () => { await live.reload(); });
+  expect(result.current.unread).toBe(0);
+  await act(async () => { post.resolve({ data: {} }); await marking; });
+  expect(result.current.unread).toBe(0);
+});
