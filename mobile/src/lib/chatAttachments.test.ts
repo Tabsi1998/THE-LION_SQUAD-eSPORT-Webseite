@@ -11,6 +11,8 @@ import {
   uploadPartForAsset,
   type ChatAttachmentDraft,
 } from "./chatAttachments";
+import { API_BASE_URL } from "../config";
+import { FOREIGN_ARTICLE_LINKS } from "./linkOrigins.fixture";
 
 // Chat-Anhänge in der App. Zwei Zusagen stehen im Mittelpunkt: Nur Bilder und
 // Videos gehen überhaupt auf die Reise, und jede Quelle trägt die Anmeldung -
@@ -79,6 +81,12 @@ describe("Quellen mit Anmeldung", () => {
     const source = authorizedSource("/api/chat-attachments/att-1", "token-1", 800);
     expect(source?.uri).toMatch(/\/api\/chat-attachments\/att-1\?w=800$/);
     expect(source).toMatchObject({ headers: { Authorization: "Bearer token-1" } });
+  });
+
+  // Herkunft (#1060): der Token geht nur an den eigenen Server - jede andere Adresse bekommt keine Kopfzeile.
+  test("Anmeldung nur für Adressen des eigenen Servers", () => {
+    expect(authorizedSource(`${API_BASE_URL}/api/chat-attachments/att-1`, "token-1")).toMatchObject({ headers: { Authorization: "Bearer token-1" } });
+    for (const link of FOREIGN_ARTICLE_LINKS) expect([link, authorizedSource(link, "token-1")]).not.toHaveProperty("1.headers");
   });
 
   test("ohne Adresse keine Quelle, ohne Token keine Kopfzeile", () => {

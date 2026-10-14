@@ -1,4 +1,5 @@
-import { WEB_BASE_URL, isOwnUrl, ownPath } from "./siteUrls";
+import { API_BASE_URL } from "../config";
+import { WEB_BASE_URL, authorizedUrl, isOwnUrl, ownPath } from "./siteUrls";
 import { ARTICLE, FOREIGN_ARTICLE_LINKS, OWN_ARTICLE_LINKS } from "./linkOrigins.fixture";
 
 // Eigene Adressen (#921): der Server der App, die öffentliche Domain mit und ohne www - sonst nichts. Der Pfad
@@ -32,4 +33,21 @@ test("ownPath: Pfad mit Abfrage von der eigenen Website, sonst null", () => {
 test("ownPath mit der gemeinsamen Herkunfts-Matrix (#998): eigene Adressen und relative Pfade ja, alles andere nein", () => {
   for (const link of OWN_ARTICLE_LINKS) expect([link, ownPath(link)]).toEqual([link, `/news/${ARTICLE}`]);
   for (const link of FOREIGN_ARTICLE_LINKS) expect([link, ownPath(link)]).toEqual([link, null]);
+});
+
+// Abrufe mit Anmeldung (#1054, #1060): Token und Gerätekennung gehen nur an den eigenen Server. Eigene Adressen und
+// relative Pfade landen dort, jede andere Herkunft gibt keine Adresse.
+test("authorizedUrl mit der gemeinsamen Herkunfts-Matrix: eigene Adressen auf den eigenen Server, sonst null", () => {
+  for (const link of OWN_ARTICLE_LINKS) expect([link, authorizedUrl(link)]).toEqual([link, `${API_BASE_URL}/news/${ARTICLE}`]);
+  for (const link of FOREIGN_ARTICLE_LINKS) expect([link, authorizedUrl(link)]).toEqual([link, null]);
+});
+
+test("authorizedUrl: Pfade der API mit Abfrage, ohne Adresse nichts", () => {
+  expect(authorizedUrl("/api/documents/d1/view")).toBe(`${API_BASE_URL}/api/documents/d1/view`);
+  expect(authorizedUrl("api/documents/d1/view")).toBe(`${API_BASE_URL}/api/documents/d1/view`);
+  expect(authorizedUrl(`${API_BASE_URL}/api/chat-attachments/a1?w=800`)).toBe(`${API_BASE_URL}/api/chat-attachments/a1?w=800`);
+  expect(authorizedUrl("https://cdn.example/x.pdf")).toBeNull();
+  expect(authorizedUrl("data:image/png;base64,AAAA")).toBeNull();
+  expect(authorizedUrl("")).toBeNull();
+  expect(authorizedUrl(null)).toBeNull();
 });
