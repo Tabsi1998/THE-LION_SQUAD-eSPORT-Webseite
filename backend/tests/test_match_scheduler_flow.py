@@ -10,6 +10,7 @@ from datetime import timedelta
 
 import pytest
 import pytest_asyncio
+from fastapi import HTTPException
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
@@ -366,3 +367,97 @@ async def test_station_moves_wait_for_a_running_tournament_action(flow):
         blocked = await flow.post(f"/api/stations/{station['id']}/assign/{match['id']}")
     assert blocked.status_code == 409, blocked.text
     assert not (await flow.reload(match)).get("station_id")
+
+
+# ---------------------------------------------------------------- Letzte Codex-Runde zu #1569: Stationen
+
+@pytest.mark.asyncio
+async def test_a_station_taken_in_the_meantime_is_not_given_away_twice(flow):
+    """Zwei Zuweisungen sahen die Station beide „frei“: die zweite schreibt nicht gegen den alten Stand."""
+    from routes.station_routes import _assign_match_to_station
+
+    _staff, tournament, _users, _registrations = await built(flow, **begun_fields())
+    station, = await stations(flow, tournament, "1")
+    first, second = sorted(await flow.matches(tournament), key=lambda row: (row["round"], row["match_key"]))[:2]
+    stale = dict(station)  # so sah die Station aus, bevor die andere Zuweisung durch war
+    await flow.db.stations.update_one({"id": station["id"]}, {"$set": {"current_match_id": first["id"], "current_match_type": "matches_v2", "status": "reserved"}})
+
+    with pytest.raises(HTTPException) as refused:
+        await _assign_match_to_station(flow.db, stale, second, "matches_v2")
+    assert refused.value.status_code == 409
+    stored = await flow.db.stations.find_one({"id": station["id"]}, {"_id": 0})
+    assert stored["current_match_id"] == first["id"] and stored["status"] == "reserved"
+    assert not (await flow.reload(second)).get("station_id")
+
+
+@pytest.mark.asyncio
+async def test_releasing_a_station_that_meanwhile_holds_another_match_does_nothing(flow):
+    from routes.station_routes import release_station
+
+    _staff, tournament, _users, _registrations = await built(flow, **begun_fields())
+    station, = await stations(flow, tournament, "1")
+    first, second = sorted(await flow.matches(tournament), key=lambda row: (row["round"], row["match_key"]))[:2]
+    await flow.db.stations.update_one({"id": station["id"]}, {"$set": {"current_match_id": second["id"], "current_match_type": "matches_v2", "status": "busy"}})
+
+    assert await release_station(flow.db, station["id"], expected_match_id=first["id"]) is False
+    stored = await flow.db.stations.find_one({"id": station["id"]}, {"_id": 0})
+    assert stored["current_match_id"] == second["id"] and stored["status"] == "busy"
+
+    assert await release_station(flow.db, station["id"], expected_match_id=second["id"]) is True
+    stored = await flow.db.stations.find_one({"id": station["id"]}, {"_id": 0})
+    assert stored["current_match_id"] is None and stored["status"] == "free"
+
+
+@pytest.mark.asyncio
+async def test_all_foreign_matches_of_a_big_event_are_loaded_not_just_the_first_thousands(flow):
+    from services.match_scheduler import load_plan_inputs
+
+    _staff, tournament, _users, _registrations = await built(flow, **begun_fields(event_id="ev-big"))
+    start = (await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0}))["start_date"]
+    await flow.db.tournaments.insert_one({"id": "t-big", "slug": "big", "title": "Groß", "format": "single_elim", "status": "live",
+                                          "event_mode": "local", "event_id": "ev-big", "start_date": start, "created_at": now_utc().isoformat()})
+    count = 5_100
+    await flow.db.matches_v2.insert_many([
+        {"id": f"m-big-{index}", "tournament_id": "t-big", "round": 1, "status": "scheduled", "match_type": "duel", "scheduled_at": start,
+         "slots": [{"slot": 1, "registration_id": None, "user_id": f"u-{index}"}, {"slot": 2, "registration_id": None}]}
+        for index in range(count)
+    ])
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    inputs = await load_plan_inputs(flow.db, stored)
+    assert len(inputs["busy_elsewhere"]) == count
+
+
+# ---------------------------------------------------------------- Neu planen nach einem Umbau der Phase (#1575)
+
+@pytest.mark.asyncio
+async def test_after_a_rebuild_the_on_site_phase_is_replanned_and_fixed_times_stay(flow):
+    from services.match_scheduler import replan_after_heat_rebuild
+
+    _staff, tournament, _users, _registrations = await built(flow, **begun_fields())
+    station, _other = await stations(flow, tournament, "1", "2")
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    stage = await flow.db.tournament_stages.find_one({"tournament_id": tournament["id"]}, {"_id": 0})
+    matches = sorted(await flow.matches(tournament), key=lambda row: (row["round"], row["match_key"]))
+    fixed = (now_utc() + timedelta(hours=3)).replace(microsecond=0).isoformat()
+    await flow.db.matches_v2.update_one({"id": matches[1]["id"]}, {"$set": {"scheduled_at": fixed, "station_id": station["id"], "schedule_source": "manual"}})
+
+    result = await replan_after_heat_rebuild(flow.db, stored, stage)
+    assert result["applies"] is True and result["written"] == 2
+    for match in await flow.matches(tournament):
+        if match["id"] == matches[1]["id"]:
+            assert match["schedule_source"] == "manual" and match["scheduled_at"] == fixed
+        else:
+            assert match["schedule_source"] == "planner" and match["scheduled_at"] and match["station_id"]
+
+
+@pytest.mark.asyncio
+async def test_an_online_phase_is_not_replanned_after_a_rebuild(flow):
+    from services.match_scheduler import replan_after_heat_rebuild
+
+    _staff, tournament, _users, _registrations = await built(flow, event_mode="online", schedule_mode="player_proposal",
+                                                             start_date=now_utc().isoformat())
+    await stations(flow, tournament, "1")
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    stage = await flow.db.tournament_stages.find_one({"tournament_id": tournament["id"]}, {"_id": 0})
+    assert await replan_after_heat_rebuild(flow.db, stored, stage) == {"applies": False, "written": 0, "warnings": []}
+    assert all(not match.get("station_id") and not match.get("scheduled_at") for match in await flow.matches(tournament))

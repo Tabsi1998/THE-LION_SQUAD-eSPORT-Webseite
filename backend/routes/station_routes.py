@@ -163,6 +163,17 @@ async def update_station(sid: str, body: StationUpdate, me: dict = Depends(requi
     return s
 
 
+async def release_station(db, station_id: str, expected_match_id: str | None) -> bool:
+    """Die Station freigeben - nur, wenn sie noch das Spiel hält, das der Aufrufer gesehen hat (Compare-and-Set).
+    Hält sie inzwischen ein anderes, bleibt das stehen; die Antwort sagt, ob freigegeben wurde."""
+    result = await db.stations.update_one(
+        {"id": station_id, "current_match_id": expected_match_id},
+        {"$set": {"current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()},
+         "$unset": {"called_at": ""}},
+    )
+    return bool(result.matched_count)
+
+
 async def _forget_call(db, match_id: str | None) -> None:
     """Der Aufruf eines Spiels ist vorbei (gestartet, freigegeben, umgeplant): „aufgerufen um“ fällt weg."""
     if match_id:
@@ -179,16 +190,6 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
         raise HTTPException(status_code=409, detail="Station ist bereits belegt. Bitte zuerst freigeben.")
     if start_now and not _match_has_minimum_participants(match):
         raise HTTPException(status_code=409, detail="Match hat zu wenige Teilnehmer und kann nicht gestartet werden.")
-    await db.stations.update_many(
-        {"current_match_id": match["id"], "id": {"$ne": station["id"]}, "status": {"$ne": "broken"}},
-        {"$set": {"current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()},
-         "$unset": {"called_at": ""}},
-    )
-    # Umlegen von einer defekten Station (#1160): sie gibt das Spiel ab, bleibt aber defekt.
-    await db.stations.update_many(
-        {"current_match_id": match["id"], "id": {"$ne": station["id"]}, "status": "broken"},
-        {"$set": {"current_match_id": None, "current_match_type": None, "updated_at": now_utc().isoformat()}, "$unset": {"called_at": ""}},
-    )
     now_iso = now_utc().isoformat()
     match_updates = {
         "station_id": station["id"],
@@ -216,7 +217,25 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
         called_at = station.get("called_at") if same_call and station.get("called_at") else now_iso
         match_updates["called_at"] = called_at
         station_updates["called_at"] = called_at
-    await db.stations.update_one({"id": station["id"]}, station_change)
+    # Die Station nur belegen, wenn sie jetzt noch frei (oder schon für dieses Spiel reserviert) ist - nicht gegen
+    # den Stand, den der Aufrufer gelesen hat (Compare-and-Set; zwei Zuweisungen zugleich sahen beide „frei“).
+    claimed = await db.stations.update_one(
+        {"id": station["id"], "status": {"$ne": "broken"},
+         "$or": [{"current_match_id": None}, {"current_match_id": {"$exists": False}}, {"current_match_id": match["id"]}]},
+        station_change,
+    )
+    if not claimed.matched_count:
+        raise HTTPException(status_code=409, detail="Station ist inzwischen belegt. Bitte zuerst freigeben.")
+    await db.stations.update_many(
+        {"current_match_id": match["id"], "id": {"$ne": station["id"]}, "status": {"$ne": "broken"}},
+        {"$set": {"current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()},
+         "$unset": {"called_at": ""}},
+    )
+    # Umlegen von einer defekten Station (#1160): sie gibt das Spiel ab, bleibt aber defekt.
+    await db.stations.update_many(
+        {"current_match_id": match["id"], "id": {"$ne": station["id"]}, "status": "broken"},
+        {"$set": {"current_match_id": None, "current_match_type": None, "updated_at": now_utc().isoformat()}, "$unset": {"called_at": ""}},
+    )
     await db[collection_name].update_one({"id": match["id"]}, match_change)
     if start_now:
         before = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "status": 1}) or {}
@@ -360,6 +379,8 @@ async def assign_match(sid: str, match_id: str, start_now: bool = False,
     await _ensure_tournament_unlocked(db, match["tournament_id"])
     await _require_station_permission(me, match["tournament_id"], sid)
     async with _tournament_lock(db, match["tournament_id"]):
+        # Station und Spiel unter dem Lock frisch lesen - der Stand von oben kann schon überholt sein.
+        station = await db.stations.find_one({"id": sid}, {"_id": 0}) or station
         current = await db.matches_v2.find_one({"id": match_id}, {"_id": 0}) or match
         await _assign_match_to_station(db, station, current, collection_name, start_now=start_now)
     return {"ok": True}
@@ -379,15 +400,19 @@ async def clear_station(sid: str, me: dict = Depends(get_current_user)):
         elif not is_global_tournament_admin(me):
             raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
         if collection_name and match:
-            # Freigeben beendet auch einen Aufruf (#1122) - unter dem Turnier-Lock wie der Planer.
+            # Freigeben beendet auch einen Aufruf (#1122) - Spiel und Station zusammen unter dem Turnier-Lock, und die
+            # Station nur, wenn sie noch dieses Spiel hält (ein inzwischen zugewiesenes bleibt).
             async with _tournament_lock(db, match["tournament_id"]):
+                held = await db.stations.find_one({"id": sid}, {"_id": 0, "current_match_id": 1}) or {}
+                if held.get("current_match_id") != s["current_match_id"]:
+                    raise HTTPException(status_code=409, detail="Die Station hält inzwischen ein anderes Spiel. Bitte neu laden.")
                 await db[collection_name].update_one({"id": s["current_match_id"]}, {
                     "$set": {"station_id": None, "updated_at": now_utc().isoformat()}, "$unset": {"called_at": ""}})
+                await release_station(db, sid, expected_match_id=s["current_match_id"])
+            return {"ok": True}
     elif not is_global_tournament_admin(me):
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
-    await db.stations.update_one({"id": sid}, {"$set": {
-        "current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()},
-        "$unset": {"called_at": ""}})
+    await release_station(db, sid, expected_match_id=s.get("current_match_id"))
     return {"ok": True}
 
 
