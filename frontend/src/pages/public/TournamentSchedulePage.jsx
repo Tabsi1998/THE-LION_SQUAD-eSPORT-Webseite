@@ -180,7 +180,7 @@ export default function TournamentSchedulePage() {
               </div>
             )}
             {hasMine && (
-              <button type="button" onClick={() => setMineOnly((value) => !value)} aria-pressed={mineOnly} data-testid="schedule-only-mine" className={`tls-btn ${mineOnly ? "tls-btn--honor" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-wider sm:ml-auto`}>
+              <button type="button" onClick={() => setMineOnly((value) => !value)} aria-pressed={mineOnly} data-testid="schedule-only-mine" className={`tls-btn ${mineOnly ? "tls-btn--secondary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-wider sm:ml-auto`}>
                 Nur meine Spiele
               </button>
             )}
@@ -318,7 +318,7 @@ function ScheduleCard({ entry, resolved, changed = false }) {
             <span className={`tls-sched-name min-w-0 flex-1 ${side.known ? "text-white" : "text-white/45 italic"} ${side.winner ? "font-semibold" : ""}`}>{side.label}</span>
             {side.mine && <span className="tls-standing-me">Du</span>}
             {side.score != null && <span className={`font-display text-base font-bold tabular-nums ${side.winner ? "text-white" : "text-white/55"}`}>{side.score}</span>}
-            {index < sides.length - 1 && <span className="sr-only"> gegen </span>}
+            {index < sides.length - 1 && <span className="sr-only">{entry.heat ? ", " : " gegen "}</span>}
           </div>
         ))}
       </div>
@@ -342,7 +342,10 @@ function StationView({ entries, changedMatches }) {
       {stations.map((station) => (
         <section key={station.key} className="min-w-0" aria-labelledby={`station-${station.key}`} data-testid={`schedule-station-group-${station.key}`}>
           <h2 id={`station-${station.key}`} className="flex items-baseline justify-between gap-3 font-heading text-lg md:text-xl font-black uppercase">
-            <span className="min-w-0 truncate">{station.label}</span>
+            <span className="flex min-w-0 items-baseline gap-2">
+              <span className="min-w-0 truncate">{station.name}</span>
+              {station.device && <span className="shrink-0 font-body text-[11px] font-semibold normal-case tracking-normal text-white/50" data-testid={`schedule-station-device-${station.name}`}>{station.device}</span>}
+            </span>
             <span className="shrink-0 font-body text-xs font-semibold normal-case tracking-normal text-white/45">{station.entries.length} {station.entries.length === 1 ? "Spiel" : "Spiele"}</span>
           </h2>
           {/* Platz für die Live-Warteschlange je Station (#1556): „jetzt dran“, „danach“ und Verzug kommen hier hin -
@@ -362,9 +365,16 @@ function StationView({ entries, changedMatches }) {
                     {entry.forecast && <span className="block text-[10px] font-normal text-white/40">voraussichtlich</span>}
                   </span>
                   <span className="min-w-0">
-                    <span className="tls-sched-name block text-sm text-white">
-                      {entry.sides.map((side) => side.label).join(" gegen ")}
-                    </span>
+                    {entry.heat ? (
+                      <>
+                        <span className="block text-sm font-semibold text-white">{entry.heat.name} · {entry.heat.count}</span>
+                        <span className="tls-sched-name block text-[12px] text-white/70">{entry.sides.map((side) => side.label).join(", ")}</span>
+                      </>
+                    ) : (
+                      <span className="tls-sched-name block text-sm text-white">
+                        {entry.sides.map((side) => side.label).join(" gegen ")}
+                      </span>
+                    )}
                     <span className="block truncate text-[11px] text-white/45">{[entry.groupLabel, entry.roundLabel].filter(Boolean).join(" · ")}</span>
                   </span>
                   <StatusLabel entry={entry} compact />

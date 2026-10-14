@@ -237,7 +237,10 @@ function TournamentDetailView() {
     primaryAction = <button type="button" disabled data-testid="tournament-closed-btn" className={`${primaryClass} border border-white/10 text-white/35 cursor-not-allowed`}>{registration.label}</button>;
   }
   const STATUS_ORDER = { checked_in: 0, approved: 1, pending: 2, waitlist: 3, rejected: 4, no_show: 5 };
-  const sortedRegs = [...regs].sort((a, b) => ((STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)) || ((a.seed ?? 999) - (b.seed ?? 999)));
+  // Nach dem Ende stehen die Teilnehmer nach ihrem Endplatz (geteilte Plätze gleich), sonst nach Status und Setzplatz -
+  // nie nach der Reihenfolge der Anmeldung, die man mit dem Podest verwechseln könnte (Abnahme #1593).
+  const finalRank = new Map(standings.filter((row) => row && !Array.isArray(row.standings) && row.registration_id && Number(row.rank) > 0).map((row) => [row.registration_id, Number(row.rank)]));
+  const sortedRegs = [...regs].sort((a, b) => ((finalRank.get(a.id) ?? 9999) - (finalRank.get(b.id) ?? 9999)) || ((STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)) || ((a.seed ?? 999) - (b.seed ?? 999)));
   const calendarItem = {
     id: t.id, slug: t.slug, kind: "tournament", title: t.title, start: t.start_date, end: t.end_date,
     location: t.location || null, detail: [t.game ? gameLabel(t.game) : null, formatTournamentDisplay(t)].filter(Boolean).join(" · "),
@@ -390,12 +393,16 @@ function TournamentDetailView() {
           <section id="teilnehmer" data-testid="tournament-participants">
             <h2 className="font-heading text-2xl font-bold uppercase mb-3">Teilnehmer ({regs.length})</h2>
             <div className="border border-white/10 rounded-sm divide-y divide-white/5 bg-[#121212]">
-              {sortedRegs.map((r, i) => {
+              {sortedRegs.map((r) => {
                 const mine = !!user && (r.user_id === user.id || r.is_mine);
                 return (
                   <div key={r.id} className={`flex items-center justify-between gap-3 px-4 py-3 ${mine ? "bg-[#FFD700]/5" : ""}`} data-testid={`tournament-participant-${r.id}`}>
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="font-display font-bold text-[#29B6E8] w-6">{r.seed ? `#${r.seed}` : i + 1}</span>
+                      {finalRank.size ? (
+                        <span className="font-display font-bold text-white/80 w-7 tabular-nums" title="Endplatz" data-testid={`tournament-participant-rank-${r.id}`}>{finalRank.has(r.id) ? `${finalRank.get(r.id)}.` : "–"}</span>
+                      ) : (
+                        <span className="font-display font-bold text-[#29B6E8] w-7" title="Setzplatz">{r.seed ? `#${r.seed}` : ""}</span>
+                      )}
                       <span className="text-white truncate">{r.display_name || r.ingame_name || r.user?.display_name || "—"}</span>
                       {r.team && <span className="text-white/45 text-xs truncate">[{r.team.tag || r.team.name}]{Number(r.team.member_count) > 0 ? ` · ${r.team.member_count} Spieler` : ""}</span>}
                       {mine && <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/50 rounded-sm px-1.5 py-0.5" data-testid={`tournament-participant-me-${r.id}`}>du</span>}

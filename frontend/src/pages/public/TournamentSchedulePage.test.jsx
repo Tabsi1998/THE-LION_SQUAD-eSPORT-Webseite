@@ -134,8 +134,10 @@ test("Sicht je Station: eine Liste je Station nach Zeit, ein Spiel antippen öff
   mockGenerated(generated.onsite);
   renderSchedule();
   await user.click(await screen.findByTestId("schedule-view-stations"));
-  const headings = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.firstElementChild.textContent);
-  expect(headings).toEqual(["PC 1", "PC 2", "Switch 3 · PC"]);
+  const headings = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.firstElementChild.firstElementChild.textContent);
+  expect(headings).toEqual(["PC 1", "PC 2", "Switch 3"]);
+  // Das Gerät steht klein daneben, nicht im Namen (Abnahme #1593).
+  expect(screen.getByTestId("schedule-station-device-Switch 3")).toHaveTextContent("PC");
   const first = generated.onsite.bracket.matches_v2.find((match) => match.status === "completed");
   await user.click(screen.getByTestId(`schedule-line-${first.id}`));
   expect(await screen.findByTestId("match-page")).toBeInTheDocument();
@@ -149,6 +151,9 @@ test("Nur meine Spiele: zeigt nur die Spiele der eigenen Anmeldung", async () =>
   expect(toggle).toHaveAttribute("aria-pressed", "false");
   await user.click(toggle);
   expect(toggle).toHaveAttribute("aria-pressed", "true");
+  // Aktiver Filter in der Filter-Farbe, nicht in Gold - Gold ist Ehre (Abnahme #1593).
+  expect(toggle.className).toContain("tls-btn--secondary");
+  expect(toggle.className).not.toContain("tls-btn--honor");
   const mineId = generated.onsite.bracket.registrations.find((reg) => reg.is_mine).id;
   const cards = screen.getAllByTestId(/^schedule-match-/);
   const mine = generated.onsite.bracket.matches_v2.filter((match) => match.slots.some((slot) => slot.registration_id === mineId));

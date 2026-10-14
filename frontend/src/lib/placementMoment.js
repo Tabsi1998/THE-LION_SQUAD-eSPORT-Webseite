@@ -70,9 +70,17 @@ export function markPlacementShown(placement, storage = defaultStorage()) {
   }
 }
 
-/** Treppchen: Platz 2 links, 1 in der Mitte, 3 rechts; gleiche Plätze stehen nebeneinander, fehlende bleiben leer. */
+/**
+ * Treppchen: Platz 2 links, 1 in der Mitte, 3 rechts; gleiche Plätze stehen nebeneinander auf einer Stufe. Ein Platz,
+ * den ein Gleichstand überspringt (zwei Erste - kein Zweiter), bekommt keine Stufe; ein Platz, den es schlicht nicht
+ * gibt (nur zwei haben gespielt), bleibt als leere Stufe mit „–“ stehen.
+ */
 export function podiumPlaces(standings) {
   const rows = flatRows(standings).filter((row) => Number(row.rank) >= 1 && Number(row.rank) <= 3);
   if (!rows.length) return [];
-  return [2, 1, 3].map((rank) => ({ rank, ...PLACEMENT_LOOKS[rank], rows: rows.filter((row) => Number(row.rank) === rank) }));
+  const byRank = (rank) => rows.filter((row) => Number(row.rank) === rank);
+  const skipped = (rank) => [1, 2].some((above) => above < rank && byRank(above).length && above + byRank(above).length - 1 >= rank);
+  return [2, 1, 3]
+    .filter((rank) => byRank(rank).length || !skipped(rank))
+    .map((rank) => ({ rank, ...PLACEMENT_LOOKS[rank], rows: byRank(rank) }));
 }

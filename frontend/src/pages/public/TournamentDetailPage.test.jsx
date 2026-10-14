@@ -321,6 +321,11 @@ test("beendet: Treppchen mit Platz 1 in der Mitte, der eigene Platz kommt einmal
   const podium = await screen.findByTestId("podium");
   expect([...podium.querySelectorAll("[data-place]")].map((el) => el.getAttribute("data-place"))).toEqual(["2", "1", "3"]);
   await waitFor(() => expect(ceremonyQueue.getCurrent()?.placement?.title).toBe("Champion"));
+  // Die Teilnehmerliste nennt nach dem Ende den Endplatz statt der Anmelde-Nummer (Abnahme #1593).
+  const ranked = [...standings].sort((a, b) => a.rank - b.rank);
+  const rows = screen.getAllByTestId(/^tournament-participant-(?!me-|rank-)/);
+  expect(rows.map((row) => row.getAttribute("data-testid").replace("tournament-participant-", ""))).toEqual(ranked.map((row) => row.registration_id));
+  expect(screen.getByTestId(`tournament-participant-rank-${ranked[0].registration_id}`)).toHaveTextContent("1.");
   ceremonyQueue.clear();
   unmount();
   renderPage();

@@ -56,6 +56,7 @@ export function scheduleEntries(bracket) {
         };
       });
       const station = stationText(match);
+      const filled = sides.filter((side) => side.id).length;
       return {
         id: match.id,
         match,
@@ -71,6 +72,8 @@ export function scheduleEntries(bracket) {
         startedAt: match.started_at || null,
         tone: statusTone(match),
         sides,
+        // Mehr als zwei Plätze (Lauf, FFA): „Lauf A · 4 Spieler“ statt „A gegen B gegen C gegen D“ (Abnahme #1593).
+        heat: sides.length > 2 ? { name: `Lauf ${match.match_key || ""}`.trim(), count: `${filled} Spieler` } : null,
         mine: sides.some((side) => side.mine),
       };
     })
@@ -103,7 +106,11 @@ export function groupByStation(entries) {
   const groups = new Map();
   for (const entry of entries) {
     const key = entry.stationKey || "";
-    if (!groups.has(key)) groups.set(key, { key: key || "none", label: entry.stationLabel || NO_STATION, entries: [] });
+    if (!groups.has(key)) {
+      // „Switch 4 · Switch 2“: der Name der Station groß, das Gerät klein daneben (Abnahme #1593).
+      const [name, ...device] = (entry.stationLabel || NO_STATION).split(" · ");
+      groups.set(key, { key: key || "none", label: entry.stationLabel || NO_STATION, name, device: device.join(" · "), entries: [] });
+    }
     groups.get(key).entries.push(entry);
   }
   const list = [...groups.values()];

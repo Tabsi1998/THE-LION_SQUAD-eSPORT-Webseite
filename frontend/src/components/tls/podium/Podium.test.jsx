@@ -43,3 +43,31 @@ test("ohne Plätze kein Podest", () => {
   const { container } = render(<Podium rows={[]} registrations={[]} />);
   expect(container).toBeEmptyDOMElement();
 });
+
+test("drei gleiche Erste: eine breite Stufe mit allen Namen, keine leeren Stufen; lange Einzelwörter brechen nicht", () => {
+  const threeFirst = standings.map((row) => ({ ...row, rank: row.rank <= 3 ? 1 : row.rank }));
+  render(<Podium rows={threeFirst} registrations={bracket.registrations} />);
+  const steps = screen.getAllByTestId(/^podium-place-/);
+  expect(steps.map((step) => step.getAttribute("data-place"))).toEqual(["1"]);
+  expect(steps[0].querySelectorAll("[data-podium-entry]")).toHaveLength(3);
+  expect(screen.queryByText("–")).toBeNull();
+  for (const name of document.querySelectorAll(".tls-podium__name")) {
+    if (!/\s/.test(name.textContent)) expect(name.className).toContain("tls-podium__name--word");
+  }
+});
+
+test("unter dem sichtbaren Bereich (etwa hinter dem Sieger-Moment): nichts versteckt, beim Hereinscrollen nur ein kurzer Gruß", async () => {
+  const { act } = await import("@testing-library/react");
+  let notify = null;
+  window.IntersectionObserver = class { constructor(callback) { notify = callback; } observe() {} disconnect() {} };
+  const rect = vi.spyOn(window.Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 5000, bottom: 5400, left: 0, right: 100, width: 100, height: 400 });
+  try {
+    render(<Podium rows={standings} registrations={bracket.registrations} />);
+    expect(screen.getByTestId("podium")).toHaveAttribute("data-play", "idle");
+    act(() => notify([{ isIntersecting: true }]));
+    expect(screen.getByTestId("podium")).toHaveAttribute("data-play", "late");
+  } finally {
+    rect.mockRestore();
+    delete window.IntersectionObserver;
+  }
+});

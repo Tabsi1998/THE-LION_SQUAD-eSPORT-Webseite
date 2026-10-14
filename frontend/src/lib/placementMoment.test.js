@@ -69,3 +69,16 @@ test("Podest: Platz 2 links, 1 in der Mitte, 3 rechts - Gleichstand nebeneinande
   expect(twoOnly[2].rows).toEqual([]);
   expect(podiumPlaces([])).toEqual([]);
 });
+
+// Abnahme #1593: übersprungene Plätze (durch Gleichstand) sind keine leeren Stufen.
+test("Podest bei Gleichstand: nur belegte Stufen - geteilter 1. als eine breite Stufe, kein „–“ für übersprungene Plätze", () => {
+  // Abgeleitet aus der echten Rangliste: die ersten drei teilen sich Platz 1, der vierte ist Vierter.
+  const threeFirst = podiumPlaces(standings.map((row) => ({ ...row, rank: row.rank <= 3 ? 1 : row.rank })));
+  expect(threeFirst.map((place) => [place.rank, place.rows.length])).toEqual([[1, 3]]);
+  const twoFirst = podiumPlaces(standings.map((row) => ({ ...row, rank: row.rank === 2 ? 1 : row.rank })));
+  expect(twoFirst.map((place) => [place.rank, place.rows.length])).toEqual([[1, 2], [3, 1]]);
+  const twoSecond = podiumPlaces(standings.map((row) => ({ ...row, rank: row.rank === 3 ? 2 : row.rank })));
+  expect(twoSecond.map((place) => [place.rank, place.rows.length])).toEqual([[2, 2], [1, 1]]);
+  // Ein wirklich fehlender Platz (nur zwei haben gespielt) bleibt als „–“ stehen.
+  expect(podiumPlaces(standings.filter((row) => row.rank <= 2)).map((place) => place.rank)).toEqual([2, 1, 3]);
+});

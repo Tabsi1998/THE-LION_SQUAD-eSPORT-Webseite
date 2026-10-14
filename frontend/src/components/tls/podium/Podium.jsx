@@ -35,6 +35,9 @@ function Avatar({ name, src }) {
 }
 
 /** Spielt die Bewegung einmal, sobald das Podest zu sehen ist; liegt es schon im Bild, sofort. */
+// Nichts wird vorab versteckt (Abnahme #1593): liegt das Podest beim Öffnen im Bild, heben sich die Stufen („run“);
+// kommt es erst beim Scrollen herein, steht es schon da und nur Ziffern und Krone grüßen einmal („late“). So ist es
+// auch hinter dem Sieger-Moment nie leer.
 function usePlayOnce(ref) {
   const [play, setPlay] = useState(() => (motionAllowed() ? "run" : null));
   useLayoutEffect(() => {
@@ -42,10 +45,10 @@ function usePlayOnce(ref) {
     if (!node || !play || typeof IntersectionObserver === "undefined") return undefined;
     const rect = node.getBoundingClientRect();
     if (rect.top < (window.innerHeight || 0) && rect.bottom > 0) return undefined;
-    setPlay("wait");
+    setPlay("idle");
     const observer = new IntersectionObserver((items) => {
       if (items.some((item) => item.isIntersecting)) {
-        setPlay("run");
+        setPlay("late");
         observer.disconnect();
       }
     }, { rootMargin: "0px 0px -10% 0px" });
@@ -63,9 +66,11 @@ export function Podium({ rows, registrations = [], className = "" }) {
   const ref = useRef(null);
   const play = usePlayOnce(ref);
   if (!places.length) return null;
+  // Breite je Stufe: Platz 1 etwas breiter, jeder weitere Name auf einer geteilten Stufe bekommt Platz dazu.
+  const columns = places.map((place) => `minmax(0, ${(place.rank === 1 ? 4 : 3) + Math.max(0, place.rows.length - 1) * 3}fr)`).join(" ");
   return (
-    <div ref={ref} className={`tls-podium ${className}`} data-testid="podium" data-play={play || undefined}>
-      <ol className="tls-podium__stage" aria-label="Podest">
+    <div ref={ref} className={`tls-podium ${className}`} data-testid="podium" data-play={play || undefined} data-steps={places.length}>
+      <ol className="tls-podium__stage" aria-label="Podest" style={{ gridTemplateColumns: columns }}>
         {places.map((place) => (
           <li
             key={place.rank}
@@ -88,7 +93,8 @@ export function Podium({ rows, registrations = [], className = "" }) {
                 return (
                   <div key={row.registration_id} className="tls-podium__entry" data-podium-entry="" data-mine={row.is_mine ? "true" : undefined}>
                     <Avatar name={row.display_name} src={src} />
-                    <span className="tls-podium__name">{row.display_name || "Teilnehmer"}</span>
+                    {/* Nie mitten im Wort brechen: mehrere Wörter dürfen zwei Zeilen nehmen, ein langes Wort endet mit „…“. */}
+                    <span className={`tls-podium__name ${/\s/.test((row.display_name || "").trim()) ? "" : "tls-podium__name--word"}`} title={row.display_name || undefined}>{row.display_name || "Teilnehmer"}</span>
                     {valueText(row) && <span className="tls-podium__value">{valueText(row)}</span>}
                   </div>
                 );

@@ -61,3 +61,18 @@ test("Gruppen: jede Karte nennt ihre Gruppe", () => {
   expect(new Set(groups.map((entry) => entry.groupLabel))).toEqual(new Set(["Gruppe A", "Gruppe B"]));
   expect(scheduleEntries(fixture.league.bracket).every((entry) => entry.groupLabel === "")).toBe(true);
 });
+
+// Abnahme #1593: Stationsname groß, Gerät klein; Läufe mit mehr als zwei Plätzen heißen „Lauf A · 4 Spieler“.
+test("Station: Name und Gerät getrennt", () => {
+  const stations = groupByStation(onsite);
+  expect(stations.map((station) => [station.name, station.device])).toEqual([["PC 1", ""], ["PC 2", ""], ["Switch 3", "PC"]]);
+});
+
+test("Lauf mit mehr als zwei Plätzen: Name des Laufs und Zahl der Spieler statt „A gegen B gegen C gegen D“", async () => {
+  const ffa = (await import("../../e2e/fixtures/ffaGenerated.json")).default.ffa16;
+  const heats = scheduleEntries(ffa).filter((entry) => entry.sides.length > 2);
+  expect(heats.length).toBeGreaterThan(0);
+  const first = heats.find((entry) => entry.match.match_key === "A");
+  expect(first.heat).toEqual({ name: "Lauf A", count: `${first.sides.filter((side) => side.id).length} Spieler` });
+  expect(onsite.every((entry) => entry.heat === null)).toBe(true);
+});
