@@ -168,7 +168,7 @@ def key_label(value: str | None) -> str:
 TOURNAMENT_FIELDS = ("id", "slug", "title", "status", "format", "format_label", "format_display_name",
                      "public_phase", "start_date", "end_date", "team_mode", "paused_until", "registration_enabled",
                      "is_invite_only", "registration_open_from", "registration_open_until", "check_in_from",
-                     "check_in_until", "max_participants", "round_sponsors",
+                     "check_in_until", "check_in_closed_at", "max_participants", "round_sponsors",
                      # Für die Dauer-Kette (#1554): ohne eigenen Wert am Spiel gilt Phase, Turnier, Game.
                      "match_duration_minutes", "game_mode", "best_of")
 STAGE_FIELDS = ("id", "name", "number", "stage_type", "match_type")

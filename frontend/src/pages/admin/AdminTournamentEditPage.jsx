@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api, formatRequestError } from "@/lib/api";
+import { placementMessage } from "@/lib/tournamentFillIn";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
@@ -22,6 +23,7 @@ import { TournamentStagesPanel } from "./tournament/StagesPanel";
 import { matchRights } from "@/lib/tournamentRights";
 import { PauseUntilControl, RoundSponsorsPanel } from "./tournament/TvTournamentPanel";
 import { HeatRebuildBar } from "./tournament/HeatRebuildBar";
+import { ParticipantRemovalActions } from "./tournament/ParticipantRemovalActions";
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
 import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
 import { planAndApplySchedule } from "@/lib/schedulePlan";
@@ -195,16 +197,23 @@ export default function AdminTournamentEditPage() {
       reason = String(answer).trim() || null;
     }
     try {
-      await api.patch(`/tournaments/${id}/registrations/${rid}`, reason ? { status, status_reason: reason } : { status });
+      const { data } = await api.patch(`/tournaments/${id}/registrations/${rid}`, reason ? { status, status_reason: reason } : { status });
+      showPlacement(data?.placement);
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Teilnehmerstatus konnte nicht gespeichert werden."));
     }
   };
+  // Nachrücker nach dem Check-in-Ende (#1551): wo die Person im Baum gelandet ist - oder dass kein Platz frei ist.
+  const showPlacement = (placement) => {
+    const message = placementMessage(placement);
+    if (message) toast[message.tone](message.text);
+  };
   const setRegCheckinStatus = async (rid, status) => {
     try {
-      await api.post(`/tournaments/${id}/registrations/${rid}/checkin`, { status });
+      const { data } = await api.post(`/tournaments/${id}/registrations/${rid}/checkin`, { status });
       toast.success(status === "checked_in" ? "Check-in gesetzt." : status === "no_show" ? "Nicht erschienen gesetzt." : "Check-in zurückgenommen.");
+      showPlacement(data?.placement);
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Check-in konnte nicht gespeichert werden."));
@@ -266,6 +275,7 @@ export default function AdminTournamentEditPage() {
       const { data } = await api.post(`/tournaments/${id}/registrations`, payload);
       // Turnier nur mit Event-Anmeldung (#875): eingetragen trotz fehlender Event-Anmeldung - sagen, nicht verhindern.
       if (data?.event_gate_warning) toast.warning(data.event_gate_warning);
+      showPlacement(data?.placement);
       const replacement = data.replacement;
       const autoBracketUpdate = data.auto_bracket_update;
       if (!replacement && autoBracketUpdate?.ok === false) {
@@ -648,6 +658,7 @@ export default function AdminTournamentEditPage() {
                   {t.can_check_in && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                   )}
+                  <ParticipantRemovalActions tournament={t} registration={r} onDone={load} compact />
                   {t.can_manage_participants && (
                     <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
                   )}
@@ -690,6 +701,7 @@ export default function AdminTournamentEditPage() {
                       {t.can_check_in && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                       )}
+                      <ParticipantRemovalActions tournament={t} registration={r} onDone={load} />
                       {t.can_manage_participants && (
                         <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
                       )}

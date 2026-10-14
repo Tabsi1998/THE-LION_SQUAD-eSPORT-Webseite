@@ -42,9 +42,9 @@ def results_for_forfeit(match: dict, forfeiting_registration_id: str) -> list[di
         raise MatchV2ResultError("Match hat keine belegten Slots")
     if forfeiting_registration_id not in participants:
         raise MatchV2ResultError("Der angegebene Teilnehmer gehört nicht zu diesem Match")
-    if len(participants) < 2:
-        raise MatchV2ResultError("Ein Forfeit braucht mindestens zwei Teilnehmer")
 
+    # Ein einziger belegter Platz (#1553: der Gegner ist noch offen oder ein Freilos): die Wertung geht trotzdem -
+    # wer nicht erschienen ist, verliert kampflos und kommt auf dem Sieger-Weg nicht weiter (match_v2_results).
     remaining = [item for item in participants if item != forfeiting_registration_id]
     results = [{"registration_id": item, "rank": index + 1} for index, item in enumerate(remaining)]
     # Ausdrücklich als Aufgabe gekennzeichnet: sonst sähe die Platzierung aus wie

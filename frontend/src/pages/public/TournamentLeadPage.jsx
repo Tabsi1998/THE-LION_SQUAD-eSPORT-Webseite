@@ -104,6 +104,20 @@ export default function TournamentLeadPage() {
     }
   };
 
+  // „Nicht erschienen?“ (#1551): Frist um - die fehlende Seite verliert dieses Spiel kampflos, oder die Frist läuft weiter.
+  const decideNoShow = async (item, body) => {
+    setDeciding(true);
+    try {
+      await api.post(`/tournaments/${encodeURIComponent(slug)}/lead/no-show/${item.match_id}`, body);
+      toast.success(body.action === "extend" ? `Frist um ${body.minutes} Minuten verlängert.` : "Kampflos gewertet – beide Seiten bekommen Bescheid.");
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Das hat nicht geklappt.");
+    } finally {
+      setDeciding(false);
+    }
+  };
+
   const openEntry = (id) => {
     setOpenId(id);
     const next = new URLSearchParams(searchParams);
@@ -162,6 +176,7 @@ export default function TournamentLeadPage() {
                 onEnter={() => openEntry(item.match_id)}
                 onMove={() => setMovingId(movingId === item.id ? "" : item.id)}
                 onMoveTo={(stationId) => moveTo(item, stationId)}
+                onNoShow={(body) => decideNoShow(item, body)}
               />
             )))}
             <p className="text-xs text-white/40">Erledigtes verschwindet von selbst. Bei neuen Fällen kommt eine Benachrichtigung.</p>
@@ -212,7 +227,7 @@ export default function TournamentLeadPage() {
   );
 }
 
-function AttentionRow({ item, highlighted, busy, canEnter, moving, stations, onEnter, onMove, onMoveTo }) {
+function AttentionRow({ item, highlighted, busy, canEnter, moving, stations, onEnter, onMove, onMoveTo, onNoShow }) {
   const bad = item.kind === "station_broken";
   return (
     <div id={`fall-${item.id}`} className={`rounded-sm border bg-[#121212] p-3 ${highlighted ? "border-[#FFD700]/70 ring-2 ring-[#FFD700]/40" : bad ? "border-[#FF3B30]/45" : "border-[#FFD700]/45"}`} data-testid={`lead-case-${item.id}`}>
@@ -227,10 +242,20 @@ function AttentionRow({ item, highlighted, busy, canEnter, moving, stations, onE
         </div>
         {item.action === "move" ? (
           <button type="button" disabled={busy} onClick={onMove} className="tls-btn tls-btn--secondary shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-case-move-${item.id}`}>Umlegen</button>
-        ) : canEnter ? (
+        ) : item.action === "no_show" ? null : canEnter ? (
           <button type="button" disabled={busy} onClick={onEnter} className="tls-btn tls-btn--primary shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-case-enter-${item.id}`}>Eintragen</button>
         ) : null}
       </div>
+      {item.action === "no_show" ? (
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-white/10 pt-3" data-testid={`lead-no-show-${item.id}`}>
+          {(item.participants || []).map((side) => (
+            <button key={side.registration_id} type="button" disabled={busy} onClick={() => onNoShow({ action: "confirm", registration_id: side.registration_id })} className="tls-btn tls-btn--secondary min-h-[44px] min-w-0 max-w-full px-3 py-2 rounded-sm text-left text-xs font-bold [overflow-wrap:anywhere]" data-testid={`lead-no-show-${side.registration_id}`}>
+              {side.name} nicht erschienen
+            </button>
+          ))}
+          <button type="button" disabled={busy} onClick={() => onNoShow({ action: "extend", minutes: 5 })} className="tls-btn tls-btn--quiet min-h-[44px] shrink-0 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-no-show-extend-${item.id}`}>+5 Min. verlängern</button>
+        </div>
+      ) : null}
       {moving ? (
         <div className="mt-3 border-t border-white/10 pt-3" data-testid={`lead-case-stations-${item.id}`}>
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/50">Auf welche Station?</div>

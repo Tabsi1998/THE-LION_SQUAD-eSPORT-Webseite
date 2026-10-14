@@ -87,6 +87,9 @@ export const REGISTRATION_STATUS_LABELS = {
   waitlist: "Warteliste",
   checked_in: "Eingecheckt",
   no_show: "Nicht erschienen",
+  // Ausgeschieden (#1553): nur über den Umbauplan der Turnierleitung, nie über die Statusauswahl.
+  withdrawn: "Ausgetreten",
+  disqualified: "Disqualifiziert",
 };
 
 export const REGISTRATION_STATUS_OPTIONS = [
@@ -94,6 +97,8 @@ export const REGISTRATION_STATUS_OPTIONS = [
   ["checked_in", REGISTRATION_STATUS_LABELS.checked_in],
   ["pending", REGISTRATION_STATUS_LABELS.pending],
   ["waitlist", REGISTRATION_STATUS_LABELS.waitlist],
+  ["withdrawn", REGISTRATION_STATUS_LABELS.withdrawn],
+  ["disqualified", REGISTRATION_STATUS_LABELS.disqualified],
 ];
 
 export const STAGE_STATUS_OPTIONS = [

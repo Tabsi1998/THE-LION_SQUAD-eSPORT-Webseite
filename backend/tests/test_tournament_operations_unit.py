@@ -158,6 +158,8 @@ def test_manual_live_start_does_not_change_status_before_hard_preflight(monkeypa
     monkeypatch.setattr(tournament_lifecycle_routes, "_ensure_tournament_unlocked", unlocked)
     monkeypatch.setattr(tournament_lifecycle_routes, "require_tournament_staff_permission", permitted)
     monkeypatch.setattr(tournament_lifecycle_routes, "_finalize_bracket_for_checkin", finalize)
+    # Aus dem Check-in heraus endet zuerst der Check-in (#1551) - derselbe Baubau, hier ebenso nachgestellt.
+    monkeypatch.setattr(tournament_lifecycle_routes, "close_check_in", finalize)
     monkeypatch.setattr(tournament_lifecycle_routes, "_collect_plan_matches", collect)
 
     with pytest.raises(HTTPException) as error:

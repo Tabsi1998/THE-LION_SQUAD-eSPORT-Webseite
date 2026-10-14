@@ -19,6 +19,8 @@ import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
 import { durationSourceText, gameModes, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
 import { gamePresets } from "@/lib/gameMatchData";
 import { PrizeEditor, Txt } from "./PrizeEditor";
+import { DeadlineFields } from "./DeadlineFields";
+import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
 import { BRONZE_FORMATS, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, MATCHDAY_FORMATS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, TOURNAMENT_STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS } from "./shared";
 
 export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat }) {
@@ -96,6 +98,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     stream_title: source.stream_title || "",
     show_chat: !!source.show_chat,
     season_weight: source.season_weight ?? 2,
+    ...deadlineFormValues(source),
   });
   const [f, setF] = useState({
     title: tournament.title || "",
@@ -161,6 +164,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     stream_title: tournament.stream_title || "",
     show_chat: !!tournament.show_chat,
     season_weight: tournament.season_weight ?? 2,
+    ...deadlineFormValues(tournament),
   });
   const firstStage = stages[0] || null;
   const stageSettings = firstStage?.settings || {};
@@ -237,6 +241,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
       if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);
     });
     payload.season_weight = Number(payload.season_weight || 0);
+    Object.assign(payload, deadlinePayload(payload));
     payload.prize_places = (payload.prize_places || [])
       .filter((p) => p.value && String(p.value).trim())
       .map((p) => ({
@@ -389,7 +394,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           <FormSection title="Erweiterte Spieloptionen" collapsible plain>
             <FormGrid cols={3}>
               <SelectInput label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />
-              <CheckField label="Folgerunden zufällig mischen" hint="Runde 1 bleibt nach Check-in fix; qualifizierte Spieler werden in die nächste Runde zufällig auf freie Zielslots verteilt." checked={!!f.randomize_advancement_rounds} onChange={(v)=>set("randomize_advancement_rounds", v)} className="md:col-span-2" />
+              <CheckField label="Folgerunden zufällig mischen" hint="Runde 1 steht ab dem Check-in-Ende fest; qualifizierte Spieler werden in die nächste Runde zufällig auf freie Zielslots verteilt." checked={!!f.randomize_advancement_rounds} onChange={(v)=>set("randomize_advancement_rounds", v)} className="md:col-span-2" />
               {modes.length > 0 && (
                 <SelectInput label="Spielmodus" value={f.game_mode} onChange={(v)=>set("game_mode", v)} testId="tr-edit-game-mode"
                   options={[["", `Erster Modus (${modes[0].label || "ohne Namen"})`], ...modes.map((mode) => [mode.mode, `${mode.label || mode.mode}${mode.minutes ? ` · ${mode.minutes} Min.${mode.per_game ? " je Spiel" : ""}` : ""}`])]}
@@ -403,6 +408,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
               <TextField label="Mindestpause Min." type="number" min="0" max="240" value={f.match_break_minutes} onChange={(v)=>set("match_break_minutes",v)} hint="So lange hat ein Spieler zwischen zwei Spielen mindestens frei; der Planer hält das ein." testId="tr-edit-break"/>
               <SeasonWeightField value={f.season_weight} onChange={(v)=>set("season_weight",v)} />
             </FormGrid>
+            <DeadlineFields form={f} onChange={set} />
             <div className="flex flex-wrap gap-4">
               {BRONZE_FORMATS.has(f.format) && <CheckField label="Spiel um Platz 3" checked={f.bronze_match} onChange={(v)=>set("bronze_match",v)} />}
               <CheckField label="Ersatzspieler erlauben" checked={f.substitutes_allowed} onChange={(v)=>set("substitutes_allowed",v)} />

@@ -365,7 +365,8 @@ def current_matchday_number(plan: dict, now: datetime | None = None) -> int | No
 
 SCHEDULE_SOURCES = ("accepted", "home", "default", "manual")
 KEPT_SOURCES = frozenset({"manual", "accepted"})
-FROZEN_MATCH_STATUSES = frozenset({"running", "in_progress", "waiting_result", "completed", "archived", "forfeit", "bye", "no_show"})
+# Entfallene Spiele (Austritt, annulliert, zusammengelegt - #1553/#1550) bekommen keinen Termin mehr.
+FROZEN_MATCH_STATUSES = frozenset({"running", "in_progress", "waiting_result", "completed", "archived", "forfeit", "bye", "no_show", "cancelled"})
 
 
 def schedule_writes(tournament: dict, matches, proposals=None, stages=None) -> list[dict]:
