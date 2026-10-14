@@ -24,11 +24,12 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
   }
 
   function enqueue(pkg) {
+    if (pkg?.placement) return enqueuePlacement(pkg);
     if (!pkg || (!(pkg.tiers || []).length && !pkg.levelUp)) return null;
     const stamp = now();
     const last = state.pending[state.pending.length - 1];
     let entry;
-    if (last && stamp - state.lastEnqueueAt <= bundleMs) {
+    if (last && !last.placement && stamp - state.lastEnqueueAt <= bundleMs) {
       entry = mergeInto(last, pkg);
     } else if (!last && state.current && pkg.levelUp && !(pkg.tiers || []).length) {
       // Ein Level-up während einer laufenden Zeremonie wird Teil davon (am Ende gezeigt).
@@ -41,6 +42,18 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
       state.pending.push(entry);
     }
     state.lastEnqueueAt = stamp;
+    if (!state.current) advance();
+    else emit();
+    return entry;
+  }
+
+  // Sieger-Moment (#1180): ein Turnier-Platz ist ein eigenes Paket - nie mit Erfolgen verschmolzen, und er steht vor
+  // Erfolgen, die noch warten (der Platz zuerst, dann der dabei freigeschaltete Erfolg). Ein laufender bleibt stehen.
+  function enqueuePlacement(pkg) {
+    const entry = { id: pkg.id || `placement-${pkg.placement.key || now()}`, tiers: [], context: {}, levelUp: null, placement: pkg.placement, onDone: pkg.onDone || null };
+    const firstOther = state.pending.findIndex((item) => !item.placement);
+    if (firstOther < 0) state.pending.push(entry);
+    else state.pending.splice(firstOther, 0, entry);
     if (!state.current) advance();
     else emit();
     return entry;

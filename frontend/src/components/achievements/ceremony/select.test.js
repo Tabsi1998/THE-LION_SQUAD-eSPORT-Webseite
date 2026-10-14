@@ -98,3 +98,12 @@ describe("describePackage", () => {
     expect(describePackage(done, [{ code: "b3" }]).groupCompleted).toBe("b");
   });
 });
+
+describe("planCeremony: Turnier-Platz (#1180)", () => {
+  it("macht aus einem Platz einen eigenen, stillen Ablauf ohne Partikel", () => {
+    const placement = { key: "t1:r1", rank: 2, metal: "silver", title: "Zweiter Platz", name: "Jo", tournamentTitle: "Cup" };
+    const plan = planCeremony({ id: "p", placement });
+    expect(plan).toMatchObject({ id: "p", sequence: "placement", placement, particles: 0 });
+    expect(planCeremony({ placement: null, tiers: [] })).toBeNull();
+  });
+});

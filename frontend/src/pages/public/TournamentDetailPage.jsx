@@ -41,6 +41,9 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { GameDiscordTile } from "@/components/tls/DiscordServerTile";
 import { viennaDateTime } from "@/lib/vienna";
 import { ShareButton } from "@/components/tls/ShareButton";
+import { Podium } from "@/components/tls/podium/Podium";
+import { markPlacementShown, placementFor, placementShown } from "@/lib/placementMoment";
+import { ceremonyQueue } from "@/components/achievements/ceremony/queue";
 
 // Eigener Stand je Turnier und Konto (#1047): ein Wechsel des Turniers oder ein echter Kontowechsel baut die Seite
 // neu auf - Chat-Entwurf und Anhänge gehen weg, späte Antworten laufen ins Leere. Das erste Laden der Anmeldung
@@ -104,6 +107,15 @@ function TournamentDetailView() {
   }, [load]);
 
   useLiveRefresh(load, ["tournaments"], { fallbackMs: 10000 });
+
+  // Sieger-Moment (#1180): wer Platz 1 bis 3 belegt hat, bekommt nach dem Ende einmal je Browser seine Karte - über die
+  // Zeremonie-Warteschlange, also nie zugleich mit einem Erfolg.
+  useEffect(() => {
+    const placement = placementFor(t, standings);
+    if (!placement || placementShown(placement)) return;
+    markPlacementShown(placement);
+    ceremonyQueue.enqueue({ id: `placement-${placement.key}`, placement });
+  }, [t, standings]);
 
   const runAction = async (task, fallback) => {
     setActionError("");
@@ -187,10 +199,7 @@ function TournamentDetailView() {
   const hasRegisterAccess = t.access_link?.grants?.includes("register");
   const canSelfRegister = (registration.canRegister || hasRegisterAccess) && !clubMemberBlocked && !eventBlocked;
   const canSelfUnregister = !!myReg && (myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role)) && !["checked_in", "no_show", "rejected"].includes(myReg.status) && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
-  const podiumRows = standings
-    .filter((row) => Number(row.rank) >= 1 && Number(row.rank) <= 3)
-    .sort((a, b) => Number(a.rank) - Number(b.rank))
-    .slice(0, 3);
+  const podiumRows = standings.filter((row) => row && !Array.isArray(row.standings) && Number(row.rank) >= 1 && Number(row.rank) <= 3);
   const nextStep = timelineSteps(t).find((step) => step.next) || null;
   const finished = ["completed", "results_published", "archived"].includes(t.status);
   const subPage = (part) => `/tournaments/${t.slug || t.id}/${part}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
@@ -349,10 +358,9 @@ function TournamentDetailView() {
           )}
           {podiumRows.length > 0 && (
             <section>
-              <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Podium</h2>
-              <div className="grid sm:grid-cols-3 gap-3">
-                {podiumRows.map((row) => <PodiumCard key={row.registration_id || row.display_name || row.rank} row={row} />)}
-              </div>
+              <h2 className="font-heading text-2xl font-bold uppercase mb-8 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Podest</h2>
+              {/* Das Treppchen (#1339) - das Bild, das nach dem Sieger-Moment stehen bleibt. */}
+              <Podium rows={podiumRows} registrations={regs} />
             </section>
           )}
           {t.status === "live" && <TournamentLiveStreams tournament={t} />}
@@ -549,28 +557,6 @@ function TournamentChat({ tournament, user }) {
         )}
       </div>
     </section>
-  );
-}
-
-function PodiumCard({ row }) {
-  const rank = Number(row.rank) || 0;
-  const styles = {
-    1: "border-[#FFD700]/60 bg-[#FFD700]/10 text-[#FFD700]",
-    2: "border-white/35 bg-white/10 text-white",
-    3: "border-[#CD7F32]/55 bg-[#CD7F32]/10 text-[#CD7F32]",
-  };
-  const label = rank === 1 ? "Gold" : rank === 2 ? "Silber" : rank === 3 ? "Bronze" : "Platz";
-  return (
-    <div className={`rounded-sm border p-4 ${styles[rank] || "border-white/10 bg-[#121212] text-white"}`}>
-      <div className="text-[10px] font-bold uppercase tracking-widest">{label}</div>
-      <div className="mt-2 flex items-baseline gap-2">
-        <span className="font-heading text-4xl font-black">#{rank}</span>
-        <span className="min-w-0 truncate font-bold text-white">{row.display_name || row.ingame_name || row.user?.display_name || "Teilnehmer"}</span>
-      </div>
-      <div className="mt-2 text-xs text-white/50">
-        {row.points != null ? `${row.points} Punkte` : row.wins != null ? `${row.wins} Siege` : "Finalplatzierung"}
-      </div>
-    </div>
   );
 }
 

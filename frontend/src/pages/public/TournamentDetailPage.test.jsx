@@ -302,3 +302,28 @@ test("die Anmeldung lädt erst nach der Seite: kein zweiter Aufbau, der erste St
   expect(title.isConnected).toBe(true);
   expect(screen.getByTestId("tournament-title")).toBe(title);
 });
+
+// Podest und Sieger-Moment (#1339, #1180) mit der echten Rangliste eines beendeten Turniers
+// (scripts/make_table_schedule_fixture.py): Treppchen statt drei Kästen, der Moment einmal je Browser.
+test("beendet: Treppchen mit Platz 1 in der Mitte, der eigene Platz kommt einmal in die Zeremonie-Warteschlange", async () => {
+  const generated = (await import("../../../e2e/fixtures/tableScheduleGenerated.json")).default;
+  const { ceremonyQueue } = await import("@/components/achievements/ceremony/queue");
+  const { tournament, standings, bracket } = generated.finished;
+  window.localStorage.clear();
+  ceremonyQueue.clear();
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...tournament, slug: "cup", id: "t1" } });
+    if (path === "/tournaments/t1/registrations") return Promise.resolve({ data: bracket.registrations });
+    if (path === "/tournaments/t1/standings") return Promise.resolve({ data: standings });
+    return Promise.resolve({ data: [] });
+  });
+  const { unmount } = renderPage();
+  const podium = await screen.findByTestId("podium");
+  expect([...podium.querySelectorAll("[data-place]")].map((el) => el.getAttribute("data-place"))).toEqual(["2", "1", "3"]);
+  await waitFor(() => expect(ceremonyQueue.getCurrent()?.placement?.title).toBe("Champion"));
+  ceremonyQueue.clear();
+  unmount();
+  renderPage();
+  await screen.findByTestId("podium");
+  expect(ceremonyQueue.getCurrent()).toBeNull();
+});
