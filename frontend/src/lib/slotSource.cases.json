@@ -34,13 +34,19 @@
     { "name": "ältere Daten: Strich heißt Freilos", "set": "none", "stage": "s1", "source": { "raw": "-" }, "text": "Freilos" },
     { "name": "ältere Daten: unbekanntes Kürzel", "set": "none", "stage": "s1", "source": { "raw": "WA2" }, "text": "" },
     { "name": "Kürzel gelten je Phase (Phase 2)", "set": "phases", "stage": "phase-2", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 2, "raw": "W:A:2" }, "text": "Platz 2 aus A" },
-    { "name": "Kürzel gelten je Phase (Phase 1)", "set": "phases", "stage": "phase-1", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 2, "raw": "W:A:2" }, "text": "Verlierer aus A" }
+    { "name": "Kürzel gelten je Phase (Phase 1)", "set": "phases", "stage": "phase-1", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 2, "raw": "W:A:2" }, "text": "Verlierer aus A" },
+    { "name": "gemischt: vor der Auslosung (#1548)", "set": "duels", "stage": "s1", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 1, "raw": "W:A:1", "draw": { "group": "WB:2", "label": "Runde 1" } }, "text": "Platz aus Runde 1" },
+    { "name": "gemischt: Loser Bracket aus zwei Runden", "set": "duels", "stage": "s1", "source": { "type": "rank", "flow": "L", "match_key": "E", "rank": 1, "raw": "L:E:1", "draw": { "group": "LB:3", "label": "Winner Runde 2 / Loser Runde 1" } }, "text": "Platz aus Winner Runde 2 / Loser Runde 1" },
+    { "name": "gemischt: Gruppe ohne Klartext", "set": "duels", "stage": "s1", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 1, "raw": "W:A:1", "draw": { "group": "WB:2" } }, "text": "Platz aus der Vorrunde" }
   ],
   "describeSlot": [
     { "name": "Anmeldung", "set": "duels", "slot": { "registration_id": "r1" }, "result": { "kind": "player", "label": "NeonFalke" } },
     { "name": "Freilos", "set": "duels", "slot": { "status": "bye", "source": { "type": "seed", "seed": 8 } }, "result": { "kind": "bye", "label": "Freilos" } },
     { "name": "Sieger aus A", "set": "duels", "slot": { "status": "pending", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 1, "raw": "W:A:1" } }, "result": { "kind": "pending", "label": "Sieger aus A" } },
-    { "name": "Setzplatz vor dem Start", "set": "duels", "slot": { "status": "preview", "source": { "type": "seed", "seed": 2 } }, "result": { "kind": "empty", "label": "" } }
+    { "name": "Setzplatz vor dem Start", "set": "duels", "slot": { "status": "preview", "source": { "type": "seed", "seed": 2 } }, "result": { "kind": "empty", "label": "" } },
+    { "name": "gemischt: wartet auf die Auslosung", "set": "duels", "slot": { "status": "pending", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 1, "raw": "W:A:1", "draw": { "group": "WB:2", "label": "Runde 1" } } }, "result": { "kind": "pending", "label": "Platz aus Runde 1" } },
+    { "name": "gemischt: ausgelost", "set": "duels", "slot": { "status": "filled", "registration_id": "r1", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 1, "raw": "W:A:1", "draw": { "group": "WB:2", "label": "Runde 1" } } }, "result": { "kind": "player", "label": "NeonFalke" } },
+    { "name": "gemischt: ausgelostes Freilos", "set": "duels", "slot": { "status": "bye", "source": { "type": "rank", "flow": "W", "match_key": "A", "rank": 1, "raw": "W:A:1", "draw": { "group": "WB:2", "label": "Runde 1" } } }, "result": { "kind": "bye", "label": "Freilos" } }
   ],
   "plannedText": [
     { "name": "heute mit Dauer", "now": "2026-10-10T08:00:00Z", "match": { "scheduled_at": "2026-10-10T14:20:00+02:00", "duration_minutes": 30 }, "text": "geplant ca. 14:20 · 30 Minuten" },

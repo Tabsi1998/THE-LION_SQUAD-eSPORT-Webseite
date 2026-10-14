@@ -25,6 +25,7 @@ import os
 from datetime import datetime, timedelta
 
 from models import new_id, now_utc
+from services.advancement_draw import draw_group_of, group_targets
 from services.match_forfeit import apply_forfeit
 from services.match_v2_results import (
     DECIDED_STATUSES,
@@ -254,14 +255,32 @@ async def _tell_actor_failed(db, match: dict, hold: dict, detail: str) -> None:
 # ---------------------------------------------------------------- Rückgängig
 
 def _downstream(match: dict, stage_matches: list[dict]) -> list[dict]:
-    """Die Spiele, in die dieses Ergebnis jemanden geschoben hat (oder ein Freilos eingetragen)."""
-    return [
+    """Die Spiele, in die dieses Ergebnis jemanden geschoben hat (oder ein Freilos eingetragen). Gemischt (#1548): hat
+    dieses Ergebnis eine Auslosung ausgelöst, gehört die ganze ausgeloste Runde dazu - Rückgängig nimmt das Los zurück."""
+    direct = [
         candidate for candidate in stage_matches
         if candidate.get("id") != match.get("id") and any(
             (slot.get("source_result") or {}).get("from_match_id") == match.get("id")
             for slot in candidate.get("slots") or []
         )
     ]
+    found = {row["id"]: row for row in direct}
+    for target in direct:
+        group = draw_group_of(target)
+        if group and isinstance(target.get("draw"), dict):
+            for mate in group_targets(stage_matches, group):
+                if mate.get("status") != "cancelled":
+                    found.setdefault(mate["id"], mate)
+    return list(found.values())
+
+
+def _undoes_draw(slot: dict, target: dict, match: dict) -> bool:
+    """Was Rückgängig leert: den Platz aus diesem Spiel - und gemischt jeden Platz aus der Auslosung dieser Runde."""
+    origin = slot.get("source_result") or {}
+    if origin.get("from_match_id") == match.get("id"):
+        return True
+    draw = target.get("draw") if isinstance(target.get("draw"), dict) else {}
+    return bool(draw.get("id")) and origin.get("draw_id") == draw.get("id")
 
 
 def _started(target: dict) -> bool:
@@ -317,15 +336,16 @@ async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | No
         slots = target.get("slots") or []
         changed = False
         for slot in slots:
-            if (slot.get("source_result") or {}).get("from_match_id") == match["id"]:
+            if _undoes_draw(slot, target, match):
                 changed = _clear_slot(slot) or changed
-        if changed:
+        drawn = isinstance(target.get("draw"), dict) and draw_group_of(target)
+        if changed or drawn:
             target["slots"] = slots
             await db.matches_v2.update_one({"id": target["id"]}, {"$set": {
                 "slots": slots, "status": _status_after_slot_fill(target, preserve_terminal=False), "updated_at": now_iso,
                 # Meldungen gehörten zur alten Paarung (#1035).
                 **({"reports": []} if target.get("reports") else {}),
-            }})
+            }, **({"$unset": {"draw": ""}} if drawn else {})})
             cleared.append(target["id"])
     await db.matches_v2.update_one({"id": match["id"]}, {
         "$set": {"results": [], "result_meta": None, "completed_at": None, "completed_by": None,

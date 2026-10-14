@@ -1,9 +1,11 @@
 """Phasen verwalten und ihre Spiele erzeugen.
 """
+import copy
 import hashlib
 import json
 import logging
 from fastapi import HTTPException, Depends
+from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_current_user, get_optional_user
 from services.tournament_permissions import (
@@ -13,9 +15,12 @@ from services.tournament_permissions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.competition_versions import persist_competition_versions
+from services.draw_records import record_build_draws, record_draws
 from services.heat_rebuild import evaluate_after_write
 from services.match_v2_results import (
     MatchV2ResultError,
+    build_league_redraw_application,
+    build_redraw_application,
     build_v2_result_application,
     public_recalculation_error,
 )
@@ -229,6 +234,7 @@ async def recalculate_tournament_matches_v2_advancement(tid: str, stage_id: str 
             if target_id in by_id:
                 by_id[target_id].update(update)
             updated_match_ids.add(target_id)
+        await record_draws(db, application.get("draws"), actor_id=me.get("id"), tournament_id=tid)
 
     await _audit_tournament_action(
         db,
@@ -301,6 +307,8 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
         {"$set": {"status": "pending" if preview else "ready", "updated_at": now_utc().isoformat()}},
     )
     await persist_competition_versions(db, tournament, "graph")
+    if not preview:
+        await record_build_draws(db, matches, actor_id=me.get("id"))
     await _audit_tournament_action(
         db,
         "tournament.stage.generate",
@@ -319,3 +327,91 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
         # Unterbesetzte Läufe (#1550): nach jedem Bau prüfen.
         await evaluate_after_write(db, tid, actor_id=me.get("id"), trigger="generate")
     return {"ok": True, "stage_id": stage_id, "match_count": len(matches), "preview": preview}
+
+
+class StageRedrawPayload(BaseModel):
+    # Die Auslosungs-Gruppe (``settings.draw_group`` der Folgespiele, z. B. „WB:2“); leer bei der Liga.
+    group: str | None = Field(default=None, max_length=80)
+
+
+REDRAW_STALE_DETAIL = ("Ein Spiel dieser Runde hat sich inzwischen geändert (aufgerufen, gestartet oder neu gesetzt). "
+                       "Es wurde nichts neu ausgelost – bitte neu laden.")
+
+
+def _unchanged_filter(before: dict) -> dict:
+    """Das Spiel steht noch so da wie gelesen: Stand, Aufruf, Beginn, Zeitstempel (``None`` trifft auch „fehlt“)."""
+    return {
+        "id": before["id"],
+        "status": before.get("status"),
+        "called_at": before.get("called_at"),
+        "started_at": before.get("started_at"),
+        "updated_at": before.get("updated_at"),
+    }
+
+
+async def _write_redraw(db, originals: dict[str, dict], target_sets: dict[str, dict]) -> None:
+    """Alles oder nichts (Compare-and-Set): erst prüfen, ob jedes Spiel noch so dasteht wie gelesen, dann schreiben -
+    jedes Schreiben nur mit diesem Filter. Trifft ein späteres Schreiben nicht mehr, wird das schon Geschriebene
+    zurückgesetzt und mit 409 abgelehnt. Die Turnier-Schreibsperre hält Ergebnisse und Stationen ohnehin fern."""
+    filters = {match_id: _unchanged_filter(originals[match_id]) for match_id in target_sets}
+    for match_filter in filters.values():
+        if await db.matches_v2.count_documents(match_filter) != 1:
+            raise HTTPException(status_code=409, detail=REDRAW_STALE_DETAIL)
+    written: list[str] = []
+    for match_id, update in target_sets.items():
+        result = await db.matches_v2.update_one(filters[match_id], {"$set": update})
+        if result.matched_count == 1:
+            written.append(match_id)
+            continue
+        for done in written:
+            before, after = originals[done], target_sets[done]
+            restore = {"$set": {key: before[key] for key in after if key in before}}
+            gone = {key: "" for key in after if key not in before}
+            if gone:
+                restore["$unset"] = gone
+            await db.matches_v2.update_one({"id": done, "updated_at": after.get("updated_at")}, restore)
+        raise HTTPException(status_code=409, detail=REDRAW_STALE_DETAIL)
+
+
+@router.post("/{tid}/stages/{stage_id}/redraw")
+async def redraw_tournament_stage(tid: str, stage_id: str, body: StageRedrawPayload | None = None,
+                                  me: dict = Depends(get_current_user),
+                                  _mutation_tid: str = Depends(_serialized_tournament_write)):
+    """„Neu auslosen“ (#1548): die Turnierleitung lost eine Folgerunde neu aus - oder bei der Liga die Spieltage -,
+    solange keines der betroffenen Spiele begonnen hat (sonst 409). Unter der Turnier-Schreibsperre; Protokoll mit
+    Person, Zeitpunkt und Ergebnis, dazu das Live-Ereignis ``draw_done``."""
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    tournament = await _ensure_tournament_unlocked(db, tid)
+    stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
+    if not stage:
+        raise HTTPException(status_code=404, detail="Phase nicht gefunden")
+    stage_matches = await db.matches_v2.find({"stage_id": stage_id, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
+    # Wie gelesen - die Auslosung ändert die Spiele im Speicher, geschrieben wird nur gegen diesen Stand.
+    originals = {match["id"]: copy.deepcopy(match) for match in stage_matches}
+    group = ((body.group if body else None) or "").strip()
+    now_iso = now_utc().isoformat()
+    try:
+        if group:
+            application = build_redraw_application(stage_matches, group, now_iso=now_iso)
+        elif stage.get("stage_type") == "league":
+            application = build_league_redraw_application(stage_matches, now_iso=now_iso)
+        else:
+            raise MatchV2ResultError("Bitte angeben, welche Runde neu ausgelost werden soll.", 422)
+    except MatchV2ResultError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+    await _write_redraw(db, originals, application["target_sets"])
+    await record_draws(db, application["draws"], actor_id=me.get("id"), tournament_id=tid)
+    # Erst auslosen, dann umbauen (#1550): die neue Belegung kann Läufe zusammenlegen oder ausgleichen.
+    await evaluate_after_write(db, tid, actor_id=me.get("id"), trigger="redraw")
+    if not group:
+        # Die Spieltage haben sich verschoben: Termine der Liga neu rechnen (von Hand gesetzte bleiben).
+        from services.matchday_schedule import persist_matchday_schedule
+        await persist_matchday_schedule(db, tournament)
+    draw = application["draw"]
+    return {
+        "ok": True,
+        "draw": {key: draw.get(key) for key in ("id", "group", "kind", "trigger", "drawn_at", "assignments")},
+        "updated_match_ids": sorted(application["target_sets"]),
+    }

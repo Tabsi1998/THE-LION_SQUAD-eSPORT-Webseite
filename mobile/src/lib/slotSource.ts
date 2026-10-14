@@ -2,10 +2,19 @@
 // und am TV (frontend/src/lib/slotSource.js, #1113). Dieselben Fälle prüfen beide (frontend/src/lib/slotSource.cases.json).
 //   „W:A:1“ → „Sieger aus A“   im Duell Platz 2 → „Verlierer aus A“   im Durchgang → „Platz 2 aus A“
 // Setzplätze bleiben vor dem Start leer (Entscheidung des Betreibers vom 23.09.), „Freilos“ bleibt.
+// Gemischt (#1548) steht bis zur Auslosung „Platz aus Runde 1“ (`source.draw`), danach der Name.
 // „L“ zählt wie am Server ab den Weiterkommern: L:A:1 ist der Beste, der nicht weiterkommt (services/match_v2_results).
 import { viennaDate, viennaDay, viennaTime } from "./vienna";
 
-export type SlotSource = { type?: string; flow?: string; match_key?: string; rank?: number; seed?: number; raw?: string } | null | undefined;
+export type SlotSource = {
+  type?: string;
+  flow?: string;
+  match_key?: string;
+  rank?: number;
+  seed?: number;
+  raw?: string;
+  draw?: { group?: string; label?: string } | null;
+} | null | undefined;
 type MatchLike = {
   match_key?: string | null;
   stage_id?: string | null;
@@ -62,6 +71,8 @@ export function sourceLabel(source: SlotSource, findMatch: (key: string) => Matc
   if (!normalized) return "";
   if (normalized.type === "bye") return "Freilos";
   if (normalized.type !== "rank" || !normalized.match_key) return "";
+  // Gemischt (#1548): bis zur Auslosung ist offen, wer aus welchem Spiel kommt - nur die Runde steht fest.
+  if (normalized.draw) return `Platz aus ${normalized.draw.label || "der Vorrunde"}`;
   const from = findMatch(normalized.match_key);
   const rank = absoluteRank(normalized, from);
   const key = normalized.match_key;
