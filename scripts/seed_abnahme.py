@@ -239,6 +239,8 @@ async def ensure_accounts(db) -> dict:
     for index, name in enumerate(PLAYERS, start=1):
         players.append(await upsert(f"spieler-{index:02d}", f"spieler{index:02d}@abnahme.lionsquad.at", name, "player", False))
     users["players"] = players
+    # Begleitperson für den Vor-Ort-Zugang (#1592): Konto ohne Mitgliedschaft, nirgends angemeldet.
+    users["guest"] = await upsert("gast", "gast@abnahme.lionsquad.at", "Begleitung Gast", "player", False)
     return users
 
 
@@ -342,6 +344,7 @@ async def inside_main() -> None:
                           for key in ACCOUNTS}, "tournaments": {}}
     # Spieler 1 (NeonFalke) spielt überall mit: eigene Spiele, „Nur meine“, „Deine Gruppe“, „Du“, Sieger-Moment.
     state["accounts"]["player"] = {"email": "spieler01@abnahme.lionsquad.at", "password": TEST_PASSWORD, "totp": None}
+    state["accounts"]["guest"] = {"email": "gast@abnahme.lionsquad.at", "password": TEST_PASSWORD, "totp": None}
     try:
         game = await ensure_game(admin, db)
         stamp = now_utc().strftime("%d.%m. %H:%M")
@@ -498,6 +501,14 @@ async def inside_main() -> None:
             await admin.call("POST", f"/api/f1/challenges/{challenge['id']}/times",
                              json={"user_id": player["id"], "track_id": track["id"], "time_ms": 92_000 + index * 1_337})
         state["fastlap"] = challenge["id"]
+
+        # Vor-Ort-Zugang (#1592): Mitglieder-Turnier vor Ort, Anmeldung offen - das Zeitfenster läuft.
+        members_cup = await tournament(admin, game, f"Abnahme Mitglieder-Cup vor Ort ({stamp})", quarter(now_utc() + timedelta(hours=3)),
+                                       format="single_elim", event_mode="local", visibility="members", max_participants=8,
+                                       registration_open_from=(now_utc() - timedelta(hours=1)).isoformat(),
+                                       end_date=(now_utc() + timedelta(hours=10)).isoformat())
+        await register(admin, members_cup, users["players"][:3])
+        state["tournaments"]["onsite_members"] = members_cup["id"]
     finally:
         await admin.close()
     slugs = {}

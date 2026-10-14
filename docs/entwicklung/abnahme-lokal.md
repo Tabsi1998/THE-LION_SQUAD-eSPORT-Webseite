@@ -44,6 +44,8 @@ Liga mit veröffentlichten Ergebnissen und geteiltem Platz 1 (Podest, Sieger-Mom
 Vor-Ort-Turnier (live, zwei Stationen, geplant, Turnierleitung eingeteilt) für die vier Modi des Weiterkommens
 (#1590): fester Baum und Auslosung nach der Runde (K.-o. 8), Show-Auslosung (FFA 16, drei von vier Läufen fertig,
 Erinnerung nach 3 Min.) und sofort zufällig (K.-o. 8, noch ohne Ergebnis).
+Dazu ein Mitglieder-Turnier vor Ort mit offener Anmeldung für den Vor-Ort-Zugang (#1592) und ein Gast-Konto ohne
+Mitgliedschaft (`vor-ort-abnahme.spec.js`).
 Spieler 1 spielt überall mit und ist der Spieler-Zugang der Tests. Es lässt sich mehrfach aufrufen: Konten
 bleiben, Turniere kommen dazu.
 
