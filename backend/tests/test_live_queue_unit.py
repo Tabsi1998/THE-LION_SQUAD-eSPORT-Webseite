@@ -269,3 +269,18 @@ def test_a_preview_tree_has_no_queue():
     matches = [{**match, "is_preview": True} for match in eight()]
     view = queue(matches, [station("st1", "1")], T0)
     assert view["applies"] is False and view["matches"] == {}
+
+
+def test_a_called_match_holds_its_station_from_now_even_if_planned_later():
+    """Codex zu #1595: Aufgerufen für 11:00, jetzt ist 10:00.
+
+    Die Station ist ab jetzt reserviert, nicht erst ab 11:00."""
+    matches = [duel("A", "r1", "r2", order=1, station_id="st1", called_at=at(0), scheduled_at=at(60)),
+               duel("B", "r3", "r4", order=2)]
+    plan = plan_schedule(tournament(), matches, [station("st1", "1")], now=T0)
+    later = by_id(plan)["id-B"]
+    assert datetime.fromisoformat(later["scheduled_at"]) >= T0 + timedelta(minutes=90), "B nicht vor das aufgerufene A"
+
+
+def by_id(plan):
+    return {item["match_id"]: item for item in plan["assignments"]}

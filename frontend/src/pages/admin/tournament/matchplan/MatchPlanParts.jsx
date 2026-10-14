@@ -151,7 +151,7 @@ export function PlanPreview({ plan, stale, busy, onApply, onDiscard, forecastOnl
               {`, ${countOf(errors.length, "Konflikt", "Konflikte")}, ${countOf(hints.length, "Hinweis", "Hinweise")}.`}
             </p>
             <p className="mp-preview__sub">{forecastOnly
-              ? "Nur Prognose: Im laufenden Turnier vor Ort entscheidet die Warteschlange je Station, der Matchplan schreibt keine Zeiten. Die geplanten Zeiten bleiben als Vergleich für den Verzug."
+              ? "Nur Prognose: „Automatisch planen“ zeigt im laufenden Turnier vor Ort nur, wie der Rest nachrückt – es entscheidet die Warteschlange je Station, geplante Zeiten bleiben als Vergleich; einzelne Spiele kannst du weiter umlegen (ändern, ziehen, Termin lösen)."
               : "Geänderte Spiele sind hell umrandet, gestrichelt steht, wo sie vorher lagen. Geschrieben wird erst mit „Übernehmen“."}</p>
             {stale && <p className="mp-preview__stale" role="alert" data-testid="mp-preview-stale">{stale} Ich habe neu geplant - bitte prüfe die Vorschau noch einmal.</p>}
           </div>
@@ -179,7 +179,7 @@ export function DelayBanner({ delay, onReplan, canPlan, forecastOnly = false }) 
       <span>
         {late ? "Verzug" : "Vorsprung"} - {delay.label} jetzt ca. {hm(delay.at)}
         <span className="mp-delay__sub"> statt {hm(delay.at - delay.minutes * 60_000)}.{forecastOnly
-          ? " Live rückt die Warteschlange von selbst nach – geplante Zeiten bleiben als Vergleich, geschrieben wird nichts."
+          ? " Live rückt die Warteschlange von selbst nach – „Automatisch planen“ zeigt nur die Prognose; einzelne Spiele kannst du weiter umlegen."
           : canPlan ? " „Automatisch planen“ rückt die offenen Spiele nach; feste Termine bleiben." : ""}</span>
       </span>
       {canPlan && <button type="button" className="tls-btn tls-btn--secondary mp-btn" onClick={onReplan}>{forecastOnly ? "Prognose ansehen" : "Nachrücken planen"}</button>}

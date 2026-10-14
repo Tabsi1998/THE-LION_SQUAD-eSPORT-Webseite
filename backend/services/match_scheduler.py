@@ -330,7 +330,9 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
             end = start + timedelta(minutes=duration(match))
             if running:
                 end = max(end, now)
-            board.block(match["id"], match.get("station_id"), players_of(match), start, end)
+            # Ein Aufruf hält Station und Spieler ab jetzt, auch wenn die geplante Zeit später liegt - sonst legt der
+            # Planer davor noch etwas auf die schon reservierte Station (Codex zu #1595).
+            board.block(match["id"], match.get("station_id"), players_of(match), now if called else start, end)
             fixed.append((match, start, end))
             held.append({"match_id": match["id"], "station_id": match.get("station_id"), "start": start.isoformat(),
                          "end": end.isoformat(), "minutes": duration(match),

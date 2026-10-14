@@ -698,6 +698,9 @@ describe("live: Warteschlange je Station", () => {
     fireEvent.click(within(banner).getByRole("button", { name: "Prognose ansehen" }));
     const preview = await screen.findByTestId("mp-preview");
     expect(preview).toHaveTextContent("Nur Prognose");
+    // Einzel-Eingriffe der Leitung bleiben (Station fällt aus, Spiel umlegen) - nur der automatische Plan schreibt nicht.
+    expect(preview).toHaveTextContent("einzelne Spiele kannst du weiter umlegen");
+    expect(banner).toHaveTextContent("einzelne Spiele kannst du weiter umlegen");
     expect(within(preview).queryByRole("button", { name: /Übernehmen/ })).toBeNull();
   });
 });

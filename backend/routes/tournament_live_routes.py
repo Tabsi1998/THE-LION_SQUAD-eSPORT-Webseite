@@ -27,7 +27,11 @@ from services.live_queue import load_live_queue, my_entries
 from services.match_calls import CALL_OPEN_STATUSES
 from services.match_scheduler import RUNNING_STATUSES, _unresolved
 from services.station_labels import station_text
-from services.tournament_permissions import STATION_ASSIGN_ROLES, has_tournament_staff_permission
+from services.tournament_permissions import (
+    STATION_ASSIGN_ROLES,
+    has_tournament_staff_permission,
+    is_global_tournament_staff,
+)
 from services.tournament_rules import match_policy
 from services.tv_display import DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, key_expired
 
@@ -56,16 +60,28 @@ async def _queue_tournament(db, tid: str, user: dict | None, access: str | None,
 
 
 async def _operate(user: dict | None, tournament_id: str, stations: list[dict]) -> dict | None:
-    """Welche Stationen diese Person bedienen darf - ``None`` ohne Recht (dann zeigt keine Seite Knöpfe)."""
+    """Welche Stationen diese Person bedienen darf - ``None`` ohne Recht (dann zeigt keine Seite Knöpfe).
+
+    Dieselbe Regel wie ``has_tournament_staff_permission`` (ganzes Turnier oder Station), aber mit einem Zugriff auf die
+    Einsätze statt einem je Station (Codex zu #1595)."""
     if not user:
         return None
-    if await has_tournament_staff_permission(user, tournament_id, STATION_ASSIGN_ROLES, "tournament"):
+    if is_global_tournament_staff(user):
         return {"all": True, "station_ids": []}
-    own = [
-        row["id"]
-        for row in stations
-        if await has_tournament_staff_permission(user, tournament_id, STATION_ASSIGN_ROLES, "station", row["id"])
-    ]
+    assignments = await get_db().tournament_staff_assignments.find(
+        {"tournament_id": tournament_id, "user_id": user.get("id"), "is_active": {"$ne": False},
+         "role": {"$in": sorted(STATION_ASSIGN_ROLES)}},
+        {"_id": 0, "scope": 1, "scope_id": 1},
+    ).to_list(200)
+    scopes = [(row.get("scope") or "tournament", row.get("scope_id")) for row in assignments]
+    if any(scope == "tournament" for scope, _ in scopes):
+        return {"all": True, "station_ids": []}
+    station_ids = [row["id"] for row in stations]
+    if any(scope == "station" and not scope_id for scope, scope_id in scopes):
+        own = station_ids
+    else:
+        allowed = {scope_id for scope, scope_id in scopes if scope == "station"}
+        own = [station_id for station_id in station_ids if station_id in allowed]
     return {"all": False, "station_ids": own} if own else None
 
 
