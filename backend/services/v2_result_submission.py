@@ -19,6 +19,8 @@ from services.competition_usage import GRAPH, record_write
 
 
 logger = logging.getLogger("tls.match_results")
+# Ergebnisse aus Spieler-Meldungen: zwei gleiche Meldungen oder eine Meldung nach Ablauf der Frist (#1551).
+PLAYER_RESULT_ACTIONS = {"match.result.auto_resolution", "match.result.auto_confirm"}
 
 
 def _submission_identity(
@@ -283,7 +285,7 @@ async def submit_v2_result(
             "tournament_id": match["tournament_id"],
             "stage_id": match["stage_id"],
             "reporter_user_id": actor_id,
-            "source": "players" if audit_action == "match.result.auto_resolution" else "staff",
+            "source": "players" if audit_action in PLAYER_RESULT_ACTIONS else "staff",
             "results": application["results"],
             "proof_url": (proof_url or "").strip() or None,
             "note": (note or "").strip() or None,

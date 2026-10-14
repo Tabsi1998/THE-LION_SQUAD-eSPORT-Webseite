@@ -369,6 +369,8 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         "stream_link", "twitch_channel", "discord_link", "location",
         "banner_url", "stream_platform", "stream_url", "stream_title", "format_label",
         "result_entry_mode", "schedule_mode",
+        # Fristen (#1551): leer heißt wieder Standard.
+        "no_show_minutes_on_site", "no_show_minutes_online", "result_confirm_minutes_online", "result_confirm_hours_league",
     }
     updates = {k: v for k, v in raw_updates.items() if v is not None or k in nullable_fields}
     billing = await tournament_fees.billing_updates(raw_updates, existing, me)

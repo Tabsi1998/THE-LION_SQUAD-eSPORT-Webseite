@@ -43,7 +43,7 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
 | **Anmeldung** | Selbstanmeldung, Warteliste, Einladung, Speziallinks, Startgeld | Reiter Bearbeiten, Reiter Teilnehmer |
 | **Check-in** | Online selbst, vor Ort durch die Turnierleitung | Reiter Teilnehmer |
 | **Aufstellung** | Bei Team-Turnieren wählt der Kapitän, wer spielt | Dein-Stand-Karte der Spieler, Anzeige im Reiter Teilnehmer |
-| **Turnierbaum, Gruppen** | Vorschau wächst mit den Anmeldungen, fix wird sie mit dem Check-in | Reiter Turnierbaum, Matchplan, Gruppen |
+| **Turnierbaum, Gruppen** | Vorschau wächst mit den Anmeldungen, fix wird sie mit dem Ende des Check-ins | Reiter Turnierbaum, Matchplan, Gruppen |
 | **Ergebnisse** | Spieler melden, oder die Turnierleitung trägt im **Ergebnis-Fenster** ein, danach 10 Sekunden **Rückgängig** | Matchplan, Stationen, Turnierleitung am Handy |
 | **Dispute** | Streitfall entscheiden mit einem Tipp | Turnierleitung am Handy |
 | **Stationen** | Spiele Geräten zuweisen, Aufruf auf dem TV | Admin → eSports → Stationen |
@@ -88,8 +88,8 @@ noch die Zeile „Gehört zu … – ändern im Event“, und der Ort kommt vom 
 
 ### 2.3 Am Turniertag
 
-1. **Check-in starten** (Knopf oben im Turnier) – das macht den Baum fix (3.4).
-2. Teilnehmer einchecken (3.3).
+1. **Check-in starten** (Knopf oben im Turnier).
+2. Teilnehmer einchecken (3.3). Mit dem Ende des Check-ins steht der Baum (3.4).
 3. **Turnier starten**.
 4. Ergebnisse eintragen oder melden lassen (3.6).
 5. Im Status **Beendet**, danach **Ergebnisse veröffentlicht** (3.10).
@@ -189,7 +189,8 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
 - Suche („Name, Discord, E-Mail oder Team suchen“) und Filter nach Status, mit Zähler und den Zahlen je Status.
 - Je Zeile: die **Status-Auswahl** (nur für die Turnierleitung): Ausstehend, Bestätigt, Abgelehnt, Warteliste,
   Eingecheckt, Nicht erschienen. Beim Ablehnen fragt die Seite nach einem freiwilligen Grund; die Person bekommt eine
-  Nachricht. Ist jemand von der Warteliste nachgerückt, stellt ihr den Status auf **Bestätigt**.
+  Nachricht. Wird bis zum Ende des Check-ins ein Platz frei (Absage, **Nicht erschienen**, Entfernen), rückt die
+  älteste Anmeldung der Warteliste von selbst nach und bekommt eine Nachricht. Danach entscheidet ihr (3.4).
 - Die Knöpfe **Check-in**, **Auschecken**, **Nicht erschienen**, **Entfernen**.
 - **Disqualifizieren** und **Austritt** (nur Strukturrollen, nur im laufenden Turnier): der erste Klick zeigt den
   Umbauplan in Worten („E: Lena kommt kampflos weiter.“), erst **Bestätigen** macht ihn wirksam; ein freiwilliger Grund
@@ -211,12 +212,20 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
 - **Vor Ort:** Der Knopf heißt für Spieler „Check-in vor Ort“ und ist gesperrt. Die Turnierleitung setzt den Haken:
   im Reiter **Teilnehmer** **Check-in** (das Gegenstück ist **Auschecken**). Wer nicht kommt: **Nicht erschienen**.
 - **Check-in starten** (Hauptknopf oben im Turnier, solange noch kein Check-in läuft) setzt den Status **Check-in
-  offen** und **baut den Turnierbaum fix** – aus allen **Bestätigten und Eingecheckten**, nicht nur aus denen, die schon
-  da sind. Bis dahin wurde die Vorschau bei jeder Anmeldung neu gemischt.
-- Danach bleibt der Baum fix: Teilnehmer lassen sich nicht mehr einfach entfernen. Stattdessen **Nicht erschienen**
-  setzen und über **Teilnehmer hinzufügen** mit **Ersetzt Nicht-Erschienen** einen Ersatz einsetzen.
-- Mit dem Haken **Folgerunden zufällig mischen** (Spieloptionen) bleibt Runde 1 nach dem Check-in fix, die Folgerunden
-  werden zufällig besetzt.
+  offen**. Der Baum bleibt bis zum Ende des Check-ins eine Vorschau; bis dahin rücken Wartende nach.
+- **Ende des Check-ins** (die Zeit **Check-in endet**, oder **Turnier starten**, wenn keine Zeit gesetzt ist): Der
+  Turnierbaum entsteht **nur aus den Eingecheckten**. Der Status bleibt **Check-in offen**, bis das Turnier startet;
+  öffentlich steht „Anmeldung geschlossen“, und Spieler können nicht mehr selbst einchecken.
+- Ohne Check-in (direkt **Turnier starten**) kommen alle **Bestätigten** in den Baum.
+- **Nachrücker** nach dem Ende des Check-ins: Wer jetzt eingecheckt, bestätigt oder über **Teilnehmer hinzufügen**
+  eingetragen wird, übernimmt genau einen freien Platz – zuerst den einer Person mit **Nicht erschienen**, sonst einen
+  leeren Platz neben einem **Freilos** (das Freilos-Spiel wird dann normal gespielt). Das geht, solange das erste Spiel
+  dieses Platzes nicht begonnen hat; in Liga und Gruppen, solange höchstens ein Spieltag gespielt ist. Ist kein Platz
+  frei, sagt die Seite es. Gezielt ersetzt **Teilnehmer hinzufügen** mit **Ersetzt Nicht-Erschienen** – auch eine
+  Person mit Freilos.
+- Teilnehmer im festen Baum lassen sich nicht einfach entfernen. Stattdessen **Nicht erschienen** setzen und ersetzen.
+- Mit dem Haken **Folgerunden zufällig mischen** (Spieloptionen) steht Runde 1 ab dem Ende des Check-ins fest, die
+  Folgerunden werden zufällig besetzt.
 - **Turnier starten** (Status **Live**) prüft vorher die Planung. Gibt es Konflikte oder Hinweise, fragt die Seite
   „Mit Hinweisen live schalten?“. Ohne ein spielbares Spiel lässt sich das Turnier nicht starten.
 
@@ -235,6 +244,11 @@ Ohne gewählte Aufstellung steht dort „Keine Aufstellung – ganzes Team“.
 Minus, bei Best-of den Sieger je Spiel antippen, bei Mehrspieler-Spielen die Zielreihenfolge, auf Wunsch ein Foto und
 eine Notiz. Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Hat eine Seite gemeldet, sieht die andere die
 Meldung in Worten (mit Foto) und bestätigt mit **Stimmt** – oder **Stimmt nicht**. Bei Teams bestätigt die Teamleitung.
+Widerspricht die Gegenseite nicht, **gilt die Meldung nach der Frist**: online nach 15 Minuten, in Liga und Gruppen nach
+48 Stunden, spätestens zum Ende der Spielwoche – die Gegenseite hat aber immer mindestens 24 Stunden. Ein Spiel, das mit
+Zustimmung des Gegners außerhalb seiner Spielwoche stattfindet, gilt 48 Stunden nach der Meldung. Vor Ort bestätigt wie
+bisher die Turnierleitung. Einspruch (3.7) bleibt
+danach möglich, in der Liga bis zum Ende der Spielwoche.
 
 **Die Turnierleitung trägt ein.** Dasselbe **Ergebnis-Fenster** öffnet sich an vier Orten, mit denselben Feldern und
 Wörtern:
@@ -292,6 +306,13 @@ auf **In Klärung**.
 
 Der Reiter zeigt auch andere Fälle, zum Beispiel ein fehlendes Ergebnis oder eine **defekte Station**: Dort legt
 **Umlegen** die wartenden Spiele auf eine freie Station. Erledigtes verschwindet von selbst.
+
+**Nicht erschienen?** Ist die Frist eines Spiels um – vor Ort 10 Minuten ab Aufruf an die Station, online 15 Minuten
+ab Spielbeginn –, schlägt die Seite „kampflos verloren“ vor: eine Benachrichtigung an die Turnierleitung und ein Fall in
+**Braucht Aufmerksamkeit** mit den Knöpfen **<Name> nicht erschienen** (die Seite verliert nur dieses Spiel, mit Grund
+im Protokoll und unter ihren Strafen) und **+5 Min. verlängern**. Die Fristen stellt ihr im Turnier unter
+**Erweiterte Spieloptionen → Fristen** ein (leer heißt Standard); eine Phase kann sie in ihren Einstellungen
+überschreiben.
 
 ### 3.8 Stationen
 

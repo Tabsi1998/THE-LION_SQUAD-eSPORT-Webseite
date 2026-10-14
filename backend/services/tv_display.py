@@ -169,7 +169,7 @@ def key_label(value: str | None) -> str:
 TOURNAMENT_FIELDS = ("id", "slug", "title", "status", "format", "format_label", "format_display_name",
                      "public_phase", "start_date", "end_date", "team_mode", "paused_until", "registration_enabled",
                      "is_invite_only", "registration_open_from", "registration_open_until", "check_in_from",
-                     "check_in_until", "max_participants", "round_sponsors")
+                     "check_in_until", "check_in_closed_at", "max_participants", "round_sponsors")
 STAGE_FIELDS = ("id", "name", "number", "stage_type", "match_type")
 MATCH_FIELDS = ("id", "tournament_id", "stage_id", "stage_number", "stage_type", "match_type", "match_key", "section",
                 "round", "round_name", "round_label", "matchday_number", "matchday_label", "order", "match_index", "status",

@@ -15,7 +15,7 @@ export const GUIDE_STEPS = [
   {
     key: "check-in",
     title: "Check-in 30 bis 60 Minuten vor dem Start",
-    why: "So sieht die Turnierleitung vor dem ersten Match, wer wirklich da ist. Mit „Check-in starten“ wird der Baum aus allen Bestätigten und Eingecheckten fix; wer fehlt, wird „Nicht erschienen“ und ersetzt.",
+    why: "So sieht die Turnierleitung vor dem ersten Match, wer wirklich da ist. Mit dem Ende des Check-ins entsteht der Baum aus den Eingecheckten; bis dahin rücken Wartende nach. Wer danach kommt, rückt auf einen freien Platz nach (auch neben einem Freilos), solange dessen erstes Spiel nicht begonnen hat.",
     how: "„Check-in öffnet“ eine Stunde vor Start, „Check-in endet“ zehn Minuten vor Start.",
     fields: ["Check-in öffnet", "Check-in endet"],
   },
@@ -23,8 +23,8 @@ export const GUIDE_STEPS = [
     key: "forfeit",
     title: "Nicht erschienen: nach 10 bis 15 Minuten Forfeit",
     why: "Ein Turnier, das auf einen Spieler wartet, verliert alle anderen. Eine feste Frist ist fair, weil sie vorher bekannt ist.",
-    how: "Frist in die Regeln schreiben; die Turnierleitung setzt im Ergebnis-Fenster „Nicht erschienen“ – das Ergebnis trägt dann den Grund.",
-    fields: ["Regeln", "Nicht erschienen im Ergebnis-Fenster"],
+    how: "Frist in die Regeln schreiben (Standard: vor Ort 10 Minuten ab Aufruf, online 15 Minuten; einstellbar unter „Fristen“). Nach Ablauf schlägt die Seite „kampflos verloren“ vor – die Turnierleitung bestätigt oder verlängert.",
+    fields: ["Regeln", "Fristen", "Nicht erschienen im Ergebnis-Fenster"],
   },
   {
     key: "groups",

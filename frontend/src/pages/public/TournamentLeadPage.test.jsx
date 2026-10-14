@@ -50,3 +50,23 @@ test("ohne Fälle startet die Ansicht bei „Ergebnisse“", async () => {
   await waitFor(() => expect(screen.getByTestId("lead-row-m8")).toBeInTheDocument());
   expect(screen.getByTestId("lead-tab-results")).toHaveAttribute("aria-selected", "true");
 });
+
+test("„Nicht erschienen?“ (#1551): die Turnierleitung wählt die fehlende Seite oder verlängert", async () => {
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  const longName = "Aleksandra Wiśniewska-Kowalczyk 🦁 [LÖWEN-ESPORTS-AKADEMIE]";
+  renderLead({
+    tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup" }, matches: [ENTRY], recent: [], counts: { open: 1 }, stations: [],
+    attention: [{
+      id: "ns-m8", kind: "no_show", title: "Nicht erschienen?", action: "no_show", match_id: "m8", station_text: "PC 4",
+      label: "Halbfinale B", names: `${longName} gegen Jo`, detail: "10 Min. ab Aufruf um – kampflos werten oder verlängern.",
+      participants: [{ registration_id: "r3", name: longName }, { registration_id: "r4", name: "Jo" }],
+    }],
+  });
+  const card = await screen.findByTestId("lead-case-ns-m8");
+  expect(card).toHaveTextContent("10 Min. ab Aufruf um");
+  expect(screen.getByTestId("lead-no-show-r3")).toHaveTextContent(`${longName} nicht erschienen`);
+  fireEvent.click(screen.getByTestId("lead-no-show-r4"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/lead/no-show/m8", { action: "confirm", registration_id: "r4" }));
+  fireEvent.click(screen.getByTestId("lead-no-show-extend-ns-m8"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/lead/no-show/m8", { action: "extend", minutes: 5 }));
+});

@@ -23,7 +23,8 @@ export function paymentLine(price) {
 
 export function MyStandCard({ tournament: t, registration: myReg, team = null, isTeamTournament = false, canCheckIn = false, staffOnlyCheckIn = false, canUnregister = false, onCheckin, onUnregister, busy = false, scheduleTo = "" }) {
   if (!myReg) return null;
-  const checkinOpen = t.status === "check_in";
+  // Nach dem Check-in-Ende (#1551) steht der Baum - der Status bleibt „Check-in“, der Knopf geht weg.
+  const checkinOpen = t.status === "check_in" && !t.check_in_closed_at;
   const line = paymentLine(myReg.price);
   // Wo die Anmeldung steht (#1081): Freigabe, Startgeld, Check-in, Turnier - immer aus dem echten Stand.
   const steps = tournamentSteps(t, myReg);
