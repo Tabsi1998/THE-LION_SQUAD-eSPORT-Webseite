@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react-native";
 import { FastLapDetailScreen } from "./FastLapDetailScreen";
+import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
 // Nach dem Ende (#1221): an einer beendeten Fast-Lap-Challenge gibt es keinen Kalender-Knopf mehr - solange sie läuft
 // oder kommt, bleibt er. Die Daten sind erfunden.
@@ -47,4 +48,17 @@ test("Kalender-Knopf an einer kommenden Challenge, nicht an einer beendeten", as
   await render(<FastLapDetailScreen route={route} />);
   await waitFor(() => expect(screen.getByText("Spielberg Hotlap")).toBeTruthy());
   expect(screen.queryByTestId("add-to-calendar")).toBeNull();
+});
+
+test("eine verspätete Antwort für die vorige Challenge wird verworfen (#1000)", async () => {
+  answer(CHALLENGE);
+  await expectLateAnswerDiscarded({
+    mockGet,
+    renderFor: (id) => <FastLapDetailScreen route={{ params: { id } }} />,
+    newId: "hotlap",
+    oldPrefix: "/f1/challenges/alt",
+    oldAnswer: () => ({ ...CHALLENGE, id: "c0", slug: "alt", title: "Alte Challenge" }),
+    newText: "Spielberg Hotlap",
+    oldText: "Alte Challenge",
+  });
 });

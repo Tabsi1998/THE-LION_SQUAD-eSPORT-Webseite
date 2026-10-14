@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
-import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -15,6 +15,8 @@ import { colors, radius } from "../../theme";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
 import { PhotoSubmitCard } from "../../components/PhotoSubmitCard";
+import { idSegment } from "../../lib/apiIds";
+import { useKeyedLoad } from "../../lib/useKeyedLoad";
 
 // Album (#236): Raster aus 400-px-Kacheln, drei je Zeile; Abschnitte wie im Web. Antippen
 // öffnet die Großansicht an dieser Stelle.
@@ -25,33 +27,22 @@ const GAP = 4;
 export function GalleryAlbumScreen({ navigation, route }: Props) {
   const { id } = route.params;
   const { width } = useWindowDimensions();
-  const [album, setAlbum] = useState<GalleryAlbum | null>(null);
+  // Laden je Kennung (#1000): ein anderes Album zeigt nie kurz das vorige, eine verspätete Antwort wird verworfen.
+  const fetchAlbum = useCallback(async (albumId: string) => (await api.get<GalleryAlbum>(`/gallery/${idSegment(albumId)}`)).data || null, []);
+  const { data: album, loading, error, problem, stale, reload } = useKeyedLoad(id, fetchAlbum);
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    await reload();
+    setRefreshing(false);
+  }, [reload]);
   // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
   const share = useMemo(() => (album ? () => { void sharePage({ kind: "album", id: String(album.slug || album.id), title: album.title, detail: "Galerie" }); } : null), [album]);
   useShareHeader(navigation, share);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
-  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
-  const [problem, setProblem] = useState<LoadProblem | null>(null);
-
-  const load = useCallback(async () => {
-    setProblem(null);
-    setError("");
-    try {
-      const response = await api.get<GalleryAlbum>(`/gallery/${encodeURIComponent(id)}`);
-      setAlbum(response.data);
-      navigation.setOptions({ title: response.data?.title || "Album" });
-    } catch (err) {
-      setError(errorMessage(err, "Das Album konnte nicht geladen werden."));
-      setProblem(loadProblem(err));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [id, navigation]);
-
-  useEffect(() => { load(); }, [load]);
+  const albumTitle = album?.title;
+  useEffect(() => {
+    if (!loading || albumTitle) navigation.setOptions({ title: albumTitle || "Album" });
+  }, [albumTitle, loading, navigation]);
 
   const groups = useMemo(() => (album ? groupBySection(album) : []), [album]);
   const ordered = useMemo(() => groups.flatMap((group) => group.items), [groups]);
@@ -62,12 +53,12 @@ export function GalleryAlbumScreen({ navigation, route }: Props) {
     navigation.navigate("GalleryViewer", { albumId: id, index });
   };
 
-  if (loading) return <Screen><SkeletonList count={3} hasImage /></Screen>;
-  if (!album) return <Screen><ErrorState title="Album nicht gefunden" detail={error || "Dieses Album ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} /></Screen>;
+  if (!album && loading) return <Screen><SkeletonList count={3} hasImage /></Screen>;
+  if (!album) return <Screen><ErrorState title="Album nicht gefunden" detail={error ? errorMessage(error, "Das Album konnte nicht geladen werden.") : "Dieses Album ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void reload(); }} /></Screen>;
 
   return (
     <Screen padded={false}>
-      <ScrollView {...seasonScrollProps("GalleryAlbum")} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}>
+      <ScrollView {...seasonScrollProps("GalleryAlbum")} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={colors.cyan} />}>
         <View style={styles.header}>
           <Title>{album.title}</Title>
           <Muted>{[formatDate(album.taken_at), albumCountLabel(album)].filter(Boolean).join(" · ")}</Muted>
@@ -82,8 +73,9 @@ export function GalleryAlbumScreen({ navigation, route }: Props) {
           {album.description ? <Body>{album.description}</Body> : null}
         </View>
         {/* Fotos einsenden (#1186): nur für Mitglieder, nur bei Event-Alben, bis eine Woche danach. */}
-        <PhotoSubmitCard albumId={String(album.slug || album.id)} info={album.photo_submission} onSent={() => { void load(); }} />
-        {error ? <Muted style={styles.error}>{error}</Muted> : null}
+        <PhotoSubmitCard albumId={String(album.slug || album.id)} info={album.photo_submission} onSent={() => { void reload(); }} />
+        {/* Nachladen gescheitert (#1000): die Bilder sind ausdrücklich der letzte Stand. */}
+        {stale && problem ? <PartialLoadNotice problem={problem} onRetry={() => { void reload(); }} testID="album-stale" /> : null}
         {groups.length ? groups.map((group) => (
           <View key={group.id || "ohne"} style={styles.section}>
             {group.title ? <Heading>{group.title}</Heading> : null}
@@ -128,5 +120,4 @@ const styles = StyleSheet.create({
     right: 6,
     width: 24,
   },
-  error: { color: colors.live },
 });

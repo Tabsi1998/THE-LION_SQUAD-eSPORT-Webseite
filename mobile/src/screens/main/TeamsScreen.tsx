@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
-import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { useTabScrollToTop } from "../../components/TabHeader";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -32,6 +32,9 @@ export function TeamsSection({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [problem, setProblem] = useState<LoadProblem | null>(null);
+  // Die Einladungen sind ein Teil (Codex-Prüfung #1512): scheitern sie, bleibt ihr letzter Stand, und oben steht
+  // „nicht alles geladen“ - sie machen aber nie aus einer leeren Teamliste einen Teams-Fehler.
+  const [inviteProblem, setInviteProblem] = useState<LoadProblem | null>(null);
 
   const load = useCallback(async () => {
     setError("");
@@ -47,6 +50,7 @@ export function TeamsSection({ navigation }: Props) {
     if (inviteResult.status === "fulfilled") setInvites(Array.isArray(inviteResult.value.data) ? inviteResult.value.data : []);
     const failed = [all, mine].find((result): result is PromiseRejectedResult => result.status === "rejected");
     setProblem(failed ? loadProblem(failed.reason) : null);
+    setInviteProblem(inviteResult.status === "rejected" ? loadProblem(inviteResult.reason) : null);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -80,6 +84,8 @@ export function TeamsSection({ navigation }: Props) {
     return result;
   }, [mine, others]);
 
+  // Teams mit letztem Stand (Nachladen gescheitert) oder fehlende Einladungen: eine Zeile oben sagt es.
+  const partialNotice = (rows.length ? problem : null) || inviteProblem;
   const statTeams = mine.length ? mine : others;
   const memberTotal = useMemo(() => statTeams.reduce((sum, team) => sum + teamMembers(team), 0), [statTeams]);
   const squadTotal = useMemo(() => statTeams.reduce((sum, team) => sum + teamSquads(team), 0), [statTeams]);
@@ -108,6 +114,8 @@ export function TeamsSection({ navigation }: Props) {
           <View style={styles.header}>
             {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
+            {/* Nachladen gescheitert (#1001): die Liste ist der letzte Stand - das steht hier, mit „Nochmal“. */}
+            {partialNotice ? <PartialLoadNotice problem={partialNotice} onRetry={() => { void load(); }} testID="teams-partial-load" /> : null}
             {statTeams.length ? (
               <View style={styles.stats}>
                 <Stat icon="shield-outline" label="Teams" value={statTeams.length} />

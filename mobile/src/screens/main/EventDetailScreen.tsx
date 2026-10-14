@@ -10,7 +10,7 @@ import { EventRecapCard } from "../../components/EventRecapCard";
 import { FormInput } from "../../components/FormInput";
 import { FriendsAtEventCard } from "../../components/FriendsAtEventCard";
 import { offerFriendsHint } from "../../lib/friendsHint";
-import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { PlayAlongSheet } from "../../components/PlayAlongSheet";
 import { RichText } from "../../components/RichText";
@@ -38,6 +38,8 @@ import { colors, kindColors, radius } from "../../theme";
 import type { ClubEvent, EventRegistration, F1Challenge, NewsPost, Tournament } from "../../types";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
+import { idSegment } from "../../lib/apiIds";
+import { useKeyedLoad } from "../../lib/useKeyedLoad";
 
 // Einzahl und Mehrzahl (#1223): „1 Platz“, „2 Plätze“, „1 Begleitperson“, „2 Begleitpersonen“.
 function placesLabel(count: number): string {
@@ -71,16 +73,16 @@ type EventDetail = ClubEvent & {
 
 export function EventDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
-  const [event, setEvent] = useState<EventDetail | null>(null);
+  // Laden je Kennung (#1000): ein anderes Event zeigt nie das vorige, verspätete Antworten werden verworfen, und ein
+  // gescheitertes Nachladen lässt den letzten Stand gekennzeichnet stehen.
+  const fetchEvent = useCallback(async (id: string) => (await api.get<EventDetail>(`/events/${idSegment(id)}`)).data || null, []);
+  const { data: event, loading, error: loadError, problem, stale, reload: load } = useKeyedLoad(route.params.id, fetchEvent);
   // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
   const share = useMemo(() => (event ? () => { void sharePage({ kind: "event", id: String(event.slug || event.id), title: event.title || event.name || "Event", start: (event.start_date || event.date) as string, end: event.end_date }); } : null), [event]);
   useShareHeader(navigation, share);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
-  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [companionCount, setCompanionCount] = useState("0");
   const [note, setNote] = useState("");
   // Kosten (#396): wählbare Positionen und der Kostenhaken - wie beim Startgeld am Turnier.
@@ -95,23 +97,10 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const [playAlongFor, setPlayAlongFor] = useState<string | null>(null);
   const returnTournament = route.params.returnTournament || null;
 
-  const load = useCallback(async () => {
-    setProblem(null);
-    setError("");
-    try {
-      const { data } = await api.get<EventDetail>(`/events/${route.params.id}`);
-      setEvent(data || null);
-    } catch (err) {
-      setError(errorMessage(err, "Event konnte nicht geladen werden."));
-      setProblem(loadProblem(err));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [route.params.id]);
-
-  useEffect(() => {
-    load();
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
   }, [load]);
 
   useEffect(() => {
@@ -239,7 +228,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
     ]);
   }, [busy, event, load]);
 
-  if (loading) {
+  if (!event && loading) {
     return (
       <Screen>
         <SkeletonList count={4} />
@@ -250,7 +239,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   if (!event) {
     return (
       <Screen>
-        <ErrorState title="Event nicht gefunden" detail={error || "Dieses Event ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
+        <ErrorState title="Event nicht gefunden" detail={loadError ? errorMessage(loadError, "Event konnte nicht geladen werden.") : "Dieses Event ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }
@@ -261,8 +250,10 @@ export function EventDetailScreen({ navigation, route }: Props) {
         ref={scrollRef}
         {...seasonScrollProps("EventDetail")}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={colors.cyan} />}
       >
+        {/* Nachladen gescheitert (#1000): das Event ist ausdrücklich der letzte Stand. */}
+        {stale && problem ? <PartialLoadNotice problem={problem} onRetry={() => { void load(); }} testID="event-stale" /> : null}
         {/* Kopfbild (#1273): ein Foto füllt das Banner, ein Logo steht klein auf einer Fläche in Event-Violett. */}
         {banner?.kind === "logo" ? (
           <View style={styles.logoStage} testID="event-banner-logo">

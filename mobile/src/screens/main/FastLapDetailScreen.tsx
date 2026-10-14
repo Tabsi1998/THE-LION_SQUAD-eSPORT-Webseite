@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { AddToCalendarButton } from "../../components/AddToCalendarButton";
 import { challengeIsOver } from "../../lib/afterEnd";
 import { Card } from "../../components/Card";
-import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -18,6 +18,8 @@ import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload, PublicUser 
 import { Button } from "../../components/Button";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
+import { idSegment } from "../../lib/apiIds";
+import { useKeyedLoad } from "../../lib/useKeyedLoad";
 import { FriendsAtEventCard } from "../../components/FriendsAtEventCard";
 import { isGuestUser } from "../../live";
 
@@ -29,20 +31,43 @@ type Props = {
   };
 };
 
+type FastLapPage = { challenge: F1Challenge; trackId: string | null; leaderboard: F1LeaderboardPayload | null; managerUsers: PublicUser[] };
+const NO_USERS: PublicUser[] = [];
+
 export function FastLapDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
-  const [challenge, setChallenge] = useState<F1Challenge | null>(null);
+  // Laden je Kennung (#1000): eine andere Challenge zeigt nie die vorige, verspätete Antworten werden verworfen, ein
+  // gescheitertes Nachladen lässt den letzten Stand gekennzeichnet stehen. Die gewählte Strecke gilt nur für diese Kennung.
+  const wantedTrack = useRef<{ id: string; track: string | null }>({ id: route.params.id, track: null });
+  const fetchChallenge = useCallback(async (id: string): Promise<FastLapPage> => {
+    const challengeResult = await api.get<F1Challenge>(`/f1/challenges/${idSegment(id)}`);
+    const nextChallenge = challengeResult.data;
+    const wanted = wantedTrack.current.id === id ? wantedTrack.current.track : null;
+    const trackId = wanted || nextChallenge.tracks?.[0]?.id || null;
+    const leaderboardResult = await api.get<F1LeaderboardPayload>(`/f1/challenges/${idSegment(nextChallenge.slug || nextChallenge.id)}/leaderboard`, {
+      params: trackId ? { track_id: trackId } : undefined,
+    });
+    let managerUsers: PublicUser[] = [];
+    if (nextChallenge.can_manage_times) {
+      const usersResult = await api.get<PublicUser[]>(`/f1/challenges/${idSegment(nextChallenge.id)}/assignable-users`).catch(() => ({ data: [] as PublicUser[] }));
+      managerUsers = Array.isArray(usersResult.data) ? usersResult.data : [];
+    }
+    return { challenge: nextChallenge, trackId, leaderboard: leaderboardResult.data, managerUsers };
+  }, []);
+  const { data: page, loading, error: loadError, problem, stale, reload } = useKeyedLoad(route.params.id, fetchChallenge);
+  const challenge = page?.challenge ?? null;
+  const leaderboard = page?.leaderboard ?? null;
+  const selectedTrackId = page?.trackId ?? null;
+  const managerUsers = page?.managerUsers ?? NO_USERS;
+  const load = useCallback(async (trackId?: string | null) => {
+    wantedTrack.current = { id: route.params.id, track: trackId || null };
+    await reload();
+  }, [reload, route.params.id]);
   // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
   const share = useMemo(() => (challenge ? () => { void sharePage({ kind: "fastlap", id: String(challenge.slug || challenge.id), title: challenge.title, detail: "Fast Lap", start: challenge.start_date, end: challenge.end_date }); } : null), [challenge]);
   useShareHeader(navigation, share);
-  const [leaderboard, setLeaderboard] = useState<F1LeaderboardPayload | null>(null);
-  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
-  const [problem, setProblem] = useState<LoadProblem | null>(null);
-  const [managerUsers, setManagerUsers] = useState<PublicUser[]>([]);
   const [managerSearch, setManagerSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [timeInput, setTimeInput] = useState("");
@@ -57,38 +82,11 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
   const activeTrackId = selectedTrackId || tracks[0]?.id || null;
   const activeTrack = tracks.find((track) => track.id === activeTrackId) || leaderboard?.track || tracks[0] || null;
 
-  const load = useCallback(async (trackId?: string | null) => {
-    setProblem(null);
-    setError("");
-    try {
-      const challengeResult = await api.get<F1Challenge>(`/f1/challenges/${route.params.id}`);
-      const nextChallenge = challengeResult.data;
-      const nextTrackId = trackId || nextChallenge.tracks?.[0]?.id || null;
-      setChallenge(nextChallenge);
-      setSelectedTrackId(nextTrackId);
-
-      const leaderboardResult = await api.get<F1LeaderboardPayload>(`/f1/challenges/${nextChallenge.slug || nextChallenge.id}/leaderboard`, {
-        params: nextTrackId ? { track_id: nextTrackId } : undefined,
-      });
-      setLeaderboard(leaderboardResult.data);
-      if (nextChallenge.can_manage_times) {
-        const usersResult = await api.get<PublicUser[]>(`/f1/challenges/${nextChallenge.id}/assignable-users`).catch(() => ({ data: [] as PublicUser[] }));
-        setManagerUsers(Array.isArray(usersResult.data) ? usersResult.data : []);
-      } else {
-        setManagerUsers([]);
-      }
-    } catch (err) {
-      setError(errorMessage(err, "Fast-Lap Zeiten konnten nicht geladen werden."));
-      setProblem(loadProblem(err));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [route.params.id]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    await load(activeTrackId);
+    setRefreshing(false);
+  }, [activeTrackId, load]);
 
   const best = useMemo(() => leaderboard?.entries?.[0], [leaderboard]);
   const registration = useMemo(() => getRegistrationState(challenge, "Einreichung"), [challenge]);
@@ -144,7 +142,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
     }
   }, [activeTrackId, adminNote, challenge, forceReference, invalidLap, load, penaltyInput, proofUrl, savingTime, scoreScope, selectedUserId, timeInput]);
 
-  if (loading) {
+  if (!challenge && loading) {
     return (
       <Screen>
         <SkeletonList count={4} />
@@ -155,7 +153,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
   if (!challenge) {
     return (
       <Screen>
-        <ErrorState title="Challenge nicht gefunden" detail={error || "Diese Challenge ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
+        <ErrorState title="Challenge nicht gefunden" detail={loadError ? errorMessage(loadError, "Fast-Lap Zeiten konnten nicht geladen werden.") : "Diese Challenge ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }
@@ -164,8 +162,10 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
     <Screen padded={false}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(activeTrackId); }} tintColor={colors.cyan} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={colors.cyan} />}
       >
+        {/* Nachladen gescheitert (#1000): die Zeiten sind ausdrücklich der letzte Stand. */}
+        {stale && problem ? <PartialLoadNotice problem={problem} onRetry={() => { void load(activeTrackId); }} testID="fastlap-stale" /> : null}
         <View style={styles.heroWrap}>
           <MediaImage
             uri={activeTrack?.image_url || challenge.banner_url}

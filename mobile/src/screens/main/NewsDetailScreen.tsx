@@ -1,11 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
-import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
@@ -20,39 +20,26 @@ import { colors, radius } from "../../theme";
 import type { NewsPost } from "../../types";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
+import { idSegment } from "../../lib/apiIds";
+import { useKeyedLoad } from "../../lib/useKeyedLoad";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "NewsDetail">;
 export function NewsDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const readerId = user?.id && !isGuestUser(user) ? user.id : null;
-  const [post, setPost] = useState<NewsPost | null>(null);
+  // Laden je Kennung (#1000): wechselt die Kennung, ist der alte Beitrag sofort weg, und eine verspätete Antwort für den
+  // vorigen Beitrag überschreibt den neuen nicht. Was beim Laden schiefging (#1152), sagt `problem` - nie „nichts da“.
+  const fetchPost = useCallback(async (id: string) => (await api.get<NewsPost>(`/news/${idSegment(id)}`)).data || null, []);
+  const { data: post, loading, error, problem, stale, reload } = useKeyedLoad(route.params.id, fetchPost);
   // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
   const share = useMemo(() => (post ? () => { void sharePage({ kind: "news", id: String(post.slug || post.id), title: post.title }); } : null), [post]);
   useShareHeader(navigation, share);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
-  const [problem, setProblem] = useState<LoadProblem | null>(null);
 
-  const load = useCallback(async () => {
-    setProblem(null);
-    setError("");
-    try {
-      const { data } = await api.get<NewsPost>(`/news/${route.params.id}`);
-      setPost(data || null);
-      // Gelesen-Marker (#616): nur mit Anmeldung, nur die Zahl - still im Hintergrund.
-      if (data?.id && readerId) api.post(`/news/${data.id}/read`).catch(() => undefined);
-    } catch (err) {
-      setError(errorMessage(err, "News-Beitrag konnte nicht geladen werden."));
-      setProblem(loadProblem(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [route.params.id, readerId]);
-
+  // Gelesen-Marker (#616): nur mit Anmeldung, nur die Zahl - still im Hintergrund, einmal je geladenem Beitrag.
+  const postId = post?.id;
   useEffect(() => {
-    load();
-  }, [load]);
+    if (postId && readerId) api.post(`/news/${postId}/read`).catch(() => undefined);
+  }, [postId, readerId]);
 
   const openContentTarget = useCallback((target: ContentTarget) => {
     if (target.type === "news") {
@@ -78,7 +65,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
     navigation.navigate("PublicProfile", { username: target.id });
   }, [navigation]);
 
-  if (loading) {
+  if (!post && loading) {
     return (
       <Screen>
         <SkeletonList count={4} />
@@ -89,7 +76,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
   if (!post) {
     return (
       <Screen>
-        <ErrorState title="Beitrag nicht gefunden" detail={error || "Dieser Beitrag ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
+        <ErrorState title="Beitrag nicht gefunden" detail={error ? errorMessage(error, "News-Beitrag konnte nicht geladen werden.") : "Dieser Beitrag ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void reload(); }} />
       </Screen>
     );
   }
@@ -103,6 +90,8 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           fallback={<Ionicons name="newspaper-outline" color={colors.gold} size={42} />}
         />
         <View style={styles.article}>
+          {/* Nachladen gescheitert (#1000): der gezeigte Beitrag ist ausdrücklich der letzte Stand. */}
+          {stale && problem ? <PartialLoadNotice problem={problem} onRetry={() => { void reload(); }} testID="news-stale" /> : null}
           <Muted>{formatDate(post.published_at || post.created_at)}{post.category ? ` · ${post.category}` : ""}</Muted>
           <Title>{post.title}</Title>
           {post.content || post.body ? (

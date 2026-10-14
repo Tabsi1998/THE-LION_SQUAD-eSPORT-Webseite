@@ -7,7 +7,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
-import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { ErrorState, PartialLoadNotice, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -17,6 +17,8 @@ import { CommendButton } from "../../components/CommendButton";
 import { isGuestUser } from "../../live";
 import { api, errorMessage } from "../../lib/api";
 import { invalidateCache } from "../../lib/cache";
+import { idSegment } from "../../lib/apiIds";
+import { useKeyedLoad } from "../../lib/useKeyedLoad";
 import {
   continuesMessageGroup,
   formatChatTime,
@@ -107,16 +109,38 @@ const scheduleLabels: Record<string, string> = {
   proposed: "Terminvorschlag offen",
 };
 
+/** Was die Matchseite lädt; `round` zählt die geladenen Stände, `partProblem` sagt, wenn der Chat nicht kam (#1000). */
+type MatchData = { page: MatchPage | null; chat: ChatMessage[]; round: number; partProblem: LoadProblem | null };
+const NO_CHAT: ChatMessage[] = [];
+
 export function MatchDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
-  const [page, setPage] = useState<MatchPage | null>(null);
-  const [chat, setChat] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Laden je Kennung (#1000): ein anderes Match zeigt nie das vorige, verspätete Antworten (auch vom Live-Nachladen)
+  // werden verworfen, ein gescheitertes Nachladen lässt den letzten Stand gekennzeichnet stehen. Der Chat ist ein Teil:
+  // kommt er nicht, bleibt der letzte Stand, und die Seite sagt es.
+  const fetchMatch = useCallback(async (id: string, previous: MatchData | null): Promise<MatchData> => {
+    const segment = idSegment(id);
+    const [pageResult, chatResult] = await Promise.allSettled([
+      api.get<MatchPage>(`/matches/${segment}/page`),
+      api.get<ChatMessage[]>(`/matches/${segment}/chat`),
+    ]);
+    if (pageResult.status === "rejected") throw pageResult.reason;
+    loadRound.current += 1;
+    return {
+      page: pageResult.value.data || null,
+      chat: chatResult.status === "fulfilled" ? (Array.isArray(chatResult.value.data) ? chatResult.value.data : []) : previous?.chat || [],
+      round: loadRound.current,
+      partProblem: chatResult.status === "rejected" ? loadProblem(chatResult.reason) : null,
+    };
+  }, []);
+  const loadRound = useRef(0);
+  const { data, loading, error: loadError, problem, stale, reload, mutate } = useKeyedLoad(route.params.id, fetchMatch);
+  const page = data?.page ?? null;
+  const chat = data?.chat ?? NO_CHAT;
+  const notice = (stale ? problem : null) || data?.partProblem || null;
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
-  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [success, setSuccess] = useState("");
   const [proposalAt, setProposalAt] = useState("");
   const [proposalNote, setProposalNote] = useState("");
@@ -127,39 +151,33 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const [resultOpen, setResultOpen] = useState(false);
 
   const lastReadChat = useRef<string | null>(null);
+  // Entwürfe (#1139): nach einer eigenen Aktion zeigt der Terminvorschlag den neuen Stand, beim Live-Nachladen bleibt,
+  // was man gerade tippt.
+  const preserveDrafts = useRef(true);
   const load = useCallback(async (options?: { preserveDrafts?: boolean }) => {
-    setProblem(null);
-    const preserveDrafts = options?.preserveDrafts !== false;
-    setError("");
-    try {
-      const [pageResult, chatResult] = await Promise.all([
-        api.get<MatchPage>(`/matches/${route.params.id}/page`),
-        api.get<ChatMessage[]>(`/matches/${route.params.id}/chat`).catch(() => ({ data: [] as ChatMessage[] })),
-      ]);
-      const nextPage = pageResult.data || null;
-      const match = nextPage?.match || {};
-      setPage(nextPage);
-      const loadedChat = Array.isArray(chatResult.data) ? chatResult.data : [];
-      setChat(loadedChat);
-      // Match-Chat gelesen (#1148) - nur für die, die mitschreiben dürfen, und nur bei einer neuen Nachricht.
-      const newest = loadedChat.length ? String(loadedChat[loadedChat.length - 1]?.id || loadedChat.length) : "";
-      if (nextPage?.can_act && newest !== lastReadChat.current) {
-        lastReadChat.current = newest;
-        void markChatRead("match", route.params.id);
-      }
-      if (preserveDrafts) {
-        setProposalAt((current) => current || viennaWall(match.scheduled_at));
-      } else {
-        setProposalAt(viennaWall(match.scheduled_at));
-      }
-    } catch (err) {
-      setError(errorMessage(err, "Match konnte nicht geladen werden."));
-      setProblem(loadProblem(err));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    preserveDrafts.current = options?.preserveDrafts !== false;
+    await reload();
+  }, [reload]);
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    await load({ preserveDrafts: false });
+    setRefreshing(false);
+  }, [load]);
+
+  // Nach jedem geladenen Stand (nicht nach einer eigenen Chat-Nachricht): gelesen melden und den Terminvorschlag füllen.
+  const round = data?.round;
+  useEffect(() => {
+    if (!round || !data) return;
+    const match = data.page?.match || {};
+    // Match-Chat gelesen (#1148) - nur für die, die mitschreiben dürfen, und nur bei einer neuen Nachricht.
+    const newest = data.chat.length ? String(data.chat[data.chat.length - 1]?.id || data.chat.length) : "";
+    if (data.page?.can_act && newest !== lastReadChat.current) {
+      lastReadChat.current = newest;
+      void markChatRead("match", route.params.id);
     }
-  }, [route.params.id]);
+    if (preserveDrafts.current) setProposalAt((current) => current || viennaWall(match.scheduled_at));
+    else setProposalAt(viennaWall(match.scheduled_at));
+  }, [round]);
 
   useEffect(() => {
     setProposalAt("");
@@ -172,7 +190,13 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   }, [route.params.id]);
 
   const isFocused = useIsFocused();
+  // Beim Wiederkommen frisch laden; das erste Öffnen lädt schon useKeyedLoad.
+  const focusedBefore = useRef(false);
   useFocusEffect(useCallback(() => {
+    if (!focusedBefore.current) {
+      focusedBefore.current = true;
+      return;
+    }
     void load({ preserveDrafts: false });
   }, [load]));
   useLiveRefresh(() => load(), MATCH_LIVE_RESOURCES, { enabled: isFocused, fallbackMs: 10000 });
@@ -227,7 +251,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setBusy(true);
     setError("");
     try {
-      await api.post(`/matches/${route.params.id}/schedule-proposals`, { scheduled_at: scheduledAt, note: proposalNote.trim() || null });
+      await api.post(`/matches/${idSegment(route.params.id)}/schedule-proposals`, { scheduled_at: scheduledAt, note: proposalNote.trim() || null });
       setProposalNote("");
       await load({ preserveDrafts: false });
     } catch (err) {
@@ -251,7 +275,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setBusy(true);
     setError("");
     try {
-      await api.post(`/matches/${route.params.id}/schedule-proposals/${proposal.id}/decision`, payload);
+      await api.post(`/matches/${idSegment(route.params.id)}/schedule-proposals/${proposal.id}/decision`, payload);
       setCounterAt("");
       setDecisionNote("");
       await load({ preserveDrafts: false });
@@ -271,8 +295,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setBusy(true);
     setError("");
     try {
-      const { data } = await api.post<ChatMessage>(`/matches/${route.params.id}/chat`, { sticker_id: sticker.id });
-      setChat((items) => [...items, data]);
+      const { data: sent } = await api.post<ChatMessage>(`/matches/${idSegment(route.params.id)}/chat`, { sticker_id: sticker.id });
+      mutate((current) => ({ ...current, chat: [...current.chat, sent] }));
     } catch (err) {
       setError(errorMessage(err, "Sticker konnte nicht gesendet werden."));
     } finally {
@@ -286,8 +310,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setBusy(true);
     setError("");
     try {
-      const { data } = await api.post<ChatMessage>(`/matches/${route.params.id}/chat`, { message: text, attachment_ids: chatAttachments.attachmentIds });
-      setChat((items) => [...items, data]);
+      const { data: sent } = await api.post<ChatMessage>(`/matches/${idSegment(route.params.id)}/chat`, { message: text, attachment_ids: chatAttachments.attachmentIds });
+      mutate((current) => ({ ...current, chat: [...current.chat, sent] }));
       setMessage("");
       chatAttachments.reset();
     } catch (err) {
@@ -311,7 +335,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setError("");
     setSuccess("");
     try {
-      const { data } = await api.post<{ awaiting_confirmation?: boolean }>(`/matches/${route.params.id}/report`, payload);
+      const { data } = await api.post<{ awaiting_confirmation?: boolean }>(`/matches/${idSegment(route.params.id)}/report`, payload);
       await refreshAfterResult();
       setSuccess(data?.awaiting_confirmation === false ? "Ergebnis bestätigt – das Spiel ist entschieden." : "Ergebnis gemeldet.");
       return true;
@@ -331,7 +355,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setBusy(true);
     setError("");
     try {
-      await api.post(`/matches/${route.params.id}/dispute`, payload);
+      await api.post(`/matches/${idSegment(route.params.id)}/dispute`, payload);
       await load({ preserveDrafts: false });
       setSuccess("Gemeldet. Die Turnierleitung schaut es sich an.");
       return true;
@@ -343,7 +367,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     }
   }, [busy, load, page?.can_dispute, route.params.id]);
 
-  if (loading) {
+  if (!page && loading) {
     return (
       <Screen>
         <SkeletonList count={4} hasImage={false} />
@@ -354,7 +378,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   if (!page) {
     return (
       <Screen>
-        <ErrorState title="Match nicht gefunden" detail={error || "Dieses Match ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
+        <ErrorState title="Match nicht gefunden" detail={loadError ? errorMessage(loadError, "Match konnte nicht geladen werden.") : "Dieses Match ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }
@@ -367,8 +391,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load({ preserveDrafts: false }); }} tintColor={colors.cyan} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={colors.cyan} />}
       >
+        {notice ? <PartialLoadNotice problem={notice} onRetry={() => { void load({ preserveDrafts: false }); }} testID="match-partial-load" /> : null}
         {/* Kopf im Klartext wie auf der Website (#1139, #1220): Runde und Namen statt „Match A“, das Kürzel nur klein.
             Vor dem Spiel der Termin, danach „Beendet“ mit dem Ergebnis; die Station genau einmal. */}
         <View style={styles.header}>

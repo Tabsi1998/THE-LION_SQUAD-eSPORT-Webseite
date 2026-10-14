@@ -1,6 +1,6 @@
 import React from "react";
 import { Linking } from "react-native";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { InfoCenterScreen, achievementLine } from "./InfoCenterScreen";
 
 // Infocenter: Referenzen kommen als { items, summary } (#252), Rollen und
@@ -128,9 +128,57 @@ test("Partner (#469): Kanäle als Chips und der Weg zur Partnerseite im Web", as
   await render(<InfoCenterScreen navigation={navigation} route={routeFor("partners")} />);
   await waitFor(() => expect(screen.getByText("PineApps eSports")).toBeTruthy());
   expect(screen.getByText("Twitch")).toBeTruthy();
-  fireEvent.press(screen.getByTestId("partner-channel-pa-1-twitch"));
+  await fireEvent.press(screen.getByTestId("partner-channel-pa-1-twitch"));
   expect(open).toHaveBeenLastCalledWith("https://www.twitch.tv/pineapps");
-  fireEvent.press(screen.getByTestId("partner-page-pa-1"));
+  await fireEvent.press(screen.getByTestId("partner-page-pa-1"));
   expect(open).toHaveBeenLastCalledWith(expect.stringMatching(/\/partners\/pineapps-esports$/));
   open.mockRestore();
+});
+
+// Ladefehler oder wirklich leer (#1001): leer heißt nur leer, wenn der Abruf geklappt hat.
+const httpError = (status: number) => Object.assign(new Error(`HTTP ${status}`), { isAxiosError: true, response: { status, data: {} } });
+const networkError = () => Object.assign(new Error("Network Error"), { isAxiosError: true });
+
+test.each([
+  ["Server-Fehler", () => httpError(500), "Laden hat nicht geklappt"],
+  ["ohne Netz", networkError, "Ohne Netz"],
+  ["nicht freigegeben", () => httpError(403), "Sponsoren nicht gefunden"],
+])("Sponsoren beim ersten Laden: %s ist ein Ladefehler, nicht „Keine Sponsoren“ (#1001)", async (_label, error, title) => {
+  const fallback = mockGet.getMockImplementation()!;
+  mockGet.mockImplementation((path: string) => (path === "/sponsors" ? Promise.reject(error()) : fallback(path)));
+  await render(<InfoCenterScreen navigation={navigation} route={routeFor("sponsors")} />);
+  await waitFor(() => expect(screen.getByTestId("info-center-error")).toBeTruthy());
+  expect(screen.getByText(title)).toBeTruthy();
+  expect(screen.queryByText("Keine Sponsoren")).toBeNull();
+});
+
+test("Sponsoren wirklich leer: „Keine Sponsoren“ ohne Fehler (#1001)", async () => {
+  const fallback = mockGet.getMockImplementation()!;
+  mockGet.mockImplementation((path: string) => (path === "/sponsors" ? Promise.resolve({ data: [] }) : fallback(path)));
+  await render(<InfoCenterScreen navigation={navigation} route={routeFor("sponsors")} />);
+  await waitFor(() => expect(screen.getByText("Keine Sponsoren")).toBeTruthy());
+  expect(screen.queryByTestId("info-center-error")).toBeNull();
+});
+
+test("andere Bereiche bleiben nutzbar, wenn einer scheitert (#1001)", async () => {
+  const fallback = mockGet.getMockImplementation()!;
+  mockGet.mockImplementation((path: string) => (path === "/sponsors" ? Promise.reject(httpError(500)) : fallback(path)));
+  await render(<InfoCenterScreen navigation={navigation} route={routeFor("partners")} />);
+  await waitFor(() => expect(screen.getByText("PineApps eSports")).toBeTruthy());
+  expect(screen.queryByTestId("info-center-error")).toBeNull();
+  expect(screen.queryByTestId("info-center-partial-load")).toBeNull();
+});
+
+test("Folgefehler: die Sponsoren bleiben stehen, ausdrücklich als letzter Stand (#1001)", async () => {
+  const fallback = mockGet.getMockImplementation()!;
+  await render(<InfoCenterScreen navigation={navigation} route={routeFor("sponsors")} />);
+  await waitFor(() => expect(screen.getByTestId("sponsor-banner-s1")).toBeTruthy());
+  mockGet.mockImplementation((path: string) => (path === "/sponsors" ? Promise.reject(networkError()) : fallback(path)));
+  const [scroll] = screen.container.queryAll((node) => Boolean(node.props.refreshControl));
+  await act(async () => {
+    await scroll.props.refreshControl.props.onRefresh();
+  });
+  await waitFor(() => expect(screen.getByTestId("info-center-partial-load")).toBeTruthy());
+  expect(screen.getByTestId("sponsor-banner-s1")).toBeTruthy();
+  expect(screen.queryByTestId("info-center-error")).toBeNull();
 });

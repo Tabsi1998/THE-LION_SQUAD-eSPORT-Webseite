@@ -1,4 +1,5 @@
 import { currentTab, navigateToNotification, navigateToUrl, openSignIn, openTab, signInOpen, targetFromNotification, targetFromUrl } from "./rootNavigation";
+import { ARTICLE, FOREIGN_ARTICLE_LINKS, OWN_ARTICLE_LINKS } from "../lib/linkOrigins.fixture";
 
 // Wohin Adressen und Benachrichtigungen führen (#1143, #1144): Detail-Screens legen sich über den Tab, in dem man gerade
 // ist; nur die Übersichten (Home, Events, Community, Verein, Profil) wechseln den Tab. Alte Adressen - aus Mails, alten
@@ -181,4 +182,17 @@ test("Benachrichtigungen: Chats, Teams, Turniere, Gewinne und Freunde - sonst di
   mockRef.root = onTab("VereinTab");
   expect(navigateToNotification(note("unbekannt") as never)).toBe(false);
   expect(mockRef.navigate).toHaveBeenLastCalledWith("Notifications", undefined);
+});
+
+test("gemeinsame Herkunfts-Matrix (#998): Adressen und Benachrichtigungen öffnen nur die eigene Website als Screen", () => {
+  for (const url of OWN_ARTICLE_LINKS) {
+    expect([url, targetFromUrl(url)]).toEqual([url, detail("NewsDetail", { id: ARTICLE })]);
+    expect([url, targetFromNotification({ id: "n", kind: "system", title: "Neu", read: false, url } as never)]).toEqual([url, detail("NewsDetail", { id: ARTICLE })]);
+  }
+  for (const url of FOREIGN_ARTICLE_LINKS) {
+    expect([url, targetFromUrl(url)]).toEqual([url, null]);
+    expect([url, targetFromNotification({ id: "n", kind: "system", title: "Neu", read: false, url } as never)]).toEqual([url, null]);
+  }
+  // Ein Pfad ohne führenden Schrägstrich bleibt wie bisher ein Pfad der eigenen Website.
+  expect(targetFromUrl("news/saisonstart")).toEqual(detail("NewsDetail", { id: "saisonstart" }));
 });

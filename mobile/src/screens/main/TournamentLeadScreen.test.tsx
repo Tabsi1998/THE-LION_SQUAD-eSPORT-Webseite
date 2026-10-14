@@ -1,6 +1,7 @@
 import React from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { TournamentLeadScreen } from "./TournamentLeadScreen";
+import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
 // Turnierleitung am Handy (#1156): offene Spiele, zuerst was fehlt; „Eintragen“ öffnet das Ergebnis-Fenster mit großen
 // Knöpfen, vor dem Speichern steht der Satz, danach 10 Sekunden „Rückgängig“. Namen sind erfunden.
@@ -69,7 +70,8 @@ test("eintragen mit Plus und Minus, Satz, dann Rückgängig", async () => {
 });
 
 test("ohne Turnier-Recht: der Satz vom Server statt der Liste", async () => {
-  mockGet.mockRejectedValue(new Error("Diese Ansicht ist nur für die Turnierleitung dieses Turniers."));
+  // Wie axios es liefert: 403 mit dem Satz des Servers (#1000: der Fehlerzustand kennt jetzt die Art des Problems).
+  mockGet.mockRejectedValue(Object.assign(new Error("Diese Ansicht ist nur für die Turnierleitung dieses Turniers."), { isAxiosError: true, response: { status: 403, data: { detail: "Diese Ansicht ist nur für die Turnierleitung dieses Turniers." } } }));
   await render(<TournamentLeadScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByText("Diese Ansicht ist nur für die Turnierleitung dieses Turniers.")).toBeTruthy());
   expect(screen.queryByTestId("lead-row-m1")).toBeNull();
@@ -105,4 +107,17 @@ test("Braucht Aufmerksamkeit (#1160): Station defekt → Umlegen → freie Stati
   await act(async () => { await fireEvent.press(screen.getByTestId("lead-move-to-sw3")); });
   expect(mockPatch).toHaveBeenCalledWith("/matches/m7", { station_id: "sw3" });
   await waitFor(() => expect(screen.getByTestId("lead-notice")).toHaveTextContent("Umgelegt."));
+});
+
+test("eine verspätete Antwort für das vorige Turnier wird verworfen (#1000)", async () => {
+  await expectLateAnswerDiscarded({
+    mockGet,
+    renderFor: (id) => <TournamentLeadScreen navigation={navigation} route={{ key: "l", name: "TournamentLead", params: { id } } as never} />,
+    newId: "fc-cup",
+    oldPrefix: "/tournaments/alt",
+    latePath: "/tournaments/alt/lead",
+    oldAnswer: () => ({ tournament: { id: "t0", title: "Altes Turnier" }, matches: [], recent: [], counts: {} }),
+    newText: "FC 26 Herbst-Cup",
+    oldText: "Altes Turnier",
+  });
 });

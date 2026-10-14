@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AddToCalendarButton } from "../../components/AddToCalendarButton";
@@ -6,7 +6,7 @@ import { tournamentIsOver } from "../../lib/afterEnd";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
-import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { ErrorState, PartialLoadNotice, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -31,6 +31,8 @@ import type { Team, Tournament, User } from "../../types";
 import { useSeasonOverlay } from "../../seasons/anchors";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
+import { idSegment } from "../../lib/apiIds";
+import { useKeyedLoad } from "../../lib/useKeyedLoad";
 
 const TOURNAMENT_LIVE_RESOURCES = ["tournaments", "matches", "matches-v2", "teams"];
 
@@ -63,50 +65,61 @@ const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiti
 const FINISHED_TOURNAMENT_STATUSES = new Set(["completed", "results_published", "archived"]);
 const CLOSED_MATCH_STATUSES = new Set(["completed", "forfeit", "closed"]);
 
+/** Was die Turnierseite lädt; `partProblem`, wenn Bracket, Tabelle oder Anmeldungen nicht kamen (#1000). */
+type TournamentPage = { tournament: Tournament; bracket: BracketPayload; standings: any[]; myTeams: Team[]; partProblem: LoadProblem | null };
+const NO_BRACKET: BracketPayload = {};
+const NO_ROWS: any[] = [];
+const NO_TEAMS: Team[] = [];
+
 export function TournamentDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
-  const [tournament, setTournament] = useState<Tournament | undefined>();
+  const signedInId = user && !isGuestUser(user) ? user.id : null;
+  const signedInRef = useRef(signedInId);
+  signedInRef.current = signedInId;
+  // Laden je Kennung (#1000): ein anderes Turnier zeigt nie das vorige, verspätete Antworten werden verworfen. Bracket,
+  // Tabelle und Anmeldungen sind Teile: kommt einer nicht, behält er seinen letzten Stand, und die Seite sagt es.
+  const fetchTournament = useCallback(async (id: string, previous: TournamentPage | null): Promise<TournamentPage> => {
+    const segment = idSegment(id);
+    const [detailResult, bracketResult, standingsResult, registrationsResult, teamsResult] = await Promise.allSettled([
+      api.get<Tournament>(`/tournaments/${segment}`),
+      api.get<BracketPayload>(`/tournaments/${segment}/bracket`),
+      api.get<any[]>(`/tournaments/${segment}/standings`),
+      api.get<any[]>(`/tournaments/${segment}/registrations`),
+      signedInRef.current ? api.get<Team[]>("/teams/my") : Promise.resolve({ data: [] as Team[] }),
+    ]);
+    if (detailResult.status === "rejected") throw detailResult.reason;
+    const failed = [bracketResult, standingsResult, registrationsResult].find((result): result is PromiseRejectedResult => result.status === "rejected");
+    const bracketData = bracketResult.status === "fulfilled" ? bracketResult.value.data || {} : previous?.bracket || {};
+    const registrations = registrationsResult.status === "fulfilled"
+      ? (Array.isArray(registrationsResult.value.data) ? registrationsResult.value.data : bracketData.registrations || [])
+      : previous?.bracket.registrations || bracketData.registrations || [];
+    const standings = standingsResult.status === "fulfilled" ? (Array.isArray(standingsResult.value.data) ? standingsResult.value.data : []) : previous?.standings || [];
+    const myTeams = teamsResult.status === "fulfilled" ? (Array.isArray(teamsResult.value.data) ? teamsResult.value.data : []) : previous?.myTeams || [];
+    return { tournament: detailResult.value.data, bracket: { ...bracketData, registrations }, standings, myTeams, partProblem: failed ? loadProblem(failed.reason) : null };
+  }, []);
+  const { data: page, loading, error: loadError, problem, stale, reload: load } = useKeyedLoad(route.params.id, fetchTournament);
+  const tournament = page?.tournament;
+  const bracket = page?.bracket ?? NO_BRACKET;
+  const standings = page?.standings ?? NO_ROWS;
+  const myTeams = page?.myTeams ?? NO_TEAMS;
+  // Nachladen gescheitert oder ein Teil fehlt (#1000): der Stand ist ausdrücklich der letzte.
+  const notice = (stale ? problem : null) || page?.partProblem || null;
+  // An- oder abgemeldet: das Turnier neu laden (eigene Anmeldung, eigene Teams) - nicht beim ersten Öffnen.
+  const firstSignedIn = useRef(signedInId);
+  useEffect(() => {
+    if (firstSignedIn.current === signedInId) return;
+    firstSignedIn.current = signedInId;
+    void load();
+  }, [load, signedInId]);
   // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
   const share = useMemo(() => (tournament ? () => { void sharePage({ kind: "tournament", id: String(tournament.slug || tournament.id), title: tournament.title, start: tournament.start_date, end: tournament.end_date }); } : null), [tournament]);
   useShareHeader(navigation, share);
-  const [bracket, setBracket] = useState<BracketPayload>({});
-  const [standings, setStandings] = useState<any[]>([]);
-  const [myTeams, setMyTeams] = useState<Team[]>([]);
   const [registerModal, setRegisterModal] = useState(false);
   const [tab, setTab] = useState<TabKey>("overview");
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
-  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const guest = isGuestUser(user);
 
-  const load = useCallback(async () => {
-    setProblem(null);
-    setError("");
-    try {
-      const [detailResult, bracketResult, standingsResult, registrationsResult, teamsResult] = await Promise.all([
-        api.get<Tournament>(`/tournaments/${route.params.id}`),
-        api.get<BracketPayload>(`/tournaments/${route.params.id}/bracket`).catch(() => ({ data: {} as BracketPayload })),
-        api.get<any[]>(`/tournaments/${route.params.id}/standings`).catch(() => ({ data: [] })),
-        api.get<any[]>(`/tournaments/${route.params.id}/registrations`).catch(() => ({ data: [] })),
-        user && !isGuestUser(user) ? api.get<Team[]>("/teams/my").catch(() => ({ data: [] })) : Promise.resolve({ data: [] as Team[] }),
-      ]);
-      setTournament(detailResult.data);
-      setBracket({ ...(bracketResult.data || {}), registrations: Array.isArray(registrationsResult.data) ? registrationsResult.data : bracketResult.data?.registrations || [] });
-      setStandings(Array.isArray(standingsResult.data) ? standingsResult.data : []);
-      setMyTeams(Array.isArray(teamsResult.data) ? teamsResult.data : []);
-    } catch (err) {
-      setError(errorMessage(err, "Turnierdetail konnte nicht geladen werden."));
-      setProblem(loadProblem(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [route.params.id, user]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   // Zurück vom Event (#1184): nach Event-Anmeldung und „Spielst du auch mit?“ hat sich der Stand geändert - beim
   // Wiederkommen frisch laden (nur nach einem Weggehen; das erste Öffnen lädt der Effekt oben).
@@ -259,7 +272,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     ]);
   }, [busy, load, ownRegistration?.id, tournament]);
 
-  if (loading) {
+  if (!tournament && loading) {
     return (
       <Screen>
         <SkeletonList count={4} hasImage={false} />
@@ -270,7 +283,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   if (!tournament) {
     return (
       <Screen>
-        <ErrorState title="Turnierdetail nicht verfügbar" detail={error || "Das Turnier konnte nicht geladen werden."} problem={problem} onRetry={() => { void load(); }} />
+        <ErrorState title="Turnierdetail nicht verfügbar" detail={loadError ? errorMessage(loadError, "Turnierdetail konnte nicht geladen werden.") : "Das Turnier konnte nicht geladen werden."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }
@@ -290,6 +303,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     <MatchFinderContext.Provider value={matchFinder}>
     <Screen padded={false}>
       <ScrollView contentContainerStyle={styles.content}>
+        {notice ? <PartialLoadNotice problem={notice} onRetry={() => { void load(); }} testID="tournament-partial-load" /> : null}
         <View style={styles.hero}>
           <Muted>{tournament.game?.display_name || tournament.game?.name || tournament.game_name || tournament.platform || "Turnier"}</Muted>
           <Title>{tournament.title}</Title>

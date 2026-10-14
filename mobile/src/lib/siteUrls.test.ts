@@ -1,4 +1,5 @@
 import { WEB_BASE_URL, isOwnUrl, ownPath } from "./siteUrls";
+import { ARTICLE, FOREIGN_ARTICLE_LINKS, OWN_ARTICLE_LINKS } from "./linkOrigins.fixture";
 
 // Eigene Adressen (#921): der Server der App, die öffentliche Domain mit und ohne www - sonst nichts. Der Pfad
 // behält die Abfrage (Reiter, Beleg), fremde Adressen mit gleichem Pfad bleiben fremd.
@@ -26,4 +27,9 @@ test("ownPath: Pfad mit Abfrage von der eigenen Website, sonst null", () => {
   expect(ownPath("mailto:info@lionsquad.at")).toBeNull();
   expect(ownPath("")).toBeNull();
   expect(ownPath(null)).toBeNull();
+});
+
+test("ownPath mit der gemeinsamen Herkunfts-Matrix (#998): eigene Adressen und relative Pfade ja, alles andere nein", () => {
+  for (const link of OWN_ARTICLE_LINKS) expect([link, ownPath(link)]).toEqual([link, `/news/${ARTICLE}`]);
+  for (const link of FOREIGN_ARTICLE_LINKS) expect([link, ownPath(link)]).toEqual([link, null]);
 });

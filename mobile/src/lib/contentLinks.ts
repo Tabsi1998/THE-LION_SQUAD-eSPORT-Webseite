@@ -78,12 +78,25 @@ export function isImageUrl(value?: string | null) {
 }
 
 function toPath(value: string) {
-  if (value.startsWith("/")) return value;
-  // Nur die eigene Website (#921): start.gg/tournaments/… ist kein eigenes Turnier.
+  // Nur die eigene Website (#921): start.gg/tournaments/… ist kein eigenes Turnier. Relative Pfade prüft dieselbe Regel
+  // wie Benachrichtigungen und Links von außen (#998): „//news/…“ oder „//fremd.example/news/…“ ist ein fremder Host.
   const own = ownPath(value);
-  return own === null ? null : own.split("?")[0];
+  return own === null ? null : own.split(/[?#]/)[0];
 }
 
+/**
+ * Die Kennung aus dem Verweis - oder "", wenn sie keine ist. RichText liest Verweise schon beim Zeichnen: eine kaputte
+ * Prozentkodierung („%“, „%E0%A4%A“) wirft darum nie (#997), sondern macht den Verweis zu Text. Nach dem Dekodieren
+ * bleibt eine Kennung ein Pfadteil: kein „/“, „\“, „?“, „#“, kein Steuerzeichen, nicht „.“ oder „..“.
+ */
 function cleanId(value?: string | null) {
-  return decodeURIComponent(String(value || "").trim().replace(/^\/+|\/+$/g, ""));
+  const raw = String(value || "").trim().replace(/^\/+|\/+$/g, "");
+  let id: string;
+  try {
+    id = decodeURIComponent(raw).trim();
+  } catch {
+    return "";
+  }
+  if (id === "." || id === ".." || /[/\\?#\u0000-\u001f\u007f]/.test(id)) return "";
+  return id;
 }

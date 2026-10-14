@@ -9,7 +9,7 @@ import { AwardCard } from "../../components/AwardCard";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { HonoursCard } from "../../components/Honours";
-import { EmptyState, PartialLoadNotice, loadProblem, type LoadProblem } from "../../components/ListState";
+import { EmptyState, ErrorState, PartialLoadNotice, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { HeaderButton, TabHeader, useTabScrollToTop } from "../../components/TabHeader";
@@ -86,6 +86,8 @@ function OwnProfile() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [message, setMessage] = useState("");
   const [problem, setProblem] = useState<LoadProblem | null>(null);
+  // Welche Listen beim letzten Laden nicht kamen (#1001): dort sagt der Reiter „nicht geladen“ statt „noch keine“.
+  const [notLoaded, setNotLoaded] = useState<{ teams?: boolean; references?: boolean; awards?: boolean }>({});
   const scrollRef = useRef<ScrollView>(null);
   useTabScrollToTop(scrollRef);
 
@@ -128,6 +130,7 @@ function OwnProfile() {
     if (teamResult) setTeams(Array.isArray(teamResult.data) ? teamResult.data : []);
     // Die Zeile „Deine Unterlagen“ steht nur da, wenn die Vereinsakte eigene Schreiben liefert.
     if (documentResult) setOwnDocuments(documentResult.data?.available && Array.isArray(documentResult.data.documents) ? documentResult.data.documents : []);
+    setNotLoaded({ teams: !teamResult, references: !referenceResult, awards: !awardResult });
     setProblem(firstProblem);
   }, []);
 
@@ -261,6 +264,8 @@ function OwnProfile() {
         />
       ))}
     </View>
+  ) : notLoaded.awards && problem ? (
+    <ErrorState problem={problem} title="Auszeichnungen nicht geladen" onRetry={() => { void refresh(); }} testID="profile-awards-error" />
   ) : (
     <EmptyState icon="medal-outline" title="Noch keine Auszeichnungen" detail="Sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht – Platz 1 bis 3 als Trophäe, alle anderen als Teilnahme-Banner." />
   );
@@ -277,7 +282,9 @@ function OwnProfile() {
         </View>
       </Card>
       {/* Turnierweg (#1193): jedes Turnier lässt sich aufklappen - mit „Bild teilen“ (#1194). */}
-      {references.items.length ? references.items.map((item) => <ReferenceWithPath key={item.id} item={item} username={user?.username} own onOpen={openReference} />) : (
+      {references.items.length ? references.items.map((item) => <ReferenceWithPath key={item.id} item={item} username={user?.username} own onOpen={openReference} />) : notLoaded.references && problem ? (
+        <ErrorState problem={problem} title="Referenzen nicht geladen" onRetry={() => { void refresh(); }} testID="profile-references-error" />
+      ) : (
         <EmptyState icon="ribbon-outline" title="Noch keine Referenzen" detail="Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier." />
       )}
     </View>
@@ -296,7 +303,8 @@ function OwnProfile() {
           <Ionicons name="chevron-forward" color={colors.muted} size={16} />
         </Pressable>
       ))}
-      {!teams.length ? <EmptyState icon="people-outline" title="Noch kein Team" detail="Einladungen, eigene Teams und Teams zum Entdecken stehen unter Community → Teams." /> : null}
+      {!teams.length && notLoaded.teams && problem ? <ErrorState problem={problem} title="Teams nicht geladen" onRetry={() => { void refresh(); }} testID="profile-teams-error" /> : null}
+      {!teams.length && !(notLoaded.teams && problem) ? <EmptyState icon="people-outline" title="Noch kein Team" detail="Einladungen, eigene Teams und Teams zum Entdecken stehen unter Community → Teams." /> : null}
       <Pressable onPress={() => openTab("CommunityHub", { section: "teams" })} accessibilityRole="button" style={styles.linkRow} testID="profile-teams-community">
         <Body style={styles.linkText}>Teams in Community</Body>
         <Ionicons name="arrow-forward" color={colors.cyan} size={16} />

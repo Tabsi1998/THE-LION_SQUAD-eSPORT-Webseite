@@ -1,6 +1,7 @@
 import { Linking } from "react-native";
 import { flushPendingLink, handleIncomingUrl, listenForAppLinks } from "./appLinks";
 import { targetFromUrl } from "../navigation/rootNavigation";
+import { ARTICLE, FOREIGN_ARTICLE_LINKS, OWN_ARTICLE_LINKS } from "./linkOrigins.fixture";
 
 // Links von außen (#921): vor dem Start der Navigation gemerkt, danach sofort; fremde Adressen nie; und die
 // App-Links in app.json nennen nur Pfade, für die die App einen Screen hat.
@@ -63,4 +64,16 @@ test("app.json: jeder App-Link-Pfad hat einen Screen, beide Schreibweisen der Do
     expect(targetFromUrl(`https://${entry.host}${sample}`)).not.toBeNull();
     expect(sample.startsWith("/admin")).toBe(false);
   }
+});
+
+test("gemeinsame Herkunfts-Matrix (#998): nur die eigene Website öffnet einen Screen", () => {
+  mockRef.ready = true;
+  for (const url of OWN_ARTICLE_LINKS) {
+    mockRef.navigate.mockClear();
+    expect([url, handleIncomingUrl(url)]).toEqual([url, "screen"]);
+    expect(mockRef.navigate).toHaveBeenLastCalledWith("NewsDetail", { id: ARTICLE });
+  }
+  mockRef.navigate.mockClear();
+  for (const url of FOREIGN_ARTICLE_LINKS) expect([url, handleIncomingUrl(url)]).toEqual([url, "none"]);
+  expect(mockRef.navigate).not.toHaveBeenCalled();
 });

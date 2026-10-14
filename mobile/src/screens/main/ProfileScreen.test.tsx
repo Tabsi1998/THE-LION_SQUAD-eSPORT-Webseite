@@ -3,6 +3,7 @@ import { NavigationContext } from "@react-navigation/native";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { ProfileScreen } from "./ProfileScreen";
 import { PublicProfileScreen, profileTabs } from "./PublicProfileScreen";
+import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
 // Ein Profil, ein Aufbau (#1149): eigenes und fremdes Profil haben dieselben Reiter in derselben Reihenfolge. Was nur dich
 // angeht, steht im Kasten „Nur für dich“ (Rechnungen, Gewinne, was noch fehlt); der Schalter „So sehen dich andere“
@@ -185,6 +186,50 @@ test("erst auswerten, dann die Erfolge laden - einmal je Öffnen, die anderen Ab
   expect(order.indexOf("post /achievements/evaluate")).toBeGreaterThanOrEqual(0);
   expect(order.indexOf("post /achievements/evaluate")).toBeLessThan(order.indexOf("get /achievements/me"));
   expect(order.filter((entry) => entry === "post /achievements/evaluate")).toHaveLength(1);
+});
+
+test("eigenes Profil ohne Netz: Teams, Referenzen und Auszeichnungen sagen „nicht geladen“, nicht „noch keine“ (#1001)", async () => {
+  const offline = () => Object.assign(new Error("Network Error"), { isAxiosError: true });
+  mockGet.mockImplementation((path: string, config?: { params?: Record<string, string> }) => (
+    ["/teams/my", "/mobile/profile/references", "/me/awards"].includes(path) ? Promise.reject(offline()) : answer(path, config)
+  ));
+  await renderOwn();
+  await waitFor(() => expect(screen.getByTestId("profile-partial-load")).toBeTruthy());
+  await fireEvent.press(screen.getByText("Teams"));
+  await waitFor(() => expect(screen.getByTestId("profile-teams-error")).toBeTruthy());
+  expect(screen.queryByText("Noch kein Team")).toBeNull();
+  await fireEvent.press(screen.getByText("Referenzen"));
+  await waitFor(() => expect(screen.getByTestId("profile-references-error")).toBeTruthy());
+  expect(screen.queryByText("Noch keine Referenzen")).toBeNull();
+  await fireEvent.press(screen.getByText("Auszeichnungen"));
+  await waitFor(() => expect(screen.getByTestId("profile-awards-error")).toBeTruthy());
+  expect(screen.queryByText("Noch keine Auszeichnungen")).toBeNull();
+  // Nochmal versuchen: jetzt klappt es - und leer ist wirklich leer.
+  mockGet.mockImplementation(answer);
+  await fireEvent.press(screen.getByTestId("profile-awards-error-retry"));
+  await waitFor(() => expect(screen.getByText("Noch keine Auszeichnungen")).toBeTruthy());
+  expect(screen.queryByTestId("profile-partial-load")).toBeNull();
+});
+
+test("eigenes Profil: wirklich keine Teams heißt „Noch kein Team“ (#1001)", async () => {
+  mockGet.mockImplementation((path: string, config?: { params?: Record<string, string> }) => (path === "/teams/my" ? Promise.resolve({ data: [] }) : answer(path, config)));
+  await renderOwn();
+  await waitFor(() => expect(screen.getByTestId("profile-private-box")).toBeTruthy());
+  await fireEvent.press(screen.getByText("Teams"));
+  await waitFor(() => expect(screen.getByText("Noch kein Team")).toBeTruthy());
+  expect(screen.queryByTestId("profile-teams-error")).toBeNull();
+});
+
+test("eine verspätete Antwort für das vorige Profil wird verworfen (#1000)", async () => {
+  await expectLateAnswerDiscarded({
+    mockGet,
+    renderFor: (username) => <PublicProfileScreen navigation={navigation} route={{ key: "p", name: "PublicProfile", params: { username } } as never} />,
+    newId: "kiwikomet",
+    oldPrefix: "/users/public/alt",
+    oldAnswer: () => ({ id: "u-alt", username: "alt", display_name: "Altes Profil", stats: {}, teams: [], awards: [], references: { items: [] } }),
+    newText: "KiwiKomet",
+    oldText: "Altes Profil",
+  });
 });
 
 test("Reiter Erfolge: ein neuer Erfolg lädt nur den Erfolge-Stand nach - keine zweite Auswertung, keine Schleife", async () => {

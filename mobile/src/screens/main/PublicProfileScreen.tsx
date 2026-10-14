@@ -7,7 +7,7 @@ import { Card } from "../../components/Card";
 import { HonourList, type Honour } from "../../components/Honours";
 import { FriendButton } from "../../components/FriendButton";
 import type { Relationship } from "../../lib/friends";
-import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
 import { LoewenRangFrame } from "../../components/LoewenRangFrame";
 import { MediaImage } from "../../components/MediaImage";
 import { AccountsCard, accountGroups, type LinkedAccount } from "../../components/LinkedAccounts";
@@ -20,6 +20,8 @@ import { PublicSeasonFindsCard } from "../../seasons/SeasonFinds";
 import { PinnedAwardsCard, type PublicAchievementData, PublicAchievementsTab } from "../../achievements/profile/PublicAchievements";
 import { prestigeStars } from "../../achievements/showcase/model";
 import { api, errorMessage } from "../../lib/api";
+import { idSegment } from "../../lib/apiIds";
+import { useKeyedLoad } from "../../lib/useKeyedLoad";
 import { sortAwards, type Award } from "../../lib/awards";
 import { formatDate, formatStatus } from "../../lib/format";
 import { blockUser, listBlocked, unblockUser } from "../../lib/moderation";
@@ -150,52 +152,68 @@ export function PublicProfileScreen({ navigation, route }: Props) {
  * eigene Profil: Schalter „So sehen dich andere“, Kasten „Nur für dich“, eigene Erfolge, Auszeichnungen (als Banner
  * wählbar), Referenzen und Teams. Mit dem Schalter zeigt es genau, was die Privatsphäre allen zeigt.
  */
+type ProfileData = { profile: PublicProfilePayload | null; achievements: AchievementPayload };
+const NO_ACHIEVEMENTS: AchievementPayload = { awards: [], groups: [] };
+
 export function ProfileView({ username, navigation, own, header, scrollRef }: { username: string; navigation: Nav; own?: OwnProfileParts; header?: React.ReactNode; scrollRef?: React.RefObject<ScrollView | null> }) {
   const { user: me } = useAuth();
-  const [profile, setProfile] = useState<PublicProfilePayload | null>(null);
   // Melden und Blockieren (#414): der Blockier-Stand kommt aus der eigenen Liste, nicht aus dem Profil.
   const [blockedByMe, setBlockedByMe] = useState(false);
   const [report, setReport] = useState<(Omit<ReportDraft, "category" | "details"> & { targetName?: string }) | null>(null);
-  const [achievements, setAchievements] = useState<AchievementPayload>({ awards: [], groups: [] });
   const [liveStreams, setLiveStreams] = useState<LiveStream[]>([]);
   const [tab, setTab] = useState<ProfileTabKey>(own?.initialTab || "overview");
   const [asOthers, setAsOthers] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
-  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
-  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const ownMode = Boolean(own) && !asOthers;
+  // Laden je Profil und Ansicht (#1000): ein anderes Profil zeigt nie das vorige, verspätete Antworten werden verworfen,
+  // ein gescheitertes Nachladen lässt den letzten Stand gekennzeichnet stehen. Die Erfolge sind ein Teil: kommen sie
+  // nicht, bleibt ihr letzter Stand.
+  const fetchProfile = useCallback(async (key: string, previous: ProfileData | null): Promise<ProfileData> => {
+    const split = key.indexOf(":");
+    const view = key.slice(0, split);
+    const name = key.slice(split + 1);
+    const { data } = await api.get<PublicProfilePayload>(`/users/public/${idSegment(name)}`, view === "public" ? { params: { view_as: "public" } } : undefined);
+    const loaded = data || null;
+    let achievements = previous?.achievements || NO_ACHIEVEMENTS;
+    if (loaded?.id) {
+      try {
+        achievements = (await api.get<AchievementPayload>(`/achievements/user/${idSegment(loaded.id)}`)).data || NO_ACHIEVEMENTS;
+      } catch {
+        // Erfolge sind ein Teil der Seite - der letzte Stand bleibt.
+      }
+    } else {
+      achievements = NO_ACHIEVEMENTS;
+    }
+    return { profile: loaded, achievements };
+  }, []);
+  const { data, loading, error: loadError, problem, stale, reload: load } = useKeyedLoad(`${asOthers ? "public" : "full"}:${username}`, fetchProfile);
+  const profile = data?.profile ?? null;
+  const achievements = data?.achievements ?? NO_ACHIEVEMENTS;
+  const error = loadError ? errorMessage(loadError, "Profil konnte nicht geladen werden.") : "";
+
+  // Blockier-Stand und Live-Streams laufen still neben jedem geladenen Stand.
+  const profileId = profile?.id;
+  useEffect(() => {
+    if (!profileId || !me?.id || profileId === me.id) return undefined;
+    let active = true;
+    listBlocked()
+      .then((entries) => { if (active) setBlockedByMe(entries.some((entry) => (entry.blocked_id || entry.user?.id) === profileId)); })
+      .catch(() => { if (active) setBlockedByMe(false); });
+    return () => { active = false; };
+  }, [me?.id, profileId]);
+  useEffect(() => {
+    if (!data) return undefined;
+    let active = true;
+    api.get<LiveStream[]>("/streams/live")
+      .then(({ data: streams }) => { if (active) setLiveStreams(Array.isArray(streams) ? streams : []); })
+      .catch(() => { if (active) setLiveStreams([]); });
+    return () => { active = false; };
+  }, [data]);
 
   useEffect(() => {
     if (own?.initialTab) setTab(own.initialTab);
   }, [own?.initialTab]);
 
-  const load = useCallback(async () => {
-    setProblem(null);
-    setError("");
-    try {
-      const { data } = await api.get<PublicProfilePayload>(`/users/public/${username}`, asOthers ? { params: { view_as: "public" } } : undefined);
-      setProfile(data || null);
-      if (data?.id && me?.id && data.id !== me.id) {
-        listBlocked().then((entries) => setBlockedByMe(entries.some((entry) => (entry.blocked_id || entry.user?.id) === data.id))).catch(() => setBlockedByMe(false));
-      }
-      api.get<LiveStream[]>("/streams/live").then(({ data: streams }) => setLiveStreams(Array.isArray(streams) ? streams : [])).catch(() => setLiveStreams([]));
-      if (data?.id) {
-        const achievementResult = await api.get<AchievementPayload>(`/achievements/user/${data.id}`).catch(() => ({ data: { awards: [], groups: [] } }));
-        setAchievements(achievementResult.data || { awards: [], groups: [] });
-      } else {
-        setAchievements({ awards: [], groups: [] });
-      }
-    } catch (err) {
-      setProfile(null);
-      setError(errorMessage(err, "Profil konnte nicht geladen werden."));
-      setProblem(loadProblem(err));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [asOthers, me?.id, username]);
 
   // Melden und Blockieren (#414) über „Mehr“ neben Nachricht und Freund.
   const toggleBlock = useCallback(() => {
@@ -230,10 +248,6 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
     ]);
   }, [blockedByMe, profile?.display_name, profile?.id, profile?.username, toggleBlock]);
 
-  useEffect(() => {
-    setLoading(true);
-    void load();
-  }, [load]);
 
   // Ohne öffentliches Profil (privat) zeigt das eigene Profil den Kopf aus dem Konto - die Inhalte kommen ohnehin von dort.
   const shown = profile || (ownMode ? own?.fallback || null : null);
@@ -255,7 +269,7 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
   const activeTab = tabs.some((item) => item.key === tab) ? tab : "overview";
   const refresh = () => {
     setRefreshing(true);
-    void load();
+    void load().finally(() => setRefreshing(false));
     if (own) void own.refresh();
   };
 
@@ -325,6 +339,8 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
         testID={own ? "own-profile" : "public-profile"}
       >
         {header}
+        {/* Nachladen gescheitert (#1000): das Profil ist ausdrücklich der letzte Stand. */}
+        {stale && problem ? <PartialLoadNotice problem={problem} onRetry={() => { void load(); }} testID="profile-stale" /> : null}
         {shown.featured_award ? (
           <View style={styles.featured} testID="profile-featured-award">
             <AwardCard award={shown.featured_award} featured onPress={() => openAward(shown.featured_award as Award)} />

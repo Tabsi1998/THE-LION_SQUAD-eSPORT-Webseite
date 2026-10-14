@@ -3,7 +3,7 @@ import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { ErrorState, PartialLoadNotice, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { TeamSchedule } from "../../components/team/TeamSchedule";
@@ -24,6 +24,8 @@ import type { Team, TeamSquad, User } from "../../types";
 import { ImagePickField } from "../../components/ImagePickField";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
+import { idSegment } from "../../lib/apiIds";
+import { useKeyedLoad } from "../../lib/useKeyedLoad";
 import { WEB_BASE_URL } from "../../lib/siteUrls";
 
 type Props = NativeStackScreenProps<TeamStackParamList, "TeamDetail">;
@@ -49,21 +51,43 @@ type SquadForm = {
 
 const emptySquad: SquadForm = { name: "", description: "", game_id: "", status: "active", member_ids: [] };
 
+type TeamLevel = { level?: number; crown?: string | null };
+/** Was die Team-Seite lädt: das Team (Pflicht) und die Teile daneben; `partProblem`, wenn ein Teil nicht kam (#1000). */
+type TeamPageData = { team: Team; overview: TeamOverview | null; level: TeamLevel | null; partProblem: LoadProblem | null };
+
 export function TeamDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
-  const [team, setTeam] = useState<Team | undefined>();
+  // Laden je Kennung (#1000): ein anderes Team zeigt nie das vorige, verspätete Antworten werden verworfen. Squads,
+  // Termine und Level sind Teile: kommt einer nicht, behält er seinen letzten Stand, und die Seite sagt es - statt „keine
+  // Squads“ vorzutäuschen.
+  const fetchTeam = useCallback(async (id: string, previous: TeamPageData | null): Promise<TeamPageData> => {
+    const segment = idSegment(id);
+    const { data } = await api.get<Team>(`/teams/${segment}`);
+    const [squads, plan, levelInfo] = await Promise.allSettled([
+      api.get<TeamSquad[]>(`/teams/${segment}/squads`),
+      api.get<TeamOverview>(`/teams/${segment}/overview`),
+      api.get<TeamLevel>(`/teams/${segment}/level`),
+    ]);
+    const failed = [squads, plan, levelInfo].find((result): result is PromiseRejectedResult => result.status === "rejected");
+    const squadList = squads.status === "fulfilled" ? (Array.isArray(squads.value.data) ? squads.value.data : []) : previous?.team.squads || [];
+    const overview = plan.status === "fulfilled" ? (plan.value.data && Array.isArray(plan.value.data.upcoming) ? plan.value.data : null) : previous?.overview ?? null;
+    const level = levelInfo.status === "fulfilled" ? (levelInfo.value.data && typeof levelInfo.value.data.level === "number" ? levelInfo.value.data : null) : previous?.level ?? null;
+    return { team: { ...data, squads: squadList }, overview, level, partProblem: failed ? loadProblem(failed.reason) : null };
+  }, []);
+  const { data: page, loading, error: loadError, problem, stale, reload: load, mutate } = useKeyedLoad(route.params.id, fetchTeam);
+  const team = page?.team;
+  const overview = page?.overview ?? null;
+  const level = page?.level ?? null;
+  // Nachladen gescheitert oder ein Teil fehlt (#1000): der Stand ist ausdrücklich der letzte.
+  const notice = (stale ? problem : null) || page?.partProblem || null;
   // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
   const share = useMemo(() => (team ? () => { void sharePage({ kind: "team", id: String(team.id), title: team.tag ? `${team.name} [${team.tag}]` : team.name, detail: "Team" }); } : null), [team]);
   useShareHeader(navigation, share);
   // Termine und letzte Spiele (#1191) aus den Team-Anmeldungen; Einladungs-Link mit QR-Code für Kapitäne.
-  const [overview, setOverview] = useState<TeamOverview | null>(null);
   const inviteToken = route.params.invite || "";
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  // Was beim Laden schiefging (#1152): ohne Netz, nicht gefunden oder ein Fehler - nie „nichts da“.
-  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [message, setMessage] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [editOpen, setEditOpen] = useState(false);
@@ -71,43 +95,29 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [teamForm, setTeamForm] = useState<TeamForm>({ name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "", color: AUTO_COLOR });
   // Team-Level für die Kopfzeile (#1347): „Level 9“ und die kleine goldene Krone des punktebesten Teams.
-  const [level, setLevel] = useState<{ level?: number; crown?: string | null } | null>(null);
   const [squadForm, setSquadForm] = useState<SquadForm | null>(null);
   const [inviteQuery, setInviteQuery] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
 
-  const load = useCallback(async () => {
-    setProblem(null);
-    setError("");
-    try {
-      const { data } = await api.get<Team>(`/teams/${route.params.id}`);
-      const squads = await api.get<TeamSquad[]>(`/teams/${route.params.id}/squads`).catch(() => ({ data: [] as TeamSquad[] }));
-      const plan = await api.get<TeamOverview>(`/teams/${route.params.id}/overview`).catch(() => ({ data: null }));
-      const levelInfo = await api.get<{ level?: number; crown?: string | null }>(`/teams/${route.params.id}/level`).catch(() => ({ data: null }));
-      setLevel(levelInfo.data && typeof levelInfo.data.level === "number" ? levelInfo.data : null);
-      const nextTeam = { ...data, squads: Array.isArray(squads.data) ? squads.data : [] };
-      setTeam(nextTeam);
-      setOverview(plan.data && Array.isArray(plan.data.upcoming) ? plan.data : null);
-      setTeamForm({
-        name: nextTeam.name || "",
-        tag: nextTeam.tag || "",
-        description: nextTeam.description || "",
-        logo_url: nextTeam.logo_url || "",
-        banner_url: nextTeam.banner_url || "",
-        discord_link: nextTeam.discord_link || "",
-        color: nextTeam.color || AUTO_COLOR,
-      });
-    } catch (err) {
-      setError(errorMessage(err, "Teamdetail konnte nicht geladen werden."));
-      setProblem(loadProblem(err));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [route.params.id]);
-
+  // Das Formular folgt dem geladenen Team - nach jedem Laden wie bisher.
   useEffect(() => {
-    load();
+    if (!page) return;
+    const loaded = page.team;
+    setTeamForm({
+      name: loaded.name || "",
+      tag: loaded.tag || "",
+      description: loaded.description || "",
+      logo_url: loaded.logo_url || "",
+      banner_url: loaded.banner_url || "",
+      discord_link: loaded.discord_link || "",
+      color: loaded.color || AUTO_COLOR,
+    });
+  }, [page]);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
   }, [load]);
 
   useEffect(() => {
@@ -244,8 +254,8 @@ export function TeamDetailScreen({ navigation, route }: Props) {
     if (!team) return;
     await api.patch(`/teams/${team.id}`, { [key]: url });
     setTeamForm((current) => ({ ...current, [key]: url }));
-    setTeam((current) => (current ? { ...current, [key]: url } : current));
-  }, [team]);
+    mutate((current) => ({ ...current, team: { ...current.team, [key]: url } }));
+  }, [mutate, team]);
 
   const saveSquad = useCallback(() => {
     if (!team || !squadForm || !canManage) return;
@@ -271,7 +281,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
     ]);
   }, [showActionResult, team]);
 
-  if (loading) {
+  if (!team && loading) {
     return (
       <Screen>
         <SkeletonList count={4} hasImage={false} />
@@ -304,7 +314,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   if (!team) {
     return (
       <Screen>
-        <ErrorState title="Teamdetail nicht verfügbar" detail={error || "Das Team konnte nicht geladen werden."} problem={problem} onRetry={() => { void load(); }} />
+        <ErrorState title="Teamdetail nicht verfügbar" detail={loadError ? errorMessage(loadError, "Teamdetail konnte nicht geladen werden.") : "Das Team konnte nicht geladen werden."} problem={problem} onRetry={() => { void load(); }} />
       </Screen>
     );
   }
@@ -313,8 +323,9 @@ export function TeamDetailScreen({ navigation, route }: Props) {
     <Screen padded={false}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={colors.cyan} />}
       >
+        {notice ? <PartialLoadNotice problem={notice} onRetry={() => { void load(); }} testID="team-partial-load" /> : null}
         <TeamHeader
           team={team}
           header={(overview?.header || null) as TeamHeaderData | null}

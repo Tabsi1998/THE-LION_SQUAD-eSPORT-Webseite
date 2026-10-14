@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { NewsDetailScreen } from "./NewsDetailScreen";
 
 // Gelesen-Marker (#616): ein Beitrag, den eine angemeldete Person öffnet, meldet sich beim Server -
@@ -67,4 +67,45 @@ test("nicht sichtbarer Beitrag: Hinweis statt Inhalt, keine Meldung", async () =
   await render(<NewsDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByText("Beitrag nicht gefunden")).toBeTruthy());
   expect(mockPost).not.toHaveBeenCalled();
+});
+
+// Kennung wechselt im selben Screen (#1000): kein alter Beitrag unter neuer Kennung, keine verspätete Antwort.
+const routeFor = (id: string) => ({ key: "n", name: "NewsDetail", params: { id } }) as never;
+const notFound = () => Object.assign(new Error("Nicht sichtbar."), { isAxiosError: true, response: { status: 404, data: { detail: "Nicht sichtbar." } } });
+
+test("A → B mit 404: der Beitrag A verschwindet, B zeigt „nicht gefunden“ (#1000)", async () => {
+  mockGet.mockImplementation((path: string) => (path === "/news/b" ? Promise.reject(notFound()) : Promise.resolve({ data: { ...POST, id: "a1", slug: "a", title: "Beitrag A" } })));
+  const view = await render(<NewsDetailScreen navigation={navigation} route={routeFor("a")} />);
+  await waitFor(() => expect(screen.getByText("Beitrag A")).toBeTruthy());
+  await view.rerender(<NewsDetailScreen navigation={navigation} route={routeFor("b")} />);
+  expect(screen.queryByText("Beitrag A")).toBeNull();
+  await waitFor(() => expect(screen.getByText("Beitrag nicht gefunden")).toBeTruthy());
+  expect(screen.queryByText("Beitrag A")).toBeNull();
+});
+
+test("eine langsame Antwort für A überschreibt das spätere B nicht - und meldet A nicht als gelesen (#1000)", async () => {
+  let finishA: (value: unknown) => void = () => undefined;
+  mockGet.mockImplementation((path: string) => (path === "/news/a"
+    ? new Promise((resolve) => { finishA = resolve; })
+    : Promise.resolve({ data: { ...POST, id: "b1", slug: "b", title: "Beitrag B" } })));
+  const view = await render(<NewsDetailScreen navigation={navigation} route={routeFor("a")} />);
+  await view.rerender(<NewsDetailScreen navigation={navigation} route={routeFor("b")} />);
+  await waitFor(() => expect(screen.getByText("Beitrag B")).toBeTruthy());
+  await act(async () => {
+    finishA({ data: { ...POST, id: "a1", slug: "a", title: "Beitrag A" } });
+  });
+  expect(screen.getByText("Beitrag B")).toBeTruthy();
+  expect(screen.queryByText("Beitrag A")).toBeNull();
+  expect(mockPost).toHaveBeenCalledTimes(1);
+  expect(mockPost).toHaveBeenCalledWith("/news/b1/read");
+});
+
+test("Nochmal versuchen lädt die aktuelle Kennung (#1000)", async () => {
+  mockGet.mockRejectedValueOnce(Object.assign(new Error("Network Error"), { isAxiosError: true }));
+  await render(<NewsDetailScreen navigation={navigation} route={routeFor("b")} />);
+  await waitFor(() => expect(screen.getByTestId("error-state-retry")).toBeTruthy());
+  mockGet.mockResolvedValue({ data: { ...POST, id: "b1", slug: "b", title: "Beitrag B" } });
+  await fireEvent.press(screen.getByTestId("error-state-retry"));
+  await waitFor(() => expect(screen.getByText("Beitrag B")).toBeTruthy());
+  expect(mockGet).toHaveBeenLastCalledWith("/news/b");
 });

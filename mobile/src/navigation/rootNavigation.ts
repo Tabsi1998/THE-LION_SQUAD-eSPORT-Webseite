@@ -1,7 +1,7 @@
 import { createNavigationContainerRef, type NavigationState, type PartialState } from "@react-navigation/native";
 import type { AppStackParamList, DetailScreenName, LooseNavigation, MainTabName, TabRootParamList } from "./types";
 import type { UserNotification } from "../types";
-import { ownPath } from "../lib/siteUrls";
+import { isLocalPath, ownPath } from "../lib/siteUrls";
 
 // Die Navigation von außen (#1144): Benachrichtigungen, Links von außen und Adressen aus Inhalten öffnen ihren Screen
 // über dem Tab, in dem man gerade ist - die Tab-Leiste springt nicht mit. Nur die Übersicht eines Tabs (Home, Events,
@@ -323,8 +323,11 @@ function invoiceParams(query: URLSearchParams) {
 }
 
 function parsePath(value?: string | null) {
-  // Eine fremde Adresse (#921) bekommt nie einen Screen - auch nicht mit zufällig gleichem Pfad.
-  const raw = /^https?:\/\//i.test(String(value || "").trim()) ? ownPath(value) || "" : String(value || "").trim();
+  // Eine fremde Adresse (#921) bekommt nie einen Screen - auch nicht mit zufällig gleichem Pfad. Dieselbe Regel wie
+  // contentLinks und openLink (#998): ein Pfad nur, wenn er auf der eigenen Seite bleibt („//host/…“ ist fremd),
+  // sonst nur Adressen der eigenen Website.
+  const text = String(value || "").trim();
+  const raw = isLocalPath(text) ? text : ownPath(text) || "";
   if (!raw) return { path: "", query: "", root: false };
   try {
     const url = new URL(raw, "https://lionsquad.local");

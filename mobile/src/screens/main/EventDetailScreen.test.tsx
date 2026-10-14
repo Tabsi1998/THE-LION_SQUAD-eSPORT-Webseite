@@ -1,6 +1,7 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { EventDetailScreen } from "./EventDetailScreen";
+import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
 // Kostenpflichtige Events (#396) und Teilnehmer für die Verwaltung (#397): Preis vor dem Absenden,
 // Kostenhaken als Pflicht, eigener Betrag; die Liste und der Check-in kommen mit den Rechten vom
@@ -306,4 +307,30 @@ test("vom Turnier mit Event-Pflicht gekommen: vorausgewählt, danach zurück zum
   expect((await screen.findByTestId("play-along-check-t1")).props.accessibilityState).toEqual({ checked: true });
   await fireEvent.press(screen.getByTestId("play-along-skip"));
   expect(goBack).toHaveBeenCalledTimes(1);
+});
+
+test("eine verspätete Antwort für das vorige Event wird verworfen (#1000)", async () => {
+  mockGet.mockResolvedValue({ data: EVENT });
+  await expectLateAnswerDiscarded({
+    mockGet,
+    renderFor: (id) => <EventDetailScreen navigation={navigation} route={{ key: "e", name: "EventDetail", params: { id } } as never} />,
+    newId: "vereinsabend",
+    oldPrefix: "/events/alt",
+    oldAnswer: () => ({ ...EVENT, id: "e0", slug: "alt", name: "Altes Event" }),
+    newText: "Vereinsabend",
+    oldText: "Altes Event",
+  });
+});
+
+test("Nachladen gescheitert: das Event bleibt, ausdrücklich als letzter Stand (#1000)", async () => {
+  mockGet.mockResolvedValue({ data: EVENT });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getAllByText("Vereinsabend").length).toBeGreaterThan(0));
+  mockGet.mockRejectedValue(Object.assign(new Error("Network Error"), { isAxiosError: true }));
+  const [scroll] = screen.container.queryAll((node) => Boolean(node.props.refreshControl));
+  await act(async () => {
+    await scroll.props.refreshControl.props.onRefresh();
+  });
+  await waitFor(() => expect(screen.getByTestId("event-stale")).toBeTruthy());
+  expect(screen.getAllByText("Vereinsabend").length).toBeGreaterThan(0);
 });

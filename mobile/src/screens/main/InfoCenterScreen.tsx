@@ -8,7 +8,7 @@ import { platformColor, platformIcon } from "../../components/LinkedAccounts";
 import { PlatformIcon } from "../../components/PlatformIcon";
 import { API_BASE_URL } from "../../config";
 import { ContentCard } from "../../components/ContentCard";
-import { EmptyState, ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { LoewenRangFrame } from "../../components/LoewenRangFrame";
 import { frameLabel } from "../../lib/loewenRang";
 import { MediaImage } from "../../components/MediaImage";
@@ -154,6 +154,8 @@ export function InfoCenterScreen({ navigation, route }: Props) {
           <ErrorState problem={failed[section]} title={`${active.label} nicht gefunden`} onRetry={() => { void loadLive(); }} testID="info-center-error" />
         ) : (
           <>
+            {/* Nachladen gescheitert (#1001): der Bereich zeigt seinen letzten Stand - ausdrücklich so gekennzeichnet. */}
+            {failed[section] ? <PartialLoadNotice problem={failed[section]} onRetry={() => { void loadLive(); }} testID="info-center-partial-load" /> : null}
             {section === "sponsors" ? <Sponsors items={sponsors} /> : null}
             {section === "partners" ? <Partners items={partners} /> : null}
             {section === "events" ? <Events items={events} onOpen={(event) => navigation.navigate("EventDetail", { id: event.slug || event.id })} /> : null}

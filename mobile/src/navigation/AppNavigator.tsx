@@ -243,12 +243,23 @@ export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptio
   ProfileEdit: { title: "Profil bearbeiten" },
 };
 
+/**
+ * Eine Seite je Kennung (#1000): News A → News B legt B als eigene Seite über A, statt A die Kennung B zu geben. So zeigt
+ * B nie Inhalt, Entwürfe oder eine verspätete Antwort von A, und „Zurück“ führt zu A. Dieselbe Kennung noch einmal öffnet
+ * keine zweite Seite. Gilt für jeden Detail-Screen, dessen Parameter eine Kennung tragen.
+ */
+export function detailRouteId(_name: DetailScreenName, params?: object): string | undefined {
+  const values = (params || {}) as { id?: unknown; username?: unknown; userId?: unknown; albumId?: unknown };
+  const id = values.id ?? values.username ?? values.userId ?? values.albumId;
+  return typeof id === "string" || typeof id === "number" ? String(id) : undefined;
+}
+
 /** Alle Detail-Screens - in jedem Tab-Stapel dieselben (#1144). */
 function detailScreens() {
   return (
     <AppStack.Group screenOptions={detailOptions}>
       {(Object.keys(DETAIL_SCREENS) as DetailScreenName[]).map((name) => (
-        <AppStack.Screen key={name} name={name} component={DETAIL_SCREENS[name]} options={DETAIL_OPTIONS[name] as never} />
+        <AppStack.Screen key={name} name={name} component={DETAIL_SCREENS[name]} options={DETAIL_OPTIONS[name] as never} getId={({ params }) => detailRouteId(name, params as object | undefined)} />
       ))}
     </AppStack.Group>
   );
