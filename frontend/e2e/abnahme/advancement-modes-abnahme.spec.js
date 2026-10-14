@@ -12,7 +12,7 @@ const { test, expect } = require("@playwright/test");
 // Läuft nur mit ABNAHME=1; Konten und Kennungen schreibt scripts/seed_abnahme.py nach .local-testing/abnahme/state.json.
 
 const ENABLED = process.env.ABNAHME === "1";
-const STATE_FILE = path.join(__dirname, "..", "..", "..", ".local-testing", "abnahme", "state.json");
+const STATE_FILE = process.env.ABNAHME_STATE || path.join(__dirname, "..", "..", "..", ".local-testing", "abnahme", "state.json");
 const SHOTS = process.env.ABNAHME_SHOTS || "";
 const state = ENABLED && fs.existsSync(STATE_FILE) ? JSON.parse(fs.readFileSync(STATE_FILE, "utf8")) : null;
 const SIZES = { desktop: { width: 1440, height: 900 }, handy: { width: 375, height: 812 } };
@@ -44,15 +44,18 @@ async function login(page, account) {
       saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000,
     }));
   });
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
     const started = await page.request.post("/api/auth/login", { data: { email: account.email, password: account.password, remember: true } });
     expect(started.status(), await started.text()).toBe(200);
     const body = await started.json();
     if (!body.mfa_required) return;
     const done = await page.request.post("/api/auth/mfa/complete", { data: { ticket: body.mfa_ticket, code: totp(account.totp), client: "web" } });
     if (done.status() === 200) return;
-    // Jeder Code zählt einmal (#1032): im selben 30-Sekunden-Fenster auf den nächsten warten.
-    await page.waitForTimeout(31_000);
+    // Jeder Code zählt einmal (#1032): im selben 30-Sekunden-Fenster auf den nächsten warten. Nach vielen Anmeldungen
+    // (Seed, vorige Tests) bremst der Server (429) und nennt die Sekunden - so lange warten.
+    const text = await done.text();
+    const seconds = done.status() === 429 ? Number((text.match(/(\d+) Sekunden/) || [0, 60])[1]) + 2 : 31;
+    await page.waitForTimeout(seconds * 1000);
   }
   throw new Error(`Anmeldung ${account.email} mit Zwei-Faktor nicht möglich`);
 }
@@ -111,6 +114,14 @@ async function enterResult(page, match) {
   await expect(page.getByTestId("result-undo-bar")).toBeVisible();
   await page.waitForTimeout(HOLD_MS);
   await expect(page.getByTestId("result-undo-bar")).toHaveCount(0);
+  // Veröffentlicht der Server die Ablage (Zeitgeber nach 12 s; der Sammler im Scheduler ist im Abnahme-Stack aus)?
+  // Erst dann stehen Baum, Auslosung und Folgespiele - also hier darauf warten, nicht nur auf das Verschwinden des
+  // „Rückgängig“ in der Oberfläche.
+  await expect.poll(async () => {
+    const row = (await matchesOf(page, match.tournament_id))[match.match_key];
+    return row?.pending_result ? "hält noch" : row?.status;
+  }, { message: `Ergebnis für ${match.match_key} wurde nicht veröffentlicht - die Ablage hängt`, timeout: 30_000 })
+    .toMatch(/^(completed|forfeit)$/);
 }
 
 test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () => {
@@ -118,13 +129,16 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
   test.skip(ENABLED && !state?.tournaments?.mode_instant, `Kein Seed-Stand mit den Modus-Turnieren: ${STATE_FILE} - erst scripts/seed_abnahme.py laufen lassen`);
   test.describe.configure({ mode: "serial", timeout: 300_000 });
 
-  test("Admin: Modus in Turnier und Phase, Erklärtexte, Minutenfeld nur bei der Show", async ({ page }, testInfo) => {
+  test("Admin: Modus im Turnier, Erklärtexte, Minutenfeld nur bei der Show", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Größe stellt der Test selbst ein");
     await page.setViewportSize(SIZES.desktop);
     await login(page, state.accounts.admin);
     const problems = watch(page);
     const tid = state.tournaments.mode_fixed;
     await page.goto(`/admin/tournaments/${tid}?tab=edit`);
+    // Die Spieloptionen sind eingeklappt (<details>) - erst aufklappen, dann wählen.
+    const openOptions = () => page.getByText("Erweiterte Spieloptionen", { exact: true }).click();
+    await openOptions();
     const select = page.getByTestId("tr-edit-advancement");
     await expect(select).toHaveValue("fixed");
     await expect(page.getByTestId("tr-edit-advancement-hint")).toContainText("Sieger aus A trifft Sieger aus B");
@@ -141,36 +155,13 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     expect((await tournamentOf(page, tid)).draw_show_minutes).toBe(7);
     // Zurück auf den festen Baum - das Turnier bleibt, wie der Seed es angelegt hat.
     await page.reload();
+    await openOptions();
     await page.getByTestId("tr-edit-advancement").selectOption("fixed");
     await page.getByTestId("tr-edit-save").click();
     await expect.poll(async () => (await tournamentOf(page, tid)).advancement_mode).toBe("fixed");
 
-    // Je Phase: leer erbt, ein Modus mit Erklärtext, die Minuten nur bei der Show.
-    await page.reload();
-    const stageSelect = page.locator("[data-testid^='stage-advancement-']").first();
-    await expect(stageSelect).toHaveValue("");
-    const stageId = (await stageSelect.getAttribute("data-testid")).replace("stage-advancement-", "");
-    await expect(page.getByTestId(`stage-advancement-${stageId}-hint`)).toHaveCount(0);
-    await stageSelect.selectOption("instant");
-    await expect(page.getByTestId(`stage-advancement-${stageId}-hint`)).toContainText("sofort");
-    await expect(page.getByTestId(`stage-advancement-${stageId}-minutes`)).toHaveCount(0);
-    await stageSelect.selectOption("draw_show");
-    await expect(page.getByTestId(`stage-advancement-${stageId}-minutes`)).toHaveCount(1);
-    await page.getByTestId(`stage-advancement-${stageId}-minutes`).fill("4");
-    await page.getByTestId(`stage-save-${stageId}`).click();
-    await expect.poll(async () => {
-      const response = await page.request.get(`/api/tournaments/${tid}/stages`);
-      const stages = await response.json();
-      return stages.find((row) => row.id === stageId)?.settings?.advancement_mode;
-    }).toBe("draw_show");
-    await shot(page, "admin-modus-phase-show-1440.png");
-    await page.reload();
-    await page.locator("[data-testid^='stage-advancement-']").first().selectOption("");
-    await page.getByTestId(`stage-save-${stageId}`).click();
-    await expect.poll(async () => {
-      const response = await page.request.get(`/api/tournaments/${tid}/stages`);
-      return (await response.json()).find((row) => row.id === stageId)?.settings?.advancement_mode ?? null;
-    }).toBe(null);
+    // Je Phase: das Feld gibt es (StagesPanel im Einstellungsmodus, API `settings.advancement_mode`), doch diesen
+    // Modus zeigt die Verwaltung seit der Matchplan-Seite (#1557) nirgends mehr - deshalb hier nur das Turnier.
     expect(problems).toEqual([]);
   });
 
@@ -236,7 +227,8 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     const problems = watch(page);
     const start = await matchesOf(page, tid);
     const first = ["A", "B", "C", "D"].map((key) => start[key]);
-    expect(first.every((row) => row && row.status === "ready")).toBe(true);
+    // Nach dem Planer tragen die Spiele einen Termin („scheduled“), sonst sind sie „ready“.
+    expect(first.every((row) => row && ["ready", "scheduled"].includes(row.status))).toBe(true);
 
     // Der Spieler hat den Baum offen - er bekommt die Bewegung mit dem nächsten Nachladen.
     const playerContext = await browser.newContext({ viewport: SIZES.desktop });
@@ -279,18 +271,30 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     const group = adminPage.getByTestId("draw-group-WB:2");
     await expect(group).toContainText("2 von 4 Plätzen gezogen");
     await shot(adminPage, "sofort-admin-auslosung-1440.png");
+    // Matchplan: die Zielspiele sind nur Prognose, das Los füllt sie einzeln. Geprüft vor dem Austritt unten - danach
+    // hat E nur noch einen möglichen Spieler (Freilos), der Planer lässt es aus und der alte Planer-Termin bleibt
+    // am Spiel stehen; die Liste meldet dann eine Überschneidung statt der Prognose (Altbefund, nicht #1590).
+    await adminPage.goto(`/admin/tournaments/${tid}?tab=matchplan`);
+    await expect(adminPage.getByTestId("mp-settings")).toBeVisible();
+    await expect(adminPage.getByTestId("mp-order")).toContainText("das Los entscheidet");
+    await shot(adminPage, "matchplan-sofort-1440.png");
+    await adminPage.goto(`/admin/tournaments/${tid}?tab=stages`);
+    await expect(group).toContainText("2 von 4 Plätzen gezogen");
     await adminPage.getByTestId("redraw-WB:2").click();
     await adminPage.getByTestId("confirm-dialog-confirm").click();
     await expect(adminPage.getByText(/neu ausgelost\./)).toBeVisible();
     rows = await matchesOf(page, tid);
     const second = Object.values(rows).filter((row) => row.round === 2);
     expect(second.flatMap(seated).sort()).toEqual([winnerA, winnerB].sort());
-    expect(second.every((row) => row.status === "pending")).toBe(true);
+    // Neu gemischt werden nur die schon gezogenen Plätze untereinander: sitzen beide Sieger im selben Spiel, bleibt es
+    // voll (spielbereit) - begonnen hat aber keines.
+    expect(second.every((row) => !row.started_at && ["pending", "ready", "scheduled"].includes(row.status))).toBe(true);
     await expect(group).toContainText("2 von 4 Plätzen gezogen");
 
     // Austritt des Siegers aus A: sein Platz in Runde 2 wird frei, der Verlierer aus A kommt nicht zurück (K.-o.).
     await adminPage.goto(`/admin/tournaments/${tid}`);
-    await adminPage.getByTestId(`admin-reg-withdraw-${winnerA}`).click();
+    // Die Teilnehmerliste hat je Zeile eine Handy- und eine Desktop-Fassung - die sichtbare zählt.
+    await adminPage.getByTestId(`admin-reg-withdraw-${winnerA}`).locator("visible=true").first().click();
     await expect(adminPage.getByTestId("admin-reg-removal-dialog")).toBeVisible();
     await expect(adminPage.getByTestId("admin-reg-removal-ops")).toContainText(/Platz|frei|kampflos|Freilos/);
     await adminPage.getByTestId("admin-reg-removal-confirm").click();
@@ -301,9 +305,15 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     expect(roundTwo.flatMap(seated)).not.toContain(winnerA);
     expect(roundTwo.flatMap(seated)).not.toContain(loserA);
     expect(roundTwo.flatMap(seated)).toContain(winnerB);
-    const freed = roundTwo.flatMap((row) => row.slots).find((slot) => slot.source_result?.removed_registration_id === winnerA);
+    const freedMatch = roundTwo.find((row) => row.slots.some((slot) => slot.source_result?.removed_registration_id === winnerA));
+    const freed = freedMatch?.slots.find((slot) => slot.source_result?.removed_registration_id === winnerA);
     expect(freed?.status).toBe("bye");
-    await expect(playerPage.getByText("Platz aus Runde 1")).toHaveCount(2, { timeout: 40_000 });
+    // Der Spieler sieht den frei gewordenen Platz als Freilos und den Namen nur noch in Runde 1 - erst dann das Bild
+    // („Platz aus Runde 1“ zählt vorher wie nachher zwei, das reicht nicht als Warten auf das Nachladen).
+    const freedCard = playerPage.getByTestId(`bracket-match-v2-${freedMatch.id}`);
+    await expect(freedCard).toContainText("Freilos", { timeout: 40_000 });
+    await expect(freedCard).not.toContainText(names[winnerA]);
+    await expect(playerPage.getByText("Platz aus Runde 1")).toHaveCount(2);
     await shot(playerPage, "sofort-spieler-baum-nach-austritt-1440.png");
     expect(problems).toEqual([]);
     expect(playerProblems).toEqual([]);
@@ -312,7 +322,8 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     await adminContext.close();
   });
 
-  test("Matchplan: „wartet auf Auslosung“ nach der Runde, Prognose bei sofort zufällig", async ({ page }, testInfo) => {
+  // Die Prognose bei „sofort zufällig“ prüft der Sofort-Test oben, vor dem Austritt.
+  test("Matchplan: „wartet auf Auslosung“ nach der Runde", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Größe stellt der Test selbst ein");
     await page.setViewportSize(SIZES.desktop);
     await login(page, state.accounts.admin);
@@ -321,10 +332,6 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     await expect(page.getByTestId("mp-settings")).toBeVisible();
     await expect(page.getByTestId("mp-order")).toContainText("wartet auf Auslosung");
     await shot(page, "matchplan-nach-der-runde-1440.png");
-    await page.goto(`/admin/tournaments/${state.tournaments.mode_instant}?tab=matchplan`);
-    await expect(page.getByTestId("mp-settings")).toBeVisible();
-    await expect(page.getByTestId("mp-order")).toContainText("das Los entscheidet");
-    await shot(page, "matchplan-sofort-1440.png");
     expect(problems).toEqual([]);
   });
 });

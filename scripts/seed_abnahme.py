@@ -12,6 +12,9 @@ Zwei-Faktor), alles andere über die Routen der App, angemeldet wie im Browser:
   * Gruppen-Turnier online (8 Spieler, 2 Gruppen, erste Runde gespielt)
   * Liga beendet und Ergebnisse veröffentlicht, mit geteiltem 1. Platz (drei gleich auf) - für Podest und Sieger-Moment
   * eine Fast Lap mit Strecke und Zeiten
+  * Weiterkommen in vier Modi (#1590), je vor Ort und live, Turnierleitung eingeteilt: fester Baum (K.-o. 8, Runde 1
+    halb gespielt), Auslosung nach der Runde (K.-o. 8, drei von vier Spielen fertig), Show-Auslosung (FFA 16, drei von
+    vier Läufen fertig - der vierte macht die Runde fertig), sofort zufällig (K.-o. 8, noch kein Ergebnis)
 
 Aufruf (der Stack läuft, siehe Anleitung):
 
@@ -357,6 +360,36 @@ async def inside_main() -> None:
         for status in ("completed", "results_published"):
             await admin.call("POST", f"/api/tournaments/{final['id']}/status", json={"status": status, "force": True})
         state["tournaments"]["league_published"] = final["id"]
+
+        # Weiterkommen in vier Modi (#1590): je ein Vor-Ort-Turnier, live, zwei Stationen, geplant, Turnierleitung eingeteilt.
+        # K.-o. mit 8 (fest, nach der Runde, sofort) bzw. FFA 16 mit Winner und Loser Bracket (Show), Minuten der
+        # Show-Erinnerung 3, damit die Restzeit in der Abnahme sichtbar bleibt.
+        modes = (("fixed", "Fester Baum", "single_elim", 2), ("draw_round", "Auslosung nach der Runde", "single_elim", 3),
+                 ("draw_show", "Show-Auslosung", "ffa_custom_bracket", 3), ("instant", "Sofort zufällig", "single_elim", 0))
+        for mode, label, fmt, played in modes:
+            ffa = fmt == "ffa_custom_bracket"
+            fields = {"format": fmt, "event_mode": "local", "schedule_mode": "fixed_by_staff", "result_entry_mode": "staff_only",
+                      "advancement_mode": mode, "draw_show_minutes": 3, "match_duration_minutes": 12,
+                      "max_participants": 16 if ffa else 8}
+            cup = await tournament(admin, game, f"Abnahme {label} ({stamp})", quarter(now_utc() - timedelta(minutes=30)), **fields)
+            await register(admin, cup, users["players"] if ffa else users["players"][:8])
+            if ffa:
+                await admin.call("POST", f"/api/tournaments/{cup['id']}/bracket/from-format?preview=false", json=CUP_STRUCTURE)
+            else:
+                await admin.call("POST", f"/api/tournaments/{cup['id']}/bracket/from-format?preview=false")
+            await admin.call("POST", f"/api/tournaments/{cup['id']}/staff", json={"user_id": users["lead"]["id"], "role": "organizer"})
+            await stations(admin, cup, 2)
+            await admin.call("POST", f"/api/tournaments/{cup['id']}/status", json={"status": "live", "force": True})
+            mode_plan = await admin.call("POST", f"/api/tournaments/{cup['id']}/schedule/plan")
+            if mode_plan.get("mode") == "stations":
+                await admin.call("POST", f"/api/tournaments/{cup['id']}/schedule/apply",
+                                 json={"fingerprint": mode_plan["fingerprint"], "planned_at": mode_plan["planned_at"]})
+            first_round = sorted((row for row in (await matches_of(admin, cup["id"])).values()
+                                  if int(row.get("round") or 0) == 1 and str(row.get("section") or "WB").upper() == "WB"),
+                                 key=lambda row: row.get("match_key") or "")
+            for match in first_round[:played]:
+                await result(admin, match)
+            state["tournaments"][f"mode_{mode}"] = cup["id"]
 
         # Fast Lap mit einer Strecke und Zeiten.
         challenge = await admin.call("POST", "/api/f1/challenges", json={"title": f"Abnahme Fast Lap ({stamp})", "game_id": game["id"],
