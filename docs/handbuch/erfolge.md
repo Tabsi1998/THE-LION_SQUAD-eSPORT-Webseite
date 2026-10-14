@@ -248,7 +248,7 @@ Jahreswertung** ×0,00 oder ein **eigener Faktor**. Die Punkte werden gutgeschri
 **Boni** können dazukommen (Check-in, Fair Play, Siege, Fast-Lap-Boni). **Schutz vor Punktesammeln:** Bei Fast Laps und Fun-Wertungen zählen
 je Person und Kalendermonat die ersten **vier** Einträge voll, danach nur noch zur Hälfte. Turniere (Major, Normal, Mini) zählen immer voll.
 
-**Event-Teilnahme:** Setzt die Turnierleitung eine Person im Event unter **Anm.** auf **Eingecheckt**, bekommt sie einen Jahreswertungs-Eintrag
+**Event-Teilnahme:** Checkt die Turnierleitung eine Person unter **Anmeldungen & Einlass** ein (**Da**), bekommt sie einen Jahreswertungs-Eintrag
 (Gewicht ×0,50 plus 5 Bonuspunkte), 60 XP und eine Erfolgs-Auswertung. Siehe [Events](events.md).
 
 **Achievements** sind Profilpunkte und fließen nicht still in die Jahreswertung. Reine Community-Aktivität zählt nur, wenn sie als

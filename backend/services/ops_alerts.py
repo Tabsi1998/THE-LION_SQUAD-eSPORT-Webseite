@@ -292,6 +292,10 @@ async def purge_old_logs(db, *, now: datetime | None = None) -> dict:
         cutoff = (current - timedelta(days=settings["retention_days"][source])).isoformat()
         result = await getattr(db, source).delete_many({"created_at": {"$lt": cutoff}})
         removed[source] = int(getattr(result, "deleted_count", 0) or 0)
+    # Nachrichten an alle Angemeldeten (#1372): dieselbe Frist wie das Adminprotokoll.
+    cutoff = (current - timedelta(days=settings["retention_days"]["audit_logs"])).isoformat()
+    result = await db.event_messages.delete_many({"created_at": {"$lt": cutoff}})
+    removed["event_messages"] = int(getattr(result, "deleted_count", 0) or 0)
     old_alerts = (current - timedelta(days=365)).isoformat()
     await db.ops_alert_log.delete_many({"at": {"$lt": old_alerts}})
     return removed

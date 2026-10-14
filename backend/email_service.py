@@ -449,6 +449,17 @@ def tpl_newsletter_event(display_name: str, title: str, when: str = "", location
     return f"Neues Event: {title}", _wrap("Neues Event", body, "Event ansehen", url)
 
 
+# Nachricht an alle Angemeldeten eines Events (#1372): von der Turnierleitung auf der Seite „Anmeldungen & Einlass“.
+@mail_template
+def tpl_event_message(display_name: str, event_name: str, message: str, url: str = "") -> tuple[str, str]:
+    body = (
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        f"<p>die Turnierleitung von <strong>{event_name}</strong> schreibt allen Angemeldeten:</p>"
+        f'<p style="border-left:3px solid {BRAND_CYAN};padding-left:12px;color:#374151;white-space:pre-line">{message}</p>'
+    )
+    return f"{event_name}: Nachricht der Turnierleitung", _wrap("Nachricht zum Event", body, "Zum Event", url)
+
+
 @mail_template
 def tpl_birthday_greeting(display_name: str, preferences_url: str = "") -> tuple[str, str]:
     body = (
@@ -642,6 +653,7 @@ async def send_template(
         "team_chat_mention": tpl_team_chat_mention,
         "newsletter_news": tpl_newsletter_news,
         "newsletter_event": tpl_newsletter_event,
+        "event_message": tpl_event_message,
     }
     fn = templates.get(template_key)
     if not fn:
