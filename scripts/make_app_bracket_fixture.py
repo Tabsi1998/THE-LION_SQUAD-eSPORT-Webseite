@@ -10,7 +10,8 @@ Quellen, alle über die echten Routen in der Flow-Testumgebung (In-Memory, kein 
 - FFA-Läufe 16 (Start, nach Runde 1), 8 von 16 vor/nach dem Zusammenlegen, 40 mit langen Namen (#1571, #1575),
 - Liga 6 (Spieltage), Gruppen 8 in 2 Gruppen (`[{group, standings}]`), Swiss 6 (zwei Runden) mit ihren Tabellen,
 - gemischte Runden (#1548/#1580, „Gegner der nächsten Runde: zufällig mischen“): K.-o. 8 vor und nach der Auslosung,
-  Doppel-K.-o. 8 nach Runde 1 (Winner und Loser Bracket getrennt gemischt), FFA 16 vor und nach der Auslosung. Das Los
+  Doppel-K.-o. 8 nach Runde 1 (Winner und Loser Bracket getrennt gemischt), FFA 16 vor und nach der Auslosung, FFA 8 von 16
+  gemischt und zusammengelegt (gestrichene Quellen sind keine Auslosung). Das Los
   ist echt zufällig - die gemeinsamen Fälle prüfen darum die Gruppen und die Herkunft aus `source_result`, nicht wer wo sitzt.
 
 Die Rundennamen (`round_labels`) rechnet services/round_labels wie die Baum-Antwort nach #1581; in den Bäumen selbst
@@ -46,6 +47,9 @@ MATCH_FIELDS = ("id", "match_key", "stage_id", "section", "round", "round_name",
                 "status", "winner_id", "started_at", "called_at", "scheduled_at", "duration_minutes", "station_text",
                 "group_id", "merged_into", "merged_into_key", "advancement", "forfeit_registration_id", "draw")
 SLOT_FIELDS = ("slot", "registration_id", "status", "source", "source_result")
+# Nur was die Anzeige braucht - interne Schlüssel (z. B. der Sperr-Schlüssel des Lauf-Umbaus) bleiben draußen.
+SOURCE_FIELDS = ("type", "flow", "match_key", "rank", "seed", "raw", "draw", "was")
+SOURCE_RESULT_FIELDS = ("from_match_id", "from_match_key", "rank", "flow", "skipped", "reason", "removed_registration_id", "draw_id")
 RESULT_FIELDS = ("registration_id", "rank", "score", "points", "forfeit", "qualified", "outcome")
 SETTING_FIELDS = ("match_size", "qualifiers_per_match", "bracket_reset", "min_players", "draw_group")
 META_FIELDS = ("source", "reason", "needed", "annulled")
@@ -60,7 +64,14 @@ def _pick(row: dict, fields) -> dict:
 
 def slim_match(match: dict) -> dict:
     out = _pick(match, MATCH_FIELDS)
-    out["slots"] = [_pick(slot, SLOT_FIELDS) for slot in match.get("slots") or []]
+    out["slots"] = []
+    for slot in match.get("slots") or []:
+        row = _pick(slot, SLOT_FIELDS)
+        if isinstance(row.get("source"), dict):
+            row["source"] = _pick(row["source"], SOURCE_FIELDS)
+        if isinstance(row.get("source_result"), dict):
+            row["source_result"] = _pick(row["source_result"], SOURCE_RESULT_FIELDS)
+        out["slots"].append({key: value for key, value in row.items() if value not in (None, "", [], {})})
     if match.get("results"):
         out["results"] = [_pick(row, RESULT_FIELDS) for row in match["results"]]
     settings = _pick(match.get("settings") or {}, SETTING_FIELDS)
@@ -374,6 +385,30 @@ async def mixed(out: dict) -> None:
         for match in await open_matches(flow, tournament, {"C", "D"}):
             await play(flow, staff, match)
         out["ffa16_mixed_drawn"] = state(await bracket(flow, tournament), "ffa_custom_bracket", note="FFA 16 gemischt: Runde 1 fertig, E und F ausgelost")
+    finally:
+        await shutdown()
+    # 8 von 16 gemischt und zusammengelegt: der Umbau streicht Quellen (Freilos-Plätze mit `source_result.skipped`) - das
+    # ist keine Auslosung, die Folgerunde wartet weiter aufs Los (#1575 mit #1548).
+    flow, shutdown = make_flow()
+    try:
+        tournament, _users, regs = await flow.with_participants(8, format="ffa_custom_bracket", heat_rebuild_mode="suggest", status="registration_open",
+                                                                 title="Lions Kart-Cup", randomize_advancement_rounds=True)
+        await name_participants(flow, regs)
+        await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"max_participants": 16}})
+        await flow.db.tournament_stages.insert_one({
+            "id": new_id(), "tournament_id": tournament["id"], "number": 1, "name": "Läufe", "stage_type": "ffa_custom_bracket", "match_type": "ffa",
+            "status": "pending", "settings": {"schema": _auto_ffa_custom_schema(16, 4, 2), "match_size": 4, "qualifiers_per_match": 2, "min_players": 2},
+            "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(),
+        })
+        staff = await flow.add_staff()
+        flow.act_as(staff)
+        await close_check_in(flow, tournament)
+        plan_doc = (await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})).get("heat_rebuild_plan")
+        if plan_doc:
+            response = await flow.post(f"/api/tournaments/{tournament['id']}/heat-rebuild/confirm", json={"plan_id": plan_doc["id"]})
+            assert response.status_code == 200, response.text
+        out["ffa8_mixed_merged"] = state(await bracket(flow, tournament), "ffa_custom_bracket",
+                                         note="FFA 8 von 16 gemischt und zusammengelegt: gestrichene Quellen sind Freilos-Plätze, noch nicht gelost")
     finally:
         await shutdown()
 

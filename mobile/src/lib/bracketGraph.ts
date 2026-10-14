@@ -17,7 +17,7 @@ export type BracketSlot = {
   registration_id?: string | null;
   status?: string | null;
   source?: SlotSource;
-  source_result?: { reason?: string | null; removed_registration_id?: string | null; from_match_key?: string | null; flow?: string | null; rank?: number | null } | null;
+  source_result?: { reason?: string | null; removed_registration_id?: string | null; from_match_key?: string | null; flow?: string | null; rank?: number | null; skipped?: boolean } | null;
 };
 export type BracketResult = { registration_id?: string | null; rank?: number | null; score?: number | null; points?: number | null; forfeit?: boolean; dnf?: boolean; no_show?: boolean; disqualified?: boolean; qualified?: boolean };
 export type BracketMatch = {
@@ -213,7 +213,9 @@ export function drawRails(matches: BracketMatch[] = []): DrawRail[] {
       }
     }
     const label = targets.flatMap((target) => (target.slots || []).map(slotDraw)).find((draw) => draw?.label)?.label || "";
-    const drawn = targets.some((target) => target.draw || (target.slots || []).some((slot) => slotDraw(slot) && slot.source_result?.from_match_key));
+    // Gelost ist, wenn ein Ziel `draw` trägt oder ein Platz seine Herkunft aus dem Los hat. Ein Freilos-Platz, dessen
+    // Quelle der Lauf-Umbau gestrichen hat (`source_result.skipped`, #1575), zählt nicht - der wartet weiter aufs Los.
+    const drawn = targets.some((target) => target.draw || (target.slots || []).some((slot) => slotDraw(slot) && slot.source_result?.from_match_key && !slot.source_result?.skipped));
     return { group, label, sources: [...sources.values()], targets: targets.map((match) => match.id), drawn };
   });
 }

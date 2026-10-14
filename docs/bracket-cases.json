@@ -1,5 +1,5 @@
 {
- "_info": "Gemeinsame Erwartungen für den Turnierbaum (#1561 Web, #1563 App) auf den echten Bäumen aus docs/bracket-trees.json (scripts/make_app_bracket_fixture.py). Spiele stehen als Kürzel, Personen als Name. Linie: \"Quelle>Ziel:Platz Fluss\", dahinter \" quer\" (über die Grenze eines Abschnitts) und \" entfällt\" (Quelle oder Ziel abgesagt). App: mobile/src/lib/bracketGraph.test.ts. Web: frontend/src/lib/bracketGraph.js rechnet dieselben Fälle (nach #1581). Gemischte Runden (#1548/#1580): „rails“ = Sammelschiene je Auslosungs-Gruppe (Quellen mit Fluss, Zielspiele, ausgelost ja/nein); vor der Auslosung keine Einzel-Linien in die Zielspiele, danach Linien aus der echten Herkunft (source_result.from_match_key) - die prüft der Test gegen die Plätze, weil das Los zufällig ist.",
+ "_info": "Gemeinsame Erwartungen für den Turnierbaum (#1561 Web, #1563 App) auf den echten Bäumen aus docs/bracket-trees.json (scripts/make_app_bracket_fixture.py). Spiele stehen als Kürzel, Personen als Name. Linie: \"Quelle>Ziel:Platz Fluss\", dahinter \" quer\" (über die Grenze eines Abschnitts) und \" entfällt\" (Quelle oder Ziel abgesagt). App: mobile/src/lib/bracketGraph.test.ts. Web: frontend/src/lib/bracketGraph.js rechnet dieselben Fälle (nach #1581). Gemischte Runden (#1548/#1580): „rails“ = Sammelschiene je Auslosungs-Gruppe (Quellen mit Fluss, Zielspiele, ausgelost ja/nein); vor der Auslosung keine Einzel-Linien in die Zielspiele, danach Linien aus der echten Herkunft (source_result.from_match_key) - die prüft der Test gegen die Plätze, weil das Los zufällig ist. Gestrichene Quellen (source_result.skipped, Lauf-Umbau) zählen nicht als gelost (ffa8_mixed_merged).",
  "edges": [
   {
    "state": "se6_live",
@@ -77,6 +77,15 @@
   },
   {
    "state": "ffa16_mixed_open",
+   "edges": [
+    "E>G:1 W",
+    "E>G:3 W",
+    "F>G:2 W",
+    "F>G:4 W"
+   ]
+  },
+  {
+   "state": "ffa8_mixed_merged",
    "edges": [
     "E>G:1 W",
     "E>G:3 W",
@@ -597,6 +606,24 @@
       "B W",
       "C W",
       "D W"
+     ],
+     "targets": [
+      "E",
+      "F"
+     ],
+     "drawn": false
+    }
+   ]
+  },
+  {
+   "state": "ffa8_mixed_merged",
+   "rails": [
+    {
+     "group": "WB:2",
+     "label": "Runde 1",
+     "sources": [
+      "A W",
+      "B W"
      ],
      "targets": [
       "E",
