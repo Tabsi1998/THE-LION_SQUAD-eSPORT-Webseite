@@ -13,6 +13,7 @@ Zustände (Zeitpunkt der Erzeugung steht in ``_generated_at``; die Tests stellen
 * ``se8_corrected`` das Ergebnis von A ist korrigiert (umgedreht), der andere steht jetzt im Halbfinale
 * ``se8_walkover`` B kampflos (nicht erschienen)
 * ``se6``          K.-o. mit 6: zwei Freilose in Runde 1
+* ``se64``         K.-o. mit 64, vier Stationen, geplant (Laufzeit der Prognose)
 * ``se8_mixed`` … ``se8_mixed_drawn`` K.-o. mit 8, Gegner gemischt (#1548): vor der Auslosung, kurz davor, ausgelost
 * ``de16`` … ``de16_champion`` Doppel-K.-o. mit 16 und Reset, lange Namen: Start, nach Winner Runde 1, vor dem
   Grand Final, Reset nötig (Sieger aus dem Loser Bracket gewinnt das Grand Final), Sieger nach dem Reset
@@ -169,6 +170,19 @@ async def se6(data):
         await shutdown()
 
 
+async def se64(data):
+    """K.-o. mit 64 und vier Stationen, Plan übernommen - für die Laufzeit der Prognose (viele Spiele auf einmal)."""
+    flow, shutdown = make_flow()
+    try:
+        staff, t = await knockout(flow, 64, "single_elim", lambda i: NAMES[i] if i < len(NAMES) else f"Fahrer {i + 1}", title="Lions Groß-Cup")
+        await add_stations(flow, t, "Switch 1", "Switch 2", "Switch 3", "Switch 4")
+        await plan(flow, t)
+        await flow.start(t)
+        data["se64"] = await display(flow, t, staff)
+    finally:
+        await shutdown()
+
+
 async def se8_mixed(data):
     """K.-o. mit 8, Gegner der nächsten Runde gemischt (#1548): vor der Auslosung, kurz davor, nach der Auslosung."""
     flow, shutdown = make_flow()
@@ -307,6 +321,7 @@ async def main():
     await se8(data)
     await se6(data)
     await se8_mixed(data)
+    await se64(data)
     await de16(data, reset=True)
     await de16(data, reset=False)
     await ffa_states(data)

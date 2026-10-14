@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 // TV-Bäume aus dem echten Generator und dem echten Planer (scripts/make_tv_bracket_fixture.py) - keine Handarbeit.
 import TVG from "../../e2e/fixtures/tvGenerated.json";
 import { viennaTime } from "@/lib/vienna";
-import { DELAY_SHOWN_FROM, forecastOf, forecastText, nextUp } from "./tvForecast";
+import { DELAY_SHOWN_FROM, forecastOf, forecastOrder, forecastText, nextUp } from "./tvForecast";
+import { bracketEdges } from "@/lib/bracketGraph";
 
 // „Als Nächstes“ mit Prognose (#1564): wann ein Spiel ungefähr losgeht und an welcher Station - aus dem Planer
 // (`scheduled_at`, `schedule_forecast`), verschoben um den Verzug: läuft das Spiel davor an derselben Station länger als
@@ -170,5 +171,55 @@ describe("forecastBoard: Reihenfolge aus den Linien, nicht aus der Zeit", () => 
     const next = board.get(d.id);
     // D wartet auf B an derselben Station: entweder ebenfalls alter Plan (ausgeblendet) oder nach Bs Ende.
     expect(next.stale || next.eta >= now + 30 * 60000).toBe(true);
+  });
+});
+
+describe("forecastBoard: viele Spiele (Codex-Nachprüfung #1564)", () => {
+  // 64er-Baum aus dem echten Generator plus fünf Doppel-K.-o.-Bäume als eigene Phasen: über 200 Spiele.
+  const big = () => {
+    const matches = [...state("se64").matches_v2];
+    for (let copy = 0; copy < 5; copy += 1) {
+      for (const match of state("de16").matches_v2) {
+        matches.push({ ...match, id: `${copy}-${match.id}`, stage_id: `${match.stage_id}-${copy}`, station_id: match.station_id ? `${match.station_id}-${copy}` : match.station_id });
+      }
+    }
+    return matches;
+  };
+
+  it("rechnet über 200 Spiele unter einer Zeitgrenze - die Auswahl der bereiten Spiele ist kein quadratisches Sortieren", () => {
+    const matches = big();
+    expect(matches.length).toBeGreaterThan(200);
+    const now = GENERATED + 45 * 60000;
+    forecastBoard(matches, { now });
+    const started = performance.now();
+    for (let round = 0; round < 20; round += 1) forecastBoard(matches, { now });
+    expect((performance.now() - started) / 20).toBeLessThan(60);
+  });
+
+  it("dasselbe Ergebnis wie die einfache Rechnung (bereite Spiele jedes Mal nach Plan sortiert)", () => {
+    const matches = big();
+    const now = GENERATED + 45 * 60000;
+    const board = forecastBoard(matches, { now });
+    // Die einfache Rechnung als Maßstab: Kahn mit Sortieren bei jeder Entnahme - dieselbe Regel, nur langsam.
+    const time = (match) => (match.scheduled_at ? Date.parse(match.scheduled_at) : Number.MAX_SAFE_INTEGER);
+    const position = new Map(matches.map((match, index) => [match.id, index]));
+    const byPlan = (a, b) => time(a) - time(b) || (a.round || 0) - (b.round || 0) || (a.order || 0) - (b.order || 0) || position.get(a.id) - position.get(b.id);
+    const byId = new Map(matches.map((match) => [match.id, match]));
+    const open = matches.filter((match) => board.has(match.id));
+    const waiting = new Map(open.map((match) => [match.id, new Set()]));
+    for (const edge of bracketEdges(matches)) if (!edge.void && waiting.has(edge.to) && waiting.has(edge.from)) waiting.get(edge.to).add(edge.from);
+    const ready = open.filter((match) => !waiting.get(match.id).size);
+    const reference = [];
+    while (ready.length) {
+      ready.sort(byPlan);
+      const match = ready.shift();
+      reference.push(match.id);
+      for (const [id, preds] of waiting) {
+        if (!preds.delete(match.id) || preds.size) continue;
+        ready.push(byId.get(id));
+      }
+    }
+    expect(forecastOrder(matches)).toEqual(reference);
+    for (const match of open) expect(board.get(match.id).eta === null || board.get(match.id).eta >= now).toBe(true);
   });
 });

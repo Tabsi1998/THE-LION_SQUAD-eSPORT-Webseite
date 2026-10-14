@@ -136,12 +136,28 @@ function BracketTv() {
   const sponsors = useTvSponsors();
   const minute = useMinuteTick();
 
+  // Abfragen können sich überholen (Codex-Nachprüfung #1564): jede bekommt beim Start ihre Nummer; eine Antwort, die
+  // älter ist als die zuletzt übernommene, wird verworfen. Das Nachholen nach einer Neuverbindung gehört genau zur
+  // ersten Abfrage danach - und zu jeder späteren, die vor ihr ankommt (sie trägt das Verpasste ebenso).
+  const seqRef = useRef(0);
+  const appliedRef = useRef(0);
+  const catchUpFromRef = useRef(null);
+
   const load = useCallback(async () => {
+    const seq = ++seqRef.current;
+    if (catchUpRef.current) {
+      catchUpFromRef.current = catchUpFromRef.current ?? seq;
+      catchUpRef.current = false;
+    }
+    const offline = offlineRef.current;
     try {
       const { data: br } = await api.get(`/tournaments/${id}/bracket/display`, displayKey ? { params: { key: displayKey } } : undefined);
+      if (seq < appliedRef.current) return;
+      appliedRef.current = seq;
       // Ruhig, wenn es Nachholen ist: nach einer Neuverbindung und während der Strom getrennt ist (Ersatz-Abfrage).
-      quietRef.current = catchUpRef.current || offlineRef.current;
-      catchUpRef.current = false;
+      const catchUp = catchUpFromRef.current !== null && seq >= catchUpFromRef.current;
+      if (catchUp) catchUpFromRef.current = null;
+      quietRef.current = catchUp || offline;
       setData(br);
       setLoadError(null);
       setKeyRefused(false);

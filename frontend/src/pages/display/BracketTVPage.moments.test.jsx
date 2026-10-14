@@ -224,3 +224,76 @@ test("solange der Strom getrennt ist, lädt der TV ruhig nach (Ersatz-Abfrage) -
   await waitFor(() => expect(screen.getByTestId(`tv-match-${current.matches_v2.find((match) => match.status === "forfeit").id}`)).toHaveAttribute("data-walkover", "1"));
   expect(main()).not.toHaveAttribute("data-moment");
 });
+
+// ---------------------------------------------------------------- Codex-Nachprüfung: überlappende Abfragen
+function deferredBrackets() {
+  const pending = [];
+  apiMock.get.mockImplementation((url) => {
+    if (url === "/tv/settings") return Promise.resolve({ data: { settings: {} } });
+    if (url.startsWith("/tournaments/")) {
+      if (!pending.length && current) {
+        // Erste Abfrage beim Laden: sofort.
+        const data = current;
+        current = null;
+        return Promise.resolve({ data });
+      }
+      return new Promise((resolve) => pending.push(resolve));
+    }
+    return Promise.resolve({ data: [] });
+  });
+  return pending;
+}
+
+async function trigger() {
+  await act(async () => {
+    emitApiInvalidation({ resource: "matches" });
+    await new Promise((resolve) => { setTimeout(resolve, 220); });
+  });
+}
+
+test("zwei überlappende Abfragen, die Antworten vertauscht: der ältere Stand überschreibt den neueren nicht", async () => {
+  current = state("se8_live");
+  const id = current.tournament.id;
+  const pending = deferredBrackets();
+  renderTv();
+  await screen.findByTestId("tv-tree");
+  await trigger();
+  await trigger();
+  expect(pending).toHaveLength(2);
+  const newer = state("se8_after_a");
+  const gameA = () => screen.getByTestId(`tv-match-${idOf(newer, "A")}`);
+  await act(async () => { pending[1]({ data: newer }); });
+  // Der neue Stand ist da (A entschieden, der Ergebnis-Moment läuft).
+  await waitFor(() => expect(gameA()).toHaveTextContent("Beendet"));
+  await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
+  // Die ältere Antwort kommt zu spät - sie wird verworfen: A bleibt entschieden, kein zweiter Moment für „live“.
+  await act(async () => { pending[0]({ data: state("se8_live") }); });
+  await new Promise((resolve) => { setTimeout(resolve, 100); });
+  expect(gameA()).toHaveTextContent("Beendet");
+  expect(gameA()).not.toHaveAttribute("data-live");
+  expect(id).toBeTruthy();
+});
+
+test("Wiederverbinden mit überlappender Abfrage: der Nachholstand bleibt ruhig, egal welche Antwort zuerst kommt", async () => {
+  current = state("se8_live");
+  const pending = deferredBrackets();
+  renderTv();
+  await screen.findByTestId("tv-tree");
+  act(() => setStreamConnected(false));
+  // Wieder verbunden: die Nachhol-Abfrage startet, kurz danach eine zweite (neue Änderung gemeldet).
+  await act(async () => {
+    setStreamConnected(true);
+    await new Promise((resolve) => { setTimeout(resolve, 220); });
+  });
+  await trigger();
+  expect(pending).toHaveLength(2);
+  // Die spätere Abfrage antwortet zuerst - sie trägt alles Verpasste und muss ruhig sein.
+  await act(async () => { pending[1]({ data: state("se8_after_a") }); });
+  await waitFor(() => expect(screen.getByTestId(`tv-match-${idOf(state("se8_after_a"), "A")}`)).toHaveTextContent("Beendet"));
+  expect(main()).not.toHaveAttribute("data-moment");
+  // Die Nachhol-Abfrage kommt danach mit einem älteren Stand: verworfen - nichts springt zurück, nichts bewegt sich.
+  await act(async () => { pending[0]({ data: state("se8_live") }); });
+  await new Promise((resolve) => { setTimeout(resolve, 100); });
+  expect(screen.getByTestId(`tv-match-${idOf(state("se8_after_a"), "A")}`)).toHaveTextContent("Beendet");
+  expect(main()).not.toHaveAttribute("data-moment");
+});
