@@ -235,3 +235,29 @@ def test_registration_response_cannot_be_used_twice(setup):
         assert error.value.status_code == 401
         assert len(db.passkeys.rows) == 1
     asyncio.run(scenario())
+
+
+def test_options_follow_the_discoverable_standard(setup):
+    """#1520: Registrierung verlangt einen auffindbaren Passkey (sonst schlägt ihn kein Browser im E-Mail-Feld vor), die
+    Anmeldung kommt ohne E-Mail und ohne Liste, die Domain ist die der Website - im Web und in der App."""
+    async def scenario():
+        _db, user, request, _issue = setup
+        registration = await routes.registration_options(routes.RegistrationStart(current_password="correct-password"), request, Response(), user)
+        selection = registration["authenticatorSelection"]
+        assert selection["residentKey"] == "required"
+        assert selection["requireResidentKey"] is True
+        assert selection["userVerification"] == "required"
+        assert registration["rp"]["id"] == "club.example"
+
+        login = await routes.login_options(request, Response())
+        assert login["rpId"] == "club.example"
+        assert login.get("allowCredentials", []) == []
+        assert login["userVerification"] == "required"
+
+        mobile = await routes.mobile_login_options(request)
+        assert mobile["options"]["rpId"] == "club.example"
+        assert mobile["options"].get("allowCredentials", []) == []
+        app_registration = await routes.mobile_registration_options(
+            routes.MobileRegistrationStart(current_password="correct-password"), request, user)
+        assert app_registration["options"]["authenticatorSelection"]["residentKey"] == "required"
+    asyncio.run(scenario())
