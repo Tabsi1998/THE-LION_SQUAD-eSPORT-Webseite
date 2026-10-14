@@ -18,12 +18,14 @@ und für den Betreiber in ``DATA_PROTECTION.md``:
 """
 from __future__ import annotations
 
+import errno
 import logging
 import pathlib
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from bson import ObjectId
+from pymongo import ReturnDocument
 
 from models import now_utc
 from services import media_audit, uploads_inventory
@@ -170,6 +172,14 @@ PERSONAL_PLACES = (
 # Dateien, deren Löschung scheiterte (gesperrt, Rechte): die Verwaltungszeilen bleiben, der Aufräum-Job versucht es
 # stündlich erneut (``retry_file_cleanups``).
 PENDING = "pending_file_cleanups"
+# Nacharbeit mit Grenze (#1046): je Datei ein Eintrag mit Status. ``pending`` wartet auf ``next_attempt_at``; der Abstand
+# wächst von einer Stunde bis zu einem Tag. Nach ``RETRY_LIMIT`` Versuchen steht er auf ``failed`` - dann braucht es
+# jemanden am Server (Rechte, Sperre), und Betrieb → Checks zeigt ihn rot, bis ein Admin „Erneut versuchen“ wählt.
+PENDING_STATUS, FAILED_STATUS = "pending", "failed"
+RETRY_LIMIT = 8
+RETRY_BASE = timedelta(hours=1)
+RETRY_MAX = timedelta(hours=24)
+SOURCE_ERASURE, SOURCE_MEDIA = "account_erasure", "media_library"
 
 
 def _id_forms(user_id: str) -> list:
@@ -204,6 +214,36 @@ def _unlink(path: pathlib.Path) -> None:
     path.unlink(missing_ok=True)
 
 
+def safe_error(exc: BaseException) -> str:
+    """Die Art des Fehlers ohne Pfad und Text (#1046): Fehlerklasse und - bei Dateifehlern - der Code (``EACCES``).
+    Der Dateiname kann vom Konto stammen, und der Pfad gehört nicht ins Log."""
+    code = getattr(exc, "errno", None)
+    if isinstance(code, int):
+        return f"{exc.__class__.__name__} {errno.errorcode.get(code, str(code))}"
+    return exc.__class__.__name__
+
+
+_SAFE_ERROR = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,60}(?: [A-Z0-9_]{1,20})?$")
+_OLD_ERRNO = re.compile(r"\[(?:Errno|WinError) (\d+)\]")
+
+
+def shown_error(value) -> str:
+    """Für die Anzeige: nur Fehlerklasse bzw. Code. Einträge von vor #1046 tragen den Text des Fehlers samt Pfad -
+    daraus bleibt höchstens der Code; der nächste Versuch schreibt den Eintrag ohnehin neu."""
+    text = str(value or "").strip()
+    if _SAFE_ERROR.match(text):
+        return text
+    found = _OLD_ERRNO.search(text)
+    if found:
+        return f"OSError {errno.errorcode.get(int(found.group(1)), found.group(1))}"
+    return "unbekannt"
+
+
+def retry_delay(attempts: int) -> timedelta:
+    """Wartezeit nach dem soundsovielten gescheiterten Versuch: 1, 2, 4 … Stunden, höchstens ``RETRY_MAX``."""
+    return min(RETRY_BASE * (2 ** min(max(0, attempts - 1), 16)), RETRY_MAX)
+
+
 async def _remove(db, name: str, scans: list[dict]) -> str | None:
     """Datei, kleinere Fassungen und Quarantäne-Kopien weg; erst danach die Verwaltungszeilen. Liefert den Fehler."""
     try:
@@ -217,7 +257,7 @@ async def _remove(db, name: str, scans: list[dict]) -> str | None:
             if key:
                 _unlink(QUARANTINE_DIR / key)
     except OSError as exc:  # die Löschung des Kontos darf an einer gesperrten Datei nicht scheitern
-        return str(exc)[:300] or exc.__class__.__name__
+        return safe_error(exc)
     if scans:
         await db.media_scans.delete_many({"_id": {"$in": [scan["_id"] for scan in scans]}})
     await db.media_uploads.delete_many({"filename": name})
@@ -236,14 +276,30 @@ async def _scans(db, owner_id: str, names: set[str]) -> dict[str, list[dict]]:
     return found
 
 
-async def _remember(db, name: str, owner_id: str, owned: bool, error: str) -> None:
-    """Zum Nachholen vermerken: der stündliche Aufräum-Job (``retry_file_cleanups``) versucht es erneut."""
-    logger.warning("[media] Datei %s nicht gelöscht, wird nachgeholt: %s", name, error)
-    now = now_utc().isoformat()
-    await db[PENDING].update_one({"filename": name}, {
-        "$set": {"owner_id": str(owner_id), "owned": owned, "last_error": error, "updated_at": now},
-        "$inc": {"attempts": 1}, "$setOnInsert": {"created_at": now},
-    }, upsert=True)
+async def _remember(db, name: str, owner_id: str, owned: bool, error: str, source: str = SOURCE_ERASURE,
+                    now: datetime | None = None) -> None:
+    """Zum Nachholen vermerken: der stündliche Aufräum-Job (``retry_file_cleanups``) versucht es erneut - nach
+    ``retry_delay``, bis ``RETRY_LIMIT`` erreicht ist. Ein Eintrag je Datei; ein weiterer Fehler zählt nur hoch.
+    Das Log nennt weder Datei noch Pfad noch Konto (#1046) - die Datei sehen die Admins unter Betrieb → Checks."""
+    current = now or now_utc()
+    stamp = current.isoformat()
+    fields = {"owned": owned, "last_error": error, "updated_at": stamp}
+    if owner_id:  # die Mediathek kennt kein Konto - ein schon vermerktes bleibt
+        fields["owner_id"] = str(owner_id)
+    row = await db[PENDING].find_one_and_update(
+        {"filename": name},
+        {"$set": fields, "$inc": {"attempts": 1}, "$setOnInsert": {"created_at": stamp, "source": source}},
+        upsert=True, return_document=ReturnDocument.AFTER, projection={"_id": 0, "attempts": 1},
+    )
+    attempts = int((row or {}).get("attempts") or 1)
+    if attempts >= RETRY_LIMIT:
+        await db[PENDING].update_one({"filename": name}, {"$set": {
+            "status": FAILED_STATUS, "next_attempt_at": None, "failed_at": stamp}})
+        logger.warning("[media] Dateilöschung nach %s Versuchen aufgegeben (%s) - siehe Betrieb → Checks", attempts, error)
+        return
+    await db[PENDING].update_one({"filename": name}, {"$set": {
+        "status": PENDING_STATUS, "next_attempt_at": (current + retry_delay(attempts)).isoformat()}})
+    logger.warning("[media] Dateilöschung gescheitert (%s), Versuch %s - wird nachgeholt", error, attempts)
 
 
 async def remove_upload(db, name: str) -> str | None:
@@ -252,13 +308,13 @@ async def remove_upload(db, name: str) -> str | None:
     nach; er prüft vorher erneut, ob die Datei inzwischen wieder verwendet wird. Liefert den Fehler."""
     error = await _remove(db, name, [])
     if error:
-        await _remember(db, name, "", True, error)
+        await _remember(db, name, "", True, error, source=SOURCE_MEDIA)
     else:
         await db[PENDING].delete_many({"filename": name})
     return error
 
 
-async def _clean(db, owner_id: str, owned: set[str], untracked: set[str]) -> int:
+async def _clean(db, owner_id: str, owned: set[str], untracked: set[str], now: datetime | None = None) -> int:
     """Löscht, was nirgends mehr steht. Eigene Dateien: persönliche Profile anderer verlieren den Eintrag."""
     names = owned | untracked
     if not names:
@@ -272,7 +328,7 @@ async def _clean(db, owner_id: str, owned: set[str], untracked: set[str]) -> int
             continue
         error = await _remove(db, name, scans.get(name, []))
         if error:
-            await _remember(db, name, owner_id, name in owned, error)
+            await _remember(db, name, owner_id, name in owned, error, now=now)
             continue
         for collection, row_id, field in personal.get(name, []):
             await getattr(db, collection).update_one({"_id": row_id}, {"$set": {field: None}})
@@ -304,15 +360,66 @@ async def _own_images(db, user_id: str, urls: list[str | None]) -> int:
     return await _clean(db, user_id, owned, untracked)
 
 
-async def retry_file_cleanups(db, limit: int = 200) -> int:
-    """Der Aufräum-Job: Dateien gelöschter Konten, deren Löschung beim ersten Mal scheiterte, erneut versuchen."""
+def _due(now: datetime) -> dict:
+    """Fällig ist, was nicht aufgegeben ist und dessen Zeit gekommen ist. Einträge von vor #1046 haben weder Status
+    noch Zeitpunkt und sind sofort dran."""
+    return {"status": {"$ne": FAILED_STATUS},
+            "$or": [{"next_attempt_at": None}, {"next_attempt_at": {"$lte": now.isoformat()}}]}
+
+
+async def retry_file_cleanups(db, limit: int = 200, now: datetime | None = None) -> int:
+    """Der Aufräum-Job: Dateien, deren Löschung scheiterte, erneut versuchen - nur die fälligen, die ältesten zuerst.
+
+    Idempotent: Was inzwischen wieder verwendet wird, bleibt und verliert nur den Eintrag; was schon weg ist, gilt als
+    gelöscht. Ein Eintrag, der aus anderem Grund scheitert (etwa an der Datenbank), hält die übrigen nicht auf."""
+    now = now or now_utc()
     removed = 0
-    async for row in db[PENDING].find({}, {"_id": 0}).limit(limit):
+    rows = await db[PENDING].find(_due(now), {"_id": 0, "filename": 1, "owner_id": 1, "owned": 1}).sort(
+        "next_attempt_at", 1).to_list(limit)
+    for row in rows:
         name = row.get("filename")
-        if name:
-            owned, untracked = ({name}, set()) if row.get("owned") else (set(), {name})
-            removed += await _clean(db, row.get("owner_id") or "", owned, untracked)
+        if not name:
+            continue
+        owned, untracked = ({name}, set()) if row.get("owned") else (set(), {name})
+        try:
+            removed += await _clean(db, row.get("owner_id") or "", owned, untracked, now=now)
+        except Exception as exc:  # noqa: BLE001 - zählt als Versuch wie jeder andere Fehler
+            logger.warning("[media] Nacharbeit einer Datei abgebrochen: %s", exc.__class__.__name__)
+            try:
+                await _remember(db, name, row.get("owner_id") or "", bool(row.get("owned")), safe_error(exc), now=now)
+            except Exception as again:  # noqa: BLE001 - ohne Datenbank bleibt der Eintrag fällig für den nächsten Lauf
+                logger.warning("[media] Versuch nicht vermerkt: %s", again.__class__.__name__)
     return removed
+
+
+async def requeue_file_cleanups(db, now: datetime | None = None) -> int:
+    """„Erneut versuchen“ der Admins: aufgegebene Einträge bekommen eine neue Runde, alle offenen sind sofort fällig."""
+    stamp = (now or now_utc()).isoformat()
+    requeued = (await db[PENDING].update_many({"status": FAILED_STATUS}, {
+        "$set": {"status": PENDING_STATUS, "attempts": 0, "next_attempt_at": stamp, "requeued_at": stamp},
+        "$unset": {"failed_at": ""}})).modified_count
+    await db[PENDING].update_many({"status": {"$ne": FAILED_STATUS}}, {"$set": {"next_attempt_at": stamp}})
+    return requeued
+
+
+async def file_cleanup_counts(db) -> dict:
+    return {"pending": await db[PENDING].count_documents({"status": {"$ne": FAILED_STATUS}}),
+            "failed": await db[PENDING].count_documents({"status": FAILED_STATUS})}
+
+
+async def file_cleanup_overview(db, limit: int = 100) -> dict:
+    """Für Betrieb → Checks: Zähler und Einträge, aufgegebene zuerst. Ohne Konto - die Datei genügt zum Handeln."""
+    fields = {"_id": 0, "filename": 1, "source": 1, "status": 1, "attempts": 1, "last_error": 1, "created_at": 1,
+              "updated_at": 1, "next_attempt_at": 1, "failed_at": 1}
+    items = await db[PENDING].find({"status": FAILED_STATUS}, fields).sort("failed_at", -1).to_list(limit)
+    if len(items) < limit:
+        items += await db[PENDING].find({"status": {"$ne": FAILED_STATUS}}, fields).sort(
+            "next_attempt_at", 1).to_list(limit - len(items))
+    for item in items:
+        item["status"] = item.get("status") or PENDING_STATUS
+        item["source"] = item.get("source") or SOURCE_ERASURE
+        item["last_error"] = shown_error(item.get("last_error"))
+    return {"counts": await file_cleanup_counts(db), "items": items, "retry_limit": RETRY_LIMIT}
 
 
 async def erase_related(db, user: dict, now: str, erased_at: str | None = None) -> dict:

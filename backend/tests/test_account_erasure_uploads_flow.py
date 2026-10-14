@@ -6,6 +6,7 @@ nicht deshalb liegen, weil sie in einem fremden Profil eingetragen ist.
 """
 import pathlib
 import sys
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
@@ -13,6 +14,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
+from models import now_utc  # noqa: E402
 from services import account_erasure  # noqa: E402
 
 UPLOADS = "/api/static/uploads/"
@@ -193,7 +195,8 @@ async def test_a_locked_file_does_not_stop_the_deletion_and_is_cleaned_later(flo
     assert pending["attempts"] == 1 and pending["owned"] is True
 
     monkeypatch.setattr(account_erasure, "_unlink", real_unlink)
-    assert await account_erasure.retry_file_cleanups(flow.db) == 1
+    # Der nächste Versuch ist erst nach einer Wartezeit fällig (#1046).
+    assert await account_erasure.retry_file_cleanups(flow.db, now=now_utc() + timedelta(hours=2)) == 1
     assert not (public / "gesperrt.webp").exists() and not (quarantine / "q-gesperrt.webp").exists()
     assert await flow.db.media_uploads.count_documents({"filename": "gesperrt.webp"}) == 0
     assert await flow.db.media_scans.count_documents({"id": "scan-q"}) == 0

@@ -2,7 +2,8 @@
 
 Alle fünf Minuten prüft der Scheduler, was im Betrieb still kaputtgehen
 kann: Datenbank-Latenz, freier Speicher, Upload-Volume, Mail-Queue,
-Änderungsstrom, fehlende Bildvarianten, offene Fehlergruppen, Scheduler.
+Änderungsstrom, fehlende Bildvarianten, offene Fehlergruppen, Scheduler,
+eindeutige Indizes (#1043) und die Nacharbeit gescheiterter Dateilöschungen (#1046).
 Jede Prüfung ergibt eine Ampel (ok, warn, crit) mit einem Wert und einem
 Satz; ein Lauf wird sieben Tage aufgehoben. Die Tageszentrale zeigt die
 schlechteste Ampel, Admin → Betrieb → Checks die Einzelheiten.
@@ -403,6 +404,42 @@ async def check_client_ip(db) -> dict:
                   "„Besucher-Adresse“). Kein Fehler, wenn an dem Tag wirklich alle im selben Netz waren, etwa am Vereinsabend.")
 
 
+async def check_unique_indexes(db) -> dict:
+    """Eindeutige Indizes, die beim Start an Altdubletten gescheitert sind (#930, #1043). Statt ihrer steht ein
+    gewöhnlicher Index; „einmal je …“ ist dann wieder nur im Code geprüft. Bereinigt wird nur mit dem Werkzeug."""
+    label = "Eindeutige Indizes"
+    try:
+        from database import AUDIT_UNIQUE_INDEXES, blocked_unique_indexes
+
+        blocked = await blocked_unique_indexes(db)
+    except Exception as exc:  # noqa: BLE001
+        return failed("unique_indexes", label, exc)
+    total = len(AUDIT_UNIQUE_INDEXES)
+    if not blocked:
+        return result("unique_indexes", label, "ok", f"{total} von {total} aktiv", "Doppelte Zeilen sind ausgeschlossen")
+    return result("unique_indexes", label, "warn", f"{len(blocked)} von {total} nicht eindeutig",
+                  f"{', '.join(blocked)}. Erst Trockenlauf: docker compose exec backend python scripts/unique_index_duplicates.py "
+                  "- dann bewusst bereinigen (docs/BETRIEB.md, „Altdubletten“). Gelöscht wird nie automatisch.")
+
+
+async def check_file_cleanups(db) -> dict:
+    """Dateien, deren Löschung scheiterte (Kontolöschung, Mediathek; #1046). Offen heißt: der Aufräum-Job versucht es
+    noch; aufgegeben heißt: nach der Grenze braucht es jemanden am Server."""
+    label = "Datei-Nacharbeit"
+    try:
+        from services.account_erasure import RETRY_LIMIT, file_cleanup_counts
+
+        counts = await file_cleanup_counts(db)
+    except Exception as exc:  # noqa: BLE001
+        return failed("file_cleanups", label, exc)
+    pending, given_up = counts["pending"], counts["failed"]
+    if not pending and not given_up:
+        return result("file_cleanups", label, "ok", "nichts offen", "Keine Datei wartet auf ihre Löschung")
+    return result("file_cleanups", label, "crit" if given_up else "warn", f"{pending} offen, {given_up} aufgegeben",
+                  "Löschung gescheitert (Rechte, Sperre). Der Aufräum-Job versucht es stündlich mit wachsendem Abstand, "
+                  f"nach {RETRY_LIMIT} Versuchen gibt er auf. Rechte am Upload-Volume prüfen, dann unten „Erneut versuchen“.")
+
+
 CheckRunner = Callable[[Any], Awaitable[dict]]
 
 
@@ -419,6 +456,8 @@ def default_checks(db) -> list[tuple[str, str, Callable[[], Awaitable[dict]]]]:
         ("twitch_poll", "Twitch-Abfrage", lambda: check_twitch_poll(db)),
         ("dolibarr_sync", "Dolibarr-Abgleich", lambda: check_dolibarr_sync(db)),
         ("client_ip", "Besucher-Adresse", lambda: check_client_ip(db)),
+        ("unique_indexes", "Eindeutige Indizes", lambda: check_unique_indexes(db)),
+        ("file_cleanups", "Datei-Nacharbeit", lambda: check_file_cleanups(db)),
     ]
 
 

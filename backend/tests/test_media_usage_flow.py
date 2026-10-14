@@ -6,6 +6,7 @@ benutzt und lässt sich dort nicht ohne Warnung löschen. Die Bild-Migration sch
 """
 import pathlib
 import sys
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
@@ -13,6 +14,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
+from models import now_utc  # noqa: E402
 from routes import phase_fg_routes  # noqa: E402
 from services import account_erasure, image_migrate, media_audit  # noqa: E402
 
@@ -211,7 +213,7 @@ async def test_references_are_cleared_first_and_a_locked_file_is_cleaned_later(f
     assert await flow.db.media_uploads.count_documents({"filename": NAME}) == 1
 
     monkeypatch.setattr(account_erasure, "_unlink", real_unlink)
-    removed = await account_erasure.retry_file_cleanups(flow.db)
+    removed = await account_erasure.retry_file_cleanups(flow.db, now=now_utc() + timedelta(hours=2))
     assert removed == 1
     assert not (public / NAME).exists()
     assert await flow.db.media_uploads.count_documents({"filename": NAME}) == 0

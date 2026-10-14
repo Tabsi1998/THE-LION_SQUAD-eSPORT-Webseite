@@ -9,7 +9,7 @@ Was die Website über sich selbst festhält, wo es steht und wann sie sich melde
 | System → Betrieb & Logs → **Fehler** | Gruppen unbehandelter Serverfehler und Antworten mit Status 5xx (ohne Namen, Adressen, Tokens) | `ops_errors`, 30 Tage |
 | System → Betrieb & Logs → **Tempo** | Anfragen über der Schwelle (Route, Dauer) | `ops_slow_requests` |
 | System → Betrieb & Logs → **Vitals** | Ladezeiten aus dem Browser je Route (LCP, INP, CLS, TTFB), anonym | `ops_vitals` |
-| System → Betrieb & Logs → **Checks** | Auto-Checks alle fünf Minuten: Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen, Besucher-Adresse | `ops_check_runs` |
+| System → Betrieb & Logs → **Checks** | Auto-Checks alle fünf Minuten: Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen, Besucher-Adresse, eindeutige Indizes, Datei-Nacharbeit; darunter die Dateien, deren Löschung scheiterte, mit „Erneut versuchen“ | `ops_check_runs`, `pending_file_cleanups` |
 | System → Betrieb & Logs → **Alarme** | Wer bei welchem Ereignis eine Meldung bekommt, Sperrfrist, Testalarm, Aufbewahrung, letzte Alarme | `settings/ops_alerts`, `ops_alert_log` |
 | System → Betrieb & Logs → **Überblick** | Je Quelle Zähler und Auffälligkeiten, die neuesten Probleme der letzten sieben Tage | Sammelsicht |
 | System → Betrieb & Logs → **Ereignisse** | Alle Quellen in einer Liste: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot – Filter nach Quelle, Schwere, Zeitraum, Text; „Als CSV“ | `GET /api/admin/ops/events` |
@@ -39,6 +39,44 @@ So wird es richtig, wenn der Nginx Proxy Manager auf einem anderen Rechner läuf
 Gelb ist kein Fehler, wenn an dem Tag wirklich alle im selben Netz waren, etwa am Vereinsabend.
 Cloudflare lässt je Anfrage höchstens 100 MB durch – größere Uploads enden mit 413, egal was im Proxy
 Manager eingestellt ist (Ausweg: der Upload-Host ohne Cloudflare, siehe unten).
+
+## Eindeutige Indizes und Altdubletten (#930, #1043)
+
+Einige Sammlungen dürfen je Schlüssel nur eine Zeile haben (etwa XP je Konto, Discord-Aktivität je Person und
+Tag). Liegen beim Start schon alte Dubletten vor, scheitert der eindeutige Index; der Server startet trotzdem mit
+einem gewöhnlichen, und die Prüfung „Eindeutige Indizes“ unter Checks steht auf Gelb und nennt den Index. Gelöscht
+wird dabei nie etwas – bereinigt wird bewusst, im Backend-Container:
+
+1. Sicherung ziehen (`BACKUP_RESTORE.md`).
+2. Trockenlauf, ändert nichts:
+   `docker compose exec backend python scripts/unique_index_duplicates.py`
+   Er nennt je Index die Zahl der Gruppen und der überzähligen Zeilen und die Regel. Schlüssel nennt er nicht.
+3. Bereinigen mit Protokoll:
+   `docker compose exec -T backend python scripts/unique_index_duplicates.py --anwenden --wer "Name" > dubletten-protokoll.json`
+   Je Gruppe bleibt die älteste Zeile (die liest und beschreibt die Anwendung); bei Plattform-Verknüpfungen je
+   Person die zuletzt verknüpfte, wie beim Start. Danach legt das Werkzeug den eindeutigen Index gleich an. Die
+   Datei enthält jede entfernte Zeile und taugt zum Zurückspielen; sie enthält Kennungen von Personen – nach der
+   Prüfung löschen. Bei laufendem Betrieb möglich, besser in ruhiger Zeit: Gelöscht wird je Zeile und nur, wenn
+   sie noch genau so aussieht wie beim Suchen; eine inzwischen geänderte Zeile bleibt und steht unter `skipped`
+   (dann später noch einmal). Ins Adminprotokoll kommen nur die Zahlen (`ops.unique_duplicates.apply`). Mit
+   `--nur sammlung.index` (mehrfach möglich) nur einzelne Indizes.
+4. Unter Checks „Jetzt prüfen“: die Prüfung ist grün.
+
+Zwei Indizes bereinigt das Werkzeug nie, es meldet sie mit „HAND“: dasselbe fremde Konto bei mehreren Personen
+(`platform_links.platform_external`) und mehrere Rechnungsaufträge für dieselbe Buchung
+(`billing_orders.booking_key`). Dort entscheidet ein Mensch, was gilt.
+
+## Datei-Nacharbeit (#1046)
+
+Scheitert beim Löschen eines Kontos oder in der Mediathek das Löschen einer Datei (Rechte, Sperre), läuft die
+Löschung trotzdem durch; die Datei steht als Eintrag in `pending_file_cleanups`. Der stündliche Job
+`erasure_file_cleanup` versucht es erneut – nach einer, zwei, vier … Stunden, höchstens einem Tag Abstand. Nach
+acht Versuchen gibt er auf; jeder Fehler zählt als Versuch, auch einer außerhalb der Datei selbst. Die Prüfung
+„Datei-Nacharbeit“ steht bei offenen Einträgen auf Gelb, bei aufgegebenen auf Rot (mit Alarm). Unter Checks stehen
+die Einträge mit Datei, Versuchen und Fehlerart (Klasse und Code, etwa `PermissionError EACCES`); Log und Eintrag
+nennen weder Pfad noch Konto, ältere Einträge werden beim Anzeigen entsprechend gekürzt. Nach dem Beheben am Server (meist die Rechte am Upload-Volume) „Erneut versuchen“: Das gibt
+aufgegebenen Einträgen eine neue Runde und versucht alles Offene sofort. Was schon weg ist, gilt als gelöscht; was
+inzwischen wieder verwendet wird, bleibt.
 
 ## Alarme (#517)
 

@@ -147,7 +147,9 @@ PERSONAL: dict[str, Entry] = {
     # Bilder und Uploads
     "media_uploads": Entry(DELETED, ("uploads",)),
     "media_scans": Entry(DELETED, note="Prüfvermerk der Bildprüfung zu den eigenen Uploads (stehen unter uploads)"),
-    "pending_file_cleanups": Entry(DELETED, note="Merkliste für Dateien, deren Löschung nachgeholt wird"),
+    "pending_file_cleanups": Entry(DELETED, note="Merkliste für Dateien, deren Löschung nachgeholt wird (#1046): Datei, "
+                                                 "Kennung des gelöschten Kontos, Status, Fehlerart ohne Pfad - weg, "
+                                                 "sobald die Datei weg ist"),
     "upload_events": Entry(EXPIRES, ("upload_events",), "Protokoll der Uploads mit IP-Adresse; nach 60 Tagen gelöscht"),
     "gallery_submissions": Entry(DELETED, ("gallery_submissions",)),
     "gallery_submission_quota": Entry(DELETED, note="Zähler, wie viele Fotos je Album eingesandt wurden"),

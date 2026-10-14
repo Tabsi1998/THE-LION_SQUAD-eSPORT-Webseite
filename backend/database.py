@@ -284,6 +284,8 @@ async def init_indexes():
     await db.media_uploads.create_index("media_scope")
     await db.media_uploads.create_index([("owner_id", 1), ("media_scope", 1)])
     await db.pending_file_cleanups.create_index("filename", unique=True)
+    # Nacharbeit mit Grenze (#1046): der Aufräum-Job sucht die fälligen, Betrieb → Checks zählt nach Status.
+    await db.pending_file_cleanups.create_index([("status", 1), ("next_attempt_at", 1)])
     await db.upload_events.create_index("id", unique=True)
     await db.upload_events.create_index("created_at")
     await db.upload_events.create_index([("status", 1), ("created_at", -1)])
@@ -379,7 +381,10 @@ async def unique_index(collection, keys, name: str, **options) -> bool:
     """Eindeutiger Index, der den Start nicht gefährdet (#930). Liegen in der Sammlung schon Dubletten, scheitert der
     Aufbau - dann bleibt ein gewöhnlicher Index und eine Warnung im Log, der Server startet trotzdem. Sind die
     Dubletten bereinigt, greift der eindeutige beim nächsten Start von selbst (der gewöhnliche macht ihm vorher Platz:
-    zwei Indizes auf denselben Feldern lässt MongoDB nicht zu)."""
+    zwei Indizes auf denselben Feldern lässt MongoDB nicht zu).
+
+    Sichtbar ist das nicht nur im Log (#1043): Betrieb → Checks zeigt jeden fehlenden eindeutigen Index
+    (``blocked_unique_indexes``). Bereinigt wird nie hier, sondern mit ``scripts/unique_index_duplicates.py``."""
     unique, plain = f"{name}_unique", f"{name}_plain"
     existing = await collection.index_information()
     if unique in existing:
@@ -390,8 +395,10 @@ async def unique_index(collection, keys, name: str, **options) -> bool:
         await collection.create_index(keys, unique=True, name=unique, **options)
         return True
     except OperationFailure as exc:
-        logger.warning("[indexes] %s: Dubletten verhindern den eindeutigen Index %s - gewöhnlicher Index angelegt (%s)",
-                       collection.name, unique, str(exc)[:200])
+        # Ohne den Text der Datenbank: der nennt den doppelten Schlüssel, und der kann eine Kennung der Person sein.
+        logger.warning("[indexes] %s: Dubletten verhindern den eindeutigen Index %s - gewöhnlicher Index angelegt "
+                       "(Fehlercode %s; Betrieb → Checks, scripts/unique_index_duplicates.py)",
+                       collection.name, unique, getattr(exc, "code", None))
         await collection.create_index(keys, name=plain, **options)
         return False
 
@@ -483,6 +490,16 @@ async def merge_duplicate_platform_links(db) -> int:
     if removed:
         logger.warning("[indexes] platform_links: %s doppelte Verknüpfungen zusammengeführt", removed)
     return removed
+
+
+async def blocked_unique_indexes(db) -> list[str]:
+    """Welche eindeutigen Indizes aus der Vollprüfung noch fehlen - für Betrieb → Checks (#1043). Gelesen wird der Stand
+    in der Datenbank, nicht der des letzten Starts: nach einer Bereinigung samt Index ist die Prüfung gleich grün."""
+    blocked = []
+    for collection, _keys, name, _options in AUDIT_UNIQUE_INDEXES:
+        if f"{name}_unique" not in await getattr(db, collection).index_information():
+            blocked.append(f"{collection}.{name}")
+    return blocked
 
 
 async def init_audit_indexes(db) -> dict:
