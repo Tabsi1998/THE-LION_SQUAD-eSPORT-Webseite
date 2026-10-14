@@ -309,7 +309,14 @@ async def award_points(
     doc = await _points_doc(db, season_id=season_id, user_id=user_id, team_id=team_id, source_type=source_type,
                             source_id=source_id, source_name=source_name, rank=rank, num_participants=num_participants,
                             weight=weight, bonus=bonus, bonus_reason=bonus_reason, farming_exempt=farming_exempt)
-    await db.season_points.insert_one(doc)
+    if source_id:
+        # Einmal je Saison, Quelle und Person (#1584): Upsert statt Lesen-dann-Schreiben.
+        key = {"season_id": season_id, "source_type": source_type, "source_id": source_id, "user_id": user_id, "team_id": team_id}
+        written = await db.season_points.update_one(key, {"$setOnInsert": doc}, upsert=True)
+        if getattr(written, "upserted_id", None) is None:
+            return await db.season_points.find_one(key, {"_id": 0})
+    else:
+        await db.season_points.insert_one(doc)
     # Live-Einbettung „Rangliste“ (#569): neue Punkte = Nachricht im Discord aktualisieren.
     from services.discord_embed_queue import request_refresh
     request_refresh("ranking")
@@ -364,8 +371,8 @@ async def _points_doc(db, *, season_id: str, user_id: str | None, team_id: str |
 async def resync_source_points(*, season_id: str, source_type: SourceType, source_id: str, source_name: str | None,
                                ranking: list[tuple[str, int]], weight: float) -> dict:
     """Saisonpunkte einer Quelle an eine neue Rangfolge angleichen (#1584) - nach einer Korrektur veröffentlichter
-    Ergebnisse. Gerechnet wird in der Saison, in der die Punkte vergeben wurden; Gewicht, Bonus und Farming-Faktor
-    bestehender Einträge bleiben. Wer nicht mehr in der Rangfolge steht, verliert die Punkte dieser Quelle.
+    Ergebnisse. Gerechnet wird in der Saison, in der die Punkte vergeben wurden, mit dem Gewicht der Quelle; Bonus und
+    Farming-Faktor bestehender Einträge bleiben. Wer nicht mehr in der Rangfolge steht, verliert die Punkte dieser Quelle.
     ``ranking``: (Person, Platz), Platz 1 zuerst. Gibt die Zahl der geänderten, neuen und entfernten Einträge zurück."""
     db = get_db()
     num_participants = max(len(ranking), 1)
@@ -379,14 +386,17 @@ async def resync_source_points(*, season_id: str, source_type: SourceType, sourc
             doc = await _points_doc(db, season_id=season_id, user_id=user_id, team_id=None, source_type=source_type,
                                     source_id=source_id, source_name=source_name, rank=rank, num_participants=num_participants,
                                     weight=weight, bonus=0, bonus_reason=None, farming_exempt=False)
-            await db.season_points.insert_one(doc)
-            counts["added"] += 1
+            key = {"season_id": season_id, "source_type": source_type, "source_id": source_id, "user_id": user_id, "team_id": None}
+            written = await db.season_points.update_one(key, {"$setOnInsert": doc}, upsert=True)
+            if getattr(written, "upserted_id", None) is not None:
+                counts["added"] += 1
             continue
-        values = _points_values(rank, num_participants, float(row.get("weight") if row.get("weight") is not None else weight),
-                                int(row.get("bonus_points") or 0), float(row.get("farming_multiplier") or 1.0))
-        if row.get("rank") != rank or row.get("num_participants") != num_participants or row.get("total_points") != values["total_points"]:
+        # Das Gewicht kommt aus der Quelle (Wertungsgewicht der Challenge) - es kann sich mit Begründung ändern.
+        values = _points_values(rank, num_participants, weight, int(row.get("bonus_points") or 0), float(row.get("farming_multiplier") or 1.0))
+        if (row.get("rank") != rank or row.get("num_participants") != num_participants or row.get("total_points") != values["total_points"]
+                or row.get("weight") != weight):
             await db.season_points.update_one({"id": row["id"]}, {"$set": {"rank": rank, "num_participants": num_participants,
-                                                                         **values, "updated_at": stamp}})
+                                                                         "weight": weight, **values, "updated_at": stamp}})
             counts["updated"] += 1
     for row in existing.values():
         await db.season_points.delete_one({"id": row["id"]})

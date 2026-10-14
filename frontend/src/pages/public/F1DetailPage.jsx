@@ -460,7 +460,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
     const reason = await changeReason("Eine Zeit nachtragen");
     if (!reason) return;
     const attempt = await submitOnce(async () => {
-      await api.post(`/f1/challenges/${challenge.id}/times`, {
+      const { data: saved } = await api.post(`/f1/challenges/${challenge.id}/times`, {
         ...(question ? { confirm_implausible: true } : {}),
         ...reason,
         user_id: driver.id,
@@ -472,6 +472,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
         score_scope: form.score_scope || "official",
       });
       toast.success("Zeit eingetragen.");
+      if (saved?.resync_warning) toast.warning(saved.resync_warning);
       setForm((current) => ({ ...current, time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "" }));
       await loadTimes();
       onSaved();
@@ -487,7 +488,8 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
       if (locked) {
         const reason = await changeReason("Eine Zeit löschen");
         if (!reason) return;
-        await api.delete(`/f1/times/${time.id}`, { data: reason });
+        const { data } = await api.delete(`/f1/times/${time.id}`, { data: reason });
+        if (data?.resync_warning) toast.warning(data.resync_warning);
       } else {
         const ok = await confirm({
           title: "Zeit löschen?",

@@ -11,8 +11,10 @@ import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 
-// Nach „Ergebnisse veröffentlicht“ (#1584) verschiebt „Vereinsmitglieder ausschließen“ Zeiten - nur mit Begründung.
+// Nach „Ergebnisse veröffentlicht“ (#1584) ändern Wertungsregeln Rangfolge, Gewinne oder Saisonpunkte - nur mit
+// Begründung; danach gleicht der Server Gewinne und Punkte an. Dieselbe Liste wie SCORING_FIELDS in f1_routes.py.
 const LOCKED_STATUSES = new Set(["results_published", "archived"]);
+const SCORING_FIELDS = ["block_club_member_results", "is_championship", "points_per_position", "prize_places", "season_weight"];
 
 const F1_SEASON_WEIGHT_OPTIONS = [
   ["1", "Fast Lap Standard (x1.00)"],
@@ -85,10 +87,10 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
         toast.info("Keine Änderungen zum Speichern.");
         return;
       }
-      if ("block_club_member_results" in patch && LOCKED_STATUSES.has(challenge.status)) {
+      if (SCORING_FIELDS.some((field) => field in patch) && LOCKED_STATUSES.has(challenge.status)) {
         const reason = await prompt({
           title: "Begründung nötig",
-          description: "Die Ergebnisse sind veröffentlicht. Diese Regel verschiebt Zeiten in die Referenzwertung; Gewinne und Saisonpunkte werden danach angeglichen. Bitte begründen (mind. 10 Zeichen) - es steht im Protokoll.",
+          description: "Die Ergebnisse sind veröffentlicht. Diese Änderung betrifft die Wertung; Gewinne und Saisonpunkte werden danach angeglichen. Bitte begründen (mind. 10 Zeichen) - es steht im Protokoll.",
           placeholder: "z. B. Mitglied fuhr irrtümlich offiziell",
           confirmLabel: "Mit Begründung speichern",
           required: true,
@@ -97,8 +99,9 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
         if (!text) return;
         patch.change_reason = text;
       }
-      await api.patch(`/f1/challenges/${challenge.id}`, patch);
+      const { data } = await api.patch(`/f1/challenges/${challenge.id}`, patch);
       toast.success("Challenge gespeichert.");
+      if (data?.resync_warning) toast.warning(data.resync_warning);
       onSaved();
     } catch (e) { toast.error(formatRequestError(e, "Challenge konnte nicht gespeichert werden.", { title: form.title })); }
   };

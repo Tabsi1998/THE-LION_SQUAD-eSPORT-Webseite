@@ -178,15 +178,9 @@ async def _sync_f1_prizes(challenge_id: str, *, review_stale: bool) -> dict:
     deadline = (now_utc() + timedelta(days=DEFAULT_PICKUP_WINDOW_DAYS)).isoformat()
 
     async def create_pickup(user_id: str, place: int, prize: dict, source_key: str, source_label: str, track: dict | None = None) -> bool:
-        existing = await db.prize_pickups.find_one({
-            "source_type": "fastlap",
-            "fastlap_challenge_id": challenge_id,
-            "fastlap_source_key": source_key,
-            "place": place,
-            "user_id": user_id,
-            "team_id": None,
-        })
-        if existing:
+        key = {"source_type": "fastlap", "fastlap_challenge_id": challenge_id, "fastlap_source_key": source_key,
+               "place": place, "user_id": user_id}
+        if await db.prize_pickups.find_one(key, {"_id": 1}):
             return False
         place_label = prize.get("label") or _ordinal(place)
         doc = {
@@ -219,7 +213,11 @@ async def _sync_f1_prizes(challenge_id: str, *, review_stale: bool) -> dict:
             "created_at": now_utc().isoformat(),
             "updated_at": now_utc().isoformat(),
         }
-        await db.prize_pickups.insert_one(doc)
+        # Einmal je Platz und Person (#1584): Upsert auf den eindeutigen Schlüssel - zwei gleichzeitige Abgleiche legen
+        # keinen zweiten Gewinn an.
+        written = await db.prize_pickups.update_one(key, {"$setOnInsert": doc}, upsert=True)
+        if getattr(written, "upserted_id", None) is None:
+            return False
         try:
             from services.user_notifications import create_user_notification
             prize_text = doc.get("prize_value") or doc.get("prize_label") or "ein Preis"

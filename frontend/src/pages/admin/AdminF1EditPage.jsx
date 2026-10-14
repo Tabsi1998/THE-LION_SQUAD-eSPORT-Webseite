@@ -179,6 +179,9 @@ export default function AdminF1EditPage() {
     return { change_reason: text };
   };
 
+  // Scheitert nach einer Korrektur der Abgleich von Gewinnen und Saisonpunkten (#1584), sagt der Server es mit.
+  const warnResync = (data) => { if (data?.resync_warning) toast.warning(data.resync_warning); };
+
   const addTime = async (e) => {
     e.preventDefault();
     if (!driver) { toast.error("Bitte zuerst den Fahrer suchen und wählen."); return; }
@@ -194,7 +197,7 @@ export default function AdminF1EditPage() {
     const reason = await changeReason("Eine Zeit nachtragen");
     if (!reason) return;
     try {
-      await api.post(`/f1/challenges/${id}/times`, {
+      const { data: saved } = await api.post(`/f1/challenges/${id}/times`, {
         user_id: driver.id, track_id: activeTrack,
         time_ms: ms, penalty_seconds: pen,
         proof_url: newTime.proof_url || null,
@@ -205,6 +208,7 @@ export default function AdminF1EditPage() {
       });
       setNewTime({ ...newTime, time_str: "", proof_url: "", admin_note: "", penalty_seconds: 0 });
       toast.success("Zeit eingetragen.");
+      warnResync(saved);
       loadTimes();
     } catch (err) { toast.error(formatRequestError(err, "Zeit konnte nicht eingetragen werden.")); }
   };
@@ -222,7 +226,8 @@ export default function AdminF1EditPage() {
       tone: "danger",
     })) return;
     try {
-      await api.delete(`/f1/times/${time.id}`, reason.change_reason ? { data: reason } : undefined);
+      const response = await api.delete(`/f1/times/${time.id}`, reason.change_reason ? { data: reason } : undefined);
+      warnResync(response?.data);
       toast.success("Zeit gelöscht.");
       loadTimes();
     } catch (err) {
@@ -246,7 +251,7 @@ export default function AdminF1EditPage() {
       if (!consent) return;
       const reason = await changeReason("Eine Zeit ändern");
       if (!reason) return;
-      await api.patch(`/f1/times/${editTime.id}`, {
+      const { data: corrected } = await api.patch(`/f1/times/${editTime.id}`, {
         time_ms: ms,
         penalty_seconds: pen,
         is_invalid: inv,
@@ -257,6 +262,7 @@ export default function AdminF1EditPage() {
         ...reason,
       });
       toast.success("Zeit aktualisiert.");
+      warnResync(corrected);
       setEditTime(null);
       loadTimes();
     } catch (e) { toast.error(formatRequestError(e, "Zeit konnte nicht gespeichert werden.")); }

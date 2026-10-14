@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 // Veröffentlichung rechts, Speichern-Leiste unten) und schicken nur die Änderung.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
-const toastMock = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
+const toastMock = { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() };
 const confirmMock = vi.fn(async () => true);
 const promptMock = vi.fn(async () => "");
 vi.mock("@/lib/api", () => ({
@@ -273,4 +273,25 @@ test("nach der Veröffentlichung: „Vereinsmitglieder ausschließen“ ändern 
   promptMock.mockResolvedValueOnce("Mitglied fuhr irrtümlich offiziell");
   fireEvent.click(screen.getByTestId("f1-edit-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/challenges/c-1", expect.objectContaining({ block_club_member_results: true, change_reason: "Mitglied fuhr irrtümlich offiziell" })));
+});
+
+test("nach der Veröffentlichung: ein neuer Preis braucht eine Begründung", async () => {
+  answerWith({ status: "results_published", prize_places: [{ place: 1, label: "Platz 1", value: "Pokal" }] });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  fireEvent.change(screen.getByTestId("f1-edit-prize-value-0"), { target: { value: "Großer Pokal" } });
+  promptMock.mockResolvedValueOnce("Sponsor hat den Preis aufgewertet");
+  fireEvent.click(screen.getByTestId("f1-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/challenges/c-1", expect.objectContaining({ change_reason: "Sponsor hat den Preis aufgewertet" })));
+  expect(promptMock).toHaveBeenCalledTimes(1);
+});
+
+test("scheitert der Abgleich, sagt die Seite es nach dem Speichern", async () => {
+  answerWith({ status: "results_published" });
+  apiMock.delete.mockResolvedValue({ data: { ok: true, resync_warning: "Korrektur gespeichert - Gewinne und Saisonpunkte ließen sich nicht angleichen, bitte prüfen." } });
+  promptMock.mockResolvedValueOnce("Doppelt eingetragen laut Video");
+  renderPage();
+  await screen.findByText("Erika");
+  fireEvent.click(screen.getByTestId("f1-delete-time-t-1"));
+  await waitFor(() => expect(toastMock.warning).toHaveBeenCalledWith(expect.stringContaining("bitte prüfen")));
 });

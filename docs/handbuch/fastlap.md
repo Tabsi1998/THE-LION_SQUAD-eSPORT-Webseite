@@ -234,8 +234,11 @@ des Formulars einen Hinweis. Die **Turnierleitung** kann noch korrigieren, aber 
 Jahreswertungs-Punkte an die neue Rangfolge an: Wer neu auf einem Preisplatz steht, bekommt seinen Gewinn; ein Gewinn,
 der nicht mehr passt, wird **nicht entzogen**, sondern steht unter **Admin → eSports → Gewinne** mit dem Vermerk
 **„Nach Korrektur prüfen“**. Die Punkte bleiben in der Saison, in der sie vergeben wurden. Dasselbe gilt, wenn ihr
-nach der Veröffentlichung **Vereinsmitglieder aus offizieller Wertung ausschließen** umstellt (auch nur mit
-Begründung). Eine veröffentlichte Challenge mit Zeiten lässt sich nicht löschen – archiviert sie. Vor dem
+nach der Veröffentlichung eine Wertungsregel ändert – **Vereinsmitglieder aus offizieller Wertung ausschließen**,
+**Championship**, Punkte je Platz, **Preise** oder das Gewicht der **Jahreswertung** (auch nur mit Begründung).
+Schaltet ihr „Vereinsmitglieder ausschließen“ wieder ab, kommen genau die Zeiten zurück in die offizielle Wertung, die
+die Regel verschoben hat. Lässt sich der Abgleich einmal nicht durchführen, bleibt die Korrektur gespeichert, die Seite
+meldet „Gewinne und Saisonpunkte … bitte prüfen“, und das Protokoll hält es fest. Eine veröffentlichte Challenge mit Zeiten lässt sich nicht löschen – archiviert sie. Vor dem
 Veröffentlichen fragt die Seite nach. Wer den Status wieder zurücksetzt, öffnet die Zeiten – auch das steht im
 Protokoll.
 

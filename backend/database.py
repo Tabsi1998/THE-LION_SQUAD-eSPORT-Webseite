@@ -307,7 +307,6 @@ async def init_indexes():
     await db.prize_pickups.create_index("status")
     await db.prize_pickups.create_index([("tournament_id", 1), ("place", 1), ("user_id", 1)])
     await db.prize_pickups.create_index([("tournament_id", 1), ("place", 1), ("team_id", 1)])
-    await db.prize_pickups.create_index([("source_type", 1), ("fastlap_challenge_id", 1), ("fastlap_source_key", 1), ("place", 1), ("user_id", 1)])
     # Phase D refinements
     await db.contact_messages.create_index("id", unique=True)
     await db.contact_messages.create_index([("status", 1), ("created_at", -1)])
@@ -412,6 +411,12 @@ async def unique_index(collection, keys, name: str, **options) -> bool:
         return False
 
 
+FASTLAP_PRIZE_KEY = [("source_type", 1), ("fastlap_challenge_id", 1), ("fastlap_source_key", 1), ("place", 1), ("user_id", 1)]
+# Gewöhnliche Indizes, die ein eindeutiger aus der Vollprüfung ersetzt (gleiche Felder) - beim Start weg damit.
+REPLACED_INDEXES = (
+    ("prize_pickups", "_".join(f"{field}_{direction}" for field, direction in FASTLAP_PRIZE_KEY)),
+)
+
 # Vollprüfung Oktober 2026 (#930): diese Sammlungen werden bei fast jeder Anfrage gelesen und hatten keinen Index;
 # „einmal je …“ war bisher nur im Code geprüft, zwei gleichzeitige Anfragen konnten zwei Zeilen anlegen.
 AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
@@ -439,6 +444,11 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     # gleichzeitige Klicks schicken dieselbe Kennung an Dolibarr. Abgeschlossene Aufträge bleiben außen vor.
     ("consent_decisions", [("user_id", 1), ("member_id", 1), ("code", 1), ("decision", 1), ("version", 1)], "open_decision",
      {"partialFilterExpression": {"status": {"$in": ["sent", "pending"]}}}),
+    # Fast Lap (#1584): je Platz, Quelle und Person ein Gewinn, je Saison, Strecke und Person eine Punktezeile - der
+    # Abgleich nach einer Korrektur schreibt per Upsert darauf.
+    ("prize_pickups", FASTLAP_PRIZE_KEY, "fastlap_place_user", {"partialFilterExpression": {"source_type": "fastlap"}}),
+    ("season_points", [("season_id", 1), ("source_type", 1), ("source_id", 1), ("user_id", 1)], "fastlap_source_user",
+     {"partialFilterExpression": {"source_type": "fastlap"}}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("platform_links", "user_id"),
@@ -518,6 +528,9 @@ async def blocked_unique_indexes(db) -> list[str]:
 async def init_audit_indexes(db) -> dict:
     """Die Indizes aus der Vollprüfung. Gibt zurück, welche eindeutigen an Dubletten gescheitert sind."""
     await merge_duplicate_platform_links(db)
+    for collection, name in REPLACED_INDEXES:
+        if name in await getattr(db, collection).index_information():
+            await getattr(db, collection).drop_index(name)
     blocked = []
     for collection, keys, name, options in AUDIT_UNIQUE_INDEXES:
         if not await unique_index(getattr(db, collection), keys, name, **options):

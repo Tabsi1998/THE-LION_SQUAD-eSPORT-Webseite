@@ -53,6 +53,16 @@ class FakeCollection:
         self.items.append(dict(doc))
         return SimpleNamespace(inserted_id=doc.get("id"))
 
+    async def update_one(self, query, update, upsert=False):
+        # Nur was der Upsert beim Anlegen braucht (#1584): $setOnInsert, wenn nichts passt.
+        if any(self._matches(item, query) for item in self.items):
+            return SimpleNamespace(upserted_id=None, matched_count=1)
+        if not upsert:
+            return SimpleNamespace(upserted_id=None, matched_count=0)
+        doc = {**query, **update.get("$setOnInsert", {})}
+        self.items.append(doc)
+        return SimpleNamespace(upserted_id=doc.get("id"), matched_count=0)
+
 
 class FakeDb:
     def __init__(
