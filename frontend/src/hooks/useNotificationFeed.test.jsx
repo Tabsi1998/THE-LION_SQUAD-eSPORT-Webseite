@@ -147,3 +147,39 @@ test("Rennen: Nachladen während „alle gelesen“ - alles bleibt gelesen, auch
   await act(async () => { post.resolve({ data: {} }); await marking; });
   expect(result.current.unread).toBe(0);
 });
+
+// Nach Codex-Prüfung (#1546): ein Nachladen, das vor dem POST gestartet ist und erst danach ankommt, nimmt die
+// Markierung nicht zurück - erst ein Nachladen, das nach dem POST gestartet ist, gilt.
+test("Rennen: Nachladen startet, POST ok, Overlay weg, alte Antwort kommt - bleibt gelesen", async () => {
+  const { result } = await loaded();
+  const oldAnswer = deferred();
+  apiMock.get.mockReturnValueOnce(oldAnswer.promise);
+  let reloading;
+  act(() => { reloading = live.reload(); });
+  apiMock.post.mockResolvedValueOnce({ data: {} });
+  await act(async () => { await result.current.markRead({ ids: ["n-1"] }); });
+  expect(result.current.pendingIds.has("n-1")).toBe(false);
+  await act(async () => { oldAnswer.resolve({ data: ROWS }); await reloading; });
+  expect(readOf(result, "n-1")).toBe(true);
+  expect(result.current.unread).toBe(1);
+
+  // Ein Nachladen, das nach dem POST startet, gilt wieder ganz.
+  apiMock.get.mockResolvedValueOnce({ data: ROWS.map((row) => (row.id === "n-1" ? { ...row, read: true } : row)) });
+  await act(async () => { await live.reload(); });
+  expect(readOf(result, "n-1")).toBe(true);
+  apiMock.get.mockResolvedValueOnce({ data: ROWS });
+  await act(async () => { await live.reload(); });
+  expect(readOf(result, "n-1")).toBe(false);
+});
+
+test("Rennen „alle gelesen“: eine alte Antwort nach dem POST nimmt nichts zurück", async () => {
+  const { result } = await loaded();
+  const oldAnswer = deferred();
+  apiMock.get.mockReturnValueOnce(oldAnswer.promise);
+  let reloading;
+  act(() => { reloading = live.reload(); });
+  apiMock.post.mockResolvedValueOnce({ data: {} });
+  await act(async () => { await result.current.markAllRead(); });
+  await act(async () => { oldAnswer.resolve({ data: ROWS }); await reloading; });
+  expect(result.current.unread).toBe(0);
+});
