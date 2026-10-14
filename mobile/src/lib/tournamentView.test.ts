@@ -154,3 +154,11 @@ test("Status eines Spiels in Worten: entfällt, zusammengelegt, kampflos, läuft
   expect(matchStatusText(byKey("se6_live").F)).toBe("Bereit");
   expect(matchStatusText(byKey("se6_done").G)).toBe("Beendet");
 });
+
+test("gemischt: Zielspiele sagen, woraus gemischt wird - bis zur Auslosung", () => {
+  const byKey = (state: string) => Object.fromEntries(TREES[state].matches_v2.map((match) => [match.match_key, match]));
+  expect(matchStatusText(byKey("se8_mixed_open").E)).toBe("gemischt aus Runde 1");
+  expect(matchStatusText(byKey("de8_mixed_r1").LC)).toBe("gemischt aus Winner Runde 2 / Loser Runde 1");
+  expect(matchStatusText(byKey("se8_mixed_drawn").E)).toBe("Bereit");
+  expect(matchStatusText(byKey("se8_mixed_open").G)).toBe("Ausstehend");
+});

@@ -8,7 +8,10 @@ Quellen, alle über die echten Routen in der Flow-Testumgebung (In-Memory, kein 
   (services/custom_bracket, Check-in-Ende #1551, Turnier-Ereignisse #1579),
 - Doppel-K.-o. 4 mit Grand Final, das die Siegerrunde gewinnt - der Reset entfällt (`bracket_reset`, #1571),
 - FFA-Läufe 16 (Start, nach Runde 1), 8 von 16 vor/nach dem Zusammenlegen, 40 mit langen Namen (#1571, #1575),
-- Liga 6 (Spieltage), Gruppen 8 in 2 Gruppen (`[{group, standings}]`), Swiss 6 (zwei Runden) mit ihren Tabellen.
+- Liga 6 (Spieltage), Gruppen 8 in 2 Gruppen (`[{group, standings}]`), Swiss 6 (zwei Runden) mit ihren Tabellen,
+- gemischte Runden (#1548/#1580, „Gegner der nächsten Runde: zufällig mischen“): K.-o. 8 vor und nach der Auslosung,
+  Doppel-K.-o. 8 nach Runde 1 (Winner und Loser Bracket getrennt gemischt), FFA 16 vor und nach der Auslosung. Das Los
+  ist echt zufällig - die gemeinsamen Fälle prüfen darum die Gruppen und die Herkunft aus `source_result`, nicht wer wo sitzt.
 
 Die Rundennamen (`round_labels`) rechnet services/round_labels wie die Baum-Antwort nach #1581; in den Bäumen selbst
 fehlt `round_label` absichtlich - so prüft die App ihren Rückfall für ältere Server gegen den Server.
@@ -41,10 +44,10 @@ LONG = {16: "Der unglaublich lange Spielername Nummer Eins mit noch mehr Text da
 
 MATCH_FIELDS = ("id", "match_key", "stage_id", "section", "round", "round_name", "matchday_label", "order", "match_type",
                 "status", "winner_id", "started_at", "called_at", "scheduled_at", "duration_minutes", "station_text",
-                "group_id", "merged_into", "merged_into_key", "advancement", "forfeit_registration_id")
+                "group_id", "merged_into", "merged_into_key", "advancement", "forfeit_registration_id", "draw")
 SLOT_FIELDS = ("slot", "registration_id", "status", "source", "source_result")
 RESULT_FIELDS = ("registration_id", "rank", "score", "points", "forfeit", "qualified", "outcome")
-SETTING_FIELDS = ("match_size", "qualifiers_per_match", "bracket_reset", "min_players")
+SETTING_FIELDS = ("match_size", "qualifiers_per_match", "bracket_reset", "min_players", "draw_group")
 META_FIELDS = ("source", "reason", "needed", "annulled")
 REG_FIELDS = ("id", "display_name", "status", "seed")
 STAGE_FIELDS = ("id", "stage_type", "match_type", "name")
@@ -318,6 +321,63 @@ async def tables(out: dict) -> None:
         await shutdown()
 
 
+async def open_matches(flow, tournament: dict, keys=None) -> list[dict]:
+    rows = sorted(await flow.matches(tournament), key=lambda m: (m.get("round") or 0, m.get("order") or 0))
+    return [m for m in rows if m.get("status") in {"ready", "in_progress"} and len(filled(m)) >= 2 and (keys is None or m["match_key"] in keys)]
+
+
+async def mixed(out: dict) -> None:
+    """Gemischte Runden (#1548): nur, wenn der Server sie kennt (services/advancement_draw, ab #1580)."""
+    import importlib.util
+    if importlib.util.find_spec("services.advancement_draw") is None:
+        print("gemischt: übersprungen - der Server kennt die Auslosung (#1580) noch nicht")
+        return
+    flow, shutdown = make_flow()
+    try:
+        tournament, staff, _regs = await staged(flow, 8, "single_elim", "single_elimination", randomize_advancement_rounds=True)
+        await flow.start(tournament)
+        for match in await open_matches(flow, tournament, {"A", "B"}):
+            await play(flow, staff, match)
+        out["se8_mixed_open"] = state(await bracket(flow, tournament), "single_elim", note="K.-o. 8 gemischt: A und B gespielt - die Halbfinals warten auf die Auslosung")
+        for match in await open_matches(flow, tournament, {"C", "D"}):
+            await play(flow, staff, match)
+        out["se8_mixed_drawn"] = state(await bracket(flow, tournament), "single_elim", note="K.-o. 8 gemischt: Runde 1 fertig, die Halbfinals sind ausgelost")
+    finally:
+        await shutdown()
+    flow, shutdown = make_flow()
+    try:
+        tournament, staff, _regs = await staged(flow, 8, "double_elim", "double_elimination", randomize_advancement_rounds=True)
+        await flow.start(tournament)
+        for match in await open_matches(flow, tournament):
+            if match.get("round") == 1:
+                await play(flow, staff, match)
+        out["de8_mixed_r1"] = state(await bracket(flow, tournament), "double_elim", note="Doppel-K.-o. 8 gemischt: Runde 1 fertig, Winner und Loser Bracket je für sich ausgelost")
+    finally:
+        await shutdown()
+    flow, shutdown = make_flow()
+    try:
+        tournament, _users, regs = await flow.with_participants(16, format="ffa_custom_bracket", heat_rebuild_mode="auto", status="registration_open",
+                                                                 title="Lions Kart-Cup", randomize_advancement_rounds=True)
+        await name_participants(flow, regs)
+        await flow.db.tournament_stages.insert_one({
+            "id": new_id(), "tournament_id": tournament["id"], "number": 1, "name": "Läufe", "stage_type": "ffa_custom_bracket", "match_type": "ffa",
+            "status": "pending", "settings": {"schema": _auto_ffa_custom_schema(16, 4, 2), "match_size": 4, "qualifiers_per_match": 2, "min_players": 2},
+            "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(),
+        })
+        staff = await flow.add_staff()
+        flow.act_as(staff)
+        await close_check_in(flow, tournament)
+        await flow.start(tournament)
+        for match in await open_matches(flow, tournament, {"A", "B"}):
+            await play(flow, staff, match)
+        out["ffa16_mixed_open"] = state(await bracket(flow, tournament), "ffa_custom_bracket", note="FFA 16 gemischt: A und B gefahren - E und F warten auf die Auslosung")
+        for match in await open_matches(flow, tournament, {"C", "D"}):
+            await play(flow, staff, match)
+        out["ffa16_mixed_drawn"] = state(await bracket(flow, tournament), "ffa_custom_bracket", note="FFA 16 gemischt: Runde 1 fertig, E und F ausgelost")
+    finally:
+        await shutdown()
+
+
 INFO = ("Erzeugt von scripts/make_app_bracket_fixture.py mit den echten Generatoren und Umbauten (#1551, #1553, #1571, "
         "#1575) über die echten Routen. Gemeinsam für App (mobile/src/lib/bracketGraph.test.ts) und Website; die "
         "Erwartungen stehen in docs/bracket-cases.json. Nicht von Hand ändern - neu erzeugen.")
@@ -337,6 +397,7 @@ async def main():
         await shutdown()
     await heats(None, out)
     await tables(out)
+    await mixed(out)
     ordered = {"_info": INFO, **{key: out[key] for key in sorted(out)}}
     OUT.write_text(json.dumps(ordered, ensure_ascii=False, indent=1, default=str) + "\n", encoding="utf-8", newline="\n")
     for key in sorted(out):

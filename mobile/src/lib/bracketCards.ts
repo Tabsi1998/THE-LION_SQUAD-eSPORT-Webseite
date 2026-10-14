@@ -2,7 +2,7 @@
 // so rechnet bracketLayout die Lage und jede Linie endet genau an der Zeile des Platzes, in den der Spieler kommt.
 // Ruhig wie im Web (#1561): Duell mit zwei Zeilen, Lauf mit Plätzen und der Linie „2 kommen weiter → E“, Freilos und
 // entfallene Spiele als eine Zeile.
-import { heatText, isByeSlot, isDone, isOut, isWalkover, matchFate, type BracketEdge, type BracketMatch, type BracketSlot } from "./bracketGraph";
+import { heatText, isByeSlot, isDone, isOut, isWalkover, matchFate, slotDraw, type BracketEdge, type BracketMatch, type BracketSlot } from "./bracketGraph";
 import { describeSlot } from "./slotSource";
 import { byeLine } from "./tournamentView";
 
@@ -89,7 +89,11 @@ export function cardModel(match: BracketMatch, ctx: CardContext): CardModel {
   }
   const rows: CardRow[] = slots.map((slot, index) => {
     const id = slot.registration_id || null;
-    const view = describeSlot(slot, ctx.nameOf, findMatch);
+    // Gemischt (#1548): bis zur Auslosung „Platz aus Runde 1“ - wie slotSource ab #1580, auch für ältere Stände.
+    const draw = slotDraw(slot);
+    const view = draw && !slot.registration_id && !isByeSlot(slot)
+      ? { kind: "pending" as const, label: `Platz aus ${draw.label || "der Vorrunde"}` }
+      : describeSlot(slot, ctx.nameOf, findMatch);
     const result = id ? results.get(id) : undefined;
     const rank = Number(result?.rank) || 0;
     const winner = done && Boolean(id) && (rank === 1 || match.winner_id === id);

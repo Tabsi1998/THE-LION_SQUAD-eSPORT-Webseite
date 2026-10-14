@@ -1,6 +1,6 @@
 // Turnieransicht der App (#1563): Rundennamen in Alltagsworten, Baum oder Tabelle, Spielplan nach Spieltag oder Station
 // („Nur meine“), Tabellen für Gruppen, Liga und Swiss, Check-in-Ende, Live-Uhr und die Freilos-Zeile. Reine Funktionen.
-import { isByeSlot, isCancelled, isDone, isLive, isWalkover, matchFate, sectionGroup, soloAdvance, type BracketMatch } from "./bracketGraph";
+import { drawGroupOf, isByeSlot, isCancelled, isDone, isLive, isWalkover, matchFate, sectionGroup, slotDraw, soloAdvance, type BracketMatch } from "./bracketGraph";
 import { formatStatus } from "./format";
 
 // ---------------------------------------------------------------------------------------------------- Rundennamen
@@ -222,5 +222,8 @@ export function matchStatusText(match: BracketMatch) {
   const fate = matchFate(match);
   if (fate) return fate.label;
   if (isWalkover(match)) return "kampflos";
+  // Gemischt (#1548): bis zur Auslosung steht am Zielspiel, aus welcher Runde gemischt wird.
+  const waiting = drawGroupOf(match) && !match.draw ? (match.slots || []).find((slot) => slotDraw(slot) && !slot.registration_id && !isByeSlot(slot)) : null;
+  if (waiting) return `gemischt aus ${slotDraw(waiting)?.label || "der Vorrunde"}`;
   return formatStatus(match.status);
 }

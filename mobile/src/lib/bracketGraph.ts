@@ -4,6 +4,12 @@
 //
 // Linien kommen aus den echten Quellen der Plätze („W:A:1“ im Ziel, `advancement` in der Quelle), nicht aus der
 // Reihenfolge der Spiele - so stimmen sie auch zwischen Winner und Loser Bracket, ins Grand Final und in den Reset.
+//
+// Gemischte Runden (#1548/#1580, „Gegner der nächsten Runde: zufällig mischen“): die Folgespiele einer Auslosungs-Gruppe
+// (`settings.draw_group`, Plätze mit `source.draw`) haben keine festen Einzel-Linien. Stattdessen eine Sammelschiene je
+// Gruppe (`drawRails`): alle Quellspiele mit Ast auf die Schiene, von dort je ein Ast in jedes Zielspiel - nur innerhalb
+// der Sektion. Nach der Auslosung kommt die Linie eines Platzes aus der echten Herkunft (`source_result.from_match_key`,
+// Kante mit `rail`); „Dein Weg“ folgt ihr. Fester Baum: wie bisher nur echte Quellen.
 import { absoluteRank, finderFor, normalizeSource, type SlotSource } from "./slotSource";
 
 export type BracketSlot = {
@@ -11,7 +17,7 @@ export type BracketSlot = {
   registration_id?: string | null;
   status?: string | null;
   source?: SlotSource;
-  source_result?: { reason?: string | null; removed_registration_id?: string | null } | null;
+  source_result?: { reason?: string | null; removed_registration_id?: string | null; from_match_key?: string | null; flow?: string | null; rank?: number | null } | null;
 };
 export type BracketResult = { registration_id?: string | null; rank?: number | null; score?: number | null; points?: number | null; forfeit?: boolean; dnf?: boolean; no_show?: boolean; disqualified?: boolean; qualified?: boolean };
 export type BracketMatch = {
@@ -41,9 +47,11 @@ export type BracketMatch = {
   advancement?: Array<{ to_match_id?: string | null; to_slot?: number | null; flow?: string | null; rank?: number | null }> | null;
   settings?: Record<string, any> | null;
   result_meta?: { source?: string | null; reason?: string | null } | null;
+  draw?: { id?: string; group?: string; drawn_at?: string } | null;
   [key: string]: unknown;
 };
-export type BracketEdge = { id: string; from: string; to: string; toSlot: number; flow: "W" | "L"; rank: number; cross: boolean; void: boolean };
+export type BracketEdge = { id: string; from: string; to: string; toSlot: number; flow: "W" | "L"; rank: number; cross: boolean; void: boolean; rail?: string };
+export type DrawRail = { group: string; label: string; sources: Array<{ id: string; flow: "W" | "L" }>; targets: string[]; drawn: boolean };
 export type MatchFate = { kind: "merged"; into: string; label: string } | { kind: "reset" | "skipped"; label: string };
 export type BracketEvent = {
   key: string;
@@ -116,16 +124,24 @@ export function isOut(result: BracketResult | null | undefined) {
   return Boolean(result?.forfeit || result?.dnf || result?.no_show || result?.disqualified);
 }
 
+/** Die Auslosung eines Platzes (`source.draw`, #1548) - oder `null` im festen Baum. */
+export function slotDraw(slot: BracketSlot | null | undefined): { group?: string; label?: string } | null {
+  const draw = (slot?.source as { draw?: { group?: string; label?: string } | null } | null | undefined)?.draw;
+  return draw && typeof draw === "object" ? draw : null;
+}
+
+export const drawGroupOf = (match: BracketMatch | null | undefined) => (match?.settings?.draw_group ? String(match.settings.draw_group) : null);
+
 /**
- * Alle Linien: `{ id, from, to, toSlot, flow, rank, cross, void }`. `cross` = über die Grenze eines Abschnitts
+ * Alle Linien: `{ id, from, to, toSlot, flow, rank, cross, void, rail? }`. `cross` = über die Grenze eines Abschnitts
  * (Winner → Loser Bracket, → Grand Final), `void` = das Quellspiel oder das Ziel entfällt.
  */
-export function bracketEdges(matches: BracketMatch[] = []): BracketEdge[] {
+export function bracketEdges(matches: BracketMatch[] = [], { schema = false }: { schema?: boolean } = {}): BracketEdge[] {
   const list = (matches || []).filter(Boolean);
   const byId = new Map(list.map((match) => [match.id, match]));
   const find = finderFor(list);
   const edges = new Map<string, BracketEdge>();
-  const add = (from: BracketMatch | undefined, to: BracketMatch | undefined, toSlot: unknown, flow: unknown, rawRank: unknown) => {
+  const add = (from: BracketMatch | undefined, to: BracketMatch | undefined, toSlot: unknown, flow: unknown, rawRank: unknown, rail?: string) => {
     if (!from || !to || from.id === to.id) return;
     const id = `${from.id}>${to.id}:${toSlot}`;
     if (edges.has(id)) return;
@@ -134,19 +150,72 @@ export function bracketEdges(matches: BracketMatch[] = []): BracketEdge[] {
       id, from: from.id, to: to.id, toSlot: Number(toSlot) || 0, flow: flow === "L" ? "L" : "W", rank,
       cross: String(from.section || "MAIN").toLowerCase() !== String(to.section || "MAIN").toLowerCase(),
       void: isCancelled(from) || isCancelled(to),
+      ...(rail ? { rail } : {}),
     });
   };
   for (const to of list) {
+    const group = schema ? null : drawGroupOf(to);
     for (const slot of to.slots || []) {
+      const draw = schema ? null : slotDraw(slot);
+      if (draw || group) {
+        // Gemischt: erst die Auslosung legt die Herkunft fest - dann aus dem echten Quellspiel.
+        const origin = slot.source_result?.from_match_key;
+        if (slot.registration_id && origin) add(find(to)(origin) as BracketMatch | undefined, to, slot.slot, slot.source_result?.flow || normalizeSource(slot.source)?.flow, slot.source_result?.rank, String(draw?.group || group));
+        continue;
+      }
       const source = normalizeSource(slot?.source);
       if (source?.type !== "rank" || !source.match_key) continue;
       add(find(to)(source.match_key) as BracketMatch | undefined, to, slot.slot, source.flow, source.rank);
     }
   }
   for (const from of list) {
-    for (const entry of from.advancement || []) add(from, byId.get(String(entry?.to_match_id || "")), entry?.to_slot, entry?.flow, entry?.rank);
+    for (const entry of from.advancement || []) {
+      const to = byId.get(String(entry?.to_match_id || ""));
+      if (!schema && drawGroupOf(to)) continue;
+      add(from, to, entry?.to_slot, entry?.flow, entry?.rank);
+    }
   }
   return [...edges.values()];
+}
+
+/**
+ * Die Sammelschienen der gemischten Runden (#1548): je Auslosungs-Gruppe die Quellspiele (mit Fluss - Sieger oder ins
+ * Loser Bracket), die Zielspiele, der Klartext („Runde 1“) und ob schon ausgelost ist. Quellen wie am Server
+ * (advancement_draw.group_sources): alle Spiele, die in ein Zielspiel der Gruppe weiterleiten.
+ */
+export function drawRails(matches: BracketMatch[] = []): DrawRail[] {
+  const list = (matches || []).filter(Boolean);
+  const groups = new Map<string, BracketMatch[]>();
+  for (const match of list) {
+    const group = drawGroupOf(match);
+    if (group) groups.set(group, [...(groups.get(group) || []), match]);
+  }
+  const find = finderFor(list);
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([group, targets]) => {
+    const targetIds = new Set(targets.map((match) => match.id));
+    const sources = new Map<string, { id: string; flow: "W" | "L" }>();
+    for (const match of list) {
+      if (targetIds.has(match.id)) continue;
+      for (const entry of match.advancement || []) {
+        if (!targetIds.has(String(entry?.to_match_id || ""))) continue;
+        const flow = entry?.flow === "L" ? "L" : "W";
+        sources.set(`${match.id}:${flow}`, { id: match.id, flow });
+      }
+    }
+    // Ältere Antworten ohne `advancement`: die Quellen aus den Plätzen.
+    if (!sources.size) {
+      for (const target of targets) {
+        for (const slot of target.slots || []) {
+          const source = normalizeSource(slot.source);
+          const from = source?.match_key ? (find(target)(source.match_key) as BracketMatch | undefined) : undefined;
+          if (from) sources.set(`${from.id}:${source?.flow === "L" ? "L" : "W"}`, { id: from.id, flow: source?.flow === "L" ? "L" : "W" });
+        }
+      }
+    }
+    const label = targets.flatMap((target) => (target.slots || []).map(slotDraw)).find((draw) => draw?.label)?.label || "";
+    const drawn = targets.some((target) => target.draw || (target.slots || []).some((slot) => slotDraw(slot) && slot.source_result?.from_match_key));
+    return { group, label, sources: [...sources.values()], targets: targets.map((match) => match.id), drawn };
+  });
 }
 
 /**
@@ -168,9 +237,14 @@ export function orderEdges(rounds: BracketMatch[][] = []): BracketEdge[] {
 }
 
 /** Wohin ein Lauf führt (#1178): die Spiele der Weiterkommer und der anderen (Loser Bracket), dazu die Zahl. */
-export function heatExits(match: BracketMatch, edges: BracketEdge[] = [], matches: BracketMatch[] = []) {
+export function heatExits(match: BracketMatch, edges: BracketEdge[] = [], matches: BracketMatch[] = [], rails: DrawRail[] = drawRails(matches)) {
   const byId = new Map((matches || []).map((row) => [row.id, row]));
-  const keys = (flow: "W" | "L") => [...new Set(edges.filter((edge) => edge.from === match.id && edge.flow === flow && !edge.void).map((edge) => byId.get(edge.to)?.match_key).filter(Boolean) as string[])];
+  // Gemischt (#1548): ein Lauf führt in alle Zielspiele seiner Auslosungs-Gruppe.
+  const railTargets = (flow: "W" | "L") => rails.filter((rail) => rail.sources.some((source) => source.id === match.id && source.flow === flow)).flatMap((rail) => rail.targets);
+  const keys = (flow: "W" | "L") => [...new Set([
+    ...edges.filter((edge) => edge.from === match.id && edge.flow === flow && !edge.void && !edge.rail).map((edge) => edge.to),
+    ...railTargets(flow),
+  ].filter((id) => !isCancelled(byId.get(id))).map((id) => byId.get(id)?.match_key).filter(Boolean) as string[])].sort();
   return { advance: keys("W"), drop: keys("L"), qualifiers: Number(match?.settings?.qualifiers_per_match || 0) };
 }
 
@@ -200,7 +274,7 @@ export function heatText(match: BracketMatch, edges: BracketEdge[], matches: Bra
 
 const playersOf = (match: BracketMatch | null | undefined) => new Set((match?.slots || []).map((slot) => slot?.registration_id).filter(Boolean) as string[]);
 
-export type BracketPath = { matches: Set<string>; edges: Set<string>; ahead?: Set<string> };
+export type BracketPath = { matches: Set<string>; edges: Set<string>; ahead?: Set<string>; rails?: Set<string> };
 
 /**
  * Dein Weg (#1177, #1561): die Spiele einer Anmeldung, die Linien zwischen ihnen und - solange ein Spiel offen ist -
@@ -227,7 +301,27 @@ export function pathFor(registrationId: string | null | undefined, matches: Brac
     }
   }
   if (result.ahead) for (const id of result.ahead) result.matches.add(id);
+  // Gemischt, noch nicht ausgelost (#1548): der Weg führt bis zur Sammelschiene - wohin danach, entscheidet das Los.
+  for (const rail of drawRails(matches)) {
+    if (rail.targets.some((id) => result.matches.has(id))) continue;
+    for (const source of rail.sources) {
+      const from = byId.get(source.id);
+      if (!result.matches.has(source.id) || isCancelled(from)) continue;
+      if (source.flow === "L" && isDone(from) && winnerOf(from) === registrationId) continue;
+      if (source.flow === "W" && isDone(from) && !advancedFrom(from, registrationId)) continue;
+      result.rails = result.rails || new Set();
+      result.rails.add(`${rail.group}:${source.id}`);
+    }
+  }
   return result;
+}
+
+/** Kommt die Anmeldung aus diesem fertigen Spiel weiter (Platz im Rahmen der Weiterkommer)? */
+function advancedFrom(match: BracketMatch | undefined, registrationId: string) {
+  const row = (match?.results || []).find((result) => result.registration_id === registrationId);
+  if (!row) return false;
+  const qualifiers = Math.max(1, Number(match?.settings?.qualifiers_per_match || 1));
+  return Number(row.rank) > 0 && Number(row.rank) <= qualifiers && !isOut(row);
 }
 
 const resultSig = (match: BracketMatch | undefined) => (match?.results || []).map((row) => `${row.registration_id}:${row.rank ?? ""}:${row.score ?? row.points ?? ""}`).sort().join(",");
@@ -263,10 +357,11 @@ export function diffBracket(previous: BracketMatch[] | null | undefined, next: B
       const id = slot?.registration_id;
       if (!id || oldSlots.get(slot.slot)?.registration_id === id || playersOf(old).has(id)) continue;
       const source = normalizeSource(slot.source);
+      const drawn = Boolean(slotDraw(slot));
       const mergedFrom = previous.find((row) => row.id !== match.id && nextById.get(row.id)?.merged_into === match.id && wasIn.has(`${row.id}:${id}`));
       if (mergedFrom) {
         moves.push({ key: `merge:${match.id}:${id}`, type: "merge", matchId: match.id, registrationId: id, from: { matchId: mergedFrom.id } });
-      } else if (source?.type === "rank" && source.match_key) {
+      } else if (!drawn && source?.type === "rank" && source.match_key) {
         const from = find(match)(source.match_key) as BracketMatch | undefined;
         if (from) moves.push({ key: `advance:${match.id}:${id}`, type: "advance", matchId: match.id, registrationId: id, from: { matchId: from.id, registrationId: id } });
       } else {

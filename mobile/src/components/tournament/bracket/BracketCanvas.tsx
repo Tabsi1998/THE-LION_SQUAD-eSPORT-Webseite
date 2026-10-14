@@ -1,9 +1,9 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import Svg, { Path } from "react-native-svg";
+import Svg, { G, Path } from "react-native-svg";
 import { useReduceMotion } from "../../FadeIn";
 import { cardModel, type CardModel } from "../../../lib/bracketCards";
-import { bracketEdges, finalMatchOf, isLive, orderEdges, pathFor, winnerOf, type BracketEdge, type BracketMatch } from "../../../lib/bracketGraph";
+import { bracketEdges, drawRails, finalMatchOf, isLive, orderEdges, pathFor, winnerOf, type BracketEdge, type BracketMatch } from "../../../lib/bracketGraph";
 import { layoutBracket, TROPHY_ID, type BracketLayout } from "../../../lib/bracketLayout";
 import type { MotionPlan } from "../../../lib/bracketMotion";
 import { finderFor } from "../../../lib/slotSource";
@@ -17,6 +17,8 @@ import { LiveNow } from "./LiveNow";
 // Der Turnierbaum der App (#1563): eine Leinwand je Phase mit Linien (react-native-svg - liegt schon im Projekt und
 // zeichnet hier wenige, einfache Pfade unter den Karten), Rundennamen statt „Runde 2“, „Du“ und dein Weg per Tipp,
 // Live mit Station und Uhr (oben angepinnt), Lauf-Karten, Pokal am Ende. Die Lage rechnet bracketLayout ohne Messen.
+// Gemischte Runden (#1548): je Auslosungs-Gruppe eine Sammelschiene; dein Weg führt bis zur Schiene und nach der
+// Auslosung entlang der echten Herkunft weiter.
 
 type Props = {
   matches: BracketMatch[];
@@ -54,6 +56,8 @@ export function BracketCanvas({ matches, stages, format, nameOf, statusOf, mineI
   const toggle = useCallback((registrationId: string) => setSelected((current) => (current === registrationId ? null : registrationId)), []);
   const labels = useMemo(() => roundLabels(matches, stages, format), [format, matches, stages]);
   const edges = useMemo(() => edgesFor(matches), [matches]);
+  const rails = useMemo(() => drawRails(matches), [matches]);
+  const positionEdges = useMemo(() => (rails.length ? bracketEdges(matches, { schema: true }) : edges), [edges, matches, rails.length]);
   const final = useMemo(() => finalMatchOf(matches, stages), [matches, stages]);
   const path = useMemo(() => (selected ? pathFor(selected, matches, edges) : null), [edges, matches, selected]);
   const finder = useMemo(() => finderFor(matches), [matches]);
@@ -70,16 +74,19 @@ export function BracketCanvas({ matches, stages, format, nameOf, statusOf, mineI
       .filter(([id, list]) => stageKind(stageById.get(id)?.stage_type, format, list[0]?.match_type) !== "table" || !stageById.get(id))
       .sort(([a], [b]) => (Number(stageById.get(a)?.number) || 0) - (Number(stageById.get(b)?.number) || 0))
       .map(([id, list]) => {
-        const stageEdges = edges.filter((edge) => list.some((match) => match.id === edge.to));
+        const ids = new Set(list.map((match) => match.id));
+        const stageEdges = edges.filter((edge) => ids.has(edge.to));
         const finalId = final && list.includes(final) ? final.id : null;
         const layout = layoutBracket(list, stageEdges, {
           heightOf: (match) => (models.get(match.id) as CardModel).height,
           anchorY: (match, slot) => (models.get(match.id) as CardModel).anchor(slot),
           finalId,
+          rails: rails.filter((rail) => rail.targets.some((target) => ids.has(target))),
+          positionEdges: positionEdges.filter((edge) => ids.has(edge.to)),
         });
         return { id, title: byStage.size > 1 ? stageById.get(id)?.name || "" : "", layout, finalId };
       });
-  }, [edges, final, format, matches, models, stages]);
+  }, [edges, final, format, matches, models, positionEdges, rails, stages]);
   const live = useMemo(() => matches.filter(isLive), [matches]);
   const champion = final ? winnerOf(final) : null;
   const mineMatches = mineId ? matches.some((match) => (match.slots || []).some((slot) => slot.registration_id === mineId)) : false;
@@ -154,8 +161,28 @@ function Canvas({ layout, matches, models, labels, path, selected, plan, reduce,
     <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.scroll}>
       <View style={{ width: layout.width + pad, height: layout.height }} testID="bracket-canvas">
         <Svg width={layout.width + pad} height={layout.height} style={StyleSheet.absoluteFill} pointerEvents="none">
+          {layout.rails.map((rail) => {
+            // Sammelschiene: Äste aus allen Quellspielen, je ein Ast in jedes Zielspiel. Fluss ins Loser Bracket leise.
+            const quiet = rail.ins.every((row) => row.flow === "L");
+            const dim = path ? 0.25 : quiet ? 0.6 : 1;
+            return (
+              <G key={rail.group} testID={`bracket-rail-${rail.group}`}>
+                <Path d={rail.spine} fill="none" stroke={LINE_COLOR} strokeWidth={1.5} strokeDasharray={quiet ? "5 4" : undefined} opacity={dim} />
+                {rail.ins.map((row) => {
+                  const on = Boolean(path?.rails?.has(`${rail.group}:${row.sourceId}`));
+                  return (
+                    <Path key={`in-${row.sourceId}`} testID={on ? `bracket-rail-weg-${rail.group}-${row.sourceId}` : undefined} d={row.d} fill="none" stroke={on ? PATH_COLOR : LINE_COLOR}
+                      strokeWidth={on ? 2.5 : 1.5} strokeDasharray={row.flow === "L" && !on ? "5 4" : undefined} opacity={on ? 1 : row.flow === "L" && !path ? 0.6 : dim} />
+                  );
+                })}
+                {rail.outs.map((row) => <Path key={`out-${row.targetId}`} d={row.d} fill="none" stroke={LINE_COLOR} strokeWidth={1.5} strokeDasharray={quiet ? "5 4" : undefined} opacity={dim} />)}
+              </G>
+            );
+          })}
           {layout.lines.map((line) => {
             const on = lineOn(line.id, line.to);
+            // Die echten Linien einer Auslosung liegen auf der Schiene - gezeichnet nur, wenn sie zu deinem Weg gehören.
+            if (line.hidden && !on) return null;
             const quiet = line.flow === "L" || line.void;
             return (
               <Path

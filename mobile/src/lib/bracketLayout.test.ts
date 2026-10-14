@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { bracketEdges, finalMatchOf, type BracketMatch } from "./bracketGraph";
+import { bracketEdges, drawRails, finalMatchOf, type BracketMatch } from "./bracketGraph";
 import { layoutBracket, TROPHY_ID, type BracketLayout } from "./bracketLayout";
 
 // Baum mit Linien (#1563): Lage der Karten und Linien als reine Rechnung - auf echten Bäumen aus dem Generator
@@ -107,4 +107,41 @@ test("leerer Baum", () => {
   const layout = layoutBracket([], [], { heightOf, anchorY, finalId: null });
   expect(layout.nodes.size).toBe(0);
   expect(layout.lines).toEqual([]);
+});
+
+// Gemischte Runden (#1548): je Auslosungs-Gruppe eine Sammelschiene in der Gasse vor den Zielspielen. Mehrere Schienen
+// in derselben Gasse liegen nebeneinander; die Karten stehen wie im festen Baum.
+test.each(["se8_mixed_open", "se8_mixed_drawn", "de8_mixed_r1", "ffa16_mixed_open"])("%s: Sammelschienen, nichts überdeckt, keine Linie durch eine Karte", (state) => {
+  const tree = TREES[state];
+  const edges = bracketEdges(tree.matches_v2);
+  const rails = drawRails(tree.matches_v2);
+  const final = finalMatchOf(tree.matches_v2, tree.stages);
+  const layout = layoutBracket(tree.matches_v2, edges, { heightOf, anchorY, finalId: final?.id || null, rails, positionEdges: bracketEdges(tree.matches_v2, { schema: true }) });
+  expect(overlaps(layout)).toEqual([]);
+  const asLines = layout.rails.flatMap((rail) => [
+    { id: `${rail.group}-schiene`, from: "", to: "", d: rail.spine },
+    ...rail.ins.map((row) => ({ id: `${rail.group}-in-${row.sourceId}`, from: row.sourceId, to: "", d: row.d })),
+    ...rail.outs.map((row) => ({ id: `${rail.group}-out-${row.targetId}`, from: "", to: row.targetId, d: row.d })),
+  ]);
+  expect(crossings({ ...layout, lines: [...layout.lines, ...asLines] as never })).toEqual([]);
+  expect(layout.rails.map((rail) => rail.group)).toEqual(rails.map((rail) => rail.group));
+  for (const rail of layout.rails) {
+    expect(rail.ins.length).toBe(new Set(rails.find((row) => row.group === rail.group)!.sources.map((source) => source.id)).size);
+    expect(rail.outs.length).toBe(rails.find((row) => row.group === rail.group)!.targets.length);
+  }
+  // Gezeichnet werden die Schienen; die echten Linien der Auslosung liegen darauf und erscheinen nur auf deinem Weg.
+  expect(layout.lines.filter((line) => line.rail).every((line) => line.hidden)).toBe(true);
+});
+
+test("Doppel-K.-o. gemischt: zwei Schienen in derselben Gasse liegen nebeneinander", () => {
+  const tree = TREES.de8_mixed_r1;
+  const layout = layoutBracket(tree.matches_v2, bracketEdges(tree.matches_v2), {
+    heightOf, anchorY, finalId: null, rails: drawRails(tree.matches_v2), positionEdges: bracketEdges(tree.matches_v2, { schema: true }),
+  });
+  const wb = layout.rails.find((rail) => rail.group === "WB:2")!;
+  const lb = layout.rails.find((rail) => rail.group === "LB:2")!;
+  expect(wb.x).not.toBe(lb.x);
+  const node = (key: string) => layout.nodes.get(tree.matches_v2.find((match) => match.match_key === key)!.id)!;
+  const mid = (key: string) => node(key).y + node(key).h / 2;
+  expect(mid("E")).toBeCloseTo((mid("A") + mid("B")) / 2, 0);
 });

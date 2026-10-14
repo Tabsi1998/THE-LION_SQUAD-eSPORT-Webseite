@@ -3,6 +3,7 @@ import path from "path";
 import {
   bracketEdges,
   diffBracket,
+  drawRails,
   finalMatchOf,
   heatExits,
   heatText,
@@ -31,6 +32,7 @@ type Cases = {
   finalMatch: Array<{ state: string; final: string | null }>;
   diff: Array<{ from: string; to: string; events: string[] }>;
   heatText: Array<{ state: string; match: string; text: Record<string, string> }>;
+  rails: Array<{ state: string; rails: Array<{ group: string; label: string; sources: string[]; targets: string[]; drawn: boolean }> }>;
 };
 const CASES: Cases = JSON.parse(fs.readFileSync(path.join(__dirname, "../../../docs/bracket-cases.json"), "utf8"));
 
@@ -126,4 +128,60 @@ test("alte Bäume ohne Herkunft: Linien nach der Reihenfolge", () => {
 test("Abschnitte wie am Server", () => {
   expect(["WB", "main", undefined].map(sectionGroup)).toEqual(["main", "main", "main"]);
   expect(["LB", "loser", "GF", "grand_final", "bronze"].map(sectionGroup)).toEqual(["loser", "loser", "final", "final", "bronze"]);
+});
+
+// Gegner der nächsten Runde gemischt (#1548/#1580, Fabian 14.10.): je Auslosungs-Gruppe eine Sammelschiene - alle
+// Quellspiele der Gruppe mit Ast auf die Schiene, von dort je ein Ast in jedes Zielspiel, nur innerhalb der Sektion.
+test.each(CASES.rails)("Sammelschiene je gemischter Gruppe: $state", ({ state, rails }) => {
+  const { tree, keyOf } = helpers(state);
+  expect(drawRails(tree.matches_v2).map((rail) => ({
+    group: rail.group,
+    label: rail.label,
+    sources: rail.sources.map((source) => `${keyOf.get(source.id)} ${source.flow}`).sort(),
+    targets: rail.targets.map((id) => keyOf.get(id)).sort(),
+    drawn: rail.drawn,
+  }))).toEqual(rails);
+});
+
+test.each(["se8_mixed_open", "se8_mixed_drawn", "de8_mixed_r1", "ffa16_mixed_open", "ffa16_mixed_drawn"])("gemischt: Linien nur aus der echten Herkunft - %s", (state) => {
+  const { tree, keyOf } = helpers(state);
+  const byKey = new Map(tree.matches_v2.map((match) => [match.match_key, match]));
+  // Unabhängig gerechnet: je ausgelostem Platz eine Linie aus `source_result.from_match_key`, keine in einen Platz, der
+  // noch auf die Auslosung wartet.
+  const expected: string[] = [];
+  for (const match of tree.matches_v2) {
+    for (const slot of match.slots || []) {
+      const source = slot.source as { draw?: unknown } | null;
+      if (!source?.draw) continue;
+      const from = (slot.source_result as { from_match_key?: string } | null)?.from_match_key;
+      if (slot.registration_id && from) expected.push(`${byKey.get(from)?.match_key}>${match.match_key}:${slot.slot}`);
+    }
+  }
+  const all = bracketEdges(tree.matches_v2);
+  expect(all.filter((edge) => edge.rail).map((edge) => `${keyOf.get(edge.from)}>${keyOf.get(edge.to)}:${edge.toSlot}`).sort()).toEqual(expected.sort());
+  const targets = new Set(tree.matches_v2.filter((match) => match.settings?.draw_group).map((match) => match.id));
+  expect(all.filter((edge) => targets.has(edge.to) && !edge.rail)).toEqual([]);
+});
+
+test("gemischt: dein Weg folgt der echten Herkunft - vor der Auslosung bis zur Schiene", () => {
+  const drawnTree = helpers("se8_mixed_drawn");
+  const target = drawnTree.tree.matches_v2.find((match) => match.match_key === "E")!;
+  const seat = (target.slots || [])[0];
+  const from = (seat.source_result as { from_match_key: string }).from_match_key;
+  const all = bracketEdges(drawnTree.tree.matches_v2);
+  const result = pathFor(seat.registration_id as string, drawnTree.tree.matches_v2, all);
+  expect(all.filter((edge) => result.edges.has(edge.id)).map((edge) => drawnTree.edgeText(edge, false))).toContain(`${from}>E:1`);
+  const open = helpers("se8_mixed_open");
+  const before = pathFor(open.idOf.get("NeonFalke") as string, open.tree.matches_v2, bracketEdges(open.tree.matches_v2));
+  expect([...(before.rails || [])]).toEqual([`WB:2:${open.byKey.get("A")!.id}`]);
+  expect([...before.matches].map((id) => open.keyOf.get(id))).toEqual(["A"]);
+});
+
+test("gemischt: die Auslosung ist eine eigene Bewegung, nicht „Weiterkommen aus A“", () => {
+  const before = helpers("se8_mixed_open");
+  const after = helpers("se8_mixed_drawn");
+  const events = diffBracket(before.tree.matches_v2, after.tree.matches_v2);
+  expect(events.filter((event) => event.type === "result").map((event) => after.keyOf.get(event.matchId)).sort()).toEqual(["C", "D"]);
+  expect(events.filter((event) => event.type === "draw").map((event) => after.keyOf.get(event.matchId)).sort()).toEqual(["E", "E", "F", "F"]);
+  expect(events.some((event) => event.type === "advance")).toBe(false);
 });

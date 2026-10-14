@@ -98,3 +98,10 @@ test("„Du“ und lange Namen bekommen Platz", () => {
   expect(mine.rows.map((row) => row.mine)).toEqual(mine.rows.map((row) => row.label === "🦁 Löwenherz"));
   expect(mine.mine).toBe(true);
 });
+
+test("gemischt vor der Auslosung: „Platz aus Runde 1“ statt „Sieger aus A“", () => {
+  const { card } = setup("se8_mixed_open");
+  expect(card("E").rows.map((row) => [row.label, row.pending])).toEqual([["Platz aus Runde 1", true], ["Platz aus Runde 1", true]]);
+  const drawn = setup("se8_mixed_drawn").card("E");
+  expect(drawn.rows.every((row) => row.registrationId && !row.pending)).toBe(true);
+});
