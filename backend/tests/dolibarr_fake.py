@@ -291,6 +291,10 @@ class FakeDolibarr:
         # Einwilligungen je Mitglied (#329): Zweck -> Stand; Aufträge je reference nur einmal.
         self.member_consents: dict[int, dict[str, dict]] = {}
         self.consent_references: set[str] = set()
+        # #1537: jeder gespeicherte Nachweis und jeder Auftrag, wie er ankam; verlorene Antworten nach dem Speichern.
+        self.consent_events: list[dict] = []
+        self.consent_posts: list[dict] = []
+        self.lose_consent_responses = 0
 
     def decide(self, external_id: str, status: str, reason: str = "") -> dict:
         """Der Verein entscheidet in Dolibarr: aufgenommen wird das Entwurfsmitglied aktiv."""
@@ -805,6 +809,11 @@ class FakeDolibarr:
         self.member_consents[member_id][body["code"]] = own
         if reference:
             self.consent_references.add(reference)
+        self.consent_events.append({"member_id": member_id, "code": body["code"], "state": own["state"], "version": own["version"], "reference": reference})
+        if self.lose_consent_responses:
+            # Gespeichert, aber die Antwort kommt nie an (#1537) - wie eine Zeitüberschreitung auf dem Rückweg.
+            self.lose_consent_responses -= 1
+            raise httpx.ReadTimeout("response lost")
         return self._json_post("/vereine/members/{id}/consents", {"code": body["code"], "state": own["state"], "version": own["version"], "recorded": True})
 
     def _application(self, body: dict) -> httpx.Response:
@@ -1093,7 +1102,15 @@ class FakeDolibarr:
                 return httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
             return self._json("/vereine/members/{id}/consents", self._consent_rows(member_id))
         if match and request.method == "POST":
-            return self._consent_decision(int(match.group(1)), json.loads(request.content.decode("utf-8")))
+            body = json.loads(request.content.decode("utf-8"))
+            self.consent_posts.append(body)
+            return self._consent_decision(int(match.group(1)), body)
+        if path == "/vereine/me/consents" and request.method == "GET":
+            # Self-Service (#1537): dasselbe Format wie der Mitglieder-Endpunkt, das Modul prüft selbst, für wen.
+            ident, denied = self._person(params, "consents")
+            if denied:
+                return denied
+            return self._json("/vereine/me/consents", self._consent_rows(ident["member_id"]))
         if path == "/vereine/applicationform":
             return self._json("/vereine/applicationform", self.application_form)
         if path == "/vereine/membershipfees":

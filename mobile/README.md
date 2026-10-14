@@ -17,7 +17,9 @@ $env:EXPO_PUBLIC_API_BASE_URL="http://10.0.2.2:8001"
 npm run android
 ```
 
-Release builds default to `https://lionsquad.at`. The login uses the deployed mobile bearer-token endpoints under `/api/auth/mobile/*`; public areas can also be opened without login through the live data mode.
+Links to pages of the website (privacy policy, terms) use `EXPO_PUBLIC_WEBSITE_BASE_URL`; in development it defaults to `http://10.0.2.2:3000` (the Vite dev server), not the backend.
+
+Release builds default to `https://lionsquad.at` for both. The login uses the deployed mobile bearer-token endpoints under `/api/auth/mobile/*`; public areas can also be opened without login through the live data mode.
 
 ## Checks
 
