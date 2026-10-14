@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useIsFocused } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -26,6 +27,7 @@ import {
 } from "../../lib/admission";
 import { errorMessage } from "../../lib/api";
 import type { MoreStackParamList } from "../../navigation/types";
+import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import { colors, radius } from "../../theme";
 
 // Einlass bei der Generalversammlung (#845, Entscheidung B): die Kamera liest den QR-Code der Mitgliedskarte, der
@@ -34,6 +36,11 @@ import { colors, radius } from "../../theme";
 // braucht einen Grund. Sichtbar nur für den Vorstand (Bereich „Verein“) - der Server prüft es bei jedem Aufruf.
 
 type Props = NativeStackScreenProps<MoreStackParamList, "Admission">;
+
+// Mehrere Geräte scannen gleichzeitig (#1063): so oft fragt der Einlass nach, solange er vorne ist - dazu sofort bei einer
+// Live-Meldung und beim Zurückkommen.
+const ADMISSION_POLL_MS = 10_000;
+const ADMISSION_LIVE_RESOURCES = ["admin/admission"] as const;
 
 const TONES: Record<AdmissionResult["tone"], { color: string; icon: "checkmark-circle" | "information-circle" | "close-circle" }> = {
   ok: { color: colors.success, icon: "checkmark-circle" },
@@ -47,82 +54,143 @@ export function AdmissionScreen(_props: Props) {
   const [result, setResult] = useState<AdmissionResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [stale, setStale] = useState(false);
   const [number, setNumber] = useState("");
-  const [undoFor, setUndoFor] = useState<number | null>(null);
+  // Die offene Rücknahme gehört zu genau einer Versammlung (#1064).
+  const [undoFor, setUndoFor] = useState<{ meetingId: number; memberId: number } | null>(null);
   const [reason, setReason] = useState("");
   const [scanning, setScanning] = useState(true);
-  const [permission, requestPermission] = useCameraPermissions();
+  const [permission, requestPermission, getPermission] = useCameraPermissions();
+  const getPermissionRef = useRef(getPermission);
+  getPermissionRef.current = getPermission;
   const gate = useRef(new ScanGate()).current;
-  const active = useAppActive();
-  // Welche Versammlung gerade gilt - für Antworten, die nach einem Wechsel ankommen (#1005).
+  // Kamera und Nachfragen nur, solange der Einlass vorne ist (#1056): App im Vordergrund und kein anderer Screen darüber.
+  const focused = useIsFocused();
+  const appActive = useAppActive();
+  const live = focused && appActive;
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  // Welche Versammlung gerade gilt, und eine Kennung, die jeder Wechsel weiterzählt (#1005, #1064): eine Antwort zeigt
+  // nur etwas an, wenn beides noch stimmt - auch nach einem Wechsel hin und zurück.
   const meetingRef = useRef<number | null>(null);
-  meetingRef.current = meetingId;
-
-  const load = useCallback(async () => {
-    try {
-      const data = await loadAdmission();
-      setView(data);
-      // Nur eine Versammlung behalten, die es noch gibt; sonst die erste gültige (#1005).
-      setMeetingId((current) => (data.meetings.some((item) => item.id === current) ? current : data.meetings[0]?.id ?? null));
-    } catch (error) {
-      setView({ ready: false, text: errorMessage(error, "Der Einlass ist gerade nicht erreichbar."), meetings: [] });
-    }
+  const epochRef = useRef(0);
+  // Ein Scan auf einmal (#1056): die Sperre steht sofort, nicht erst nach dem nächsten Zeichnen.
+  const busyRef = useRef(false);
+  // Reihenfolge der Abfragen (#1063): nur die zuletzt gestartete zählt, und keine, die vor einem eigenen Scan losging.
+  const loadSeq = useRef(0);
+  const changeSeq = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      epochRef.current += 1;
+    };
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  // Andere Versammlung (angetippt oder nach dem Nachladen): Ergebnis, offene Rücknahme und Scan-Sperre gehören
-  // zur alten (#1005).
-  useEffect(() => {
+  // Andere Versammlung (angetippt oder nach dem Nachladen): Ergebnis, offene Rücknahme und Scan-Sperre gehören zur alten
+  // (#1005) - gleich beim Wechsel, nicht erst nach dem Zeichnen (#1064).
+  const selectMeeting = useCallback((id: number | null) => {
+    if (id === meetingRef.current) return;
+    meetingRef.current = id;
+    epochRef.current += 1;
+    gate.reset();
+    setMeetingId(id);
     setResult(null);
     setUndoFor(null);
     setReason("");
-    gate.reset();
-  }, [gate, meetingId]);
+  }, [gate]);
+
+  /** `quiet`: Nachfragen im Hintergrund - ein Aussetzer lässt den letzten Stand stehen statt eines Fehlerbildschirms. */
+  const load = useCallback(async (quiet = false) => {
+    const seq = ++loadSeq.current;
+    const changes = changeSeq.current;
+    try {
+      const data = await loadAdmission();
+      if (!mounted.current || seq !== loadSeq.current || changes !== changeSeq.current) return;
+      setView(data);
+      setStale(false);
+      // Nur eine Versammlung behalten, die es noch gibt; sonst die erste gültige (#1005).
+      selectMeeting(data.meetings.some((item) => item.id === meetingRef.current) ? meetingRef.current : data.meetings[0]?.id ?? null);
+    } catch (error) {
+      if (!mounted.current || seq !== loadSeq.current) return;
+      const failed: AdmissionView = { ready: false, text: errorMessage(error, "Der Einlass ist gerade nicht erreichbar."), meetings: [] };
+      setView((current) => (quiet && current?.ready ? current : failed));
+      setStale(true);
+    }
+  }, [selectMeeting]);
+
+  // Beim Öffnen, beim Zurückkommen (Hintergrund, anderer Screen) und alle zehn Sekunden: Zahlen und Liste neu; dazu das
+  // Kamerarecht - es kann inzwischen in den Einstellungen geändert worden sein.
+  useEffect(() => {
+    if (!live) return undefined;
+    void load(true);
+    void getPermissionRef.current?.()?.catch?.(() => undefined);
+    const timer = setInterval(() => { void load(true); }, ADMISSION_POLL_MS);
+    return () => clearInterval(timer);
+  }, [live, load]);
+  const loadQuietly = useCallback(() => load(true), [load]);
+  useLiveRefresh(loadQuietly, ADMISSION_LIVE_RESOURCES, { enabled: live });
 
   const meeting = (view?.meetings || []).find((item) => item.id === meetingId) || null;
 
   const patchMeeting = (id: number, change: (item: AdmissionMeeting) => AdmissionMeeting) => {
+    // Ein eigener Scan ist neuer als jede Abfrage, die vorher losging (#1063).
+    changeSeq.current += 1;
     setView((current) => (current ? { ...current, meetings: current.meetings.map((item) => (item.id === id ? change(item) : item)) } : current));
   };
 
+  /** Ein Auftrag für genau diese Versammlung: `current()` sagt später, ob seine Antwort noch angezeigt werden darf. */
+  const ticket = (id: number) => {
+    const epoch = epochRef.current;
+    return { id, current: () => mounted.current && epochRef.current === epoch && meetingRef.current === id };
+  };
+
   const admit = async (payload: { code?: string; number?: string }) => {
-    if (!meeting || busy) return;
+    if (!meeting || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
+    const job = ticket(meeting.id);
     try {
-      const data = await admitMember(meeting.id, payload);
-      patchMeeting(meeting.id, (item) => rememberAdmission(item, data));
-      if (meetingRef.current !== meeting.id) return;
+      const data = await admitMember(job.id, payload);
+      if (!mounted.current) return;
+      patchMeeting(job.id, (item) => rememberAdmission(item, data));
+      if (!job.current()) return;
       setResult(resultFromScan(data));
       if (payload.number) setNumber("");
     } catch (error) {
-      if (meetingRef.current === meeting.id) setResult(resultFromError(error));
+      if (job.current()) setResult(resultFromError(error));
     } finally {
-      setBusy(false);
+      busyRef.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
 
   const undo = async (row: AdmissionRow) => {
-    if (!meeting || busy || !reason.trim()) return;
+    const text = reason.trim();
+    if (!meeting || busyRef.current || !text || undoFor?.meetingId !== meeting.id || undoFor.memberId !== row.member_id || meetingRef.current !== meeting.id) return;
+    busyRef.current = true;
     setBusy(true);
+    const job = ticket(meeting.id);
     try {
-      const data = await undoAdmission(meeting.id, row.member_id, reason.trim());
-      patchMeeting(meeting.id, (item) => rememberAdmission(item, data));
-      if (meetingRef.current !== meeting.id) return;
-      setResult({ tone: "info", headline: `Zurückgenommen: ${row.name}`, detail: `Grund: ${reason.trim()}` });
+      const data = await undoAdmission(job.id, row.member_id, text);
+      if (!mounted.current) return;
+      patchMeeting(job.id, (item) => rememberAdmission(item, data));
+      if (!job.current()) return;
+      setResult({ tone: "info", headline: `Zurückgenommen: ${row.name}`, detail: `Grund: ${text}` });
       setUndoFor(null);
       setReason("");
     } catch (error) {
-      if (meetingRef.current === meeting.id) setResult(resultFromError(error, "Nicht zurückgenommen"));
+      if (job.current()) setResult(resultFromError(error, "Nicht zurückgenommen"));
     } finally {
-      setBusy(false);
+      busyRef.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
 
   const onBarcode = ({ data }: { data: string }) => {
-    if (busy || !gate.accept(data)) return;
+    // Ein Bild, das nach dem Verlassen noch ankommt, oder ein zweites, während der erste Scan läuft, zählt nicht (#1056).
+    if (!liveRef.current || busyRef.current || !gate.accept(data)) return;
     void admit({ code: data });
   };
 
@@ -163,7 +231,7 @@ export function AdmissionScreen(_props: Props) {
             {view.meetings.length > 1 ? (
               <View style={styles.meetingRow} testID="admission-meetings">
                 {view.meetings.map((item) => (
-                  <Pressable key={item.id} onPress={() => setMeetingId(item.id)} accessibilityRole="button" accessibilityState={{ selected: item.id === meeting.id }}
+                  <Pressable key={item.id} onPress={() => selectMeeting(item.id)} accessibilityRole="button" accessibilityState={{ selected: item.id === meeting.id }}
                     style={[styles.meetingChip, item.id === meeting.id && styles.meetingChipActive]} testID={`admission-meeting-${item.id}`}>
                     <Text style={[styles.meetingChipText, item.id === meeting.id && styles.meetingChipTextActive]}>{item.title}{item.time ? ` · ${item.time}` : ""}</Text>
                   </Pressable>
@@ -174,6 +242,7 @@ export function AdmissionScreen(_props: Props) {
             <Card testID="admission-meeting-card">
               <Body style={styles.meetingTitle}>{meeting.title}{meeting.time ? ` · ${meeting.time}` : ""}{meeting.place ? ` · ${meeting.place}` : ""}</Body>
               <Text style={[styles.counts, { color: meeting.counts?.quorum_reached ? colors.success : colors.gold }]} testID="admission-counts">{quorumText(meeting.counts)}</Text>
+              {stale ? <Muted style={styles.stale} testID="admission-stale">Verbindung gestört – die Zahlen sind vielleicht nicht aktuell.</Muted> : null}
             </Card>
 
             {result && tone ? (
@@ -188,7 +257,7 @@ export function AdmissionScreen(_props: Props) {
 
             <View style={styles.scanner} testID="admission-scanner">
               {cameraReady ? (
-                scanning && active ? (
+                scanning && live ? (
                   <CameraView
                     style={styles.camera}
                     facing="back"
@@ -234,13 +303,13 @@ export function AdmissionScreen(_props: Props) {
                       <Body style={styles.rowName}>{row.name}</Body>
                       <Muted style={row.state === "present" ? undefined : styles.rowGone}>{rowText(row)}</Muted>
                       {row.state === "present" ? (
-                        <Pressable onPress={() => { setUndoFor(row.member_id); setReason(""); }} accessibilityRole="button" style={styles.undoButton} testID={`admission-undo-${row.member_id}`}>
+                        <Pressable onPress={() => { setUndoFor({ meetingId: meeting.id, memberId: row.member_id }); setReason(""); }} accessibilityRole="button" style={styles.undoButton} testID={`admission-undo-${row.member_id}`}>
                           <Ionicons name="arrow-undo-outline" size={14} color={colors.muted} />
                           <Text style={styles.undoText}>Zurücknehmen</Text>
                         </Pressable>
                       ) : null}
                     </View>
-                    {undoFor === row.member_id ? (
+                    {undoFor?.meetingId === meeting.id && undoFor.memberId === row.member_id ? (
                       <View style={styles.undoForm}>
                         <FormInput label="Grund der Rücknahme" value={reason} onChangeText={setReason} maxLength={200} placeholder="z. B. falscher Ausweis" placeholderTextColor={colors.muted} testID="admission-undo-reason" />
                         <View style={styles.undoActions}>
@@ -273,6 +342,7 @@ const styles = StyleSheet.create({
   meetingChipTextActive: { color: colors.white, fontWeight: "700" },
   meetingTitle: { fontWeight: "700" },
   counts: { marginTop: 4, fontSize: 13 },
+  stale: { marginTop: 4, fontSize: 12 },
   result: { borderWidth: 1, borderRadius: radius.lg, padding: 18, backgroundColor: "rgba(255,255,255,0.03)", gap: 6 },
   resultHead: { flexDirection: "row", alignItems: "center", gap: 10 },
   resultHeadline: { fontSize: 24, fontWeight: "900", flex: 1 },
