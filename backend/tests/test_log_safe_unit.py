@@ -28,3 +28,10 @@ def test_the_record_written_by_logging_stays_one_line(caplog):
     with caplog.at_level(logging.WARNING, logger="tls.test.log_safe"):
         logger.warning("[test] %s: %s", log_safe("twitch\r\nFAKE"), log_safe(RuntimeError("a\nb"), 300))
     assert [record.getMessage() for record in caplog.records] == ["[test] twitch  FAKE: a b"]
+
+
+def test_mask_addresses_also_masks_url_encoded_at_signs():
+    from services.log_safe import mask_addresses
+    for raw in ("paula%40example.test", "paula%2540example.test", "paula%252540example.test", "paula%40EXAMPLE.test"):
+        out = mask_addresses(f"an {raw}")
+        assert "paula" not in out and "p***@" in out, out
