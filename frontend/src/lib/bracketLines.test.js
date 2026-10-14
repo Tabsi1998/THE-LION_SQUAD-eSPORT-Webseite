@@ -304,3 +304,12 @@ describe("stageLines: Schiene ohne Knick", () => {
     expect(auditLines({ lines, boxes: [...nodes.values()] })).toEqual([]);
   });
 });
+
+describe("routeEdge: Ziel über oder unter der Quelle (#1591)", () => {
+  it("Grand Final über der letzten Loser-Spalte: aus der Quelle rechts hinaus, hinauf, von rechts in den Platz", () => {
+    const final = { left: 840, right: 1072, top: 100, bottom: 300, width: 232, height: 200 };
+    const lf = { left: 840, right: 1072, top: 700, bottom: 900, width: 232, height: 200 };
+    const points = routeEdge({ a: lf, b: final, toY: 250, fromY: 780, obstacles: [final, lf], corridors: [500], gap: GAP });
+    expect(points).toEqual([{ x: 1072, y: 780 }, { x: 1096, y: 780 }, { x: 1096, y: 250 }, { x: 1072, y: 250 }]);
+  });
+});

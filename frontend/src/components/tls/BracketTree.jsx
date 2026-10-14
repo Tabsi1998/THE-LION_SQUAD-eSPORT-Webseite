@@ -495,6 +495,16 @@ function ChampionCard({ match, regMap }) {
   );
 }
 
+/** Geht es seitlich weiter (#1591)? `data-more` „left“, „right“ oder „both“ blendet den Rand aus (index.css). */
+function markMore(canvas) {
+  if (!canvas) return;
+  const left = canvas.scrollLeft > 1;
+  const right = canvas.scrollLeft + canvas.clientWidth < canvas.scrollWidth - 1;
+  const value = left && right ? "both" : left ? "left" : right ? "right" : "";
+  if (value) canvas.setAttribute("data-more", value);
+  else canvas.removeAttribute("data-more");
+}
+
 /**
  * Die Leinwand einer Phase am Desktop: links Hauptfeld und Loser Bracket untereinander, rechts Grand Final, Pokal und
  * Spiel um Platz 3. Die Linien liegen als ein SVG darüber und werden nur gemessen, wenn sich Daten oder Größen ändern
@@ -588,8 +598,10 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
       });
       const w = canvas.scrollWidth;
       const h = canvas.scrollHeight;
-      const key = `${w}x${h}|${lines.map((line) => `${line.id}:${line.d}`).join(";")}`;
-      setGeom((current) => (current.key === key ? current : { lines, w, h, key }));
+      const overflow = w > canvas.clientWidth + 1;
+      markMore(canvas);
+      const key = `${w}x${h}|${overflow}|${lines.map((line) => `${line.id}:${line.d}`).join(";")}`;
+      setGeom((current) => (current.key === key ? current : { lines, w, h, key, overflow }));
     };
     const schedule = () => {
       if (frame || typeof requestAnimationFrame !== "function") { if (!frame) measure(); return; }
@@ -599,12 +611,16 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
     if (typeof ResizeObserver === "undefined") return undefined;
     const observer = new ResizeObserver(schedule);
     if (contentRef.current) observer.observe(contentRef.current);
+    // Auch die Leinwand selbst: wird das Fenster schmaler, kommt der Hinweis zum Scrollen (#1591).
+    observer.observe(canvas);
     canvas.querySelectorAll("[data-node]").forEach((node) => observer.observe(node));
     return () => {
       observer.disconnect();
       if (frame && typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame);
     };
   }, [stageEdges, stageRails, columnOf, sections, byIdMatch]);
+
+  const onScroll = useCallback((event) => markMore(event.currentTarget), []);
 
   // Zeigen oder Tippen auf eine Karte (#1591): ihre Abstiege, die Äste in eine Schiene und die Einzelwege erscheinen.
   // Nur Attribute an den Linien - die Karten rendern dafür nicht neu.
@@ -623,17 +639,30 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
   const onPointerLeave = useCallback(() => focusOn(null), [focusOn]);
   useEffect(() => { focusRef.current = null; }, [geom.key]);
 
-  const block = (name) => (
+  // Kompakt (#1591): hat das Loser Bracket mehr Runden als das Winner Bracket, stehen Grand Final, Reset und Pokal in
+  // der freien Spalte rechts neben dem Winner Bracket (über der letzten Loser-Runde) - untereinander statt nebeneinander.
+  // So passt ein Doppel-K.-o. mit 8 oder 16 Läufen bei 1440 px ohne Abschneiden.
+  const columnsOf = (group) => Math.max(0, ...left.filter((name) => sectionGroup(name) === group).map((name) => roundNumbers(sections[name]).length));
+  const mains = left.filter((name) => sectionGroup(name) === "main");
+  const compact = Boolean(right.length || champion) && mains.length === 1 && columnsOf("loser") > columnsOf("main");
+  const finals = order(right).filter((name) => sectionGroup(name) === "final");
+  // Nur K.-o. ohne Loser Bracket und ohne weitere Abschnitte: der Pokal steht unter dem Finale in der letzten Spalte,
+  // statt eine ganze Spalte breiter zu machen (#1591).
+  const championBelow = Boolean(champion) && !right.length && !left.some((name) => sectionGroup(name) === "loser") && mains.length === 1;
+  const others = order(right).filter((name) => sectionGroup(name) !== "final");
+
+  const block = (name, { stacked = false, trophy = false } = {}) => (
     <section key={name} className="space-y-3" data-testid={`bracket-section-${normalizeSection(name)}`}>
       <SectionTitle section={name} flowHint={sectionFlowHint(name, hasLoser, hasReset)} sticky={left.includes(name)} fit />
-      <div className="flex items-stretch" style={{ gap: COLUMN_GAP }}>
-        {roundNumbers(sections[name]).map((rn) => (
+      <div className={stacked ? "flex flex-col gap-6" : "flex items-stretch"} style={stacked ? undefined : { gap: COLUMN_GAP }}>
+        {roundNumbers(sections[name]).map((rn, index, all) => (
           <div key={rn} className="flex shrink-0 flex-col" style={{ width: CARD_WIDTH }}>
             <div className="mb-3 min-h-[1rem] px-1 text-[11px] font-bold uppercase tracking-wider text-muted-text" data-testid="bracket-round-title">
               {roundHeading(sections[name][rn], rn, formatBracketSection(name))}
             </div>
-            <div className="flex flex-1 flex-col justify-around gap-4">
+            <div className={`flex flex-1 flex-col gap-4 ${trophy && index === all.length - 1 ? "justify-center gap-8" : "justify-around"}`}>
               {sections[name][rn].map((match) => <MatchCard key={match.id} match={match} regMap={regMap} podiumMap={podiumMap} />)}
+              {trophy && index === all.length - 1 ? <ChampionCard match={champion} regMap={regMap} /> : null}
             </div>
           </div>
         ))}
@@ -642,7 +671,13 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
   );
 
   return (
-    <div ref={canvasRef} className="tls-bracket-canvas relative overflow-x-auto pb-4" data-testid="bracket-tree" data-stage={stageId} onPointerOver={onPointerOver} onPointerLeave={onPointerLeave}>
+    <>
+    {geom.overflow ? (
+      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-text" data-testid="bracket-scroll-hint">
+        <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />Der Baum ist breiter als das Fenster – seitlich scrollen.
+      </p>
+    ) : null}
+    <div ref={canvasRef} className="tls-bracket-canvas relative overflow-x-auto pb-4" data-testid="bracket-tree" data-stage={stageId} onPointerOver={onPointerOver} onPointerLeave={onPointerLeave} onScroll={onScroll}>
       <svg className="pointer-events-none absolute left-0 top-0" width={geom.w || "100%"} height={geom.h || "100%"} aria-hidden="true" data-testid="bracket-connectors">
         {geom.lines.map((line) => {
           // Gerüst der Schiene: an, solange dein Weg (noch vor der Auslosung) hierher führt - danach leuchtet der echte Weg.
@@ -684,17 +719,32 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
           <circle key={`${line.id}:marker`} className="tls-bracket-marker" cx={line.marker.x} cy={line.marker.y} r={3.5} data-line-marker="1" data-rel={line.rel ? line.rel.join(" ") : undefined} data-path={active ? "off" : undefined} />
         ))}
       </svg>
-      <div ref={contentRef} className="relative grid w-max items-center" data-rail-lead={busLead ? "1" : undefined} style={{ gridTemplateColumns: right.length || champion ? "max-content max-content" : "max-content", columnGap: COLUMN_GAP, paddingLeft: busLead ? COLUMN_GAP : undefined }}>
-        <div className="space-y-10">{order(left).map(block)}</div>
-        {right.length || champion ? (
-          <div className="flex flex-col justify-center gap-10">
-            {order(right).filter((name) => sectionGroup(name) === "final").map(block)}
-            {champion ? <div style={{ width: CARD_WIDTH }}><ChampionCard match={champion} regMap={regMap} /></div> : null}
-            {order(right).filter((name) => sectionGroup(name) !== "final").map(block)}
+      {compact ? (
+        <div ref={contentRef} className="relative w-max space-y-10" data-rail-lead={busLead ? "1" : undefined} data-layout="compact" style={{ paddingLeft: busLead ? COLUMN_GAP : undefined, paddingRight: COLUMN_GAP }}>
+          <div className="flex items-end" style={{ gap: COLUMN_GAP }}>
+            {block(mains[0])}
+            <div className="flex flex-col gap-8" style={{ width: CARD_WIDTH }}>
+              {finals.map((name) => block(name, { stacked: true }))}
+              {champion ? <ChampionCard match={champion} regMap={regMap} /> : null}
+              {others.map((name) => block(name, { stacked: true }))}
+            </div>
           </div>
-        ) : null}
-      </div>
+          {order(left).filter((name) => name !== mains[0]).map((name) => block(name))}
+        </div>
+      ) : (
+        <div ref={contentRef} className="relative grid w-max items-center" data-rail-lead={busLead ? "1" : undefined} style={{ gridTemplateColumns: right.length || (champion && !championBelow) ? "max-content max-content" : "max-content", columnGap: COLUMN_GAP, paddingLeft: busLead ? COLUMN_GAP : undefined }}>
+          <div className="space-y-10">{order(left).map((name) => block(name, { trophy: championBelow && name === mains[0] }))}</div>
+          {right.length || (champion && !championBelow) ? (
+            <div className="flex flex-col justify-center gap-10">
+              {finals.map((name) => block(name))}
+              {champion && !championBelow ? <div style={{ width: CARD_WIDTH }}><ChampionCard match={champion} regMap={regMap} /></div> : null}
+              {others.map((name) => block(name))}
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
+    </>
   );
 }
 

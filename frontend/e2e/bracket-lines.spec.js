@@ -101,8 +101,41 @@ for (const name of WEB_CASES) {
     const views = await collect(page, WEB);
     expect(views.length).toBeGreaterThan(0);
     expect(check(views)).toEqual([]);
+    // Bei 1440 passt der ganze Baum (#1591): keine Leinwand scrollt, keine Karte reicht aus dem sichtbaren Bereich.
+    expect(await clipped(page)).toEqual([]);
   });
 }
+
+/** Was bei dieser Breite abgeschnitten wäre: Leinwände, die scrollen, und Karten außerhalb der Leinwand oder des Fensters. */
+function clipped(page) {
+  return page.evaluate(() => {
+    const found = [];
+    for (const canvas of document.querySelectorAll("[data-testid='bracket-tree']")) {
+      if (canvas.scrollWidth > canvas.clientWidth + 1) found.push(`Leinwand ${canvas.getAttribute("data-stage")} scrollt (${canvas.scrollWidth} > ${canvas.clientWidth})`);
+      const box = canvas.getBoundingClientRect();
+      for (const node of canvas.querySelectorAll("[data-node], [data-section-head]")) {
+        const rect = node.getBoundingClientRect();
+        if (rect.left < box.left - 1 || rect.right > box.right + 1 || rect.right > window.innerWidth) found.push(`${node.getAttribute("data-node") || "Kopf"} ragt hinaus (${Math.round(rect.right)} > ${Math.round(Math.min(box.right, window.innerWidth))})`);
+      }
+    }
+    return found;
+  });
+}
+
+test("Web 1100: zu breit - die Leinwand scrollt, der Hinweis steht da, der Rand blendet aus", async ({ page, isMobile }) => {
+  test.skip(Boolean(isMobile), "Desktop-Leinwand");
+  await page.setViewportSize({ width: 1100, height: 900 });
+  const tournament = await mockWeb(page, "ffa16de_start");
+  await page.goto(`/tournaments/${tournament.slug}/bracket`);
+  const canvas = page.getByTestId("bracket-tree").first();
+  await expect(canvas).toBeVisible();
+  await expect.poll(() => canvas.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
+  await expect(page.getByTestId("bracket-scroll-hint")).toBeVisible();
+  await expect(canvas).toHaveAttribute("data-more", "right");
+  await canvas.evaluate((node) => { node.scrollLeft = node.scrollWidth; node.dispatchEvent(new Event("scroll")); });
+  await expect(canvas).toHaveAttribute("data-more", "left");
+  await shot(page, "web-1100-ffa16de_start");
+});
 
 test("Web 1440: Abstiege erst beim Zeigen auf die Karte - dann ganz, angeschlossen, in der Leinwand", async ({ page, isMobile }) => {
   test.skip(Boolean(isMobile), "Zeigen gibt es nur mit Maus");

@@ -75,6 +75,13 @@ export function routeEdge({ a, b, toY, fromY, obstacles = [], corridors = [], ga
     const points = [{ x: x1, y: a.bottom }, { x: x1, y }, { x: x2, y }, { x: x2, y: b.top }];
     if (b.top - a.bottom >= 8 && !pathHits(points, others)) return points;
   }
+  // Ziel in derselben Spalte darüber oder darunter, mit Zeile (Grand Final über der letzten Loser-Spalte, #1591): rechts
+  // aus der Quelle, in der Gasse daneben hinauf bzw. hinunter, von rechts in den Platz - kurz, ohne Umweg über die Lücke.
+  if (!preferCorridor && toY != null && overlapRight - overlapLeft > 16 && (b.bottom <= a.top || b.top >= a.bottom)) {
+    const x = Math.max(a.right, b.right) + gap / 2;
+    const points = [{ x: a.right, y: startY }, { x, y: startY }, { x, y: endY }, { x: b.right, y: endY }];
+    if (!pathHits(points, others)) return points;
+  }
   if (!preferCorridor && b.left > a.right) {
     const points = simple();
     if (!pathHits(points, others)) return points;
