@@ -1276,6 +1276,15 @@ async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(r
 
 
 # --- Gäste ohne Konto (#1585) ---
+GUESTS_BUSY = "Gerade wird ein Gast angelegt oder umbenannt - bitte gleich noch einmal versuchen."
+
+
+def guests_resource(challenge_id: str) -> str:
+    """Eine Sperre je Challenge für Anlegen und Umbenennen: die Prüfung „Name gibt es schon“ und das Schreiben gehören
+    zusammen, sonst kämen zwei gleiche Namen gleichzeitig durch."""
+    return f"fastlap:{challenge_id}:guests"
+
+
 @router.get("/challenges/{cid}/guests")
 async def list_guests(cid: str, me: dict = Depends(get_current_user)):
     db = get_db()
@@ -1293,7 +1302,7 @@ async def create_guest(cid: str, body: F1GuestCreate, me: dict = Depends(get_cur
     await _require_f1_result_permission(me, cid)
     name = clean_guest_name(body.display_name)
     try:
-        async with mutation_lock(db, f"fastlap:{cid}:guests", wait_seconds=LAP_WAIT_SECONDS):
+        async with mutation_lock(db, guests_resource(cid), wait_seconds=LAP_WAIT_SECONDS):
             await ensure_unique_name(db, cid, name)
             last = await db.f1_guests.find_one({"challenge_id": cid}, {"_id": 0, "number": 1}, sort=[("number", -1)])
             stamp = now_utc().isoformat()
@@ -1301,7 +1310,7 @@ async def create_guest(cid: str, body: F1GuestCreate, me: dict = Depends(get_cur
                    "created_by": me["id"], "created_at": stamp, "updated_at": stamp, "name_expired_at": None}
             await db.f1_guests.insert_one(doc)
     except MutationLockBusy:
-        raise HTTPException(status_code=409, detail="Gerade wird ein Gast angelegt - bitte gleich noch einmal versuchen.")
+        raise HTTPException(status_code=409, detail=GUESTS_BUSY)
     doc.pop("_id", None)
     return guest_payload(doc)
 
@@ -1320,9 +1329,13 @@ async def rename_guest(gid: str, body: F1GuestRename, me: dict = Depends(get_cur
     challenge = await db.f1_challenges.find_one({"id": guest["challenge_id"]}, {"_id": 0, "status": 1}) or {}
     reason = _published_change_reason(challenge, me, body.change_reason)
     name = clean_guest_name(body.display_name)
-    await ensure_unique_name(db, guest["challenge_id"], name, current_id=gid)
-    stamp = now_utc().isoformat()
-    await db.f1_guests.update_one({"id": gid}, {"$set": {"display_name": name, "updated_at": stamp}})
+    try:
+        async with mutation_lock(db, guests_resource(guest["challenge_id"]), wait_seconds=LAP_WAIT_SECONDS):
+            await ensure_unique_name(db, guest["challenge_id"], name, current_id=gid)
+            stamp = now_utc().isoformat()
+            await db.f1_guests.update_one({"id": gid}, {"$set": {"display_name": name, "updated_at": stamp}})
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=GUESTS_BUSY)
     await db.audit_logs.insert_one({"id": new_id(), "action": "fastlap.guest.rename", "actor_id": me.get("id"), "target_id": gid,
                                     "data": {"challenge_id": guest["challenge_id"], "reason": reason, "after_publishing": reason is not None},
                                     "created_at": stamp})
@@ -1467,6 +1480,9 @@ async def move_up_in_queue(qid: str, me: dict = Depends(get_current_user)):
             entry = await db.f1_queue.find_one({"id": qid}, {"_id": 0})
             if not entry:
                 raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
+            # Wer schon am Start ist, steht nicht mehr in der Reihenfolge.
+            if entry.get("state") != "next":
+                raise HTTPException(status_code=409, detail="Ist schon am Start - nach oben geht nur, wer wartet.")
             before = await db.f1_queue.find_one({"challenge_id": entry["challenge_id"], "state": "next", "order": {"$lt": entry["order"]}},
                                                 {"_id": 0, "id": 1, "order": 1}, sort=[("order", -1)])
             if before:

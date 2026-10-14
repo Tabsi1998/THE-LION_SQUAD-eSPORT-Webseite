@@ -499,3 +499,46 @@ async def test_the_team_sees_the_queue_with_its_ids(flow):
     flow.act_as(helper)
     row = (await queue(flow, cid))["next"][0]
     assert row["user_id"] == driver["id"] and row["participant_id"] == driver["id"]
+
+
+@pytest.mark.asyncio
+async def test_renaming_a_guest_waits_for_the_guest_lock(flow, monkeypatch):
+    from routes import f1_routes
+    from services.mutation_lock import mutation_lock
+
+    cid, *_ = await setup(flow)
+    guest = await add_guest(flow, cid, "Anna")
+    monkeypatch.setattr(f1_routes, "LAP_WAIT_SECONDS", 0.2)
+    async with mutation_lock(flow.db, f"fastlap:{cid}:guests", wait_seconds=1, lease_seconds=30, retry_seconds=0.05):
+        response = await flow.patch(f"/api/f1/guests/{guest['id']}", json={"display_name": "Anna K."})
+    assert response.status_code == 409
+    assert (await flow.db.f1_guests.find_one({"id": guest["id"]}))["display_name"] == "Anna"
+
+
+@pytest.mark.asyncio
+async def test_two_parallel_renames_to_the_same_name_leave_one_name(flow):
+    import asyncio
+
+    cid, *_ = await setup(flow)
+    first, second = await add_guest(flow, cid, "Anna"), await add_guest(flow, cid, "Ben")
+    answers = await asyncio.gather(
+        flow.patch(f"/api/f1/guests/{first['id']}", json={"display_name": "Max"}),
+        flow.patch(f"/api/f1/guests/{second['id']}", json={"display_name": "max"}),
+    )
+    assert sorted(response.status_code for response in answers) == [200, 409]
+    names = [row["display_name"].casefold() for row in await flow.db.f1_guests.find({"challenge_id": cid}).to_list(10)]
+    assert names.count("max") == 1
+
+
+@pytest.mark.asyncio
+async def test_an_entry_that_is_on_track_cannot_move_up(flow):
+    cid, tid, driver, *_ = await setup(flow)
+    other = await flow.add_user(name="zweite")
+    await line_up(flow, cid, tid, user=other)
+    entry = await line_up(flow, cid, tid, user=driver)
+    response = await flow.post(f"/api/f1/queue/{entry['id']}/start", json={})
+    assert response.status_code == 200
+    response = await flow.post(f"/api/f1/queue/{entry['id']}/up")
+    assert response.status_code == 409
+    row = await flow.db.f1_queue.find_one({"id": entry["id"]})
+    assert row["state"] == "on_track"
