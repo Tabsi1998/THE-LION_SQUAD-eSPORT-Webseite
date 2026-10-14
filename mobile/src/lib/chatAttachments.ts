@@ -1,7 +1,7 @@
-import { API_BASE_URL } from "../config";
 import type { ChatAttachment } from "../types";
 import { api, errorMessage } from "./api";
 import { registerCacheClearer } from "./cache";
+import { authorizedUrl, isApiRequest } from "./siteUrls";
 
 // Bilder und Videos im Chat, auf Seite der App.
 //
@@ -88,17 +88,23 @@ export function canSendChatMessage(text: string, drafts: ChatAttachmentDraft[]) 
   return Boolean(text.trim()) || readyAttachmentIds(drafts).length > 0;
 }
 
-/** Absolute Adresse eines Anhangs; mit Breite die kleinere Fassung (400, 800, 1600). */
+/**
+ * Absolute Adresse eines Anhangs auf dem eigenen Server; mit Breite die kleinere Fassung (400, 800, 1600). Eine Adresse
+ * anderer Herkunft bleibt, wie sie ist - sie bekommt nie die Anmeldung (#1060).
+ */
 export function attachmentRequestUrl(url: string, width?: number) {
-  const absolute = url.startsWith("/") ? `${API_BASE_URL}${url}` : url;
+  const absolute = authorizedUrl(url) || url;
   return width ? `${absolute}${absolute.includes("?") ? "&" : "?"}w=${width}` : absolute;
 }
 
-/** Bild- oder Videoquelle mit Anmeldung; mit Breite die kleinere Fassung. */
+/**
+ * Bild- oder Videoquelle mit Anmeldung; mit Breite die kleinere Fassung. Den Token trägt sie nur zum eigenen Server
+ * (#1060) - eine Adresse anderer Herkunft bleibt ohne Kopfzeile.
+ */
 export function authorizedSource(url: string | null | undefined, token: string | null | undefined, width?: number) {
   if (!url) return null;
   const uri = attachmentRequestUrl(url, width);
-  return token ? { uri, headers: { Authorization: `Bearer ${token}` } } : { uri };
+  return token && isApiRequest(uri) ? { uri, headers: { Authorization: `Bearer ${token}` } } : { uri };
 }
 
 /**

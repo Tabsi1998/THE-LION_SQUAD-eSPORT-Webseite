@@ -1,4 +1,4 @@
-import { buildCacheKey, clearAllCache, getStaleEntry, setCached, shouldCache } from "./cache";
+import { buildCacheKey, clearAllCache, getStaleEntry, registerCacheClearer, setCached, shouldCache } from "./cache";
 
 // Persönliche Antworten (#1187, #1188): Rückblick mit „Du warst dabei“ und Freunde beim Event landen nie im
 // Offline-Zwischenspeicher. Gegenprobe: die Event-Seite selbst, der Kalender und der Adventkalender (auch „private“
@@ -35,3 +35,24 @@ test.each([
     expect((await getStaleEntry(key, url))?.data).toEqual({ ok: true });
   },
 );
+
+// Sitzungsende (#1059): Abmelden und Kontowechsel warten, bis auch die Dateien weg sind - und ein Aufräumer, der
+// scheitert, hält die anderen nicht auf.
+test("clearAllCache wartet auf jeden Aufräumer, auch wenn einer scheitert", async () => {
+  const done: string[] = [];
+  registerCacheClearer(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    done.push("dateien");
+  });
+  registerCacheClearer(() => {
+    throw new Error("kaputt");
+  });
+  registerCacheClearer(async () => {
+    throw new Error("auch kaputt");
+  });
+  registerCacheClearer(() => {
+    done.push("bilder");
+  });
+  await expect(clearAllCache()).resolves.toBeUndefined();
+  expect(done.sort()).toEqual(["bilder", "dateien"]);
+});
