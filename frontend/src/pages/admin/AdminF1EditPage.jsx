@@ -34,17 +34,6 @@ function trackLimits(track) {
 // „Einreichung offen/geschlossen“ nur, wenn es Online-Einreichen gibt (#1585) - bis dahin stehen sie nicht zur Wahl.
 const SUBMISSION_STATUSES = new Set(["registration_open", "registration_closed"]);
 
-// Nach „Ergebnisse veröffentlicht“ (#1584) ändert nur die Turnierleitung Zeiten - mit Begründung, die im Protokoll steht.
-const LOCKED_STATUSES = new Set(["results_published", "archived"]);
-const OPEN_STATUSES = new Set(["scheduled", "registration_open", "registration_closed", "live", "paused"]);
-
-function trackLimits(track) {
-  const min = parseLapTime(track.min_time);
-  const max = parseLapTime(track.max_time);
-  if (Number.isNaN(min) || Number.isNaN(max)) return null;
-  return { min_plausible_ms: min, max_plausible_ms: max };
-}
-
 const F1_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
   ["scheduled", "Angekündigt"],
