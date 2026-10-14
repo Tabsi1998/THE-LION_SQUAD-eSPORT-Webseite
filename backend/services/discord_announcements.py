@@ -30,6 +30,9 @@ from services import event_days
 from services.discord_plain_text import _without_tags, plain_text  # noqa: F401 - umgezogen (#1420)
 from services.tournament_rules import self_checkin_allowed
 
+# Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
+__all__ = ["_without_tags"]
+
 logger = logging.getLogger("tls.discord.announce")
 
 VIENNA = ZoneInfo("Europe/Vienna")

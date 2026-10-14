@@ -23,8 +23,6 @@ from services.image_upload import (  # noqa: F401 - umgezogen (#1420), hier weit
     IMAGE_MIME_BY_EXT,
     VIDEO_MIME_BY_EXT,
     VIDEO_MIME_ALIASES,
-    VIDEO_EXT_BY_MIME,
-    PIL_IMAGE_FORMATS,
     ALLOWED_DOC,
     MAX_IMAGE_UPLOAD_MB,
     MAX_DOCUMENT_UPLOAD_MB,
@@ -35,23 +33,17 @@ from services.image_upload import (  # noqa: F401 - umgezogen (#1420), hier weit
     MAX_DOC_BYTES,
     MAX_ORIGINAL_BYTES,
     MAX_IMAGE_DIMENSION,
-    MAX_IMAGE_PIXELS,
     ADMIN_UPLOAD_RATE_LIMIT,
     ADMIN_UPLOAD_RATE_WINDOW_SECONDS,
     USER_UPLOAD_RATE_LIMIT,
     USER_UPLOAD_RATE_WINDOW_SECONDS,
     UPLOAD_EVENT_RETENTION_DAYS,
-    UPLOAD_STREAM_CHUNK_BYTES,
     VIDEO_SNIFF_BYTES,
     _read_upload_limited,
     _write_upload_stream_limited,
     _resize_for_storage,
-    _crop_with_padding,
-    _trim_empty_borders,
     _encode_image_bytes,
     _detect_video_upload,
-    _upload_mb_from_env,
-    _int_from_env,
 )
 from services.image_variants import schedule_variants
 from services.permissions import MFA_MESSAGE, admin_role_without_second_factor, is_confirmed_admin_role
@@ -63,6 +55,9 @@ from services.media_formats import (
     ORIGINAL_MEDIA_MIME_BY_EXT,
     RAW_PHOTO_MIME_BY_EXT,
 )
+
+# Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
+__all__ = ["MAX_IMAGE_DIMENSION"]
 
 try:
     import rawpy

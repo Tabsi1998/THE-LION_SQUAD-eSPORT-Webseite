@@ -18,6 +18,9 @@ from services import dolibarr_identity, dolibarr_meetings
 from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key, load_settings
 from services.dolibarr_ballot_state import STATE_ID, feed_state, load_state  # noqa: F401 - umgezogen (#1420)
 
+# Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
+__all__ = ["feed_state"]
+
 MIN_VERSION = (1, 7, 0)
 LIVE_SECONDS = 5
 IDLE_SECONDS = 60
