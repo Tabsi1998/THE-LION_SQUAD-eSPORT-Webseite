@@ -40,20 +40,23 @@ export function ProfileSwitch({ label, checked, onCheckedChange, disabled = fals
   );
 }
 
-// Zeigt, was mit dem Speichern von selbst gerade passiert. Scheitert es, bleibt die Schalterstellung stehen und
-// „Erneut versuchen“ schickt sie noch einmal (#1048).
-export function AutosaveStatus({ status, message, onRetry }) {
+// Zeigt ruhig, was mit dem Speichern von selbst gerade passiert (#1048): „Speichert …“, kurz „Gespeichert ✓“, bei einem
+// Fehler „Nicht gespeichert“ mit „Erneut versuchen“. Die Eingabe bleibt dabei stehen; ungültige Eingaben haben ihren
+// Hinweis am Feld und gehen nicht an den Server.
+export function AutosaveStatus({ status, message, onRetry, testId = "profile-autosave-status" }) {
   const text = {
-    idle: "Änderungen hier speichern von selbst.",
-    pending: "Änderung wird gleich gespeichert …",
+    idle: "Änderungen speichern von selbst.",
+    pending: "Speichert …",
     saving: "Speichert …",
-    saved: "Gespeichert.",
-    error: message || "Speichern fehlgeschlagen.",
+    saved: "Gespeichert ✓",
+    invalid: "Nicht gespeichert – bitte die markierte Eingabe prüfen.",
+    error: "Nicht gespeichert.",
   }[status] || "";
-  const tone = status === "error" ? "text-[#FF3B30]" : status === "saved" ? "text-[#00FF88]" : "text-white/50";
+  const tone = status === "error" || status === "invalid" ? "text-warn" : status === "saved" ? "text-ok" : "text-white/50";
   return (
-    <div role="status" aria-live="polite" data-testid="profile-autosave-status" className={`flex flex-wrap items-center gap-2 text-xs ${tone}`}>
+    <div role="status" aria-live="polite" data-testid={testId} data-status={status} className={`flex flex-wrap items-center gap-2 text-xs ${tone}`}>
       <span>{text}</span>
+      {status === "error" && message ? <span className="text-white/60">{message}</span> : null}
       {status === "error" && onRetry ? (
         <button
           type="button"
