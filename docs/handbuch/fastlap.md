@@ -38,6 +38,7 @@ Challenge macht, darf dort **Zeiten eintragen und ändern**, aber keine Challeng
 | **Strecken** | Eine oder mehrere Strecken mit Bild, Land, Zielzeit und Reihenfolge | Challenge öffnen, Kasten „Strecken“ |
 | **Championship** | Mehrere Strecken, Punkte nach Platz je Strecke, dazu eine Gesamtwertung | Haken „Championship“ beim Anlegen |
 | **Zeiten** | Zeit, Strafsekunden, Beleg, ungültig markieren | Challenge öffnen, Kasten „Zeiten eintragen“ |
+| **Vor Ort** | Schnelleingabe mit Ziffernblock, Gäste ohne Konto, Liste „Am Start / Als Nächstes“ | Challenge öffnen, ganz oben (siehe 3.12) |
 | **Vereins-Referenzzeiten** | Zeiten von Vereinsmitgliedern außer Wertung als „Zielzeit zum Schlagen“ | Formular, Kasten „Teilnahme und Vereins-Referenzzeiten“ |
 | **Fast-Lap-Team** | Helfer, die Zeiten eintragen dürfen | Challenge öffnen, Kasten „Fast-Lap-Team“ |
 | **Preise** | Preise je Platz, daraus entstehen Gewinn-Einträge | Formular, Kasten „Preise“ |
@@ -58,7 +59,8 @@ Challenge macht, darf dort **Zeiten eintragen und ändern**, aber keine Challeng
    **Fahrhilfen**, **Controller-Typ**, **Plattform**. Wer alle gleich fahren lässt, bekommt vergleichbare Zeiten.
 4. Soll es **mehrere Strecken** mit Punkten geben, setzt jetzt den Haken **Championship (mehrere Strecken + Punkte
    pro Platz)**. Ihn gibt es nur beim Anlegen. Im Formular zum Bearbeiten ist er nicht mehr da.
-5. **Unbegrenzte Versuche** ist an. Schaltet ihn aus, erscheint **Max Versuche**.
+5. **Versuche je Person und Strecke** steht auf **3**. Tragt eine andere Zahl ein (zum Beispiel 10) oder lasst das Feld
+   leer – dann sind die Versuche unbegrenzt. Ungültige Runden zählen mit.
 6. Rechts unter **Veröffentlichung und Zeitplan**: **Sichtbarkeit** (Öffentlich / Nur registrierte Community / Nur
    Vereinsmitglieder / Nur intern), **Veröffentlichung** (Entwurf oder Angekündigt), **Start** und **Ende**.
 7. Auf **Challenge erstellen** klicken. Die Challenge startet als **Entwurf**, niemand sieht sie, solange ihr sie nicht
@@ -107,7 +109,7 @@ daran, den Status zu setzen.
 | --- | --- |
 | **Entwurf** | nur im Admin |
 | **Angekündigt** | sichtbar, noch nicht gestartet |
-| **Einreichung offen** / **Einreichung geschlossen** | die Anzeige „Online-Einreichung“ auf der öffentlichen Seite (siehe 3.3) |
+| **Einreichung offen** / **Einreichung geschlossen** | die Anzeige „Online-Einreichung“ auf der öffentlichen Seite (siehe 3.3); in der Auswahl nur, wenn **Online-Einreichung öffentlich anzeigen** an ist |
 | **Live** | läuft |
 | **Pausiert** | angehalten |
 | **Beendet** | vorbei, die Ergebnisse sind sichtbar, die Gewinn-Einträge entstehen (setzt die Turnierleitung) |
@@ -126,7 +128,11 @@ hinzugefügt wird (Event → **Programm** → **+ Fast Lap** oder **Bestehendes 
 - **Gleichstand:** Haben zwei dieselbe wirksame Zeit, liegt **die früher gefahrene** (früher eingetragene) vorn. Diese
   eine Regel gilt überall: Rangliste, TV, Gewinne, Jahreswertung, Event-Rückblick, Widget und Profil.
 - **Versuche:** Die Zahl „Versuche“ zählt alle Zeiten einer Person in der Wertung, **auch ungültige** – genau wie die
-  Grenze **Max Versuche**.
+  Grenze **Versuche je Person und Strecke**. Tabelle, TV und App zeigen die eingestellte Zahl („2 / 3“, „Versuch 2 von
+  3“); ohne Grenze steht nur die Zahl.
+- **Gäste ohne Konto** (siehe 3.12) stehen in der Rangliste wie alle anderen, auch auf dem TV und der Urkunde. In
+  **Gewinnen, Jahreswertung und Erfolgen** zählen sie nicht – dort reihen sich nur Konten. Fährt ein Gast die beste Zeit,
+  bekommt den Preis für Platz 1 die schnellste Person mit Konto.
 - **Championship:** Auf jeder Strecke gibt es nach Platz Punkte: Platz 1 bekommt 25, dann 18, 15, 12, 10, 8, 6, 4, 2
   und Platz 10 einen Punkt. Alles darunter keinen. Die Punkte werden über alle Strecken addiert. Bei Gleichstand
   entscheiden die Siege. Das ist die **Gesamtwertung**, die auf der öffentlichen Seite als „Championship
@@ -138,6 +144,9 @@ hinzugefügt wird (Event → **Programm** → **+ Fast Lap** oder **Bestehendes 
   **Admin → eSports → Jahreswertung**.
 
 ### 3.3 Online-Einreichung
+
+Online einreichen können Fahrer noch nicht; der Haken ist bei neuen Challenges aus, und solange er aus ist, steht
+nirgends „Einreichung offen“.
 
 Im Kasten **Veröffentlichung und Zeitplan** gibt es den Haken **Online-Einreichung öffentlich anzeigen** mit
 **öffnet** und **endet**. Er steuert, ob auf der öffentlichen Seite ein Hinweis mit den Einreichungs-Zeiten steht. Zeiten
@@ -164,8 +173,10 @@ Darunter steht die Liste der Zeiten dieser Strecke. Ohne Strecke steht dort „B
 Die Zeitnehmer können dasselbe Formular auch auf der öffentlichen Seite der Challenge nutzen („Direkt für
 Zeitnehmer, Schiedsrichter und Organisation“).
 
-Ist die **Maximale Anzahl Versuche** erreicht (nur bei begrenzten Versuchen), lehnt der Server die Zeit ab. Versuche
-zählen getrennt für offizielle Zeiten und Referenzzeiten.
+Ist die **Maximale Anzahl Versuche** erreicht (nur bei begrenzten Versuchen), lehnt der Server die Zeit ab – auch bei
+Gästen, jeder Gast hat seine eigenen Versuche. Versuche zählen getrennt für offizielle Zeiten und Referenzzeiten.
+
+Am Simulator geht es schneller mit der **Schnelleingabe** (3.12).
 
 ### 3.5 Zeiten prüfen und ändern
 
@@ -208,22 +219,30 @@ veröffentlicht** und fehlen Einträge, gibt es den Knopf **Gewinne erzeugen**.
 
 Auf der öffentlichen Seite der Challenge: eine **Strecken-Rangliste** je Strecke und, bei Championship, die
 **Gesamtwertung** mit Punkten. Bei einer Championship gibt es, sobald die Challenge **Beendet**, **Ergebnisse veröffentlicht** oder **Archiviert** ist,
-**Gesamtwertung-PDF** und **Gesamtwertungs-Urkunden**. Im Admin stehen oben auf der Challenge-Seite **CSV** (die Bestzeit je Fahrer und Strecke) und **PDF**
+**Gesamtwertung-PDF** und **Gesamtwertungs-Urkunden**. Die **Turnierleitung** sieht **Urkunden jetzt drucken** und in
+der Tabelle **Drucken** für die ersten vier schon, während die Challenge läuft – für Gäste genauso. Im Admin stehen oben auf der Challenge-Seite **CSV** (die Bestzeit je Fahrer und Strecke) und **PDF**
 (Rangliste, für die gewählte Strecke). Die Liste aller Challenges exportiert ihr mit **CSV**.
 
 ### 3.9 Bestzeit-Moment
 
 - **Auf dem TV:** Ansicht **Fast Lap** im Baukasten unter **Admin → eSports → TV & Beamer**, oder in der Challenge der Knopf
   **TV Modus**. Kommt eine neue Bestzeit, liegt etwa drei Sekunden ein Moment „Neue Bestzeit!“ über der Liste mit Bild,
-  Name, Zeit, Abstand und dem bisherigen Halter. Danach rutscht die Zeile an ihren Platz. Ein Sponsor-Moment läuft
-  dazwischen mit, wenn er eingeschaltet ist.
+  Name, Zeit, Abstand und dem bisherigen Halter, ein Glanz läuft einmal darüber. Danach rutscht die Zeile an ihren
+  Platz. Ein Sponsor-Moment läuft dazwischen mit, wenn er eingeschaltet ist. Steht jemand in der Liste „Am Start / Als
+  Nächstes“ (3.12), zeigt das TV über der Rangliste, wer gerade fährt (mit Station und „Versuch 2 von 3“) und wer als
+  Nächstes dran ist.
+- **Auf der Website:** Kommt eine neue Zeit, gleitet die Zeile an ihren neuen Platz, die Zeit läuft kurz von der alten
+  zur neuen und an der Zeile steht „−0.412 s · persönliche Bestzeit“. Bei einer neuen Bestzeit leuchtet Platz 1 ruhig
+  auf, darüber steht kurz „Neue Bestzeit!“. Der Abstand zur Spitze steht zusätzlich als schmaler Balken da. Mit
+  „Bewegung reduzieren“ im Betriebssystem bewegt sich nichts, die Hinweise stehen einfach da.
 - **In Discord:** Wer mit einer **offiziellen** gültigen Zeit die Strecke anführt, löst die Meldung „Neue Bestzeit“ aus
-  (nicht bei Referenzzeiten und ungültigen Zeiten). Wohin sie geht, stellt ihr unter **Admin → Verbindungen → Discord →
+  (nicht bei Referenzzeiten, ungültigen Zeiten und Gästen – ihr Name geht nicht an Discord). Wohin sie geht, stellt ihr unter **Admin → Verbindungen → Discord →
   Reiter „Meldungen“** ein.
 
 ### 3.10 Erfolge
 
-Eingetragene offizielle Zeiten zählen für Erfolge der Fahrer (zum Beispiel „Zielzeit geknackt“). Referenzzeiten zählen dafür nicht.
+Eingetragene offizielle Zeiten zählen für Erfolge der Fahrer (zum Beispiel „Zielzeit geknackt“). Referenzzeiten und
+Zeiten von Gästen zählen dafür nicht.
 
 ### 3.11 Nach „Ergebnisse veröffentlicht“
 
@@ -242,6 +261,44 @@ meldet „Gewinne und Saisonpunkte … bitte prüfen“, und das Protokoll hält
 Veröffentlichen fragt die Seite nach. Wer den Status wieder zurücksetzt, öffnet die Zeiten – auch das steht im
 Protokoll.
 
+### 3.12 Vor Ort: Schnelleingabe, Gäste, Am Start / Als Nächstes
+
+Auf der Seite der Challenge stehen ganz oben (solange die Ergebnisse nicht veröffentlicht sind) zwei Kästen. Von der
+öffentlichen Seite führt **Schnelleingabe** dorthin. Gedacht für Handy und Tablet am Simulator.
+
+**Schnelleingabe**
+
+1. **Fahrer** wählen: **Konto** (Personensuche) oder **Gast**. Steht genau eine Person **Am Start**, ist sie schon gewählt.
+2. Rechts oben steht **Versuch 2 von 3** (die eingestellte Zahl). Sind alle Versuche gefahren, steht dort „Alle 3
+   Versuche gefahren“ und Eintragen geht nicht mehr.
+3. Zeit am großen **Ziffernblock** tippen (`1`, `:`, `2`, `4`, `,`, `5`, `8`, `7`) oder mit der Tastatur. Unter dem Feld
+   steht, was die Seite liest („= 1:24.587“) oder „nicht lesbar“. Unplausible Zeiten fragen wie immer nach.
+4. **Eintragen** – oder **Eintragen & nächster Fahrer**: dann verlässt die Person die Liste „Am Start“, und die
+   nächste Person aus „Als Nächstes“ kommt an dieselbe Station.
+5. **Ungültig** öffnet die Gründe (**Strecke verlassen**, **Abkürzung**, **Kollision**, **Runde nicht beendet**); ein Tipp
+   speichert. Ist keine Zeit getippt, zählt die Runde als „ohne Zeit“ – als Versuch zählt sie immer.
+6. **Letzte korrigieren** holt die zuletzt gespeicherte Zeit ins Feld; **Korrektur speichern** ändert sie.
+
+Tastatur mit Ziffernblock: **Enter** trägt ein, **+** trägt ein und holt den nächsten Fahrer, **/** setzt den Doppelpunkt
+(der Ziffernblock hat keinen). Ohne Minuten geht es auch ohne Doppelpunkt: `84,587`.
+
+**Gäste ohne Konto**
+
+Im Reiter **Gast** einen Namen eintragen und **Anlegen** – fertig. Den Namen vorher fragen; wer nicht mit Namen
+auftauchen möchte, bekommt einen Spitznamen oder Initialen. Zwei Gäste mit demselben Namen gehen nicht (z. B. „Max B.“
+und „Max K.“). Gäste stehen in Rangliste, TV und Urkunde, aber nicht in Gewinnen, Jahreswertung und Erfolgen (3.2).
+Nach **90 Tagen** wird der Name von selbst zu „Gast 3“ (Datenschutz, siehe `DATA_PROTECTION.md`); die Zeit bleibt.
+Einen Gast später mit einem Konto verknüpfen geht noch nicht.
+
+**Am Start / Als Nächstes**
+
+- **In die Liste:** Fahrer (Konto oder Gast) wählen, optional die **Station** („Simulator 1“ – Auswahl aus den Stationen
+  des Events oder freier Text), **In die Liste**. Jede Person steht je Strecke einmal in der Liste.
+- **Als Nächstes:** Pfeil hoch schiebt nach vorn, ▶ startet sofort, ✕ nimmt aus der Liste.
+- **Am Start:** **Nächster** – die Person ist fertig, die nächste kommt an dieselbe Station. ✓ – fertig ohne Nachfolger.
+- **Ersten starten** holt die erste wartende Person an den Start.
+- Das TV zeigt die Liste mit Station und Versuch. Ändern dürfen Turnierleitung und Fast-Lap-Team.
+
 ---
 
 ## 4. Wenn etwas nicht klappt
@@ -254,7 +311,10 @@ Protokoll.
 | „Zielzeit bitte als m:ss.mmm angeben“ | Dasselbe bei der Zielzeit einer Strecke | Zum Beispiel `1:32.450` |
 | „Bei Strafzeit ist eine Begründung (mind. 5 Zeichen) Pflicht.“ | Strafe oder ungültig ohne Begründung | Im Feld **Begründung** mindestens fünf Zeichen eintragen |
 | „Bitte zuerst den Fahrer suchen und wählen.“ | Der Fahrer wurde nur getippt, nicht aus der Liste gewählt | Namen tippen und in der Trefferliste anklicken |
-| „Maximale Anzahl Versuche erreicht …“ | Die Challenge hat begrenzte Versuche | Bei den Einstellungen **Max Versuche** erhöhen oder **Unbegrenzte Versuche** einschalten |
+| „Maximale Anzahl Versuche erreicht …“ / „Alle 3 Versuche gefahren“ | Die Challenge hat begrenzte Versuche | Bei den Einstellungen **Versuche je Person und Strecke** erhöhen oder leeren (unbegrenzt) |
+| „Diesen Namen gibt es schon …“ | Ein Gast mit demselben Namen ist schon angelegt | Den vorhandenen Gast wählen oder den Namen unterscheidbar machen |
+| „Steht schon in der Liste.“ | Die Person steht auf dieser Strecke schon in „Am Start / Als Nächstes“ | Den vorhandenen Eintrag nutzen |
+| „Gäste fahren nur in der offiziellen Wertung.“ | Für einen Gast wurde **Vereins-Referenz** gewählt | **Offizielle Wertung** wählen |
 | „Vereinsmitglieder dürfen bei dieser Challenge nur als Vereins-Referenz eingetragen werden.“ | Der Haken **Vereinsmitglieder aus offizieller Wertung ausschließen** ist an | Als **Vereins-Referenz** eintragen, oder den Haken ausschalten |
 | „Vereins-Referenzzeiten sind bei dieser Challenge deaktiviert.“ | **Vereins-Referenzzeiten erlauben** ist aus | Haken einschalten |
 | „Keine Fast-Lap-Berechtigung für diese Aktion“ | Die Person ist weder Turnierleitung noch im Fast-Lap-Team (oder pausiert) | Im Kasten **Fast-Lap-Team** hinzufügen oder **Aktivieren** |
@@ -286,6 +346,10 @@ Technisch ja, aber es gibt dann nichts zu fahren. Legt zuerst mindestens eine St
 
 **Wie lade ich die Ergebnisse herunter?**
 Auf der Challenge-Seite oben **CSV** (alle Zeiten) oder **PDF** (Rangliste). Die Liste aller Challenges exportiert ihr mit **CSV**.
+
+**Kann jemand ohne Konto mitfahren?**
+Ja, als **Gast** (3.12). Gäste stehen in der Rangliste, bekommen aber keine Gewinne, keine Jahreswertungs-Punkte und
+keine Erfolge.
 
 **Wie kommt die Rangliste auf den Fernseher?**
 [TV und Beamer](tv.md), Abschnitt „Fast Lap am TV“.

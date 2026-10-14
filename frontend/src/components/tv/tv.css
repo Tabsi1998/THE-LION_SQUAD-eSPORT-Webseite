@@ -1336,7 +1336,8 @@
   border: var(--tv-line-w) solid var(--tv-line-strong); border-radius: 6px; background: var(--tv-panel);
 }
 .tv-queue__col { display: grid; align-content: start; gap: calc(var(--tv-u) * 0.5); min-width: 0; }
-.tv-queue__row { display: flex; align-items: baseline; gap: calc(var(--tv-u) * 1.2); min-width: 0; }
+.tv-queue__row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 calc(var(--tv-u) * 1.2); min-width: 0; }
+.tv-queue__row > .tv-queue__name { max-width: 100%; }
 .tv-queue__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; text-transform: uppercase; }
 .tv-queue__next { display: flex; flex-wrap: wrap; gap: calc(var(--tv-u) * 0.6) calc(var(--tv-u) * 1.4); min-width: 0; }
 .tv-queue__next .tv-queue__name { max-width: 100%; }

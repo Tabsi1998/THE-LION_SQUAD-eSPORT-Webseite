@@ -72,7 +72,7 @@ function QueueBand({ queue, motionOn }) {
           {onTrack.length ? onTrack.map((row) => (
             <motion.div key={row.id} layoutId={`tv-q-${row.id}`} transition={glide} className="tv-queue__row" data-testid="tv-queue-ontrack">
               <span className="tv-queue__name tv-t-name font-heading" data-tv-name="1">{row.display_name}</span>
-              {row.station ? <span className="tv-t-info tv-muted shrink-0">{row.station}</span> : null}
+              {row.station ? <span className="tv-t-info tv-muted min-w-0 [overflow-wrap:anywhere]">{row.station}</span> : null}
               <AttemptTicker text={attemptLabel(row.attempts_used, queue.max_attempts)} motionOn={motionOn} />
             </motion.div>
           )) : <div className="tv-t-info tv-faint">Gleich geht&apos;s los</div>}
@@ -304,7 +304,7 @@ function FastLapTv() {
         kicker="THE LION SQUAD · FAST LAP"
         title={challenge.title}
         aside={(
-          <div className="flex items-center gap-[calc(var(--tv-u)*1.6)]">
+          <div className="flex items-center gap-[calc(var(--tv-u)*1.6)] max-w-[45vw] min-w-0">
             {track?.image_url ? (
               <div className="w-[calc(var(--tv-u)*16)] h-[calc(var(--tv-u)*8.5)] border border-[color:var(--tv-line)] bg-black/50 rounded-sm overflow-hidden flex items-center justify-center shrink-0">
                 <img src={resolveMediaUrl(track.image_url)} alt="" className="w-full h-full object-contain" />
@@ -312,7 +312,7 @@ function FastLapTv() {
             ) : null}
             <div className="text-right min-w-0">
               <div className="tv-kicker tv-t-meta tv-faint">Strecke {activeTrackIdx + 1} / {trackCount}</div>
-              <div className="tv-t-title font-heading font-black uppercase tv-accent" data-testid="tv-track-name">{track?.name || activeTrack?.name || "—"}</div>
+              <div className="tv-t-title font-heading font-black uppercase tv-accent [overflow-wrap:anywhere]" data-testid="tv-track-name">{track?.name || activeTrack?.name || "—"}</div>
               {track?.country ? <div className="tv-t-info tv-muted">{track.country}</div> : null}
               {trackCount > 1 ? (
                 <div className="mt-[calc(var(--tv-u)*0.6)] flex items-center justify-end gap-[calc(var(--tv-u)*0.6)]">
@@ -363,7 +363,7 @@ function FastLapTv() {
                 {chip ? (
                   <div className={`tv-lap-chip ${chip.kind === "best" ? "tv-lap-chip--best" : ""}`} data-testid={`tv-lap-chip-${participantKey(entry)}`}>{chip.text}</div>
                 ) : (
-                  <div className="tv-t-info tv-muted">{entry.gap_str || "Bestzeit"} · {entry.attempts}{view?.max_attempts ? ` von ${view.max_attempts}` : ""} Versuche</div>
+                  <div className="tv-t-info tv-muted">{entry.gap_str || "Bestzeit"} · {view?.max_attempts ? `${entry.attempts} von ${view.max_attempts} Versuchen` : `${entry.attempts} Versuche`}</div>
                 )}
               </motion.div>
             );

@@ -486,7 +486,7 @@ export default function AdminF1EditPage() {
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="text-white/50 text-xs w-6">#{t.attempt_number}</span>
                       <span className="text-white text-sm truncate">{t.user?.display_name || t.user?.username}</span>
-                      {t.user?.is_guest && <span className="text-[9px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/40 rounded-sm px-1">Gast</span>}
+                      {t.user?.is_guest && <span className="text-[9px] font-bold uppercase tracking-widest text-honor border border-honor/40 rounded-sm px-1">Gast</span>}
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`font-display font-bold text-lg tabular-nums ${t.is_invalid ? "line-through text-white/40" : "text-white"}`}>{t.time_str}</span>

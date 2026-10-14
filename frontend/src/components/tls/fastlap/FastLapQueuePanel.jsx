@@ -17,7 +17,7 @@ function Row({ row, max, children }) {
     <div className="flex items-center gap-3 min-w-0">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 min-w-0">
-          {row.is_guest && <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/40 rounded-sm px-1">Gast</span>}
+          {row.is_guest && <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-honor border border-honor/40 rounded-sm px-1">Gast</span>}
           <span className="text-sm font-semibold truncate" title={row.display_name}>{row.display_name}</span>
         </div>
         <div className="text-[11px] text-white/45 truncate">{[row.station, attemptLabel(row.attempts_used, max)].filter(Boolean).join(" · ")}</div>
@@ -66,7 +66,7 @@ export function FastLapQueuePanel({ challenge, track, queue, guests, onGuestCrea
     "Der nächste Fahrer ließ sich nicht holen.");
 
   return (
-    <section className="border border-white/10 bg-[#121212] rounded-sm p-4 sm:p-5" data-testid="fl-queue" aria-label="Am Start und als Nächstes">
+    <section className="min-w-0 border border-white/10 bg-[#121212] rounded-sm p-4 sm:p-5" data-testid="fl-queue" aria-label="Am Start und als Nächstes">
       <div className="flex items-center justify-between gap-3 mb-3">
         <h2 className="font-heading font-bold uppercase text-lg">Am Start / Als Nächstes</h2>
         {waiting.length > 0 && onTrack.length === 0 && (
@@ -99,7 +99,7 @@ export function FastLapQueuePanel({ challenge, track, queue, guests, onGuestCrea
               <span className="sr-only">Platz {index + 1}</span>
               {index > 0 && <button type="button" disabled={busy} onClick={() => run(() => api.post(`/f1/queue/${row.id}/up`), "Ließ sich nicht verschieben.")} aria-label={`${row.display_name} nach oben`} className="p-1.5 text-white/50 hover:text-white disabled:opacity-40"><ArrowUp className="w-4 h-4" /></button>}
               <button type="button" disabled={busy} onClick={() => run(() => api.post(`/f1/queue/${row.id}/start`, { station: station.trim() || null }), "Ließ sich nicht starten.")} aria-label={`${row.display_name} starten`} className="p-1.5 text-white/50 hover:text-[#29B6E8] disabled:opacity-40"><Play className="w-4 h-4" /></button>
-              <button type="button" disabled={busy} onClick={() => run(() => api.delete(`/f1/queue/${row.id}`), "Ließ sich nicht entfernen.")} aria-label={`${row.display_name} aus der Liste nehmen`} className="p-1.5 text-white/50 hover:text-[#FF3B30] disabled:opacity-40"><X className="w-4 h-4" /></button>
+              <button type="button" disabled={busy} onClick={() => run(() => api.delete(`/f1/queue/${row.id}`), "Ließ sich nicht entfernen.")} aria-label={`${row.display_name} aus der Liste nehmen`} className="p-1.5 text-white/50 hover:text-live disabled:opacity-40"><X className="w-4 h-4" /></button>
             </Row>
           </motion.li>
         ))}

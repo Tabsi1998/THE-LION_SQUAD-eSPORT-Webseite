@@ -51,8 +51,8 @@ export function FastLapDriverChooser({ challengeId, guests, onGuestCreated, valu
     return (
       <div data-testid={testId}>
         <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Fahrer</div>
-        <div className="flex items-center gap-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-3 py-2" data-testid={`${testId}-selected`}>
-          <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/40 rounded-sm px-1.5 py-0.5">Gast</span>
+        <div className="flex items-center gap-3 border border-honor/30 bg-honor/5 rounded-sm px-3 py-2" data-testid={`${testId}-selected`}>
+          <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-honor border border-honor/40 rounded-sm px-1.5 py-0.5">Gast</span>
           <span className="min-w-0 flex-1 text-sm font-semibold truncate">{value.name}</span>
           <button type="button" onClick={() => onChange(null)} aria-label="Anderen Fahrer wählen" className="p-1 text-white/50 hover:text-white"><X className="w-4 h-4" /></button>
         </div>

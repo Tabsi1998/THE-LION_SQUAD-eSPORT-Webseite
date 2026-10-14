@@ -293,7 +293,7 @@ export default function F1DetailPage() {
                   <div key={marks.bestKey} className="tls-best-flash" role="status" data-testid="f1-best-flash">
                     <span className="tls-best-flash__kicker font-heading">Neue Bestzeit!</span>
                     <span className="min-w-0 truncate font-bold">{marks.best.entry.display_name}</span>
-                    <span className="font-display font-bold tabular-nums text-[#FFD700]">{marks.best.entry.time_str}</span>
+                    <span className="font-display font-bold tabular-nums text-honor">{marks.best.entry.time_str}</span>
                     {marks.best.gapMs !== null && <span className="font-display tabular-nums text-white/70">{deltaText(marks.best.gapMs)}</span>}
                   </div>
                 )}
@@ -305,10 +305,10 @@ export default function F1DetailPage() {
                     <tr>
                       <th className="text-left px-4 py-3 w-12">#</th>
                       <th className="text-left px-4 py-3">Fahrer</th>
-                      <th className="text-right px-4 py-3 font-display">Beste Zeit</th>
-                      <th className="text-right px-4 py-3">Abstand</th>
-                      <th className="text-right px-4 py-3">Versuche</th>
-                      {showCertificates && <th className="text-right px-4 py-3">Urkunde</th>}
+                      <th className="text-right px-4 py-3 font-display whitespace-nowrap">Beste Zeit</th>
+                      <th className="hidden sm:table-cell text-right px-4 py-3">Abstand</th>
+                      <th className="hidden sm:table-cell text-right px-4 py-3">Versuche</th>
+                      {showCertificates && <th className="hidden sm:table-cell text-right px-4 py-3">Urkunde</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
@@ -321,11 +321,14 @@ export default function F1DetailPage() {
                       return (
                       <tr key={key} data-flip-key={key} data-testid={`f1-row-${e.rank}`} className={`tls-lap-row ${e.rank <= 3 ? `tls-lap-row--p${e.rank} bg-[#29B6E8]/5` : ""} ${record ? "tls-lap-row--record" : fresh ? "tls-lap-row--fresh" : ""}`}>
                         <td className={`px-4 py-3 font-display font-bold ${e.rank === 1 ? "text-[#FFD700]" : e.rank === 2 ? "text-white/80" : e.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}><span data-rank-digit className="inline-block">{e.rank}</span></td>
-                        <td className="px-4 py-3 min-w-[8rem] max-w-[16rem]">
-                          <span className="flex items-center gap-2 min-w-0">
+                        <td className="px-3 sm:px-4 py-3">
+                          {/* Lange Namen (break-ui): die Zelle kürzt selbst, sonst schöbe ein Name die Zeit aus dem Bild. */}
+                          <span className="flex items-center gap-2 min-w-0 max-w-[9.5rem] sm:max-w-[18rem]">
                             <span className="truncate" title={e.display_name}>{e.display_name}</span>
-                            {e.is_guest && <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-[#FFD700]/80 border border-[#FFD700]/30 rounded-sm px-1" title="Gast ohne Konto - nicht in Jahreswertung, Erfolgen und Gewinnen">Gast</span>}
+                            {e.is_guest && <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-honor/80 border border-honor/30 rounded-sm px-1" title="Gast ohne Konto - nicht in Jahreswertung, Erfolgen und Gewinnen">Gast</span>}
                           </span>
+                          {/* Am Handy stehen die Versuche unter dem Namen - Abstand, Versuche und Urkunde haben dort keine Spalte. */}
+                          <span className="sm:hidden block text-[10px] text-white/45 tabular-nums">{attemptsCell(e.attempts, maxAttempts)} Versuche</span>
                           {chip && <span className={`tls-lap-chip-web ${chip.kind === "best" ? "tls-lap-chip-web--best" : ""}`} data-testid={`f1-chip-${key}`}>{chip.text}</span>}
                         </td>
                         <td className="px-4 py-3 text-right font-display font-bold text-white tabular-nums">
@@ -347,16 +350,16 @@ export default function F1DetailPage() {
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right text-white/60 tabular-nums whitespace-nowrap">
+                        <td className="hidden sm:table-cell px-4 py-3 text-right text-white/60 tabular-nums whitespace-nowrap">
                           {e.gap_str || "—"}
                           {/* Abstand als Balken (#1349): wächst beim ersten Auftritt, passt sich bei neuer Bestzeit weich an. */}
                           {largestGap > 0 && e.rank > 1 && (
                             <span className="tls-gap-track" aria-hidden="true"><span className="tls-gap-bar" style={{ transform: `scaleX(${Math.max(0.02, (Number(e.gap_ms) || 0) / largestGap)})` }} /></span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right text-white/50 tabular-nums whitespace-nowrap" data-testid={`f1-attempts-${e.rank}`}>{attemptsCell(e.attempts, maxAttempts)}</td>
+                        <td className="hidden sm:table-cell px-4 py-3 text-right text-white/50 tabular-nums whitespace-nowrap" data-testid={`f1-attempts-${e.rank}`}>{attemptsCell(e.attempts, maxAttempts)}</td>
                         {showCertificates && (
-                          <td className="px-4 py-3 text-right">
+                          <td className="hidden sm:table-cell px-4 py-3 text-right">
                             {e.rank <= 4 ? (
                               <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/certificates/${encodeURIComponent(key)}.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`} target="_blank" rel="noreferrer" data-testid={`f1-certificate-${e.rank}`} className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">
                                 <Award className="w-3 h-3" /> {showResultPdf ? "PDF" : "Drucken"}

@@ -39,7 +39,7 @@ alle Sammlungen im Code und verlangt jede dort – eine neue Sammlung ohne Entsc
 | Eintrag im Mitgliederverzeichnis aus der Mitgliederverwaltung oder von der Redaktion, Vorstandsposten | bleibt beim Verein, verliert nur die Verknüpfung zum Konto |
 | Einlass bei der Generalversammlung (Anwesenheit am Eingang) | bleibt beim Verein, verliert nur die Verknüpfung zum Konto; wer als Vorstand selbst eingelassen hat, steht dort danach ohne Namen |
 | Mitgliedsanträge | Motivation und Angaben zur Person gelöscht, ein laufender Antrag gilt als zurückgezogen; der Datensatz in der Mitgliederverwaltung bleibt Sache des Vereins |
-| Einladungen zur Mitgliedschaft und in Teams, Tokens der Mitgliedskarte, persönlicher Kalender-Link, Zugangslinks, Aufgaben im Turnier- und F1-Team, Verbindung zur Mitgliederakte samt zwischengespeicherter Ehrungen | gelöscht bzw. abgeschaltet |
+| Einladungen zur Mitgliedschaft und in Teams, Tokens der Mitgliedskarte, persönlicher Kalender-Link, Zugangslinks, Aufgaben im Turnier- und F1-Team, Platz in der Liste „Am Start / Als Nächstes“ einer Fast Lap, Verbindung zur Mitgliederakte samt zwischengespeicherter Ehrungen | gelöscht bzw. abgeschaltet |
 | Teamzugehörigkeit | bleibt für Teamhistorie und Aufstellungen; das Konto heißt dort „Gelöschter User“ |
 | Anmeldungen zu Events und Turnieren | bleiben als Zählung und für den Turnierbaum – ohne Name, E-Mail, Notiz, Discord- und Plattform-Kennung |
 | Turnier-Ergebnisse, Ergebnismeldungen, Terminvorschläge, Rundenzeiten, Saisonpunkte und -tabellen | bleiben ohne Namen (sportliche Integrität); Nachweis-Link und Notiz einer Rundenzeit gelöscht |
@@ -74,6 +74,7 @@ Migration 5 für #1029). Sie nimmt nur Konten im vollständigen Löschzustand: Z
 | Fotos zu Ergebnismeldungen | 30 Tage nach dem Anhängen | Nachweis bei Einsprüchen |
 | Nach einer Kontolöschung: Einwilligungsnachweise (Website und Mitgliederverwaltung), Moderationsfälle (Meldungen von und über die Person, Verwarnungen, Sperren), Ergebnismeldungen, angemeldet geschriebene Kontaktanfragen als Vorgang | drei Jahre ab der Löschung (Entscheidung des Vereins zu #1029). Die Löschung setzt `erase_after`, der tägliche Job `ops_retention` löscht Abgelaufenes (`purge_expired_records`). Für früher gelöschte Konten setzt Migration 5 die Frist ab dem damaligen `anonymized_at`. Einträge aktiver Konten laufen nicht ab | Nachweis |
 | Ergebnisse und Tabellen | ohne Frist | sportliche Integrität, Teil des Turnierverlaufs |
+| Anzeigenamen von Fast-Lap-Gästen ohne Konto (`f1_guests`, #1585) | 90 Tage nach dem Anlegen, dann „Gast <Nummer>“ (Job `ops_retention`, `services/fastlap_guests.py`); die Zeiten bleiben ohne Namen | Gäste haben kein Konto, also weder Auskunft noch Löschung darüber – die Frist ersetzt sie. Vorher löscht die Leitung einen Namen auf Wunsch durch Umbenennen. Der Name geht nicht an Discord |
 
 Betriebsdaten ohne Personenbezug (`ops_errors`, `ops_slow_requests`, `ops_vitals`: nur „angemeldet“ oder „anonym“)
 laufen nach 30 Tagen ab. Die Ereignis-Kennungen signierter Webhooks der Mitgliederverwaltung (`dolibarr_webhook_events`:
