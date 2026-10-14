@@ -33,6 +33,7 @@ from models import (
 )
 from services.competition_read import canonical_match_for_source, find_match_source
 from services.match_overview import operational_match_overviews, own_match_overviews
+from services.match_duration import load_duration_game, with_effective_durations
 from services.match_public_view import public_match_view, public_tournament_view
 from services.match_planning import (
     ensure_plan_keeps_result_state,
@@ -632,6 +633,9 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         viewer_id = (user or {}).get("id")
         match = public_match_view(match, viewer_id)
         canonical_match = public_match_view(canonical_match, viewer_id)
+    # Die Dauer, die gilt (#1554) - die App rechnet die Kette nicht selbst.
+    duration_game = await load_duration_game(db, tournament)
+    with_effective_durations([match, canonical_match], stages=[stage], tournament=tournament, game=duration_game)
     return {
         "match": match,
         "canonical_match": canonical_match,

@@ -168,19 +168,22 @@ def key_label(value: str | None) -> str:
 TOURNAMENT_FIELDS = ("id", "slug", "title", "status", "format", "format_label", "format_display_name",
                      "public_phase", "start_date", "end_date", "team_mode", "paused_until", "registration_enabled",
                      "is_invite_only", "registration_open_from", "registration_open_until", "check_in_from",
-                     "check_in_until", "check_in_closed_at", "max_participants", "round_sponsors")
+                     "check_in_until", "check_in_closed_at", "max_participants", "round_sponsors",
+                     # Für die Dauer-Kette (#1554): ohne eigenen Wert am Spiel gilt Phase, Turnier, Game.
+                     "match_duration_minutes", "game_mode", "best_of")
 STAGE_FIELDS = ("id", "name", "number", "stage_type", "match_type")
+STAGE_SETTING_FIELDS = ("duration_minutes", "game_mode", "best_of")
 MATCH_FIELDS = ("id", "tournament_id", "stage_id", "stage_number", "stage_type", "match_type", "match_key", "section",
                 "round", "round_name", "matchday_number", "matchday_label", "order", "match_index", "status",
                 "scheduled_at", "started_at", "completed_at", "duration_minutes", "station_id", "station_name",
-                "station_label", "winner_id", "is_preview", "called_at")
+                "station_label", "winner_id", "is_preview", "called_at", "best_of", "effective_duration_minutes")
 # Wer zum Check-in zählt (#1123) und wer einen Platz belegt (wie die Anmeldung: offen, bestätigt, eingecheckt).
 CHECKIN_STATUSES = ("approved", "checked_in")
 SEAT_STATUSES = ("pending", "approved", "checked_in")
 SLOT_FIELDS = ("slot", "registration_id", "status", "seed", "source")
 SOURCE_FIELDS = ("type", "flow", "match_key", "rank", "seed", "raw")
 RESULT_FIELDS = ("registration_id", "rank", "score", "points", "qualified")
-MATCH_SETTING_FIELDS = ("match_size", "qualifiers_per_match", "duration_minutes")
+MATCH_SETTING_FIELDS = ("match_size", "qualifiers_per_match", "duration_minutes", "best_of")
 STATION_FIELDS = ("id", "name", "label", "device_type", "status")
 
 
@@ -240,7 +243,9 @@ def display_bracket_payload(payload: dict) -> dict:
     return {
         "tournament": _pick(tournament, TOURNAMENT_FIELDS),
         "registrations": registrations,
-        "stages": [_pick(stage, STAGE_FIELDS) for stage in payload.get("stages") or []],
+        "stages": [{**_pick(stage, STAGE_FIELDS), "settings": _pick(stage.get("settings") or {}, STAGE_SETTING_FIELDS)}
+                   for stage in payload.get("stages") or []],
+        "duration_game": payload.get("duration_game"),
         "matches": [],
         "matches_v2": matches,
         "engine": payload.get("engine"),

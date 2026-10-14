@@ -308,3 +308,11 @@ test("eine verspätete Antwort für das vorige Match wird verworfen (#1000)", as
     oldText: "Altes Viertelfinale",
   });
 });
+
+// Spieldauer (#1554): der Server nennt die Dauer, die gilt (Spiel, Phase, Turnier oder Spiel-Modus) - auch wenn am
+// Spiel selbst keine steht.
+test("die Dauer kommt vom Server, auch ohne eigenen Wert am Spiel", async () => {
+  answer({ ...PAGE, match: { ...PAGE.match, duration_minutes: null, effective_duration_minutes: 15 } });
+  await render(<MatchDetailScreen navigation={navigation} route={route} />);
+  expect(await screen.findByText("15 Min.")).toBeTruthy();
+});

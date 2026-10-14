@@ -30,3 +30,10 @@ test("ältere Daten und absolute Plätze wie im Web", () => {
   expect(absoluteRank({ type: "rank", flow: "L", match_key: "E", rank: 3 }, { settings: { match_size: 8, qualifiers_per_match: 2 } })).toBe(5);
   expect(absoluteRank({ type: "rank", flow: "L", match_key: "E", rank: 3 }, { settings: {} })).toBe(3);
 });
+
+// Spieldauer (#1554): ohne eingefrorenen Wert am Spiel nennt der Server die Dauer, die gilt.
+test("Zeit: die Dauer vom Server geht vor", () => {
+  const now = new Date("2026-10-10T08:00:00Z");
+  expect(plannedText({ scheduled_at: "2026-10-10T14:20:00+02:00", effective_duration_minutes: 15 }, now)).toBe("geplant ca. 14:20 · 15 Minuten");
+  expect(plannedText({ duration_minutes: 20, effective_duration_minutes: 20 }, now)).toBe("20 Minuten");
+});

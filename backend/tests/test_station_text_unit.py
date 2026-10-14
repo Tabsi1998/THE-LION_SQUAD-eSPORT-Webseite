@@ -54,3 +54,9 @@ async def test_attach_station_info_adds_the_text_and_never_an_id():
     assert matches[1]["station_text"] == "Station B"
     assert matches[2]["station_text"] == ""
     assert "station_text" not in matches[3]
+
+
+def test_consoles_for_game_devices_have_names():
+    """Geräte der Spiele (#1554): PS5 und Xbox wie bei den Stationen, nie als Kürzel „Ps5“."""
+    assert station_text("1", "ps5") == "Station 1 · PS5"
+    assert station_text("2", "xbox") == "Station 2 · Xbox"

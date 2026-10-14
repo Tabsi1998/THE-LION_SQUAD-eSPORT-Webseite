@@ -27,6 +27,7 @@ from datetime import datetime
 from models import now_utc
 from services.match_deadlines import NO_SHOW_RULE_TEXT
 from services.match_disputes import category_label, open_dispute
+from services.match_duration import load_duration_game
 from services.match_timing import OPEN_STATUSES, filled_slots, registration_name, timing
 from services.station_labels import attach_station_info, station_text
 from services.tournament_permissions import result_staff_user_ids
@@ -50,7 +51,7 @@ def _label(match: dict) -> str:
 
 
 def attention_items(tournament: dict, matches: list[dict], stations: list[dict], regs_by_id: dict[str, dict],
-                    now: datetime) -> list[dict]:
+                    now: datetime, *, stages: dict[str, dict] | None = None, game: dict | None = None) -> list[dict]:
     """Die Fälle eines Turniers - ``matches`` mit Stationstext (attach_station_info)."""
     items: list[dict] = []
     for match in matches:
@@ -81,7 +82,7 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
             items.append({**base, "id": f"rc-{match.get('id')}", "kind": "report_conflict", "title": "Meldungen weichen ab",
                           "detail": "Die Spieler melden verschiedene Ergebnisse.", "action": "enter", "since": None})
             continue
-        info = timing(match, tournament, now)
+        info = timing(match, tournament, now, stage=(stages or {}).get(match.get("stage_id") or ""), game=game)
         if info.get("missing"):
             items.append({**base, "id": f"rm-{match.get('id')}", "kind": "result_missing", "title": "Ergebnis fehlt",
                           "detail": f"{info.get('overdue_minutes') or 0} Min. über der Zeit", "action": "enter",
@@ -116,7 +117,10 @@ async def tournament_attention(db, tournament: dict, *, now: datetime | None = N
     registrations = await db.tournament_registrations.find(
         {"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1}).to_list(2000)
     regs_by_id = {row["id"]: row for row in registrations if row.get("id")}
-    return attention_items(tournament, matches, stations, regs_by_id, now), {match["id"]: match for match in matches if match.get("id")}
+    stages = {row["id"]: row for row in await db.tournament_stages.find(
+        {"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "settings": 1}).to_list(200) if row.get("id")}
+    items = attention_items(tournament, matches, stations, regs_by_id, now, stages=stages, game=await load_duration_game(db, tournament))
+    return items, {match["id"]: match for match in matches if match.get("id")}
 
 
 async def sweep(db, *, now: datetime | None = None) -> int:

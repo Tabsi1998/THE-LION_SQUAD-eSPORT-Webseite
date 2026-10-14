@@ -434,7 +434,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
               {scheduleModeLabel ? <Pill label={scheduleModeLabel} /> : null}
               <Pill label={formatWhen(match.scheduled_at, { fallback: "Noch kein Termin" })} />
               {station ? <Pill label={station} accent="cyan" /> : null}
-              {match.duration_minutes ? <Pill label={`${match.duration_minutes} Min.`} /> : null}
+              {/* Die Dauer, die gilt (#1554): vom Server gerechnet, ältere Server nur am Spiel. */}
+              {match.effective_duration_minutes || match.duration_minutes ? <Pill label={`${match.effective_duration_minutes || match.duration_minutes} Min.`} /> : null}
             </View>
           )}
           {/* GG (#616): nach dem Ende lobt eine Seite die andere - wie auf der Matchseite im Web. */}
