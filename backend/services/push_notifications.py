@@ -48,6 +48,7 @@ PUSH_CHANNELS = {
     "f1_prize_reminder": "lion_tournaments",
     "event_member": "lion_tournaments",
     "event_board": "lion_tournaments",
+    "event_message": "lion_tournaments",
     # Fotos vom Event (#1185) und Bescheid zu eingesandten Fotos (#1186).
     "gallery_event": "lion_tournaments",
     "gallery_member": "lion_tournaments",
