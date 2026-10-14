@@ -72,6 +72,7 @@ export const MATCH_STATUS_LABELS = {
   disputed: "In Klärung",
   forfeit: "Wertung",
   bye: "Freilos",
+  cancelled: "Entfällt",
   no_show: "Nicht erschienen",
   free: "Frei",
   busy: "Belegt",

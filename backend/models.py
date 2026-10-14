@@ -606,6 +606,8 @@ class TournamentCreate(BaseModel):
     prize_places: Optional[List[dict]] = None  # [{"group":"overall|winner|loser","place":1,"label":"1. Platz","value":"…"}]
     best_of: int = 1
     bronze_match: bool = False
+    # Doppel-K.-o. (#1549): kein Grand Final, eines, oder mit Reset-Spiel (Vorgabe).
+    grand_final_mode: Literal["none", "single", "reset"] = "reset"
     match_duration_minutes: int = 30
     stream_link: Optional[str] = None
     twitch_channel: Optional[str] = None
@@ -678,6 +680,7 @@ class TournamentUpdate(BaseModel):
     prize_places: Optional[List[dict]] = None
     best_of: Optional[int] = None
     bronze_match: Optional[bool] = None
+    grand_final_mode: Optional[Literal["none", "single", "reset"]] = None
     match_duration_minutes: Optional[int] = None
     stream_link: Optional[str] = None
     twitch_channel: Optional[str] = None

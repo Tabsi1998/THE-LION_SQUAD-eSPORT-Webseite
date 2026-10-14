@@ -288,3 +288,27 @@ describe("Turnierbaum am TV (#1115)", () => {
     expect(screen.queryByTestId("bracket-next-match")).toBeNull();
   });
 });
+
+describe("Grand Final Reset (#1549)", () => {
+  it("nennt im Grand Final den Reset und zeigt ein nicht nötiges Reset-Spiel als „nicht nötig“", () => {
+    const data = knockout();
+    data.matches_v2.push(
+      { id: "gf", section: "GF", round: 3, order: 0, match_key: "GF", status: "completed", slots: [
+        { slot: 1, registration_id: "r1", status: "filled", source: { type: "rank", flow: "W", match_key: "WF", rank: 1, raw: "W:WF:1" } },
+        { slot: 2, registration_id: "r2", status: "filled", source: { type: "rank", flow: "W", match_key: "LF", rank: 1, raw: "W:LF:1" } },
+      ], results: [{ registration_id: "r1", rank: 1 }, { registration_id: "r2", rank: 2 }] },
+      { id: "gfr", section: "GF", round: 4, order: 1, match_key: "GFR", round_name: "Grand Final Reset", status: "cancelled",
+        settings: { bracket_reset: { of_match_key: "GF", upper_slot: 1 } }, result_meta: { source: "bracket_reset", needed: false }, slots: [
+          { slot: 1, registration_id: "r1", status: "filled", source: { type: "rank", flow: "W", match_key: "GF", rank: 1, raw: "W:GF:1" } },
+          { slot: 2, registration_id: "r2", status: "filled", source: { type: "rank", flow: "W", match_key: "GF", rank: 2, raw: "W:GF:2" } },
+        ], results: [] },
+      { id: "lb1", section: "LB", round: 2, order: 0, match_key: "LA", status: "completed", slots: [
+        { slot: 1, registration_id: "r2", status: "filled", source: { type: "rank", flow: "L", match_key: "WA1", rank: 1, raw: "L:WA1:1" } },
+        { slot: 2, registration_id: null, status: "bye", source: { type: "bye", raw: "bye" } },
+      ], results: [{ registration_id: "r2", rank: 1 }] },
+    );
+    render(<BracketTree data={data} />);
+    expect(screen.getByText(/folgt ein Reset-Spiel/)).toBeInTheDocument();
+    expect(screen.getByTestId("bracket-reset-not-needed")).toHaveTextContent("nicht nötig");
+  });
+});

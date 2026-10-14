@@ -214,6 +214,7 @@ function StageBracketTree({ stages, matches, regMap, podiumMap, compact = false,
           const blocks = Object.keys(stageSections).map((name) => ({ name, rounds: stageSections[name] }));
           if (!blocks.length) return null;
           const hasLoser = blocks.some((block) => ["lb", "loser"].includes(normalizeSection(block.name)));
+          const hasReset = hasResetMatch(stageSections);
           return (
             <section key={stage.id} className="tv-tree__stage" data-tv-stage={stage.id}>
               {stagesForView.length > 1 ? <h3 className="tv-tree__phase tv-t-head font-heading">{stage.name || `Phase ${stage.number || ""}`}</h3> : null}
@@ -230,7 +231,7 @@ function StageBracketTree({ stages, matches, regMap, podiumMap, compact = false,
                       viewMode={viewMode}
                       layout={layout}
                       onMatchClick={onMatchClick}
-                      flowHint={sectionFlowHint(block.name, hasLoser)}
+                      flowHint={sectionFlowHint(block.name, hasLoser, hasReset)}
                     />
                   ))}
                 </div>
@@ -248,6 +249,7 @@ function StageBracketTree({ stages, matches, regMap, podiumMap, compact = false,
         const stageSections = byStage[stage.id] || {};
         const sectionNames = Object.keys(stageSections);
         const hasLoser = sectionNames.some((name) => ["lb", "loser"].includes(normalizeSection(name)));
+        const hasReset = hasResetMatch(stageSections);
         return (
           <div key={stage.id} className="space-y-6">
             {stagesForView.length > 1 && (
@@ -267,7 +269,7 @@ function StageBracketTree({ stages, matches, regMap, podiumMap, compact = false,
                 viewMode={viewMode}
                 layout={layout}
                 onMatchClick={onMatchClick}
-                flowHint={sectionFlowHint(section, hasLoser)}
+                flowHint={sectionFlowHint(section, hasLoser, hasReset)}
               />
             ))}
             {sectionNames.length === 0 && (
@@ -335,13 +337,22 @@ function arrangeTvRows(blocks, columns) {
 }
 
 /** Der Fluss zwischen den Blöcken (#399): wer verliert, wechselt in die Verliererrunde. */
-function sectionFlowHint(section, hasLoser) {
+function sectionFlowHint(section, hasLoser, hasReset = false) {
   const key = normalizeSection(section);
   if (!hasLoser) return "";
   if (["wb", "winner", "main"].includes(key)) return "Wer hier verliert, spielt in der Verliererrunde weiter.";
   if (["lb", "loser"].includes(key)) return "Wer hier verliert, scheidet aus; der Sieger trifft im Großen Finale auf den Sieger der Siegerrunde.";
-  if (["gf", "grand_final"].includes(key)) return "Sieger der Siegerrunde gegen Sieger der Verliererrunde.";
+  if (["gf", "grand_final"].includes(key)) {
+    return hasReset
+      ? "Sieger der Siegerrunde gegen Sieger der Verliererrunde. Gewinnt die Verliererrunde, folgt ein Reset-Spiel - sonst entfällt es."
+      : "Sieger der Siegerrunde gegen Sieger der Verliererrunde.";
+  }
   return "";
+}
+
+/** Gibt es in dieser Phase ein Reset-Spiel (#1549)? */
+function hasResetMatch(stageSections) {
+  return Object.values(stageSections).some((roundMap) => Object.values(roundMap).some((list) => list.some((match) => match?.settings?.bracket_reset)));
 }
 
 function MatchNode({ match, regMap, podiumMap, compact, onMatchClick }) {
@@ -607,9 +618,13 @@ function pendingLabel(slot, findMatch) {
   return info.kind === "pending" ? info.label : "";
 }
 
-function LiveStatus({ status }) {
+function LiveStatus({ status, resetMatch = false }) {
   const finished = useContext(FinishedContext);
   const isLive = LIVE_STATUSES.has(String(status || "").toLowerCase());
+  // Ein Reset-Spiel, das nicht nötig war (#1549): der Sieger der Siegerrunde hat das erste Finale gewonnen.
+  if (resetMatch && String(status || "").toLowerCase() === "cancelled") {
+    return <span className="text-white/35" data-testid="bracket-reset-not-needed">nicht nötig</span>;
+  }
   if (finished && !DONE_STATUSES.has(String(status || "").toLowerCase())) {
     return <span className="text-white/35" data-testid="bracket-not-played">nicht gespielt</span>;
   }
@@ -667,7 +682,7 @@ function V2DuelNode({ match, regMap, podiumMap, compact = false, onClick }) {
     >
       <div className={`${compact ? "px-2.5 py-1" : "px-3 py-1.5"} flex items-center justify-between gap-2 border-b border-white/5`}>
         <span className="text-[11px] font-bold tracking-wider text-white/55">{match.match_key || "Spiel"}{isMine ? <span className="ml-2 text-[#FFD700]">Du</span> : null}</span>
-        <span className="text-[11px] text-white/45"><LiveStatus status={match.status} /></span>
+        <span className="text-[11px] text-white/45"><LiveStatus status={match.status} resetMatch={Boolean(match.settings?.bracket_reset)} /></span>
       </div>
       {slots.map((slot, index) => {
         const reg = regMap.get(slot.registration_id);

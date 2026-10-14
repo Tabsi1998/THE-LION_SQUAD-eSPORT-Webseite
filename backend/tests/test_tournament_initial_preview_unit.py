@@ -82,6 +82,9 @@ class FakeDb:
 def test_initial_preview_uses_selected_tournament_format():
     assert _estimated_match_count({"format": "single_elim", "max_participants": 16}) == 15
     assert _estimated_match_count({"format": "double_elim", "max_participants": 8}) == 15
+    # Grand Final einstellbar (#1549): Vorgabe mit Reset-Spiel (2), eines (1), keines (0).
+    assert _estimated_match_count({"format": "double_elim", "max_participants": 8, "grand_final_mode": "single"}) == 14
+    assert _estimated_match_count({"format": "double_elim", "max_participants": 8, "grand_final_mode": "none"}) == 13
     assert _estimated_match_count({"format": "round_robin", "max_participants": 8}) == 28
 
 

@@ -18,6 +18,7 @@ _TOURNAMENT_PLAN_FIELDS = (
     "max_participants",
     "best_of",
     "bronze_match",
+    "grand_final_mode",
     "seeding_mode",
     "match_duration_minutes",
     "randomize_advancement_rounds",

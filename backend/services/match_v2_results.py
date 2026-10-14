@@ -518,6 +518,135 @@ def _status_after_slot_fill(match: dict, preserve_terminal: bool = True) -> str:
     return "pending"
 
 
+AUTO_BYE_NOTE = "Auto-Advance durch Bye"
+RESET_NOT_NEEDED_NOTE = "Kein Reset nötig – der Sieger der Siegerrunde hat das Grand Final gewonnen."
+
+
+def _effective_status(match: dict, target_sets: dict[str, dict]) -> str:
+    """Der Stand, der nach dem Schreiben gilt: was ``target_sets`` schon vorsieht, sonst der gespeicherte."""
+    return str(target_sets.get(match.get("id") or "", {}).get("status") or match.get("status") or "pending")
+
+
+def _mark_slot_bye(slot: dict, source_match: dict, rank: int, flow: str | None, now_iso: str) -> None:
+    slot["registration_id"] = None
+    slot["user_id"] = None
+    slot["source_result"] = {
+        "from_match_id": source_match["id"],
+        "from_match_key": source_match.get("match_key"),
+        "rank": rank,
+        "flow": flow,
+        "skipped": True,
+        "reason": "bye",
+        "confirmed_at": now_iso,
+    }
+    slot["status"] = "bye"
+
+
+def _auto_bye_result(winner: dict, now_iso: str) -> dict:
+    return {
+        "registration_id": winner.get("registration_id"),
+        "user_id": winner.get("user_id"),
+        "slot": winner.get("slot"),
+        "rank": 1,
+        "score": None,
+        "points": None,
+        "time_ms": None,
+        "dnf": False,
+        "forfeit": False,
+        "note": AUTO_BYE_NOTE,
+        "reported_by": "system",
+        "reported_at": now_iso,
+    }
+
+
+def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets: dict[str, dict], now_iso: str) -> None:
+    """Die Freilos-Kette (#1549): ein Spiel ohne offenen Zufluss und mit höchstens einem Teilnehmer ist entschieden.
+
+    Genau ein Teilnehmer: er kommt kampflos weiter - nur den Sieger-Weg (``W`` Platz 1); jeder andere Weg (Verlierer
+    ins Loser Bracket, Spiel um Platz 3, weitere Plätze) bekommt ein Freilos, denn es gibt niemanden, der verloren
+    hätte. Kein Teilnehmer (nur Freilose): das Spiel entfällt und gibt alle Wege als Freilos weiter. Beides läuft
+    rekursiv in die Folgespiele - beim Bau des Baums und nach jedem Ergebnis. Was sich ändert, steht danach in
+    ``target_sets`` und in den Spielen selbst."""
+    queue = list(start_ids)
+    seen: set[str] = set()
+    while queue:
+        match_id = queue.pop(0)
+        match = by_id.get(match_id)
+        if not match or match_id in seen:
+            continue
+        seen.add(match_id)
+        status = _effective_status(match, target_sets)
+        if match.get("is_preview") or status in LOCKED_DOWNSTREAM_STATUSES or status == "cancelled":
+            continue
+        slots = match.get("slots") or []
+        if not slots or any(slot.get("status") == "pending" for slot in slots):
+            continue
+        filled = _filled_slots(match)
+        if len(filled) > 1 or not any(slot.get("status") == "bye" for slot in slots):
+            continue
+        winner = filled[0] if filled else None
+        change = {
+            "results": [_auto_bye_result(winner, now_iso)] if winner else [],
+            "status": "completed" if winner else "cancelled",
+            "result_meta": {"source": "auto_bye", "updated_at": now_iso, **({} if winner else {"reason": "no_participants"})},
+            "completed_at": now_iso if winner else None,
+            "completed_by": "system" if winner else None,
+            "updated_at": now_iso,
+        }
+        match.update(change)
+        target_sets.setdefault(match_id, {}).update(change)
+        for advancement in match.get("advancement") or []:
+            target = by_id.get(advancement.get("to_match_id"))
+            target_slot = _find_slot(target, int(advancement.get("to_slot") or 0)) if target else None
+            if not target or not target_slot:
+                continue
+            rank = int(advancement.get("rank") or 0)
+            if winner and advancement.get("flow") == "W" and rank == 1:
+                target_slot["registration_id"] = winner.get("registration_id")
+                target_slot["user_id"] = winner.get("user_id")
+                target_slot["source_result"] = {
+                    "from_match_id": match_id,
+                    "from_match_key": match.get("match_key"),
+                    "rank": 1,
+                    "flow": "W",
+                    "confirmed_at": now_iso,
+                }
+                target_slot["status"] = "filled"
+            else:
+                _mark_slot_bye(target_slot, match, rank, advancement.get("flow"), now_iso)
+            target["status"] = _effective_status(target, target_sets)
+            target["status"] = _status_after_slot_fill(target)
+            target["updated_at"] = now_iso
+            target_sets.setdefault(target["id"], {}).update({
+                "slots": target.get("slots") or [],
+                "status": target["status"],
+                "updated_at": now_iso,
+            })
+            queue.append(target["id"])
+
+
+def _apply_bracket_reset_rule(match: dict, results: list[dict], by_id: dict[str, dict],
+                              target_sets: dict[str, dict], now_iso: str) -> None:
+    """Grand Final Reset (#1549): das Reset-Spiel zu diesem Spiel wird nur gespielt, wenn der Spieler aus dem
+    unteren Platz (Verliererrunde) gewinnt - sonst entfällt es, sauber abgeschlossen für Tabelle und Platzierungen."""
+    winner_slot = next((int(row.get("slot") or 0) for row in results if int(row.get("rank") or 0) == 1), None)
+    for advancement in match.get("advancement") or []:
+        target = by_id.get(advancement.get("to_match_id"))
+        rule = ((target or {}).get("settings") or {}).get("bracket_reset") or {}
+        if not target or rule.get("of_match_key") != match.get("match_key"):
+            continue
+        needed = winner_slot is not None and winner_slot != int(rule.get("upper_slot") or 1)
+        change = {
+            "status": _status_after_slot_fill(target, preserve_terminal=False) if needed else "cancelled",
+            "results": [] if not needed else target.get("results") or [],
+            "result_meta": {"source": "bracket_reset", "needed": needed, "updated_at": now_iso,
+                            **({} if needed else {"note": RESET_NOT_NEEDED_NOTE})},
+            "updated_at": now_iso,
+        }
+        target.update(change)
+        target_sets.setdefault(target["id"], {}).update(change)
+
+
 def _ensure_no_pending_result(match: dict) -> None:
     """Liegt im Folgespiel gerade ein Ergebnis für „Rückgängig“ bereit, wartet die Korrektur - sonst ginge es ins Leere."""
     if isinstance(match.get("pending_result"), dict):
@@ -711,6 +840,10 @@ def build_v2_result_application(
                 # Neue Paarung ohne Ergebnis: was zur alten gehörte, gilt nicht mehr.
                 target_sets[target_id].update(_pairing_reset_fields(target, now_iso))
             _cascade_clear_downstream(target_id, by_id, downstream, target_sets, now_iso, reset_log=reset_matches)
+
+    # Freilos-Kette und Reset-Regel erst jetzt - nach Korrektur und Kaskade steht fest, was in den Zielen gilt.
+    resolve_walkovers(list(target_sets), by_id, target_sets, now_iso)
+    _apply_bracket_reset_rule(match, results, by_id, target_sets, now_iso)
 
     match_set = {
         "results": results,

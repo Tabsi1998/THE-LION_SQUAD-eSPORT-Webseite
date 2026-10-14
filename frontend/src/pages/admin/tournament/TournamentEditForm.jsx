@@ -17,7 +17,7 @@ import { gameOptionLabel } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
 import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
 import { PrizeEditor, Txt } from "./PrizeEditor";
-import { BRONZE_FORMATS, CUSTOM_BRACKET_FORMATS, DEFAULT_FFA_SCHEMA, EVENT_MODE_OPTIONS, MATCHDAY_FORMATS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, TOURNAMENT_STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS } from "./shared";
+import { BRONZE_FORMATS, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, MATCHDAY_FORMATS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, TOURNAMENT_STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS } from "./shared";
 
 export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat }) {
   const dt = toDateTimeLocalInput;
@@ -67,6 +67,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     best_of: source.best_of || 1,
     match_duration_minutes: source.match_duration_minutes || 30,
     bronze_match: !!source.bronze_match,
+    grand_final_mode: source.grand_final_mode || "reset",
     seeding_mode: source.seeding_mode || "random",
     randomize_advancement_rounds: !!source.randomize_advancement_rounds,
     is_public: source.is_public !== false,
@@ -127,6 +128,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     best_of: tournament.best_of || 1,
     match_duration_minutes: tournament.match_duration_minutes || 30,
     bronze_match: !!tournament.bronze_match,
+    grand_final_mode: tournament.grand_final_mode || "reset",
     seeding_mode: tournament.seeding_mode || "random",
     randomize_advancement_rounds: !!tournament.randomize_advancement_rounds,
     is_public: tournament.is_public !== false,
@@ -161,7 +163,9 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     min_players: stageSettings.min_players || 2,
     qualifiers_per_match: stageSettings.qualifiers_per_match || (tournament.format === "ffa_custom_bracket" ? 2 : 1),
     duration_minutes: stageSettings.duration_minutes || tournament.match_duration_minutes || 30,
-    schema: stageSettings.schema || (tournament.format === "ffa_custom_bracket" ? DEFAULT_FFA_SCHEMA : ""),
+    // Leer heißt automatisch (#1549): Läufe nach Spielgröße und Quote, Ebene für Ebene bis zum Finale. Ein vorbelegtes
+    // Beispiel-Schema hätte beim „Struktur anwenden“ diese Automatik verdrängt.
+    schema: stageSettings.schema || "",
   });
   useEffect(() => {
     api.get("/games").then(({ data }) => setGames(data || [])).catch(() => setGames([]));
@@ -184,9 +188,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
       match_size: value === "ffa_custom_bracket" ? (current.match_size || 4) : 2,
       min_players: 2,
       qualifiers_per_match: value === "ffa_custom_bracket" ? (current.qualifiers_per_match || 2) : 1,
-      schema: value === "ffa_custom_bracket" ? (current.schema || DEFAULT_FFA_SCHEMA)
-        : value === "custom_bracket" ? current.schema
-          : "",
+      schema: CUSTOM_BRACKET_FORMATS.has(value) ? current.schema : "",
     }));
   };
   const normalizeTournamentPayload = (source) => {
@@ -366,6 +368,9 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
               {BRONZE_FORMATS.has(f.format) && <CheckField label="Spiel um Platz 3" checked={f.bronze_match} onChange={(v)=>set("bronze_match",v)} />}
               <CheckField label="Ersatzspieler erlauben" checked={f.substitutes_allowed} onChange={(v)=>set("substitutes_allowed",v)} />
             </div>
+            {GRAND_FINAL_FORMATS.has(f.format) && (
+              <SelectInput label="Grand Final" value={f.grand_final_mode} onChange={(v)=>set("grand_final_mode",v)} options={GRAND_FINAL_OPTIONS} hint={GRAND_FINAL_HINT} testId="tr-edit-grand-final" />
+            )}
           </FormSection>
           {CUSTOM_BRACKET_FORMATS.has(f.format) && (
             <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
@@ -378,6 +383,13 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
                 <textarea value={structure.schema} onChange={(e)=>setStructureField("schema", e.target.value)} rows={12} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" data-testid="tr-edit-structure-schema" />
               </label>
+              {f.format === "ffa_custom_bracket" && (
+                <p className="text-xs text-white/45" data-testid="tr-edit-structure-auto-hint">
+                  Leer lassen für die Automatik: Die Teilnehmer werden gleichmäßig auf Läufe bis zur Spielgröße verteilt
+                  (nie ein Lauf mit nur einem Spieler), die Besten kommen Ebene für Ebene weiter, bis ein Finale von höchstens
+                  Spielgröße übrig ist. Kleinere Läufe schicken anteilig weniger weiter.
+                </p>
+              )}
             </div>
           )}
         </FormSection>
