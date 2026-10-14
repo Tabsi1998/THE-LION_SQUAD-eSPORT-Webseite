@@ -54,7 +54,8 @@ def public_stage_view(stage: dict | None) -> dict | None:
 
 
 def public_tournament_view(tournament: dict | None) -> dict | None:
-    """Das Turnier auf der Spielseite: ohne die interne Abrechnung (`billing`) - wie die öffentliche Turnierseite."""
+    """Das Turnier auf der Spielseite: ohne die interne Abrechnung (`billing`) und ohne den Umbau-Vorschlag der
+    Turnierleitung (`heat_rebuild_plan`, #1550) - wie die öffentliche Turnierseite."""
     if not isinstance(tournament, dict):
         return tournament
-    return {key: value for key, value in tournament.items() if key != "billing"}
+    return {key: value for key, value in tournament.items() if key not in {"billing", "heat_rebuild_plan", "heat_rebuild_dismissed"}}
