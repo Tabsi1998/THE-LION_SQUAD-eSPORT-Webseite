@@ -132,7 +132,8 @@ hinzugefügt wird (Event → **Programm** → **+ Fast Lap** oder **Bestehendes 
   3“); ohne Grenze steht nur die Zahl.
 - **Gäste ohne Konto** (siehe 3.12) stehen in der Rangliste wie alle anderen, auch auf dem TV und der Urkunde. In
   **Gewinnen, Jahreswertung und Erfolgen** zählen sie nicht – dort reihen sich nur Konten. Fährt ein Gast die beste Zeit,
-  bekommt den Preis für Platz 1 die schnellste Person mit Konto.
+  bekommt den Preis für Platz 1 die schnellste Person mit Konto (Entscheidung des Vereins, 14.10.2026). Wird der Gast
+  später mit einem Konto verknüpft (3.12), zählt er ab dann voll.
 - **Championship:** Auf jeder Strecke gibt es nach Platz Punkte: Platz 1 bekommt 25, dann 18, 15, 12, 10, 8, 6, 4, 2
   und Platz 10 einen Punkt. Alles darunter keinen. Die Punkte werden über alle Strecken addiert. Bei Gleichstand
   entscheiden die Siege. Das ist die **Gesamtwertung**, die auf der öffentlichen Seite als „Championship
@@ -289,8 +290,19 @@ auftauchen möchte, bekommt einen Spitznamen oder Initialen. Zwei Gäste mit dem
 und „Max K.“). Gäste stehen in Rangliste, TV und Urkunde, aber nicht in Gewinnen, Jahreswertung und Erfolgen (3.2).
 Nach **90 Tagen** wird der Name von selbst zu „Gast 3“ (Datenschutz, siehe `DATA_PROTECTION.md`); die Zeit bleibt.
 Umbenannt wird ein Gast über die Schnittstelle der Verwaltung; nach **Ergebnisse veröffentlicht** nur durch die
-Turnierleitung mit Begründung, jedes Umbenennen steht im Protokoll. Einen Gast später mit einem Konto verknüpfen geht
-noch nicht. Die öffentliche Liste „Am Start / Als Nächstes“ zeigt nur Name, Station, Versuch und Platz.
+Turnierleitung mit Begründung, jedes Umbenennen steht im Protokoll. Die öffentliche Liste „Am Start / Als Nächstes“
+zeigt nur Name, Station, Versuch und Platz.
+
+**Gast mit Konto verknüpfen:** Legt ein Gast später ein Konto an, klickt die **Turnierleitung** in der Liste der Zeiten
+beim Gast auf das Ketten-Symbol (**Mit Konto verknüpfen**), sucht das Konto und sieht vorher, was passiert („3 Zeiten von
+Gast ‚Anna‘ gehen an Konto ‚…‘“). Mit **Verknüpfen** gehören alle Zeiten des Gastes dem Konto – ab dann zählt es voll:
+Rangliste, Gewinne, Jahreswertung, Erfolge. Hat das Konto hier schon Zeiten, werden beide zusammengeführt (es zählt die
+beste; bei gleicher Zeit die früher gefahrene). Die Versuchsgrenze darf dabei überschritten werden, die Vorschau sagt es.
+Der Gast bleibt als „verknüpft“ stehen und ist zum Eintragen nicht mehr wählbar; steht er in „Am Start / Als Nächstes“,
+steht dort jetzt das Konto. Ist das Konto Vereinsmitglied und die Challenge schließt Mitglieder aus, werden die Zeiten zu
+Referenzzeiten. Nach **Ergebnisse veröffentlicht** geht das nur mit Begründung; danach gleicht die Website Gewinne und
+Jahreswertung an – ein schon vergebener Gewinn wird nicht entzogen, sondern steht unter **Gewinne** mit „Nach Korrektur
+prüfen“. Ein zweites Verknüpfen mit demselben Konto ändert nichts, ein anderes Konto geht nicht mehr.
 
 **Am Start / Als Nächstes**
 
@@ -317,6 +329,8 @@ noch nicht. Die öffentliche Liste „Am Start / Als Nächstes“ zeigt nur Name
 | „Diesen Namen gibt es schon …“ | Ein Gast mit demselben Namen ist schon angelegt | Den vorhandenen Gast wählen oder den Namen unterscheidbar machen |
 | „Steht schon in der Liste.“ | Die Person steht auf dieser Strecke schon in „Am Start / Als Nächstes“ | Den vorhandenen Eintrag nutzen |
 | „Gäste fahren nur in der offiziellen Wertung.“ | Für einen Gast wurde **Vereins-Referenz** gewählt | **Offizielle Wertung** wählen |
+| „Der Gast ist mit einem Konto verknüpft …“ | Der Gast gehört inzwischen zu einem Konto | Das Konto als Fahrer wählen |
+| „Der Gast ist schon mit einem anderen Konto verknüpft.“ | Verknüpfen geht nur einmal | Bei einem Irrtum die Zeiten von Hand korrigieren |
 | „Vereinsmitglieder dürfen bei dieser Challenge nur als Vereins-Referenz eingetragen werden.“ | Der Haken **Vereinsmitglieder aus offizieller Wertung ausschließen** ist an | Als **Vereins-Referenz** eintragen, oder den Haken ausschalten |
 | „Vereins-Referenzzeiten sind bei dieser Challenge deaktiviert.“ | **Vereins-Referenzzeiten erlauben** ist aus | Haken einschalten |
 | „Keine Fast-Lap-Berechtigung für diese Aktion“ | Die Person ist weder Turnierleitung noch im Fast-Lap-Team (oder pausiert) | Im Kasten **Fast-Lap-Team** hinzufügen oder **Aktivieren** |
@@ -351,7 +365,7 @@ Auf der Challenge-Seite oben **CSV** (alle Zeiten) oder **PDF** (Rangliste). Die
 
 **Kann jemand ohne Konto mitfahren?**
 Ja, als **Gast** (3.12). Gäste stehen in der Rangliste, bekommen aber keine Gewinne, keine Jahreswertungs-Punkte und
-keine Erfolge.
+keine Erfolge – bis die Turnierleitung sie mit einem Konto verknüpft.
 
 **Wie kommt die Rangliste auf den Fernseher?**
 [TV und Beamer](tv.md), Abschnitt „Fast Lap am TV“.

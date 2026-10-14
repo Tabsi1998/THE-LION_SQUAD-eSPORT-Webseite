@@ -1188,6 +1188,12 @@ class F1GuestRename(F1GuestCreate):
     change_reason: Optional[str] = Field(default=None, max_length=500)
 
 
+class F1GuestLink(BaseModel):
+    """Gast mit Konto verknüpfen (#1585): das Konto aus der Personensuche, nach der Veröffentlichung mit Begründung."""
+    user_id: str
+    change_reason: Optional[str] = Field(default=None, max_length=500)
+
+
 class F1QueueCreate(BaseModel):
     """„Am Start / Als Nächstes“ (#1585): ein Konto oder ein Gast, auf einer Strecke, an einer Station (Freitext)."""
     user_id: Optional[str] = None

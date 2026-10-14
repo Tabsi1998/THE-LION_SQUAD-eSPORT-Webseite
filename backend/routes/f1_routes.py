@@ -28,7 +28,7 @@ from services.laptime import format_lap_time, plausibility_warning, plausible_ra
 from models import (
     F1ChallengeCreate, F1ChallengeUpdate, F1TrackCreate, F1TrackUpdate,
     F1LapTimeCreate, F1LapTimeDelete, F1LapTimeUpdate,
-    F1GuestCreate, F1GuestRename, F1QueueCreate, F1QueueNext, F1QueueStart,
+    F1GuestCreate, F1GuestLink, F1GuestRename, F1QueueCreate, F1QueueNext, F1QueueStart,
     now_utc, new_id,
 )
 
@@ -1340,6 +1340,132 @@ async def rename_guest(gid: str, body: F1GuestRename, me: dict = Depends(get_cur
                                     "data": {"challenge_id": guest["challenge_id"], "reason": reason, "after_publishing": reason is not None},
                                     "created_at": stamp})
     return guest_payload({**guest, "display_name": name})
+
+
+# --- Gast mit Konto verknüpfen (#1585, Entscheidung 14.10.2026) ---
+# Legt ein Gast später ein Konto an, ordnet die Leitung ihn dem Konto zu: alle Zeiten des Gastes gehören dann dem Konto,
+# das ab da voll zählt (Rangliste, Gewinne, Saisonpunkte, Erfolge). Hat das Konto in der Challenge schon Zeiten, werden
+# sie zusammengeführt - die Versuchsgrenze darf dabei überschritten werden (Hinweis), die Gleichstand-Regel nach
+# ``created_at`` bleibt. Der Gast bleibt als „verknüpft“ stehen (``linked_user_id``), seine Zeiten behalten ``guest_id``
+# als Herkunft. Unter der Gast-Sperre der Challenge und wiederholbar: ein zweites Verknüpfen mit demselben Konto tut
+# nichts. Nach der Veröffentlichung wie eine Korrektur: Begründung, Protokoll, Abgleich von Gewinnen und Saisonpunkten.
+LINK_ALREADY_OTHER = "Der Gast ist schon mit einem anderen Konto verknüpft."
+
+
+async def _guest_for_link(db, gid: str, me: dict) -> dict:
+    guest = await db.f1_guests.find_one({"id": gid}, {"_id": 0})
+    if not guest:
+        raise HTTPException(status_code=404, detail="Gast nicht gefunden")
+    if not _is_staff(me):
+        if lead_without_second_factor(_auth_user(me)):
+            raise HTTPException(status_code=403, detail=MFA_MESSAGE)
+        raise HTTPException(status_code=403, detail="Einen Gast mit einem Konto verknüpfen darf nur die Turnierleitung.")
+    return guest
+
+
+async def _link_plan(db, challenge: dict, guest: dict, user_id: str) -> dict:
+    """Was beim Verknüpfen passiert: wie viele Zeiten wandern, wie viele das Konto schon hat, wo die Grenze reißt."""
+    cid = challenge["id"]
+    guest_laps = await db.f1_lap_times.find({"challenge_id": cid, "guest_id": guest["id"], "user_id": None},
+                                            {"_id": 0, "track_id": 1}).to_list(None)
+    account_laps = await db.f1_lap_times.find({"challenge_id": cid, "user_id": user_id,
+                                               "$or": [{"score_scope": {"$exists": False}}, {"score_scope": "official"}]},
+                                              {"_id": 0, "track_id": 1}).to_list(None)
+    limit = _max_attempts(challenge)
+    over = []
+    if limit is not None:
+        tracks = {row["id"]: row for row in await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0, "id": 1, "name": 1}).to_list(100)}
+        for track_id in sorted({row.get("track_id") for row in guest_laps}):
+            total = sum(1 for row in guest_laps + account_laps if row.get("track_id") == track_id)
+            if total > limit:
+                over.append({"track_id": track_id, "track_name": (tracks.get(track_id) or {}).get("name"),
+                             "attempts": total, "max_attempts": limit})
+    return {"laps": len(guest_laps), "account_laps": len(account_laps), "over_limit": over}
+
+
+@router.get("/guests/{gid}/link-preview")
+async def guest_link_preview(gid: str, user_id: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    guest = await _guest_for_link(db, gid, me)
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "display_name": 1, "username": 1})
+    if not user:
+        raise HTTPException(status_code=400, detail="Konto nicht gefunden")
+    challenge = await db.f1_challenges.find_one({"id": guest["challenge_id"]}, {"_id": 0}) or {"id": guest["challenge_id"]}
+    plan = await _link_plan(db, challenge, guest, user_id)
+    return {**plan, "guest_name": guest.get("display_name"), "account_name": user.get("display_name") or user.get("username"),
+            "linked_user_id": guest.get("linked_user_id"), "needs_reason": challenge.get("status") in LOCKED_STATUSES}
+
+
+@router.post("/guests/{gid}/link")
+async def link_guest(gid: str, body: F1GuestLink, me: dict = Depends(get_current_user)):
+    db = get_db()
+    guest = await _guest_for_link(db, gid, me)
+    cid = guest["challenge_id"]
+    if not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=400, detail="Konto nicht gefunden")
+    challenge = await db.f1_challenges.find_one({"id": cid}, {"_id": 0}) or {}
+    if guest.get("linked_user_id") == body.user_id:
+        return {"ok": True, "already_linked": True, "laps_moved": 0, "over_limit": []}
+    if guest.get("linked_user_id"):
+        raise HTTPException(status_code=409, detail=LINK_ALREADY_OTHER)
+    reason = _published_change_reason(challenge, me, body.change_reason)
+    try:
+        async with mutation_lock(db, guests_resource(cid), wait_seconds=LAP_WAIT_SECONDS):
+            # Frisch lesen: ein zweiter Klick oder ein anderer Leiter kann gerade verknüpft haben.
+            guest = await db.f1_guests.find_one({"id": gid}, {"_id": 0}) or guest
+            if guest.get("linked_user_id") == body.user_id:
+                return {"ok": True, "already_linked": True, "laps_moved": 0, "over_limit": []}
+            if guest.get("linked_user_id"):
+                raise HTTPException(status_code=409, detail=LINK_ALREADY_OTHER)
+            plan = await _link_plan(db, challenge, guest, body.user_id)
+            stamp = now_utc().isoformat()
+            # Vereinsmitglieder bei „nur als Referenz“: dieselbe Regel wie beim Einschalten der Regel (Markierung).
+            member_rule = bool(challenge.get("block_club_member_results")) and await _is_active_club_member(body.user_id)
+            lap_update = {"user_id": body.user_id, "linked_from_guest": gid, "updated_at": stamp, "updated_by": me["id"]}
+            if member_rule:
+                lap_update.update(score_scope="club_reference", moved_by_member_rule=True)
+            moved = await db.f1_lap_times.update_many({"challenge_id": cid, "guest_id": gid, "user_id": None}, {"$set": lap_update})
+            async for row in db.f1_queue.find({"challenge_id": cid, "guest_id": gid}, {"_id": 0}):
+                twin = await db.f1_queue.find_one({"challenge_id": cid, "track_id": row.get("track_id"), "user_id": body.user_id}, {"_id": 0})
+                if twin:
+                    # Nie zweimal in der Liste: wer schon am Start ist, bleibt; sonst bleibt der frühere Platz.
+                    keep_guest = row.get("state") == "on_track" or (twin.get("state") != "on_track" and row.get("order", 0) < twin.get("order", 0))
+                    await db.f1_queue.delete_one({"id": twin["id"] if keep_guest else row["id"]})
+                    if not keep_guest:
+                        continue
+                await db.f1_queue.update_one({"id": row["id"]}, {"$set": {"user_id": body.user_id, "guest_id": None}})
+            await db.f1_guests.update_one({"id": gid}, {"$set": {"linked_user_id": body.user_id, "linked_at": stamp,
+                                                                  "linked_by": me["id"], "updated_at": stamp}})
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=GUESTS_BUSY)
+    laps_moved = getattr(moved, "modified_count", 0) or 0
+    await db.audit_logs.insert_one({"id": new_id(), "action": "fastlap.guest.link", "actor_id": me.get("id"), "target_id": gid,
+                                    "data": {"challenge_id": cid, "user_id": body.user_id, "laps_moved": laps_moved,
+                                             "over_limit": len(plan["over_limit"]), "member_rule": member_rule,
+                                             "reason": reason, "after_publishing": reason is not None},
+                                    "created_at": stamp})
+    result = {"ok": True, "already_linked": False, "laps_moved": laps_moved, "over_limit": plan["over_limit"]}
+    warning = await _resync_published_results(db, cid, me, reason, "fastlap.guest.link")
+    if warning:
+        result["resync_warning"] = warning
+    elif challenge.get("status") == "completed":
+        # „Beendet“ hat schon Gewinne angelegt: dieselbe Rechnung wie nach einer Korrektur, ohne etwas zu entziehen.
+        try:
+            from services.prize_service import review_f1_prizes
+            async with mutation_lock(db, results_resource(cid), wait_seconds=RESYNC_WAIT_SECONDS):
+                await review_f1_prizes(cid)
+        except Exception:
+            logger.warning("[f1] Gewinne nach dem Verknüpfen in %s nicht angeglichen", log_safe(cid), exc_info=True)
+            result["resync_warning"] = RESYNC_WARNING
+    if laps_moved:
+        try:
+            from badges import on_lap_submitted
+            track_ids = await db.f1_lap_times.distinct("track_id", {"challenge_id": cid, "linked_from_guest": gid})
+            for track_id in track_ids:
+                await on_lap_submitted(body.user_id, cid, track_id, False, False)
+        except Exception:
+            logger.warning("[achievements] verknüpfte Zeiten in %s nicht ausgewertet", log_safe(cid), exc_info=True)
+    return result
 
 
 # --- Am Start / Als Nächstes (#1585) ---

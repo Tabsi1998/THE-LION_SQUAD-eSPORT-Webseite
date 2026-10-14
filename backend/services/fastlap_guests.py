@@ -48,6 +48,9 @@ def guest_payload(guest: dict) -> dict:
         "participant_id": guest_participant_id(guest["id"]),
         "is_guest": True,
         "created_at": guest.get("created_at"),
+        # Mit einem Konto verknüpft (#1585): die Zeiten gehören dann dem Konto, der Gast bleibt als Nachweis stehen.
+        "linked_user_id": guest.get("linked_user_id"),
+        "linked_at": guest.get("linked_at"),
     }
 
 
@@ -63,6 +66,8 @@ async def find_guest(db, challenge_id: str, guest_id: str | None) -> dict:
     guest = await db.f1_guests.find_one({"id": guest_id, "challenge_id": challenge_id}, {"_id": 0}) if guest_id else None
     if not guest:
         raise HTTPException(status_code=400, detail="Gast gehört nicht zu dieser Challenge.")
+    if guest.get("linked_user_id"):
+        raise HTTPException(status_code=400, detail="Der Gast ist mit einem Konto verknüpft - bitte das Konto wählen.")
     return guest
 
 

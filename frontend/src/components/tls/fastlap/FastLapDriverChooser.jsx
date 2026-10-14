@@ -28,6 +28,8 @@ export function FastLapDriverChooser({ challengeId, guests, onGuestCreated, valu
   const [tab, setTab] = useState(value?.kind === "guest" ? "guest" : "user");
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  // Verknüpfte Gäste (#1585) fahren als Konto weiter - sie stehen hier nicht mehr zur Wahl.
+  const open = (guests || []).filter((guest) => !guest.linked_user_id);
 
   const createGuest = async (event) => {
     event?.preventDefault();
@@ -82,9 +84,9 @@ export function FastLapDriverChooser({ challengeId, guests, onGuestCreated, valu
               <UserPlus className="w-3.5 h-3.5" /> Anlegen
             </button>
           </form>
-          {guests?.length > 0 && (
+          {open.length > 0 && (
             <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto" data-testid={`${testId}-guests`}>
-              {guests.map((guest) => (
+              {open.map((guest) => (
                 <button key={guest.id} type="button" onClick={() => onChange(driverFromGuest(guest))} data-testid={`${testId}-guest-${guest.id}`} className="tls-btn tls-btn--quiet max-w-full truncate px-2.5 py-1 rounded-sm text-xs">
                   {guest.display_name}
                 </button>

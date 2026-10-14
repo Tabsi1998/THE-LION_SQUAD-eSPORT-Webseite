@@ -9,7 +9,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { PersonPicker } from "@/components/tls/PersonPicker";
 import { toast } from "sonner";
-import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
+import { Link2, Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
@@ -18,6 +18,7 @@ import { ChallengeSettingsForm } from "./f1/ChallengeSettingsForm";
 import { F1StaffPanel } from "./f1/F1StaffPanel";
 import { FastLapQuickEntry } from "@/components/tls/fastlap/FastLapQuickEntry";
 import { FastLapQueuePanel } from "@/components/tls/fastlap/FastLapQueuePanel";
+import { FastLapGuestLinkDialog } from "@/components/tls/fastlap/FastLapGuestLinkDialog";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 // Nach „Ergebnisse veröffentlicht“ (#1584) ändert nur die Turnierleitung Zeiten - mit Begründung, die im Protokoll steht.
@@ -63,6 +64,8 @@ export default function AdminF1EditPage() {
   const [editTrack, setEditTrack] = useState(null);
   const [newTime, setNewTime] = useState({ time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "", score_scope: "official" });
   const [editTime, setEditTime] = useState(null);
+  // Gast mit Konto verknüpfen (#1585) - nur die Turnierleitung.
+  const [linkGuest, setLinkGuest] = useState(null);
   // Vor Ort (#1585): Gäste ohne Konto und die Liste „Am Start / Als Nächstes“.
   const [guests, setGuests] = useState([]);
   const [queue, setQueue] = useState(null);
@@ -487,6 +490,11 @@ export default function AdminF1EditPage() {
                       <span className="text-white/50 text-xs w-6">#{t.attempt_number}</span>
                       <span className="text-white text-sm truncate">{t.user?.display_name || t.user?.username}</span>
                       {t.user?.is_guest && <span className="text-[9px] font-bold uppercase tracking-widest text-honor border border-honor/40 rounded-sm px-1">Gast</span>}
+                      {t.user?.is_guest && isTournamentLead && (
+                        <button type="button" onClick={() => setLinkGuest({ id: t.guest_id, name: t.user?.display_name || "Gast" })} data-testid={`f1-link-guest-${t.id}`} title="Mit Konto verknüpfen" aria-label={`${t.user?.display_name || "Gast"} mit Konto verknüpfen`} className="p-1 text-white/40 hover:text-[#29B6E8]">
+                          <Link2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`font-display font-bold text-lg tabular-nums ${t.is_invalid ? "line-through text-white/40" : "text-white"}`}>{t.time_str}</span>
@@ -515,6 +523,10 @@ export default function AdminF1EditPage() {
           ) : <div className="text-white/40 text-sm">Bitte erst eine Strecke anlegen.</div>}
         </div>
       </div>
+
+      {linkGuest && (
+        <FastLapGuestLinkDialog guest={linkGuest} onClose={() => setLinkGuest(null)} onLinked={() => { loadTimes(); loadGuests(); loadQueue(); }} />
+      )}
 
       {/* Edit Time Modal */}
       {editTime && (

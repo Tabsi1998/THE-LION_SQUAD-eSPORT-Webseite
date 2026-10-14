@@ -125,6 +125,26 @@ function fakeBackend({ lead = true, worst = false } = {}) {
       if (used >= 3) return json(route, { detail: "Maximale Anzahl Versuche erreicht (3) für offizielle Zeiten." }, 400);
       return json(route, { ...add(body), attempt_number: used + 1 });
     });
+    await page.route(/\/api\/f1\/guests\/[^/]+\/link-preview/, (route) => {
+      const gid = route.request().url().split("/guests/")[1].split("/")[0];
+      const userId = new URL(route.request().url()).searchParams.get("user_id");
+      return json(route, {
+        laps: state.laps.filter((lap) => lap.guest_id === gid && !lap.user_id).length,
+        account_laps: state.laps.filter((lap) => lap.user_id === userId).length,
+        guest_name: state.guests.find((g) => g.id === gid)?.display_name,
+        account_name: state.users.find((u) => u.id === userId)?.name,
+        over_limit: [], needs_reason: false,
+      });
+    });
+    await page.route(/\/api\/f1\/guests\/[^/]+\/link$/, (route) => {
+      const gid = route.request().url().split("/guests/")[1].split("/")[0];
+      const { user_id: userId } = route.request().postDataJSON();
+      let moved = 0;
+      for (const lap of state.laps) if (lap.guest_id === gid && !lap.user_id) { lap.user_id = userId; moved += 1; }
+      const guest = state.guests.find((g) => g.id === gid);
+      if (guest) guest.linked_user_id = userId;
+      return json(route, { ok: true, laps_moved: moved, over_limit: [] });
+    });
     await page.route(/\/api\/f1\/challenges\/c-1\/queue\/next$/, async (route) => {
       const body = route.request().postDataJSON() || {};
       state.queue = state.queue.filter((row) => row.id !== body.done_id);
@@ -298,5 +318,24 @@ test.describe("Fast Lap vor Ort (#1585)", () => {
       await expectNoPageXOverflow(page);
       await shot(page, "09-schlimmster-fall-tv");
     });
+  });
+
+  test("Gast mit Konto verknüpfen: Vorschau, dann gehören die Zeiten dem Konto", async ({ page }, info) => {
+    test.skip(info.project.name !== "chromium", "einmal reicht");
+    const api = fakeBackend();
+    api.state.guests.push({ id: "g-1", display_name: "Anna K.", number: 1 });
+    const lap = api.add({ guest_id: "g-1", track_id: "t-1", time_ms: 80400 });
+    api.add({ guest_id: "g-1", track_id: "t-1", time_ms: 80900 });
+    await api.install(page);
+    await page.setViewportSize({ width: 1366, height: 1000 });
+    await page.goto("/admin/f1/c-1");
+    await page.getByTestId(`f1-link-guest-${lap.id}`).click();
+    await page.getByTestId("fl-link-person-search").fill("Fa");
+    await page.getByTestId("fl-link-person-option-u-1").click();
+    await expect(page.getByTestId("fl-link-preview")).toContainText("2 Zeiten von Gast „Anna K.“ gehen an Konto „Fahrerin“");
+    await shot(page, "10-gast-verknuepfen");
+    await page.getByTestId("fl-link-confirm").click();
+    await expect(page.getByTestId("fl-link-dialog")).toHaveCount(0);
+    expect(api.state.laps.every((row) => row.user_id === "u-1")).toBe(true);
   });
 });
