@@ -128,6 +128,11 @@ CAPABILITIES: tuple[Capability, ...] = (
        ["GET /api/tournaments/{tid}/matchdays"], [GRAPH],
        note="Nur Liga, Round Robin und Gruppen spielen in Wochen; andere Formate "
             "antworten mit applies=false. Rein lesend, die Termine werden berechnet."),
+    _c("access.onsite", "Vor-Ort-Zugang per QR: einlösen, Einstellung, erneuern",
+       ["POST /api/tournaments/onsite/redeem", "GET /api/tournaments/{tid}/onsite-access",
+        "PUT /api/tournaments/{tid}/onsite-access", "POST /api/tournaments/{tid}/onsite-access/renew"], [CLASSIC, GRAPH],
+       note="#1592: Begleitpersonen melden sich vor Ort auch bei Mitglieder-Turnieren an; Einlösen nur im Zeitfenster, "
+            "Einstellung und Erneuern nur für die Turnierleitung."),
     _c("planning.check", "Planungsprüfung und Spielplan-Export",
        ["GET /api/tournaments/{tid}/planning-check", "GET /api/tournaments/{tid}/match-plan.csv"], [CLASSIC, GRAPH]),
     _c("planning.schedule", "Spielplan planen (Vorschau) und übernehmen",

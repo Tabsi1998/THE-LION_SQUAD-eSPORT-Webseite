@@ -65,7 +65,7 @@ test("ein neuer Scan im selben Tab (nur der Anker ändert sich) löst den neuen 
   tokenMock.captureOnsiteToken.mockReturnValue(true);
   tokenMock.peekOnsiteToken.mockReturnValue("neuer-code-1234567890");
   apiMock.post.mockResolvedValue({ data: { tournament: { id: "t1", slug: "lan-cup" } } });
-  await act(async () => { window.dispatchEvent(new HashChangeEvent("hashchange")); });
+  await act(async () => { window.dispatchEvent(new window.HashChangeEvent("hashchange")); });
   expect(await screen.findByTestId("target-page")).toBeInTheDocument();
   expect(apiMock.post).toHaveBeenCalledWith("/tournaments/onsite/redeem", { token: "neuer-code-1234567890" });
 });
