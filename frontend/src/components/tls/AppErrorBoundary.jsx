@@ -1,7 +1,8 @@
 import { Component, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AlertTriangle, ClipboardCopy, Home, RefreshCw } from "lucide-react";
+import { AlertTriangle, ClipboardCopy, Home, RefreshCw, X } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { LoadNotice } from "@/components/tls/LoadState";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { reportCaughtError, scrubClientLogText } from "@/lib/clientLog";
 import { viennaDateTime } from "@/lib/vienna";
@@ -52,8 +53,10 @@ class Boundary extends Component {
       });
   }
 
+  reset = () => this.setState({ error: null, report: null });
+
   render() {
-    return this.state.error ? this.props.fallback(this.state.error, this.state.report) : this.props.children;
+    return this.state.error ? this.props.fallback(this.state.error, this.state.report, this.reset) : this.props.children;
   }
 }
 
@@ -148,6 +151,66 @@ function PlainScreen({ error, report }) {
       <ErrorCard error={error} report={report} />
     </div>
   );
+}
+
+/** Der kurze Hinweis an Stelle eines abgestürzten Teils: „Nochmal versuchen“ setzt die Grenze zurück. */
+function OptionalNotice({ onRetry }) {
+  const [closed, setClosed] = useState(false);
+  if (closed) return null;
+  return (
+    <div className="fixed bottom-20 lg:bottom-4 left-4 right-4 sm:right-auto sm:max-w-sm z-[85] flex items-stretch gap-1 bg-[#0F1012] rounded-sm shadow-lg">
+      <LoadNotice testId="optional-error" className="flex-1" message="Dieser Teil konnte nicht geladen werden." onRetry={onRetry} />
+      <button type="button" onClick={() => setClosed(true)} aria-label="Hinweis schließen" className="tls-hit shrink-0 px-2 text-white/50 hover:text-white">
+        <X className="h-4 w-4" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Für optionale Teile über jeder Seite (#986): Abstimmung, Zeremonie, Adventkalender. Stürzt so ein Teil ab, fehlt
+ * nur er - die Seite darunter bleibt bedienbar, der Fehler wird gemeldet, und an seiner Stelle steht ein kurzer
+ * Hinweis mit „Nochmal versuchen“ (role="status"). Auf der nächsten Seite versucht er es ohnehin wieder.
+ * `quiet` nur für Teile ohne eigene Aufgabe für die Person: reine Saison-Deko (Schnee, Ecken) und Hintergrund-Abgleiche
+ * ohne Anzeige - dort hilft ein Hinweis niemandem, er würde nur auf jeder Seite stören.
+ */
+export function OptionalBoundary({ children, quiet = false }) {
+  const { pathname } = useLocation();
+  const fallback = (_error, _report, reset) => (quiet ? null : <OptionalNotice onRetry={reset} />);
+  return <Boundary resetKey={pathname} fallback={fallback}>{children}</Boundary>;
+}
+
+function RootCard() {
+  // Ganz außen gibt es weder Router noch Anmeldung: nur der Satz, „Neu laden“ und ein gewöhnlicher Link.
+  return (
+    <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center px-4 py-10">
+      <div className="max-w-xl w-full mx-auto border border-warn/30 bg-[#121212] rounded-sm p-6 text-center" role="alert" data-testid="root-error">
+        <div className="mx-auto mb-5 w-14 h-14 rounded-sm border border-warn/40 bg-warn/10 flex items-center justify-center text-warn">
+          <AlertTriangle className="w-7 h-7" />
+        </div>
+        <h1 className="font-heading text-2xl md:text-3xl font-black uppercase">Die Website konnte nicht angezeigt werden</h1>
+        <p className="mt-3 text-sm text-white/60">Lade die Seite neu. Hilft das nicht, probier es später noch einmal.</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs"
+          >
+            <RefreshCw className="w-4 h-4" /> Neu laden
+          </button>
+          <a href="/" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs">
+            <Home className="w-4 h-4" /> Startseite
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Die äußerste Grenze um den ganzen Appbaum (#986): auch ein Fehler in Anmeldung, Router oder Saison-Kontext lässt
+ * keinen leeren Bildschirm zurück. */
+export function RootErrorBoundary({ children }) {
+  return <Boundary fallback={() => <RootCard />}>{children}</Boundary>;
 }
 
 export function AppErrorBoundary({ children }) {

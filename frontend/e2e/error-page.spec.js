@@ -69,3 +69,39 @@ test("als Admin: Technische Angaben zugeklappt, mit Kennung zum Kopieren", async
   expect(copied).toContain(`Kennung: ${REPORT_ID}`);
   expect(copied).toContain("Seite: /servers");
 });
+
+// #986: eine kaputte Abstimmung (keine Liste, sondern {length: 1}) leert die Seite nicht mehr - das Popup fehlt, die
+// Seite darunter steht, und der Wechsel auf eine andere Seite klappt.
+test("eine kaputte Abstimmung vom Server lässt die Seite stehen", async ({ page }) => {
+  const MEMBER = { id: "m-1", display_name: "Mia Mitglied", username: "mia", role: "player", is_club_member: true };
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
+  });
+  let asked = 0;
+  await page.route("**/api/**", async (route) => {
+    const url = route.request().url();
+    const json = (body) => route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
+    if (url.includes("/api/settings/public")) return json({ club_name: "THE LION SQUAD", tagline: "eSports", domain: "lionsquad.at" });
+    if (url.includes("/api/auth/me")) return json(MEMBER);
+    if (url.includes("/api/membership/me/ballots/open")) {
+      asked += 1;
+      return json({ ballots: { length: 1 }, poll_seconds: 0 });
+    }
+    if (url.includes("/api/mobile/client-logs")) return json({ ok: true, id: null });
+    if (/notifications|sponsors|partners|news|events|games|nav$|site-banners/.test(url)) return json([]);
+    return json({});
+  });
+  await page.goto("/imprint");
+  await expect.poll(() => asked).toBeGreaterThan(0);
+  await expect(page.locator("header").first()).toBeVisible();
+  await expect(page.locator("footer").first()).toBeVisible();
+  await expect(page.getByTestId("ballot-popup")).toHaveCount(0);
+  await expect(page.getByTestId("page-error")).toHaveCount(0);
+  await expect(page.getByTestId("root-error")).toHaveCount(0);
+  expect(await page.evaluate(() => document.getElementById("root").children.length)).toBeGreaterThan(0);
+  await page.goto("/privacy");
+  await expect(page.locator("footer").first()).toBeVisible();
+  expect(errors.filter((message) => /ballots|filter is not a function/.test(message))).toEqual([]);
+});
