@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertTriangle, Clock3, Pin, Wand2 } from "lucide-react";
-import { durationSourceText } from "@/lib/matchDuration";
+import { durationSourceText, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
 import { countOf } from "@/lib/schedulePlanText";
 import { motionTransition } from "@/lib/motion";
 import { formatDeviceType } from "@/lib/tournamentLabels";
@@ -196,6 +196,8 @@ export function PlanWarnings({ items, warnings }) {
 }
 
 function stateText(item) {
+  if (item.preview) return "noch ohne Zeit - Baum ist Vorschau";
+  if (item.start === null || item.start === undefined) return "noch ohne Zeit";
   if (item.state === "running") return `läuft ${item.elapsedMinutes} Min.`;
   if (item.state === "done") return "erledigt";
   if (item.conflicts.length) return item.conflicts[0].text;
@@ -207,7 +209,9 @@ function stateText(item) {
 const TONE_LABEL = { wb: "WB", lb: "LB", final: "Finale", main: "Spiel" };
 
 /** Die Reihenfolge als Liste: nach Zeit, mit Station, Dauer und Herkunft des Termins. */
-export function OrderList({ items, laneNames, canEdit, onRelease }) {
+export function OrderList({ items, laneNames, canEdit, onRelease, editor }) {
+  const [open, setOpen] = useState(null);
+  const editable = (item) => typeof canEdit === "function" ? canEdit(item) : Boolean(canEdit);
   return (
     <div className="mp-order-scroll">
       <table className="mp-order" data-testid="mp-order">
@@ -215,27 +219,38 @@ export function OrderList({ items, laneNames, canEdit, onRelease }) {
           <tr><th>#</th><th>Spiel</th><th>Zeit</th><th>Station</th><th>Dauer</th><th><span className="sr-only">Aktion</span></th></tr>
         </thead>
         <tbody>
-          {items.map((item, index) => (
+          {items.map((item, index) => [
             <tr key={item.id} data-state={item.state} data-conflict={item.conflicts.length ? "true" : undefined}>
               <td className="mp-mono">{index + 1}</td>
               <td>
                 <span className="mp-pill" data-tone={item.tone}>{TONE_LABEL[item.tone]}</span> <strong>{item.key}</strong>
                 <span className="mp-order__why" data-warn={item.conflicts.length ? "true" : undefined}>{stateText(item)}</span>
               </td>
-              <td className="mp-mono">{hm(item.start)}–{hm(item.end)}</td>
+              <td className="mp-mono">{item.start === null || item.start === undefined ? "–" : `${hm(item.start)}–${hm(item.end)}`}</td>
               <td>{item.laneId === "none" ? "ohne Station" : laneNames[item.laneId]}</td>
               <td className="mp-mono">{item.minutes} Min.</td>
               <td>
-                {canEdit && item.fixed && item.source === "manual" && item.state === "planned" && (
-                  <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small" aria-label={`Termin von ${item.key} lösen`} onClick={() => onRelease(item)}>
-                    <Pin className="h-3 w-3" aria-hidden="true" /> lösen
-                  </button>
-                )}
+                <span className="mp-order__actions">
+                  {editable(item) && item.fixed && item.source === "manual" && item.state === "planned" && item.start !== null && (
+                    <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small" aria-label={`Termin von ${item.key} lösen`} onClick={() => onRelease(item)}>
+                      <Pin className="h-3 w-3" aria-hidden="true" /> lösen
+                    </button>
+                  )}
+                  {editor && editable(item) && !item.preview && item.state === "planned" && (
+                    <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small" aria-label={`${item.key} ändern`} aria-expanded={open === item.id}
+                      onClick={() => setOpen(open === item.id ? null : item.id)}>
+                      ändern
+                    </button>
+                  )}
+                </span>
               </td>
-            </tr>
-          ))}
+            </tr>,
+            open === item.id && editor ? (
+              <tr key={`${item.id}-edit`} className="mp-order__editor"><td colSpan={6}>{editor(item, () => setOpen(null))}</td></tr>
+            ) : null,
+          ])}
           {!items.length && (
-            <tr><td colSpan={6} className="mp-order__empty">Noch kein Spiel mit Zeit. „Automatisch planen“ zeigt, wann welches Spiel an welcher Station laufen kann.</td></tr>
+            <tr><td colSpan={6} className="mp-order__empty">Noch kein Spiel. „Automatisch planen“ zeigt, wann welches Spiel an welcher Station laufen kann.</td></tr>
           )}
         </tbody>
       </table>
@@ -244,7 +259,10 @@ export function OrderList({ items, laneNames, canEdit, onRelease }) {
 }
 
 /** Handy: je Station die Spiele untereinander - was jetzt läuft, was als Nächstes kommt. */
-export function StationAgenda({ timeline, canEdit = false, onRelease }) {
+export function StationAgenda({ timeline, canEdit = false, onRelease, editor }) {
+  const [open, setOpen] = useState(null);
+  const editable = (item) => typeof canEdit === "function" ? canEdit(item) : Boolean(canEdit);
+  const unscheduled = timeline.unscheduled || [];
   return (
     <div className="mp-agenda" data-testid="mp-agenda">
       {timeline.lanes.map((lane) => {
@@ -270,7 +288,12 @@ export function StationAgenda({ timeline, canEdit = false, onRelease }) {
                     <span className="mp-agenda__state" data-warn={item.conflicts.length ? "true" : undefined}>
                       {next?.id === item.id && item.state === "planned" ? "als Nächstes · " : ""}{stateText(item)}
                     </span>
-                    {canEdit && onRelease && item.fixed && item.source === "manual" && item.state === "planned" && (
+                    {editor && editable(item) && item.state === "planned" && !item.preview && (
+                      <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small mp-agenda__action" aria-label={`${item.key} ändern`}
+                        aria-expanded={open === item.id} onClick={() => setOpen(open === item.id ? null : item.id)}>ändern</button>
+                    )}
+                    {open === item.id && editor ? editor(item, () => setOpen(null)) : null}
+                    {editable(item) && onRelease && item.fixed && item.source === "manual" && item.state === "planned" && (
                       <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small mp-agenda__action" aria-label={`Termin von ${item.key} lösen`} onClick={() => onRelease(item)}>
                         <Pin className="h-3 w-3" aria-hidden="true" /> Termin lösen
                       </button>
@@ -283,6 +306,91 @@ export function StationAgenda({ timeline, canEdit = false, onRelease }) {
           </section>
         );
       })}
+      {unscheduled.length > 0 && (
+        <section className="mp-agenda__lane" aria-label="Noch ohne Zeit">
+          <h4 className="mp-agenda__title"><span>Noch ohne Zeit</span><span className="mp-agenda__count">{countOf(unscheduled.length, "Spiel", "Spiele")}</span></h4>
+          <ul className="mp-agenda__list">
+            {unscheduled.map((item) => (
+              <li key={item.id} className="mp-agenda__item" data-state="open">
+                <span className="mp-agenda__time mp-mono">–</span>
+                <span className="mp-agenda__body">
+                  <span className="mp-agenda__key"><span className="mp-pill" data-tone={item.tone}>{TONE_LABEL[item.tone]}</span> {item.key}</span>
+                  <span className="mp-agenda__names">{item.names.join(" · ")}</span>
+                  <span className="mp-agenda__state">{stateText(item)}</span>
+                  {editor && editable(item) && !item.preview && item.state === "planned" && (
+                    <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small mp-agenda__action" aria-label={`${item.key} ändern`}
+                      aria-expanded={open === item.id} onClick={() => setOpen(open === item.id ? null : item.id)}>ändern</button>
+                  )}
+                  {open === item.id && editor ? editor(item, () => setOpen(null)) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
+  );
+}
+
+/** Ein Hinweis über dem Plan: warum (noch) nichts geplant wird, oder dass die Anfrage an den Planer scheiterte. */
+export function PlanNotice({ tone = "info", testId, children }) {
+  return <p className="mp-notice" data-tone={tone} data-testid={testId} role={tone === "error" ? "alert" : "status"}>{children}</p>;
+}
+
+/**
+ * Ein Spiel von Hand: Start (Wiener Uhr), Station, eigene Dauer. Ersetzt die alte „Matchplanung“ an den Spielkarten im
+ * Reiter „Spiele“. Leere Dauer erbt (daneben steht, woher), leerer Start gibt den Termin an den Planer zurück.
+ */
+export function MatchEditor({ item, match, stations, stage, tournament, game, onSave, onClose, withStation = true }) {
+  const inherited = matchDurationSource(match ? { ...match, duration_minutes: null } : {}, { stage, tournament, game });
+  const [start, setStart] = useState(viennaInputValue(match?.scheduled_at));
+  const [stationId, setStationId] = useState(match?.station_id || "");
+  const [duration, setDuration] = useState(ownDurationInput(match?.duration_minutes));
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const id = useId();
+  const save = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    const result = await onSave(item, {
+      scheduled_at: start ? fromViennaInput(start) : null,
+      // Online und Liga haben keine Station - das Feld fehlt, die Station bleibt, wie sie ist.
+      ...(withStation ? { station_id: stationId || null } : {}),
+      duration_minutes: ownDurationPayload(duration),
+    });
+    setBusy(false);
+    if (result?.ok) onClose?.();
+    else setMessage(result?.message || "Das Spiel konnte nicht gespeichert werden.");
+  };
+  return (
+    <form className="mp-editor" data-testid="mp-editor" onSubmit={save} aria-label={`${item.key} ändern`}>
+      <div className="mp-editor__grid">
+        <div className="mp-field">
+          <label className="mp-field__label" htmlFor={`${id}-start`}>Start</label>
+          <input id={`${id}-start`} type="datetime-local" className="mp-input" value={start} onChange={(e) => setStart(e.target.value)} />
+          <span className="mp-field__hint">Leer: der Planer plant das Spiel wieder.</span>
+        </div>
+        {withStation && <div className="mp-field">
+          <label className="mp-field__label" htmlFor={`${id}-station`}>Station</label>
+          <select id={`${id}-station`} className="mp-input" value={stationId} onChange={(e) => setStationId(e.target.value)}>
+            <option value="">Ohne Station</option>
+            {stations.map((station) => (
+              <option key={station.id} value={station.id}>{station.name}{station.status === "broken" ? " (defekt)" : ""}</option>
+            ))}
+          </select>
+        </div>}
+        <div className="mp-field">
+          <label className="mp-field__label" htmlFor={`${id}-duration`}>Eigene Dauer (Min.)</label>
+          <input id={`${id}-duration`} type="number" min="1" className="mp-input" value={duration} placeholder={String(inherited.minutes)}
+            onChange={(e) => setDuration(e.target.value)} aria-describedby={`${id}-duration-hint`} />
+          <span className="mp-field__hint" id={`${id}-duration-hint`}>Leer lassen: {durationSourceText(inherited)}</span>
+        </div>
+      </div>
+      {message && <p className="mp-editor__message" role="alert">{message}</p>}
+      <div className="mp-editor__actions">
+        <button type="submit" className="tls-btn tls-btn--primary mp-btn" disabled={busy}>{busy ? "Speichert …" : "Speichern"}</button>
+        <button type="button" className="tls-btn tls-btn--quiet mp-btn" onClick={onClose} disabled={busy}>Abbrechen</button>
+      </div>
+    </form>
   );
 }

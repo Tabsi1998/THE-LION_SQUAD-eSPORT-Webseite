@@ -2978,6 +2978,14 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-order td.mp-mono { white-space: nowrap; font-size: 15px; }
 .mp-order tr[data-state="done"] td { color: rgba(255, 255, 255, 0.45); }
 .mp-order tr[data-state="running"] .mp-order__why { color: var(--tls-live); }
+.mp-order__actions { display: inline-flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.mp-order__editor td { background: var(--tls-surface-2); }
+.mp-editor { display: grid; gap: 12px; padding: 4px 0; }
+.mp-editor__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 16px; }
+.mp-editor__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mp-editor__message { font-size: 13px; color: var(--tls-warn); }
+.mp-notice { padding: 10px 14px; font-size: 14px; color: rgba(255, 255, 255, 0.85); border: 1px solid rgb(var(--tls-brand-rgb) / 0.35); background: rgb(var(--tls-brand-rgb) / 0.07); border-radius: 2px; }
+.mp-notice[data-tone="error"] { color: #fff; border-color: rgb(var(--tls-warn-rgb) / 0.45); background: rgb(var(--tls-warn-rgb) / 0.1); }
 .mp-order__empty { padding: 18px 10px; color: rgba(255, 255, 255, 0.55); }
 .mp-order__why { display: block; margin-top: 2px; font-size: 12.5px; color: rgba(255, 255, 255, 0.5); }
 .mp-order__why[data-warn="true"], .mp-agenda__state[data-warn="true"] { color: var(--tls-warn); }
@@ -3012,6 +3020,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-round__title span, .mp-week__title span { font-size: 12px; font-weight: 400; color: rgba(255, 255, 255, 0.5); white-space: nowrap; }
 .mp-round__list, .mp-week__list { display: grid; gap: 4px; margin-top: 6px; }
 .mp-remote { display: grid; gap: 2px; padding: 8px 10px; border-radius: 2px; background: var(--tls-surface-2); font-size: 13.5px; color: #fff; }
+.mp-remote__action { justify-self: start; margin-top: 4px; }
 .mp-remote__names { color: rgba(255, 255, 255, 0.85); overflow-wrap: anywhere; }
 .mp-remote__state { font-size: 12.5px; color: rgba(255, 255, 255, 0.55); }
 .mp-remote[data-tone="done"] { opacity: 0.6; }
