@@ -52,7 +52,7 @@ from services.competition_snapshot import build_structure_snapshot
 from services.competition_usage import GRAPH, record_write
 from services.competition_versions import persist_competition_versions
 from services.custom_bracket import _snake_split, heat_quota
-from services.match_v2_results import _status_after_slot_fill, resolve_walkovers
+from services.match_v2_results import _status_after_slot_fill, group_awaits_draw, resolve_walkovers, run_ready_draws
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from services.station_runtime import release_station_for_match
 from services.tournament_permissions import STRUCTURE_STAFF_ROLES
@@ -171,13 +171,24 @@ class _Graph:
         self._entries[match["id"]] = rows
         return rows
 
+    def awaits_draw(self, match: dict) -> bool:
+        """Folgespiel einer gemischten Runde, die noch nicht ausgelost ist (#1548)."""
+        return group_awaits_draw(self.matches, ((match.get("settings") or {}).get("draw_group")))
+
     def deliverable(self, slot: dict) -> bool:
         source = slot.get("source") or {}
         origin = self.by_key.get(source.get("match_key"))
-        if not origin or not _live(origin):
+        if not origin:
+            return False
+        if _live(origin):
+            count = len(self.entries(origin))
+        elif (str(origin.get("status") or "") in DECIDED_STATUSES
+              and group_awaits_draw(self.matches, (source.get("draw") or {}).get("group"))):
+            # Gemischt (#1548): die Quelle ist entschieden, ihr Weiterkommer wartet nur noch auf die Auslosung.
+            count = len(origin.get("results") or [])
+        else:
             return False
         rank = int(source.get("rank") or 0)
-        count = len(self.entries(origin))
         flow = source.get("flow")
         if flow == "W":
             return 1 <= rank <= min(_quota_of(origin), count)
@@ -190,9 +201,14 @@ class _Graph:
         alle, die aus offenen Läufen davor noch weitergeschickt werden."""
         total = 0
         for match in self.matches:
-            if not _live(match) or match.get("match_type") != "ffa":
+            if match.get("match_type") != "ffa":
                 continue
-            if int(match.get("round") or 0) >= round_no:
+            if not _live(match):
+                # Gemischt (#1548): die Weiterkommer eines entschiedenen Laufs, die noch auf die Auslosung warten, sitzen
+                # noch nirgends - sie sind im Rennen, gleich welche Runde (``deliverable`` lässt nur solche Plätze durch).
+                if str(match.get("status") or "") not in DECIDED_STATUSES:
+                    continue
+            elif int(match.get("round") or 0) >= round_no:
                 total += sum(1 for slot in match.get("slots") or [] if slot.get("status") == "filled" and slot.get("registration_id"))
                 continue
             for entry in match.get("advancement") or []:
@@ -371,7 +387,8 @@ def _revive(graph: _Graph, heat: dict, rank: int, now_iso: str) -> bool:
             source = slot.get("source") or {}
             if source.get("type") != "bye" or (source.get("was") or {}) != wanted:
                 continue
-            slot["source"] = {"type": "rank", **wanted, "raw": source.get("raw") or f"W:{heat.get('match_key')}:{rank}"}
+            slot["source"] = {"type": "rank", **wanted, "raw": source.get("raw") or f"W:{heat.get('match_key')}:{rank}",
+                              **({"draw": source["draw"]} if source.get("draw") else {})}
             slot["source_result"] = None
             slot["registration_id"] = None
             slot["user_id"] = None
@@ -480,10 +497,12 @@ def _group_key(match: dict) -> tuple:
             frozenset(str(entry.get("to_match_id")) for entry in match.get("advancement") or []))
 
 
-def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: bool, now_iso: str, ops: list[dict]) -> None:
+def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: bool, now_iso: str, ops: list[dict],
+          draws: list[dict] | None = None) -> None:
     groups: dict[tuple, list[dict]] = defaultdict(list)
     for match in graph.matches:
-        if match.get("match_type") == "ffa" and _rebuildable(match):
+        # Gemischt (#1548): erst auslosen, dann umbauen - wer in diesen Läufen fährt, entscheidet erst das Los.
+        if match.get("match_type") == "ffa" and _rebuildable(match) and not graph.awaits_draw(match):
             groups[_group_key(match)].append(match)
     ordered = sorted(groups.items(), key=lambda item: (item[0][1], min(int(h.get("order") or 0) for h in item[1])))
     for (_section, round_no, targets), heats in ordered:
@@ -537,7 +556,11 @@ def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: 
             if structural and len(heats) == 1:
                 _shorten(graph, heats[0], now_iso, ops)
     live_ids = [match["id"] for match in graph.matches if _live(match)]
-    resolve_walkovers(live_ids, graph.by_id, {}, now_iso)
+    resolve_walkovers(live_ids, graph.by_id, {}, now_iso, draws=draws)
+    # Hat der Umbau den letzten offenen Lauf einer gemischten Runde abgesagt, ist die Runde fertig: auslosen (#1548).
+    drawn = run_ready_draws(graph.by_id, {}, now_iso, draws=draws)
+    if drawn:
+        resolve_walkovers(drawn, graph.by_id, {}, now_iso, draws=draws)
     _normalize_sources(graph)
     graph.invalidate()
 
@@ -555,7 +578,8 @@ def _normalize_sources(graph: _Graph) -> None:
             if source.get("type") != "rank" or (match["id"], _slot_no(slot)) in fed:
                 continue
             slot["source"] = {"type": "bye", "raw": source.get("raw"),
-                              "was": {key: source.get(key) for key in ("flow", "match_key", "rank")}}
+                              "was": {key: source.get(key) for key in ("flow", "match_key", "rank")},
+                              **({"draw": source["draw"]} if source.get("draw") else {})}
             if slot.get("status") == "pending":
                 slot["status"] = "bye"
 
@@ -666,20 +690,23 @@ def rebuild_heats(matches: list[dict], *, cap: int, quota: int, min_players: int
     unerfüllbare Quellen werden markiert. Antwort: ``ops`` (je Umbau ein Eintrag mit ``kind``) und ``changed_ids``.
     Zweimal aufgerufen ändert der zweite Lauf nichts mehr."""
     if not _is_ffa_bracket(matches):
-        return {"ops": [], "changed_ids": []}
+        return {"ops": [], "changed_ids": [], "draws": []}
     now_iso = now_iso or now_utc().isoformat()
     before = {match["id"]: _fingerprint(match) for match in matches}
     graph = _Graph(matches)
     ops: list[dict] = []
+    draws: list[dict] = []
     for _ in range(MAX_PASSES):
         snapshot = {match["id"]: _fingerprint(match) for match in matches}
-        _pass(graph, cap=cap, quota=quota, min_players=min_players, structural=structural, now_iso=now_iso, ops=ops)
+        _pass(graph, cap=cap, quota=quota, min_players=min_players, structural=structural, now_iso=now_iso, ops=ops,
+              draws=draws)
         if all(_fingerprint(match) == snapshot[match["id"]] for match in matches):
             break
     for op in ops:
         op["text"] = describe_op(op)
     changed = [match["id"] for match in matches if _fingerprint(match) != before[match["id"]]]
-    return {"ops": ops, "changed_ids": changed}
+    # Auslosungen, die der Umbau ausgelöst hat (#1548) - ``_persist`` schreibt sie ins Protokoll.
+    return {"ops": ops, "changed_ids": changed, "draws": draws}
 
 
 # ---------------------------------------------------------------------------------------------- Texte und Plan
@@ -749,7 +776,8 @@ async def _replan_schedule(db, tournament: dict, stage: dict) -> None:
 
 
 async def _persist(db, tournament: dict, stage: dict, matches: list[dict], original: dict[str, dict],
-                   ops: list[dict], *, actor_id: str | None, trigger: str, plan_id: str | None = None) -> list[str]:
+                   ops: list[dict], *, actor_id: str | None, trigger: str, plan_id: str | None = None,
+                   draws: list[dict] | None = None) -> list[str]:
     tid = tournament["id"]
     snapshot = build_structure_snapshot(tid, stage_matches=matches, stages=[stage])
     report = validate_competition_graph(snapshot)
@@ -789,6 +817,9 @@ async def _persist(db, tournament: dict, stage: dict, matches: list[dict], origi
         await _audit(db, AUDIT_ACTIONS.get(op.get("kind"), "tournament.heats.adjusted"), tid, actor_id, {
             "engine": GRAPH, "stage_id": stage.get("id"), "trigger": trigger, **({"plan_id": plan_id} if plan_id else {}), **op,
         })
+    if draws:
+        from services.draw_records import record_draws
+        await record_draws(db, draws, actor_id=actor_id, tournament_id=tid)
     await persist_competition_versions(db, tournament, "graph")
     await publish_api_change("POST", f"/api/tournaments/{tid}/heat-rebuild", 200)
     await _replan_schedule(db, tournament, stage)
@@ -862,13 +893,15 @@ async def evaluate_heat_rebuild(db, tournament_id: str, *, actor_id: str | None 
         original = {match["id"]: copy.deepcopy(match) for match in matches}
         automatic = rebuild_heats(matches, now_iso=now_iso, structural=False, **rules)
         if automatic["changed_ids"]:
-            await _persist(db, tournament, stage, matches, original, automatic["ops"], actor_id=actor_id, trigger=trigger)
+            await _persist(db, tournament, stage, matches, original, automatic["ops"], actor_id=actor_id, trigger=trigger,
+                           draws=automatic["draws"])
             applied.extend(automatic["ops"])
             original = {match["id"]: copy.deepcopy(match) for match in matches}
         if mode == "auto":
             full = rebuild_heats(matches, now_iso=now_iso, structural=True, **rules)
             if full["changed_ids"]:
-                await _persist(db, tournament, stage, matches, original, full["ops"], actor_id=actor_id, trigger=trigger)
+                await _persist(db, tournament, stage, matches, original, full["ops"], actor_id=actor_id, trigger=trigger,
+                               draws=full["draws"])
                 applied.extend(full["ops"])
             continue
         trial = copy.deepcopy(matches)
@@ -898,7 +931,8 @@ async def confirm_heat_rebuild(db, tournament: dict, plan_id: str | None, *, act
             fresh = {**tournament, "heat_rebuild_plan": None}
             await _store_plan(db, fresh, stage, full["ops"], actor_id=actor_id, trigger="confirm")
             raise HeatRebuildError("Der Vorschlag ist nicht mehr aktuell - inzwischen hat sich etwas geändert. Bitte neu prüfen.", 409)
-        changed = await _persist(db, tournament, stage, matches, original, full["ops"], actor_id=actor_id, trigger="confirm", plan_id=plan["id"])
+        changed = await _persist(db, tournament, stage, matches, original, full["ops"], actor_id=actor_id, trigger="confirm",
+                                 plan_id=plan["id"], draws=full["draws"])
         await db.tournaments.update_one({"id": tid}, {"$set": {"heat_rebuild_plan": None}, "$unset": {"heat_rebuild_dismissed": ""}})
         await _audit(db, "tournament.heats.confirmed", tid, actor_id, {"engine": GRAPH, "stage_id": stage.get("id"), "plan_id": plan["id"], "summary": plan.get("summary")})
         return {"ok": True, "applied": full["ops"], "changed_match_ids": changed}

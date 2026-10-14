@@ -442,16 +442,17 @@ def _withdraw(match: dict, registration_id: str) -> None:
             slot.update({"registration_id": None, "user_id": None, "status": "bye"})
 
 
+@pytest.mark.parametrize("shuffle", [False, True], ids=["fest", "gemischt"])
 @pytest.mark.parametrize("match_size,qualifiers", [(3, 1), (4, 2), (8, 2)])
 @pytest.mark.parametrize("count", range(3, 41))
-def test_ffa_bracket_survives_random_dropouts_after_round_one(count: int, match_size: int, qualifiers: int):
+def test_ffa_bracket_survives_random_dropouts_after_round_one(count: int, match_size: int, qualifiers: int, shuffle: bool):
     """Nach Runde 1 fallen zufällig Fahrer aus (Wertung „nicht erschienen“ und Ausfall vor dem Start): der Planer legt
     zusammen, gleicht aus und kürzt ab - das Finale ist immer erreichbar, kein gespielter Lauf hat weniger als 2,
-    das Finale nie mehr als die Laufgröße."""
+    das Finale nie mehr als die Laufgröße. Gemischt (#1548): erst wird ausgelost, dann umgebaut."""
     rng = random.Random(count * 1000 + match_size * 10 + qualifiers)
     stage = {"id": "s", "number": 1, "stage_type": "ffa_custom_bracket", "match_type": "ffa",
              "settings": {"match_size": match_size, "qualifiers_per_match": qualifiers, "min_players": 2}}
-    base = {"id": "t", "seeding_mode": "manual", "max_participants": count}
+    base = {"id": "t", "seeding_mode": "manual", "max_participants": count, **(SHUFFLE if shuffle else {})}
     matches = build_matches_v2_from_schema(base, stage, registrations(count))
     _rebuild(matches, stage)
     withdrawn: set[str] = set()
@@ -467,6 +468,7 @@ def test_ffa_bracket_survives_random_dropouts_after_round_one(count: int, match_
             victim_match["status"] = "ready" if len(filled_ids(victim_match)) >= 2 else "pending"
             _rebuild(matches, stage)
             assert_nobody_twice_ready(matches)
+            assert_draws_wait_for_whole_round(matches)
             continue
         match = rng.choice(ready)
         ranking = filled_ids(match)
@@ -480,6 +482,7 @@ def test_ffa_bracket_survives_random_dropouts_after_round_one(count: int, match_
             by_id[target_id].update(update)
         _rebuild(matches, stage)
         assert_nobody_twice_ready(matches)
+        assert_draws_wait_for_whole_round(matches)
         withdrawn |= {row["registration_id"] for row in match["results"] if row.get("forfeit")}
     assert all(m["status"] in TERMINAL for m in matches), [m["match_key"] for m in matches if m["status"] not in TERMINAL]
     finals = [m for m in matches if m["status"] == "completed" and not m.get("advancement")]

@@ -362,6 +362,8 @@ async def redraw_tournament_stage(tid: str, stage_id: str, body: StageRedrawPayl
     for target_id, update in application["target_sets"].items():
         await db.matches_v2.update_one({"id": target_id}, {"$set": update})
     await record_draws(db, application["draws"], actor_id=me.get("id"), tournament_id=tid)
+    # Erst auslosen, dann umbauen (#1550): die neue Belegung kann Läufe zusammenlegen oder ausgleichen.
+    await evaluate_after_write(db, tid, actor_id=me.get("id"), trigger="redraw")
     if not group:
         # Die Spieltage haben sich verschoben: Termine der Liga neu rechnen (von Hand gesetzte bleiben).
         from services.matchday_schedule import persist_matchday_schedule

@@ -687,6 +687,26 @@ def run_draw(group: str, by_id: dict[str, dict], target_sets: dict[str, dict], n
     return [target["id"] for target in targets]
 
 
+def group_awaits_draw(matches, group: str | None) -> bool:
+    """Ist die Gruppe noch nicht ausgelost? Dann sind ihre Plätze offen, obwohl Quellen schon entschieden sein können -
+    für den Lauf-Umbau (#1550) heißt das: nicht anfassen, die Plätze kommen mit der Auslosung."""
+    if not group:
+        return False
+    targets = [row for row in group_targets(matches, group) if row.get("status") != "cancelled"]
+    return bool(targets) and not _group_is_drawn(targets)
+
+
+def run_ready_draws(by_id: dict[str, dict], target_sets: dict[str, dict], now_iso: str, *, rng=None,
+                    draws: list[dict] | None = None, trigger: str = "walkover") -> list[str]:
+    """Jede noch offene Auslosung, deren Runde inzwischen ganz entschieden ist - etwa weil der Lauf-Umbau den letzten
+    offenen Lauf abgesagt hat. Rückgabe: die jetzt besetzten Folgespiele."""
+    groups = sorted({group for row in by_id.values() if (group := draw_group_of(row))})
+    drawn: list[str] = []
+    for group in groups:
+        drawn.extend(run_draw(group, by_id, target_sets, now_iso, rng=rng, draws=draws, trigger=trigger))
+    return drawn
+
+
 def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets: dict[str, dict], now_iso: str,
                       *, rng=None, draws: list[dict] | None = None) -> None:
     """Die Freilos-Kette (#1549): ein Spiel ohne offenen Zufluss und mit höchstens einem Teilnehmer ist entschieden.

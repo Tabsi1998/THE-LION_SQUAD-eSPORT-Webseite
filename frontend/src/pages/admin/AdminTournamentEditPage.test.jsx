@@ -656,6 +656,7 @@ test("Bearbeiten: „Läufe umbauen“ nur beim FFA-Turnierbaum, und der Vorschl
   await user.selectOptions(select, "suggest");
   await user.click(screen.getByTestId("tr-edit-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ heat_rebuild_mode: "suggest" })));
+});
 
 // Gegner der nächsten Runde (#1548): Auswahl statt Haken, gespeicherter Wert vorbelegt, geht als Ja/Nein mit.
 test("Bearbeiten: Gegner der nächsten Runde – fester Baum oder zufällig mischen", async () => {
