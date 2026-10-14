@@ -123,6 +123,7 @@ TEMPLATE_CATEGORY = {
     "checkin_closes_soon": "tournament_updates",
     "checkin_closes_soon_on_site": "tournament_updates",
     "tournament_finished": "tournament_updates",
+    "event_message": "tournament_updates",
     "match_reminder": "match_reminders",
     "match_lead_10m": "match_reminders",
     "score_reported": "match_reminders",
@@ -194,6 +195,8 @@ NOTIFICATION_KIND_CATEGORY = {
     "news_board": "club_internal",
     "event_member": "club_internal",
     "event_board": "club_internal",
+    # Nachricht an alle Angemeldeten eines Events (#1372) - wie andere Event-Hinweise unter Turnier-Updates.
+    "event_message": "tournament_updates",
     # Fotos vom Event (#1185): „Die Fotos sind da“ an die Teilnehmer - wie „Wie war …?“ unter Turnier-Updates,
     # Mitglieder-Alben unter „Vereinsintern“.
     "gallery_event": "tournament_updates",

@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 import uuid
 
 from match_rules import RESULT_MAX_SCORE, RESULT_MAX_TIME_MS
-
-MIN_PASSWORD_LENGTH = 10
+# Der Passwortvertrag (#1033) steht in services/password_policy.py; MIN_PASSWORD_LENGTH bleibt hier abrufbar.
+from services.password_policy import MIN_PASSWORD_LENGTH, NewPassword  # noqa: F401
 
 
 def now_utc():
@@ -28,7 +28,7 @@ DirectMessagePrivacy = Literal["everyone", "friends", "team_members", "club_memb
 class UserRegister(BaseModel):
     username: str = Field(min_length=3, max_length=32)
     email: EmailStr
-    password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=128)
+    password: NewPassword
     display_name: Optional[str] = None
     birth_date: Optional[str] = None  # ISO date string
     gender: Optional[Literal["male", "female", "diverse"]] = None
@@ -50,7 +50,7 @@ class UserLogin(BaseModel):
 class AdminUserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=32)
     email: EmailStr
-    password: Optional[str] = Field(default=None, min_length=MIN_PASSWORD_LENGTH, max_length=128)
+    password: Optional[NewPassword] = None
     display_name: Optional[str] = None
     gender: Optional[Literal["male", "female", "diverse"]] = None
     role: Role = "player"
@@ -241,14 +241,14 @@ class ForgotPasswordBody(BaseModel):
 
 class ResetPasswordBody(BaseModel):
     token: str
-    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=128)
+    new_password: NewPassword
     accept_privacy: bool = False
     accept_terms: bool = False
 
 
 class ChangePasswordBody(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=128)
+    new_password: NewPassword
 
 
 # ---------- Teams ----------

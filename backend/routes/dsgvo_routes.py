@@ -17,7 +17,7 @@ dsgvo_router = APIRouter(prefix="/api/dsgvo", tags=["dsgvo"])
 # Auskunft (#1030). Welche Sammlung wo steht, legt services/personal_data.py fest; ein Test vergleicht beide Listen.
 # Nie in die Auskunft: Prüfwerte, Schlüssel und Speicherorte - sie sagen über die Person nichts aus und wären außerhalb
 # des Systems ein Werkzeug.
-HIDDEN_KEYS = frozenset({"_id", "password_hash", "token_hash", "storage_key", "poster_key", "mfa_secret", "mfa_pending_secret",
+HIDDEN_KEYS = frozenset({"_id", "password_hash", "password_contract", "token_hash", "storage_key", "poster_key", "mfa_secret", "mfa_pending_secret",
                          "mfa_recovery_code_hashes", "mfa_totp_last_counter"})
 # Seitenweise lesen statt einer Obergrenze: jede Liste kommt vollständig, sortiert nach dem Zeitpunkt des Anlegens (_id).
 EXPORT_PAGE = 500
@@ -187,6 +187,8 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("mobile_devices", _rows(db.mobile_push_tokens, me, lambda row: _clean(row, "token"))),
         ("mobile_client_logs", _rows(db.mobile_client_logs, me)),
         ("audit_trail", _rows(db.audit_logs, {"$or": [{"actor_id": user_id}, {"target_id": user_id}]}, _audit_entry(user_id))),
+        # Nachrichten an alle Angemeldeten eines Events (#1372), die die Person als Turnierleitung geschickt hat.
+        ("event_messages_sent", _rows(db.event_messages, {"actor_id": user_id}, _pick("id", "event_id", "text", "recipient_count", "created_at"))),
         # Seit Fassung 3 (#928): was bisher weder in der Auskunft stand noch beim Löschen aufgeräumt wurde.
         ("xp", _value(lambda: one(db.user_xp, me))),
         ("xp_events", _rows(db.xp_events, me)),
@@ -299,7 +301,7 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
             "password_hash": "!disabled", "anonymized_at": now, "updated_at": now,
         },
         "$unset": {
-            "google_id": "", "google_email": "", "mfa_secret": "", "mfa_pending_secret": "",
+            "password_contract": "", "google_id": "", "google_email": "", "mfa_secret": "", "mfa_pending_secret": "",
             "mfa_pending_created_at": "", "mfa_recovery_code_hashes": "", "mfa_totp_last_counter": "",
             "platform_verified": "",
             # Freunde beim Event (#1188): Wahl und Hinweis gehören zum Konto.
