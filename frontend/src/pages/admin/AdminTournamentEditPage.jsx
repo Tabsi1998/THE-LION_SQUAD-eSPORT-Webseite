@@ -6,6 +6,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
+import { OnsiteAccessPanel, OnsiteMark } from "./tournament/OnsiteAccessPanel";
 import { TournamentFlowStepper } from "@/components/tls/TournamentFlowStepper";
 import { toast } from "sonner";
 import { Zap, RefreshCw, Eye, Search, Tv } from "lucide-react";
@@ -548,6 +549,7 @@ export default function AdminTournamentEditPage() {
         </div>
       </div>
 
+      {isTournamentLead && <div className="mb-5"><OnsiteAccessPanel tournamentId={t.id} /></div>}
       {isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister collapsible /></div>}
 
       <TournamentFlowStepper
@@ -621,7 +623,7 @@ export default function AdminTournamentEditPage() {
                     <div className="mt-1 font-heading font-bold uppercase break-words">{r.display_name || r.user?.display_name || r.ingame_name}</div>
                     <div className="mt-1 text-xs text-white/45 break-all">{r.discord || "Kein Discord"}</div>
                     <EventGateMark mark={r.event_gate} />
-                    <LineupMark info={lineups[r.id]} />
+                    <LineupMark info={lineups[r.id]} /><OnsiteMark via={r.registered_via} />
                   </div>
                   <StatusBadge status={r.status} />
                 </div>
@@ -664,7 +666,7 @@ export default function AdminTournamentEditPage() {
               {filteredRegistrations.map((r, i) => (
                 <tr key={r.id}>
                   <td className="px-4 py-3 text-white/50">{i + 1}</td>
-                  <td className="px-4 py-3">{r.display_name || r.user?.display_name || r.ingame_name}<EventGateMark mark={r.event_gate} /><LineupMark info={lineups[r.id]} /></td>
+                  <td className="px-4 py-3">{r.display_name || r.user?.display_name || r.ingame_name}<EventGateMark mark={r.event_gate} /><LineupMark info={lineups[r.id]} /><OnsiteMark via={r.registered_via} /></td>
                   <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
                   <td className="px-4 py-3 text-white/60">{r.discord || "—"}</td>
                   <td className="px-4 py-3 text-right">
