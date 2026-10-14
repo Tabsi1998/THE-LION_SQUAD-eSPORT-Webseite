@@ -4,6 +4,7 @@ import {
   bracketEdges,
   diffBracket,
   drawRails,
+  railKey,
   finalMatchOf,
   heatExits,
   heatText,
@@ -33,6 +34,11 @@ type Cases = {
   diff: Array<{ from: string; to: string; events: string[] }>;
   heatText: Array<{ state: string; match: string; text: Record<string, string> }>;
   rails: Array<{ state: string; rails: Array<{ group: string; label: string; sources: string[]; targets: string[]; drawn: boolean }> }>;
+  railsPerPhase: Array<{
+    state: string;
+    rails: Array<{ phase: number; group: string; sources: string[]; targets: string[]; drawn: boolean }>;
+    path: { phase: number; player: string; rails: string[] };
+  }>;
 };
 const CASES: Cases = JSON.parse(fs.readFileSync(path.join(__dirname, "../../../docs/bracket-cases.json"), "utf8"));
 
@@ -173,7 +179,9 @@ test("gemischt: dein Weg folgt der echten Herkunft - vor der Auslosung bis zur S
   expect(all.filter((edge) => result.edges.has(edge.id)).map((edge) => drawnTree.edgeText(edge, false))).toContain(`${from}>E:1`);
   const open = helpers("se8_mixed_open");
   const before = pathFor(open.idOf.get("NeonFalke") as string, open.tree.matches_v2, bracketEdges(open.tree.matches_v2));
-  expect([...(before.rails || [])]).toEqual([`WB:2:${open.byKey.get("A")!.id}`]);
+  const rail = drawRails(open.tree.matches_v2)[0];
+  expect(rail.key).toBe(railKey(open.byKey.get("A")!.stage_id, "WB:2"));
+  expect([...(before.rails || [])]).toEqual([`${rail.key}:${open.byKey.get("A")!.id}`]);
   expect([...before.matches].map((id) => open.keyOf.get(id))).toEqual(["A"]);
 });
 
@@ -184,4 +192,35 @@ test("gemischt: die Auslosung ist eine eigene Bewegung, nicht „Weiterkommen au
   expect(events.filter((event) => event.type === "result").map((event) => after.keyOf.get(event.matchId)).sort()).toEqual(["C", "D"]);
   expect(events.filter((event) => event.type === "draw").map((event) => after.keyOf.get(event.matchId)).sort()).toEqual(["E", "E", "F", "F"]);
   expect(events.some((event) => event.type === "advance")).toBe(false);
+});
+
+// Mehrere Phasen (#1581, Codex): Gruppen heißen je Phase gleich („WB:2“) - die Schienen bleiben je (Phase, Gruppe) getrennt,
+// auch dein Weg. Dieselbe Kopie der Phase wie der Web-Test (frontend/src/lib/bracketCases.test.js).
+test.each(CASES.railsPerPhase)("Schienen je Phase getrennt: $state", ({ state, rails, path: expectedPath }) => {
+  const { tree, idOf } = helpers(state);
+  const tag = <T extends string | null | undefined>(id: T) => (id ? `${id}#2` : id);
+  const copy: BracketMatch[] = JSON.parse(JSON.stringify(tree.matches_v2)).map((match: BracketMatch) => ({
+    ...match, id: tag(match.id) as string, stage_id: "phase-2",
+    advancement: (match.advancement || []).map((entry) => ({ ...entry, to_match_id: tag(entry.to_match_id) })),
+    slots: (match.slots || []).map((slot) => ({ ...slot, registration_id: tag(slot.registration_id), source_result: slot.source_result ? { ...slot.source_result, from_match_id: tag((slot.source_result as { from_match_id?: string }).from_match_id) } : slot.source_result })),
+    results: (match.results || []).map((row) => ({ ...row, registration_id: tag(row.registration_id) })),
+    winner_id: tag(match.winner_id),
+  }));
+  const matches = [...tree.matches_v2, ...copy];
+  const keyOf = new Map(matches.map((match) => [match.id, match.match_key]));
+  const phaseOf = (id: string) => (String(id).endsWith("#2") ? 2 : 1);
+  const all = drawRails(matches);
+  expect(all.map((rail) => ({
+    phase: phaseOf(rail.targets[0]),
+    group: rail.group,
+    sources: rail.sources.map((source) => `${keyOf.get(source.id)} ${source.flow}`).sort(),
+    targets: rail.targets.map((id) => keyOf.get(id)).sort(),
+    drawn: rail.drawn,
+  })).sort((a, b) => a.phase - b.phase)).toEqual(rails);
+  const player = idOf.get(expectedPath.player) as string;
+  const result = pathFor(expectedPath.phase === 2 ? `${player}#2` : player, matches, bracketEdges(matches));
+  expect([...(result.rails || [])].map((entry) => {
+    const rail = all.find((candidate) => entry.startsWith(`${candidate.key}:`))!;
+    return `${phaseOf(rail.targets[0])} ${rail.group}:${keyOf.get(entry.slice(rail.key.length + 1))}`;
+  })).toEqual(expectedPath.rails);
 });

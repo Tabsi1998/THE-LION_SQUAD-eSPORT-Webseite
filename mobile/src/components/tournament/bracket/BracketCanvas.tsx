@@ -166,12 +166,12 @@ function Canvas({ layout, matches, models, labels, path, selected, plan, reduce,
             const quiet = rail.ins.every((row) => row.flow === "L");
             const dim = path ? 0.25 : quiet ? 0.6 : 1;
             return (
-              <G key={rail.group} testID={`bracket-rail-${rail.group}`}>
+              <G key={rail.key} testID={`bracket-rail-${rail.key}`}>
                 <Path d={rail.spine} fill="none" stroke={LINE_COLOR} strokeWidth={1.5} strokeDasharray={quiet ? "5 4" : undefined} opacity={dim} />
                 {rail.ins.map((row) => {
-                  const on = Boolean(path?.rails?.has(`${rail.group}:${row.sourceId}`));
+                  const on = Boolean(path?.rails?.has(`${rail.key}:${row.sourceId}`));
                   return (
-                    <Path key={`in-${row.sourceId}`} testID={on ? `bracket-rail-weg-${rail.group}-${row.sourceId}` : undefined} d={row.d} fill="none" stroke={on ? PATH_COLOR : LINE_COLOR}
+                    <Path key={`in-${row.sourceId}`} testID={on ? `bracket-rail-weg-${rail.key}-${row.sourceId}` : undefined} d={row.d} fill="none" stroke={on ? PATH_COLOR : LINE_COLOR}
                       strokeWidth={on ? 2.5 : 1.5} strokeDasharray={row.flow === "L" && !on ? "5 4" : undefined} opacity={on ? 1 : row.flow === "L" && !path ? 0.6 : dim} />
                   );
                 })}

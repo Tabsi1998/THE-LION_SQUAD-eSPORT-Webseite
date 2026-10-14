@@ -193,13 +193,14 @@ describe("gemischte Runden (#1548)", () => {
   test("vor der Auslosung: Sammelschiene statt Einzel-Linien, „Platz aus Runde 1“, dein Weg bis zur Schiene", async () => {
     serve("se8_mixed_open", {}, "NeonFalke");
     await open("Baum");
-    expect(await screen.findByTestId("bracket-rail-WB:2")).toBeTruthy();
+    const railKey = `${TREES.se8_mixed_open.matches_v2[0].stage_id}/WB:2`;
+    expect(await screen.findByTestId(`bracket-rail-${railKey}`)).toBeTruthy();
     const target = screen.getByTestId(`bracket-card-${keyId("se8_mixed_open", "E")}`);
     expect(target).toHaveTextContent(/gemischt aus Runde 1/);
     expect(target).toHaveTextContent(/Platz aus Runde 1/);
     expect(screen.queryByTestId(/^bracket-line-.*>.*E/)).toBeNull();
     await fireEvent.press(screen.getByTestId("bracket-my-path"));
-    expect(screen.getByTestId(`bracket-rail-weg-WB:2-${keyId("se8_mixed_open", "A")}`)).toBeTruthy();
+    expect(screen.getByTestId(`bracket-rail-weg-${railKey}-${keyId("se8_mixed_open", "A")}`)).toBeTruthy();
   });
 
   test("nach der Auslosung: die Schiene bleibt, dein Weg folgt der echten Herkunft", async () => {
@@ -209,7 +210,7 @@ describe("gemischte Runden (#1548)", () => {
     const name = tree.registrations.find((reg: any) => reg.id === seat.registration_id).display_name;
     serve("se8_mixed_drawn", {}, name);
     await open("Baum");
-    expect(await screen.findByTestId("bracket-rail-WB:2")).toBeTruthy();
+    expect(await screen.findByTestId(`bracket-rail-${target.stage_id}/WB:2`)).toBeTruthy();
     await fireEvent.press(screen.getByTestId("bracket-my-path"));
     const from = tree.matches_v2.find((match: any) => match.match_key === seat.source_result.from_match_key).id;
     expect(screen.getByTestId(`bracket-line-weg-${from}>${target.id}:1`)).toBeTruthy();

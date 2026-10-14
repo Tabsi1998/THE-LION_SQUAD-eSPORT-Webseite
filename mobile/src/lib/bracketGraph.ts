@@ -51,7 +51,7 @@ export type BracketMatch = {
   [key: string]: unknown;
 };
 export type BracketEdge = { id: string; from: string; to: string; toSlot: number; flow: "W" | "L"; rank: number; cross: boolean; void: boolean; rail?: string };
-export type DrawRail = { group: string; label: string; sources: Array<{ id: string; flow: "W" | "L" }>; targets: string[]; drawn: boolean };
+export type DrawRail = { key: string; stageId: string | null; group: string; label: string; sources: Array<{ id: string; flow: "W" | "L" }>; targets: string[]; drawn: boolean };
 export type MatchFate = { kind: "merged"; into: string; label: string } | { kind: "reset" | "skipped"; label: string };
 export type BracketEvent = {
   key: string;
@@ -133,6 +133,12 @@ export function slotDraw(slot: BracketSlot | null | undefined): { group?: string
 export const drawGroupOf = (match: BracketMatch | null | undefined) => (match?.settings?.draw_group ? String(match.settings.draw_group) : null);
 
 /**
+ * Der eindeutige Schlüssel einer Sammelschiene: Phase und Gruppe - wie im Web (`railKey`, #1581). Gruppen heißen je Phase
+ * gleich („WB:2“); mit mehreren K.-o.-Phasen in einem Turnier dürfen sie sich nie vermischen.
+ */
+export const railKey = (stageId: string | null | undefined, group: string) => `${stageId || "-"}/${group}`;
+
+/**
  * Alle Linien: `{ id, from, to, toSlot, flow, rank, cross, void, rail? }`. `cross` = über die Grenze eines Abschnitts
  * (Winner → Loser Bracket, → Grand Final), `void` = das Quellspiel oder das Ziel entfällt.
  */
@@ -160,7 +166,7 @@ export function bracketEdges(matches: BracketMatch[] = [], { schema = false }: {
       if (draw || group) {
         // Gemischt: erst die Auslosung legt die Herkunft fest - dann aus dem echten Quellspiel.
         const origin = slot.source_result?.from_match_key;
-        if (slot.registration_id && origin) add(find(to)(origin) as BracketMatch | undefined, to, slot.slot, slot.source_result?.flow || normalizeSource(slot.source)?.flow, slot.source_result?.rank, String(draw?.group || group));
+        if (slot.registration_id && origin) add(find(to)(origin) as BracketMatch | undefined, to, slot.slot, slot.source_result?.flow || normalizeSource(slot.source)?.flow, slot.source_result?.rank, railKey(to.stage_id, String(draw?.group || group)));
         continue;
       }
       const source = normalizeSource(slot?.source);
@@ -185,13 +191,17 @@ export function bracketEdges(matches: BracketMatch[] = [], { schema = false }: {
  */
 export function drawRails(matches: BracketMatch[] = []): DrawRail[] {
   const list = (matches || []).filter(Boolean);
-  const groups = new Map<string, BracketMatch[]>();
+  // Je Phase getrennt (#1581): Schlüssel = Phase und Gruppe; sortiert nach Gruppe, dann Phase - wie im Web.
+  const groups = new Map<string, { group: string; stageId: string | null; targets: BracketMatch[] }>();
   for (const match of list) {
     const group = drawGroupOf(match);
-    if (group) groups.set(group, [...(groups.get(group) || []), match]);
+    if (!group) continue;
+    const key = railKey(match.stage_id, group);
+    if (!groups.has(key)) groups.set(key, { group, stageId: match.stage_id || null, targets: [] });
+    (groups.get(key) as { targets: BracketMatch[] }).targets.push(match);
   }
   const find = finderFor(list);
-  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([group, targets]) => {
+  return [...groups.entries()].sort(([keyA, a], [keyB, b]) => a.group.localeCompare(b.group) || keyA.localeCompare(keyB)).map(([key, { group, stageId, targets }]) => {
     const targetIds = new Set(targets.map((match) => match.id));
     const sources = new Map<string, { id: string; flow: "W" | "L" }>();
     for (const match of list) {
@@ -216,7 +226,7 @@ export function drawRails(matches: BracketMatch[] = []): DrawRail[] {
     // Gelost ist, wenn ein Ziel `draw` trägt oder ein Platz seine Herkunft aus dem Los hat. Ein Freilos-Platz, dessen
     // Quelle der Lauf-Umbau gestrichen hat (`source_result.skipped`, #1575), zählt nicht - der wartet weiter aufs Los.
     const drawn = targets.some((target) => target.draw || (target.slots || []).some((slot) => slotDraw(slot) && slot.source_result?.from_match_key && !slot.source_result?.skipped));
-    return { group, label, sources: [...sources.values()], targets: targets.map((match) => match.id), drawn };
+    return { key, stageId, group, label, sources: [...sources.values()], targets: targets.map((match) => match.id), drawn };
   });
 }
 
@@ -312,7 +322,7 @@ export function pathFor(registrationId: string | null | undefined, matches: Brac
       if (source.flow === "L" && isDone(from) && winnerOf(from) === registrationId) continue;
       if (source.flow === "W" && isDone(from) && !advancedFrom(from, registrationId)) continue;
       result.rails = result.rails || new Set();
-      result.rails.add(`${rail.group}:${source.id}`);
+      result.rails.add(`${rail.key}:${source.id}`);
     }
   }
   return result;

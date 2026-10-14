@@ -22,6 +22,7 @@ export const BAND_LABEL_H = 18;
 export type LayoutNode = { id: string; x: number; y: number; w: number; h: number; col: number; band: Band };
 export type LayoutLine = { id: string; from: string; to: string; toSlot: number; flow: "W" | "L"; cross: boolean; void: boolean; d: string; rail?: string; hidden?: boolean };
 export type LayoutRail = {
+  key: string;
   group: string;
   x: number;
   spine: string;
@@ -134,7 +135,7 @@ export function layoutBracket(matches: BracketMatch[], edges: BracketEdge[], { h
     byGap.set(col, [...(byGap.get(col) || []), rail]);
   }
   for (const [col, list] of byGap) {
-    list.forEach((rail, index) => railX.set(rail.group, xOf(col) - COL_GAP / 2 + (index - (list.length - 1) / 2) * 8));
+    list.forEach((rail, index) => railX.set(rail.key, xOf(col) - COL_GAP / 2 + (index - (list.length - 1) / 2) * 8));
   }
 
   // Linien: rechtwinklig, Knick in der Gasse vor dem Ziel; nach links oder in derselben Spalte über eine freie Bahn
@@ -174,7 +175,7 @@ export function layoutBracket(matches: BracketMatch[], edges: BracketEdge[], { h
   }
 
   const layoutRails: LayoutRail[] = placedRails.map((rail) => {
-    const x = railX.get(rail.group) as number;
+    const x = railX.get(rail.key) as number;
     const ins = [...new Map(rail.sources.map((source) => [source.id, source])).values()]
       .filter((source) => nodes.has(source.id))
       .map((source) => {
@@ -189,6 +190,7 @@ export function layoutBracket(matches: BracketMatch[], edges: BracketEdge[], { h
     });
     const ys = [...ins, ...outs].map((row) => row.y);
     return {
+      key: rail.key,
       group: rail.group,
       x,
       spine: `M${round1(x)} ${round1(Math.min(...ys))} L${round1(x)} ${round1(Math.max(...ys))}`,
