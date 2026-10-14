@@ -13,6 +13,8 @@ import { flashStyle } from "./motion";
 
 const SPRING = { stiffness: 260, damping: 20 };
 const POP_SPRING = { stiffness: 420, damping: 16 };
+// Starke Ease-out-Kurve (animate-expo): das Zählen ist sofort sichtbar und läuft ruhig aus.
+const COUNT_EASE = Easing.bezier(0.23, 1, 0.32, 1);
 
 export function SpringIn({ delay, reduce, style, children }: { delay: number; reduce: boolean; style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
   const progress = useSharedValue(reduce ? 1 : 0);
@@ -44,7 +46,7 @@ export function PopIn({ delay, reduce, children }: { delay: number; reduce: bool
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const animated = useAnimatedStyle(() => ({
     opacity: Math.min(1, progress.get() * 2),
-    transform: [{ scale: 0.6 + 0.4 * progress.get() }],
+    transform: [{ scale: 0.85 + 0.15 * progress.get() }],
   }));
   return <Animated.View style={animated}>{children}</Animated.View>;
 }
@@ -57,7 +59,7 @@ export function CountUp({ value, delay, reduce, style }: { value: string; delay:
   const count = useSharedValue(Number.isFinite(target) && !reduce ? 0 : target || 0);
   useEffect(() => {
     if (!Number.isFinite(target) || reduce) return undefined;
-    count.set(withDelay(delay, withTiming(target, { duration: Math.min(520, 180 + target * 60), easing: Easing.out(Easing.cubic) })));
+    count.set(withDelay(delay, withTiming(target, { duration: Math.min(520, 180 + target * 60), easing: COUNT_EASE })));
     return () => cancelAnimation(count);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const animatedProps = useAnimatedProps(() => ({ text: String(Math.round(count.get())), defaultValue: String(Math.round(count.get())) }) as never);

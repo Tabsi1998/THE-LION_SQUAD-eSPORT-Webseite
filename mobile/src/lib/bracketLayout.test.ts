@@ -142,6 +142,11 @@ test("Doppel-K.-o. gemischt: zwei Schienen in derselben Gasse liegen nebeneinand
   const lb = layout.rails.find((rail) => rail.group === "LB:2")!;
   expect(wb.x).not.toBe(lb.x);
   const node = (key: string) => layout.nodes.get(tree.matches_v2.find((match) => match.match_key === key)!.id)!;
-  const mid = (key: string) => node(key).y + node(key).h / 2;
-  expect(mid("E")).toBeCloseTo((mid("A") + mid("B")) / 2, 0);
+  // Gemischt gibt es keine feste Paarung: die Zielspiele stehen in ihrer Reihenfolge um die Mitte aller Quellen.
+  expect(node("E").y).toBeLessThan(node("F").y);
+  expect(node("LC").y).toBeLessThan(node("LD").y);
+  const sources = ["A", "B", "C", "D"].map((key) => node(key).y + node(key).h / 2);
+  const middle = (Math.min(...sources) + Math.max(...sources)) / 2;
+  expect(node("E").y).toBeLessThan(middle);
+  expect(node("F").y + node("F").h).toBeGreaterThan(middle);
 });

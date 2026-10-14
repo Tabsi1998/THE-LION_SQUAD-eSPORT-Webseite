@@ -99,7 +99,7 @@ export function BracketCanvas({ matches, stages, format, nameOf, statusOf, mineI
           {selected ? (
             <View style={styles.pathBar} testID="bracket-path-bar">
               <View style={styles.pathSwatch} />
-              <Text style={styles.pathText} numberOfLines={1}>{selected === mineId ? "Dein Weg" : `Weg von ${nameOf(selected) || "Teilnehmer"}`}</Text>
+              <Text style={styles.pathText} numberOfLines={2}>{selected === mineId ? "Dein Weg" : `Weg von ${nameOf(selected) || "Teilnehmer"}`}</Text>
               <Pressable onPress={() => setSelected(null)} hitSlop={10} accessibilityRole="button" testID="bracket-path-clear">
                 <Text style={styles.pathClear}>aufheben</Text>
               </Pressable>

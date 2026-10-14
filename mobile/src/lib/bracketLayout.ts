@@ -6,7 +6,7 @@
 // Gemischte Runden (#1548): je Auslosungs-Gruppe eine Sammelschiene in der Gasse vor den Zielspielen - Äste aus allen
 // Quellspielen hinein, je ein Ast in jedes Zielspiel. Liegen mehrere Schienen in derselben Gasse (Winner und Loser
 // Bracket), stehen sie nebeneinander. Die echten Linien der Auslosung laufen genau auf der Schiene und werden nur für
-// „Dein Weg“ gezeichnet (`hidden`). Die Karten stehen wie im festen Baum (`positionEdges`).
+// „Dein Weg“ gezeichnet (`hidden`). Die Zielspiele einer Schiene stehen gemeinsam um die Mitte ihrer Quellen.
 import { isCancelled, sectionGroup, type BracketEdge, type BracketMatch, type DrawRail } from "./bracketGraph";
 
 export const TROPHY_ID = "__trophy";
@@ -68,6 +68,9 @@ export function layoutBracket(matches: BracketMatch[], edges: BracketEdge[], { h
   const byId = new Map(matches.map((match) => [match.id, match]));
   const sourcesOf = new Map<string, string[]>();
   for (const edge of positionEdges) sourcesOf.set(edge.to, [...(sourcesOf.get(edge.to) || []), edge.from]);
+  // Gemischt: die Zielspiele einer Schiene stehen gemeinsam um die Mitte aller Quellen, in ihrer Reihenfolge - ein
+  // fester Platz zwischen zwei Quellen würde eine Paarung behaupten, die erst das Los macht.
+  for (const rail of rails) for (const target of rail.targets) sourcesOf.set(target, rail.sources.map((source) => source.id));
   const colBottom = new Map<number, number>();
 
   const center = (id: string) => {
