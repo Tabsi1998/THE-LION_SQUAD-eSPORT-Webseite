@@ -79,16 +79,20 @@ export async function invalidateCache(urlPattern?: string): Promise<void> {
   }
 }
 
-const clearers = new Set<() => void>();
+const clearers = new Set<() => void | Promise<void>>();
 
-/** Wer eigene Zwischenspeicher hält (Chat-Bilder), räumt mit auf, wenn das Konto wechselt. */
-export function registerCacheClearer(clear: () => void) {
+/** Wer eigene Zwischenspeicher hält (Chat-Bilder, geladene Dateien), räumt mit auf, wenn das Konto wechselt. */
+export function registerCacheClearer(clear: () => void | Promise<void>) {
   clearers.add(clear);
 }
 
+/**
+ * Alles weg, was am Konto hängt. Abmelden und Kontowechsel warten, bis auch die Dateien gelöscht sind (#1059); ein
+ * Aufräumer, der scheitert, hält die anderen nicht auf.
+ */
 export async function clearAllCache(): Promise<void> {
   memoryCache.clear();
-  clearers.forEach((clear) => clear());
+  await Promise.all([...clearers].map((clear) => Promise.resolve().then(clear).catch(() => {})));
 }
 
 export async function getStaleCache<T>(cacheKey: string, url: string): Promise<T | null> {

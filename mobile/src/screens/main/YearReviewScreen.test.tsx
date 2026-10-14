@@ -16,6 +16,9 @@ jest.mock("../../lib/yearReview", () => ({ ...jest.requireActual("../../lib/year
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { YearReviewScreen } = require("./YearReviewScreen");
+// Das Bild trägt die Anmeldung - es kommt nur vom eigenen Server (#1060).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { API_BASE_URL } = require("../../config");
 
 const REVIEW = {
   year: 2026, club_name: "THE LION SQUAD", image_path: "/api/year-review/me/card.png",
@@ -55,7 +58,7 @@ test("blättert vor und zurück bis zum Bild und teilt es", async () => {
 
   for (let i = 0; i < 4; i += 1) await fireEvent.press(screen.getByTestId("year-review-next"));
   expect(await screen.findByTestId("year-review-page-share")).toBeTruthy();
-  expect(screen.getByTestId("year-review-card").props.source).toEqual({ uri: "https://verein.example/api/year-review/me/card.png", headers: { Authorization: "Bearer token-1" } });
+  expect(screen.getByTestId("year-review-card").props.source).toEqual({ uri: `${API_BASE_URL}/api/year-review/me/card.png`, headers: { Authorization: "Bearer token-1" } });
   mockShare.mockResolvedValue("failed");
   await fireEvent.press(screen.getByTestId("year-review-share"));
   await waitFor(() => expect(mockShare).toHaveBeenCalledWith(REVIEW, "token-1"));
