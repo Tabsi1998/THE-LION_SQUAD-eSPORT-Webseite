@@ -5,7 +5,7 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
-import { API_BASE_URL } from "../../config";
+import { WEBSITE_BASE_URL } from "../../config";
 import { api, errorMessage } from "../../lib/api";
 import { colors, radius } from "../../theme";
 
@@ -42,9 +42,9 @@ export function ConsentScreen() {
         </View>
         <Card style={styles.card}>
           <ConsentToggle label="Datenschutzerklärung gelesen und akzeptiert" value={privacy} onChange={setPrivacy} />
-          <Button label="Datenschutzerklärung öffnen" variant="secondary" onPress={() => void Linking.openURL(`${API_BASE_URL}/privacy`)} />
+          <Button label="Datenschutzerklärung öffnen" variant="secondary" onPress={() => void Linking.openURL(`${WEBSITE_BASE_URL}/privacy`)} />
           <ConsentToggle label="Nutzungsbedingungen akzeptiert" value={terms} onChange={setTerms} />
-          <Button label="Nutzungsbedingungen öffnen" variant="secondary" onPress={() => void Linking.openURL(`${API_BASE_URL}/terms`)} />
+          <Button label="Nutzungsbedingungen öffnen" variant="secondary" onPress={() => void Linking.openURL(`${WEBSITE_BASE_URL}/terms`)} />
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Button label={busy ? "Speichere ..." : "Bestätigen und fortfahren"} onPress={submit} disabled={busy || !privacy || !terms} />
           <Button label="Abmelden" variant="secondary" onPress={() => void logout()} disabled={busy} />

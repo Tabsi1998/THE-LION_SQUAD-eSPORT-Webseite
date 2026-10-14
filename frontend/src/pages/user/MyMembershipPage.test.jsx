@@ -119,6 +119,72 @@ test("Einwilligungen aus der Mitgliederverwaltung: Stand, Zustimmen nur nach dem
   expect(toastMock.success).toHaveBeenCalledWith("Widerruf gespeichert.");
 });
 
+const ledMe = { membership, is_active_member: true, dolibarr: { connected: true, led_by_dolibarr: true, as_of: "2026-09-21T10:00:00+00:00", stale: false, functions: [], fee: { required: false, status: "not_required" }, link: { status: "verified" } } };
+
+test("Einwilligungen (#1537): der Text der zugestimmten Fassung bleibt lesbar, bei neuer Fassung stehen beide da", async () => {
+  const user = userEvent.setup();
+  const consents = [
+    { code: "newsletter", label: "Newsletter", state: "given", version: 3, current_version: 3, moment: "2026-01-10T10:00:00+01:00", can_give: false, can_withdraw: true, text: "Newsletter, Fassung 3.", given_text: "Newsletter, Fassung 3.", text_changed: false },
+    { code: "fotos", label: "Fotos", state: "given", version: 1, current_version: 2, moment: "2026-01-10T10:00:00+01:00", can_give: true, can_withdraw: true, text: "Fotos, Fassung 2.", given_text: "Fotos, Fassung 1.", text_changed: true },
+    { code: "spiel", label: "Spielberichte", state: "given", version: 1, current_version: 2, moment: "2026-01-10T10:00:00+01:00", can_give: true, can_withdraw: true, text: "Spielberichte, Fassung 2.", given_text: null, text_changed: true },
+  ];
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? { available: true, consents } : url === "/membership/me/directory" ? { eligible: false } : ledMe }));
+  renderPage();
+  const card = await screen.findByTestId("membership-consents-card");
+  // Solange das Modul kein Pflicht-Kennzeichen liefert, sagt die Karte nichts über Pflicht oder Freiwilligkeit.
+  expect(card).not.toHaveTextContent(/freiwillig|Pflicht/i);
+
+  // Erteilt, keine neue Fassung: kein Zustimmen, aber der Text ist lesbar.
+  expect(screen.queryByTestId("consent-give-newsletter")).toBeNull();
+  await user.click(screen.getByTestId("consent-open-newsletter"));
+  expect(screen.getByTestId("consent-given-text-newsletter")).toHaveTextContent("Newsletter, Fassung 3.");
+  expect(screen.queryByTestId("consent-give-newsletter")).toBeNull();
+
+  // Neue Fassung: die zugestimmte und die neue nebeneinander.
+  await user.click(screen.getByTestId("consent-open-fotos"));
+  expect(screen.getByTestId("consent-given-text-fotos")).toHaveTextContent("Fotos, Fassung 1.");
+  expect(screen.getByTestId("consent-given-text-fotos")).toHaveTextContent("Fassung 1");
+  expect(screen.getByTestId("consent-current-text-fotos")).toHaveTextContent("Fotos, Fassung 2.");
+  expect(screen.getByTestId("consent-give-fotos")).toBeInTheDocument();
+
+  // Die alte Fassung kennt die Website nicht: das steht da, und die aktuelle.
+  await user.click(screen.getByTestId("consent-open-spiel"));
+  expect(screen.getByTestId("consent-given-missing-spiel")).toHaveTextContent("Fassung 1");
+  expect(screen.getByTestId("consent-current-text-spiel")).toHaveTextContent("Spielberichte, Fassung 2.");
+});
+
+test("Einwilligungen (#1537): antwortet die Mitgliederverwaltung nicht, steht das da – mit „Nochmal versuchen“", async () => {
+  const user = userEvent.setup();
+  let answer = { available: false, reason: "unavailable", text: "Die Mitgliederverwaltung antwortet gerade nicht (nicht erreichbar)." };
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? answer : url === "/membership/me/directory" ? { eligible: false } : ledMe }));
+  renderPage();
+  const card = await screen.findByTestId("membership-consents-card");
+  expect(screen.getByTestId("consents-error")).toHaveTextContent("nicht geladen");
+  expect(screen.getByTestId("consents-error")).toHaveTextContent("antwortet gerade nicht");
+
+  answer = { available: true, consents: [{ code: "fotos", label: "Fotos", state: "none", version: 0, current_version: 1, moment: null, can_give: true, can_withdraw: false, text: "Fotos.", given_text: null, text_changed: false }] };
+  await user.click(screen.getByTestId("consents-retry"));
+  expect(await screen.findByTestId("consent-fotos")).toBeInTheDocument();
+  expect(card).toBeInTheDocument();
+  expect(screen.queryByTestId("consents-error")).toBeNull();
+});
+
+test("Einwilligungen (#1537): ein Netzfehler ist ein Fehler, keine verschwundene Karte; ohne Zuordnung bleibt sie weg", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/me/consents") throw new Error("Network Error");
+    return { data: url === "/membership/me/directory" ? { eligible: false } : ledMe };
+  });
+  const { unmount } = renderPage();
+  expect(await screen.findByTestId("consents-error")).toHaveTextContent("nicht geladen");
+  unmount();
+
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? { available: false, reason: "not_linked" } : url === "/membership/me/directory" ? { eligible: false } : ledMe }));
+  renderPage();
+  await screen.findByTestId("membership-fee-card").catch(() => null);
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/membership/me/consents"));
+  expect(screen.queryByTestId("membership-consents-card")).toBeNull();
+});
+
 test("ein gesperrter Eintrag zeigt nur den Hinweis", async () => {
   const me = { membership, is_active_member: true, dolibarr: null };
   const directory = { eligible: true, listed: false, blocked: true, editorial: false, slug: "paula", entry: { display_name: "Paula", gamertag: "paula", games: [], platforms: [], bio: "" } };
