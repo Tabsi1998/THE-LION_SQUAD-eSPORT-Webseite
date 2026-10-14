@@ -85,7 +85,7 @@ async def apply_group_mapping(db, mapping: dict | None = None, *, dry_run: bool 
     """Die Abbildung anwenden (oder nur zeigen). Jede alte Gruppe genau einmal, gemerkt im Marker."""
     mapping = GROUP_MAPPING if mapping is None else mapping
     if compute_progress is None:
-        from badges import compute_user_progress
+        from services.achievement_progress import compute_user_progress
         compute_progress = compute_user_progress
     marker = await db.settings.find_one({"id": MARKER_ID}, {"_id": 0}) or {}
     done = set(marker.get("applied") or [])
@@ -146,7 +146,7 @@ async def apply_redefined(db, mapping: dict | None = None, *, dry_run: bool = Fa
     from achievement_catalog import REDEFINED_OLD_TIERS
     mapping = REDEFINED_OLD_TIERS if mapping is None else mapping
     if compute_progress is None:
-        from badges import compute_user_progress
+        from services.achievement_progress import compute_user_progress
         compute_progress = compute_user_progress
     marker = await db.settings.find_one({"id": MARKER_ID}, {"_id": 0}) or {}
     done = set(marker.get("redefined") or [])

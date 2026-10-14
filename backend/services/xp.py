@@ -367,7 +367,7 @@ async def rebuild(user_id: str) -> dict:
     doc = await state(user_id)
     if doc.get("baseline_at"):
         return doc
-    from badges import compute_user_progress
+    from services.achievement_progress import compute_user_progress
     counters = await compute_user_progress(user_id)
     total = 0
     for counter, source in BASELINE_SOURCES:

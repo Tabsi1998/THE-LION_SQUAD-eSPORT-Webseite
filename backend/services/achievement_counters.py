@@ -21,6 +21,8 @@ from zoneinfo import ZoneInfo
 
 from database import get_db
 from models import now_utc
+from services import achievement_progress
+from services.achievement_core import evaluator
 from services.private_fields import private_projection
 
 logger = logging.getLogger("tls.achievements.counters")
@@ -771,8 +773,7 @@ async def compute(user_id: str, keys: set[str] | None = None, legacy: bool = Tru
     db = get_db()
     values: dict[str, int] = {}
     if legacy or keys is None:
-        from badges import compute_user_progress
-        values = dict(await compute_user_progress(user_id))
+        values = dict(await achievement_progress.compute_user_progress(user_id))
     ctx = Context(db, user_id)
     for key, item in REGISTRY.items():
         if keys is not None and key not in keys:
@@ -815,7 +816,7 @@ async def reconcile(days: int = 7, limit: int = 5000) -> dict:
     since = (now_utc() - timedelta(days=days)).isoformat()
     active = {row["user_id"] async for row in db.xp_events.find({"at": {"$gte": since}}, {"_id": 0, "user_id": 1})}
     active |= {row["user_id"] async for row in db[STATS].find({"updated_at": {"$gte": since}}, {"_id": 0, "user_id": 1})}
-    from badges import evaluate_user_progress
+    evaluate_user_progress = evaluator()
     checked = drift = awarded = 0
     for user_id in list(active)[:limit]:
         before = ((await db[STATS].find_one({"user_id": user_id}, {"_id": 0, "values": 1}) or {}).get("values") or {})

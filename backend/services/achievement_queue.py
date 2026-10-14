@@ -20,6 +20,7 @@ from datetime import timedelta
 
 from database import get_db
 from models import new_id, now_utc
+from services.achievement_core import evaluator
 
 logger = logging.getLogger("tls.achievements.queue")
 
@@ -76,8 +77,7 @@ async def request_evaluation(user_ids, reason: str = "", sources=None) -> int:
 
 
 async def process_queue(limit: int = BATCH) -> dict:
-    from badges import evaluate_user_progress
-
+    evaluate_user_progress = evaluator()
     db = get_db()
     due = await db.achievement_eval_queue.find({"due_at": {"$lte": now_utc().isoformat()}}, {"_id": 0}).sort("due_at", 1).to_list(limit)
     awarded = 0

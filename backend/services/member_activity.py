@@ -55,7 +55,7 @@ async def note_document_open(db, user: dict | None, doc_id: str) -> bool:
 
 async def note_profile_completion(db, user_id: str) -> bool:
     """Ist das Profil jetzt vollständig und war es das noch nie, den Zeitpunkt festhalten - True, wenn gerade gesetzt."""
-    from badges import PROFILE_FIELDS, compute_profile_completeness
+    from services.achievement_progress import PROFILE_FIELDS, compute_profile_completeness
 
     projection = {"_id": 0, "id": 1, "profile_completed_at": 1, **{key: 1 for key, _weight in PROFILE_FIELDS}}
     user = await db.users.find_one({"id": user_id}, projection)
