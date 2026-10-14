@@ -3,10 +3,12 @@ import { Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { buildTimeline, scheduleDelay } from "@/lib/matchTimeline";
+import { buildTimeline, knownStations, scheduleDelay } from "@/lib/matchTimeline";
 import { dependencyGraph } from "@/lib/matchFlow";
 import { matchDurationSource } from "@/lib/matchDuration";
-import { applySchedulePlan, moveMatch, requestSchedulePlan, updateMatchPlan } from "@/lib/schedulePlan";
+import { applySchedulePlan, moveMatch, releaseSchedule, requestSchedulePlan, updateMatchPlan } from "@/lib/schedulePlan";
+import { countOf } from "@/lib/schedulePlanText";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { matchRights } from "@/lib/tournamentRights";
 import { planViewMode } from "@/lib/matchPlanMode";
 import { viennaTime } from "@/lib/vienna";
@@ -58,6 +60,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const [deadlines, setDeadlines] = useState(null);
   const [matchdays, setMatchdays] = useState(null);
   const [planError, setPlanError] = useState("");
+  const confirm = useConfirm();
   const [remoteError, setRemoteError] = useState("");
   const [queue, setQueue] = useState(null);
   const [busyStation, setBusyStation] = useState("");
@@ -130,8 +133,10 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
     if (preview) return preview;
     if (!background) return null;
     const assignments = live ? (background.assignments || []).map((row) => ({ ...row, changed: false })) : [];
-    return { assignments, warnings: background.warnings || [] };
+    return { assignments, warnings: background.warnings || [], stations: background.stations };
   }, [preview, background, live]);
+  // Eine Wahrheit für Kopf, Zeitleiste und Auswahl: die Stationen des Turniers und die, die der Planer kennt (Event).
+  const allStations = useMemo(() => knownStations(stations, background), [stations, background]);
   const timeline = useMemo(() => buildTimeline({
     matches, stations, stages, tournament, game: durationGame, registrations, plan: shownPlan, now,
   }), [matches, stations, stages, tournament, durationGame, registrations, shownPlan, now]);
@@ -215,13 +220,15 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const editor = (item, close, { withStation = true } = {}) => {
     const match = matchById.get(item.id);
     return (
-      <MatchEditor item={item} match={match} stations={stations} stage={stages.find((stage) => stage.id === match?.stage_id) || null}
+      <MatchEditor item={item} match={match} stations={allStations} stage={stages.find((stage) => stage.id === match?.stage_id) || null}
         tournament={tournament} game={durationGame} onSave={saveMatch} onClose={close} withStation={withStation} />
     );
   };
   // Online und Liga: ohne Station, nur Start und Dauer - mit denselben Rechten je Spiel.
   const remoteEditor = (match, close) => editor({ id: match.id, key: match.match_key || "Spiel" }, close, { withStation: false });
-  const canEditMatch = (match) => Boolean(match) && !match.is_preview && matchRights(tournament, match).plan;
+  // Auch Vorschau-Spiele (Baum bis Check-in-Ende, Fabian live 14.10.): nie begonnen, und ihre Termine gehen mit in den
+  // fixen Baum - wer sie nicht ändern kann, bekommt sie nicht von einer gelöschten Station.
+  const canEditMatch = (match) => Boolean(match) && matchRights(tournament, match).plan;
 
   const release = async (item) => {
     const result = await moveMatch(item.id, { release: true });
@@ -245,10 +252,61 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
     }
   };
 
+  // Feste Termine auf einmal lösen (Praxis 14.10.): die alte Planung hatte jedes Spiel von Hand gesetzt, oft auf einer
+  // Station, die es nicht mehr gibt. Gezählt wird wie am Server: von Hand gesetzt bzw. an der fehlenden Station, nicht
+  // begonnen - auch Vorschau-Spiele (Baum bis Check-in-Ende): sie haben nie begonnen, und ihre Termine gehen beim
+  // Check-in-Ende in den fixen Baum mit.
+  const unstarted = (match) => !match.started_at
+    && !["completed", "forfeit", "cancelled", "archived", "bye", "no_show", "disputed", "in_progress", "running", "waiting_result"].includes(match.status);
+  const manualCount = matches.filter((match) => unstarted(match) && match.schedule_source === "manual").length;
+  const missingIds = new Set((background?.warnings || []).filter((row) => row.type === "unknown_station").flatMap((row) => row.match_ids || []));
+  // Vorschau-Spiele plant der Planer nicht, darum meldet er sie auch nicht als „unbekannte Station“ (Fabian live 14.10.).
+  // Gleiche Wahrheit wie am Server: die Stationen aus seiner Antwort (station_query) - was daneben liegt, fehlt.
+  if (Array.isArray(background?.stations)) {
+    const known = new Set(background.stations.map((station) => station.id));
+    for (const match of matches) if (match.station_id && !known.has(match.station_id)) missingIds.add(match.id);
+  }
+  const missingCount = matches.filter((match) => missingIds.has(match.id) && unstarted(match)).length;
+
+  const releaseAll = async (scope, count) => {
+    const verb = count === 1 ? "verliert seinen festen Termin und seine Station" : "verlieren ihre festen Termine und Stationen";
+    const ok = await confirm({
+      title: scope === "all" ? "Alle Termine von Hand lösen?" : "Spiele an gelöschten Stationen lösen?",
+      description: `${countOf(count, "Spiel", "Spiele")} ${verb}. Danach „Automatisch planen“: die Vorschau zeigt, wie der Planer neu `
+        + "verteilt - geschrieben wird erst mit „Übernehmen“. Laufende und gespielte Spiele bleiben.",
+      confirmLabel: "Termine lösen",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setBusy(true);
+    const result = await releaseSchedule(tid, scope);
+    setBusy(false);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    toast.success(`${countOf(result.released, "Spiel", "Spiele")} gelöst - jetzt plant der Planer neu.`);
+    await onChanged?.();
+    await refreshPlan();
+    await startPreview();
+  };
+
   const planButton = mode === "local" && canPlan ? (
-    <button type="button" className="tls-btn tls-btn--primary mp-btn" onClick={startPreview} disabled={busy}>
-      <Wand2 className="h-4 w-4" aria-hidden="true" /> {liveLocal ? "Prognose ansehen" : "Automatisch planen"}
-    </button>
+    <>
+      <button type="button" className="tls-btn tls-btn--primary mp-btn" onClick={startPreview} disabled={busy}>
+        <Wand2 className="h-4 w-4" aria-hidden="true" /> {liveLocal ? "Prognose ansehen" : "Automatisch planen"}
+      </button>
+      {manualCount > 0 && (
+        <button type="button" className="tls-btn tls-btn--quiet mp-btn" onClick={() => releaseAll("all", manualCount)} disabled={busy}>
+          Alle Termine von Hand lösen
+        </button>
+      )}
+      {missingCount > 0 && (
+        <button type="button" className="tls-btn tls-btn--quiet mp-btn" onClick={() => releaseAll("missing_stations", missingCount)} disabled={busy}>
+          Nur Spiele an gelöschten Stationen lösen
+        </button>
+      )}
+    </>
   ) : null;
 
   // Erst nach Zeit, dahinter, was noch keine Zeit hat - so steht jedes Spiel da, auch solange der Baum Vorschau ist.
@@ -257,8 +315,14 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   let note = "";
   if (!canPlan) {
     note = "Planen und Verschieben darf, wer in diesem Turnier Stationen zuweisen darf (Turnierleitung, Schiedsrichter, Stationsleitung). Du siehst den Plan.";
+  } else if (mode === "local" && (stages || []).some((stage) => stage?.schedule_hint === "tree_changed")) {
+    // Vom Check-in-Ende gesetzt, bis neu geplant und übernommen ist (Vorplanen, Fabian live 14.10.).
+    note = "Der Baum hat sich beim Check-in-Ende geändert - neu planen: einmal „Automatisch planen“ und übernehmen. Spiele, die es in der Vorschau nicht gab, haben noch keine Zeit.";
   } else if (mode === "local" && allPreview) {
-    note = "Der Turnierbaum ist noch eine Vorschau (bis zum Ende des Check-ins). Zeiten und Stationen plant der Planer, sobald er fix ist - die Spiele stehen unten schon da.";
+    note = "Vorschau: Du kannst schon vorplanen - alle sehen die Zeiten als „voraussichtlich“, wer gegen wen spielt, kann sich bis zum Check-in-Ende noch ändern. Nach dem Check-in einmal „Automatisch planen“.";
+    // Das Check-in-Ende baut den Baum neu, übernimmt aber Zeit und Station je Spiel (_collect_match_plan) - alte
+    // Termine verschwinden also nicht von selbst.
+    if (manualCount > 0) note += " Feste Termine von Hand gehen dabei mit in den fixen Baum - alte Termine vorher lösen.";
   } else if (mode === "local" && background?.mode === "none" && background?.reason) {
     note = background.reason;
   }
@@ -275,7 +339,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
         tournament={tournament}
         mode={mode}
         duration={duration}
-        stations={stations}
+        stations={allStations}
         canEdit={canEditSettings}
         onSave={saveSettings}
         actions={planButton}

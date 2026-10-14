@@ -13,7 +13,15 @@ from services.tournament_permissions import (
     STRUCTURE_STAFF_ROLES,
     require_tournament_staff_permission,
 )
+from services.advancement_draw import (
+    MODE_KEY,
+    SETTING_KEY as LEGACY_MODE_KEY,
+    SHOW_MINUTES_KEY,
+    normalize_mode,
+    sync_advancement_fields,
+)
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
+from services.draw_show import perform_show_draw, write_draw_sets
 from services.competition_versions import persist_competition_versions
 from services.draw_records import record_build_draws, record_draws
 from services.heat_rebuild import evaluate_after_write
@@ -58,6 +66,26 @@ async def list_tournament_stages(tid: str, user=Depends(get_optional_user)):
     return [public_stage_view(stage) for stage in stages]
 
 
+def _sync_stage_settings(settings) -> None:
+    """Weiterkommen je Phase (#1590): Modus und alter Schalter im Gleichschritt; leer heißt „vom Turnier erben“.
+    Die Minuten der Show-Auslosung bleiben eine Zahl ab 1 oder fallen weg."""
+    if not isinstance(settings, dict):
+        return
+    if MODE_KEY in settings or LEGACY_MODE_KEY in settings:
+        if normalize_mode(settings.get(MODE_KEY)) is None and settings.get(MODE_KEY) not in (None, ""):
+            raise HTTPException(status_code=422, detail="Unbekannter Modus für das Weiterkommen.")
+        sync_advancement_fields(settings, stage=True)
+    if SHOW_MINUTES_KEY in settings:
+        try:
+            minutes = int(settings.get(SHOW_MINUTES_KEY) or 0)
+        except (TypeError, ValueError):
+            minutes = 0
+        if minutes < 1 or minutes > 240:
+            settings[SHOW_MINUTES_KEY] = None
+        else:
+            settings[SHOW_MINUTES_KEY] = minutes
+
+
 @router.post("/{tid}/stages")
 async def create_tournament_stage(tid: str, body: TournamentStageCreate,
                                   me: dict = Depends(get_current_user),
@@ -67,6 +95,7 @@ async def create_tournament_stage(tid: str, body: TournamentStageCreate,
     await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     doc = body.model_dump()
+    _sync_stage_settings(doc.get("settings"))
     creation_digest = hashlib.sha256(
         json.dumps(body.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     ).hexdigest()
@@ -119,6 +148,7 @@ async def update_tournament_stage(tid: str, stage_id: str, body: TournamentStage
     if not current:
         raise HTTPException(status_code=404, detail="Stage nicht gefunden")
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    _sync_stage_settings(updates.get("settings"))
     if "number" in updates:
         duplicate = await db.tournament_stages.find_one(
             {"id": {"$ne": stage_id}, "tournament_id": tid, "number": updates["number"]},
@@ -334,43 +364,35 @@ class StageRedrawPayload(BaseModel):
     group: str | None = Field(default=None, max_length=80)
 
 
-REDRAW_STALE_DETAIL = ("Ein Spiel dieser Runde hat sich inzwischen geändert (aufgerufen, gestartet oder neu gesetzt). "
-                       "Es wurde nichts neu ausgelost – bitte neu laden.")
-
-
-def _unchanged_filter(before: dict) -> dict:
-    """Das Spiel steht noch so da wie gelesen: Stand, Aufruf, Beginn, Zeitstempel (``None`` trifft auch „fehlt“)."""
-    return {
-        "id": before["id"],
-        "status": before.get("status"),
-        "called_at": before.get("called_at"),
-        "started_at": before.get("started_at"),
-        "updated_at": before.get("updated_at"),
-    }
-
-
 async def _write_redraw(db, originals: dict[str, dict], target_sets: dict[str, dict]) -> None:
-    """Alles oder nichts (Compare-and-Set): erst prüfen, ob jedes Spiel noch so dasteht wie gelesen, dann schreiben -
-    jedes Schreiben nur mit diesem Filter. Trifft ein späteres Schreiben nicht mehr, wird das schon Geschriebene
-    zurückgesetzt und mit 409 abgelehnt. Die Turnier-Schreibsperre hält Ergebnisse und Stationen ohnehin fern."""
-    filters = {match_id: _unchanged_filter(originals[match_id]) for match_id in target_sets}
-    for match_filter in filters.values():
-        if await db.matches_v2.count_documents(match_filter) != 1:
-            raise HTTPException(status_code=409, detail=REDRAW_STALE_DETAIL)
-    written: list[str] = []
-    for match_id, update in target_sets.items():
-        result = await db.matches_v2.update_one(filters[match_id], {"$set": update})
-        if result.matched_count == 1:
-            written.append(match_id)
-            continue
-        for done in written:
-            before, after = originals[done], target_sets[done]
-            restore = {"$set": {key: before[key] for key in after if key in before}}
-            gone = {key: "" for key in after if key not in before}
-            if gone:
-                restore["$unset"] = gone
-            await db.matches_v2.update_one({"id": done, "updated_at": after.get("updated_at")}, restore)
-        raise HTTPException(status_code=409, detail=REDRAW_STALE_DETAIL)
+    """Alles oder nichts (Compare-and-Set) - dieselbe Schreibregel wie „Jetzt auslosen“ (services/draw_show)."""
+    try:
+        await write_draw_sets(db, originals, target_sets)
+    except MatchV2ResultError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+
+
+@router.post("/{tid}/stages/{stage_id}/draw")
+async def draw_tournament_stage(tid: str, stage_id: str, body: StageRedrawPayload | None = None,
+                                me: dict = Depends(get_current_user),
+                                _mutation_tid: str = Depends(_serialized_tournament_write)):
+    """„Jetzt auslosen“ (Show-Auslosung, #1590): die Turnierleitung mit Aufbau-Recht legt das Los einer bereiten Runde.
+    Vorher 409, zweimal 409, unbekannte Gruppe 404. Unter der Turnier-Schreibsperre, alles oder nichts; Protokoll
+    ``tournament.draw.done`` mit Person, dazu das Live-Ereignis ``draw_done``."""
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    tournament = await _ensure_tournament_unlocked(db, tid)
+    stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
+    if not stage:
+        raise HTTPException(status_code=404, detail="Phase nicht gefunden")
+    group = ((body.group if body else None) or "").strip()
+    if not group:
+        raise HTTPException(status_code=422, detail="Bitte angeben, welche Runde ausgelost werden soll.")
+    try:
+        return await perform_show_draw(db, tournament, stage_id, group, actor_id=me.get("id"), trigger="show")
+    except MatchV2ResultError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
 
 @router.post("/{tid}/stages/{stage_id}/redraw")

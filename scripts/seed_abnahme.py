@@ -11,7 +11,12 @@ Zwei-Faktor), alles andere über die Routen der App, angemeldet wie im Browser:
   * Online-Turnier (K.-o., 8 Spieler, live, ein Ergebnis) und eine Liga (6 Spieler, Spieltag 1 gespielt)
   * Gruppen-Turnier online (8 Spieler, 2 Gruppen, erste Runde gespielt)
   * Liga beendet und Ergebnisse veröffentlicht, mit geteiltem 1. Platz (drei gleich auf) - für Podest und Sieger-Moment
+  * Praxis 14.10. (Fabian): Vor-Ort-Cup OHNE Stationen, einmal mit Vorschau-Baum, einmal nach dem Check-in mit der alten
+    Matchplanung (feste Zeiten, LE vor LC, G/LF/Finale 30 Min.) auf einer Station, die danach gelöscht wurde
   * eine Fast Lap mit Strecke und Zeiten
+  * Weiterkommen in vier Modi (#1590), je vor Ort und live, Turnierleitung eingeteilt: fester Baum (K.-o. 8, Runde 1
+    halb gespielt), Auslosung nach der Runde (K.-o. 8, drei von vier Spielen fertig), Show-Auslosung (FFA 16, drei von
+    vier Läufen fertig - der vierte macht die Runde fertig), sofort zufällig (K.-o. 8, noch kein Ergebnis)
 
 Aufruf (der Stack läuft, siehe Anleitung):
 
@@ -30,7 +35,14 @@ import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 
-PROJECT = "lsw-abnahme"
+# Mehrere Stände nebeneinander: eigener Projektname (ABNAHME_PROJECT) und eigene Stand-Datei (ABNAHME_STATE).
+PROJECT = os.environ.get("ABNAHME_PROJECT", "lsw-abnahme")
+# Der Seed schreibt nur in den Abnahme-Stand: Datenbankname wie in `.env.abnahme.example`, keine Produktion, Adressen nur
+# auf diesem Rechner. Zeigen ABNAHME_PROJECT oder der Compose-Ordner auf einen fremden Stack, bricht er ab (s. unten).
+ABNAHME_DB_NAME = "tls_abnahme"
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+PRODUCTION = {"production", "prod"}
+MONGO_HOSTS = {"mongodb", *LOCAL_HOSTS}
 # Testwerte, nur für diesen lokalen Stack. Das TOTP-Geheimnis ist das Beispiel aus RFC 6238.
 TEST_PASSWORD = "Abnahme-Testpasswort-2026"
 TEST_TOTP_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
@@ -91,7 +103,7 @@ def host_main() -> int:
         print("Kein Ergebnis vom Seed - siehe Ausgabe oben.")
         return 1
     state = json.loads(line[len(marker):])
-    target = root / ".local-testing" / "abnahme" / "state.json"
+    target = pathlib.Path(os.environ.get("ABNAHME_STATE") or root / ".local-testing" / "abnahme" / "state.json")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(state, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     for row in completed.stdout.splitlines():
@@ -102,6 +114,52 @@ def host_main() -> int:
 
 
 # ------------------------------------------------------------------------------------------------ im Backend-Container
+
+
+def mongo_hosts(url: str) -> list[str] | None:
+    """Die Hosts einer Mongo-Adresse (auch mehrere, durch Komma) - None, wenn es keine einfache mongodb://-Adresse ist
+    (mongodb+srv:// zeigt immer auf einen entfernten Cluster)."""
+    if not url.startswith("mongodb://"):
+        return None
+    hosts = url[len("mongodb://"):].split("/", 1)[0].split("?", 1)[0].rsplit("@", 1)[-1]
+    return [entry[1:entry.find("]")] if entry.startswith("[") else entry.split(":", 1)[0] for entry in hosts.split(",")]
+
+
+def mongo_is_local(url: str) -> bool:
+    # Nur der Compose-Dienst „mongodb“ des Abnahme-Stacks oder dieser Rechner (Codex zu #1610).
+    hosts = mongo_hosts(url)
+    return bool(hosts) and all(host in MONGO_HOSTS for host in hosts)
+
+
+def abnahme_target_problems(env) -> list[str]:
+    """Was dagegen spricht, in diese Umgebung zu schreiben - leer heißt: ein lokaler Abnahme-Stand."""
+    from urllib.parse import urlsplit
+
+    problems = []
+    if not str(env.get("DB_NAME") or "").startswith(ABNAHME_DB_NAME):
+        problems.append(f"Datenbank {env.get('DB_NAME')!r} ist nicht die der Abnahme ({ABNAHME_DB_NAME})")
+    if {str(env.get(key) or "").strip().lower() for key in ("APP_ENV", "ENV", "ENVIRONMENT")} & PRODUCTION:
+        problems.append("Umgebung ist Produktion")
+    # FRONTEND_URL setzt der Abnahme-Stand immer; PUBLIC_BACKEND_URL ist dort nur Build-Argument des Frontends und
+    # fehlt im Backend - geprüft wird sie nur, wenn sie gesetzt ist (wie guard_environment im Fast-Lap-Seed).
+    for key, required in (("FRONTEND_URL", True), ("PUBLIC_BACKEND_URL", False)):
+        value = str(env.get(key) or "")
+        if not value and not required:
+            continue
+        host = urlsplit(value).hostname
+        if host not in LOCAL_HOSTS:
+            problems.append(f"{key} zeigt auf {host or '(leer)'!r}, nicht auf diesen Rechner")
+    if not mongo_is_local(str(env.get("MONGO_URL") or "")):
+        problems.append("MONGO_URL zeigt nicht auf die Datenbank des Abnahme-Stacks (Dienst mongodb) oder diesen Rechner")
+    return problems
+
+
+def ensure_abnahme_target(env) -> None:
+    """Hart abbrechen, bevor irgendetwas geschrieben wird, wenn das kein lokaler Abnahme-Stand ist."""
+    problems = abnahme_target_problems(env)
+    if problems:
+        raise SystemExit("Seed abgebrochen, das ist kein lokaler Abnahme-Stand: " + "; ".join(problems))
+
 
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -248,6 +306,20 @@ async def matches_of(admin: Session, tid: str) -> dict:
     return {row.get("match_key"): row for row in rows if not row.get("is_preview")}
 
 
+# Die alte Matchplanung aus der Praxis: Start (Wiener Uhr am Turniertag), eigene Dauer, auf der Station oder nicht.
+OLD_PLAN = {"A": ("15:30", None, True), "B": ("15:50", None, True), "C": ("16:10", None, True), "D": ("16:30", None, True),
+            "E": ("16:50", None, True), "F": ("17:10", None, True), "LA": ("17:30", None, True), "LB": ("17:50", None, True),
+            "G": ("18:10", 30, True), "LD": ("18:50", None, True), "LE": ("19:10", None, True), "LC": ("19:40", None, True),
+            "LF": ("19:50", 30, False), "FINAL": ("20:20", 30, True)}
+
+
+def vienna_on(day: datetime, clock: str) -> str:
+    from zoneinfo import ZoneInfo
+    hour, minute = (int(part) for part in clock.split(":"))
+    local = datetime(day.year, day.month, day.day, hour, minute, tzinfo=ZoneInfo("Europe/Vienna"))
+    return local.astimezone(timezone.utc).isoformat()
+
+
 CUP_STRUCTURE = {"name": "Läufe", "stage_type": "ffa_custom_bracket", "match_type": "ffa",
                  "settings": {"schema": CUP_SCHEMA, "match_size": 4, "qualifiers_per_match": 2, "min_players": 2}}
 CUP_FIELDS = {"format": "ffa_custom_bracket", "event_mode": "local", "schedule_mode": "fixed_by_staff",
@@ -256,11 +328,14 @@ CUP_FIELDS = {"format": "ffa_custom_bracket", "event_mode": "local", "schedule_m
 
 
 async def inside_main() -> None:
+    ensure_abnahme_target(os.environ)
     sys.path.insert(0, "/app")
     from database import get_db
     from services import scheduler
 
     db = get_db()
+    # Neu befüllen hebt die Sperre gegen Rateversuche bei der Anmeldung auf (nur hier, im geprüften Abnahme-Stand).
+    await db.rate_limits.delete_many({"bucket": {"$regex": "^auth:"}})
     users = await ensure_accounts(db)
     admin = await Session.login(ACCOUNTS["admin"]["email"], True)
     state = {"accounts": {key: {"email": ACCOUNTS[key]["email"], "password": TEST_PASSWORD, "totp": TEST_TOTP_SECRET if ACCOUNTS[key]["mfa"] else None}
@@ -357,6 +432,63 @@ async def inside_main() -> None:
         for status in ("completed", "results_published"):
             await admin.call("POST", f"/api/tournaments/{final['id']}/status", json={"status": status, "force": True})
         state["tournaments"]["league_published"] = final["id"]
+
+        # Praxis 14.10.: Vor-Ort-Cup ohne Stationen - Vorschau-Baum.
+        nostation = {**CUP_FIELDS, "match_buffer_minutes": None, "match_duration_minutes": 20}
+        bare_draft = await tournament(admin, game, f"Abnahme Cup ohne Stationen, Vorschau ({stamp})",
+                                      quarter(now_utc() + timedelta(days=17)), **nostation)
+        await register(admin, bare_draft, users["players"])
+        await admin.call("POST", f"/api/tournaments/{bare_draft['id']}/bracket/from-format?preview=true", json=CUP_STRUCTURE)
+        await admin.call("POST", f"/api/tournaments/{bare_draft['id']}/staff", json={"user_id": users["lead"]["id"], "role": "organizer"})
+        state["tournaments"]["practice_draft"] = bare_draft["id"]
+
+        # ... und nach dem Check-in: Baum fix, die alte Matchplanung auf „Station A“ gespeichert, die Station danach gelöscht.
+        # Zweimal: einmal zum Ansehen, einmal zum Lösen und Neuplanen in der Abnahme (verändert den Stand).
+        day = quarter(now_utc() + timedelta(days=17))
+        for key, label in (("practice_old_plan", "alte Planung"), ("practice_release", "alte Planung zum Lösen")):
+            practice = await tournament(admin, game, f"Abnahme Cup {label} ({stamp})", datetime.fromisoformat(vienna_on(day, "15:30")), **nostation)
+            await register(admin, practice, users["players"])
+            await admin.call("POST", f"/api/tournaments/{practice['id']}/bracket/from-format?preview=false", json=CUP_STRUCTURE)
+            await admin.call("POST", f"/api/tournaments/{practice['id']}/staff", json={"user_id": users["lead"]["id"], "role": "organizer"})
+            old_station = await admin.call("POST", "/api/stations", json={"name": "Station A", "device_type": "switch", "tournament_id": practice["id"]})
+            practice_matches = await matches_of(admin, practice["id"])
+            for match_key, (clock, minutes, on_station) in OLD_PLAN.items():
+                await admin.call("PATCH", f"/api/matches/{practice_matches[match_key]['id']}", json={
+                    "scheduled_at": vienna_on(day, clock), "station_id": old_station["id"] if on_station else None, "duration_minutes": minutes})
+            # Altdaten wie vor #1611 herstellen: das Station-Dokument direkt entfernen, die Spiele behalten ihre station_id (die
+            # Route lehnt das Löschen ab, solange geplante Spiele daran hängen).
+            await db.stations.delete_one({"id": old_station["id"]})
+            state["tournaments"][key] = practice["id"]
+
+        # Weiterkommen in vier Modi (#1590): je ein Vor-Ort-Turnier, live, zwei Stationen, geplant, Turnierleitung eingeteilt.
+        # K.-o. mit 8 (fest, nach der Runde, sofort) bzw. FFA 16 mit Winner und Loser Bracket (Show), Minuten der
+        # Show-Erinnerung 3, damit die Restzeit in der Abnahme sichtbar bleibt.
+        modes = (("fixed", "Fester Baum", "single_elim", 2), ("draw_round", "Auslosung nach der Runde", "single_elim", 3),
+                 ("draw_show", "Show-Auslosung", "ffa_custom_bracket", 3), ("instant", "Sofort zufällig", "single_elim", 0))
+        for mode, label, fmt, played in modes:
+            ffa = fmt == "ffa_custom_bracket"
+            fields = {"format": fmt, "event_mode": "local", "schedule_mode": "fixed_by_staff", "result_entry_mode": "staff_only",
+                      "advancement_mode": mode, "draw_show_minutes": 3, "match_duration_minutes": 12,
+                      "max_participants": 16 if ffa else 8}
+            cup = await tournament(admin, game, f"Abnahme {label} ({stamp})", quarter(now_utc() - timedelta(minutes=30)), **fields)
+            await register(admin, cup, users["players"] if ffa else users["players"][:8])
+            if ffa:
+                await admin.call("POST", f"/api/tournaments/{cup['id']}/bracket/from-format?preview=false", json=CUP_STRUCTURE)
+            else:
+                await admin.call("POST", f"/api/tournaments/{cup['id']}/bracket/from-format?preview=false")
+            await admin.call("POST", f"/api/tournaments/{cup['id']}/staff", json={"user_id": users["lead"]["id"], "role": "organizer"})
+            await stations(admin, cup, 2)
+            await admin.call("POST", f"/api/tournaments/{cup['id']}/status", json={"status": "live", "force": True})
+            mode_plan = await admin.call("POST", f"/api/tournaments/{cup['id']}/schedule/plan")
+            if mode_plan.get("mode") == "stations":
+                await admin.call("POST", f"/api/tournaments/{cup['id']}/schedule/apply",
+                                 json={"fingerprint": mode_plan["fingerprint"], "planned_at": mode_plan["planned_at"]})
+            first_round = sorted((row for row in (await matches_of(admin, cup["id"])).values()
+                                  if int(row.get("round") or 0) == 1 and str(row.get("section") or "WB").upper() == "WB"),
+                                 key=lambda row: row.get("match_key") or "")
+            for match in first_round[:played]:
+                await result(admin, match)
+            state["tournaments"][f"mode_{mode}"] = cup["id"]
 
         # Fast Lap mit einer Strecke und Zeiten.
         challenge = await admin.call("POST", "/api/f1/challenges", json={"title": f"Abnahme Fast Lap ({stamp})", "game_id": game["id"],

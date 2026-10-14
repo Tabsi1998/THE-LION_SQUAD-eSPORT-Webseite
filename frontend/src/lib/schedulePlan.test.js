@@ -13,7 +13,7 @@ vi.mock("@/lib/api", () => ({
 }));
 vi.mock("sonner", () => ({ toast: { message: vi.fn(), success: vi.fn(), error: vi.fn() } }));
 
-const { applySchedulePlan, moveMatch, requestSchedulePlan } = await import("./schedulePlan");
+const { applySchedulePlan, moveMatch, releaseSchedule, requestSchedulePlan } = await import("./schedulePlan");
 
 function conflict(detail) {
   const error = new Error("409");
@@ -82,5 +82,25 @@ describe("Spiel verschieben (Ziehen oder Tastatur)", () => {
     patch.mockResolvedValueOnce({ data: {} });
     await moveMatch("m1", { release: true });
     expect(patch).toHaveBeenCalledWith("/matches/m1", { scheduled_at: null });
+  });
+});
+
+
+describe("Alle Termine von Hand lösen (Praxis 14.10.)", () => {
+  it("schickt den Umfang und gibt die Zahl der gelösten Spiele zurück", async () => {
+    post.mockResolvedValueOnce({ data: { released: 14, match_ids: [], scope: "all" } });
+    expect(await releaseSchedule("t1", "all")).toEqual({ ok: true, released: 14 });
+    expect(post).toHaveBeenCalledWith("/tournaments/t1/schedule/release", { scope: "all" });
+  });
+
+  it("nur gelöschte Stationen", async () => {
+    post.mockResolvedValueOnce({ data: { released: 13 } });
+    await releaseSchedule("t1", "missing_stations");
+    expect(post).toHaveBeenCalledWith("/tournaments/t1/schedule/release", { scope: "missing_stations" });
+  });
+
+  it("ein Fehler steht in Worten da", async () => {
+    post.mockRejectedValueOnce(Object.assign(new Error("x"), { response: { status: 403, data: { detail: "Keine Turnierberechtigung" } } }));
+    expect(await releaseSchedule("t1", "all")).toEqual({ ok: false, message: "Keine Turnierberechtigung" });
   });
 });

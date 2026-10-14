@@ -131,7 +131,8 @@ CAPABILITIES: tuple[Capability, ...] = (
     _c("planning.check", "Planungsprüfung und Spielplan-Export",
        ["GET /api/tournaments/{tid}/planning-check", "GET /api/tournaments/{tid}/match-plan.csv"], [CLASSIC, GRAPH]),
     _c("planning.schedule", "Spielplan planen (Vorschau) und übernehmen",
-       ["POST /api/tournaments/{tid}/schedule/plan", "POST /api/tournaments/{tid}/schedule/apply"], [GRAPH],
+       ["POST /api/tournaments/{tid}/schedule/plan", "POST /api/tournaments/{tid}/schedule/apply",
+        "POST /api/tournaments/{tid}/schedule/release"], [GRAPH],
        note="Der Spielplaner (#1552) schreibt Zeit und Station zusammen mit schedule_source; die Vorschau "
             "schreibt nichts, Übernehmen alles auf einmal. Online nie Stationen."),
     _c("planning.deadlines", "Fristen je Spiel lesen (Matchplan online und Liga)",
@@ -196,7 +197,13 @@ CAPABILITIES: tuple[Capability, ...] = (
     _c("structure.redraw", "Gegner der nächsten Runde neu auslosen",
        ["POST /api/tournaments/{tid}/stages/{stage_id}/redraw"], [GRAPH],
        note="#1548: gemischt lost der Server nach jeder fertigen Runde von selbst aus; die Turnierleitung lost eine "
-            "Runde (oder bei der Liga die Spieltage) neu aus, bis eines der Spiele beginnt."),
+            "Runde (oder bei der Liga die Spieltage) neu aus, bis eines der Spiele beginnt. Sofort zufällig (#1590): "
+            "nur die Spiele, die noch nicht begonnen haben."),
+    _c("structure.draw_show", "Show-Auslosung: Jetzt auslosen",
+       ["POST /api/tournaments/{tid}/stages/{stage_id}/draw"], [GRAPH],
+       note="#1590: Weiterkommen in vier Modi (fest, Auslosung nach der Runde, Show, sofort zufällig). Bei der Show "
+            "steht der Topf, bis die Turnierleitung mit Aufbau-Recht lost; nach der Frist lost der Server selbst "
+            "(services/draw_show)."),
 )
 
 

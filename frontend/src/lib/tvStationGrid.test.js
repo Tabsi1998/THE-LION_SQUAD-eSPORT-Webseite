@@ -1,6 +1,6 @@
 // Stationen auf der Hallen-Tafel (#1126): frei, belegt, aufgerufen, defekt - reserviert zählt nicht als belegt; 6, 12 und
 // 24 Stationen: alle sichtbar oder geblättert, keine fehlt still.
-import { pageOf, sortStations, stationCounts, stationGrid, stationState } from "./tvStationGrid";
+import { hallStations, pageOf, sortStations, stationCounts, stationGrid, stationState } from "./tvStationGrid";
 
 const LEVELS = [{ key: "large", minW: 30, h: 15 }, { key: "small", minW: 24, h: 11 }];
 const AREA = { w: 100, h: 50 };
@@ -37,4 +37,23 @@ test("24 Stationen: das Raster blättert - jede Station steht auf einer Seite", 
 
 test("Stationen nach Namen, Zahlen richtig sortiert", () => {
   expect(sortStations([{ name: "PC 10" }, { name: "PC 2" }, { name: "Switch 1" }, { name: "PC 1" }]).map((station) => station.name)).toEqual(["PC 1", "PC 2", "PC 10", "Switch 1"]);
+});
+
+// Hallen-Tafel (#1564, Teil von #1555): heute legt jedes Turnier seine Stationen selbst an - dieselbe Switch steht dann
+// je Turnier einmal da. Bis die Stationen dem Event gehören, zählt eine Station mit gleichem Namen und Gerät nur einmal.
+test("dieselbe Station aus zwei Turnieren steht auf der Hallen-Tafel nur einmal - mit allen Kennungen", () => {
+  const stations = [
+    { id: "a1", name: "Switch 2", device_type: "switch2", tournament_id: "kart", status: "free" },
+    { id: "b1", name: " switch  2 ", device_type: "switch2", tournament_id: "smash", status: "busy", current_match_id: "m9" },
+    { id: "a2", name: "Switch 1", device_type: "switch2", tournament_id: "kart", status: "reserved" },
+    { id: "c1", name: "Switch 1", device_type: "pc", tournament_id: "fifa", status: "free" },
+    { id: "a1", name: "Switch 2", device_type: "switch2", tournament_id: "kart", status: "free" },
+  ];
+  const hall = hallStations(stations);
+  expect(hall).toHaveLength(3);
+  const switch2 = hall.find((station) => station.ids.includes("b1"));
+  // Belegt schlägt frei: wer in die Halle schaut, sieht, dass dort gespielt wird.
+  expect(switch2).toMatchObject({ id: "b1", status: "busy", current_match_id: "m9", ids: ["b1", "a1"] });
+  // Anderes Gerät = andere Station, auch bei gleichem Namen.
+  expect(hall.filter((station) => station.name === "Switch 1")).toHaveLength(2);
 });

@@ -23,7 +23,8 @@ function when(value) {
 
 function describeAssignment(item) {
   const station = item.station_name ? `Station ${item.station_name}` : "ohne Station";
-  return `${shortLabel(item.label || item.match_key)}: ${when(item.scheduled_at)} · ${station}${item.forecast ? " (voraussichtlich)" : ""}`;
+  const note = item.waiting_for_draw ? " (wartet auf Auslosung)" : item.forecast ? " (voraussichtlich)" : "";
+  return `${shortLabel(item.label || item.match_key)}: ${when(item.scheduled_at)} · ${station}${note}`;
 }
 
 export function describeSchedulePlan(plan, changed, warnings) {

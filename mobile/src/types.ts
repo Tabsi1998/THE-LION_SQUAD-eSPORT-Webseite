@@ -569,7 +569,11 @@ export type F1Challenge = {
 };
 
 export type F1LeaderboardEntry = {
-  user_id: string;
+  // Gäste ohne Konto (#1585): keine user_id, dafür guest_id und participant_id „guest-…“.
+  user_id: string | null;
+  guest_id?: string | null;
+  participant_id?: string;
+  is_guest?: boolean;
   username?: string;
   display_name?: string;
   avatar_url?: string | null;
@@ -589,6 +593,8 @@ export type F1LeaderboardPayload = {
   entries: F1LeaderboardEntry[];
   club_reference_entries?: F1LeaderboardEntry[];
   club_reference_public?: boolean;
+  // Versuche je Person und Strecke (#1585), null = unbegrenzt.
+  max_attempts?: number | null;
 };
 
 export type MemberBenefit = {

@@ -1,0 +1,7 @@
+{
+  "_hinweis": "Abschnittsnamen im Turnierbaum (#1591) - eine Wahrheit: Quelle ist backend/services/round_labels.py (MAIN_SECTIONS, LOSER_SECTIONS, FINAL_SECTIONS, BRONZE_SECTIONS). Das Frontend liest diese Datei (frontend/src/lib/bracketSections.js, im Frontend, damit sie im Docker-Build mitkommt); backend/tests/test_bracket_sections_unit.py und frontend/src/lib/bracketSections.test.js gleichen beide Seiten ab. Kleingeschrieben, ohne Leerraum am Rand.",
+  "main": ["", "main", "wb", "winner", "winners"],
+  "loser": ["lb", "loser", "losers", "lower", "lower_bracket", "loser bracket", "looser"],
+  "final": ["gf", "grand_final", "grand final", "final"],
+  "bronze": ["bronze", "br", "spiel um platz 3", "platz 3"]
+}

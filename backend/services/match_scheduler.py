@@ -25,15 +25,22 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from services.advancement_draw import draw_group_of, prerequisite_ids
+from pymongo import ReturnDocument
+
+from services.advancement_draw import draw_group_of, match_mode, prerequisite_ids
 from services.match_audience import playing_ids, teams_by_id
+from services.match_v2_results import group_awaits_draw
 from services.match_duration import effective_match_duration, load_duration_game, load_duration_games
+from services.match_planning import restore_change, station_open_for_matches, written_state
 from services.matchday_schedule import plays_in_matchdays, schedule_writes
 from services.tournament_rules import match_policy
+
+logger = logging.getLogger("tls.scheduler")
 
 DEFAULT_BREAK_MINUTES = 5
 # Uhrzeiten in Warnungen: so, wie die Turnierleitung in der Halle sie liest (#1557).
@@ -175,7 +182,10 @@ def _predecessors(match: dict, by_key: dict[tuple, dict]) -> list[dict]:
 
 def _predecessor_map(matches: list[dict], by_key: dict[tuple, dict]) -> dict[str, list[dict]]:
     """Worauf jedes Spiel wartet. Gemischt (#1548) wartet eine Folgerunde auf **alle** Spiele der Runde davor - die
-    Auslosung passiert erst, wenn sie fertig ist (``advancement_draw.prerequisite_ids``); sonst die Platz-Herkunft."""
+    Auslosung passiert erst, wenn sie fertig ist (``advancement_draw.prerequisite_ids``); sonst die Platz-Herkunft.
+    Sofort zufällig (#1590): je Zielspiel die Prognose-Regel (``advancement_draw.instant_prerequisites``) - die
+    Zielspiele in Schlüssel-Reihenfolge füllen sich mit den Quellen in Schlüssel-Reihenfolge; die Platz-Herkunft aus dem
+    Schema zählt dort nicht, denn der Platz wird erst beim Ergebnis gezogen."""
     by_id = {match["id"]: match for match in matches}
     direct = {match["id"]: _predecessors(match, by_key) for match in matches}
     groups: dict[tuple, list[dict]] = {}
@@ -184,9 +194,15 @@ def _predecessor_map(matches: list[dict], by_key: dict[tuple, dict]) -> dict[str
         if group:
             groups.setdefault((match.get("stage_id"), group), []).append(match)
     group_needs: dict[tuple, dict[str, dict]] = {}
+    instant_needs: dict[str, dict[str, dict]] = {}
     for (stage_id, group), mates in groups.items():
-        needed: dict[str, dict] = {}
         stage_rows = [row for row in matches if row.get("stage_id") == stage_id]
+        if match_mode(mates[0]) == "instant":
+            for mate in mates:
+                instant_needs[mate["id"]] = {match_id: by_id[match_id] for match_id in prerequisite_ids(mate, stage_rows)
+                                             if match_id in by_id}
+            continue
+        needed: dict[str, dict] = {}
         for match_id in prerequisite_ids(mates[0], stage_rows):
             if match_id in by_id:
                 needed[match_id] = by_id[match_id]
@@ -196,13 +212,25 @@ def _predecessor_map(matches: list[dict], by_key: dict[tuple, dict]) -> dict[str
         group_needs[(stage_id, group)] = needed
     result: dict[str, list[dict]] = {}
     for match in matches:
-        found = {previous["id"]: previous for previous in direct[match["id"]]}
-        group = draw_group_of(match)
-        if group:
-            found.update(group_needs[(match.get("stage_id"), group)])
+        if match["id"] in instant_needs:
+            found = dict(instant_needs[match["id"]])
+        else:
+            found = {previous["id"]: previous for previous in direct[match["id"]]}
+            group = draw_group_of(match)
+            if group:
+                found.update(group_needs[(match.get("stage_id"), group)])
         found.pop(match["id"], None)
         result[match["id"]] = list(found.values())
     return result
+
+
+def _draw_state(match: dict, matches: list[dict]) -> dict:
+    """Für Matchplan und Prognose (#1590): wartet das Spiel auf ein Los je Runde - und steht der Topf schon (Show)?"""
+    group = draw_group_of(match)
+    if not group or match_mode(match) == "instant":
+        return {"waiting_for_draw": False, "draw_ready": False}
+    waiting = group_awaits_draw(matches, group, match.get("stage_id"))
+    return {"waiting_for_draw": waiting, "draw_ready": waiting and isinstance(match.get("draw_ready"), dict)}
 
 
 def _chain_lengths(matches: list[dict], predecessors: dict[str, list[dict]]) -> dict[str, int]:
@@ -253,9 +281,10 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
         return participants_of(match, participant_keys)
     usable = _usable_stations(tournament, stations, game)
     if not usable:
+        # Ohne freie Station plant der Planer keine Zeiten - feste Termine prüft er trotzdem (Praxis 14.10.: ohne Station
+        # standen von Hand gesetzte Spiele vor ihren Vorspielen, und nichts war rot).
         warnings.append({"type": "no_stations", "severity": "warning",
                          "message": "Keine freie Station für dieses Turnier - ohne Stationen plant der Planer keine Zeiten."})
-        return [], warnings, []
 
     pause = break_minutes(tournament)
     horizon = max(now, _parse(tournament.get("start_date")) or now)
@@ -271,7 +300,7 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
         if start and end:
             board.block(entry.get("match_id") or entry.get("label") or "anderes Turnier", None, set(entry.get("participants") or ()), start, end)
 
-    station_by_id = {station["id"]: station for station in usable}
+    station_by_id = {station["id"]: station for station in stations or [] if station.get("id")}
     for station in usable:
         current = station.get("current_match_id")
         if station.get("status") == "busy" and current and current not in by_id:
@@ -313,6 +342,21 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
             continue
         candidates.append(match)
 
+    # Spiele an einer Station, die es nicht mehr gibt (gelöscht, oder einem anderen Turnier zugeordnet): beim Namen nennen,
+    # statt sie auf einer namenlosen Bahn zu zeigen - zuweisen kann man dort nichts mehr.
+    orphans: dict[str, list[dict]] = {}
+    for match in matches:
+        station_id = match.get("station_id")
+        if station_id and station_id not in station_by_id and str(match.get("status") or "") not in DONE_STATUSES:
+            orphans.setdefault(station_id, []).append(match)
+    for station_id, rows in orphans.items():
+        labels = ", ".join(_label(row) for row in rows[:8]) + (" …" if len(rows) > 8 else "")
+        count = f"{len(rows)} Spiel" if len(rows) == 1 else f"{len(rows)} Spiele"
+        warnings.append({"type": "unknown_station", "severity": "error", "station_id": station_id,
+                         "match_ids": [row["id"] for row in rows],
+                         "message": f"{count} ({labels}) hängen an einer Station, die es nicht mehr gibt - bitte neu zuweisen "
+                                    f"oder mit „Automatisch planen“ neu verteilen."})
+
     # Feste Termine gegeneinander: dieselbe Station oder derselbe Spieler zur selben Zeit.
     reported: set[tuple[str, str]] = set()
     for index, (match, start, end) in enumerate(fixed):
@@ -337,7 +381,7 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
     chains = _chain_lengths(matches, predecessors)
     assignments: list[dict] = []
     stage_floor = horizon
-    stage_numbers = sorted({int(match.get("stage_number") or 0) for match in candidates})
+    stage_numbers = sorted({int(match.get("stage_number") or 0) for match in candidates}) if usable else []
     for stage_number in stage_numbers:
         remaining = {match["id"]: match for match in candidates if int(match.get("stage_number") or 0) == stage_number}
         stage_ends: list[datetime] = [end for match, _start, end in fixed if int(match.get("stage_number") or 0) == stage_number]
@@ -353,7 +397,8 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                                                  int(item.get("order") or item.get("position") or 0), str(item.get("match_key") or item["id"])))
             del remaining[match["id"]]
             lower = stage_floor
-            forecast = _unresolved(match)
+            # Vorschau: wer gegen wen spielt, kann sich bis zum Check-in-Ende noch ändern - nur voraussichtlich.
+            forecast = _unresolved(match) or bool(match.get("is_preview"))
             for previous in predecessors.get(match["id"], []):
                 if str(previous.get("status") or "") not in DONE_STATUSES:
                     forecast = True
@@ -384,8 +429,10 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                 "station_name": station.get("name"),
                 "duration_minutes": minutes,
                 "forecast": forecast,
+                **_draw_state(match, matches),
                 "schedule_source": "planner",
-                "changed": previous_at != moment or match.get("station_id") != station["id"] or match.get("schedule_source") != "planner",
+                "changed": (previous_at != moment or match.get("station_id") != station["id"]
+                            or match.get("schedule_source") != "planner" or bool(match.get("schedule_forecast")) != forecast),
                 "previous": {"scheduled_at": match.get("scheduled_at"), "station_id": match.get("station_id"),
                              "schedule_source": match.get("schedule_source"), "status": match.get("status")},
             })
@@ -425,11 +472,13 @@ def plan_schedule(tournament: dict, matches, stations=(), *, stages=(), proposal
     local: list[dict] = []
     weekly: list[dict] = []
     for match in matches or []:
-        if match.get("is_preview"):
-            continue
         stage = stage_by_id.get(match.get("stage_id"))
         if match_policy(match, tournament, stage)["event_mode"] == "local":
+            # Auch der Vorschau-Baum (bis Check-in-Ende): Vorplanen, damit sich jede Person schon einplanen kann (Fabian
+            # live 14.10.). Dieselben Abhängigkeiten wie im fixen Baum; alles nur „voraussichtlich“ (siehe forecast).
             local.append(match)
+        elif match.get("is_preview"):
+            continue
         elif plays_in_matchdays(tournament, stage):
             weekly.append(match)
 
@@ -467,6 +516,14 @@ def plan_schedule(tournament: dict, matches, stations=(), *, stages=(), proposal
     if mode == "none":
         reason = ("Online-Turnier: Termine werden abgestimmt, Stationen gibt es nur vor Ort."
                   if any(not match.get("is_preview") for match in matches or []) else "Keine Spiele zum Planen.")
+    # Die Stationen, die der Planer kennt (des Turniers und - ohne Turnier - des Events): eine Wahrheit für Kopf und
+    # Zeitleiste der Matchplan-Seite, samt Herkunft und ob er sie nutzt (defekt, falsches Gerät, anderes Spiel: nein).
+    usable_ids = {station["id"] for station in _usable_stations(tournament, stations, game)}
+    known_stations = [{
+        "id": station["id"], "name": station.get("name") or "Station", "status": station.get("status"),
+        "device_type": station.get("device_type"), "scope": "tournament" if station.get("tournament_id") else "event",
+        "usable": station["id"] in usable_ids,
+    } for station in stations or [] if station.get("id")]
     return {
         "mode": mode,
         "reason": reason,
@@ -475,6 +532,7 @@ def plan_schedule(tournament: dict, matches, stations=(), *, stages=(), proposal
         "warnings": warnings,
         "held": held,
         "fingerprint": _fingerprint(assignments),
+        "stations": known_stations,
     }
 
 
@@ -498,6 +556,16 @@ async def resolve_participant_keys(db, matches) -> dict[str, set[str]]:
     return keys
 
 
+def station_query(tournament: dict) -> dict:
+    """Die Stationen, die ein Turnier nutzen darf: eigene und die des Events ohne Turnier. Eine Stelle für Planer und
+    „Termine lösen“ - eine Station eines anderen Turniers/Events gilt für beide als unbekannt."""
+    tid = tournament["id"]
+    event_id = tournament.get("event_id")
+    if event_id:
+        return {"$or": [{"tournament_id": tid}, {"event_id": event_id, "tournament_id": {"$in": [None, ""]}}]}
+    return {"tournament_id": tid}
+
+
 async def load_plan_inputs(db, tournament: dict) -> dict:
     """Alles, was der Planer braucht: Spiele, Phasen, Stationen, Vorschläge - und was am selben Event sonst läuft."""
     tid = tournament["id"]
@@ -505,10 +573,7 @@ async def load_plan_inputs(db, tournament: dict) -> dict:
     stages = await db.tournament_stages.find({"tournament_id": tid}, {"_id": 0}).to_list(200)
     proposals = await db.match_schedule_proposals.find({"tournament_id": tid}, {"_id": 0, "match_collection": 0}).to_list(3000)
     event_id = tournament.get("event_id")
-    station_query = {"tournament_id": tid}
-    if event_id:
-        station_query = {"$or": [{"tournament_id": tid}, {"event_id": event_id, "tournament_id": {"$in": [None, ""]}}]}
-    stations = await db.stations.find(station_query, {"_id": 0}).to_list(500)
+    stations = await db.stations.find(station_query(tournament), {"_id": 0}).to_list(500)
     participant_keys = await resolve_participant_keys(db, matches)
     busy_elsewhere: list[dict] = []
     if event_id:
@@ -563,6 +628,7 @@ async def apply_plan(db, tournament: dict, plan: dict) -> dict:
     """
     now_iso = datetime.now(timezone.utc).isoformat()
     written = 0
+    on_station: list[tuple[dict, dict]] = []
     for item in plan.get("assignments") or []:
         if not item.get("changed"):
             continue
@@ -594,9 +660,34 @@ async def apply_plan(db, tournament: dict, plan: dict) -> dict:
             guard["called_at"] = None
         if previous.get("schedule_source") in KEPT_SOURCES or previous.get("status") in RUNNING_STATUSES | DONE_STATUSES:
             continue
-        result = await db.matches_v2.update_one(guard, {"$set": update})
-        written += int(bool(result.matched_count))
-    return {"written": written, "mode": plan.get("mode"), "warnings": plan.get("warnings") or []}
+        before = await db.matches_v2.find_one_and_update(guard, {"$set": update}, projection={"_id": 0},
+                                                         return_document=ReturnDocument.BEFORE)
+        if before is not None:
+            written += 1
+            if update.get("station_id"):
+                on_station.append((before, update))
+    warnings = list(plan.get("warnings") or [])
+    # Nachprüfen (Codex zu #1611): eine Station, die zwischen Vorschau und Schreiben gelöscht wurde, bekommt nichts.
+    for station_id in {update["station_id"] for _item, update in on_station}:
+        if await station_open_for_matches(db, station_id):
+            continue
+        for before, update in [row for row in on_station if row[1]["station_id"] == station_id]:
+            # Alles, was der Plan gesetzt hat, exakt wie vorher (auch Prognose und Schreib-Metadaten) - nur, wenn das
+            # Spiel noch so dasteht wie geschrieben.
+            back = await db.matches_v2.update_one(written_state(before["id"], {"$set": update}), restore_change(before, update))
+            if back.matched_count:
+                written -= 1
+            else:
+                # Inzwischen fremd geändert: nicht überschreiben - die Warnung unten sagt, dass neu geplant werden muss.
+                logger.warning("[scheduler] %s an gelöschter Station %s, inzwischen fremd geändert - nicht zurückgesetzt",
+                               before["id"], station_id)
+        warnings.append({"type": "station_gone", "severity": "error", "station_id": station_id,
+                         "message": "Eine Station wurde beim Übernehmen gelöscht - ihre Spiele sind nicht geplant. Bitte neu planen."})
+    if plan.get("assignments"):
+        # Neu geplant: der Hinweis vom Check-in-Ende („Baum hat sich geändert - neu planen“) ist erledigt.
+        await db.tournament_stages.update_many({"tournament_id": tournament["id"], "schedule_hint": {"$exists": True}},
+                                               {"$unset": {"schedule_hint": ""}})
+    return {"written": written, "mode": plan.get("mode"), "warnings": warnings}
 
 
 async def replan_after_heat_rebuild(db, tournament: dict, stage: dict | None) -> dict:

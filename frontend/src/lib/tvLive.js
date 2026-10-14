@@ -1,6 +1,7 @@
 // Live am Turnierbaum-TV (#1116, #1117, #1118): welche Spiele laufen, wie lange schon, was sich seit dem letzten Stand
 // geändert hat. Die Spielzeit kommt aus der Startzeit (`started_at`, setzt die Stationsverwaltung) - sie stimmt deshalb
 // auch nach dem Neuladen und über Mitternacht. Ohne Startzeit steht nur „Live“.
+import { matchName as treeMatchName } from "@/lib/bracketNames";
 import { isMatchDone } from "@/lib/slotSource";
 
 export const LIVE_STATUSES = new Set(["running", "in_progress", "live"]);
@@ -100,9 +101,11 @@ export function liveZoomPlan(matchIds = [], matches = [], { roundLabel = (match)
   return { matchIds: started.map((match) => match.id), text: [label, `${started.length} Spiele`].filter(Boolean).join(" · ") };
 }
 
-/** „Spiel A“, „Durchgang C“ - wie die Karte im Baum. */
+/** „Spiel A“, „Durchgang C“ - wie die Karte im Baum; ein Wort als Kürzel heißt wie seine Runde („Grand Final“, #1591). */
 export function matchName(match) {
   const key = match?.match_key || "";
+  const named = treeMatchName(match);
+  if (named && named !== key) return named;
   const heat = String(match?.match_type || "duel") !== "duel" || (match?.slots || []).length > 2;
   return `${heat ? "Durchgang" : "Spiel"} ${key}`.trim();
 }

@@ -86,3 +86,16 @@ test("introOnce: der erste Auftritt gilt nur, solange das Hochzählen dauert, un
   window.sessionStorage.setItem("tls.shown.probe:liste-2", "1");
   expect(introOnce("probe:liste-2")).toBe(false);
 });
+
+test("neue Bestzeit (#1585): mit from läuft die Zeit kurz von der alten zur neuen - kürzer als beim ersten Auftritt", () => {
+  vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance", "setTimeout", "clearTimeout"] });
+  render(<LapTime value="1:23.412" play from={83824} duration={LAP_COUNT_MS / 2} data-testid="zeit" />);
+  const cell = screen.getByTestId("zeit");
+  expect(cell).toHaveTextContent("1:23.824");
+  act(() => { vi.advanceTimersByTime(LAP_COUNT_MS / 4); });
+  const half = parseLap(cell.textContent);
+  expect(half).toBeLessThan(83824);
+  expect(half).toBeGreaterThanOrEqual(83412);
+  act(() => { vi.advanceTimersByTime(LAP_COUNT_MS); });
+  expect(cell).toHaveTextContent("1:23.412");
+});

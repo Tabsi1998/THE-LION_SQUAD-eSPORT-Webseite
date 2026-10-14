@@ -255,3 +255,17 @@ def test_online_has_no_queue():
 def test_without_stations_there_is_no_queue():
     view = queue(eight(), [], T0)
     assert view["applies"] is False and view["reason"]
+
+
+def test_a_station_being_deleted_gets_nothing():
+    """Eine Station mit Löschmarkierung (``deleting``) steht nicht in der Warteschlange und bekommt kein Spiel."""
+    view = queue(eight(), [station("st1", "1"), station("st2", "2", deleting=True)], T0)
+    assert [row["id"] for row in view["stations"]] == ["st1"]
+    assert {entry["station_id"] for entry in view["matches"].values()} == {"st1"}
+
+
+def test_a_preview_tree_has_no_queue():
+    """Vorschau-Baum (vor dem Check-in-Ende): keine Warteschlange, also auch kein Aufruf."""
+    matches = [{**match, "is_preview": True} for match in eight()]
+    view = queue(matches, [station("st1", "1")], T0)
+    assert view["applies"] is False and view["matches"] == {}

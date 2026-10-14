@@ -100,7 +100,7 @@ export function PlanSettings({ tournament, mode, duration, stations, canEdit, on
             {stations.map((station) => (
               <li key={station.id} className="mp-chip" data-status={station.status}>
                 <span>{station.name}</span>
-                <span className="mp-chip__meta">{formatDeviceType(station.device_type)}{station.status === "broken" ? " · defekt" : ""}</span>
+                <span className="mp-chip__meta">{formatDeviceType(station.device_type)}{station.scope === "event" ? " · Event" : ""}{station.status === "broken" ? " · defekt" : ""}</span>
               </li>
             ))}
             {!stations.length && <li className="mp-chip mp-chip--empty">Noch keine Station - ohne Station plant der Planer keine Zeiten.</li>}
@@ -202,12 +202,15 @@ export function PlanWarnings({ items, warnings }) {
 }
 
 function stateText(item) {
-  if (item.preview) return "noch ohne Zeit - Baum ist Vorschau";
+  if (item.preview && (item.start === null || item.start === undefined)) return "noch ohne Zeit - Baum ist Vorschau";
   if (item.start === null || item.start === undefined) return "noch ohne Zeit";
   if (item.state === "running") return `läuft ${item.elapsedMinutes} Min.`;
   if (item.state === "done") return "erledigt";
   if (item.conflicts.length) return item.conflicts[0].text;
   if (item.fixed) return item.source === "accepted" ? "vereinbart - bleibt" : "fest - von Hand gesetzt";
+  if (item.draw === "ready") return "wartet auf Auslosung - der Topf steht";
+  if (item.draw === "waiting") return "wartet auf Auslosung";
+  if (item.draw === "instant") return "Prognose - das Los entscheidet, Plätze füllen sich einzeln";
   if (item.forecast) return "Prognose - Spieler stehen noch nicht fest";
   return "vom Planer";
 }
@@ -242,7 +245,7 @@ export function OrderList({ items, laneNames, canEdit, onRelease, editor }) {
                       <Pin className="h-3 w-3" aria-hidden="true" /> lösen
                     </button>
                   )}
-                  {editor && editable(item) && !item.preview && item.state === "planned" && (
+                  {editor && editable(item) && item.state === "planned" && (
                     <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small" aria-label={`${item.key} ändern`} aria-expanded={open === item.id}
                       onClick={() => setOpen(open === item.id ? null : item.id)}>
                       ändern
@@ -295,7 +298,7 @@ export function StationAgenda({ timeline, canEdit = false, onRelease, editor, ne
                     <span className="mp-agenda__state" data-warn={item.conflicts.length ? "true" : undefined}>
                       {next?.id === item.id && item.state === "planned" ? "als Nächstes · " : ""}{stateText(item)}
                     </span>
-                    {editor && editable(item) && item.state === "planned" && !item.preview && (
+                    {editor && editable(item) && item.state === "planned" && (
                       <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small mp-agenda__action" aria-label={`${item.key} ändern`}
                         aria-expanded={open === item.id} onClick={() => setOpen(open === item.id ? null : item.id)}>ändern</button>
                     )}
@@ -324,7 +327,7 @@ export function StationAgenda({ timeline, canEdit = false, onRelease, editor, ne
                   <span className="mp-agenda__key"><span className="mp-pill" data-tone={item.tone}>{TONE_LABEL[item.tone]}</span> {item.key}</span>
                   <span className="mp-agenda__names">{item.names.join(" · ")}</span>
                   <span className="mp-agenda__state">{stateText(item)}</span>
-                  {editor && editable(item) && !item.preview && item.state === "planned" && (
+                  {editor && editable(item) && item.state === "planned" && (
                     <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small mp-agenda__action" aria-label={`${item.key} ändern`}
                       aria-expanded={open === item.id} onClick={() => setOpen(open === item.id ? null : item.id)}>ändern</button>
                   )}

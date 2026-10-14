@@ -23,7 +23,10 @@ function barLabel(item, laneName) {
   if (item.state === "running") parts.push(`läuft seit ${item.elapsedMinutes} Minuten`);
   if (item.state === "done") parts.push("erledigt");
   if (item.fixed) parts.push("fester Termin");
-  if (item.forecast) parts.push("Prognose, Spieler stehen noch nicht fest");
+  if (item.draw === "ready") parts.push("wartet auf Auslosung, der Topf steht");
+  else if (item.draw === "waiting") parts.push("wartet auf Auslosung");
+  else if (item.draw === "instant") parts.push("Prognose, das Los entscheidet");
+  else if (item.forecast) parts.push("Prognose, Spieler stehen noch nicht fest");
   for (const conflict of item.conflicts) parts.push(`Konflikt: ${conflict.text}`);
   return parts.join(", ");
 }
@@ -66,11 +69,12 @@ export function StationTimeline({ timeline, editable = false, canMoveItem = null
     return () => clearTimeout(timer);
   }, [instant]);
 
-  const movable = (item) => editable && !busy && item.state === "planned" && !item.preview && (!canMoveItem || canMoveItem(item));
+  const movable = (item) => editable && !busy && item.state === "planned" && (!canMoveItem || canMoveItem(item));
 
   const describe = (next, item) => {
     const blocking = dropConflicts(timeline, item.id, next.laneId, next.start);
     const where = `${item.key} → ${laneName(next.laneId)} · ${hm(next.start)}`;
+    if (blocking.some((row) => row.missing)) return `${where} · Diese Station gibt es nicht mehr - bitte eine andere wählen`;
     return blocking.length ? `${where} · im Weg: ${blocking.map((row) => row.key).join(", ")}` : `${where} · frei`;
   };
 
@@ -90,6 +94,10 @@ export function StationTimeline({ timeline, editable = false, canMoveItem = null
     setDrag(null);
     if (next.start === item.start && next.laneId === item.laneId) {
       setStatus(`${item.key} bleibt, wo es ist.`);
+      return;
+    }
+    if (timeline.lanes.find((lane) => lane.id === next.laneId)?.missing) {
+      setStatus(`${item.key}: Diese Station gibt es nicht mehr - bitte eine andere wählen.`);
       return;
     }
     setBusy(true);
@@ -196,7 +204,7 @@ export function StationTimeline({ timeline, editable = false, canMoveItem = null
                 <div className="mp-lane__label">
                   <span className="mp-lane__name" title={lane.name}>{lane.name}</span>
                   <span className="mp-lane__meta">
-                    {lane.status === "broken" ? "defekt · " : ""}{lane.count === 1 ? "1 Spiel" : `${lane.count} Spiele`}
+                    {lane.missing ? "gibt es nicht mehr · " : lane.status === "broken" ? "defekt · " : lane.scope === "event" ? "Event · " : ""}{lane.count === 1 ? "1 Spiel" : `${lane.count} Spiele`}
                   </span>
                 </div>
                 <div className="mp-lane__track" style={{ "--mp-tick": `${15 * ppm}px` }}>

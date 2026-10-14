@@ -9,6 +9,7 @@ import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { toast } from "sonner";
+import { attemptsPayload } from "@/lib/fastLapEvent";
 
 const CREATE_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -44,7 +45,8 @@ export default function AdminF1NewPage() {
     visibility: "public",
     vehicle: "", weather: "", assists_allowed: "",
     controller_type: "", platform: "", banner_url: "",
-    unlimited_attempts: true, max_attempts: 0,
+    // Vor Ort (#1585): 3 Versuche je Person und Strecke als Vorgabe; leer = unbegrenzt.
+    attempts: "3",
     registration_enabled: false, registration_open_from: "", registration_open_until: "",
     block_club_member_results: false, allow_club_reference_times: true, show_club_reference_times: true,
     start_date: "", end_date: "", status: "draft",
@@ -80,9 +82,11 @@ export default function AdminF1NewPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form };
+      const attempts = attemptsPayload(form.attempts);
+      if (attempts.error) { toast.error(attempts.error); setSaving(false); return; }
+      const { attempts: _attemptsText, ...fields } = form;
+      const payload = { ...fields, ...attempts };
       if (payload.block_club_member_results) payload.allow_club_reference_times = true;
-      if (payload.unlimited_attempts) payload.max_attempts = null;
       payload.season_weight = Number(payload.season_weight || 0);
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
       payload.prize_places = (payload.prize_places || [])
@@ -180,8 +184,7 @@ export default function AdminF1NewPage() {
             <TextField label="Plattform" value={form.platform} onChange={(v) => set("platform", v)} testId="f1-new-platform" />
           </FormGrid>
           <CheckField label="Championship (mehrere Strecken + Punkte pro Platz)" checked={form.is_championship} onChange={(v) => set("is_championship", v)} testId="f1-new-championship" />
-          <CheckField label="Unbegrenzte Versuche" checked={form.unlimited_attempts} onChange={(v) => set("unlimited_attempts", v)} testId="f1-new-unlimited" />
-          {!form.unlimited_attempts && <TextField label="Max Versuche" type="number" value={form.max_attempts} onChange={(v) => set("max_attempts", Number(v))} testId="f1-new-max-attempts" className="md:max-w-xs" />}
+          <TextField label="Versuche je Person und Strecke" hint="Leer = unbegrenzt. Ungültige Runden zählen mit." type="number" value={form.attempts} onChange={(v) => set("attempts", v)} testId="f1-new-attempts" className="md:max-w-xs" />
         </FormSection>
 
         <FormSection title="Preise (strukturiert)" accent="#FFD700" hint="Wird bei Ergebnisveröffentlichung als Gewinnabholung angelegt.">

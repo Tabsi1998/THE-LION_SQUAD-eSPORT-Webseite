@@ -210,3 +210,62 @@ describe("Worst Case: 47 Spiele, 8 Stationen, eine defekt", () => {
     expect(timeline.items.filter((item) => item.conflicts.length)).toEqual([]);
   });
 });
+
+
+// Weiterkommen in vier Modi (#1590): was auf ein Los wartet, sagt das im Matchplan - aus der Planer-Antwort oder, ohne
+// Plan, aus dem Spiel selbst (Gruppe, Modus, Topf).
+describe("Zeitleiste: wartet auf Auslosung", () => {
+  const state = fixture.local.applied;
+  const withMode = (mode, extra = {}) => ({
+    ...state,
+    matches: state.matches.map((row) => (row.match_key === "E"
+      ? { ...row, settings: { ...row.settings, draw_group: "WB:2", advancement_mode: mode }, slots: row.slots.map((slot) => ({ ...slot, registration_id: null, status: "pending", source: { ...slot.source, draw: { group: "WB:2", label: "Runde 1" } } })), ...extra }
+      : row)),
+  });
+
+  it("ohne Plan: Auslosung nach der Runde wartet, Show mit Topf ist bereit, sofort zufällig ist nur Prognose", () => {
+    expect(byKey(timelineOf(withMode("draw_round"))).E.draw).toBe("waiting");
+    expect(byKey(timelineOf(withMode("draw_show"))).E.draw).toBe("waiting");
+    expect(byKey(timelineOf(withMode("draw_show", { draw_ready: { group: "WB:2", since: "2026-10-14T17:00:00+00:00" } }))).E.draw).toBe("ready");
+    expect(byKey(timelineOf(withMode("instant"))).E.draw).toBe("instant");
+    expect(byKey(timelineOf(withMode("draw_round", { draw: { id: "d1", group: "WB:2" } }))).E.draw).toBe(null);
+    expect(byKey(timelineOf(state)).E.draw).toBe(null);
+  });
+
+  it("mit Plan zählt die Antwort des Planers", () => {
+    const plan = { ...state.plan, assignments: state.plan.assignments.map((row) => (row.match_key === "E" ? { ...row, waiting_for_draw: true, draw_ready: true } : row)) };
+    expect(byKey(timelineOf(withMode("draw_show"), { plan })).E.draw).toBe("ready");
+  });
+});
+
+// Praxis 14.10. (Fabian): Spiele auf einer gelöschten Station standen auf einer Bahn „Station“, obwohl der Kopf
+// „Noch keine Station“ sagte, und LE stand ohne Warnung vor LC. Die Stationen und Warnungen kommen jetzt vom Planer.
+describe("Stationen, die der Planer kennt - und eine, die es nicht mehr gibt", () => {
+  it("eine gelöschte Station heißt so, ist als fehlend markiert und ihre Spiele tragen die Warnung", () => {
+    const state = fixture.orphan;
+    const timeline = timelineOf(state, { plan: state.plan });
+    const lane = timeline.lanes.find((row) => row.id === state.deleted_station_id);
+    expect(lane).toMatchObject({ name: "Gelöschte Station", missing: true, count: 13 });
+    expect(timeline.lanes.find((row) => row.id === "none")).toMatchObject({ name: "Ohne Station", count: 1 });
+    const items = byKey(timeline);
+    expect(items.A.conflicts.map((row) => row.type)).toContain("unknown_station");
+    expect(items.LE.conflicts.find((row) => row.type === "too_early")).toMatchObject({ otherKey: "LC" });
+    expect(items.FINAL.conflicts.find((row) => row.type === "too_early")).toMatchObject({ otherKey: "LF" });
+    expect(items.G.minutes).toBe(30);
+  });
+
+  it("eine Station des Events steht mit ihrem Namen auf der Bahn, auch wenn die Liste des Turniers sie nicht kennt", () => {
+    const state = fixture.event_stations;
+    const hall = state.plan.stations.find((row) => row.scope === "event");
+    const timeline = timelineOf(state, { plan: state.plan });
+    expect(timeline.lanes.map((lane) => lane.name)).toContain(hall.name);
+    expect(timeline.lanes.find((lane) => lane.id === hall.id)).toMatchObject({ missing: false, scope: "event" });
+  });
+
+  it("auf eine Station, die es nicht mehr gibt, lässt sich nichts legen", () => {
+    const state = fixture.orphan;
+    const timeline = timelineOf(state, { plan: state.plan });
+    const lf = byKey(timeline).LF;
+    expect(dropConflicts(timeline, lf.id, state.deleted_station_id, lf.start)).toEqual([{ key: "gelöscht", missing: true }]);
+  });
+});

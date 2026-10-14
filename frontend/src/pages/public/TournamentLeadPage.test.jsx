@@ -90,3 +90,45 @@ test("Stationen (#1556): vor Ort die Warteschlange je Station - „Aufrufen“ u
   fireEvent.click(await screen.findByTestId("live-call-st2"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/live-queue/call", { station_id: "st2", match_id: "QF2" }));
 });
+
+// Show-Auslosung (#1590): „Auslosung bereit · N Namen“ mit Topf, Restzeit bis zum automatischen Los und „Jetzt auslosen“.
+test("Auslosung bereit: Topf mit Namen, Restzeit, „Jetzt auslosen“ nur mit Aufbau-Recht", async () => {
+  // Die Browser-Uhr steht drei Minuten nach der Server-Uhr der Antwort - die Restzeit zählt von dort weiter.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-14T10:06:30+00:00"));
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  const card = {
+    id: "draw-WB:2", stage_id: "s1", stage_name: "K.-o.", group: "WB:2", label: "Runde 1", match_ids: ["m5", "m6"], match_keys: ["E", "F"],
+    pot: ["NeonFalke", "Aleksandra Wiśniewska-Kowalczyk 🦁 [LÖWEN-ESPORTS-AKADEMIE]", "TurboTina", "Jo"], pot_size: 4,
+    since: "2026-10-14T10:00:00+00:00", remind_minutes: 10, remind_at: "2026-10-14T10:10:00+00:00", due_at: "2026-10-14T10:20:00+00:00", can_draw: true,
+  };
+  renderLead({
+    tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup" }, now: "2026-10-14T10:03:30+00:00", matches: [ENTRY], recent: [], counts: { open: 1 },
+    attention: [], stations: [], draws: [card],
+  });
+  expect(await screen.findByTestId("lead-tab-attention")).toHaveTextContent("Braucht Aufmerksamkeit (1)");
+  const shown = screen.getByTestId("lead-draw-WB:2");
+  expect(shown).toHaveTextContent("Auslosung bereit · 4 Namen");
+  expect(shown).toHaveTextContent("nach Runde 1 → E, F");
+  expect(screen.getByTestId("lead-draw-pot-WB:2").querySelectorAll("li")).toHaveLength(4);
+  expect(screen.getByTestId("lead-draw-countdown-WB:2")).toHaveTextContent("automatisch in 14 Min.");
+  fireEvent.click(screen.getByTestId("lead-draw-now-WB:2"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/stages/s1/draw", { group: "WB:2" }));
+  // Nach dem Auslosen lädt die Ansicht neu (die Warteschlange vor Ort fragt die Seite getrennt, #1556).
+  await waitFor(() => expect(apiMock.get.mock.calls.filter(([url]) => String(url).endsWith("/lead"))).toHaveLength(2));
+  vi.useRealTimers();
+});
+
+test("Auslosung bereit ohne Aufbau-Recht: Karte ohne Knopf; nach der Frist steht „jeden Moment“", async () => {
+  const { drawCountdown } = await import("./TournamentLeadPage");
+  const card = { id: "draw-LB:3", stage_id: "s1", group: "LB:3", label: "Loser Runde 2", match_keys: ["LC"], pot: ["Jo"], pot_size: 1, due_at: "2026-10-14T10:20:00+00:00", can_draw: false };
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-14T10:25:00+00:00"));
+  renderLead({ tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup" }, now: "2026-10-14T10:25:00+00:00", matches: [], recent: [], counts: {}, attention: [], stations: [], draws: [card] });
+  expect(await screen.findByTestId("lead-draw-LB:3")).toHaveTextContent("Auslosung bereit · 1 Name");
+  expect(screen.queryByTestId("lead-draw-now-LB:3")).toBeNull();
+  expect(screen.getByTestId("lead-draw-countdown-LB:3")).toHaveTextContent("jeden Moment");
+  expect(drawCountdown(card, "2026-10-14T10:09:30+00:00", new Date("2026-10-14T10:09:30+00:00").getTime())).toBe("automatisch in 11 Min.");
+  expect(drawCountdown({ due_at: null }, "2026-10-14T10:09:30+00:00")).toBe("");
+  vi.useRealTimers();
+});

@@ -16,6 +16,23 @@ logger = logging.getLogger("tls.draws")
 
 ACTION_DONE = "tournament.draw.done"
 ACTION_REDRAWN = "tournament.draw.redrawn"
+# Weiterkommen in vier Modi (#1590): die Show-Runde ist bereit (Topf steht), je Platz sofort zugewiesen.
+ACTION_READY = "tournament.draw.ready"
+ACTION_ASSIGNED = "tournament.draw.assigned"
+# Je Art ein Anzeige-Ereignis für Web, TV und App: ``draw_ready`` (Topf steht, Spiele der Runde), ``draw_assigned``
+# (ein Platz, ein Spiel), sonst ``draw_done`` (die ganze Runde).
+EVENT_TYPES = {"ready": "draw_ready", "instant": "draw_assigned"}
+
+
+def _action_for(draw: dict) -> str:
+    kind = draw.get("kind") or "advancement"
+    if kind == "ready":
+        return ACTION_READY
+    if draw.get("trigger") == "redraw":
+        return ACTION_REDRAWN
+    if kind == "instant":
+        return ACTION_ASSIGNED
+    return ACTION_DONE
 
 
 async def record_draws(db, draws: list[dict] | None, *, actor_id: str | None, tournament_id: str | None = None) -> int:
@@ -25,7 +42,7 @@ async def record_draws(db, draws: list[dict] | None, *, actor_id: str | None, to
         target_id = draw.get("tournament_id") or tournament_id
         if not target_id or not draw.get("id"):
             continue
-        action = ACTION_REDRAWN if draw.get("trigger") == "redraw" else ACTION_DONE
+        action = _action_for(draw)
         await db.audit_logs.update_one(
             {"id": f"audit-draw-{draw['id']}"},
             {"$setOnInsert": {
@@ -40,17 +57,22 @@ async def record_draws(db, draws: list[dict] | None, *, actor_id: str | None, to
                     "kind": draw.get("kind") or "advancement",
                     "trigger": draw.get("trigger"),
                     "assignments": draw.get("assignments") or [],
+                    **({"pot_size": draw.get("pot_size"), "match_ids": draw.get("match_ids") or []}
+                       if draw.get("kind") == "ready" else {}),
                 },
                 "created_at": draw.get("drawn_at"),
             }},
             upsert=True,
         )
+        event_type = EVENT_TYPES.get(draw.get("kind") or "", "draw_done")
         try:
-            # Anzeige-Ereignis (#1553) vom Typ ``draw_done``: öffentlich Typ, Turnier und die ausgelosten Spiele.
+            # Anzeige-Ereignis (#1553): öffentlich Typ, Turnier und die betroffenen Spiele - keine Namen.
             match_ids = list(dict.fromkeys(row.get("match_id") for row in draw.get("assignments") or [] if row.get("match_id")))
-            await publish_tournament_event(target_id, "draw_done", match_ids=match_ids)
+            if draw.get("kind") == "ready":
+                match_ids = list(draw.get("match_ids") or [])
+            await publish_tournament_event(target_id, event_type, match_ids=match_ids)
         except Exception as exc:  # noqa: BLE001 - das Ereignis ist ein Hinweis, das Protokoll steht schon
-            logger.warning("draw_done event failed type=%s", type(exc).__name__)
+            logger.warning("%s event failed type=%s", event_type, type(exc).__name__)
         count += 1
     return count
 

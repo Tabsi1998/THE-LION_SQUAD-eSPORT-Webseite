@@ -728,7 +728,11 @@ class TournamentCreate(BaseModel):
     # Auszeichnungen (#230): gestaltete Bilder für Platz 1 bis 3 ({"1": url, ...}); ohne Bild gilt die feste Vorlage.
     award_images: Optional[dict] = None
     seeding_mode: Literal["manual", "random", "ranking"] = "random"
-    randomize_advancement_rounds: bool = False
+    # Weiterkommen in vier Modi (#1590); der alte Schalter bleibt als Spiegel (services/advancement_draw).
+    advancement_mode: Optional[Literal["fixed", "draw_round", "draw_show", "instant"]] = None
+    randomize_advancement_rounds: Optional[bool] = None
+    # Show-Auslosung: Minuten bis zur Erinnerung an die Turnierleitung; nach noch einmal so vielen lost der Server.
+    draw_show_minutes: Optional[int] = Field(default=None, ge=1, le=240)
     # Phase 5: unified stream-per-object
     has_live_stream: bool = False
     stream_platform: Optional[StreamPlatform] = None
@@ -813,7 +817,9 @@ class TournamentUpdate(BaseModel):
     banner_url: Optional[str] = None
     award_images: Optional[dict] = None
     seeding_mode: Optional[Literal["manual", "random", "ranking"]] = None
+    advancement_mode: Optional[Literal["fixed", "draw_round", "draw_show", "instant"]] = None
     randomize_advancement_rounds: Optional[bool] = None
+    draw_show_minutes: Optional[int] = Field(default=None, ge=1, le=240)
     has_live_stream: Optional[bool] = None
     stream_platform: Optional[StreamPlatform] = None
     stream_url: Optional[str] = None
@@ -1074,9 +1080,11 @@ class F1ChallengeCreate(BaseModel):
     assists_allowed: Optional[str] = None
     controller_type: Optional[str] = None
     platform: Optional[str] = None
-    max_attempts: Optional[int] = None
-    unlimited_attempts: bool = True
-    registration_enabled: bool = True
+    # Vor Ort (#1585): 3 Versuche je Person und Strecke als Vorgabe, einstellbar (leer bzw. unbegrenzt = keine Grenze).
+    # Online-Einreichen gibt es noch nicht (#1278) - neue Challenges zeigen es nicht an.
+    max_attempts: Optional[int] = Field(default=3, ge=1, le=100)
+    unlimited_attempts: bool = False
+    registration_enabled: bool = False
     block_club_member_results: bool = False
     allow_club_reference_times: bool = True
     show_club_reference_times: bool = True
@@ -1117,7 +1125,7 @@ class F1ChallengeUpdate(BaseModel):
     assists_allowed: Optional[str] = None
     controller_type: Optional[str] = None
     platform: Optional[str] = None
-    max_attempts: Optional[int] = None
+    max_attempts: Optional[int] = Field(default=None, ge=1, le=100)
     unlimited_attempts: Optional[bool] = None
     registration_enabled: Optional[bool] = None
     block_club_member_results: Optional[bool] = None
@@ -1149,7 +1157,9 @@ class F1ChallengeUpdate(BaseModel):
 
 
 class F1LapTimeCreate(BaseModel):
-    user_id: str
+    # Genau eins von beiden: ein Konto oder ein Gast ohne Konto (#1585).
+    user_id: Optional[str] = None
+    guest_id: Optional[str] = None
     track_id: str
     time_ms: int = Field(ge=0, description="Lap time in milliseconds")
     penalty_seconds: float = 0.0
@@ -1175,6 +1185,41 @@ class F1LapTimeUpdate(BaseModel):
 
 class F1LapTimeDelete(BaseModel):
     change_reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class F1GuestCreate(BaseModel):
+    """Ein Gast ohne Konto (#1585): nur ein Anzeigename - geprüft wird er in ``services.fastlap_guests``."""
+    display_name: str = Field(max_length=200)
+
+
+class F1GuestRename(F1GuestCreate):
+    """Umbenennen (#1585) - nach der Veröffentlichung wie eine Zeitkorrektur nur mit Begründung."""
+    change_reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class F1GuestLink(BaseModel):
+    """Gast mit Konto verknüpfen (#1585): das Konto aus der Personensuche, nach der Veröffentlichung mit Begründung."""
+    user_id: str
+    change_reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class F1QueueCreate(BaseModel):
+    """„Am Start / Als Nächstes“ (#1585): ein Konto oder ein Gast, auf einer Strecke, an einer Station (Freitext)."""
+    user_id: Optional[str] = None
+    guest_id: Optional[str] = None
+    track_id: Optional[str] = None
+    station: Optional[str] = Field(default=None, max_length=40)
+
+
+class F1QueueStart(BaseModel):
+    station: Optional[str] = Field(default=None, max_length=40)
+
+
+class F1QueueNext(BaseModel):
+    """„Nächster Fahrer“: wer gerade fertig ist (``done_id``) verlässt die Liste, der Nächste geht an die Station."""
+    done_id: Optional[str] = None
+    station: Optional[str] = Field(default=None, max_length=40)
+    track_id: Optional[str] = None
 
 
 # ---------- Stations ----------

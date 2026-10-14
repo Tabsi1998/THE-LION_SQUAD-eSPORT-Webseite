@@ -3,7 +3,7 @@
 // Wiedergabeliste (#1121). Gerechnet wird wie am Server: die Anmeldung ist offen, wenn sie es für Spieler wirklich ist
 // (Status „Anmeldung offen“, eingeschaltet, im Zeitraum), der Check-in nach Status oder Zeitraum. Die Uhr läuft mit -
 // der TV wechselt von selbst, auch ohne neue Daten.
-import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
+import { formatBracketSection, matchRoundLabel } from "@/lib/tournamentLabels";
 import { isMatchDone } from "@/lib/slotSource";
 import { isLiveMatch, matchName, stationName } from "@/lib/tvLive";
 import { asInstant, viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
@@ -65,7 +65,7 @@ export function nextUp(matches = []) {
   const rank = (match) => (match.called_at ? 0 : match.station_id ? 1 : 2);
   const at = (match) => timeOf(match.called_at || match.scheduled_at) ?? Number.MAX_SAFE_INTEGER;
   const [first] = [...open].sort((a, b) => rank(a) - rank(b) || at(a) - at(b) || (a.round || 0) - (b.round || 0) || (a.order || 0) - (b.order || 0));
-  const where = [formatBracketSection(first.section), formatRoundName(first.round_name, first.round)].filter(Boolean).join(", ");
+  const where = [formatBracketSection(first.section), matchRoundLabel(first)].filter(Boolean).join(", ");
   const station = stationName(first);
   const name = station ? `${matchName(first)} an ${station}` : matchName(first);
   return { match: first, text: [where, name].filter(Boolean).join(" · ") };

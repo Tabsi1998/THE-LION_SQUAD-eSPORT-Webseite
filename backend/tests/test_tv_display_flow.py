@@ -375,6 +375,30 @@ def test_the_tv_learns_about_the_reset_and_why_a_match_is_dropped_but_nothing_pe
     assert "user-1" not in json.dumps(matches) and "Notiz" not in json.dumps(matches)
 
 
+def test_the_tv_knows_the_forecast_and_who_dropped_out_but_no_notes():
+    """„Als Nächstes“ mit Prognose (#1564): der TV weiß, ob eine Zeit nur eine Prognose des Planers ist, und wer
+    ausgefallen ist (Aufgabe, nicht ins Ziel) - ohne Notizen und Konten aus der Wertung."""
+    payload = {"tournament": {"id": "t1"}, "registrations": [], "stages": [], "matches_v2": [
+        {"id": "e", "match_key": "E", "section": "WB", "round": 2, "status": "pending", "slots": [], "results": [],
+         "scheduled_at": "2026-10-31T15:40:00+00:00", "schedule_forecast": True, "schedule_source": "planner",
+         "schedule_written_at": "2026-10-31T12:00:00+00:00"},
+        {"id": "a", "match_key": "A", "section": "WB", "round": 1, "status": "completed", "slots": [], "results": [
+            {"registration_id": "r1", "rank": 1, "score": 2, "dnf": False, "forfeit": False, "user_id": "u1", "note": "geheim"},
+            {"registration_id": "r2", "rank": 2, "forfeit": True, "user_id": "u2", "note": "Kam nicht, laut Herrn X"},
+            {"registration_id": "r3", "rank": 3, "dnf": True}]},
+    ]}
+    matches = {match["id"]: match for match in tv_display.display_bracket_payload(payload)["matches_v2"]}
+    assert matches["e"]["schedule_forecast"] is True
+    assert matches["e"]["schedule_source"] == "planner"
+    assert "schedule_written_at" not in matches["e"]
+    assert matches["a"]["results"] == [
+        {"registration_id": "r1", "rank": 1, "score": 2, "dnf": False, "forfeit": False},
+        {"registration_id": "r2", "rank": 2, "forfeit": True},
+        {"registration_id": "r3", "rank": 3, "dnf": True},
+    ]
+    assert "geheim" not in json.dumps(matches) and "u1" not in json.dumps(matches)
+
+
 def test_the_tv_learns_about_mixed_groups_and_where_each_player_really_came_from():
     """Gegner mischen (#1548, #1561): der TV braucht die Gruppe, den Klartext der Plätze, ob gelost ist und die echte
     Herkunft je Platz - ohne Konten (`user_id`) und ohne Zeitstempel der Bestätigung."""

@@ -4,6 +4,7 @@ import { MOTION, motionAllowed } from "@/lib/motion";
 // Timing-Board (#1077): eine Rundenzeit zählt beim ersten Erscheinen der Bestenliste einmal hoch - wie auf einer
 // Anzeigetafel. Am Ende steht immer exakt der Text vom Server; gerechnet wird nur für die Bewegung dazwischen.
 // Ohne `play`, mit „Bewegung reduzieren“ oder bei einem Text, der keine Zeit ist, steht der Wert sofort da.
+// Neue Bestzeit (#1585): mit `from` (Millisekunden der alten Zeit) läuft die Zahl kurz von der alten zur neuen.
 
 const LAP = /^(?:(\d+):)?(?:(\d{1,2}):)?(\d{1,2})[.,](\d{1,3})$/;
 export const LAP_COUNT_MS = MOTION.slow * 2;
@@ -35,10 +36,11 @@ export function formatLapLike(ms, template) {
   return `${String(Math.floor(rest / 60)).padStart(first.length, "0")}:${minutesText}:${secondsText}${separator}${part}`;
 }
 
-export function LapTime({ value, play = false, duration = LAP_COUNT_MS, className = "", ...rest }) {
+export function LapTime({ value, play = false, from = 0, duration = LAP_COUNT_MS, className = "", ...rest }) {
   const target = parseLap(value);
+  const start = Number.isFinite(Number(from)) ? Number(from) : 0;
   const animate = useRef(Boolean(play) && target !== null && motionAllowed());
-  const [shown, setShown] = useState(() => (animate.current ? formatLapLike(0, value) : null));
+  const [shown, setShown] = useState(() => (animate.current ? formatLapLike(start, value) : null));
 
   useEffect(() => {
     if (!animate.current || typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
@@ -46,15 +48,15 @@ export function LapTime({ value, play = false, duration = LAP_COUNT_MS, classNam
       return undefined;
     }
     let frame = 0;
-    const start = window.performance.now();
+    const began = window.performance.now();
     const step = (now) => {
-      const progress = Math.min(1, (now - start) / duration);
+      const progress = Math.min(1, (now - began) / duration);
       if (progress >= 1) {
         animate.current = false;
         setShown(null);
         return;
       }
-      setShown(formatLapLike(target * (1 - (1 - progress) ** 3), value));
+      setShown(formatLapLike(start + (target - start) * (1 - (1 - progress) ** 3), value));
       frame = window.requestAnimationFrame(step);
     };
     frame = window.requestAnimationFrame(step);

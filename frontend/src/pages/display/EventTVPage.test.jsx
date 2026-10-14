@@ -98,3 +98,31 @@ test("die Aufruf-Tafel eines Events: Aufrufe aus allen Turnieren, mit Turnier", 
   expect(board).toHaveTextContent("Lions Herbst-Cup");
   expect(screen.getByTestId("event-calls-tv")).toHaveTextContent("Aufrufe");
 });
+
+test("#1564: dieselbe Station aus Event und Turnier steht nur einmal da - der lebhafteste Stand zählt", async () => {
+  const hall = hallEvent({ now: Date.now(), stations: 6 });
+  // Heute legt jedes Turnier seine Stationen selbst an: dieselben Namen und Geräte noch einmal, mit eigener Kennung.
+  const copies = hall.stations.map((station) => ({ ...station, id: `${station.id}-kopie`, status: "free", current_match_id: null }));
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/tv/settings") return { data: { settings: {} } };
+    if (url === "/events/event-1") return { data: hall.event };
+    if (url.startsWith("/stations?event_id=")) return { data: hall.stations };
+    if (url.startsWith("/stations?tournament_id=")) return { data: copies };
+    const bracket = /\/tournaments\/(t\d)\/bracket/.exec(url);
+    if (bracket) return { data: hall.brackets[bracket[1]] };
+    return { data: [] };
+  });
+  renderAt("/display/event/event-1");
+  await screen.findAllByTestId("tv-station");
+  expect(screen.getAllByTestId("tv-station")).toHaveLength(6);
+  const busy = hall.stations.find((station) => station.status === "busy" || station.status === "in_use");
+  if (busy) expect(document.querySelector(`[data-station='${busy.id}']`)).toHaveAttribute("data-state", "busy");
+});
+
+test("#1564: „Als Nächstes“ in der Halle nennt das nächste Spiel mit Prognose und Station", async () => {
+  serve(hallEvent({ now: Date.now(), stations: 6 }));
+  renderAt("/display/event/event-1");
+  const next = await screen.findByTestId("tv-next-match");
+  // Mit Uhrzeit „ca. 16:40 · PC 4“, ohne geplante Zeit nur die Station.
+  expect(next).toHaveTextContent(/Spiel [A-Z]+ · (ca\. \d{2}:\d{2} · )?PC \d/);
+});

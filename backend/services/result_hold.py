@@ -274,6 +274,21 @@ def _downstream(match: dict, stage_matches: list[dict]) -> list[dict]:
     return list(found.values())
 
 
+def _ready_groups_fed_by(match: dict, stage_matches: list[dict]) -> list[tuple[str, str | None]]:
+    """Die Show-Runden (#1590), die dieses Spiel beliefert und die gerade „bereit“ sind - je Phase und Gruppe."""
+    by_id = {row.get("id"): row for row in stage_matches if row.get("id")}
+    found: list[tuple[str, str | None]] = []
+    for entry in match.get("advancement") or []:
+        target = by_id.get(entry.get("to_match_id"))
+        group = draw_group_of(target)
+        if not group or not isinstance(target.get("draw_ready"), dict) or isinstance(target.get("draw"), dict):
+            continue
+        scope = (group, target.get("stage_id"))
+        if scope not in found:
+            found.append(scope)
+    return found
+
+
 def _undoes_draw(slot: dict, target: dict, match: dict) -> bool:
     """Was Rückgängig leert: den Platz aus diesem Spiel - und gemischt jeden Platz aus der Auslosung dieser Runde."""
     origin = slot.get("source_result") or {}
@@ -347,6 +362,15 @@ async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | No
                 **({"reports": []} if target.get("reports") else {}),
             }, **({"$unset": {"draw": ""}} if drawn else {})})
             cleared.append(target["id"])
+    # Show-Auslosung (#1590): war die Runde „bereit“, ist sie es ohne dieses Ergebnis nicht mehr - die Marke geht weg.
+    for group, stage_id in _ready_groups_fed_by(match, stage_matches):
+        result = await db.matches_v2.update_many(
+            {"stage_id": stage_id, "settings.draw_group": group, "draw_ready": {"$type": "object"}, "draw": {"$exists": False}},
+            {"$set": {"draw_ready": None, "updated_at": now_iso}},
+        )
+        if getattr(result, "modified_count", 0):
+            cleared.extend(row["id"] for row in group_targets(stage_matches, group, stage_id)
+                           if isinstance(row.get("draw_ready"), dict) and row["id"] not in cleared)
     await db.matches_v2.update_one({"id": match["id"]}, {
         "$set": {"results": [], "result_meta": None, "completed_at": None, "completed_by": None,
                  "status": _open_status(match), "updated_at": now_iso},

@@ -11,16 +11,19 @@ import { useEventHall } from "@/components/tv/useEventHall";
 import { useLowMomentTimer, useMinuteTick, useSponsorMoments, useTvSponsors } from "@/components/tv/tvHooks";
 import { callsOf } from "@/lib/tvCalls";
 import { dayPlan } from "@/lib/tvDayPlan";
-import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
-import { isLiveMatch, stationName } from "@/lib/tvLive";
+import { formatBracketSection, matchRoundLabel } from "@/lib/tournamentLabels";
+import { isLiveMatch, matchName, stationName } from "@/lib/tvLive";
+import { forecastText, nextUp } from "@/lib/tvForecast";
 import { createMomentQueue } from "@/lib/tvMoments";
-import { sortStations, stationState } from "@/lib/tvStationGrid";
+import { hallStations, sortStations, stationState } from "@/lib/tvStationGrid";
 import { sponsorFor, sponsorPlan } from "@/lib/tvSponsors";
 
 // Event-TV als Hallen-Tafel (#1126): Gäste finden ohne Nachfragen, was läuft, was als Nächstes kommt und welcher Platz
 // frei ist. Links der Tagesplan mit „jetzt“-Linie (bei mehrtägigen Events „Tag 2 von 3“, #884), rechts alle Stationen -
 // frei, belegt, aufgerufen (reserviert, #1122), defekt -, unten „Jetzt läuft“ und „Als Nächstes“. Viele Stationen:
 // das Raster wird kleiner bis zur Untergrenze, danach blättert es ruhig. Sponsoren nach den Einstellungen (#1125).
+// Seit #1564: dieselbe Station aus mehreren Turnieren steht nur einmal da (bis die Stationen dem Event gehören, #1555),
+// und „Als Nächstes“ nennt das nächste Spiel mit Prognose, Station und Verzug.
 
 const ACTIVE_STATUSES = new Set(["live", "check_in", "checkin_open", "registration_open", "paused"]);
 
@@ -52,7 +55,7 @@ function statusLabel(status) {
 function EventTv() {
   const { id } = useParams();
   const { settings } = useTv();
-  const { event, stations, matches, lookup, loadError, lastUpdated, load } = useEventHall(id);
+  const { event, stations, matches, lookup, tournamentOfMatch, loadError, lastUpdated, load } = useEventHall(id);
   const sponsors = useTvSponsors();
   const minute = useMinuteTick();
   const now = minute * 60000 + 30000;
@@ -61,12 +64,13 @@ function EventTv() {
   const calls = useMemo(() => callsOf(matches, stations, { reportMinutes: settings.report_minutes }), [matches, stations, settings.report_minutes]);
   const entries = useMemo(() => {
     const callByStation = new Map(calls.map((call) => [call.stationId, call]));
-    return sortStations(stations).map((station) => {
-      const detail = (station.current_match_id && lookup.byId.get(station.current_match_id)) || lookup.byStation.get(station.id) || null;
+    return sortStations(hallStations(stations)).map((station) => {
+      const ids = station.ids || [station.id];
+      const detail = (station.current_match_id && lookup.byId.get(station.current_match_id)) || ids.map((stationId) => lookup.byStation.get(stationId)).find(Boolean) || null;
       const state = stationState(station, detail?.match);
       // Eine freie Station zeigt kein geplantes Spiel als „belegt“ - nur, was dort läuft oder aufgerufen ist.
       const shownDetail = state === "busy" || state === "called" ? detail : null;
-      return { station, state, detail: shownDetail, call: callByStation.get(station.id) || null };
+      return { station, state, detail: shownDetail, call: ids.map((stationId) => callByStation.get(stationId)).find(Boolean) || null };
     });
   }, [stations, lookup, calls]);
 
@@ -76,12 +80,19 @@ function EventTv() {
     const live = matches.filter((match) => match.tournament_id === block.source.id && isLiveMatch(match));
     if (!live.length) return block.hint;
     const first = live[0];
-    const where = [formatBracketSection(first.section), formatRoundName(first.round_name, first.round)].filter(Boolean).join(", ");
+    const where = [formatBracketSection(first.section), matchRoundLabel(first)].filter(Boolean).join(", ");
     const places = [...new Set(live.map(stationName).filter(Boolean))];
     const games = live.length === 1 ? "1 Spiel" : `${live.length} Spiele`;
     const at = places.length ? ` an ${places.length > 1 ? `${places.slice(0, -1).join(", ")} und ${places.at(-1)}` : places[0]}` : "";
     return `${where} · ${games}${at}`;
   }, [matches]);
+
+  // Das nächste Spiel der Halle mit Prognose (#1564): „Kart-Cup · Spiel C · ca. 16:40 · Switch 2“, dazu der Verzug.
+  const nextMatch = useMemo(() => {
+    const [entry] = nextUp(matches, { stations, now, limit: 1 });
+    if (!entry) return null;
+    return { text: [tournamentOfMatch(entry.match), matchName(entry.match), forecastText(entry)].filter(Boolean).join(" · "), delay: entry.delayText };
+  }, [matches, stations, now, tournamentOfMatch]);
 
   // ------------------------------------------------------------ Sponsor-Moment im Takt (#1125)
   const queue = useMemo(() => createMomentQueue(), []);
@@ -136,7 +147,7 @@ function EventTv() {
           </div>
         </section>
         <TvStationBoard entries={entries} />
-        <TvNowNext plan={plan} runningText={runningText} />
+        <TvNowNext plan={plan} runningText={runningText} nextMatch={nextMatch} />
         {sponsorShown ? (
           <div className="tv-hall__moment">
             <TvSponsorMoment sponsor={sponsorShown} title={event.name} overlay />

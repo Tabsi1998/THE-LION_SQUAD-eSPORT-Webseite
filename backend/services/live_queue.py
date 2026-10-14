@@ -160,6 +160,8 @@ def build_live_queue(
     """Die Warteschlange eines Turniers vor Ort: je Station läuft/als Nächstes/danach, je Spiel Prognose und Verzug."""
     now = _aware(now)
     names = names or {}
+    # Eine Station, die gerade gelöscht wird (Markierung ``deleting``), bekommt nichts mehr und steht nicht da.
+    stations = [station for station in stations or [] if not station.get("deleting")]
     stage_by_id = {(stage or {}).get("id"): stage for stage in stages or []}
     local = [
         match
