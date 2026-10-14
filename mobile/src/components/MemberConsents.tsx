@@ -4,7 +4,7 @@ import { Button } from "./Button";
 import { Card } from "./Card";
 import { Body, Heading, Muted } from "./Text";
 import { api, errorMessage } from "../lib/api";
-import { CONSENTS_HIDDEN, consentStateLine, type ConsentRow, type ConsentsView } from "../lib/consents";
+import { CONSENTS_HIDDEN, consentStateLine, missingGivenText, type ConsentRow, type ConsentsView } from "../lib/consents";
 import { formatDateTime } from "../lib/format";
 import { colors, radius } from "../theme";
 
@@ -147,13 +147,11 @@ function ConsentTexts({ row }: { row: ConsentRow }) {
             <Muted>{row.given_text}</Muted>
           </View>
         ) : (
-          <Muted testID={`consent-given-missing-${row.code}`}>
-            Zugestimmt hast du Fassung {row.version} – deren Text liegt der Website nicht vor. Hier steht die aktuelle Fassung.
-          </Muted>
+          <Muted testID={`consent-given-missing-${row.code}`}>{missingGivenText(row)}</Muted>
         )
       ) : null}
       <View style={styles.text} testID={`consent-current-text-${row.code}`}>
-        {row.state === "given" ? <Muted style={[styles.caption, styles.withdrawn]}>Neue Fassung {row.current_version}</Muted> : null}
+        {row.state === "given" && row.given_text ? <Muted style={[styles.caption, styles.withdrawn]}>Neue Fassung {row.current_version}</Muted> : null}
         <Body>{row.text || "Der Text ist gerade nicht abrufbar – bitte später noch einmal öffnen."}</Body>
       </View>
     </View>

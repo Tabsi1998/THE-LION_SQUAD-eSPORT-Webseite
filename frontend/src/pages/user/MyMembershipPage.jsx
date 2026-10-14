@@ -12,7 +12,7 @@ import { MemberFileAccountsCard } from "@/pages/user/MemberFileAccountsCard";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet, Users, ShieldCheck } from "lucide-react";
-import { viennaDateTime } from "@/lib/vienna";
+import { viennaDate, viennaDateTime } from "@/lib/vienna";
 import { PublicErrorState } from "@/components/tls/PublicEmptyState";
 import { problemKind } from "@/lib/loadProblem";
 
@@ -476,6 +476,13 @@ const CONSENT_STATE = {
 // sagt das Modul nicht - die Karte sagt dazu nichts. Antwortet die Mitgliederverwaltung nicht, steht das da.
 const CONSENTS_HIDDEN = new Set(["not_connected", "not_linked"]);
 
+// Der Text einer früheren Fassung kommt nicht vom Modul; die Website kennt ihn nur, wenn sie ihn selbst einmal gelesen hat
+// (Codex-Prüfung #1547). Fehlt er, steht das ehrlich da - mit der aktuellen Fassung darunter.
+function missingGivenText(row) {
+  const which = row.moment ? `vom ${viennaDate(row.moment, { day: "2-digit", month: "2-digit", year: "numeric" })}` : row.version;
+  return `Den Text der Fassung ${which}, der du zugestimmt hast, haben wir nicht. Aktuelle Fassung:`;
+}
+
 function ConsentTexts({ row }) {
   if (row.state === "given" && !row.text_changed) {
     return (
@@ -493,12 +500,10 @@ function ConsentTexts({ row }) {
           <p className="mt-1 text-sm text-white/60 whitespace-pre-wrap">{row.given_text}</p>
         </div>
       ) : (
-        <div className="text-xs text-white/45" data-testid={`consent-given-missing-${row.code}`}>
-          Zugestimmt hast du Fassung {row.version} – deren Text liegt der Website nicht vor. Hier steht die aktuelle Fassung.
-        </div>
+        <div className="text-xs text-white/45" data-testid={`consent-given-missing-${row.code}`}>{missingGivenText(row)}</div>
       ))}
       <div data-testid={`consent-current-text-${row.code}`}>
-        {row.state === "given" && <div className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700]">Neue Fassung {row.current_version}</div>}
+        {row.state === "given" && row.given_text && <div className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700]">Neue Fassung {row.current_version}</div>}
         <p className="mt-1 text-sm text-white/75 whitespace-pre-wrap">{row.text || "Der Text ist gerade nicht abrufbar – bitte später noch einmal öffnen."}</p>
       </div>
     </div>
@@ -528,6 +533,7 @@ function ConsentsCard() {
   if (!state && !problem) return null;
 
   const decide = async (row, decision) => {
+    if (decision === "given" && !await confirm({ title: `„${row.label}“ zustimmen?`, description: `Du stimmst der Fassung ${row.current_version} zu, die du gerade gelesen hast. Das gilt sofort in der Mitgliederverwaltung; widerrufen kannst du jederzeit.`, confirmLabel: "Zustimmen" })) return;
     if (decision === "withdrawn" && !await confirm({ title: `„${row.label}“ widerrufen?`, description: "Der Widerruf gilt sofort in der Mitgliederverwaltung. Du kannst später wieder zustimmen.", confirmLabel: "Widerrufen" })) return;
     setBusy(true);
     try {

@@ -2,6 +2,7 @@
 aus Dolibarr (erteilte und aktuelle Textfassung), stimmt nur mit der gezeigten Fassung zu, widerruft
 jederzeit; jede Entscheidung geht mit fester Vorgangskennung nach Dolibarr und wird nie lokal als
 zweite Wahrheit geführt. Ohne Zuordnung oder ohne Anbindung gibt es nichts zu entscheiden."""
+import asyncio
 import pathlib
 import sys
 
@@ -11,7 +12,11 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from dolibarr_fake import API_KEY, BASE_URL, OPENAPI, FakeDolibarr, member  # noqa: E402
-from flow_harness import make_flow  # noqa: E402
+from flow_harness import InterleavedReads, make_flow  # noqa: E402
+from pymongo.errors import DuplicateKeyError  # noqa: E402
+
+import database  # noqa: E402
+from routes import membership_routes  # noqa: E402
 from services import dolibarr_client, dolibarr_identity  # noqa: E402
 from services.dolibarr_links import verify_link  # noqa: E402
 from services.secret_store import encrypt_secret  # noqa: E402
@@ -252,3 +257,70 @@ def test_the_contract_offers_the_own_consents_for_reading_only():
     assert {"code", "label", "state", "version", "current_version", "moment", "can_give", "can_withdraw"} <= fields
     decision = OPENAPI["components"]["schemas"]["ConsentDecision"]["properties"]
     assert {"reference", "granted_at", "form"} <= set(decision)
+
+
+@pytest.mark.asyncio
+async def test_two_identical_clicks_at_once_send_one_reference_and_leave_one_proof(flow, fake, monkeypatch):
+    """Codex-Prüfung #1547: zwei gleichzeitige gleiche Klicks lesen beide „kein offener Auftrag“ - ohne atomaren
+    Schreibschritt gingen zwei Kennungen raus. Mit Upsert auf den offenen Auftrag (eindeutiger partieller Index) ist
+    es derselbe Auftrag."""
+    await connect(flow)
+    await database.init_audit_indexes(flow.db)
+    paula = await linked_member(flow, fake, "paula", 12)
+    flow.act_as(paula)
+    monkeypatch.setattr(membership_routes, "get_db", lambda: InterleavedReads(flow.db, "consent_decisions"))
+    # Beide Klicks sind gleichzeitig unterwegs: keiner bekommt die Antwort von Dolibarr, bevor der andere seinen Auftrag hat.
+    both_sent = asyncio.Barrier(2)
+    decide = dolibarr_client.DolibarrClient.decide_consent
+
+    async def overlapping(self, member_id, payload):
+        await asyncio.wait_for(both_sent.wait(), 2)
+        return await decide(self, member_id, payload)
+
+    monkeypatch.setattr(dolibarr_client.DolibarrClient, "decide_consent", overlapping)
+
+    body = {"code": "fotos", "decision": "given", "version": 2}
+    first, second = await asyncio.gather(flow.post("/api/membership/me/consents", json=body), flow.post("/api/membership/me/consents", json=body))
+    assert first.status_code == 200 and second.status_code == 200, (first.text, second.text)
+    assert len({post["reference"] for post in fake.consent_posts}) == 1, "genau eine Kennung"
+    assert len(fake.consent_events) == 1, "genau ein Nachweis"
+    assert await flow.db.consent_decisions.count_documents({"user_id": paula["id"]}) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_duplicate_key_on_the_open_order_is_the_same_order(flow, fake, monkeypatch):
+    """Verliert ein Request das Rennen um das Anlegen (DuplicateKeyError am partiellen Index), nimmt er den Auftrag des
+    anderen - dieselbe Kennung, kein Fehler."""
+    await connect(flow)
+    await database.init_audit_indexes(flow.db)
+    paula = await linked_member(flow, fake, "paula", 12)
+    flow.act_as(paula)
+    collection = flow.db.consent_decisions
+    original = collection.find_one_and_update
+    calls = {"n": 0}
+
+    async def racing(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            # Der andere Request legt den Auftrag genau jetzt an.
+            await collection.insert_one({"id": "fremd", "user_id": paula["id"], "member_id": 12, "code": "fotos", "decision": "given", "version": 2,
+                                         "reference": "web-c-andere", "created_at": "2026-10-14T08:00:00+00:00", "status": "sent", "attempts": 1})
+            raise DuplicateKeyError("E11000 duplicate key")
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(type(collection), "find_one_and_update", lambda self, *args, **kwargs: racing(*args, **kwargs))
+    answer = await flow.post("/api/membership/me/consents", json={"code": "fotos", "decision": "given", "version": 2})
+    assert answer.status_code == 200, answer.text
+    assert [post["reference"] for post in fake.consent_posts] == ["web-c-andere"]
+    assert [post["granted_at"] for post in fake.consent_posts] == ["2026-10-14T08:00:00+00:00"]
+
+
+@pytest.mark.asyncio
+async def test_the_open_order_index_only_covers_open_orders(flow):
+    await database.init_audit_indexes(flow.db)
+    key = {"user_id": "u1", "member_id": 12, "code": "fotos", "decision": "given", "version": 2}
+    await flow.db.consent_decisions.insert_one({**key, "status": "recorded"})
+    await flow.db.consent_decisions.insert_one({**key, "status": "failed"})
+    await flow.db.consent_decisions.insert_one({**key, "status": "sent"})
+    with pytest.raises(DuplicateKeyError):
+        await flow.db.consent_decisions.insert_one({**key, "status": "pending"})

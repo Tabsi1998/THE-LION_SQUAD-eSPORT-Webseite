@@ -20,6 +20,9 @@ from models import (
 )
 from services.notification_preferences import send_user_template
 from typing import Literal
+
+from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key as dolibarr_instance_key, load_settings as load_dolibarr_settings
 from services.dolibarr_links import link_for_user, public_link, verified_link
 from services.dolibarr_policy import MAX_STATE_AGE_HOURS, club_today
@@ -550,19 +553,25 @@ async def my_consents(user: dict = Depends(get_current_user)):
 
 async def _decision_record(db, user_id: str, member_id: int, code: str, decision: str, version: int | None) -> dict:
     """Der Auftrag für diese Entscheidung: ein offener derselben Art wird wiederverwendet (dieselbe Kennung, derselbe
-    Zeitpunkt), sonst ein neuer - und offene Aufträge anderer Art zum selben Zweck gehen nie mehr raus."""
+    Zeitpunkt), sonst ein neuer - und offene Aufträge anderer Art zum selben Zweck gehen nie mehr raus.
+
+    Atomar (Codex-Prüfung #1547): ein Upsert auf den offenen Auftrag, abgesichert durch den eindeutigen partiellen Index
+    ``consent_decisions.open_decision`` (``database.AUDIT_UNIQUE_INDEXES``). Legen zwei gleichzeitige Klicks ihn beide
+    an, scheitert einer am Index (DuplicateKeyError) - für ihn ist es derselbe Auftrag, der zweite Durchgang findet ihn."""
     query = {"user_id": user_id, "member_id": member_id, "code": code, "status": {"$in": list(OPEN_DECISION)}}
-    same = await db.consent_decisions.find_one({**query, "decision": decision, "version": version}, {"_id": 0}, sort=[("created_at", -1)])
-    if same:
-        await db.consent_decisions.update_one({"id": same["id"]}, {"$set": {"status": "sent"}, "$inc": {"attempts": 1}})
-        return same
-    await db.consent_decisions.update_many(query, {"$set": {"status": "superseded"}})
-    record = {
-        "id": new_id(), "user_id": user_id, "member_id": member_id, "code": code, "decision": decision, "version": version,
-        "reference": f"web-c-{new_id()}", "created_at": now_utc().isoformat(), "status": "sent", "attempts": 1,
+    same = {"decision": decision, "version": version}
+    await db.consent_decisions.update_many({**query, "$nor": [same]}, {"$set": {"status": "superseded"}})
+    update = {
+        "$set": {"status": "sent"}, "$inc": {"attempts": 1},
+        "$setOnInsert": {"id": new_id(), "reference": f"web-c-{new_id()}", "created_at": now_utc().isoformat()},
     }
-    await db.consent_decisions.insert_one(dict(record))
-    return record
+    for _attempt in range(3):
+        try:
+            return await db.consent_decisions.find_one_and_update(
+                {**query, **same}, update, upsert=True, sort=[("created_at", -1)], projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+        except DuplicateKeyError:
+            continue
+    raise HTTPException(409, "Diese Entscheidung ist gerade schon unterwegs - bitte kurz warten und die Seite neu laden.")
 
 
 @router.post("/me/consents")

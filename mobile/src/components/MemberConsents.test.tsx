@@ -55,7 +55,7 @@ test("Abschnitt mit Titel, Stand und dem Text der zugestimmten Fassung zum Aufkl
 
 test("neue Fassung: die zugestimmte und die neue stehen da; kennt die Website die alte nicht, sagt sie das", async () => {
   const changed = { ...NEWS, version: 2, can_give: true, given_text: "Newsletter, Fassung 2.", text_changed: true };
-  const unknown = { ...FOTOS, state: "given" as const, version: 1, can_withdraw: true, given_text: null, text_changed: true };
+  const unknown = { ...FOTOS, state: "given" as const, version: 1, moment: "2026-01-10T10:00:00+01:00", can_withdraw: true, given_text: null, text_changed: true };
   mockGet.mockResolvedValue({ data: { available: true, consents: [changed, unknown] } });
   await render(<MemberConsents />);
   await waitFor(() => expect(screen.getByTestId("consent-changed-newsletter")).toHaveTextContent(/Text geändert/));
@@ -63,7 +63,7 @@ test("neue Fassung: die zugestimmte und die neue stehen da; kennt die Website di
   expect(screen.getByTestId("consent-given-text-newsletter")).toHaveTextContent(/Newsletter, Fassung 2\./);
   expect(screen.getByTestId("consent-current-text-newsletter")).toHaveTextContent(/Newsletter, Fassung 3\./);
   await fireEvent.press(screen.getByTestId("consent-open-fotos"));
-  expect(screen.getByTestId("consent-given-missing-fotos")).toHaveTextContent(/Fassung 1/);
+  expect(screen.getByTestId("consent-given-missing-fotos")).toHaveTextContent(/^Den Text der Fassung vom \d\d\.\d\d\.\d{4}, der du zugestimmt hast, haben wir nicht\. Aktuelle Fassung:$/);
   expect(screen.getByTestId("consent-current-text-fotos")).toHaveTextContent(/Fotos, Fassung 2\./);
 });
 

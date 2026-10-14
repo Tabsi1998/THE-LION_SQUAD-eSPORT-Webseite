@@ -7,11 +7,12 @@ import { MemoryRouter } from "react-router-dom";
 
 const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn() };
+const confirmMock = vi.fn(async () => true);
 
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler", formatMemberSince: () => "1.1.2023" }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { display_name: "Paula" } }) }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
-vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
@@ -149,8 +150,26 @@ test("Einwilligungen (#1537): der Text der zugestimmten Fassung bleibt lesbar, b
 
   // Die alte Fassung kennt die Website nicht: das steht da, und die aktuelle.
   await user.click(screen.getByTestId("consent-open-spiel"));
-  expect(screen.getByTestId("consent-given-missing-spiel")).toHaveTextContent("Fassung 1");
+  expect(screen.getByTestId("consent-given-missing-spiel")).toHaveTextContent(/^Den Text der Fassung vom 10\.01\.2026, der du zugestimmt hast, haben wir nicht\. Aktuelle Fassung:$/);
   expect(screen.getByTestId("consent-current-text-spiel")).toHaveTextContent("Spielberichte, Fassung 2.");
+});
+
+test("Einwilligungen (Codex-Prüfung #1547): auch „Ich stimme zu“ fragt nach – Abbrechen schickt nichts", async () => {
+  const user = userEvent.setup();
+  const consents = [{ code: "fotos", label: "Fotos", state: "none", version: 0, current_version: 2, moment: null, can_give: true, can_withdraw: false, text: "Fotos, Fassung 2.", given_text: null, text_changed: false }];
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? { available: true, consents } : url === "/membership/me/directory" ? { eligible: false } : ledMe }));
+  apiMock.post.mockResolvedValue({ data: { ok: true, result: { code: "fotos", state: "given", version: 2, recorded: true }, consents: [{ ...consents[0], state: "given", version: 2, can_give: false, can_withdraw: true, given_text: "Fotos, Fassung 2." }] } });
+  renderPage();
+  await user.click(await screen.findByTestId("consent-open-fotos"));
+  confirmMock.mockResolvedValueOnce(false);
+  await user.click(screen.getByTestId("consent-give-fotos"));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "„Fotos“ zustimmen?", confirmLabel: "Zustimmen" }));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  expect(screen.getByTestId("consent-state-fotos")).toHaveTextContent("Noch nicht entschieden");
+
+  await user.click(screen.getByTestId("consent-give-fotos"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/membership/me/consents", { code: "fotos", decision: "given", version: 2 }));
+  expect(confirmMock).toHaveBeenCalledTimes(2);
 });
 
 test("Einwilligungen (#1537): antwortet die Mitgliederverwaltung nicht, steht das da – mit „Nochmal versuchen“", async () => {

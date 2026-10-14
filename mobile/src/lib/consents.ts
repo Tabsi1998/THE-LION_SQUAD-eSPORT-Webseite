@@ -28,6 +28,15 @@ export type ConsentsView = {
 /** Ohne Anbindung oder ohne Zuordnung gibt es keinen Abschnitt - den Weg dorthin erklärt die Karte „Vereinsakte“. */
 export const CONSENTS_HIDDEN = ["not_connected", "not_linked"];
 
+/**
+ * Fehlt der Text der zugestimmten Fassung (das Modul liefert nur die aktuelle; die Website kennt eine frühere nur, wenn
+ * sie sie selbst einmal gelesen hat), steht das ehrlich da - wie im Web (Codex-Prüfung #1547).
+ */
+export function missingGivenText(row: ConsentRow): string {
+  const which = row.moment ? `vom ${formatDate(row.moment)}` : String(row.version);
+  return `Den Text der Fassung ${which}, der du zugestimmt hast, haben wir nicht. Aktuelle Fassung:`;
+}
+
 /** Der Stand in Worten - wie im Web. */
 export function consentStateLine(row: ConsentRow): string {
   const when = row.moment ? ` am ${formatDate(row.moment)}` : "";
