@@ -385,18 +385,20 @@ async def inside_main() -> None:
         state["tournaments"]["practice_draft"] = bare_draft["id"]
 
         # ... und nach dem Check-in: Baum fix, die alte Matchplanung auf „Station A“ gespeichert, die Station danach gelöscht.
+        # Zweimal: einmal zum Ansehen, einmal zum Lösen und Neuplanen in der Abnahme (verändert den Stand).
         day = quarter(now_utc() + timedelta(days=17))
-        practice = await tournament(admin, game, f"Abnahme Cup alte Planung ({stamp})", datetime.fromisoformat(vienna_on(day, "15:30")), **nostation)
-        await register(admin, practice, users["players"])
-        await admin.call("POST", f"/api/tournaments/{practice['id']}/bracket/from-format?preview=false", json=CUP_STRUCTURE)
-        await admin.call("POST", f"/api/tournaments/{practice['id']}/staff", json={"user_id": users["lead"]["id"], "role": "organizer"})
-        old_station = await admin.call("POST", "/api/stations", json={"name": "Station A", "device_type": "switch", "tournament_id": practice["id"]})
-        practice_matches = await matches_of(admin, practice["id"])
-        for key, (clock, minutes, on_station) in OLD_PLAN.items():
-            await admin.call("PATCH", f"/api/matches/{practice_matches[key]['id']}", json={
-                "scheduled_at": vienna_on(day, clock), "station_id": old_station["id"] if on_station else None, "duration_minutes": minutes})
-        await admin.call("DELETE", f"/api/stations/{old_station['id']}")
-        state["tournaments"]["practice_old_plan"] = practice["id"]
+        for key, label in (("practice_old_plan", "alte Planung"), ("practice_release", "alte Planung zum Lösen")):
+            practice = await tournament(admin, game, f"Abnahme Cup {label} ({stamp})", datetime.fromisoformat(vienna_on(day, "15:30")), **nostation)
+            await register(admin, practice, users["players"])
+            await admin.call("POST", f"/api/tournaments/{practice['id']}/bracket/from-format?preview=false", json=CUP_STRUCTURE)
+            await admin.call("POST", f"/api/tournaments/{practice['id']}/staff", json={"user_id": users["lead"]["id"], "role": "organizer"})
+            old_station = await admin.call("POST", "/api/stations", json={"name": "Station A", "device_type": "switch", "tournament_id": practice["id"]})
+            practice_matches = await matches_of(admin, practice["id"])
+            for match_key, (clock, minutes, on_station) in OLD_PLAN.items():
+                await admin.call("PATCH", f"/api/matches/{practice_matches[match_key]['id']}", json={
+                    "scheduled_at": vienna_on(day, clock), "station_id": old_station["id"] if on_station else None, "duration_minutes": minutes})
+            await admin.call("DELETE", f"/api/stations/{old_station['id']}")
+            state["tournaments"][key] = practice["id"]
 
         # Fast Lap mit einer Strecke und Zeiten.
         challenge = await admin.call("POST", "/api/f1/challenges", json={"title": f"Abnahme Fast Lap ({stamp})", "game_id": game["id"],

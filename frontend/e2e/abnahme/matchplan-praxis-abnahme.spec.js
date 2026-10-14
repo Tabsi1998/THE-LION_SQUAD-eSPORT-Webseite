@@ -72,6 +72,42 @@ test.describe("Abnahme: Praxis-Fall 14.10. - Cup ohne Stationen, alte Matchplanu
   test.skip(ENABLED && !state?.tournaments?.practice_old_plan, `Kein passender Seed-Stand: ${STATE_FILE}`);
   test.describe.configure({ mode: "serial", timeout: 180_000 });
 
+  test("admin: alle Termine von Hand lösen, Station anlegen, automatisch planen, übernehmen", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "Größe stellt der Test selbst ein");
+    test.skip(!state?.tournaments?.practice_release, "Seed ohne den Fall zum Lösen");
+    await page.setViewportSize(SIZES.desktop);
+    await login(page, state.accounts.admin);
+    const problems = watch(page);
+    const tid = state.tournaments.practice_release;
+    await page.goto(`/admin/tournaments/${tid}?tab=matchplan`);
+    await expect(page.getByTestId("mp-warnings")).toContainText("die es nicht mehr gibt");
+    await shot(page, "loesen-1-vorher");
+    await page.getByRole("button", { name: "Alle Termine von Hand lösen" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("14 Spiele verlieren ihre festen Termine und Stationen");
+    await dialog.getByRole("button", { name: "Termine lösen" }).click();
+    await expect(page.getByTestId("mp-preview")).toBeVisible();
+    await expect(page.getByTestId("mp-warnings")).not.toContainText("die es nicht mehr gibt");
+    await shot(page, "loesen-2-geloest-ohne-station");
+    // Wie Fabian: eine Station anlegen, dann neu planen und übernehmen.
+    const csrf = (await page.context().cookies()).find((cookie) => cookie.name === "csrf_token")?.value;
+    const created = await page.request.post("/api/stations", { data: { name: "Switch 1", device_type: "switch", tournament_id: tid },
+      headers: { "x-csrf-token": csrf || "" } });
+    expect(created.status(), await created.text()).toBe(200);
+    await page.reload();
+    await page.getByRole("button", { name: "Automatisch planen" }).click();
+    const preview = page.getByTestId("mp-preview");
+    await expect(preview).toContainText("14 Spiele bekommen Zeit und Station");
+    await shot(page, "loesen-3-vorschau");
+    await preview.getByRole("button", { name: "Übernehmen" }).click();
+    await expect(preview).toHaveCount(0);
+    await expect(page.locator("[data-testid^='mp-lane-'][data-name='Switch 1']")).toContainText("14 Spiele");
+    await expect(page.getByTestId("mp-warnings")).toHaveCount(0);
+    await page.waitForTimeout(1_000);
+    await shot(page, "loesen-4-neu-geplant");
+    expect(problems).toEqual([]);
+  });
+
   for (const role of ["admin", "lead"]) {
     for (const [size, viewport] of Object.entries(SIZES)) {
       test(`${role} ${size}: alte Planung auf gelöschter Station und Vorschau-Baum ohne Stationen`, async ({ page }, testInfo) => {
