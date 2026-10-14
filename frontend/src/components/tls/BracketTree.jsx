@@ -8,6 +8,7 @@ import { finderFor, initials } from "@/lib/slotSource";
 import { buildPodiumMap, finalMatchOf, isBronzeMatch, lastStageId, normalizeSection } from "@/lib/bracketPodium";
 import { bracketEdges, isDone, isLive, orderEdges, pathFor, sectionGroup } from "@/lib/bracketGraph";
 import { motionTransition } from "@/lib/motion";
+import { laneCounter, routeEdge, toPath } from "@/lib/bracketLines";
 import { TV_LINE, treeBlockUnits, treeBox, treeScale } from "@/lib/tvType";
 import { BracketMotionContext, useBracketMotion, useBracketMotionState } from "./bracket/bracketMotion";
 import { LiveClock, MatchCard, getStationLabel, slotLabel, formatNodeDateTime } from "./bracket/BracketCards";
@@ -517,35 +518,39 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
       const base = canvas.getBoundingClientRect();
       const ox = canvas.scrollLeft - base.left;
       const oy = canvas.scrollTop - base.top;
+      // Alles in Leinwand-Koordinaten (mit Scroll): Karten sind die Hindernisse, die Lücken über und unter den
+      // Abschnitten die freien Querbahnen (#1561: keine Linie schneidet eine Karte).
+      const local = (rect) => ({ left: rect.left + ox, right: rect.right + ox, top: rect.top + oy, bottom: rect.bottom + oy, width: rect.width, height: rect.height });
       const nodes = new Map();
-      canvas.querySelectorAll("[data-node]").forEach((node) => nodes.set(node.getAttribute("data-node"), node.getBoundingClientRect()));
+      canvas.querySelectorAll("[data-node]").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (rect.width) nodes.set(node.getAttribute("data-node"), local(rect));
+      });
       const anchors = new Map();
       canvas.querySelectorAll("[data-slot-anchor]").forEach((node) => anchors.set(node.getAttribute("data-slot-anchor"), node.getBoundingClientRect()));
+      const corridors = [];
+      canvas.querySelectorAll("section[data-testid^='bracket-section-']").forEach((node) => {
+        const rect = local(node.getBoundingClientRect());
+        if (rect.height) corridors.push(rect.top - 20, rect.bottom + 20);
+      });
+      const obstacles = [...nodes.values()];
+      const lanes = laneCounter();
       const lines = [];
       for (const edge of stageEdges) {
         const a = nodes.get(edge.from);
         const b = nodes.get(edge.to);
-        if (!a || !b || !a.width || !b.width) continue;
-        let d;
-        const below = b.top >= a.bottom - 1 && b.left < a.right;
-        if ((edge.flow === "L" && edge.cross) || below) {
-          // Fall ins Loser Bracket: von unten aus der Karte nach unten in die Zielkarte.
-          const x1 = a.left + a.width / 2 + ox;
-          const y1 = a.bottom + oy;
-          const x2 = b.left + Math.min(24, b.width / 2) + ox;
-          const y2 = b.top + oy;
-          const midY = y1 + (y2 - y1) / 2;
-          d = `M${x1} ${y1} V${midY} H${x2} V${y2}`;
-        } else {
-          const anchor = anchors.get(`${edge.to}:${edge.toSlot}`);
-          const x1 = a.right + ox;
-          const y1 = a.top + a.height / 2 + oy;
-          const x2 = b.left + ox;
-          const y2 = (anchor && anchor.height ? anchor.top + anchor.height / 2 : b.top + b.height / 2) + oy;
-          const mid = x2 > x1 ? x1 + (x2 - x1) / 2 : x1 + 12;
-          d = `M${x1} ${y1} H${mid} V${y2} H${x2}`;
-        }
-        lines.push({ ...edge, d, column: columnOf.get(edge.from) || 0 });
+        if (!a || !b) continue;
+        const anchor = anchors.get(`${edge.to}:${edge.toSlot}`);
+        const drop = edge.flow === "L" && edge.cross;
+        const points = routeEdge({
+          a, b, obstacles, lanes, gap: COLUMN_GAP,
+          corridors: corridors.filter((y) => y > 2),
+          toY: anchor && anchor.height ? anchor.top + anchor.height / 2 + oy : undefined,
+          // Der Abstieg beginnt unten an der Karte - so liegt er nicht auf dem Knick des Siegers.
+          fromY: drop ? a.bottom - 10 : undefined,
+          preferCorridor: drop,
+        });
+        lines.push({ ...edge, d: toPath(points), column: columnOf.get(edge.from) || 0 });
       }
       const w = canvas.scrollWidth;
       const h = canvas.scrollHeight;
