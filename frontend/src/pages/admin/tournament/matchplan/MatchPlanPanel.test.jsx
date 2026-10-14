@@ -87,6 +87,27 @@ describe("vor Ort: Aufbau der Seite", () => {
       expect.objectContaining({ match_buffer_minutes: 10, match_break_minutes: 5 })));
   });
 
+  it("Turnierstart in Wiener Uhr - egal, wo das Gerät steht; die doppelte Stunde am 25.10. meint die erste", async () => {
+    // Das Gerät steht in New York (Node übernimmt die Zone zur Laufzeit): Feld und Speichern bleiben Wiener Uhr.
+    const zone = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    try {
+      expect(new Date("2026-10-31T16:30:00Z").getHours()).toBe(12);
+      const user = userEvent.setup();
+      const state = fixture.local.applied;
+      setup({ ...state, tournament: { ...state.tournament, start_date: "2026-10-31T16:30:00+00:00" } });
+      const field = screen.getByLabelText("Turnierstart");
+      expect(field).toHaveValue("2026-10-31T17:30");
+      fireEvent.change(field, { target: { value: "2026-10-25T02:30" } });
+      await user.click(screen.getByRole("button", { name: "Einstellungen speichern" }));
+      await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith(`/tournaments/${state.tournament.id}`,
+        expect.objectContaining({ start_date: "2026-10-25T00:30:00.000Z" })));
+    } finally {
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    }
+  });
+
   it("ohne Recht auf Turnier-Einstellungen stehen die Werte nur da", () => {
     setup(fixture.local.applied, { lead: false });
     expect(screen.queryByRole("button", { name: "Einstellungen speichern" })).toBeNull();

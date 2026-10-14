@@ -6,8 +6,7 @@ import { durationSourceText } from "@/lib/matchDuration";
 import { countOf } from "@/lib/schedulePlanText";
 import { motionTransition } from "@/lib/motion";
 import { formatDeviceType } from "@/lib/tournamentLabels";
-import { fromDateTimeLocal, toDateTimeLocalInput } from "@/lib/datetime";
-import { viennaDateTime, viennaTime } from "@/lib/vienna";
+import { fromViennaInput, viennaDateTime, viennaInputValue, viennaTime } from "@/lib/vienna";
 
 // Bausteine der Matchplan-Seite (#1557). Sie zeigen nur an, was der Planer gerechnet hat oder am Turnier steht.
 
@@ -33,7 +32,7 @@ function number(value) {
 /** Oben: wann es losgeht, wie viel Luft zwischen und in den Spielen ist, wie lange ein Spiel dauert, welche Stationen. */
 export function PlanSettings({ tournament, mode, duration, stations, canEdit, onSave, actions }) {
   const initial = {
-    start: toDateTimeLocalInput(tournament.start_date),
+    start: viennaInputValue(tournament.start_date),
     pause: String(tournament.match_break_minutes ?? 5),
     buffer: String(tournament.match_buffer_minutes ?? 0),
   };
@@ -42,7 +41,7 @@ export function PlanSettings({ tournament, mode, duration, stations, canEdit, on
   const stamp = `${tournament.start_date}|${tournament.match_break_minutes}|${tournament.match_buffer_minutes}`;
   useEffect(() => {
     setForm({
-      start: toDateTimeLocalInput(tournament.start_date),
+      start: viennaInputValue(tournament.start_date),
       pause: String(tournament.match_break_minutes ?? 5),
       buffer: String(tournament.match_buffer_minutes ?? 0),
     });
@@ -56,7 +55,8 @@ export function PlanSettings({ tournament, mode, duration, stations, canEdit, on
     event.preventDefault();
     setSaving(true);
     await onSave({
-      ...(form.start ? { start_date: fromDateTimeLocal(form.start) } : {}),
+      // Turnierstart in Wiener Uhr - das Gerät kann woanders stehen (Zeitumstellung siehe lib/vienna).
+      ...(form.start && fromViennaInput(form.start) ? { start_date: fromViennaInput(form.start) } : {}),
       match_break_minutes: number(form.pause) ?? 0,
       ...(local ? { match_buffer_minutes: number(form.buffer) ?? 0 } : {}),
     });
