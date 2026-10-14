@@ -211,7 +211,7 @@ def elimination_standings(matches: list[dict], registrations: list[dict]) -> lis
     return rows
 
 
-def round_robin_standings(matches: list[dict], registrations: list[dict]) -> list[dict]:
+def _round_robin_rows(matches: list[dict], registrations: list[dict]) -> list[dict]:
     stats = {
         registration["id"]: {
             "registration_id": registration["id"],
@@ -266,16 +266,79 @@ def round_robin_standings(matches: list[dict], registrations: list[dict]) -> lis
                 stats[registration_b]["drawn"] += 1
                 stats[registration_b]["points"] += 1
     rows = list(stats.values())
-    rows.sort(key=lambda row: (row["points"], row["won"], row["score_for"] - row["score_against"]), reverse=True)
+    for row in rows:
+        row["score_diff"] = row["score_for"] - row["score_against"]
+    rows.sort(key=lambda row: (row["points"], row["won"], row["score_diff"]), reverse=True)
     for index, row in enumerate(rows, start=1):
         row["rank"] = index
     return rows
 
 
+def round_robin_standings(matches: list[dict], registrations: list[dict]) -> list[dict]:
+    """Liga, Round Robin und jede Gruppe: Punkte, Differenz, Form und Bewegung seit dem letzten Spieltag."""
+    return _with_form_and_movement(_round_robin_rows, matches, registrations)
+
+
 def swiss_standings(matches: list[dict], registrations: list[dict]) -> list[dict]:
+    return _with_form_and_movement(_swiss_rows, matches, registrations)
+
+
+FORM_LENGTH = 5
+
+
+def _played_in_order(matches: list[dict]) -> list[dict]:
+    terminal = [match for match in matches if match.get("status") in TERMINAL_MATCH_STATUSES]
+    return sorted(terminal, key=lambda match: (_safe_int(match.get("round")), _safe_int(match.get("order"))))
+
+
+def _form(matches: list[dict]) -> dict[str, list[str]]:
+    """Die letzten Spiele je Anmeldung als „W“ (Sieg), „D“ (Unentschieden), „L“ (Niederlage) - das jüngste rechts.
+
+    Ein Freilos zählt wie in der Tabelle als Sieg.
+    """
+    form: dict[str, list[str]] = {}
+    for match in _played_in_order(matches):
+        slot_a, slot_b, _result_a, _result_b = _duel_entries(match)
+        registration_a = (slot_a or {}).get("registration_id")
+        registration_b = (slot_b or {}).get("registration_id")
+        if registration_a and registration_b is None:
+            form.setdefault(registration_a, []).append("W")
+            continue
+        winner_id = _sole_winner(match)
+        for registration_id in (registration_a, registration_b):
+            if not registration_id:
+                continue
+            letter = "D" if winner_id is None else "W" if winner_id == registration_id else "L"
+            form.setdefault(registration_id, []).append(letter)
+    return {registration_id: letters[-FORM_LENGTH:] for registration_id, letters in form.items()}
+
+
+def _with_form_and_movement(compute, matches: list[dict], registrations: list[dict]) -> list[dict]:
+    """Pfeile in der Tabelle (#1179): der Platz nach dem vorigen Spieltag, solange der jüngste läuft.
+
+    Verglichen wird mit der Tabelle ohne den jüngsten Spieltag, an dem schon ein Ergebnis steht. Gibt es davor keinen
+    gespielten Spieltag, bleibt ``previous_rank`` leer - dann zeigt niemand einen Pfeil.
+    """
+    rows = compute(matches, registrations)
+    played_rounds = sorted({_safe_int(match.get("round")) for match in _played_in_order(matches)})
+    previous: dict[str, int] = {}
+    if len(played_rounds) > 1:
+        latest = played_rounds[-1]
+        earlier = [match for match in matches if _safe_int(match.get("round")) < latest]
+        previous = {row["registration_id"]: row["rank"] for row in compute(earlier, registrations)}
+    form = _form(matches)
+    for row in rows:
+        row["form"] = form.get(row["registration_id"], [])
+        row["previous_rank"] = previous.get(row["registration_id"])
+    return rows
+
+
+def _swiss_rows(matches: list[dict], registrations: list[dict]) -> list[dict]:
     stats = {
         registration["id"]: {
             "registration_id": registration["id"],
+            "user_id": registration.get("user_id"),
+            "team_id": registration.get("team_id"),
             "display_name": _display_name(registration),
             "points": 0,
             "played": 0,
