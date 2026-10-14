@@ -21,6 +21,9 @@ import { AppErrorBoundary, OptionalBoundary, RootErrorBoundary } from "@/compone
 import { BottomNav } from "@/components/tls/BottomNav";
 import { PageTransition } from "@/components/tls/PageTransition";
 import { RouteFallback, StartSplashGate } from "@/components/tls/RouteFallback";
+// Seitenwechsel anhalten, solange in den Einstellungen etwas nicht gespeichert werden konnte (#1048): der Hörer für
+// „Zurück“ muss vor dem des Routers stehen, deshalb wird das Modul hier früh geladen.
+import "@/lib/navigationGuard";
 
 function MeRedirect() {
   const { user } = useAuth();
