@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { problemKind } from "@/lib/loadProblem";
 
 // Laden an einer Stelle (#983, #984, #985; wie useKeyedLoad in der App, #1000/#1512). Drei Regeln statt in jeder Seite:
@@ -40,7 +40,9 @@ export function useLoad(key, fetcher, { debounceMs = 0, isEmpty = defaultIsEmpty
   const controller = useRef(null);
   const fetcherRef = useRef(fetcher);
   const stateRef = useRef(state);
-  useEffect(() => {
+  // Im Layout-Effekt, nicht im normalen: der normale läuft erst in einer späteren Aufgabe nach dem Schreiben ins Bild
+  // (#1570). Wer in diesem Spalt nachlädt, bekäme sonst als `previous` den Stand von vor dem Laden.
+  useLayoutEffect(() => {
     fetcherRef.current = fetcher;
     stateRef.current = state;
   });
