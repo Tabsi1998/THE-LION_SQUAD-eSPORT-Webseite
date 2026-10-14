@@ -533,6 +533,15 @@ def test_double_elimination_survives_random_disqualifications(count: int):
     assert gf and gf[0]["status"] in TERMINAL
     rows = stage_standings(matches, registrations(count))
     assert rows[0]["registration_id"] not in removed
+    # Reset-Regel auch nach einem kampflosen Grand Final: gewinnt die Siegerrunde, entfällt das Reset-Spiel.
+    if gf[0]["status"] == "completed" and len(gf) == 2:
+        champion = gf[0]["results"][0]["registration_id"]
+        upper = gf[0]["slots"][0].get("registration_id")
+        if champion == upper:
+            assert gf[1]["status"] == "cancelled" and gf[1]["result_meta"]["source"] == "bracket_reset", \
+                "Sieg der Siegerrunde (auch kampflos): das Reset-Spiel ist nicht nötig"
+        else:
+            assert gf[1]["status"] == "completed"
 
 
 @pytest.mark.parametrize("match_size,qualifiers", [(3, 1), (4, 2), (8, 2)])

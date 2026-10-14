@@ -115,8 +115,8 @@ export function ParticipantRemovalActions({ tournament, registration, onDone, co
   cancelRef.current = cancel;
 
   const buttonClass = compact
-    ? "px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase disabled:opacity-50"
-    : "px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase disabled:opacity-50";
+    ? "px-2 py-2 border border-live/40 text-live rounded-sm text-[10px] font-bold uppercase disabled:opacity-50"
+    : "px-2 py-1 border border-live/40 text-live rounded-sm text-[10px] font-bold uppercase disabled:opacity-50";
   const ops = Array.isArray(plan?.ops) ? plan.ops.filter(Boolean) : [];
   const labels = KIND_LABELS[kind] || KIND_LABELS.withdrawn;
 
@@ -125,7 +125,7 @@ export function ParticipantRemovalActions({ tournament, registration, onDone, co
       <button type="button" onClick={() => propose("disqualified")} disabled={!!busy} data-testid={`admin-reg-disqualify-${registration.id}`} className={buttonClass}>
         {busy === "disqualified" ? "Prüft …" : KIND_LABELS.disqualified.button}
       </button>
-      <button type="button" onClick={() => propose("withdrawn")} disabled={!!busy} data-testid={`admin-reg-withdraw-${registration.id}`} className={buttonClass.replace("border-[#FF3B30]/40 text-[#FF3B30]", "border-white/20 text-white/70")}>
+      <button type="button" onClick={() => propose("withdrawn")} disabled={!!busy} data-testid={`admin-reg-withdraw-${registration.id}`} className={buttonClass.replace("border-live/40 text-live", "border-white/20 text-white/70")}>
         {busy === "withdrawn" ? "Prüft …" : KIND_LABELS.withdrawn.button}
       </button>
       {plan ? (

@@ -134,3 +134,25 @@ async def test_discord_announces_each_stream_start_once(flow, posted):
 
     samples = (await flow.get("/api/settings/discord/samples")).json()
     assert any(entry["key"] == "tournament.stream_live" for entry in samples["entries"]), "die Vorschau kennt die Meldung"
+
+
+@pytest.mark.asyncio
+async def test_withdrawn_and_disqualified_participants_are_not_promoted(flow):
+    """Codex-Befund zu #1553: wer ausgetreten oder disqualifiziert ist, zählt nicht mehr als Teilnehmer - sein Stream
+    steht weder auf der Turnierseite noch in der Discord-Meldung."""
+    paula = await streamer(flow, "paula")
+    nora = await streamer(flow, "nora")
+    omar = await streamer(flow, "omar")
+    await flow.db.tournaments.insert_one({"id": "t1", "slug": "sommer-cup", "title": "Sommer-Cup", "status": "live", "is_public": True, "visibility": "public"})
+    await flow.db.tournament_registrations.insert_many([
+        {"id": "r1", "tournament_id": "t1", "user_id": paula["id"], "status": "checked_in"},
+        {"id": "r2", "tournament_id": "t1", "user_id": nora["id"], "status": "withdrawn"},
+        {"id": "r3", "tournament_id": "t1", "user_id": omar["id"], "status": "disqualified"},
+    ])
+    for user, stream_id in ((paula, "s-paula"), (nora, "s-nora"), (omar, "s-omar")):
+        await live(flow, user, stream_id)
+    rows = (await flow.get("/api/tournaments/sommer-cup/streams")).json()
+    assert [row["username"] for row in rows] == ["paula"]
+    tournament = await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0})
+    discord_rows = await tournament_streams.live_streams_for_tournament(flow.db, tournament, for_discord=True)
+    assert [row["username"] for row in discord_rows] == ["paula"]

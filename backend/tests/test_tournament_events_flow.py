@@ -163,6 +163,14 @@ async def test_confirming_applies_once_with_protocol_station_notifications_and_d
     assert withdrawn and withdrawn[-1]["visibility_scope"] == "public"
     assert keys["E"]["id"] in withdrawn[-1]["tournament_event"]["match_ids"]
     assert "Spieler" not in str(withdrawn[-1])
+    # Öffentlich (Codex-Befund): nur „ein Platz wurde frei“ mit Spiel-Kennungen - weder die Anmeldung noch die Art.
+    public = change_events._event_for_scope(withdrawn[-1], "public")
+    assert public["tournament_event"]["type"] == "slot_cleared"
+    assert "registration_id" not in public["tournament_event"] and victim["id"] not in str(public)
+    assert public["tournament_event"]["match_ids"] == withdrawn[-1]["tournament_event"]["match_ids"]
+    staff = change_events._event_for_scope(withdrawn[-1], "staff")
+    assert staff["tournament_event"]["type"] == "player_disqualified"
+    assert staff["tournament_event"]["registration_id"] == victim["id"]
     walkovers = events_of("walkover", tournament)
     assert walkovers and walkovers[-1]["tournament_event"]["match_ids"] == [keys["E"]["id"]]
     # Noch einmal bestätigen: einmal ausgeführt, kein zweites Protokoll.

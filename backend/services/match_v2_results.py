@@ -584,6 +584,7 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
     ``target_sets`` und in den Spielen selbst."""
     queue = deque(start_ids)
     seen: set[str] = set()
+    by_key = {row.get("match_key"): row for row in by_id.values() if row.get("match_key")}
     while queue:
         match_id = queue.popleft()
         match = by_id.get(match_id)
@@ -643,6 +644,11 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
                 "updated_at": now_iso,
             })
             queue.append(target["id"])
+        if winner:
+            # Ein kampflos entschiedenes Grand Final (#1553) durchläuft die Reset-Regel wie ein gespieltes: gewinnt die
+            # Siegerrunde, entfällt das Reset-Spiel („nicht nötig“) statt selbst zum Freilos zu werden; gewinnt die
+            # Verliererrunde, ist es nötig und wird in der Kette ebenfalls kampflos entschieden.
+            _apply_bracket_reset_rule(match, change["results"], by_id, by_key, target_sets, now_iso)
 
 
 def _came_from_lower_side(slot: dict | None, by_key: dict[str, dict], upper_slot: int) -> bool:

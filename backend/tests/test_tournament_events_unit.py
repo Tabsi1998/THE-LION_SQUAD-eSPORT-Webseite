@@ -15,6 +15,7 @@ import pytest
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from services.competition_graph_validation import validate_competition_graph  # noqa: E402
+from services.competition_standings import stage_standings  # noqa: E402
 from services.competition_snapshot import build_structure_snapshot  # noqa: E402
 from services.custom_bracket import build_matches_v2_from_schema  # noqa: E402
 from services.graph_swiss import swiss_round_documents  # noqa: E402
@@ -219,6 +220,44 @@ def test_double_elimination_dq_in_the_loser_bracket_walks_the_opponent_over():
     assert "walkover" in [op["kind"] for op in plan["ops"]]
     assert target["status"] == "completed" and target["results"][0]["registration_id"] == opponent
     assert all(victim not in filled_ids(m) for m in matches if m["status"] not in TERMINAL)
+    assert_nobody_twice_ready(matches)
+    assert_graph_valid(matches)
+
+
+@pytest.mark.parametrize("grand_final", ["reset", "single"])
+@pytest.mark.parametrize("removed_side", ["upper", "lower"])
+def test_double_elimination_removal_before_the_grand_final_respects_the_reset_rule(grand_final: str, removed_side: str):
+    """Codex-Befund: ein kampflos entschiedenes Grand Final muss die Reset-Regel durchlaufen. Fällt der Sieger der
+    Verliererrunde aus, gewinnt die Siegerrunde kampflos - das Reset-Spiel entfällt („nicht nötig“) und wird nicht
+    selbst zum Freilos. Fällt der Sieger der Siegerrunde aus, gewinnt die Verliererrunde kampflos; mit Reset-Regel ist
+    das Reset-Spiel dann nötig und ebenfalls kampflos entschieden."""
+    matches = build(4, "double_elimination", tournament={"grand_final_mode": grand_final})
+    by_key = by_key_of(matches)
+    for _ in range(20):
+        ready = [m for m in matches if m["status"] == "ready" and section_of(m) != "GF"]
+        if not ready:
+            break
+        match = ready[0]
+        apply_result(matches, match, sorted(filled_ids(match), key=lambda reg: int(reg[1:])))
+    gf = by_key["GF"]
+    assert gf["status"] == "ready"
+    upper, lower = gf["slots"][0]["registration_id"], gf["slots"][1]["registration_id"]
+    victim, survivor = (upper, lower) if removed_side == "upper" else (lower, upper)
+    plan = plan_removal(matches, victim, kind="disqualified", now_iso=NOW)
+    assert "walkover" in [op["kind"] for op in plan["ops"]]
+    assert gf["status"] == "completed" and gf["results"][0]["registration_id"] == survivor
+    reset = by_key.get("GFR")
+    if grand_final == "single":
+        assert reset is None
+    elif removed_side == "lower":
+        assert reset["status"] == "cancelled", "Sieg der Siegerrunde: das Reset-Spiel ist nicht nötig"
+        assert reset["result_meta"]["source"] == "bracket_reset" and reset["result_meta"]["needed"] is False
+    else:
+        assert reset["status"] == "completed" and reset["results"][0]["registration_id"] == survivor
+        assert reset["result_meta"]["source"] == "auto_bye", "die Verliererrunde gewinnt: Reset nötig, aber ohne Gegner kampflos"
+    assert all(m["status"] in TERMINAL for m in matches), [m["match_key"] for m in matches if m["status"] not in TERMINAL]
+    rows = stage_standings(matches, registrations(4))
+    assert rows[0]["registration_id"] == survivor
     assert_nobody_twice_ready(matches)
     assert_graph_valid(matches)
 
@@ -462,3 +501,11 @@ def test_a_forfeiting_player_does_not_advance_on_the_winner_path():
     assert first in filled_ids(semi) and second not in [s.get("registration_id") for s in semi["slots"]]
     freed = next(s for s in semi["slots"] if (s.get("source") or {}).get("match_key") == "A" and s.get("source", {}).get("rank") == 2)
     assert freed["status"] == "bye" and freed["source_result"]["reason"] == "forfeit"
+
+
+def test_lineups_are_closed_for_withdrawn_and_disqualified_teams():
+    from services.team_lineup import CLOSED_REGISTRATIONS, lineup_open
+    assert {"withdrawn", "disqualified"} <= CLOSED_REGISTRATIONS
+    tournament = {"status": "check_in"}
+    assert lineup_open(tournament, {"status": "approved"}) is True
+    assert lineup_open(tournament, {"status": "disqualified"}) is False
