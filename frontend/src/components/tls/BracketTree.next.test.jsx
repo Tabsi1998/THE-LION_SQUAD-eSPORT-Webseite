@@ -51,6 +51,16 @@ describe("Linien aus den echten Quellen", () => {
     expect(drop).toHaveAttribute("data-flow", "L");
   });
 
+  it("alte Bäume ohne Herkunft der Plätze bekommen ihre Linien wie früher nach der Reihenfolge - am Web und am TV", () => {
+    const strip = (bracket) => { for (const match of bracket.matches_v2) for (const slot of match.slots) delete slot.source; return bracket; };
+    const { unmount } = render(<BracketTree data={strip(singleElimination(4))} layout="tree" />);
+    expect(lines().sort()).toEqual(["m-A>m-C", "m-B>m-C", "m-C>bracket-champion"]);
+    unmount();
+    const Card = ({ match }) => <div>{match.match_key}</div>;
+    render(<BracketTree data={strip(singleElimination(4))} viewMode="tv" nodeRenderer={Card} tvLayout={{ columns: 4 }} />);
+    expect(lines().sort()).toEqual(["m-A>m-C", "m-B>m-C"]);
+  });
+
   it("FFA-Läufe: Linien aus jedem Lauf ins Finale, auf der Karte „2 kommen weiter → C“", () => {
     render(<BracketTree data={heats(8)} layout="tree" />);
     expect(lines()).toEqual(expect.arrayContaining(["m-A>m-C", "m-B>m-C"]));

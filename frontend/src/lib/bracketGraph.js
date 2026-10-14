@@ -98,6 +98,24 @@ export function bracketEdges(matches = []) {
   return [...edges.values()];
 }
 
+/**
+ * Für alte Bäume ohne Herkunft der Plätze: Linien nach der Reihenfolge wie früher (je zwei Spiele speisen eines,
+ * bei gleich großen Runden je eines). `rounds` = Spiele je Runde, in Reihenfolge. `toSlot` 0 = Platz unbekannt.
+ */
+export function orderEdges(rounds = []) {
+  const edges = [];
+  for (let index = 0; index < rounds.length - 1; index += 1) {
+    const from = rounds[index] || [];
+    const to = rounds[index + 1] || [];
+    if (!from.length || !to.length || to.length > from.length) continue;
+    from.forEach((match, position) => {
+      const target = to[Math.min(to.length - 1, Math.floor((position * to.length) / from.length))];
+      edges.push({ id: `${match.id}>${target.id}:0`, from: match.id, to: target.id, toSlot: 0, flow: "W", rank: 1, cross: false, void: isCancelled(match) || isCancelled(target) });
+    });
+  }
+  return edges;
+}
+
 /** Wohin ein Lauf führt (#1178): die Spiele der Weiterkommer und der anderen (Loser Bracket), dazu die Zahl. */
 export function heatExits(match, edges = [], matches = []) {
   const byId = new Map((matches || []).map((row) => [row.id, row]));
@@ -121,10 +139,11 @@ export function pathFor(registrationId, matches = [], edges = []) {
     const from = byId.get(edge.from);
     const to = byId.get(edge.to);
     if (!to) continue;
-    const slot = (to.slots || []).find((row) => Number(row.slot) === edge.toSlot);
-    if (slot?.registration_id === registrationId) {
+    const slot = edge.toSlot ? (to.slots || []).find((row) => Number(row.slot) === edge.toSlot) : null;
+    const arrived = edge.toSlot ? slot?.registration_id === registrationId : playersOf(to).has(registrationId);
+    if (arrived) {
       result.edges.add(edge.id);
-    } else if (!isDone(from) && !isCancelled(from) && !slot?.registration_id) {
+    } else if (edge.toSlot && !isDone(from) && !isCancelled(from) && !slot?.registration_id) {
       result.edges.add(edge.id);
       result.ahead = result.ahead || new Set();
       result.ahead.add(to.id);

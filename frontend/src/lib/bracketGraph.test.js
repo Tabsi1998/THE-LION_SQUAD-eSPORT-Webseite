@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { clone, decide, doubleElimination, find, heats, singleElimination } from "../../e2e/fixtures/tvBrackets.mjs";
-import { bracketEdges, diffBracket, heatExits, matchFate, pathFor, soloAdvance } from "./bracketGraph";
+import { bracketEdges, diffBracket, heatExits, matchFate, orderEdges, pathFor, soloAdvance } from "./bracketGraph";
 
 // Turnierbaum neu (#1561): die Linien kommen aus den echten Quellen der Plätze („W:A:1“, `advancement`), nicht aus der
 // Reihenfolge der Spiele. Dazu: was mit einem Spiel geschah (entfällt, zusammengelegt), dein Weg und die Bewegungen,
@@ -54,6 +54,23 @@ describe("bracketEdges", () => {
     const edges = bracketEdges(bracket.matches_v2).filter((edge) => edge.from === "m-B");
     expect(edges.length).toBeGreaterThan(0);
     expect(edges.every((edge) => edge.void)).toBe(true);
+  });
+});
+
+describe("orderEdges (alte Bäume ohne Herkunft)", () => {
+  it("verbindet wie früher nach der Reihenfolge - nur wenn kein Platz seine Herkunft kennt", () => {
+    const m = (id, round, order) => ({ id, section: "WB", round, order, slots: [{ slot: 1 }, { slot: 2 }] });
+    const rounds = [[m("a", 1, 0), m("b", 1, 1), m("c", 1, 2), m("d", 1, 3)], [m("e", 2, 0), m("f", 2, 1)], [m("g", 3, 0)]];
+    expect(orderEdges(rounds).map((edge) => `${edge.from}>${edge.to}`)).toEqual(["a>e", "b>e", "c>f", "d>f", "e>g", "f>g"]);
+    expect(orderEdges(rounds).every((edge) => edge.toSlot === 0 && edge.flow === "W")).toBe(true);
+  });
+
+  it("dein Weg folgt auch diesen Linien", () => {
+    const a = { id: "a", round: 1, status: "completed", slots: [{ slot: 1, registration_id: "r1" }, { slot: 2, registration_id: "r2" }] };
+    const b = { id: "b", round: 2, status: "running", slots: [{ slot: 1, registration_id: "r1" }, { slot: 2, registration_id: "r3" }] };
+    const edges = orderEdges([[a], [b]]);
+    expect(pathFor("r1", [a, b], edges).edges.size).toBe(1);
+    expect(pathFor("r2", [a, b], edges).edges.size).toBe(0);
   });
 });
 

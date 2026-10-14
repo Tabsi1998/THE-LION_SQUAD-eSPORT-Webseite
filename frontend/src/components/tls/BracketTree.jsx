@@ -6,7 +6,7 @@ import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
 import { asInstant, viennaTime } from "@/lib/vienna";
 import { finderFor, initials } from "@/lib/slotSource";
 import { buildPodiumMap, finalMatchOf, isBronzeMatch, lastStageId, normalizeSection } from "@/lib/bracketPodium";
-import { bracketEdges, isDone, isLive, pathFor, sectionGroup } from "@/lib/bracketGraph";
+import { bracketEdges, isDone, isLive, orderEdges, pathFor, sectionGroup } from "@/lib/bracketGraph";
 import { motionTransition } from "@/lib/motion";
 import { TV_LINE, treeBlockUnits, treeBox, treeScale } from "@/lib/tvType";
 import { BracketMotionContext, useBracketMotion, useBracketMotionState } from "./bracket/bracketMotion";
@@ -112,7 +112,14 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
   const regMap = useMemo(() => new Map(registrations.map((reg) => [reg.id, reg])), [registrations]);
   const mine = mineId || registrations.find((reg) => reg?.is_mine)?.id || null;
   const finder = useMemo(() => finderFor(matches_v2), [matches_v2]);
-  const edges = useMemo(() => bracketEdges(matches_v2), [matches_v2]);
+  const edges = useMemo(() => {
+    const real = bracketEdges(matches_v2);
+    if (real.length) return real;
+    // Alte Bäume ohne Herkunft der Plätze: Linien nach der Reihenfolge wie früher, je Abschnitt.
+    return Object.values(groupMatches(matches_v2)).flatMap((sections) => Object.values(sections)
+      .filter((rounds) => !isTableFormat(Object.values(rounds).flat()))
+      .flatMap((rounds) => orderEdges(roundNumbers(rounds).map((rn) => rounds[rn]))));
+  }, [matches_v2]);
   const finalMatch = useMemo(() => finalMatchOf(matches_v2, stages), [matches_v2, stages]);
   const graph = useMemo(() => {
     const decisive = new Set(matches_v2.filter((match) => isBronzeMatch(match) || sectionGroup(match.section) === "final").map((match) => match.id));
