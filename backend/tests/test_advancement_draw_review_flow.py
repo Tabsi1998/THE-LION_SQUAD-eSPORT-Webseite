@@ -218,7 +218,8 @@ async def test_removal_that_decides_the_last_match_of_a_round_records_the_draw(f
     victim = next(reg for reg in regs if reg["id"] == last["slots"][1]["registration_id"])
     url = f"/api/tournaments/{tournament['id']}/registrations/{victim['id']}/removal"
     plan = (await flow.post(url, json={"kind": "withdrawn"})).json()["plan"]
-    before = len(change_events._event_buffer)
+    # Der Puffer ist begrenzt (EVENT_BUFFER_SIZE) - neue Ereignisse erkennt die fortlaufende Version, nicht die Länge.
+    before = change_events._version
     confirmed = await flow.post(url, json={"kind": "withdrawn", "plan_id": plan["id"]})
     assert confirmed.status_code == 200, confirmed.text
     second = [m for m in await flow.matches(tournament) if m["round"] == 2 and m["section"] == "WB"]
@@ -226,6 +227,6 @@ async def test_removal_that_decides_the_last_match_of_a_round_records_the_draw(f
     assert victim["id"] not in {s.get("registration_id") for m in second for s in m["slots"]}
     entry = await flow.db.audit_logs.find_one({"action": "tournament.draw.done"}, {"_id": 0})
     assert entry and entry["actor_id"] == staff["id"] and entry["data"]["draw_id"] == second[0]["draw"]["id"]
-    drawn = [e for e in list(change_events._event_buffer)[before:]
+    drawn = [e for e in list(change_events._event_buffer) if e.get("version", 0) > before
              if (e.get("tournament_event") or {}).get("type") == "draw_done"]
     assert len(drawn) == 1

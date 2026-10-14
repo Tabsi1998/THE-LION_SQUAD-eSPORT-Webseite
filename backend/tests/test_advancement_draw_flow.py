@@ -63,7 +63,8 @@ async def test_draw_happens_when_the_round_is_done_and_lands_in_the_protocol(flo
     assert all(not any(s.get("registration_id") for s in m["slots"]) for m in second)
     assert not await flow.db.audit_logs.count_documents({"action": "tournament.draw.done"})
 
-    before = len(change_events._event_buffer)
+    # Der Puffer ist begrenzt (EVENT_BUFFER_SIZE) - neue Ereignisse erkennt die fortlaufende Version, nicht die Länge.
+    before = change_events._version
     await play_round_one(flow, tournament)
     second = await round_matches(flow, tournament, 2)
     assert all(m["status"] == "ready" for m in second)
@@ -75,7 +76,7 @@ async def test_draw_happens_when_the_round_is_done_and_lands_in_the_protocol(flo
     assert entry["data"]["draw_id"] == second[0]["draw"]["id"]
     assert {row["registration_id"] for row in entry["data"]["assignments"]} == {
         s["registration_id"] for m in second for s in m["slots"]}
-    events = [e for e in list(change_events._event_buffer)[before:]
+    events = [e for e in list(change_events._event_buffer) if e.get("version", 0) > before
               if (e.get("tournament_event") or {}).get("type") == "draw_done"]
     assert len(events) == 1
     public = change_events._event_for_scope(events[0], "public")
