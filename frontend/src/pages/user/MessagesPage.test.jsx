@@ -349,3 +349,34 @@ test("die Anmeldung lädt erst nach der Seite: Entwurf und erster Stand bleiben"
   expect(screen.getByTestId("direct-chat-input")).toHaveValue("schon getippt");
   expect(apiMock.get.mock.calls.filter(([url]) => String(url).startsWith("/messages/direct/u-schatten"))).toHaveLength(loads);
 });
+
+// Websuche (#985): Begriff A langsam, B schnell - die spätere Antwort für A ändert die Treffer für B nicht; nach dem
+// Leeren zeigt eine alte Antwort nichts mehr.
+test("Namenssuche: eine verspätete Antwort für den alten Begriff ändert die Treffer nicht, Leeren verwirft sie", async () => {
+  const slow = deferred();
+  const late = deferred();
+  stubTwoChats({
+    "/messages/users": (url) => {
+      if (url.endsWith("q=pix")) return Promise.resolve({ data: [{ id: "u-pixel", username: "pixelpanther", display_name: "PixelPanther", can_message: true }] });
+      if (url.endsWith("q=pi")) return slow.promise;
+      return late.promise;
+    },
+  });
+  const user = userEvent.setup();
+  renderAt("/messages");
+  await screen.findByTestId("conversation-item-u-pixel");
+  const input = screen.getByTestId("messages-search");
+  await user.type(input, "pi");
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/messages/users?q=pi"));
+  await user.type(input, "x");
+  expect(await screen.findByTestId("messages-candidate-u-pixel")).toBeInTheDocument();
+  await act(async () => slow.resolve({ data: [{ id: "u-pilz", username: "pilzkopf", display_name: "Pilzkopf", can_message: true }] }));
+  expect(screen.queryByTestId("messages-candidate-u-pilz")).not.toBeInTheDocument();
+
+  await user.clear(input);
+  await user.type(input, "lun");
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/messages/users?q=lun"));
+  await user.clear(input);
+  await act(async () => late.resolve({ data: [{ id: "u-luna", username: "lunabyte", display_name: "LunaByte", can_message: true }] }));
+  expect(screen.queryByTestId("messages-candidate-u-luna")).not.toBeInTheDocument();
+});

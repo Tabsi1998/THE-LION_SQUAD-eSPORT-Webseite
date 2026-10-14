@@ -54,7 +54,8 @@ function ConfirmResultButton({ bundle, onDone, testId }) {
   );
 }
 
-export function NotificationRow({ bundle, onOpen, onDelete, compact = false, testIdPrefix = "notification-row" }) {
+// `pending` (#987): „gelesen“ ist unterwegs - die Zeile ist kenntlich, bis der Server es bestätigt oder ablehnt.
+export function NotificationRow({ bundle, onOpen, onDelete, compact = false, testIdPrefix = "notification-row", pending = false }) {
   const badge = notificationBadge(bundle);
   const content = (
     <div className="flex items-start gap-2 min-w-0">
@@ -84,7 +85,7 @@ export function NotificationRow({ bundle, onOpen, onDelete, compact = false, tes
     link = <button type="button" onClick={handleOpen} className={`w-full ${className}`}>{content}</button>;
   }
   return (
-    <div data-testid={`${testIdPrefix}-${bundle.id}`} className="group border-b border-white/5 flex items-stretch">
+    <div data-testid={`${testIdPrefix}-${bundle.id}`} aria-busy={pending || undefined} data-pending={pending ? "true" : undefined} className={`group border-b border-white/5 flex items-stretch transition-opacity ${pending ? "opacity-60" : ""}`}>
       {link}
       <ConfirmResultButton bundle={bundle} onDone={onOpen} testId={`${testIdPrefix}-confirm-${bundle.id}`} />
       {onDelete ? (
