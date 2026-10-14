@@ -11,6 +11,7 @@ from auth import get_current_user, get_optional_user
 from services.access_links import AccessLinkUsedUp, claim_access_link_use, release_access_link_use, validate_access_link
 from services.match_audience import responsible_registration
 from services.registration_notifications import notify_registration_status
+from services.tournament_events import REMOVAL_KINDS
 from services.tournament_rules import self_checkin_allowed
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
@@ -709,6 +710,13 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    if updates.get("status") in REMOVAL_KINDS:
+        # Austritt und Disqualifikation (#1553) bauen den Baum um - das geht nur über den Umbauplan mit Bestätigung.
+        raise HTTPException(
+            status_code=409,
+            detail="Austritt und Disqualifikation bitte über „Austritt eintragen“ bzw. „Disqualifizieren“ in der "
+                   "Teilnehmerliste - dort wird der Umbau des Turnierbaums gezeigt und bestätigt.",
+        )
     # Der Grund einer Absage geht nur in die Nachricht an die Person (#1133), nicht an die Anmeldung.
     status_reason = updates.pop("status_reason", None)
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})

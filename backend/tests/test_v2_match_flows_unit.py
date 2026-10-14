@@ -64,9 +64,9 @@ def test_a_stranger_cannot_forfeit_this_match():
         results_for_forfeit(match_with("a", "b"), "fremder")
 
 
-def test_a_match_without_an_opponent_cannot_be_forfeited():
-    with pytest.raises(MatchV2ResultError):
-        results_for_forfeit(match_with("a"), "a")
+def test_a_match_with_a_single_seated_player_is_forfeited_alone():
+    """Seit #1553 wertbar: der eine Spieler verliert kampflos (sein Sieger-Platz wird ein Freilos, match_v2_results)."""
+    assert results_for_forfeit(match_with("a"), "a") == [{"registration_id": "a", "rank": 1, "forfeit": True}]
 
 
 @pytest.mark.parametrize("note", [None, "", "   ", "kurz"])
