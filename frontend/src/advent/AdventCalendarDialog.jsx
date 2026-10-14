@@ -1,4 +1,4 @@
-import { useEffect, useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useLocation, useNavigate } from "react-router-dom";
 import { X } from "lucide-react";
@@ -17,6 +17,21 @@ export function AdventCalendarDialog() {
   const location = useLocation();
   const navigate = useNavigate();
   const titleId = `advent-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+
+  // Ein Seitenwechsel schließt das Fenster (#991): „Anmelden“, News-, Event-, Partner- und Gewinner-Links führen auf
+  // ihre Seite, und die ist danach frei - auch der Link auf die Seite, auf der man schon ist. Mit dem Fenster geht
+  // das Türchen-Fenster darin zu. Ausgenommen sind die Ankunft über /advent (die öffnet es gleich wieder) und das
+  // Aufräumen danach (gleiche Adresse, nur ohne den Wunsch).
+  const previous = useRef(location);
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = location;
+    if (before.key === location.key) return;
+    if (location.state?.[OPEN_STATE_KEY]) return;
+    const samePlace = before.pathname === location.pathname && before.search === location.search && before.hash === location.hash;
+    if (before.state?.[OPEN_STATE_KEY] && samePlace) return;
+    closeAdventCalendar();
+  }, [location]);
 
   // Die Umleitung von /advent legt den Wunsch in den Verlauf: einmal lesen, dann vergessen - sonst ginge das Fenster
   // bei jedem „Zurück“ wieder auf.
