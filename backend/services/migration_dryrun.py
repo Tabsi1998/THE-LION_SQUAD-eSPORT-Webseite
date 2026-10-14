@@ -100,7 +100,7 @@ def tournament_fingerprint(
         results.setdefault(identity, []).append(_winner(match))
 
     standings = standings_for_structure(tournament, snapshot, registrations, groups=list(groups))
-    placements = placements_for_structure(snapshot, registrations)
+    placements = placements_for_structure(snapshot, registrations, tournament=tournament)
 
     return {
         "participants": sorted(
@@ -110,8 +110,10 @@ def tournament_fingerprint(
         "decided_count": len(decided),
         "results": {key: sorted(filter(None, value)) for key, value in sorted(results.items())},
         "standings": standings_order(standings),
-        "placements": {str(rank): entry.get("registration_id")
-                       for rank, entry in sorted(placements.items())},
+        # Ein Platz mit einem Halter bleibt eine Kennung (gleiche Prüfsumme wie bisher), ein geteilter wird eine Liste.
+        "placements": {str(rank): group[0].get("registration_id") if len(group) == 1
+                       else sorted(entry.get("registration_id") or "" for entry in group)
+                       for rank, group in sorted(placements.items())},
     }
 
 
@@ -120,7 +122,7 @@ def fingerprint_digest(fingerprint: dict) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
-def placement_risk(snapshot: dict, registrations: list[dict]) -> dict | None:
+def placement_risk(snapshot: dict, registrations: list[dict], *, tournament: dict | None = None) -> dict | None:
     """Whether this tournament's placements would be answered differently afterwards.
 
     Placements are the one projection that is *not* engine-independent today.
@@ -148,7 +150,7 @@ def placement_risk(snapshot: dict, registrations: list[dict]) -> dict | None:
                       "danach aus der Tabelle abgeleitet und können abweichen. Betrifft Preise, "
                       "Profil-Historie, Abzeichen und Saisonpunkte.",
         }
-    if decided and not placements_for_structure(snapshot, registrations):
+    if decided and not placements_for_structure(snapshot, registrations, tournament=tournament):
         return {
             "code": "placements_would_appear",
             "detail": "Das Turnier hat heute keine Platzierungen.",
@@ -158,7 +160,7 @@ def placement_risk(snapshot: dict, registrations: list[dict]) -> dict | None:
     return None
 
 
-def migration_notices(snapshot: dict, registrations: list[dict] = ()) -> list[dict]:
+def migration_notices(snapshot: dict, registrations: list[dict] = (), *, tournament: dict | None = None) -> list[dict]:
     """Things that will change on migration but are systemic, not broken.
 
     Kept apart from the blockers on purpose. A blocker is a defect in one
@@ -167,7 +169,7 @@ def migration_notices(snapshot: dict, registrations: list[dict] = ()) -> list[di
     bury three real defects under fifty routine lines.
     """
     notices = []
-    risk = placement_risk(snapshot, list(registrations))
+    risk = placement_risk(snapshot, list(registrations), tournament=tournament)
     if risk:
         notices.append(risk)
     return notices
@@ -277,7 +279,7 @@ def tournament_report(
         "digest": fingerprint_digest(fingerprint),
         "fingerprint": fingerprint,
         "blockers": blockers,
-        "notices": migration_notices(snapshot, registrations),
+        "notices": migration_notices(snapshot, registrations, tournament=tournament),
         "ready": not blockers and engine is not None,
     }
 

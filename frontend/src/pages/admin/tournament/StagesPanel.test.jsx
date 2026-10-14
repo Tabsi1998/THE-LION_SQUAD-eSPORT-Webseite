@@ -29,7 +29,6 @@ function panel(props = {}) {
       registrations={[{ id: "r1", display_name: "A" }, { id: "r2", display_name: "B" }]}
       rightsForMatch={PLAN_RIGHTS}
       onChanged={() => {}}
-      onSaveMatchMeta={vi.fn()}
       {...props}
     />,
   );
@@ -40,24 +39,19 @@ beforeEach(() => {
   apiMock.patch.mockResolvedValue({ data: {} });
 });
 
-test("Matchplan: ohne eigene Dauer zeigt das Spiel die Dauer vom Turnier", () => {
-  panel({ tournament: { match_duration_minutes: 45 }, durationGame: GAME });
-  expect(screen.getByLabelText("Dauer in Minuten")).toHaveValue(null);
-  expect(screen.getByLabelText("Dauer in Minuten")).toHaveAttribute("placeholder", "45");
-  expect(screen.getByTestId("matchplan-duration-source-m1")).toHaveTextContent("vom Turnier: 45 Min.");
-  expect(screen.getByTestId("matchplan-saved-m1")).toHaveTextContent("Dauer 45 Min.");
-});
-
-test("Matchplan: ohne Turnierwert kommt die Dauer vom Spiel", () => {
-  panel({ tournament: {}, durationGame: GAME });
-  expect(screen.getByTestId("matchplan-duration-source-m1")).toHaveTextContent("vom Spiel: 15 Min. (Grand Prix 4 Rennen)");
-});
-
-test("Matchplan: eine eigene Dauer steht im Feld", () => {
-  panel({ matches: [{ ...MATCH, duration_minutes: 20 }], tournament: { match_duration_minutes: 45 } });
-  expect(screen.getByLabelText("Dauer in Minuten")).toHaveValue(20);
-  expect(screen.getByTestId("matchplan-saved-m1")).toHaveTextContent("Dauer 20 Min.");
-  expect(screen.getByTestId("matchplan-duration-source-m1")).toHaveTextContent("Leer lassen: vom Turnier: 45 Min.");
+// Matchplan ersetzt die alte Matchplanung (Praxis nach #1589): im Reiter „Spiele“ stehen keine Felder mehr für Zeit,
+// Station und Dauer je Spiel - nur der Hinweis und der Weg in den Matchplan. Die Felder prüft MatchPlanPanel.test.jsx.
+test("Spiele: keine Planungsfelder mehr, Hinweis und Weg in den Matchplan", () => {
+  const onOpenMatchplan = vi.fn();
+  panel({ tournament: { match_duration_minutes: 45 }, durationGame: GAME, onOpenMatchplan });
+  expect(screen.queryByLabelText("Dauer in Minuten")).toBeNull();
+  expect(screen.queryByLabelText("Station")).toBeNull();
+  expect(screen.queryByText("Planung speichern")).toBeNull();
+  expect(screen.getByTestId("stages-matchplan-hint")).toHaveTextContent("Zeiten und Stationen planst du im Matchplan");
+  fireEvent.click(screen.getByRole("button", { name: "Zum Matchplan" }));
+  expect(onOpenMatchplan).toHaveBeenCalled();
+  // Gelesen wird der Termin weiter an der Karte.
+  expect(screen.getByText(/Termin offen|31\.10\./)).toBeInTheDocument();
 });
 
 // Weiterkommen je Phase (#1590): leer erbt; ein Modus geht mit Schalter-Spiegel mit, die Show-Minuten nur bei der Show.

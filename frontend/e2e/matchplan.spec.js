@@ -74,6 +74,25 @@ test.describe("Matchplan-Seite", () => {
     await shot(page, "01-vorschau-desktop.png");
   });
 
+  test("Baum noch Vorschau (Planer meldet „none“): die Ansicht bleibt vor Ort und zeigt die Spiele", async ({ page }) => {
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    // Der Änderungsstrom ist im Test nur JSON - diese eine Meldung kommt vom Nachstellen, nicht von der Seite.
+    page.on("console", (message) => { if (message.type() === "error" && !message.text().startsWith("EventSource")) errors.push(message.text()); });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const tid = await mockState(page, fixture.draft);
+    const planned = page.waitForResponse((response) => response.url().includes("/schedule/plan"));
+    await page.goto(`/admin/tournaments/${tid}?tab=matchplan`);
+    await planned;
+    await page.waitForTimeout(500);
+    await expect(page.getByTestId("mp-settings")).toBeVisible();
+    await expect(page.getByTestId("mp-online")).toHaveCount(0);
+    await expect(page.getByTestId("mp-flow").getByRole("button")).toHaveCount(14);
+    await expect(page.getByTestId("mp-order")).toContainText("FINAL");
+    expect(errors).toEqual([]);
+    await shot(page, "11-vorschau-baum-desktop.png");
+  });
+
   test("live: Verzug oben, laufendes Spiel rot, erledigte grau", async ({ page }) => {
     await page.clock.setFixedTime(new Date(fixture.live.now));
     await page.setViewportSize({ width: 1440, height: 900 });

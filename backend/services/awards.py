@@ -109,9 +109,11 @@ async def record_tournament_awards(db, tournament_id: str) -> int:
     observe_structure_read(snapshot, surface="awards")
     matches = snapshot.get("matches") or []
     placements = {}
-    for rank, placement in placements_for_structure(snapshot, regs).items():
-        if placement.get("registration_id"):
-            placements[placement["registration_id"]] = rank
+    # Ein geteilter Platz (#1593) zählt für jeden, der ihn hält.
+    for rank, group in placements_for_structure(snapshot, regs, tournament=tournament).items():
+        for placement in group:
+            if placement.get("registration_id"):
+                placements[placement["registration_id"]] = rank
     if not placements and matches:
         groups = []
         if tournament.get("format") == "groups":

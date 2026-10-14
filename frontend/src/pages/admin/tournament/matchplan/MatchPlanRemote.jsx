@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { countOf } from "@/lib/schedulePlanText";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { formatScheduleGroupLabel } from "@/lib/tournamentLabels";
@@ -19,6 +20,7 @@ function namesOf(match, registrations, findIn) {
 
 function onlineState(match, deadline) {
   const status = String(match.status || "");
+  if (match.is_preview) return { tone: "waiting", text: "Vorschau - der Baum steht erst mit dem Ende des Check-ins fest" };
   if (DONE.has(status)) return { tone: "done", text: status === "bye" ? "Freilos" : "gespielt" };
   if (RUNNING.has(status)) return { tone: "running", text: "läuft" };
   if (deadline?.result_due_at) return { tone: "open", text: `Meldung liegt vor · gilt ab ${hm(deadline.result_due_at)}, wenn niemand widerspricht` };
@@ -31,8 +33,25 @@ function onlineState(match, deadline) {
 }
 
 /** Online: Runden untereinander, je Spiel der Stand und die nächste Frist. */
-export function OnlineRounds({ tournament, matches, registrations, deadlines }) {
-  const rows = (matches || []).filter((match) => !match.is_preview);
+/** „ändern“ an einer Partie (Start und Dauer) - nur mit Recht auf Termine und nicht für Vorschau oder Gespieltes. */
+function EditToggle({ match, canEdit, editor, open, setOpen }) {
+  if (!editor || !canEdit?.(match) || DONE.has(String(match.status || ""))) return null;
+  const key = match.match_key || "Spiel";
+  return (
+    <>
+      <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small mp-remote__action" aria-label={`${key} ändern`}
+        aria-expanded={open === match.id} onClick={() => setOpen(open === match.id ? null : match.id)}>ändern</button>
+      {open === match.id ? editor(match, () => setOpen(null)) : null}
+    </>
+  );
+}
+
+export function OnlineRounds({ tournament, matches, registrations, deadlines, error = "", canEdit = null, editor = null }) {
+  const [open, setOpen] = useState(null);
+  // Wie der Planer: echte Spiele, sonst die Vorschau (als solche gekennzeichnet) - nie eine leere Fläche.
+  const all = (matches || []).filter(Boolean);
+  const real = all.filter((match) => !match.is_preview);
+  const rows = real.length ? real : all;
   const findIn = finderFor(rows);
   const byId = new Map((deadlines?.matches || []).map((row) => [row.match_id, row]));
   const rounds = new Map();
@@ -46,6 +65,8 @@ export function OnlineRounds({ tournament, matches, registrations, deadlines }) 
         <h3 className="mp-card__title">Runden und Fristen</h3>
         <span className="mp-card__note">Ein Spiel öffnet, sobald die Gegner feststehen. „Nicht erschienen“ und „Ergebnis gilt“ kommen erst nach der Frist.</span>
       </div>
+      {error && <p className="mp-notice" data-tone="error" role="alert" data-testid="mp-remote-error">Fristen konnten nicht geladen werden: {error}</p>}
+      {!rows.length && <p className="mp-empty">Noch keine Spiele.</p>}
       <div className="mp-rounds">
         {[...rounds.entries()].map(([label, list]) => (
           <div key={label} className="mp-round">
@@ -58,6 +79,7 @@ export function OnlineRounds({ tournament, matches, registrations, deadlines }) 
                     <strong>{match.match_key || "Spiel"}</strong>
                     <span className="mp-remote__names">{namesOf(match, registrations, findIn).join(" – ")}</span>
                     <span className="mp-remote__state">{state.text}</span>
+                    <EditToggle match={match} canEdit={canEdit} editor={editor} open={open} setOpen={setOpen} />
                   </li>
                 );
               })}
@@ -77,7 +99,8 @@ const SOURCE_TEXT = {
 };
 
 /** Liga: Spielwochen nebeneinander - Fenster, Frist, je Partie der geltende Termin und woher er kommt. */
-export function LeagueWeeks({ tournament, matches, registrations, matchdays }) {
+export function LeagueWeeks({ tournament, matches, registrations, matchdays, error = "", canEdit = null, editor = null }) {
+  const [open, setOpen] = useState(null);
   const byId = new Map((matches || []).map((match) => [match.id, match]));
   const findIn = finderFor(matches || []);
   const weeks = matchdays?.matchdays || [];
@@ -87,6 +110,7 @@ export function LeagueWeeks({ tournament, matches, registrations, matchdays }) {
         <h3 className="mp-card__title">Spielwochen</h3>
         <span className="mp-card__note">Ohne Einigung gilt die Standardzeit. „Ergebnis fehlt“ meldet sich erst nach der Frist der Woche. Der Planer überschreibt vereinbarte Termine nie.</span>
       </div>
+      {error && <p className="mp-notice" data-tone="error" role="alert" data-testid="mp-remote-error">Spielwochen konnten nicht geladen werden: {error}</p>}
       <div className="mp-weeks-scroll">
         <ol className="mp-weeks">
           {weeks.map((week) => (
@@ -106,6 +130,7 @@ export function LeagueWeeks({ tournament, matches, registrations, matchdays }) {
                       <span className="mp-remote__state">
                         {done ? "gespielt" : entry.scheduled_at ? `${SOURCE_TEXT[entry.schedule_source] || "Termin"} ${dayTime(entry.scheduled_at)}` : "noch kein Termin"}
                       </span>
+                      {match.id ? <EditToggle match={match} canEdit={canEdit} editor={editor} open={open} setOpen={setOpen} /> : null}
                     </li>
                   );
                 })}

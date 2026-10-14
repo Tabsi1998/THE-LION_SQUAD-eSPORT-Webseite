@@ -43,6 +43,19 @@ export async function moveMatch(matchId, { start, stationId, release = false } =
   }
 }
 
+/**
+ * Ein Spiel von Hand ändern (Matchplan, ersetzt die alte „Matchplanung“ im Reiter „Spiele“): Start, Station und eigene
+ * Dauer über PATCH /matches/:id. Ein Start macht den Termin fest (`manual`), leer gibt ihn an den Planer zurück.
+ */
+export async function updateMatchPlan(matchId, body) {
+  try {
+    await api.patch(`/matches/${encodeURIComponent(matchId)}`, body);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: formatRequestError(error, "Das Spiel konnte nicht gespeichert werden.") };
+  }
+}
+
 // Spielplaner (#1552), ein Ablauf für Turnierseite und Stationsseite: „Planen“ holt die Vorschau, der Dialog zeigt
 // Zeit und Station je Spiel samt Konflikten, und erst „Übernehmen“ schreibt - mit dem Fingerabdruck der gesehenen
 // Vorschau, damit nie etwas anderes geschrieben wird als gezeigt. Gibt true zurück, wenn geschrieben wurde.

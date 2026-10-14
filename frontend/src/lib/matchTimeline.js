@@ -86,8 +86,10 @@ function stateOf(match) {
 export function buildTimeline({ matches = [], stations = [], stages = [], tournament = null, game = null, registrations = [],
   plan = null, now = new Date() } = {}) {
   const nowMs = instant(now instanceof Date ? now.getTime() : now) ?? Date.now();
-  const real = (matches || []).filter((match) => match && !match.is_preview);
-  const rows = real.length ? real : [];
+  // Wie der Planer: echte Spiele, sonst (Baum noch Vorschau) die Vorschau - die hat keine Zeit und steht nur in der Liste.
+  const all = (matches || []).filter(Boolean);
+  const real = all.filter((match) => !match.is_preview);
+  const rows = real.length ? real : all;
   const stageById = new Map((stages || []).map((stage) => [stage?.id, stage]));
   const assignments = new Map((plan?.assignments || []).map((item) => [item.match_id, item]));
   const findIn = finderFor(rows);
@@ -120,6 +122,7 @@ export function buildTimeline({ matches = [], stations = [], stages = [], tourna
       end: null,
       laneId: stationId || NO_STATION,
       stationId,
+      preview: Boolean(match.is_preview),
       fixed: FIXED_SOURCES.has(match.schedule_source),
       source: match.schedule_source || null,
       forecast: assignment ? Boolean(assignment.forecast) : Boolean(match.schedule_forecast),
