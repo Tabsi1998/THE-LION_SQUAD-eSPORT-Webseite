@@ -230,3 +230,24 @@ async def test_removal_that_decides_the_last_match_of_a_round_records_the_draw(f
     drawn = [e for e in list(change_events._event_buffer) if e.get("version", 0) > before
              if (e.get("tournament_event") or {}).get("type") == "draw_done"]
     assert len(drawn) == 1
+
+
+# ---------------------------------------------------------------------------------------------- Codex-Prüfung zu #1590
+
+@pytest.mark.asyncio
+async def test_old_structure_plan_still_applies_after_the_mode_field_arrives(flow):
+    """Ein Plan aus der Zeit vor den vier Modi (#1590): das Turnier bekommt danach ``advancement_mode`` (leer oder
+    ``fixed``) - der Plan gilt weiter, kein ``structure_plan_changed``."""
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(8)
+    url = f"/api/tournaments/{tournament['id']}/bracket"
+    plan = await flow.post(f"{url}/plan", json={"preview": False})
+    assert plan.status_code == 200, plan.text
+    body = plan.json()
+    for value in (None, "fixed"):
+        await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"advancement_mode": value}})
+        again = await flow.post(f"{url}/plan", json={"preview": False})
+        assert again.json()["plan_hash"] == body["plan_hash"], f"Modus {value!r} ändert den Plan nicht"
+    applied = await flow.post(f"{url}/apply", json={"preview": False, **body["apply_requirements"]})
+    assert applied.status_code == 200, applied.text

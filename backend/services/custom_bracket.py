@@ -937,7 +937,9 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
                 "score_type": settings.get("score_type") or "points",
                 "calculation": settings.get("calculation") or "points",
                 "randomize_advancement_rounds": shuffle,
-                "advancement_mode": advancement_mode,
+                # Nur ein gemischter Modus steht am Spiel (#1590) - der feste Baum bleibt, wie er immer gebaut wurde,
+                # damit ein Strukturplan aus der Zeit davor beim Anwenden denselben Baum ergibt.
+                **({"advancement_mode": advancement_mode} if shuffle else {}),
             },
             "status": "preview" if preview else ("ready" if not has_ref and filled_count >= min(min_players, len(slots)) else "pending"),
             "is_preview": bool(preview),

@@ -1368,11 +1368,17 @@ def _instant_redraw(targets: list[dict], by_id: dict[str, dict], group: str, now
             origin = slot.get("source_result") or {}
             if (slot.get("source") or {}).get("type") != "rank" or not origin.get("from_match_id"):
                 continue
+            # Das Schema folgt dem Los (wie ``_rewire_instant``): Zubringer-Eintrag und Platz-Identität wandern mit dem
+            # Weiterkommer auf seinen neuen Platz - sonst zeigt der Graph danach auf die alten Plätze, und ein späteres
+            # Nachrücken leert einen fremden Platz.
+            feeder = _feeder_of(target, slot, by_id)
             entries.append({
                 "registration_id": slot.get("registration_id"), "user_id": slot.get("user_id"),
                 "rank": int(origin.get("rank") or 0), "flow": origin.get("flow"),
                 "source": by_id.get(origin.get("from_match_id")) or {"id": origin.get("from_match_id"), "match_key": origin.get("from_match_key")},
                 "reason": origin.get("reason") or "bye",
+                "identity": {key: value for key, value in (slot.get("source") or {}).items() if key != "draw"},
+                "feeder": feeder,
             })
             seats[target["id"]].append(int(slot.get("slot") or 0))
             _clear_slot(slot)
@@ -1382,10 +1388,18 @@ def _instant_redraw(targets: list[dict], by_id: dict[str, dict], group: str, now
     ordered = sorted(open_targets, key=lambda row: (row.get("order") or 0, row.get("match_key") or ""))
     placed = assign_balanced(entries, [(target["id"], seats[target["id"]]) for target in ordered if seats.get(target["id"])], rng)
     assignments = []
+    rewired_sources: dict[str, dict] = {}
     for target_id, slot_no, entry in placed:
         target = by_id[target_id]
         slot = _find_slot(target, slot_no)
         source = entry["source"] if entry else None
+        if entry:
+            draw_mark = (slot.get("source") or {}).get("draw")
+            slot["source"] = {**entry["identity"], **({"draw": draw_mark} if draw_mark else {})}
+            if entry.get("feeder"):
+                feeder_source, feeder_entry = entry["feeder"]
+                feeder_entry.update({"to_match_id": target_id, "to_match_key": target.get("match_key"), "to_slot": slot_no})
+                rewired_sources[feeder_source["id"]] = feeder_source
         if entry and entry.get("registration_id"):
             slot["registration_id"] = entry["registration_id"]
             slot["user_id"] = entry.get("user_id")
@@ -1406,6 +1420,10 @@ def _instant_redraw(targets: list[dict], by_id: dict[str, dict], group: str, now
         target["updated_at"] = now_iso
         target_sets[target["id"]] = {"slots": target.get("slots") or [], "status": target["status"], "updated_at": now_iso,
                                      **_pairing_reset_fields(target, now_iso)}
+    for source in rewired_sources.values():
+        # Die Quellen schreiben ihre umgehängten Weiterleitungen mit - alles oder nichts, zusammen mit den Zielspielen.
+        source["updated_at"] = now_iso
+        target_sets.setdefault(source["id"], {}).update({"advancement": source.get("advancement") or [], "updated_at": now_iso})
     draw = {"id": draw_id, "group": group, "kind": "instant", "trigger": "redraw", "drawn_at": now_iso,
             "stage_id": open_targets[0].get("stage_id"), "tournament_id": open_targets[0].get("tournament_id"),
             "assignments": assignments}

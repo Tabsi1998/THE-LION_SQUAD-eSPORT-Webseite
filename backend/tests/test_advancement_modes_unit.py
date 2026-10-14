@@ -441,3 +441,103 @@ def test_planner_marks_show_round_as_waiting_for_the_draw():
     assert got["E"]["waiting_for_draw"] is False and got["E"]["draw_ready"] is False
     fixed = plan_for(build(8, "single_elimination"))
     assert fixed["E"]["waiting_for_draw"] is False
+
+
+# ---------------------------------------------------------------------------------------------- Codex-Prüfung (PR #1600)
+
+def _assert_schema_follows_the_draw(matches: list[dict]) -> None:
+    """Sofort zufällig: jeder gezogene Platz trägt die Identität seines Zubringers, und dessen Weiterleitung zeigt genau
+    auf diesen Platz - sonst leert ein späteres Nachrücken einen fremden Platz."""
+    by_id = {m["id"]: m for m in matches}
+    for target in matches:
+        if not (target.get("settings") or {}).get("draw_group"):
+            continue
+        for slot in target["slots"]:
+            origin = slot.get("source_result") or {}
+            if not origin.get("from_match_id"):
+                continue
+            source = by_id[origin["from_match_id"]]
+            identity = slot["source"]
+            assert identity["match_key"] == source["match_key"] and identity["flow"] == origin["flow"], (target["match_key"], slot["slot"])
+            entry = next((e for e in source["advancement"] if e["flow"] == origin["flow"] and int(e["rank"]) == int(identity["rank"])), None)
+            assert entry and entry["to_match_id"] == target["id"] and int(entry["to_slot"]) == int(slot["slot"]), (target["match_key"], slot["slot"])
+
+
+@pytest.mark.parametrize("kind", ["duel", "ffa"])
+def test_instant_redraw_rewires_schema_and_a_later_dq_frees_the_right_seat(kind):
+    """Codex-Befund: „Neu auslosen“ bei sofort zufällig muss Weiterleitungen und Platz-Quellen mitziehen. Danach
+    Disqualifikation eines Weiterkommers aus Runde 1: genau sein Platz wird frei (Duell: der Wartende kommt kampflos
+    weiter; Lauf: der Nächste rückt auf diesen Platz), niemand geht verloren, der Graph bleibt gültig."""
+    from services.competition_graph_validation import validate_competition_graph
+    from services.competition_snapshot import build_structure_snapshot
+    from services.tournament_events import plan_removal
+
+    def valid(rows):
+        report = validate_competition_graph(build_structure_snapshot("t", stage_matches=rows))
+        assert report["valid"], [i for i in report["issues"] if i["severity"] == "error"]
+
+    for attempt in range(6):
+        if kind == "duel":
+            matches = build(16, "single_elimination", tournament=INSTANT)
+            first_round = "ABCDEFGH"
+        else:
+            matches = build(12, "ffa_custom_bracket", "ffa", settings={"match_size": 4, "qualifiers_per_match": 2, "min_players": 2},
+                            tournament=INSTANT)
+            first_round = "ABC"
+        keys = by_key(matches)
+        rng = random.Random(attempt)
+        for key in first_round:
+            apply(matches, keys[key], lower_seed_wins(keys[key]), rng=rng)
+        group = next(m for m in matches if m["round"] == 2)["settings"]["draw_group"]
+        before = {m["match_key"]: filled_ids(m) for m in matches if m["round"] == 2}
+        application = build_redraw_application(matches, group, now_iso=NOW, rng=random.Random(100 + attempt))
+        apply_sets(matches, application)
+        _assert_schema_follows_the_draw(matches)
+        # Die Quellen schreiben ihre umgehängten Weiterleitungen mit - sonst zeigt die Datenbank auf alte Plätze.
+        rewired = [m for m in matches if m["round"] == 1 and m["id"] in application["target_sets"]]
+        assert rewired and all("advancement" in application["target_sets"][m["id"]] for m in rewired)
+        if any(filled_ids(m) != before[m["match_key"]] for m in matches if m["round"] == 2):
+            break
+    else:
+        pytest.fail("sechs Neuauslosungen ohne Änderung - das Los steht")
+    valid(matches)
+    ranked = [row["registration_id"] for row in keys["A"]["results"]]
+    winner, second, third = ranked[0], ranked[1], (ranked[2] if len(ranked) > 2 else None)
+    seat_before = seat_of(matches, winner, 2)
+    second_seat_before = seat_of(matches, second, 2)
+    assert seat_before
+    others = {s["registration_id"] for m in matches if m["round"] == 2 for s in m["slots"] if s.get("registration_id")} - {winner}
+    plan_removal(matches, winner, kind="disqualified", now_iso=NOW)
+    assert seat_of(matches, winner, 2) is None
+    target = keys[seat_before[0]]
+    freed = next(s for s in target["slots"] if int(s["slot"]) == seat_before[1])
+    if kind == "duel":
+        # K.-o.: der Platz ist ein Freilos mit Grund, der Wartende kommt kampflos weiter.
+        assert freed["status"] == "bye" and freed["source_result"]["removed_registration_id"] == winner
+        assert target["status"] == "completed" and (target.get("result_meta") or {}).get("source") == "auto_bye"
+    else:
+        # Lauf: Plätze rücken auf - der Zweite aus A übernimmt genau diesen Platz, der Dritte den Platz des Zweiten.
+        assert freed["registration_id"] == second and seat_of(matches, second, 2) == seat_before
+        assert seat_of(matches, third, 2) == second_seat_before
+    seated = [s["registration_id"] for m in matches if m["round"] == 2 for s in m["slots"] if s.get("registration_id")]
+    assert others <= set(seated) and len(seated) == len(set(seated)), "niemand geht verloren, niemand sitzt doppelt"
+    _assert_schema_follows_the_draw(matches)
+    valid(matches)
+
+
+def test_structure_plan_hash_stays_the_same_for_old_tournaments():
+    """Vor dem Deploy erzeugte Pläne: fehlender Modus, None oder ``fixed`` ergeben denselben Eingabe-Hash wie vorher;
+    der alte Schalter zählt wie bisher. Erst ein neuer Modus (Show, sofort) ändert den Hash."""
+    from services.competition_structure_plan import structure_plan_seed
+
+    def seed(**fields):
+        return structure_plan_seed({"id": "t", "format": "single_elim", "max_participants": 8, **fields}, {"preview": False}, [], {})["input_hash"]
+
+    assert seed() == seed(advancement_mode=None) == seed(advancement_mode="fixed")
+    assert seed(randomize_advancement_rounds=True) == seed(randomize_advancement_rounds=True, advancement_mode="draw_round")
+    assert seed(advancement_mode="instant", randomize_advancement_rounds=True) != seed(randomize_advancement_rounds=True)
+    assert seed(advancement_mode="draw_show", randomize_advancement_rounds=True) != seed(advancement_mode="instant", randomize_advancement_rounds=True)
+    # Der feste Baum schreibt keinen Modus an die Spiele - ein alter Plan bleibt beim Anwenden gleich.
+    fixed = build(8, "single_elimination")
+    assert all("advancement_mode" not in m["settings"] for m in fixed)
+    assert all(match_mode(m) == "fixed" for m in fixed)

@@ -22,8 +22,6 @@ _TOURNAMENT_PLAN_FIELDS = (
     "seeding_mode",
     "match_duration_minutes",
     "randomize_advancement_rounds",
-    # Weiterkommen in vier Modi (#1590): ein anderer Modus ist ein anderer Plan.
-    "advancement_mode",
     "engine_version",
     "ruleset_version",
 )
@@ -86,11 +84,14 @@ def structure_plan_seed(
     """Build hashes binding a plan to inputs and the current structure state."""
 
     base_structure_hash = stable_structure_digest(base_structure)
+    plan_tournament = {field: tournament.get(field) for field in _TOURNAMENT_PLAN_FIELDS}
+    # Weiterkommen in vier Modi (#1590): ein neuer Modus (Show, sofort) ist ein anderer Plan. Fester Baum und
+    # „Auslosung nach der Runde“ stecken schon im alten Schalter - so behalten Pläne aus der Zeit davor ihren Hash.
+    mode = tournament.get("advancement_mode")
+    if mode in ("draw_show", "instant"):
+        plan_tournament["advancement_mode"] = mode
     input_payload = {
-        "tournament": {
-            field: tournament.get(field)
-            for field in _TOURNAMENT_PLAN_FIELDS
-        },
+        "tournament": plan_tournament,
         "request": request_payload,
         "registrations": [
             {
