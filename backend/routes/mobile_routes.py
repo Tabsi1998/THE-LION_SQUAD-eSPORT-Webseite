@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -23,7 +23,8 @@ from services import event_days
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
 from services.visibility import lead_can_see
-from services.app_releases import current_release, next_check_after, public_release, release_file, update_decision, updater_settings
+from services.app_releases import app_version_release, current_release, next_check_after, public_release, release_file, update_decision
+from services.rate_limit import enforce_rate_limit
 
 PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=at.lionsquad.app"
 
@@ -724,19 +725,22 @@ async def create_mobile_client_log(body: MobileClientLogCreate, user: dict = Dep
 # ---------------------------------------------------------------- App-Releases (#250)
 
 @router.get("/app-version")
-async def app_version(build: int | None = None, user: dict = Depends(get_current_user)):
-    """Das aktuelle Release und ob diese App-Installation ein Update braucht."""
+async def app_version(request: Request, response: Response, build: int | None = None):
+    """Das aktuelle Release und ob diese App-Installation ein Update braucht.
+
+    Ohne Anmeldung (#1002): die Prüfung gilt für die Installation, auch Gäste brauchen sie.
+    Es kommen nur öffentliche Angaben zum Release (``APP_VERSION_FIELDS``); der APK-Download bleibt angemeldet.
+    Die Antwort hängt nicht am Konto: fünf Minuten öffentlich zwischenspeicherbar, je Adresse gebremst."""
+    await enforce_rate_limit(request, "app_version", 60, 60)
+    response.headers["Cache-Control"] = "public, max-age=300"
     db = get_db()
     current = await current_release(db)
     decision = update_decision(build, current)
-    settings = await updater_settings(db)
+    # Ohne den Server-Updater-Schalter (#421): eine interne Einstellung, die öffentliche Antwort braucht ihn nicht (#1002).
     return {
-        "current": public_release(current),
+        "current": app_version_release(current),
         "own_build": int(build or 0) or None,
         "next_check_after": next_check_after(),
-        # Play-Installationen nehmen Googles Dialog; ob die Server-APK überhaupt angeboten wird,
-        # entscheidet der Betreiber (#421).
-        "server_updater_enabled": settings["server_updater_enabled"],
         "play_store_url": PLAY_STORE_URL,
         **decision,
     }

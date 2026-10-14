@@ -62,8 +62,12 @@ async def test_admin_uploads_and_users_see_and_download_the_update(flow):
     assert download.headers["x-release-sha256"] == body["sha256"]
     assert download.content == FAKE_APK
 
+    # Die Update-Prüfung gilt für die Installation (#1002): auch Gäste ohne Konto fragen sie ab.
+    # Der APK-Download bleibt angemeldeten Nutzern vorbehalten.
     flow.act_as(None)
-    assert (await flow.get("/api/mobile/app-version?build=62")).status_code == 401
+    guest = await flow.get("/api/mobile/app-version?build=62")
+    assert guest.status_code == 200, guest.text
+    assert guest.json()["update_available"] is True and guest.json()["current"]["build"] == 63
     assert (await flow.get("/api/mobile/app-download/63")).status_code == 401
 
 
@@ -153,8 +157,9 @@ async def test_the_admin_sees_whether_the_server_has_an_upload_token(flow, monke
 
 
 @pytest.mark.asyncio
-async def test_server_updater_switch_reaches_the_app_and_only_club_admins_flip_it(flow):
-    """Server-Updater an/aus (#421): Standard an; der Club-Admin schaltet, die App liest es mit."""
+async def test_server_updater_switch_stays_internal_and_only_club_admins_flip_it(flow):
+    """Server-Updater an/aus (#421): Standard an; nur der Club-Admin schaltet. Seit #1002 ist die Update-Prüfung
+    öffentlich - der Schalter ist eine interne Einstellung und steht nicht mehr in ihrer Antwort."""
     admin = await flow.add_user(role="club_admin", name="clubadmin")
     flow.act_as(admin)
     assert (await upload(flow)).status_code == 200
@@ -163,7 +168,7 @@ async def test_server_updater_switch_reaches_the_app_and_only_club_admins_flip_i
     player = await flow.add_user(role="player", name="spieler")
     flow.act_as(player)
     info = (await flow.get("/api/mobile/app-version?build=62")).json()
-    assert info["server_updater_enabled"] is True
+    assert "server_updater_enabled" not in info
     assert info["play_store_url"].endswith("id=at.lionsquad.app")
     denied = await flow.client.patch("/api/admin/app-releases/settings", json={"server_updater_enabled": False})
     assert denied.status_code == 403
@@ -173,6 +178,39 @@ async def test_server_updater_switch_reaches_the_app_and_only_club_admins_flip_i
     assert flipped.status_code == 200, flipped.text
     assert flipped.json() == {"server_updater_enabled": False}
     flow.act_as(player)
-    assert (await flow.get("/api/mobile/app-version?build=62")).json()["server_updater_enabled"] is False
+    assert "server_updater_enabled" not in (await flow.get("/api/mobile/app-version?build=62")).json()
     # Die {build}-Routen bleiben unberührt: „settings“ ist keine Buildnummer.
     assert (await flow.get("/api/admin/app-releases")).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_guests_see_only_public_release_fields_with_short_public_cache(flow):
+    """Ohne Anmeldung (#1002): nur Öffentliches zum Release - kein Hochlader, keine Pfade, keine Download-Adresse."""
+    admin = await flow.add_user(role="club_admin", name="clubadmin")
+    flow.act_as(admin)
+    assert (await upload(flow, min_build=60)).status_code == 200
+
+    flow.act_as(None)
+    answer = await flow.get("/api/mobile/app-version?build=62")
+    assert answer.status_code == 200, answer.text
+    assert answer.headers["cache-control"] == "public, max-age=300"
+    # Genau diese Felder - keine internen Einstellungen wie der Server-Updater-Schalter.
+    assert set(answer.json()) == {"current", "own_build", "next_check_after", "play_store_url", "update_available", "mandatory"}
+    current = answer.json()["current"]
+    assert set(current) == {"build", "version", "notes", "sha256", "size", "min_build", "channel"}
+    assert current["build"] == 63 and current["min_build"] == 60 and current["sha256"] == hashlib.sha256(FAKE_APK).hexdigest()
+    assert current["size"] == len(FAKE_APK) and current["notes"].startswith("- Was ist neu")
+    # Angemeldet kommt dieselbe Auswahl - die Antwort hängt nicht am Konto und darf zwischengespeichert werden.
+    player = await flow.add_user(role="player", name="spieler")
+    flow.act_as(player)
+    assert set((await flow.get("/api/mobile/app-version?build=62")).json()["current"]) == set(current)
+
+
+@pytest.mark.asyncio
+async def test_app_version_is_rate_limited_per_address(flow):
+    flow.act_as(None)
+    answers = [await flow.get("/api/mobile/app-version?build=62") for _ in range(61)]
+    assert [answer.status_code for answer in answers[:60]] == [200] * 60
+    assert answers[60].status_code == 429
+    # Die Bremse wird nicht zwischengespeichert - nur die Antwort mit Release-Angaben.
+    assert answers[60].headers["cache-control"] == "no-store"

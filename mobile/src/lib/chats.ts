@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { idSegment, isValidId } from "./apiIds";
 import { dayBefore, viennaDate, viennaDay, viennaTime } from "./vienna";
 
 // Alle Chats an einem Ort (#1148): Direktnachrichten, Team-, Turnier- und Match-Chats aus `/api/chats`, das Neueste oben.
@@ -42,10 +43,11 @@ export function chatKey(kind: ChatKind, targetId: string) {
 
 /** „Gelesen bis jetzt“ für eine Unterhaltung - beim Öffnen des Chats. Fehler sind still: die Zahl kommt beim nächsten Laden. */
 export async function markChatRead(kind: ChatKind, targetId: string): Promise<void> {
-  if (!targetId) return;
+  // Die Kennung kommt oft aus einer Adresse (#1512): nur als ein geprüfter Pfadteil, sonst gar nicht.
+  if (!isValidId(targetId)) return;
   readListeners.forEach((listener) => listener(chatKey(kind, targetId)));
   try {
-    await api.post(`/chats/${kind}/${encodeURIComponent(targetId)}/read`);
+    await api.post(`/chats/${kind}/${idSegment(targetId)}/read`);
   } catch {
     // bleibt ungelesen bis zum nächsten Öffnen
   }

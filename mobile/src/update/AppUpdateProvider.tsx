@@ -1,18 +1,18 @@
 import * as SecureStore from "expo-secure-store";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
-import { useAuth } from "../auth/AuthContext";
 import { AppUpdateBanner } from "../components/AppUpdateBanner";
 import { WhatsNewCard } from "../components/WhatsNewCard";
 import { api } from "../lib/api";
-import { decideUpdate, ownBuild, shouldCheck, showOwnUpdateHint, SNOOZE_KEY, type AppVersionInfo } from "../lib/appUpdate";
+import { activeSnoozeBuild, decideUpdate, ownBuild, parseSnooze, shouldCheck, showOwnUpdateHint, SNOOZE_KEY, type AppVersionInfo, type UpdateSnooze } from "../lib/appUpdate";
 import { detectInstallSource, startPlayUpdate, type PlayUpdateState } from "../lib/installSource";
 import { currentWhatsNew, SEEN_BUILD_KEY, shouldShowWhatsNew } from "../lib/whatsnew";
-import { isGuestUser } from "../live";
 
 // Updates und „Was ist neu“ (#249, #250) an einer Stelle: beim Start und beim
 // Zurückkehren in den Vordergrund höchstens einmal pro Stunde nachfragen; die
 // Karte mit den Neuerungen genau einmal nach einem Update, sonst über Mehr.
+// Die Prüfung gilt für die Installation, nicht für ein Konto (#1002): Gäste und
+// Abgemeldete bekommen sie genauso, An- und Abmelden fragt nicht erneut.
 
 type AppUpdateValue = {
   info: AppVersionInfo | null;
@@ -34,18 +34,27 @@ async function readNumber(key: string): Promise<number | null> {
   }
 }
 
-async function writeNumber(key: string, value: number) {
+async function readSnooze(): Promise<UpdateSnooze | null> {
   try {
-    await SecureStore.setItemAsync(key, String(value));
+    return parseSnooze(await SecureStore.getItemAsync(SNOOZE_KEY));
   } catch {
-    // Ohne Speicher zeigt die App die Karte beim nächsten Start noch einmal - kein Drama.
+    return null;
+  }
+}
+
+async function writeText(key: string, value: string) {
+  try {
+    await SecureStore.setItemAsync(key, value);
+  } catch {
+    // Ohne Speicher zeigt die App Karte oder Hinweis beim nächsten Start noch einmal - kein Drama.
   }
 }
 
 export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
   const [info, setInfo] = useState<AppVersionInfo | null>(null);
-  const [snoozed, setSnoozed] = useState<number | null>(null);
+  const [snooze, setSnooze] = useState<UpdateSnooze | null>(null);
+  // Erst wenn der gespeicherte Aufschub gelesen ist, darf der Hinweis erscheinen - sonst blitzt er beim Start kurz auf.
+  const [snoozeLoaded, setSnoozeLoaded] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   // Installationsquelle (#421, #593): Play-Installationen bekommen Googles Dialog, alle anderen den Store-Link.
   const [play, setPlay] = useState<PlayUpdateState | null>(null);
@@ -53,10 +62,9 @@ export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
   const lastCheck = useRef<number | null>(null);
   const build = ownBuild();
   const entry = useMemo(() => currentWhatsNew(), []);
-  const enabled = Boolean(user && !isGuestUser(user));
 
   useEffect(() => {
-    if (!enabled || __DEV__) return undefined;
+    if (__DEV__) return undefined;
     let cancelled = false;
     detectInstallSource().then((state) => {
       if (!cancelled) setPlay(state);
@@ -64,7 +72,20 @@ export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, []);
+
+  // „Später“ aus einer früheren Sitzung (#1003) - unabhängig von „Was ist neu gesehen“.
+  useEffect(() => {
+    let cancelled = false;
+    void readSnooze().then((stored) => {
+      if (cancelled) return;
+      if (stored) setSnooze((current) => current ?? stored);
+      setSnoozeLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // „Was ist neu“ genau einmal nach einem Update; danach den eigenen Build merken.
   useEffect(() => {
@@ -73,7 +94,7 @@ export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
       const seen = await readNumber(SEEN_BUILD_KEY);
       if (cancelled) return;
       if (shouldShowWhatsNew(seen, build, entry.items)) setWhatsNewOpen(true);
-      if (build && seen !== build) await writeNumber(SEEN_BUILD_KEY, build);
+      if (build && seen !== build) await writeText(SEEN_BUILD_KEY, String(build));
     })();
     return () => {
       cancelled = true;
@@ -81,7 +102,7 @@ export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
   }, [build, entry.items]);
 
   const check = useCallback(async (force = false) => {
-    if (!enabled || !build) return;
+    if (!build) return;
     if (!force && !shouldCheck(lastCheck.current)) return;
     lastCheck.current = Date.now();
     try {
@@ -91,21 +112,17 @@ export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
       // Kein Netz oder Server ohne Release-Endpunkt: nichts zeigen, beim nächsten Mal wieder fragen.
       lastCheck.current = null;
     }
-  }, [build, enabled]);
+  }, [build]);
 
   useEffect(() => {
-    if (!enabled) {
-      setInfo(null);
-      return undefined;
-    }
     check();
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") check();
     });
     return () => subscription.remove();
-  }, [check, enabled]);
+  }, [check]);
 
-  const decision = decideUpdate(info, snoozed);
+  const decision = decideUpdate(info, activeSnoozeBuild(snooze));
 
   // Play kennt schon ein Update: Googles Dialog einmal je Sitzung von selbst öffnen - bei Pflicht
   // „sofort“, sonst im Hintergrund. Eine App aus Google Play bekommt keinen eigenen Hinweis (#926).
@@ -122,13 +139,15 @@ export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
       {children}
       <WhatsNewCard entry={entry} visible={whatsNewOpen} onClose={() => setWhatsNewOpen(false)} />
       {/* Eigener Hinweis nur für die Server-APK und Geräte ohne Play (#926) - aus Google Play kommt nur Googles Dialog. */}
-      {decision.release && showOwnUpdateHint(decision, play?.source, whatsNewOpen) ? (
+      {snoozeLoaded && decision.release && showOwnUpdateHint(decision, play?.source, whatsNewOpen) ? (
         <AppUpdateBanner
           release={decision.release}
           mandatory={decision.mandatory}
           onLater={() => {
-            setSnoozed(decision.release?.build ?? null);
-            void writeNumber(SNOOZE_KEY, decision.release?.build ?? 0);
+            if (!decision.release) return;
+            const next = { build: decision.release.build, at: Date.now() };
+            setSnooze(next);
+            void writeText(SNOOZE_KEY, JSON.stringify(next));
           }}
           onWhatsNew={() => setWhatsNewOpen(true)}
         />

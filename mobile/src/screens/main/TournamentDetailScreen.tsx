@@ -88,7 +88,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
       signedInRef.current ? api.get<Team[]>("/teams/my") : Promise.resolve({ data: [] as Team[] }),
     ]);
     if (detailResult.status === "rejected") throw detailResult.reason;
-    const failed = [bracketResult, standingsResult, registrationsResult].find((result): result is PromiseRejectedResult => result.status === "rejected");
+    // Auch die eigenen Teams sind ein Teil: kommen sie nicht, bleibt ihr letzter Stand, und die Seite sagt es.
+    const failed = [bracketResult, standingsResult, registrationsResult, teamsResult].find((result): result is PromiseRejectedResult => result.status === "rejected");
     const bracketData = bracketResult.status === "fulfilled" ? bracketResult.value.data || {} : previous?.bracket || {};
     const registrations = registrationsResult.status === "fulfilled"
       ? (Array.isArray(registrationsResult.value.data) ? registrationsResult.value.data : bracketData.registrations || [])

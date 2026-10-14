@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { AdmissionScreen } from "./AdmissionScreen";
 
 // Einlass in der App (#845, Entscheidung B): Scan → „Anwesend: <Name>, stimmberechtigt“ groß und grün; doppelt
@@ -114,4 +114,78 @@ test("keine Versammlung heute: der Grund vom Server, kein Scanner", async () => 
   await render(<AdmissionScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("admission-not-ready")).toHaveTextContent(/Heute ist keine Generalversammlung angesetzt\./));
   expect(screen.queryByTestId("admission-scanner")).toBeNull();
+});
+
+// #1005: nach dem Nachladen nur eine Versammlung behalten, die es noch gibt; leere Liste mit Hinweis;
+// Wechsel der Versammlung setzt Ergebnis, Rücknahme und Scan-Sperre zurück.
+
+const OTHER = { id: 42, title: "Außerordentliche GV", time: "20:00", place: "Vereinsheim", counts: { present: 5, eligible: 20, quorum_from: 11, quorum_reached: false }, recent: [] };
+
+async function pullToRefresh() {
+  const [scroll] = screen.container.queryAll((node) => Boolean(node.props.refreshControl));
+  await act(async () => {
+    await scroll.props.refreshControl.props.onRefresh();
+  });
+}
+
+test("Versammlung 41 fällt beim Nachladen weg: die App wählt 42, Scanner und Zählung gehören zu 42", async () => {
+  await render(<AdmissionScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("admission-counts")).toHaveTextContent(/^2 anwesend/));
+  mockGet.mockResolvedValue({ data: { ready: true, meetings: [OTHER] } });
+  await pullToRefresh();
+  await waitFor(() => expect(screen.getByTestId("admission-counts")).toHaveTextContent(/^5 anwesend/));
+  expect(screen.getByTestId("admission-meeting-card")).toHaveTextContent(/Außerordentliche GV/);
+  expect(screen.getByTestId("admission-camera")).toBeTruthy();
+  mockPost.mockResolvedValueOnce({ data: { ok: true, already: false, admission: { member_id: 9, name: "Max Beispiel", state: "present", voting: true, reason_text: "stimmberechtigt" },
+    counts: { ...OTHER.counts, present: 6 }, headline: "Anwesend: Max Beispiel, stimmberechtigt" } });
+  await scan("https://lionsquad.at/card/abc");
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/admin/admission/42/scan", { code: "https://lionsquad.at/card/abc" }));
+});
+
+test("leere Liste trotz bereit: verständlicher Hinweis; ein weiteres Nachladen stellt die Auswahl ohne Neustart wieder her", async () => {
+  await render(<AdmissionScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("admission-camera")).toBeTruthy());
+  mockGet.mockResolvedValue({ data: { ready: true, meetings: [] } });
+  await pullToRefresh();
+  await waitFor(() => expect(screen.getByTestId("admission-no-meeting")).toBeTruthy());
+  expect(screen.queryByTestId("admission-scanner")).toBeNull();
+
+  mockGet.mockResolvedValue({ data: { ready: true, meetings: [MEETING, OTHER] } });
+  await pullToRefresh();
+  await waitFor(() => expect(screen.getByTestId("admission-camera")).toBeTruthy());
+  expect(screen.getByTestId("admission-meetings")).toBeTruthy();
+  expect(screen.queryByTestId("admission-no-meeting")).toBeNull();
+});
+
+test("Nachladen mit ready=false zeigt den Grund statt eines leeren Bildschirms", async () => {
+  await render(<AdmissionScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("admission-camera")).toBeTruthy());
+  mockGet.mockResolvedValue({ data: { ready: false, text: "Die Versammlung ist beendet.", meetings: [] } });
+  await pullToRefresh();
+  await waitFor(() => expect(screen.getByTestId("admission-not-ready")).toHaveTextContent(/Die Versammlung ist beendet\./));
+  expect(screen.queryByTestId("admission-scanner")).toBeNull();
+});
+
+test("Wechsel der Versammlung setzt Ergebnis, offene Rücknahme und Scan-Sperre zurück", async () => {
+  mockGet.mockResolvedValue({ data: { ready: true, meetings: [MEETING, OTHER] } });
+  mockPost.mockResolvedValue({ data: { ok: true, already: false, admission: { member_id: 9, name: "Max Beispiel", state: "present", voting: true, reason_text: "stimmberechtigt" },
+    counts: MEETING.counts, headline: "Anwesend: Max Beispiel, stimmberechtigt" } });
+  await render(<AdmissionScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("admission-camera")).toBeTruthy());
+  await scan("https://lionsquad.at/card/abc");
+  await waitFor(() => expect(screen.getByTestId("admission-result")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("admission-undo-7"));
+  expect(screen.getByTestId("admission-undo-reason")).toBeTruthy();
+
+  await fireEvent.press(screen.getByTestId("admission-meeting-42"));
+  expect(screen.queryByTestId("admission-result")).toBeNull();
+  expect(screen.queryByTestId("admission-undo-reason")).toBeNull();
+  // Dieselbe Karte gleich danach für die andere Versammlung: die Sperre gegen Doppelscans gilt nicht über den Wechsel.
+  await scan("https://lionsquad.at/card/abc");
+  await waitFor(() => expect(mockPost).toHaveBeenLastCalledWith("/admin/admission/42/scan", { code: "https://lionsquad.at/card/abc" }));
+  expect(mockPost).toHaveBeenCalledTimes(2);
+
+  // Zurück zu 41: die Rücknahme-Form von vorhin ist nicht wieder offen.
+  await fireEvent.press(screen.getByTestId("admission-meeting-41"));
+  expect(screen.queryByTestId("admission-undo-reason")).toBeNull();
 });

@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { api, errorMessage } from "../lib/api";
+import { idSegment, isValidId } from "../lib/apiIds";
 import { colors, radius } from "../theme";
 
 // GG (#616, in der App E13 #623): nach einem Match lobt eine Seite die andere - einmal je Match, nur Beteiligte, nur
@@ -15,9 +16,10 @@ export function CommendButton({ matchId, completed, enabled = true }: { matchId:
   const [thanked, setThanked] = useState(false);
 
   const load = useCallback(async () => {
-    if (!enabled || !matchId || !completed) return;
+    // Eine Kennung, die kein Pfadteil ist (#1512), fragt gar nicht - dann gibt es keinen Knopf.
+    if (!enabled || !matchId || !completed || !isValidId(matchId)) return;
     try {
-      const { data } = await api.get<CommendState>(`/matches/${matchId}/commend`);
+      const { data } = await api.get<CommendState>(`/matches/${idSegment(matchId)}/commend`);
       setState(data || null);
     } catch {
       setState(null);
@@ -33,7 +35,7 @@ export function CommendButton({ matchId, completed, enabled = true }: { matchId:
     if (busy) return;
     setBusy(true);
     try {
-      const { data } = await api.post<CommendState>(`/matches/${matchId}/commend`);
+      const { data } = await api.post<CommendState>(`/matches/${idSegment(matchId)}/commend`);
       setState(data || null);
       setThanked(!data?.already);
     } catch (err) {

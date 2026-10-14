@@ -5,8 +5,9 @@ zusätzlich eine Kopie im Upload-Volume (``uploads/app-releases``) und liefert
 sie an angemeldete Nutzer: so prüft die App ihr Update gegen den eigenen
 Server (Mindest-Build, Prüfsumme, „Was ist neu“) statt gegen GitHub. Entstanden
 ist das, als das Repo noch privat war und vom Handy aus niemand ohne
-GitHub-Login an die APK kam. Die App fragt ``/api/mobile/app-version`` und
-lädt ``/api/mobile/app-download/{build}``.
+GitHub-Login an die APK kam. Die App fragt ``/api/mobile/app-version`` (seit
+#1002 ohne Anmeldung, auch für Gäste) und lädt ``/api/mobile/app-download/{build}``
+(nur angemeldet).
 
 Hochladen darf der Vereinsadmin (Web) oder das Release-Skript mit dem
 Upload-Token aus der Server-Umgebung (``APP_RELEASE_UPLOAD_TOKEN``) - das
@@ -107,6 +108,19 @@ def public_release(doc: dict | None) -> dict | None:
         "filename": apk_filename(doc.get("version") or "0.0.0", build),
         "download_url": f"/api/mobile/app-download/{build}",
     }
+
+
+# Was die Update-Prüfung ohne Anmeldung zeigt (#1002): nur Öffentliches zum Release. Kein Hochlader, keine Quelle,
+# keine Pfade oder Download-Adressen; der Kanal ergibt sich aus der Versionsnummer und steht im Banner.
+APP_VERSION_FIELDS = ("build", "version", "notes", "sha256", "size", "min_build", "channel")
+
+
+def app_version_release(doc: dict | None) -> dict | None:
+    """Das Release für ``/api/mobile/app-version`` - nur die Felder aus ``APP_VERSION_FIELDS``."""
+    release = public_release(doc)
+    if release is None:
+        return None
+    return {key: release[key] for key in APP_VERSION_FIELDS}
 
 
 async def store_release(db, *, build: int, version: str, notes: str, chunks: AsyncIterator[bytes],

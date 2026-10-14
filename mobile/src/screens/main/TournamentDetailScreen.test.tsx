@@ -211,3 +211,15 @@ test("Bracket oder Tabelle kommen nicht: das Turnier steht, die Seite sagt es (#
   await waitFor(() => expect(screen.getByTestId("tournament-partial-load")).toBeTruthy());
   expect(screen.getAllByText("LAN-Cup").length).toBeGreaterThan(0);
 });
+
+test("eigene Teams kommen nicht: das Turnier steht, die Seite sagt es statt still „keine Teams“ (#1512)", async () => {
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...TOURNAMENT, event_gate: null } });
+    if (path === "/teams/my") return Promise.reject(Object.assign(new Error("Network Error"), { isAxiosError: true }));
+    if (path.endsWith("/bracket")) return Promise.resolve({ data: {} });
+    return Promise.resolve({ data: [] });
+  });
+  await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("tournament-partial-load")).toBeTruthy());
+  expect(screen.getAllByText("LAN-Cup").length).toBeGreaterThan(0);
+});

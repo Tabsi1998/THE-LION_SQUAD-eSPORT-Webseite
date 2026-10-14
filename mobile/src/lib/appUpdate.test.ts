@@ -1,4 +1,4 @@
-import { channelLabel, decideUpdate, showOwnUpdateHint, installPrompt, releaseChannel, releaseTitle, shouldCheck, type AppRelease } from "./appUpdate";
+import { activeSnoozeBuild, channelLabel, decideUpdate, parseSnooze, SNOOZE_MS, showOwnUpdateHint, installPrompt, releaseChannel, releaseTitle, shouldCheck, type AppRelease } from "./appUpdate";
 
 // Update aus der App (#250, #593): wann gefragt wird, wann der Banner erscheint, welche
 // Art (Beta oder Release) genannt wird. Den Download gibt es seit der Play-Fassung nicht mehr.
@@ -57,4 +57,17 @@ test("eigener Update-Hinweis nur für die Server-APK und Geräte ohne Play - nie
   expect(showOwnUpdateHint(decision, "unknown")).toBe(true);
   expect(showOwnUpdateHint(decision, "sideload", true)).toBe(false);
   expect(showOwnUpdateHint(decideUpdate(info, 87), "sideload")).toBe(false);
+});
+
+test("„Später“ (#1003): gespeicherter Aufschub gilt für denselben Build und höchstens SNOOZE_MS lang", () => {
+  const now = 50_000_000_000;
+  expect(parseSnooze(JSON.stringify({ build: 64, at: now - 1000 }))).toEqual({ build: 64, at: now - 1000 });
+  for (const raw of [null, "", "kaputt", "64", "null", "[]", "{\"build\":\"x\",\"at\":1}", "{\"build\":64}", "{\"build\":0,\"at\":1}"]) {
+    expect(parseSnooze(raw)).toBeNull();
+  }
+  expect(activeSnoozeBuild({ build: 64, at: now - 1000 }, now)).toBe(64);
+  expect(activeSnoozeBuild({ build: 64, at: now - SNOOZE_MS }, now)).toBeNull();
+  // Eine Uhr, die zurückgestellt wurde, verlängert den Aufschub nicht beliebig.
+  expect(activeSnoozeBuild({ build: 64, at: now + SNOOZE_MS }, now)).toBeNull();
+  expect(activeSnoozeBuild(null, now)).toBeNull();
 });

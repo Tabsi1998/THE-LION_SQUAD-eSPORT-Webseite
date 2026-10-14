@@ -62,3 +62,17 @@ test("ein Fehler bleibt sichtbar, der Knopf bleibt", async () => {
   expect(screen.getByTestId("commend-button")).toBeTruthy();
   alert.mockRestore();
 });
+
+test("Kennung im API-Pfad (#1512): kodiert als ein Pfadteil, eine Kennung mit Pfadzeichen fragt gar nicht", async () => {
+  mockGet.mockResolvedValue({ data: { participant: true, completed: true, can_commend: true, given: false } });
+  const view = await render(<CommendButton matchId="löwen cup" completed />);
+  await waitFor(() => expect(screen.getByTestId("commend-button")).toBeTruthy());
+  expect(mockGet).toHaveBeenCalledWith("/matches/l%C3%B6wen%20cup/commend");
+  await view.unmount();
+
+  mockGet.mockClear();
+  await render(<CommendButton matchId="../admin/users" completed />);
+  await Promise.resolve();
+  expect(mockGet).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("commend-button")).toBeNull();
+});

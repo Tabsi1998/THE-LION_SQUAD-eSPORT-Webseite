@@ -4,7 +4,7 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, Vi
 import { AddToCalendarButton } from "../../components/AddToCalendarButton";
 import { challengeIsOver } from "../../lib/afterEnd";
 import { Card } from "../../components/Card";
-import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
+import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -31,7 +31,7 @@ type Props = {
   };
 };
 
-type FastLapPage = { challenge: F1Challenge; trackId: string | null; leaderboard: F1LeaderboardPayload | null; managerUsers: PublicUser[] };
+type FastLapPage = { challenge: F1Challenge; trackId: string | null; leaderboard: F1LeaderboardPayload | null; managerUsers: PublicUser[]; usersProblem: LoadProblem | null };
 const NO_USERS: PublicUser[] = [];
 
 export function FastLapDetailScreen({ navigation, route }: Props) {
@@ -39,7 +39,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
   // Laden je Kennung (#1000): eine andere Challenge zeigt nie die vorige, verspätete Antworten werden verworfen, ein
   // gescheitertes Nachladen lässt den letzten Stand gekennzeichnet stehen. Die gewählte Strecke gilt nur für diese Kennung.
   const wantedTrack = useRef<{ id: string; track: string | null }>({ id: route.params.id, track: null });
-  const fetchChallenge = useCallback(async (id: string): Promise<FastLapPage> => {
+  const fetchChallenge = useCallback(async (id: string, previous: FastLapPage | null): Promise<FastLapPage> => {
     const challengeResult = await api.get<F1Challenge>(`/f1/challenges/${idSegment(id)}`);
     const nextChallenge = challengeResult.data;
     const wanted = wantedTrack.current.id === id ? wantedTrack.current.track : null;
@@ -48,17 +48,25 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
       params: trackId ? { track_id: trackId } : undefined,
     });
     let managerUsers: PublicUser[] = [];
+    let usersProblem: LoadProblem | null = null;
     if (nextChallenge.can_manage_times) {
-      const usersResult = await api.get<PublicUser[]>(`/f1/challenges/${idSegment(nextChallenge.id)}/assignable-users`).catch(() => ({ data: [] as PublicUser[] }));
-      managerUsers = Array.isArray(usersResult.data) ? usersResult.data : [];
+      // Zuweisbare Personen sind ein Teil: kommen sie nicht, bleibt die Liste von vorhin, und die Karte sagt es.
+      try {
+        const usersResult = await api.get<PublicUser[]>(`/f1/challenges/${idSegment(nextChallenge.id)}/assignable-users`);
+        managerUsers = Array.isArray(usersResult.data) ? usersResult.data : [];
+      } catch (usersError) {
+        managerUsers = previous?.managerUsers ?? [];
+        usersProblem = loadProblem(usersError);
+      }
     }
-    return { challenge: nextChallenge, trackId, leaderboard: leaderboardResult.data, managerUsers };
+    return { challenge: nextChallenge, trackId, leaderboard: leaderboardResult.data, managerUsers, usersProblem };
   }, []);
   const { data: page, loading, error: loadError, problem, stale, reload } = useKeyedLoad(route.params.id, fetchChallenge);
   const challenge = page?.challenge ?? null;
   const leaderboard = page?.leaderboard ?? null;
   const selectedTrackId = page?.trackId ?? null;
   const managerUsers = page?.managerUsers ?? NO_USERS;
+  const usersProblem = page?.usersProblem ?? null;
   const load = useCallback(async (trackId?: string | null) => {
     wantedTrack.current = { id: route.params.id, track: trackId || null };
     await reload();
@@ -301,6 +309,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
           <Card style={styles.managerCard}>
             <Heading>Zeit eintragen</Heading>
             <Muted>Für Admins und Fast-Lap-Team. Zeiten werden für die aktuell gewählte Strecke gespeichert.</Muted>
+            {usersProblem ? <PartialLoadNotice problem={usersProblem} onRetry={() => { void load(activeTrackId); }} testID="fastlap-users-partial" /> : null}
             <TextInput
               value={managerSearch}
               onChangeText={setManagerSearch}
