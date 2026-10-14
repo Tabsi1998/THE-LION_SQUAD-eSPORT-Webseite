@@ -255,6 +255,20 @@ async def refresh(db, settings: dict, client: DolibarrClient, doc: dict, *, forc
     return fresh
 
 
+async def refresh_open(db, settings: dict, client: DolibarrClient) -> dict:
+    """Alle offenen Anträge jetzt nachlesen (Anlass: signierter Webhook, #1540). ``failed`` zählt die, deren Stand
+    nicht lesbar war - dann versucht es die Warteschlange später noch einmal."""
+    if not coupled(settings):
+        return {"checked": 0, "failed": 0}
+    checked = failed = 0
+    async for doc in db.membership_applications.find({"status": "pending", "external_id": {"$exists": True}}, {"_id": 0}):
+        fresh = await refresh(db, settings, client, doc, force=True)
+        checked += 1
+        if ((fresh or {}).get("dolibarr") or {}).get("error"):
+            failed += 1
+    return {"checked": checked, "failed": failed}
+
+
 async def withdraw(db, client: DolibarrClient, doc: dict) -> dict:
     """Zurückziehen, solange der Verein nicht entschieden hat; 409 von Dolibarr heißt: schon entschieden."""
     result = await client.withdraw_application(doc["external_id"])

@@ -29,8 +29,9 @@ from services.dolibarr_client import (
 )
 from services.dolibarr_links import OPEN_STATUSES, LinkConflict, close_link, link_for_user, note_candidate, verify_link
 from services.dolibarr_policy import DERIVABLE_AREAS, areas_from_functions, clean_policy_map, policy_active
-from services import dolibarr_identity, dolibarr_participations
+from services import dolibarr_identity, dolibarr_participations, vereine_webhooks
 from services.dolibarr_sync import DEFAULT_FIELD_MAP, FIELD_MAP_COLUMNS, STATE_ID, apply_summary, migration_preview, queue_member, run_sync, sync_state
+from services.log_safe import log_safe
 from services.membership_service import VALID_TYPES
 from services.permissions import user_has_area
 from services.rate_limit import enforce_rate_limit
@@ -127,6 +128,8 @@ async def _features(db, settings: dict) -> list[dict]:
     else:
         participations_state = f"an · {participations['sent']} gemeldet" + (f", {participations['failed_total']} abgelehnt" if participations["failed_total"] else "")
     statutes_on, statutes_state = await _statutes_feature(db, branding, facts)
+    signed_source = vereine_webhooks.secret_source(settings)
+    legacy_active = vereine_webhooks.legacy_enabled(settings) and secret_is_configured(settings.get("webhook_token"))
     return [
         {"key": "members", "label": "Mitgliedschaft, Beitrag und Funktionen aus Dolibarr", "enabled": live, "state": mode_state,
          "hint": "Gilt für Konten mit bestätigter Zuordnung (Reiter Zuordnungen und Umstellung).", "where": connection, "where_label": "Verbindung → Modus"},
@@ -170,9 +173,16 @@ async def _features(db, settings: dict) -> list[dict]:
         {"key": "invoices", "label": "Rechnungen und Geschäftspartner in Dolibarr anlegen", "enabled": bool(settings.get("write_enabled")), "state": "an" if settings.get("write_enabled") else "aus",
          "hint": "Schreibzugriff einschalten; Belege werden erst mit vollständigen Konditionen und geprüften Steuersätzen von selbst freigegeben.",
          "switch": {"on": bool(settings.get("write_enabled")), "system_only": True}, "where": features_tab, "where_label": "Dolibarr → Funktionen"},
-        {"key": "webhook", "label": "Benachrichtigung aus Dolibarr (Webhook)", "enabled": secret_is_configured(settings.get("webhook_token")), "state": "eingerichtet" if secret_is_configured(settings.get("webhook_token")) else "aus (Abgleich alle 10 Minuten)",
-         "hint": "Optional: Dolibarr meldet Änderungen sofort, sonst holt der Abgleich alle 10 Minuten auf.",
+        {"key": "webhook", "label": "Benachrichtigung aus Dolibarr (signierter Webhook)", "enabled": signed_source is not None,
+         "state": {"env": "eingerichtet (Server-Umgebung)", "settings": "eingerichtet"}.get(signed_source or "", "aus (Abgleich alle 10 Minuten)"),
+         "hint": f"Dolibarr meldet Änderungen sofort, sonst holt der Abgleich alle 10 Minuten auf. Im Vereinsmodul unter Einrichtung → Vereine → "
+                 f"Webhooks die Adresse {vereine_webhooks.PATH} eintragen; Schlüssel-Kennung und Geheimnis kommen in die Server-Umgebung "
+                 f"({vereine_webhooks.SECRETS_ENV}).",
          "where": connection, "where_label": "Verbindung → Webhook"},
+        {"key": "legacy_webhook", "label": "Alter Webhook-Weg (Token in der Adresse)", "enabled": legacy_active,
+         "state": "an" if legacy_active else ("abgeschaltet" if not vereine_webhooks.legacy_enabled(settings) else "aus (kein Token)"),
+         "hint": "Bleibt nur bis zur Umstellung auf signierte Webhooks. Erst im Vereinsmodul den signierten Webhook einrichten, dann hier abschalten.",
+         "switch": {"on": vereine_webhooks.legacy_enabled(settings), "system_only": True}, "where": features_tab, "where_label": "Dolibarr → Funktionen"},
     ]
 
 
@@ -203,6 +213,10 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
         # Konditionen (#370): ohne die drei bleibt jeder Beleg Entwurf.
         "invoice_terms": invoice_terms_view(settings),
         "webhook_configured": secret_is_configured(settings.get("webhook_token")),
+        # Signierte Webhooks (#1540): ob ein Geheimnis da ist und woher - nie das Geheimnis selbst.
+        "signed_webhook": {"configured": vereine_webhooks.secret_source(settings) is not None,
+                           "source": vereine_webhooks.secret_source(settings), "path": vereine_webhooks.PATH},
+        "legacy_webhook_enabled": vereine_webhooks.legacy_enabled(settings),
         "auto_link_verified_email": bool(settings.get("auto_link_verified_email")),
         "applications_enabled": bool(settings.get("applications_enabled")),
         "applications_coupled": settings["mode"] == "live" and bool(settings.get("applications_enabled")),
@@ -415,6 +429,11 @@ class DolibarrSettingsUpdate(BaseModel):
     directory_field_map: dict[str, str] | None = None
     # Teilnahmen in die Mitgliederakte (#847): Check-ins und Turniere; ab dem Einschalten, Älteres per Nachzug.
     participations_enabled: bool | None = None
+    # Signierte Webhooks (#1540): Schlüssel-Kennung und Geheimnis aus dem Vereinsmodul; das Geheimnis kommt nie zurück.
+    signed_webhook_key_id: str | None = Field(None, max_length=64)
+    signed_webhook_secret: str | None = Field(None, max_length=300)
+    # Der ältere Webhook-Weg: bis zur Umstellung an, danach abschalten.
+    legacy_webhook_enabled: bool | None = None
 
 
 @admin_router.get("/consent-texts")
@@ -461,6 +480,18 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
         updates["write_enabled"] = bool(data["write_enabled"])
     if "applications_enabled" in data:
         updates["applications_enabled"] = bool(data["applications_enabled"])
+    if "signed_webhook_key_id" in data:
+        key_id = str(data["signed_webhook_key_id"] or "").strip()
+        if key_id and not vereine_webhooks.KEY_ID_PATTERN.fullmatch(key_id):
+            raise HTTPException(400, "Die Schlüssel-Kennung besteht aus Buchstaben, Ziffern, „_“ und „-“.")
+        updates["signed_webhook_key_id"] = key_id
+    if data.get("signed_webhook_secret"):
+        secret = data["signed_webhook_secret"].strip()
+        if len(secret) < vereine_webhooks.MIN_SECRET_LENGTH:
+            raise HTTPException(400, f"Das Geheimnis hat mindestens {vereine_webhooks.MIN_SECRET_LENGTH} Zeichen.")
+        updates["signed_webhook_secret"] = encrypt_secret(secret)
+    if "legacy_webhook_enabled" in data:
+        updates["legacy_webhook_enabled"] = bool(data["legacy_webhook_enabled"])
     if "participations_enabled" in data:
         updates["participations_enabled"] = bool(data["participations_enabled"])
         if updates["participations_enabled"] and not current.get("participations_enabled"):
@@ -561,6 +592,12 @@ async def update_feature(body: FeatureUpdate, me: dict = Depends(require_area("c
         if not updates:
             raise HTTPException(400, "Nichts zu ändern.")
         await _set_sponsor_source(db, me, updates)
+    elif key == "legacy_webhook":
+        if body.on is None:
+            raise HTTPException(400, "An oder aus fehlt.")
+        if not await user_has_area(me, "system"):
+            raise HTTPException(403, "Den Webhook-Weg schaltet nur „System“.")
+        await update_dolibarr_settings(DolibarrSettingsUpdate(legacy_webhook_enabled=bool(body.on)), me)
     elif key in ("applications", "invoices", "members", "directory", "participations"):
         patch: dict = {}
         if key == "applications" and body.on is not None:
@@ -822,11 +859,14 @@ async def update_function_policy(body: PolicyUpdate, me: dict = Depends(require_
 
 @public_router.post("/webhook/{token}", status_code=202)
 async def dolibarr_webhook(token: str, request: Request):
-    """Dolibarr signiert nichts; das Token in der Adresse ist der Ausweis. Das Ereignis trägt keinen
+    """Der ältere Weg: das Token in der Adresse ist der Ausweis. Bleibt bis zur Umstellung auf signierte
+    Webhooks (#1540) und lässt sich unter Dolibarr → Funktionen abschalten. Das Ereignis trägt keinen
     Stand - es ist nur der Anlass, die Zusammenfassung in ein paar Sekunden neu zu lesen."""
     await enforce_rate_limit(request, "dolibarr:webhook", limit=120, window_seconds=60)
     db = get_db()
     settings = await load_settings(db)
+    if not vereine_webhooks.legacy_enabled(settings):
+        raise HTTPException(404, "Not found")
     try:
         expected = decrypt_secret(settings.get("webhook_token"))
     except RuntimeError:
@@ -844,6 +884,60 @@ async def dolibarr_webhook(token: str, request: Request):
     if settings["mode"] == "live":
         await queue_member(db, settings, member_id)
     return {"accepted": True}
+
+
+async def _read_limited(request: Request, limit: int) -> bytes | None:
+    """Den Body lesen, aber nie mehr als ``limit`` Bytes - None, wenn er größer ist."""
+    declared = request.headers.get("content-length") or ""
+    if declared.isdigit() and int(declared) > limit:
+        return None
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > limit:
+            return None
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+@public_router.post("/vereine-webhook")
+async def vereine_signed_webhook(request: Request):
+    """Signierter Hinweis des Vereinsmoduls (#1540): Kopf, Schlüssel, Zeitfenster, HMAC, Ereignis-Kennung -
+    in dieser Reihenfolge (services/vereine_webhooks.py). Ohne Geheimnis bleibt die Tür zu (503)."""
+    await enforce_rate_limit(request, "dolibarr:vereine-webhook", limit=120, window_seconds=60)
+    db = get_db()
+    settings = await load_settings(db)
+    known = vereine_webhooks.configured_secrets(settings)
+    if not known:
+        vereine_webhooks.logger.warning("[dolibarr] signierter Webhook ohne eingerichtetes Geheimnis abgewiesen")
+        raise HTTPException(503, "Signierte Webhooks sind nicht eingerichtet.")
+    body = await _read_limited(request, vereine_webhooks.MAX_BODY_BYTES)
+    if body is None:
+        vereine_webhooks.logger.warning("[dolibarr] signierter Webhook abgewiesen: zu groß")
+        raise HTTPException(413, "Zu groß.")
+    header = request.headers.get(vereine_webhooks.HEADER)
+    problem = vereine_webhooks.verify(header, body, known, vereine_webhooks.clock())
+    if problem:
+        vereine_webhooks.logger.warning("[dolibarr] signierter Webhook abgewiesen: %s", problem)
+        if problem == "header":
+            raise HTTPException(400, "Signatur-Kopf fehlt oder ist nicht lesbar.")
+        raise HTTPException(401, "Signatur ungültig.")
+    event = vereine_webhooks.parse_event(body, vereine_webhooks.read_header(header)["event_id"])
+    if event is None:
+        vereine_webhooks.logger.warning("[dolibarr] signierter Webhook abgewiesen: Body nicht lesbar")
+        raise HTTPException(400, "Unbekanntes Format.")
+    if not await vereine_webhooks.remember(db, settings, event):
+        vereine_webhooks.logger.info("[dolibarr] signierter Webhook %s… schon verarbeitet", log_safe(event["event_id"], 12))
+        return {"ok": True, "result": "duplicate"}
+    try:
+        result = await vereine_webhooks.handle(db, settings, event)
+    except Exception as exc:  # noqa: BLE001 - nicht eingereiht heißt: Kennung freigeben, das Modul wiederholt
+        await vereine_webhooks.forget(db, settings, event["event_id"])
+        vereine_webhooks.logger.warning("[dolibarr] signierter Webhook %s… nicht eingereiht: %s", log_safe(event["event_id"], 12), type(exc).__name__)
+        raise HTTPException(503, "Gerade nicht verarbeitbar, bitte wiederholen.") from exc
+    vereine_webhooks.logger.info("[dolibarr] signierter Webhook %s… %s/%s: %s", log_safe(event["event_id"], 12), log_safe(event["object_type"], 40), log_safe(event["change"], 40), log_safe(result, 80))
+    return {"ok": True, "result": result}
 
 
 # ---------------------------------------------------------------- Die betroffene Person

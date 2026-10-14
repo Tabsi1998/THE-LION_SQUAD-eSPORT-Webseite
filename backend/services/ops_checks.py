@@ -330,6 +330,28 @@ async def check_dolibarr_sync(db) -> dict:
     return result("dolibarr_sync", label, status, f"{where}: {counts.get('seen', 0)} gelesen, {counts.get('applied', 0)} übernommen", "letzter Lauf in Ordnung")
 
 
+async def check_dolibarr_webhook(db) -> dict:
+    """Signierte Webhooks (#1540): gelb, solange der ältere Webhook-Weg noch angenommen wird."""
+    from services import vereine_webhooks
+    from services.secret_store import secret_is_configured
+
+    label = "Dolibarr-Webhook"
+    try:
+        settings = await db.settings.find_one({"id": "dolibarr"}, {"_id": 0}) or {}
+    except Exception as exc:  # noqa: BLE001
+        return failed("dolibarr_webhook", label, exc)
+    if (settings.get("mode") or "off") == "off":
+        return result("dolibarr_webhook", label, "ok", "aus", "die Mitgliederverwaltung ist nicht angebunden")
+    signed = vereine_webhooks.secret_source(settings) is not None
+    if vereine_webhooks.legacy_enabled(settings) and secret_is_configured(settings.get("webhook_token")):
+        step = "den alten Weg" if signed else "im Vereinsmodul den signierten Webhook einrichten, dann den alten Weg"
+        return result("dolibarr_webhook", label, "warn", "alter Webhook-Weg aktiv",
+                      f"Auf signierte Webhooks umstellen: {step} unter Admin → Dolibarr → Funktionen abschalten")
+    if signed:
+        return result("dolibarr_webhook", label, "ok", "signiert", "Hinweise aus dem Vereinsmodul werden geprüft angenommen")
+    return result("dolibarr_webhook", label, "ok", "noch nicht eingerichtet", "ohne Webhook holt der Abgleich alle 10 min auf")
+
+
 def _missing_variants(path: Path, limit: int = VARIANT_SCAN_LIMIT) -> tuple[int, int, bool]:
     scanned = 0
     missing = 0
@@ -455,6 +477,7 @@ def default_checks(db) -> list[tuple[str, str, Callable[[], Awaitable[dict]]]]:
         ("scheduler", "Scheduler", check_scheduler),
         ("twitch_poll", "Twitch-Abfrage", lambda: check_twitch_poll(db)),
         ("dolibarr_sync", "Dolibarr-Abgleich", lambda: check_dolibarr_sync(db)),
+        ("dolibarr_webhook", "Dolibarr-Webhook", lambda: check_dolibarr_webhook(db)),
         ("client_ip", "Besucher-Adresse", lambda: check_client_ip(db)),
         ("unique_indexes", "Eindeutige Indizes", lambda: check_unique_indexes(db)),
         ("file_cleanups", "Datei-Nacharbeit", lambda: check_file_cleanups(db)),
