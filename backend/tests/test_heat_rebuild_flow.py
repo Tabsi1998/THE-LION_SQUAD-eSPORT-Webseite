@@ -292,3 +292,93 @@ async def test_the_detail_route_shows_the_plan_only_to_structure_staff(flow):
         data = (await flow.get(url)).json()
         assert ("heat_rebuild_plan" in data) is visible, role
         assert "heat_rebuild_dismissed" not in data or visible
+
+
+# ---------------------------------------------------------------------------------------------- Codex-Nachprüfung
+
+def _failing_second_write(flow, monkeypatch, *, foreign_change: dict | None = None):
+    """Der zweite Schreibzugriff des Umbaus trifft einen Lauf, der sich gerade geändert hat - und den ersten Lauf hat
+    optional auch jemand angefasst (``foreign_change``). Jeder Zugriff auf ``db.matches_v2`` liefert einen neuen
+    Wrapper, deshalb hängt der Haken an der Klasse und greift nur bei Schreibzugriffen des Umbaus."""
+    collection = flow.db.matches_v2
+    sync = collection._AsyncMongoMockCollection__collection
+    collection_class = type(collection)
+    real_update = collection_class.update_one
+    state = {"writes": 0, "first": None}
+
+    async def update_one(self, filter_doc, update, *args, **kwargs):
+        if self.name == "matches_v2" and "rebuild_token" in (update.get("$set") or {}):
+            state["writes"] += 1
+            if state["writes"] == 1:
+                state["first"] = filter_doc["id"]
+            if state["writes"] == 2:
+                sync.update_one({"id": filter_doc["id"]}, {"$set": {"updated_at": "2099-01-01T00:00:00+00:00"}})
+                if foreign_change:
+                    sync.update_one({"id": state["first"]}, {"$set": foreign_change})
+        return await real_update(self, filter_doc, update, *args, **kwargs)
+
+    monkeypatch.setattr(collection_class, "update_one", update_one)
+    return state
+
+
+@pytest.mark.asyncio
+async def test_rollback_restores_the_first_heat_exactly_including_new_fields(flow, monkeypatch):
+    tournament, _staff = await sixteen_scheme(flow, 10, "suggest")
+    plan = (await stored(flow, tournament))["heat_rebuild_plan"]
+    before = {m["id"]: m for m in await flow.matches(tournament)}
+    state = _failing_second_write(flow, monkeypatch)
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/heat-rebuild/confirm", json={"plan_id": plan["id"]})
+    assert response.status_code == 409, response.text
+    assert state["writes"] == 2
+    after = {m["id"]: m for m in await flow.matches(tournament)}
+    first = after[state["first"]]
+    assert first == before[state["first"]], "der zurückgesetzte Lauf ist wieder genau der alte - ohne neue Felder"
+    assert not {"merged_into", "rebuilt_at", "rebuild_token", "qualifiers_effective"} & set(first)
+    assert (await stored(flow, tournament)).get("heat_rebuild_incomplete") is None
+
+
+@pytest.mark.asyncio
+async def test_rollback_never_overwrites_a_foreign_change_but_flags_and_notifies(flow, monkeypatch):
+    tournament, staff = await sixteen_scheme(flow, 10, "suggest")
+    plan = (await stored(flow, tournament))["heat_rebuild_plan"]
+    state = _failing_second_write(flow, monkeypatch, foreign_change={"status": "in_progress", "updated_at": "2099-01-01T00:00:01+00:00"})
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/heat-rebuild/confirm", json={"plan_id": plan["id"]})
+    assert response.status_code == 409, response.text
+    first = await flow.db.matches_v2.find_one({"id": state["first"]}, {"_id": 0})
+    assert first["status"] == "in_progress", "die fremde Änderung bleibt stehen"
+    incomplete = (await stored(flow, tournament))["heat_rebuild_incomplete"]
+    assert incomplete["match_ids"] == [state["first"]] and incomplete["match_keys"]
+    assert (await audit_actions(flow, tournament)).count("tournament.heats.incomplete") == 1
+    note = await flow.db.notifications.find_one({"user_id": staff["id"], "kind": "tournament_heat_rebuild"}, {"_id": 0})
+    assert note and incomplete["match_keys"][0] in note["body"]
+
+
+@pytest.mark.asyncio
+async def test_a_conflict_after_a_result_is_retried_once_and_then_queued(flow, monkeypatch):
+    import services.heat_rebuild as heat_rebuild
+
+    tournament, _staff = await sixteen_scheme(flow, 10, "auto")
+    real = heat_rebuild.evaluate_heat_rebuild
+    calls = {"n": 0, "fail": 2}
+
+    async def flaky(db, tid, **kwargs):
+        calls["n"] += 1
+        if calls["n"] <= calls["fail"]:
+            raise heat_rebuild.HeatRebuildError(heat_rebuild.STALE_DETAIL, 409)
+        return await real(db, tid, **kwargs)
+
+    monkeypatch.setattr(heat_rebuild, "evaluate_heat_rebuild", flaky)
+    # Zweimal Konflikt: einmal frisch wiederholt, dann eingereiht.
+    assert await heat_rebuild.evaluate_after_write(flow.db, tournament["id"], actor_id=None, trigger="result") is None
+    assert calls["n"] == 2
+    assert (await stored(flow, tournament))["heat_rebuild_pending"]["trigger"] == "result"
+    # Der Minuten-Job arbeitet die Warteschlange ab - unter der Turnier-Schreibsperre.
+    calls["fail"] = 0
+    processed = await heat_rebuild.process_pending_heat_rebuilds(flow.db)
+    assert processed == 1 and calls["n"] == 3
+    assert (await stored(flow, tournament)).get("heat_rebuild_pending") is None
+    # Ein Konflikt, dann Erfolg: kein Eintrag in die Warteschlange.
+    calls.update(n=0, fail=1)
+    assert (await heat_rebuild.evaluate_after_write(flow.db, tournament["id"], actor_id=None, trigger="result"))["ok"]
+    assert calls["n"] == 2
+    assert (await stored(flow, tournament)).get("heat_rebuild_pending") is None

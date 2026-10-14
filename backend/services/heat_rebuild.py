@@ -51,7 +51,10 @@ from services.competition_usage import GRAPH, record_write
 from services.competition_versions import persist_competition_versions
 from services.custom_bracket import _snake_split, heat_quota
 from services.match_v2_results import _status_after_slot_fill, resolve_walkovers
+from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from services.station_runtime import release_station_for_match
+from services.tournament_permissions import STRUCTURE_STAFF_ROLES
+from services.user_notifications import create_user_notification
 
 logger = logging.getLogger("tls.heat_rebuild")
 
@@ -560,6 +563,57 @@ def _fingerprint(match: dict) -> str:
 
 
 STALE_DETAIL = "Ein Lauf hat sich inzwischen geändert (aufgerufen, gestartet oder entschieden). Bitte neu prüfen."
+INCOMPLETE_KIND = "tournament_heat_rebuild"
+
+
+async def _roll_back(db, tournament: dict, written: list[tuple[dict, dict]], token: str, stamp: str, *,
+                     actor_id: str | None) -> None:
+    """Das schon Geschriebene zurück - als inverses Update (alte Felder zurück, neue Felder weg) und nur, solange noch
+    der eigene Stand drinsteht (Kennung und Zeitstempel des Umbaus). Hat inzwischen jemand anderes geschrieben, bleibt
+    dessen Stand; der Lauf gilt als „Umbau unvollständig“ - am Turnier vermerkt, im Protokoll, Nachricht an die
+    Turnierleitung. Mit der Turnier-Schreibsperre in den Stationsrouten (#1569) ist das nur noch der Notfall."""
+    incomplete: list[dict] = []
+    for before, after in written:
+        inverse = {"$set": _doc_fields(before)}
+        gone = {key: "" for key in after if key not in before and key not in {"id", "_id"}}
+        if gone:
+            inverse["$unset"] = gone
+        result = await db.matches_v2.update_one({"id": before["id"], "rebuild_token": token, "updated_at": stamp}, inverse)
+        if result.matched_count != 1:
+            incomplete.append(before)
+    if not incomplete:
+        return
+    tid = tournament["id"]
+    keys = [str(row.get("match_key") or row.get("id")) for row in incomplete]
+    mark = {"at": now_utc().isoformat(), "token": token, "match_ids": [row["id"] for row in incomplete], "match_keys": keys}
+    await db.tournaments.update_one({"id": tid}, {"$set": {"heat_rebuild_incomplete": mark}})
+    await _audit(db, "tournament.heats.incomplete", tid, actor_id, {"engine": GRAPH, **mark})
+    logger.error("Lauf-Umbau unvollständig tournament=%s heats=%s", tid, keys)
+    title = "Lauf-Umbau unvollständig"
+    body = (f"{tournament.get('title') or 'Turnier'}: Beim Umbau der Läufe wurde {_join(keys)} gleichzeitig von jemand "
+            "anderem geändert. Bitte den Turnierbaum prüfen.")
+    for user_id in sorted(await _structure_staff_user_ids(db, tid)):
+        await create_user_notification(user_id, title, body, f"/admin/tournaments/{tid}?tab=bracket", INCOMPLETE_KIND,
+                                       {"tournament_id": tid, "dedupe_key": f"{INCOMPLETE_KIND}:{token}"})
+
+
+async def _structure_staff_user_ids(db, tournament_id: str) -> set[str]:
+    """Wer den Umbau entscheiden darf (wie ``can_manage_structure``): Turnierleitung als Rolle oder Freigabe und die
+    Helfer mit Strukturrolle für das ganze Turnier."""
+    from services.permissions import tournament_lead_filter
+
+    users = await db.users.find(
+        {**tournament_lead_filter(), "is_active": {"$ne": False}, "is_banned": {"$ne": True}},
+        {"_id": 0, "id": 1},
+    ).to_list(200)
+    ids = {row["id"] for row in users if row.get("id")}
+    assignments = await db.tournament_staff_assignments.find(
+        {"tournament_id": tournament_id, "is_active": {"$ne": False}, "role": {"$in": sorted(STRUCTURE_STAFF_ROLES)},
+         "$or": [{"scope": "tournament"}, {"scope": None}, {"scope_id": None}]},
+        {"_id": 0, "user_id": 1},
+    ).to_list(500)
+    ids.update(row["user_id"] for row in assignments if row.get("user_id"))
+    return ids
 
 
 def _doc_fields(match: dict) -> dict:
@@ -683,16 +737,22 @@ async def _persist(db, tournament: dict, stage: dict, matches: list[dict], origi
     for match in changed:
         if await db.matches_v2.count_documents(_unchanged_filter(original[match["id"]])) != 1:
             raise HeatRebuildError(STALE_DETAIL, 409)
-    written: list[dict] = []
+    # Jeder geschriebene Lauf trägt die Kennung dieses Umbaus und denselben Zeitstempel - daran erkennt ein Rollback,
+    # dass noch der eigene Stand drinsteht und nicht schon eine fremde Änderung.
+    token = str(uuid.uuid4())
+    stamp = now_utc().isoformat()
+    for match in changed:
+        match["rebuild_token"] = token
+        match["updated_at"] = stamp
+    written: list[tuple[dict, dict]] = []
     for match in changed:
         before = original[match["id"]]
         result = await db.matches_v2.update_one(_unchanged_filter(before), {"$set": _doc_fields(match)})
         if result.matched_count != 1:
             # Ein Lauf hat sich zwischen Prüfung und Schreiben geändert: das Geschriebene zurück, nichts bleibt halb.
-            for row in written:
-                await db.matches_v2.update_one({"id": row["id"]}, {"$set": _doc_fields(row)})
+            await _roll_back(db, tournament, written, token, stamp, actor_id=actor_id)
             raise HeatRebuildError(STALE_DETAIL, 409)
-        written.append(before)
+        written.append((before, match))
     for match in changed:
         before = original[match["id"]]
         if before.get("station_id") and match.get("status") == "cancelled":
@@ -782,6 +842,8 @@ async def evaluate_heat_rebuild(db, tournament_id: str, *, actor_id: str | None 
         trial = copy.deepcopy(matches)
         full = rebuild_heats(trial, now_iso=now_iso, structural=True, **rules)
         plan = plan or await _store_plan(db, tournament, stage, full["ops"], actor_id=actor_id, trigger=trigger)
+    if tournament.get("heat_rebuild_pending"):
+        await db.tournaments.update_one({"id": tournament_id}, {"$unset": {"heat_rebuild_pending": ""}})
     return {"ok": True, "mode": mode, "applied": applied, "plan": plan}
 
 
@@ -825,13 +887,40 @@ async def reject_heat_rebuild(db, tournament: dict, plan_id: str | None, *, acto
 
 
 async def evaluate_after_write(db, tournament_id: str | None, *, actor_id: str | None, trigger: str) -> dict | None:
-    """Für die Schreibwege (Ergebnis, Wertung, Baubau): eine Störung hier darf den Schreibvorgang nicht verlieren."""
+    """Für die Schreibwege (Ergebnis, Wertung, Baubau): eine Störung hier darf den Schreibvorgang nicht verlieren.
+
+    Ein Konflikt (ein Lauf hat sich zwischen Lesen und Schreiben geändert) wird einmal frisch wiederholt; bleibt er,
+    wird die Auswertung eingereiht (``heat_rebuild_pending`` am Turnier) - der Minuten-Job und die nächste Auswertung
+    arbeiten sie ab. Ohne das bliebe ein Umbau nach einer Stationsaktion dauerhaft aus, weil Stationsänderungen keine
+    Auswertung auslösen."""
     if not tournament_id:
         return None
-    try:
-        return await evaluate_heat_rebuild(db, tournament_id, actor_id=actor_id, trigger=trigger)
-    except HeatRebuildError as exc:
-        logger.warning("Lauf-Umbau nicht angewendet tournament=%s trigger=%s detail=%s", tournament_id, trigger, exc.detail)
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Lauf-Umbau fehlgeschlagen tournament=%s trigger=%s type=%s", tournament_id, trigger, type(exc).__name__)
+    for attempt in (1, 2):
+        try:
+            return await evaluate_heat_rebuild(db, tournament_id, actor_id=actor_id, trigger=trigger)
+        except HeatRebuildError as exc:
+            logger.warning("Lauf-Umbau nicht angewendet tournament=%s trigger=%s versuch=%s detail=%s",
+                           tournament_id, trigger, attempt, exc.detail)
+            detail = exc.detail
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Lauf-Umbau fehlgeschlagen tournament=%s trigger=%s type=%s", tournament_id, trigger, type(exc).__name__)
+            return None
+    await db.tournaments.update_one({"id": tournament_id}, {"$set": {
+        "heat_rebuild_pending": {"at": now_utc().isoformat(), "trigger": trigger, "detail": detail},
+    }})
     return None
+
+
+async def process_pending_heat_rebuilds(db) -> int:
+    """Eingereihte Auswertungen abarbeiten (Minuten-Job im Scheduler): je Turnier unter der Turnier-Schreibsperre;
+    ist sie belegt, kommt das Turnier beim nächsten Lauf dran. Liefert, wie viele Turniere ausgewertet wurden."""
+    rows = await db.tournaments.find({"heat_rebuild_pending": {"$exists": True}}, {"_id": 0, "id": 1}).to_list(200)
+    processed = 0
+    for row in rows:
+        try:
+            async with mutation_lock(db, tournament_write_resource(row["id"])):
+                await evaluate_after_write(db, row["id"], actor_id=None, trigger="pending")
+                processed += 1
+        except MutationLockBusy:
+            continue
+    return processed
