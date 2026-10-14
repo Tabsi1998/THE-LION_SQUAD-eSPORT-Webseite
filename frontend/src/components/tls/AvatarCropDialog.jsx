@@ -79,7 +79,8 @@ export function AvatarCropDialog({ file, busy = false, onCancel, onApply, onLoad
     setDims(null);
     setCrop(INITIAL_AVATAR_CROP);
     // Nur eine echte Blob-Adresse kommt in die Vorschau; alles andere gilt als „Bild nicht ladbar“.
-    if (isSafeBlobUrl(next)) {
+    // Die Zeichenprüfung steht hier noch einmal ausdrücklich, damit auch die Code-Analyse sie an dieser Stelle sieht.
+    if (isSafeBlobUrl(next) && !/[\s"'<>`]/.test(next)) {
       setUrl(next);
       return () => URL.revokeObjectURL(next);
     }
