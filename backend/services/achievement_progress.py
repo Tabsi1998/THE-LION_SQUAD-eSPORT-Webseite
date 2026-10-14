@@ -84,6 +84,12 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
             tournament_id = registration.get("tournament_id")
             if tournament_id:
                 registrations_by_tournament.setdefault(tournament_id, []).append(registration)
+    # Das Format entscheidet, aus welcher Tabelle die Plätze kommen (geteilte Plätze in Liga und Swiss, #1593).
+    tournaments_by_id = {
+        row["id"]: row
+        for row in (await db.tournaments.find({"id": {"$in": tids}}, {"_id": 0, "id": 1, "format": 1}).to_list(10000) if tids else [])
+        if row.get("id")
+    }
     own_registration_ids_by_tournament: dict[str, set[str]] = {}
     for registration in regs:
         tournament_id = registration.get("tournament_id")
@@ -95,6 +101,7 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
             read_model.structure_snapshot(),
             registrations_by_tournament.get(tournament_id) or [],
             own_registration_ids,
+            tournament=tournaments_by_id.get(tournament_id),
         )
         for key, value in summary.items():
             placement_progress[key] += value
@@ -112,13 +119,10 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     for tid in distinct_tracks:
         if not tid:
             continue
-        best = await db.f1_lap_times.find_one(
-            {"track_id": tid, "is_invalid": {"$ne": True},
-             "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}]},
-            {"_id": 0, "user_id": 1, "time_ms": 1},
-            sort=[("time_ms", 1)],
-        )
-        if best and best.get("user_id") == user_id:
+        # Pole aus der einen Rangfunktion (#1584): Strafe eingerechnet, Gleichstand - die früher gefahrene Zeit vorn.
+        from services.fastlap_standings import load_laps, official_query, rank_laps
+        ranked = rank_laps(await load_laps(db, official_query({"track_id": tid})))
+        if ranked and ranked[0]["user_id"] == user_id:
             pole_count += 1
     p["pole_count"] = pole_count
 

@@ -59,3 +59,46 @@ test("Skelett beim Laden, danach nichts hervorgehoben; eine Änderung leuchtet u
   expect(animate).toHaveBeenCalled();
   delete window.Element.prototype.animate;
 });
+
+// Gruppen, Liga-Spalten, Pfeile und eigene Zeile (#1562, #1179) - mit den Daten aus dem echten Generator.
+const generated = (await import("../../../e2e/fixtures/tableScheduleGenerated.json")).default;
+
+function mockGenerated(set) {
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...set.tournament, slug: "cup" } });
+    if (path === `/tournaments/${set.tournament.id}/standings`) return Promise.resolve({ data: set.standings });
+    return Promise.reject(new Error(path));
+  });
+}
+
+test("Gruppen: je Gruppe eine Tabelle mit Überschrift, die eigene Gruppe und Zeile sind markiert", async () => {
+  mockGenerated(generated.groups);
+  renderPage();
+  expect(await screen.findByRole("heading", { name: /Gruppe A/ })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: /Gruppe B/ })).toBeInTheDocument();
+  expect(screen.getAllByRole("table")).toHaveLength(2);
+  const mine = generated.groups.standings.flatMap((entry) => entry.standings).find((row) => row.is_mine);
+  const row = screen.getByTestId(`standing-row-${mine.registration_id}`);
+  expect(row).toHaveAttribute("data-mine", "true");
+  expect(row).toHaveTextContent("Du");
+  expect(screen.getAllByText("Deine Gruppe")).toHaveLength(1);
+});
+
+test("Liga: Spiele, Differenz, Form und Pfeile seit dem vorigen Spieltag", async () => {
+  mockGenerated(generated.league);
+  renderPage();
+  await screen.findByRole("table");
+  for (const header of ["Sp", "Diff", "Form", "Pkt"]) expect(screen.getByRole("columnheader", { name: header })).toBeInTheDocument();
+  for (const row of generated.league.standings) {
+    const tr = screen.getByTestId(`standing-row-${row.registration_id}`);
+    const before = generated.league.standings_after_first.find((old) => old.registration_id === row.registration_id).rank;
+    const move = screen.queryByTestId(`standing-move-${row.registration_id}`);
+    if (before > row.rank) expect(move).toHaveAccessibleName(`${before - row.rank} ${before - row.rank === 1 ? "Platz" : "Plätze"} hinauf`);
+    else if (before < row.rank) expect(move).toHaveAccessibleName(`${row.rank - before} ${row.rank - before === 1 ? "Platz" : "Plätze"} hinunter`);
+    else expect(move).toBeNull();
+    expect(tr.querySelector("[data-form]")).toHaveAttribute("aria-label", expect.stringMatching(/^Form: /));
+    if (row.is_mine) expect(tr).toHaveAttribute("data-mine", "true");
+    else expect(tr).not.toHaveAttribute("data-mine");
+  }
+  expect(screen.getAllByText("Du")).toHaveLength(1);
+});

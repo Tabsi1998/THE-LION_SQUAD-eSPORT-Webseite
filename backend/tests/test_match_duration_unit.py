@@ -188,3 +188,25 @@ def test_the_result_timer_knows_stage_and_game():
     now = start + timedelta(minutes=14)
     assert timing(match, {}, now, game=MK8)["overdue_minutes"] == 2
     assert timing(match, {}, now, stage={"settings": {"duration_minutes": 10}})["overdue_minutes"] == 4
+
+
+# Puffer je Spiel (#1557): die Turnierleitung legt etwas Luft auf jede Dauer - aus Spiel, Phase, Turnier oder Vorgabe.
+# Eine Dauer am Spiel selbst ist die ganze Dauer (wie bisher) und bekommt keinen Puffer.
+def test_the_buffer_comes_on_top_of_game_stage_tournament_and_default():
+    tournament = {"match_buffer_minutes": 5}
+    assert effective_match_duration({}, tournament=tournament) == 35
+    assert effective_match_duration({}, tournament=tournament, game=MK8) == 17
+    assert effective_match_duration({}, tournament={**tournament, "match_duration_minutes": 20}) == 25
+    assert effective_match_duration({}, stage={"settings": {"duration_minutes": 10}}, tournament=tournament) == 15
+
+
+def test_a_duration_at_the_match_itself_gets_no_buffer():
+    tournament = {"match_buffer_minutes": 5}
+    assert effective_match_duration({"duration_minutes": 12}, tournament=tournament) == 12
+    assert effective_match_duration({"settings": {"duration_minutes": 12}}, tournament=tournament) == 12
+    assert effective_match_duration({"duration_minutes": 50}, tournament=tournament, updates={"duration_minutes": None}) == 35
+
+
+@pytest.mark.parametrize("bad", [None, "", 0, -3, "x", True])
+def test_without_a_usable_buffer_nothing_is_added(bad):
+    assert effective_match_duration({}, tournament={"match_buffer_minutes": bad}, game=MK8) == 12

@@ -38,6 +38,41 @@ export function asInstant(value) {
   return new Date(Number.isNaN(instant) ? value : instant);
 }
 
+// ---------------------------------------------------------------- Eingabefelder (datetime-local)
+// Ein Feld „Datum und Uhrzeit“ zeigt die Wiener Uhr, egal, in welcher Zone das Gerät steht (#1557). Zeitumstellung
+// wie Temporal „compatible“: eine Uhrzeit, die es nicht gibt (letzter Sonntag im März, 02:00–02:59), rückt um die
+// fehlende Stunde vor; eine Uhrzeit, die es zweimal gibt (letzter Sonntag im Oktober, 02:00–02:59), meint die erste.
+const HOUR_MS = 60 * 60 * 1000;
+let inputFormat;
+
+/** Ein Zeitpunkt als Wert für ein datetime-local-Feld („JJJJ-MM-TTTHH:MM“) in Wiener Uhr - leer ohne gültigen Wert. */
+export function viennaInputValue(value) {
+  if (value == null || value === "") return "";
+  const date = asInstant(value);
+  if (Number.isNaN(date.getTime())) return "";
+  inputFormat = inputFormat || new Intl.DateTimeFormat("en-CA", {
+    timeZone: VIENNA_ZONE, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+  const parts = {};
+  for (const part of inputFormat.formatToParts(date)) parts[part.type] = part.value;
+  return `${parts.year}-${parts.month}-${parts.day}T${String(Number(parts.hour) % 24).padStart(2, "0")}:${parts.minute}`;
+}
+
+/** Ein datetime-local-Feld, gelesen als Wiener Uhr, als ISO-Zeitpunkt (UTC) - null ohne gültigen Wert. */
+export function fromViennaInput(text) {
+  const clock = typeof text === "string" ? CLOCK.exec(text.trim()) : null;
+  if (!clock) return null;
+  const wall = Date.UTC(Number(clock[1]), Number(clock[2]) - 1, Number(clock[3]), Number(clock[4]), Number(clock[5]), Number(clock[6] || 0));
+  if (Number.isNaN(wall)) return null;
+  // Die Abstände zu UTC vor und nach einer möglichen Umstellung; gültig ist, was in Wien wieder genau diese Uhr zeigt.
+  const before = viennaOffset(wall - 3 * HOUR_MS);
+  const after = viennaOffset(wall + 3 * HOUR_MS);
+  const fits = [wall - before, wall - after].filter((instant) => viennaOffset(instant) === wall - instant);
+  // Doppelte Stunde: zwei passen, die erste gilt. Lücke: keiner passt, mit dem Abstand davor rückt die Uhr vor.
+  const instant = fits.length ? Math.min(...fits) : wall - before;
+  return new Date(instant).toISOString();
+}
+
 /** Nur das Datum. Ohne Wert kommt nichts zurück - wie bei `wert?.toLocaleDateString()`. */
 export function viennaDate(value, options) {
   return value == null ? undefined : asInstant(value).toLocaleDateString(VIENNA_LOCALE, inVienna(options));

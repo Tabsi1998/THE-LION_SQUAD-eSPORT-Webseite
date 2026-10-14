@@ -7,6 +7,7 @@ import {
   expectedGames,
   gameDuration,
   gameMode,
+  durationSourceText,
   matchDurationSource,
 } from "./matchDuration";
 
@@ -113,6 +114,34 @@ function sourceFiles(dir) {
     return SOURCE_FILE.test(name) && !TEST_FILE.test(name) ? [full] : [];
   });
 }
+
+describe("Puffer je Spiel (#1557)", () => {
+  it("kommt auf Game, Phase, Turnier und Vorgabe - wie im Backend", () => {
+    const tournament = { match_buffer_minutes: 5 };
+    expect(effectiveMatchDuration({}, { tournament })).toBe(35);
+    expect(effectiveMatchDuration({}, { tournament, game: MK8 })).toBe(17);
+    expect(effectiveMatchDuration({}, { tournament: { ...tournament, match_duration_minutes: 20 } })).toBe(25);
+    expect(effectiveMatchDuration({}, { tournament, stage: { settings: { duration_minutes: 10 } } })).toBe(15);
+  });
+
+  it("eine Dauer am Spiel selbst ist die ganze Dauer, ohne Puffer", () => {
+    const tournament = { match_buffer_minutes: 5 };
+    expect(effectiveMatchDuration({ duration_minutes: 12 }, { tournament })).toBe(12);
+    expect(effectiveMatchDuration({ settings: { duration_minutes: 12 } }, { tournament })).toBe(12);
+  });
+
+  it("ohne brauchbaren Puffer kommt nichts dazu", () => {
+    for (const bad of [null, "", 0, -3, "x", true]) {
+      expect(effectiveMatchDuration({}, { tournament: { match_buffer_minutes: bad }, game: MK8 })).toBe(12);
+    }
+  });
+
+  it("sagt Herkunft und Puffer getrennt: „vom Spiel: 12 Min. + 8 Min. Puffer“", () => {
+    const source = matchDurationSource({}, { tournament: { match_buffer_minutes: 8 }, game: MK8 });
+    expect(source).toMatchObject({ minutes: 20, source: "game", buffer: 8 });
+    expect(durationSourceText(source)).toBe("vom Spiel: 12 Min. (Grand Prix 4 Rennen) + 8 Min. Puffer");
+  });
+});
 
 describe("Wächter: eine Dauer-Kette", () => {
   it("keine Datei außer lib/matchDuration.js baut die Kette nach", () => {

@@ -5,6 +5,11 @@
 // vorher hatte. Strafsekunden und ungültige Zeiten sortiert der Server ein (die Zeiten kommen in Millisekunden, mit
 // Strafe) - sie machen nichts schneller und lösen keinen Moment aus.
 
+function byRank(a, b) {
+  const rank = (entry) => (Number.isFinite(Number(entry.rank)) ? Number(entry.rank) : Number.POSITIVE_INFINITY);
+  return rank(a) - rank(b) || Number(a.time_ms) - Number(b.time_ms);
+}
+
 function entriesOf(board) {
   return (board?.entries || []).filter((entry) => entry?.user_id && Number.isFinite(Number(entry.time_ms)));
 }
@@ -25,8 +30,9 @@ export function compareBoards(previous, next) {
     if (!old) added.push({ userId: entry.user_id, entry });
     else if (Number(entry.time_ms) < Number(old.time_ms)) improved.push({ userId: entry.user_id, entry, old, deltaMs: Number(entry.time_ms) - Number(old.time_ms) });
   }
-  const [oldLeader] = entriesOf(previous).sort((a, b) => a.time_ms - b.time_ms);
-  const [newLeader] = entriesOf(next).sort((a, b) => a.time_ms - b.time_ms);
+  // Wer vorn liegt, sagt der Rang vom Server (#1584) - bei gleicher Zeit die früher gefahrene.
+  const [oldLeader] = entriesOf(previous).sort(byRank);
+  const [newLeader] = entriesOf(next).sort(byRank);
   let best = null;
   const changed = new Set([...improved, ...added].map((row) => row.userId));
   if (newLeader && changed.has(newLeader.user_id) && !(Number(newLeader.penalty_seconds) > 0)) {

@@ -102,31 +102,27 @@ async def widget_f1(slug_or_id: str, track_id: Optional[str] = None):
         if not first:
             return {"challenge": _public_challenge_summary(c), "track": None, "entries": []}
         track_id = first["id"]
-    # reuse f1 leaderboard logic (inline-light)
-    track = await db.f1_tracks.find_one({"id": track_id}, {"_id": 0})
-    times = await db.f1_lap_times.find(
-        {"challenge_id": c["id"], "track_id": track_id, "is_invalid": {"$ne": True}},
-        {"_id": 0, "admin_note": 0, "proof_url": 0},
-    ).to_list(5000)
-    best_per_user = {}
-    for t in times:
-        eff = t["time_ms"] + int(t.get("penalty_seconds", 0) * 1000)
-        if t["user_id"] not in best_per_user or eff < best_per_user[t["user_id"]]["effective_ms"]:
-            best_per_user[t["user_id"]] = {**t, "effective_ms": eff}
-    user_ids = list(best_per_user.keys())
+    # Nur Strecken dieser Challenge (#1584) und dieselbe Rangfolge wie die Tabelle: Strafe eingerechnet, ungültige und
+    # Vereins-Referenzzeiten nicht gewertet, bei Gleichstand die früher gefahrene Zeit vorn.
+    from services.fastlap_standings import official_times, rank_laps
+    track = await db.f1_tracks.find_one({"id": track_id, "challenge_id": c["id"]}, {"_id": 0})
+    if not track:
+        raise HTTPException(status_code=404)
+    ranked = rank_laps(await official_times(db, c["id"], track_id))
+    user_ids = [row["user_id"] for row in ranked]
     users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, private_projection("email")).to_list(500)}
+        {"id": {"$in": user_ids}}, private_projection("email")).to_list(len(user_ids) + 10)} if user_ids else {}
+    leader_ms = ranked[0]["effective_ms"] if ranked else 0
     entries = []
-    for uid, tr in best_per_user.items():
-        u = users.get(uid, {})
-        m = tr["effective_ms"]
+    for row in ranked:
+        u = users.get(row["user_id"], {})
+        m = row["effective_ms"]
+        gap = m - leader_ms
         entries.append({"display_name": u.get("display_name") or u.get("username") or "—",
-                         "time_ms": m,
-                         "time_str": f"{m//60000}:{(m%60000)//1000:02d}.{m%1000:03d}"})
-    entries.sort(key=lambda e: e["time_ms"])
-    for i, e in enumerate(entries):
-        e["rank"] = i + 1
-        e["gap_ms"] = e["time_ms"] - entries[0]["time_ms"] if i > 0 else 0
-        e["gap_str"] = f"+{e['gap_ms']/1000:.3f}s" if i > 0 else ""
+                        "time_ms": m,
+                        "time_str": f"{m//60000}:{(m%60000)//1000:02d}.{m%1000:03d}",
+                        "rank": row["rank"],
+                        "gap_ms": gap,
+                        "gap_str": f"+{gap/1000:.3f}s" if row["rank"] > 1 else ""})
     return {"challenge": _public_challenge_summary(c),
             "track": track, "entries": entries}

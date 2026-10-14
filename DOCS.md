@@ -39,6 +39,7 @@ Was die Funktionen können und was ihr dafür einrichtet – zum Durchlesen, ohn
 | [DATA_PROTECTION](DATA_PROTECTION.md) | Daten, Löschung und Betreiberpflichten |
 | [PUBLIC_ROUTE_INVENTORY](PUBLIC_ROUTE_INVENTORY.md) | Öffentliche Seiten und Routen |
 | [Frontend](frontend/README.md) | Lokale Entwicklung und Build |
+| [Abnahme lokal](docs/entwicklung/abnahme-lokal.md) | Echter Server in Docker mit Testdaten, Browser-Abnahme ohne Nachstellen |
 | [PERFORMANCE_BUDGETS](frontend/PERFORMANCE_BUDGETS.md) | Frontend-Leistungsziele |
 
 Prüfungen: [CI](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions/workflows/ci.yml),

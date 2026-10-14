@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -12,6 +12,8 @@ import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seoTextPreview } from "@/lib/textPreview";
 import { Award, FileDown } from "lucide-react";
+import { StandingsTable, standingKey } from "@/components/tls/tournament/StandingsTable";
+import { standingSections, tableKind } from "@/lib/standingsTable";
 
 const PUBLIC_RESULT_STATUSES = new Set(["completed", "results_published", "archived"]);
 
@@ -41,12 +43,16 @@ export default function TournamentStandingsPage() {
   }, [load]);
 
   useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 7000 });
+  // Gruppen kommen als [{group, standings}] (#1562): je Gruppe eine Tabelle. Live-Rahmen und Gleiten über alle Zeilen.
+  const sections = useMemo(() => standingSections(rows), [rows]);
+  const flatRows = useMemo(() => sections.flatMap((section) => section.rows), [sections]);
   // Kommt ein Ergebnis, gleiten die Zeilen auf ihren neuen Platz und die geänderte leuchtet kurz (#225).
-  const changed = useChangedKeys(rows, standingKey, standingSignature);
-  const registerRow = useFlipRows(rows, standingKey);
+  const changed = useChangedKeys(flatRows, standingKey, standingSignature);
+  const registerRow = useFlipRows(flatRows, standingKey);
   const tournamentUrl = t ? `/tournaments/${t.slug || t.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "/tournaments";
   const resultPdfUrl = t ? `${API}/exports/tournaments/${t.slug || t.id}/standings.pdf${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "";
   const certificatePdfUrl = t ? `${API}/exports/tournaments/${t.slug || t.id}/certificates.pdf${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "";
+  const certificateHref = (row) => `${API}/exports/tournaments/${t.slug || t.id}/certificates/${row.registration_id}.pdf${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
 
   if (!t) {
     return (
@@ -86,52 +92,36 @@ export default function TournamentStandingsPage() {
             </div>
           )}
         </div>
-        <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
-              <tr>
-                <th className="text-left px-4 py-3 w-14">#</th>
-                <th className="text-left px-4 py-3">Spieler</th>
-                <th className="text-right px-4 py-3">S</th>
-                <th className="text-right px-4 py-3">N</th>
-                <th className="text-right px-4 py-3">Punkte</th>
-                {PUBLIC_RESULT_STATUSES.has(t.status) && <th className="text-right px-4 py-3">Urkunde</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {rows.map((r) => (
-                <tr
-                  key={r.registration_id}
-                  ref={registerRow(standingKey(r))}
-                  data-testid={`standing-row-${r.registration_id}`}
-                  data-changed={changed.has(standingKey(r)) ? "true" : undefined}
-                  className={`${r.rank <= 3 ? "bg-[#29B6E8]/5" : ""} ${changed.has(standingKey(r)) ? "tls-changed-row" : ""}`}
-                >
-                  <td className="px-4 py-3 font-display font-bold text-[#29B6E8]">{r.rank}</td>
-                  <td className="px-4 py-3 text-white">{r.display_name}</td>
-                  <td className="px-4 py-3 text-right text-white/80">{r.won ?? r.wins ?? 0}</td>
-                  <td className="px-4 py-3 text-right text-white/80">{r.lost ?? r.losses ?? 0}</td>
-                  <td className="px-4 py-3 text-right font-display font-bold text-white">{r.points ?? r.furthest_round ?? 0}</td>
-                  {PUBLIC_RESULT_STATUSES.has(t.status) && (
-                    <td className="px-4 py-3 text-right">
-                      {r.rank <= 4 ? (
-                        <a href={`${API}/exports/tournaments/${t.slug || t.id}/certificates/${r.registration_id}.pdf${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">
-                          <Award className="w-3 h-3" /> PDF
-                        </a>
-                      ) : <span className="text-white/25">—</span>}
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {rows.length === 0 && <tr><td colSpan={PUBLIC_RESULT_STATUSES.has(t.status) ? 6 : 5} className="text-center py-8 text-white/40">Noch keine Ergebnisse</td></tr>}
-            </tbody>
-          </table>
+        {sections.length > 2 && (
+          <nav className="mt-6 flex flex-wrap gap-2" aria-label="Gruppen" data-testid="standings-group-nav">
+            {sections.map((section) => (
+              <a key={section.key} href={`#gruppe-${section.key}`} className={`tls-btn ${section.mine ? "tls-btn--secondary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-wider`}>
+                {section.label}
+              </a>
+            ))}
+          </nav>
+        )}
+        <div className="mt-8 space-y-10">
+          {sections.map((section) => (
+            <section key={section.key} id={section.label ? `gruppe-${section.key}` : undefined} aria-labelledby={section.label ? `gruppe-${section.key}-titel` : undefined} className="scroll-mt-24">
+              {section.label && (
+                <h2 id={`gruppe-${section.key}-titel`} className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-heading text-xl md:text-2xl font-black uppercase">
+                  {section.label}
+                  {section.mine && <span className="tls-standing-me text-[11px] font-body normal-case tracking-normal">Deine Gruppe</span>}
+                </h2>
+              )}
+              <StandingsTable
+                rows={section.rows}
+                kind={tableKind(section.rows)}
+                changed={changed}
+                registerRow={registerRow}
+                label={section.label ? `Tabelle ${section.label}` : "Rangliste"}
+                certificateHref={PUBLIC_RESULT_STATUSES.has(t.status) && !section.label ? certificateHref : null}
+              />
+            </section>
+          ))}
         </div>
       </div>
     </PublicLayout>
   );
-}
-
-function standingKey(row) {
-  return row.registration_id || row.id || row.display_name;
 }
