@@ -1,6 +1,5 @@
-import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
-import { documentsDirectory } from "./memberDocuments";
+import { currentFileSession, downloadPrivateFile, fileSessionActive } from "./memberDocuments";
 import { authorizedUrl } from "./siteUrls";
 
 // Jahresrückblick „Dein Jahr bei LION“ (#1195) - dieselbe Seitenfolge und dieselben Sätze wie im Web
@@ -81,14 +80,13 @@ export function yearCardUrl(review: YearReview): string {
 /** Bild laden (mit Anmeldung) und ins Teilen-Menü geben. */
 export async function shareYearCard(review: YearReview, token: string | null | undefined): Promise<"shared" | "failed"> {
   if (!token) return "failed";
+  // Sitzungsbindung (#1059): das Bild gehört der Sitzung, in der es geladen wurde. Abmelden bricht den Download ab und
+  // löscht die Datei; geteilt wird nur, solange dieselbe Sitzung gilt.
+  const session = currentFileSession();
   try {
-    if (!(await Sharing.isAvailableAsync())) return "failed";
-    // Im privaten Ordner der App (#1059): beim Abmelden und Kontowechsel geht das Bild mit den Dokumenten.
-    const directory = documentsDirectory(FileSystem.cacheDirectory);
-    await FileSystem.makeDirectoryAsync(directory, { intermediates: true }).catch(() => {});
-    const target = `${directory}mein-jahr-${Number(review.year) || "rueckblick"}.png`;
-    const download = await FileSystem.downloadAsync(yearCardUrl(review), target, { headers: { Authorization: `Bearer ${token}` } });
-    if (download.status && download.status !== 200) return "failed";
+    if (!(await Sharing.isAvailableAsync()) || !fileSessionActive(session)) return "failed";
+    const download = await downloadPrivateFile(yearCardUrl(review), `mein-jahr-${Number(review.year) || "rueckblick"}.png`, token);
+    if (download.session !== session || !fileSessionActive(session)) return "failed";
     await Sharing.shareAsync(download.uri, { mimeType: "image/png", UTI: "public.png", dialogTitle: `Mein ${review.year}` });
     return "shared";
   } catch {

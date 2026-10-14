@@ -1,5 +1,6 @@
+import { Platform } from "react-native";
 import { API_BASE_URL } from "../config";
-import { categoryLabel, documentFileName, documentsLine, documentUrl, documentsDirectory, downloadErrorText, formatFileSize, invoiceFileName } from "./memberDocuments";
+import { categoryLabel, documentFileName, fetchAndOpen, documentsLine, documentUrl, documentsDirectory, downloadErrorText, formatFileSize, invoiceFileName } from "./memberDocuments";
 
 // Vereinsdokumente in der App (#341): private Dateien, klare Fehlertexte.
 
@@ -52,4 +53,19 @@ test("Zeile der eigenen Unterlagen", () => {
   expect(documentsLine([{ id: "a" }])).toBe("1 Dokument");
   expect(documentsLine([])).toBe("");
   expect(documentsLine(null)).toBe("");
+});
+
+// Dateiname und Adresse (#1054): die Kennung kommt vom Server und bleibt im eigenen Ordner und im eigenen Pfad.
+test("Kennung im Dateinamen und in der Adresse: nur harmlose Zeichen", () => {
+  for (const id of ["../../files/x", "..\\..\\x", "a/b", ".", "x".repeat(65), ""]) {
+    const name = documentFileName({ id, original_filename: "a.pdf" });
+    expect([id, /^[A-Za-z0-9._ -]+$/.test(name) && !name.includes("..")]).toEqual([id, true]);
+  }
+  expect(documentFileName({ id: "dolibarr-3_x", original_filename: "a.pdf" })).toBe("dolibarr-3_x-a.pdf");
+  expect(documentUrl({ id: "../../auth/x" })).toBe(`${API_BASE_URL}/api/documents/..%2F..%2Fauth%2Fx/view`);
+});
+
+test("ein Dateiname mit Pfadteilen lädt nicht", async () => {
+  Platform.OS = "android";
+  await expect(fetchAndOpen("/api/documents/d1/view", "../x.pdf", "application/pdf", "tok")).rejects.toThrow("konnte nicht geladen");
 });

@@ -1,4 +1,4 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { API_BASE_URL, API_URL } from "../config";
 import type { AuthResponse } from "../types";
 import { buildCacheKey, getStaleEntry, setCached } from "./cache";
@@ -28,12 +28,39 @@ type CacheAwareConfig = InternalAxiosRequestConfig & {
 };
 
 /** Das Ziel des Aufrufs samt Basisadresse - eine absolute Adresse ersetzt die Basis. */
-function sendsToOwnServer(config: InternalAxiosRequestConfig): boolean {
+function requestTarget(config: InternalAxiosRequestConfig): string {
   try {
-    return isApiRequest(api.getUri(config));
+    return api.getUri(config);
+  } catch {
+    return "";
+  }
+}
+
+// Die Gerätekopfzeilen (#942) liest der Server nur, wenn er eine Sitzung anlegt oder erneuert - alles unter /api/auth/.
+const AUTH_PATH = `${(() => {
+  try {
+    return new URL(API_URL).pathname.replace(/\/+$/, "");
+  } catch {
+    return "/api";
+  }
+})()}/auth/`;
+
+function isAuthPath(target: string): boolean {
+  try {
+    return new URL(target).pathname.startsWith(AUTH_PATH);
   } catch {
     return false;
   }
+}
+
+/**
+ * Wohin die Antwort am Ende kam (#1060). Weiterleitungen folgt der Netzwerk-Stack von React Native selbst - abschalten
+ * lässt sich das für XHR nicht. Den Token gibt er dabei nicht an einen anderen Host weiter; kommt die Antwort aber
+ * nicht mehr vom eigenen Server, zählt sie nicht.
+ */
+function answeredElsewhere(response: AxiosResponse): boolean {
+  const finalUrl = (response.request as { responseURL?: unknown } | null | undefined)?.responseURL;
+  return typeof finalUrl === "string" && finalUrl !== "" && !isApiRequest(finalUrl);
 }
 
 let readTokens: () => TokenSnapshot = () => ({ accessToken: null, refreshToken: null, userId: null });
@@ -119,7 +146,8 @@ export function configureAuthBridge(bridge: {
 // ─── Request Interceptor: Auth-Token + Cache-Check ───────────────────────────
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   // Herkunft (#1060): eine Adresse anderer Herkunft (etwa aus einer Antwort) geht ohne Anmeldung und ohne Gerät raus.
-  const ownServer = sendsToOwnServer(config);
+  const target = requestTarget(config);
+  const ownServer = isApiRequest(target);
   (config as CacheAwareConfig)._ownServer = ownServer;
   (config as CacheAwareConfig)._generation = readTokens().generation;
   if (!ownServer) {
@@ -151,9 +179,12 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   }
   (config as CacheAwareConfig)._generation = readTokens().generation;
   // Gerät je Installation (#942): Kennung und Name als Kopfzeilen - der Server zeigt das Gerät in der Sitzungsliste
-  // und schließt beim Neu-Login die alte Sitzung desselben Geräts.
-  for (const [name, value] of Object.entries(await deviceHeaders())) {
-    config.headers.set(name, value);
+  // und schließt beim Neu-Login die alte Sitzung desselben Geräts. Er liest sie nur beim Anmelden und Erneuern, darum
+  // gehen sie auch nur dorthin.
+  if (isAuthPath(target)) {
+    for (const [name, value] of Object.entries(await deviceHeaders())) {
+      config.headers.set(name, value);
+    }
   }
 
   // Bind every cached response to the account and exact query parameters.
@@ -168,6 +199,9 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
 // ─── Response Interceptor: Cache befüllen + Offline-Fallback ─────────────────
 api.interceptors.response.use(
   async (response) => {
+    if ((response.config as CacheAwareConfig)._ownServer && answeredElsewhere(response)) {
+      throw new AxiosError("Die Antwort kam nicht vom Server des Vereins.", AxiosError.ERR_BAD_RESPONSE, response.config, response.request);
+    }
     // Eine echte Antwort: das Netz ist da (#1152, Offline-Leiste).
     noteFresh();
     // Erfolgreiche GET-Responses cachen

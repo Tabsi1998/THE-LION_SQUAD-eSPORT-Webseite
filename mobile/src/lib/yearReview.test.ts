@@ -1,6 +1,16 @@
 // Jahresrückblick (#1195): dieselbe Seitenfolge und dieselben Sätze wie im Web; das Bild nur mit Anmeldung.
 
-const mockFs = { cacheDirectory: "file:///cache/", downloadAsync: jest.fn(), makeDirectoryAsync: jest.fn(async () => {}) };
+// Der Download läuft über eine abbrechbare Aufgabe (#1059); `downloadAsync` steht für das, was der Server liefert.
+const mockFs = {
+  cacheDirectory: "file:///cache/",
+  downloadAsync: jest.fn(),
+  makeDirectoryAsync: jest.fn(async () => {}),
+  deleteAsync: jest.fn(async () => {}),
+  createDownloadResumable: jest.fn((url: string, uri: string, options?: unknown) => ({
+    downloadAsync: () => mockFs.downloadAsync(url, uri, options),
+    cancelAsync: jest.fn(async () => {}),
+  })),
+};
 const mockSharing = { isAvailableAsync: jest.fn(), shareAsync: jest.fn() };
 jest.mock("expo-file-system/legacy", () => mockFs);
 jest.mock("expo-sharing", () => mockSharing);
@@ -8,6 +18,8 @@ jest.mock("./api", () => ({ resolveMediaUrl: (value?: string | null) => (value ?
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { API_BASE_URL } = require("../config");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { forgetDocuments } = require("./memberDocuments");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { bestResultText, comparisonText, fastlapText, seasonText, shareYearCard, yearCardUrl, yearReviewPages } = require("./yearReview");
 
@@ -23,6 +35,7 @@ const FULL = {
 
 beforeEach(() => {
   mockFs.downloadAsync.mockReset();
+  mockFs.deleteAsync.mockClear();
   mockSharing.isAvailableAsync.mockReset();
   mockSharing.shareAsync.mockReset();
 });
@@ -61,4 +74,20 @@ test("Bild des Rückblicks nur vom eigenen Server", () => {
   expect(yearCardUrl({ ...FULL, image_path: "https://cdn.example/card.png" })).toBe(`${API_BASE_URL}/api/year-review/me/card.png`);
   expect(yearCardUrl({ ...FULL, image_path: "//cdn.example/card.png", preview: true })).toBe(`${API_BASE_URL}/api/year-review/me/card.png?vorschau=true`);
   expect(yearCardUrl({ ...FULL, image_path: null })).toBe(`${API_BASE_URL}/api/year-review/me/card.png`);
+});
+
+// Sitzungsbindung (#1059): wer sich während des Downloads abmeldet, teilt das Bild nicht mehr - und es bleibt nicht liegen.
+test("abgemeldet während des Downloads: kein Teilen, keine Datei", async () => {
+  mockSharing.isAvailableAsync.mockResolvedValue(true);
+  const target = "file:///cache/member-documents/mein-jahr-2026.png";
+  let release: () => void = () => {};
+  mockFs.downloadAsync.mockImplementation(() => new Promise((resolve) => { release = () => resolve({ uri: target, status: 200 }); }));
+  const sharing = shareYearCard(FULL, "token-1");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const forgetting = forgetDocuments();
+  release();
+  await forgetting;
+  expect(await sharing).toBe("failed");
+  expect(mockSharing.shareAsync).not.toHaveBeenCalled();
+  expect(mockFs.deleteAsync).toHaveBeenCalledWith(target, { idempotent: true });
 });

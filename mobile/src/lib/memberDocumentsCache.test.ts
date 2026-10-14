@@ -7,10 +7,13 @@ import { Platform } from "react-native";
 type Answer = { status: number } | Error;
 const mockFiles = new Set<string>();
 const mockAnswers: Answer[] = [];
-const mockTasks: Array<{ url: string; uri: string; headers: Record<string, string>; resumeData?: string; resumed: boolean }> = [];
+const mockTasks: Array<{ url: string; uri: string; headers: Record<string, string>; resumeData?: string; resumed: boolean; cancelled: boolean }> = [];
 let mockResumeData: string | null = null;
 // Hält einen Download an, bis der Test ihn freigibt (Abmelden mitten im Download, #1059).
 let mockGate: Promise<void> | null = null;
+// Hält das Verschieben bzw. das Öffnen an (Abmelden zwischen zwei Schritten).
+let mockMoveGate: Promise<void> | null = null;
+let mockOpenGate: Promise<void> | null = null;
 
 const mockFs = {
   cacheDirectory: "file:///cache/",
@@ -20,15 +23,22 @@ const mockFs = {
   }),
   getInfoAsync: jest.fn(async (uri: string) => ({ exists: mockFiles.has(uri) })),
   moveAsync: jest.fn(async ({ from, to }: { from: string; to: string }) => {
+    if (mockMoveGate) await mockMoveGate;
     mockFiles.delete(from);
     mockFiles.add(to);
   }),
-  getContentUriAsync: jest.fn(async (uri: string) => `content://${uri}`),
+  getContentUriAsync: jest.fn(async (uri: string) => {
+    if (mockOpenGate) await mockOpenGate;
+    return `content://${uri}`;
+  }),
   createDownloadResumable: jest.fn((url: string, uri: string, options?: { headers?: Record<string, string> }, _callback?: unknown, resumeData?: string) => {
-    const task = { url, uri, headers: options?.headers || {}, resumeData, resumed: false };
+    const task = { url, uri, headers: options?.headers || {}, resumeData, resumed: false, cancelled: false };
     mockTasks.push(task);
+    let cancel: () => void = () => {};
+    const cancelled = new Promise<void>((resolve) => { cancel = resolve; });
     const run = async () => {
-      if (mockGate) await mockGate;
+      if (mockGate) await Promise.race([mockGate, cancelled]);
+      if (task.cancelled) throw new Error("abgebrochen");
       const answer = mockAnswers.shift() || { status: 200 };
       if (answer instanceof Error) throw answer;
       if (answer.status === 200 || answer.status === 206) mockFiles.add(uri);
@@ -41,6 +51,10 @@ const mockFs = {
         return run();
       },
       pauseAsync: async () => ({ resumeData: mockResumeData }),
+      cancelAsync: async () => {
+        task.cancelled = true;
+        cancel();
+      },
       savable: () => ({ resumeData: mockResumeData }),
     };
   }),
@@ -66,6 +80,8 @@ beforeEach(() => {
   mockTasks.length = 0;
   mockResumeData = null;
   mockGate = null;
+  mockMoveGate = null;
+  mockOpenGate = null;
   resetDocumentDownloads();
   jest.clearAllMocks();
 });
@@ -185,6 +201,40 @@ test("abgemeldet während eines abgerissenen Downloads: kein Stand zum Fortsetze
   release();
   await expect(opening).rejects.toThrow();
   mockGate = null;
+  mockAnswers.length = 0;
   await openDocument(DOC, "tok");
   expect(mockTasks[mockTasks.length - 1].resumeData).toBeUndefined();
+});
+
+// Abmelden zwischen zwei Schritten (#1059): nach jedem Schritt prüft die App, ob die Sitzung noch dieselbe ist.
+test.each([
+  ["beim Verschieben", "move"],
+  ["vor dem Öffnen", "open"],
+])("abgemeldet %s: keine Datei bleibt, nichts wird geöffnet", async (_name, step) => {
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  if (step === "move") mockMoveGate = gate;
+  else mockOpenGate = gate;
+  const opening = openDocument(DOC, "tok");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const forgetting = forgetDocuments();
+  release();
+  await forgetting;
+  await expect(opening).rejects.toThrow();
+  expect(mockFiles.size).toBe(0);
+  expect(mockLauncher.startActivityAsync).not.toHaveBeenCalled();
+});
+
+test("Abmelden bricht laufende Downloads ab und wartet, bis sie aufgeräumt haben", async () => {
+  mockGate = new Promise<void>(() => {});
+  let settled = false;
+  const opening = openDocument(DOC, "tok").finally(() => { settled = true; });
+  opening.catch(() => {});
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(mockTasks).toHaveLength(1);
+  await forgetDocuments();
+  expect(mockTasks[0].cancelled).toBe(true);
+  expect(settled).toBe(true);
+  await expect(opening).rejects.toThrow();
+  expect(mockFiles.size).toBe(0);
 });
