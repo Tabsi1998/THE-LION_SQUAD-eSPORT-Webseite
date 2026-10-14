@@ -88,3 +88,53 @@ test("die Benachrichtigungsseite listet die Bündel und markiert alle als gelese
   await list.getByTestId("notifications-mark-all-read").click();
   await expect(list.getByText(/0 ungelesen · 30 gelesen/)).toBeVisible();
 });
+
+// Rest aus #1543 (Muster #987): im Dashboard-Kasten wird ein abgelehntes „gelesen“ zurückgenommen und bietet
+// „Nochmal versuchen“; ein Ladefehler ist kein „Keine Benachrichtigungen.“
+test("Dashboard: abgelehntes „gelesen“ wird zurückgenommen, „Nochmal versuchen“ klappt", async ({ page }) => {
+  const readCalls = [];
+  await mockServer(page, readCalls);
+  let refuse = true;
+  await page.route("**/api/admin/notifications/*/read", (route) => {
+    readCalls.push(route.request().url().split("/notifications/")[1].replace("/read", ""));
+    if (refuse) return route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "kaputt" }) });
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+  await page.goto("/dashboard");
+  const consent = page.getByRole("button", { name: /alle erlauben/i });
+  if (await consent.count()) await consent.click();
+
+  const panel = page.getByTestId("dashboard-notifications");
+  const row = panel.getByTestId("dashboard-notification-notification-0");
+  await expect(row).toBeVisible();
+  await expect(row.locator(".rounded-full")).toHaveCount(1);
+  await row.getByText("Testhinweis 1", { exact: true }).click();
+  const notice = panel.getByTestId("dashboard-notifications-action-error");
+  await expect(notice).toContainText("Die Benachrichtigung konnte nicht als gelesen markiert werden.");
+  await expect(row.locator(".rounded-full"), "wieder ungelesen").toHaveCount(1);
+
+  refuse = false;
+  await notice.getByRole("button", { name: /Nochmal versuchen/ }).click();
+  await expect(notice).toHaveCount(0);
+  await expect(row.locator(".rounded-full")).toHaveCount(0);
+  expect(readCalls).toEqual(["notification-0", "notification-0"]);
+});
+
+test("Dashboard: ein Ladefehler zeigt den Fehler mit „Nochmal versuchen“, nicht „Keine Benachrichtigungen.“", async ({ page }) => {
+  const readCalls = [];
+  await mockServer(page, readCalls);
+  let broken = true;
+  await page.route("**/api/admin/notifications", (route) => (broken
+    ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "kaputt" }) })
+    : route.fulfill({ contentType: "application/json", body: JSON.stringify(rows) })));
+  await page.goto("/dashboard");
+  const consent = page.getByRole("button", { name: /alle erlauben/i });
+  if (await consent.count()) await consent.click();
+
+  const panel = page.getByTestId("dashboard-notifications");
+  await expect(panel.getByTestId("dashboard-notifications-error")).toContainText("Die Benachrichtigungen konnten nicht geladen werden.");
+  await expect(panel).not.toContainText("Keine Benachrichtigungen.");
+  broken = false;
+  await panel.getByTestId("dashboard-notifications-error").getByRole("button", { name: /Nochmal versuchen/ }).click();
+  await expect(panel.getByText("3 neue Nachrichten von TheLostFriday", { exact: true })).toBeVisible();
+});

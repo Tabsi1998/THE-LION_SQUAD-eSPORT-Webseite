@@ -259,6 +259,32 @@ test.describe("Adventkalender", () => {
     await expect(page.getByTestId("advent-window")).toHaveCount(0);
   });
 
+  // #991: „Anmelden“ im Türchen wechselt auf /login - danach sind Kalender und Türchen zu und die Anmeldung ist bedienbar.
+  test("Anmelden im Türchen schließt beide Fenster und gibt die Anmeldung frei", async ({ page, isMobile }, testInfo) => {
+    const state = fresh();
+    await mockCalendar(page, state);
+    await openPage(page);
+    await page.getByTestId("advent-door-button-12").click();
+    await expect(page.getByTestId("advent-prize-login")).toBeVisible();
+    await page.getByTestId("advent-prize-login").click();
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByTestId("advent-dialog")).toHaveCount(0);
+    await expect(page.getByTestId("advent-window")).toHaveCount(0);
+    const login = page.getByTestId("login-email");
+    await expect(login).toBeVisible();
+    await login.click();
+    await expect(login).toBeFocused();
+    expect(await page.evaluate(() => getComputedStyle(document.body).pointerEvents)).not.toBe("none");
+    if (process.env.SHOT_DIR) await page.screenshot({ path: `${process.env.SHOT_DIR}/advent-login-${isMobile ? "handy" : "pc"}.png` });
+    await testInfo.attach(`advent-login-${isMobile ? "handy" : "pc"}`, { body: await page.screenshot(), contentType: "image/png" });
+
+    // Zurück auf die Startseite: das Fenster geht nicht von selbst wieder auf.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    await page.waitForTimeout(500);
+    await expect(page.getByTestId("advent-window")).toHaveCount(0);
+  });
+
   test("vor dem Advent ist der Kalender zu", async ({ page }, testInfo) => {
     const state = fresh({ closed: { active: false, next_start: "2026-12-01T00:00:00+01:00" } });
     await mockCalendar(page, state);
