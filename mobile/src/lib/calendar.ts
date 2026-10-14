@@ -1,8 +1,9 @@
 // Kalender (#216): Monatsraster, Termine je Tag und „In meinen Kalender“ - reine Rechnung ohne
 // Netz und ohne native Module, damit sie sich testen lässt. Ein Tag ist ein Kalendertag in Wien
-// („JJJJ-MM-TT“) - wie die Uhrzeit daneben; die Termine kommen als ISO-Zeit mit Zone. Das Raster
-// selbst ist reine Kalenderrechnung.
-import { viennaDay } from "./vienna";
+// („JJJJ-MM-TT“) - wie die Uhrzeit daneben. Die Termine kommen als ISO-Zeit; mit Zone gilt die Zone, ohne Zone die
+// Wiener Uhr (#1062) - wie in jeder anderen Anzeige der App und im Web, nie die Uhr des Geräts. Das Raster selbst ist
+// reine Kalenderrechnung.
+import { asInstant, viennaDay } from "./vienna";
 
 // „club“ (#1190, #1272): Versammlungen und eigene Helferschichten - nur für Mitglieder, in der Farbe des Vereins.
 export type CalendarKind = "event" | "tournament" | "fastlap" | "club";
@@ -80,7 +81,7 @@ export function monthMatrix(year: number, month: number): CalendarCell[][] {
 
 function parseIso(value?: string | null): Date | null {
   if (!value) return null;
-  const date = new Date(value);
+  const date = asInstant(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -109,7 +110,9 @@ export function itemsByDay(items: CalendarItem[]): Map<string, CalendarItem[]> {
       map.set(key, list);
     }
   }
-  for (const list of map.values()) list.sort((a, b) => a.start.localeCompare(b.start));
+  // Nach dem Zeitpunkt, nicht nach dem Text: „09:30Z“ ist später als „10:00+02:00“ (#1062).
+  const startOf = (item: CalendarItem) => parseIso(item.start)?.getTime() ?? Infinity;
+  for (const list of map.values()) list.sort((a, b) => startOf(a) - startOf(b));
   return map;
 }
 
