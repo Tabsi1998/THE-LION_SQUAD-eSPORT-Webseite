@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo, useSyncExternalStore } from "react";
+import { matchFate } from "@/lib/bracketGraph";
 import { Trophy } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { describeSlot, initials, isMatchDone, plannedText } from "@/lib/slotSource";
@@ -111,7 +112,9 @@ export function TvTreeNode({ match, regMap, podiumMap, findMatch }) {
     slots = [...slots].sort((a, b) => (byRegistration.get(a.slot.registration_id)?.rank ?? 99) - (byRegistration.get(b.slot.registration_id)?.rank ?? 99) || a.index - b.index);
   }
   const qualifiers = Number(match.settings?.qualifiers_per_match || 0);
-  const status = live ? "" : done ? formatMatchStatus(match.status) : shortPlanned(match) || formatMatchStatus(match.status);
+  // Entfällt (#1561): ein nicht nötiges Reset-Spiel, ein zusammengelegter Lauf - sagen, warum.
+  const fate = matchFate(match);
+  const status = fate ? fate.label : live ? "" : done ? formatMatchStatus(match.status) : shortPlanned(match) || formatMatchStatus(match.status);
   const goldCard = tree.goldCards.has(match.id);
   const meta = heat ? [`${(match.slots || []).length} Spieler`, qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : ""].filter(Boolean).join(" · ") : "";
 

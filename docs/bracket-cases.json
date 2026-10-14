@@ -1,5 +1,5 @@
 {
- "_info": "Gemeinsame Erwartungen für den Turnierbaum (#1561 Web, #1563 App) auf den echten Bäumen aus docs/bracket-trees.json (scripts/make_app_bracket_fixture.py). Spiele stehen als Kürzel, Personen als Name. Linie: \"Quelle>Ziel:Platz Fluss\", dahinter \" quer\" (über die Grenze eines Abschnitts) und \" entfällt\" (Quelle oder Ziel abgesagt). App: mobile/src/lib/bracketGraph.test.ts. Web: frontend/src/lib/bracketGraph.js rechnet dieselben Fälle (nach #1581). Gemischte Runden (#1548/#1580): „rails“ = Sammelschiene je Auslosungs-Gruppe (Quellen mit Fluss, Zielspiele, ausgelost ja/nein); vor der Auslosung keine Einzel-Linien in die Zielspiele, danach Linien aus der echten Herkunft (source_result.from_match_key) - die prüft der Test gegen die Plätze, weil das Los zufällig ist. Gestrichene Quellen (source_result.skipped, Lauf-Umbau) zählen nicht als gelost (ffa8_mixed_merged).",
+ "_info": "Gemeinsame Erwartungen für den Turnierbaum (#1561 Web, #1563 App) auf den echten Bäumen aus docs/bracket-trees.json (scripts/make_app_bracket_fixture.py). Spiele stehen als Kürzel, Personen als Name. Linie: \"Quelle>Ziel:Platz Fluss\", dahinter \" quer\" (über die Grenze eines Abschnitts) und \" entfällt\" (Quelle oder Ziel abgesagt). App: mobile/src/lib/bracketGraph.test.ts. Web: frontend/src/lib/bracketGraph.js rechnet dieselben Fälle (nach #1581). Gemischte Runden (#1548/#1580): „rails“ = Sammelschiene je Auslosungs-Gruppe (Quellen mit Fluss, Zielspiele, ausgelost ja/nein); vor der Auslosung keine Einzel-Linien in die Zielspiele, danach Linien aus der echten Herkunft (source_result.from_match_key) - die prüft der Test gegen die Plätze, weil das Los zufällig ist. Gestrichene Quellen (source_result.skipped, Lauf-Umbau) zählen nicht als gelost (ffa8_mixed_merged). „railsPerPhase“ (aus #1581): dieselbe Gruppe in zwei Phasen ergibt getrennte Schienen je (stage_id, draw_group).",
  "edges": [
   {
    "state": "se6_live",
@@ -632,6 +632,51 @@
      "drawn": false
     }
    ]
+  }
+ ],
+ "railsPerPhase": [
+  {
+   "state": "se8_mixed_open",
+   "how": "Zwei K.-o.-Phasen mit derselben Gruppe (#1561, Codex): zweite Phase = alle Spiele kopiert; Kennungen von Spielen und Anmeldungen bekommen den Anhang \"#2\" (auch advancement.to_match_id, results.registration_id, winner_id, source_result.from_match_id), stage_id der Kopie = \"phase-2\". Schienen je (stage_id, draw_group) getrennt; \"phase\" 1 = Original, 2 = Kopie.",
+   "rails": [
+    {
+     "phase": 1,
+     "group": "WB:2",
+     "sources": [
+      "A W",
+      "B W",
+      "C W",
+      "D W"
+     ],
+     "targets": [
+      "E",
+      "F"
+     ],
+     "drawn": false
+    },
+    {
+     "phase": 2,
+     "group": "WB:2",
+     "sources": [
+      "A W",
+      "B W",
+      "C W",
+      "D W"
+     ],
+     "targets": [
+      "E",
+      "F"
+     ],
+     "drawn": false
+    }
+   ],
+   "path": {
+    "phase": 1,
+    "player": "NeonFalke",
+    "rails": [
+     "1 WB:2:A"
+    ]
+   }
   }
  ]
 }

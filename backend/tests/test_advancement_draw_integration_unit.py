@@ -290,3 +290,120 @@ def test_removed_qualifier_after_the_draw_hands_the_drawn_seat_to_the_next():
     for reg, seat in before.items():
         if reg not in order[:2]:
             assert after[reg] == seat, "alle anderen bleiben, wo das Los sie hingesetzt hat"
+
+
+# ---------------------------------------------------------------------------------------------- Mehrere Phasen
+# Zwei gemischte K.-o.-Phasen haben dieselben Gruppen-Namen (``WB:2``): eine Auslosung gehört immer zu genau einer
+# Phase - ihr Topf, ihre Folgespiele und ihr Protokoll-Eintrag (``stage_id``).
+
+
+def phase(stage_id: str, number: int, prefix: str, count: int = 8, stage_type: str = "single_elimination",
+          *, plan: bool = False) -> list[dict]:
+    """Eine gemischte Phase; ``plan``: gebaut wie im Strukturplan - ohne Los, gelost wird beim Anwenden."""
+    stage = {"id": stage_id, "number": number, "stage_type": stage_type, "match_type": "duel", "settings": {}}
+    regs = [{"id": f"{prefix}{i}", "user_id": f"u{prefix}{i}", "status": "approved", "seed": i}
+            for i in range(1, count + 1)]
+    tournament = {"id": "t", "seeding_mode": "manual", "max_participants": count, **SHUFFLE}
+    return build_matches_v2_from_schema(tournament, stage, regs, defer_draws=plan)
+
+
+def decided_at_build(match: dict) -> None:
+    """Runde schon entschieden, wenn der Plan angewendet wird (wie eine Runde nur aus Freilosen)."""
+    ranking = sorted(filled(match), key=lambda reg: int(reg[1:]))
+    match["results"] = [{"registration_id": reg, "rank": index + 1} for index, reg in enumerate(ranking)]
+    match["status"] = "completed"
+
+
+def seated(rows: dict[str, dict], names: str) -> set[str]:
+    return {reg for key in names for reg in filled(rows[key])}
+
+
+def test_structure_plan_draws_each_phase_from_its_own_pot():
+    from services.match_v2_results import apply_deferred_draws
+
+    first, second = phase("s1", 1, "a", plan=True), phase("s2", 2, "b", plan=True)
+    assert {m["settings"].get("draw_group") for m in first + second if m["match_key"] in "EF"} == {"WB:2"}
+    for match in first + second:
+        if match["round"] == 1:
+            decided_at_build(match)
+    draws = apply_deferred_draws(first + second, now_iso=NOW)
+    assert sorted(draw["stage_id"] for draw in draws) == ["s1", "s2"], "ein Protokoll-Eintrag je Phase"
+    for draw in draws:
+        prefix = "a" if draw["stage_id"] == "s1" else "b"
+        assert draw["group"] == "WB:2"
+        assert {row["registration_id"][0] for row in draw["assignments"]} == {prefix}
+    for rows in (keys(first), keys(second)):
+        winners = {rows[key]["results"][0]["registration_id"] for key in "ABCD"}
+        assert seated(rows, "EF") == winners, "nur die eigenen Weiterkommer"
+        assert rows["E"]["draw"]["id"] == rows["F"]["draw"]["id"]
+    assert keys(first)["E"]["draw"]["id"] != keys(second)["E"]["draw"]["id"]
+
+
+def test_structure_plan_draws_a_finished_phase_without_waiting_for_the_other():
+    from services.match_v2_results import apply_deferred_draws
+
+    first, second = phase("s1", 1, "a", plan=True), phase("s2", 2, "b", plan=True)
+    for match in first:
+        if match["round"] == 1:
+            decided_at_build(match)
+    draws = apply_deferred_draws(first + second, now_iso=NOW)
+    assert [draw["stage_id"] for draw in draws] == ["s1"]
+    assert len(seated(keys(first), "EF")) == 4
+    assert not seated(keys(second), "EF") and not any(keys(second)[key].get("draw") for key in "EF")
+
+
+def test_structure_plan_draws_two_shuffled_leagues_apart():
+    from services.match_v2_results import apply_deferred_draws
+
+    first = phase("s1", 1, "a", count=4, stage_type="league", plan=True)
+    second = phase("s2", 2, "b", count=4, stage_type="league", plan=True)
+    draws = apply_deferred_draws(first + second, now_iso=NOW)
+    assert sorted(draw["stage_id"] for draw in draws) == ["s1", "s2"]
+    for rows in (first, second):
+        assert len({m["draw"]["id"] for m in rows}) == 1
+        assert {m["round"] for m in rows} == set(range(1, 7)), "Spieltage je Phase ab 1 (Hin- und Rückrunde)"
+
+
+def test_group_helpers_stay_inside_their_phase():
+    from services.advancement_draw import group_sources, group_targets, prerequisite_ids
+    from services.match_v2_results import group_awaits_draw
+
+    first, second = phase("s1", 1, "a"), phase("s2", 2, "b")
+    both = first + second
+    a, b = keys(first), keys(second)
+    assert prerequisite_ids(a["E"], both) == {a[key]["id"] for key in "ABCD"}
+    assert {m["id"] for m in group_targets(both, "WB:2", stage_id="s2")} == {b["E"]["id"], b["F"]["id"]}
+    assert {m["id"] for m in group_sources(both, "WB:2", stage_id="s1")} == {a[key]["id"] for key in "ABCD"}
+    for key in "ABCD":
+        play(second, b[key])
+    assert b["E"].get("draw") and not a["E"].get("draw")
+    assert group_awaits_draw(both, "WB:2", stage_id="s1") is True
+    assert group_awaits_draw(both, "WB:2", stage_id="s2") is False
+
+
+def test_result_over_all_phases_draws_only_its_own_phase():
+    """Der Ergebnis-Weg über alle Spiele des Turniers (z. B. Wertung beim Austritt): fertig ist nur Phase 1."""
+    first, second = phase("s1", 1, "a"), phase("s2", 2, "b")
+    both = first + second
+    for key in "ABC":
+        play(both, keys(first)[key])
+    last = play(both, keys(first)["D"])
+    assert [draw["stage_id"] for draw in last["draws"]] == ["s1"]
+    assert len(seated(keys(first), "EF")) == 4 and not seated(keys(second), "EF")
+
+
+def test_removed_winner_waits_for_the_draw_of_its_own_phase():
+    """Austritt vor der Auslosung (#1553) - auch wenn die gleichnamige Runde der anderen Phase schon ausgelost ist."""
+    from services.tournament_events import plan_removal
+
+    first, second = phase("s1", 1, "a"), phase("s2", 2, "b")
+    a, b = keys(first), keys(second)
+    for key in "ABCD":
+        play(second, b[key])
+    for key in "ABC":
+        play(first, a[key])
+    gone = a["A"]["results"][0]["registration_id"]
+    plan = plan_removal(first + second, gone, kind="withdrawn", now_iso=NOW)
+    assert any(op["kind"] == "draw_excluded" for op in plan["ops"])
+    play(first, a["D"])
+    assert gone not in seated(a, "EF") and len(seated(a, "EF")) == 3

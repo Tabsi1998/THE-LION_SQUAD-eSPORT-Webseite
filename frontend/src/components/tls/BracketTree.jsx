@@ -1,49 +1,54 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { resolveMediaUrl } from "@/lib/api";
-import { formatBracketSection, formatMatchStatus, formatRoundName } from "@/lib/tournamentLabels";
-import { asInstant, viennaDateTime } from "@/lib/vienna";
-import { describeSlot, finderFor, initials } from "@/lib/slotSource";
-import { buildPodiumMap, lastStageId, normalizeSection } from "@/lib/bracketPodium";
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, createContext } from "react";
+import { Link, useInRouterContext } from "react-router-dom";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { ChevronLeft, ChevronRight, Trophy } from "lucide-react";
+import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
+import { asInstant, viennaTime } from "@/lib/vienna";
+import { finderFor, initials } from "@/lib/slotSource";
+import { buildPodiumMap, finalMatchOf, isBronzeMatch, lastStageId, normalizeSection } from "@/lib/bracketPodium";
+import { bracketEdges, drawRails, isCancelled, isDone, isLive, orderEdges, pathFor, sectionGroup } from "@/lib/bracketGraph";
+import { motionTransition } from "@/lib/motion";
+import { laneCounter, routeBus, routeEdge, toPath } from "@/lib/bracketLines";
 import { TV_LINE, treeBlockUnits, treeBox, treeScale } from "@/lib/tvType";
 import { effectiveMatchDuration } from "@/lib/matchDuration";
+import { BracketMotionContext, useBracketMotion, useBracketMotionState } from "./bracket/bracketMotion";
+import { LiveClock, MatchCard, getStationLabel, slotLabel, formatNodeDateTime } from "./bracket/BracketCards";
+import {
+  ChangedMatchesContext, DurationContext, EMPTY_SET, FinderContext, FinishedContext, GraphContext, MatchLinkContext, MineContext, PathContext,
+} from "./bracket/context";
 
 /**
- * Turnierbaum (#399): K.-o.-Runden als Spalten mit gemessenen Verbindungslinien, Mehrspieler-
- * Durchgänge als Karten, Sieger mit Akzent, leere Setzplätze (Entscheidung des Betreibers: vor dem
- * Start steht dort nichts), am Handy Runde für Runde. `data` ist die Antwort von
- * /api/tournaments/:id/bracket; `mineId` die eigene Anmeldung für „Dein nächstes Spiel“.
+ * Turnierbaum (#399, neu mit #1561): K.-o.-Runden als Spalten auf einer Leinwand, die Linien kommen aus den echten
+ * Quellen der Plätze (lib/bracketGraph) - auch zwischen Winner und Loser Bracket, ins Grand Final und in den Reset.
+ * Ruhige Karten (#1340), Runden mit Namen (#1259, `round_label` vom Server), Lauf-Karte mit „2 kommen weiter → C“
+ * (#1178), Pokal am Ende. Dein Weg per Tipp (#1177), auch am Handy; ein Tipp ins Leere hebt ihn auf. Laufende Spiele
+ * atmen in der Live-Farbe, mit Station und Spielzeit; am Handy stehen sie oben. Bewegungen kommen aus dem Vergleich
+ * alter/neuer Stand (components/tls/bracket/bracketMotion) - genau einmal, mit „Bewegung reduzieren“ sofort am Ende.
+ * Gruppen, Liga und Schweizer System sind keine Baum-Spalten, sondern ein Verweis auf Tabelle und Spielplan.
+ *
+ * `data` ist die Antwort von /api/tournaments/:id/bracket; `mineId` die eigene Anmeldung. `quietUpdate`: der neue Stand
+ * kommt aus einem Nachladen nach einer Neuverbindung - dann springt alles ohne Bewegung ans Ende.
  *
  * TV-Fassung (#1115, `viewMode="tv"`): derselbe Baum mit Linien, Winner Bracket, Loser Bracket und Grand Final als
- * Blöcke wie auf der Turnierseite; kleine Blöcke (Spiel um Platz 3, Grand Final) stehen neben einem anderen, wenn
- * dort Platz ist (`tvLayout.columns` = so viele Spalten passen ins Bild). Die Karten zeichnet `nodeRenderer` (die TV-Karte),
- * Liga, Gruppen und Schweizer System zeigen ihre Spieltage als Raster. Die Linien werden auch dann richtig gemessen,
- * wenn die Kamera die Bühne vergrößert.
+ * Blöcke; die Karten zeichnet `nodeRenderer` (die TV-Karte), Liga, Gruppen und Schweizer System als Raster.
  */
-const EMPTY_SET = new Set();
 // Podium und letzte Phase wohnen seit #1119 in lib/bracketPodium (auch der Champion am TV braucht sie).
 export { buildPodiumMap, lastStageId };
-
-// Zuletzt geänderte Matches (#225) bekommen einen Rahmen. Über einen Kontext, damit die
-// Kennung nicht durch Stufe → Abschnitt → Runde → Knoten gereicht werden muss.
-const ChangedMatchesContext = createContext(EMPTY_SET);
-const MineContext = createContext(null);
-// Der Weg eines Spielers (#833): Fahren über einen Namen hebt jede Partie dieser Person hervor und dämpft den Rest;
-// Fokus auf einer Partie (Tastatur) hebt die Wege ihrer Spieler hervor. `ids` ist eine Menge von Anmeldungen.
-const PathContext = createContext({ ids: null, show: () => {} });
-// Nach dem Ende (#833): was nicht gespielt wurde, heißt so - nicht mehr „Bereit“ oder „Geplant“.
-const FinishedContext = createContext(false);
-const FINISHED_TOURNAMENT = new Set(["completed", "results_published", "archived", "cancelled"]);
-
-// Kürzel für Spieler ohne Bild (#833) - seit #1113 an einer Stelle mit dem TV (lib/slotSource), auch für
-// zusammengeschriebene Namen: NeonFalke → NF.
+// Kürzel für Spieler ohne Bild (#833, #1113).
 export { initials };
-// Wer in einen noch leeren Platz kommt (#1113): „Sieger aus A“ statt „—“. Setzplätze bleiben leer.
-const FinderContext = createContext(() => () => undefined);
-// Die Spieldauer je Spiel (#1554) - eine Funktion aus lib/matchDuration.js mit Phase, Turnier und Spiel der Antwort.
-const DurationContext = createContext((match) => effectiveMatchDuration(match));
+
 // TV (#1115): eine eigene Karte statt der Karte der Turnierseite, und wie viele Spalten ins Bild passen.
 const NodeRendererContext = createContext(null);
 const TvLayoutContext = createContext({ columns: 4, viewport: null, minZoom: 1, textSize: "normal" });
+
+const FINISHED_TOURNAMENT = new Set(["completed", "results_published", "archived", "cancelled"]);
+const DONE_STATUSES = new Set(["completed", "finished", "reported", "confirmed"]);
+const LIVE_STATUSES = new Set(["running", "in_progress"]);
+// Abstand der Spalten - die Linien brauchen Platz für ihren Knick.
+const COLUMN_GAP = 48;
+// Breite einer Spalte bzw. Karte auf der Leinwand.
+const CARD_WIDTH = 232;
+const CHAMPION_ID = "bracket-champion";
 
 /** Liegt diese Partie auf dem hervorgehobenen Weg - oder wird sie gedämpft? */
 export function pathState(ids, registrationIds) {
@@ -51,53 +56,86 @@ export function pathState(ids, registrationIds) {
   return registrationIds.some((id) => id && ids.has(id)) ? "on" : "off";
 }
 
-/** Nur Tastatur-Fokus zeigt den Weg - ein Tippen am Handy (öffnet die Partie) soll den Baum nicht dämpfen. */
-function keyboardFocus(element) {
-  try {
-    return element.matches(":focus-visible");
-  } catch {
-    return true;
-  }
+function useIsNarrow() {
+  const [narrow, setNarrow] = useState(() => (typeof window !== "undefined" && typeof window.matchMedia === "function" ? !window.matchMedia("(min-width: 768px)").matches : false));
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+    const query = window.matchMedia("(min-width: 768px)");
+    const update = () => setNarrow(!query.matches);
+    update();
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  }, []);
+  return narrow;
 }
 
-function canHover() {
-  try {
-    return typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(hover: hover)").matches;
-  } catch {
-    return false;
-  }
+/** Dein Weg: angetippt (bleibt) oder nur vorab (Maus, Tastatur) - daraus die Spiele und Linien auf dem Weg. */
+function usePath(matches, edges) {
+  const [selected, setSelected] = useState(null);
+  const [previewIds, setPreviewIds] = useState(null);
+  const ids = previewIds && previewIds.size ? previewIds : selected ? new Set([selected]) : null;
+  const key = ids ? [...ids].sort().join("|") : "";
+  const active = useMemo(() => {
+    if (!key) return null;
+    const result = { ids: new Set(key.split("|")), matches: new Set(), edges: new Set(), rails: new Set() };
+    for (const id of key.split("|")) {
+      const path = pathFor(id, matches, edges);
+      path.matches.forEach((value) => result.matches.add(value));
+      path.edges.forEach((value) => result.edges.add(value));
+      path.rails?.forEach((value) => result.rails.add(value));
+    }
+    return result;
+  }, [key, matches, edges]);
+  const toggle = useCallback((id) => setSelected((current) => (current === id ? null : id)), []);
+  const clear = useCallback(() => { setSelected(null); setPreviewIds(null); }, []);
+  // Ein Tipp ins Leere (oder Escape) hebt den Weg auf. Namen, Knöpfe und Links zählen nicht als leer.
+  useEffect(() => {
+    if (!selected) return undefined;
+    const onKey = (event) => { if (event.key === "Escape") setSelected(null); };
+    const onClick = (event) => {
+      if (event.target?.closest?.("[data-path-trigger], button, a, input, select, textarea")) return;
+      setSelected(null);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("click", onClick);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("click", onClick);
+    };
+  }, [selected]);
+  return useMemo(() => ({ active, selected, toggle, clear, preview: setPreviewIds }), [active, selected, toggle, clear]);
 }
 
-function useMatchChanged(matchId) {
-  return useContext(ChangedMatchesContext).has(matchId);
-}
-
-const LIVE_STATUSES = new Set(["running", "in_progress"]);
-const DONE_STATUSES = new Set(["completed", "finished", "reported", "confirmed"]);
-// Verbindungslinien: Spaltenbreite und Lücke, gemessen wird trotzdem - die Knoten sind
-// unterschiedlich hoch (mit oder ohne Uhrzeit/Station).
-const COLUMN_GAP = 48;
-
-export function BracketTree({ data, compact = false, viewMode = "standard", onMatchClick, changedMatchIds = EMPTY_SET, mineId = null, layout = "auto", nodeRenderer = null, tvLayout = null }) {
-  const { matches_v2 = [], stages = [], registrations = [] } = data || {};
-  const [pathIds, setPathIds] = useState(null);
-  const path = useMemo(() => ({ ids: pathIds, show: setPathIds }), [pathIds]);
+export function BracketTree({ data, compact = false, viewMode = "standard", onMatchClick, changedMatchIds = EMPTY_SET, mineId = null, layout = "auto", nodeRenderer = null, tvLayout = null, quietUpdate = false }) {
+  const { matches_v2: matchesRaw, stages: stagesRaw, registrations: registrationsRaw } = data || {};
+  const matches_v2 = useMemo(() => matchesRaw || [], [matchesRaw]);
+  const stages = useMemo(() => stagesRaw || [], [stagesRaw]);
+  const registrations = useMemo(() => registrationsRaw || [], [registrationsRaw]);
+  const isTv = viewMode === "tv";
   const finished = FINISHED_TOURNAMENT.has(String(data?.tournament?.status || ""));
   const podiumMap = useMemo(() => buildPodiumMap(matches_v2, stages), [matches_v2, stages]);
-  const regMap = useMemo(() => {
-    const m = new Map();
-    for (const r of registrations) m.set(r.id, r);
-    return m;
-  }, [registrations]);
-  const mine = mineId || registrations.find((r) => r?.is_mine)?.id || null;
+  const regMap = useMemo(() => new Map(registrations.map((reg) => [reg.id, reg])), [registrations]);
+  const mine = mineId || registrations.find((reg) => reg?.is_mine)?.id || null;
   const finder = useMemo(() => finderFor(matches_v2), [matches_v2]);
-  // Die Dauer-Kette (#1554): ohne eigenen Wert am Spiel gelten Phase, Turnier und Spiel (Modus) aus der Antwort.
-  const tournament = data?.tournament;
-  const durationGame = data?.duration_game;
-  const duration = useMemo(() => {
-    const stageById = new Map(stages.map((stage) => [stage?.id, stage]));
-    return (match) => effectiveMatchDuration(match, { stage: stageById.get(match?.stage_id), tournament, game: durationGame });
-  }, [stages, tournament, durationGame]);
+  const edges = useMemo(() => {
+    const real = bracketEdges(matches_v2);
+    if (real.length) return real;
+    // Alte Bäume ohne Herkunft der Plätze: Linien nach der Reihenfolge wie früher, je Abschnitt.
+    return Object.values(groupMatches(matches_v2)).flatMap((sections) => Object.values(sections)
+      .filter((rounds) => !isTableFormat(Object.values(rounds).flat()))
+      .flatMap((rounds) => orderEdges(roundNumbers(rounds).map((rn) => rounds[rn]))));
+  }, [matches_v2]);
+  const finalMatch = useMemo(() => finalMatchOf(matches_v2, stages), [matches_v2, stages]);
+  const graph = useMemo(() => {
+    const decisive = new Set(matches_v2.filter((match) => isBronzeMatch(match) || sectionGroup(match.section) === "final").map((match) => match.id));
+    if (finalMatch) decisive.add(finalMatch.id);
+    return { edges, byId: new Map(matches_v2.map((match) => [match.id, match])), decisive, matches: matches_v2, finalId: finalMatch?.id || null };
+  }, [edges, matches_v2, finalMatch]);
+  const path = usePath(matches_v2, edges);
+  const motionValue = useBracketMotion(isTv ? null : matches_v2, { quiet: quietUpdate });
+  const narrow = useIsNarrow();
+  const steps = !isTv && (layout === "steps" || (layout === "auto" && narrow));
+  const tournamentPath = data?.tournament ? `/tournaments/${data.tournament.slug || data.tournament.id}` : "";
   const tvColumns = tvLayout?.columns || 4;
   const tvViewportW = tvLayout?.viewport?.w || 0;
   const tvViewportH = tvLayout?.viewport?.h || 0;
@@ -109,41 +147,55 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
     minZoom: tvMinZoom,
     textSize: tvTextSize,
   }), [tvColumns, tvViewportW, tvViewportH, tvMinZoom, tvTextSize]);
+  const linkValue = useMemo(() => ({ onMatchClick: onMatchClick || null }), [onMatchClick]);
+  // Die Dauer-Kette (#1554): ohne eigenen Wert am Spiel gelten Phase, Turnier und Spiel (Modus) aus der Antwort.
+  const durationTournament = data?.tournament;
+  const durationGame = data?.duration_game;
+  const duration = useMemo(() => {
+    const stageById = new Map(stages.map((stage) => [stage?.id, stage]));
+    return (match) => effectiveMatchDuration(match, { stage: stageById.get(match?.stage_id), tournament: durationTournament, game: durationGame });
+  }, [stages, durationTournament, durationGame]);
+
+  const tree = isTv ? (
+    <TvStageTree stages={stages} matches={matches_v2} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} />
+  ) : (
+    <div data-bracket-root="" data-season-quiet="bracket" className="space-y-8">
+      {mine && !finished ? <NextMatchBanner matches={matches_v2} regMap={regMap} mineId={mine} /> : null}
+      {steps && !finished ? <LiveStrip matches={matches_v2} regMap={regMap} /> : null}
+      <WebStages stages={stages} matches={matches_v2} regMap={regMap} podiumMap={podiumMap} steps={steps} finalMatch={finalMatch} tournamentPath={tournamentPath} />
+    </div>
+  );
 
   return (
-    <NodeRendererContext.Provider value={nodeRenderer}>
-    <TvLayoutContext.Provider value={tvValue}>
-    <FinderContext.Provider value={finder}>
-    <DurationContext.Provider value={duration}>
-    <ChangedMatchesContext.Provider value={changedMatchIds || EMPTY_SET}>
-      <MineContext.Provider value={mine}>
-        <FinishedContext.Provider value={finished}>
-          <PathContext.Provider value={path}>
-            {mine && viewMode !== "tv" && !finished ? <NextMatchBanner matches={matches_v2} regMap={regMap} mineId={mine} onMatchClick={onMatchClick} /> : null}
-            <StageBracketTree
-              stages={stages}
-              matches={matches_v2}
-              regMap={regMap}
-              podiumMap={podiumMap}
-              compact={compact}
-              viewMode={viewMode}
-              layout={layout}
-              onMatchClick={onMatchClick}
-            />
-          </PathContext.Provider>
-        </FinishedContext.Provider>
-      </MineContext.Provider>
-    </ChangedMatchesContext.Provider>
-    </DurationContext.Provider>
-    </FinderContext.Provider>
-    </TvLayoutContext.Provider>
-    </NodeRendererContext.Provider>
+    <MotionConfig reducedMotion="user">
+      <NodeRendererContext.Provider value={nodeRenderer}>
+        <TvLayoutContext.Provider value={tvValue}>
+          <FinderContext.Provider value={finder}>
+            <ChangedMatchesContext.Provider value={changedMatchIds || EMPTY_SET}>
+              <MineContext.Provider value={mine}>
+                <FinishedContext.Provider value={finished}>
+                  <GraphContext.Provider value={graph}>
+                    <PathContext.Provider value={path}>
+                      <MatchLinkContext.Provider value={linkValue}>
+                        <DurationContext.Provider value={duration}>
+                          <BracketMotionContext.Provider value={motionValue}>
+                            {tree}
+                          </BracketMotionContext.Provider>
+                        </DurationContext.Provider>
+                      </MatchLinkContext.Provider>
+                    </PathContext.Provider>
+                  </GraphContext.Provider>
+                </FinishedContext.Provider>
+              </MineContext.Provider>
+            </ChangedMatchesContext.Provider>
+          </FinderContext.Provider>
+        </TvLayoutContext.Provider>
+      </NodeRendererContext.Provider>
+    </MotionConfig>
   );
 }
 
-// Formate, die in einer Tabelle ausgespielt werden statt in einem Baum. Sie
-// laufen über Spieltage, an denen alle gleichzeitig spielen - nebeneinander
-// scrollende Runden wären dafür die falsche Form, besonders am Telefon.
+// Formate, die in einer Tabelle ausgespielt werden statt in einem Baum: Spieltage, an denen alle gleichzeitig spielen.
 const TABLE_STAGE_TYPES = new Set(["round_robin_groups", "league", "swiss"]);
 const TABLE_SECTION_RE = /^(round_robin|liga|league|swiss|group_.+)$/i;
 
@@ -157,7 +209,7 @@ export function isTableFormat(matches = []) {
 /** „Dein nächstes Spiel“: das erste noch offene Match mit der eigenen Anmeldung. */
 export function nextMatchFor(matches = [], mineId) {
   if (!mineId) return null;
-  const own = matches.filter((match) => (match.slots || []).some((slot) => slot.registration_id === mineId) && !DONE_STATUSES.has(String(match.status || "").toLowerCase()));
+  const own = matches.filter((match) => (match.slots || []).some((slot) => slot.registration_id === mineId) && !DONE_STATUSES.has(String(match.status || "").toLowerCase()) && String(match.status || "").toLowerCase() !== "cancelled");
   own.sort((a, b) => {
     const live = Number(LIVE_STATUSES.has(String(b.status || "").toLowerCase())) - Number(LIVE_STATUSES.has(String(a.status || "").toLowerCase()));
     if (live) return live;
@@ -169,7 +221,12 @@ export function nextMatchFor(matches = [], mineId) {
   return own[0] || null;
 }
 
-function NextMatchBanner({ matches, regMap, mineId, onMatchClick }) {
+function roundNameOf(match, number) {
+  return match?.round_label || formatRoundName(match?.round_name, number);
+}
+
+function NextMatchBanner({ matches, regMap, mineId }) {
+  const { onMatchClick } = useContext(MatchLinkContext);
   const match = nextMatchFor(matches, mineId);
   if (!match) return null;
   const opponents = (match.slots || []).filter((slot) => slot.registration_id && slot.registration_id !== mineId).map((slot) => slotLabel(slot, regMap)).filter(Boolean);
@@ -181,115 +238,492 @@ function NextMatchBanner({ matches, regMap, mineId, onMatchClick }) {
       type="button"
       onClick={() => onMatchClick?.(match)}
       data-testid="bracket-next-match"
-      className={`mb-6 w-full text-left rounded-sm border px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-1 transition ${live ? "border-live/50 bg-live/8" : "border-[#FFD700]/45 bg-[#FFD700]/8"} hover:border-white/40`}
+      className={`w-full text-left rounded-md border px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-1 transition-colors duration-mid ease-tls ${live ? "border-live/50 bg-live/[0.08]" : "border-brand/45 bg-brand/[0.08]"} hover:border-white/40`}
     >
-      <span className={`text-[11px] uppercase tracking-[0.25em] font-bold ${live ? "text-live" : "text-[#FFD700]"}`}>{live ? "Dein Spiel läuft" : "Dein nächstes Spiel"}</span>
-      <span className="font-heading text-lg font-black uppercase">{formatRoundName(match.round_name, match.round)} · {match.match_key || "Spiel"}</span>
-      {opponents.length ? <span className="text-sm text-white/75">gegen {opponents.join(", ")}</span> : <span className="text-sm text-white/45">Gegner steht noch nicht fest</span>}
-      {(when || station) && <span className="text-xs uppercase tracking-wider text-white/55">{[when, station].filter(Boolean).join(" · ")}</span>}
+      <span className={`text-[11px] uppercase tracking-[0.25em] font-bold ${live ? "text-live" : "text-brand"}`}>{live ? "Dein Spiel läuft" : "Dein nächstes Spiel"}</span>
+      <span className="font-heading text-lg font-black uppercase">{roundNameOf(match, match.round)} · {match.match_key || "Spiel"}</span>
+      {opponents.length ? <span className="text-sm text-white/75">gegen {opponents.length > 3 ? `${opponents.length} Gegner` : opponents.join(", ")}</span> : <span className="text-sm text-muted-text">Gegner steht noch nicht fest</span>}
+      {(when || station) && <span className="text-xs uppercase tracking-wider text-muted-text">{[when, station].filter(Boolean).join(" · ")}</span>}
     </button>
   );
 }
 
-function StageBracketTree({ stages, matches, regMap, podiumMap, compact = false, viewMode = "standard", layout = "auto", onMatchClick }) {
-  const isTv = viewMode === "tv";
-  const stagesForView = stages.length
-    ? stages
-    : [{ id: "__default", name: "Turnierbaum", number: 1 }];
-  const byStage = useMemo(() => {
-    const grouped = {};
-    for (const match of matches) {
-      const stageId = match.stage_id || "__default";
-      grouped[stageId] = grouped[stageId] || {};
-      const section = match.section || "MAIN";
-      grouped[stageId][section] = grouped[stageId][section] || {};
-      const round = match.round || 1;
-      grouped[stageId][section][round] = grouped[stageId][section][round] || [];
-      grouped[stageId][section][round].push(match);
-    }
-    for (const sectionMap of Object.values(grouped)) {
-      for (const roundMap of Object.values(sectionMap)) {
-        for (const list of Object.values(roundMap)) {
-          list.sort((a, b) => (a.order || 0) - (b.order || 0));
-        }
-      }
-    }
-    return grouped;
-  }, [matches]);
+/** Am Handy (#1561): laufende Spiele oben angepinnt - mit Station und Spielzeit. */
+function LiveStrip({ matches, regMap }) {
+  const live = matches.filter((match) => isLive(match));
+  if (!live.length) return null;
+  return (
+    <section data-testid="bracket-live-strip" aria-label="Läuft gerade" className="rounded-md border border-live/40 bg-live/[0.06] p-3">
+      <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-live">
+        <span className="w-1.5 h-1.5 rounded-full bg-live tv-live-dot" aria-hidden="true" /> Läuft gerade
+      </div>
+      <ul className="space-y-2">
+        <AnimatePresence initial={false}>
+          {live.map((match) => (
+            <motion.li key={match.id} layout="position" initial={{ opacity: 0, transform: "translateY(-6px)" }} animate={{ opacity: 1, transform: "translateY(0px)" }} exit={{ opacity: 0 }} transition={motionTransition("mid")}
+              className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+              <span className="font-bold text-white/85">{roundNameOf(match, match.round)} · {match.match_key}</span>
+              <span className="min-w-0 break-words text-white/75">{(match.slots || []).map((slot) => slotLabel(slot, regMap)).filter(Boolean).join(" – ")}</span>
+              <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-live">
+                {getStationLabel(match) || "läuft"}{match.started_at ? <>{" · "}<LiveClock startedAt={match.started_at} /></> : null}
+              </span>
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ul>
+    </section>
+  );
+}
 
-  const tvLayoutValue = useContext(TvLayoutContext);
-  if (isTv) {
+/** Spiele nach Phase → Abschnitt → Runde, je Runde nach Reihenfolge. */
+function groupMatches(matches) {
+  const grouped = {};
+  for (const match of matches) {
+    const stageId = match.stage_id || "__default";
+    const section = match.section || "MAIN";
+    const round = match.round || 1;
+    grouped[stageId] = grouped[stageId] || {};
+    grouped[stageId][section] = grouped[stageId][section] || {};
+    grouped[stageId][section][round] = grouped[stageId][section][round] || [];
+    grouped[stageId][section][round].push(match);
+  }
+  for (const sectionMap of Object.values(grouped)) {
+    for (const roundMap of Object.values(sectionMap)) {
+      for (const list of Object.values(roundMap)) list.sort((a, b) => (a.order || 0) - (b.order || 0));
+    }
+  }
+  return grouped;
+}
+
+const roundNumbers = (rounds) => Object.keys(rounds).map(Number).sort((a, b) => a - b);
+
+/** Eine Runde, die der Umbau ganz gestrichen hat (#1575, abgekürzt), fällt aus der Ansicht weg - wie in Vorschau 2. */
+function withoutDroppedRounds(sections) {
+  const dropped = (list) => list.length > 0 && list.every((match) => String(match.status || "").toLowerCase() === "cancelled" && match.result_meta?.source === "heat_rebuild");
+  const out = {};
+  for (const [name, rounds] of Object.entries(sections)) {
+    const kept = Object.fromEntries(Object.entries(rounds).filter(([, list]) => !dropped(list)));
+    if (Object.keys(kept).length) out[name] = kept;
+  }
+  return out;
+}
+
+/** Der Fluss zwischen den Blöcken (#399): wer verliert, wechselt in die Verliererrunde. */
+function sectionFlowHint(section, hasLoser, hasReset = false) {
+  const key = normalizeSection(section);
+  if (!hasLoser) return "";
+  if (["wb", "winner", "main"].includes(key)) return "Wer hier verliert, spielt im Loser Bracket weiter.";
+  if (sectionGroup(section) === "loser") return "Wer hier verliert, scheidet aus; der Sieger trifft im Grand Final auf den Sieger des Winner Bracket.";
+  if (["gf", "grand_final"].includes(key)) {
+    return hasReset
+      ? "Sieger der Siegerrunde gegen Sieger der Verliererrunde. Gewinnt die Verliererrunde, folgt ein Reset-Spiel - sonst entfällt es."
+      : "Sieger der Siegerrunde gegen Sieger der Verliererrunde.";
+  }
+  return "";
+}
+
+/** Gibt es in dieser Phase ein Reset-Spiel (#1549)? */
+function hasResetMatch(stageSections) {
+  return Object.values(stageSections).some((roundMap) => Object.values(roundMap).some((list) => list.some((match) => match?.settings?.bracket_reset)));
+}
+
+/** Runden-Kopf - leer, wenn er nur den Abschnitt wiederholt (#833). */
+export function roundTitle(match, number, sectionTitle = "") {
+  const title = roundNameOf(match, number);
+  return sectionTitle && title.toLowerCase() === String(sectionTitle).toLowerCase() ? "" : title;
+}
+
+/** Runden-Kopf mit Uhrzeit (#1340): „Viertelfinale · 18:30“ - die früheste geplante Zeit der Runde. */
+function roundHeading(list, number, sectionTitle) {
+  const title = roundTitle(list[0], number, sectionTitle);
+  const times = list.map((match) => match.scheduled_at).filter(Boolean)
+    .map((value) => ({ value, at: asInstant(value).getTime() })).filter((entry) => !Number.isNaN(entry.at));
+  if (!times.length || list.every((match) => isDone(match))) return title;
+  const earliest = times.reduce((best, entry) => (entry.at < best.at ? entry : best));
+  const time = viennaTime(earliest.value, { hour: "2-digit", minute: "2-digit" });
+  return [title, time].filter(Boolean).join(" · ");
+}
+
+function tableTitle(names, sections) {
+  const first = Object.values(sections[names[0]] || {}).flat()[0] || {};
+  if (names.some((name) => /^group_/i.test(name)) || first.stage_type === "round_robin_groups") return "Gruppenphase";
+  if (first.stage_type === "swiss" || /swiss/i.test(names[0])) return "Schweizer System";
+  return "Liga";
+}
+
+/** Gruppen, Liga, Swiss (#1561): kein Baum, sondern der Weg zu Tabelle und Spielplan (die Tabelle selbst: #1562). */
+function TableHint({ title, tournamentPath }) {
+  const inRouter = useInRouterContext();
+  const Anchor = ({ to, children }) => (inRouter
+    ? <Link to={to} className="tls-btn tls-btn--secondary inline-flex px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">{children}</Link>
+    : <a href={to} className="tls-btn tls-btn--secondary inline-flex px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">{children}</a>);
+  return (
+    <div data-testid="bracket-table-hint" className="rounded-md border border-white/10 bg-surface-1 p-5 space-y-3">
+      <h3 className="font-heading text-lg font-black uppercase">{title}</h3>
+      <p className="text-sm text-muted-text max-w-prose">Hier spielt jeder gegen jeden: Wer vorne liegt, steht in der Tabelle, wann wer spielt, im Spielplan.</p>
+      {tournamentPath ? (
+        <div className="flex flex-wrap gap-2">
+          <Anchor to={`${tournamentPath}/standings`}>Zur Tabelle</Anchor>
+          <Anchor to={`${tournamentPath}/matches`}>Zum Spielplan</Anchor>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function WebStages({ stages, matches, regMap, podiumMap, steps, finalMatch, tournamentPath }) {
+  const byStage = useMemo(() => groupMatches(matches), [matches]);
+  const stagesForView = stages.length ? stages : [{ id: "__default", name: "Turnierbaum", number: 1 }];
+  return stagesForView.map((stage) => {
+    const sections = withoutDroppedRounds(byStage[stage.id] || {});
+    const names = Object.keys(sections);
+    const multi = stagesForView.length > 1;
+    const heading = multi ? (
+      <div className="flex items-center gap-2 uppercase tracking-[0.2em] text-xs font-bold">
+        <span className="w-2 h-2 bg-brand" aria-hidden="true" />
+        <span className="text-white/80">{stage.name || `Phase ${stage.number || ""}`}</span>
+      </div>
+    ) : null;
+    if (!names.length) {
+      return (
+        <div key={stage.id} className="space-y-4">
+          {heading}
+          <div className="rounded-md border border-white/10 bg-surface-1 p-8 text-center text-muted-text">Noch keine Spiele</div>
+        </div>
+      );
+    }
+    const tableNames = names.filter((name) => isTableFormat(Object.values(sections[name]).flat()));
+    const treeNames = names.filter((name) => !tableNames.includes(name));
+    const champion = finalMatch && (finalMatch.stage_id || "__default") === stage.id ? finalMatch : null;
+    const hasLoser = treeNames.some((name) => sectionGroup(name) === "loser");
+    const hasReset = hasResetMatch(sections);
     return (
-      <div className="tv-tree" data-testid="tv-tree" data-season-quiet="bracket">
-        {stagesForView.map((stage) => {
-          const stageSections = byStage[stage.id] || {};
-          const blocks = Object.keys(stageSections).map((name) => ({ name, rounds: stageSections[name] }));
-          if (!blocks.length) return null;
-          const hasLoser = blocks.some((block) => ["lb", "loser"].includes(normalizeSection(block.name)));
-          const hasReset = hasResetMatch(stageSections);
-          return (
-            <section key={stage.id} className="tv-tree__stage" data-tv-stage={stage.id}>
-              {stagesForView.length > 1 ? <h3 className="tv-tree__phase tv-t-head font-heading">{stage.name || `Phase ${stage.number || ""}`}</h3> : null}
-              {arrangeTvBlocks(blocks, tvLayoutValue).map((row) => (
-                <div key={row.map((block) => block.name).join("+")} className="tv-tree__row">
-                  {row.map((block) => (
-                    <StageSection
-                      key={`${stage.id}-${block.name}`}
-                      section={block.name}
-                      rounds={block.rounds}
-                      regMap={regMap}
-                      podiumMap={podiumMap}
-                      compact={compact}
-                      viewMode={viewMode}
-                      layout={layout}
-                      onMatchClick={onMatchClick}
-                      flowHint={sectionFlowHint(block.name, hasLoser, hasReset)}
-                    />
-                  ))}
-                </div>
-              ))}
-            </section>
-          );
-        })}
+      <div key={stage.id} className="space-y-4">
+        {heading}
+        {tableNames.length ? <TableHint title={tableTitle(tableNames, sections)} tournamentPath={tournamentPath} /> : null}
+        {treeNames.length ? (steps ? (
+          <div className="space-y-8">
+            {treeNames.map((name) => (
+              <SectionSteps key={name} section={name} rounds={sections[name]} regMap={regMap} podiumMap={podiumMap} flowHint={sectionFlowHint(name, hasLoser, hasReset)} />
+            ))}
+            {champion ? <ChampionCard match={champion} regMap={regMap} /> : null}
+          </div>
+        ) : (
+          <StageCanvas stageId={stage.id} sections={sections} names={treeNames} regMap={regMap} podiumMap={podiumMap} champion={champion} hasLoser={hasLoser} hasReset={hasReset} />
+        )) : null}
       </div>
     );
-  }
+  });
+}
+
+function SectionTitle({ section, flowHint, sticky = false, fit = false }) {
+  const key = normalizeSection(section);
+  const group = sectionGroup(section);
+  // Auf der Leinwand (`fit`) höchstens so breit wie eine Karte (#1561): Titel und Erklärzeile stehen über der ersten
+  // Spalte, die Gassen daneben bleiben für die Linien frei. Am Handy (Runde für Runde) volle Breite.
+  return (
+    <div className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 ${sticky ? "sticky left-0" : ""}`} style={fit ? { maxWidth: CARD_WIDTH } : undefined} data-section-head={fit ? "" : undefined}>
+      <div className="flex items-center gap-2 uppercase tracking-[0.2em] text-xs font-bold">
+        <span className={`w-2 h-2 ${group === "loser" ? "bg-quiet" : group === "final" ? "bg-honor" : "bg-brand"}`} aria-hidden="true" />
+        <span className="text-white/80" data-testid={`bracket-section-title-${key}`}>{formatBracketSection(section)}</span>
+      </div>
+      {flowHint ? <span className="text-xs text-muted-text">{flowHint}</span> : null}
+    </div>
+  );
+}
+
+/** Am Handy (#399): eine Runde auf einmal, „Runde x von y“, vor und zurück; startet bei deinem nächsten Spiel. */
+function SectionSteps({ section, rounds, regMap, podiumMap, flowHint }) {
+  const mine = useContext(MineContext);
+  const roundNums = useMemo(() => roundNumbers(rounds), [rounds]);
+  const initial = useMemo(() => {
+    if (!mine) return 0;
+    const next = nextMatchFor(roundNums.flatMap((rn) => rounds[rn]), mine);
+    const index = next ? roundNums.indexOf(Number(next.round || 1)) : -1;
+    return index >= 0 ? index : 0;
+  }, [mine, roundNums, rounds]);
+  const [step, setStep] = useState(initial);
+  // Richtung des Blätterns: die neue Runde kommt von der Seite, in die geblättert wurde (#1561).
+  const [direction, setDirection] = useState(0);
+  const go = (to) => { setDirection(to > step ? 1 : -1); setStep(to); };
+  const current = Math.min(step, roundNums.length - 1);
+  const rn = roundNums[current];
+  return (
+    <section className="space-y-3" data-testid={`bracket-section-${normalizeSection(section)}`}>
+      <SectionTitle section={section} flowHint={flowHint} />
+      <div className="space-y-3" data-testid="bracket-steps">
+        <div className="flex items-center justify-between gap-3">
+          <button type="button" onClick={() => go(Math.max(0, current - 1))} disabled={current === 0} data-testid="bracket-step-prev" aria-label="Vorige Runde" className="tls-btn tls-btn--quiet shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-sm disabled:opacity-35"><ChevronLeft className="h-5 w-5" aria-hidden="true" /></button>
+          <div className="text-center min-w-0 flex-1">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-muted-text" data-testid="bracket-step-label">Runde {current + 1} von {roundNums.length}</div>
+            {/* Ganze Wörter (#1561): keine Silbentrennung wie sonst bei Überschriften am Handy, lieber zwei ausgeglichene Zeilen. */}
+            <div className="font-heading text-sm font-black uppercase leading-tight ![hyphens:none] [text-wrap:balance]" data-testid="bracket-round-title">{roundNameOf(rounds[rn][0], rn)}</div>
+          </div>
+          <button type="button" onClick={() => go(Math.min(roundNums.length - 1, current + 1))} disabled={current >= roundNums.length - 1} data-testid="bracket-step-next" aria-label="Nächste Runde" className="tls-btn tls-btn--quiet shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-sm disabled:opacity-35"><ChevronRight className="h-5 w-5" aria-hidden="true" /></button>
+        </div>
+        <div key={rn} className="flex flex-col gap-3" data-step-dir={direction > 0 ? "next" : direction < 0 ? "prev" : undefined}>
+          {rounds[rn].map((match) => <MatchCard key={match.id} match={match} regMap={regMap} podiumMap={podiumMap} />)}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** Der Pokal am Ende (#1340): Sieger in Gold, vorher „noch offen“. */
+function ChampionCard({ match, regMap }) {
+  const winnerId = isDone(match)
+    ? (match.winner_id || (match.results || []).find((row) => Number(row.rank) === 1)?.registration_id || null)
+    : null;
+  const name = winnerId ? slotLabel({ registration_id: winnerId }, regMap) : "";
+  const { active } = useContext(PathContext);
+  const { state: motionState } = useBracketMotionState();
+  const state = active ? (winnerId && active.ids.has(winnerId) ? "on" : "off") : "";
+  // Der Sieger-Moment: steht das Finale gerade fest, läuft einmal der goldene Schimmer über den Pokal.
+  const crowned = Boolean(winnerId) && motionState.pop.has(match.id);
+  return (
+    <div data-node={CHAMPION_ID} data-testid="bracket-champion" data-path={state || undefined} data-done={winnerId ? "1" : undefined} data-sweep={crowned ? "1" : undefined} className={`tls-bracket-champion ${crowned ? "tls-winner-sweep is-crowned" : ""}`}>
+      <Trophy className={`tls-bracket-trophy w-6 h-6 shrink-0 ${winnerId ? "text-honor" : "text-quiet"}`} aria-hidden="true" />
+      <div className="min-w-0">
+        <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-text">Sieger</div>
+        {winnerId
+          ? <div className="font-heading text-base font-black uppercase break-words text-honor">{name}</div>
+          : <div className="text-sm italic text-quiet">noch offen</div>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Die Leinwand einer Phase am Desktop: links Hauptfeld und Loser Bracket untereinander, rechts Grand Final, Pokal und
+ * Spiel um Platz 3. Die Linien liegen als ein SVG darüber und werden nur gemessen, wenn sich Daten oder Größen ändern
+ * (ResizeObserver, gebündelt in einem Frame) - nie beim Antippen eines Weges.
+ */
+function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, hasLoser, hasReset }) {
+  const canvasRef = useRef(null);
+  const contentRef = useRef(null);
+  const [geom, setGeom] = useState({ lines: [], w: 0, h: 0, key: "" });
+  const { edges, byId } = useContext(GraphContext);
+  const byIdMatch = useCallback((id) => byId.get(id), [byId]);
+  const championId = champion && isDone(champion)
+    ? (champion.winner_id || (champion.results || []).find((row) => Number(row.rank) === 1)?.registration_id || null)
+    : null;
+  const { active } = useContext(PathContext);
+  const { state: motionState } = useBracketMotionState();
+  const left = names.filter((name) => ["main", "loser"].includes(sectionGroup(name)));
+  const right = names.filter((name) => !left.includes(name));
+  const order = (list) => [...list].sort((a, b) => ["main", "loser", "final", "bronze"].indexOf(sectionGroup(a)) - ["main", "loser", "final", "bronze"].indexOf(sectionGroup(b)));
+  const stageMatchIds = useMemo(() => new Set(names.flatMap((name) => Object.values(sections[name]).flat().map((match) => match.id))), [names, sections]);
+  // Gemischte Runden dieser Phase (#1548): ihre Sammelschienen (drawRails, wie App und TV).
+  const stageRails = useMemo(() => drawRails(names.flatMap((name) => Object.values(sections[name]).flat())), [names, sections]);
+  const stageEdges = useMemo(() => {
+    const list = edges.filter((edge) => stageMatchIds.has(edge.from) && stageMatchIds.has(edge.to));
+    if (champion && stageMatchIds.has(champion.id)) list.push({ id: `${champion.id}>${CHAMPION_ID}`, from: champion.id, to: CHAMPION_ID, toSlot: 0, flow: "W", rank: 1, cross: false, void: false });
+    return list;
+  }, [edges, stageMatchIds, champion]);
+  const columnOf = useMemo(() => {
+    const map = new Map();
+    for (const name of names) roundNumbers(sections[name]).forEach((rn, index) => sections[name][rn].forEach((match) => map.set(match.id, index)));
+    return map;
+  }, [names, sections]);
+  // Liegt ein Ziel einer Gruppe in der ersten Spalte (Loser-Runde 1), braucht die Schiene links eine Gasse.
+  const busLead = stageRails.some((rail) => rail.targets.some((id) => columnOf.get(id) === 0));
+
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const base = canvas.getBoundingClientRect();
+      const ox = canvas.scrollLeft - base.left;
+      const oy = canvas.scrollTop - base.top;
+      // Alles in Leinwand-Koordinaten (mit Scroll): Karten sind die Hindernisse, die Lücken über und unter den
+      // Abschnitten die freien Querbahnen (#1561: keine Linie schneidet eine Karte).
+      const local = (rect) => ({ left: rect.left + ox, right: rect.right + ox, top: rect.top + oy, bottom: rect.bottom + oy, width: rect.width, height: rect.height });
+      const nodes = new Map();
+      canvas.querySelectorAll("[data-node]").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (rect.width) nodes.set(node.getAttribute("data-node"), local(rect));
+      });
+      const anchors = new Map();
+      canvas.querySelectorAll("[data-slot-anchor]").forEach((node) => anchors.set(node.getAttribute("data-slot-anchor"), node.getBoundingClientRect()));
+      const corridors = [];
+      canvas.querySelectorAll("section[data-testid^='bracket-section-']").forEach((node) => {
+        const rect = local(node.getBoundingClientRect());
+        if (rect.height) corridors.push(rect.top - 20, rect.bottom + 20);
+      });
+      // Auch die Köpfe der Abschnitte (Titel, Erklärzeile, Rundentitel) sind Hindernisse.
+      const heads = [];
+      canvas.querySelectorAll("[data-section-head], [data-testid='bracket-round-title']").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (rect.width) heads.push(local(rect));
+      });
+      const obstacles = [...nodes.values(), ...heads];
+      const lanes = laneCounter();
+      const lines = [];
+      const freeCorridors = corridors.filter((y) => y > 2);
+      // Sammelschienen (#1548): je gemischter Gruppe eine senkrechte Linie in der Gasse vor ihren Zielen, je Quelle ein
+      // Ast hinauf, je Ziel ein Ast hinaus - das Gerüst, das auch nach der Auslosung stehen bleibt.
+      const rails = new Map();
+      for (const rail of stageRails) {
+        const targetIds = rail.targets.filter((id) => nodes.has(id) && !isCancelled(byIdMatch(id)));
+        if (!targetIds.length) continue;
+        const section = String(byIdMatch(targetIds[0])?.section || "");
+        const sourceIds = [...new Set(rail.sources.map((source) => source.id))].filter((id) => nodes.has(id) && !isCancelled(byIdMatch(id)));
+        const sources = sourceIds.map((id) => ({ id, rect: nodes.get(id), cross: String(byIdMatch(id)?.section || "") !== section }));
+        const slotYs = [];
+        for (const id of targetIds) {
+          for (const slot of byIdMatch(id)?.slots || []) {
+            const anchor = anchors.get(`${id}:${slot.slot}`);
+            if (anchor && anchor.height) slotYs.push(anchor.top + anchor.height / 2 + oy);
+          }
+        }
+        const bus = routeBus({ sources, targets: targetIds.map((id) => ({ id, rect: nodes.get(id) })), slotYs, obstacles, corridors: freeCorridors, gap: COLUMN_GAP, lanes });
+        rails.set(rail.key, bus);
+        const column = columnOf.get(targetIds[0]) || 0;
+        const node = `rail:${rail.key}`;
+        lines.push({ id: `${node}:spine`, from: node, to: node, flow: "W", spine: rail.key, railGroup: rail.group, d: toPath(bus.spine), column });
+        for (const source of sources) {
+          const flow = rail.sources.find((entry) => entry.id === source.id)?.flow || "W";
+          lines.push({ id: `${node}:in:${source.id}`, from: source.id, to: node, flow, cross: source.cross, scaffold: "in", railKey: `${rail.key}:${source.id}`, rail: rail.key, d: toPath(bus.branchesIn.get(source.id)), column: columnOf.get(source.id) || 0 });
+        }
+        for (const id of targetIds) {
+          lines.push({ id: `${node}:out:${id}`, from: node, to: id, flow: "W", scaffold: "out", rail: rail.key, d: toPath(bus.branchesOut.get(id)), column });
+        }
+      }
+      for (const edge of stageEdges) {
+        const a = nodes.get(edge.from);
+        const b = nodes.get(edge.to);
+        if (!a || !b) continue;
+        const anchor = anchors.get(`${edge.to}:${edge.toSlot}`);
+        if (edge.rail && rails.has(edge.rail)) {
+          // Der echte Weg eines Spielers nach der Auslosung: Ast aus der Quelle, die Schiene entlang, Ast in den Platz.
+          const points = rails.get(edge.rail).via(a, edge.cross, anchor && anchor.height ? anchor.top + anchor.height / 2 + oy : b.top + b.height / 2, b);
+          lines.push({ ...edge, d: toPath(points), column: columnOf.get(edge.from) || 0 });
+          continue;
+        }
+        const drop = edge.flow === "L" && edge.cross;
+        const points = routeEdge({
+          a, b, obstacles, lanes, gap: COLUMN_GAP,
+          corridors: freeCorridors,
+          toY: anchor && anchor.height ? anchor.top + anchor.height / 2 + oy : undefined,
+          // Der Abstieg beginnt unten an der Karte - so liegt er nicht auf dem Knick des Siegers.
+          fromY: drop ? a.bottom - 10 : undefined,
+          preferCorridor: drop,
+        });
+        lines.push({ ...edge, d: toPath(points), column: columnOf.get(edge.from) || 0 });
+      }
+      const w = canvas.scrollWidth;
+      const h = canvas.scrollHeight;
+      const key = `${w}x${h}|${lines.map((line) => `${line.id}:${line.d}`).join(";")}`;
+      setGeom((current) => (current.key === key ? current : { lines, w, h, key }));
+    };
+    const schedule = () => {
+      if (frame || typeof requestAnimationFrame !== "function") { if (!frame) measure(); return; }
+      frame = requestAnimationFrame(measure);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(schedule);
+    if (contentRef.current) observer.observe(contentRef.current);
+    canvas.querySelectorAll("[data-node]").forEach((node) => observer.observe(node));
+    return () => {
+      observer.disconnect();
+      if (frame && typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame);
+    };
+  }, [stageEdges, stageRails, columnOf, sections, byIdMatch]);
+
+  const block = (name) => (
+    <section key={name} className="space-y-3" data-testid={`bracket-section-${normalizeSection(name)}`}>
+      <SectionTitle section={name} flowHint={sectionFlowHint(name, hasLoser, hasReset)} sticky={left.includes(name)} fit />
+      <div className="flex items-stretch" style={{ gap: COLUMN_GAP }}>
+        {roundNumbers(sections[name]).map((rn) => (
+          <div key={rn} className="flex shrink-0 flex-col" style={{ width: CARD_WIDTH }}>
+            <div className="mb-3 min-h-[1rem] px-1 text-[11px] font-bold uppercase tracking-wider text-muted-text" data-testid="bracket-round-title">
+              {roundHeading(sections[name][rn], rn, formatBracketSection(name))}
+            </div>
+            <div className="flex flex-1 flex-col justify-around gap-4">
+              {sections[name][rn].map((match) => <MatchCard key={match.id} match={match} regMap={regMap} podiumMap={podiumMap} />)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 
   return (
-    <div className="space-y-10" data-season-quiet="bracket">
+    <div ref={canvasRef} className="tls-bracket-canvas relative overflow-x-auto pb-4" data-testid="bracket-tree" data-stage={stageId}>
+      <svg className="pointer-events-none absolute left-0 top-0" width={geom.w || "100%"} height={geom.h || "100%"} aria-hidden="true" data-testid="bracket-connectors">
+        {geom.lines.map((line) => {
+          // Gerüst der Schiene: an, solange dein Weg (noch vor der Auslosung) hierher führt - danach leuchtet der echte Weg.
+          const onRail = !active ? false
+            : line.spine ? [...(active.rails || [])].some((key) => key.startsWith(`${line.spine}:`))
+              : line.scaffold === "in" ? active.rails?.has(line.railKey) : false;
+          const state = active ? (onRail || active.edges.has(line.id) || (line.to === CHAMPION_ID && championId && active.ids.has(championId)) ? "on" : "off") : "";
+          const fresh = line.spine || line.scaffold ? undefined : motionState.fresh.get(`${line.from}>${line.to}`);
+          const quiet = line.flow === "L" && line.cross;
+          const real = Boolean(line.rail && !line.scaffold && !line.spine);
+          return (
+            <path
+              key={line.id}
+              d={line.d}
+              pathLength={line.void || (quiet && fresh == null && !real) ? undefined : "1"}
+              className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : fresh != null ? "tls-bracket-line--fresh" : real ? "tls-bracket-line--real" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
+              style={{ "--tls-i": line.column, ...(fresh != null ? { "--tls-fresh-delay": `${fresh.delay}ms`, "--tls-fresh-duration": `${fresh.duration}ms` } : null) }}
+              data-rail-spine={line.spine || undefined}
+              data-rail-group={line.railGroup || undefined}
+              data-real={real ? "1" : undefined}
+              data-to-slot={line.toSlot || undefined}
+              data-from={line.from}
+              data-to={line.to}
+              data-flow={line.flow}
+              data-cross={quiet ? "1" : undefined}
+              data-void={line.void ? "1" : undefined}
+              data-path={state || undefined}
+              data-fresh={fresh != null ? "1" : undefined}
+            />
+          );
+        })}
+      </svg>
+      <div ref={contentRef} className="relative grid w-max items-center" data-rail-lead={busLead ? "1" : undefined} style={{ gridTemplateColumns: right.length || champion ? "max-content max-content" : "max-content", columnGap: COLUMN_GAP, paddingLeft: busLead ? COLUMN_GAP : undefined }}>
+        <div className="space-y-10">{order(left).map(block)}</div>
+        {right.length || champion ? (
+          <div className="flex flex-col justify-center gap-10">
+            {order(right).filter((name) => sectionGroup(name) === "final").map(block)}
+            {champion ? <div style={{ width: CARD_WIDTH }}><ChampionCard match={champion} regMap={regMap} /></div> : null}
+            {order(right).filter((name) => sectionGroup(name) !== "final").map(block)}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------- TV
+
+function TvStageTree({ stages, matches, regMap, podiumMap, compact, onMatchClick }) {
+  const stagesForView = stages.length ? stages : [{ id: "__default", name: "Turnierbaum", number: 1 }];
+  const byStage = useMemo(() => groupMatches(matches), [matches]);
+  const tvLayoutValue = useContext(TvLayoutContext);
+  return (
+    <div className="tv-tree" data-testid="tv-tree" data-season-quiet="bracket">
       {stagesForView.map((stage) => {
         const stageSections = byStage[stage.id] || {};
-        const sectionNames = Object.keys(stageSections);
-        const hasLoser = sectionNames.some((name) => ["lb", "loser"].includes(normalizeSection(name)));
+        const blocks = Object.keys(stageSections).map((name) => ({ name, rounds: stageSections[name] }));
+        if (!blocks.length) return null;
+        const hasLoser = blocks.some((block) => sectionGroup(block.name) === "loser");
         const hasReset = hasResetMatch(stageSections);
         return (
-          <div key={stage.id} className="space-y-6">
-            {stagesForView.length > 1 && (
-              <div className="flex items-center gap-2 uppercase tracking-[0.2em] text-xs font-bold">
-                <span className="w-2 h-2 bg-[#29B6E8]" />
-                <span className="text-white/80">{stage.name || `Phase ${stage.number || ""}`}</span>
+          <section key={stage.id} className="tv-tree__stage" data-tv-stage={stage.id}>
+            {stagesForView.length > 1 ? <h3 className="tv-tree__phase tv-t-head font-heading">{stage.name || `Phase ${stage.number || ""}`}</h3> : null}
+            {arrangeTvBlocks(blocks, tvLayoutValue).map((row) => (
+              <div key={row.map((block) => block.name).join("+")} className="tv-tree__row">
+                {row.map((block) => (
+                  <TvSection key={`${stage.id}-${block.name}`} section={block.name} rounds={block.rounds} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} flowHint={sectionFlowHint(block.name, hasLoser, hasReset)} />
+                ))}
               </div>
-            )}
-            {sectionNames.map((section) => (
-              <StageSection
-                key={`${stage.id}-${section}`}
-                section={section}
-                rounds={stageSections[section]}
-                regMap={regMap}
-                podiumMap={podiumMap}
-                compact={compact}
-                viewMode={viewMode}
-                layout={layout}
-                onMatchClick={onMatchClick}
-                flowHint={sectionFlowHint(section, hasLoser, hasReset)}
-              />
             ))}
-            {sectionNames.length === 0 && (
-              <div className="border border-white/10 rounded-sm bg-[#121212] p-8 text-center text-white/40">
-                Noch keine Spiele generiert
-              </div>
-            )}
-          </div>
+          </section>
         );
       })}
     </div>
@@ -348,180 +782,67 @@ function arrangeTvRows(blocks, columns) {
   return rows.map((row) => row.blocks);
 }
 
-/** Der Fluss zwischen den Blöcken (#399): wer verliert, wechselt in die Verliererrunde. */
-function sectionFlowHint(section, hasLoser, hasReset = false) {
-  const key = normalizeSection(section);
-  if (!hasLoser) return "";
-  if (["wb", "winner", "main"].includes(key)) return "Wer hier verliert, spielt in der Verliererrunde weiter.";
-  if (["lb", "loser"].includes(key)) return "Wer hier verliert, scheidet aus; der Sieger trifft im Großen Finale auf den Sieger der Siegerrunde.";
-  if (["gf", "grand_final"].includes(key)) {
-    return hasReset
-      ? "Sieger der Siegerrunde gegen Sieger der Verliererrunde. Gewinnt die Verliererrunde, folgt ein Reset-Spiel - sonst entfällt es."
-      : "Sieger der Siegerrunde gegen Sieger der Verliererrunde.";
-  }
-  return "";
-}
-
-/** Gibt es in dieser Phase ein Reset-Spiel (#1549)? */
-function hasResetMatch(stageSections) {
-  return Object.values(stageSections).some((roundMap) => Object.values(roundMap).some((list) => list.some((match) => match?.settings?.bracket_reset)));
-}
-
-function MatchNode({ match, regMap, podiumMap, compact, onMatchClick }) {
+function TvMatchNode({ match, regMap, podiumMap }) {
   const Custom = useContext(NodeRendererContext);
   const findMatch = useContext(FinderContext)(match);
   if (Custom) return <Custom match={match} regMap={regMap} podiumMap={podiumMap} findMatch={findMatch} />;
-  const isDuel = (match.match_type || "duel") === "duel" && (match.slots || []).length <= 2;
-  const Node = isDuel ? V2DuelNode : HeatNode;
-  return <Node match={match} regMap={regMap} podiumMap={podiumMap} compact={compact} onClick={onMatchClick} />;
+  return <MatchCard match={match} regMap={regMap} podiumMap={podiumMap} />;
 }
 
-function useIsNarrow() {
-  const [narrow, setNarrow] = useState(() => (typeof window !== "undefined" && typeof window.matchMedia === "function" ? !window.matchMedia("(min-width: 768px)").matches : false));
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
-    const query = window.matchMedia("(min-width: 768px)");
-    const update = () => setNarrow(!query.matches);
-    update();
-    query.addEventListener?.("change", update);
-    return () => query.removeEventListener?.("change", update);
-  }, []);
-  return narrow;
-}
-
-function StageSection({ section, rounds, regMap, podiumMap, compact, viewMode, layout, onMatchClick, flowHint }) {
-  const isTv = viewMode === "tv";
-  const roundNums = Object.keys(rounds).map(Number).sort((a, b) => a - b);
+function TvSection({ section, rounds, regMap, podiumMap, onMatchClick }) {
+  const roundNums = roundNumbers(rounds);
   const asTable = isTableFormat(roundNums.flatMap((rn) => rounds[rn]));
-  const narrow = useIsNarrow();
-  const steps = !isTv && !asTable && (layout === "steps" || (layout === "auto" && narrow));
   const { columns: tvColumns } = useContext(TvLayoutContext);
-
-  if (isTv) {
-    const key = normalizeSection(section);
-    return (
-      <div className="tv-block" data-testid={`bracket-section-${key}`} data-tv-block={key}>
-        <div className="tv-block__title">
-          <span className="tv-block__mark" aria-hidden="true" />
-          <span className="tv-t-head font-heading" data-testid={`bracket-section-title-${key}`}>{formatBracketSection(section)}</span>
-        </div>
-        {asTable ? (
-          // Spieltage untereinander, die Spiele eines Spieltags als Raster - so breit wie das Bild.
-          <div className="tv-table" style={{ "--tv-table-cols": Math.max(1, Math.min(tvColumns, ...roundNums.map((rn) => rounds[rn].length))) }}>
-            {roundNums.map((rn) => (
-              <div key={rn} className="tv-table__day" data-tv-round={rn}>
-                <div className="tv-ko__round tv-t-meta">{formatRoundName(rounds[rn][0].round_name, rn)}</div>
-                <div className="tv-table__grid">
-                  {rounds[rn].map((match) => (
-                    <div key={match.id} className="tv-ko__card" data-tv-card={match.id}>
-                      <MatchNode match={match} regMap={regMap} podiumMap={podiumMap} compact onMatchClick={onMatchClick} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <KnockoutTree roundNums={roundNums} rounds={rounds} regMap={regMap} podiumMap={podiumMap} compact onMatchClick={onMatchClick} sectionTitle={formatBracketSection(section)} isTv />
-        )}
-      </div>
-    );
-  }
-
+  const key = normalizeSection(section);
   return (
-    <div className="space-y-3" data-testid={`bracket-section-${normalizeSection(section)}`}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <div className="flex items-center gap-2 uppercase tracking-[0.2em] text-xs font-bold">
-          <span className="w-2 h-2 bg-[#FFD700]" />
-          <span className="text-white/80" data-testid={`bracket-section-title-${normalizeSection(section)}`}>{formatBracketSection(section)}</span>
-        </div>
-        {flowHint ? <span className="text-xs text-white/40">{flowHint}</span> : null}
+    <div className="tv-block" data-testid={`bracket-section-${key}`} data-tv-block={key}>
+      <div className="tv-block__title">
+        <span className="tv-block__mark" aria-hidden="true" />
+        <span className="tv-t-head font-heading" data-testid={`bracket-section-title-${key}`}>{formatBracketSection(section)}</span>
       </div>
-
       {asTable ? (
-        // Spieltage untereinander: an einem Spieltag spielen alle gleichzeitig,
-        // es gibt keinen Fluss von links nach rechts.
-        <div className="space-y-5">
+        // Spieltage untereinander, die Spiele eines Spieltags als Raster - so breit wie das Bild.
+        <div className="tv-table" style={{ "--tv-table-cols": Math.max(1, Math.min(tvColumns, ...roundNums.map((rn) => rounds[rn].length))) }}>
           {roundNums.map((rn) => (
-            <div key={rn} className="space-y-2">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 px-2">
-                {formatRoundName(rounds[rn][0].round_name, rn)}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 md:gap-4">
+            <div key={rn} className="tv-table__day" data-tv-round={rn}>
+              <div className="tv-ko__round tv-t-meta">{roundNameOf(rounds[rn][0], rn)}</div>
+              <div className="tv-table__grid">
                 {rounds[rn].map((match) => (
-                  <MatchNode key={match.id} match={match} regMap={regMap} podiumMap={podiumMap}
-                             compact={compact} onMatchClick={onMatchClick} />
+                  <div key={match.id} className="tv-ko__card" data-tv-card={match.id}>
+                    <TvMatchNode match={match} regMap={regMap} podiumMap={podiumMap} onMatchClick={onMatchClick} />
+                  </div>
                 ))}
               </div>
             </div>
           ))}
         </div>
-      ) : steps ? (
-        <RoundSteps roundNums={roundNums} rounds={rounds} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} />
       ) : (
-        <KnockoutTree roundNums={roundNums} rounds={rounds} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} sectionTitle={formatBracketSection(section)} />
+        <TvKnockoutTree roundNums={roundNums} rounds={rounds} regMap={regMap} podiumMap={podiumMap} sectionTitle={formatBracketSection(section)} />
       )}
     </div>
   );
 }
 
-/** Am Handy (#399): eine Runde auf einmal, „Runde x von y“, vor und zurück. */
-function RoundSteps({ roundNums, rounds, regMap, podiumMap, compact, onMatchClick }) {
-  const mine = useContext(MineContext);
-  const initial = useMemo(() => {
-    if (!mine) return 0;
-    const next = nextMatchFor(roundNums.flatMap((rn) => rounds[rn]), mine);
-    const index = next ? roundNums.indexOf(Number(next.round || 1)) : -1;
-    return index >= 0 ? index : 0;
-  }, [mine, roundNums, rounds]);
-  const [step, setStep] = useState(initial);
-  const current = Math.min(step, roundNums.length - 1);
-  const rn = roundNums[current];
-  return (
-    <div className="space-y-3" data-testid="bracket-steps">
-      <div className="flex items-center justify-between gap-3">
-        <button type="button" onClick={() => setStep(Math.max(0, current - 1))} disabled={current === 0} data-testid="bracket-step-prev" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-35">← Vorige</button>
-        <div className="text-center min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-white/50" data-testid="bracket-step-label">Runde {current + 1} von {roundNums.length}</div>
-          <div className="font-heading text-base font-black uppercase truncate">{formatRoundName(rounds[rn][0].round_name, rn)}</div>
-        </div>
-        <button type="button" onClick={() => setStep(Math.min(roundNums.length - 1, current + 1))} disabled={current >= roundNums.length - 1} data-testid="bracket-step-next" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-35">Nächste →</button>
-      </div>
-      <div className="flex flex-col gap-3">
-        {rounds[rn].map((match) => (
-          <MatchNode key={match.id} match={match} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /**
- * Am Desktop (#399): Spalten je Runde, Knoten gleichmäßig verteilt, dazwischen gemessene
- * Verbindungslinien (Klammern). Wer weiterkommt, speist das Spiel, dessen Position der
- * Reihenfolge entspricht - bei halbierenden Runden je zwei, bei gleich großen je eines.
+ * TV: Spalten je Runde mit gemessenen Linien von Karte zu Karte. Die Ziele kommen aus den echten Quellen (#1561) -
+ * nur die Linien der Sieger innerhalb des Blocks, je Paar Karten eine.
  */
-export function connectorTargets(countFrom, countTo) {
-  if (!countFrom || !countTo || countTo > countFrom) return [];
-  return Array.from({ length: countFrom }, (_, index) => Math.min(countTo - 1, Math.floor((index * countTo) / countFrom)));
-}
-
-/** Runden-Kopf - leer, wenn er nur den Abschnitt wiederholt (#833). */
-export function roundTitle(match, number, sectionTitle = "") {
-  const title = formatRoundName(match?.round_name, number);
-  return sectionTitle && title.toLowerCase() === String(sectionTitle).toLowerCase() ? "" : title;
-}
-
-function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchClick, sectionTitle = "", isTv = false }) {
+function TvKnockoutTree({ roundNums, rounds, regMap, podiumMap, sectionTitle = "" }) {
   const containerRef = useRef(null);
   const nodeRefs = useRef(new Map());
   const [lines, setLines] = useState([]);
-  const { ids: pathIds } = useContext(PathContext);
-  const playersByMatch = useMemo(() => {
-    const map = new Map();
-    for (const rn of roundNums) for (const match of rounds[rn]) map.set(match.id, (match.slots || []).map((slot) => slot.registration_id).filter(Boolean));
-    return map;
-  }, [roundNums, rounds]);
+  const { edges } = useContext(GraphContext);
+  const pairs = useMemo(() => {
+    const column = new Map();
+    roundNums.forEach((rn, index) => rounds[rn].forEach((match) => column.set(match.id, index)));
+    const seen = new Set();
+    return edges.filter((edge) => {
+      const key = `${edge.from}>${edge.to}`;
+      if (edge.flow !== "W" || !column.has(edge.from) || !column.has(edge.to) || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).map((edge) => ({ from: edge.from, to: edge.to, round: column.get(edge.from) }));
+  }, [edges, roundNums, rounds]);
 
   const register = (id) => (node) => {
     if (node) nodeRefs.current.set(id, node);
@@ -537,22 +858,16 @@ function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchCl
       const scale = container.offsetWidth ? base.width / container.offsetWidth : 1;
       const local = (value) => value / (scale || 1);
       const next = [];
-      for (let index = 0; index < roundNums.length - 1; index += 1) {
-        const from = rounds[roundNums[index]];
-        const to = rounds[roundNums[index + 1]];
-        const targets = connectorTargets(from.length, to.length);
-        from.forEach((match, position) => {
-          const target = to[targets[position]];
-          const a = nodeRefs.current.get(match.id)?.getBoundingClientRect();
-          const b = target ? nodeRefs.current.get(target.id)?.getBoundingClientRect() : null;
-          if (!a || !b || !a.width || !b.width) return;
-          const x1 = local(a.right - base.left) + container.scrollLeft;
-          const y1 = local(a.top + a.height / 2 - base.top) + container.scrollTop;
-          const x2 = local(b.left - base.left) + container.scrollLeft;
-          const y2 = local(b.top + b.height / 2 - base.top) + container.scrollTop;
-          const mid = x1 + (x2 - x1) / 2;
-          next.push({ id: `${match.id}-${target.id}`, from: match.id, to: target.id, round: index, d: `M${x1} ${y1} H${mid} V${y2} H${x2}` });
-        });
+      for (const pair of pairs) {
+        const a = nodeRefs.current.get(pair.from)?.getBoundingClientRect();
+        const b = nodeRefs.current.get(pair.to)?.getBoundingClientRect();
+        if (!a || !b || !a.width || !b.width) continue;
+        const x1 = local(a.right - base.left) + container.scrollLeft;
+        const y1 = local(a.top + a.height / 2 - base.top) + container.scrollTop;
+        const x2 = local(b.left - base.left) + container.scrollLeft;
+        const y2 = local(b.top + b.height / 2 - base.top) + container.scrollTop;
+        const mid = x1 + (x2 - x1) / 2;
+        next.push({ id: `${pair.from}-${pair.to}`, from: pair.from, to: pair.to, round: pair.round, d: `M${x1} ${y1} H${mid} V${y2} H${x2}` });
       }
       setLines(next);
     };
@@ -562,33 +877,25 @@ function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchCl
     observer.observe(container);
     for (const node of nodeRefs.current.values()) observer.observe(node);
     return () => observer.disconnect();
-  }, [roundNums, rounds]);
+  }, [pairs]);
 
   return (
-    <div ref={containerRef} className={isTv ? "tv-ko" : "relative overflow-x-auto pb-4"} data-testid="bracket-tree">
+    <div ref={containerRef} className="tv-ko" data-testid="bracket-tree">
       <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%" aria-hidden="true" data-testid="bracket-connectors">
-        {lines.map((line) => {
-          // Eine Linie liegt auf dem Weg, wenn die Person in beiden Partien steht (#833).
-          const state = pathIds && pathIds.size
-            ? ((playersByMatch.get(line.from) || []).some((id) => pathIds.has(id) && (playersByMatch.get(line.to) || []).includes(id)) ? "on" : "off")
-            : "";
-          return (
-            // Die Linien zeichnen sich beim ersten Erscheinen einmal, Runde für Runde (#1076).
-            <path key={line.id} d={line.d} fill="none" pathLength="1" className="tls-bracket-line tls-bracket-line--draw" style={{ "--tls-i": line.round }} data-path={state || undefined} data-from={line.from} data-to={line.to}
-              stroke={state === "on" ? "rgba(41,182,232,0.85)" : "rgba(255,255,255,0.22)"} strokeWidth={state === "on" ? 2.5 : 2} />
-          );
-        })}
+        {lines.map((line) => (
+          // Die Linien zeichnen sich beim ersten Erscheinen einmal, Runde für Runde (#1076).
+          <path key={line.id} d={line.d} fill="none" pathLength="1" className="tls-bracket-line tls-bracket-line--draw" style={{ "--tls-i": line.round }} data-from={line.from} data-to={line.to}
+            stroke="rgba(255,255,255,0.22)" strokeWidth={2} />
+        ))}
       </svg>
-      <div className={isTv ? "tv-ko__cols" : "flex items-stretch"} style={isTv ? undefined : { gap: COLUMN_GAP, minWidth: "max-content" }}>
+      <div className="tv-ko__cols">
         {roundNums.map((rn) => (
-          <div key={rn} className={isTv ? "tv-ko__col" : `flex flex-col ${compact ? "w-[228px]" : "w-[272px]"} shrink-0`} data-tv-round={isTv ? rn : undefined}>
-            <div className={isTv ? "tv-ko__round tv-t-meta" : "text-[11px] font-bold uppercase tracking-wider text-white/50 px-2 mb-3 sticky top-0 min-h-[1rem]"}>
-              {roundTitle(rounds[rn][0], rn, sectionTitle)}
-            </div>
-            <div className={isTv ? "tv-ko__cards" : "flex flex-col justify-around flex-1 gap-4"}>
+          <div key={rn} className="tv-ko__col" data-tv-round={rn}>
+            <div className="tv-ko__round tv-t-meta">{roundTitle(rounds[rn][0], rn, sectionTitle)}</div>
+            <div className="tv-ko__cards">
               {rounds[rn].map((match) => (
-                <div key={match.id} ref={register(match.id)} className={isTv ? "tv-ko__card" : "relative"} data-tv-card={isTv ? match.id : undefined}>
-                  <MatchNode match={match} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} />
+                <div key={match.id} ref={register(match.id)} className="tv-ko__card" data-tv-card={match.id}>
+                  <TvMatchNode match={match} regMap={regMap} podiumMap={podiumMap} />
                 </div>
               ))}
             </div>
@@ -597,311 +904,4 @@ function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchCl
       </div>
     </div>
   );
-}
-
-function formatNodeDateTime(value) {
-  if (!value) return "";
-  const date = asInstant(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return viennaDateTime(date, { dateStyle: "short", timeStyle: "short" });
-}
-
-function getStationLabel(match) {
-  const station = match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
-  if (!station) return "";
-  return /^station\b/i.test(station) ? station : `Station ${station}`;
-}
-
-/** Name im Knoten: die Anmeldung, sonst leer - ein Setzplatz vor dem Start zeigt nichts (Betreiber, 23.09.). */
-function slotLabel(slot, regMap) {
-  const reg = regMap.get(slot?.registration_id);
-  const user = reg?.user || {};
-  if (reg) return reg.display_name || user.display_name || reg.ingame_name || "-";
-  return "";
-}
-
-function isBye(slot) {
-  return ["bye", "walkover"].includes(String(slot?.status || "").toLowerCase());
-}
-
-/** Klartext für einen leeren Platz einer späteren Runde (#1113) - Setzplätze und Unbekanntes bleiben leer. */
-function pendingLabel(slot, findMatch) {
-  const info = describeSlot(slot, () => "", findMatch);
-  return info.kind === "pending" ? info.label : "";
-}
-
-function LiveStatus({ status, resetMatch = false }) {
-  const finished = useContext(FinishedContext);
-  const isLive = LIVE_STATUSES.has(String(status || "").toLowerCase());
-  // Ein Reset-Spiel, das nicht nötig war (#1549): der Sieger der Siegerrunde hat das erste Finale gewonnen.
-  if (resetMatch && String(status || "").toLowerCase() === "cancelled") {
-    return <span className="text-white/35" data-testid="bracket-reset-not-needed">nicht nötig</span>;
-  }
-  if (finished && !DONE_STATUSES.has(String(status || "").toLowerCase())) {
-    return <span className="text-white/35" data-testid="bracket-not-played">nicht gespielt</span>;
-  }
-  return (
-    <span className={`inline-flex items-center gap-1.5 ${isLive ? "text-live" : ""}`} data-live={isLive ? "1" : undefined}>
-      {isLive && <span className="w-1.5 h-1.5 rounded-full bg-live tv-live-dot" />}
-      {formatMatchStatus(status)}
-    </span>
-  );
-}
-
-function MatchMeta({ match, compact = false }) {
-  const time = formatNodeDateTime(match?.scheduled_at);
-  const station = getStationLabel(match);
-  const duration = useContext(DurationContext)(match);
-  if (!time && !station && !duration) return null;
-  return (
-    <div className={`border-t border-white/5 bg-[#050505]/40 ${compact ? "px-2.5 py-1" : "px-3 py-1.5"} text-[11px] text-white/50 flex flex-wrap gap-x-3 gap-y-1`}>
-      {time && <span>{time}</span>}
-      {duration && <span>{duration} Min.</span>}
-      {station && <span className="text-[#29B6E8]">{station}</span>}
-    </div>
-  );
-}
-
-function V2DuelNode({ match, regMap, podiumMap, compact = false, onClick }) {
-  const mine = useContext(MineContext);
-  const resultMap = new Map((match.results || []).map((r) => [r.registration_id, r]));
-  const slots = [...(match.slots || [])].slice(0, 2);
-  while (slots.length < 2) {
-    slots.push({ slot: slots.length + 1, registration_id: null, status: "empty" });
-  }
-  const nodePodium = topPodiumRank(slots.map((slot) => slot.registration_id), podiumMap);
-  const changed = useMatchChanged(match.id);
-  const isMine = Boolean(mine) && slots.some((slot) => slot.registration_id === mine);
-  const done = DONE_STATUSES.has(String(match.status || "").toLowerCase());
-  const { ids: pathIds, show } = useContext(PathContext);
-  const finished = useContext(FinishedContext);
-  const players = slots.map((slot) => slot.registration_id).filter(Boolean);
-  const onPath = pathState(pathIds, players);
-  const live = !finished && LIVE_STATUSES.has(String(match.status || "").toLowerCase());
-  const findMatch = useContext(FinderContext)(match);
-
-  return (
-    <button
-      type="button"
-      onClick={() => onClick?.(match)}
-      onFocus={(event) => players.length && keyboardFocus(event.currentTarget) && show(new Set(players))}
-      onBlur={() => show(null)}
-      data-testid={`bracket-match-v2-${match.id}`}
-      data-changed={changed ? "true" : undefined}
-      data-mine={isMine ? "true" : undefined}
-      data-path={onPath || undefined}
-      className={`tls-bracket-node relative w-full text-left rounded-md overflow-hidden border ${podiumBorderClass(nodePodium)} ${isMine ? "ring-1 ring-[#FFD700]/60" : ""} hover:border-[#29B6E8]/60 transition-all group ${changed ? "tls-changed-frame" : ""} ${live ? "tls-bracket-live" : ""}`}
-    >
-      <div className={`${compact ? "px-2.5 py-1" : "px-3 py-1.5"} flex items-center justify-between gap-2 border-b border-white/5`}>
-        <span className="text-[11px] font-bold tracking-wider text-white/55">{match.match_key || "Spiel"}{isMine ? <span className="ml-2 text-[#FFD700]">Du</span> : null}</span>
-        <span className="text-[11px] text-white/45"><LiveStatus status={match.status} resetMatch={Boolean(match.settings?.bracket_reset)} /></span>
-      </div>
-      {slots.map((slot, index) => {
-        const reg = regMap.get(slot.registration_id);
-        const user = reg?.user || {};
-        const result = resultMap.get(slot.registration_id);
-        const isWinner = done && Boolean(result?.rank === 1 || result?.qualified);
-        return (
-          <Row
-            key={slot.slot || index}
-            registrationId={slot.registration_id}
-            label={slotLabel(slot, regMap)}
-            pending={reg ? "" : pendingLabel(slot, findMatch)}
-            empty={!reg}
-            bye={isBye(slot)}
-            score={done || result ? (result?.score ?? result?.points ?? 0) : null}
-            isWinner={isWinner}
-            // Trifft das Ergebnis gerade ein, läuft einmal ein goldener Schimmer über die Siegerzeile (#1076).
-            sweep={changed && isWinner}
-            isLoser={done && reg && !isWinner}
-            isMine={Boolean(mine) && slot.registration_id === mine}
-            podiumRank={podiumMap?.get(slot.registration_id)}
-            avatar={user.avatar_url || reg?.avatar_url}
-            compact={compact}
-          />
-        );
-      })}
-      <MatchMeta match={match} compact={compact} />
-    </button>
-  );
-}
-
-/** Durchgang (FFA, #399): Titel mit Spielerzahl und Weiterkommern, vor dem Spiel keine „Platz“-Zeile. */
-function HeatNode({ match, regMap, podiumMap, compact = false, onClick }) {
-  const mine = useContext(MineContext);
-  const resultMap = new Map((match.results || []).map((r) => [r.registration_id, r]));
-  const nodePodium = topPodiumRank((match.slots || []).map((slot) => slot.registration_id), podiumMap);
-  const changed = useMatchChanged(match.id);
-  const slots = match.slots || [];
-  const qualifiers = Number((match.settings || {}).qualifiers_per_match || 0);
-  const played = slots.some((slot) => resultMap.has(slot.registration_id));
-  const rows = played
-    ? [...slots].sort((a, b) => (resultMap.get(a.registration_id)?.rank || 99) - (resultMap.get(b.registration_id)?.rank || 99))
-    : slots;
-  const filled = slots.filter((slot) => slot.registration_id).length;
-  const isMine = Boolean(mine) && slots.some((slot) => slot.registration_id === mine);
-  // Zweizeilig statt abgeschnitten (#833): oben der Name, darunter Spielerzahl und Weiterkommer.
-  const name = match.match_type === "ffa" ? `Durchgang ${match.match_key || ""}`.trim() : (match.match_key || "Spiel");
-  const meta = [`${filled || slots.length} Spieler`, qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : null].filter(Boolean).join(" · ");
-  const { ids: pathIds, show } = useContext(PathContext);
-  const finished = useContext(FinishedContext);
-  const players = slots.map((slot) => slot.registration_id).filter(Boolean);
-  const onPath = pathState(pathIds, players);
-  const live = !finished && LIVE_STATUSES.has(String(match.status || "").toLowerCase());
-  const findMatch = useContext(FinderContext)(match);
-  return (
-    <button
-      type="button"
-      onClick={() => onClick?.(match)}
-      onFocus={(event) => players.length && keyboardFocus(event.currentTarget) && show(new Set(players))}
-      onBlur={() => show(null)}
-      data-testid={`bracket-heat-${match.id}`}
-      data-changed={changed ? "true" : undefined}
-      data-mine={isMine ? "true" : undefined}
-      data-path={onPath || undefined}
-      className={`tls-bracket-node relative w-full text-left rounded-md overflow-hidden border ${podiumBorderClass(nodePodium)} ${isMine ? "ring-1 ring-[#FFD700]/60" : ""} hover:border-[#29B6E8]/60 transition-all group bg-[#0A0A0A] ${changed ? "tls-changed-frame" : ""} ${live ? "tls-bracket-live" : ""}`}
-    >
-      <div className={`${compact ? "px-2.5 py-1.5" : "px-3 py-2"} border-b border-white/5 flex items-start justify-between gap-2`}>
-        <div className="min-w-0">
-          <div className="text-xs font-bold text-white/85 truncate" data-testid={`bracket-heat-title-${match.id}`}>{name}</div>
-          <div className="text-[10px] text-white/45 leading-snug" data-testid={`bracket-heat-meta-${match.id}`}>{meta}</div>
-          {isMine ? <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">Du bist dabei</div> : null}
-        </div>
-        <span className="text-[11px] text-white/45 shrink-0"><LiveStatus status={match.status} /></span>
-      </div>
-      <MatchMeta match={match} compact={compact} />
-      {rows.map((slot) => {
-        const reg = regMap.get(slot.registration_id);
-        const result = resultMap.get(slot.registration_id);
-        const qualified = Boolean(result) && (result.rank || 99) <= (qualifiers || 1);
-        return (
-          <HeatRow
-            key={slot.slot}
-            registrationId={slot.registration_id}
-            registration={reg}
-            pending={reg ? "" : pendingLabel(slot, findMatch)}
-            result={result}
-            played={played}
-            qualified={qualified}
-            isMine={Boolean(mine) && slot.registration_id === mine}
-            podiumRank={podiumMap?.get(slot.registration_id)}
-            compact={compact}
-          />
-        );
-      })}
-    </button>
-  );
-}
-
-function HeatRow({ registrationId, registration, pending = "", result, played, qualified, isMine, podiumRank, compact = false, sweep = false }) {
-  const user = registration?.user || {};
-  const label = registration ? (registration.display_name || user.display_name || registration.ingame_name || "-") : "";
-  const score = result?.score ?? result?.points;
-  const podium = podiumMeta(podiumRank);
-  const pathHandlers = usePathHover(registrationId);
-  return (
-    <div {...pathHandlers} className={`flex items-center justify-between gap-2 ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} border-b border-white/5 last:border-b-0 ${podium?.row || (qualified ? "bg-[#29B6E8]/10" : "")} ${sweep ? "tls-winner-sweep" : ""}`} data-sweep={sweep ? "1" : undefined}>
-      <div className="flex items-center gap-2 min-w-0">
-        <SlotAvatar avatar={user.avatar_url} label={label} empty={!registration} />
-        <div className="min-w-0">
-          <div className={`${compact ? "text-sm" : "text-base"} truncate ${label ? (podium?.text || (qualified ? "text-[#29B6E8] font-semibold" : "text-white/85")) : pending ? "text-white/50" : "text-white/25"}`} data-pending={pending && !label ? "1" : undefined}>{label || pending || "—"}</div>
-          {isMine ? <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">Du</div> : null}
-        </div>
-      </div>
-      <div className="text-right shrink-0">
-        {played ? (
-          <>
-            <div className={`font-display font-bold ${podium?.text || (qualified ? "text-[#29B6E8]" : "text-white/70")}`}>{podium ? podium.label : result?.rank ? `#${result.rank}` : "-"}</div>
-            {score != null && <div key={score} className="tls-score-tick text-[10px] text-white/45">{score} Pkt.</div>}
-          </>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-/** Bild oder Kürzel (#833) - leere graue Quadrate gibt es nur noch für freie Plätze. */
-function SlotAvatar({ avatar, label, empty }) {
-  if (avatar) return <img src={resolveMediaUrl(avatar)} alt="" className="w-7 h-7 rounded-sm object-cover shrink-0" />;
-  const short = empty ? "" : initials(label);
-  if (!short) return <div className="w-7 h-7 rounded-sm border border-dashed border-white/15 shrink-0" />;
-  return (
-    <div className="w-7 h-7 rounded-sm border border-white/10 bg-gradient-to-br from-white/[0.09] to-white/[0.02] text-[10px] font-bold tracking-wide text-white/65 flex items-center justify-center shrink-0" aria-hidden="true" data-testid="bracket-initials">
-      {short}
-    </div>
-  );
-}
-
-/** Fahren über einen Namen zeigt den Weg dieser Person - nur mit Maus, am Handy bleibt alles ruhig. */
-function usePathHover(registrationId) {
-  const { show } = useContext(PathContext);
-  if (!registrationId) return {};
-  return {
-    onMouseEnter: () => canHover() && show(new Set([registrationId])),
-    onMouseLeave: () => canHover() && show(null),
-  };
-}
-
-function Row({ registrationId, label, pending = "", empty, bye, score, isWinner, isLoser, isMine, podiumRank, avatar, compact = false, sweep = false }) {
-  const podium = podiumMeta(podiumRank);
-  const pathHandlers = usePathHover(registrationId);
-  return (
-    <div {...pathHandlers} data-sweep={sweep ? "1" : undefined} className={`flex items-center justify-between gap-2 ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} ${podium?.row || (isWinner ? "bg-[#29B6E8]/10" : "")} ${sweep ? "tls-winner-sweep" : ""}`}>
-      <div className="flex items-center gap-2 min-w-0">
-        <SlotAvatar avatar={avatar} label={bye ? "" : label} empty={empty || bye} />
-        <span className={`${compact ? "text-sm" : "text-base"} truncate ${podium?.text || (isWinner ? "text-[#29B6E8] font-bold" : isLoser ? "text-white/45" : empty && pending && !bye ? "text-white/50" : empty ? "text-white/25" : "text-white/85")}`} data-pending={empty && pending && !bye ? "1" : undefined}>
-          {bye ? "Freilos" : label || pending || "—"}
-        </span>
-        {isMine ? <span className="text-[10px] uppercase tracking-widest text-[#FFD700] shrink-0">Du</span> : null}
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        {podium && <span className={`px-1.5 py-0.5 rounded-sm border text-[10px] font-display font-bold ${podium.badge}`}>{podium.label}</span>}
-        {score != null && (
-          <span key={score} className={`tls-score-tick font-display font-bold ${compact ? "text-base" : "text-lg"} ${podium?.text || (isWinner ? "text-[#29B6E8]" : "text-white/55")}`}>
-            {score}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function topPodiumRank(ids, podiumMap) {
-  const ranks = (ids || []).map((id) => podiumMap?.get(id)).filter(Boolean);
-  return ranks.length ? Math.min(...ranks) : null;
-}
-
-function podiumMeta(rank) {
-  if (rank === 1) {
-    return {
-      label: "#1",
-      row: "bg-[#FFD700]/15",
-      text: "text-[#FFD700] font-semibold",
-      badge: "border-[#FFD700]/50 bg-[#FFD700]/15 text-[#FFD700]",
-    };
-  }
-  if (rank === 2) {
-    return {
-      label: "#2",
-      row: "bg-white/10",
-      text: "text-white font-semibold",
-      badge: "border-white/35 bg-white/10 text-white",
-    };
-  }
-  if (rank === 3) {
-    return {
-      label: "#3",
-      row: "bg-[#CD7F32]/15",
-      text: "text-[#CD7F32] font-semibold",
-      badge: "border-[#CD7F32]/50 bg-[#CD7F32]/15 text-[#CD7F32]",
-    };
-  }
-  return null;
-}
-
-function podiumBorderClass(rank) {
-  if (rank === 1) return "border-[#FFD700]/45 shadow-[0_0_0_1px_rgba(255,215,0,0.08)]";
-  if (rank === 2) return "border-white/25";
-  if (rank === 3) return "border-[#CD7F32]/45";
-  return "border-white/10";
 }

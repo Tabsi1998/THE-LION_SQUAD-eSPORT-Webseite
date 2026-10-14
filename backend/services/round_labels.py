@@ -100,3 +100,16 @@ def round_label(match: dict, *, max_rounds: dict[tuple, int] | None = None, kind
         if from_end in KO_FROM_END:
             return KO_FROM_END[from_end]
     return f"Runde {number}" if number else "Runde"
+
+
+def attach_round_labels(matches: list[dict], stages: list[dict] | None = None, tournament: dict | None = None) -> list[dict]:
+    """Schreibt je Spiel ``round_label`` (#1259, #1561) - für die Baum-Antwort, damit Website, App und TV gleich heißen."""
+    stage_types = {stage.get("id"): stage.get("stage_type") for stage in stages or [] if isinstance(stage, dict)}
+    max_rounds = rounds_by_section(matches)
+    tournament_format = (tournament or {}).get("format")
+    for match in matches or []:
+        if not isinstance(match, dict):
+            continue
+        kind = stage_kind(stage_types.get(match.get("stage_id")) or match.get("stage_type"), tournament_format, match.get("match_type"))
+        match["round_label"] = round_label(match, max_rounds=max_rounds, kind=kind)
+    return matches

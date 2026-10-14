@@ -347,3 +347,50 @@ async def test_keys_are_listed_without_the_secret_and_only_under_tv(flow):
         assert (await flow.post("/api/tv/keys", json={"tournament_id": tournament["id"]})).status_code == 403, role
         deleted = await flow.delete(f"/api/tv/keys/{created['id']}")
         assert deleted.status_code == 403, role
+
+
+def test_the_tv_learns_about_the_reset_and_why_a_match_is_dropped_but_nothing_personal():
+    """Grand Final Reset und entfallene Spiele (#1561): der TV bekommt die Reset-Regel und die öffentlichen Gründe aus
+    `result_meta` (Quelle, Grund, nötig) - keine Konten, keine Notizen, keine Zeitstempel der Turnierleitung."""
+    payload = {"tournament": {"id": "t1"}, "registrations": [], "stages": [], "matches_v2": [
+        {"id": "gfr", "match_key": "GFR", "section": "GF", "round": 5, "status": "cancelled", "slots": [], "results": [],
+         "settings": {"bracket_reset": {"of_match_key": "GF", "upper_slot": 1, "intern": "x"}, "match_size": 2, "schema": "geheim"},
+         "result_meta": {"source": "bracket_reset", "needed": False, "reason": None, "updated_at": "2026-10-31T12:00:00Z",
+                         "confirmed_by": "user-1", "note": "Notiz der Turnierleitung"}},
+        {"id": "c", "match_key": "C", "section": "WB", "round": 1, "status": "cancelled", "slots": [], "results": [],
+         "merged_into": "b", "merged_into_key": "B", "result_meta": {"source": "heat_rebuild", "reason": "merged", "merged_into": "b"}},
+        {"id": "a", "match_key": "A", "section": "WB", "round": 1, "status": "completed", "slots": [], "results": []},
+        {"id": "d", "match_key": "D", "section": "WB", "round": 1, "status": "forfeit", "slots": [], "results": [],
+         "result_meta": {"source": "admin", "reason": "Kam 20 Minuten zu spät, laut Herrn X"}},
+    ]}
+    matches = {match["id"]: match for match in tv_display.display_bracket_payload(payload)["matches_v2"]}
+    assert matches["gfr"]["settings"]["bracket_reset"] == {"of_match_key": "GF", "upper_slot": 1}
+    assert "schema" not in matches["gfr"]["settings"]
+    assert matches["gfr"]["result_meta"] == {"source": "bracket_reset", "needed": False, "reason": None}
+    assert matches["c"]["result_meta"] == {"source": "heat_rebuild", "reason": "merged"}
+    assert matches["c"]["merged_into_key"] == "B"
+    assert "result_meta" not in matches["a"]
+    # Freier Text als Grund bleibt intern.
+    assert matches["d"]["result_meta"] == {"source": "admin"}
+    assert "user-1" not in json.dumps(matches) and "Notiz" not in json.dumps(matches)
+
+
+def test_the_tv_learns_about_mixed_groups_and_where_each_player_really_came_from():
+    """Gegner mischen (#1548, #1561): der TV braucht die Gruppe, den Klartext der Plätze, ob gelost ist und die echte
+    Herkunft je Platz - ohne Konten (`user_id`) und ohne Zeitstempel der Bestätigung."""
+    payload = {"tournament": {"id": "t1"}, "registrations": [], "stages": [], "matches_v2": [
+        {"id": "e", "match_key": "E", "section": "WB", "round": 2, "status": "ready", "results": [],
+         "settings": {"draw_group": "WB:2", "match_size": 2},
+         "draw": {"id": "d1", "group": "WB:2", "drawn_at": "2026-10-31T12:00:00Z", "trigger": "result", "by": "user-9"},
+         "slots": [{"slot": 1, "registration_id": "r1", "user_id": "user-1", "status": "filled",
+                    "source": {"type": "rank", "flow": "W", "match_key": "A", "rank": 1, "raw": "W:A:1", "draw": {"group": "WB:2", "label": "Runde 1"}},
+                    "source_result": {"from_match_id": "c", "from_match_key": "C", "rank": 1, "flow": "W", "draw_id": "d1",
+                                      "confirmed_at": "2026-10-31T12:00:00Z"}}]},
+    ]}
+    match = tv_display.display_bracket_payload(payload)["matches_v2"][0]
+    assert match["settings"]["draw_group"] == "WB:2"
+    assert match["draw"] == {"id": "d1", "group": "WB:2", "drawn_at": "2026-10-31T12:00:00Z"}
+    slot = match["slots"][0]
+    assert slot["source"]["draw"] == {"group": "WB:2", "label": "Runde 1"}
+    assert slot["source_result"] == {"from_match_id": "c", "from_match_key": "C", "rank": 1, "flow": "W", "draw_id": "d1"}
+    assert "user-1" not in json.dumps(match) and "user-9" not in json.dumps(match)

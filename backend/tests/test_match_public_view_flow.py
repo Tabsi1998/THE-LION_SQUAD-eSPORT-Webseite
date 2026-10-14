@@ -183,3 +183,10 @@ async def test_tournament_staff_still_see_internals_in_bracket_and_list(flow):
     stages = await flow.get(f"/api/tournaments/{tournament['id']}/stages")
     assert stages.status_code == 200, stages.text
     assert all(stage.get("created_by") == staff["id"] and "creation_key" not in stage for stage in stages.json())
+
+
+def test_the_rebuild_lock_token_stays_internal():
+    """Der Sperr-Schlüssel des Lauf-Umbaus (`rebuild_token`, #1550) ist Technik der Turnierleitung - öffentlich nie.
+    Gefunden mit #1561: er stand in der öffentlichen Baum-Antwort (und darum in den Web-Testdaten)."""
+    match = {"id": "m1", "status": "ready", "rebuild_token": "ccaf65c5-0000-0000-0000-000000000000", "slots": []}
+    assert "rebuild_token" not in public_match_view(match)
