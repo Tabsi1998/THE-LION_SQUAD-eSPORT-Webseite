@@ -19,9 +19,7 @@ import logging
 from database import get_db
 from models import new_id, now_utc
 from services.discord_links import (  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
-    _normalize_base_url,
     _public_base_url,
-    _is_public_http_url,
     _public_avatar_url,
     _public_link_url,
     build_embed,
@@ -35,6 +33,9 @@ from services.discord_targets import (  # noqa: F401 - umgezogen (#1420), hier w
     TARGETS,
     resolve_target,
 )
+
+# Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
+__all__ = ["_public_base_url", "_public_avatar_url", "_public_link_url"]
 
 logger = logging.getLogger("tls-arena.discord")
 PRIVATE_DISCORD_VISIBILITIES = {"members", "internal"}

@@ -25,7 +25,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow, new_id  # noqa: E402
 
 import auth  # noqa: E402
-from auth import hash_password, password_fields, password_work  # noqa: E402
 
 BACKEND = pathlib.Path(__file__).resolve().parents[1]
 PASSWORD = "Loewen-Testpasswort-1"
@@ -49,7 +48,7 @@ async def account(flow, **fields) -> dict:
     user = {
         "id": new_id(), "username": name, "display_name": name, "email": f"{name}@example.com",
         "role": "player", "roles": ["player"], "is_active": True, "is_banned": False,
-        "email_verified": True, "mfa_enabled": False, **password_fields(PASSWORD),
+        "email_verified": True, "mfa_enabled": False, **auth.password_fields(PASSWORD),
         "password_login_available": True, "privacy_policy_version": "2026-08-26",
     }
     user.update(fields)
@@ -61,6 +60,12 @@ class _Checks(list):
     def __init__(self):
         super().__init__()
         self.threads: list[int] = []
+
+    def __eq__(self, other):
+        # Gleichheit wie bei einer Liste: nur die Kosten-Präfixe zählen, ``threads`` ist Beiwerk.
+        return list.__eq__(self, other)
+
+    __hash__ = None
 
 
 @pytest.fixture
@@ -80,7 +85,7 @@ def hash_checks(monkeypatch):
 
 
 def cost_prefix() -> bytes:
-    return hash_password(PASSWORD).encode("utf-8")[:7]
+    return auth.hash_password(PASSWORD).encode("utf-8")[:7]
 
 
 async def rejected_states(flow) -> dict[str, str]:
@@ -113,7 +118,7 @@ async def rejected_states(flow) -> dict[str, str]:
 @pytest.mark.parametrize("attempt", [WRONG, "x" * 100, WRONG_DECOMPOSED], ids=["kurz", "lang", "zerlegt"])
 async def test_a_rejected_sign_in_looks_the_same_in_every_account_state(flow, hash_checks, path, attempt):
     answers = {}
-    expected = [cost_prefix()] * password_work(attempt)
+    expected = [cost_prefix()] * auth.password_work(attempt)
     loop_thread = threading.get_ident()
     for state, email in (await rejected_states(flow)).items():
         hash_checks.clear()
