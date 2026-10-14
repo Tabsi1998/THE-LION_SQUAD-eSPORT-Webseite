@@ -1,9 +1,11 @@
 import { useContext, useEffect, useId, useRef, useState } from "react";
+import { animate } from "framer-motion";
 import { Link, useInRouterContext } from "react-router-dom";
 import { resolveMediaUrl } from "@/lib/api";
 import { formatMatchStatus } from "@/lib/tournamentLabels";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
 import { describeSlot, initials } from "@/lib/slotSource";
+import { MOTION, motionAllowed } from "@/lib/motion";
 import { heatExits, isDone, isLive, isOut, isWalkover, matchFate, soloAdvance } from "@/lib/bracketGraph";
 import { useBracketMotionState, useRowFlight } from "./bracketMotion";
 import {
@@ -139,6 +141,29 @@ function useSheet() {
   return { open, setOpen, ref };
 }
 
+/**
+ * Eine Zahl, die bei einem neuen Ergebnis hochzählt statt zu springen (framer-motion, nur der Text ändert sich).
+ * Gerendert wird immer der Endwert - ohne Bewegung (oder „Bewegung reduzieren“) steht er sofort da.
+ */
+function CountUp({ value, run = false, delay = 0 }) {
+  const ref = useRef(null);
+  const number = Number(value);
+  useEffect(() => {
+    const node = ref.current;
+    if (!run || !node || !Number.isFinite(number) || number <= 0 || !motionAllowed()) return undefined;
+    node.textContent = "0";
+    const controls = animate(0, number, {
+      duration: MOTION.slow / 1000,
+      delay: delay / 1000,
+      ease: [...MOTION.ease],
+      onUpdate: (current) => { node.textContent = String(Math.round(current)); },
+      onComplete: () => { node.textContent = String(number); },
+    });
+    return () => { controls.stop(); node.textContent = String(number); };
+  }, [run, number, delay]);
+  return <span ref={ref} className="tabular-nums">{value}</span>;
+}
+
 /** Bild oder Kürzel (#833) - gestrichelt nur für freie Plätze. */
 function SlotAvatar({ avatar, label, empty }) {
   if (avatar) return <img src={resolveMediaUrl(avatar)} alt="" className="w-5 h-5 rounded-sm object-cover shrink-0" />;
@@ -170,7 +195,7 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
   const bye = !reg && isByeSlot(slot);
   const pending = reg || bye ? "" : pendingLabel(slot, findMatch);
   const rowMotion = regId ? state.rows.get(`${match.id}:${regId}`) || null : null;
-  useRowFlight(ref, rowMotion, done);
+  useRowFlight(ref, rowMotion, done, slot?.slot ?? null);
   const podium = podiumMeta(podiumRank);
   const out = Boolean(reg) && (isOut(result) || OUT_REGISTRATION.has(String(reg?.status || "").toLowerCase()));
   const isMine = Boolean(mine) && regId === mine;
@@ -215,14 +240,14 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
       {podium ? <span className={`shrink-0 px-1 py-0.5 rounded-sm border text-[10px] font-display font-bold ${podium.badge}`}>{podium.label}</span> : null}
       {heat ? (
         <span className="flex shrink-0 items-center gap-1.5">
-          {played && score != null ? <span className="font-display text-xs tabular-nums text-quiet">{score} P</span> : null}
+          {played && score != null ? <span className="font-display text-xs tabular-nums text-quiet"><CountUp value={score} run={pop} delay={(rank ? rank - 1 : 0) * 60} /> P</span> : null}
           <span className={`tls-bracket-rank ${qualified ? "is-qualified" : ""}`} data-rank={rank || undefined} data-motion={pop && rank ? "pop" : undefined} style={rank ? { "--tls-i": rank - 1 } : undefined}>
             {played && rank ? rank : ""}
           </span>
         </span>
       ) : score != null ? (
         <span key={score} className={`tls-score-tick shrink-0 font-display text-base font-bold tabular-nums ${podium?.text || (isWinner ? "text-brand" : "text-quiet")}`} data-motion={pop ? "pop" : undefined} style={pop ? { "--tls-i": isWinner ? 0 : 1 } : undefined}>
-          {score}
+          <CountUp value={score} run={pop} delay={isWinner ? 0 : 60} />
         </span>
       ) : null}
     </Tag>
@@ -344,7 +369,7 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
   const meta = [field, onward].filter(Boolean).join(" · ");
   const empty = !filled && slots.every((slot) => !pendingLabel(slot, findMatch));
   const cutAt = qualifiers > 0 && exits.advance.length && qualifiers < rows.length ? qualifiers : 0;
-  const cutText = `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter → ${exits.advance.join(", ")}`;
+  const cutText = `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter → ${exits.advance.join(", ")}${exits.lot ? " (Los)" : ""}`;
   const dropText = exits.drop.length ? `Die anderen → ${exits.drop.join(", ")}` : exits.advance.length ? "Die anderen scheiden aus" : "";
   return (
     <div

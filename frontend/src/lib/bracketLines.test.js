@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { doubleElimination, decide } from "../../e2e/fixtures/tvBrackets.mjs";
-import { bracketEdges, sectionGroup } from "./bracketGraph";
-import { laneCounter, pathHits, routeEdge, segmentHitsRect } from "./bracketLines";
+import FFA from "../../e2e/fixtures/ffaGenerated.json";
+import { bracketEdges, drawGroupsOf, sectionGroup } from "./bracketGraph";
+import { laneCounter, pathHits, routeBus, routeEdge, segmentHitsRect } from "./bracketLines";
 
 // Linienführung (#1561): keine Strecke schneidet eine Karte - auch nicht der Abstieg vom Winner ins Loser Bracket.
 // Die Rechtecke bilden die Leinwand nach (BracketTree, StageCanvas): Spalten 232 px breit, Gassen 48 px, Abschnitte
@@ -13,7 +14,7 @@ const CARD_H = 104;
 const ROW = 128;
 const HEAD = 52;
 
-function layout(bracket) {
+function layout(bracket, pad = 0) {
   const sections = new Map();
   for (const match of bracket.matches_v2) {
     const name = match.section;
@@ -52,10 +53,10 @@ function layout(bracket) {
     }
     return { width, height: y - 40 - y0 };
   };
-  const main = place(left, 0, 0);
+  const main = place(left, pad, 0);
   const side = place(right, 0, 0);
   // Rechte Spalte (Grand Final) senkrecht mittig neben der linken.
-  const shiftX = main.width + GAP;
+  const shiftX = pad + main.width + GAP;
   const shiftY = (main.height - side.height) / 2;
   for (const name of right) {
     const section = sectionRects.find((entry) => entry.name === name);
@@ -127,4 +128,42 @@ describe("routeEdge: keine Linie schneidet eine Karte", () => {
     const shared = [...byGutter.values()].filter((set) => set.size > 1);
     expect(shared.length).toBeGreaterThan(0);
   });
+});
+
+// Gemischte Gruppen (#1548): die Sammelschiene liegt in der Gasse vor den Zielen, bleibt in ihrem Abschnitt und kreuzt
+// keine Karte und keinen Kopf - auch die echten Linien über die Schiene nicht. Echte Daten aus dem Generator.
+describe("routeBus: Sammelschiene in der Gasse", () => {
+  for (const state of ["se8_draw_before", "se8_draw_after", "de8_draw_before", "de8_draw_after", "ffa16_draw_before", "ffa16_draw_after"]) {
+    it(`${state}: Schiene, Äste und echte Wege laufen nur durch Gassen und Lücken, die Schiene bleibt im Abschnitt`, () => {
+      const bracket = structuredClone(FFA[state]);
+      const { rects, sectionRects, heads } = layout(bracket, GAP);
+      const obstacles = [...rects.values(), ...heads];
+      const corridors = sectionRects.flatMap((rect) => [rect.top - 20, rect.bottom + 20]);
+      const byId = new Map(bracket.matches_v2.map((match) => [match.id, match]));
+      const groups = drawGroupsOf(bracket.matches_v2);
+      expect(groups.size).toBeGreaterThan(0);
+      const lanes = laneCounter();
+      for (const group of groups.values()) {
+        const targets = group.targetIds.map((id) => ({ id, rect: rects.get(id) }));
+        const sources = group.sourceIds.map((id) => ({ id, rect: rects.get(id), cross: byId.get(id).section !== byId.get(group.targetIds[0]).section }));
+        const bus = routeBus({ sources, targets, obstacles, corridors, gap: GAP, lanes });
+        const own = (id) => obstacles.filter((rect) => rect !== rects.get(id));
+        expect(pathHits(bus.spine, obstacles), `${group.group} Schiene`).toBe(false);
+        for (const [id, points] of bus.branchesIn) expect(pathHits(points, own(id)), `${group.group} Ast aus ${byId.get(id).match_key}`).toBe(false);
+        for (const [id, points] of bus.branchesOut) expect(pathHits(points, own(id)), `${group.group} Ast in ${byId.get(id).match_key}`).toBe(false);
+        const section = sectionRects.find((rect) => rect.name === byId.get(group.targetIds[0]).section);
+        expect(bus.spine[0].y, `${group.group} oben im Abschnitt`).toBeGreaterThanOrEqual(section.top - 20);
+        expect(bus.spine[1].y, `${group.group} unten im Abschnitt`).toBeLessThanOrEqual(section.bottom);
+        // Nach der Auslosung: der echte Weg jedes Spielers über die Schiene.
+        for (const target of group.targetIds.map((id) => byId.get(id))) {
+          for (const slot of target.slots.filter((row) => row.registration_id && row.source_result?.from_match_id)) {
+            const from = byId.get(slot.source_result.from_match_id);
+            const points = bus.via(rects.get(from.id), from.section !== target.section, rects.get(target.id).top + rects.get(target.id).height / 2, rects.get(target.id));
+            expect(pathHits(points, obstacles.filter((rect) => rect !== rects.get(from.id) && rect !== rects.get(target.id))), `${state} ${from.match_key} → ${target.match_key}`).toBe(false);
+            expect(points.some((p) => p.x === bus.x), "läuft über die Schiene").toBe(true);
+          }
+        }
+      }
+    });
+  }
 });

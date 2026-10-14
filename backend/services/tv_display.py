@@ -181,7 +181,11 @@ SEAT_STATUSES = ("pending", "approved", "checked_in")
 SLOT_FIELDS = ("slot", "registration_id", "status", "seed", "source")
 SOURCE_FIELDS = ("type", "flow", "match_key", "rank", "seed", "raw")
 RESULT_FIELDS = ("registration_id", "rank", "score", "points", "qualified")
-MATCH_SETTING_FIELDS = ("match_size", "qualifiers_per_match", "duration_minutes")
+MATCH_SETTING_FIELDS = ("match_size", "qualifiers_per_match", "duration_minutes", "draw_group")
+# Gegner mischen (#1548, #1561): Gruppe, Klartext des Platzes, ob gelost ist und die echte Herkunft je Platz.
+DRAW_FIELDS = ("id", "group", "drawn_at")
+SOURCE_DRAW_FIELDS = ("group", "label")
+SOURCE_RESULT_FIELDS = ("from_match_id", "from_match_key", "rank", "flow", "draw_id", "skipped", "reason")
 # Grand Final Reset und entfallene Spiele (#1561): die Regel und die öffentlichen Gründe - nie Konten oder Notizen.
 RESET_RULE_FIELDS = ("of_match_key", "upper_slot")
 RESULT_META_FIELDS = ("source", "reason", "needed")
@@ -199,10 +203,16 @@ def _display_match(match: dict) -> dict:
         row = _pick(slot, SLOT_FIELDS)
         if isinstance(slot.get("source"), dict):
             row["source"] = _pick(slot["source"], SOURCE_FIELDS)
+            if isinstance(slot["source"].get("draw"), dict):
+                row["source"]["draw"] = _pick(slot["source"]["draw"], SOURCE_DRAW_FIELDS)
+        if isinstance(slot.get("source_result"), dict):
+            row["source_result"] = _pick(slot["source_result"], SOURCE_RESULT_FIELDS)
         out["slots"].append(row)
     out["results"] = [_pick(row, RESULT_FIELDS) for row in match.get("results") or []]
     settings = match.get("settings") or {}
     out["settings"] = _pick(settings, MATCH_SETTING_FIELDS)
+    if isinstance(match.get("draw"), dict):
+        out["draw"] = _pick(match["draw"], DRAW_FIELDS)
     if isinstance(settings.get("bracket_reset"), dict):
         out["settings"]["bracket_reset"] = _pick(settings["bracket_reset"], RESET_RULE_FIELDS)
     if isinstance(match.get("result_meta"), dict):

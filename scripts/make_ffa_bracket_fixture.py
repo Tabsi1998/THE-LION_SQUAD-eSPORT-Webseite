@@ -33,19 +33,30 @@ LONG = {16: "Der unglaublich lange Spielername Nummer Eins mit noch mehr Text da
         18: "🦁 Löwenherz", 19: "Nguyễn Thị Thanh Hương", 20: "bartholomew.fitzgerald@northwind-industries.example", 21: "Jo"}
 
 
-async def build(flow, count: int, mode: str, plan_size: int):
+async def build(flow, count: int, mode: str, plan_size: int, *, shuffle: bool = False, duel: bool = False, double: bool = False):
+    """Ein Turnier wie im Betrieb. ``shuffle``: Gegner der nächsten Runde mischen (#1548); ``duel``: K.-o. mit Duellen
+    (Auto-Schema ``single_elimination``) statt FFA-Läufen."""
     tournament, _users, regs = await flow.with_participants(
-        count, format="ffa_custom_bracket", heat_rebuild_mode=mode, status="registration_open", title="Lions Kart-Cup")
+        count, format=("double_elim" if double else "single_elim") if duel else "ffa_custom_bracket", heat_rebuild_mode=mode, status="registration_open",
+        title="Lions Smash-Cup" if duel else "Lions Kart-Cup", randomize_advancement_rounds=shuffle)
     for index, reg in enumerate(sorted(regs, key=lambda r: r.get("seed") or 0)):
         name = NAMES[index] if index < len(NAMES) else LONG.get(index, f"Fahrer {index + 1}")
         await flow.db.tournament_registrations.update_one({"id": reg["id"]}, {"$set": {"display_name": name, "ingame_name": name}})
-    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"max_participants": plan_size, "slug": f"kart-cup-{count}"}})
-    # Der Baum ist für die geplante Größe gebaut (so wie beim Öffnen des Check-ins mit allen Anmeldungen).
-    schema = _auto_ffa_custom_schema(plan_size, 4, 2)
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {
+        "max_participants": plan_size, "slug": f"{'smash' if duel else 'kart'}-cup-{count}{'-gemischt' if shuffle else ''}",
+        "randomize_advancement_rounds": shuffle}})
+    if duel:
+        # K.-o. mit Duellen: das Auto-Schema des Generators (kein eigenes Schema).
+        schema = None
+        stage = {"stage_type": "double_elimination" if double else "single_elimination", "match_type": "duel", "name": "Turnierbaum",
+                 "settings": {"grand_final": "reset"} if double else {}}
+    else:
+        # Der Baum ist für die geplante Größe gebaut (so wie beim Öffnen des Check-ins mit allen Anmeldungen).
+        schema = _auto_ffa_custom_schema(plan_size, 4, 2)
+        stage = {"stage_type": "ffa_custom_bracket", "match_type": "ffa", "name": "Läufe",
+                 "settings": {"schema": schema, "match_size": 4, "qualifiers_per_match": 2, "min_players": 2}}
     await flow.db.tournament_stages.insert_one({
-        "id": new_id(), "tournament_id": tournament["id"], "number": 1, "name": "Läufe",
-        "stage_type": "ffa_custom_bracket", "match_type": "ffa", "status": "pending",
-        "settings": {"schema": schema, "match_size": 4, "qualifiers_per_match": 2, "min_players": 2},
+        "id": new_id(), "tournament_id": tournament["id"], "number": 1, "status": "pending", **stage,
         "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(),
     })
     staff = await flow.add_staff()
@@ -80,7 +91,8 @@ async def results(flow, tournament, staff, keys):
 
 INFO = ("Erzeugt von scripts/make_ffa_bracket_fixture.py mit dem echten Generator (#1571) und dem echten Umbau "
         "(#1575). Zustände: 16 Fahrer (Start, nach Runde 1), 10 von 16 (ausgeglichen), 8 von 16 vor und nach dem "
-        "Zusammenlegen, 40 Fahrer mit langen Namen. Nicht von Hand ändern - neu erzeugen.")
+        "Zusammenlegen, 40 Fahrer mit langen Namen; Gegner mischen (#1548) je vor und nach der Auslosung für K.-o. mit 8 "
+        "(se8_draw_*), Doppel-K.-o. mit 8 (de8_draw_*) und Läufe mit 16 (ffa16_draw_*). Nicht von Hand ändern - neu erzeugen.")
 
 
 async def main():
@@ -113,13 +125,27 @@ async def main():
         data["ffa8_after_merge"] = await bracket(flow, t8)
     finally:
         await shutdown()
+    # Gegner mischen (#1548): je ein Stand vor der Auslosung (drei von vier Spielen der Runde entschieden) und danach.
+    # Doppel-K.-o.: die Loser-Runde 1 wird erst gelost, wenn alle Winner-Spiele der Runde 1 entschieden sind.
+    for name, duel, double, size in (("se8", True, False, 8), ("de8", True, True, 8), ("ffa16", False, False, 16)):
+        flow, shutdown = make_flow()
+        try:
+            tournament, staff, _schema = await build(flow, size, "auto", size, shuffle=True, duel=duel, double=double)
+            await flow.start(tournament)
+            await results(flow, tournament, staff, ["A", "B", "C"])
+            data[f"{name}_draw_before"] = await bracket(flow, tournament)
+            await results(flow, tournament, staff, ["D"])
+            data[f"{name}_draw_after"] = await bracket(flow, tournament)
+        finally:
+            await shutdown()
     flow, shutdown = make_flow()
     try:
         t40, _staff, _schema = await build(flow, 40, "auto", 40)
         data["ffa40"] = await bracket(flow, t40)
     finally:
         await shutdown()
-    states = ("ffa16", "ffa16_round1", "ffa10_balanced", "ffa8_before_merge", "ffa8_after_merge", "ffa40")
+    states = ("ffa16", "ffa16_round1", "ffa10_balanced", "ffa8_before_merge", "ffa8_after_merge", "ffa40",
+              "se8_draw_before", "se8_draw_after", "de8_draw_before", "de8_draw_after", "ffa16_draw_before", "ffa16_draw_after")
     out = {"_info": INFO, "plan16": data["plan16"], "plan10": data["plan10"], "schema16": data["schema16"]}
     for key in states:
         out[key] = {name: value for name, value in data[key].items() if name not in {"structure", "matches"}}

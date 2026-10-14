@@ -80,3 +80,43 @@ export function routeEdge({ a, b, toY, fromY, obstacles = [], corridors = [], ga
   }
   return simple();
 }
+
+/**
+ * Die Sammelschiene einer gemischten Gruppe (#1548): eine senkrechte Linie in der Gasse vor den Zielspielen, je
+ * Quellspiel ein Ast hinauf, je Zielspiel ein Ast hinaus. Quellen aus demselben Abschnitt münden waagrecht (oder über
+ * Gasse und Lücke, wenn Karten im Weg sind); Quellen aus einem anderen Abschnitt (Abstieg ins Loser Bracket) kommen wie
+ * jeder Abstieg über Gasse und Lücke an. `sources`/`targets`: `{ id, rect, cross }`; `slotYs`: Höhen, auf denen echte
+ * Linien in die Ziele münden (die Schiene reicht bis dorthin).
+ * Liefert `{ x, spine, branchesIn: Map, branchesOut: Map, via(a, cross, yEnd, b) }` - `via` baut die echte Linie eines
+ * Spielers über die Schiene.
+ */
+export function routeBus({ sources = [], targets = [], slotYs = [], obstacles = [], corridors = [], gap = 48, lanes = laneCounter() }) {
+  const left = Math.min(...targets.map((target) => target.rect.left));
+  const x = left - gap / 2;
+  const point = (y) => ({ left: x, right: x, top: y, bottom: y, width: 0, height: 0 });
+  const center = (rect) => rect.top + rect.height / 2;
+  const branch = (rect, cross, y) => {
+    if (!cross && rect.right <= x) {
+      const straight = [{ x: rect.right, y: center(rect) }, { x, y: center(rect) }];
+      if (!pathHits(straight, obstacles.filter((other) => other !== rect))) return straight;
+    }
+    return routeEdge({ a: rect, b: point(y), toY: y, fromY: cross ? rect.bottom - 10 : undefined, obstacles, corridors, gap, lanes, preferCorridor: true });
+  };
+  const ys = [...targets.map((target) => center(target.rect)), ...slotYs];
+  const top = Math.min(...ys);
+  const branchesIn = new Map();
+  for (const source of sources) {
+    const points = branch(source.rect, source.cross, source.cross ? top : center(source.rect));
+    branchesIn.set(source.id, points);
+    ys.push(points[points.length - 1].y);
+  }
+  const spine = [{ x, y: Math.min(...ys) }, { x, y: Math.max(...ys) }];
+  const branchesOut = new Map(targets.map((target) => [target.id, [{ x, y: center(target.rect) }, { x: target.rect.left, y: center(target.rect) }]]));
+  /** Die echte Linie: Ast aus der Quelle, die Schiene entlang, Ast in den Platz. */
+  const via = (rect, cross, yEnd, target) => {
+    const first = branch(rect, cross, cross ? top : center(rect));
+    const end = first[first.length - 1];
+    return [...first, { x, y: end.y }, { x, y: yEnd }, { x: target.left, y: yEnd }].filter((p, index, list) => index === 0 || p.x !== list[index - 1].x || p.y !== list[index - 1].y);
+  };
+  return { x, spine, branchesIn, branchesOut, via };
+}

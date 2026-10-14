@@ -66,35 +66,126 @@ export function isOut(result) {
   return Boolean(result?.forfeit || result?.dnf || result?.no_show || result?.disqualified);
 }
 
+const sectionKey = (match) => String(match?.section || "MAIN").trim().toLowerCase();
+export const drawGroupOf = (match) => (match?.settings?.draw_group ? String(match.settings.draw_group) : null);
+export const BUS_PREFIX = "bus:";
+export const isBusId = (id) => String(id || "").startsWith(BUS_PREFIX);
+
+/**
+ * Gegner mischen (#1548): die Auslosungs-Gruppen (`settings.draw_group` am Folgespiel, wie
+ * services/advancement_draw). Je Gruppe `{ id: "bus:WB:2", group, label, targetIds, sourceIds, drawn, section }`:
+ * Ziele sind die nicht entfallenen Folgespiele der Gruppe, Quellen alle Spiele, die in eines davon weiterleiten
+ * (`advancement` oder Platz-Herkunft). `drawn`: ein Ziel trägt `draw` (die Auslosung ist gelaufen).
+ */
+export function drawGroupsOf(matches = []) {
+  const list = (matches || []).filter(Boolean);
+  const find = finderFor(list);
+  const groups = new Map();
+  for (const match of list) {
+    const group = drawGroupOf(match);
+    if (!group) continue;
+    if (!groups.has(group)) groups.set(group, { id: `${BUS_PREFIX}${group}`, group, label: "", targetIds: [], sourceIds: [], drawn: false, section: sectionKey(match) });
+    const entry = groups.get(group);
+    if (isCancelled(match)) continue;
+    entry.targetIds.push(match.id);
+    if (match.draw && typeof match.draw === "object") entry.drawn = true;
+    for (const slot of match.slots || []) {
+      const source = normalizeSource(slot?.source);
+      if (!entry.label && source?.draw?.label) entry.label = String(source.draw.label);
+    }
+  }
+  for (const entry of groups.values()) {
+    const targets = new Set(entry.targetIds);
+    const sources = new Set();
+    for (const match of list) {
+      if (targets.has(match.id) || isCancelled(match)) continue;
+      if ((match.advancement || []).some((row) => targets.has(row?.to_match_id))) sources.add(match.id);
+    }
+    for (const id of targets) {
+      const target = list.find((row) => row.id === id);
+      for (const slot of target?.slots || []) {
+        const source = normalizeSource(slot?.source);
+        if (source?.type === "rank" && source.match_key) {
+          const from = find(target)(source.match_key);
+          if (from && !isCancelled(from) && !targets.has(from.id)) sources.add(from.id);
+        }
+      }
+    }
+    entry.sourceIds = list.filter((row) => sources.has(row.id)).map((row) => row.id);
+  }
+  // Eine Gruppe braucht mindestens zwei Ziele - sonst ändert Mischen nichts (wie der Server).
+  for (const [key, entry] of groups) if (entry.targetIds.length < 2) groups.delete(key);
+  return groups;
+}
+
 /**
  * Alle Linien: `{ id, from, to, toSlot, flow, rank, cross, void }`. `cross` = über die Grenze eines Abschnitts
  * (Winner → Loser Bracket, → Grand Final), `void` = das Quellspiel oder das Ziel entfällt.
+ *
+ * Gemischte Gruppen (#1548): keine festen Einzel-Linien in ihre Plätze. Stattdessen das Gerüst der Sammelschiene
+ * (`bus`: Ast aus jeder Quelle `scaffold: "in"`, Ast in jedes Ziel `scaffold: "out"`) - es bleibt auch nach der
+ * Auslosung stehen. Nach der Auslosung kommt je besetztem Platz die echte Linie aus `source_result` dazu (`bus` =
+ * Gruppe): sie läuft über die Schiene und zeigt sich auf deinem Weg und in der Bewegung.
  */
 export function bracketEdges(matches = []) {
   const list = (matches || []).filter(Boolean);
   const byId = new Map(list.map((match) => [match.id, match]));
   const find = finderFor(list);
+  const groups = drawGroupsOf(list);
+  const grouped = (match) => {
+    const group = drawGroupOf(match);
+    return group && groups.has(group) ? groups.get(group) : null;
+  };
   const edges = new Map();
-  const add = (from, to, toSlot, flow, rawRank) => {
+  const add = (from, to, toSlot, flow, rawRank, extra = null) => {
     if (!from || !to || from.id === to.id) return;
     const id = `${from.id}>${to.id}:${toSlot}`;
     if (edges.has(id)) return;
     const rank = absoluteRank({ flow, rank: rawRank }, from) || Number(rawRank) || 1;
     edges.set(id, {
       id, from: from.id, to: to.id, toSlot: Number(toSlot) || 0, flow: flow === "L" ? "L" : "W", rank,
-      cross: String(from.section || "MAIN").toLowerCase() !== String(to.section || "MAIN").toLowerCase(),
+      cross: sectionKey(from) !== sectionKey(to),
       void: isCancelled(from) || isCancelled(to),
+      ...(extra || {}),
     });
   };
   for (const to of list) {
+    const group = grouped(to);
     for (const slot of to.slots || []) {
       const source = normalizeSource(slot?.source);
+      if (group) {
+        // Gemischt: nur die echte Herkunft eines besetzten Platzes - nie die Linie aus dem Schema.
+        const origin = slot?.source_result;
+        if (group.drawn && slot?.registration_id && origin?.from_match_id) {
+          add(byId.get(origin.from_match_id) || find(to)(origin.from_match_key), to, slot.slot, origin.flow, origin.rank, { bus: group.group });
+        }
+        continue;
+      }
       if (source?.type !== "rank" || !source.match_key) continue;
       add(find(to)(source.match_key), to, slot.slot, source.flow, source.rank);
     }
   }
   for (const from of list) {
-    for (const entry of from.advancement || []) add(from, byId.get(entry?.to_match_id), entry?.to_slot, entry?.flow, entry?.rank);
+    for (const entry of from.advancement || []) {
+      const to = byId.get(entry?.to_match_id);
+      if (!to || grouped(to)) continue;
+      add(from, to, entry?.to_slot, entry?.flow, entry?.rank);
+    }
+  }
+  // Das Gerüst der Sammelschiene: je Quelle ein Ast hinein, je Ziel ein Ast hinaus.
+  for (const group of groups.values()) {
+    for (const sourceId of group.sourceIds) {
+      const from = byId.get(sourceId);
+      const flows = new Set((from?.advancement || []).filter((row) => group.targetIds.includes(row?.to_match_id)).map((row) => (row.flow === "L" ? "L" : "W")));
+      for (const flow of flows.size ? flows : new Set(["W"])) {
+        const id = `${sourceId}>${group.id}:${flow}`;
+        edges.set(id, { id, from: sourceId, to: group.id, toSlot: 0, flow, rank: 0, cross: sectionKey(from) !== group.section, void: false, bus: group.group, scaffold: "in" });
+      }
+    }
+    for (const targetId of group.targetIds) {
+      const id = `${group.id}>${targetId}`;
+      edges.set(id, { id, from: group.id, to: targetId, toSlot: 0, flow: "W", rank: 0, cross: false, void: false, bus: group.group, scaffold: "out" });
+    }
   }
   return [...edges.values()];
 }
@@ -117,11 +208,30 @@ export function orderEdges(rounds = []) {
   return edges;
 }
 
-/** Wohin ein Lauf führt (#1178): die Spiele der Weiterkommer und der anderen (Loser Bracket), dazu die Zahl. */
+/**
+ * Wohin ein Lauf führt (#1178): die Spiele der Weiterkommer und der anderen (Loser Bracket), dazu die Zahl. Geht es in
+ * eine gemischte Gruppe (#1548), sind alle Ziele der Gruppe möglich - `lot` sagt, ob noch gelost wird.
+ */
 export function heatExits(match, edges = [], matches = []) {
   const byId = new Map((matches || []).map((row) => [row.id, row]));
-  const keys = (flow) => [...new Set(edges.filter((edge) => edge.from === match.id && edge.flow === flow && !edge.void).map((edge) => byId.get(edge.to)?.match_key).filter(Boolean))];
-  return { advance: keys("W"), drop: keys("L"), qualifiers: Number(match?.settings?.qualifiers_per_match || 0) };
+  const groups = drawGroupsOf(matches);
+  let lot = false;
+  const keys = (flow) => {
+    const out = [];
+    for (const edge of edges) {
+      if (edge.from !== match.id || edge.flow !== flow || edge.void) continue;
+      if (isBusId(edge.to)) {
+        const group = groups.get(String(edge.to).slice(BUS_PREFIX.length));
+        if (!group) continue;
+        if (!group.drawn) lot = true;
+        for (const id of group.targetIds) out.push(byId.get(id)?.match_key);
+      } else if (!edge.bus) {
+        out.push(byId.get(edge.to)?.match_key);
+      }
+    }
+    return [...new Set(out.filter(Boolean))];
+  };
+  return { advance: keys("W"), drop: keys("L"), qualifiers: Number(match?.settings?.qualifiers_per_match || 0), lot };
 }
 
 const playersOf = (match) => new Set((match?.slots || []).map((slot) => slot?.registration_id).filter(Boolean));
@@ -138,6 +248,16 @@ export function pathFor(registrationId, matches = [], edges = []) {
   for (const edge of edges) {
     if (!result.matches.has(edge.from) || edge.void) continue;
     const from = byId.get(edge.from);
+    if (edge.scaffold === "in") {
+      // Vor der Auslosung: der Weg führt auf die Schiene, solange offen ist, wohin - nach der Auslosung die echte Linie.
+      const group = drawGroupsOf(matches).get(edge.bus);
+      if (group && !group.drawn && qualifiesFor(from, registrationId, edge.flow)) {
+        result.edges.add(edge.id);
+        result.buses = result.buses || new Set();
+        result.buses.add(edge.bus);
+      }
+      continue;
+    }
     const to = byId.get(edge.to);
     if (!to) continue;
     const slot = edge.toSlot ? (to.slots || []).find((row) => Number(row.slot) === edge.toSlot) : null;
@@ -152,6 +272,16 @@ export function pathFor(registrationId, matches = [], edges = []) {
   }
   if (result.ahead) for (const id of result.ahead) result.matches.add(id);
   return result;
+}
+
+/** Kommt die Anmeldung über diesen Weg weiter? Offenes Spiel: vielleicht (ja); entschieden: nach ihrem Platz. */
+function qualifiesFor(match, registrationId, flow) {
+  if (!isDone(match)) return true;
+  const row = (match.results || []).find((entry) => entry.registration_id === registrationId);
+  if (!row) return false;
+  const quota = Number(match.settings?.qualifiers_per_match || 1);
+  const qualified = row.qualified ?? (Number(row.rank) > 0 && Number(row.rank) <= quota);
+  return flow === "L" ? !qualified : Boolean(qualified);
 }
 
 const resultSig = (match) => (match?.results || []).map((row) => `${row.registration_id}:${row.rank ?? ""}:${row.score ?? row.points ?? ""}`).sort().join(",");
@@ -189,8 +319,13 @@ export function diffBracket(previous, next) {
       if (!id || oldSlots.get(slot.slot)?.registration_id === id || playersOf(old).has(id)) continue;
       const source = normalizeSource(slot.source);
       const mergedFrom = previous.find((row) => row.id !== match.id && nextById.get(row.id)?.merged_into === match.id && wasIn.get(`${row.id}:${id}`));
+      const origin = slot.source_result?.from_match_id ? nextById.get(slot.source_result.from_match_id) : null;
+      const group = drawGroupOf(match);
       if (mergedFrom) {
         moves.push({ key: `merge:${match.id}:${id}`, type: "merge", matchId: match.id, registrationId: id, from: { matchId: mergedFrom.id } });
+      } else if (origin && source?.type === "rank") {
+        // Die echte Herkunft (auch aus der Auslosung, #1548) - über die Schiene, wenn gemischt.
+        moves.push({ key: `advance:${match.id}:${id}`, type: "advance", matchId: match.id, registrationId: id, from: { matchId: origin.id, registrationId: id }, ...(group ? { bus: group } : {}) });
       } else if (source?.type === "rank") {
         const from = find(match)(source.match_key);
         if (from) moves.push({ key: `advance:${match.id}:${id}`, type: "advance", matchId: match.id, registrationId: id, from: { matchId: from.id, registrationId: id } });
