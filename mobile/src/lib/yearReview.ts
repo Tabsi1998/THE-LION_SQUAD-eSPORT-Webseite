@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
-import { resolveMediaUrl } from "./api";
+import { documentsDirectory } from "./memberDocuments";
+import { authorizedUrl } from "./siteUrls";
 
 // Jahresrückblick „Dein Jahr bei LION“ (#1195) - dieselbe Seitenfolge und dieselben Sätze wie im Web
 // (frontend/src/lib/yearReview.js): nur Seiten mit Inhalt, höchstens acht, am Ende das Bild zum Teilen.
@@ -66,9 +67,15 @@ export function seasonText(review?: YearReview | null): string {
   return [season.participants ? `von ${season.participants}` : "", points].filter(Boolean).join(" · ");
 }
 
-/** Adresse des Bildes - mit Vorschau für die Verwaltung. Laden nur mit Anmeldung. */
+const YEAR_CARD_PATH = "/api/year-review/me/card.png";
+
+/**
+ * Adresse des Bildes - mit Vorschau für die Verwaltung. Laden nur mit Anmeldung, darum nur vom eigenen Server (#1060):
+ * eine Adresse anderer Herkunft ersetzt der feste Pfad.
+ */
 export function yearCardUrl(review: YearReview): string {
-  return resolveMediaUrl(`${review.image_path || "/api/year-review/me/card.png"}${review.preview ? "?vorschau=true" : ""}`);
+  const suffix = review.preview ? "?vorschau=true" : "";
+  return authorizedUrl(`${review.image_path || YEAR_CARD_PATH}${suffix}`) || (authorizedUrl(`${YEAR_CARD_PATH}${suffix}`) as string);
 }
 
 /** Bild laden (mit Anmeldung) und ins Teilen-Menü geben. */
@@ -76,7 +83,10 @@ export async function shareYearCard(review: YearReview, token: string | null | u
   if (!token) return "failed";
   try {
     if (!(await Sharing.isAvailableAsync())) return "failed";
-    const target = `${FileSystem.cacheDirectory}mein-jahr-${review.year}.png`;
+    // Im privaten Ordner der App (#1059): beim Abmelden und Kontowechsel geht das Bild mit den Dokumenten.
+    const directory = documentsDirectory(FileSystem.cacheDirectory);
+    await FileSystem.makeDirectoryAsync(directory, { intermediates: true }).catch(() => {});
+    const target = `${directory}mein-jahr-${Number(review.year) || "rueckblick"}.png`;
     const download = await FileSystem.downloadAsync(yearCardUrl(review), target, { headers: { Authorization: `Bearer ${token}` } });
     if (download.status && download.status !== 200) return "failed";
     await Sharing.shareAsync(download.uri, { mimeType: "image/png", UTI: "public.png", dialogTitle: `Mein ${review.year}` });

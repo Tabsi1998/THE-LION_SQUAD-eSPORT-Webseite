@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../config";
 import { categoryLabel, documentFileName, documentsLine, documentUrl, documentsDirectory, downloadErrorText, formatFileSize, invoiceFileName } from "./memberDocuments";
 
 // Vereinsdokumente in der App (#341): private Dateien, klare Fehlertexte.
@@ -9,10 +10,11 @@ test("Dateiname im Cache: Kennung vorne, harmlose Zeichen, Endung aus Name oder 
   expect(documentFileName({ id: "d4", mime: "image/png" })).toBe("d4-dokument.png");
 });
 
-test("Adresse: view_url relativ zur API, absolute bleiben", () => {
-  expect(documentUrl({ id: "d1", view_url: "/api/documents/d1/view" })).toMatch(/^https?:\/\/.+\/api\/documents\/d1\/view$/);
-  expect(documentUrl({ id: "d1" })).toMatch(/\/api\/documents\/d1\/view$/);
-  expect(documentUrl({ id: "d1", view_url: "https://cdn.example/x.pdf" })).toBe("https://cdn.example/x.pdf");
+test("Adresse: view_url relativ zur API; eine Adresse anderer Herkunft gibt es nicht (#1054)", () => {
+  expect(documentUrl({ id: "d1", view_url: "/api/documents/d1/view" })).toBe(`${API_BASE_URL}/api/documents/d1/view`);
+  expect(documentUrl({ id: "d1" })).toBe(`${API_BASE_URL}/api/documents/d1/view`);
+  expect(documentUrl({ id: "d1", view_url: `${API_BASE_URL}/api/documents/d1/view` })).toBe(`${API_BASE_URL}/api/documents/d1/view`);
+  expect(documentUrl({ id: "d1", view_url: "https://cdn.example/x.pdf" })).toBeNull();
 });
 
 test("Fehlertexte sagen, woran es liegt", () => {

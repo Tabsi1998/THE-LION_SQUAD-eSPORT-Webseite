@@ -2,12 +2,17 @@ import { Platform } from "react-native";
 import { API_BASE_URL } from "../config";
 import { registerCacheClearer } from "./cache";
 import { formatDate } from "./format";
+import { authorizedUrl } from "./siteUrls";
 
 // Vereinsdokumente in der App (#341). Die Dateien sind nicht öffentlich: Jeder Abruf trägt
 // die Anmeldung, die Datei landet nur im privaten Cache der App (kein Downloads-Ordner, keine
 // Galerie) und wird gelöscht, sobald jemand sich abmeldet oder das Konto wechselt. Dokumente der
 // Vereinsakte (#849) liegen unter ihrer Prüfsumme: vor jedem Öffnen fragt die App nach (das Modul
 // prüft die Rechte), unverändert kommt nur ein 304 - und ein abgebrochener Download geht weiter.
+//
+// Vertrag des Abrufs (#1054): die Anmeldung geht nur an den eigenen Server - eine Adresse anderer Herkunft lädt die
+// App gar nicht. Wo sie ein Dokument nicht öffnen kann, lädt sie es auch nicht. Und was beim Abmelden oder Kontowechsel
+// noch lädt (#1059), bleibt nicht liegen und wird nicht mehr geöffnet.
 
 export type MemberDocument = {
   id: string;
@@ -84,9 +89,9 @@ export function documentFileName(doc: MemberDocument): string {
   return `${doc.id}-${base}.${extension}`;
 }
 
-export function documentUrl(doc: MemberDocument): string {
-  const path = doc.view_url || `/api/documents/${doc.id}/view`;
-  return /^https?:/i.test(path) ? path : `${API_BASE_URL}/${path.replace(/^\/+/, "")}`;
+/** Die Adresse zum Öffnen - immer auf dem eigenen Server; eine Adresse anderer Herkunft gibt es nicht (null). */
+export function documentUrl(doc: MemberDocument): string | null {
+  return authorizedUrl(doc.view_url || `/api/documents/${doc.id}/view`);
 }
 
 /** Was die Person liest, wenn es nicht klappt - der Grund steht im Statuscode. */
@@ -133,6 +138,22 @@ function failure(status: number | null | undefined, text = downloadErrorText(sta
   return error;
 }
 
+// Sitzung der Dateien (#1059): Abmelden und Kontowechsel zählen weiter. Ein Download, der danach ankommt, gehört der
+// vorigen Sitzung - er wird gelöscht statt geöffnet.
+let fileSession = 0;
+
+function sessionEnded(): Error {
+  return failure(null, "Du hast dich inzwischen abgemeldet. Das Dokument wird nicht geöffnet.");
+}
+
+/** Vor jedem Abruf: nur zum eigenen Server und nur, wo die App das Dokument auch öffnen kann. */
+function checkedRequest(url: string): string {
+  if (Platform.OS !== "android") throw new Error("Dokumente lassen sich derzeit nur auf Android öffnen.");
+  const target = authorizedUrl(url);
+  if (!target) throw failure(null);
+  return target;
+}
+
 /** Öffnet eine Datei aus dem App-Cache mit der passenden App. */
 async function openWithApp(FileSystem: FileSystemLike, target: string, mime: string): Promise<void> {
   if (Platform.OS !== "android") throw new Error("Dokumente lassen sich derzeit nur auf Android öffnen.");
@@ -148,12 +169,21 @@ async function openWithApp(FileSystem: FileSystemLike, target: string, mime: str
 
 /** Holt eine private Datei mit Anmeldung in den App-Cache und öffnet sie mit der passenden App. */
 export async function fetchAndOpen(url: string, fileName: string, mime: string, token: string): Promise<void> {
+  const request = checkedRequest(url);
+  const session = fileSession;
   const FileSystem = await fileSystem();
   const directory = documentsDirectory(FileSystem.cacheDirectory);
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true }).catch(() => {});
   const target = `${directory}${fileName}`;
-  const task = FileSystem.createDownloadResumable(url, target, { headers: { Authorization: `Bearer ${token}` } });
-  const result = await task.downloadAsync();
+  const task = FileSystem.createDownloadResumable(request, target, { headers: { Authorization: `Bearer ${token}` } });
+  const result = await task.downloadAsync().catch((error: unknown) => {
+    if (session !== fileSession) return undefined;
+    throw error;
+  });
+  if (session !== fileSession) {
+    await FileSystem.deleteAsync(target, { idempotent: true }).catch(() => {});
+    throw sessionEnded();
+  }
   if (!result || result.status >= 400) {
     await FileSystem.deleteAsync(target, { idempotent: true }).catch(() => {});
     throw failure(result?.status);
@@ -182,6 +212,8 @@ export function resetDocumentDownloads(): void {
  * Tipp dort weiter, wo er aufgehört hat (Teilabruf über den Server).
  */
 export async function fetchChecked(url: string, checksum: string, extension: string, mime: string, token: string): Promise<void> {
+  const request = checkedRequest(url);
+  const session = fileSession;
   const FileSystem = await fileSystem();
   const directory = documentsDirectory(FileSystem.cacheDirectory);
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true }).catch(() => {});
@@ -190,8 +222,12 @@ export async function fetchChecked(url: string, checksum: string, extension: str
   const cached = FileSystem.getInfoAsync ? await FileSystem.getInfoAsync(target).catch(() => ({ exists: false })) : { exists: false };
   if (cached.exists) {
     const probe = `${directory}sha-${checksum}.check`;
-    const check = FileSystem.createDownloadResumable(url, probe, { headers: { ...auth, "If-None-Match": `"${checksum}"` } });
+    const check = FileSystem.createDownloadResumable(request, probe, { headers: { ...auth, "If-None-Match": `"${checksum}"` } });
     const answer = await check.downloadAsync().catch(() => undefined);
+    if (session !== fileSession) {
+      await FileSystem.deleteAsync(probe, { idempotent: true }).catch(() => {});
+      throw sessionEnded();
+    }
     if (answer?.status === 304) {
       await FileSystem.deleteAsync(probe, { idempotent: true }).catch(() => {});
       await openWithApp(FileSystem, target, mime);
@@ -211,20 +247,28 @@ export async function fetchChecked(url: string, checksum: string, extension: str
   }
   const part = `${directory}sha-${checksum}.part`;
   const saved = resumes.get(checksum);
-  const task = FileSystem.createDownloadResumable(url, part, { headers: auth }, undefined, saved);
+  const task = FileSystem.createDownloadResumable(request, part, { headers: auth }, undefined, saved);
   let result: DownloadResult | undefined;
   try {
     result = saved && task.resumeAsync ? await task.resumeAsync() : await task.downloadAsync();
   } catch {
+    if (session !== fileSession) {
+      await FileSystem.deleteAsync(part, { idempotent: true }).catch(() => {});
+      throw sessionEnded();
+    }
     const paused = task.pauseAsync ? await task.pauseAsync().catch(() => null) : null;
     const resumeData = paused?.resumeData || task.savable?.()?.resumeData || "";
-    if (resumeData) resumes.set(checksum, resumeData);
+    if (resumeData && session === fileSession) resumes.set(checksum, resumeData);
     else resumes.delete(checksum);
     throw failure(null, resumeData
       ? "Die Verbindung ist abgerissen. Tippe noch einmal – der Download geht dort weiter, wo er aufgehört hat."
       : "Die Verbindung ist abgerissen. Bitte noch einmal tippen.");
   }
   resumes.delete(checksum);
+  if (session !== fileSession) {
+    await FileSystem.deleteAsync(part, { idempotent: true }).catch(() => {});
+    throw sessionEnded();
+  }
   if (!result || (result.status !== 200 && result.status !== 206) || !FileSystem.moveAsync) {
     await FileSystem.deleteAsync(part, { idempotent: true }).catch(() => {});
     throw failure(result?.status);
@@ -235,10 +279,12 @@ export async function fetchChecked(url: string, checksum: string, extension: str
 
 export type OpenDocument = (doc: MemberDocument, token: string) => Promise<void>;
 
-export const openDocument: OpenDocument = (doc, token) => {
+export const openDocument: OpenDocument = async (doc, token) => {
+  const url = documentUrl(doc);
+  if (!url) throw failure(null);
   const checksum = cleanChecksum(doc.checksum);
   const mime = doc.mime || "application/octet-stream";
-  return checksum ? fetchChecked(documentUrl(doc), checksum, documentExtension(doc), mime, token) : fetchAndOpen(documentUrl(doc), documentFileName(doc), mime, token);
+  return checksum ? fetchChecked(url, checksum, documentExtension(doc), mime, token) : fetchAndOpen(url, documentFileName(doc), mime, token);
 };
 
 // ---------------------------------------------------------------- Eigene Belege (#339)
@@ -285,8 +331,9 @@ export function invoiceFileName(invoice: Invoice): string {
 export const openInvoice = (invoice: Invoice, token: string) =>
   fetchAndOpen(`${API_BASE_URL}/api/account/invoices/${encodeURIComponent(invoice.key)}/pdf`, invoiceFileName(invoice), "application/pdf", token);
 
-/** Beim Abmelden oder Kontowechsel: alle geladenen Dokumente weg. */
+/** Beim Abmelden oder Kontowechsel: alle geladenen Dokumente weg - auch was gerade noch lädt (#1059). */
 export async function forgetDocuments(): Promise<void> {
+  fileSession += 1;
   resumes.clear();
   try {
     const FileSystem = await fileSystem();
@@ -296,4 +343,4 @@ export async function forgetDocuments(): Promise<void> {
   }
 }
 
-registerCacheClearer(() => { void forgetDocuments(); });
+registerCacheClearer(forgetDocuments);

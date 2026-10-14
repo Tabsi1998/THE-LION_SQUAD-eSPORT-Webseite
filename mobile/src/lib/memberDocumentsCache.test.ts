@@ -9,6 +9,8 @@ const mockFiles = new Set<string>();
 const mockAnswers: Answer[] = [];
 const mockTasks: Array<{ url: string; uri: string; headers: Record<string, string>; resumeData?: string; resumed: boolean }> = [];
 let mockResumeData: string | null = null;
+// Hält einen Download an, bis der Test ihn freigibt (Abmelden mitten im Download, #1059).
+let mockGate: Promise<void> | null = null;
 
 const mockFs = {
   cacheDirectory: "file:///cache/",
@@ -26,6 +28,7 @@ const mockFs = {
     const task = { url, uri, headers: options?.headers || {}, resumeData, resumed: false };
     mockTasks.push(task);
     const run = async () => {
+      if (mockGate) await mockGate;
       const answer = mockAnswers.shift() || { status: 200 };
       if (answer instanceof Error) throw answer;
       if (answer.status === 200 || answer.status === 206) mockFiles.add(uri);
@@ -46,7 +49,11 @@ jest.mock("expo-file-system/legacy", () => mockFs);
 const mockLauncher = { startActivityAsync: jest.fn(async () => ({})) };
 jest.mock("expo-intent-launcher", () => mockLauncher);
 
-const { cleanChecksum, forgetDocuments, openDocument, resetDocumentDownloads } = require("./memberDocuments");
+const { cleanChecksum, fetchAndOpen, forgetDocuments, openDocument, openInvoice, resetDocumentDownloads } = require("./memberDocuments");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { FOREIGN_ARTICLE_LINKS } = require("./linkOrigins.fixture");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { API_BASE_URL } = require("../config");
 
 const SHA = "a".repeat(64);
 const TARGET = `file:///cache/member-documents/sha-${SHA}.pdf`;
@@ -58,6 +65,7 @@ beforeEach(() => {
   mockAnswers.length = 0;
   mockTasks.length = 0;
   mockResumeData = null;
+  mockGate = null;
   resetDocumentDownloads();
   jest.clearAllMocks();
 });
@@ -124,4 +132,59 @@ test("ohne Prüfsumme (eigene Dateien des Vereins) bleibt es beim bisherigen Weg
   await openDocument({ id: "d1", mime: "application/pdf", original_filename: "Satzung.pdf" }, "tok");
   expect(mockTasks[0].uri).toBe("file:///cache/member-documents/d1-Satzung.pdf");
   expect(mockFs.getInfoAsync).not.toHaveBeenCalled();
+});
+
+// Abruf mit Anmeldung (#1054): nur vom eigenen Server - jede andere Herkunft lädt gar nicht erst.
+test("Dokumente und Belege kommen nur vom eigenen Server", async () => {
+  for (const link of FOREIGN_ARTICLE_LINKS) {
+    await expect(openDocument({ ...DOC, view_url: link }, "tok")).rejects.toThrow("konnte nicht geladen");
+    await expect(openDocument({ id: "d1", mime: "application/pdf", view_url: link }, "tok")).rejects.toThrow("konnte nicht geladen");
+    await expect(fetchAndOpen(link, "x.pdf", "application/pdf", "tok")).rejects.toThrow("konnte nicht geladen");
+  }
+  expect(mockTasks).toHaveLength(0);
+
+  await openInvoice({ key: "k 1", ref: "RE-1", type: "standard", type_label: "Rechnung", status: "open", status_label: "offen" }, "tok");
+  expect(mockTasks[0].url).toBe(`${API_BASE_URL}/api/account/invoices/k%201/pdf`);
+  expect(mockTasks[0].headers).toEqual({ Authorization: "Bearer tok" });
+});
+
+test("wo die App Dokumente nicht öffnen kann, lädt sie sie auch nicht", async () => {
+  Platform.OS = "ios";
+  await expect(openDocument(DOC, "tok")).rejects.toThrow("nur auf Android");
+  await expect(openDocument({ id: "d1", mime: "application/pdf", original_filename: "Satzung.pdf" }, "tok")).rejects.toThrow("nur auf Android");
+  expect(mockTasks).toHaveLength(0);
+  expect(mockFiles.size).toBe(0);
+});
+
+// Dateilebenszyklus (#1059): was beim Abmelden noch lädt, bleibt nicht liegen und wird nicht mehr geöffnet.
+test.each([
+  ["mit Prüfsumme", DOC],
+  ["ohne Prüfsumme", { id: "d1", mime: "application/pdf", original_filename: "Satzung.pdf" }],
+])("abgemeldet während des Downloads (%s): keine Datei bleibt, nichts wird geöffnet", async (_name, doc) => {
+  let release: () => void = () => {};
+  mockGate = new Promise<void>((resolve) => { release = resolve; });
+  const opening = openDocument(doc, "tok");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(mockTasks).toHaveLength(1);
+  await forgetDocuments();
+  release();
+  await expect(opening).rejects.toThrow();
+  expect(mockFiles.size).toBe(0);
+  expect(mockLauncher.startActivityAsync).not.toHaveBeenCalled();
+});
+
+test("abgemeldet während eines abgerissenen Downloads: kein Stand zum Fortsetzen bleibt für das nächste Konto", async () => {
+  let release: () => void = () => {};
+  mockGate = new Promise<void>((resolve) => { release = resolve; });
+  mockAnswers.push(new Error("Netz weg"));
+  mockResumeData = "4096";
+  const opening = openDocument(DOC, "tok");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(mockTasks).toHaveLength(1);
+  await forgetDocuments();
+  release();
+  await expect(opening).rejects.toThrow();
+  mockGate = null;
+  await openDocument(DOC, "tok");
+  expect(mockTasks[mockTasks.length - 1].resumeData).toBeUndefined();
 });

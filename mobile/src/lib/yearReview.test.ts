@@ -1,11 +1,13 @@
 // Jahresrückblick (#1195): dieselbe Seitenfolge und dieselben Sätze wie im Web; das Bild nur mit Anmeldung.
 
-const mockFs = { cacheDirectory: "file:///cache/", downloadAsync: jest.fn() };
+const mockFs = { cacheDirectory: "file:///cache/", downloadAsync: jest.fn(), makeDirectoryAsync: jest.fn(async () => {}) };
 const mockSharing = { isAvailableAsync: jest.fn(), shareAsync: jest.fn() };
 jest.mock("expo-file-system/legacy", () => mockFs);
 jest.mock("expo-sharing", () => mockSharing);
 jest.mock("./api", () => ({ resolveMediaUrl: (value?: string | null) => (value ? `https://verein.example${value}` : "") }));
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { API_BASE_URL } = require("../config");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { bestResultText, comparisonText, fastlapText, seasonText, shareYearCard, yearCardUrl, yearReviewPages } = require("./yearReview");
 
@@ -39,15 +41,24 @@ test("Sätze wie im Web", () => {
   expect(seasonText(FULL)).toBe("von 48 · 210,5 Punkte");
 });
 
-test("Bild teilen lädt mit Anmeldung und öffnet das Teilen-Menü", async () => {
-  expect(yearCardUrl(FULL)).toBe("https://verein.example/api/year-review/me/card.png");
-  expect(yearCardUrl({ ...FULL, preview: true })).toBe("https://verein.example/api/year-review/me/card.png?vorschau=true");
+test("Bild teilen lädt mit Anmeldung vom eigenen Server und öffnet das Teilen-Menü", async () => {
+  expect(yearCardUrl(FULL)).toBe(`${API_BASE_URL}/api/year-review/me/card.png`);
+  expect(yearCardUrl({ ...FULL, preview: true })).toBe(`${API_BASE_URL}/api/year-review/me/card.png?vorschau=true`);
   mockSharing.isAvailableAsync.mockResolvedValue(true);
-  mockFs.downloadAsync.mockResolvedValue({ uri: "file:///cache/mein-jahr-2026.png", status: 200 });
+  const target = "file:///cache/member-documents/mein-jahr-2026.png";
+  mockFs.downloadAsync.mockResolvedValue({ uri: target, status: 200 });
   expect(await shareYearCard(FULL, "token-1")).toBe("shared");
-  expect(mockFs.downloadAsync).toHaveBeenCalledWith("https://verein.example/api/year-review/me/card.png", "file:///cache/mein-jahr-2026.png", { headers: { Authorization: "Bearer token-1" } });
-  expect(mockSharing.shareAsync).toHaveBeenCalledWith("file:///cache/mein-jahr-2026.png", { mimeType: "image/png", UTI: "public.png", dialogTitle: "Mein 2026" });
+  expect(mockFs.downloadAsync).toHaveBeenCalledWith(`${API_BASE_URL}/api/year-review/me/card.png`, target, { headers: { Authorization: "Bearer token-1" } });
+  expect(mockSharing.shareAsync).toHaveBeenCalledWith(target, { mimeType: "image/png", UTI: "public.png", dialogTitle: "Mein 2026" });
   expect(await shareYearCard(FULL, null)).toBe("failed");
   mockFs.downloadAsync.mockResolvedValue({ uri: "x", status: 404 });
   expect(await shareYearCard(FULL, "token-1")).toBe("failed");
+});
+
+// Herkunft (#1060): das Bild trägt die Anmeldung - es kommt nur vom eigenen Server. Liegt es im privaten Ordner, geht
+// es beim Abmelden mit (#1059).
+test("Bild des Rückblicks nur vom eigenen Server", () => {
+  expect(yearCardUrl({ ...FULL, image_path: "https://cdn.example/card.png" })).toBe(`${API_BASE_URL}/api/year-review/me/card.png`);
+  expect(yearCardUrl({ ...FULL, image_path: "//cdn.example/card.png", preview: true })).toBe(`${API_BASE_URL}/api/year-review/me/card.png?vorschau=true`);
+  expect(yearCardUrl({ ...FULL, image_path: null })).toBe(`${API_BASE_URL}/api/year-review/me/card.png`);
 });

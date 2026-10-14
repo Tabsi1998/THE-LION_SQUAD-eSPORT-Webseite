@@ -469,3 +469,65 @@ describe("Erneuerung über einen Sitzungswechsel hinweg (#1519)", () => {
     expect(sent).toEqual(["refresh-a", "refresh-b"]);
   });
 });
+
+// Herkunft (#1060): Token und Gerätekennung gehen nur an den eigenen Server. Eine Adresse anderer Herkunft (etwa aus
+// einer Antwort des Servers) läuft ohne beides - und ein 401 von dort erneuert nichts.
+describe("Anmeldung nur für den eigenen Server (#1060)", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { API_BASE_URL } = require("../config");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { FOREIGN_ARTICLE_LINKS } = require("./linkOrigins.fixture");
+  let seen: Array<{ url: string; auth: unknown; device: unknown }>;
+
+  beforeEach(() => {
+    seen = [];
+    handler = async (config) => {
+      const headers = config.headers as Record<string, unknown> | undefined;
+      seen.push({ url: String(config.url), auth: headers?.Authorization, device: headers?.["X-Device-Id"] });
+      return { data: {}, status: 200, headers: {}, config };
+    };
+  });
+
+  test("relative Pfade und Adressen des eigenen Servers tragen Token und Gerät", async () => {
+    await api.get("/news");
+    await api.get(`${API_BASE_URL}/api/chat-attachments/a1?w=800`);
+    expect(seen.map(({ auth, device }) => [auth, device])).toEqual([["Bearer access-alt", "geraet-1"], ["Bearer access-alt", "geraet-1"]]);
+  });
+
+  test("andere Herkunft: weder Token noch Gerät", async () => {
+    const absolute = FOREIGN_ARTICLE_LINKS.filter((link: string) => /^(https?:)?\/\//i.test(link));
+    expect(absolute.length).toBeGreaterThan(5);
+    for (const link of absolute) await api.get(link).catch(() => undefined);
+    expect(seen.length).toBe(absolute.length);
+    for (const call of seen) expect(call).toEqual({ url: call.url, auth: undefined, device: undefined });
+  });
+
+  test("ein 401 einer anderen Herkunft erneuert die Sitzung nicht und wiederholt nichts", async () => {
+    handler = async (config) => {
+      seen.push({ url: String(config.url), auth: (config.headers as Record<string, unknown>)?.Authorization, device: undefined });
+      throw httpError(401, config);
+    };
+    await expect(api.get("https://cdn.example/bild.png")).rejects.toBeTruthy();
+    expect(seen).toEqual([{ url: "https://cdn.example/bild.png", auth: undefined, device: undefined }]);
+    expect(persistSession).not.toHaveBeenCalled();
+    expect(clearSession).not.toHaveBeenCalled();
+  });
+});
+
+// Sitzungsende (#1057): eine Antwort, die erst nach Abmelden oder Kontowechsel ankommt, landet nicht mehr im
+// Zwischenspeicher.
+test("eine Antwort der vorigen Sitzung wird nicht mehr zwischengespeichert", async () => {
+  let snapshot: { accessToken: string | null; refreshToken: string | null; userId: string | null; generation: number } =
+    { accessToken: "access-a", refreshToken: "refresh-a", userId: "u-a", generation: 1 };
+  configureAuthBridge({ readTokens: () => snapshot, persistSession, clearSession });
+  handler = async (config) => {
+    snapshot = { accessToken: null, refreshToken: null, userId: "guest", generation: 2 };
+    return { data: { privat: true }, status: 200, headers: {}, config };
+  };
+  await api.get("/profile");
+  expect(mockSetCached).not.toHaveBeenCalled();
+
+  handler = async (config) => ({ data: { ok: true }, status: 200, headers: {}, config });
+  await api.get("/news");
+  expect(mockSetCached).toHaveBeenCalledTimes(1);
+});

@@ -5,6 +5,7 @@ import { buildCacheKey, getStaleEntry, setCached } from "./cache";
 import { noteFresh, noteOffline } from "./network";
 import { deviceHeaders } from "./deviceIdentity";
 import { accessTokenExpired, isSessionRejected, tokenExpiry } from "./session";
+import { isApiRequest } from "./siteUrls";
 
 type TokenSnapshot = {
   accessToken: string | null;
@@ -22,7 +23,18 @@ type CacheAwareConfig = InternalAxiosRequestConfig & {
   _offlineFallback?: boolean;
   /** Die Sitzungs-Generation beim Senden (#1519) - ein Aufruf der alten Sitzung wird nie mit der neuen wiederholt. */
   _generation?: number;
+  /** Geht der Aufruf an den eigenen Server (#1060)? Nur dann trägt er Token und Gerät - und nur dann wird erneuert. */
+  _ownServer?: boolean;
 };
+
+/** Das Ziel des Aufrufs samt Basisadresse - eine absolute Adresse ersetzt die Basis. */
+function sendsToOwnServer(config: InternalAxiosRequestConfig): boolean {
+  try {
+    return isApiRequest(api.getUri(config));
+  } catch {
+    return false;
+  }
+}
 
 let readTokens: () => TokenSnapshot = () => ({ accessToken: null, refreshToken: null, userId: null });
 let persistSession: (session: AuthResponse) => Promise<void> = async () => {};
@@ -106,6 +118,14 @@ export function configureAuthBridge(bridge: {
 
 // ─── Request Interceptor: Auth-Token + Cache-Check ───────────────────────────
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+  // Herkunft (#1060): eine Adresse anderer Herkunft (etwa aus einer Antwort) geht ohne Anmeldung und ohne Gerät raus.
+  const ownServer = sendsToOwnServer(config);
+  (config as CacheAwareConfig)._ownServer = ownServer;
+  (config as CacheAwareConfig)._generation = readTokens().generation;
+  if (!ownServer) {
+    config.headers.delete("Authorization");
+    return config;
+  }
   let { accessToken, userId } = readTokens();
   const { refreshToken, accessReceivedAt, generation } = readTokens();
   // Abgelaufenes Zugangs-Token (#1519): erst erneuern, dann senden. Öffentliche Aufrufe (Dashboard, /auth/me) antworten
@@ -153,7 +173,9 @@ api.interceptors.response.use(
     // Erfolgreiche GET-Responses cachen
     if (response.config.method?.toLowerCase() === "get" && response.config.url) {
       const config = response.config as CacheAwareConfig;
-      if (config._cacheKey && config.url) await setCached(config._cacheKey, config.url, response.data);
+      // Kam die Antwort erst nach Abmelden oder Kontowechsel (#1057), gehört sie zur vorigen Sitzung: nicht ablegen.
+      const sameSession = config._generation === readTokens().generation;
+      if (config._cacheKey && config.url && sameSession) await setCached(config._cacheKey, config.url, response.data);
     }
     return response;
   },
@@ -166,7 +188,7 @@ api.interceptors.response.use(
     // Einmal erneuern und wiederholen. Endet die Sitzung, dann nur, weil der Server die Erneuerung ablehnt (#1519) - ein
     // zweiter 401 nach erfolgreicher Erneuerung oder ein 401 beim Anmelden betrifft nur diesen Aufruf, nicht die Sitzung.
     const sameSession = original?._generation === readTokens().generation;
-    if (error.response?.status === 401 && original && !original._retry && refreshToken && !isAuthCall && sameSession) {
+    if (error.response?.status === 401 && original?._ownServer && !original._retry && refreshToken && !isAuthCall && sameSession) {
       original._retry = true;
       try {
         const access = await renewAccess(refreshToken);
