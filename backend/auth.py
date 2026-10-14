@@ -1,6 +1,9 @@
 """JWT auth helpers + password hashing + role deps."""
+import asyncio
 import logging
 import os
+import weakref
+import anyio
 import bcrypt
 import jwt
 import hashlib
@@ -67,22 +70,62 @@ def has_password_contract(user: dict) -> bool:
     return user.get(PASSWORD_CONTRACT_FIELD) == PASSWORD_CONTRACT_VERSION
 
 
-def _matches(candidates: list[bytes], hashed) -> bool:
+_STAND_IN_HASH: bytes | None = None
+
+
+def _stand_in_hash() -> bytes:
+    """Ein Hash mit denselben Kosten wie jeder echte, zu dem kein Passwort passt - einmal je Prozess erzeugt."""
+    global _STAND_IN_HASH
+    if _STAND_IN_HASH is None:
+        _STAND_IN_HASH = bcrypt.hashpw(secrets.token_hex(32).encode("ascii"), bcrypt.gensalt())
+    return _STAND_IN_HASH
+
+
+def _has_usable_hash(user: dict | None) -> bool:
+    stored = (user or {}).get("password_hash")
+    return isinstance(stored, str) and stored.startswith("$2") and len(stored) == 60
+
+
+def _stand_in_checks(count: int) -> None:
+    for _ in range(max(0, count)):
+        bcrypt.checkpw(b"-", _stand_in_hash())
+
+
+def _matches(candidates: list[bytes], hashed, work: int) -> bool:
+    """Prüft die Kandidaten gegen den Hash. Bleibt es ohne Treffer, sind es immer genau ``work`` vollwertige
+    Vergleiche (#1510): fehlende werden gegen den Platzhalter-Hash nachgeholt."""
     try:
         stored = hashed.encode("utf-8")
     except Exception:
-        return False
-    for candidate in candidates:
+        stored = None
+    done = 0
+    for candidate in candidates if stored is not None else []:
+        done += 1
         try:
             if bcrypt.checkpw(candidate, stored):
                 return True
         except Exception:
-            return False
+            break
+    _stand_in_checks(work - done)
     return False
 
 
+def password_work(plain: str) -> int:
+    """Wie viele Vergleiche eine abgelehnte Prüfung dieser Eingabe kostet: so viele Formen, wie die Eingabe hat
+    (``verification_candidates``: eins, bei nicht vereinheitlichter Eingabe zwei) - für jedes Konto gleich."""
+    try:
+        return max(1, len(password_policy.verification_candidates(plain)))
+    except Exception:
+        return 1
+
+
 def verify_password(plain: str, hashed: str, *, strict: bool = False) -> bool:
-    """Prüft eine Eingabe gegen einen Hash. ``strict``: nur die Form des Vertrags, sonst auch der frühere Weg."""
+    """Prüft eine Eingabe gegen einen Hash. ``strict``: nur die Form des Vertrags, sonst auch der frühere Weg.
+
+    Ein Konto von vor dem Vertrag braucht beide Formen der Eingabe: gehasht wurde damals, wie das Gerät sie schickte,
+    heute kann dasselbe Passwort in der anderen Unicode-Form ankommen. Damit eine Ablehnung trotzdem nichts über das
+    Konto verrät, kostet sie immer ``password_work`` Vergleiche - auch bei strenger Prüfung und ohne prüfbare Form."""
+    work = password_work(plain)
     try:
         if strict:
             exact = password_policy.contract_bytes(plain)
@@ -90,8 +133,8 @@ def verify_password(plain: str, hashed: str, *, strict: bool = False) -> bool:
         else:
             candidates = password_policy.verification_candidates(plain)
     except Exception:
-        return False
-    return _matches(candidates, hashed)
+        candidates = []
+    return _matches(candidates, hashed, work)
 
 
 def verify_user_password(user: dict, plain: str) -> bool:
@@ -99,17 +142,47 @@ def verify_user_password(user: dict, plain: str) -> bool:
     return verify_password(plain, user.get("password_hash") or "", strict=has_password_contract(user))
 
 
-async def verify_and_upgrade_password(db, user: dict, plain: str) -> bool:
+# bcrypt läuft nie im Event-Loop (#1510): höchstens so viele Prüfungen gleichzeitig in Hintergrund-Threads.
+PASSWORD_WORKERS = 4
+_PASSWORD_LIMITERS: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+
+
+def _password_limiter() -> anyio.CapacityLimiter:
+    loop = asyncio.get_running_loop()
+    limiter = _PASSWORD_LIMITERS.get(loop)
+    if limiter is None:
+        limiter = anyio.CapacityLimiter(PASSWORD_WORKERS)
+        _PASSWORD_LIMITERS[loop] = limiter
+    return limiter
+
+
+async def run_password_work(function, *args):
+    """``function(*args)`` (bcrypt) in einem der ``PASSWORD_WORKERS`` Threads - der Event-Loop bleibt frei."""
+    return await anyio.to_thread.run_sync(function, *args, limiter=_password_limiter())
+
+
+async def verify_user_password_async(user: dict, plain: str) -> bool:
+    """``verify_user_password`` über den begrenzten Pool - für Routen, die ein Passwort bestätigen lassen."""
+    return await run_password_work(verify_user_password, user, plain)
+
+
+async def verify_and_upgrade_password(db, user: dict | None, plain: str) -> bool:
     """Anmeldung: prüft das Passwort und hasht ein Konto ohne Markierung nach dem Vertrag neu, wenn die Eingabe
-    in dessen Form passt (höchstens 72 Byte). So verschwinden Hashes von vor dem Vertrag mit der Zeit."""
-    if not verify_user_password(user, plain):
+    in dessen Form passt (höchstens 72 Byte). So verschwinden Hashes von vor dem Vertrag mit der Zeit.
+
+    Einheitlich (#1510): ohne Konto oder ohne verwendbaren Hash wird trotzdem ein vollwertiger Vergleich gerechnet -
+    eine abgelehnte Anmeldung kostet und antwortet immer gleich."""
+    if not _has_usable_hash(user):
+        await run_password_work(verify_password, plain, _stand_in_hash().decode("ascii"))
+        return False
+    if not await verify_user_password_async(user, plain):
         return False
     if has_password_contract(user):
         return True
     exact = password_policy.contract_bytes(plain)
     if exact is None:
         return True
-    fresh = bcrypt.hashpw(exact, bcrypt.gensalt()).decode("utf-8")
+    fresh = (await run_password_work(bcrypt.hashpw, exact, bcrypt.gensalt())).decode("utf-8")
     try:
         # Nur, wenn sich der Hash seit dem Lesen nicht geändert hat - ein gleichzeitig gesetztes Passwort bleibt.
         await db.users.update_one(
