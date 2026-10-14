@@ -705,12 +705,13 @@ async def login(body: UserLogin, request: Request, response: Response):
     await _check_brute_force(db, identifier)
 
     user = await db.users.find_one({"email": email})
-    if user and user.get("password_setup_required"):
-        await _record_failed(db, identifier)
-        raise HTTPException(status_code=403, detail="Bitte zuerst den Einladungslink verwenden und ein Passwort erstellen.")
-    if not user or not await verify_and_upgrade_password(db, user, body.password):
+    # Erst das Passwort (#1510): jede abgelehnte Anmeldung antwortet gleich, egal in welchem Zustand das Konto ist.
+    if not await verify_and_upgrade_password(db, user, body.password):
         await _record_failed(db, identifier)
         raise HTTPException(status_code=401, detail="Ungültige Zugangsdaten")
+    if user.get("password_setup_required"):
+        await _record_failed(db, identifier)
+        raise HTTPException(status_code=403, detail="Bitte zuerst den Einladungslink verwenden und ein Passwort erstellen.")
     if user.get("is_active") is False:
         raise HTTPException(status_code=403, detail="Account deaktiviert")
     if user.get("is_banned"):
@@ -990,12 +991,13 @@ async def mobile_login(body: UserLogin, request: Request):
     await _check_brute_force(db, identifier)
 
     user = await db.users.find_one({"email": email})
-    if user and user.get("password_setup_required"):
-        await _record_failed(db, identifier)
-        raise HTTPException(status_code=403, detail="Bitte zuerst den Einladungslink verwenden und ein Passwort erstellen.")
-    if not user or not await verify_and_upgrade_password(db, user, body.password):
+    # Erst das Passwort (#1510): jede abgelehnte Anmeldung antwortet gleich, egal in welchem Zustand das Konto ist.
+    if not await verify_and_upgrade_password(db, user, body.password):
         await _record_failed(db, identifier)
         raise HTTPException(status_code=401, detail="Ungültige Zugangsdaten")
+    if user.get("password_setup_required"):
+        await _record_failed(db, identifier)
+        raise HTTPException(status_code=403, detail="Bitte zuerst den Einladungslink verwenden und ein Passwort erstellen.")
     if user.get("is_active") is False:
         raise HTTPException(status_code=403, detail="Account deaktiviert")
     if user.get("is_banned"):
@@ -1413,6 +1415,7 @@ async def enable_mfa(body: MfaCodeBody, request: Request, user: dict = Depends(g
 
 @router.post("/mfa/disable")
 async def disable_mfa(body: MfaDisableBody, request: Request, user: dict = Depends(get_current_user)):
+    await enforce_rate_limit(request, "auth:mfa-disable:user", limit=5, window_seconds=900, subject=user["id"])
     db = get_db()
     full = await db.users.find_one({"id": user["id"]})
     if not full or not full.get("mfa_enabled"):
@@ -1519,7 +1522,9 @@ async def _set_password_from_link(db, doc: dict, body: ResetPasswordBody, now: d
 
 
 @router.post("/change-password")
-async def change_password(body: ChangePasswordBody, user: dict = Depends(get_current_user)):
+async def change_password(body: ChangePasswordBody, request: Request, user: dict = Depends(get_current_user)):
+    # Begrenzt wie die übrigen Konto-Endpunkte, die das Passwort prüfen (#1510).
+    await enforce_rate_limit(request, "auth:change-password:user", limit=8, window_seconds=900, subject=user["id"])
     db = get_db()
     full = await db.users.find_one({"id": user["id"]})
     if not full or not verify_user_password(full, body.current_password):

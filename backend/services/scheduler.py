@@ -292,6 +292,15 @@ async def _safe_matchday_schedule():
 
 async def _safe_billing_orders():
     try:
+        # Erst fehlende Aufträge zu eingefrorenen Preisen nachholen (#1042), dann einsortieren.
+        from database import get_db
+        from services import billing_repair
+        repaired = await billing_repair.repair_missing_orders(get_db())
+        if repaired.get("repaired") or repaired.get("errors"):
+            logger.info(f"[scheduler] billing_repair {repaired}")
+    except Exception as exc:
+        _log_task_failure("billing_repair", exc)
+    try:
         from services.billing_orders import classify_due
         res = await classify_due()
         if res.get("looked"):

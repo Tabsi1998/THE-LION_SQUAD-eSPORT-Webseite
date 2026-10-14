@@ -67,10 +67,31 @@ def has_password_contract(user: dict) -> bool:
     return user.get(PASSWORD_CONTRACT_FIELD) == PASSWORD_CONTRACT_VERSION
 
 
+_STAND_IN_HASH: bytes | None = None
+
+
+def _stand_in_hash() -> bytes:
+    """Ein Hash mit denselben Kosten wie jeder echte, zu dem kein Passwort passt - einmal je Prozess erzeugt."""
+    global _STAND_IN_HASH
+    if _STAND_IN_HASH is None:
+        _STAND_IN_HASH = bcrypt.hashpw(secrets.token_hex(32).encode("ascii"), bcrypt.gensalt())
+    return _STAND_IN_HASH
+
+
+def _has_usable_hash(user: dict | None) -> bool:
+    stored = (user or {}).get("password_hash")
+    return isinstance(stored, str) and stored.startswith("$2") and len(stored) == 60
+
+
 def _matches(candidates: list[bytes], hashed) -> bool:
     try:
         stored = hashed.encode("utf-8")
     except Exception:
+        return False
+    if not candidates:
+        # Keine prüfbare Form (z. B. zu lang für den Vertrag): trotzdem ein vollwertiger Vergleich, damit eine
+        # abgelehnte Prüfung immer gleich viel kostet (#1510).
+        bcrypt.checkpw(b"-", _stand_in_hash())
         return False
     for candidate in candidates:
         try:
@@ -99,9 +120,15 @@ def verify_user_password(user: dict, plain: str) -> bool:
     return verify_password(plain, user.get("password_hash") or "", strict=has_password_contract(user))
 
 
-async def verify_and_upgrade_password(db, user: dict, plain: str) -> bool:
+async def verify_and_upgrade_password(db, user: dict | None, plain: str) -> bool:
     """Anmeldung: prüft das Passwort und hasht ein Konto ohne Markierung nach dem Vertrag neu, wenn die Eingabe
-    in dessen Form passt (höchstens 72 Byte). So verschwinden Hashes von vor dem Vertrag mit der Zeit."""
+    in dessen Form passt (höchstens 72 Byte). So verschwinden Hashes von vor dem Vertrag mit der Zeit.
+
+    Einheitlich (#1510): ohne Konto oder ohne verwendbaren Hash wird trotzdem ein vollwertiger Vergleich gerechnet -
+    eine abgelehnte Anmeldung kostet und antwortet immer gleich."""
+    if not _has_usable_hash(user):
+        verify_password(plain, _stand_in_hash().decode("ascii"), strict=True)
+        return False
     if not verify_user_password(user, plain):
         return False
     if has_password_contract(user):
