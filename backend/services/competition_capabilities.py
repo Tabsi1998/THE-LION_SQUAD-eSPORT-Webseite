@@ -180,6 +180,11 @@ CAPABILITIES: tuple[Capability, ...] = (
         "POST /api/tournaments/{tid}/heat-rebuild/reject"], [GRAPH],
        note="#1550: Prüfung läuft nach Baubau und Ergebnis von selbst; im Modus „Vorschlag“ bestätigt oder lehnt "
             "die Turnierleitung hier ab."),
+    _c("participants.removal", "Disqualifikation und Austritt mit Umbauplan",
+       ["POST /api/tournaments/{tid}/registrations/{reg_id}/removal",
+        "POST /api/tournaments/{tid}/registrations/{reg_id}/removal/reject"], [GRAPH],
+       note="#1553: Ereignis → Umbauplan (Format × Ereignis) → Vorschlag → Bestätigung der Turnierleitung; K.-o. "
+            "kampflos weiter ohne Loser-Bracket, Liga/Gruppen 50-Prozent-Regel, Swiss nicht mehr paaren, Läufe rücken auf."),
 )
 
 

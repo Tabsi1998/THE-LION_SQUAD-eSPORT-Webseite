@@ -22,6 +22,7 @@ import { TournamentStagesPanel } from "./tournament/StagesPanel";
 import { matchRights } from "@/lib/tournamentRights";
 import { PauseUntilControl, RoundSponsorsPanel } from "./tournament/TvTournamentPanel";
 import { HeatRebuildBar } from "./tournament/HeatRebuildBar";
+import { ParticipantRemovalActions } from "./tournament/ParticipantRemovalActions";
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
 import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
 import { planAndApplySchedule } from "@/lib/schedulePlan";
@@ -648,6 +649,7 @@ export default function AdminTournamentEditPage() {
                   {t.can_check_in && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                   )}
+                  <ParticipantRemovalActions tournament={t} registration={r} onDone={load} compact />
                   {t.can_manage_participants && (
                     <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
                   )}
@@ -690,6 +692,7 @@ export default function AdminTournamentEditPage() {
                       {t.can_check_in && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                       )}
+                      <ParticipantRemovalActions tournament={t} registration={r} onDone={load} />
                       {t.can_manage_participants && (
                         <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
                       )}

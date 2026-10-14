@@ -735,7 +735,10 @@ class RegistrationCreate(BaseModel):
 
 
 class RegistrationUpdate(BaseModel):
-    status: Optional[Literal["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"]] = None
+    # ``withdrawn`` (Austritt) und ``disqualified`` (#1553) setzt nur der Umbauplan über
+    # ``POST /registrations/{id}/removal`` - die Statusroute lehnt sie mit einem Hinweis ab.
+    status: Optional[Literal["pending", "approved", "rejected", "waitlist", "checked_in", "no_show",
+                             "withdrawn", "disqualified"]] = None
     seed: Optional[int] = None
     ingame_name: Optional[str] = None
     # Grund einer Absage (#1133): steht nur in der Nachricht an die Person, nicht an der Anmeldung.

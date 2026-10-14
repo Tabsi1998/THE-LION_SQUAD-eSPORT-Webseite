@@ -52,11 +52,18 @@ class _Inserts:
         return next((deepcopy(doc) for doc in self.docs if all(doc.get(k) == v for k, v in query.items())), None)
 
 
+class _Registrations:
+    def find(self, _query, _projection=None):
+        return _Cursor([])
+
+
 class _Db:
     def __init__(self, rows):
         self.matches_v2 = _Matches(rows)
         self.match_reports_v2 = _Inserts()
         self.audit_logs = _Inserts()
+        # Ausgeschiedene (#1553) rücken nie mehr ein - hier gibt es keine.
+        self.tournament_registrations = _Registrations()
         # Für das Best-of der Prüfung (#1035): Phase und Turnier ohne Angabe.
         self.tournament_stages = _Inserts()
         self.tournaments = _Inserts()

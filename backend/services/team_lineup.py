@@ -27,7 +27,7 @@ from services.match_audience import playing_user_ids
 VIENNA = ZoneInfo("Europe/Vienna")
 NUDGE_MINUTES = 10
 LOCKED_STATUSES = {"live", "paused", "completed", "results_published", "archived", "cancelled"}
-CLOSED_REGISTRATIONS = {"rejected", "no_show"}
+CLOSED_REGISTRATIONS = {"rejected", "no_show", "withdrawn", "disqualified"}
 
 
 def _parse(value) -> datetime | None:

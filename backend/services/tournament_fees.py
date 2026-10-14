@@ -25,7 +25,7 @@ from services import billing_orders, pricing
 from services.permissions import user_has_area
 
 BILLABLE_STATUSES = ("approved", "checked_in")
-CLOSED_STATUSES = ("rejected", "no_show", "withdrawn", "cancelled")
+CLOSED_STATUSES = ("rejected", "no_show", "withdrawn", "disqualified", "cancelled")
 
 
 async def billing_updates(raw: dict, existing: dict | None, me: dict) -> dict | None:

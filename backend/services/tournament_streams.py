@@ -47,7 +47,7 @@ async def live_streams_for_tournament(db, tournament: dict, *, for_discord: bool
     if not (discord_tournament(tournament) if for_discord else public_tournament(tournament)):
         return []
     registrations = await db.tournament_registrations.find(
-        {"tournament_id": tournament["id"], "status": {"$nin": ["cancelled", "rejected", "withdrawn", "no_show"]}},
+        {"tournament_id": tournament["id"], "status": {"$nin": ["cancelled", "rejected", "withdrawn", "disqualified", "no_show"]}},
         {"_id": 0, "user_id": 1, "team_id": 1},
     ).to_list(2000)
     participants = await _participant_user_ids(db, registrations)
