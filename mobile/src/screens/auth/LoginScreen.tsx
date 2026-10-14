@@ -8,7 +8,7 @@ import { Screen } from "../../components/Screen";
 import { Body, Muted } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { errorMessage } from "../../lib/api";
-import { mfaTicketGone, needsEmailVerification } from "../../lib/loginRecovery";
+import { cancelMfaChallenge, mfaTicketGone, needsEmailVerification } from "../../lib/loginRecovery";
 import { passkeyError, passkeysSupported, silentPasskeyMiss, type PasskeyMiss } from "../../lib/passkeys";
 import type { RootStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -50,13 +50,22 @@ export function LoginScreen({ navigation }: Props) {
   // Ein Passkey am Handy, den der Server nicht (mehr) kennt (#949): ruhiger Hinweis statt rotem Fehler.
   const [unknownHint, setUnknownHint] = useState("");
   const asked = useRef(false);
+  // Die MFA-Abfrage, die am Server noch offen ist (#996): beim Abbrechen oder Verlassen der Seite wird sie verworfen.
+  const openTicket = useRef("");
+
+  useEffect(() => () => {
+    if (openTicket.current) void cancelMfaChallenge(openTicket.current);
+  }, []);
 
   function done() {
     if (navigation.canGoBack?.()) navigation.goBack?.();
   }
 
   // Zurück zum Formular (#996): ohne Ticket und ohne Code. E-Mail und Passwort bleiben - „Anmelden“ holt eine neue Abfrage.
-  function leaveMfa() {
+  // Beim Abbrechen gilt die Abfrage auch am Server nicht mehr; ist sie dort schon ungültig, braucht es das nicht.
+  function leaveMfa(cancelOnServer: boolean) {
+    if (cancelOnServer && openTicket.current) void cancelMfaChallenge(openTicket.current);
+    openTicket.current = "";
     setMfaTicket("");
     setMfaCode("");
     setRecoveryCode(false);
@@ -74,19 +83,21 @@ export function LoginScreen({ navigation }: Props) {
     try {
       if (mfaTicket) {
         await completeMfa(mfaTicket, mfaCode.trim(), remember, noDevicePasskey);
+        openTicket.current = "";
         done();
       } else {
         const result = await login(email.trim(), password, remember, noDevicePasskey);
         if (result.mfaRequired && result.ticket) {
           setMfaCode("");
           setRecoveryCode(false);
+          openTicket.current = result.ticket;
           setMfaTicket(result.ticket);
         } else done();
       }
     } catch (err) {
       if (mfaTicket && mfaTicketGone(err)) {
         // Die Abfrage gilt nicht mehr - weitere Codes helfen nicht. Neu beginnen statt die App neu zu starten.
-        leaveMfa();
+        leaveMfa(false);
         setError("Die Bestätigung ist abgelaufen. Tippe auf „Anmelden“, dann bekommst du eine neue Abfrage.");
         return;
       }
@@ -231,7 +242,7 @@ export function LoginScreen({ navigation }: Props) {
             ) : null}
             <Button label={submitting ? "Anmelden ..." : mfaTicket ? "MFA bestätigen" : "Anmelden"} onPress={submit} disabled={submitting} />
             {mfaTicket ? (
-              <Pressable onPress={leaveMfa} disabled={submitting} style={styles.linkWrap} testID="login-mfa-restart">
+              <Pressable onPress={() => leaveMfa(true)} disabled={submitting} style={styles.linkWrap} testID="login-mfa-restart">
                 <Text style={styles.link}>Abbrechen und neu anmelden</Text>
               </Pressable>
             ) : null}

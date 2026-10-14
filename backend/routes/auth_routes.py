@@ -5,7 +5,7 @@ import secrets
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Response, Request, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 from starlette.concurrency import run_in_threadpool
@@ -80,6 +80,10 @@ class MfaLoginBody(BaseModel):
     ticket: str = ""
     code: str = ""
     client: str = "web"
+
+
+class MfaCancelBody(BaseModel):
+    ticket: str = Field(default="", max_length=512)
 
 
 class ConsentBody(BaseModel):
@@ -201,6 +205,9 @@ def _eligible_session_user(user: dict | None) -> dict:
 MFA_ATTEMPTS_PER_LOGIN = 5
 MFA_ATTEMPTS_PER_ACCOUNT = 10  # Fehlversuche je Viertelstunde, über alle offenen Anmeldungen eines Kontos
 RESET_CLAIM_MINUTES = 2  # so lange hält eine Anfrage einen Link fest, während sie das Passwort setzt
+# Die MFA-Abfrage gilt nicht mehr (#996): abgelaufen, verbraucht, abgebrochen, abgelöst oder ein anderes Gerät. Dann hilft
+# kein weiterer Code, nur eine neue Anmeldung - App und Website erkennen das an diesem Kennzeichen, nicht am Text.
+MFA_CHALLENGE_INVALID = {"X-Auth-Error": "mfa_challenge_invalid"}
 
 
 def _requires_admin_mfa(user: dict) -> bool:
@@ -217,6 +224,12 @@ async def _create_mfa_login_challenge(db, user: dict, request: Request, client: 
     ticket = secrets.token_urlsafe(32)
     now = now_utc()
     user_agent, ip = _request_identity(request)
+    # Eine neue Anmeldung auf demselben Gerät löst die offenen Abfragen dieses Kontos dort ab (#996): es gilt nur die
+    # neueste. Anmeldungen auf anderen Geräten bleiben offen.
+    await db.mfa_login_challenges.update_many(
+        {"user_id": user["id"], "user_agent": user_agent, "ip": ip, "used": False},
+        {"$set": {"used": True, "used_at": now, "invalidated_reason": "superseded"}},
+    )
     await db.mfa_login_challenges.insert_one({
         "id": new_id(),
         "ticket_hash": hash_token(ticket),
@@ -1263,10 +1276,10 @@ async def complete_mfa_login(body: MfaLoginBody, request: Request, response: Res
         },
     )
     if not challenge:
-        raise HTTPException(status_code=401, detail="MFA-Anmeldung ist ungültig oder abgelaufen.")
+        raise HTTPException(status_code=401, detail="MFA-Anmeldung ist ungültig oder abgelaufen.", headers=MFA_CHALLENGE_INVALID)
     user_agent, ip = _request_identity(request)
     if challenge.get("ip") != ip or challenge.get("user_agent") != user_agent:
-        raise HTTPException(status_code=401, detail="MFA-Anmeldung gehört zu einem anderen Gerät.")
+        raise HTTPException(status_code=401, detail="MFA-Anmeldung gehört zu einem anderen Gerät.", headers=MFA_CHALLENGE_INVALID)
     user = _eligible_session_user(await db.users.find_one({"id": challenge["user_id"]}))
     # Je Konto begrenzt (#1032), sonst brächte jede neue Anmeldung wieder fünf frische Versuche. Der Platz wird vor
     # der Prüfung atomar reserviert und nach einem richtigen Code zurückgegeben - es zählen nur Fehlversuche. Eine
@@ -1286,7 +1299,7 @@ async def complete_mfa_login(body: MfaLoginBody, request: Request, response: Res
     )
     if not attempt:
         await release_rate_limit(account_slot)
-        raise HTTPException(status_code=401, detail="MFA-Anmeldung ist ungültig oder abgelaufen.")
+        raise HTTPException(status_code=401, detail="MFA-Anmeldung ist ungültig oder abgelaufen.", headers=MFA_CHALLENGE_INVALID)
     if not await _verify_mfa_code(db, user, body.code):
         await db.mfa_login_challenges.update_one({"_id": challenge["_id"]}, {"$set": {"last_failed_at": now}})
         await _security_audit(db, user["id"], "auth.mfa.failed", request)
@@ -1298,7 +1311,7 @@ async def complete_mfa_login(body: MfaLoginBody, request: Request, response: Res
         return_document=ReturnDocument.BEFORE,
     )
     if not claimed:
-        raise HTTPException(status_code=401, detail="MFA-Anmeldung wurde bereits verwendet.")
+        raise HTTPException(status_code=401, detail="MFA-Anmeldung wurde bereits verwendet.", headers=MFA_CHALLENGE_INVALID)
     client = "mobile" if challenge.get("client") == "mobile" or body.client == "mobile" else "web"
     await _security_audit(db, user["id"], "auth.mfa.login", request)
     if client == "mobile":
@@ -1311,6 +1324,23 @@ async def complete_mfa_login(body: MfaLoginBody, request: Request, response: Res
     public = _public_user(user)
     await _attach_membership(public)
     return public
+
+
+@router.post("/mfa/cancel")
+async def cancel_mfa_login(body: MfaCancelBody, request: Request):
+    """MFA-Abfrage abbrechen (#996): danach gilt sie am Server nicht mehr, auch nicht in den restlichen Minuten.
+
+    Wer das Ticket hat, darf es verwerfen - mehr nicht. Die Antwort ist immer dieselbe und sagt nicht, ob es die
+    Abfrage gab; ein zweiter Abbruch ändert nichts.
+    """
+    await enforce_rate_limit(request, "auth:mfa-cancel:ip", limit=30, window_seconds=900)
+    ticket = body.ticket.strip()
+    if ticket:
+        await get_db().mfa_login_challenges.update_one(
+            {"ticket_hash": hash_token(ticket), "used": False},
+            {"$set": {"used": True, "used_at": now_utc(), "invalidated_reason": "cancelled"}},
+        )
+    return {"ok": True}
 
 
 @router.post("/consent")

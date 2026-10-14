@@ -35,10 +35,28 @@ export function needsEmailVerification(error: unknown): boolean {
 }
 
 /**
- * Die MFA-Abfrage gilt nicht mehr (abgelaufen, schon verwendet, zu viele Versuche oder ein anderes Gerät): dann hilft
- * kein weiterer Code, nur eine neue Anmeldung. Ein falscher Code lässt die Abfrage offen.
+ * Die MFA-Abfrage gilt nicht mehr (abgelaufen, schon verwendet, abgebrochen, abgelöst, zu viele Versuche oder ein
+ * anderes Gerät): dann hilft kein weiterer Code, nur eine neue Anmeldung. Ein falscher Code lässt die Abfrage offen.
+ * Der Server sagt das mit dem Kennzeichen `X-Auth-Error: mfa_challenge_invalid`.
  */
 export function mfaTicketGone(error: unknown): boolean {
-  const { status, detail } = failure(error);
-  return status === 401 && detail.startsWith("MFA-Anmeldung");
+  const { status, headers, detail } = failure(error);
+  if (status !== 401) return false;
+  if (String(headers["x-auth-error"] || "") === "mfa_challenge_invalid") return true;
+  // Rückfall für ältere Server ohne Kennzeichen: dort beginnen nur diese Sätze mit „MFA-Anmeldung“ - ein falscher Code
+  // heißt „Ungültiger MFA- oder Wiederherstellungscode.“. Kann weg, wenn kein Server ohne Kennzeichen mehr läuft.
+  return !headers["x-auth-error"] && detail.startsWith("MFA-Anmeldung");
+}
+
+/**
+ * MFA-Abfrage abbrechen (#996): der Server verwirft sie, statt sie noch Minuten gelten zu lassen. Klappt das nicht
+ * (offline), bleibt es still - die Abfrage läuft dann von selbst ab.
+ */
+export async function cancelMfaChallenge(ticket: string): Promise<void> {
+  if (!ticket) return;
+  try {
+    await api.post("/auth/mfa/cancel", { ticket });
+  } catch {
+    // still: die Abfrage läuft von selbst ab
+  }
 }

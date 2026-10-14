@@ -1,6 +1,6 @@
 import { api } from "./api";
 import { PASSWORD_RULE_HINT } from "./passwordRules";
-import { mfaTicketGone, needsEmailVerification, requestPasswordReset, requestVerificationMail } from "./loginRecovery";
+import { cancelMfaChallenge, mfaTicketGone, needsEmailVerification, requestPasswordReset, requestVerificationMail } from "./loginRecovery";
 
 // Wege aus der Anmeldung (#996): dieselben Server-Wege wie die Website - Passwort-Link und Bestätigungs-Mail anfordern,
 // ein abgelaufenes MFA-Ticket erkennen. Keine eigenen Endpunkte der App.
@@ -34,7 +34,13 @@ test("E-Mail noch nicht bestätigt: am Kennzeichen des Servers erkannt, sonst ni
   expect(needsEmailVerification(null)).toBe(false);
 });
 
-test("MFA-Ticket weg (abgelaufen, verbraucht, anderes Gerät): neu anmelden; ein falscher Code nicht", () => {
+test("MFA-Ticket weg: am Kennzeichen des Servers erkannt, egal mit welchem Satz", () => {
+  expect(mfaTicketGone(failure(401, "Bitte neu anmelden.", { "x-auth-error": "mfa_challenge_invalid" }))).toBe(true);
+  expect(mfaTicketGone(failure(401, "Ungültiger MFA- oder Wiederherstellungscode."))).toBe(false);
+  expect(mfaTicketGone(failure(401, "Bitte neu anmelden.", { "x-auth-error": "email_verification_required" }))).toBe(false);
+});
+
+test("MFA-Ticket weg bei älterem Server ohne Kennzeichen (abgelaufen, verbraucht, anderes Gerät): am Satz; ein falscher Code nicht", () => {
   expect(mfaTicketGone(failure(401, "MFA-Anmeldung ist ungültig oder abgelaufen."))).toBe(true);
   expect(mfaTicketGone(failure(401, "MFA-Anmeldung wurde bereits verwendet."))).toBe(true);
   expect(mfaTicketGone(failure(401, "MFA-Anmeldung gehört zu einem anderen Gerät."))).toBe(true);
@@ -45,4 +51,16 @@ test("MFA-Ticket weg (abgelaufen, verbraucht, anderes Gerät): neu anmelden; ein
 
 test("Passwort-Hinweis: derselbe Vertrag wie Server und Website (#1509)", () => {
   expect(PASSWORD_RULE_HINT).toBe("Mindestens 10 Zeichen, höchstens 72 Byte (Umlaute zählen doppelt, Emojis vierfach).");
+});
+
+test("MFA abbrechen: verwirft die Abfrage am Server; scheitert das, bleibt es still", async () => {
+  post.mockResolvedValueOnce({ data: { ok: true } });
+  await cancelMfaChallenge("ticket-1");
+  expect(post).toHaveBeenCalledWith("/auth/mfa/cancel", { ticket: "ticket-1" });
+
+  post.mockRejectedValueOnce(new Error("offline"));
+  await expect(cancelMfaChallenge("ticket-2")).resolves.toBeUndefined();
+  post.mockClear();
+  await cancelMfaChallenge("");
+  expect(post).not.toHaveBeenCalled();
 });

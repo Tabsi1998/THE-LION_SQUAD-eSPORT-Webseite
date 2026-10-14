@@ -13,7 +13,9 @@ const mockCompleteMfa = jest.fn();
 jest.mock("../../auth/AuthContext", () => ({
   useAuth: () => ({ login: mockLogin, loginWithPasskey: mockLoginWithPasskey, completeMfa: mockCompleteMfa, rememberSession: true }),
 }));
+const mockPost = jest.fn(async (..._args: unknown[]) => ({ data: { ok: true } }));
 jest.mock("../../lib/api", () => ({
+  api: { post: (...args: unknown[]) => mockPost(...args) },
   errorMessage: (error: unknown, fallback: string) => {
     const detail = (error as { response?: { data?: { detail?: unknown } } } | null)?.response?.data?.detail;
     if (typeof detail === "string") return detail;
@@ -153,11 +155,15 @@ test("MFA: falscher oder verbrauchter Code - Satz des Servers, Eingabe bleibt of
 
 test("MFA abgelaufen: zurück zum Formular mit Hinweis, „Anmelden“ holt eine neue Abfrage ohne Neustart", async () => {
   await toMfa();
-  mockCompleteMfa.mockRejectedValueOnce({ response: { status: 401, data: { detail: "MFA-Anmeldung ist ungültig oder abgelaufen." } } });
+  mockCompleteMfa.mockRejectedValueOnce({
+    response: { status: 401, headers: { "x-auth-error": "mfa_challenge_invalid" }, data: { detail: "MFA-Anmeldung ist ungültig oder abgelaufen." } },
+  });
   await fireEvent.changeText(screen.getByLabelText("Code aus der Authenticator-App"), "123456");
   await fireEvent.press(screen.getByText("MFA bestätigen"));
   await waitFor(() => expect(screen.getByLabelText("E-Mail")).toBeTruthy());
   expect(screen.getByText(/abgelaufen/)).toBeTruthy();
+  // Gilt am Server schon nicht mehr - kein zusätzlicher Abbruch nötig.
+  expect(mockPost).not.toHaveBeenCalled();
   expect(screen.getByLabelText("E-Mail").props.value).toBe("paula@club-mail.at");
 
   mockLogin.mockResolvedValueOnce({ mfaRequired: true, ticket: "ticket-2" });
@@ -170,13 +176,29 @@ test("MFA abgelaufen: zurück zum Formular mit Hinweis, „Anmelden“ holt eine
   await waitFor(() => expect(mockCompleteMfa).toHaveBeenCalledWith("ticket-2", "654321", true, false));
 });
 
-test("MFA abbrechen: zurück zum Formular, ohne Ticket und ohne Code", async () => {
+test("MFA abbrechen: zurück zum Formular, ohne Ticket und ohne Code - und die Abfrage gilt am Server nicht mehr", async () => {
   await toMfa();
   await fireEvent.changeText(screen.getByLabelText("Code aus der Authenticator-App"), "12");
   await fireEvent.press(screen.getByTestId("login-mfa-restart"));
   expect(screen.getByLabelText("E-Mail")).toBeTruthy();
   expect(screen.queryByText("MFA bestätigen")).toBeNull();
   expect(mockCompleteMfa).not.toHaveBeenCalled();
+  expect(mockPost).toHaveBeenCalledWith("/auth/mfa/cancel", { ticket: "ticket-1" });
+});
+
+test("Seite verlassen während der MFA-Abfrage: die Abfrage wird am Server verworfen; nach Erfolg nicht", async () => {
+  await toMfa();
+  await screen.unmount();
+  expect(mockPost).toHaveBeenCalledWith("/auth/mfa/cancel", { ticket: "ticket-1" });
+
+  mockPost.mockClear();
+  await toMfa();
+  mockCompleteMfa.mockResolvedValueOnce(undefined);
+  await fireEvent.changeText(screen.getByLabelText("Code aus der Authenticator-App"), "123456");
+  await fireEvent.press(screen.getByText("MFA bestätigen"));
+  await waitFor(() => expect(navigation.goBack).toHaveBeenCalled());
+  await screen.unmount();
+  expect(mockPost).not.toHaveBeenCalled();
 });
 
 // Wege aus der Anmeldung (#996): Passwort vergessen und fehlende Bestätigungs-Mail haben einen sichtbaren nächsten Schritt.
