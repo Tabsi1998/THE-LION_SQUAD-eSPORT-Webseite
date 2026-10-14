@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
@@ -12,7 +12,8 @@ vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail |
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { display_name: "Paula" } }) }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
-vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
+const invalidation = { reload: null };
+vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: (callback, resources = []) => { if (resources.includes("users")) invalidation.reload = callback; } }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
 const MyMembershipPage = (await import("./MyMembershipPage")).default;
@@ -305,4 +306,19 @@ test("ein Ladefehler beendet das Laden: Fehler mit „Nochmal versuchen“, dana
   apiMock.get.mockResolvedValue({ data: { membership: null, is_active_member: false, dolibarr: { connected: true, led_by_dolibarr: false, link: null } } });
   await userEvent.click(screen.getByTestId("public-error-retry"));
   await waitFor(() => expect(screen.queryByTestId("public-error-state")).toBeNull());
+});
+
+test("ein gescheitertes Nachladen lässt die Mitgliedschaft stehen und sagt es (#983)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/me") return { data: { membership: null, is_active_member: false, dolibarr: { connected: true, led_by_dolibarr: false, link: null } } };
+    throw Object.assign(new Error("nicht da"), { response: { status: 404 } });
+  });
+  renderPage();
+  await waitFor(() => expect(screen.queryByText("Lade Mitgliedschaft")).toBeNull());
+  const before = document.body.textContent;
+  apiMock.get.mockRejectedValue(Object.assign(new Error("boom"), { response: { status: 500 } }));
+  await act(async () => { await invalidation.reload(); });
+  expect(screen.getByTestId("load-stale")).toHaveTextContent("letzten Stand");
+  expect(screen.queryByTestId("public-error-state")).toBeNull();
+  expect(document.body.textContent.length).toBeGreaterThanOrEqual(before.length);
 });
