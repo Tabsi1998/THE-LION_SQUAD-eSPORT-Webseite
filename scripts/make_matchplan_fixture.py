@@ -8,6 +8,8 @@ je 4 Fahrer) - gebaut vom echten Generator aus dem Schema.
 Zustände:
   local.preview   Baum gebaut, zwei Stationen, Vorschau vor dem ersten Übernehmen
   local.applied   nach „Übernehmen“: gespeicherter Plan, Vorschau ohne Änderung
+  orphan          Praxis 14.10.: alte Matchplanung auf einer gelöschten Station, LE vor LC, LF ohne Station
+  event_stations  eine Station des Turniers und eine des Events
   draft           Baum noch Vorschau (vor dem Check-in-Ende): der Planer meldet „none“, die Spiele stehen trotzdem da
   local.conflict  eine Zeit von Hand zu früh gesetzt (Warnung „zu früh“), dazu die 409 beim Belegen einer Station und
                   die 409 einer veralteten Vorschau
@@ -26,7 +28,7 @@ import asyncio
 import json
 import pathlib
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / "frontend" / "e2e" / "fixtures" / "matchplanGenerated.json"
@@ -186,6 +188,60 @@ async def draft_state(out):
         await shutdown()
 
 
+# Die alte Matchplanung aus der Praxis (Fabian, 14.10.): Start in Wiener Zeit am 31.10. (UTC+1), eigene Dauer, auf
+# „Station A“ - LF ohne Station. Danach wurde die Station gelöscht.
+OLD_PLAN = {"A": ("15:30", None, True), "B": ("15:50", None, True), "C": ("16:10", None, True), "D": ("16:30", None, True),
+            "E": ("16:50", None, True), "F": ("17:10", None, True), "LA": ("17:30", None, True), "LB": ("17:50", None, True),
+            "G": ("18:10", 30, True), "LD": ("18:50", None, True), "LE": ("19:10", None, True), "LC": ("19:40", None, True),
+            "LF": ("19:50", 30, False), "FINAL": ("20:20", 30, True)}
+
+
+def vienna_31(clock):
+    hour, minute = (int(part) for part in clock.split(":"))
+    return datetime(2026, 10, 31, hour - 1, minute, tzinfo=timezone.utc).isoformat()
+
+
+async def orphan_state(out):
+    """Praxis-Fehler 14.10.: Cup gemischt nach dem Check-in, alte Matchplanung auf einer inzwischen gelöschten Station."""
+    flow, shutdown = make_flow()
+    try:
+        staff = await flow.add_staff()
+        tournament = await cup(flow, staff, datetime(2026, 10, 31, 14, 30, tzinfo=timezone.utc), title="Kart-Cup (alte Planung)")
+        await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"randomize_advancement_rounds": True,
+                                                                                 "match_buffer_minutes": None, "match_duration_minutes": 20}})
+        response = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false&force=true", json={
+            "name": "Läufe", "stage_type": "ffa_custom_bracket", "match_type": "ffa",
+            "settings": {"schema": CUP_SCHEMA, "match_size": 4, "qualifiers_per_match": 2, "min_players": 2}})
+        assert response.status_code == 200, response.text
+        station = (await flow.post("/api/stations", json={"name": "Station A", "device_type": "switch", "tournament_id": tournament["id"]})).json()
+        by_key = {match["match_key"]: match for match in await flow.matches(tournament) if not match.get("is_preview")}
+        for key, (clock, duration, on_station) in OLD_PLAN.items():
+            updated = await flow.patch(f"/api/matches/{by_key[key]['id']}", json={
+                "scheduled_at": vienna_31(clock), "station_id": station["id"] if on_station else None, "duration_minutes": duration})
+            assert updated.status_code == 200, updated.text
+        assert (await flow.delete(f"/api/stations/{station['id']}")).status_code == 200
+        out["orphan"] = await snapshot(flow, tournament)
+        out["orphan"]["deleted_station_id"] = station["id"]
+    finally:
+        await shutdown()
+
+
+async def event_station_state(out):
+    """Eine Station des Events (ohne Turnier) neben einer des Turniers: der Planer kennt und nutzt beide."""
+    flow, shutdown = make_flow()
+    try:
+        staff = await flow.add_staff()
+        tournament = await cup(flow, staff, quarter(now_utc() + timedelta(hours=3)), title="Kart-Cup am Event")
+        event_id = new_id()
+        await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"event_id": event_id}})
+        await stations(flow, tournament, ["Switch 1"])
+        await flow.db.stations.insert_one({"id": new_id(), "name": "Bühne", "device_type": "switch2", "event_id": event_id,
+                                           "tournament_id": None, "status": "free", "current_match_id": None, "notes": None})
+        out["event_stations"] = await snapshot(flow, tournament)
+    finally:
+        await shutdown()
+
+
 async def live_state(out):
     flow, shutdown = make_flow()
     try:
@@ -306,6 +362,8 @@ async def main():
     out = {"_info": INFO, "generated_at": now_utc().isoformat()}
     await local_states(out)
     await draft_state(out)
+    await orphan_state(out)
+    await event_station_state(out)
     await live_state(out)
     await big_state(out)
     await online_state(out)
@@ -316,6 +374,8 @@ async def main():
         plan = out["local"][key]["plan"]
         print("local", key, plan["mode"], len(plan["assignments"]), [w["type"] for w in plan["warnings"]])
     print("draft", out["draft"]["plan"]["mode"], out["draft"]["plan"]["reason"], sum(1 for m in out["draft"]["matches"] if m.get("is_preview")))
+    print("orphan", [w["type"] for w in out["orphan"]["plan"]["warnings"]], len(out["orphan"]["plan"]["stations"]))
+    print("event_stations", [(st["name"], st["scope"]) for st in out["event_stations"]["plan"]["stations"]], len(out["event_stations"]["plan"]["assignments"]))
     print("live", len(out["live"]["plan"]["assignments"]), [w["type"] for w in out["live"]["plan"]["warnings"]])
     print("big", len(out["big"]["matches"]), out["big"]["plan"]["mode"], len(out["big"]["plan"]["assignments"]))
     print("online", out["online"]["plan"]["mode"], len(out["online"]["deadlines"]["matches"]))

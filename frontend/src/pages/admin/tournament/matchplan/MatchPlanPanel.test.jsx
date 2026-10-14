@@ -496,6 +496,47 @@ describe("online, Liga, hybrid: dieselben Regeln wie der Planer", () => {
   });
 });
 
+describe("Praxis 14.10.: Stationen und Reihenfolge - eine Wahrheit für Kopf und Zeitleiste", () => {
+  it("gelöschte Station: Kopf „Noch keine Station“, Bahn „Gelöschte Station“, Warnungen in Worten", async () => {
+    const state = fixture.orphan;
+    setup(state);
+    await waitFor(() => expect(screen.getByTestId("mp-warnings")).toHaveTextContent("die es nicht mehr gibt"));
+    expect(screen.getByTestId("mp-settings")).toHaveTextContent("Noch keine Station");
+    expect(screen.getByTestId(`mp-lane-${state.deleted_station_id}`)).toHaveAttribute("data-name", "Gelöschte Station");
+    expect(screen.getByTestId("mp-warnings")).toHaveTextContent(/LE ist fest um 19:10, aber LC ist erst um 20:00 vorbei\./);
+    expect(bar("LE")).toHaveAttribute("data-conflict", "true");
+  });
+
+  it("auf die gelöschte Station lässt sich nichts ziehen - mit Grund, ohne Anfrage", async () => {
+    const state = fixture.orphan;
+    setup(state);
+    await waitFor(() => expect(screen.getByTestId("mp-warnings")).toBeInTheDocument());
+    const lanes = screen.getAllByTestId(/^mp-lane-/).map((lane) => lane.getAttribute("data-testid").replace("mp-lane-", ""));
+    const handle = bar("LF");
+    const dy = (lanes.indexOf(state.deleted_station_id) - lanes.indexOf("none")) * 64;
+    fireEvent.pointerDown(handle, { pointerId: 1, button: 0, clientX: 200, clientY: 300 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 200, clientY: 300 + dy });
+    expect(screen.getByTestId("mp-ghost")).toHaveAttribute("data-blocked", "true");
+    expect(screen.getByTestId("mp-drag-status")).toHaveTextContent("Diese Station gibt es nicht mehr");
+    fireEvent.pointerUp(handle, { pointerId: 1, clientX: 200, clientY: 300 + dy });
+    await act(async () => {});
+    expect(apiMock.patch).not.toHaveBeenCalled();
+  });
+
+  it("die Stationen des Events stehen im Kopf und in der Auswahl beim Ändern", async () => {
+    const user = userEvent.setup();
+    const state = fixture.event_stations;
+    const hall = state.plan.stations.find((row) => row.scope === "event");
+    setup(state);
+    await waitFor(() => expect(screen.getByTestId("mp-settings")).toHaveTextContent(hall.name));
+    expect(screen.getByTestId("mp-settings")).toHaveTextContent("Event");
+    const first = state.matches.find((row) => row.match_key === "A");
+    expect(first).toBeTruthy();
+    await user.click(within(screen.getByTestId("mp-order")).getAllByRole("button", { name: /ändern$/ })[0]);
+    expect(within(screen.getByTestId("mp-editor")).getByRole("option", { name: new RegExp(hall.name) })).toBeInTheDocument();
+  });
+});
+
 describe("online und Liga: keine Stationen, keine Zeitleiste je Station", () => {
   it("online: Runden mit Fristen je Spiel, ohne Stationsfelder", async () => {
     setup(fixture.online);

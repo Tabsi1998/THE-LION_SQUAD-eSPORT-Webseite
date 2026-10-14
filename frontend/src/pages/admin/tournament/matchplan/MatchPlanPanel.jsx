@@ -3,7 +3,7 @@ import { Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { buildTimeline, scheduleDelay } from "@/lib/matchTimeline";
+import { buildTimeline, knownStations, scheduleDelay } from "@/lib/matchTimeline";
 import { dependencyGraph } from "@/lib/matchFlow";
 import { matchDurationSource } from "@/lib/matchDuration";
 import { applySchedulePlan, moveMatch, requestSchedulePlan, updateMatchPlan } from "@/lib/schedulePlan";
@@ -111,8 +111,10 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
     if (preview) return preview;
     if (!background) return null;
     const assignments = live ? (background.assignments || []).map((row) => ({ ...row, changed: false })) : [];
-    return { assignments, warnings: background.warnings || [] };
+    return { assignments, warnings: background.warnings || [], stations: background.stations };
   }, [preview, background, live]);
+  // Eine Wahrheit für Kopf, Zeitleiste und Auswahl: die Stationen des Turniers und die, die der Planer kennt (Event).
+  const allStations = useMemo(() => knownStations(stations, background), [stations, background]);
   const timeline = useMemo(() => buildTimeline({
     matches, stations, stages, tournament, game: durationGame, registrations, plan: shownPlan, now,
   }), [matches, stations, stages, tournament, durationGame, registrations, shownPlan, now]);
@@ -177,7 +179,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const editor = (item, close, { withStation = true } = {}) => {
     const match = matchById.get(item.id);
     return (
-      <MatchEditor item={item} match={match} stations={stations} stage={stages.find((stage) => stage.id === match?.stage_id) || null}
+      <MatchEditor item={item} match={match} stations={allStations} stage={stages.find((stage) => stage.id === match?.stage_id) || null}
         tournament={tournament} game={durationGame} onSave={saveMatch} onClose={close} withStation={withStation} />
     );
   };
@@ -237,7 +239,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
         tournament={tournament}
         mode={mode}
         duration={duration}
-        stations={stations}
+        stations={allStations}
         canEdit={canEditSettings}
         onSave={saveSettings}
         actions={planButton}
