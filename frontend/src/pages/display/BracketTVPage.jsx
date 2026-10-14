@@ -152,33 +152,29 @@ function BracketTv() {
   const minute = useMinuteTick();
 
   // Abfragen können sich überholen (Codex-Nachprüfung #1564): jede bekommt beim Start ihre Nummer; eine Antwort, die
-  // älter ist als die zuletzt übernommene, wird verworfen. Das Nachholen nach einer Neuverbindung gehört genau zur
-  // ersten Abfrage danach - und zu jeder späteren, die vor ihr ankommt (sie trägt das Verpasste ebenso).
+  // älter ist als die zuletzt übernommene, wird verworfen. Ob eine Abfrage still ist, steht beim Start fest - an ihr
+  // selbst, nie geerbt: eine Abfrage zu einer Meldung aus dem Strom zeigt ihren Moment immer.
   const seqRef = useRef(0);
   const appliedRef = useRef(0);
-  const catchUpFromRef = useRef(null);
 
   const load = useCallback(async () => {
     const seq = ++seqRef.current;
     const driven = eventSeqRef.current > usedEventRef.current;
     usedEventRef.current = eventSeqRef.current;
-    if (catchUpRef.current) {
-      if (!driven) catchUpFromRef.current = catchUpFromRef.current ?? seq;
-      catchUpRef.current = false;
-    }
+    const catchUp = catchUpRef.current && !driven;
+    catchUpRef.current = false;
     const reconnected = reconnectSeqRef.current > usedReconnectRef.current;
     usedReconnectRef.current = reconnectSeqRef.current;
     // Ersatz-Abfrage im Takt bei getrenntem Strom: eine echte Unterbrechung - ruhig.
     const offline = !driven && !reconnected && offlineRef.current;
     if (offline) outageRef.current = true;
+    const quiet = catchUp || offline;
     try {
       const { data: br } = await api.get(`/tournaments/${id}/bracket/display`, displayKey ? { params: { key: displayKey } } : undefined);
       if (seq < appliedRef.current) return;
       appliedRef.current = seq;
-      // Ruhig, wenn es Nachholen ist: nach einer Neuverbindung und während der Strom getrennt ist (Ersatz-Abfrage).
-      const catchUp = catchUpFromRef.current !== null && seq >= catchUpFromRef.current;
-      if (catchUp) catchUpFromRef.current = null;
-      quietRef.current = catchUp || offline;
+      // Ruhig, wenn es Nachholen ist: nach einer echten Unterbrechung und während der Strom getrennt ist (Ersatz-Abfrage).
+      quietRef.current = quiet;
       setData(br);
       setLoadError(null);
       setKeyRefused(false);
