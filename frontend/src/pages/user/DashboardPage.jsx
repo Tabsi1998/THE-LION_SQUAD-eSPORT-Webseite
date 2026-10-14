@@ -6,13 +6,12 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { AdventHint } from "@/advent/AdventHint";
 import { StatusBadge } from "@/components/tls/StatusBadge";
-import { NotificationRow } from "@/components/tls/NotificationRow";
 import { ModerationStandingCard } from "@/components/tls/ModerationStandingCard";
 import { AchievementsTile } from "@/components/tls/AchievementsTile";
-import { bundleNotifications } from "@/lib/notifications";
+import { DashboardNotifications } from "./DashboardNotifications";
 import { dashboardActions, formatVienna, registrationLabel, seasonLine, splitHomeTimeline, timelineItems } from "@/lib/dashboard";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { Trophy, Bell, Crown, Gift, AlertTriangle, UserCheck, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, Settings, Star } from "lucide-react";
+import { Trophy, Crown, Gift, AlertTriangle, UserCheck, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, Settings, Star } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
 import { stationText } from "@/lib/tournamentLabels";
 import { FeedbackDialog } from "@/components/tls/FeedbackDialog";
@@ -101,7 +100,6 @@ function TimelineRow({ item, live = false }) {
 export default function DashboardPage() {
   const { user, isClubMember, isModerator } = useAuth();
   const [dashboard, setDashboard] = useState(null);
-  const [notifications, setNotifications] = useState([]);
   const [openPrizes, setOpenPrizes] = useState(0);
   const [completeness, setCompleteness] = useState(null);
   const [penaltyCount, setPenaltyCount] = useState(0);
@@ -118,15 +116,13 @@ export default function DashboardPage() {
   }, [searchParams, setSearchParams]);
 
   const load = useCallback(async () => {
-    const [home, n, p, c, pen] = await Promise.allSettled([
+    const [home, p, c, pen] = await Promise.allSettled([
       api.get("/mobile/dashboard"),
-      api.get("/notifications/me"),
       api.get("/prizes/me/open-count"),
       api.get("/users/me/profile-completeness"),
       api.get("/penalties/me"),
     ]);
     if (home.status === "fulfilled") setDashboard(home.value.data && typeof home.value.data === "object" ? home.value.data : null);
-    if (n.status === "fulfilled") setNotifications(Array.isArray(n.value.data) ? n.value.data : (n.value.data?.items || []));
     if (p.status === "fulfilled") setOpenPrizes(p.value.data?.count || 0);
     if (c.status === "fulfilled") setCompleteness(c.value.data);
     if (pen.status === "fulfilled") setPenaltyCount(pen.value.data?.count || 0);
@@ -143,7 +139,7 @@ export default function DashboardPage() {
       document.removeEventListener("visibilitychange", refreshVisible);
     };
   }, [load]);
-  useLiveRefresh(load, ["matches", "prizes", "users", "penalties", "achievements", "membership", "tournaments", "events", "f1", "admin/notifications"], { fallbackMs: 10000 });
+  useLiveRefresh(load, ["matches", "prizes", "users", "penalties", "achievements", "membership", "tournaments", "events", "f1"], { fallbackMs: 10000 });
 
   const me = dashboard?.me || {};
   const matches = useMemo(() => (Array.isArray(me.matches) ? me.matches : []).filter((match) => OPEN_MATCH_STATUSES.has(String(match.status || ""))), [me.matches]);
@@ -155,16 +151,6 @@ export default function DashboardPage() {
   const actions = useMemo(() => dashboardActions(dashboard, { openPrizes }), [dashboard, openPrizes]);
   const season = dashboard?.season || null;
 
-  // Die fünf neuesten, gebündelt und anklickbar (#255); „Alle N anzeigen“
-  // führt auf die Benachrichtigungsseite. Ein Klick markiert das Bündel als
-  // gelesen, die Zeile selbst führt ans Ziel.
-  const notificationBundles = useMemo(() => bundleNotifications(notifications).slice(0, 5), [notifications]);
-  const openNotification = useCallback(async (bundle) => {
-    const ids = (bundle.ids || []).filter((id) => notifications.some((row) => row.id === id && !row.read));
-    if (!ids.length) return;
-    setNotifications((rows) => rows.map((row) => (ids.includes(row.id) ? { ...row, read: true } : row)));
-    await Promise.allSettled(ids.map((id) => api.post(`/admin/notifications/${id}/read`)));
-  }, [notifications]);
 
   const hasDates = timeline.live.length + timeline.next.length > 0;
 
@@ -311,20 +297,8 @@ export default function DashboardPage() {
               </Link>
             ) : null}
 
-            <div className="border border-white/10 rounded-sm bg-[#121212] p-5 min-w-0" data-testid="dashboard-notifications">
-              <h2 className="font-heading text-xl font-bold uppercase mb-4 flex items-center gap-2"><Bell className="w-4 h-4 text-[#29B6E8]" /> Benachrichtigungen</h2>
-              <div id="dashboard-notification-list" className="-mx-2 border border-white/5 rounded-sm bg-[#0F0F10] overflow-hidden">
-                {notifications.length === 0 && <div className="p-3 text-sm text-white/40">Keine Benachrichtigungen.</div>}
-                {notificationBundles.map((bundle) => (
-                  <NotificationRow key={bundle.id} bundle={bundle} onOpen={openNotification} compact testIdPrefix="dashboard-notification" />
-                ))}
-              </div>
-              {notifications.length > notificationBundles.length && (
-                <Link to="/notifications" data-testid="dashboard-notifications-all" className="mt-4 min-h-11 w-full inline-flex items-center justify-center border border-[#29B6E8]/40 rounded-sm px-3 py-2 text-sm font-bold text-[#29B6E8] hover:bg-[#29B6E8]/10">
-                  {`Alle ${notifications.length} anzeigen`}
-                </Link>
-              )}
-            </div>
+            {/* Benachrichtigungen (#255): eigener Abruf über den Baustein von Glocke und Seite - Fehler statt leer (#984), abgelehntes „gelesen“ wird zurückgenommen (#987). */}
+            <DashboardNotifications />
           </div>
         </div>
 

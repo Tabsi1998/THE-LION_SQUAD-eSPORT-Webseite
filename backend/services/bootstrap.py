@@ -15,16 +15,12 @@ statisch - sie holen es im Notfall über ``services.wiring.ensure``.
 """
 from __future__ import annotations
 
-_done = False
+from functools import cache
 
 
+@cache
 def ensure_wiring() -> None:
-    """Idempotent: beim ersten Aufruf die Module laden, die sich beim Import anmelden."""
-    global _done
-    if _done:
-        return
+    """Idempotent: beim ersten Aufruf die Module laden, die sich beim Import anmelden (``cache`` merkt sich den Aufruf)."""
     import badges  # noqa: F401 - meldet die Erfolge-Auswertung an
     from routes import match_routes, team_routes, tournament_chat_routes  # noqa: F401 - Zugriff auf Chat-Anhänge
     from services import discord_bot  # noqa: F401 - Ereignisse und Befehle des Bots
-
-    _done = True

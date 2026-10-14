@@ -33,6 +33,9 @@ from models import now_utc
 from services.discord_bracket_state import FIELD, GUILD_FIELD, _dirty, _state_at, pending, request_refresh  # noqa: F401 - umgezogen (#1420)
 from services.bracket_common import DONE, LIVE, TABLE_STAGE_TYPES, VIENNA, _dt, _safe_int, _score, round_label, section_label
 
+# Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
+__all__ = ["pending", "request_refresh"]
+
 logger = logging.getLogger("tls.discord.bracket")
 
 ROUTE_KEY = "tournament.live"

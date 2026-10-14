@@ -23,7 +23,6 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from services import scheduler_state, wiring
-from services.scheduler_state import get_scheduler_status  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
 
 logger = logging.getLogger("tls.scheduler")
 

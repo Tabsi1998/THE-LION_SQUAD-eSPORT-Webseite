@@ -32,12 +32,14 @@ from routes.auth_routes import (
 from services.passkey_config import (  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
     APK_ORIGIN_PREFIX,
     DEFAULT_APK_KEY_HASHES,
-    ENROLL_MINUTES,
     issue_enroll_ticket,
     mobile_origins,
     passkey_configuration,
 )
 from services.rate_limit import enforce_rate_limit
+
+# Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
+__all__ = ["DEFAULT_APK_KEY_HASHES", "issue_enroll_ticket"]
 
 router = APIRouter(prefix="/api/auth/passkeys", tags=["passkeys"])
 logger = logging.getLogger("tls.passkeys")

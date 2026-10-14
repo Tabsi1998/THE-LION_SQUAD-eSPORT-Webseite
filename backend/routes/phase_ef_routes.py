@@ -30,6 +30,9 @@ from services.permissions import user_has_area
 from services.stream_visibility import homepage_visibility, reason_text
 from services.log_safe import log_safe
 
+# Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
+__all__ = ["render_template"]
+
 
 # ============= Streams (public + admin) =============
 streams_router = APIRouter(prefix="/api/streams", tags=["streams"])
