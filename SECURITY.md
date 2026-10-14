@@ -64,13 +64,21 @@ APP_ENV=development python backend/reset_data.py \
 
 Audit exceptions must name an exact advisory, explain the exposure, and expire. CI continues
 to fail for every unlisted or expired finding at the configured threshold (moderate for the
-mobile app, high for the frontend).
+mobile app, high for the frontend runtime dependencies).
 
-`mobile/scripts/security-audit-allowlist.json` temporarily accepts two `image-size` denial-of-
-service advisories in Expo 56's Metro build toolchain. The package is not used by the shipped
-app at runtime, no patched release exists, and npm's proposed forced fix downgrades Expo to an
-incompatible major version. Both exceptions expire on 2026-09-30 and must be removed as soon
-as Expo/Metro provides a compatible fix.
+Both gates (`frontend/scripts/audit-high.js`, `mobile/scripts/audit-ci.cjs`) share one evaluator,
+`scripts/dependency-audit-gate.cjs`, with a self-test (`scripts/dependency-audit-gate.test.mjs`)
+that runs before every audit:
+
+- No silent pass: if the audit cannot reach the registry, reports an error, or its JSON does not
+  have the expected shape (summary, counts per severity, findings), the gate fails.
+- Every entry in `security-audit-allowlist.json` needs `module`, `expires` (a real date, at most
+  one year ahead) and a `reason`; an invalid list fails the gate.
+- An exception that expires within 30 days is announced as a warning (also as a GitHub Actions
+  annotation); an exception no longer needed is reported so it can be removed.
+
+The current exceptions are listed in `mobile/scripts/security-audit-allowlist.json` together with
+their reason and expiry date; none of them is part of the shipped app bundle.
 
 ## Reporting
 

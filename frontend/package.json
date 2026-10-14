@@ -92,7 +92,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "audit:high": "node scripts/audit-high.js",
+    "audit:high": "node --test --test-reporter=dot ../scripts/dependency-audit-gate.test.mjs && node scripts/audit-high.js",
     "audit:public": "node scripts/audit-public-content.js",
     "check:contrast": "node scripts/check-contrast.js"
   },

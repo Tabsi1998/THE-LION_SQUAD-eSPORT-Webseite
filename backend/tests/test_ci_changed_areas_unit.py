@@ -33,6 +33,9 @@ ALL = set(areas.AREAS)
         # Beide Skripte ruft der Frontend-Job auf.
         ("scripts/check-public-routes.sh", {"backend", "frontend"}),
         ("scripts/compose-backup-target.py", {"backend", "frontend"}),
+        # Den gemeinsamen Audit-Auswerter samt Selbsttest rufen Website- und App-Job auf (#1055).
+        ("scripts/dependency-audit-gate.cjs", {"backend", "frontend", "mobile"}),
+        ("scripts/dependency-audit-gate.test.mjs", {"backend", "frontend", "mobile"}),
         ("scripts/check-web-update.py", {"backend", "container"}),
         ("docker-compose.yml", {"frontend", "container"}),
         ("docker-compose.staging.yml", {"frontend", "container"}),

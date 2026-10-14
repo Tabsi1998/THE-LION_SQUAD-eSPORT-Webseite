@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "audit:ci": "node scripts/audit-ci.cjs",
+    "audit:ci": "node --test --test-reporter=dot ../scripts/dependency-audit-gate.test.mjs && node scripts/audit-ci.cjs",
     "sync:badge-art": "node scripts/sync-badge-art.js",
     "test:security": "node --no-warnings --test scripts/cache-security.test.mjs scripts/logging-security.test.mjs",
     "release:preflight": "node scripts/release-preflight.cjs",
