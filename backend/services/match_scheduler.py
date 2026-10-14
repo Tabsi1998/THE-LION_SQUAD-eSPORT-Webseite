@@ -32,6 +32,7 @@ from zoneinfo import ZoneInfo
 from services.advancement_draw import draw_group_of, prerequisite_ids
 from services.match_audience import playing_ids, teams_by_id
 from services.match_duration import effective_match_duration, load_duration_game, load_duration_games
+from services.match_planning import station_open_for_matches
 from services.matchday_schedule import plays_in_matchdays, schedule_writes
 from services.tournament_rules import match_policy
 
@@ -548,6 +549,7 @@ async def apply_plan(db, tournament: dict, plan: dict) -> dict:
     """
     now_iso = datetime.now(timezone.utc).isoformat()
     written = 0
+    on_station: list[tuple[dict, dict]] = []
     for item in plan.get("assignments") or []:
         if not item.get("changed"):
             continue
@@ -578,8 +580,24 @@ async def apply_plan(db, tournament: dict, plan: dict) -> dict:
         if previous.get("schedule_source") in KEPT_SOURCES or previous.get("status") in RUNNING_STATUSES | DONE_STATUSES:
             continue
         result = await db.matches_v2.update_one(guard, {"$set": update})
-        written += int(bool(result.matched_count))
-    return {"written": written, "mode": plan.get("mode"), "warnings": plan.get("warnings") or []}
+        if result.matched_count:
+            written += 1
+            if update.get("station_id"):
+                on_station.append((item, update))
+    warnings = list(plan.get("warnings") or [])
+    # Nachprüfen (Codex zu #1611): eine Station, die zwischen Vorschau und Schreiben gelöscht wurde, bekommt nichts.
+    for station_id in {update["station_id"] for _item, update in on_station}:
+        if await station_open_for_matches(db, station_id):
+            continue
+        for item, update in [row for row in on_station if row[1]["station_id"] == station_id]:
+            previous = item.get("previous") or {}
+            back = await db.matches_v2.update_one(
+                {"id": item["match_id"], "station_id": station_id, "schedule_written_at": update["schedule_written_at"]},
+                {"$set": {key: previous.get(key) for key in ("scheduled_at", "schedule_source", "status", "station_id")}})
+            written -= int(bool(back.matched_count))
+        warnings.append({"type": "station_gone", "severity": "error", "station_id": station_id,
+                         "message": "Eine Station wurde beim Übernehmen gelöscht - ihre Spiele sind nicht geplant. Bitte neu planen."})
+    return {"written": written, "mode": plan.get("mode"), "warnings": warnings}
 
 
 async def replan_after_heat_rebuild(db, tournament: dict, stage: dict | None) -> dict:

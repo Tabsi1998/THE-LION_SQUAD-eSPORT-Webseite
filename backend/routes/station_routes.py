@@ -220,7 +220,7 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
     # Die Station nur belegen, wenn sie jetzt noch frei (oder schon für dieses Spiel reserviert) ist - nicht gegen
     # den Stand, den der Aufrufer gelesen hat (Compare-and-Set; zwei Zuweisungen zugleich sahen beide „frei“).
     claimed = await db.stations.update_one(
-        {"id": station["id"], "status": {"$ne": "broken"},
+        {"id": station["id"], "status": {"$ne": "broken"}, "deleting": {"$ne": True},
          "$or": [{"current_match_id": None}, {"current_match_id": {"$exists": False}}, {"current_match_id": match["id"]}]},
         station_change,
     )
@@ -426,13 +426,23 @@ async def delete_station(sid: str, me: dict = Depends(require_admin())):
     # einer Station, die es nicht mehr gibt, samt fester Zeit - der Plan wäre nicht mehr zu lesen. Stilles Lösen wäre
     # die andere Wahl, würfe aber von Hand gesetzte Zeiten weg, ohne dass es jemand sieht. Gespielte Spiele halten die
     # Station nicht fest, sie behalten nur, wo sie gespielt wurden.
+    if not station:
+        return {"ok": True}
+    # Atomar gegen Zuweisungen (Codex zu #1611): erst markieren - nur wenn die Station gerade kein Spiel hält -, dann
+    # prüfen, dann löschen. Zuweisungen lehnen markierte Stationen ab und prüfen nach dem Schreiben nach.
+    marked = await db.stations.update_one(
+        {"id": sid, "deleting": {"$ne": True}, "$or": [{"current_match_id": None}, {"current_match_id": {"$exists": False}}]},
+        {"$set": {"deleting": True}})
+    if not marked.matched_count:
+        raise HTTPException(status_code=409, detail="Die Station hält gerade ein Spiel oder wird schon gelöscht. Bitte neu laden.")
     holding = sorted(
         await load_matches_by_query(db, {"station_id": sid, "status": {"$nin": list(DONE_STATUSES)}}, per_store_limit=500),
         key=lambda match: str(match.get("match_key") or ""),
     )
     if holding:
-        raise HTTPException(status_code=409, detail=station_in_use_message((station or {}).get("name"), holding))
-    await db.stations.delete_one({"id": sid})
+        await db.stations.update_one({"id": sid, "deleting": True}, {"$unset": {"deleting": ""}})
+        raise HTTPException(status_code=409, detail=station_in_use_message(station.get("name"), holding))
+    await db.stations.delete_one({"id": sid, "deleting": True})
     return {"ok": True}
 
 

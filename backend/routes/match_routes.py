@@ -36,8 +36,11 @@ from services.match_overview import operational_match_overviews, own_match_overv
 from services.match_duration import load_duration_game, with_effective_durations
 from services.match_public_view import public_match_view, public_tournament_view
 from services.match_planning import (
+    STATION_GONE,
     ensure_plan_keeps_result_state,
+    ensure_station_open,
     ensure_station_slot_available,
+    station_open_for_matches,
     ensure_tournament_accepts_results,
 )
 from services.match_v2_results import MatchV2ResultError, checked_results
@@ -1034,6 +1037,9 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         if updates.get("scheduled_at") and v2_match.get("status") in {"pending", "ready", "preview"} and "status" not in updates:
             updates["status"] = "scheduled"
         ensure_plan_keeps_result_state(v2_match, updates)
+        new_station = updates.get("station_id") if updates.get("station_id") != v2_match.get("station_id") else None
+        if new_station:
+            await ensure_station_open(db, new_station)
         await ensure_station_slot_available(db, v2_match, updates, "matches_v2")
         if updates and all(v2_match.get(key) == value for key, value in updates.items()):
             return {**v2_match, "idempotent_replay": True}
@@ -1045,6 +1051,12 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         if v2_match.get("called_at") and (status_moved or station_moved):
             change["$unset"] = {"called_at": ""}
         await db.matches_v2.update_one({"id": match_id}, change)
+        if new_station and not await station_open_for_matches(db, new_station):
+            # Die Station wurde zwischen Prüfung und Schreiben gelöscht (Codex zu #1611): zurück, nur wenn noch unser Stand.
+            await db.matches_v2.update_one(
+                {"id": match_id, "station_id": new_station, "updated_at": updates["updated_at"]},
+                {"$set": {key: v2_match.get(key) for key in updates}})
+            raise HTTPException(status_code=409, detail=STATION_GONE)
         if station_moved and v2_match.get("station_id"):
             # Umlegen (#1160): die alte Station gibt das Spiel ab - eine defekte bleibt defekt, sonst ist sie frei.
             old = await db.stations.find_one({"id": v2_match["station_id"], "current_match_id": match_id}, {"_id": 0, "status": 1})

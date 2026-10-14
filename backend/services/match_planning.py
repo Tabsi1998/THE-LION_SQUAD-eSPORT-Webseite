@@ -55,6 +55,21 @@ def _duration_minutes(match: dict, updates: dict | None = None, *, tournament: d
     return effective_match_duration(match, stage=stage, tournament=tournament, game=game, updates=updates)
 
 
+STATION_GONE = "Die Station gibt es nicht mehr oder sie wird gerade gelöscht. Bitte neu laden und eine andere wählen."
+
+
+async def station_open_for_matches(db, station_id: str) -> bool:
+    """Darf ein Spiel an diese Station? Nur wenn es sie gibt und sie nicht gerade gelöscht wird (Markierung deleting)."""
+    return bool(await db.stations.find_one({"id": station_id, "deleting": {"$ne": True}}, {"_id": 0, "id": 1}))
+
+
+async def ensure_station_open(db, station_id: str) -> None:
+    """Vor dem Zuweisen. Löschen markiert zuerst und prüft dann; wer zuweist, prüft vorher und nach dem Schreiben noch
+    einmal (``station_open_for_matches``) - so sieht in jeder Reihenfolge einer den anderen."""
+    if not await station_open_for_matches(db, station_id):
+        raise HTTPException(status_code=409, detail=STATION_GONE)
+
+
 def _overlaps(start_a: datetime, minutes_a: int, start_b: datetime, minutes_b: int) -> bool:
     end_a = start_a + timedelta(minutes=minutes_a)
     end_b = start_b + timedelta(minutes=minutes_b)

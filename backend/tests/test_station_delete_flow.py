@@ -16,6 +16,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from models import new_id, now_utc  # noqa: E402
+from routes import match_routes, station_routes  # noqa: E402
+from services import match_scheduler  # noqa: E402
 
 
 @pytest_asyncio.fixture
@@ -88,3 +90,76 @@ async def test_a_station_without_matches_is_deleted(flow):
     response = await flow.delete(f"/api/stations/{station['id']}")
     assert response.status_code == 200, response.text
     assert await flow.db.stations.find_one({"id": station["id"]}) is None
+
+
+# ---- verschränkt (Codex zu #1611): Zwischen Prüfung und Löschen darf kein Spiel an die Station kommen - und kein Spiel
+# an eine Station, die gerade gelöscht wird. Löschen markiert die Station zuerst (deleting), prüft dann; Zuweisungen
+# lehnen markierte Stationen ab und prüfen nach dem Schreiben noch einmal.
+
+@pytest.mark.asyncio
+async def test_an_assignment_while_the_station_is_being_deleted_is_refused(flow, monkeypatch):
+    _tournament, station, matches = await on_site_cup(flow)
+    seen = {}
+    original = station_routes.load_matches_by_query
+
+    async def assign_in_between(db, query, **kwargs):
+        # Die Station ist schon markiert, die Prüfung noch nicht gelaufen: genau jetzt wollen zwei Wege zuweisen.
+        seen["patch"] = await flow.patch(f"/api/matches/{matches[0]['id']}", json={"station_id": station["id"]})
+        seen["assign"] = await flow.post(f"/api/stations/{station['id']}/assign/{matches[1]['id']}")
+        return await original(db, query, **kwargs)
+
+    monkeypatch.setattr(station_routes, "load_matches_by_query", assign_in_between)
+    response = await flow.delete(f"/api/stations/{station['id']}")
+    assert response.status_code == 200, response.text
+    assert seen["patch"].status_code == 409, seen["patch"].text
+    assert seen["assign"].status_code == 409, seen["assign"].text
+    assert await flow.db.stations.find_one({"id": station["id"]}) is None
+    assert not await flow.db.matches_v2.find_one({"station_id": station["id"]})
+
+
+@pytest.mark.asyncio
+async def test_a_deletion_while_a_match_is_being_put_on_the_station_is_caught_after_writing(flow, monkeypatch):
+    _tournament, station, matches = await on_site_cup(flow)
+    seen = {}
+    original = match_routes.ensure_station_open
+
+    async def delete_in_between(db, station_id):
+        # Die Zuweisung hat die Station geprüft (offen), noch nicht geschrieben: genau jetzt wird gelöscht.
+        await original(db, station_id)
+        seen["delete"] = await flow.delete(f"/api/stations/{station['id']}")
+
+    monkeypatch.setattr(match_routes, "ensure_station_open", delete_in_between)
+    response = await flow.patch(f"/api/matches/{matches[0]['id']}", json={"station_id": station["id"]})
+    assert seen["delete"].status_code == 200, seen["delete"].text
+    assert response.status_code == 409, response.text
+    assert not await flow.db.matches_v2.find_one({"station_id": station["id"]}), "kein Spiel an einer gelöschten Station"
+
+
+@pytest.mark.asyncio
+async def test_applying_a_plan_onto_a_station_being_deleted_writes_nothing_there(flow):
+    tournament, station, matches = await on_site_cup(flow)
+    match = matches[0]
+    await flow.db.stations.update_one({"id": station["id"]}, {"$set": {"deleting": True}})
+    plan = {"assignments": [{
+        "match_id": match["id"], "changed": True, "schedule_source": "planner", "station_id": station["id"],
+        "scheduled_at": (now_utc() + timedelta(hours=3)).isoformat(), "forecast": False,
+        "previous": {"scheduled_at": match.get("scheduled_at"), "schedule_source": match.get("schedule_source"),
+                     "status": match.get("status"), "station_id": match.get("station_id")},
+    }]}
+    result = await match_scheduler.apply_plan(flow.db, tournament, plan)
+    assert result["written"] == 0
+    assert any(item.get("type") == "station_gone" for item in result["warnings"])
+    after = await flow.db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
+    assert after.get("station_id") == match.get("station_id") and after.get("scheduled_at") == match.get("scheduled_at")
+
+
+@pytest.mark.asyncio
+async def test_a_failed_deletion_takes_its_mark_back(flow):
+    _tournament, station, matches = await on_site_cup(flow)
+    await put_on(flow, matches[0], station)
+    refused = await flow.delete(f"/api/stations/{station['id']}")
+    assert refused.status_code == 409
+    assert not (await flow.db.stations.find_one({"id": station["id"]})).get("deleting")
+    # Und die Station nimmt danach wieder Spiele an.
+    response = await flow.patch(f"/api/matches/{matches[1]['id']}", json={"station_id": station["id"]})
+    assert response.status_code == 200, response.text
