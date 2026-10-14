@@ -45,6 +45,8 @@ const DONE_STATUSES = new Set(["completed", "finished", "reported", "confirmed"]
 const LIVE_STATUSES = new Set(["running", "in_progress"]);
 // Abstand der Spalten - die Linien brauchen Platz für ihren Knick.
 const COLUMN_GAP = 48;
+// Breite einer Spalte bzw. Karte auf der Leinwand.
+const CARD_WIDTH = 232;
 const CHAMPION_ID = "bracket-champion";
 
 /** Liegt diese Partie auf dem hervorgehobenen Weg - oder wird sie gedämpft? */
@@ -406,9 +408,10 @@ function WebStages({ stages, matches, regMap, podiumMap, steps, finalMatch, tour
 function SectionTitle({ section, flowHint, sticky = false, fit = false }) {
   const key = normalizeSection(section);
   const group = sectionGroup(section);
-  // `fit`: so breit wie der Block, ohne ihn breiter zu machen - der Hinweis bricht um statt überzustehen.
+  // Auf der Leinwand (`fit`) höchstens so breit wie eine Karte (#1561): Titel und Erklärzeile stehen über der ersten
+  // Spalte, die Gassen daneben bleiben für die Linien frei. Am Handy (Runde für Runde) volle Breite.
   return (
-    <div className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 ${sticky ? "sticky left-0 w-max max-w-[min(100vw-2rem,48rem)]" : ""}`} style={fit ? { width: 0, minWidth: "100%" } : undefined}>
+    <div className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 ${sticky ? "sticky left-0" : ""}`} style={fit ? { maxWidth: CARD_WIDTH } : undefined} data-section-head={fit ? "" : undefined}>
       <div className="flex items-center gap-2 uppercase tracking-[0.2em] text-xs font-bold">
         <span className={`w-2 h-2 ${group === "loser" ? "bg-quiet" : group === "final" ? "bg-honor" : "bg-brand"}`} aria-hidden="true" />
         <span className="text-white/80" data-testid={`bracket-section-title-${key}`}>{formatBracketSection(section)}</span>
@@ -533,7 +536,13 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
         const rect = local(node.getBoundingClientRect());
         if (rect.height) corridors.push(rect.top - 20, rect.bottom + 20);
       });
-      const obstacles = [...nodes.values()];
+      // Auch die Köpfe der Abschnitte (Titel, Erklärzeile, Rundentitel) sind Hindernisse.
+      const heads = [];
+      canvas.querySelectorAll("[data-section-head], [data-testid='bracket-round-title']").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (rect.width) heads.push(local(rect));
+      });
+      const obstacles = [...nodes.values(), ...heads];
       const lanes = laneCounter();
       const lines = [];
       for (const edge of stageEdges) {
@@ -574,10 +583,10 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
 
   const block = (name) => (
     <section key={name} className="space-y-3" data-testid={`bracket-section-${normalizeSection(name)}`}>
-      <SectionTitle section={name} flowHint={sectionFlowHint(name, hasLoser, hasReset)} sticky={left.includes(name)} fit={!left.includes(name)} />
+      <SectionTitle section={name} flowHint={sectionFlowHint(name, hasLoser, hasReset)} sticky={left.includes(name)} fit />
       <div className="flex items-stretch" style={{ gap: COLUMN_GAP }}>
         {roundNumbers(sections[name]).map((rn) => (
-          <div key={rn} className="flex w-[232px] shrink-0 flex-col">
+          <div key={rn} className="flex shrink-0 flex-col" style={{ width: CARD_WIDTH }}>
             <div className="mb-3 min-h-[1rem] px-1 text-[11px] font-bold uppercase tracking-wider text-muted-text" data-testid="bracket-round-title">
               {roundHeading(sections[name][rn], rn, formatBracketSection(name))}
             </div>
@@ -620,7 +629,7 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
         {right.length || champion ? (
           <div className="flex flex-col justify-center gap-10">
             {order(right).filter((name) => sectionGroup(name) === "final").map(block)}
-            {champion ? <div className="w-[232px]"><ChampionCard match={champion} regMap={regMap} /></div> : null}
+            {champion ? <div style={{ width: CARD_WIDTH }}><ChampionCard match={champion} regMap={regMap} /></div> : null}
             {order(right).filter((name) => sectionGroup(name) !== "final").map(block)}
           </div>
         ) : null}

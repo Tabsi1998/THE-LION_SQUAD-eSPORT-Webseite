@@ -67,6 +67,13 @@ describe("Linien aus den echten Quellen", () => {
     expect(css).toMatch(/\.tls-bracket-line--drop\s*\{[^}]*stroke-dasharray/);
   });
 
+  it("der Kopf eines Abschnitts ist so breit wie eine Karte - die Gassen bleiben für die Linien frei", () => {
+    render(<BracketTree data={doubleElimination(8)} layout="tree" />);
+    const heads = document.querySelectorAll("[data-section-head]");
+    expect(heads.length).toBe(3);
+    for (const head of heads) expect(head.style.maxWidth).toBe("232px");
+  });
+
   it("andere Namen für das Loser Bracket (lower_bracket) zählen wie „LB“", () => {
     const data = doubleElimination(4);
     for (const match of data.matches_v2) if (match.section === "LB") match.section = "lower_bracket";

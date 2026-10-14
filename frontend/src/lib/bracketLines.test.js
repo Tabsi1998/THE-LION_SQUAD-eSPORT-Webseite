@@ -24,6 +24,7 @@ function layout(bracket) {
   }
   const rects = new Map();
   const sectionRects = [];
+  const heads = [];
   const left = [...sections.keys()].filter((name) => ["main", "loser"].includes(sectionGroup(name)));
   const right = [...sections.keys()].filter((name) => !left.includes(name));
   const place = (names, x0, y0) => {
@@ -33,7 +34,10 @@ function layout(bracket) {
       const rounds = [...sections.get(name).entries()].sort((p, q) => p[0] - q[0]).map(([, list]) => list.sort((p, q) => p.order - q.order));
       const rows = Math.max(...rounds.map((list) => list.length));
       const height = HEAD + rows * ROW;
+      // Kopf: Titel und Erklärzeile (eine Kartenbreite, drei Zeilen), darunter je Spalte der Rundentitel.
+      heads.push({ left: x0, right: x0 + CARD_W, top: y, bottom: y + 34, width: CARD_W, height: 34, section: name });
       rounds.forEach((list, column) => {
+        heads.push({ left: x0 + column * (CARD_W + GAP), right: x0 + column * (CARD_W + GAP) + CARD_W, top: y + 38, bottom: y + 50, width: CARD_W, height: 12, section: name });
         const share = (rows * ROW) / list.length;
         list.forEach((match, index) => {
           const top = y + HEAD + index * share + (share - CARD_H) / 2;
@@ -60,13 +64,16 @@ function layout(bracket) {
       const rect = rects.get(match.id);
       rects.set(match.id, { ...rect, left: rect.left + shiftX, right: rect.right + shiftX, top: rect.top + shiftY, bottom: rect.bottom + shiftY });
     }
+    for (const head of heads.filter((entry) => entry.section === name)) {
+      Object.assign(head, { left: head.left + shiftX, right: head.right + shiftX, top: head.top + shiftY, bottom: head.bottom + shiftY });
+    }
   }
-  return { rects, sectionRects };
+  return { rects, sectionRects, heads };
 }
 
 function routeAll(bracket) {
-  const { rects, sectionRects } = layout(bracket);
-  const obstacles = [...rects.values()];
+  const { rects, sectionRects, heads } = layout(bracket);
+  const obstacles = [...rects.values(), ...heads];
   const corridors = sectionRects.flatMap((rect) => [rect.top - 20, rect.bottom + 20]);
   const lanes = laneCounter();
   return bracketEdges(bracket.matches_v2).map((edge) => {
@@ -74,7 +81,7 @@ function routeAll(bracket) {
     const b = rects.get(edge.to);
     const drop = edge.flow === "L" && edge.cross;
     const points = routeEdge({ a, b, fromY: drop ? a.bottom - 10 : undefined, obstacles, corridors, gap: GAP, lanes, preferCorridor: drop });
-    return { edge, points, a, b, obstacles };
+    return { edge, points, a, b, obstacles, heads };
   });
 }
 
@@ -99,6 +106,8 @@ describe("routeEdge: keine Linie schneidet eine Karte", () => {
         expect(pathHits(points, others), `${edge.from} → ${edge.to}`).toBe(false);
         // Auch die eigenen Karten werden nur an der Kante berührt.
         expect(pathHits(points.slice(1, -1), [a, b]), `${edge.from} → ${edge.to} (eigene Karten)`).toBe(false);
+        // Die Köpfe der Abschnitte (Titel, Erklärzeile, Rundentitel) bleiben frei.
+        for (const head of routes[0].heads) expect(pathHits(points, [head]), `${edge.from} → ${edge.to} durch den Kopf von ${head.section}`).toBe(false);
         // Nur rechte Winkel.
         for (let index = 0; index < points.length - 1; index += 1) {
           expect(points[index].x === points[index + 1].x || points[index].y === points[index + 1].y).toBe(true);
