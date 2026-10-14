@@ -100,7 +100,8 @@ async def test_a_time_set_by_hand_stays_through_apply(flow):
     updated = await flow.put(f"/api/matches/{match['id']}", json={"scheduled_at": fixed.isoformat(), "station_id": station["id"]})
     assert updated.status_code == 200, updated.text
 
-    applied = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply", json={})
+    planned = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/plan")
+    applied = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply", json={"fingerprint": planned.json()["fingerprint"]})
     assert applied.status_code == 200, applied.text
     kept = await flow.reload(match)
     assert kept["schedule_source"] == "manual" and kept["scheduled_at"] == fixed.isoformat() and kept["station_id"] == station["id"]
@@ -179,3 +180,72 @@ async def test_the_response_time_of_the_tournament_sets_the_deadline_and_runs_ou
     assert {note["user_id"] for note in notes} == {staff["id"]}
     await persist_all_matchday_schedules(flow.db)
     assert len(await flow.db.notifications.find({"kind": "schedule_escalation"}, {"_id": 0}).to_list(20)) == len(notes)
+
+
+# ---------------------------------------------------------------- Codex-Prüfung zu #1569
+
+@pytest.mark.asyncio
+async def test_applying_needs_the_fingerprint_of_a_preview(flow):
+    _staff, tournament, _users, _registrations = await built(flow, **on_site_fields())
+    await stations(flow, tournament, "1")
+    blind = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply", json={})
+    assert blind.status_code == 422, blind.text
+    assert all(not match.get("scheduled_at") for match in await flow.matches(tournament))
+
+
+@pytest.mark.asyncio
+async def test_a_match_changed_by_hand_after_the_preview_is_not_overwritten(flow):
+    from services.match_scheduler import apply_plan, plan_for_tournament
+
+    _staff, tournament, _users, _registrations = await built(flow, **on_site_fields())
+    station, _other = await stations(flow, tournament, "1", "2")
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    plan = await plan_for_tournament(flow.db, stored)
+    assert len(plan["assignments"]) == 3
+
+    # Nach der Vorschau setzt jemand ein Spiel von Hand.
+    match = sorted(await flow.matches(tournament), key=lambda row: (row["round"], row["match_key"]))[0]
+    fixed = (now_utc() + timedelta(hours=3)).replace(microsecond=0).isoformat()
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"scheduled_at": fixed, "station_id": station["id"], "schedule_source": "manual"}})
+
+    result = await apply_plan(flow.db, stored, plan)
+    assert result["written"] == 2
+    kept = await flow.reload(match)
+    assert kept["schedule_source"] == "manual" and kept["scheduled_at"] == fixed
+
+
+@pytest.mark.asyncio
+async def test_the_old_auto_assign_only_previews(flow):
+    _staff, tournament, _users, _registrations = await built(flow, **on_site_fields())
+    await stations(flow, tournament, "1")
+    legacy = await flow.post(f"/api/stations/auto-assign?tournament_id={tournament['id']}&plan=true")
+    assert legacy.status_code == 200, legacy.text
+    assert legacy.json()["planned"] is True and legacy.json()["assigned"] == 0 and len(legacy.json()["assignments"]) == 3
+    assert all(not match.get("scheduled_at") and not match.get("station_id") for match in await flow.matches(tournament)), "nur Vorschau"
+
+
+@pytest.mark.asyncio
+async def test_a_team_member_playing_elsewhere_at_the_event_is_not_booked_twice(flow):
+    _staff, tournament, users, registrations = await built(flow, **on_site_fields(event_id="ev-1"))
+    await stations(flow, tournament, "1", "2")
+    start = (await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0}))["start_date"]
+    shared = users[0]  # Spieler 1 steht auch im Team „Löwen“ des anderen Turniers
+    await flow.db.tournaments.insert_one({"id": "t-team", "slug": "teamcup", "title": "Teamcup", "format": "single_elim", "status": "live",
+                                          "event_mode": "local", "event_id": "ev-1", "team_mode": "team", "start_date": start, "created_at": now_utc().isoformat()})
+    await flow.db.teams.insert_one({"id": "team-1", "name": "Löwen", "leader_id": "captain-1", "member_ids": ["captain-1", shared["id"]]})
+    await flow.db.tournament_registrations.insert_one({"id": "reg-team-1", "tournament_id": "t-team", "team_id": "team-1", "user_id": "captain-1", "status": "approved"})
+    await flow.db.tournament_registrations.insert_one({"id": "reg-team-2", "tournament_id": "t-team", "team_id": None, "user_id": "someone-else", "status": "approved"})
+    await flow.db.matches_v2.insert_one({"id": "m-team", "tournament_id": "t-team", "match_key": "T1", "round": 1, "status": "scheduled", "match_type": "duel",
+                                          "scheduled_at": start, "duration_minutes": 40, "station_id": "st-team",
+                                          "slots": [{"slot": 1, "registration_id": "reg-team-1", "user_id": "captain-1"},
+                                                    {"slot": 2, "registration_id": "reg-team-2", "user_id": "someone-else"}], "created_at": now_utc().isoformat()})
+
+    planned = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/plan")
+    assert planned.status_code == 200, planned.text
+    mine = next(match for match in await flow.matches(tournament)
+                if any(slot.get("registration_id") == registrations[0]["id"] for slot in match["slots"]))
+    item = next(item for item in planned.json()["assignments"] if item["match_id"] == mine["id"])
+    from datetime import datetime
+    assert datetime.fromisoformat(item["scheduled_at"]) >= datetime.fromisoformat(start) + timedelta(minutes=40 + 5)
+    others = [item for item in planned.json()["assignments"] if item["match_id"] != mine["id"] and item["round"] == 1]
+    assert all(datetime.fromisoformat(item["scheduled_at"]) == datetime.fromisoformat(start) for item in others)

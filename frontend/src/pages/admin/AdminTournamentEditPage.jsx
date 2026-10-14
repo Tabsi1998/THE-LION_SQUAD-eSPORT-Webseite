@@ -23,7 +23,7 @@ import { matchRights } from "@/lib/tournamentRights";
 import { PauseUntilControl, RoundSponsorsPanel } from "./tournament/TvTournamentPanel";
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
 import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
-import { countOf, describeSchedulePlan } from "@/lib/schedulePlanText";
+import { planAndApplySchedule } from "@/lib/schedulePlan";
 
 export default function AdminTournamentEditPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
@@ -144,32 +144,7 @@ export default function AdminTournamentEditPage() {
   // Konflikte -, und erst „Übernehmen“ schreibt alles auf einmal. Nebenbei (Statuswechsel, An-/Abmeldung,
   // Neuaufbau) wird nicht mehr still geplant; feste Termine bleiben, Konflikte stehen rot im Dialog.
   const planSchedule = async () => {
-    try {
-      const { data: plan } = await api.post(`/tournaments/${id}/schedule/plan`);
-      const changed = (plan.assignments || []).filter((item) => item.changed !== false);
-      const warnings = plan.warnings || [];
-      const errors = warnings.filter((item) => item.severity === "error");
-      if (plan.mode === "none" || (!changed.length && !warnings.length)) {
-        toast.message(plan.reason || "Nichts zu planen: alle Spiele stehen schon so im Plan.");
-        return;
-      }
-      const ok = await confirm({
-        title: "Spielplan übernehmen?",
-        description: describeSchedulePlan(plan, changed, warnings),
-        confirmLabel: "Übernehmen",
-        tone: errors.length ? "danger" : "info",
-      });
-      if (!ok) return;
-      const { data } = await api.post(`/tournaments/${id}/schedule/apply`, { fingerprint: plan.fingerprint });
-      toast.success(`${countOf(data.written, "Spiel", "Spiele")} geplant.`);
-      load();
-    } catch (e) {
-      if (e.response?.status === 409) {
-        toast.error(e.response?.data?.detail || "Der Plan hat sich inzwischen geändert - bitte noch einmal Planen.");
-        return;
-      }
-      toast.error(formatRequestError(e, "Spielplan konnte nicht berechnet werden."));
-    }
+    if (await planAndApplySchedule({ tournamentId: id, confirm })) load();
   };
 
   const reset = async () => {

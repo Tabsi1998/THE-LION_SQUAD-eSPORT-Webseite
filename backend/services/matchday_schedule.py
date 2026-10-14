@@ -106,8 +106,12 @@ def matchday_window(season_start, number: int, *, days: int = MATCHDAY_DAYS) -> 
         raise MatchdayScheduleError("Spieltage werden ab 1 gezählt")
     if days < 1:
         raise MatchdayScheduleError("Ein Spieltag muss mindestens einen Tag dauern")
-    offset = timedelta(days=days * (number - 1))
-    return MatchdayWindow(number=number, start=start + offset, end=start + offset + timedelta(days=days))
+    # Die Wochen laufen in Wiener Kalendertagen (#1552): über die Zeitumstellung bleibt der Wochenrand bei derselben
+    # Wanduhrzeit, statt in UTC um eine Stunde zu rutschen. Gespeichert und verglichen wird in UTC.
+    local_start = start.astimezone(LOCAL_TZ)
+    begins = (local_start + timedelta(days=days * (number - 1))).astimezone(timezone.utc)
+    ends = (local_start + timedelta(days=days * number)).astimezone(timezone.utc)
+    return MatchdayWindow(number=number, start=begins, end=ends)
 
 
 def matchday_number_of(match: dict) -> int | None:
@@ -389,8 +393,27 @@ def schedule_writes(tournament: dict, matches, proposals=None, stages=None) -> l
             }
             if match.get("status") in {"pending", "ready"}:
                 update["status"] = "scheduled"
-            writes.append({"match_id": entry["match_id"], "matchday": matchday["number"], "update": update})
+            writes.append({
+                "match_id": entry["match_id"], "matchday": matchday["number"], "update": update,
+                # Was die Partie beim Lesen hatte: geschrieben wird nur, wenn es noch so ist (Compare-and-Set).
+                "expect": {"schedule_source": match.get("schedule_source"), "scheduled_at": match.get("scheduled_at")},
+            })
     return writes
+
+
+async def apply_schedule_writes(db, writes) -> int:
+    """Die Termine schreiben - jeden nur, wenn die Partie noch so dasteht wie beim Lesen. Hat sich inzwischen jemand
+    geeinigt oder die Turnierleitung etwas gesetzt, bleibt das stehen; der nächste Lauf sieht es dann."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    written = 0
+    for write in writes:
+        expect = write.get("expect") or {}
+        result = await db.matches_v2.update_one(
+            {"id": write["match_id"], "schedule_source": expect.get("schedule_source"), "scheduled_at": expect.get("scheduled_at")},
+            {"$set": {**write["update"], "updated_at": now_iso}},
+        )
+        written += int(bool(result.matched_count))
+    return written
 
 
 async def persist_matchday_schedule(db, tournament: dict) -> dict:
@@ -403,10 +426,9 @@ async def persist_matchday_schedule(db, tournament: dict) -> dict:
     matches = await db.matches_v2.find({"tournament_id": tid, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
     proposals = await db.match_schedule_proposals.find({"tournament_id": tid}, {"_id": 0, "match_collection": 0}).to_list(3000)
     writes = schedule_writes(tournament, matches, proposals, stages)
-    for write in writes:
-        await db.matches_v2.update_one({"id": write["match_id"]}, {"$set": {**write["update"], "updated_at": datetime.now(timezone.utc).isoformat()}})
+    written = await apply_schedule_writes(db, writes)
     escalated = await escalate_overdue_proposals(db, tournament, matches)
-    return {"applies": True, "written": len(writes), "escalated": escalated}
+    return {"applies": True, "written": written, "escalated": escalated}
 
 
 # ---------------------------------------------------------------- Eskalation (#1552)
@@ -468,7 +490,12 @@ async def persist_all_matchday_schedules(db, limit: int = 50) -> dict:
     """Der Scheduler-Lauf, Liga-Modus des Planers (#1552): alle laufenden Ligen, Round Robins und Gruppen, die
     online in Spielwochen spielen - Standardzeit, Heimrecht, abgelaufene Fristen."""
     counts = {"tournaments": 0, "written": 0}
-    query = {"format": {"$in": sorted(MATCHDAY_FORMATS)}, "status": {"$nin": ["draft", "completed", "results_published", "archived", "cancelled"]}}
+    # Spielwochen gibt es als Turnierformat und als Phase (Liga-Phase in einem Turnier anderen Formats).
+    staged = await db.tournament_stages.distinct("tournament_id", {"stage_type": {"$in": sorted(MATCHDAY_STAGE_TYPES)}})
+    query = {
+        "$or": [{"format": {"$in": sorted(MATCHDAY_FORMATS)}}, {"id": {"$in": [tid for tid in staged if tid]}}],
+        "status": {"$nin": ["draft", "completed", "results_published", "archived", "cancelled"]},
+    }
     async for tournament in db.tournaments.find(query, {"_id": 0}).limit(limit):
         result = await persist_matchday_schedule(db, tournament)
         counts["tournaments"] += 1

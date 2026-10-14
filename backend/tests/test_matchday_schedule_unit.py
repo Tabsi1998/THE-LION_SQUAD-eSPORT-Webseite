@@ -357,3 +357,17 @@ def test_an_agreed_time_in_the_match_is_not_overwritten_by_the_default():
     window = matchday_window(TUESDAY, 1)
     agreed = fixture("m1", 1, scheduled_at=(TUESDAY + timedelta(days=9)).isoformat(), schedule_source="accepted", status="scheduled")
     assert schedule_writes(league(), [agreed], []) == []
+
+
+def test_a_week_boundary_keeps_the_vienna_wall_time_across_the_summer_time_change():
+    """Liga-Start Dienstag 18:00 Wien im Sommer: die zweite Woche beginnt Dienstag 18:00 Wien im Winter."""
+    start = datetime(2026, 10, 20, 16, 0, tzinfo=timezone.utc)  # 18:00 Wien, Sommerzeit
+    first, second = matchday_window(start, 1), matchday_window(start, 2)
+    assert first.end == second.start
+    assert second.start == datetime(2026, 10, 27, 17, 0, tzinfo=timezone.utc)  # 18:00 Wien, Winterzeit
+    assert second.start.astimezone(ZoneInfo("Europe/Vienna")).strftime("%a %H:%M") == "Tue 18:00"
+
+
+def test_a_write_says_what_it_expects_to_find_so_a_stale_run_cannot_overwrite():
+    writes = schedule_writes(league(), [fixture("m1", 1)], [])
+    assert writes[0]["expect"] == {"schedule_source": None, "scheduled_at": None}

@@ -249,3 +249,16 @@ def test_a_match_with_too_few_possible_players_is_skipped():
     matches[0]["slots"][1] = {"slot": 2, "source": {"type": "bye"}, "registration_id": None, "user_id": None, "status": "bye"}
     plan = plan_schedule(tournament(), matches, [station("s-a"), station("s-b")], now=T0)
     assert "id-A" not in by_match(plan)
+
+
+# ---------------------------------------------------------------- Teams (Codex-Prüfung zu #1569)
+
+def test_team_members_resolved_by_the_caller_count_as_players():
+    # Zwei Spiele mit verschiedenen Anmeldungen, aber derselbe Mensch steht in beiden Teams: nie gleichzeitig.
+    matches = [duel("A", "r1", "r4", order=1), duel("B", "r2", "r3", order=2)]
+    keys = {"id-A": {"reg:r1", "reg:r4", "user:captain-a", "user:member-shared"},
+            "id-B": {"reg:r2", "reg:r3", "user:captain-b", "user:member-shared"}}
+    plan = plan_schedule(tournament(), matches, [station("s-a"), station("s-b")], now=T0, participant_keys=keys)
+    got = by_match(plan)
+    assert moment(got["id-A"]) == T0
+    assert moment(got["id-B"]) == T0 + timedelta(minutes=30 + DEFAULT_BREAK_MINUTES)

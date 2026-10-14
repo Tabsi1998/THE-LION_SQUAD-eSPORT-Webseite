@@ -288,8 +288,8 @@ Der Reiter zeigt auch andere Fälle, zum Beispiel ein fehlendes Ergebnis oder ei
   „Switch“ mal 8) – nur für die Turnierleitung.
 - **Spiel zuweisen** an einer Station: **Zuweisen** reserviert, **Direkt starten** startet gleich. **Starten** und
   **Freigeben** stehen an der belegten Station.
-- **Zeitplan füllen** verteilt offene Spiele automatisch, **Freie Stationen starten** startet, was bereit ist. Im
-  Turnier macht **Werkzeuge → Planen** dasselbe mit Vorschau: Der Spielplaner zeigt je Spiel Zeit und Station,
+- **Zeitplan füllen** plant offene Spiele mit Vorschau, **Freie Stationen starten** startet, was bereit ist. Im
+  Turnier macht **Werkzeuge → Planen** dasselbe: Der Spielplaner zeigt je Spiel Zeit und Station,
   dazu Konflikte, und schreibt erst bei **Übernehmen** alles auf einmal. Er plant ab jetzt (Erledigtes und Laufendes
   bleibt), hält die Reihenfolge des Turnierbaums ein (spätere Runden stehen als „voraussichtlich“), setzt keinen
   Spieler zweimal gleichzeitig an und hält die **Mindestpause** (Bearbeiten → Erweiterte Spieloptionen, Vorgabe

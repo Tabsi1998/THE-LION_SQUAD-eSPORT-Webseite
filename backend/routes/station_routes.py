@@ -14,7 +14,7 @@ from services.tournament_permissions import (
 from services.match_calls import notify_match_called
 from services.station_runtime import notify_match_started
 from services.competition_read import find_match_source, load_competition_read_model
-from services.match_scheduler import apply_plan, plan_for_tournament
+from services.match_scheduler import plan_for_tournament
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
 TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
@@ -270,16 +270,10 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
     await _ensure_tournament_unlocked(db, tournament_id)
     await require_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "tournament")
     if plan and not start_now:
-        # Planen heißt seit #1552: der Spielplaner rechnet Zeit und Station zusammen (Abhängigkeiten, kein Spieler
-        # doppelt, feste Termine bleiben, online keine Stationen) und schreibt mit Quelle „planner“.
+        # Planen heißt seit #1552: der Spielplaner rechnet Zeit und Station zusammen - hier nur als Vorschau.
+        # Geschrieben wird allein über POST /tournaments/{tid}/schedule/apply mit dem Fingerabdruck der Vorschau.
         computed = await plan_for_tournament(db, tournament)
-        result = await apply_plan(db, tournament, computed)
-        items = [
-            {"station_id": item["station_id"], "match_id": item["match_id"], "match_type": "matches_v2",
-             "scheduled_at": item["scheduled_at"], "duration_minutes": item.get("duration_minutes")}
-            for item in computed["assignments"] if item.get("changed")
-        ]
-        return {"assigned": result["written"], "items": items, "planned": True, "mode": computed["mode"], "warnings": computed["warnings"]}
+        return {"assigned": 0, "items": [], "planned": True, **computed}
     station_query = {"tournament_id": tournament_id, "status": {"$ne": "broken"}}
     station_query = {
         **station_query,
