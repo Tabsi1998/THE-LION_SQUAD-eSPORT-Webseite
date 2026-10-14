@@ -371,3 +371,20 @@ test("kurzes Neuverbinden, und die Abfrage danach bringt schon das neue Ergebnis
   });
   await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
 });
+
+test("Nachhol-Antwort und Meldungs-Antwort im selben Render-Durchgang: nur der neue Moment, nichts Verpasstes", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  current = state("se8_live");
+  const pending = deferredBrackets();
+  renderTv();
+  await screen.findByTestId("tv-tree");
+  await outageThenReconnectWithMessage(pending);
+  // Beide Antworten kommen zusammen an: verpasst (A entschieden) und neu gemeldet (A korrigiert).
+  await act(async () => {
+    pending[0]({ data: state("se8_after_a") });
+    pending[1]({ data: state("se8_corrected") });
+  });
+  await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
+  // Der Moment ist die Korrektur - nicht das verpasste „entschieden“.
+  expect(screen.getByTestId("tv-result-card")).toHaveTextContent("Korrigiert");
+});

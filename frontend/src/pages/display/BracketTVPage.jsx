@@ -16,7 +16,7 @@ import { TvCheckInScreen, TvPauseScreen, TvRegistrationScreen } from "@/componen
 import { TvNextUp } from "@/components/tv/TvNextUp";
 import { useLowMomentTimer, useMinuteTick, useTvSound, useTvSponsors } from "@/components/tv/tvHooks";
 import { lastStageId } from "@/lib/bracketPodium";
-import { bracketChanges, isLiveMatch } from "@/lib/tvLive";
+import { bracketChanges, bracketSnapshot, isLiveMatch } from "@/lib/tvLive";
 import { slotDraw } from "@/lib/bracketGraph";
 import { advancementsOf } from "@/lib/tvTravel";
 import { championKey, championOf } from "@/lib/tvChampion";
@@ -132,7 +132,9 @@ function BracketTv() {
   const [lastUpdated, setLastUpdated] = useState(null);
   // Nach einer Neuverbindung (#1564, wie die Turnierseite #1561): der nächste Stand holt Verpasstes nach - ohne Moment.
   const catchUpRef = useRef(false);
-  const quietRef = useRef(false);
+  // Der zuletzt still übernommene Stand (Codex-Prüfung #1564): beim Übernehmen festgehalten, nicht als Flag - so bleibt
+  // er Basis des Vergleichs, auch wenn React ihn mit einer späteren Antwort in einem Durchgang zeichnet.
+  const quietBaseRef = useRef(null);
   // Nachholen ist nur, was nicht über den Strom kam (Codex-Prüfung #1564, CI-Befund): eine Ersatz-Abfrage, während der
   // Strom getrennt ist, und die Abfrage nach einer Neuverbindung. Kam vor der Abfrage eine Änderung über den Strom, ist
   // es keine Nachhol-Abfrage - auch wenn der Strom danach kurz neu verbindet (EventSource tut das nach jedem Ende).
@@ -174,7 +176,8 @@ function BracketTv() {
       if (seq < appliedRef.current) return;
       appliedRef.current = seq;
       // Ruhig, wenn es Nachholen ist: nach einer echten Unterbrechung und während der Strom getrennt ist (Ersatz-Abfrage).
-      quietRef.current = quiet;
+      // Nur setzen, nie löschen: eine spätere Antwort im selben Durchgang darf die stille Basis nicht wegnehmen.
+      if (quiet) quietBaseRef.current = br;
       setData(br);
       setLoadError(null);
       setKeyRefused(false);
@@ -255,6 +258,21 @@ function BracketTv() {
 
   useEffect(() => {
     if (!data) return;
+    // Ein still übernommener Stand ist die neue Basis: was er gegenüber dem Gezeigten ändert, ist gesehen - ohne Moment,
+    // auch der Sieger. Verglichen wird erst ab ihm (er kann schon der aktuelle Stand sein).
+    const base = quietBaseRef.current;
+    quietBaseRef.current = null;
+    if (base && previousRef.current) {
+      const baseMatches = base.matches_v2 || [];
+      momentsFromChange(previousRef.current, baseMatches, { seen: seenRef.current });
+      previousRef.current = baseMatches;
+      snapshotRef.current = bracketSnapshot(baseMatches);
+      const baseKey = championKey(championOf(baseMatches, base.stages || []));
+      if (baseKey !== championKeyRef.current) {
+        championKeyRef.current = baseKey;
+        setChampionState({ key: baseKey, parked: Boolean(baseKey) });
+      }
+    }
     const { started, decided, snapshot } = bracketChanges(snapshotRef.current, matches);
     const first = snapshotRef.current === null;
     snapshotRef.current = snapshot;
@@ -262,14 +280,12 @@ function BracketTv() {
     const previous = previousRef.current;
     previousRef.current = matches;
     const change = momentsFromChange(previous, matches, { seen: seenRef.current });
-    const catchUp = quietRef.current;
-    quietRef.current = false;
     const hidden = typeof document !== "undefined" && document.hidden;
     const key = championKey(champion);
     // Beim ersten Laden ist nichts neu: steht der Sieger schon fest, gleich das Endbild - ohne Konfetti. Ebenso nach
     // einer Neuverbindung, bei verdecktem Bildschirm und bei Riesen-Sprüngen: nichts nachholen, nur den Stand merken.
     // Pause, Check-in, Anmeldung oder ein Bildschirm ohne Baum: genauso.
-    if (first || catchUp || hidden || !showMoments || change.count > MAX_EVENTS) {
+    if (first || hidden || !showMoments || change.count > MAX_EVENTS) {
       championKeyRef.current = key;
       setChampionState({ key, parked: Boolean(champion) });
       return;
