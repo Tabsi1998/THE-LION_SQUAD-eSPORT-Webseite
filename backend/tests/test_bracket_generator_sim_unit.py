@@ -331,3 +331,25 @@ def test_ffa_bracket_seeds_snake_into_heats():
     by_key = {m["match_key"]: m for m in matches}
     assert [slot["source"]["seed"] for slot in by_key["A"]["slots"]] == [1, 4, 5, 8]
     assert [slot["source"]["seed"] for slot in by_key["B"]["slots"]] == [2, 3, 6, 7]
+
+
+def test_correction_rebuilds_the_walkover_chain():
+    """Korrektur eines Erstrundenspiels neben einem Freilos: das kampflose Loser-Spiel bekommt den neuen Verlierer,
+    das Folgespiel den neuen kampflosen Sieger - nichts bleibt doppelt besetzt."""
+    matches = build(5, "double_elimination")
+    by_key = {m["match_key"]: m for m in matches}
+    apply_result(matches, by_key["B"], ["r4", "r5"])
+    walkover = next(m for m in matches if section_of(m) == "LB" and (m.get("result_meta") or {}).get("source") == "auto_bye")
+    assert walkover["results"][0]["registration_id"] == "r5"
+    follow_up = next(m for m in matches if any((s.get("source_result") or {}).get("from_match_id") == walkover["id"] for s in m["slots"]))
+    assert "r5" in filled_ids(follow_up)
+    raw = [{"registration_id": "r5", "rank": 1}, {"registration_id": "r4", "rank": 2}]
+    application = build_v2_result_application(by_key["B"], matches, raw, actor_id="staff", now_iso=NOW, force=True)
+    by_key["B"].update(application["match_set"])
+    for target_id, update in application["target_sets"].items():
+        next(m for m in matches if m["id"] == target_id).update(update)
+    assert walkover["status"] == "completed"
+    assert walkover["results"][0]["registration_id"] == "r4"
+    assert "r4" in filled_ids(follow_up) and "r5" not in filled_ids(follow_up)
+    assert_nobody_twice_ready(matches)
+    play_through(matches, random.Random(5))
