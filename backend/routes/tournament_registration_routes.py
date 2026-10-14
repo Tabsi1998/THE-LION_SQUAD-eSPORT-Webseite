@@ -735,9 +735,11 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
         replacement = await _replace_registration_in_open_matches(db, tid, old_reg_id, reg, me.get("id"), replace_targets)
     auto_bracket_update = None
     placement = None
-    if not old_reg_id and reg["status"] in {"approved", "checked_in"}:
+    if reg["status"] in {"approved", "checked_in"}:
+        # Vor dem Check-in-Ende frischt auch ein Ersatz die Vorschau auf; ein fester Baum bleibt dabei unberührt.
         auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
-        placement = await _place_fill_in(db, tid, reg, me.get("id"))
+        if not old_reg_id:
+            placement = await _place_fill_in(db, tid, reg, me.get("id"))
 
     # Turnier nur mit Event-Anmeldung (#875): die Turnierleitung darf übergehen - mit Hinweis und im Audit.
     gate = await tournament_event_gate.check(db, tournament, user=user if user and not team else None, team=team) if (user or team) else None

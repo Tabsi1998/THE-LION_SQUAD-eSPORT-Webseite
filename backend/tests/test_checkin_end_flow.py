@@ -175,3 +175,19 @@ async def test_self_check_in_after_the_end_is_refused(flow):
     refused = await flow.post(f"/api/tournaments/{tournament['id']}/checkin")
     assert refused.status_code == 409
     assert "Check-in ist beendet" in refused.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_a_replacement_during_check_in_shows_up_in_the_preview(flow):
+    _staff, tournament, regs = await sixteen(flow, checked_in=4)
+    await open_check_in(flow, tournament)
+    await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=true")
+    absent = regs[0]["id"]
+    substitute = await flow.add_user(name="Ersatz")
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/registrations",
+                               json={"user_id": substitute["id"], "status": "checked_in", "replace_registration_id": absent})
+    assert response.status_code == 200, response.text
+    preview = await flow.matches(tournament)
+    assert preview and all(match.get("is_preview") for match in preview)
+    shown = bracket_ids(preview)
+    assert response.json()["registration"]["id"] in shown and absent not in shown
