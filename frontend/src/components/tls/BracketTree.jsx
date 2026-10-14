@@ -6,7 +6,7 @@ import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
 import { asInstant, viennaTime } from "@/lib/vienna";
 import { finderFor, initials } from "@/lib/slotSource";
 import { buildPodiumMap, finalMatchOf, isBronzeMatch, lastStageId, normalizeSection } from "@/lib/bracketPodium";
-import { bracketEdges, drawGroupsOf, isBusId, isDone, isLive, orderEdges, pathFor, sectionGroup } from "@/lib/bracketGraph";
+import { bracketEdges, drawRails, isCancelled, isDone, isLive, orderEdges, pathFor, sectionGroup } from "@/lib/bracketGraph";
 import { motionTransition } from "@/lib/motion";
 import { laneCounter, routeBus, routeEdge, toPath } from "@/lib/bracketLines";
 import { TV_LINE, treeBlockUnits, treeBox, treeScale } from "@/lib/tvType";
@@ -76,12 +76,12 @@ function usePath(matches, edges) {
   const key = ids ? [...ids].sort().join("|") : "";
   const active = useMemo(() => {
     if (!key) return null;
-    const result = { ids: new Set(key.split("|")), matches: new Set(), edges: new Set(), buses: new Set() };
+    const result = { ids: new Set(key.split("|")), matches: new Set(), edges: new Set(), rails: new Set() };
     for (const id of key.split("|")) {
       const path = pathFor(id, matches, edges);
       path.matches.forEach((value) => result.matches.add(value));
       path.edges.forEach((value) => result.edges.add(value));
-      path.buses?.forEach((value) => result.buses.add(value));
+      path.rails?.forEach((value) => result.rails.add(value));
     }
     return result;
   }, [key, matches, edges]);
@@ -503,26 +503,20 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
   const right = names.filter((name) => !left.includes(name));
   const order = (list) => [...list].sort((a, b) => ["main", "loser", "final", "bronze"].indexOf(sectionGroup(a)) - ["main", "loser", "final", "bronze"].indexOf(sectionGroup(b)));
   const stageMatchIds = useMemo(() => new Set(names.flatMap((name) => Object.values(sections[name]).flat().map((match) => match.id))), [names, sections]);
-  // Gemischte Gruppen dieser Phase (#1548): ihre Sammelschienen und ob eine vor der ersten Spalte eines Abschnitts liegt.
-  const stageGroups = useMemo(() => {
-    const matches = names.flatMap((name) => Object.values(sections[name]).flat());
-    return [...drawGroupsOf(matches).values()];
-  }, [names, sections]);
-  const busIds = useMemo(() => new Set(stageGroups.map((group) => group.id)), [stageGroups]);
-  const inStage = (id) => stageMatchIds.has(id) || busIds.has(id);
+  // Gemischte Runden dieser Phase (#1548): ihre Sammelschienen (drawRails, wie App und TV).
+  const stageRails = useMemo(() => drawRails(names.flatMap((name) => Object.values(sections[name]).flat())), [names, sections]);
   const stageEdges = useMemo(() => {
-    const list = edges.filter((edge) => inStage(edge.from) && inStage(edge.to));
+    const list = edges.filter((edge) => stageMatchIds.has(edge.from) && stageMatchIds.has(edge.to));
     if (champion && stageMatchIds.has(champion.id)) list.push({ id: `${champion.id}>${CHAMPION_ID}`, from: champion.id, to: CHAMPION_ID, toSlot: 0, flow: "W", rank: 1, cross: false, void: false });
     return list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [edges, stageMatchIds, busIds, champion]);
+  }, [edges, stageMatchIds, champion]);
   const columnOf = useMemo(() => {
     const map = new Map();
     for (const name of names) roundNumbers(sections[name]).forEach((rn, index) => sections[name][rn].forEach((match) => map.set(match.id, index)));
     return map;
   }, [names, sections]);
   // Liegt ein Ziel einer Gruppe in der ersten Spalte (Loser-Runde 1), braucht die Schiene links eine Gasse.
-  const busLead = stageGroups.some((group) => group.targetIds.some((id) => columnOf.get(id) === 0));
+  const busLead = stageRails.some((rail) => rail.targets.some((id) => columnOf.get(id) === 0));
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -558,39 +552,46 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
       const lanes = laneCounter();
       const lines = [];
       const freeCorridors = corridors.filter((y) => y > 2);
-      // Sammelschienen (#1548): je Gruppe eine senkrechte Linie in der Gasse vor ihren Zielen.
-      const buses = new Map();
-      for (const group of stageGroups) {
-        const targets = group.targetIds.filter((id) => nodes.has(id)).map((id) => ({ id, rect: nodes.get(id) }));
-        if (targets.length < 2) continue;
-        const section = byIdMatch(group.targetIds[0])?.section;
-        const sources = group.sourceIds.filter((id) => nodes.has(id)).map((id) => ({ id, rect: nodes.get(id), cross: String(byIdMatch(id)?.section || "") !== String(section || "") }));
+      // Sammelschienen (#1548): je gemischter Gruppe eine senkrechte Linie in der Gasse vor ihren Zielen, je Quelle ein
+      // Ast hinauf, je Ziel ein Ast hinaus - das Gerüst, das auch nach der Auslosung stehen bleibt.
+      const rails = new Map();
+      for (const rail of stageRails) {
+        const targetIds = rail.targets.filter((id) => nodes.has(id) && !isCancelled(byIdMatch(id)));
+        if (!targetIds.length) continue;
+        const section = String(byIdMatch(targetIds[0])?.section || "");
+        const sourceIds = [...new Set(rail.sources.map((source) => source.id))].filter((id) => nodes.has(id) && !isCancelled(byIdMatch(id)));
+        const sources = sourceIds.map((id) => ({ id, rect: nodes.get(id), cross: String(byIdMatch(id)?.section || "") !== section }));
         const slotYs = [];
-        for (const id of group.targetIds) {
+        for (const id of targetIds) {
           for (const slot of byIdMatch(id)?.slots || []) {
             const anchor = anchors.get(`${id}:${slot.slot}`);
             if (anchor && anchor.height) slotYs.push(anchor.top + anchor.height / 2 + oy);
           }
         }
-        const bus = routeBus({ sources, targets, slotYs, obstacles, corridors: freeCorridors, gap: COLUMN_GAP, lanes });
-        buses.set(group.group, bus);
-        lines.push({ id: `${group.id}:spine`, from: group.id, to: group.id, flow: "W", spine: group.group, d: toPath(bus.spine), column: columnOf.get(group.targetIds[0]) || 0 });
+        const bus = routeBus({ sources, targets: targetIds.map((id) => ({ id, rect: nodes.get(id) })), slotYs, obstacles, corridors: freeCorridors, gap: COLUMN_GAP, lanes });
+        rails.set(rail.group, bus);
+        const column = columnOf.get(targetIds[0]) || 0;
+        const node = `rail:${rail.group}`;
+        lines.push({ id: `${node}:spine`, from: node, to: node, flow: "W", spine: rail.group, d: toPath(bus.spine), column });
+        for (const source of sources) {
+          const flow = rail.sources.find((entry) => entry.id === source.id)?.flow || "W";
+          lines.push({ id: `${node}:in:${source.id}`, from: source.id, to: node, flow, cross: source.cross, scaffold: "in", railKey: `${rail.group}:${source.id}`, rail: rail.group, d: toPath(bus.branchesIn.get(source.id)), column: columnOf.get(source.id) || 0 });
+        }
+        for (const id of targetIds) {
+          lines.push({ id: `${node}:out:${id}`, from: node, to: id, flow: "W", scaffold: "out", rail: rail.group, d: toPath(bus.branchesOut.get(id)), column });
+        }
       }
       for (const edge of stageEdges) {
-        const a = isBusId(edge.from) ? null : nodes.get(edge.from);
-        const b = isBusId(edge.to) ? null : nodes.get(edge.to);
+        const a = nodes.get(edge.from);
+        const b = nodes.get(edge.to);
+        if (!a || !b) continue;
         const anchor = anchors.get(`${edge.to}:${edge.toSlot}`);
-        if (edge.bus) {
-          const bus = buses.get(edge.bus);
-          if (!bus) continue;
-          let points = null;
-          if (edge.scaffold === "in") points = bus.branchesIn.get(edge.from);
-          else if (edge.scaffold === "out") points = bus.branchesOut.get(edge.to);
-          else if (a && b) points = bus.via(a, edge.cross, anchor && anchor.height ? anchor.top + anchor.height / 2 + oy : b.top + b.height / 2, b);
-          if (points) lines.push({ ...edge, d: toPath(points), column: columnOf.get(edge.to) ?? columnOf.get(edge.from) ?? 0 });
+        if (edge.rail && rails.has(edge.rail)) {
+          // Der echte Weg eines Spielers nach der Auslosung: Ast aus der Quelle, die Schiene entlang, Ast in den Platz.
+          const points = rails.get(edge.rail).via(a, edge.cross, anchor && anchor.height ? anchor.top + anchor.height / 2 + oy : b.top + b.height / 2, b);
+          lines.push({ ...edge, d: toPath(points), column: columnOf.get(edge.from) || 0 });
           continue;
         }
-        if (!a || !b) continue;
         const drop = edge.flow === "L" && edge.cross;
         const points = routeEdge({
           a, b, obstacles, lanes, gap: COLUMN_GAP,
@@ -620,7 +621,7 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
       observer.disconnect();
       if (frame && typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame);
     };
-  }, [stageEdges, stageGroups, columnOf, sections, byIdMatch]);
+  }, [stageEdges, stageRails, columnOf, sections, byIdMatch]);
 
   const block = (name) => (
     <section key={name} className="space-y-3" data-testid={`bracket-section-${normalizeSection(name)}`}>
@@ -644,11 +645,14 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
     <div ref={canvasRef} className="tls-bracket-canvas relative overflow-x-auto pb-4" data-testid="bracket-tree" data-stage={stageId}>
       <svg className="pointer-events-none absolute left-0 top-0" width={geom.w || "100%"} height={geom.h || "100%"} aria-hidden="true" data-testid="bracket-connectors">
         {geom.lines.map((line) => {
-          const onBus = line.spine ? active?.buses?.has(line.spine) : false;
-          const state = active ? (onBus || active.edges.has(line.id) || (line.to === CHAMPION_ID && championId && active.ids.has(championId)) ? "on" : "off") : "";
+          // Gerüst der Schiene: an, solange dein Weg (noch vor der Auslosung) hierher führt - danach leuchtet der echte Weg.
+          const onRail = !active ? false
+            : line.spine ? [...(active.rails || [])].some((key) => key.startsWith(`${line.spine}:`))
+              : line.scaffold === "in" ? active.rails?.has(line.railKey) : false;
+          const state = active ? (onRail || active.edges.has(line.id) || (line.to === CHAMPION_ID && championId && active.ids.has(championId)) ? "on" : "off") : "";
           const fresh = line.spine || line.scaffold ? undefined : motionState.fresh.get(`${line.from}>${line.to}`);
           const quiet = line.flow === "L" && line.cross;
-          const real = Boolean(line.bus && !line.scaffold);
+          const real = Boolean(line.rail && !line.scaffold && !line.spine);
           return (
             <path
               key={line.id}
@@ -656,7 +660,7 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
               pathLength={line.void || (quiet && fresh == null && !real) ? undefined : "1"}
               className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : fresh != null ? "tls-bracket-line--fresh" : real ? "tls-bracket-line--real" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
               style={{ "--tls-i": line.column, ...(fresh != null ? { "--tls-fresh-delay": `${fresh.delay}ms`, "--tls-fresh-duration": `${fresh.duration}ms` } : null) }}
-              data-bus-spine={line.spine || undefined}
+              data-rail-spine={line.spine || undefined}
               data-real={real ? "1" : undefined}
               data-to-slot={line.toSlot || undefined}
               data-from={line.from}
@@ -670,7 +674,7 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
           );
         })}
       </svg>
-      <div ref={contentRef} className="relative grid w-max items-center" data-bus-lead={busLead ? "1" : undefined} style={{ gridTemplateColumns: right.length || champion ? "max-content max-content" : "max-content", columnGap: COLUMN_GAP, paddingLeft: busLead ? COLUMN_GAP : undefined }}>
+      <div ref={contentRef} className="relative grid w-max items-center" data-rail-lead={busLead ? "1" : undefined} style={{ gridTemplateColumns: right.length || champion ? "max-content max-content" : "max-content", columnGap: COLUMN_GAP, paddingLeft: busLead ? COLUMN_GAP : undefined }}>
         <div className="space-y-10">{order(left).map(block)}</div>
         {right.length || champion ? (
           <div className="flex flex-col justify-center gap-10">

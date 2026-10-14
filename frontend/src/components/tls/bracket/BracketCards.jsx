@@ -6,7 +6,7 @@ import { formatMatchStatus } from "@/lib/tournamentLabels";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
 import { describeSlot, initials } from "@/lib/slotSource";
 import { MOTION, motionAllowed } from "@/lib/motion";
-import { heatExits, isDone, isLive, isOut, isWalkover, matchFate, soloAdvance } from "@/lib/bracketGraph";
+import { heatText, isDone, isLive, isOut, isWalkover, matchFate, soloAdvance } from "@/lib/bracketGraph";
 import { useBracketMotionState, useRowFlight } from "./bracketMotion";
 import {
   FinderContext, FinishedContext, GraphContext, MatchLinkContext, MineContext, PathContext, nodePathState, useMatchChanged,
@@ -355,22 +355,18 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
     ? [...taken].sort((a, b) => (resultMap.get(a.registration_id)?.rank || 99) - (resultMap.get(b.registration_id)?.rank || 99))
     : taken;
   const filled = slots.filter((slot) => slot.registration_id).length;
-  const exits = heatExits(match, edges, matches);
-  const qualifiers = exits.qualifiers;
+  // Die Wörter der Karte aus einer Regel mit der App (lib/bracketGraph.heatText): „4 Spieler · 2 kommen weiter“,
+  // „2 kommen weiter → E“, „Die anderen …“, „2 Plätze frei“; der letzte Lauf: „Platz 1 gewinnt“.
+  const text = heatText(match, edges, matches, finalId);
+  const qualifiers = Number(match.settings?.qualifiers_per_match || 0);
   const isMine = Boolean(mine) && slots.some((slot) => slot.registration_id === mine);
   const live = !finished && isLive(match);
-  const name = match.match_type === "ffa" ? `Lauf ${match.match_key || ""}`.trim() : (match.match_key || "Spiel");
-  // Gezählt werden nur Plätze, die noch jemand bekommen kann - ein Freilos-Platz („frei“) zählt nicht mit.
-  const seats = taken.length;
-  const field = filled === seats ? `${filled} Spieler` : filled ? `${filled} von ${seats} Spielern` : `${seats} ${seats === 1 ? "Platz" : "Plätze"}`;
-  // Der letzte Lauf ohne Folgespiel (#1561): danach kommt nur der Pokal - „2 kommen weiter“ wäre falsch.
-  const lastHeat = match.id === finalId && !exits.advance.length && !exits.drop.length;
-  const onward = lastHeat ? "Platz 1 gewinnt" : qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : null;
-  const meta = [field, onward].filter(Boolean).join(" · ");
+  const name = text.name;
+  const meta = text.meta;
   const empty = !filled && slots.every((slot) => !pendingLabel(slot, findMatch));
-  const cutAt = qualifiers > 0 && exits.advance.length && qualifiers < rows.length ? qualifiers : 0;
-  const cutText = `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter → ${exits.advance.join(", ")}${exits.lot ? " (Los)" : ""}`;
-  const dropText = exits.drop.length ? `Die anderen → ${exits.drop.join(", ")}` : exits.advance.length ? "Die anderen scheiden aus" : "";
+  const cutAt = qualifiers > 0 && text.cut && qualifiers < rows.length ? qualifiers : 0;
+  const cutText = text.cut;
+  const dropText = text.rest;
   return (
     <div
       ref={sheet.ref}
@@ -420,10 +416,10 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
         );
       })}
       {freeCount && !empty ? (
-        <div className="px-3 py-1.5 text-xs italic text-quiet" data-testid={`bracket-heat-free-${match.id}`}>{freeCount} {freeCount === 1 ? "Platz" : "Plätze"} frei</div>
+        <div className="px-3 py-1.5 text-xs italic text-quiet" data-testid={`bracket-heat-free-${match.id}`}>{text.free}</div>
       ) : null}
       {dropText && !empty ? (
-        <div className="px-3 pb-2 pt-1 text-[11px] text-muted-text" data-testid={exits.drop.length ? `bracket-heat-drop-${match.id}` : `bracket-heat-out-${match.id}`}>{dropText}</div>
+        <div className="px-3 pb-2 pt-1 text-[11px] text-muted-text" data-testid={dropText.startsWith("Die anderen →") ? `bracket-heat-drop-${match.id}` : `bracket-heat-out-${match.id}`}>{dropText}</div>
       ) : null}
       <MatchSheet match={match} id={sheetId} />
     </div>

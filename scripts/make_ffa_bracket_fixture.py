@@ -92,7 +92,8 @@ async def results(flow, tournament, staff, keys):
 INFO = ("Erzeugt von scripts/make_ffa_bracket_fixture.py mit dem echten Generator (#1571) und dem echten Umbau "
         "(#1575). Zustände: 16 Fahrer (Start, nach Runde 1), 10 von 16 (ausgeglichen), 8 von 16 vor und nach dem "
         "Zusammenlegen, 40 Fahrer mit langen Namen; Gegner mischen (#1548) je vor und nach der Auslosung für K.-o. mit 8 "
-        "(se8_draw_*), Doppel-K.-o. mit 8 (de8_draw_*) und Läufe mit 16 (ffa16_draw_*). Nicht von Hand ändern - neu erzeugen.")
+        "(se8_draw_*), mit 6 und Freilosen (se6_draw_*), Doppel-K.-o. mit 8 (de8_draw_*), Läufe mit 16 (ffa16_draw_*) und 8 "
+        "von 16 gemischt nach dem Zusammenlegen (ffa8_shuffle_merged). Nicht von Hand ändern - neu erzeugen.")
 
 
 async def main():
@@ -138,6 +139,31 @@ async def main():
             data[f"{name}_draw_after"] = await bracket(flow, tournament)
         finally:
             await shutdown()
+    # Gemischt mit Freilosen: 6 Spieler im 8er-Baum - zwei Viertelfinals sind Freilose, gelost wird trotzdem die Runde.
+    flow, shutdown = make_flow()
+    try:
+        tournament, staff, _schema = await build(flow, 6, "auto", 6, shuffle=True, duel=True)
+        await flow.start(tournament)
+        open_keys = [m["match_key"] for m in await flow.matches(tournament)
+                     if m.get("round") == 1 and m.get("status") == "ready"]
+        await results(flow, tournament, staff, open_keys[:-1])
+        data["se6_draw_before"] = await bracket(flow, tournament)
+        await results(flow, tournament, staff, open_keys[-1:])
+        data["se6_draw_after"] = await bracket(flow, tournament)
+    finally:
+        await shutdown()
+    # Gemischt und zusammengelegt: 8 von 16 Fahrern, der Umbau legt Läufe zusammen und kürzt ab.
+    flow, shutdown = make_flow()
+    try:
+        tournament, staff, _schema = await build(flow, 8, "suggest", 16, shuffle=True)
+        flow.act_as(staff)
+        plan = (await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})).get("heat_rebuild_plan")
+        if plan:
+            response = await flow.post(f"/api/tournaments/{tournament['id']}/heat-rebuild/confirm", json={"plan_id": plan["id"]})
+            assert response.status_code == 200, response.text
+        data["ffa8_shuffle_merged"] = await bracket(flow, tournament)
+    finally:
+        await shutdown()
     flow, shutdown = make_flow()
     try:
         t40, _staff, _schema = await build(flow, 40, "auto", 40)
@@ -145,7 +171,8 @@ async def main():
     finally:
         await shutdown()
     states = ("ffa16", "ffa16_round1", "ffa10_balanced", "ffa8_before_merge", "ffa8_after_merge", "ffa40",
-              "se8_draw_before", "se8_draw_after", "de8_draw_before", "de8_draw_after", "ffa16_draw_before", "ffa16_draw_after")
+              "se8_draw_before", "se8_draw_after", "de8_draw_before", "de8_draw_after", "ffa16_draw_before", "ffa16_draw_after",
+              "se6_draw_before", "se6_draw_after", "ffa8_shuffle_merged")
     out = {"_info": INFO, "plan16": data["plan16"], "plan10": data["plan10"], "schema16": data["schema16"]}
     for key in states:
         out[key] = {name: value for name, value in data[key].items() if name not in {"structure", "matches"}}
