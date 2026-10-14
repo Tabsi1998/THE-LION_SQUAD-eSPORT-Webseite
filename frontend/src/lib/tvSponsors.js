@@ -4,7 +4,7 @@
 // der Reihe nach dran. Welcher Sponsor eine Runde präsentiert, wählt die Turnierleitung beim Turnier; der TV zeigt ihn,
 // solange diese Runde läuft oder als Nächstes dran ist - ist die Runde fertig, verschwindet er.
 import { isMatchDone } from "@/lib/slotSource";
-import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
+import { formatBracketSection, matchRoundLabel } from "@/lib/tournamentLabels";
 import { isLiveMatch } from "@/lib/tvLive";
 
 /** Was die TV-Seiten an Sponsoren brauchen: nur mit Logo, jeder einmal, in der Reihenfolge der Liste. */
@@ -85,7 +85,7 @@ export function presentedBy(tournament, matches = [], sponsors = []) {
   const sponsor = entry ? sponsors.find((row) => row.id === entry.sponsor_id) : null;
   if (!sponsor) return null;
   const section = formatBracketSection(match.section);
-  const name = formatRoundName(match.round_name, match.round);
+  const name = matchRoundLabel(match);
   const showSection = section && !["WB", ""].includes(String(match.section || "").toUpperCase()) && !name.toLowerCase().includes(section.toLowerCase().split(" ")[0]);
   return { label: showSection ? `${section} · ${name}` : name, sponsor, roundId: round.id };
 }

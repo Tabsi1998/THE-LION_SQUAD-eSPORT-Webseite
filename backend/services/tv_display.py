@@ -178,13 +178,16 @@ MATCH_FIELDS = ("id", "tournament_id", "stage_id", "stage_number", "stage_type",
                 "round", "round_name", "round_label", "matchday_number", "matchday_label", "order", "match_index", "status",
                 "scheduled_at", "started_at", "completed_at", "duration_minutes", "station_id", "station_name",
                 "station_label", "winner_id", "is_preview", "called_at", "best_of", "effective_duration_minutes",
-                "merged_into_key")
+                "merged_into_key",
+                # „Als Nächstes“ mit Prognose (#1564): ist die Zeit nur eine Prognose des Planers, und woher stammt sie.
+                "schedule_forecast", "schedule_source")
 # Wer zum Check-in zählt (#1123) und wer einen Platz belegt (wie die Anmeldung: offen, bestätigt, eingecheckt).
 CHECKIN_STATUSES = ("approved", "checked_in")
 SEAT_STATUSES = ("pending", "approved", "checked_in")
 SLOT_FIELDS = ("slot", "registration_id", "status", "seed", "source")
 SOURCE_FIELDS = ("type", "flow", "match_key", "rank", "seed", "raw")
-RESULT_FIELDS = ("registration_id", "rank", "score", "points", "qualified")
+# Ausgefallen (#1564): Aufgabe bzw. nicht ins Ziel - nur die Kennzeichen, nie Notiz oder Konto.
+RESULT_FIELDS = ("registration_id", "rank", "score", "points", "qualified", "dnf", "forfeit")
 MATCH_SETTING_FIELDS = ("match_size", "qualifiers_per_match", "duration_minutes", "best_of", "draw_group")
 # Gegner mischen (#1548, #1561): Gruppe, Klartext des Platzes, ob gelost ist und die echte Herkunft je Platz.
 DRAW_FIELDS = ("id", "group", "drawn_at")

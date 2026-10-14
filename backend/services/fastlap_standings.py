@@ -9,6 +9,9 @@ Tabelle, TV, Gewinne, Gewinn-Erinnerung, Saisonpunkte, Event-Rückblick, Widget,
 - Bei gleicher wirksamer Zeit liegt die früher gefahrene vorn (Entscheidung 14.10.2026). Gefahren heißt eingetragen
   (``created_at``); eine Zeit ohne Zeitpunkt steht hinter einer mit.
 - Versuche zählen alle Zeiten der Wertung, auch ungültige - wie die Versuchsgrenze beim Eintragen.
+- Gäste ohne Konto (#1585) tragen ``guest_id`` statt ``user_id``. Sie kommen nur mit ``include_guests`` in die
+  Rangfolge (Tabelle, TV, Urkunde) - Gewinne, Saisonpunkte, Erfolge, Profil und Rückblick rufen ohne und sehen nur
+  Konten. Jeder Gast zählt für sich (``participant_id`` = ``guest-<Kennung>``).
 """
 from __future__ import annotations
 
@@ -62,21 +65,34 @@ def _in_scope(row: dict, scope: str) -> bool:
     return row_scope == REFERENCE_SCOPE if scope == REFERENCE_SCOPE else row_scope != REFERENCE_SCOPE
 
 
+GUEST_PREFIX = "guest-"
+
+
+def participant_id(row: dict, include_guests: bool = True) -> str | None:
+    """Wer eine Zeit gefahren ist: die Kennung des Kontos, bei einem Gast ``guest-<Kennung>``, sonst ``None``."""
+    if row.get("user_id"):
+        return row["user_id"]
+    if include_guests and row.get("guest_id"):
+        return f"{GUEST_PREFIX}{row['guest_id']}"
+    return None
+
+
 def _rankable(row: dict) -> bool:
     time_ms = row.get("time_ms")
     return not row.get("is_invalid") and isinstance(time_ms, (int, float)) and not isinstance(time_ms, bool)
 
 
-def rank_laps(times: list[dict], scope: str = "official") -> list[dict]:
+def rank_laps(times: list[dict], scope: str = "official", *, include_guests: bool = False) -> list[dict]:
     """Die Rangfolge einer Strecke: je Person die beste wirksame Zeit, schnellste zuerst, Gleichstand früher vorn.
 
-    Jede Zeile ist die beste Zeit der Person mit ``effective_ms``, ``rank`` (1, 2, 3 … ohne geteilte Plätze) und
-    ``attempts`` (alle Zeiten der Wertung, auch ungültige)."""
+    Jede Zeile ist die beste Zeit der Person mit ``effective_ms``, ``rank`` (1, 2, 3 … ohne geteilte Plätze),
+    ``attempts`` (alle Zeiten der Wertung, auch ungültige), ``participant_id`` und ``is_guest``. Gäste nur mit
+    ``include_guests`` - und nie als Vereins-Referenz."""
     attempts: Counter = Counter()
     best: dict[str, tuple[tuple, dict]] = {}
     for row in times:
-        uid = row.get("user_id")
-        if not uid or not _in_scope(row, scope):
+        uid = participant_id(row, include_guests)
+        if not uid or not _in_scope(row, scope) or (scope == REFERENCE_SCOPE and not row.get("user_id")):
             continue
         attempts[uid] += 1
         if not _rankable(row):
@@ -86,7 +102,8 @@ def rank_laps(times: list[dict], scope: str = "official") -> list[dict]:
             best[uid] = (key, row)
     ordered = sorted(best.items(), key=lambda item: (item[1][0], item[0]))
     return [
-        {**row, "user_id": uid, "effective_ms": key[0], "rank": index, "attempts": attempts[uid]}
+        {**row, "user_id": row.get("user_id") or None, "participant_id": uid, "is_guest": not row.get("user_id"),
+         "effective_ms": key[0], "rank": index, "attempts": attempts[uid]}
         for index, (uid, (key, row)) in enumerate(ordered, start=1)
     ]
 

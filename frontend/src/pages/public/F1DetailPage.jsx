@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { parseLapTime, plausibilityText } from "@/lib/laptime";
@@ -27,6 +27,10 @@ import { toast } from "sonner";
 import { ShareButton } from "@/components/tls/ShareButton";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { tournamentIsOver } from "@/lib/afterEnd";
+import { attemptsCell, participantKey } from "@/lib/fastLapEvent";
+import { deltaText } from "@/lib/tvFastLap";
+import { MOTION } from "@/lib/motion";
+import { useLapBoardMotion } from "@/hooks/useLapBoardMotion";
 
 const PUBLIC_RESULT_STATUSES = new Set(["completed", "results_published", "archived"]);
 // Nach „Ergebnisse veröffentlicht“ (#1584) ändert nur die Turnierleitung Zeiten - mit Begründung.
@@ -45,7 +49,8 @@ export default function F1DetailPage() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
   const accessToken = searchParams.get("access") || "";
-  const { user } = useAuth();
+  // Urkunde jetzt drucken (#1585): die Turnierleitung auch, solange die Challenge läuft.
+  const { user, isTournamentLead } = useAuth();
   const [challenge, setChallenge] = useState(null);
   const [activeTrack, setActiveTrack] = useState(null);
   const [board, setBoard] = useState(null);
@@ -94,11 +99,18 @@ export default function F1DetailPage() {
 
   useLiveRefresh(loadBoard, ["f1"], { fallbackMs: 10000 });
 
+  // Bewegung bei neuen Zeiten (#1585): Zeile gleitet an ihren Platz, Zeit läuft kurz, Platz 1 leuchtet ruhig.
+  const boardRef = useRef(null);
+  const marks = useLapBoardMotion(board, boardRef);
+
   if (!challenge) return <PublicLayout><PublicLoadingState label="Lade Fast Lap" /></PublicLayout>;
 
   const hasOnlineSubmission = hasOnlineRegistration(challenge);
   const registration = hasOnlineSubmission ? getRegistrationState(challenge, "Einreichung") : null;
   const showResultPdf = PUBLIC_RESULT_STATUSES.has(challenge.status);
+  const showCertificates = showResultPdf || isTournamentLead;
+  const maxAttempts = board?.max_attempts ?? null;
+  const largestGap = Math.max(0, ...(board?.entries || []).map((entry) => Number(entry.gap_ms) || 0));
 
   return (
     <PublicLayout>
@@ -165,14 +177,15 @@ export default function F1DetailPage() {
                 <FileDown className="w-4 h-4" /> Ergebnis-PDF
               </a>
             )}
-            {showResultPdf && (
+            {showCertificates && (
               <a
                 href={`${API}/exports/f1/${challenge.slug || challenge.id}/certificates.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`}
                 target="_blank"
                 rel="noreferrer"
+                data-testid="f1-certificates"
                 className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm"
               >
-                <Award className="w-4 h-4" /> Urkunden
+                <Award className="w-4 h-4" /> {showResultPdf ? "Urkunden" : "Urkunden jetzt drucken"}
               </a>
             )}
             {showResultPdf && challenge.is_championship && (
@@ -271,36 +284,60 @@ export default function F1DetailPage() {
                   onSaved={loadBoard}
                 />
               )}
-              <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-                <div className="p-4 border-b border-white/10 flex items-center justify-between">
-                  <h3 className="font-heading text-xl font-bold">{board?.track?.name || "—"}</h3>
-                  <span className="text-[11px] uppercase tracking-widest text-white/50 font-display">{board?.entries?.length || 0} Fahrer</span>
+              <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden relative">
+                <div className="p-4 border-b border-white/10 flex items-center justify-between gap-3">
+                  <h3 className="font-heading text-xl font-bold min-w-0 truncate">{board?.track?.name || "—"}</h3>
+                  <span className="shrink-0 text-[11px] uppercase tracking-widest text-white/50 font-display">{board?.entries?.length || 0} Fahrer</span>
                 </div>
+                {marks.best && (
+                  <div key={marks.bestKey} className="tls-best-flash" role="status" data-testid="f1-best-flash">
+                    <span className="tls-best-flash__kicker font-heading">Neue Bestzeit!</span>
+                    <span className="min-w-0 truncate font-bold">{marks.best.entry.display_name}</span>
+                    <span className="font-display font-bold tabular-nums text-honor">{marks.best.entry.time_str}</span>
+                    {marks.best.gapMs !== null && <span className="font-display tabular-nums text-white/70">{deltaText(marks.best.gapMs)}</span>}
+                  </div>
+                )}
+                <div className="overflow-x-auto">
                 {/* Timing-Board (#1077): beim ersten Erscheinen zählen die Zeiten einmal hoch, Platz 1 bis 3 tragen einen
                     Strich in Gold, Silber und Bronze, beim Drüberfahren läuft ein Lichtstreif durch die Zeile. */}
-                <table className="tls-lap-board w-full text-sm" data-intro={introOnce(board?.track?.id ? `fastlap:${challenge.id}:${board.track.id}` : "") ? "1" : undefined} data-testid="f1-board">
+                <table ref={boardRef} className="tls-lap-board w-full text-sm" data-intro={introOnce(board?.track?.id ? `fastlap:${challenge.id}:${board.track.id}` : "") ? "1" : undefined} data-testid="f1-board">
                   <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
                     <tr>
                       <th className="text-left px-4 py-3 w-12">#</th>
                       <th className="text-left px-4 py-3">Fahrer</th>
-                      <th className="text-right px-4 py-3 font-display">Beste Zeit</th>
-                      <th className="text-right px-4 py-3">Abstand</th>
-                      <th className="text-right px-4 py-3">Versuche</th>
-                      {showResultPdf && <th className="text-right px-4 py-3">Urkunde</th>}
+                      <th className="text-right px-4 py-3 font-display whitespace-nowrap">Beste Zeit</th>
+                      <th className="hidden sm:table-cell text-right px-4 py-3">Abstand</th>
+                      <th className="hidden sm:table-cell text-right px-4 py-3">Versuche</th>
+                      {showCertificates && <th className="hidden sm:table-cell text-right px-4 py-3">Urkunde</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {board?.entries?.map((e) => (
-                      <tr key={e.user_id} data-testid={`f1-row-${e.rank}`} className={`tls-lap-row ${e.rank <= 3 ? `tls-lap-row--p${e.rank} bg-[#29B6E8]/5` : ""}`}>
-                        <td className={`px-4 py-3 font-display font-bold ${e.rank === 1 ? "text-[#FFD700]" : e.rank === 2 ? "text-white/80" : e.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{e.rank}</td>
-                        <td className="px-4 py-3">{e.display_name}</td>
+                    {board?.entries?.map((e) => {
+                      const key = participantKey(e);
+                      const chip = marks.chips.get(key);
+                      const fresh = marks.fresh.has(key);
+                      const record = fresh && marks.best?.userId === key;
+                      const from = marks.fromMs.get(key);
+                      return (
+                      <tr key={key} data-flip-key={key} data-testid={`f1-row-${e.rank}`} className={`tls-lap-row ${e.rank <= 3 ? `tls-lap-row--p${e.rank} bg-[#29B6E8]/5` : ""} ${record ? "tls-lap-row--record" : fresh ? "tls-lap-row--fresh" : ""}`}>
+                        <td className={`px-4 py-3 font-display font-bold ${e.rank === 1 ? "text-[#FFD700]" : e.rank === 2 ? "text-white/80" : e.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}><span data-rank-digit className="inline-block">{e.rank}</span></td>
+                        <td className="px-3 sm:px-4 py-3">
+                          {/* Lange Namen (break-ui): die Zelle kürzt selbst, sonst schöbe ein Name die Zeit aus dem Bild. */}
+                          <span className="flex items-center gap-2 min-w-0 max-w-[9.5rem] sm:max-w-[18rem]">
+                            <span className="truncate" title={e.display_name}>{e.display_name}</span>
+                            {e.is_guest && <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-honor/80 border border-honor/30 rounded-sm px-1" title="Gast ohne Konto - nicht in Jahreswertung, Erfolgen und Gewinnen">Gast</span>}
+                          </span>
+                          {/* Am Handy stehen die Versuche unter dem Namen - Abstand, Versuche und Urkunde haben dort keine Spalte. */}
+                          <span className="sm:hidden block text-[10px] text-white/45 tabular-nums">{attemptsCell(e.attempts, maxAttempts)} Versuche</span>
+                          {chip && <span className={`tls-lap-chip-web ${chip.kind === "best" ? "tls-lap-chip-web--best" : ""}`} data-testid={`f1-chip-${key}`}>{chip.text}</span>}
+                        </td>
                         <td className="px-4 py-3 text-right font-display font-bold text-white tabular-nums">
                           <span className="inline-flex items-center gap-1.5">
-                            <LapTime value={e.time_str} play={introOnce(board?.track?.id ? `fastlap:${challenge.id}:${board.track.id}` : "")} data-testid={`f1-time-${e.rank}`} />
+                            <LapTime key={`${key}:${e.time_str}`} value={e.time_str} play={from !== undefined || introOnce(board?.track?.id ? `fastlap:${challenge.id}:${board.track.id}` : "")} from={from} duration={from !== undefined ? MOTION.slow * 2 : undefined} data-testid={`f1-time-${e.rank}`} />
                             {e.penalty_seconds > 0 && (
                               <span
                                 title={`+${e.penalty_seconds}s Strafzeit · ${e.penalty_note || "ohne Begründung"}`}
-                                data-testid={`f1-penalty-${e.user_id}`}
+                                data-testid={`f1-penalty-${key}`}
                                 className="inline-flex items-center gap-1 text-[10px] font-bold text-[#FF3B30] bg-[#FF3B30]/10 px-1.5 py-0.5 rounded-sm normal-case"
                               >
                                 +{e.penalty_seconds}s ⓘ
@@ -313,22 +350,30 @@ export default function F1DetailPage() {
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right text-white/60 tabular-nums">{e.gap_str || "—"}</td>
-                        <td className="px-4 py-3 text-right text-white/50">{e.attempts}</td>
-                        {showResultPdf && (
-                          <td className="px-4 py-3 text-right">
+                        <td className="hidden sm:table-cell px-4 py-3 text-right text-white/60 tabular-nums whitespace-nowrap">
+                          {e.gap_str || "—"}
+                          {/* Abstand als Balken (#1349): wächst beim ersten Auftritt, passt sich bei neuer Bestzeit weich an. */}
+                          {largestGap > 0 && e.rank > 1 && (
+                            <span className="tls-gap-track" aria-hidden="true"><span className="tls-gap-bar" style={{ transform: `scaleX(${Math.max(0.02, (Number(e.gap_ms) || 0) / largestGap)})` }} /></span>
+                          )}
+                        </td>
+                        <td className="hidden sm:table-cell px-4 py-3 text-right text-white/50 tabular-nums whitespace-nowrap" data-testid={`f1-attempts-${e.rank}`}>{attemptsCell(e.attempts, maxAttempts)}</td>
+                        {showCertificates && (
+                          <td className="hidden sm:table-cell px-4 py-3 text-right">
                             {e.rank <= 4 ? (
-                              <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/certificates/${e.user_id}.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">
-                                <Award className="w-3 h-3" /> PDF
+                              <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/certificates/${encodeURIComponent(key)}.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`} target="_blank" rel="noreferrer" data-testid={`f1-certificate-${e.rank}`} className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">
+                                <Award className="w-3 h-3" /> {showResultPdf ? "PDF" : "Drucken"}
                               </a>
                             ) : <span className="text-white/25">—</span>}
                           </td>
                         )}
                       </tr>
-                    ))}
-                    {(!board || board.entries?.length === 0) && <tr><td colSpan={showResultPdf ? 6 : 5} className="text-center py-10 text-white/40">Noch keine Zeiten</td></tr>}
+                      );
+                    })}
+                    {(!board || board.entries?.length === 0) && <tr><td colSpan={showCertificates ? 6 : 5} className="text-center py-10 text-white/40">Noch keine Zeiten</td></tr>}
                   </tbody>
                 </table>
+                </div>
               </div>
               <ClubReferenceTimes entries={board?.club_reference_entries || []} />
             </div>
@@ -525,7 +570,11 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
             <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeit erfassen</div>
             <div className="text-xs text-white/45 mt-1">Direkt für Zeitnehmer, Schiedsrichter und Organisation.</div>
           </div>
-          {currentUser && <div className="text-[10px] uppercase tracking-widest text-white/35">{currentUser.display_name || currentUser.username}</div>}
+          {/* Am Simulator (#1585): Ziffernblock, Gäste und „Am Start / Als Nächstes“ stehen in der Verwaltung. */}
+          <div className="flex items-center gap-3 shrink-0">
+            {currentUser && <div className="hidden sm:block text-[10px] uppercase tracking-widest text-white/35">{currentUser.display_name || currentUser.username}</div>}
+            <Link to={`/admin/f1/${challenge.id}#vor-ort`} data-testid="fastlap-quick-link" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">Schnelleingabe</Link>
+          </div>
         </div>
         <div className="grid md:grid-cols-[minmax(12rem,1fr)_9rem_11rem_8rem_auto] gap-2 items-end">
           <PersonPicker purpose="fastlap" contextId={challenge.id} value={driver} onChange={(person) => { setDriver(person); setActionError(""); }} label="Fahrer" placeholder="Fahrer suchen …" testId="fastlap-user" />
@@ -605,7 +654,7 @@ function ClubReferenceTimes({ entries }) {
       </div>
       <div className="grid sm:grid-cols-3 gap-2">
         {entries.map((entry) => (
-          <div key={entry.user_id} className="border border-white/10 bg-[#0A0A0A]/60 rounded-sm px-3 py-2">
+          <div key={participantKey(entry)} className="border border-white/10 bg-[#0A0A0A]/60 rounded-sm px-3 py-2">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[11px] font-display font-bold text-[#FFD700]">#{entry.rank}</span>
               <span className="font-display font-bold tabular-nums text-white">{entry.time_str}</span>

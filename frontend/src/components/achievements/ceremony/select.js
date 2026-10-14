@@ -110,6 +110,10 @@ export function levelTexts(levelUp) {
 }
 
 export function planCeremony(pkg) {
+  // Turnier-Platz (#1180): feierlich, aber ruhig - eigener Ablauf ohne Partikel (components/tls/podium/PlacementMoment).
+  if (pkg?.placement) {
+    return { id: pkg.id || `placement-${pkg.placement.key}`, sequence: "placement", placement: pkg.placement, particles: 0, tiers: [], levelUp: null };
+  }
   const levelUp = pkg?.levelUp || null;
   const tiers = sortByRank((pkg?.tiers || []).filter((t) => !isNegative(t)));
   if (!tiers.length && !levelUp) return null;

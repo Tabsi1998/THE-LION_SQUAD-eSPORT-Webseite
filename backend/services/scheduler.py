@@ -691,6 +691,18 @@ async def _safe_match_deadlines():
         _log_task_failure("match_deadlines", exc)
 
 
+async def _safe_draw_show():
+    """Show-Auslosung (#1590): Erinnerung an die Turnierleitung, nach der Frist lost der Server selbst."""
+    try:
+        from database import get_db
+        from services.draw_show import sweep
+        result = await sweep(get_db())
+        if result.get("reminded") or result.get("drawn"):
+            logger.info(f"[scheduler] draw_show reminded={result['reminded']} drawn={result['drawn']}")
+    except Exception as exc:
+        _log_task_failure("draw_show", exc)
+
+
 async def _safe_proof_photo_retention():
     """Fotos vom Ergebnis (#1157): nie verwendete nach 24 Stunden, sonst 30 Tage nach dem Hochladen weg."""
     try:
@@ -743,6 +755,11 @@ async def _safe_ops_retention():
         gone = await purge_discord_activity(get_db())
         if gone:
             logger.info(f"[scheduler] discord_activity_servers removed={gone}")
+        # Namen von Fast-Lap-Gästen ohne Konto (#1585): nach 90 Tagen nur noch „Gast <Nummer>“.
+        from services.fastlap_guests import expire_guest_names
+        renamed = await expire_guest_names(get_db())
+        if renamed:
+            logger.info(f"[scheduler] fastlap_guest_names expired={renamed}")
         # App-Sitzungen ohne Aktivität seit 30 Tagen (#942) schließen - sie stünden sonst 90 Tage in der Liste.
         from services.auth_sessions import purge_stale_app_sessions
         closed = await purge_stale_app_sessions(get_db())
@@ -1107,6 +1124,9 @@ def start_scheduler() -> AsyncIOScheduler:
     # Fristen im Spiel (#1551): „nicht erschienen“ vorschlagen, Ergebnisse nach Frist gelten lassen - jede Minute.
     sched.add_job(_single_replica("match_deadlines", _safe_match_deadlines, lease_seconds=120.0), IntervalTrigger(seconds=60),
                   id="match_deadlines", max_instances=1, coalesce=True)
+    # Show-Auslosung (#1590): erinnern und nach der Frist selbst auslosen - jede Minute.
+    sched.add_job(_single_replica("draw_show", _safe_draw_show, lease_seconds=120.0), IntervalTrigger(seconds=60),
+                  id="draw_show", max_instances=1, coalesce=True)
     # Bildprüfung (#415): Sammler für alles, was die sofortige Prüfung nach dem Upload nicht erwischt hat.
     sched.add_job(_single_replica("media_scan", _safe_media_scan, lease_seconds=120.0), IntervalTrigger(seconds=20), id="media_scan",
                   max_instances=1, coalesce=True)

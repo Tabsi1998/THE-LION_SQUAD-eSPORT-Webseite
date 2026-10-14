@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ClipboardCheck, Clock, Radio } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, Clock, Radio, Shuffle } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -62,9 +62,25 @@ export default function TournamentLeadPage() {
   const everyone = useMemo(() => [...matches, ...(data?.recent || [])], [matches, data]);
   const opened = everyone.find((item) => item.id === openId) || null;
   const attention = useMemo(() => data?.attention || [], [data]);
+  // Show-Auslosung (#1590): „Auslosung bereit · N Namen“ - ein Fall wie jeder andere, mit „Jetzt auslosen“.
+  const draws = useMemo(() => data?.draws || [], [data]);
   const byId = useMemo(() => Object.fromEntries(matches.map((item) => [item.id, item])), [matches]);
-  const activeTab = tab || (fall || attention.length ? "attention" : "results");
+  const cases = attention.length + draws.length;
+  const activeTab = tab || (fall || cases ? "attention" : "results");
   const freeStations = (data?.stations || []).filter((station) => station.status !== "broken" && !station.busy);
+
+  const drawNow = async (card) => {
+    setDeciding(true);
+    try {
+      await api.post(`/tournaments/${encodeURIComponent(slug)}/stages/${card.stage_id}/draw`, { group: card.group });
+      toast.success(`${card.label}: ausgelost.`);
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Auslosen hat nicht geklappt.");
+    } finally {
+      setDeciding(false);
+    }
+  };
 
   // Umlegen (#1160): die wartenden Spiele einer defekten Station auf eine freie Station legen.
   const moveTo = async (item, stationId) => {
@@ -152,16 +168,17 @@ export default function TournamentLeadPage() {
         <h1 className="mt-1 font-heading text-2xl md:text-4xl font-black uppercase [overflow-wrap:anywhere]">{data?.tournament?.title || "…"}</h1>
 
         <div className="mt-6 flex items-center gap-1 border-b border-white/10" role="tablist" aria-label="Turnierleitung">
-          {[["attention", `Braucht Aufmerksamkeit (${attention.length})`, AlertTriangle], ["results", "Ergebnisse", ClipboardCheck]].map(([key, label, Icon]) => (
+          {[["attention", `Braucht Aufmerksamkeit (${cases})`, AlertTriangle], ["results", "Ergebnisse", ClipboardCheck]].map(([key, label, Icon]) => (
             <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setTab(key)} className={`inline-flex min-h-[44px] items-center gap-2 border-b-2 px-3 text-xs sm:text-sm font-bold uppercase tracking-wider ${activeTab === key ? "border-[#29B6E8] text-white" : "border-transparent text-white/50"}`} data-testid={`lead-tab-${key}`}>
-              <Icon className={`w-4 h-4 ${key === "attention" && attention.length ? "text-[#FFD700]" : "text-[#29B6E8]"}`} /> {label}
+              <Icon className={`w-4 h-4 ${key === "attention" && cases ? "text-[#FFD700]" : "text-[#29B6E8]"}`} /> {label}
             </button>
           ))}
         </div>
 
         {activeTab === "attention" ? (
           <div className="mt-5 space-y-3" data-testid="lead-attention">
-            {data && attention.length === 0 ? <div className="rounded-sm border border-white/10 bg-[#121212] p-6 text-center text-white/50" data-testid="lead-attention-empty">Gerade hängt nichts.</div> : null}
+            {data && cases === 0 ? <div className="rounded-sm border border-white/10 bg-[#121212] p-6 text-center text-white/50" data-testid="lead-attention-empty">Gerade hängt nichts.</div> : null}
+            {draws.map((card) => <DrawCard key={card.id} card={card} now={data?.now} highlighted={fall === card.id} busy={deciding} onDraw={() => drawNow(card)} />)}
             {attention.map((item) => (item.kind === "dispute" && byId[item.match_id]?.dispute ? (
               <DisputeCard key={item.id} item={byId[item.match_id]} busy={deciding} highlighted={fall === item.id} onKeep={(note) => keepResult(byId[item.match_id], note)} onChange={() => openEntry(item.match_id)} />
             ) : (
@@ -224,6 +241,52 @@ export default function TournamentLeadPage() {
       {opened && opened.can_enter ? <ResultWindow key={opened.id} entry={opened} onClose={closeEntry} onSaved={undo.start} /> : null}
       <ResultUndoBar undo={undo} />
     </PublicLayout>
+  );
+}
+
+/** Restzeit bis zum automatischen Los: ganze Minuten, aus der Server-Uhr (`now`) weitergezählt. */
+export function drawCountdown(card, serverNow, clientNow = Date.now()) {
+  const due = card?.due_at ? new Date(card.due_at).getTime() : NaN;
+  const base = serverNow ? new Date(serverNow).getTime() : NaN;
+  if (Number.isNaN(due)) return "";
+  // Die Server-Uhr gilt; was seit dem Laden vergangen ist, zählt der Browser dazu.
+  const elapsed = Number.isNaN(base) ? 0 : Math.max(0, clientNow - Math.min(base, clientNow));
+  const left = Math.ceil((due - (Number.isNaN(base) ? clientNow : base + elapsed)) / 60000);
+  if (left <= 0) return "der Server lost jeden Moment selbst";
+  return `automatisch in ${left} Min.`;
+}
+
+/** Show-Auslosung (#1590): der Topf steht - die Leitung lost mit einem Tipp, sonst der Server nach der Frist. */
+function DrawCard({ card, now, highlighted, busy, onDraw }) {
+  const [tick, setTick] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setTick(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+  const names = card.pot || [];
+  return (
+    <div id={`fall-${card.id}`} className={`rounded-sm border bg-surface-1 p-3 ${highlighted ? "border-honor/70 ring-2 ring-honor/40" : "border-brand/45"}`} data-testid={`lead-draw-${card.group}`}>
+      <div className="flex items-center gap-3">
+        <div className="flex h-12 w-14 shrink-0 items-center justify-center rounded-sm border border-brand/40 text-brand" aria-hidden="true">
+          <Shuffle className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold text-white">Auslosung bereit · {card.pot_size} {card.pot_size === 1 ? "Name" : "Namen"}</div>
+          <div className="text-xs text-white/55 [overflow-wrap:anywhere]">{card.stage_name ? `${card.stage_name} · ` : ""}nach {card.label} → {(card.match_keys || []).join(", ")}</div>
+          <div className="text-[11px] text-brand" data-testid={`lead-draw-countdown-${card.group}`}>{drawCountdown(card, now, tick)}</div>
+        </div>
+        {card.can_draw ? (
+          <button type="button" disabled={busy} onClick={onDraw} className="tls-btn tls-btn--primary shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-draw-now-${card.group}`}>Jetzt auslosen</button>
+        ) : null}
+      </div>
+      {names.length ? (
+        <ul className="mt-3 flex flex-wrap gap-1.5 border-t border-white/10 pt-3" aria-label="Im Topf" data-testid={`lead-draw-pot-${card.group}`}>
+          {names.map((name, index) => (
+            <li key={`${name}-${index}`} className="max-w-full rounded-sm border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-white/85 [overflow-wrap:anywhere]">{name}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 

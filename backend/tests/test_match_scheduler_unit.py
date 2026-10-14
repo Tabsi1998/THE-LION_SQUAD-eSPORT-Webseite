@@ -262,3 +262,17 @@ def test_team_members_resolved_by_the_caller_count_as_players():
     got = by_match(plan)
     assert moment(got["id-A"]) == T0
     assert moment(got["id-B"]) == T0 + timedelta(minutes=30 + DEFAULT_BREAK_MINUTES)
+
+
+def test_a_too_early_time_is_told_in_vienna_time_with_the_earliest_possible_start():
+    # Matchplan-Seite (#1557): die Warnung steht so in der Vorschau - in Wiener Zeit, nicht in UTC, und mit dem Zeitpunkt,
+    # ab dem das Spiel frühestens gehen kann.
+    from zoneinfo import ZoneInfo
+    matches = single_elim_four()
+    matches[2].update({"status": "scheduled", "scheduled_at": T0.isoformat(), "station_id": "s-a", "schedule_source": "manual"})
+    plan = plan_schedule(tournament(), matches, [station("s-a"), station("s-b")], now=T0)
+    warning = next(item for item in plan["warnings"] if item["type"] == "too_early")
+    vienna = T0.astimezone(ZoneInfo("Europe/Vienna")).strftime("%H:%M")
+    assert "UTC" not in warning["message"] and f"um {vienna}" in warning["message"]
+    earliest = datetime.fromisoformat(warning["earliest_at"])
+    assert earliest >= T0 + timedelta(minutes=30 + DEFAULT_BREAK_MINUTES)

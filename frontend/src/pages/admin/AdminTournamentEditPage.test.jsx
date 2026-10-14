@@ -577,61 +577,16 @@ test("ein Statuswechsel plant keine Stationen mehr nebenbei", async () => {
   expect(urls.some((url) => url.includes("auto-assign") || url.includes("/schedule/"))).toBe(false);
 });
 
-test("„Planen“ zeigt die Vorschau und schreibt erst nach „Übernehmen“", async () => {
+test("Werkzeuge → Planen öffnet den Matchplan statt eines eigenen Dialogs", async () => {
   const user = userEvent.setup();
-  apiMock.post.mockImplementation((url) => {
-    if (String(url).includes("/schedule/plan")) {
-      return Promise.resolve({ data: {
-        mode: "stations", fingerprint: "abc123", planned_at: "2026-10-31T09:58:00+00:00",
-        assignments: [
-          { match_id: "m1", label: "A1", scheduled_at: "2026-10-31T10:00:00+00:00", station_name: "1", forecast: false, changed: true },
-          { match_id: "m2", label: "F", scheduled_at: "2026-10-31T10:35:00+00:00", station_name: "1", forecast: true, changed: true },
-        ],
-        warnings: [{ type: "too_early", severity: "error", match_id: "m3", message: "B1 ist fest um 10:00 UTC, aber A1 ist erst um 10:30 UTC vorbei." }],
-      } });
-    }
-    if (String(url).includes("/schedule/apply")) return Promise.resolve({ data: { written: 2, warnings: [] } });
-    return Promise.resolve({ data: {} });
-  });
-  renderPageWithStation();
-  await screen.findByRole("heading", { name: "Winter Cup 2026" });
-  const tools = screen.getByTestId("admin-tr-tools");
-  await user.click(tools.querySelector("summary"));
-  expect(screen.queryByTestId("admin-tr-auto-stations")).not.toBeInTheDocument();
-
-  await user.click(screen.getByTestId("admin-tr-plan-schedule"));
-
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(expect.stringContaining("/tournaments/t-1/schedule/plan")));
-  const dialog = await screen.findByRole("dialog");
-  expect(dialog).toHaveTextContent("2 Spiele");
-  expect(dialog).toHaveTextContent("1 Konflikt");
-  expect(dialog).toHaveTextContent("B1 ist fest um 10:00 UTC");
-  expect(dialog).toHaveTextContent("voraussichtlich");
-  expect(apiMock.post.mock.calls.some(([url]) => String(url).includes("/schedule/apply"))).toBe(false);
-
-  await user.click(screen.getByRole("button", { name: "Übernehmen" }));
-
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(
-    expect.stringContaining("/tournaments/t-1/schedule/apply"),
-    expect.objectContaining({ fingerprint: "abc123", planned_at: "2026-10-31T09:58:00+00:00" })
-  ));
-});
-
-test("ein Online-Turnier bekommt beim Planen keine Stationen, nur den Hinweis", async () => {
-  const user = userEvent.setup();
-  apiMock.post.mockImplementation((url) => {
-    if (String(url).includes("/schedule/plan")) {
-      return Promise.resolve({ data: { mode: "none", reason: "Online-Turnier: Termine werden abgestimmt, Stationen gibt es nur vor Ort.", fingerprint: "x", assignments: [], warnings: [] } });
-    }
-    return Promise.resolve({ data: {} });
-  });
+  apiMock.post.mockImplementation((url) => (String(url).includes("/schedule/plan")
+    ? Promise.resolve({ data: { mode: "stations", fingerprint: "abc123", planned_at: "2026-10-31T09:58:00+00:00", assignments: [], warnings: [] } })
+    : Promise.resolve({ data: {} })));
   renderPageWithStation();
   await screen.findByRole("heading", { name: "Winter Cup 2026" });
   await user.click(screen.getByTestId("admin-tr-tools").querySelector("summary"));
-
   await user.click(screen.getByTestId("admin-tr-plan-schedule"));
-
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(expect.stringContaining("/schedule/plan")));
+  expect(await screen.findByTestId("mp-settings")).toBeInTheDocument();
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(apiMock.post.mock.calls.some(([url]) => String(url).includes("/schedule/apply"))).toBe(false);
 });
@@ -754,18 +709,38 @@ test("Bearbeiten: „Läufe umbauen“ nur beim FFA-Turnierbaum, und der Vorschl
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ heat_rebuild_mode: "suggest" })));
 });
 
-// Gegner der nächsten Runde (#1548): Auswahl statt Haken, gespeicherter Wert vorbelegt, geht als Ja/Nein mit.
-test("Bearbeiten: Gegner der nächsten Runde – fester Baum oder zufällig mischen", async () => {
+// Weiterkommen in vier Modi (#1548, #1590): Auswahl mit Erklärtext je Modus, gespeicherter Wert vorbelegt (auch aus
+// dem alten Schalter), geht als advancement_mode mit; die Show-Minuten nur bei der Show-Auslosung.
+test("Bearbeiten: Weiterkommen – vier Modi mit Erklärtext, Show-Minuten nur bei der Show", async () => {
   const user = userEvent.setup();
   renderPage();
   await screen.findByRole("heading", { name: "Winter Cup 2026" });
   await user.click(screen.getByTestId("admin-tr-tab-edit"));
   const select = await screen.findByTestId("tr-edit-advancement");
   expect(select).toHaveValue("fixed");
-  expect(screen.getByText(/alle Weiterkommer in einen Topf/)).toBeInTheDocument();
-  await user.selectOptions(select, "shuffle");
+  expect(screen.getByTestId("tr-edit-advancement-hint")).toHaveTextContent("Sieger aus A trifft Sieger aus B");
+  await user.selectOptions(select, "draw_round");
+  expect(screen.getByTestId("tr-edit-advancement-hint")).toHaveTextContent(/alle Weiterkommer in einen Topf/);
+  expect(screen.queryByTestId("tr-edit-draw-show-minutes")).toBeNull();
+  await user.selectOptions(select, "draw_show");
+  expect(screen.getByTestId("tr-edit-advancement-hint")).toHaveTextContent(/Jetzt auslosen/);
+  expect(screen.getByTestId("tr-edit-draw-show-minutes")).toHaveAttribute("placeholder", "10");
   await user.click(screen.getByTestId("tr-edit-save"));
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ randomize_advancement_rounds: true })));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ advancement_mode: "draw_show" })));
+  expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("randomize_advancement_rounds");
+});
+
+test("Bearbeiten: der alte Schalter wird als „Auslosung nach der Runde“ vorbelegt", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/tournaments/t-1") && !path.includes("/t-1/")) return Promise.resolve({ data: { ...TOURNAMENT, randomize_advancement_rounds: true } });
+    return Promise.resolve(routeFor(path));
+  });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  expect(await screen.findByTestId("tr-edit-advancement")).toHaveValue("draw_round");
 });
 
 // Neu auslosen (#1548): im Betriebs-Reiter mit Aufbau-Recht, solange die Runde nicht begonnen hat.

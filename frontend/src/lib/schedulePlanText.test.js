@@ -47,4 +47,9 @@ describe("describeSchedulePlan", () => {
     expect(text).toContain("1 Spiel bekommt Zeit, 0 Konflikte, 0 Hinweise.");
     expect(text).toContain("A1: Sa., 31.10., 11:00 · ohne Station");
   });
+
+  it("ein Spiel, das auf die Auslosung wartet (#1590), sagt das statt „voraussichtlich“", () => {
+    const text = describeSchedulePlan({ mode: "stations" }, [assignment({ forecast: true, waiting_for_draw: true })], []);
+    expect(text).toContain("A1: Sa., 31.10., 11:00 · Station 1 (wartet auf Auslosung)");
+  });
 });

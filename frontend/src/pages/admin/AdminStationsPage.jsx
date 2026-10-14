@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { API, api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useAuth } from "@/context/AuthContext";
 import { formatBracketSection, formatDeviceType, formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
@@ -15,6 +17,10 @@ import { ResultWindowLoader } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { planAndApplySchedule } from "@/lib/schedulePlan";
 import { effectiveMatchDuration } from "@/lib/matchDuration";
+import { buildTimeline } from "@/lib/matchTimeline";
+import { moveMatch } from "@/lib/schedulePlan";
+import { StationTimeline } from "./tournament/matchplan/StationTimeline";
+import { StationAgenda } from "./tournament/matchplan/MatchPlanParts";
 
 const DEVICES = [
   ["switch", "Switch"], ["switch2", "Switch 2"], ["pc", "PC"], ["ps5", "PS5"], ["xbox", "Xbox"],
@@ -37,6 +43,8 @@ export default function AdminStationsPage() {
   const [activeTid, setActiveTid] = useState("");
   const [matches, setMatches] = useState([]);
   const [regs, setRegs] = useState([]);
+  // Für die Belegung (#1557): Turnier, Phasen und Spiel-Daten aus derselben Antwort - die Zeitleiste rechnet nichts selbst.
+  const [context, setContext] = useState({ tournament: null, stages: [], game: null });
   const [loadingStations, setLoadingStations] = useState(false);
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [pageError, setPageError] = useState("");
@@ -88,7 +96,6 @@ export default function AdminStationsPage() {
     }
   }, [activeTid]);
   useEffect(() => { loadStations(); }, [loadStations]);
-  useApiInvalidation(loadStations, ["stations", "tournaments"]);
 
   const loadMatches = useCallback(async () => {
     const requestId = matchesRequestRef.current + 1;
@@ -109,6 +116,7 @@ export default function AdminStationsPage() {
       const durationOf = (m) => effectiveMatchDuration(m, { stage: stageById.get(m.stage_id), tournament, game: data?.duration_game });
       setMatches(safeArray(data?.matches_v2).map((m) => ({ ...m, is_multi_slot: true, tournament, planned_minutes: durationOf(m) })));
       setRegs(safeArray(data?.registrations));
+      setContext({ tournament, stages: safeArray(data?.stages), game: data?.duration_game || null });
       setPageError("");
     } catch (e) {
       if (matchesRequestRef.current !== requestId) return;
@@ -120,7 +128,9 @@ export default function AdminStationsPage() {
     }
   }, [activeTid]);
   useEffect(() => { loadMatches(); }, [loadMatches]);
-  useApiInvalidation(loadMatches, ["stations", "matches", "tournaments"]);
+  // Live (#1557): Änderungsstrom, und ohne Strom alle 15 Sekunden - am Turniertag hängt die Halle an dieser Seite.
+  const refreshLive = useCallback(() => Promise.all([loadStations(), loadMatches()]), [loadStations, loadMatches]);
+  useLiveRefresh(refreshLive, ["stations", "matches", "tournaments"], { fallbackMs: 15000 });
   const resultUndo = useResultUndo({ onDone: () => { loadStations(); loadMatches(); } });
   useEffect(() => {
     setAssignFor(null);
@@ -211,6 +221,10 @@ export default function AdminStationsPage() {
     }
   };
 
+  // Belegung je Station (#1557): dieselbe Zeitleiste wie im Matchplan, aus denselben Daten.
+  const timeline = useMemo(() => buildTimeline({
+    matches, stations: list, stages: context.stages, tournament: context.tournament, game: context.game, registrations: regs,
+  }), [matches, list, context, regs]);
   const regById = Object.fromEntries(safeArray(regs).filter((r) => r?.id).map((r) => [r.id, r]));
   const matchById = Object.fromEntries(safeArray(matches).filter((m) => m?.id).map((m) => [m.id, m]));
   const unassignedMatches = safeArray(matches).filter(
@@ -230,8 +244,7 @@ export default function AdminStationsPage() {
     if (!m) return "—";
     if (m.is_multi_slot || m.slots) {
       const names = safeArray(m.slots)
-        .map((slot) => regById[slot?.registration_id]?.display_name || sourceLabel(slot?.source, findIn(m)) || "Offen")
-        .slice(0, 4);
+        .map((slot) => regById[slot?.registration_id]?.display_name || sourceLabel(slot?.source, findIn(m)) || "Offen");
       return `${m.match_key || "Durchgang"} · ${names.join(" / ")}`;
     }
     const a = regById[m.participant_a_id]?.display_name || "Offen";
@@ -242,6 +255,12 @@ export default function AdminStationsPage() {
     if (!m) return "Spiel";
     const section = m.section ? `${formatBracketSection(m.section)} · ` : "";
     return `${section}${formatScheduleGroupLabel(m, m.tournament)} · ${formatMatchKind(m)}`;
+  };
+
+  const moveOnTimeline = async (item, next) => {
+    const result = await moveMatch(item.id, { start: next.start, stationId: next.laneId });
+    if (result.ok) { loadStations(); loadMatches(); }
+    return result;
   };
 
   return (
@@ -295,6 +314,21 @@ export default function AdminStationsPage() {
           <Play className="w-4 h-4" /> Freie Stationen starten
         </button>
       </div>
+
+      {activeTid && timeline.items.length > 0 && (
+        <section className="mp-card mb-6" aria-label="Belegung je Station" data-testid="stations-timeline">
+          <div className="mp-card__head">
+            <h2 className="mp-card__title">Belegung je Station</h2>
+            <Link to={`/admin/tournaments/${encodeURIComponent(activeTid)}?tab=matchplan`} className="mp-link">Im Matchplan öffnen</Link>
+          </div>
+          <div className="mp-desktop-only">
+            <StationTimeline timeline={timeline} editable onMove={moveOnTimeline} showNow />
+          </div>
+          <div className="mp-mobile-only">
+            <StationAgenda timeline={timeline} />
+          </div>
+        </section>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* LEFT: Create form + unassigned matches queue */}

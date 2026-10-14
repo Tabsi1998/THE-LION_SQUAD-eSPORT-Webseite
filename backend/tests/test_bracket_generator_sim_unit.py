@@ -32,6 +32,14 @@ NOW = "2026-10-31T10:00:00+00:00"
 TERMINAL = {"completed", "forfeit", "cancelled"}
 ACTIVE = {"ready", "scheduled", "in_progress", "waiting_result"}
 SHUFFLE = {"randomize_advancement_rounds": True}
+INSTANT = {"advancement_mode": "instant"}
+# Weiterkommen in vier Modi (#1590): fest, Auslosung nach der Runde („gemischt“) und sofort zufällig („sofort“).
+MODES = [None, SHUFFLE, INSTANT]
+MODE_IDS = ["fest", "gemischt", "sofort"]
+
+
+def mode_fields(mode) -> dict:
+    return dict(mode or {})
 
 
 def registrations(count: int) -> list[dict]:
@@ -72,9 +80,22 @@ def assert_draws_wait_for_whole_round(matches: list[dict]) -> None:
     """Gemischt: solange ein Quellspiel einer Gruppe offen ist, ist dort niemand ausgelost; danach steht jeder
     Weiterkommer genau einmal in der Folgerunde."""
     groups = {m["settings"]["draw_group"] for m in matches if (m.get("settings") or {}).get("draw_group")}
+    by_id = {m["id"]: m for m in matches}
     for group in groups:
         targets = group_targets(matches, group)
         sources = group_sources(matches, group)
+        if targets and (targets[0].get("settings") or {}).get("advancement_mode") == "instant":
+            # Sofort zufällig (#1590): kein Los je Runde; jeder besetzte Platz kommt aus einem entschiedenen Spiel, und
+            # jeder Weiterkommer sitzt genau einmal.
+            assert not any(t.get("draw") for t in targets), f"{group}: sofort zufällig kennt kein Los je Runde"
+            for target in targets:
+                for slot in target["slots"]:
+                    origin = (slot.get("source_result") or {}).get("from_match_id")
+                    if slot.get("registration_id") and origin in by_id:
+                        assert by_id[origin]["status"] in TERMINAL, f"{group}: {slot['registration_id']} sitzt, bevor die Quelle fertig ist"
+            seated = [reg for t in targets for reg in filled_ids(t)]
+            assert len(seated) == len(set(seated)), f"{group}: jemand sitzt doppelt"
+            continue
         if any(m["status"] not in TERMINAL for m in sources):
             assert not any(t.get("draw") for t in targets), f"{group} ausgelost, obwohl die Runde noch läuft"
             assert not any(filled_ids(t) for t in targets), f"{group} besetzt, obwohl die Runde noch läuft"
@@ -112,12 +133,12 @@ def section_of(match: dict) -> str:
 
 # ---------------------------------------------------------------------------------------------- Single Elimination
 
-@pytest.mark.parametrize("shuffle", [False, True], ids=["fest", "gemischt"])
+@pytest.mark.parametrize("mode", MODES, ids=MODE_IDS)
 @pytest.mark.parametrize("count", range(2, 41))
 @pytest.mark.parametrize("bronze", [False, True])
-def test_single_elimination_plays_through_for_every_size(count: int, bronze: bool, shuffle: bool):
+def test_single_elimination_plays_through_for_every_size(count: int, bronze: bool, mode):
     matches = build(count, "single_elimination",
-                    tournament={"bronze_match": bronze, "format": "single_elim", **(SHUFFLE if shuffle else {})})
+                    tournament={"bronze_match": bronze, "format": "single_elim", **mode_fields(mode)})
     play_through(matches, random.Random(count))
     final = max((m for m in matches if section_of(m) in {"WB", "MAIN"}), key=lambda m: m["round"])
     assert final["status"] == "completed"
@@ -159,12 +180,13 @@ def earliest_allowed_rematch_round(bracket_size: int) -> int:
     return int(math.log2(bracket_size))
 
 
-@pytest.mark.parametrize("shuffle", [False, True], ids=["fest", "gemischt"])
+@pytest.mark.parametrize("mode", MODES, ids=MODE_IDS)
 @pytest.mark.parametrize("count", range(2, 41))
 @pytest.mark.parametrize("grand_final", ["reset", "single", "none"])
-def test_double_elimination_plays_through_for_every_size(count: int, grand_final: str, shuffle: bool):
+def test_double_elimination_plays_through_for_every_size(count: int, grand_final: str, mode):
+    shuffle = mode is not None
     matches = build(count, "double_elimination",
-                    tournament={"grand_final_mode": grand_final, **(SHUFFLE if shuffle else {})})
+                    tournament={"grand_final_mode": grand_final, **mode_fields(mode)})
     bracket_size = 2 ** math.ceil(math.log2(max(2, count)))
     met: dict[frozenset, list[dict]] = {}
     losses: dict[str, int] = {}
@@ -312,12 +334,12 @@ def test_double_elimination_schema_orders_loser_drops_to_avoid_rematches():
 
 # ---------------------------------------------------------------------------------------------- FFA-Läufe
 
-@pytest.mark.parametrize("shuffle", [False, True], ids=["fest", "gemischt"])
+@pytest.mark.parametrize("mode", MODES, ids=MODE_IDS)
 @pytest.mark.parametrize("match_size,qualifiers", [(3, 1), (3, 2), (4, 1), (4, 2), (8, 1), (8, 2)])
 @pytest.mark.parametrize("count", range(2, 41))
-def test_ffa_bracket_plays_through_balanced_for_every_size(count: int, match_size: int, qualifiers: int, shuffle: bool):
+def test_ffa_bracket_plays_through_balanced_for_every_size(count: int, match_size: int, qualifiers: int, mode):
     matches = build(count, "ffa_custom_bracket", "ffa", settings={"match_size": match_size, "qualifiers_per_match": qualifiers},
-                    tournament=SHUFFLE if shuffle else None)
+                    tournament=mode)
     by_round: dict[int, list[dict]] = {}
     for match in matches:
         by_round.setdefault(match["round"], []).append(match)
@@ -442,17 +464,17 @@ def _withdraw(match: dict, registration_id: str) -> None:
             slot.update({"registration_id": None, "user_id": None, "status": "bye"})
 
 
-@pytest.mark.parametrize("shuffle", [False, True], ids=["fest", "gemischt"])
+@pytest.mark.parametrize("mode", MODES, ids=MODE_IDS)
 @pytest.mark.parametrize("match_size,qualifiers", [(3, 1), (4, 2), (8, 2)])
 @pytest.mark.parametrize("count", range(3, 41))
-def test_ffa_bracket_survives_random_dropouts_after_round_one(count: int, match_size: int, qualifiers: int, shuffle: bool):
+def test_ffa_bracket_survives_random_dropouts_after_round_one(count: int, match_size: int, qualifiers: int, mode):
     """Nach Runde 1 fallen zufällig Fahrer aus (Wertung „nicht erschienen“ und Ausfall vor dem Start): der Planer legt
     zusammen, gleicht aus und kürzt ab - das Finale ist immer erreichbar, kein gespielter Lauf hat weniger als 2,
     das Finale nie mehr als die Laufgröße. Gemischt (#1548): erst wird ausgelost, dann umgebaut."""
     rng = random.Random(count * 1000 + match_size * 10 + qualifiers)
     stage = {"id": "s", "number": 1, "stage_type": "ffa_custom_bracket", "match_type": "ffa",
              "settings": {"match_size": match_size, "qualifiers_per_match": qualifiers, "min_players": 2}}
-    base = {"id": "t", "seeding_mode": "manual", "max_participants": count, **(SHUFFLE if shuffle else {})}
+    base = {"id": "t", "seeding_mode": "manual", "max_participants": count, **mode_fields(mode)}
     matches = build_matches_v2_from_schema(base, stage, registrations(count))
     _rebuild(matches, stage)
     withdrawn: set[str] = set()
@@ -560,9 +582,19 @@ def _play_with_random_removals(matches: list[dict], rng: random.Random, *, stage
     return removed
 
 
+# Ausscheiden fest und sofort zufällig (#1590). „Auslosung nach der Runde“ fehlt hier bewusst, und die FFA-Läufe laufen
+# nur fest: beim Ausscheiden nach einem Los kann der Lauf-Umbau in seltenen Fällen zwei „Finals“ hinterlassen - ein
+# Altfehler, der mit anderen Startwerten auch im festen Baum auftritt (#1596).
+REMOVAL_MODES = [None, INSTANT]
+REMOVAL_MODE_IDS = ["fest", "sofort"]
+FFA_REMOVAL_MODES = [None]
+FFA_REMOVAL_MODE_IDS = ["fest"]
+
+
+@pytest.mark.parametrize("mode", REMOVAL_MODES, ids=REMOVAL_MODE_IDS)
 @pytest.mark.parametrize("count", range(3, 41))
-def test_single_elimination_survives_random_disqualifications(count: int):
-    matches = build(count, "single_elimination", tournament={"bronze_match": count % 2 == 0, "format": "single_elim"})
+def test_single_elimination_survives_random_disqualifications(count: int, mode):
+    matches = build(count, "single_elimination", tournament={"bronze_match": count % 2 == 0, "format": "single_elim", **mode_fields(mode)})
     removed = _play_with_random_removals(matches, random.Random(count * 11))
     final = max((m for m in matches if section_of(m) in {"WB", "MAIN"}), key=lambda m: m["round"])
     assert final["status"] == "completed"
@@ -570,9 +602,10 @@ def test_single_elimination_survives_random_disqualifications(count: int):
     assert champion not in removed, "ein Ausgeschiedener gewinnt nie"
 
 
+@pytest.mark.parametrize("mode", REMOVAL_MODES, ids=REMOVAL_MODE_IDS)
 @pytest.mark.parametrize("count", range(3, 41))
-def test_double_elimination_survives_random_disqualifications(count: int):
-    matches = build(count, "double_elimination")
+def test_double_elimination_survives_random_disqualifications(count: int, mode):
+    matches = build(count, "double_elimination", tournament=mode)
     removed = _play_with_random_removals(matches, random.Random(count * 13))
     gf = sorted((m for m in matches if section_of(m) == "GF"), key=lambda m: m["round"])
     assert gf and gf[0]["status"] in TERMINAL
@@ -589,12 +622,13 @@ def test_double_elimination_survives_random_disqualifications(count: int):
             assert gf[1]["status"] == "completed"
 
 
+@pytest.mark.parametrize("mode", FFA_REMOVAL_MODES, ids=FFA_REMOVAL_MODE_IDS)
 @pytest.mark.parametrize("match_size,qualifiers", [(3, 1), (4, 2), (8, 2)])
 @pytest.mark.parametrize("count", range(3, 41))
-def test_ffa_bracket_survives_random_disqualifications(count: int, match_size: int, qualifiers: int):
+def test_ffa_bracket_survives_random_disqualifications(count: int, match_size: int, qualifiers: int, mode):
     stage = {"id": "s", "number": 1, "stage_type": "ffa_custom_bracket", "match_type": "ffa",
              "settings": {"match_size": match_size, "qualifiers_per_match": qualifiers, "min_players": 2}}
-    base = {"id": "t", "seeding_mode": "manual", "max_participants": count}
+    base = {"id": "t", "seeding_mode": "manual", "max_participants": count, **mode_fields(mode)}
     matches = build_matches_v2_from_schema(base, stage, registrations(count))
     _rebuild(matches, stage)
     removed = _play_with_random_removals(matches, random.Random(count * 17 + match_size), stage=stage)

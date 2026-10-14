@@ -179,9 +179,9 @@ def test_placements_keep_explicit_legacy_final_positions_authoritative():
 
     placements = placements_for_structure(snapshot, REGISTRATIONS)
 
-    assert placements[1]["registration_id"] == "r1"
-    assert placements[1]["user_id"] == "u1"
-    assert placements[2]["registration_id"] == "r2"
+    assert [entry["registration_id"] for entry in placements[1]] == ["r1"]
+    assert placements[1][0]["user_id"] == "u1"
+    assert [entry["registration_id"] for entry in placements[2]] == ["r2"]
     assert placement_rows_for_structure(snapshot, REGISTRATIONS) == [
         {"registration_id": "r1", "user_id": "u1", "team_id": None, "rank": 1},
         {"registration_id": "r2", "user_id": "u2", "team_id": None, "rank": 2},
@@ -228,8 +228,8 @@ def test_placements_filter_stage_bracket_sections_through_canonical_fields():
     winner = placements_for_structure(snapshot, REGISTRATIONS, sections={"winner", "wb"})
     loser = placements_for_structure(snapshot, REGISTRATIONS, sections={"loser", "lb"})
 
-    assert winner[1]["registration_id"] == "r1"
-    assert loser[1]["registration_id"] == "r3"
+    assert [entry["registration_id"] for entry in winner[1]] == ["r1"]
+    assert [entry["registration_id"] for entry in loser[1]] == ["r3"]
 
 
 def test_badge_match_progress_combines_engines_and_keeps_chronological_streak():

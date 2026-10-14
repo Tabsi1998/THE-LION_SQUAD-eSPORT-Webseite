@@ -1,10 +1,11 @@
+import { treeSlotLabel } from "@/lib/bracketNames";
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import { animate } from "framer-motion";
 import { Link, useInRouterContext } from "react-router-dom";
 import { resolveMediaUrl } from "@/lib/api";
 import { formatMatchStatus } from "@/lib/tournamentLabels";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
-import { describeSlot, initials } from "@/lib/slotSource";
+import { initials } from "@/lib/slotSource";
 import { MOTION, motionAllowed } from "@/lib/motion";
 import { heatText, isDone, isLive, isOut, isWalkover, matchFate, soloAdvance } from "@/lib/bracketGraph";
 import { useBracketMotionState, useRowFlight } from "./bracketMotion";
@@ -56,9 +57,11 @@ export function slotLabel(slot, regMap) {
   return "";
 }
 
-function pendingLabel(slot, findMatch) {
-  const info = describeSlot(slot, () => "", findMatch);
-  return info.kind === "pending" ? info.label : "";
+/** Wer in einen leeren Platz kommt - gelost: „Weiter aus Runde 1“, „Verlierer aus Runde 2“ (#1591). */
+function pendingLabel(slot, findMatch, match = null) {
+  // Show-Auslosung (#1590): der Topf steht, die Turnierleitung lost gleich - das steht statt „Weiter aus Runde 1“.
+  if (slot?.source?.draw && match?.draw_ready && typeof match.draw_ready === "object") return "Auslosung bereit";
+  return treeSlotLabel(slot, findMatch);
 }
 
 function isByeSlot(slot) {
@@ -87,11 +90,14 @@ function LiveStatus({ match }) {
   if (finished && !isDone(match)) return <span className="text-quiet" data-testid="bracket-not-played">nicht gespielt</span>;
   if (!finished && isLive(match)) {
     const station = getStationLabel(match);
+    // Eigene Zeile unter dem Titel (#1591): ein langer Stationsname kürzt mit „…“ (voll im Titel-Attribut und im Blatt),
+    // die Spielzeit bleibt immer ganz.
+    const label = station || formatMatchStatus(status);
     return (
-      <span className="inline-flex items-center gap-1.5 text-live" data-live="1">
-        <span className="w-1.5 h-1.5 rounded-full bg-live tv-live-dot" aria-hidden="true" />
-        {station || formatMatchStatus(status)}
-        {match.started_at ? <>{" · "}<LiveClock startedAt={match.started_at} /></> : null}
+      <span className="flex min-w-0 items-center gap-1.5 text-live" data-live="1">
+        <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-live tv-live-dot" aria-hidden="true" />
+        <span className="min-w-0 truncate" title={label}>{label}</span>
+        {match.started_at ? <span className="shrink-0 tabular-nums">{"· "}<LiveClock startedAt={match.started_at} /></span> : null}
       </span>
     );
   }
@@ -114,7 +120,7 @@ function MatchSheet({ match, id }) {
   return (
     <div id={id} className="tls-bracket-sheet" role="group" aria-label={`Spiel ${match.match_key || ""}`.trim()}>
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-text">
-        {time ? <span>{time}</span> : null}
+        {time ? <span>{time}{match?.schedule_forecast || match?.is_preview ? " · voraussichtlich" : ""}</span> : null}
         {duration ? <span>{duration} Min.</span> : null}
         {station ? <span className="text-brand">{station}</span> : null}
         {!time && !station && !duration ? <span>Zeit und Station folgen</span> : null}
@@ -193,7 +199,7 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
   const reg = regMap.get(regId);
   const label = slotLabel(slot, regMap);
   const bye = !reg && isByeSlot(slot);
-  const pending = reg || bye ? "" : pendingLabel(slot, findMatch);
+  const pending = reg || bye ? "" : pendingLabel(slot, findMatch, match);
   const rowMotion = regId ? state.rows.get(`${match.id}:${regId}`) || null : null;
   useRowFlight(ref, rowMotion, done, slot?.slot ?? null);
   const podium = podiumMeta(podiumRank);
@@ -233,7 +239,7 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
     >
       <span className="w-4 shrink-0 text-right font-display text-[11px] tabular-nums text-quiet">{seed || ""}</span>
       <SlotAvatar avatar={reg?.user?.avatar_url || reg?.avatar_url} label={label} empty={!reg} />
-      <span className={`min-w-0 flex-1 break-words leading-tight ${String(label || pending).length > (heat ? 14 : 22) ? "text-xs" : "text-sm"} ${nameTone}`} data-pending={!label && pending ? "1" : undefined}>
+      <span className={`min-w-0 flex-1 leading-tight ${!label && pending ? "truncate" : "break-words"} ${String(label || pending).length > (heat ? 14 : 22) ? "text-xs" : "text-sm"} ${nameTone}`} data-pending={!label && pending ? "1" : undefined} title={!label && pending ? pending : undefined}>
         {bye ? "Freilos" : label || pending || "—"}
       </span>
       {isMine ? <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-brand">Du</span> : null}
@@ -265,15 +271,22 @@ function nodeClasses({ live, mine, changed }) {
 }
 
 function CardHead({ match, title, meta, sheetId, open, onToggle }) {
+  const finished = useContext(FinishedContext);
+  // Läuft das Spiel, steht der Live-Hinweis (Station, Spielzeit) in einer eigenen Zeile - sonst drückt er den Titel
+  // zusammen, bis „4 Spieler · 2 kommen weiter“ Wort für Wort untereinander steht (#1591).
+  const live = !finished && isLive(match);
   return (
     <button type="button" className="tls-bracket-head" aria-expanded={open} aria-controls={sheetId} onClick={onToggle}>
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         {title}
         {meta}
+        {live ? <span className="mt-0.5 block text-[11px]"><LiveStatus match={match} /></span> : null}
       </span>
-      <span className="shrink-0 text-[11px] text-muted-text">
-        <LiveStatus match={match} />
-      </span>
+      {live ? null : (
+        <span className="shrink-0 text-[11px] text-muted-text">
+          <LiveStatus match={match} />
+        </span>
+      )}
     </button>
   );
 }
@@ -411,7 +424,7 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
               heat
             />
             {cutAt && index === cutAt - 1 ? (
-              <div className="tls-bracket-cut" data-testid={`bracket-heat-cut-${match.id}`}><span>{cutText}</span></div>
+              <div className="tls-bracket-cut" data-testid={`bracket-heat-cut-${match.id}`} data-exit-anchor={`${match.id}:W`}><span>{cutText}</span></div>
             ) : null}
           </div>
         );
@@ -420,7 +433,7 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
         <div className="px-3 py-1.5 text-xs italic text-quiet" data-testid={`bracket-heat-free-${match.id}`}>{text.free}</div>
       ) : null}
       {dropText && !empty ? (
-        <div className="px-3 pb-2 pt-1 text-[11px] text-muted-text" data-testid={dropText.startsWith("Die anderen →") ? `bracket-heat-drop-${match.id}` : `bracket-heat-out-${match.id}`}>{dropText}</div>
+        <div className="px-3 pb-2 pt-1 text-[11px] text-muted-text" data-testid={dropText.startsWith("Die anderen →") ? `bracket-heat-drop-${match.id}` : `bracket-heat-out-${match.id}`} data-exit-anchor={dropText.startsWith("Die anderen →") ? `${match.id}:L` : undefined}>{dropText}</div>
       ) : null}
       <MatchSheet match={match} id={sheetId} />
     </div>

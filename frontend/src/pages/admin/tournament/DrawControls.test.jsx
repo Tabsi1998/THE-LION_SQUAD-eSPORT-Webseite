@@ -1,5 +1,5 @@
 // Gegner mischen (#1548): „Neu auslosen“ in der Turnierverwaltung, solange keines der betroffenen Spiele begonnen hat.
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 import { drawGroupsOf, leagueRedrawAllowed } from "./shared";
@@ -113,6 +113,47 @@ test("Liga: Spieltage neu auslosen nur vor Spieltag 1", async () => {
   await user.click(screen.getByTestId("redraw-league"));
   await user.click(await screen.findByTestId("confirm-dialog-confirm"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/stages/s-1/redraw", {}));
+});
+
+// Show-Auslosung (#1590): die Runde ist bereit, die Leitung lost mit „Jetzt auslosen“ - ohne Rückfrage, der Topf steht.
+test("Show: „Auslosung bereit“ mit „Jetzt auslosen“, danach wie jede Auslosung", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockResolvedValue({ data: { ok: true, draw: { id: "d-3" } } });
+  const show = (id, extra = {}) => target(id, { draw: undefined, status: "pending", settings: { draw_group: "WB:2", advancement_mode: "draw_show" }, draw_ready: { group: "WB:2", since: "2026-10-14T10:00:00+00:00" }, ...extra });
+  const groups = drawGroupsOf([show("E"), show("F")]);
+  expect(groups[0]).toMatchObject({ mode: "draw_show", ready: true, drawn: false, canRedraw: false });
+  // Noch nicht bereit: kein Knopf, der Satz nennt die Leitung.
+  renderControls({ matches: [show("E", { draw_ready: null }), show("F", { draw_ready: null })] });
+  expect(screen.getByText(/dann lost die Turnierleitung/)).toBeInTheDocument();
+  expect(screen.queryByTestId("draw-now-WB:2")).toBeNull();
+  cleanup();
+  const { onChanged } = renderControls({ matches: [show("E"), show("F")] });
+  expect(screen.getByText(/Auslosung bereit/)).toBeInTheDocument();
+  expect(screen.queryByTestId("redraw-WB:2")).toBeNull();
+  await user.click(screen.getByTestId("draw-now-WB:2"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/stages/s-1/draw", { group: "WB:2" }));
+  expect(onChanged).toHaveBeenCalled();
+});
+
+// Sofort zufällig (#1590): gezogen wird je Platz; neu auslosen nur für Spiele, die noch nicht begonnen haben.
+test("Sofort zufällig: Plätze zählen je Platz, neu auslosen nur für nicht begonnene Spiele", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  const seat = (slot, reg) => ({ slot, status: reg ? "filled" : "pending", registration_id: reg, source: { type: "rank", flow: "W", match_key: "A", rank: 1, draw: { group: "WB:2", label: "Runde 1" } }, source_result: reg ? { from_match_key: "A", draw_id: `dr-${reg}` } : null });
+  const instant = (id, slots, extra = {}) => target(id, { draw: undefined, status: "pending", settings: { draw_group: "WB:2", advancement_mode: "instant" }, slots, ...extra });
+  const fresh = drawGroupsOf([instant("E", [seat(1), seat(2)]), instant("F", [seat(1), seat(2)])]);
+  expect(fresh[0]).toMatchObject({ mode: "instant", drawn: false, assigned: 0, open: 4, canRedraw: false });
+  const half = [instant("E", [seat(1, "r1"), seat(2)]), instant("F", [seat(1, "r2"), seat(2, "r3")], { status: "in_progress" })];
+  const groups = drawGroupsOf(half);
+  expect(groups[0]).toMatchObject({ drawn: true, assigned: 3, open: 1, canRedraw: true, redrawKeys: ["E"] });
+  renderControls({ matches: half });
+  expect(screen.getByText(/3 von 4 Plätzen gezogen/)).toBeInTheDocument();
+  await user.click(screen.getByTestId("redraw-WB:2"));
+  expect(await screen.findByTestId("confirm-dialog")).toHaveTextContent("die Spiele E");
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/stages/s-1/redraw", { group: "WB:2" }));
+  // Alles begonnen: kein Knopf mehr.
+  expect(drawGroupsOf([instant("E", [seat(1, "r1"), seat(2, "r4")], { status: "in_progress" }), instant("F", [seat(1, "r2"), seat(2, "r3")], { status: "completed", results: [{ rank: 1 }] })])[0].canRedraw).toBe(false);
 });
 
 test("Fester Baum: nichts anzuzeigen", () => {

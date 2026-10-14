@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.0 - 2026-10-14
+
+- Mobile: Turnierbaum mit Linien: Im Reiter „Baum“ siehst du den Turnierbaum wie auf der Website – mit Linien von jedem Spiel in den Platz, in den der Sieger (oder der Verlierer) kommt, Rundennamen wie „Halbfinale“ und der frühesten Uhrzeit über jeder Spalte. Bei Doppel-K.-o. liegt das Loser Bracket unter dem Hauptfeld, rechts steht der Pokal. Freilos, „kampflos“ und Spiele, die entfallen, sind klar benannt; bei Läufen steht, wie viele weiterkommen und wohin die anderen gehen (#1563).
+- Mobile: Dein Weg: Du bist im Baum in Cyan markiert, „Meinen Weg zeigen“ hebt deinen Weg bis zum Pokal hervor. Tippst du auf einen anderen Namen, siehst du dessen Weg in Gold; ein zweiter Tipp hebt es wieder auf (#1563).
+- Mobile: Live im Baum: Läuft ein Spiel, zeigt die Karte einen roten Punkt mit Station und Spielzeit, und oben steht angepinnt „Läuft gerade“ (#1563).
+- Mobile: Gemischte Runden: Wird die nächste Runde ausgelost, zeigt der Baum vorher „gemischt aus Runde 1“ und danach die tatsächliche Herkunft jedes Platzes. Wer ausgelost wird, gleitet in seinen Platz (#1548, #1563).
+- Mobile: Tabellen und Spielplan: Gruppen, Liga und Swiss zeigen im Baum und unter „Tabelle“ echte Tabellen (Spiele, Siege, Unentschieden, Niederlagen, Differenz, Punkte; bei Swiss mit Buchholz). Der Spielplan ist nach Spieltag, Runde oder Station gruppiert, mit „Nur meine“ und einem Punkt bei laufenden Spielen (#1563).
+- Mobile: Bewegung und Vibration: Wer weiterkommt, gleitet in seine Zeile und leuchtet kurz auf, frische Ergebnisse zählen hoch, der Pokal hebt sich beim Finale. Das Handy vibriert beim Aufruf, beim Einchecken, bei einem eingetragenen Ergebnis, wenn du weiterkommst und beim Turniersieg. Mit „Bewegung reduzieren“ steht alles sofort am Ende (#1563, #1168).
+- Mobile: Check-in und Status: Ist der Check-in vorbei, steht statt „Jetzt einchecken“ ein Hinweis, dass du dich bei der Turnierleitung melden sollst. „Ausgetreten“ und „Disqualifiziert“ stehen auf Deutsch, und die eigene Anmeldung sagt „Du bist ausgeschieden“. Die Turnierleitung kann „nicht erschienen“ eintragen oder die Frist um 5 Minuten verlängern (#1563).
+- Mobile: Fast Lap: Zeiten tippst du wie auf der Website ein – mit Komma oder Punkt, als „1:24,587“ oder „84.587“; eine Zahl ohne Doppelpunkt sind Sekunden („90“ ist 1:30.000, vorher 90 Millisekunden). Ist eine Zeit unwahrscheinlich schnell oder langsam, fragt die App nach, bevor sie speichert. Fahrer suchst du über die Personensuche statt in einer langen Liste. Sind die Ergebnisse veröffentlicht, steht ein Hinweis, dass die Zeiten gesperrt sind (#1584).
+
 ## 1.6.1 - 2026-10-14
 
 - Mobile: Anmelden: Hast du die Zwei-Faktor-App nicht zur Hand, tippst du einen Wiederherstellungscode in ein eigenes Feld mit voller Tastatur ein. Die Zwei-Faktor-Abfrage brichst du mit „Abbrechen und neu anmelden“ ab, ohne die App neu zu starten. Die neue Seite „Hilfe beim Anmelden“ schickt dir bei „Passwort vergessen?“ oder fehlender Bestätigungs-Mail den Link per E-Mail (#995, #996).

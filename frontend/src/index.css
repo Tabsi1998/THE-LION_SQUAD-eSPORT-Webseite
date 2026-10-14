@@ -265,6 +265,20 @@ button.tls-bracket-row[aria-pressed="true"] { background-color: rgb(var(--tls-ho
 /* Gemischte Gruppen (#1548): der echte Weg über die Sammelschiene zeigt sich auf deinem Weg und in der Bewegung. */
 .tls-bracket-canvas .tls-bracket-line--real { opacity: 0; }
 .tls-bracket-canvas .tls-bracket-line--real[data-path="on"] { opacity: 1; }
+/* Übersicht (#1591): Abstiege, Äste aus einem anderen Abschnitt und die Einzelwege einer Gabel erscheinen erst beim
+   Zeigen auf eine Karte, auf deinem Weg oder in der Bewegung. Am Ziel steht dafür ein Eingang: kurzer Strich, Marker. */
+.tls-bracket-canvas .tls-bracket-line[data-demand="1"]:not([data-path="on"]):not([data-focus="1"]):not([data-fresh="1"]) { opacity: 0; }
+.tls-bracket-canvas .tls-bracket-line[data-demand="1"][data-focus="1"]:not([data-path]) { opacity: 0.9; }
+/* Breiter als das Fenster (#1591): der Rand, hinter dem es weitergeht, blendet aus - nie hart abgeschnitten. */
+.tls-bracket-canvas[data-more="right"] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }
+.tls-bracket-canvas[data-more="left"] { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); }
+.tls-bracket-canvas[data-more="both"] { -webkit-mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
+/* Zeigen passiert oft: schnell ein- und ausblenden, nie träge. */
+.tls-bracket-canvas .tls-bracket-line[data-demand="1"] { transition-duration: var(--tls-motion-fast); }
+.tls-bracket-canvas .tls-bracket-line--stub { stroke: rgb(var(--tls-quiet-rgb) / 0.6); stroke-width: 1.5px; }
+.tls-bracket-canvas .tls-bracket-marker { fill: var(--tls-surface-0); stroke: rgb(var(--tls-quiet-rgb) / 0.75); stroke-width: 1.5px; transition: opacity var(--tls-motion-mid) var(--tls-ease), stroke var(--tls-motion-mid) var(--tls-ease); }
+.tls-bracket-canvas .tls-bracket-marker[data-path="off"] { opacity: 0.35; }
+.tls-bracket-canvas .tls-bracket-marker[data-focus="1"] { stroke: var(--tls-brand); }
 /* Ankommen: die Zielzeile leuchtet kurz und weich auf (nur Deckkraft einer Fläche). */
 .tls-bracket-row[data-landed]::after {
   content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 4px;
@@ -350,6 +364,240 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   /* Endzustand sofort - bracketMotion setzt bei „Bewegung reduzieren“ ohnehin keine Bewegung. */
   [data-motion], .tls-bracket-canvas .tls-bracket-line--fresh, .tls-bracket-row[data-landed]::after,
   .tls-bracket-champion.is-crowned::before, .tls-bracket-champion.is-crowned .tls-bracket-trophy { animation: none; }
+}
+
+/* Rangliste (#1562, #1179): Liga- und Gruppentabellen. Sieg hell in Cyan, Unentschieden mit Rahmen, Niederlage grau;
+   die eigene Zeile trägt einen leisen Cyan-Grund und „Du“; Pfeile seit dem vorigen Spieltag. Rot bleibt Live. */
+.tls-standing-row { border-top: 1px solid rgb(255 255 255 / 0.05); transition: background-color var(--tls-motion-fast) var(--tls-ease); }
+.tls-standing-row:first-child { border-top: 0; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-standing-row:hover { background-color: rgb(255 255 255 / 0.025); }
+}
+.tls-standing-row[data-mine="true"] { background-color: rgb(var(--tls-brand-rgb) / 0.08); box-shadow: inset 0 0 0 1px rgb(var(--tls-brand-rgb) / 0.28); }
+.tls-standing-name { overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.3; }
+.tls-standing-me {
+  flex: none; display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--tls-brand); background: rgb(var(--tls-brand-rgb) / 0.12);
+}
+.tls-standing-move {
+  display: inline-flex; align-items: center; gap: 1px; font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif;
+  font-size: 12px; font-weight: 700; line-height: 1;
+}
+.tls-standing-move[data-dir="up"] { color: var(--tls-brand); }
+.tls-standing-move[data-dir="down"] { color: var(--tls-quiet); }
+.tls-standing-form { display: inline-flex; gap: 3px; vertical-align: middle; }
+.tls-standing-form__dot {
+  display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 3px;
+  font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 11px; font-weight: 700; line-height: 1;
+}
+.tls-standing-form__dot[data-result="W"] { color: var(--tls-surface-0); background: var(--tls-brand); }
+.tls-standing-form__dot[data-result="D"] { color: var(--tls-text-muted); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.28); }
+.tls-standing-form__dot[data-result="L"] { color: rgb(255 255 255 / 0.55); background: rgb(255 255 255 / 0.1); }
+/* Das jüngste Spiel steht rechts und ist eine Spur kräftiger umrandet. */
+.tls-standing-form__dot:last-child { outline: 1px solid rgb(255 255 255 / 0.35); outline-offset: 1px; }
+@media (max-width: 420px) {
+  .tls-standing-form { gap: 2px; }
+  .tls-standing-form__dot { width: 13px; height: 13px; font-size: 9px; }
+}
+
+/* Spielplan (#1562) im Bild des Turnierbaums: Status nach Rolle - Live rot mit leisem Puls, fertig ruhig, offen grau. */
+.tls-sched-card { color: inherit; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-sched-card:hover { border-color: rgb(var(--tls-brand-rgb) / 0.45); }
+}
+.tls-sched-card:focus-visible, .tls-sched-line:focus-visible { outline: 2px solid var(--tls-brand); outline-offset: 2px; }
+.tls-sched-name { overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.3; }
+.tls-sched-status {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; white-space: nowrap; color: var(--tls-text-muted);
+}
+.tls-sched-status[data-tone="live"] { color: var(--tls-live); }
+.tls-sched-status[data-tone="done"] { color: rgb(255 255 255 / 0.45); }
+.tls-sched-status[data-tone="cancelled"] { color: rgb(255 255 255 / 0.35); text-decoration: line-through; }
+.tls-sched-status__dot {
+  width: 6px; height: 6px; border-radius: 999px; background: var(--tls-live);
+  animation: tls-live-dot 1.8s ease-out infinite;
+}
+.tls-sched-line {
+  display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  padding: 10px 12px; color: inherit; transition: background-color var(--tls-motion-fast) var(--tls-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .tls-sched-line:hover { background-color: rgb(255 255 255 / 0.035); }
+}
+.tls-sched-line[data-mine="true"] { background-color: rgb(var(--tls-brand-rgb) / 0.08); }
+.tls-sched-line[data-tone="live"] { box-shadow: inset 0 0 0 1px rgb(var(--tls-live-rgb) / 0.4); }
+.tls-sched-line[data-tone="done"] .tls-sched-name { color: rgb(255 255 255 / 0.6); }
+.tls-sched-line__time { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 14px; font-weight: 700; color: rgb(255 255 255 / 0.8); }
+@media (max-width: 479px) {
+  .tls-sched-line { grid-template-columns: 5.25rem minmax(0, 1fr); }
+  .tls-sched-line > .tls-sched-status { grid-column: 2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-sched-status__dot { animation: none; }
+}
+
+/* Podest (#1339): Treppchen mit Metall nur an Kante und Ziffer. Die Bewegung (einmal beim Erscheinen) ist ruhig: die
+   Stufen heben sich nacheinander zum Sieger hin (60 ms Abstand), die Ziffer schwingt kaum merklich über, über die Krone
+   läuft ein kurzer Glanz. Nur transform und opacity; „Bewegung reduzieren“ lässt alles stehen. */
+.tls-podium { --tls-metal-rgb: var(--tls-honor-rgb); max-width: 640px; margin-inline: auto; padding-top: 30px; }
+.tls-podium__stage { display: grid; grid-template-columns: 30fr 40fr 30fr; align-items: end; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.tls-podium__col { display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; }
+.tls-podium__col[data-metal="gold"] { --tls-metal-rgb: var(--tls-honor-rgb); }
+.tls-podium__col[data-metal="silver"] { --tls-metal-rgb: var(--tls-silver-rgb); }
+.tls-podium__col[data-metal="bronze"] { --tls-metal-rgb: var(--tls-bronze-rgb); }
+.tls-podium__people { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 6px; padding: 0 2px 10px; }
+/* Eine geteilte Stufe hält ihre Namen nebeneinander, solange jeder mindestens 84 px hat - sonst brechen sie in eine neue
+   Reihe um, statt dass sich die Bilder überlappen (Abnahme #1593). */
+.tls-podium__entry { display: flex; flex: 1 1 84px; min-width: 0; max-width: 160px; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.tls-podium__avatar {
+  display: grid; flex: none; place-items: center; width: 48px; height: 48px; overflow: hidden; border-radius: 999px;
+  background: var(--tls-surface-3); box-shadow: 0 0 0 1px rgb(255 255 255 / 0.12);
+  font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 16px; font-weight: 700; color: var(--tls-text-muted);
+}
+.tls-podium__col[data-place="1"] .tls-podium__avatar { width: 56px; height: 56px; }
+.tls-podium__name {
+  max-width: 100%; overflow-wrap: normal; word-break: normal; hyphens: manual;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  font-size: 13px; font-weight: 600; line-height: 1.25; color: #fff;
+}
+/* Ein einzelnes Wort („KartKönigin“) bleibt ganz oder endet mit „…“ - nie „KartK|önigin“. */
+.tls-podium__name--word { display: block; white-space: nowrap; text-overflow: ellipsis; }
+.tls-podium__entry[data-mine="true"] .tls-podium__name { color: var(--tls-brand); }
+.tls-podium__value { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--tls-text-muted); }
+.tls-podium__empty { padding-bottom: 8px; font-family: 'Rajdhani', sans-serif; font-size: 20px; color: rgb(255 255 255 / 0.3); }
+.tls-podium__crown {
+  position: absolute; left: 50%; top: -26px; display: inline-grid; place-items: center; overflow: hidden;
+  width: 28px; height: 22px; margin-left: -14px; color: var(--tls-honor);
+}
+.tls-podium__step {
+  position: relative; display: grid; place-items: center; height: 48px; border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, var(--tls-surface-2) 0%, var(--tls-surface-1) 100%);
+  box-shadow: inset 0 3px 0 rgb(var(--tls-metal-rgb)), inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+.tls-podium__col[data-place="1"] .tls-podium__step { height: 72px; }
+.tls-podium__col[data-place="3"] .tls-podium__step { height: 40px; }
+.tls-podium__digit {
+  display: inline-block; font-family: 'Unbounded', 'Arial Black', sans-serif; font-size: 22px; font-weight: 900; line-height: 1;
+  color: rgb(var(--tls-metal-rgb));
+}
+.tls-podium__col[data-place="1"] .tls-podium__digit { font-size: 30px; }
+@media (min-width: 640px) {
+  .tls-podium__stage { gap: 12px; }
+  .tls-podium__avatar { width: 56px; height: 56px; }
+  .tls-podium__col[data-place="1"] .tls-podium__avatar { width: 64px; height: 64px; }
+  .tls-podium__name { font-size: 14px; }
+  .tls-podium__step { height: 64px; }
+  .tls-podium__col[data-place="1"] .tls-podium__step { height: 88px; }
+  .tls-podium__col[data-place="3"] .tls-podium__step { height: 52px; }
+  .tls-podium__digit { font-size: 28px; }
+  .tls-podium__col[data-place="1"] .tls-podium__digit { font-size: 38px; }
+}
+@keyframes tls-podium-rise {
+  from { opacity: 0; transform: translateY(calc(var(--tls-rise, 16px) * var(--tls-motion-on))); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tls-podium-digit {
+  0% { opacity: 0; transform: scale(calc(1 - 0.12 * var(--tls-motion-on))); }
+  60% { opacity: 1; transform: scale(calc(1 + 0.06 * var(--tls-motion-on))); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes tls-podium-glint {
+  0% { opacity: 0; transform: translateX(-120%) skewX(-20deg); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(120%) skewX(-20deg); }
+}
+.tls-podium[data-play="run"] .tls-podium__col {
+  animation: tls-podium-rise var(--tls-motion-slow) var(--tls-ease) both;
+  animation-delay: calc(var(--tls-i, 0) * 60ms);
+}
+.tls-podium[data-play="run"] .tls-podium__digit {
+  animation: tls-podium-digit var(--tls-motion-mid) var(--tls-ease) both;
+  animation-delay: calc(var(--tls-i, 0) * 60ms + var(--tls-motion-mid));
+}
+.tls-podium[data-play="run"] .tls-podium__crown {
+  animation: tls-crown-lift calc(var(--tls-motion-slow) * 2) var(--tls-ease) both;
+  animation-delay: calc(2 * 60ms + var(--tls-motion-slow));
+}
+.tls-podium__crown::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: linear-gradient(90deg, transparent 20%, rgb(255 255 255 / 0.75) 50%, transparent 80%);
+}
+.tls-podium[data-play="run"] .tls-podium__crown::after {
+  animation: tls-podium-glint calc(var(--tls-motion-slow) * 2) var(--tls-ease) both;
+  animation-delay: calc(2 * 60ms + var(--tls-motion-slow) + var(--tls-motion-mid));
+}
+/* Drucken (Urkunden-Ansicht, Ergebnis-Aushang): das Treppchen steht immer da, auch ohne Sichtbarwerden. */
+@keyframes tls-podium-digit-late {
+  0% { transform: scale(calc(1 - 0.08 * var(--tls-motion-on))); }
+  60% { transform: scale(calc(1 + 0.06 * var(--tls-motion-on))); }
+  100% { transform: none; }
+}
+/* Später hereingescrollt: alles steht schon, nur Ziffern und Krone grüßen einmal - ohne Ausblenden, ohne Sprung. */
+.tls-podium[data-play="late"] .tls-podium__digit {
+  animation: tls-podium-digit-late var(--tls-motion-mid) var(--tls-ease) both;
+  animation-delay: calc(var(--tls-i, 0) * 60ms);
+}
+.tls-podium[data-play="late"] .tls-podium__crown::after {
+  animation: tls-podium-glint calc(var(--tls-motion-slow) * 2) var(--tls-ease) both;
+  animation-delay: calc(2 * 60ms + var(--tls-motion-mid));
+}
+@media print {
+  .tls-podium[data-play] .tls-podium__col { opacity: 1; animation: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-podium[data-play] .tls-podium__col, .tls-podium[data-play] .tls-podium__digit, .tls-podium[data-play] .tls-podium__crown { animation: none; opacity: 1; }
+  .tls-podium[data-play] .tls-podium__crown::after { animation: none; opacity: 0; }
+}
+
+/* Sieger-Moment (#1180): eine ruhige Karte statt Feuerwerk. Metall nur an Kante, Symbol und Ziffer; die Zeilen folgen
+   im Abstand von 60 ms, die Ziffer schwingt kaum merklich über, über den Pokal läuft einmal ein Glanz. */
+.tls-placement { --tls-metal-rgb: var(--tls-honor-rgb); position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.tls-placement[data-metal="silver"] { --tls-metal-rgb: var(--tls-silver-rgb); }
+.tls-placement[data-metal="bronze"] { --tls-metal-rgb: var(--tls-bronze-rgb); }
+.tls-placement__backdrop { position: absolute; inset: 0; background: rgb(5 5 6 / 0.84); }
+.tls-placement__card {
+  position: relative; width: 100%; max-width: 26rem; padding: 28px 24px 22px; border-radius: 10px; text-align: center; outline: none;
+  background: linear-gradient(180deg, var(--tls-surface-2) 0%, var(--tls-surface-0) 100%);
+  border: 1px solid rgb(var(--tls-metal-rgb) / 0.35);
+  box-shadow: inset 0 3px 0 rgb(var(--tls-metal-rgb)), 0 24px 48px -28px rgb(var(--tls-metal-rgb) / 0.22), 0 18px 40px -20px rgb(0 0 0 / 0.9);
+}
+.tls-placement__close { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 6px; color: rgb(255 255 255 / 0.55); transition: color var(--tls-motion-fast) var(--tls-ease); }
+.tls-placement__close:focus-visible { outline: 2px solid var(--tls-brand); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-placement__close:hover { color: #fff; }
+}
+.tls-placement__stage { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 14px; }
+.tls-placement__icon { position: relative; display: inline-grid; place-items: center; overflow: hidden; width: 56px; height: 56px; border-radius: 999px; color: rgb(var(--tls-metal-rgb)); background: rgb(var(--tls-metal-rgb) / 0.08); }
+.tls-placement__digit { display: inline-block; font-family: 'Unbounded', 'Arial Black', sans-serif; font-size: 56px; font-weight: 900; line-height: 1; color: rgb(var(--tls-metal-rgb)); }
+.tls-placement__label { font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: rgb(var(--tls-metal-rgb)); }
+.tls-placement__title { margin-top: 4px; font-size: clamp(1.5rem, 7vw, 2rem); font-weight: 900; text-transform: uppercase; line-height: 1.1; color: #fff; overflow-wrap: anywhere; }
+.tls-placement__name { margin-top: 10px; font-size: 16px; font-weight: 600; color: #fff; overflow-wrap: anywhere; }
+.tls-placement__tournament { margin-top: 2px; font-size: 14px; color: var(--tls-text-muted); overflow-wrap: anywhere; }
+.tls-placement__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 20px; }
+/* Große Schrift am kleinen Handy: Knöpfe brechen um, statt aus der Karte zu ragen. */
+.tls-placement__actions > * { max-width: 100%; white-space: normal; text-align: center; }
+@media (max-width: 359px) { .tls-placement__card { padding: 24px 16px 18px; } }
+.tls-placement__icon::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: linear-gradient(90deg, transparent 25%, rgb(255 255 255 / 0.6) 50%, transparent 75%);
+}
+.tls-placement__card[data-play="run"] .tls-placement__digit {
+  animation: tls-podium-digit var(--tls-motion-mid) var(--tls-ease) both; animation-delay: var(--tls-motion-mid);
+}
+.tls-placement__card[data-play="run"] .tls-placement__line {
+  --tls-rise: 8px;
+  animation: tls-podium-rise var(--tls-motion-slow) var(--tls-ease) both;
+  animation-delay: calc(var(--tls-motion-mid) + var(--tls-i, 0) * 60ms);
+}
+.tls-placement[data-metal="gold"] .tls-placement__card[data-play="run"] .tls-placement__icon { animation: tls-crown-lift calc(var(--tls-motion-slow) * 2) var(--tls-ease) both; animation-delay: var(--tls-motion-slow); }
+.tls-placement[data-metal="gold"] .tls-placement__card[data-play="run"] .tls-placement__icon::after {
+  animation: tls-podium-glint calc(var(--tls-motion-slow) * 2) var(--tls-ease) both; animation-delay: calc(var(--tls-motion-slow) + var(--tls-motion-mid));
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-placement__card[data-play] .tls-placement__digit, .tls-placement__card[data-play] .tls-placement__line,
+  .tls-placement__card[data-play] .tls-placement__icon, .tls-placement__card[data-play] .tls-placement__icon::after { animation: none; }
 }
 
 /* TV mode */
@@ -2395,6 +2643,80 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   .tls-lap-board[data-intro="1"] .tls-lap-row > td:first-child::before { animation: none; }
 }
 
+/* Fast Lap vor Ort (#1585) ------------------------------------------------------------------------------------
+   Neue Zeit in der Tabelle: die Zeile leuchtet ruhig auf (nur Deckkraft einer Fläche), bei einer neuen Bestzeit länger und
+   in Gold; das Band „Neue Bestzeit!“ trägt einen Glanz, der einmal durchläuft. Der Hinweis „−0.412 s · persönliche Bestzeit“ blendet ein. Der Abstand
+   ist ein Balken, der beim ersten Auftritt wächst und sich bei neuer Bestzeit weich anpasst (scaleX). Bewegung nur über
+   transform und opacity; „Bewegung reduzieren“ stellt die Dauern zentral ab und --tls-motion-on auf 0. */
+.tls-lap-row--fresh > td, .tls-lap-row--record > td { position: relative; }
+.tls-lap-row--fresh > td::after, .tls-lap-row--record > td::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: rgba(41, 182, 232, 0.14);
+  animation: tls-row-land calc(var(--tls-motion-slow) * 3) var(--tls-ease) both;
+}
+.tls-lap-row--record > td::after {
+  background: rgb(var(--tls-honor-rgb) / 0.16);
+  animation-duration: calc(var(--tls-motion-slow) * 6);
+}
+.tls-lap-chip-web {
+  display: inline-block; margin-top: 2px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  color: var(--tls-cyan); font-variant-numeric: tabular-nums;
+  animation: tls-chip-in var(--tls-motion-mid) var(--tls-ease) both;
+}
+.tls-lap-chip-web--best { color: var(--tls-honor); }
+@keyframes tls-chip-in {
+  from { opacity: 0; transform: translateY(calc(4px * var(--tls-motion-on))); }
+}
+.tls-best-flash {
+  display: flex; align-items: baseline; gap: 0.75rem; min-width: 0; padding: 0.6rem 1rem;
+  border-bottom: 1px solid rgb(var(--tls-honor-rgb) / 0.25);
+  background: linear-gradient(90deg, rgb(var(--tls-honor-rgb) / 0.12), rgb(var(--tls-honor-rgb) / 0.02));
+  position: relative; overflow: hidden;
+  animation: tls-best-in var(--tls-motion-mid) var(--tls-ease) both;
+}
+.tls-best-flash::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgb(var(--tls-honor-rgb) / 0.22) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: tls-winner-sweep calc(var(--tls-motion-slow) * 3) var(--tls-ease) var(--tls-motion-mid) 1 forwards;
+}
+.tls-best-flash__kicker { color: var(--tls-honor); font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; }
+@keyframes tls-best-in {
+  from { opacity: 0; transform: translateY(calc(-6px * var(--tls-motion-on))); }
+}
+.tls-gap-track { display: block; height: 2px; margin-top: 4px; margin-left: auto; width: 4.5rem; background: rgba(255, 255, 255, 0.06); border-radius: 1px; overflow: hidden; }
+.tls-gap-bar {
+  display: block; height: 100%; background: rgba(41, 182, 232, 0.55); transform-origin: 0 50%;
+  transition: transform var(--tls-motion-slow) var(--tls-ease-move);
+  animation: tls-gap-grow var(--tls-motion-slow) var(--tls-ease) var(--tls-motion-mid) backwards;
+}
+@keyframes tls-gap-grow {
+  from { transform: scaleX(0); }
+}
+/* Schnelleingabe: großer Ziffernblock, Finger- und Tablet-tauglich (mindestens 56 px hoch). */
+.tls-keypad { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.tls-keypad__key {
+  min-height: 56px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.04);
+  font-size: 1.6rem; font-weight: 700; color: #fff; touch-action: manipulation;
+  transition: background-color var(--tls-motion-fast) var(--tls-ease), transform var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-keypad__key--wide { font-size: 0.8rem; }
+.tls-keypad__key:active { transform: scale(calc(1 - 0.04 * var(--tls-motion-on))); background: rgba(41, 182, 232, 0.18); }
+.tls-keypad__key:focus-visible { outline: 2px solid var(--tls-cyan); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-keypad__key:hover { background: rgba(255, 255, 255, 0.08); }
+}
+/* „Versuch 2 von 3“: der Zähler tickt beim Wechsel einmal ein (neuer key → neue Animation). */
+.tls-attempt-chip {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; font-variant-numeric: tabular-nums;
+  border: 1px solid currentColor; border-radius: 2px; padding: 3px 8px;
+  animation: tls-tick-in var(--tls-motion-mid) var(--tls-ease) both;
+}
+@keyframes tls-tick-in {
+  from { opacity: 0; transform: translateY(calc(5px * var(--tls-motion-on))); }
+}
+.tls-reveal { animation: tls-chip-in var(--tls-motion-fast) var(--tls-ease) both; }
+
 /* Schritt-Anzeige (#1081): eine schmale Leiste je Schritt; erledigte und der aktuelle sind gefüllt, der Balken füllt
    sich beim Weitergehen von links. Vorleseprogramme hören „Schritt x von y“ (aria-label am Element). */
 .tls-steps {
@@ -2823,3 +3145,214 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   .tls-print-sheet, .tls-print-sheet * { visibility: visible; }
   .tls-print-sheet { position: absolute; top: 0; left: 0; width: 100%; }
 }
+
+/* Matchplan-Seite (#1557): Zeitleiste je Station, „Wer wartet auf wen“, Vorschau, Live-Verzug. Farben nur über die
+   Rollen (Winner Bracket Marke, Loser Bracket Violett, Finale Ehre, läuft Rot, Konflikt Orange, erledigt ruhig), Zeiten
+   in Rajdhani mit gleich breiten Ziffern. Bewegung über die Bewegungs-Regeln: Balken gleiten beim Umplanen
+   (Verschieben, --tls-motion-mid), ein neuer Konflikt pulsiert zweimal kurz; beim Ziehen und mit der Tastatur springt
+   nichts nach - das Spiel folgt der Hand sofort. Mit „Bewegung reduzieren“ fällt beides weg (Dauern 0,01 ms). */
+.mp { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; --mp-label: 168px; }
+.mp-card { background: var(--tls-surface-1); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 2px; padding: 16px; min-width: 0; }
+@media (min-width: 768px) { .mp-card { padding: 18px 20px; } }
+.mp-card__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; margin-bottom: 14px; }
+.mp-card__title { font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255, 255, 255, 0.7); }
+.mp-card__note { font-size: 12.5px; color: rgba(255, 255, 255, 0.5); max-width: 72ch; }
+.mp-mono, .mp-bar__time, .mp-node__time, .mp-tick, .mp-delay__value, .mp-agenda__time { font-family: "Rajdhani", "Bahnschrift", sans-serif; font-variant-numeric: tabular-nums; font-weight: 600; }
+.mp-empty { font-size: 14px; color: rgba(255, 255, 255, 0.55); max-width: 70ch; }
+.mp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.mp-btn:disabled { opacity: 0.45; cursor: default; }
+.mp-btn--small { padding: 4px 8px; font-size: 11px; gap: 4px; }
+.mp-link { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tls-brand); text-underline-offset: 3px; }
+.mp-link:hover { text-decoration: underline; }
+.mp-desktop-only { display: none; }
+@media (min-width: 768px) { .mp-desktop-only { display: block; } .mp-mobile-only { display: none; } }
+
+/* Einstellungen */
+.mp-settings__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 16px; align-items: start; }
+.mp-field { display: grid; gap: 6px; min-width: 0; }
+.mp-field__label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.55); }
+.mp-field dd { font-size: 15px; color: #fff; }
+.mp-field__hint { font-size: 12px; color: rgba(255, 255, 255, 0.45); }
+.mp-input { width: 100%; background: var(--tls-surface-0); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 2px; padding: 8px 10px; font-size: 14px; color: #fff; color-scheme: dark; transition: border-color var(--tls-motion-fast) var(--tls-ease); }
+.mp-input:focus { outline: none; border-color: rgb(var(--tls-brand-rgb) / 0.7); }
+.mp-settings__facts { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+.mp-fact { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(255, 255, 255, 0.8); background: var(--tls-surface-2); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 2px; padding: 6px 10px; }
+.mp-settings__stations { margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.mp-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.mp-chip { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 5px 10px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px; font-size: 13px; color: #fff; background: var(--tls-surface-2); }
+.mp-chip > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-chip__meta { font-size: 11px; color: rgba(255, 255, 255, 0.5); white-space: nowrap; }
+.mp-chip[data-status="broken"] { border-color: rgb(var(--tls-warn-rgb) / 0.45); color: var(--tls-warn); }
+.mp-chip--empty { color: rgba(255, 255, 255, 0.55); border-style: dashed; }
+.mp-settings__actions { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Vorschau, Verzug, Konflikte */
+.mp-preview { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 14px 16px; border: 1px solid rgb(var(--tls-brand-rgb) / 0.45); background: rgb(var(--tls-brand-rgb) / 0.08); border-radius: 2px; }
+.mp-preview__eyebrow { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--tls-brand); }
+.mp-preview__summary { margin-top: 4px; font-size: 16px; font-weight: 600; color: #fff; }
+.mp-preview__sub { margin-top: 2px; font-size: 12.5px; color: rgba(255, 255, 255, 0.55); }
+.mp-preview__stale { margin-top: 8px; font-size: 13px; color: var(--tls-warn); }
+.mp-preview__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.mp-delay { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 16px; border: 1px solid rgb(var(--tls-warn-rgb) / 0.45); background: rgb(var(--tls-warn-rgb) / 0.1); border-radius: 2px; font-size: 14px; color: #fff; }
+.mp-delay[data-late="false"] { border-color: rgb(var(--tls-ok-rgb) / 0.45); background: rgb(var(--tls-ok-rgb) / 0.08); }
+.mp-delay__value { font-size: 28px; line-height: 1; color: var(--tls-warn); }
+.mp-delay[data-late="false"] .mp-delay__value { color: var(--tls-ok); }
+.mp-delay__sub { color: rgba(255, 255, 255, 0.6); }
+.mp-delay > span { flex: 1 1 280px; }
+.mp-warnings { display: grid; gap: 6px; }
+.mp-warnings li { display: flex; gap: 8px; align-items: flex-start; padding: 9px 12px; font-size: 14px; color: #fff; border: 1px solid rgb(var(--tls-warn-rgb) / 0.35); background: rgb(var(--tls-warn-rgb) / 0.08); border-radius: 2px; }
+.mp-warnings svg { color: var(--tls-warn); margin-top: 2px; }
+
+/* Zeitleiste */
+.mp-timeline { --mp-label: 168px; }
+.mp-timeline__scroll { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-color: rgba(255, 255, 255, 0.22) transparent; scrollbar-width: thin; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 2px; }
+.mp-timeline__canvas { position: relative; min-width: 100%; }
+.mp-timeline__head { display: grid; grid-template-columns: var(--mp-label) 1fr; height: 26px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.mp-timeline__corner { position: sticky; left: 0; z-index: 3; background: var(--tls-surface-1); }
+.mp-timeline__ticks { position: relative; }
+.mp-tick { position: absolute; top: 0; left: 0; height: 26px; padding: 5px 0 0 4px; font-size: 12px; color: rgba(255, 255, 255, 0.45); border-left: 1px solid rgba(255, 255, 255, 0.12); white-space: nowrap; }
+.mp-tick[data-hour="true"] { color: rgba(255, 255, 255, 0.85); border-left-color: rgba(255, 255, 255, 0.3); }
+.mp-lane { display: grid; grid-template-columns: var(--mp-label) 1fr; height: 64px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.mp-lane:last-of-type { border-bottom: 0; }
+.mp-lane__label { position: sticky; left: 0; z-index: 3; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 0 12px; min-width: 0; background: var(--tls-surface-1); border-right: 1px solid rgba(255, 255, 255, 0.08); }
+.mp-lane__name { font-size: 14px; font-weight: 600; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-lane__meta { font-size: 12px; color: rgba(255, 255, 255, 0.45); }
+.mp-lane[data-status="broken"] .mp-lane__meta, .mp-lane[data-status="missing"] .mp-lane__meta { color: var(--tls-warn); }
+.mp-lane[data-status="missing"] .mp-lane__name { color: var(--tls-warn); }
+.mp-lane__track { position: relative; background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px); background-size: var(--mp-tick) 100%; }
+.mp-lane[data-status="broken"] .mp-lane__track { background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0 6px, transparent 6px 12px); }
+.mp-lane__empty { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); font-size: 12.5px; color: rgba(255, 255, 255, 0.4); white-space: nowrap; }
+.mp-bar {
+  --mp-tone: var(--tls-quiet-rgb);
+  position: absolute; top: 8px; left: 0; height: 48px; display: flex; flex-direction: column; justify-content: center; gap: 1px;
+  padding: 0 8px; overflow: hidden; text-align: left; white-space: nowrap; color: #fff; border-radius: 3px;
+  border: 1px solid rgb(var(--mp-tone) / 0.6); border-right-width: 3px; border-right-color: var(--tls-surface-1);
+  background: rgb(var(--mp-tone) / 0.22); background-clip: padding-box; touch-action: none; user-select: none;
+  transition: transform var(--tls-motion-mid) var(--tls-ease), opacity var(--tls-motion-fast) var(--tls-ease), box-shadow var(--tls-motion-fast) var(--tls-ease), border-color var(--tls-motion-fast) var(--tls-ease);
+}
+.mp-bar[data-tone="wb"] { --mp-tone: var(--tls-brand-rgb); }
+.mp-bar[data-tone="lb"] { --mp-tone: var(--tls-event-rgb); }
+.mp-bar[data-tone="final"] { --mp-tone: var(--tls-honor-rgb); }
+.mp-bar[data-forecast="true"] { border-style: dashed; border-right-style: solid; }
+.mp-bar[data-state="done"] { background: var(--tls-surface-2); color: rgba(255, 255, 255, 0.5); border-color: rgba(255, 255, 255, 0.1); border-right-color: var(--tls-surface-1); }
+.mp-bar[data-state="running"] { --mp-tone: var(--tls-live-rgb); background: rgb(var(--tls-live-rgb) / 0.26); border-color: var(--tls-live); border-right-color: var(--tls-surface-1); }
+.mp-bar[data-changed="true"] { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85), 0 6px 18px -6px rgb(var(--mp-tone) / 0.7); }
+.mp-bar[data-conflict="true"] { border-color: var(--tls-warn); border-right-color: var(--tls-surface-1); animation: mp-conflict var(--tls-motion-slow) var(--tls-ease) 2; }
+.mp-bar[data-selected="true"], .mp-bar:focus-visible { outline: 2px solid #fff; outline-offset: 1px; z-index: 2; }
+.mp-bar[data-carried="true"] { opacity: 0.45; }
+.mp-bar[data-movable="true"] { cursor: grab; }
+.mp-timeline[data-dragging] .mp-bar[data-movable="true"] { cursor: grabbing; }
+.mp-timeline[data-instant] .mp-bar { transition-property: opacity, box-shadow, border-color; }
+@media (hover: hover) and (pointer: fine) {
+  .mp-bar[data-movable="true"]:hover { border-color: rgb(var(--mp-tone) / 1); border-right-color: var(--tls-surface-1); }
+}
+.mp-bar__key { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; }
+.mp-bar__icon { width: 12px; height: 12px; flex: none; }
+.mp-bar__icon--warn { color: var(--tls-warn); }
+.mp-bar__time { font-size: 13px; opacity: 0.85; }
+.mp-bar[data-state="running"] .mp-bar__time { color: #fff; opacity: 1; }
+@keyframes mp-conflict {
+  0% { box-shadow: 0 0 0 0 rgb(var(--tls-warn-rgb) / 0.55); }
+  100% { box-shadow: 0 0 0 calc(7px * var(--tls-motion-on)) rgb(var(--tls-warn-rgb) / 0); }
+}
+.mp-was { position: absolute; top: 8px; left: 0; height: 48px; border: 1px dashed rgba(255, 255, 255, 0.28); border-radius: 3px; pointer-events: none; }
+.mp-ghost { position: absolute; top: 6px; left: 0; height: 52px; z-index: 4; padding: 4px 8px; display: flex; align-items: flex-end; font-family: "Rajdhani", "Bahnschrift", sans-serif; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; color: var(--tls-brand); border: 2px dashed rgb(var(--tls-brand-rgb) / 0.85); background: linear-gradient(rgb(var(--tls-brand-rgb) / 0.16), rgb(var(--tls-brand-rgb) / 0.16)), var(--tls-surface-1); border-radius: 3px; pointer-events: none; white-space: nowrap; overflow: hidden; }
+.mp-ghost[data-blocked="true"] { color: var(--tls-warn); border-color: var(--tls-warn); background: linear-gradient(rgb(var(--tls-warn-rgb) / 0.18), rgb(var(--tls-warn-rgb) / 0.18)), var(--tls-surface-1); }
+.mp-now { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--tls-live); z-index: 5; pointer-events: none; }
+.mp-now span { position: absolute; top: 4px; left: 6px; font-size: 11px; font-weight: 700; color: var(--tls-live); white-space: nowrap; background: var(--tls-surface-1); padding: 0 4px; }
+.mp-timeline__status { min-height: 1.4em; margin-top: 8px; font-size: 13px; color: rgba(255, 255, 255, 0.75); }
+.mp-hint { font-size: 12px; color: rgba(255, 255, 255, 0.45); max-width: 90ch; }
+
+/* Wer wartet auf wen */
+.mp-flow-scroll { overflow-x: auto; scrollbar-color: rgba(255, 255, 255, 0.22) transparent; scrollbar-width: thin; padding-bottom: 4px; }
+.mp-flow { position: relative; }
+.mp-flow__col { position: absolute; top: 0; left: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.4); }
+.mp-flow__edges { position: absolute; inset: 0; overflow: visible; }
+.mp-edge { fill: none; stroke-width: 1.6; stroke: rgb(var(--tls-brand-rgb) / 0.6); transition: opacity var(--tls-motion-fast) var(--tls-ease), stroke-width var(--tls-motion-fast) var(--tls-ease); }
+.mp-edge[data-kind="L"] { stroke: rgb(var(--tls-event-rgb) / 0.7); stroke-dasharray: 5 4; }
+.mp-edge[data-lit="true"] { stroke-width: 2.6; opacity: 1; }
+.mp-edge[data-lit="false"] { opacity: 0.12; }
+.mp-node {
+  --mp-tone: var(--tls-quiet-rgb);
+  position: absolute; top: 0; left: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 0 10px 0 13px;
+  text-align: left; color: #fff; background: var(--tls-surface-2); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 3px;
+  box-shadow: inset 3px 0 0 rgb(var(--mp-tone) / 0.9); overflow: hidden; white-space: nowrap;
+  transition: opacity var(--tls-motion-fast) var(--tls-ease), border-color var(--tls-motion-fast) var(--tls-ease);
+}
+.mp-node[data-tone="wb"] { --mp-tone: var(--tls-brand-rgb); }
+.mp-node[data-tone="lb"] { --mp-tone: var(--tls-event-rgb); }
+.mp-node[data-tone="final"] { --mp-tone: var(--tls-honor-rgb); }
+.mp-node[data-forecast="true"] { border-style: dashed; border-color: rgba(255, 255, 255, 0.3); }
+.mp-node[data-state="done"] { color: rgba(255, 255, 255, 0.5); --mp-tone: var(--tls-quiet-rgb); }
+.mp-node[data-state="running"] { border-color: var(--tls-live); --mp-tone: var(--tls-live-rgb); }
+.mp-node[data-conflict="true"] { border-color: var(--tls-warn); }
+.mp-node[data-selected="true"], .mp-node:focus-visible { border-color: #fff; outline: 1px solid #fff; }
+.mp-node[data-dim="true"] { opacity: 0.32; }
+@media (hover: hover) and (pointer: fine) { .mp-node:hover { border-color: rgba(255, 255, 255, 0.5); } }
+.mp-node__key { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.mp-node__time { font-size: 13px; color: rgba(255, 255, 255, 0.6); overflow: hidden; text-overflow: ellipsis; }
+.mp-flow__detail { margin-top: 12px; display: grid; gap: 3px; padding: 10px 12px; font-size: 14px; color: rgba(255, 255, 255, 0.8); background: var(--tls-surface-2); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 2px; overflow-wrap: anywhere; }
+
+/* Reihenfolge */
+.mp-order-scroll { position: relative; overflow-x: auto; }
+.mp-order { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 14px; }
+.mp-order th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); border-bottom: 1px solid rgba(255, 255, 255, 0.1); white-space: nowrap; }
+.mp-order td { padding: 9px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); vertical-align: middle; }
+.mp-order td.mp-mono { white-space: nowrap; font-size: 15px; }
+.mp-order tr[data-state="done"] td { color: rgba(255, 255, 255, 0.45); }
+.mp-order tr[data-state="running"] .mp-order__why { color: var(--tls-live); }
+.mp-order__actions { display: inline-flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.mp-order__editor td { background: var(--tls-surface-2); }
+.mp-editor { display: grid; gap: 12px; padding: 4px 0; }
+.mp-editor__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 16px; }
+.mp-editor__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mp-editor__message { font-size: 13px; color: var(--tls-warn); }
+.mp-notice { padding: 10px 14px; font-size: 14px; color: rgba(255, 255, 255, 0.85); border: 1px solid rgb(var(--tls-brand-rgb) / 0.35); background: rgb(var(--tls-brand-rgb) / 0.07); border-radius: 2px; }
+.mp-notice[data-tone="error"] { color: #fff; border-color: rgb(var(--tls-warn-rgb) / 0.45); background: rgb(var(--tls-warn-rgb) / 0.1); }
+.mp-order__empty { padding: 18px 10px; color: rgba(255, 255, 255, 0.55); }
+.mp-order__why { display: block; margin-top: 2px; font-size: 12.5px; color: rgba(255, 255, 255, 0.5); }
+.mp-order__why[data-warn="true"], .mp-agenda__state[data-warn="true"] { color: var(--tls-warn); }
+.mp-pill { display: inline-block; padding: 1px 6px; border-radius: 2px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.8); background: rgba(255, 255, 255, 0.08); }
+.mp-pill[data-tone="wb"] { color: var(--tls-brand); background: rgb(var(--tls-brand-rgb) / 0.15); }
+.mp-pill[data-tone="lb"] { color: var(--tls-event); background: rgb(var(--tls-event-rgb) / 0.18); }
+.mp-pill[data-tone="final"] { color: var(--tls-honor); background: rgb(var(--tls-honor-rgb) / 0.14); }
+
+/* Handy: Liste je Station */
+.mp-agenda { display: grid; gap: 14px; }
+.mp-agenda__title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); font-size: 15px; font-weight: 700; color: #fff; }
+.mp-agenda__title > span:first-child { overflow-wrap: anywhere; }
+.mp-agenda__count { font-size: 12px; font-weight: 400; color: rgba(255, 255, 255, 0.5); white-space: nowrap; }
+.mp-agenda__list { display: grid; gap: 4px; margin-top: 6px; }
+.mp-agenda__item { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 10px; padding: 9px 10px; border-radius: 2px; background: var(--tls-surface-2); }
+.mp-agenda__item[data-state="running"] { background: rgb(var(--tls-live-rgb) / 0.14); }
+.mp-agenda__item[data-state="running"] .mp-agenda__time, .mp-agenda__item[data-state="running"] .mp-agenda__state { color: var(--tls-live); }
+.mp-agenda__item[data-next="true"] { background: rgb(var(--tls-brand-rgb) / 0.1); }
+.mp-agenda__item[data-next="true"] .mp-agenda__state { color: var(--tls-brand); }
+.mp-agenda__item[data-state="done"] { opacity: 0.55; }
+.mp-agenda__time { font-size: 18px; line-height: 1.2; color: #fff; }
+.mp-agenda__body { display: grid; gap: 2px; min-width: 0; }
+.mp-agenda__key { display: flex; align-items: center; gap: 6px; font-weight: 700; color: #fff; }
+.mp-agenda__names { font-size: 13px; color: rgba(255, 255, 255, 0.7); overflow-wrap: anywhere; }
+.mp-agenda__state { font-size: 12.5px; color: rgba(255, 255, 255, 0.5); }
+.mp-agenda__action { justify-self: start; margin-top: 4px; }
+.mp-agenda__empty { font-size: 13px; color: rgba(255, 255, 255, 0.45); padding: 6px 0; }
+
+/* Online und Liga */
+.mp-rounds { display: grid; gap: 16px; }
+.mp-round__title, .mp-week__title { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; font-weight: 700; color: #fff; }
+.mp-round__title span, .mp-week__title span { font-size: 12px; font-weight: 400; color: rgba(255, 255, 255, 0.5); white-space: nowrap; }
+.mp-round__list, .mp-week__list { display: grid; gap: 4px; margin-top: 6px; }
+.mp-remote { display: grid; gap: 2px; padding: 8px 10px; border-radius: 2px; background: var(--tls-surface-2); font-size: 13.5px; color: #fff; }
+.mp-remote__action { justify-self: start; margin-top: 4px; }
+.mp-remote__names { color: rgba(255, 255, 255, 0.85); overflow-wrap: anywhere; }
+.mp-remote__state { font-size: 12.5px; color: rgba(255, 255, 255, 0.55); }
+.mp-remote[data-tone="done"] { opacity: 0.6; }
+.mp-remote[data-tone="running"] .mp-remote__state { color: var(--tls-live); }
+.mp-remote[data-tone="open"] .mp-remote__state { color: var(--tls-brand); }
+.mp-remote[data-tone="accepted"] .mp-remote__state { color: var(--tls-ok); }
+.mp-weeks-scroll { overflow-x: auto; scrollbar-color: rgba(255, 255, 255, 0.22) transparent; scrollbar-width: thin; }
+.mp-weeks { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr); gap: 10px; }
+.mp-week { padding: 12px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 2px; background: var(--tls-surface-0); min-width: 0; }
+.mp-week[data-current="true"] { border-color: rgb(var(--tls-brand-rgb) / 0.55); }
+.mp-week__deadline { margin-top: 2px; font-size: 12.5px; color: rgba(255, 255, 255, 0.55); }
+.mp-week--empty { font-size: 13px; color: rgba(255, 255, 255, 0.5); }

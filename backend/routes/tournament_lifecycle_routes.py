@@ -90,6 +90,9 @@ async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: s
         if not matches:
             continue
         _apply_match_plan(matches, match_plan, _v2_plan_key)
+        # Vorgeplant, aber der fixe Baum hat andere Spiele (z. B. weniger Eingecheckte): was nicht passt, bleibt ohne
+        # Termin, und der Matchplan sagt „Baum hat sich geändert - neu planen“ (bis zum nächsten Übernehmen).
+        tree_changed = bool(match_plan) and {_v2_plan_key(match) for match in existing_matches} != {_v2_plan_key(match) for match in matches}
         if existing_matches:
             match_ids = await db.matches_v2.distinct("id", {"stage_id": stage["id"]})
             if match_ids:
@@ -100,7 +103,7 @@ async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: s
         await record_build_draws(db, matches, actor_id=actor_id)
         await db.tournament_stages.update_one(
             {"id": stage["id"]},
-            {"$set": {"status": "ready", "updated_at": now_utc().isoformat()}},
+            {"$set": {"status": "ready", "updated_at": now_utc().isoformat(), **({"schedule_hint": "tree_changed"} if tree_changed else {})}},
         )
         changed_stages.append({
             "stage_id": stage["id"],
@@ -403,7 +406,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             read_model = await load_competition_read_model(db, tid)
             snapshot = read_model.structure_snapshot()
             observe_structure_read(snapshot, surface="season_points")
-            placements = placement_rows_for_structure(snapshot, regs)
+            placements = placement_rows_for_structure(snapshot, regs, tournament=t)
             placed_reg_ids = {
                 placement["registration_id"]
                 for placement in placements

@@ -1,0 +1,23 @@
+# Lokaler Abnahme-Stand (docs/entwicklung/abnahme-lokal.md): eigener Projektname (lsw-abnahme), eigene Container,
+# Volumes und Ports, nur Testwerte aus .env.abnahme.example. Gebaut wird aus ABNAHME_SOURCE (Vorgabe: dieser
+# Ordner) - so lässt sich jeder Zweig abnehmen, ohne seinen Worktree umzuschalten.
+#
+#   docker compose -p lsw-abnahme --env-file .env.abnahme.example -f docker-compose.yml -f docker-compose.abnahme.yml up -d --build
+services:
+  mongodb:
+    container_name: ${ABNAHME_PROJECT:-lsw-abnahme}-mongodb
+
+  backend:
+    container_name: ${ABNAHME_PROJECT:-lsw-abnahme}-backend
+    build:
+      context: ${ABNAHME_SOURCE:-.}/backend
+    environment:
+      APP_ENV: development
+      DB_NAME: tls_abnahme
+      # Zeitgesteuerte Läufe (Mails, Erinnerungen, Statuswechsel) aus: der Seed stößt an, was er braucht.
+      DISABLE_SCHEDULER: "true"
+
+  frontend:
+    container_name: ${ABNAHME_PROJECT:-lsw-abnahme}-frontend
+    build:
+      context: ${ABNAHME_SOURCE:-.}/frontend

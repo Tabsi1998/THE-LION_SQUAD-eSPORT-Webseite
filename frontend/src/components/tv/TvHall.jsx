@@ -170,7 +170,17 @@ export function TvStationBoard({ entries = [] }) {
 }
 
 /** Unten: „Jetzt läuft“ und „Als Nächstes · 14:30“ mit Hinweis. */
-export function TvNowNext({ plan, runningText }) {
+/** Das nächste Spiel mit Prognose (#1564) - der Verzug in der Warn-Farbe, aber immer auch in Worten. */
+function NextMatchLine({ entry }) {
+  return (
+    <span className="tv-t-info tv-nownext__match" data-testid="tv-next-match">
+      {entry.text}
+      {entry.delay ? <span className="tv-nownext__delay"> · {entry.delay}</span> : null}
+    </span>
+  );
+}
+
+export function TvNowNext({ plan, runningText, nextMatch = null }) {
   const running = plan?.running || [];
   const next = plan?.next || null;
   return (
@@ -195,11 +205,12 @@ export function TvNowNext({ plan, runningText }) {
           <>
             <b className="tv-nownext__title font-heading">{next.title}</b>
             <span className="tv-t-info tv-muted">{next.hint}</span>
+            {nextMatch ? <NextMatchLine entry={nextMatch} /> : null}
           </>
         ) : (
           <>
-            <b className="tv-nownext__title font-heading">Für heute ist alles geplant</b>
-            <span className="tv-t-info tv-muted">Danke, dass ihr da seid.</span>
+            <b className="tv-nownext__title font-heading">{nextMatch ? "Nächstes Spiel" : "Für heute ist alles geplant"}</b>
+            {nextMatch ? <NextMatchLine entry={nextMatch} /> : <span className="tv-t-info tv-muted">Danke, dass ihr da seid.</span>}
           </>
         )}
       </div>

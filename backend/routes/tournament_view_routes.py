@@ -100,6 +100,31 @@ async def export_match_plan_csv(tid: str, me: dict = Depends(get_current_user)):
     )
 
 
+async def _own_registration_ids(db, regs: list[dict], user: dict | None) -> set[str]:
+    """Die eigene Anmeldung des Schauenden (#1562): als Spieler oder als Mitglied des angemeldeten Teams."""
+    if not user or not user.get("id"):
+        return set()
+    team_ids = {
+        row.get("team_id")
+        for row in await db.team_members.find({"user_id": user["id"]}, {"_id": 0, "team_id": 1}).to_list(100)
+        if row.get("team_id")
+    }
+    return {
+        reg["id"]
+        for reg in regs
+        if reg.get("id") and (reg.get("user_id") == user["id"] or (reg.get("team_id") and reg.get("team_id") in team_ids))
+    }
+
+
+def _mark_own_rows(rows: list[dict], own_ids: set[str]) -> None:
+    """Die eigene Zeile markieren - auch in jeder Gruppentabelle (`[{group, standings}]`)."""
+    for row in rows:
+        if isinstance(row.get("standings"), list):
+            _mark_own_rows(row["standings"], own_ids)
+        elif row.get("registration_id") in own_ids:
+            row["is_mine"] = True
+
+
 async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool) -> dict:
     t["public_phase"] = derive_public_phase(t, "tournament")
     read_model = await load_competition_read_model(db, t["id"])
@@ -117,7 +142,12 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
         matches_v2 = [public_match_view(match, viewer_id) for match in matches_v2]
         stages = [public_stage_view(stage) for stage in stages]
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
+    own_ids = await _own_registration_ids(db, regs, user)
     regs = [_public_registration(r, user, is_staff) for r in regs]
+    # Dein Weg und „Nur meine Spiele“ (#1562): die eigene Anmeldung ist markiert, auch im Team.
+    for r in regs:
+        if r.get("id") in own_ids:
+            r["is_mine"] = True
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
@@ -247,6 +277,7 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
     is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
     read_model = await load_competition_read_model(db, tid)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+    own_ids = await _own_registration_ids(db, regs, user)
     # Austritt/Disqualifikation mit annullierten Spielen (#1553, 50-Prozent-Regel): raus aus der Tabelle. Wer mit
     # kampflosen Niederlagen ausgeschieden ist, bleibt mit ihnen drin.
     regs = [r for r in regs if (r.get("removal") or {}).get("mode") != "annulled"]
@@ -263,9 +294,12 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
         groups = await db.tournament_groups.find({"tournament_id": tid}, {"_id": 0}).to_list(50)
     structure = read_model.structure_snapshot()
     observe_structure_read(structure, surface="standings")
-    return standings_for_structure(
+    rows = standings_for_structure(
         t,
         structure,
         regs,
         groups=groups,
     )
+    # Die eigene Zeile ist markiert (#1179) - nur für den, der schaut.
+    _mark_own_rows(rows, own_ids)
+    return rows

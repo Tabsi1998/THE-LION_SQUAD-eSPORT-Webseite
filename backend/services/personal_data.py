@@ -140,6 +140,10 @@ PERSONAL: dict[str, Entry] = {
     "f1_staff_assignments": Entry(DELETED, ("f1_staff",)),
     "event_registrations": Entry(OVERWRITTEN, ("event_registrations",)),
     "f1_lap_times": Entry(OVERWRITTEN, ("f1_lap_times",)),
+    # Fast Lap vor Ort (#1585): Gäste ohne Konto und die Liste „Am Start / Als Nächstes“.
+    "f1_guests": Entry(EXPIRES, note="Anzeigename eines Gastes ohne Konto - kein Konto, also weder Auskunft noch Löschung "
+                                     "darüber; nach 90 Tagen zu „Gast <Nummer>“ (Job ops_retention), die Zeiten bleiben"),
+    "f1_queue": Entry(DELETED, note="Reihenfolge am Simulator während einer Fast Lap; wer gefahren ist, verlässt die Liste"),
     "prize_pickups": Entry(OVERWRITTEN, ("prize_pickups",)),
     "season_points": Entry(KEPT, ("season_points",), SPORT),
     "season_standings": Entry(KEPT, ("season_standings",), SPORT),

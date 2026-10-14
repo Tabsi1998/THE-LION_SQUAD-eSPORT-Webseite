@@ -8,7 +8,7 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 - **Admin → eSports → Turniere** (`/admin/tournaments`) – Liste aller Turniere mit Suche, Status-Filter und CSV-Export
 - **Admin → eSports → Turniere → Neues Turnier** (`/admin/tournaments/new`) – anlegen
 - **Admin → eSports → Turniere → Turnier öffnen** (`/admin/tournaments/<Turnier>`) – Reiter **Teilnehmer**,
-  **Turnierbaum**, **Matchplan**, **Gruppen** (nur beim Format Gruppenphase), **Team**, **Rückmeldungen** (erst nach
+  **Turnierbaum**, **Matchplan** (Zeitleiste je Station, siehe 3.8), **Spiele**, **Gruppen** (nur beim Format Gruppenphase), **Team**, **Rückmeldungen** (erst nach
   dem Ende), **Bearbeiten**
 - **Admin → eSports → Turnier-Leitfaden** (`/admin/tournament-guide`) – welches Format wofür, mit „Voreinstellung übernehmen“
 - **Admin → eSports → Stationen** (`/admin/stations`) – Geräte und Plätze in der Halle, Spiele zuweisen
@@ -142,7 +142,7 @@ Zu den Besonderheiten:
 - **Seeding** (Zufall, Manuell, Ranking) und der **Setzplatz** pro Teilnehmer stehen unter Spieloptionen bzw. beim
   Hinzufügen eines Teilnehmers.
 
-Ob der Baum Vorschau oder fix ist, siehst du im Reiter **Matchplan** (Hinweis „Vorschau / Draft“).
+Ob der Baum Vorschau oder fix ist, siehst du im Reiter **Spiele** (Hinweis „Vorschau / Draft“).
 
 ### 3.2 Online, Vor Ort, Hybrid
 
@@ -224,16 +224,34 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
   frei, sagt die Seite es. Gezielt ersetzt **Teilnehmer hinzufügen** mit **Ersetzt Nicht-Erschienen** – auch eine
   Person mit Freilos.
 - Teilnehmer im festen Baum lassen sich nicht einfach entfernen. Stattdessen **Nicht erschienen** setzen und ersetzen.
-- **Gegner der nächsten Runde** (Spieloptionen, auch je Phase): **Fester Baum** (Standard) oder **Zufällig mischen**.
-  Gemischt steht Runde 1 ab dem Ende des Check-ins fest. Erst wenn **alle** Spiele einer Runde fertig sind, kommen alle
-  Weiterkommer in einen Topf und werden gleichmäßig auf die Spiele der nächsten Runde verteilt – echtes Los, auch zwei
-  aus demselben Spiel können sich wiedersehen. Im Doppel-K.-o. wird im Loser Bracket nur innerhalb derselben
-  Loser-Runde gemischt; laufen nur zwei Spiele in eines zusammen (Finale, Grand Final, Spiel um Platz 3), ändert sich
-  nichts. Bis zur Auslosung steht im Baum „Platz aus Runde 1“. Jede Auslosung steht mit Zeitpunkt, Person und Ergebnis
-  im Protokoll. **Neu auslosen** (Reiter Spiele, Kasten „Auslosung“) geht, bis eines der Spiele der Runde aufgerufen
-  oder gestartet ist. In der **Liga** werden Reihenfolge der Spieltage und Heimrecht ausgelost (jeder spielt trotzdem
-  genau einmal je Hin- und Rückrunde gegen jeden); **Spieltage neu auslosen** geht bis Spieltag 1 beginnt. Die
-  Einstellung gilt, sobald der Turnierbaum neu gebaut wird (Vorschau oder Ende des Check-ins).
+- **Weiterkommen (Gegner der nächsten Runde)** (Spieloptionen, auch je Phase), vier Modi:
+  - **Fester Baum** (Standard): Die Zuordnung steht im Turnierbaum, Sieger aus A trifft Sieger aus B.
+  - **Auslosung nach der Runde**: Erst wenn **alle** Spiele einer Runde fertig sind, kommen alle Weiterkommer in einen
+    Topf und werden gleichmäßig auf die Spiele der nächsten Runde verteilt – echtes Los, auch zwei aus demselben Spiel
+    können sich wiedersehen. Bis zur Auslosung steht im Baum, wer kommt: „Weiter aus Runde 1“ bei Läufen, „Sieger aus
+    Viertelfinale“ bei Duellen.
+  - **Show-Auslosung**: wie die Auslosung nach der Runde, nur lost erst die Turnierleitung. Ist die Runde fertig, steht
+    im Baum „Auslosung bereit“; die **Turnierleitung am Handy** (Reiter „Braucht Aufmerksamkeit“) und der Kasten
+    „Auslosung“ im Reiter Spiele zeigen „Auslosung bereit · N Namen“ mit dem Topf und dem Knopf **Jetzt auslosen**
+    (Aufbau-Recht). Nach der eingestellten Zeit (Vorgabe 10 Minuten, je Turnier und Phase) erinnert der Server die
+    Turnierleitung; nach noch einmal so viel Zeit lost er selbst.
+  - **Sofort zufällig**: Ist ein Spiel fertig, kommt jeder Weiterkommer **sofort** auf einen zufälligen freien Platz
+    der nächsten Runde (gleiche Runde und gleicher Abschnitt; Sieger und Verlierer landen ohnehin in getrennten
+    Runden). Ein Spiel kann starten, sobald es voll ist – alles kann passieren. Im Baum fährt jeder Name einzeln über die
+    Sammelschiene; freie Plätze zeigen weiter „Weiter aus Runde 1“ bzw. „Sieger aus Viertelfinale“.
+
+  Für alle gemischten Modi gilt: Runde 1 steht ab dem Ende des Check-ins fest. Im Doppel-K.-o. wird im Loser Bracket
+  nur innerhalb derselben Loser-Runde gemischt; laufen nur zwei Spiele in eines zusammen (Finale, Grand Final, Spiel um
+  Platz 3), ändert sich nichts. Jede Auslosung bzw. Zuweisung steht mit Zeitpunkt, Person und Ergebnis im Protokoll.
+  Wird ein Ergebnis korrigiert, bleibt der Platz und die Person wird getauscht; läuft das Zielspiel schon, gelten die
+  Sperren wie bei jeder Korrektur. **Neu auslosen** (Reiter Spiele, Kasten „Auslosung“) geht, bis eines der Spiele der
+  Runde aufgerufen oder gestartet ist – bei „Sofort zufällig“ nur für die Spiele, die noch nicht begonnen haben. Der
+  Matchplan plant eine ausgeloste Runde erst nach **allen** Spielen davor („wartet auf Auslosung“); bei „Sofort
+  zufällig“ gilt eine Prognose: Die Spiele der nächsten Runde füllen sich in ihrer Reihenfolge mit den Spielen davor in
+  deren Reihenfolge – das echte Los entscheidet. In der **Liga** werden Reihenfolge der Spieltage und Heimrecht
+  ausgelost (jeder spielt trotzdem genau einmal je Hin- und Rückrunde gegen jeden); **Spieltage neu auslosen** geht bis
+  Spieltag 1 beginnt. Die Einstellung gilt, sobald der Turnierbaum neu gebaut wird (Vorschau oder Ende des Check-ins).
+  Ältere Turniere mit dem früheren Haken „Zufällig mischen“ laufen als „Auslosung nach der Runde“ weiter.
 - **Turnier starten** (Status **Live**) prüft vorher die Planung. Gibt es Konflikte oder Hinweise, fragt die Seite
   „Mit Hinweisen live schalten?“. Ohne ein spielbares Spiel lässt sich das Turnier nicht starten.
 
@@ -263,7 +281,7 @@ Wörtern:
 
 | Ort | Weg |
 | --- | --- |
-| **Matchplan** | Turnier öffnen → Reiter **Matchplan** → am Spiel **Ergebnis eintragen** (nur, wenn das Turnier **Live** oder **Pausiert** ist und beide Seiten feststehen) |
+| **Spiele** | Turnier öffnen → Reiter **Spiele** → am Spiel **Ergebnis eintragen** (nur, wenn das Turnier **Live** oder **Pausiert** ist und beide Seiten feststehen) |
 | **Stationen** | Admin → eSports → Stationen → an der Station **Ergebnis eintragen** |
 | **Turnierleitung am Handy** | `/tournaments/<Name>/leitung` → Reiter **Ergebnisse** → **Eintragen** |
 | **Matchseite** | öffentliche Seite des Spiels |
@@ -331,7 +349,7 @@ im Protokoll und unter ihren Strafen) und **+5 Min. verlängern**. Die Fristen s
 - **Spiel zuweisen** an einer Station: **Zuweisen** reserviert, **Direkt starten** startet gleich. **Starten** und
   **Freigeben** stehen an der belegten Station.
 - **Zeitplan füllen** plant offene Spiele mit Vorschau, **Freie Stationen starten** startet, was bereit ist. Im
-  Turnier macht **Werkzeuge → Planen** dasselbe: Der Spielplaner zeigt je Spiel Zeit und Station,
+  Turnier öffnet **Werkzeuge → Planen** den Matchplan (unten): Der Spielplaner zeigt je Spiel Zeit und Station,
   dazu Konflikte, und schreibt erst bei **Übernehmen** alles auf einmal. Er plant ab jetzt (Erledigtes und Laufendes
   bleibt), hält die Reihenfolge des Turnierbaums ein (spätere Runden stehen als „voraussichtlich“), setzt keinen
   Spieler zweimal gleichzeitig an und hält die **Mindestpause** (Bearbeiten → Erweiterte Spieloptionen, Vorgabe
@@ -341,9 +359,45 @@ im Protokoll und unter ihren Strafen) und **+5 Min. verlängern**. Die Fristen s
   Spiel kommt aus der einen Dauer-Regel (3.12).
 - **PDF Hochformat / Querformat** liefert einen Aushang der Stationen.
 - Der Status einer Station (frei, belegt, reserviert, defekt) lässt sich ändern.
+- **Belegung je Station** zeigt dieselbe Zeitleiste wie der Matchplan (unten), live; **Im Matchplan öffnen** springt
+  in den Reiter des Turniers. Ein Lauf zeigt alle seine Spieler.
+
+**Matchplan** (Turnier öffnen → Reiter **Matchplan**) ist das Werkzeug der Turnierleitung am Turniertag:
+
+- **Oben die Planung:** Turnierstart, **Mindestpause** zwischen zwei Spielen, **Puffer je Spiel** (Luft, die auf jede
+  Spieldauer kommt – nicht auf eine Dauer, die am Spiel selbst steht), die Spieldauer mit Herkunft („vom Spiel:
+  12 Min. (Grand Prix) + 8 Min. Puffer“) und die Stationen des Turniers. Ändern darf das die Turnierleitung über alle
+  Turniere; alle anderen sehen die Werte.
+- **Automatisch planen** zeigt die Vorschau des Spielplaners: geänderte Spiele hell umrandet, gestrichelt, wo sie
+  vorher lagen, Konflikte in Worten. Erst **Übernehmen** schreibt. Hat sich der Plan inzwischen geändert, steht das da,
+  und die Seite plant neu – geschrieben wird nie etwas anderes als gezeigt.
+- **Wer wartet auf wen:** der Ablauf von links nach rechts; antippen zeigt, was ein Spiel braucht und wer danach
+  darauf wartet. Gestrichelter Rahmen = Prognose (die Spieler stehen noch nicht fest).
+- **Zeitleiste je Station:** Balken je Spiel, Länge = Dauer. Winner Bracket blau, Loser Bracket violett, Finale gold,
+  läuft rot mit Spielzeit, erledigt grau, Konflikt orange, feste Termine mit Nadel. **Ziehen** legt ein Spiel auf eine
+  andere Zeit oder Station und macht den Termin fest; ein belegtes Feld wird schon beim Ziehen orange. Mit der
+  Tastatur: Spiel wählen, **Enter** nimmt auf, **Pfeiltasten** verschieben (5 Minuten, mit Umschalt 15, hoch und runter
+  die Station), **Enter** legt ab, **Escape** bricht ab. **Termin lösen** gibt einen festen Termin an den Planer
+  zurück.
+- **Ändern** (in der Liste, am Handy am Spiel): Start, Station und eigene Dauer eines Spiels von Hand – eine leere Dauer
+  erbt (daneben steht, woher), ein leerer Start gibt das Spiel an den Planer zurück. Das ersetzt die frühere
+  „Matchplanung“ an den Spielkarten; im Reiter **Spiele** stehen nur noch Phasen, Spiele und Ergebnisse.
+- **Baum noch Vorschau** (vor dem Ende des Check-ins): die Spiele stehen schon da, ohne Zeit; geplant wird, sobald der
+  Baum fix ist. Kann der Planer nicht antworten oder fehlt das Recht, steht das als Hinweis da.
+- **Live:** Oben steht der Verzug aus der Prognose des Planers („+11 Min. – Finale jetzt ca. 20:51“), die Zeitleiste
+  zeigt, wie der Rest nachrückt; **Nachrücken planen** öffnet die Vorschau dazu. Feste Termine bleiben.
+- **Am Handy** steht statt der breiten Zeitleiste je Station eine Liste: was läuft, was als Nächstes kommt.
+- **Online** gibt es keine Stationen: der Matchplan zeigt die Runden mit Fristen je Spiel (offen seit, „nicht
+  erschienen“ ab, Ergebnis gilt ab). **Liga:** Spielwochen mit Frist und dem geltenden Termin (vereinbart, Heimrecht,
+  Standardzeit).
 
 Ein Spiel gilt auf dem Aufruf-TV als aufgerufen, sobald es einer Station zugewiesen und noch nicht gestartet ist. Mehr
 in [TV und Beamer](tv.md).
+
+Auf der öffentlichen Seite **Spielplan** sehen Zuschauer und Spieler denselben Plan: **Nach Runden** als Karten wie im
+Turnierbaum oder, sobald Stationen vergeben sind, **Nach Stationen** als Liste je Station nach Zeit. Ein laufendes Spiel
+steht in Rot mit Spielzeit, spätere Runden mit „voraussichtlich“. Angemeldete filtern mit **Nur meine Spiele**. Die
+Seite rechnet nichts selbst – Zeit und Station kommen aus dem Spielplaner.
 
 ### 3.9 TV
 
@@ -363,6 +417,17 @@ der TV zählt dann herunter. Im Reiter **Turnierbaum** setzt ihr „Runde präse
 4. **Sperren** (Werkzeuge, ab dem Status Beendet): Danach sind Ergebnisse, Teilnehmer, Spielzeiten und Stationen nur
    noch lesbar. Mit **Entsperren** geht es wieder. Löschen bleibt möglich.
 5. Der Reiter **Rückmeldungen** erscheint nach dem Ende und zeigt die Rückmeldungen ohne Namen.
+6. Nach dem Ende zeigt die Turnierseite das **Podest** (Platz 1 in der Mitte, 2 links, 3 rechts) – bei **Beendet**
+   mit dem Hinweis „Stand vorläufig“. Erst mit **Ergebnisse veröffentlicht** bekommt, wer Platz 1 bis 3 belegt hat,
+   beim nächsten Öffnen der Turnierseite einmal eine Karte „Champion“, „Zweiter Platz“ oder „Dritter Platz“ mit
+   **Teilen** und **Turnierbaum** – einmal je Browser, nie zugleich mit einem Erfolg. Gleich stehende Teilnehmer teilen
+   sich in der Rangliste den Platz (1, 1, 3) – beide bekommen Jahreswertungs-Punkte, Preis und Auszeichnung dieses
+   Platzes, je Person einmal.
+
+Die **Rangliste** zeigt bei Liga, Jeder gegen jeden und Schweizer System Spiele, Siege/Unentschieden/Niederlagen,
+Differenz (beim Schweizer System Buchholz), die Form der letzten fünf Spiele und Pfeile, wie sich der Platz seit dem
+vorigen Spieltag geändert hat. Bei der Gruppenphase steht je Gruppe eine eigene Tabelle. Die eigene Zeile ist markiert,
+bei Team-Turnieren für alle Mitglieder des Teams.
 
 Strafen stehen unter **Admin → eSports → Strafen**, die Jahreswertung unter **Admin → eSports → Jahreswertung**.
 

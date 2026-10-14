@@ -51,3 +51,34 @@ describe("createCeremonyQueue", () => {
     expect(queue.getPendingCount()).toBe(0);
   });
 });
+
+// Sieger-Moment (#1180): derselbe Weg wie Erfolge - nie zwei zugleich, nie mit einem Erfolg verschmolzen, und der Platz
+// steht vor einem Erfolg, der noch wartet.
+describe("Turnier-Platz in der Warteschlange", () => {
+  const placement = { key: "t1:r1", rank: 1, metal: "gold", title: "Champion", name: "NeonFalke", tournamentTitle: "Lions Smash Finale" };
+
+  it("kommt dran, wenn nichts läuft, und wird nie mit einem Erfolg gebündelt", () => {
+    const queue = createCeremonyQueue({ now: () => 10 });
+    queue.enqueue({ id: "platz", placement });
+    expect(queue.getCurrent().placement).toEqual(placement);
+    queue.enqueue({ id: "a", tiers: [tier("a")] });
+    queue.enqueue({ id: "b", tiers: [tier("b")] });
+    expect(queue.getCurrent().id).toBe("platz");
+    expect(queue.getCurrent().tiers).toEqual([]);
+    expect(queue.advance().id).toBe("a");
+    expect(queue.getCurrent().tiers.map((x) => x.code)).toEqual(["a", "b"]);
+  });
+
+  it("überholt einen wartenden Erfolg, unterbricht aber keinen laufenden", () => {
+    let t = 0;
+    const queue = createCeremonyQueue({ now: () => t });
+    queue.enqueue({ id: "läuft", tiers: [tier("a")] });
+    t += BUNDLE_WINDOW_MS + 1;
+    queue.enqueue({ id: "wartet", tiers: [tier("b")] });
+    t += 10;
+    queue.enqueue({ id: "platz", placement });
+    expect(queue.getCurrent().id).toBe("läuft");
+    expect(queue.advance().id).toBe("platz");
+    expect(queue.advance().id).toBe("wartet");
+  });
+});

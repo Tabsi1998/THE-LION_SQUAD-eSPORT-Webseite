@@ -66,4 +66,6 @@ test("Zoom-Entscheidung: ein Start - Zoom auf das Spiel; mehrere zugleich - ein 
   expect(liveZoomPlan(["C", "E"].map((key) => find(bracket, key).id), bracket.matches_v2).text).toBe("2 Spiele");
   expect(liveZoomPlan([], bracket.matches_v2)).toBeNull();
   expect(matchName({ match_key: "C", match_type: "ffa", slots: [{}, {}, {}, {}] })).toBe("Durchgang C");
+  // Ein Wort als Kürzel (#1591): „Grand Final“ statt „Durchgang FINAL“.
+  expect(matchName({ match_key: "FINAL", round_label: "Grand Final", match_type: "ffa", slots: [{}, {}, {}, {}] })).toBe("Grand Final");
 });

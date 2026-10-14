@@ -25,8 +25,15 @@ from services.match_v2_results import _advancement_result_rank, _ranking_mode, h
 from services.result_hold import hold_view
 from services.round_labels import round_label, rounds_by_section, stage_kind
 from services.station_labels import attach_station_info
-from services.tournament_permissions import RESULT_STAFF_ROLES, is_global_tournament_staff
+from services.draw_show import lead_cards
+from services.tournament_permissions import (
+    RESULT_STAFF_ROLES,
+    STRUCTURE_STAFF_ROLES,
+    has_tournament_staff_permission,
+    is_global_tournament_staff,
+)
 from services.v2_match_flows import latest_reports
+from services.v2_result_submission import eliminated_registration_ids
 
 RECENT_LIMIT = 6
 
@@ -240,6 +247,10 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
 
     stations = await db.stations.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(500)
     attention = attention_items(tournament, matches, stations, regs_by_id, now, stages=stages, game=game)
+    # Show-Auslosung (#1590): „Auslosung bereit · N Namen“ mit „Jetzt auslosen“ für die Leitung mit Aufbau-Recht.
+    can_draw = await has_tournament_staff_permission(user, tournament_id, STRUCTURE_STAFF_ROLES)
+    draws = lead_cards(matches, tournament, stages, regs_by_id, can_draw=can_draw,
+                       eliminated=await eliminated_registration_ids(db, tournament_id))
     recent = sorted(
         [match for match in matches if str(match.get("status") or "") in {"completed", "forfeit"} and match.get("completed_at")],
         key=lambda match: str(match.get("completed_at") or ""), reverse=True,
@@ -253,6 +264,7 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
         "missing_after_minutes": MISSING_AFTER_MINUTES,
         "matches": open_items,
         "attention": attention,
+        "draws": draws,
         "stations": [
             {"id": row.get("id"), "name": row.get("name") or row.get("label") or "Station", "status": row.get("status") or "free",
              "busy": bool(row.get("current_match_id"))}

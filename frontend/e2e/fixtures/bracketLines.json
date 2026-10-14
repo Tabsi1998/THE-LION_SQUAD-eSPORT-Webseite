@@ -1,0 +1,6737 @@
+{
+ "_info": "Erzeugt von scripts/make_ffa_bracket_fixture.py --lines mit dem echten Generator (#1591): Läufe mit 16 im Doppel-K.-o. mit Grand Final, gemischt, vor und nach Runde 1 (ffa16de_start, ffa16de_round1); K.-o. mit 8 fest (se8_fixed); Doppel-K.-o. mit 8 fest (de8_fixed); 8 von 16 Fahrern zusammengelegt (ffa8_merged). Nicht von Hand ändern - neu erzeugen.",
+ "ffa16de_start": {
+  "tournament": {
+   "id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+   "slug": "kart-cup-16-gemischt",
+   "title": "Lions Kart-Cup",
+   "format": "ffa_custom_bracket",
+   "status": "check_in",
+   "visibility": "public",
+   "max_participants": 16,
+   "seeding_mode": "manual",
+   "best_of": 1,
+   "match_duration_minutes": 30,
+   "team_mode": "solo",
+   "result_entry_mode": "player_confirmed",
+   "engine_version": "competition.graph.v1",
+   "ruleset_version": "competition.ruleset.v1",
+   "heat_rebuild_mode": "auto",
+   "randomize_advancement_rounds": true,
+   "updated_at": "2026-10-14T16:04:19.059392+00:00",
+   "check_in_until": "2026-10-14T16:03:19.053791+00:00",
+   "check_in_closed_at": "2026-10-14T16:04:19.059392+00:00",
+   "public_phase": {
+    "state": "registration_closed",
+    "label": "Anmeldung geschlossen",
+    "raw_status": "check_in",
+    "target_at": null,
+    "next_transition_at": null,
+    "countdown_kind": "starts",
+    "now": "2026-10-14T16:04:19.062444+00:00"
+   },
+   "can_view_display": false
+  },
+  "registrations": [
+   {
+    "id": "769f27e2-8b14-4bf2-87c3-2fa6f238ce08",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "NeonFalke",
+    "ingame_name": "NeonFalke",
+    "team_id": null,
+    "seed": 1,
+    "created_at": null
+   },
+   {
+    "id": "3c208ef9-57d3-49bb-b3b1-9e98621dd3e1",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "KartKönigin",
+    "ingame_name": "KartKönigin",
+    "team_id": null,
+    "seed": 2,
+    "created_at": null
+   },
+   {
+    "id": "53303946-a05e-4a64-bf09-8d99dad3b1f1",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "LuckyLion",
+    "ingame_name": "LuckyLion",
+    "team_id": null,
+    "seed": 3,
+    "created_at": null
+   },
+   {
+    "id": "6563db23-3da5-4271-a717-dff524c4ef30",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "PixelPaula",
+    "ingame_name": "PixelPaula",
+    "team_id": null,
+    "seed": 4,
+    "created_at": null
+   },
+   {
+    "id": "3d4c63ae-cb45-4852-82fa-25366e5671fd",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "DriftDaniel",
+    "ingame_name": "DriftDaniel",
+    "team_id": null,
+    "seed": 5,
+    "created_at": null
+   },
+   {
+    "id": "311334f5-4d43-4fbe-b89d-e66976a9e2a1",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "BoostBerta",
+    "ingame_name": "BoostBerta",
+    "team_id": null,
+    "seed": 6,
+    "created_at": null
+   },
+   {
+    "id": "7f52275b-0ac6-461f-9f32-7b40d08d6b5e",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "TurboTom",
+    "ingame_name": "TurboTom",
+    "team_id": null,
+    "seed": 7,
+    "created_at": null
+   },
+   {
+    "id": "dc268f8d-f4ab-489c-806a-5597a09a0725",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "SchnellSchnecke",
+    "ingame_name": "SchnellSchnecke",
+    "team_id": null,
+    "seed": 8,
+    "created_at": null
+   },
+   {
+    "id": "315439ae-8e36-402f-b1c3-3292c8f28a38",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "KurvenKarl",
+    "ingame_name": "KurvenKarl",
+    "team_id": null,
+    "seed": 9,
+    "created_at": null
+   },
+   {
+    "id": "a59fcd2c-86f7-4708-94c0-ddfbff4f549f",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "NitroNina",
+    "ingame_name": "NitroNina",
+    "team_id": null,
+    "seed": 10,
+    "created_at": null
+   },
+   {
+    "id": "9acae8b9-142a-487f-8494-3a033f84149d",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "BlitzBea",
+    "ingame_name": "BlitzBea",
+    "team_id": null,
+    "seed": 11,
+    "created_at": null
+   },
+   {
+    "id": "71d37075-7cef-451e-9df9-603b8b50b8e0",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "RaketenRudi",
+    "ingame_name": "RaketenRudi",
+    "team_id": null,
+    "seed": 12,
+    "created_at": null
+   },
+   {
+    "id": "e5d92a1b-d798-48b9-95d6-daa9f8da8523",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "SternSeppi",
+    "ingame_name": "SternSeppi",
+    "team_id": null,
+    "seed": 13,
+    "created_at": null
+   },
+   {
+    "id": "ee62c8af-d5fc-405f-80ef-777f58412009",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "GipfelGabi",
+    "ingame_name": "GipfelGabi",
+    "team_id": null,
+    "seed": 14,
+    "created_at": null
+   },
+   {
+    "id": "b986feec-3c98-4df6-be20-8e5af32c6505",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "PistenPaul",
+    "ingame_name": "PistenPaul",
+    "team_id": null,
+    "seed": 15,
+    "created_at": null
+   },
+   {
+    "id": "d7fee7db-a8d0-4bfd-a799-048bd0c9a095",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "ZickZackZoe",
+    "ingame_name": "ZickZackZoe",
+    "team_id": null,
+    "seed": 16,
+    "created_at": null
+   }
+  ],
+  "stages": [
+   {
+    "id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "number": 1,
+    "status": "ready",
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "name": "Läufe",
+    "settings": {
+     "schema": "[WB]\n# Runde 1\nA=[1,2,3,4]\nB=[5,6,7,8]\nC=[9,10,11,12]\nD=[13,14,15,16]\n# Runde 2\nE=[W:A:1,W:A:2,W:B:1,W:B:2]\nF=[W:C:1,W:C:2,W:D:1,W:D:2]\n# Finale\nG=[W:E:1,W:E:2,W:F:1,W:F:2]\n\n[LB]\n# Runde 2\nLA=[L:A:1,L:A:2,L:B:1,L:B:2]\nLB=[L:C:1,L:C:2,L:D:1,L:D:2]\n# Runde 3\nLC=[W:LA:1,W:LA:2,L:E:1,L:E:2]\nLD=[W:LB:1,W:LB:2,L:F:1,L:F:2]\n# Runde 4\nLE=[W:LC:1,W:LC:2,W:LD:1,W:LD:2]\n# Runde 5\nLF=[W:LE:1,W:LE:2,L:G:1,L:G:2]\n\n[GF]\n# Grand Final\nFINAL=[W:G:1,W:G:2,W:LF:1,W:LF:2]",
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    },
+    "created_at": "2026-10-14T16:04:18.907786+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00"
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "e9d462f5-5857-4e23-9e05-45fe93036bc0",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "A",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 1,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      },
+      "registration_id": "769f27e2-8b14-4bf2-87c3-2fa6f238ce08",
+      "user_id": "2665c80f-7048-475b-9e6b-46cc3332fa31",
+      "seed": 1,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      },
+      "registration_id": "3c208ef9-57d3-49bb-b3b1-9e98621dd3e1",
+      "user_id": "a29343e3-9a86-4509-a456-1ca289c75508",
+      "seed": 2,
+      "status": "filled"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      },
+      "registration_id": "53303946-a05e-4a64-bf09-8d99dad3b1f1",
+      "user_id": "214d3796-a47e-4228-998c-c71bd6b0d6e1",
+      "seed": 3,
+      "status": "filled"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      },
+      "registration_id": "6563db23-3da5-4271-a717-dff524c4ef30",
+      "user_id": "4efa10f3-e60b-4026-8308-f5d2be5125f1",
+      "seed": 4,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "E",
+      "to_match_id": "5ce7e737-1f96-4a69-90da-86ced43eacf7",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "E",
+      "to_match_id": "5ce7e737-1f96-4a69-90da-86ced43eacf7",
+      "to_slot": 2
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LA",
+      "to_match_id": "91835c7a-2b55-4902-9a70-d79113b8f90c",
+      "to_slot": 1
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LA",
+      "to_match_id": "91835c7a-2b55-4902-9a70-d79113b8f90c",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "06005834-a2d1-4468-a622-fbc0c93bf5ba",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "B",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 2,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      },
+      "registration_id": "3d4c63ae-cb45-4852-82fa-25366e5671fd",
+      "user_id": "afebea95-49c8-46a6-9bc6-1d46fec21dc9",
+      "seed": 5,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      },
+      "registration_id": "311334f5-4d43-4fbe-b89d-e66976a9e2a1",
+      "user_id": "671e75cb-df34-456f-ac73-1461213670ed",
+      "seed": 6,
+      "status": "filled"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      },
+      "registration_id": "7f52275b-0ac6-461f-9f32-7b40d08d6b5e",
+      "user_id": "ebd8e791-cd12-4181-b97f-0cac9d89560f",
+      "seed": 7,
+      "status": "filled"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      },
+      "registration_id": "dc268f8d-f4ab-489c-806a-5597a09a0725",
+      "user_id": "a8243aff-729a-406d-92f4-cda2ef4a7401",
+      "seed": 8,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "E",
+      "to_match_id": "5ce7e737-1f96-4a69-90da-86ced43eacf7",
+      "to_slot": 3
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "E",
+      "to_match_id": "5ce7e737-1f96-4a69-90da-86ced43eacf7",
+      "to_slot": 4
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LA",
+      "to_match_id": "91835c7a-2b55-4902-9a70-d79113b8f90c",
+      "to_slot": 3
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LA",
+      "to_match_id": "91835c7a-2b55-4902-9a70-d79113b8f90c",
+      "to_slot": 4
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "abb6e501-7952-405a-b5a5-54fc0f3c47d9",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "C",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 3,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 9,
+       "raw": "9"
+      },
+      "registration_id": "315439ae-8e36-402f-b1c3-3292c8f28a38",
+      "user_id": "81712c98-5fc1-472c-a17f-fc4cebde9e45",
+      "seed": 9,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 10,
+       "raw": "10"
+      },
+      "registration_id": "a59fcd2c-86f7-4708-94c0-ddfbff4f549f",
+      "user_id": "aba35a50-c9ff-4130-a4c8-40c3cb924a69",
+      "seed": 10,
+      "status": "filled"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "seed",
+       "seed": 11,
+       "raw": "11"
+      },
+      "registration_id": "9acae8b9-142a-487f-8494-3a033f84149d",
+      "user_id": "8617a921-f48d-4dd6-9b2d-93be0ae3ed9f",
+      "seed": 11,
+      "status": "filled"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "seed",
+       "seed": 12,
+       "raw": "12"
+      },
+      "registration_id": "71d37075-7cef-451e-9df9-603b8b50b8e0",
+      "user_id": "704fe8e9-10f0-4781-9985-736809b2a157",
+      "seed": 12,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "F",
+      "to_match_id": "9a79b1ab-5466-4f8a-81f9-02da28ee295c",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "F",
+      "to_match_id": "9a79b1ab-5466-4f8a-81f9-02da28ee295c",
+      "to_slot": 2
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LB",
+      "to_match_id": "3127a558-141f-4684-8433-fc7b6ab67b5c",
+      "to_slot": 1
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LB",
+      "to_match_id": "3127a558-141f-4684-8433-fc7b6ab67b5c",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "a595957e-bac0-4616-9df5-6185add312b3",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "D",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 4,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 13,
+       "raw": "13"
+      },
+      "registration_id": "e5d92a1b-d798-48b9-95d6-daa9f8da8523",
+      "user_id": "b00f60fc-1a1a-438e-8cf8-2dcee2cc9f58",
+      "seed": 13,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 14,
+       "raw": "14"
+      },
+      "registration_id": "ee62c8af-d5fc-405f-80ef-777f58412009",
+      "user_id": "d7fe6d18-58de-4822-9411-37e2e048c8fc",
+      "seed": 14,
+      "status": "filled"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "seed",
+       "seed": 15,
+       "raw": "15"
+      },
+      "registration_id": "b986feec-3c98-4df6-be20-8e5af32c6505",
+      "user_id": "eb635dd5-4622-4663-bd87-c3807d784788",
+      "seed": 15,
+      "status": "filled"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "seed",
+       "seed": 16,
+       "raw": "16"
+      },
+      "registration_id": "d7fee7db-a8d0-4bfd-a799-048bd0c9a095",
+      "user_id": "29ddeb80-d6e8-44be-980e-1dcc823ab046",
+      "seed": 16,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "F",
+      "to_match_id": "9a79b1ab-5466-4f8a-81f9-02da28ee295c",
+      "to_slot": 3
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "F",
+      "to_match_id": "9a79b1ab-5466-4f8a-81f9-02da28ee295c",
+      "to_slot": 4
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LB",
+      "to_match_id": "3127a558-141f-4684-8433-fc7b6ab67b5c",
+      "to_slot": 3
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LB",
+      "to_match_id": "3127a558-141f-4684-8433-fc7b6ab67b5c",
+      "to_slot": 4
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "5ce7e737-1f96-4a69-90da-86ced43eacf7",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "E",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 5,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "W:A:1",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 2,
+       "raw": "W:A:2",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "W:B:1",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 2,
+       "raw": "W:B:2",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "G",
+      "to_match_id": "79ded431-b876-45cd-a9c0-1b5e50cacfee",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "G",
+      "to_match_id": "79ded431-b876-45cd-a9c0-1b5e50cacfee",
+      "to_slot": 2
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LC",
+      "to_match_id": "034f4460-7052-4ff9-83c2-604ebe05fc93",
+      "to_slot": 3
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LC",
+      "to_match_id": "034f4460-7052-4ff9-83c2-604ebe05fc93",
+      "to_slot": 4
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true,
+     "draw_group": "WB:2"
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Runde 2",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "9a79b1ab-5466-4f8a-81f9-02da28ee295c",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "F",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 6,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "W:C:1",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 2,
+       "raw": "W:C:2",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 1,
+       "raw": "W:D:1",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 2,
+       "raw": "W:D:2",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "G",
+      "to_match_id": "79ded431-b876-45cd-a9c0-1b5e50cacfee",
+      "to_slot": 3
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "G",
+      "to_match_id": "79ded431-b876-45cd-a9c0-1b5e50cacfee",
+      "to_slot": 4
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LD",
+      "to_match_id": "aa22d729-bc6b-4fae-a0d9-252abcc89131",
+      "to_slot": 3
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LD",
+      "to_match_id": "aa22d729-bc6b-4fae-a0d9-252abcc89131",
+      "to_slot": 4
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true,
+     "draw_group": "WB:2"
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Runde 2",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "91835c7a-2b55-4902-9a70-d79113b8f90c",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "LA",
+    "section": "LB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 8,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "L:A:1",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "A",
+       "rank": 2,
+       "raw": "L:A:2",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "L:B:1",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "B",
+       "rank": 2,
+       "raw": "L:B:2",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LC",
+      "to_match_id": "034f4460-7052-4ff9-83c2-604ebe05fc93",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "LC",
+      "to_match_id": "034f4460-7052-4ff9-83c2-604ebe05fc93",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true,
+     "draw_group": "LB:2"
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Loser Runde 2",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "3127a558-141f-4684-8433-fc7b6ab67b5c",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "LB",
+    "section": "LB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 9,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "L:C:1",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "C",
+       "rank": 2,
+       "raw": "L:C:2",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "D",
+       "rank": 1,
+       "raw": "L:D:1",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "D",
+       "rank": 2,
+       "raw": "L:D:2",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LD",
+      "to_match_id": "aa22d729-bc6b-4fae-a0d9-252abcc89131",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "LD",
+      "to_match_id": "aa22d729-bc6b-4fae-a0d9-252abcc89131",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true,
+     "draw_group": "LB:2"
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Loser Runde 2",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "79ded431-b876-45cd-a9c0-1b5e50cacfee",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "G",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Finale",
+    "order": 7,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 1,
+       "raw": "W:E:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 2,
+       "raw": "W:E:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 1,
+       "raw": "W:F:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 2,
+       "raw": "W:F:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LF",
+      "to_match_id": "03898ab3-d93d-4440-b826-c74dec0f2a56",
+      "to_slot": 3
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LF",
+      "to_match_id": "03898ab3-d93d-4440-b826-c74dec0f2a56",
+      "to_slot": 4
+     },
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "FINAL",
+      "to_match_id": "af55dad3-2b9e-4439-a87e-fbd82988ef31",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "FINAL",
+      "to_match_id": "af55dad3-2b9e-4439-a87e-fbd82988ef31",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Finale",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "034f4460-7052-4ff9-83c2-604ebe05fc93",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "LC",
+    "section": "LB",
+    "round": 3,
+    "round_name": "Runde 3",
+    "order": 10,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LA",
+       "rank": 1,
+       "raw": "W:LA:1",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LA",
+       "rank": 2,
+       "raw": "W:LA:2",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "E",
+       "rank": 1,
+       "raw": "L:E:1",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "E",
+       "rank": 2,
+       "raw": "L:E:2",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LE",
+      "to_match_id": "79771816-1659-4907-a5a9-d907d2f7835f",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "LE",
+      "to_match_id": "79771816-1659-4907-a5a9-d907d2f7835f",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true,
+     "draw_group": "LB:3"
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Loser Runde 3",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "aa22d729-bc6b-4fae-a0d9-252abcc89131",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "LD",
+    "section": "LB",
+    "round": 3,
+    "round_name": "Runde 3",
+    "order": 11,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LB",
+       "rank": 1,
+       "raw": "W:LB:1",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LB",
+       "rank": 2,
+       "raw": "W:LB:2",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "F",
+       "rank": 1,
+       "raw": "L:F:1",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "F",
+       "rank": 2,
+       "raw": "L:F:2",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LE",
+      "to_match_id": "79771816-1659-4907-a5a9-d907d2f7835f",
+      "to_slot": 3
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "LE",
+      "to_match_id": "79771816-1659-4907-a5a9-d907d2f7835f",
+      "to_slot": 4
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true,
+     "draw_group": "LB:3"
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Loser Runde 3",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "79771816-1659-4907-a5a9-d907d2f7835f",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "LE",
+    "section": "LB",
+    "round": 4,
+    "round_name": "Runde 4",
+    "order": 12,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LC",
+       "rank": 1,
+       "raw": "W:LC:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LC",
+       "rank": 2,
+       "raw": "W:LC:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LD",
+       "rank": 1,
+       "raw": "W:LD:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LD",
+       "rank": 2,
+       "raw": "W:LD:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LF",
+      "to_match_id": "03898ab3-d93d-4440-b826-c74dec0f2a56",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "LF",
+      "to_match_id": "03898ab3-d93d-4440-b826-c74dec0f2a56",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Loser Runde 4",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "03898ab3-d93d-4440-b826-c74dec0f2a56",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "LF",
+    "section": "LB",
+    "round": 5,
+    "round_name": "Runde 5",
+    "order": 13,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LE",
+       "rank": 1,
+       "raw": "W:LE:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LE",
+       "rank": 2,
+       "raw": "W:LE:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "G",
+       "rank": 1,
+       "raw": "L:G:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "G",
+       "rank": 2,
+       "raw": "L:G:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "FINAL",
+      "to_match_id": "af55dad3-2b9e-4439-a87e-fbd82988ef31",
+      "to_slot": 3
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "FINAL",
+      "to_match_id": "af55dad3-2b9e-4439-a87e-fbd82988ef31",
+      "to_slot": 4
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Loser Runde 5",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "af55dad3-2b9e-4439-a87e-fbd82988ef31",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "FINAL",
+    "section": "GF",
+    "round": 6,
+    "round_name": "Grand Final",
+    "order": 14,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "G",
+       "rank": 1,
+       "raw": "W:G:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "G",
+       "rank": 2,
+       "raw": "W:G:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LF",
+       "rank": 1,
+       "raw": "W:LF:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LF",
+       "rank": 2,
+       "raw": "W:LF:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Grand Final",
+    "effective_duration_minutes": 30
+   }
+  ],
+  "engine": "stage",
+  "duration_game": null
+ },
+ "ffa16de_round1": {
+  "tournament": {
+   "id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+   "slug": "kart-cup-16-gemischt",
+   "title": "Lions Kart-Cup",
+   "format": "ffa_custom_bracket",
+   "status": "live",
+   "visibility": "public",
+   "max_participants": 16,
+   "seeding_mode": "manual",
+   "best_of": 1,
+   "match_duration_minutes": 30,
+   "team_mode": "solo",
+   "result_entry_mode": "player_confirmed",
+   "engine_version": "competition.graph.v1",
+   "ruleset_version": "competition.ruleset.v1",
+   "heat_rebuild_mode": "auto",
+   "randomize_advancement_rounds": true,
+   "updated_at": "2026-10-14T16:04:19.059392+00:00",
+   "check_in_until": "2026-10-14T16:03:19.053791+00:00",
+   "check_in_closed_at": "2026-10-14T16:04:19.059392+00:00",
+   "public_phase": {
+    "state": "registration_open",
+    "label": "Anmeldung offen",
+    "raw_status": "live",
+    "target_at": null,
+    "next_transition_at": null,
+    "countdown_kind": "registration_closes",
+    "now": "2026-10-14T16:04:19.155742+00:00"
+   },
+   "can_view_display": false
+  },
+  "registrations": [
+   {
+    "id": "769f27e2-8b14-4bf2-87c3-2fa6f238ce08",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "NeonFalke",
+    "ingame_name": "NeonFalke",
+    "team_id": null,
+    "seed": 1,
+    "created_at": null
+   },
+   {
+    "id": "3c208ef9-57d3-49bb-b3b1-9e98621dd3e1",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "KartKönigin",
+    "ingame_name": "KartKönigin",
+    "team_id": null,
+    "seed": 2,
+    "created_at": null
+   },
+   {
+    "id": "53303946-a05e-4a64-bf09-8d99dad3b1f1",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "LuckyLion",
+    "ingame_name": "LuckyLion",
+    "team_id": null,
+    "seed": 3,
+    "created_at": null
+   },
+   {
+    "id": "6563db23-3da5-4271-a717-dff524c4ef30",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "PixelPaula",
+    "ingame_name": "PixelPaula",
+    "team_id": null,
+    "seed": 4,
+    "created_at": null
+   },
+   {
+    "id": "3d4c63ae-cb45-4852-82fa-25366e5671fd",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "DriftDaniel",
+    "ingame_name": "DriftDaniel",
+    "team_id": null,
+    "seed": 5,
+    "created_at": null
+   },
+   {
+    "id": "311334f5-4d43-4fbe-b89d-e66976a9e2a1",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "BoostBerta",
+    "ingame_name": "BoostBerta",
+    "team_id": null,
+    "seed": 6,
+    "created_at": null
+   },
+   {
+    "id": "7f52275b-0ac6-461f-9f32-7b40d08d6b5e",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "TurboTom",
+    "ingame_name": "TurboTom",
+    "team_id": null,
+    "seed": 7,
+    "created_at": null
+   },
+   {
+    "id": "dc268f8d-f4ab-489c-806a-5597a09a0725",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "SchnellSchnecke",
+    "ingame_name": "SchnellSchnecke",
+    "team_id": null,
+    "seed": 8,
+    "created_at": null
+   },
+   {
+    "id": "315439ae-8e36-402f-b1c3-3292c8f28a38",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "KurvenKarl",
+    "ingame_name": "KurvenKarl",
+    "team_id": null,
+    "seed": 9,
+    "created_at": null
+   },
+   {
+    "id": "a59fcd2c-86f7-4708-94c0-ddfbff4f549f",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "NitroNina",
+    "ingame_name": "NitroNina",
+    "team_id": null,
+    "seed": 10,
+    "created_at": null
+   },
+   {
+    "id": "9acae8b9-142a-487f-8494-3a033f84149d",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "BlitzBea",
+    "ingame_name": "BlitzBea",
+    "team_id": null,
+    "seed": 11,
+    "created_at": null
+   },
+   {
+    "id": "71d37075-7cef-451e-9df9-603b8b50b8e0",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "RaketenRudi",
+    "ingame_name": "RaketenRudi",
+    "team_id": null,
+    "seed": 12,
+    "created_at": null
+   },
+   {
+    "id": "e5d92a1b-d798-48b9-95d6-daa9f8da8523",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "SternSeppi",
+    "ingame_name": "SternSeppi",
+    "team_id": null,
+    "seed": 13,
+    "created_at": null
+   },
+   {
+    "id": "ee62c8af-d5fc-405f-80ef-777f58412009",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "GipfelGabi",
+    "ingame_name": "GipfelGabi",
+    "team_id": null,
+    "seed": 14,
+    "created_at": null
+   },
+   {
+    "id": "b986feec-3c98-4df6-be20-8e5af32c6505",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "PistenPaul",
+    "ingame_name": "PistenPaul",
+    "team_id": null,
+    "seed": 15,
+    "created_at": null
+   },
+   {
+    "id": "d7fee7db-a8d0-4bfd-a799-048bd0c9a095",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "status": "checked_in",
+    "display_name": "ZickZackZoe",
+    "ingame_name": "ZickZackZoe",
+    "team_id": null,
+    "seed": 16,
+    "created_at": null
+   }
+  ],
+  "stages": [
+   {
+    "id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "number": 1,
+    "status": "ready",
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "name": "Läufe",
+    "settings": {
+     "schema": "[WB]\n# Runde 1\nA=[1,2,3,4]\nB=[5,6,7,8]\nC=[9,10,11,12]\nD=[13,14,15,16]\n# Runde 2\nE=[W:A:1,W:A:2,W:B:1,W:B:2]\nF=[W:C:1,W:C:2,W:D:1,W:D:2]\n# Finale\nG=[W:E:1,W:E:2,W:F:1,W:F:2]\n\n[LB]\n# Runde 2\nLA=[L:A:1,L:A:2,L:B:1,L:B:2]\nLB=[L:C:1,L:C:2,L:D:1,L:D:2]\n# Runde 3\nLC=[W:LA:1,W:LA:2,L:E:1,L:E:2]\nLD=[W:LB:1,W:LB:2,L:F:1,L:F:2]\n# Runde 4\nLE=[W:LC:1,W:LC:2,W:LD:1,W:LD:2]\n# Runde 5\nLF=[W:LE:1,W:LE:2,L:G:1,L:G:2]\n\n[GF]\n# Grand Final\nFINAL=[W:G:1,W:G:2,W:LF:1,W:LF:2]",
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    },
+    "created_at": "2026-10-14T16:04:18.907786+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00"
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "e9d462f5-5857-4e23-9e05-45fe93036bc0",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "A",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 1,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      },
+      "registration_id": "769f27e2-8b14-4bf2-87c3-2fa6f238ce08",
+      "user_id": "2665c80f-7048-475b-9e6b-46cc3332fa31",
+      "seed": 1,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      },
+      "registration_id": "3c208ef9-57d3-49bb-b3b1-9e98621dd3e1",
+      "user_id": "a29343e3-9a86-4509-a456-1ca289c75508",
+      "seed": 2,
+      "status": "filled"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      },
+      "registration_id": "53303946-a05e-4a64-bf09-8d99dad3b1f1",
+      "user_id": "214d3796-a47e-4228-998c-c71bd6b0d6e1",
+      "seed": 3,
+      "status": "filled"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      },
+      "registration_id": "6563db23-3da5-4271-a717-dff524c4ef30",
+      "user_id": "4efa10f3-e60b-4026-8308-f5d2be5125f1",
+      "seed": 4,
+      "status": "filled"
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "769f27e2-8b14-4bf2-87c3-2fa6f238ce08",
+      "slot": 1,
+      "rank": 1,
+      "score": 15.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     },
+     {
+      "registration_id": "3c208ef9-57d3-49bb-b3b1-9e98621dd3e1",
+      "slot": 2,
+      "rank": 2,
+      "score": 12.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     },
+     {
+      "registration_id": "53303946-a05e-4a64-bf09-8d99dad3b1f1",
+      "slot": 3,
+      "rank": 3,
+      "score": 9.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     },
+     {
+      "registration_id": "6563db23-3da5-4271-a717-dff524c4ef30",
+      "slot": 4,
+      "rank": 4,
+      "score": 6.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     }
+    ],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "E",
+      "to_match_id": "5ce7e737-1f96-4a69-90da-86ced43eacf7",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "E",
+      "to_match_id": "5ce7e737-1f96-4a69-90da-86ced43eacf7",
+      "to_slot": 2
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LA",
+      "to_match_id": "91835c7a-2b55-4902-9a70-d79113b8f90c",
+      "to_slot": 1
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LA",
+      "to_match_id": "91835c7a-2b55-4902-9a70-d79113b8f90c",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "completed",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.083280+00:00",
+    "result_meta": {
+     "proof_url": null,
+     "confirmed_at": "2026-10-14T16:04:19.083280+00:00",
+     "force": false,
+     "report_id": "v2-result-41f5361320aa4b0e05765b3ee293bc336206ee61149b1d2de838230b616815be",
+     "advanced_match_ids": [],
+     "previous_status": "ready"
+    },
+    "completed_at": "2026-10-14T16:04:19.083280+00:00",
+    "round_label": "Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "06005834-a2d1-4468-a622-fbc0c93bf5ba",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "B",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 2,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      },
+      "registration_id": "3d4c63ae-cb45-4852-82fa-25366e5671fd",
+      "user_id": "afebea95-49c8-46a6-9bc6-1d46fec21dc9",
+      "seed": 5,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      },
+      "registration_id": "311334f5-4d43-4fbe-b89d-e66976a9e2a1",
+      "user_id": "671e75cb-df34-456f-ac73-1461213670ed",
+      "seed": 6,
+      "status": "filled"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      },
+      "registration_id": "7f52275b-0ac6-461f-9f32-7b40d08d6b5e",
+      "user_id": "ebd8e791-cd12-4181-b97f-0cac9d89560f",
+      "seed": 7,
+      "status": "filled"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      },
+      "registration_id": "dc268f8d-f4ab-489c-806a-5597a09a0725",
+      "user_id": "a8243aff-729a-406d-92f4-cda2ef4a7401",
+      "seed": 8,
+      "status": "filled"
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "3d4c63ae-cb45-4852-82fa-25366e5671fd",
+      "slot": 1,
+      "rank": 1,
+      "score": 15.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     },
+     {
+      "registration_id": "311334f5-4d43-4fbe-b89d-e66976a9e2a1",
+      "slot": 2,
+      "rank": 2,
+      "score": 12.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     },
+     {
+      "registration_id": "7f52275b-0ac6-461f-9f32-7b40d08d6b5e",
+      "slot": 3,
+      "rank": 3,
+      "score": 9.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     },
+     {
+      "registration_id": "dc268f8d-f4ab-489c-806a-5597a09a0725",
+      "slot": 4,
+      "rank": 4,
+      "score": 6.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     }
+    ],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "E",
+      "to_match_id": "5ce7e737-1f96-4a69-90da-86ced43eacf7",
+      "to_slot": 3
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "E",
+      "to_match_id": "5ce7e737-1f96-4a69-90da-86ced43eacf7",
+      "to_slot": 4
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LA",
+      "to_match_id": "91835c7a-2b55-4902-9a70-d79113b8f90c",
+      "to_slot": 3
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LA",
+      "to_match_id": "91835c7a-2b55-4902-9a70-d79113b8f90c",
+      "to_slot": 4
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "completed",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.122916+00:00",
+    "result_meta": {
+     "proof_url": null,
+     "confirmed_at": "2026-10-14T16:04:19.122916+00:00",
+     "force": false,
+     "report_id": "v2-result-a45b589aae8dc9225df577c8c524fd899947a84832e7935d52d1dcabfda1f81a",
+     "advanced_match_ids": [],
+     "previous_status": "ready"
+    },
+    "completed_at": "2026-10-14T16:04:19.122916+00:00",
+    "round_label": "Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "abb6e501-7952-405a-b5a5-54fc0f3c47d9",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "C",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 3,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 9,
+       "raw": "9"
+      },
+      "registration_id": "315439ae-8e36-402f-b1c3-3292c8f28a38",
+      "user_id": "81712c98-5fc1-472c-a17f-fc4cebde9e45",
+      "seed": 9,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 10,
+       "raw": "10"
+      },
+      "registration_id": "a59fcd2c-86f7-4708-94c0-ddfbff4f549f",
+      "user_id": "aba35a50-c9ff-4130-a4c8-40c3cb924a69",
+      "seed": 10,
+      "status": "filled"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "seed",
+       "seed": 11,
+       "raw": "11"
+      },
+      "registration_id": "9acae8b9-142a-487f-8494-3a033f84149d",
+      "user_id": "8617a921-f48d-4dd6-9b2d-93be0ae3ed9f",
+      "seed": 11,
+      "status": "filled"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "seed",
+       "seed": 12,
+       "raw": "12"
+      },
+      "registration_id": "71d37075-7cef-451e-9df9-603b8b50b8e0",
+      "user_id": "704fe8e9-10f0-4781-9985-736809b2a157",
+      "seed": 12,
+      "status": "filled"
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "315439ae-8e36-402f-b1c3-3292c8f28a38",
+      "slot": 1,
+      "rank": 1,
+      "score": 15.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     },
+     {
+      "registration_id": "a59fcd2c-86f7-4708-94c0-ddfbff4f549f",
+      "slot": 2,
+      "rank": 2,
+      "score": 12.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     },
+     {
+      "registration_id": "9acae8b9-142a-487f-8494-3a033f84149d",
+      "slot": 3,
+      "rank": 3,
+      "score": 9.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     },
+     {
+      "registration_id": "71d37075-7cef-451e-9df9-603b8b50b8e0",
+      "slot": 4,
+      "rank": 4,
+      "score": 6.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     }
+    ],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "F",
+      "to_match_id": "9a79b1ab-5466-4f8a-81f9-02da28ee295c",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "F",
+      "to_match_id": "9a79b1ab-5466-4f8a-81f9-02da28ee295c",
+      "to_slot": 2
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LB",
+      "to_match_id": "3127a558-141f-4684-8433-fc7b6ab67b5c",
+      "to_slot": 1
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LB",
+      "to_match_id": "3127a558-141f-4684-8433-fc7b6ab67b5c",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "completed",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.133323+00:00",
+    "result_meta": {
+     "proof_url": null,
+     "confirmed_at": "2026-10-14T16:04:19.133323+00:00",
+     "force": false,
+     "report_id": "v2-result-9c32683a7829c7e62ef989cab90c513b712c111634c32aaf89c8070f7da60707",
+     "advanced_match_ids": [],
+     "previous_status": "ready"
+    },
+    "completed_at": "2026-10-14T16:04:19.133323+00:00",
+    "round_label": "Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "a595957e-bac0-4616-9df5-6185add312b3",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "D",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 4,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 13,
+       "raw": "13"
+      },
+      "registration_id": "e5d92a1b-d798-48b9-95d6-daa9f8da8523",
+      "user_id": "b00f60fc-1a1a-438e-8cf8-2dcee2cc9f58",
+      "seed": 13,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 14,
+       "raw": "14"
+      },
+      "registration_id": "ee62c8af-d5fc-405f-80ef-777f58412009",
+      "user_id": "d7fe6d18-58de-4822-9411-37e2e048c8fc",
+      "seed": 14,
+      "status": "filled"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "seed",
+       "seed": 15,
+       "raw": "15"
+      },
+      "registration_id": "b986feec-3c98-4df6-be20-8e5af32c6505",
+      "user_id": "eb635dd5-4622-4663-bd87-c3807d784788",
+      "seed": 15,
+      "status": "filled"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "seed",
+       "seed": 16,
+       "raw": "16"
+      },
+      "registration_id": "d7fee7db-a8d0-4bfd-a799-048bd0c9a095",
+      "user_id": "29ddeb80-d6e8-44be-980e-1dcc823ab046",
+      "seed": 16,
+      "status": "filled"
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "e5d92a1b-d798-48b9-95d6-daa9f8da8523",
+      "slot": 1,
+      "rank": 1,
+      "score": 15.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     },
+     {
+      "registration_id": "ee62c8af-d5fc-405f-80ef-777f58412009",
+      "slot": 2,
+      "rank": 2,
+      "score": 12.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     },
+     {
+      "registration_id": "b986feec-3c98-4df6-be20-8e5af32c6505",
+      "slot": 3,
+      "rank": 3,
+      "score": 9.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     },
+     {
+      "registration_id": "d7fee7db-a8d0-4bfd-a799-048bd0c9a095",
+      "slot": 4,
+      "rank": 4,
+      "score": 6.0,
+      "points": null,
+      "time_ms": null,
+      "dnf": false,
+      "forfeit": false
+     }
+    ],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "F",
+      "to_match_id": "9a79b1ab-5466-4f8a-81f9-02da28ee295c",
+      "to_slot": 3
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "F",
+      "to_match_id": "9a79b1ab-5466-4f8a-81f9-02da28ee295c",
+      "to_slot": 4
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LB",
+      "to_match_id": "3127a558-141f-4684-8433-fc7b6ab67b5c",
+      "to_slot": 3
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LB",
+      "to_match_id": "3127a558-141f-4684-8433-fc7b6ab67b5c",
+      "to_slot": 4
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "completed",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.143923+00:00",
+    "result_meta": {
+     "proof_url": null,
+     "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+     "force": false,
+     "report_id": "v2-result-bb199c6e9ce1cc2b716b10a65b0889e8f7bf6b7f5bbefa271555091d9384e4f4",
+     "advanced_match_ids": [
+      "5ce7e737-1f96-4a69-90da-86ced43eacf7",
+      "9a79b1ab-5466-4f8a-81f9-02da28ee295c",
+      "91835c7a-2b55-4902-9a70-d79113b8f90c",
+      "3127a558-141f-4684-8433-fc7b6ab67b5c"
+     ],
+     "previous_status": "ready"
+    },
+    "completed_at": "2026-10-14T16:04:19.143923+00:00",
+    "round_label": "Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "5ce7e737-1f96-4a69-90da-86ced43eacf7",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "E",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 5,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "W:A:1",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "3d4c63ae-cb45-4852-82fa-25366e5671fd",
+      "user_id": "afebea95-49c8-46a6-9bc6-1d46fec21dc9",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "06005834-a2d1-4468-a622-fbc0c93bf5ba",
+       "from_match_key": "B",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "0bb2794a-e831-49ce-9f70-1a630ba54c18"
+      }
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 2,
+       "raw": "W:A:2",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "311334f5-4d43-4fbe-b89d-e66976a9e2a1",
+      "user_id": "671e75cb-df34-456f-ac73-1461213670ed",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "06005834-a2d1-4468-a622-fbc0c93bf5ba",
+       "from_match_key": "B",
+       "rank": 2,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "0bb2794a-e831-49ce-9f70-1a630ba54c18"
+      }
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "W:B:1",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "3c208ef9-57d3-49bb-b3b1-9e98621dd3e1",
+      "user_id": "a29343e3-9a86-4509-a456-1ca289c75508",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "e9d462f5-5857-4e23-9e05-45fe93036bc0",
+       "from_match_key": "A",
+       "rank": 2,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "0bb2794a-e831-49ce-9f70-1a630ba54c18"
+      }
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 2,
+       "raw": "W:B:2",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "315439ae-8e36-402f-b1c3-3292c8f28a38",
+      "user_id": "81712c98-5fc1-472c-a17f-fc4cebde9e45",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "abb6e501-7952-405a-b5a5-54fc0f3c47d9",
+       "from_match_key": "C",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "0bb2794a-e831-49ce-9f70-1a630ba54c18"
+      }
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "G",
+      "to_match_id": "79ded431-b876-45cd-a9c0-1b5e50cacfee",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "G",
+      "to_match_id": "79ded431-b876-45cd-a9c0-1b5e50cacfee",
+      "to_slot": 2
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LC",
+      "to_match_id": "034f4460-7052-4ff9-83c2-604ebe05fc93",
+      "to_slot": 3
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LC",
+      "to_match_id": "034f4460-7052-4ff9-83c2-604ebe05fc93",
+      "to_slot": 4
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true,
+     "draw_group": "WB:2"
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.143923+00:00",
+    "draw": {
+     "id": "0bb2794a-e831-49ce-9f70-1a630ba54c18",
+     "group": "WB:2",
+     "drawn_at": "2026-10-14T16:04:19.143923+00:00",
+     "trigger": "result"
+    },
+    "round_label": "Runde 2",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "9a79b1ab-5466-4f8a-81f9-02da28ee295c",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "F",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 6,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "W:C:1",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "ee62c8af-d5fc-405f-80ef-777f58412009",
+      "user_id": "d7fe6d18-58de-4822-9411-37e2e048c8fc",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "a595957e-bac0-4616-9df5-6185add312b3",
+       "from_match_key": "D",
+       "rank": 2,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "0bb2794a-e831-49ce-9f70-1a630ba54c18"
+      }
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 2,
+       "raw": "W:C:2",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "a59fcd2c-86f7-4708-94c0-ddfbff4f549f",
+      "user_id": "aba35a50-c9ff-4130-a4c8-40c3cb924a69",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "abb6e501-7952-405a-b5a5-54fc0f3c47d9",
+       "from_match_key": "C",
+       "rank": 2,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "0bb2794a-e831-49ce-9f70-1a630ba54c18"
+      }
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 1,
+       "raw": "W:D:1",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "769f27e2-8b14-4bf2-87c3-2fa6f238ce08",
+      "user_id": "2665c80f-7048-475b-9e6b-46cc3332fa31",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "e9d462f5-5857-4e23-9e05-45fe93036bc0",
+       "from_match_key": "A",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "0bb2794a-e831-49ce-9f70-1a630ba54c18"
+      }
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 2,
+       "raw": "W:D:2",
+       "draw": {
+        "group": "WB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "e5d92a1b-d798-48b9-95d6-daa9f8da8523",
+      "user_id": "b00f60fc-1a1a-438e-8cf8-2dcee2cc9f58",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "a595957e-bac0-4616-9df5-6185add312b3",
+       "from_match_key": "D",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "0bb2794a-e831-49ce-9f70-1a630ba54c18"
+      }
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "G",
+      "to_match_id": "79ded431-b876-45cd-a9c0-1b5e50cacfee",
+      "to_slot": 3
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "G",
+      "to_match_id": "79ded431-b876-45cd-a9c0-1b5e50cacfee",
+      "to_slot": 4
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LD",
+      "to_match_id": "aa22d729-bc6b-4fae-a0d9-252abcc89131",
+      "to_slot": 3
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LD",
+      "to_match_id": "aa22d729-bc6b-4fae-a0d9-252abcc89131",
+      "to_slot": 4
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true,
+     "draw_group": "WB:2"
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.143923+00:00",
+    "draw": {
+     "id": "0bb2794a-e831-49ce-9f70-1a630ba54c18",
+     "group": "WB:2",
+     "drawn_at": "2026-10-14T16:04:19.143923+00:00",
+     "trigger": "result"
+    },
+    "round_label": "Runde 2",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "91835c7a-2b55-4902-9a70-d79113b8f90c",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "LA",
+    "section": "LB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 8,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "L:A:1",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "7f52275b-0ac6-461f-9f32-7b40d08d6b5e",
+      "user_id": "ebd8e791-cd12-4181-b97f-0cac9d89560f",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "06005834-a2d1-4468-a622-fbc0c93bf5ba",
+       "from_match_key": "B",
+       "rank": 3,
+       "flow": "L",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "1f19a0ba-fe6a-4024-ab62-d85f53408fb1"
+      }
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "A",
+       "rank": 2,
+       "raw": "L:A:2",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "b986feec-3c98-4df6-be20-8e5af32c6505",
+      "user_id": "eb635dd5-4622-4663-bd87-c3807d784788",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "a595957e-bac0-4616-9df5-6185add312b3",
+       "from_match_key": "D",
+       "rank": 3,
+       "flow": "L",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "1f19a0ba-fe6a-4024-ab62-d85f53408fb1"
+      }
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "L:B:1",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "71d37075-7cef-451e-9df9-603b8b50b8e0",
+      "user_id": "704fe8e9-10f0-4781-9985-736809b2a157",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "abb6e501-7952-405a-b5a5-54fc0f3c47d9",
+       "from_match_key": "C",
+       "rank": 4,
+       "flow": "L",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "1f19a0ba-fe6a-4024-ab62-d85f53408fb1"
+      }
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "B",
+       "rank": 2,
+       "raw": "L:B:2",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "6563db23-3da5-4271-a717-dff524c4ef30",
+      "user_id": "4efa10f3-e60b-4026-8308-f5d2be5125f1",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "e9d462f5-5857-4e23-9e05-45fe93036bc0",
+       "from_match_key": "A",
+       "rank": 4,
+       "flow": "L",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "1f19a0ba-fe6a-4024-ab62-d85f53408fb1"
+      }
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LC",
+      "to_match_id": "034f4460-7052-4ff9-83c2-604ebe05fc93",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "LC",
+      "to_match_id": "034f4460-7052-4ff9-83c2-604ebe05fc93",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true,
+     "draw_group": "LB:2"
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.143923+00:00",
+    "draw": {
+     "id": "1f19a0ba-fe6a-4024-ab62-d85f53408fb1",
+     "group": "LB:2",
+     "drawn_at": "2026-10-14T16:04:19.143923+00:00",
+     "trigger": "result"
+    },
+    "round_label": "Loser Runde 2",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "3127a558-141f-4684-8433-fc7b6ab67b5c",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "LB",
+    "section": "LB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 9,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "L:C:1",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "9acae8b9-142a-487f-8494-3a033f84149d",
+      "user_id": "8617a921-f48d-4dd6-9b2d-93be0ae3ed9f",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "abb6e501-7952-405a-b5a5-54fc0f3c47d9",
+       "from_match_key": "C",
+       "rank": 3,
+       "flow": "L",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "1f19a0ba-fe6a-4024-ab62-d85f53408fb1"
+      }
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "C",
+       "rank": 2,
+       "raw": "L:C:2",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "dc268f8d-f4ab-489c-806a-5597a09a0725",
+      "user_id": "a8243aff-729a-406d-92f4-cda2ef4a7401",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "06005834-a2d1-4468-a622-fbc0c93bf5ba",
+       "from_match_key": "B",
+       "rank": 4,
+       "flow": "L",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "1f19a0ba-fe6a-4024-ab62-d85f53408fb1"
+      }
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "D",
+       "rank": 1,
+       "raw": "L:D:1",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "53303946-a05e-4a64-bf09-8d99dad3b1f1",
+      "user_id": "214d3796-a47e-4228-998c-c71bd6b0d6e1",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "e9d462f5-5857-4e23-9e05-45fe93036bc0",
+       "from_match_key": "A",
+       "rank": 3,
+       "flow": "L",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "1f19a0ba-fe6a-4024-ab62-d85f53408fb1"
+      }
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "D",
+       "rank": 2,
+       "raw": "L:D:2",
+       "draw": {
+        "group": "LB:2",
+        "label": "Runde 1"
+       }
+      },
+      "registration_id": "d7fee7db-a8d0-4bfd-a799-048bd0c9a095",
+      "user_id": "29ddeb80-d6e8-44be-980e-1dcc823ab046",
+      "seed": null,
+      "status": "filled",
+      "source_result": {
+       "from_match_id": "a595957e-bac0-4616-9df5-6185add312b3",
+       "from_match_key": "D",
+       "rank": 4,
+       "flow": "L",
+       "confirmed_at": "2026-10-14T16:04:19.143923+00:00",
+       "draw_id": "1f19a0ba-fe6a-4024-ab62-d85f53408fb1"
+      }
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LD",
+      "to_match_id": "aa22d729-bc6b-4fae-a0d9-252abcc89131",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "LD",
+      "to_match_id": "aa22d729-bc6b-4fae-a0d9-252abcc89131",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true,
+     "draw_group": "LB:2"
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.143923+00:00",
+    "draw": {
+     "id": "1f19a0ba-fe6a-4024-ab62-d85f53408fb1",
+     "group": "LB:2",
+     "drawn_at": "2026-10-14T16:04:19.143923+00:00",
+     "trigger": "result"
+    },
+    "round_label": "Loser Runde 2",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "79ded431-b876-45cd-a9c0-1b5e50cacfee",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "G",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Finale",
+    "order": 7,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 1,
+       "raw": "W:E:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 2,
+       "raw": "W:E:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 1,
+       "raw": "W:F:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 2,
+       "raw": "W:F:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LF",
+      "to_match_id": "03898ab3-d93d-4440-b826-c74dec0f2a56",
+      "to_slot": 3
+     },
+     {
+      "flow": "L",
+      "rank": 2,
+      "to_match_key": "LF",
+      "to_match_id": "03898ab3-d93d-4440-b826-c74dec0f2a56",
+      "to_slot": 4
+     },
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "FINAL",
+      "to_match_id": "af55dad3-2b9e-4439-a87e-fbd82988ef31",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "FINAL",
+      "to_match_id": "af55dad3-2b9e-4439-a87e-fbd82988ef31",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Finale",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "034f4460-7052-4ff9-83c2-604ebe05fc93",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "LC",
+    "section": "LB",
+    "round": 3,
+    "round_name": "Runde 3",
+    "order": 10,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LA",
+       "rank": 1,
+       "raw": "W:LA:1",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LA",
+       "rank": 2,
+       "raw": "W:LA:2",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "E",
+       "rank": 1,
+       "raw": "L:E:1",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "E",
+       "rank": 2,
+       "raw": "L:E:2",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LE",
+      "to_match_id": "79771816-1659-4907-a5a9-d907d2f7835f",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "LE",
+      "to_match_id": "79771816-1659-4907-a5a9-d907d2f7835f",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true,
+     "draw_group": "LB:3"
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Loser Runde 3",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "aa22d729-bc6b-4fae-a0d9-252abcc89131",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "LD",
+    "section": "LB",
+    "round": 3,
+    "round_name": "Runde 3",
+    "order": 11,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LB",
+       "rank": 1,
+       "raw": "W:LB:1",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LB",
+       "rank": 2,
+       "raw": "W:LB:2",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "F",
+       "rank": 1,
+       "raw": "L:F:1",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "F",
+       "rank": 2,
+       "raw": "L:F:2",
+       "draw": {
+        "group": "LB:3",
+        "label": "Runde 2"
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LE",
+      "to_match_id": "79771816-1659-4907-a5a9-d907d2f7835f",
+      "to_slot": 3
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "LE",
+      "to_match_id": "79771816-1659-4907-a5a9-d907d2f7835f",
+      "to_slot": 4
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true,
+     "draw_group": "LB:3"
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Loser Runde 3",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "79771816-1659-4907-a5a9-d907d2f7835f",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "LE",
+    "section": "LB",
+    "round": 4,
+    "round_name": "Runde 4",
+    "order": 12,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LC",
+       "rank": 1,
+       "raw": "W:LC:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LC",
+       "rank": 2,
+       "raw": "W:LC:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LD",
+       "rank": 1,
+       "raw": "W:LD:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LD",
+       "rank": 2,
+       "raw": "W:LD:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LF",
+      "to_match_id": "03898ab3-d93d-4440-b826-c74dec0f2a56",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "LF",
+      "to_match_id": "03898ab3-d93d-4440-b826-c74dec0f2a56",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Loser Runde 4",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "03898ab3-d93d-4440-b826-c74dec0f2a56",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "LF",
+    "section": "LB",
+    "round": 5,
+    "round_name": "Runde 5",
+    "order": 13,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LE",
+       "rank": 1,
+       "raw": "W:LE:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LE",
+       "rank": 2,
+       "raw": "W:LE:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "G",
+       "rank": 1,
+       "raw": "L:G:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "G",
+       "rank": 2,
+       "raw": "L:G:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "FINAL",
+      "to_match_id": "af55dad3-2b9e-4439-a87e-fbd82988ef31",
+      "to_slot": 3
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "FINAL",
+      "to_match_id": "af55dad3-2b9e-4439-a87e-fbd82988ef31",
+      "to_slot": 4
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Loser Runde 5",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "af55dad3-2b9e-4439-a87e-fbd82988ef31",
+    "tournament_id": "68ad87ce-0416-41b6-bef4-f83d59b0307a",
+    "stage_id": "af64237e-71f0-4139-a6b0-579b0b01fda8",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "FINAL",
+    "section": "GF",
+    "round": 6,
+    "round_name": "Grand Final",
+    "order": 14,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "G",
+       "rank": 1,
+       "raw": "W:G:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "G",
+       "rank": 2,
+       "raw": "W:G:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LF",
+       "rank": 1,
+       "raw": "W:LF:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LF",
+       "rank": 2,
+       "raw": "W:LF:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": true
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.055339+00:00",
+    "updated_at": "2026-10-14T16:04:19.055339+00:00",
+    "round_label": "Grand Final",
+    "effective_duration_minutes": 30
+   }
+  ],
+  "engine": "stage",
+  "duration_game": null
+ },
+ "se8_fixed": {
+  "tournament": {
+   "id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+   "slug": "smash-cup-8",
+   "title": "Lions Smash-Cup",
+   "format": "single_elim",
+   "status": "check_in",
+   "visibility": "public",
+   "max_participants": 8,
+   "seeding_mode": "manual",
+   "best_of": 1,
+   "match_duration_minutes": 30,
+   "team_mode": "solo",
+   "result_entry_mode": "player_confirmed",
+   "engine_version": "competition.graph.v1",
+   "ruleset_version": "competition.ruleset.v1",
+   "heat_rebuild_mode": "auto",
+   "randomize_advancement_rounds": false,
+   "updated_at": "2026-10-14T16:04:19.168930+00:00",
+   "check_in_until": "2026-10-14T16:03:19.167392+00:00",
+   "check_in_closed_at": "2026-10-14T16:04:19.168930+00:00",
+   "public_phase": {
+    "state": "registration_closed",
+    "label": "Anmeldung geschlossen",
+    "raw_status": "check_in",
+    "target_at": null,
+    "next_transition_at": null,
+    "countdown_kind": "starts",
+    "now": "2026-10-14T16:04:19.170163+00:00"
+   },
+   "can_view_display": false
+  },
+  "registrations": [
+   {
+    "id": "ab6ee0e5-34ed-4c22-bcce-5f23cb0aa3a6",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "status": "checked_in",
+    "display_name": "NeonFalke",
+    "ingame_name": "NeonFalke",
+    "team_id": null,
+    "seed": 1,
+    "created_at": null
+   },
+   {
+    "id": "b1cc6e27-b89c-4418-94a6-2041214ab41f",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "status": "checked_in",
+    "display_name": "KartKönigin",
+    "ingame_name": "KartKönigin",
+    "team_id": null,
+    "seed": 2,
+    "created_at": null
+   },
+   {
+    "id": "f87dec1b-6da8-4333-80b4-ddf95e520c0a",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "status": "checked_in",
+    "display_name": "LuckyLion",
+    "ingame_name": "LuckyLion",
+    "team_id": null,
+    "seed": 3,
+    "created_at": null
+   },
+   {
+    "id": "94550bf4-fe87-43cb-a299-a856b7a7ef9b",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "status": "checked_in",
+    "display_name": "PixelPaula",
+    "ingame_name": "PixelPaula",
+    "team_id": null,
+    "seed": 4,
+    "created_at": null
+   },
+   {
+    "id": "2b292090-a505-4b73-9fdf-8e58fcd4280e",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "status": "checked_in",
+    "display_name": "DriftDaniel",
+    "ingame_name": "DriftDaniel",
+    "team_id": null,
+    "seed": 5,
+    "created_at": null
+   },
+   {
+    "id": "64e919cb-a71d-4216-8a47-b501e0bc82f9",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "status": "checked_in",
+    "display_name": "BoostBerta",
+    "ingame_name": "BoostBerta",
+    "team_id": null,
+    "seed": 6,
+    "created_at": null
+   },
+   {
+    "id": "b1420426-bb60-4ba6-91a0-b4b6612426f5",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "status": "checked_in",
+    "display_name": "TurboTom",
+    "ingame_name": "TurboTom",
+    "team_id": null,
+    "seed": 7,
+    "created_at": null
+   },
+   {
+    "id": "86c8b650-b8d1-412c-8798-f89ab4e65e08",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "status": "checked_in",
+    "display_name": "SchnellSchnecke",
+    "ingame_name": "SchnellSchnecke",
+    "team_id": null,
+    "seed": 8,
+    "created_at": null
+   }
+  ],
+  "stages": [
+   {
+    "id": "543dbc00-f4f0-4cc6-a1f4-de33d6903d90",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "number": 1,
+    "status": "ready",
+    "stage_type": "single_elimination",
+    "match_type": "duel",
+    "name": "Turnierbaum",
+    "settings": {},
+    "created_at": "2026-10-14T16:04:19.162766+00:00",
+    "updated_at": "2026-10-14T16:04:19.167392+00:00"
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "92390aba-7f56-49ee-9994-5b96f44c4f9a",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "stage_id": "543dbc00-f4f0-4cc6-a1f4-de33d6903d90",
+    "stage_number": 1,
+    "stage_type": "single_elimination",
+    "match_type": "duel",
+    "match_key": "A",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 1,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      },
+      "registration_id": "ab6ee0e5-34ed-4c22-bcce-5f23cb0aa3a6",
+      "user_id": "a125d19a-724e-47d1-8091-2f8824bf9015",
+      "seed": 1,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      },
+      "registration_id": "86c8b650-b8d1-412c-8798-f89ab4e65e08",
+      "user_id": "82e1f642-59a4-470b-a8a6-f2ce0f96fb92",
+      "seed": 8,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "E",
+      "to_match_id": "5ba1187c-8d77-4b6c-9f2b-eb30be64a77e",
+      "to_slot": 1
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.167392+00:00",
+    "updated_at": "2026-10-14T16:04:19.167392+00:00",
+    "round_label": "Viertelfinale",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "4e1c8b35-b0de-4989-aa8d-b5183aa1b04f",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "stage_id": "543dbc00-f4f0-4cc6-a1f4-de33d6903d90",
+    "stage_number": 1,
+    "stage_type": "single_elimination",
+    "match_type": "duel",
+    "match_key": "B",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 2,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      },
+      "registration_id": "94550bf4-fe87-43cb-a299-a856b7a7ef9b",
+      "user_id": "26409440-6fe6-4372-bef3-8c6921a3b187",
+      "seed": 4,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      },
+      "registration_id": "2b292090-a505-4b73-9fdf-8e58fcd4280e",
+      "user_id": "98263520-6ef8-4375-a661-550a1b74a2a0",
+      "seed": 5,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "E",
+      "to_match_id": "5ba1187c-8d77-4b6c-9f2b-eb30be64a77e",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.167392+00:00",
+    "updated_at": "2026-10-14T16:04:19.167392+00:00",
+    "round_label": "Viertelfinale",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "bb90e53c-fb58-441f-bfb4-001e7f37da2a",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "stage_id": "543dbc00-f4f0-4cc6-a1f4-de33d6903d90",
+    "stage_number": 1,
+    "stage_type": "single_elimination",
+    "match_type": "duel",
+    "match_key": "C",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 3,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      },
+      "registration_id": "b1cc6e27-b89c-4418-94a6-2041214ab41f",
+      "user_id": "c1394468-9d07-4da3-970b-7b0263aac4d9",
+      "seed": 2,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      },
+      "registration_id": "b1420426-bb60-4ba6-91a0-b4b6612426f5",
+      "user_id": "d16fd50d-efd4-4e53-9ed2-85f0e3adc256",
+      "seed": 7,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "F",
+      "to_match_id": "d4e31fb9-8977-4c18-bca6-a225c25a0f4a",
+      "to_slot": 1
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.167392+00:00",
+    "updated_at": "2026-10-14T16:04:19.167392+00:00",
+    "round_label": "Viertelfinale",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "77be92ac-6bd2-463a-ba90-698b23870b2e",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "stage_id": "543dbc00-f4f0-4cc6-a1f4-de33d6903d90",
+    "stage_number": 1,
+    "stage_type": "single_elimination",
+    "match_type": "duel",
+    "match_key": "D",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 4,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      },
+      "registration_id": "f87dec1b-6da8-4333-80b4-ddf95e520c0a",
+      "user_id": "489b189d-bd34-4bc9-a69e-18453347f276",
+      "seed": 3,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      },
+      "registration_id": "64e919cb-a71d-4216-8a47-b501e0bc82f9",
+      "user_id": "82b87e4e-e317-45eb-84fa-78045bab67b6",
+      "seed": 6,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "F",
+      "to_match_id": "d4e31fb9-8977-4c18-bca6-a225c25a0f4a",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.167392+00:00",
+    "updated_at": "2026-10-14T16:04:19.167392+00:00",
+    "round_label": "Viertelfinale",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "5ba1187c-8d77-4b6c-9f2b-eb30be64a77e",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "stage_id": "543dbc00-f4f0-4cc6-a1f4-de33d6903d90",
+    "stage_number": 1,
+    "stage_type": "single_elimination",
+    "match_type": "duel",
+    "match_key": "E",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 5,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "W:A:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "W:B:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "G",
+      "to_match_id": "5a796812-286a-41e1-b8d4-6beff7510d44",
+      "to_slot": 1
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.167392+00:00",
+    "updated_at": "2026-10-14T16:04:19.167392+00:00",
+    "round_label": "Halbfinale",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "d4e31fb9-8977-4c18-bca6-a225c25a0f4a",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "stage_id": "543dbc00-f4f0-4cc6-a1f4-de33d6903d90",
+    "stage_number": 1,
+    "stage_type": "single_elimination",
+    "match_type": "duel",
+    "match_key": "F",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 6,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "W:C:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 1,
+       "raw": "W:D:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "G",
+      "to_match_id": "5a796812-286a-41e1-b8d4-6beff7510d44",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.167392+00:00",
+    "updated_at": "2026-10-14T16:04:19.167392+00:00",
+    "round_label": "Halbfinale",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "5a796812-286a-41e1-b8d4-6beff7510d44",
+    "tournament_id": "5a3915cd-bac4-4510-bd66-07c20db8e376",
+    "stage_id": "543dbc00-f4f0-4cc6-a1f4-de33d6903d90",
+    "stage_number": 1,
+    "stage_type": "single_elimination",
+    "match_type": "duel",
+    "match_key": "G",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Runde 3",
+    "order": 7,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 1,
+       "raw": "W:E:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 1,
+       "raw": "W:F:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.167392+00:00",
+    "updated_at": "2026-10-14T16:04:19.167392+00:00",
+    "round_label": "Finale",
+    "effective_duration_minutes": 30
+   }
+  ],
+  "engine": "stage",
+  "duration_game": null
+ },
+ "de8_fixed": {
+  "tournament": {
+   "id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+   "slug": "smash-cup-8",
+   "title": "Lions Smash-Cup",
+   "format": "double_elim",
+   "status": "check_in",
+   "visibility": "public",
+   "max_participants": 8,
+   "seeding_mode": "manual",
+   "best_of": 1,
+   "match_duration_minutes": 30,
+   "team_mode": "solo",
+   "result_entry_mode": "player_confirmed",
+   "engine_version": "competition.graph.v1",
+   "ruleset_version": "competition.ruleset.v1",
+   "heat_rebuild_mode": "auto",
+   "randomize_advancement_rounds": false,
+   "updated_at": "2026-10-14T16:04:19.181985+00:00",
+   "check_in_until": "2026-10-14T16:03:19.179468+00:00",
+   "check_in_closed_at": "2026-10-14T16:04:19.181985+00:00",
+   "public_phase": {
+    "state": "registration_closed",
+    "label": "Anmeldung geschlossen",
+    "raw_status": "check_in",
+    "target_at": null,
+    "next_transition_at": null,
+    "countdown_kind": "starts",
+    "now": "2026-10-14T16:04:19.184002+00:00"
+   },
+   "can_view_display": false
+  },
+  "registrations": [
+   {
+    "id": "b029fa12-f566-4ad6-a516-4f289d29c064",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "status": "checked_in",
+    "display_name": "NeonFalke",
+    "ingame_name": "NeonFalke",
+    "team_id": null,
+    "seed": 1,
+    "created_at": null
+   },
+   {
+    "id": "5b471034-1157-4e9c-a0ce-7c1efb06618e",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "status": "checked_in",
+    "display_name": "KartKönigin",
+    "ingame_name": "KartKönigin",
+    "team_id": null,
+    "seed": 2,
+    "created_at": null
+   },
+   {
+    "id": "66c7a225-89a5-4f82-aebf-a4d3dd0fce7d",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "status": "checked_in",
+    "display_name": "LuckyLion",
+    "ingame_name": "LuckyLion",
+    "team_id": null,
+    "seed": 3,
+    "created_at": null
+   },
+   {
+    "id": "9b6fecb6-fe24-4dca-9fd7-fa216566149a",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "status": "checked_in",
+    "display_name": "PixelPaula",
+    "ingame_name": "PixelPaula",
+    "team_id": null,
+    "seed": 4,
+    "created_at": null
+   },
+   {
+    "id": "47709774-bbb6-4de9-80a0-bff67184a912",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "status": "checked_in",
+    "display_name": "DriftDaniel",
+    "ingame_name": "DriftDaniel",
+    "team_id": null,
+    "seed": 5,
+    "created_at": null
+   },
+   {
+    "id": "968e581f-857e-4631-9996-3b8fba2fa3d8",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "status": "checked_in",
+    "display_name": "BoostBerta",
+    "ingame_name": "BoostBerta",
+    "team_id": null,
+    "seed": 6,
+    "created_at": null
+   },
+   {
+    "id": "f12a0e4b-b732-478a-9674-8192e205bd5c",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "status": "checked_in",
+    "display_name": "TurboTom",
+    "ingame_name": "TurboTom",
+    "team_id": null,
+    "seed": 7,
+    "created_at": null
+   },
+   {
+    "id": "eb7e8d8a-bf7b-42d1-b96e-55727dfe7b82",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "status": "checked_in",
+    "display_name": "SchnellSchnecke",
+    "ingame_name": "SchnellSchnecke",
+    "team_id": null,
+    "seed": 8,
+    "created_at": null
+   }
+  ],
+  "stages": [
+   {
+    "id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "number": 1,
+    "status": "ready",
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "name": "Turnierbaum",
+    "settings": {
+     "grand_final": "reset"
+    },
+    "created_at": "2026-10-14T16:04:19.174768+00:00",
+    "updated_at": "2026-10-14T16:04:19.180978+00:00"
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "c6e52dfc-3ce1-4388-bc09-1b05699a22a6",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "A",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Winner Runde 1",
+    "order": 1,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      },
+      "registration_id": "b029fa12-f566-4ad6-a516-4f289d29c064",
+      "user_id": "163f4e63-5306-4e9d-bd0d-e94f172b1206",
+      "seed": 1,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      },
+      "registration_id": "eb7e8d8a-bf7b-42d1-b96e-55727dfe7b82",
+      "user_id": "3ede3c1c-f8fe-40a3-a1e9-6f23e145b5fd",
+      "seed": 8,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "E",
+      "to_match_id": "57222ec5-b37d-4a2e-ba3e-5b61016ee37e",
+      "to_slot": 1
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LA",
+      "to_match_id": "64caf7a7-373c-4ae0-9090-425bbf96f8bc",
+      "to_slot": 1
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Winner Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "5fc84636-3ad9-457b-98ec-ab401f832151",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "B",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Winner Runde 1",
+    "order": 2,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      },
+      "registration_id": "9b6fecb6-fe24-4dca-9fd7-fa216566149a",
+      "user_id": "7a9e995d-33ca-4d9f-aca1-c6cba7f83ab7",
+      "seed": 4,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      },
+      "registration_id": "47709774-bbb6-4de9-80a0-bff67184a912",
+      "user_id": "ac5eeb60-b1e4-4cf4-8631-61798907af96",
+      "seed": 5,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "E",
+      "to_match_id": "57222ec5-b37d-4a2e-ba3e-5b61016ee37e",
+      "to_slot": 2
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LA",
+      "to_match_id": "64caf7a7-373c-4ae0-9090-425bbf96f8bc",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Winner Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "05ad9ec0-f185-4b22-9290-e5462d6e970b",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "C",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Winner Runde 1",
+    "order": 3,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      },
+      "registration_id": "5b471034-1157-4e9c-a0ce-7c1efb06618e",
+      "user_id": "9fb0036d-e229-4bd6-b7ce-dca2c681cb89",
+      "seed": 2,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      },
+      "registration_id": "f12a0e4b-b732-478a-9674-8192e205bd5c",
+      "user_id": "d4c2a463-b6d5-489d-8360-f2bbfb6a3edd",
+      "seed": 7,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "F",
+      "to_match_id": "1281a696-fed3-4319-b7c6-a79d1ba4215a",
+      "to_slot": 1
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LB",
+      "to_match_id": "f429e7c8-d6d4-40f3-8685-fd7cb978fff4",
+      "to_slot": 1
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Winner Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "4f56c1fe-eb05-4923-947c-ef07506cf7a1",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "D",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Winner Runde 1",
+    "order": 4,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      },
+      "registration_id": "66c7a225-89a5-4f82-aebf-a4d3dd0fce7d",
+      "user_id": "9082e476-31c2-4b94-a688-aebf8cd7b911",
+      "seed": 3,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      },
+      "registration_id": "968e581f-857e-4631-9996-3b8fba2fa3d8",
+      "user_id": "add3f9ec-825e-4e4a-96f1-b622f47ef6c8",
+      "seed": 6,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "F",
+      "to_match_id": "1281a696-fed3-4319-b7c6-a79d1ba4215a",
+      "to_slot": 2
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LB",
+      "to_match_id": "f429e7c8-d6d4-40f3-8685-fd7cb978fff4",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Winner Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "57222ec5-b37d-4a2e-ba3e-5b61016ee37e",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "E",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Winner Runde 2",
+    "order": 5,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "W:A:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "W:B:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "G",
+      "to_match_id": "16339f1b-bb6b-40c9-9265-6974411e9d08",
+      "to_slot": 1
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LD",
+      "to_match_id": "529b5118-7f25-4cab-907e-d0b9b0b1502a",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Winner Runde 2",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "1281a696-fed3-4319-b7c6-a79d1ba4215a",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "F",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Winner Runde 2",
+    "order": 6,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "W:C:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 1,
+       "raw": "W:D:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "G",
+      "to_match_id": "16339f1b-bb6b-40c9-9265-6974411e9d08",
+      "to_slot": 2
+     },
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LC",
+      "to_match_id": "7c74f891-224f-46d2-8b0f-ed39a8fa5776",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Winner Runde 2",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "64caf7a7-373c-4ae0-9090-425bbf96f8bc",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "LA",
+    "section": "LB",
+    "round": 2,
+    "round_name": "Loser Runde 1",
+    "order": 8,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "L:A:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "L:B:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LC",
+      "to_match_id": "7c74f891-224f-46d2-8b0f-ed39a8fa5776",
+      "to_slot": 1
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Loser Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "f429e7c8-d6d4-40f3-8685-fd7cb978fff4",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "LB",
+    "section": "LB",
+    "round": 2,
+    "round_name": "Loser Runde 1",
+    "order": 9,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "L:C:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "D",
+       "rank": 1,
+       "raw": "L:D:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LD",
+      "to_match_id": "529b5118-7f25-4cab-907e-d0b9b0b1502a",
+      "to_slot": 1
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Loser Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "16339f1b-bb6b-40c9-9265-6974411e9d08",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "G",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Winner Runde 3",
+    "order": 7,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 1,
+       "raw": "W:E:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 1,
+       "raw": "W:F:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "L",
+      "rank": 1,
+      "to_match_key": "LF",
+      "to_match_id": "aa429a4c-4fb5-45bd-82ce-9c873346604a",
+      "to_slot": 2
+     },
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "GF",
+      "to_match_id": "d90e48a4-05a9-4f04-bbc3-7da8ff1613ff",
+      "to_slot": 1
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Winner Final",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "7c74f891-224f-46d2-8b0f-ed39a8fa5776",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "LC",
+    "section": "LB",
+    "round": 3,
+    "round_name": "Loser Runde 2",
+    "order": 10,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LA",
+       "rank": 1,
+       "raw": "W:LA:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "F",
+       "rank": 1,
+       "raw": "L:F:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LE",
+      "to_match_id": "f92f4eb7-af34-4a55-9b5c-590fc8078021",
+      "to_slot": 1
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Loser Runde 2",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "529b5118-7f25-4cab-907e-d0b9b0b1502a",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "LD",
+    "section": "LB",
+    "round": 3,
+    "round_name": "Loser Runde 2",
+    "order": 11,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LB",
+       "rank": 1,
+       "raw": "W:LB:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "E",
+       "rank": 1,
+       "raw": "L:E:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LE",
+      "to_match_id": "f92f4eb7-af34-4a55-9b5c-590fc8078021",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Loser Runde 2",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "f92f4eb7-af34-4a55-9b5c-590fc8078021",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "LE",
+    "section": "LB",
+    "round": 4,
+    "round_name": "Loser Runde 3",
+    "order": 12,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LC",
+       "rank": 1,
+       "raw": "W:LC:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LD",
+       "rank": 1,
+       "raw": "W:LD:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "LF",
+      "to_match_id": "aa429a4c-4fb5-45bd-82ce-9c873346604a",
+      "to_slot": 1
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Loser Runde 3",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "aa429a4c-4fb5-45bd-82ce-9c873346604a",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "LF",
+    "section": "LB",
+    "round": 5,
+    "round_name": "Loser Runde 4",
+    "order": 13,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LE",
+       "rank": 1,
+       "raw": "W:LE:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "G",
+       "rank": 1,
+       "raw": "L:G:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "GF",
+      "to_match_id": "d90e48a4-05a9-4f04-bbc3-7da8ff1613ff",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Loser Runde 4",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "d90e48a4-05a9-4f04-bbc3-7da8ff1613ff",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "GF",
+    "section": "GF",
+    "round": 6,
+    "round_name": "Grand Final",
+    "order": 14,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "G",
+       "rank": 1,
+       "raw": "W:G:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LF",
+       "rank": 1,
+       "raw": "W:LF:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "GFR",
+      "to_match_id": "7252823e-171f-4e53-ada6-d50cb1181ce7",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "GFR",
+      "to_match_id": "7252823e-171f-4e53-ada6-d50cb1181ce7",
+      "to_slot": 2
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Grand Final",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "7252823e-171f-4e53-ada6-d50cb1181ce7",
+    "tournament_id": "44edd06c-d4a6-40b9-a4c9-b8edd4ee231a",
+    "stage_id": "d5e19818-2d48-4fee-96ef-f0b776ba8abf",
+    "stage_number": 1,
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "match_key": "GFR",
+    "section": "GF",
+    "round": 7,
+    "round_name": "Grand Final Reset",
+    "order": 15,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "GF",
+       "rank": 1,
+       "raw": "W:GF:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "GF",
+       "rank": 2,
+       "raw": "W:GF:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     }
+    ],
+    "results": [],
+    "advancement": [],
+    "settings": {
+     "min_players": 2,
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "bracket_reset": {
+      "of_match_key": "GF",
+      "upper_slot": 1
+     },
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.180473+00:00",
+    "updated_at": "2026-10-14T16:04:19.180473+00:00",
+    "round_label": "Grand Final Reset",
+    "effective_duration_minutes": 30
+   }
+  ],
+  "engine": "stage",
+  "duration_game": null
+ },
+ "ffa8_merged": {
+  "tournament": {
+   "id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+   "slug": "kart-cup-8",
+   "title": "Lions Kart-Cup",
+   "format": "ffa_custom_bracket",
+   "status": "check_in",
+   "visibility": "public",
+   "max_participants": 16,
+   "seeding_mode": "manual",
+   "best_of": 1,
+   "match_duration_minutes": 30,
+   "team_mode": "solo",
+   "result_entry_mode": "player_confirmed",
+   "engine_version": "competition.graph.v1",
+   "ruleset_version": "competition.ruleset.v1",
+   "heat_rebuild_mode": "suggest",
+   "randomize_advancement_rounds": false,
+   "updated_at": "2026-10-14T16:04:19.203519+00:00",
+   "check_in_until": "2026-10-14T16:03:19.195980+00:00",
+   "check_in_closed_at": "2026-10-14T16:04:19.203519+00:00",
+   "public_phase": {
+    "state": "registration_closed",
+    "label": "Anmeldung geschlossen",
+    "raw_status": "check_in",
+    "target_at": null,
+    "next_transition_at": null,
+    "countdown_kind": "starts",
+    "now": "2026-10-14T16:04:19.211759+00:00"
+   },
+   "can_view_display": false
+  },
+  "registrations": [
+   {
+    "id": "e17fa51c-92db-4175-ac71-221c449ee1a8",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "status": "checked_in",
+    "display_name": "NeonFalke",
+    "ingame_name": "NeonFalke",
+    "team_id": null,
+    "seed": 1,
+    "created_at": null
+   },
+   {
+    "id": "4d902070-fed8-443d-808e-0ca175553cd8",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "status": "checked_in",
+    "display_name": "KartKönigin",
+    "ingame_name": "KartKönigin",
+    "team_id": null,
+    "seed": 2,
+    "created_at": null
+   },
+   {
+    "id": "5cbdb0f5-1b31-48ad-9c6d-dcf6eaf9465d",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "status": "checked_in",
+    "display_name": "LuckyLion",
+    "ingame_name": "LuckyLion",
+    "team_id": null,
+    "seed": 3,
+    "created_at": null
+   },
+   {
+    "id": "0106599a-5bb8-43b1-b4b4-0bf7bbf4f6ff",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "status": "checked_in",
+    "display_name": "PixelPaula",
+    "ingame_name": "PixelPaula",
+    "team_id": null,
+    "seed": 4,
+    "created_at": null
+   },
+   {
+    "id": "20fccaa7-e758-4055-bf67-3c6d94a71b66",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "status": "checked_in",
+    "display_name": "DriftDaniel",
+    "ingame_name": "DriftDaniel",
+    "team_id": null,
+    "seed": 5,
+    "created_at": null
+   },
+   {
+    "id": "c179fddf-6941-4464-a9ba-e6b396b39531",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "status": "checked_in",
+    "display_name": "BoostBerta",
+    "ingame_name": "BoostBerta",
+    "team_id": null,
+    "seed": 6,
+    "created_at": null
+   },
+   {
+    "id": "1da58f32-ab9a-42df-813d-bd388fb33112",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "status": "checked_in",
+    "display_name": "TurboTom",
+    "ingame_name": "TurboTom",
+    "team_id": null,
+    "seed": 7,
+    "created_at": null
+   },
+   {
+    "id": "bff763e6-e28f-4fc7-9a3b-8f1941e178df",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "status": "checked_in",
+    "display_name": "SchnellSchnecke",
+    "ingame_name": "SchnellSchnecke",
+    "team_id": null,
+    "seed": 8,
+    "created_at": null
+   }
+  ],
+  "stages": [
+   {
+    "id": "34e2191a-fa3c-4a7b-acd9-b85964c96b17",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "number": 1,
+    "status": "ready",
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "name": "Läufe",
+    "settings": {
+     "schema": "[WB]\n# Runde 1\nA=[1,8,9,16]\nB=[2,7,10,15]\nC=[3,6,11,14]\nD=[4,5,12,13]\n\n# Halbfinale\nE=[W:A:1,W:D:1,W:A:2,W:D:2]\nF=[W:B:1,W:C:1,W:B:2,W:C:2]\n\n# Finale\nG=[W:E:1,W:F:1,W:E:2,W:F:2]",
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    },
+    "created_at": "2026-10-14T16:04:19.190764+00:00",
+    "updated_at": "2026-10-14T16:04:19.196983+00:00"
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "4b9f6f01-0c02-4d7c-a755-3ef21cd90b3e",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "stage_id": "34e2191a-fa3c-4a7b-acd9-b85964c96b17",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "A",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 1,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      },
+      "registration_id": "e17fa51c-92db-4175-ac71-221c449ee1a8",
+      "user_id": "b677d08e-d430-47a0-984d-ef29327e80ca",
+      "seed": 1,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      },
+      "registration_id": "0106599a-5bb8-43b1-b4b4-0bf7bbf4f6ff",
+      "user_id": "6a103f4f-e197-4925-a13b-b17be0d2db81",
+      "seed": 4,
+      "status": "filled"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      },
+      "registration_id": "bff763e6-e28f-4fc7-9a3b-8f1941e178df",
+      "user_id": "d095fe71-d58d-4302-871f-d4081be125b8",
+      "seed": 5,
+      "status": "filled"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      },
+      "registration_id": "20fccaa7-e758-4055-bf67-3c6d94a71b66",
+      "user_id": "c11ae631-662e-4a38-a9dc-1348391b58a8",
+      "seed": 8,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "E",
+      "to_match_id": "357f789f-1c2d-4505-a38b-b18e8360eeea",
+      "to_slot": 1
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "E",
+      "to_match_id": "357f789f-1c2d-4505-a38b-b18e8360eeea",
+      "to_slot": 3
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.195980+00:00",
+    "updated_at": "2026-10-14T16:04:19.208739+00:00",
+    "qualifiers_effective": 2,
+    "rebuilt_at": "2026-10-14T16:04:19.207232+00:00",
+    "round_label": "Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "4afe7699-1878-4e7f-b322-ca9a9fafa0e9",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "stage_id": "34e2191a-fa3c-4a7b-acd9-b85964c96b17",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "B",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 2,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      },
+      "registration_id": "4d902070-fed8-443d-808e-0ca175553cd8",
+      "user_id": "98cc11fe-3029-4be4-879a-c25e48faa012",
+      "seed": 2,
+      "status": "filled"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      },
+      "registration_id": "5cbdb0f5-1b31-48ad-9c6d-dcf6eaf9465d",
+      "user_id": "c332c397-6e91-4e9e-8ec0-2d1bef03fafe",
+      "seed": 3,
+      "status": "filled"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      },
+      "registration_id": "1da58f32-ab9a-42df-813d-bd388fb33112",
+      "user_id": "27e807f5-93fb-41a0-888c-291198dcd3e3",
+      "seed": 6,
+      "status": "filled"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      },
+      "registration_id": "c179fddf-6941-4464-a9ba-e6b396b39531",
+      "user_id": "a0150d83-88ab-494e-aa66-7de9274c7c94",
+      "seed": 7,
+      "status": "filled"
+     }
+    ],
+    "results": [],
+    "advancement": [
+     {
+      "flow": "W",
+      "rank": 1,
+      "to_match_key": "E",
+      "to_match_id": "357f789f-1c2d-4505-a38b-b18e8360eeea",
+      "to_slot": 2
+     },
+     {
+      "flow": "W",
+      "rank": 2,
+      "to_match_key": "E",
+      "to_match_id": "357f789f-1c2d-4505-a38b-b18e8360eeea",
+      "to_slot": 4
+     }
+    ],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "ready",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.195980+00:00",
+    "updated_at": "2026-10-14T16:04:19.208739+00:00",
+    "qualifiers_effective": 2,
+    "rebuilt_at": "2026-10-14T16:04:19.207232+00:00",
+    "round_label": "Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "2a42d06d-8a45-475f-8016-740ad1ceeb78",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "stage_id": "34e2191a-fa3c-4a7b-acd9-b85964c96b17",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "C",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 3,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": 3,
+      "status": "bye",
+      "moved_to": "4afe7699-1878-4e7f-b322-ca9a9fafa0e9"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": 6,
+      "status": "bye",
+      "moved_to": "4afe7699-1878-4e7f-b322-ca9a9fafa0e9"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "seed",
+       "seed": 11,
+       "raw": "11"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": 11,
+      "status": "bye"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "seed",
+       "seed": 14,
+       "raw": "14"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": 14,
+      "status": "bye"
+     }
+    ],
+    "results": [],
+    "advancement": [],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "cancelled",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.195980+00:00",
+    "updated_at": "2026-10-14T16:04:19.208739+00:00",
+    "qualifiers_effective": 1,
+    "result_meta": {
+     "source": "heat_rebuild",
+     "reason": "merged",
+     "updated_at": "2026-10-14T16:04:19.207232+00:00",
+     "merged_into": "4afe7699-1878-4e7f-b322-ca9a9fafa0e9"
+    },
+    "completed_at": null,
+    "called_at": null,
+    "merged_into": "4afe7699-1878-4e7f-b322-ca9a9fafa0e9",
+    "merged_into_key": "B",
+    "round_label": "Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "156272da-2578-4213-9d13-ed4fd867d4cd",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "stage_id": "34e2191a-fa3c-4a7b-acd9-b85964c96b17",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "D",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 4,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": 4,
+      "status": "bye",
+      "moved_to": "4b9f6f01-0c02-4d7c-a755-3ef21cd90b3e"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": 5,
+      "status": "bye",
+      "moved_to": "4b9f6f01-0c02-4d7c-a755-3ef21cd90b3e"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "seed",
+       "seed": 12,
+       "raw": "12"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": 12,
+      "status": "bye"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "seed",
+       "seed": 13,
+       "raw": "13"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": 13,
+      "status": "bye"
+     }
+    ],
+    "results": [],
+    "advancement": [],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "cancelled",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.195980+00:00",
+    "updated_at": "2026-10-14T16:04:19.208739+00:00",
+    "qualifiers_effective": 1,
+    "result_meta": {
+     "source": "heat_rebuild",
+     "reason": "merged",
+     "updated_at": "2026-10-14T16:04:19.207232+00:00",
+     "merged_into": "4b9f6f01-0c02-4d7c-a755-3ef21cd90b3e"
+    },
+    "completed_at": null,
+    "called_at": null,
+    "merged_into": "4b9f6f01-0c02-4d7c-a755-3ef21cd90b3e",
+    "merged_into_key": "A",
+    "round_label": "Runde 1",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "357f789f-1c2d-4505-a38b-b18e8360eeea",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "stage_id": "34e2191a-fa3c-4a7b-acd9-b85964c96b17",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "E",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Finale",
+    "order": 5,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "W:A:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "W:B:1"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending"
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 2,
+       "raw": "W:A:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending",
+      "source_result": null
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 2,
+       "raw": "W:B:2"
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "pending",
+      "source_result": null
+     }
+    ],
+    "results": [],
+    "advancement": [],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "pending",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.195980+00:00",
+    "updated_at": "2026-10-14T16:04:19.208739+00:00",
+    "qualifiers_effective": 2,
+    "rebuilt_at": "2026-10-14T16:04:19.207232+00:00",
+    "shortened_at": "2026-10-14T16:04:19.207232+00:00",
+    "round_label": "Finale",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "735086e1-8139-437b-ba01-678c0cb9405d",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "stage_id": "34e2191a-fa3c-4a7b-acd9-b85964c96b17",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "F",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Halbfinale",
+    "order": 6,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "bye",
+       "raw": "W:B:1",
+       "was": {
+        "flow": "W",
+        "match_key": "B",
+        "rank": 1
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "bye",
+      "moved_to": "357f789f-1c2d-4505-a38b-b18e8360eeea"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "bye",
+       "raw": "W:C:1",
+       "was": {
+        "flow": "W",
+        "match_key": "C",
+        "rank": 1
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "bye",
+      "source_result": {
+       "from_match_id": "2a42d06d-8a45-475f-8016-740ad1ceeb78",
+       "from_match_key": "C",
+       "rank": 1,
+       "flow": "W",
+       "skipped": true,
+       "reason": "merged",
+       "confirmed_at": "2026-10-14T16:04:19.207232+00:00"
+      }
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "bye",
+       "raw": "W:B:2",
+       "was": {
+        "flow": "W",
+        "match_key": "B",
+        "rank": 2
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "bye",
+      "source_result": null,
+      "moved_to": "357f789f-1c2d-4505-a38b-b18e8360eeea"
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "bye",
+       "raw": "W:C:2",
+       "was": {
+        "flow": "W",
+        "match_key": "C",
+        "rank": 2
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "bye",
+      "source_result": {
+       "from_match_id": "2a42d06d-8a45-475f-8016-740ad1ceeb78",
+       "from_match_key": "C",
+       "rank": 2,
+       "flow": "W",
+       "skipped": true,
+       "reason": "source_unfulfillable",
+       "confirmed_at": "2026-10-14T16:04:19.197485+00:00"
+      }
+     }
+    ],
+    "results": [],
+    "advancement": [],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 1,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "cancelled",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.195980+00:00",
+    "updated_at": "2026-10-14T16:04:19.208739+00:00",
+    "qualifiers_effective": 1,
+    "result_meta": {
+     "source": "heat_rebuild",
+     "reason": "merged",
+     "updated_at": "2026-10-14T16:04:19.207232+00:00",
+     "merged_into": "357f789f-1c2d-4505-a38b-b18e8360eeea"
+    },
+    "completed_at": null,
+    "called_at": null,
+    "merged_into": "357f789f-1c2d-4505-a38b-b18e8360eeea",
+    "merged_into_key": "E",
+    "round_label": "Halbfinale",
+    "effective_duration_minutes": 30
+   },
+   {
+    "id": "9b7d3624-fcc5-4f7a-9e2c-e70eca358634",
+    "tournament_id": "3b9b1c9b-50f9-4d90-9b44-7c833ce449c7",
+    "stage_id": "34e2191a-fa3c-4a7b-acd9-b85964c96b17",
+    "stage_number": 1,
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "match_key": "G",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Finale",
+    "order": 7,
+    "slots": [
+     {
+      "slot": 1,
+      "source": {
+       "type": "bye",
+       "raw": "W:E:1",
+       "was": {
+        "flow": "W",
+        "match_key": "E",
+        "rank": 1
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "bye"
+     },
+     {
+      "slot": 2,
+      "source": {
+       "type": "bye",
+       "raw": "W:F:1",
+       "was": {
+        "flow": "W",
+        "match_key": "F",
+        "rank": 1
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "bye",
+      "source_result": {
+       "from_match_id": "735086e1-8139-437b-ba01-678c0cb9405d",
+       "from_match_key": "F",
+       "rank": 1,
+       "flow": "W",
+       "skipped": true,
+       "reason": "merged",
+       "confirmed_at": "2026-10-14T16:04:19.207232+00:00"
+      }
+     },
+     {
+      "slot": 3,
+      "source": {
+       "type": "bye",
+       "raw": "W:E:2",
+       "was": {
+        "flow": "W",
+        "match_key": "E",
+        "rank": 2
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "bye",
+      "source_result": null
+     },
+     {
+      "slot": 4,
+      "source": {
+       "type": "bye",
+       "raw": "W:F:2",
+       "was": {
+        "flow": "W",
+        "match_key": "F",
+        "rank": 2
+       }
+      },
+      "registration_id": null,
+      "user_id": null,
+      "seed": null,
+      "status": "bye",
+      "source_result": {
+       "from_match_id": "735086e1-8139-437b-ba01-678c0cb9405d",
+       "from_match_key": "F",
+       "rank": 2,
+       "flow": "W",
+       "skipped": true,
+       "reason": "source_unfulfillable",
+       "confirmed_at": "2026-10-14T16:04:19.197485+00:00"
+      }
+     }
+    ],
+    "results": [],
+    "advancement": [],
+    "settings": {
+     "min_players": 2,
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "score_type": "points",
+     "calculation": "points",
+     "randomize_advancement_rounds": false
+    },
+    "status": "cancelled",
+    "is_preview": false,
+    "generation_mode": "seeded",
+    "scheduled_at": null,
+    "station_id": null,
+    "created_at": "2026-10-14T16:04:19.195980+00:00",
+    "updated_at": "2026-10-14T16:04:19.208739+00:00",
+    "result_meta": {
+     "source": "heat_rebuild",
+     "reason": "shortened",
+     "updated_at": "2026-10-14T16:04:19.207232+00:00"
+    },
+    "completed_at": null,
+    "called_at": null,
+    "round_label": "Finale",
+    "effective_duration_minutes": 30
+   }
+  ],
+  "engine": "stage",
+  "duration_game": null
+ }
+}

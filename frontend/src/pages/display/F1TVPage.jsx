@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
@@ -11,6 +11,7 @@ import { useLowMomentTimer, useSponsorMoments, useTvSponsors } from "@/component
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { compareBoards, deltaText, previousHolderText, rowChips } from "@/lib/tvFastLap";
+import { attemptLabel, participantKey } from "@/lib/fastLapEvent";
 import { MOMENT_MS, createMomentQueue } from "@/lib/tvMoments";
 import { sponsorFor, sponsorPlan } from "@/lib/tvSponsors";
 import { charsPerLine, fitItems, TV_LINE, wrapLines } from "@/lib/tvType";
@@ -21,6 +22,8 @@ import { charsPerLine, fitItems, TV_LINE, wrapLines } from "@/lib/tvType";
 // neuen Bestzeit liegt etwa 3 Sekunden ein Moment über der Liste - Bild, Name, Zeit, Abstand und wer sie vorher hatte -,
 // danach gleitet die Zeile nach oben. Der Streckenwechsel bei Meisterschaften ist einstellbar (Standard 45 Sekunden)
 // und wartet, bis ein Moment vorbei ist. „Bewegung reduzieren“: Zeilen springen, der Moment erscheint ohne Bewegung.
+// Vor Ort (#1585): ein Band „Am Start / Als Nächstes“ mit Station und „Versuch 2 von 3“ (die eingestellte Zahl vom
+// Server); beim Wechsel rückt der Nächste nach oben. Gäste ohne Konto stehen wie alle in der Liste.
 
 // Gold, Silber, Bronze - im Kontrast-Modus heller (tv.css), damit auch Bronze 7:1 schafft.
 const medalColors = ["var(--tv-medal-1)", "var(--tv-medal-2)", "var(--tv-medal-3)"];
@@ -35,11 +38,66 @@ export default function F1TVPage() {
   );
 }
 
+/** „Versuch 2 von 3“ - tickt beim Wechsel einmal (alter Wert geht nach oben, neuer kommt von unten). */
+function AttemptTicker({ text, motionOn }) {
+  const ease = { duration: motionOn ? 0.24 : 0, ease: [0.2, 0.7, 0.2, 1] };
+  return (
+    <span className="tv-queue__attempt tv-t-info">
+      <AnimatePresence initial={false}>
+        <motion.span
+          key={text}
+          initial={motionOn ? { opacity: 0, transform: "translateY(60%)" } : false}
+          animate={{ opacity: 1, transform: "translateY(0%)" }}
+          exit={motionOn ? { opacity: 0, transform: "translateY(-60%)" } : { opacity: 0 }}
+          transition={ease}
+        >
+          {text}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
+/** Am Start / Als Nächstes: wer fährt, an welcher Station, im wievielten Versuch - und die nächsten drei. */
+function QueueBand({ queue, motionOn }) {
+  const onTrack = queue?.on_track || [];
+  const waiting = (queue?.next || []).slice(0, 3);
+  if (!onTrack.length && !waiting.length) return null;
+  const glide = motionOn ? { layout: { duration: 0.6, ease: [0.77, 0, 0.175, 1] } } : { duration: 0 };
+  return (
+    <LayoutGroup id="tv-queue">
+      <div className="tv-queue shrink-0" data-testid="tv-queue">
+        <div className="tv-queue__col">
+          <div className="tv-kicker tv-t-meta tv-accent">Am Start</div>
+          {onTrack.length ? onTrack.map((row) => (
+            <motion.div key={row.id} layoutId={`tv-q-${row.id}`} transition={glide} className="tv-queue__row" data-testid="tv-queue-ontrack">
+              <span className="tv-queue__name tv-t-name font-heading" data-tv-name="1">{row.display_name}</span>
+              {row.station ? <span className="tv-t-info tv-muted min-w-0 [overflow-wrap:anywhere]">{row.station}</span> : null}
+              <AttemptTicker text={attemptLabel(row.attempts_used, queue.max_attempts)} motionOn={motionOn} />
+            </motion.div>
+          )) : <div className="tv-t-info tv-faint">Gleich geht&apos;s los</div>}
+        </div>
+        <div className="tv-queue__col">
+          <div className="tv-kicker tv-t-meta tv-faint">Als Nächstes</div>
+          <div className="tv-queue__next">
+            {waiting.map((row, index) => (
+              <motion.span key={row.id} layoutId={`tv-q-${row.id}`} transition={glide} className="tv-queue__name tv-t-info" data-testid="tv-queue-next">
+                <span className="tv-faint">{index + 1}.</span> {row.display_name}
+              </motion.span>
+            ))}
+            {!waiting.length ? <span className="tv-t-info tv-faint">—</span> : null}
+          </div>
+        </div>
+      </div>
+    </LayoutGroup>
+  );
+}
+
 /** Der Bestzeit-Moment: ein Band über der Liste. */
 function BestMoment({ best }) {
   const entry = best.entry;
   return (
-    <div className="tv-best" role="status" data-testid="tv-best-moment" data-user={entry.user_id}>
+    <div className="tv-best" role="status" data-testid="tv-best-moment" data-user={participantKey(entry)}>
       <TvFace name={entry.display_name} avatar={entry.avatar_url || ""} className="tv-best__face" />
       <div className="tv-best__mid">
         <div className="tv-best__kicker font-heading">Neue Bestzeit!</div>
@@ -61,6 +119,7 @@ function FastLapTv() {
   const [challenge, setChallenge] = useState(null);
   const [activeTrackIdx, setActiveTrackIdx] = useState(0);
   const [board, setBoard] = useState(null);
+  const [lineUp, setLineUp] = useState(null);
   const [shown, setShown] = useState(null);
   const [chips, setChips] = useState(() => new Map());
   const [challengeError, setChallengeError] = useState(null);
@@ -101,6 +160,13 @@ function FastLapTv() {
       setLastUpdated(Date.now());
     } catch (error) {
       setBoardError(error);
+    }
+    try {
+      const { data } = await api.get(`/f1/challenges/${id}/queue?track_id=${activeTrack.id}`);
+      setLineUp(data);
+    } catch {
+      // Ohne Liste zeigt das TV einfach die Rangliste.
+      setLineUp(null);
     }
   }, [activeTrack, id]);
   useEffect(() => {
@@ -229,7 +295,7 @@ function FastLapTv() {
   const trackCount = challenge.tracks?.length || 1;
   const prevTrack = () => challenge.tracks?.length && setActiveTrackIdx((i) => (i - 1 + challenge.tracks.length) % challenge.tracks.length);
   const nextTrack = () => challenge.tracks?.length && setActiveTrackIdx((i) => (i + 1) % challenge.tracks.length);
-  const chipOf = (entry) => chips.get(entry.user_id) || null;
+  const chipOf = (entry) => chips.get(participantKey(entry)) || null;
   const layoutTransition = motionOn ? { layout: { duration: 0.85, ease: [0.22, 1, 0.36, 1] } } : { duration: 0 };
 
   return (
@@ -238,7 +304,7 @@ function FastLapTv() {
         kicker="THE LION SQUAD · FAST LAP"
         title={challenge.title}
         aside={(
-          <div className="flex items-center gap-[calc(var(--tv-u)*1.6)]">
+          <div className="flex items-center gap-[calc(var(--tv-u)*1.6)] max-w-[45vw] min-w-0">
             {track?.image_url ? (
               <div className="w-[calc(var(--tv-u)*16)] h-[calc(var(--tv-u)*8.5)] border border-[color:var(--tv-line)] bg-black/50 rounded-sm overflow-hidden flex items-center justify-center shrink-0">
                 <img src={resolveMediaUrl(track.image_url)} alt="" className="w-full h-full object-contain" />
@@ -246,7 +312,7 @@ function FastLapTv() {
             ) : null}
             <div className="text-right min-w-0">
               <div className="tv-kicker tv-t-meta tv-faint">Strecke {activeTrackIdx + 1} / {trackCount}</div>
-              <div className="tv-t-title font-heading font-black uppercase tv-accent" data-testid="tv-track-name">{track?.name || activeTrack?.name || "—"}</div>
+              <div className="tv-t-title font-heading font-black uppercase tv-accent [overflow-wrap:anywhere]" data-testid="tv-track-name">{track?.name || activeTrack?.name || "—"}</div>
               {track?.country ? <div className="tv-t-info tv-muted">{track.country}</div> : null}
               {trackCount > 1 ? (
                 <div className="mt-[calc(var(--tv-u)*0.6)] flex items-center justify-end gap-[calc(var(--tv-u)*0.6)]">
@@ -279,7 +345,7 @@ function FastLapTv() {
             const chip = chipOf(entry);
             return (
               <motion.div
-                key={entry.user_id}
+                key={participantKey(entry)}
                 layout="position"
                 initial={motionOn ? { y: 30, opacity: 0 } : false}
                 animate={{ y: 0, opacity: 1 }}
@@ -287,7 +353,7 @@ function FastLapTv() {
                 className={`tv-card tv-podium relative px-[calc(var(--tv-u)*2)] pt-[calc(var(--tv-u)*2.6)] pb-[calc(var(--tv-u)*1.4)] ${chip ? (chip.kind === "best" ? "tv-lap-row--best" : "tv-lap-row--hot") : ""}`}
                 style={{ borderColor: chip ? undefined : `color-mix(in srgb, ${medalColors[i]} 60%, transparent)`, borderWidth: "max(2px, calc(var(--tv-u) * 0.2))" }}
                 data-testid="tv-podium"
-                data-user={entry.user_id}
+                data-user={participantKey(entry)}
               >
                 <div className="absolute top-0 left-[calc(var(--tv-u)*2)] -translate-y-1/2 px-[0.6em] py-[0.15em] tv-t-num font-display font-black" style={{ backgroundColor: medalColors[i], color: "#000" }}>
                   P{i + 1}
@@ -295,9 +361,9 @@ function FastLapTv() {
                 <div className="tv-t-name font-heading font-black uppercase" data-tv-name="1" data-fit={(entry.display_name || "").length > 20 ? "small" : undefined}>{entry.display_name}</div>
                 <div className="tv-t-hero font-display font-bold" style={{ color: medalColors[i] }}>{entry.time_str}</div>
                 {chip ? (
-                  <div className={`tv-lap-chip ${chip.kind === "best" ? "tv-lap-chip--best" : ""}`} data-testid={`tv-lap-chip-${entry.user_id}`}>{chip.text}</div>
+                  <div className={`tv-lap-chip ${chip.kind === "best" ? "tv-lap-chip--best" : ""}`} data-testid={`tv-lap-chip-${participantKey(entry)}`}>{chip.text}</div>
                 ) : (
-                  <div className="tv-t-info tv-muted">{entry.gap_str || "Bestzeit"} · {entry.attempts} Versuche</div>
+                  <div className="tv-t-info tv-muted">{entry.gap_str || "Bestzeit"} · {view?.max_attempts ? `${entry.attempts} von ${view.max_attempts} Versuchen` : `${entry.attempts} Versuche`}</div>
                 )}
               </motion.div>
             );
@@ -307,20 +373,22 @@ function FastLapTv() {
           )}
         </div>
 
+        <QueueBand queue={lineUp} motionOn={motionOn} />
+
         <div ref={listRef} className="flex-1 min-h-0 overflow-hidden flex flex-col gap-[calc(var(--tv-u)*0.5)]" data-testid="tv-lap-list">
           {/* Ohne Ausblenden beim Wegfallen: eine Zeile, die gerade ausblendet, belegte noch Platz - die Liste liefe kurz über. */}
           {restFit.shown.map((entry, i) => {
             const chip = chipOf(entry);
             return (
               <motion.div
-                key={entry.user_id}
+                key={participantKey(entry)}
                 layout="position"
                 initial={motionOn ? { x: -20, opacity: 0 } : false}
                 animate={{ x: 0, opacity: 1 }}
                 transition={motionOn ? { delay: i * 0.03, ...layoutTransition } : { duration: 0 }}
                 className={`tv-card grid grid-cols-12 items-center gap-[var(--tv-gap)] px-[calc(var(--tv-u)*1.6)] py-[calc(var(--tv-u)*0.6)] ${chip ? (chip.kind === "best" ? "tv-lap-row--best" : "tv-lap-row--hot") : ""}`}
                 data-testid="tv-lap-row"
-                data-user={entry.user_id}
+                data-user={participantKey(entry)}
                 data-rank={entry.rank}
               >
                 <div className="col-span-1 tv-t-num font-display font-bold tv-accent">{entry.rank}</div>
@@ -331,7 +399,7 @@ function FastLapTv() {
                 <div className="col-span-2 text-right tv-t-num font-display font-bold">{entry.time_str}</div>
                 <div className="col-span-3 flex justify-end min-w-0">
                   {chip ? (
-                    <span className={`tv-lap-chip ${chip.kind === "best" ? "tv-lap-chip--best" : ""}`} data-testid={`tv-lap-chip-${entry.user_id}`}>{chip.text}</span>
+                    <span className={`tv-lap-chip ${chip.kind === "best" ? "tv-lap-chip--best" : ""}`} data-testid={`tv-lap-chip-${participantKey(entry)}`}>{chip.text}</span>
                   ) : <span className="tv-t-info tv-muted tabular-nums">{entry.gap_str}</span>}
                 </div>
               </motion.div>
@@ -346,7 +414,7 @@ function FastLapTv() {
             <div className="tv-t-meta tv-muted">Zielzeiten zum Schlagen, nicht Teil der offiziellen Rangliste.</div>
             <div className="mt-[calc(var(--tv-u)*0.8)] grid grid-cols-3 gap-[var(--tv-gap)]">
               {references.slice(0, 3).map((entry) => (
-                <div key={entry.user_id} className="tv-card px-[calc(var(--tv-u)*1.2)] py-[calc(var(--tv-u)*0.6)]">
+                <div key={participantKey(entry)} className="tv-card px-[calc(var(--tv-u)*1.2)] py-[calc(var(--tv-u)*0.6)]">
                   <div className="flex items-center justify-between gap-[var(--tv-gap)]">
                     <span className="tv-t-num font-display font-bold tv-gold">#{entry.rank}</span>
                     <span className="tv-t-num font-display font-bold tabular-nums">{entry.time_str}</span>
