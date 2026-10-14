@@ -62,3 +62,25 @@ async def test_leerer_header_wird_abgelehnt(flow):
     assert res.status_code == 409, res.text
     stored = await flow.db.users.find_one({"id": anna["id"]}, {"_id": 0, "bio": 1})
     assert (stored or {}).get("bio") in (None, "")
+
+
+@pytest.mark.asyncio
+async def test_autosave_schickt_felder_einzeln_und_alles_bleibt(flow):
+    """Profil speichert von selbst (#1048): jede Änderung geht als eigener kleiner PATCH mit dem Header. Was vorher
+    gespeichert wurde, bleibt stehen; neu gelesen ist alles da und updated_at ist der neueste Stand."""
+    anna = await flow.add_user(name="anna")
+    flow.act_as(anna)
+    headers = {"X-Expected-User-Id": anna["id"]}
+    first = await flow.patch("/api/users/me", json={"bio": "Von selbst gespeichert"}, headers=headers)
+    assert first.status_code == 200, first.text
+    second = await flow.patch("/api/users/me", json={"privacy_public_profile": False}, headers=headers)
+    assert second.status_code == 200, second.text
+    assert second.json()["bio"] == "Von selbst gespeichert"
+    assert second.json()["updated_at"] >= first.json()["updated_at"]
+
+    # Neu laden: das eigene Konto frisch aus der Datenbank (die Sitzung im Prüfstand ist fest).
+    reloaded = await flow.get(f"/api/users/{anna['id']}")
+    assert reloaded.status_code == 200, reloaded.text
+    assert reloaded.json()["bio"] == "Von selbst gespeichert"
+    assert reloaded.json()["privacy_public_profile"] is False
+    assert reloaded.json()["updated_at"] == second.json()["updated_at"]
