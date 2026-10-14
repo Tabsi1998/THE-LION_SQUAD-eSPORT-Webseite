@@ -18,9 +18,18 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 
 from services.fastlap_standings import GUEST_PREFIX
+from services.mutation_lock import MutationLockBusy, mutation_lock
 
 GUEST_NAME_MAX = 40
 GUEST_NAME_DAYS = 90
+# Wartet der Job zu lange auf eine Challenge, lässt er sie aus - der nächste Lauf (täglich) holt sie nach.
+EXPIRE_WAIT_SECONDS = 2.0
+
+
+def challenge_write_resource(challenge_id: str) -> str:
+    """Die Schreib-Sperre einer Fast Lap (#1585): Zeiten, Gäste, Liste „Am Start“ und Veröffentlichung ändern sich nur
+    unter ihr - auch der Fristen-Job. Die Routen nutzen sie über ``routes.f1_routes.challenge_write``."""
+    return f"fastlap:{challenge_id}:write"
 
 
 def clean_guest_name(value) -> str:
@@ -78,16 +87,24 @@ async def ensure_unique_name(db, challenge_id: str, name: str, *, current_id: st
             raise HTTPException(status_code=409, detail="Diesen Namen gibt es schon - bitte unterscheidbar machen, z. B. „Max B.“.")
 
 
-async def expire_guest_names(db, *, now: datetime | None = None) -> int:
-    """Gast-Namen nach ``GUEST_NAME_DAYS`` durch „Gast <Nummer>“ ersetzen. Gibt die Zahl der ersetzten Namen zurück."""
+async def expire_guest_names(db, *, now: datetime | None = None, wait_seconds: float = EXPIRE_WAIT_SECONDS) -> int:
+    """Gast-Namen nach ``GUEST_NAME_DAYS`` durch „Gast <Nummer>“ ersetzen - je Challenge unter ihrer Schreib-Sperre;
+    ist sie belegt, bleibt die Challenge bis zum nächsten Lauf. Gibt die Zahl der ersetzten Namen zurück."""
     current = now or datetime.now(timezone.utc)
     cutoff = (current - timedelta(days=GUEST_NAME_DAYS)).isoformat()
+    due = {"created_at": {"$lt": cutoff}, "name_expired_at": None}
     changed = 0
-    async for row in db.f1_guests.find({"created_at": {"$lt": cutoff}, "name_expired_at": None}, {"_id": 0, "id": 1, "number": 1}):
-        await db.f1_guests.update_one({"id": row["id"]}, {"$set": {
-            "display_name": f"Gast {row.get('number') or ''}".strip(),
-            "name_expired_at": current.isoformat(),
-            "updated_at": current.isoformat(),
-        }})
-        changed += 1
+    for challenge_id in sorted(cid for cid in await db.f1_guests.distinct("challenge_id", due) if cid):
+        try:
+            async with mutation_lock(db, challenge_write_resource(challenge_id), wait_seconds=wait_seconds):
+                stamp = current.isoformat()
+                async for row in db.f1_guests.find({**due, "challenge_id": challenge_id}, {"_id": 0, "id": 1, "number": 1}):
+                    await db.f1_guests.update_one({"id": row["id"], "name_expired_at": None}, {"$set": {
+                        "display_name": f"Gast {row.get('number') or ''}".strip(),
+                        "name_expired_at": stamp,
+                        "updated_at": stamp,
+                    }})
+                    changed += 1
+        except MutationLockBusy:
+            continue
     return changed

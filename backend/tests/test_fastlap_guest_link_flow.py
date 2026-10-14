@@ -371,3 +371,97 @@ async def test_everything_at_once_finishes_without_a_deadlock(flow):
     answers = await asyncio.wait_for(asyncio.gather(*calls), timeout=20)
     assert all(response.status_code < 500 for response in answers), [response.text for response in answers]
     assert await flow.db.f1_lap_times.count_documents({"challenge_id": cid, "guest_id": guest["id"], "user_id": None}) == 0
+
+
+# ------------------------------------------------------------------ Nachprüfung 4: jede Änderung unter der Schreib-Sperre
+
+@pytest_asyncio.fixture
+async def held_write(flow, monkeypatch):
+    """Hält die Schreib-Sperre einer Challenge, solange der Test es will - Routen müssen dann warten (409)."""
+    from contextlib import asynccontextmanager
+
+    from routes import f1_routes
+    from services.mutation_lock import mutation_lock
+
+    monkeypatch.setattr(f1_routes, "WRITE_WAIT_SECONDS", 0.2)
+
+    @asynccontextmanager
+    async def hold(cid):
+        async with mutation_lock(flow.db, f1_routes.write_resource(cid), wait_seconds=1, lease_seconds=30, retry_seconds=0.05):
+            yield
+
+    return hold
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["up", "start", "delete", "next"])
+async def test_every_queue_change_waits_for_the_write_lock(flow, held_write, action):
+    cid, tid, _lead, _helper = await setup(flow)
+    first, second = await flow.add_user(name="erste"), await flow.add_user(name="zweite")
+    for who in (first, second):
+        response = await flow.post(f"/api/f1/challenges/{cid}/queue", json={"user_id": who["id"], "track_id": tid})
+        assert response.status_code == 200
+    rows = await flow.db.f1_queue.find({"challenge_id": cid}, {"_id": 0}).sort("order", 1).to_list(5)
+    async with held_write(cid):
+        if action == "up":
+            response = await flow.post(f"/api/f1/queue/{rows[1]['id']}/up")
+        elif action == "start":
+            response = await flow.post(f"/api/f1/queue/{rows[1]['id']}/start", json={})
+        elif action == "delete":
+            response = await flow.delete(f"/api/f1/queue/{rows[1]['id']}")
+        else:
+            response = await flow.post(f"/api/f1/challenges/{cid}/queue/next", json={})
+    assert response.status_code == 409
+    after = await flow.db.f1_queue.find({"challenge_id": cid}, {"_id": 0}).sort("order", 1).to_list(5)
+    assert [(row["id"], row["state"], row["order"]) for row in after] == [(row["id"], row["state"], row["order"]) for row in rows]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("what", ["challenge", "track"])
+async def test_deleting_waits_for_the_write_lock(flow, held_write, what):
+    cid, tid, _lead, _helper = await setup(flow)
+    guest = await add_guest(flow, cid)
+    await enter(flow, cid, tid, guest=guest)
+    async with held_write(cid):
+        if what == "challenge":
+            response = await flow.delete(f"/api/f1/challenges/{cid}")
+        else:
+            response = await flow.delete(f"/api/f1/tracks/{tid}")
+    assert response.status_code == 409
+    assert await flow.db.f1_lap_times.count_documents({"challenge_id": cid}) == 1
+    assert await flow.db.f1_tracks.count_documents({"id": tid}) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["create", "rename"])
+async def test_guest_changes_wait_for_the_write_lock(flow, held_write, action):
+    cid, _tid, _lead, _helper = await setup(flow)
+    guest = await add_guest(flow, cid, "Anna")
+    async with held_write(cid):
+        if action == "create":
+            response = await flow.post(f"/api/f1/challenges/{cid}/guests", json={"display_name": "Ben"})
+        else:
+            response = await flow.patch(f"/api/f1/guests/{guest['id']}", json={"display_name": "Anna K."})
+    assert response.status_code == 409
+    assert [row["display_name"] for row in await flow.db.f1_guests.find({"challenge_id": cid}).to_list(5)] == ["Anna"]
+
+
+@pytest.mark.asyncio
+async def test_the_retention_job_skips_a_busy_challenge_and_catches_up_later(flow):
+    from datetime import datetime, timedelta, timezone
+
+    from routes import f1_routes
+    from services.fastlap_guests import GUEST_NAME_DAYS, expire_guest_names
+    from services.mutation_lock import mutation_lock
+
+    busy, _tid, _lead, _helper = await setup(flow)
+    calm, *_ = await setup(flow)
+    first, second = await add_guest(flow, busy, "Anna"), await add_guest(flow, calm, "Ben")
+    past = (datetime.now(timezone.utc) - timedelta(days=GUEST_NAME_DAYS + 1)).isoformat()
+    await flow.db.f1_guests.update_many({}, {"$set": {"created_at": past}})
+    async with mutation_lock(flow.db, f1_routes.write_resource(busy), wait_seconds=1, lease_seconds=30, retry_seconds=0.05):
+        assert await expire_guest_names(flow.db, wait_seconds=0.1) == 1
+    names = {row["id"]: row["display_name"] for row in await flow.db.f1_guests.find({}).to_list(5)}
+    assert names == {first["id"]: "Anna", second["id"]: "Gast 1"}
+    assert await expire_guest_names(flow.db, wait_seconds=0.1) == 1
+    assert (await flow.db.f1_guests.find_one({"id": first["id"]}))["display_name"] == "Gast 1"

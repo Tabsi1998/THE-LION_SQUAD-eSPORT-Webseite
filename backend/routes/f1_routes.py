@@ -23,6 +23,7 @@ from services.fastlap_standings import (
     REFERENCE_SCOPE, effective_ms, load_laps, official_times, participant_id, penalty_ms, rank_laps, track_ranking,
 )
 from services.fastlap_guests import (
+    challenge_write_resource as write_resource,
     clean_guest_name, ensure_unique_name, find_guest, guest_participant_id, guest_payload, guests_by_id,
 )
 from services.laptime import format_lap_time, plausibility_warning, plausible_range
@@ -162,17 +163,14 @@ async def check_lap_time(db, challenge: dict, lap: dict, *, current: dict | None
 router = APIRouter(prefix="/api/f1", tags=["f1"])
 
 # Eine Sperre je Challenge für alles, was über Wertung und Personen entscheidet (#1585, Nachprüfung): Zeiten eintragen,
-# korrigieren, löschen, in die Liste „Am Start“ setzen, einen Gast verknüpfen und die Challenge ändern (auch
-# Veröffentlichen und Zurücknehmen). Wer sie hält, liest Gast-Status, Veröffentlichung und Begründung frisch - sonst
+# korrigieren, löschen, Gäste anlegen, umbenennen und verknüpfen, jede Änderung an „Am Start / Als Nächstes“, Challenge
+# oder Strecke löschen und die Challenge ändern (auch Veröffentlichen und Zurücknehmen); dazu der Fristen-Job für
+# Gast-Namen (``expire_guest_names``). Wer sie hält, liest Gast-Status, Veröffentlichung und Begründung frisch - sonst
 # könnte etwa eine Zeit nach dem Verknüpfen noch als Gast landen. Reihenfolge, damit sich nichts gegenseitig blockiert:
 # diese Sperre zuerst, darin die Gast-Sperre, die Listen-Sperre, die Versuchs-Sperre je Person und zuletzt die
 # Abgleich-Sperre (``results_resource``). Keine Route nimmt eine davon und danach diese.
 WRITE_WAIT_SECONDS = 10.0
 WRITE_BUSY = "Gerade wird an dieser Fast Lap gespeichert - bitte gleich noch einmal versuchen."
-
-
-def write_resource(challenge_id: str) -> str:
-    return f"fastlap:{challenge_id}:write"
 
 
 @asynccontextmanager
@@ -951,8 +949,14 @@ async def _award_f1_season_points(challenge: dict):
 
 @router.delete("/challenges/{cid}")
 async def delete_challenge(cid: str, me: dict = Depends(require_admin())):
-    db = get_db()
     cid = await _resolve_cid(cid)
+    async with challenge_write(cid):
+        return await _delete_challenge_locked(cid)
+
+
+async def _delete_challenge_locked(cid: str):
+    db = get_db()
+    # Frisch unter der Schreib-Sperre: der Status kann sich gerade geändert haben.
     current = await db.f1_challenges.find_one({"id": cid}, {"_id": 0, "status": 1}) or {}
     # Veröffentlichte Ergebnisse verschwinden nicht mit der Challenge (#1584) - dafür gibt es „Archiviert“.
     if current.get("status") in LOCKED_STATUSES and await db.f1_lap_times.count_documents({"challenge_id": cid}):
@@ -1010,6 +1014,14 @@ async def update_track(tid: str, body: F1TrackUpdate, me: dict = Depends(require
 
 @router.delete("/tracks/{tid}")
 async def delete_track(tid: str, me: dict = Depends(require_admin())):
+    known = await get_db().f1_tracks.find_one({"id": tid}, {"_id": 0, "challenge_id": 1})
+    if not known:
+        return {"ok": True}
+    async with challenge_write(known.get("challenge_id")):
+        return await _delete_track_locked(tid)
+
+
+async def _delete_track_locked(tid: str):
     db = get_db()
     track = await db.f1_tracks.find_one({"id": tid}, {"_id": 0, "challenge_id": 1}) or {}
     challenge = await db.f1_challenges.find_one({"id": track.get("challenge_id")}, {"_id": 0, "status": 1}) or {}
@@ -1348,8 +1360,13 @@ async def list_guests(cid: str, me: dict = Depends(get_current_user)):
 @router.post("/challenges/{cid}/guests")
 async def create_guest(cid: str, body: F1GuestCreate, me: dict = Depends(get_current_user)):
     """Einen Gast anlegen - nur mit Anzeigenamen; ein Konto braucht er nicht. Dürfen Leitung und Fast-Lap-Team."""
-    db = get_db()
     cid = await _resolve_cid(cid)
+    async with challenge_write(cid):
+        return await _create_guest_locked(cid, body, me)
+
+
+async def _create_guest_locked(cid: str, body: F1GuestCreate, me: dict):
+    db = get_db()
     await _require_f1_result_permission(me, cid)
     name = clean_guest_name(body.display_name)
     try:
@@ -1372,6 +1389,14 @@ async def rename_guest(gid: str, body: F1GuestRename, me: dict = Depends(get_cur
     steht in Rangliste und Urkunde: nach der Veröffentlichung gilt dieselbe Sperre wie für Zeiten (Helfer nicht, Leitung
     mit Begründung), und jedes Umbenennen steht im Protokoll - nur mit Kennungen. Den Ablauf nach der Frist macht der
     Job ``expire_guest_names`` ohne diese Route."""
+    known = await get_db().f1_guests.find_one({"id": gid}, {"_id": 0, "challenge_id": 1})
+    if not known:
+        raise HTTPException(status_code=404, detail="Gast nicht gefunden")
+    async with challenge_write(known["challenge_id"]):
+        return await _rename_guest_locked(gid, body, me)
+
+
+async def _rename_guest_locked(gid: str, body: F1GuestRename, me: dict):
     db = get_db()
     guest = await db.f1_guests.find_one({"id": gid}, {"_id": 0})
     if not guest:
@@ -1546,6 +1571,13 @@ def _clean_station(value) -> str | None:
     return text[:40] or None
 
 
+async def _queue_challenge_id(qid: str) -> str:
+    entry = await get_db().f1_queue.find_one({"id": qid}, {"_id": 0, "challenge_id": 1})
+    if not entry:
+        raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
+    return entry["challenge_id"]
+
+
 async def _queue_entry(db, qid: str, me: dict) -> dict:
     entry = await db.f1_queue.find_one({"id": qid}, {"_id": 0})
     if not entry:
@@ -1666,6 +1698,11 @@ async def _add_to_queue_locked(cid: str, body: F1QueueCreate, me: dict):
 
 @router.post("/queue/{qid}/up")
 async def move_up_in_queue(qid: str, me: dict = Depends(get_current_user)):
+    async with challenge_write(await _queue_challenge_id(qid)):
+        return await _move_up_locked(qid, me)
+
+
+async def _move_up_locked(qid: str, me: dict):
     db = get_db()
     entry = await _queue_entry(db, qid, me)
     try:
@@ -1688,6 +1725,11 @@ async def move_up_in_queue(qid: str, me: dict = Depends(get_current_user)):
 
 @router.post("/queue/{qid}/start")
 async def start_from_queue(qid: str, body: F1QueueStart | None = None, me: dict = Depends(get_current_user)):
+    async with challenge_write(await _queue_challenge_id(qid)):
+        return await _start_locked(qid, body, me)
+
+
+async def _start_locked(qid: str, body: F1QueueStart | None, me: dict):
     db = get_db()
     entry = await _queue_entry(db, qid, me)
     try:
@@ -1705,6 +1747,11 @@ async def start_from_queue(qid: str, body: F1QueueStart | None = None, me: dict 
 
 @router.delete("/queue/{qid}")
 async def remove_from_queue(qid: str, me: dict = Depends(get_current_user)):
+    async with challenge_write(await _queue_challenge_id(qid)):
+        return await _remove_locked(qid, me)
+
+
+async def _remove_locked(qid: str, me: dict):
     db = get_db()
     entry = await _queue_entry(db, qid, me)
     try:
@@ -1720,8 +1767,13 @@ async def remove_from_queue(qid: str, me: dict = Depends(get_current_user)):
 @router.post("/challenges/{cid}/queue/next")
 async def next_in_queue(cid: str, body: F1QueueNext | None = None, me: dict = Depends(get_current_user)):
     """„Nächster Fahrer“: wer fertig ist, verlässt die Liste; der Erste, der wartet, geht an dieselbe Station."""
-    db = get_db()
     cid = await _resolve_cid(cid)
+    async with challenge_write(cid):
+        return await _next_locked(cid, body, me)
+
+
+async def _next_locked(cid: str, body: F1QueueNext | None, me: dict):
+    db = get_db()
     await _require_f1_result_permission(me, cid)
     body = body or F1QueueNext()
     try:
