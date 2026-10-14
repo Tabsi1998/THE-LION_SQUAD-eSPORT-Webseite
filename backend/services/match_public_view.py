@@ -58,4 +58,5 @@ def public_tournament_view(tournament: dict | None) -> dict | None:
     Turnierleitung (`heat_rebuild_plan`, #1550) - wie die öffentliche Turnierseite."""
     if not isinstance(tournament, dict):
         return tournament
-    return {key: value for key, value in tournament.items() if key not in {"billing", "heat_rebuild_plan", "heat_rebuild_dismissed"}}
+    return {key: value for key, value in tournament.items()
+            if key not in {"billing", "heat_rebuild_plan", "heat_rebuild_dismissed", "participant_removal_plan"}}

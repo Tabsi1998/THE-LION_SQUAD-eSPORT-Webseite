@@ -98,6 +98,49 @@ async def _close_disputes(db, match: dict, actor_id: str, now_iso: str) -> None:
     }})
 
 
+async def eliminated_registration_ids(db, tournament_id: str | None) -> set[str]:
+    """Wer disqualifiziert oder ausgetreten ist (#1553), rückt bei keinem Ergebnis und keiner Korrektur mehr ein."""
+    if not tournament_id:
+        return set()
+    rows = await db.tournament_registrations.find(
+        {"tournament_id": tournament_id, "status": {"$in": ["withdrawn", "disqualified"]}}, {"_id": 0, "id": 1},
+    ).to_list(1000)
+    return {row["id"] for row in rows if row.get("id")}
+
+
+async def _finish_reset_side_effects(db, match: dict, reset_docs: list[dict], now_iso: str) -> None:
+    """Folgespiele, die eine Korrektur zurückgesetzt hat (#1553, Ziel 4): Station und Aufruf frei, die Spieler der
+    alten Paarung informiert (auch, wer nicht mehr drinsteht), ein Anzeige-Ereignis für Baum und TV."""
+    from services.change_events import publish_tournament_event
+    from services.match_audience import playing_user_ids, registrations_for_match
+    from services.user_notifications import create_user_notification
+
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "title": 1}) or {}
+    for before in reset_docs:
+        try:
+            await release_station_for_match(db, before, "matches_v2")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Station release failed for reset match=%s type=%s", before.get("id"), type(exc).__name__)
+        try:
+            registrations = await registrations_for_match(db, before)
+            name = before.get("round_name") or before.get("match_key") or "Dein Spiel"
+            for user_id in sorted(await playing_user_ids(db, registrations)):
+                await create_user_notification(
+                    user_id, "Paarung geändert",
+                    f"{tournament.get('title') or 'Turnier'}: {name} wurde nach einer Korrektur neu gesetzt. "
+                    "Bitte die neue Paarung und den Aufruf abwarten.",
+                    url=f"/matches/{before.get('id')}", kind="match_result",
+                    meta={"match_id": before.get("id"), "tournament_id": before.get("tournament_id"),
+                          "reason": "pairing_changed", "dedupe_key": f"pairing-changed:{before.get('id')}:{now_iso}"},
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Reset notice failed for match=%s type=%s", before.get("id"), type(exc).__name__)
+    try:
+        await publish_tournament_event(str(match.get("tournament_id") or ""), "result_corrected", match_ids=[match.get("id")])
+    except Exception:  # noqa: BLE001
+        pass
+
+
 async def _finish_result_side_effects(db, match: dict, force: bool, dispute_resolved: bool = False) -> None:
     # Bracket im Discord (#571): jedes bestätigte Ergebnis merkt das Turnier für die nächste Bearbeitung vor.
     try:
@@ -196,6 +239,9 @@ async def submit_v2_result(
     ).to_list(3000)
     now_iso = now_utc().isoformat()
     report_id, normalized_results = _submission_identity(match, raw_results, proof_url, note, force)
+    # Die Paarung vor der Korrektur (#1553): der Anwender setzt die Plätze der Folgespiele direkt um; wer vorher
+    # drinstand, soll trotzdem erfahren, dass sein Spiel neu gesetzt wurde.
+    seats_before = {row["id"]: [dict(slot) for slot in row.get("slots") or []] for row in stage_matches if row.get("id")}
     application = build_v2_result_application(
         match,
         stage_matches,
@@ -205,9 +251,12 @@ async def submit_v2_result(
         proof_url=proof_url,
         note=note,
         force=force,
+        eliminated=await eliminated_registration_ids(db, match.get("tournament_id")),
     )
     advanced_match_ids = list(application["target_sets"].keys())
     reset_matches = application.get("reset_matches") or []
+    reset_ids = {row["id"] for row in reset_matches}
+    reset_docs = [{**row, "slots": seats_before.get(row["id"]) or []} for row in stage_matches if row.get("id") in reset_ids]
     # Eine Wertung „nicht erschienen“, die nicht mehr gilt (#1035): die Korrektur nimmt Wertung, Begründung und den
     # Eintrag bei der Person zurück - am Spiel selbst und in zurückgesetzten Folgespielen.
     withdrawn = _withdrawn_walkovers(match, application, reset_matches)
@@ -277,6 +326,8 @@ async def submit_v2_result(
         await _close_disputes(db, match, actor_id, now_iso)
     updated = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
     await _finish_result_side_effects(db, updated, force, dispute_resolved=dispute_resolved)
+    if reset_docs:
+        await _finish_reset_side_effects(db, updated, reset_docs, now_iso)
     # Unterbesetzte Läufe (#1550): jedes Ergebnis - auch Korrektur, Wertung und Freilos-Kette - ändert, was die
     # Folgeläufe erwarten; der Aufrufer hält die Turnier-Schreibsperre.
     from services.heat_rebuild import evaluate_after_write

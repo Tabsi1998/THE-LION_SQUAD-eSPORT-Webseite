@@ -322,7 +322,8 @@ def current_matchday_number(plan: dict, now: datetime | None = None) -> int | No
 # "manual") wird nie überschrieben; erledigte oder laufende Partien auch nicht.
 
 SCHEDULE_SOURCES = ("accepted", "home", "default", "manual")
-FROZEN_MATCH_STATUSES = frozenset({"running", "in_progress", "waiting_result", "completed", "archived", "forfeit", "bye", "no_show"})
+# Entfallene Spiele (Austritt, annulliert, zusammengelegt - #1553/#1550) bekommen keinen Termin mehr.
+FROZEN_MATCH_STATUSES = frozenset({"running", "in_progress", "waiting_result", "completed", "archived", "forfeit", "bye", "no_show", "cancelled"})
 
 
 def schedule_writes(tournament: dict, matches, proposals=None) -> list[dict]:

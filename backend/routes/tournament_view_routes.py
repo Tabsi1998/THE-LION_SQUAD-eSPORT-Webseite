@@ -225,6 +225,9 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
     is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
     read_model = await load_competition_read_model(db, tid)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+    # Austritt/Disqualifikation mit annullierten Spielen (#1553, 50-Prozent-Regel): raus aus der Tabelle. Wer mit
+    # kampflosen Niederlagen ausgeschieden ist, bleibt mit ihnen drin.
+    regs = [r for r in regs if (r.get("removal") or {}).get("mode") != "annulled"]
     regs = [_public_registration(r, user, is_staff) for r in regs]
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
