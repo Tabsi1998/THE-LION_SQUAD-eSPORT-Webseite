@@ -469,6 +469,20 @@ test("Stream-Betreuung: nur die Werkzeuge zum Lesen, kein Check-in, kein Entfern
   expect(apiMock.get.mock.calls.map(([url]) => String(url))).not.toContain("/admin/choices/teams");
 });
 
+test("Disqualifizieren und Austritt (#1553): nur mit Struktur-Recht und nur im laufenden Turnier", async () => {
+  authState.lead = false;
+  serveTournament({ can_use_staff_tools: true, can_check_in: true, can_manage_participants: true, can_manage_results: true });
+  const { unmount } = renderPage();
+  await screen.findAllByText("Max Muster");
+  expect(screen.queryByTestId("admin-reg-disqualify-r-1")).toBeNull();
+  unmount();
+  serveTournament({ can_use_staff_tools: true, can_manage_structure: true, status: "live" });
+  renderPage();
+  await screen.findAllByText("Max Muster");
+  expect(screen.getAllByTestId("admin-reg-disqualify-r-1").length).toBeGreaterThan(0);
+  expect(screen.getAllByTestId("admin-reg-withdraw-r-1").length).toBeGreaterThan(0);
+});
+
 test("Ergebnisdienst: Check-in und Teilnehmer ja, Turnierbaum zurücksetzen nein", async () => {
   authState.lead = false;
   serveTournament({ can_use_staff_tools: true, can_check_in: true, can_manage_participants: true, can_manage_results: true });
