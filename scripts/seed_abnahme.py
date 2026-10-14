@@ -39,6 +39,7 @@ PROJECT = os.environ.get("ABNAHME_PROJECT", "lsw-abnahme")
 ABNAHME_DB_NAME = "tls_abnahme"
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 PRODUCTION = {"production", "prod"}
+MONGO_HOSTS = {"mongodb", *LOCAL_HOSTS}
 # Testwerte, nur für diesen lokalen Stack. Das TOTP-Geheimnis ist das Beispiel aus RFC 6238.
 TEST_PASSWORD = "Abnahme-Testpasswort-2026"
 TEST_TOTP_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
@@ -111,6 +112,22 @@ def host_main() -> int:
 
 # ------------------------------------------------------------------------------------------------ im Backend-Container
 
+
+def mongo_hosts(url: str) -> list[str] | None:
+    """Die Hosts einer Mongo-Adresse (auch mehrere, durch Komma) - None, wenn es keine einfache mongodb://-Adresse ist
+    (mongodb+srv:// zeigt immer auf einen entfernten Cluster)."""
+    if not url.startswith("mongodb://"):
+        return None
+    hosts = url[len("mongodb://"):].split("/", 1)[0].split("?", 1)[0].rsplit("@", 1)[-1]
+    return [entry[1:entry.find("]")] if entry.startswith("[") else entry.split(":", 1)[0] for entry in hosts.split(",")]
+
+
+def mongo_is_local(url: str) -> bool:
+    # Nur der Compose-Dienst „mongodb“ des Abnahme-Stacks oder dieser Rechner (Codex zu #1610).
+    hosts = mongo_hosts(url)
+    return bool(hosts) and all(host in MONGO_HOSTS for host in hosts)
+
+
 def abnahme_target_problems(env) -> list[str]:
     """Was dagegen spricht, in diese Umgebung zu schreiben - leer heißt: ein lokaler Abnahme-Stand."""
     from urllib.parse import urlsplit
@@ -129,6 +146,8 @@ def abnahme_target_problems(env) -> list[str]:
         host = urlsplit(value).hostname
         if host not in LOCAL_HOSTS:
             problems.append(f"{key} zeigt auf {host or '(leer)'!r}, nicht auf diesen Rechner")
+    if not mongo_is_local(str(env.get("MONGO_URL") or "")):
+        problems.append("MONGO_URL zeigt nicht auf die Datenbank des Abnahme-Stacks (Dienst mongodb) oder diesen Rechner")
     return problems
 
 
