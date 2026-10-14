@@ -4,17 +4,14 @@ name: CodeQL
 # Antwort) und findet Lücken, die Lint, Paket-Audits und der Geheimnis-Scan
 # nicht sehen. Das Repo ist seit Oktober 2026 öffentlich, damit kostet es
 # nichts mehr (#954); davor lief es nur von Hand.
-# Auslöser: Pull Requests und Merges nach main, die Code berühren, dazu einmal
-# die Woche (frische Regeln von GitHub) und von Hand. Reine Doku-Änderungen
-# und Entwürfe starten nichts.
+# Auslöser: jeder Pull Request (Pflicht-Ergebnis für die Regel auf main), Merges
+# nach main, die Code berühren, dazu einmal die Woche (frische Regeln von
+# GitHub) und von Hand. Entwürfe starten nichts.
 on:
+  # Bei Pull Requests ohne Pfad-Filter: Die Regel für main verlangt ein CodeQL-Ergebnis
+  # für jeden PR. Mit Filter wartete ein reiner Doku- oder Workflow-PR ewig darauf.
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - "mobile/**"
-      - ".github/workflows/codeql.yml"
   push:
     branches: [main]
     paths:
