@@ -154,6 +154,13 @@ export function pathFor(registrationId, matches = [], edges = []) {
   return result;
 }
 
+/** Wurde `row` in `target` zusammengelegt? Per Kennung (Web) oder - am TV, der nur Schlüssel bekommt - per Spiel-Schlüssel. */
+function mergedInto(row, target) {
+  if (!row || !target) return false;
+  if (row.merged_into) return row.merged_into === target.id;
+  return Boolean(row.merged_into_key) && row.merged_into_key === target.match_key && (row.stage_id || "") === (target.stage_id || "");
+}
+
 const resultSig = (match) => (match?.results || []).map((row) => `${row.registration_id}:${row.rank ?? ""}:${row.score ?? row.points ?? ""}`).sort().join(",");
 
 /**
@@ -188,7 +195,7 @@ export function diffBracket(previous, next) {
       const id = slot?.registration_id;
       if (!id || oldSlots.get(slot.slot)?.registration_id === id || playersOf(old).has(id)) continue;
       const source = normalizeSource(slot.source);
-      const mergedFrom = previous.find((row) => row.id !== match.id && nextById.get(row.id)?.merged_into === match.id && wasIn.get(`${row.id}:${id}`));
+      const mergedFrom = previous.find((row) => row.id !== match.id && mergedInto(nextById.get(row.id), match) && wasIn.get(`${row.id}:${id}`));
       if (mergedFrom) {
         moves.push({ key: `merge:${match.id}:${id}`, type: "merge", matchId: match.id, registrationId: id, from: { matchId: mergedFrom.id } });
       } else if (source?.type === "rank") {

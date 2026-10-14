@@ -12,14 +12,16 @@ import { TvChampionCard, avatarOfRegistration, nameOfRegistration } from "@/comp
 import { TvCallBoard } from "@/components/tv/TvCallBoard";
 import { TvLiveSlide, TvSlideBar, TvSponsorMoment, TvStatsSlide } from "@/components/tv/TvSlides";
 import { TvCheckInScreen, TvPauseScreen, TvRegistrationScreen } from "@/components/tv/TvScreens";
+import { TvNextUp } from "@/components/tv/TvNextUp";
 import { useLowMomentTimer, useMinuteTick, useTvSound, useTvSponsors } from "@/components/tv/tvHooks";
 import { lastStageId } from "@/lib/bracketPodium";
 import { bracketChanges, isLiveMatch } from "@/lib/tvLive";
 import { advancementsOf } from "@/lib/tvTravel";
 import { championKey, championOf } from "@/lib/tvChampion";
-import { COLLECT_AFTER, createMomentQueue } from "@/lib/tvMoments";
+import { COLLECT_AFTER, createMomentQueue, momentsFromChange } from "@/lib/tvMoments";
 import { advance, changesAfter, firstIndex, isDue, onlyMomentSlides, serializePlaylist } from "@/lib/tvPlaylist";
-import { callsOf, newCalls, nextPlanned } from "@/lib/tvCalls";
+import { callsOf, newCalls } from "@/lib/tvCalls";
+import { nextUp } from "@/lib/tvForecast";
 import { statsTiles } from "@/lib/tvStats";
 import { presentedBy, sponsorFor, sponsorPlan } from "@/lib/tvSponsors";
 import { tvScreenFor } from "@/lib/tvScreens";
@@ -31,9 +33,16 @@ import { viennaTime } from "@/lib/vienna";
 // Liste an, der Baum zeigt den Moment, danach läuft die Folie zu Ende. Ohne Spiel wählt der TV selbst: Pause, Check-in
 // oder Anmeldung (#1123). Immer nur ein Moment; nach dem Neuladen gleich der aktuelle Stand - ohne Fahrten, Zoom oder
 // Konfetti. Mit Anzeige-Schlüssel im Link läuft die Seite ohne Anmeldung.
+// Seit #1564 hat jedes Turnier-Ereignis seinen Moment (Auslosung, zusammengelegt, kampflos, korrigiert, entfällt) - aus
+// demselben Vergleich wie der Web-Baum, genau einmal. Nach einer Neuverbindung holt der TV den Stand ruhig nach, wie
+// beim ersten Laden. Unten stehen „Läuft“ und „Als Nächstes“ mit Prognose und Verzug.
 
 const EMPTY = new Set();
-const HIGH = new Set(["champion", "result", "live"]);
+const NO_TAGS = new Map();
+// Momente, die auf dem Baum spielen (die anderen sind Folien: Sponsor, Zahlen).
+const HIGH = new Set(["champion", "result", "live", "draw", "merge", "mark"]);
+// Mehr Ereignisse auf einmal sind kein Live-Geschehen mehr (Neuaufbau, Nachladen) - dann ohne Moment ans Ende.
+const MAX_EVENTS = 48;
 
 export default function BracketTVPage() {
   return (
@@ -117,12 +126,17 @@ function BracketTv() {
   const [loadError, setLoadError] = useState(null);
   const [keyRefused, setKeyRefused] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  // Nach einer Neuverbindung (#1564, wie die Turnierseite #1561): der nächste Stand holt Verpasstes nach - ohne Moment.
+  const catchUpRef = useRef(false);
+  const quietRef = useRef(false);
   const sponsors = useTvSponsors();
   const minute = useMinuteTick();
 
   const load = useCallback(async () => {
     try {
       const { data: br } = await api.get(`/tournaments/${id}/bracket/display`, displayKey ? { params: { key: displayKey } } : undefined);
+      quietRef.current = catchUpRef.current;
+      catchUpRef.current = false;
       setData(br);
       setLoadError(null);
       setKeyRefused(false);
@@ -150,7 +164,12 @@ function BracketTv() {
     load();
   }, [load]);
   // Die TV-Anzeige läuft stundenlang: ohne Strom alle 15 s nachfragen. „tv“: ein widerrufener Schlüssel wirkt sofort.
-  useLiveRefresh(load, ["tournaments", "matches", "stations", "tv"], { fallbackMs: 15000 });
+  const connected = useLiveRefresh(load, ["tournaments", "matches", "stations", "tv"], { fallbackMs: 15000 });
+  const wasConnected = useRef(connected);
+  useEffect(() => {
+    if (connected && !wasConnected.current) catchUpRef.current = true;
+    wasConnected.current = connected;
+  }, [connected]);
 
   const t = data?.tournament;
   const matches = useMemo(() => data?.matches_v2 || [], [data?.matches_v2]);
@@ -173,6 +192,9 @@ function BracketTv() {
   const [championState, setChampionState] = useState({ key: "", parked: false });
   const [parkSpot, setParkSpot] = useState("");
   const snapshotRef = useRef(null);
+  const previousRef = useRef(null);
+  const seenRef = useRef(new Set());
+  const [resultTags, setResultTags] = useState(NO_TAGS);
   const championKeyRef = useRef(null);
   const champion = useMemo(() => (data ? championOf(matches, data.stages || []) : null), [data, matches]);
 
@@ -181,15 +203,18 @@ function BracketTv() {
     const { started, decided, snapshot } = bracketChanges(snapshotRef.current, matches);
     const first = snapshotRef.current === null;
     snapshotRef.current = snapshot;
+    // Jede Bewegung genau einmal: was der Vergleich findet, ist ab jetzt gesehen - auch wenn es gleich nicht gezeigt wird.
+    const previous = previousRef.current;
+    previousRef.current = matches;
+    const change = momentsFromChange(previous, matches, { seen: seenRef.current });
+    const catchUp = quietRef.current;
+    quietRef.current = false;
+    const hidden = typeof document !== "undefined" && document.hidden;
     const key = championKey(champion);
-    // Beim ersten Laden ist nichts neu: steht der Sieger schon fest, gleich das Endbild - ohne Konfetti.
-    if (first) {
-      championKeyRef.current = key;
-      setChampionState({ key, parked: Boolean(champion) });
-      return;
-    }
-    if (!showMoments) {
-      // Pause, Check-in, Anmeldung oder ein Bildschirm ohne Baum: nichts nachholen, nur den Stand merken.
+    // Beim ersten Laden ist nichts neu: steht der Sieger schon fest, gleich das Endbild - ohne Konfetti. Ebenso nach
+    // einer Neuverbindung, bei verdecktem Bildschirm und bei Riesen-Sprüngen: nichts nachholen, nur den Stand merken.
+    // Pause, Check-in, Anmeldung oder ein Bildschirm ohne Baum: genauso.
+    if (first || catchUp || hidden || !showMoments || change.count > MAX_EVENTS) {
       championKeyRef.current = key;
       setChampionState({ key, parked: Boolean(champion) });
       return;
@@ -199,8 +224,16 @@ function BracketTv() {
       setChampionState({ key, parked: false });
       if (champion) queue.enqueue({ type: "champion", key });
     }
-    // Das Finale bekommt den Champion-Moment statt einer Ergebnis-Karte.
-    const results = decided.filter((matchId) => !champion || matchId !== champion.finalMatchId);
+    // Das Finale bekommt den Champion-Moment statt einer Ergebnis-Karte. Korrigierte Ergebnisse kommen wie neue.
+    const results = [...new Set([...decided, ...change.corrected])].filter((matchId) => !champion || matchId !== champion.finalMatchId);
+    if (change.walkovers.size || change.corrected.size) {
+      setResultTags((current) => {
+        const next = new Map(current);
+        change.walkovers.forEach((matchId) => next.set(matchId, "walkover"));
+        change.corrected.forEach((matchId) => next.set(matchId, "corrected"));
+        return next;
+      });
+    }
     if (results.length) {
       if (motionOn) {
         // Bis die Fahrt ankommt, zeigen die Ziel-Plätze noch, wer kommt - dann landet der Name dort.
@@ -216,6 +249,16 @@ function BracketTv() {
       if (results.length > COLLECT_AFTER) queue.enqueue({ type: "result", items: results });
       else results.forEach((matchId) => queue.enqueue({ type: "result", items: [matchId] }));
     }
+    // Auslosung und Zusammenlegen: bis der Moment sie zeigt, stehen die neuen Plätze noch leer.
+    if (motionOn) {
+      const keys = [];
+      for (const entry of change.moments) {
+        if (entry.type === "draw") entry.rows.forEach((row) => keys.push(`${row.matchId}:${row.slotIndex}`));
+        if (entry.type === "merge") entry.moves.forEach((move) => keys.push(`${move.matchId}:${move.slotIndex}`));
+      }
+      if (keys.length) setHidden((current) => new Set([...current, ...keys]));
+    }
+    change.moments.forEach((entry) => queue.enqueue(entry));
     if (started.length) queue.enqueue({ type: "live", matchIds: started });
     queue.next();
   }, [data, matches, champion, queue, motionOn, showMoments]);
@@ -240,7 +283,8 @@ function BracketTv() {
   // ------------------------------------------------------------ Inhalte der Folien
   const live = useMemo(() => matches.filter(isLiveMatch), [matches]);
   const calls = useMemo(() => callsOf(matches, stations, { reportMinutes: settings.report_minutes }), [matches, stations, settings.report_minutes]);
-  const upcoming = useMemo(() => nextPlanned(matches, calls, { limit: 3 }), [matches, calls]);
+  // Was danach kommt (#1564): mit Prognose aus dem Planer und dem Verzug der Halle - jede Minute neu gerechnet.
+  const upcoming = useMemo(() => nextUp(matches, { stations, now: Math.max(Date.now(), minute * 60000), limit: 3, exclude: new Set(calls.map((call) => call.matchId)) }), [matches, stations, calls, minute]);
   const tiles = useMemo(() => statsTiles(matches, nameOf), [matches, nameOf]);
   const plan = sponsorPlan(settings, sponsors);
   const lastStage = lastStageId(matches, data?.stages || []);
@@ -370,6 +414,7 @@ function BracketTv() {
                     onParkSpot={setParkSpot}
                     gong={settings.result_sound ? gong : null}
                     active={active === "tree"}
+                    resultTags={resultTags}
                   />
                 </div>
               ) : null}
@@ -402,7 +447,9 @@ function BracketTv() {
         </div>
       </main>
 
-      <TvFooter qrValue={screen === "registration" ? registerUrl : publicUrl} kicker={screen === "registration" ? "Jetzt anmelden" : "Jetzt mitfiebern"} text={screen === "registration" ? "QR scannen und anmelden" : "QR scannen und Turnierbaum öffnen"} />
+      <TvFooter qrValue={screen === "registration" ? registerUrl : publicUrl} kicker={screen === "registration" ? "Jetzt anmelden" : "Jetzt mitfiebern"} text={screen === "registration" ? "QR scannen und anmelden" : "QR scannen und Turnierbaum öffnen"}>
+        {screen === "playlist" && hasMatches && !parked ? <TvNextUp matches={matches} stations={stations} nameOf={nameOf} /> : null}
+      </TvFooter>
       {needsClick ? <div className="tv-hint tv-t-meta" role="status" data-testid="tv-sound-hint">Für Ton einmal klicken</div> : null}
     </div>
   );

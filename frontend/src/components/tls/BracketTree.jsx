@@ -9,7 +9,7 @@ import { buildPodiumMap, finalMatchOf, isBronzeMatch, lastStageId, normalizeSect
 import { bracketEdges, isDone, isLive, orderEdges, pathFor, sectionGroup } from "@/lib/bracketGraph";
 import { motionTransition } from "@/lib/motion";
 import { laneCounter, routeEdge, toPath } from "@/lib/bracketLines";
-import { TV_LINE, treeBlockUnits, treeBox, treeScale } from "@/lib/tvType";
+import { TV_LINE, TV_STAGE_UNIT_PX, treeBlockUnits, treeBox, treeScale } from "@/lib/tvType";
 import { BracketMotionContext, useBracketMotion, useBracketMotionState } from "./bracket/bracketMotion";
 import { LiveClock, MatchCard, getStationLabel, slotLabel, formatNodeDateTime } from "./bracket/BracketCards";
 import {
@@ -643,29 +643,155 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
 function TvStageTree({ stages, matches, regMap, podiumMap, compact, onMatchClick }) {
   const stagesForView = stages.length ? stages : [{ id: "__default", name: "Turnierbaum", number: 1 }];
   const byStage = useMemo(() => groupMatches(matches), [matches]);
-  const tvLayoutValue = useContext(TvLayoutContext);
   return (
     <div className="tv-tree" data-testid="tv-tree" data-season-quiet="bracket">
       {stagesForView.map((stage) => {
-        const stageSections = byStage[stage.id] || {};
+        // Wie im Web-Baum (#1561): eine Runde, die der Umbau ganz gestrichen hat, fällt aus der Ansicht.
+        const stageSections = withoutDroppedRounds(byStage[stage.id] || {});
         const blocks = Object.keys(stageSections).map((name) => ({ name, rounds: stageSections[name] }));
         if (!blocks.length) return null;
-        const hasLoser = blocks.some((block) => sectionGroup(block.name) === "loser");
-        const hasReset = hasResetMatch(stageSections);
         return (
-          <section key={stage.id} className="tv-tree__stage" data-tv-stage={stage.id}>
-            {stagesForView.length > 1 ? <h3 className="tv-tree__phase tv-t-head font-heading">{stage.name || `Phase ${stage.number || ""}`}</h3> : null}
-            {arrangeTvBlocks(blocks, tvLayoutValue).map((row) => (
-              <div key={row.map((block) => block.name).join("+")} className="tv-tree__row">
-                {row.map((block) => (
-                  <TvSection key={`${stage.id}-${block.name}`} section={block.name} rounds={block.rounds} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} flowHint={sectionFlowHint(block.name, hasLoser, hasReset)} />
-                ))}
-              </div>
-            ))}
-          </section>
+          <TvStageCanvas key={stage.id} stage={stage} multi={stagesForView.length > 1} blocks={blocks} sections={stageSections}
+            regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} />
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Eine Phase am TV (#1564): dieselben Linien wie im Web-Baum - aus den Quellen der Plätze (lib/bracketGraph), geführt nur
+ * durch Gassen und Lücken (lib/bracketLines). Ein SVG über der ganzen Phase, deshalb auch über die Blöcke hinweg: der
+ * Abstieg ins Loser Bracket (leise), die Linien aus Winner und Loser Bracket ins Grand Final und in den Reset. Jede Linie
+ * endet in der Zeile ihres Platzes. Gemessen wird nur, wenn sich Daten oder Größen ändern; die Kamera vergrößert die
+ * Bühne, deshalb wird zurückgerechnet. `data-points` trägt den Weg für die Fahrten (TvBracketStage).
+ */
+function TvStageCanvas({ stage, multi, blocks, sections, regMap, podiumMap, compact, onMatchClick }) {
+  const ref = useRef(null);
+  const [geom, setGeom] = useState({ lines: [], w: 0, h: 0, key: "" });
+  const { edges } = useContext(GraphContext);
+  const tvLayoutValue = useContext(TvLayoutContext);
+  const gap = treeBox(tvLayoutValue.textSize || "normal").colGap * TV_STAGE_UNIT_PX;
+  const hasLoser = blocks.some((block) => sectionGroup(block.name) === "loser");
+  const hasReset = hasResetMatch(sections);
+  const treeBlocks = useMemo(() => blocks.filter((block) => !isTableFormat(Object.values(block.rounds).flat())), [blocks]);
+  const columnOf = useMemo(() => {
+    const map = new Map();
+    for (const block of treeBlocks) roundNumbers(block.rounds).forEach((rn, index) => block.rounds[rn].forEach((match) => map.set(match.id, index)));
+    return map;
+  }, [treeBlocks]);
+  const stageEdges = useMemo(() => edges.filter((edge) => columnOf.has(edge.from) && columnOf.has(edge.to)), [edges, columnOf]);
+
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!root) return undefined;
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const base = root.getBoundingClientRect();
+      const scale = root.offsetWidth && base.width ? base.width / root.offsetWidth : 1;
+      const local = (rect) => {
+        const left = (rect.left - base.left) / scale;
+        const top = (rect.top - base.top) / scale;
+        const width = rect.width / scale;
+        const height = rect.height / scale;
+        return { left, top, right: left + width, bottom: top + height, width, height };
+      };
+      const cards = new Map();
+      root.querySelectorAll("[data-tv-card]").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (rect.width) cards.set(node.getAttribute("data-tv-card"), local(rect));
+      });
+      const anchors = new Map();
+      root.querySelectorAll("[data-slot-anchor]").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (rect.height) anchors.set(node.getAttribute("data-slot-anchor"), local(rect));
+      });
+      // Die Lücken über und unter den Blöcken sind die freien Querbahnen; Köpfe und Rundentitel sind Hindernisse.
+      const corridors = [];
+      root.querySelectorAll("[data-tv-block]").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (!rect.height) return;
+        const box = local(rect);
+        corridors.push(box.top - gap / 4, box.bottom + gap / 4);
+      });
+      const heads = [];
+      root.querySelectorAll(".tv-block__title, .tv-ko__round, .tv-tree__phase").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (rect.width && rect.height) heads.push(local(rect));
+      });
+      const obstacles = [...cards.values(), ...heads];
+      const lanes = laneCounter();
+      const lines = [];
+      for (const edge of stageEdges) {
+        const a = cards.get(edge.from);
+        const b = cards.get(edge.to);
+        if (!a || !b) continue;
+        const anchor = anchors.get(`${edge.to}:${edge.toSlot}`);
+        const drop = edge.flow === "L" && edge.cross;
+        const points = routeEdge({
+          a, b, obstacles, lanes, gap,
+          corridors: corridors.filter((y) => y > 2),
+          toY: anchor ? anchor.top + anchor.height / 2 : undefined,
+          fromY: drop ? a.bottom - 10 : undefined,
+          preferCorridor: drop,
+        });
+        lines.push({ ...edge, d: toPath(points), points: points.map((point) => `${Math.round(point.x * 10) / 10},${Math.round(point.y * 10) / 10}`).join(" "), column: columnOf.get(edge.from) || 0 });
+      }
+      const w = root.offsetWidth || base.width / scale;
+      const h = root.offsetHeight || base.height / scale;
+      const key = `${Math.round(w)}x${Math.round(h)}|${lines.map((line) => `${line.id}:${line.d}`).join(";")}`;
+      setGeom((current) => (current.key === key ? current : { lines, w, h, key }));
+    };
+    const schedule = () => {
+      if (frame || typeof requestAnimationFrame !== "function") { if (!frame) measure(); return; }
+      frame = requestAnimationFrame(measure);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(schedule);
+    observer.observe(root);
+    root.querySelectorAll("[data-tv-card]").forEach((node) => observer.observe(node));
+    return () => {
+      observer.disconnect();
+      if (frame && typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame);
+    };
+  }, [stageEdges, columnOf, sections, gap]);
+
+  return (
+    <section ref={ref} className="tv-tree__stage" data-tv-stage={stage.id}>
+      <svg className="tv-tree__lines" width={geom.w || "100%"} height={geom.h || "100%"} aria-hidden="true" data-testid="bracket-connectors">
+        {geom.lines.map((line) => {
+          const quiet = line.flow === "L" && line.cross;
+          return (
+            // Die Linien zeichnen sich beim ersten Erscheinen einmal, Runde für Runde (#1076); der Abstieg und
+            // Entfallenes stehen leise und gestrichelt.
+            <path
+              key={line.id}
+              d={line.d}
+              pathLength={line.void || quiet ? undefined : "1"}
+              className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
+              style={{ "--tls-i": line.column }}
+              data-from={line.from}
+              data-to={line.to}
+              data-to-slot={line.toSlot || undefined}
+              data-flow={line.flow}
+              data-cross={quiet ? "1" : undefined}
+              data-void={line.void ? "1" : undefined}
+              data-points={line.points}
+            />
+          );
+        })}
+      </svg>
+      {multi ? <h3 className="tv-tree__phase tv-t-head font-heading">{stage.name || `Phase ${stage.number || ""}`}</h3> : null}
+      {arrangeTvBlocks(blocks, tvLayoutValue).map((row) => (
+        <div key={row.map((block) => block.name).join("+")} className="tv-tree__row">
+          {row.map((block) => (
+            <TvSection key={`${stage.id}-${block.name}`} section={block.name} rounds={block.rounds} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} flowHint={sectionFlowHint(block.name, hasLoser, hasReset)} />
+          ))}
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -762,78 +888,17 @@ function TvSection({ section, rounds, regMap, podiumMap, onMatchClick }) {
   );
 }
 
-/**
- * TV: Spalten je Runde mit gemessenen Linien von Karte zu Karte. Die Ziele kommen aus den echten Quellen (#1561) -
- * nur die Linien der Sieger innerhalb des Blocks, je Paar Karten eine.
- */
+/** TV: Spalten je Runde. Die Linien zeichnet die ganze Phase (TvStageCanvas) - auch über die Blöcke hinweg (#1564). */
 function TvKnockoutTree({ roundNums, rounds, regMap, podiumMap, sectionTitle = "" }) {
-  const containerRef = useRef(null);
-  const nodeRefs = useRef(new Map());
-  const [lines, setLines] = useState([]);
-  const { edges } = useContext(GraphContext);
-  const pairs = useMemo(() => {
-    const column = new Map();
-    roundNums.forEach((rn, index) => rounds[rn].forEach((match) => column.set(match.id, index)));
-    const seen = new Set();
-    return edges.filter((edge) => {
-      const key = `${edge.from}>${edge.to}`;
-      if (edge.flow !== "W" || !column.has(edge.from) || !column.has(edge.to) || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).map((edge) => ({ from: edge.from, to: edge.to, round: column.get(edge.from) }));
-  }, [edges, roundNums, rounds]);
-
-  const register = (id) => (node) => {
-    if (node) nodeRefs.current.set(id, node);
-    else nodeRefs.current.delete(id);
-  };
-
-  useLayoutEffect(() => {
-    const container = containerRef.current;
-    if (!container) return undefined;
-    const measure = () => {
-      const base = container.getBoundingClientRect();
-      // Vergrößert die TV-Kamera die Bühne (#1115), sind die gemessenen Maße mit vergrößert - zurückrechnen.
-      const scale = container.offsetWidth ? base.width / container.offsetWidth : 1;
-      const local = (value) => value / (scale || 1);
-      const next = [];
-      for (const pair of pairs) {
-        const a = nodeRefs.current.get(pair.from)?.getBoundingClientRect();
-        const b = nodeRefs.current.get(pair.to)?.getBoundingClientRect();
-        if (!a || !b || !a.width || !b.width) continue;
-        const x1 = local(a.right - base.left) + container.scrollLeft;
-        const y1 = local(a.top + a.height / 2 - base.top) + container.scrollTop;
-        const x2 = local(b.left - base.left) + container.scrollLeft;
-        const y2 = local(b.top + b.height / 2 - base.top) + container.scrollTop;
-        const mid = x1 + (x2 - x1) / 2;
-        next.push({ id: `${pair.from}-${pair.to}`, from: pair.from, to: pair.to, round: pair.round, d: `M${x1} ${y1} H${mid} V${y2} H${x2}` });
-      }
-      setLines(next);
-    };
-    measure();
-    if (typeof ResizeObserver === "undefined") return undefined;
-    const observer = new ResizeObserver(measure);
-    observer.observe(container);
-    for (const node of nodeRefs.current.values()) observer.observe(node);
-    return () => observer.disconnect();
-  }, [pairs]);
-
   return (
-    <div ref={containerRef} className="tv-ko" data-testid="bracket-tree">
-      <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%" aria-hidden="true" data-testid="bracket-connectors">
-        {lines.map((line) => (
-          // Die Linien zeichnen sich beim ersten Erscheinen einmal, Runde für Runde (#1076).
-          <path key={line.id} d={line.d} fill="none" pathLength="1" className="tls-bracket-line tls-bracket-line--draw" style={{ "--tls-i": line.round }} data-from={line.from} data-to={line.to}
-            stroke="rgba(255,255,255,0.22)" strokeWidth={2} />
-        ))}
-      </svg>
+    <div className="tv-ko" data-testid="bracket-tree">
       <div className="tv-ko__cols">
         {roundNums.map((rn) => (
           <div key={rn} className="tv-ko__col" data-tv-round={rn}>
             <div className="tv-ko__round tv-t-meta">{roundTitle(rounds[rn][0], rn, sectionTitle)}</div>
             <div className="tv-ko__cards">
               {rounds[rn].map((match) => (
-                <div key={match.id} ref={register(match.id)} className="tv-ko__card" data-tv-card={match.id}>
+                <div key={match.id} className="tv-ko__card" data-tv-card={match.id}>
                   <TvMatchNode match={match} regMap={regMap} podiumMap={podiumMap} />
                 </div>
               ))}

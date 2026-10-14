@@ -243,6 +243,14 @@ export function formatRoundName(value, number) {
     .replace(/^(Bronze Match|Platz 3 Match|Third Place( Match)?|3rd Place( Match)?)$/i, "Spiel um Platz 3");
 }
 
+/**
+ * Der Rundenname eines Spiels (#1259, #1564): der Name aus dem Server (`round_label`: „Viertelfinale“, „Winner Final“,
+ * „Grand Final Reset“), sonst wie bisher aus `round_name` bzw. der Nummer. Eine Regel für Web-Baum, TV und Halle.
+ */
+export function matchRoundLabel(match) {
+  return match?.round_label || formatRoundName(match?.round_name, match?.round);
+}
+
 export function isLeagueSchedule(tournamentOrFormat, matchOrStage = {}) {
   const format = typeof tournamentOrFormat === "string"
     ? tournamentOrFormat

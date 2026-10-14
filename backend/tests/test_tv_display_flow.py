@@ -373,3 +373,52 @@ def test_the_tv_learns_about_the_reset_and_why_a_match_is_dropped_but_nothing_pe
     # Freier Text als Grund bleibt intern.
     assert matches["d"]["result_meta"] == {"source": "admin"}
     assert "user-1" not in json.dumps(matches) and "Notiz" not in json.dumps(matches)
+
+
+def test_the_tv_knows_the_forecast_and_who_dropped_out_but_no_notes():
+    """„Als Nächstes“ mit Prognose (#1564): der TV weiß, ob eine Zeit nur eine Prognose des Planers ist, und wer
+    ausgefallen ist (Aufgabe, nicht ins Ziel) - ohne Notizen und Konten aus der Wertung."""
+    payload = {"tournament": {"id": "t1"}, "registrations": [], "stages": [], "matches_v2": [
+        {"id": "e", "match_key": "E", "section": "WB", "round": 2, "status": "pending", "slots": [], "results": [],
+         "scheduled_at": "2026-10-31T15:40:00+00:00", "schedule_forecast": True, "schedule_source": "planner",
+         "schedule_written_at": "2026-10-31T12:00:00+00:00"},
+        {"id": "a", "match_key": "A", "section": "WB", "round": 1, "status": "completed", "slots": [], "results": [
+            {"registration_id": "r1", "rank": 1, "score": 2, "dnf": False, "forfeit": False, "user_id": "u1", "note": "geheim"},
+            {"registration_id": "r2", "rank": 2, "forfeit": True, "user_id": "u2", "note": "Kam nicht, laut Herrn X"},
+            {"registration_id": "r3", "rank": 3, "dnf": True}]},
+    ]}
+    matches = {match["id"]: match for match in tv_display.display_bracket_payload(payload)["matches_v2"]}
+    assert matches["e"]["schedule_forecast"] is True
+    assert matches["e"]["schedule_source"] == "planner"
+    assert "schedule_written_at" not in matches["e"]
+    assert matches["a"]["results"] == [
+        {"registration_id": "r1", "rank": 1, "score": 2, "dnf": False, "forfeit": False},
+        {"registration_id": "r2", "rank": 2, "forfeit": True},
+        {"registration_id": "r3", "rank": 3, "dnf": True},
+    ]
+    assert "geheim" not in json.dumps(matches) and "u1" not in json.dumps(matches)
+
+
+def test_the_tv_knows_the_draw_but_nobody_who_drew():
+    """Gegner gemischt (#1548, #1564): der TV zeichnet den Los-Knoten und die echte Herkunft - er bekommt die Gruppe am
+    Folgespiel, das Los am Platz, aus welchem Spiel der Platz besetzt wurde, und die Auslosung selbst (Kennung, Gruppe,
+    Zeitpunkt). Nie die Person, nie interne Felder der Herkunft."""
+    payload = {"tournament": {"id": "t1"}, "registrations": [], "stages": [], "matches_v2": [
+        {"id": "e", "match_key": "E", "section": "WB", "round": 2, "status": "ready", "results": [],
+         "settings": {"draw_group": "WB:2", "match_size": 2, "intern": "x"},
+         "draw": {"id": "d1", "group": "WB:2", "drawn_at": "2026-10-31T15:00:00+00:00", "trigger": "result", "by": "user-1"},
+         "slots": [
+             {"slot": 1, "registration_id": "r1", "status": "filled",
+              "source": {"type": "rank", "flow": "W", "match_key": "B", "rank": 1, "raw": "W:B:1", "draw": {"group": "WB:2", "label": "Runde 1", "x": 1}},
+              "source_result": {"from_match_id": "b", "from_match_key": "B", "rank": 1, "flow": "W", "draw_id": "d1",
+                                "confirmed_at": "2026-10-31T15:00:00+00:00", "user_id": "u9"}},
+         ]},
+    ]}
+    match = tv_display.display_bracket_payload(payload)["matches_v2"][0]
+    assert match["settings"]["draw_group"] == "WB:2"
+    assert "intern" not in match["settings"]
+    assert match["draw"] == {"id": "d1", "group": "WB:2", "drawn_at": "2026-10-31T15:00:00+00:00"}
+    slot = match["slots"][0]
+    assert slot["source"]["draw"] == {"group": "WB:2", "label": "Runde 1"}
+    assert slot["source_result"] == {"from_match_key": "B"}
+    assert "user-1" not in json.dumps(match) and "u9" not in json.dumps(match)

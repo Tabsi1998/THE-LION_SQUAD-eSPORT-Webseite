@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useSyncExternalStore } from "react";
-import { matchFate } from "@/lib/bracketGraph";
+import { isOut, isWalkover, matchFate, soloAdvance } from "@/lib/bracketGraph";
 import { Trophy } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { describeSlot, initials, isMatchDone, plannedText } from "@/lib/slotSource";
@@ -15,8 +15,12 @@ import { useTv } from "./TvScreen";
 // weitergeht: blau weiter, gedämpft rot ins Loser Bracket, blasser raus (die Worte dazu stehen auf der Ergebnis-Karte und
 // in der Startaufstellung). Was die Seite drumherum weiß (Plätze, auf die gerade jemand zufährt, der goldene Weg), kommt
 // über TvTreeContext - so baut ein neues Ergebnis den Baum nicht neu auf.
+// Seit #1564 mit denselben Regeln wie der Web-Baum: ein Freilos-Duell ist eine Zeile, kampflos steht im Kopf, wer
+// ausgefallen ist, steht durchgestrichen mit Wort, Entfallenes tritt zurück. Jede Zeile trägt ihren Platz
+// (`data-slot-anchor`), dort enden die Linien. Bewegungen setzt die Bühne über `marks` und `drawRows` - genau einmal.
 
 const EMPTY = new Set();
+const NO_MARKS = new Map();
 export const TvTreeContext = createContext({
   matches: [],
   hiddenSlots: EMPTY,
@@ -26,6 +30,9 @@ export const TvTreeContext = createContext({
   finished: false,
   lastStageId: null,
   isTable: () => false,
+  marks: NO_MARKS,
+  drawRows: NO_MARKS,
+  drawStep: 60,
 });
 
 // Eine Uhr für alle laufenden Spiele: einmal je Sekunde, nur die Uhren zeichnen neu.
@@ -77,6 +84,12 @@ function avatarOf(regMap, registrationId) {
   return reg?.user?.avatar_url || reg?.avatar_url || "";
 }
 
+/** Wer ausgefallen ist, in Worten: nicht angetreten (kampflos) oder ausgefallen (Aufgabe, nicht ins Ziel). */
+function goneText(result) {
+  if (!isOut(result)) return "";
+  return result.forfeit || result.no_show ? "nicht angetreten" : "ausgefallen";
+}
+
 function podiumClass(rank) {
   return rank === 1 ? "tv-row--p1" : rank === 2 ? "tv-row--p2" : rank === 3 ? "tv-row--p3" : "";
 }
@@ -114,16 +127,27 @@ export function TvTreeNode({ match, regMap, podiumMap, findMatch }) {
   const qualifiers = Number(match.settings?.qualifiers_per_match || 0);
   // Entfällt (#1561): ein nicht nötiges Reset-Spiel, ein zusammengelegter Lauf - sagen, warum.
   const fate = matchFate(match);
-  const status = fate ? fate.label : live ? "" : done ? formatMatchStatus(match.status) : shortPlanned(match) || formatMatchStatus(match.status);
+  const walkover = done && isWalkover(match);
+  const solo = fate ? null : soloAdvance(match);
+  const status = fate ? fate.label : live ? "" : walkover ? "kampflos" : solo ? "Freilos" : done ? formatMatchStatus(match.status) : shortPlanned(match) || formatMatchStatus(match.status);
   const goldCard = tree.goldCards.has(match.id);
   const meta = heat ? [`${(match.slots || []).length} Spieler`, qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : ""].filter(Boolean).join(" · ") : "";
+  const mark = tree.marks?.get(match.id) || "";
+  if (solo) {
+    // Freilos-Duell (#1259, wie im Web-Baum): eine Zeile, wer weiterkommt - keine leere Gegner-Zeile.
+    const index = (match.slots || []).indexOf(solo.slot);
+    if (!heat) slots = slots.filter((entry) => entry.index === index);
+  }
 
   return (
     <article
-      className={["tv-node", live ? "tv-node--live" : "", done ? "tv-node--done" : "", goldCard ? "tv-node--gold" : "", heat ? "tv-node--heat" : ""].filter(Boolean).join(" ")}
+      className={["tv-node", live ? "tv-node--live" : "", done ? "tv-node--done" : "", goldCard ? "tv-node--gold" : "", heat ? "tv-node--heat" : "", fate ? "tv-node--void" : "", solo ? "tv-node--bye" : ""].filter(Boolean).join(" ")}
       data-testid={`tv-match-${match.id}`}
       data-tv-node={match.id}
       data-live={live ? "1" : undefined}
+      data-walkover={walkover ? "1" : undefined}
+      data-bye={solo ? "1" : undefined}
+      data-mark={mark || undefined}
     >
       <header className="tv-node__head">
         <span className="tv-node__title tv-t-meta">
@@ -161,17 +185,23 @@ export function TvTreeNode({ match, regMap, podiumMap, findMatch }) {
         const score = result?.score ?? result?.points;
         const avatar = registrationId ? avatarOf(regMap, registrationId) : "";
         const short = info.kind === "player" ? initials(info.label) : "";
-        const fit = nameFit(info.label, 23, scale);
+        const label = solo ? `Freilos: ${info.label} kommt weiter` : info.label;
+        const fit = nameFit(label, 23, scale);
+        const gone = goneText(result);
+        const draw = tree.drawRows?.get(slotKey);
+        const rowClasses = [classes, gone ? "tv-row--gone" : "", draw ? "tv-row--draw" : ""].filter(Boolean).join(" ");
         return (
-          <div key={slot.slot ?? index} className={classes} data-tv-slot={slotKey} data-tv-reg={registrationId || undefined} data-slot-kind={info.kind} data-outcome={kind || undefined}>
+          <div key={slot.slot ?? index} className={rowClasses} data-tv-slot={slotKey} data-slot-anchor={`${match.id}:${slot.slot ?? index + 1}`} data-tv-reg={registrationId || undefined} data-slot-kind={info.kind} data-outcome={kind || undefined}
+            style={draw ? { "--tv-i": draw.index, "--tv-draw-step": `${tree.drawStep || 60}ms` } : undefined}>
             <div className="tv-row__who">
               <div className={`tv-avatar tv-t-meta ${short || avatar ? "" : "tv-avatar--empty"}`} aria-hidden="true" data-tv-avatar="1">
                 {avatar && info.kind === "player" ? <img src={resolveMediaUrl(avatar)} alt="" /> : short}
               </div>
-              {info.label ? (
+              {label ? (
                 <span className="tv-t-name tv-row__name" data-fit={fit.small ? "small" : undefined} data-tv-name="1">
                   {(won || gold) && !heat ? <Trophy className="tv-icon tv-gold" aria-hidden="true" /> : null}
-                  <span className="min-w-0">{info.label}</span>
+                  <span className="min-w-0">{label}</span>
+                  {gone ? <span className="tv-row__gone tv-t-meta">{gone}</span> : null}
                 </span>
               ) : null}
             </div>

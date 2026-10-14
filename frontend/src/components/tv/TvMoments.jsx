@@ -1,7 +1,7 @@
 import { Trophy } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { initials } from "@/lib/slotSource";
-import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
+import { formatBracketSection, matchRoundLabel } from "@/lib/tournamentLabels";
 import { matchName } from "@/lib/tvLive";
 import { advancementsOf, outcomeLabel, rankingOf } from "@/lib/tvTravel";
 import { isDuelMatch } from "@/lib/tvGrid";
@@ -34,21 +34,24 @@ function Avatar({ name, avatar, className = "" }) {
   );
 }
 
-/** „Ergebnis · Winner Bracket · Runde 1“ */
-function resultKicker(match) {
-  return ["Ergebnis", formatBracketSection(match.section), formatRoundName(match.round_name, match.round)].filter(Boolean).join(" · ");
+const TAG_KICKER = { walkover: "Kampflos", corrected: "Korrigiert" };
+const TAG_TITLE = { walkover: "kampflos entschieden", corrected: "korrigiert" };
+
+/** „Ergebnis · Winner Bracket · Viertelfinale“ - kampflos und korrigiert sagen es vorn (#1564). */
+function resultKicker(match, tag) {
+  return [TAG_KICKER[tag] || "Ergebnis", formatBracketSection(match.section), matchRoundLabel(match)].filter(Boolean).join(" · ");
 }
 
-/** Ein Ergebnis groß über dem Baum: Spiel, Plätze mit Punkten, wer weiterkommt. */
-export function TvResultCard({ match, matches, registrations, lastStage = true, table = false }) {
+/** Ein Ergebnis groß über dem Baum: Spiel, Plätze mit Punkten, wer weiterkommt. `tag`: „walkover“ oder „corrected“. */
+export function TvResultCard({ match, matches, registrations, lastStage = true, table = false, tag = "" }) {
   const nameOf = nameOfRegistration(registrations);
   const avatarOf = avatarOfRegistration(registrations);
   const outcomes = advancementsOf(match, matches, { lastStage, table });
   const duel = isDuelMatch(match);
   return (
-    <div className="tv-moment tv-result" role="status" data-testid="tv-result-card" data-match={match.id}>
-      <div className="tv-kicker tv-t-info">{resultKicker(match)}</div>
-      <div className="tv-result__title tv-t-title font-heading">{matchName(match)} entschieden</div>
+    <div className="tv-moment tv-result" role="status" data-testid="tv-result-card" data-match={match.id} data-tag={tag || undefined}>
+      <div className="tv-kicker tv-t-info">{resultKicker(match, tag)}</div>
+      <div className="tv-result__title tv-t-title font-heading">{matchName(match)} {TAG_TITLE[tag] || "entschieden"}</div>
       <div className="tv-result__rows">
         {outcomes.map((entry) => {
           const label = outcomeLabel(entry);
@@ -101,12 +104,18 @@ export function TvCollectiveCard({ matches: shown, allMatches, registrations, is
   );
 }
 
-/** „Jetzt live: Spiel B an PC 5“ - oben mittig über dem Baum, solange der Zoom läuft. */
-export function TvLiveBanner({ text }) {
+/**
+ * „Jetzt live: Spiel B an PC 5“ - oben mittig über dem Baum, solange der Moment läuft. Seit #1564 auch für die anderen
+ * Ereignisse (`kind` „event“: Auslosung, zusammengelegt, entfällt) - ohne Live-Punkt; `note` leuchtet kurz (die Station,
+ * die frei wird).
+ */
+export function TvLiveBanner({ text, kind = "live", note = "" }) {
+  const live = kind === "live";
   return (
-    <div className="tv-live-banner tv-t-info" role="status" data-testid="tv-live-banner">
-      <span className="tv-live-dot-tv tv-live-dot" aria-hidden="true" />
-      <span>Jetzt live: {text}</span>
+    <div className={`tv-live-banner tv-t-info ${live ? "" : "tv-live-banner--event"}`} role="status" data-testid="tv-live-banner" data-kind={kind}>
+      {live ? <span className="tv-live-dot-tv tv-live-dot" aria-hidden="true" /> : <span className="tv-live-banner__mark" aria-hidden="true" />}
+      <span>{live ? `Jetzt live: ${text}` : text}</span>
+      {note ? <span className="tv-live-banner__note" data-testid="tv-freed">{note}</span> : null}
     </div>
   );
 }
