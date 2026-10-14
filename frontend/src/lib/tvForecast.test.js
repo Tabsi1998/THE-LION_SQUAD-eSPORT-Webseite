@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 // TV-Bäume aus dem echten Generator und dem echten Planer (scripts/make_tv_bracket_fixture.py) - keine Handarbeit.
 import TVG from "../../e2e/fixtures/tvGenerated.json";
 import { viennaTime } from "@/lib/vienna";
-import { forecastOf, forecastText, nextUp } from "./tvForecast";
+import { DELAY_SHOWN_FROM, forecastOf, forecastText, nextUp } from "./tvForecast";
 
 // „Als Nächstes“ mit Prognose (#1564): wann ein Spiel ungefähr losgeht und an welcher Station - aus dem Planer
 // (`scheduled_at`, `schedule_forecast`), verschoben um den Verzug: läuft das Spiel davor an derselben Station länger als
@@ -84,4 +84,50 @@ it("ein Plan von gestern ist kein Verzug: dann nur die Station, keine Uhrzeit un
   expect(entry.stale).toBe(true);
   expect(entry.delayText).toBe("");
   expect(forecastText(entry)).toBe("Switch 2");
+});
+
+// ---------------------------------------------------------------- Eine Zeit für alles (#1564, Nachtrag)
+// Am Beamer steht überall dieselbe, aktuelle Zeit: Karte und Fuß rechnen mit derselben Funktion. Verzug rückt die
+// Folgespiele nach - über die Station (das Spiel davor an derselben Station) und über die Vorspiele (Linien).
+import { forecastBoard } from "./tvForecast";
+
+describe("forecastBoard: eine Prognose für Karte und Fuß", () => {
+  const live = () => {
+    const bracket = state("se8_live");
+    const a = byKey(bracket, "A");
+    return { bracket, now: Date.parse(a.started_at) + 40 * 60000 };
+  };
+
+  it("B ist 40 Minuten zu spät - die Karte und „Als Nächstes“ haben dieselbe Zeit", () => {
+    const { bracket, now } = live();
+    const board = forecastBoard(bracket.matches_v2, { now });
+    const b = board.get(byKey(bracket, "B").id);
+    expect(b.delayMinutes).toBeGreaterThanOrEqual(39);
+    const [next] = nextUp(bracket.matches_v2, { now, limit: 1 });
+    expect(next.match.match_key).toBe("B");
+    expect(next.eta).toBe(b.eta);
+    expect(forecastText(next)).toBe(forecastText(b));
+  });
+
+  it("die Folgespiele rücken nach: D nach B an Switch 2, E nach A, B und C, G nach E und F", () => {
+    const { bracket, now } = live();
+    const board = forecastBoard(bracket.matches_v2, { now });
+    const at = (key) => board.get(byKey(bracket, key).id);
+    const end = (key) => at(key).eta + 30 * 60000;
+    // D wartet, bis B an Switch 2 fertig ist.
+    expect(at("D").eta).toBeGreaterThanOrEqual(end("B"));
+    // E (Halbfinale) braucht die Sieger aus A und B - und Switch 1 nach C.
+    expect(at("E").eta).toBeGreaterThanOrEqual(end("B"));
+    expect(at("E").eta).toBeGreaterThanOrEqual(end("C"));
+    expect(at("E").delayMinutes).toBeGreaterThan(0);
+    // Das Finale nach beiden Halbfinals.
+    expect(at("G").eta).toBeGreaterThanOrEqual(Math.max(end("E"), end("F")));
+    expect(at("G").eta).toBeGreaterThan(Date.parse(byKey(bracket, "G").scheduled_at));
+  });
+
+  it("läuft alles nach Plan, rückt nichts", () => {
+    const bracket = state("se8_planned");
+    const board = forecastBoard(bracket.matches_v2, { now: GENERATED });
+    for (const match of bracket.matches_v2) expect(board.get(match.id).delayMinutes, match.match_key).toBeLessThan(DELAY_SHOWN_FROM);
+  });
 });

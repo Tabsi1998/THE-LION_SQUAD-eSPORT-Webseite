@@ -92,3 +92,10 @@ condition = "AND"
 paths = ['''^backend/tests/test_account_sign_in_contract_flow\.py$''']
 regexTarget = "secret"
 regexes = ['''^Loewen-Testpasswort-1$''', '''^sign-in-tests-secret-with-at-least-32-characters$''']
+
+[[allowlists]]
+description = "Testwerte, kein Geheimnis: die Umbau-Marker (`rebuild_token`) in den erzeugten FFA-Testdaten aus #1561. Sie stammen aus der Datenbank im Speicher von scripts/make_ffa_bracket_fixture.py und dienen dem Server nur als Vergleichswert beim Zurückschreiben eines Lauf-Umbaus - kein Zugang, kein Schlüssel. Nur genau diese fünf Werte in genau dieser Datei."
+condition = "AND"
+paths = ['''^frontend/e2e/fixtures/ffaGenerated\.json$''']
+regexTarget = "secret"
+regexes = ['''^(2bab3a2f-53a4-4021-af11-458ee0955578|84a0f042-d626-4e54-910a-22ba39c95b10|97e39310-bdeb-4fca-966a-703c4359de41|9c4ecb0d-a8d7-44d6-8773-8013f0cf46d5|da458179-22b1-4b09-97d5-9301099181f4)$''']

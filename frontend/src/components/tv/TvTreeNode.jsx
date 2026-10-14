@@ -7,6 +7,7 @@ import { isLiveMatch, matchName, spotlightParts } from "@/lib/tvLive";
 import { advancementsOf } from "@/lib/tvTravel";
 import { isDuelMatch } from "@/lib/tvGrid";
 import { formatMatchStatus } from "@/lib/tournamentLabels";
+import { DELAY_SHOWN_FROM, forecastText } from "@/lib/tvForecast";
 import { nameFit, treeScale } from "@/lib/tvType";
 import { useTv } from "./TvScreen";
 
@@ -33,6 +34,7 @@ export const TvTreeContext = createContext({
   marks: NO_MARKS,
   drawRows: NO_MARKS,
   drawStep: 60,
+  forecast: NO_MARKS,
 });
 
 // Eine Uhr für alle laufenden Spiele: einmal je Sekunde, nur die Uhren zeichnen neu.
@@ -129,7 +131,12 @@ export function TvTreeNode({ match, regMap, podiumMap, findMatch }) {
   const fate = matchFate(match);
   const walkover = done && isWalkover(match);
   const solo = fate ? null : soloAdvance(match);
-  const status = fate ? fate.label : live ? "" : walkover ? "kampflos" : solo ? "Freilos" : done ? formatMatchStatus(match.status) : shortPlanned(match) || formatMatchStatus(match.status);
+  // Hinkt die Halle hinterher, steht die neue Prognose da - dieselbe wie im Fuß (lib/tvForecast.forecastBoard), klein
+  // dazu, um wie viel es später wird. Sonst wie bisher „geplant ca. 14:20“.
+  const ahead = !fate && !live && !done ? tree.forecast?.get(match.id) : null;
+  const late = ahead && ahead.eta !== null && ahead.delayMinutes >= DELAY_SHOWN_FROM ? ahead : null;
+  const status = fate ? fate.label : live ? "" : walkover ? "kampflos" : solo ? "Freilos" : done ? formatMatchStatus(match.status)
+    : late ? forecastText({ ...late, station: "" }) : shortPlanned(match) || formatMatchStatus(match.status);
   const goldCard = tree.goldCards.has(match.id);
   const meta = heat && !matchFate(match) ? [`${(match.slots || []).length} Spieler`, qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : ""].filter(Boolean).join(" · ") : "";
   const mark = tree.marks?.get(match.id) || "";
@@ -158,7 +165,12 @@ export function TvTreeNode({ match, regMap, podiumMap, findMatch }) {
         </span>
         {live ? (
           <span className="tv-node__live tv-t-meta"><span className="tv-live-dot-tv" aria-hidden="true" />Live</span>
-        ) : status ? <span className="tv-node__status tv-t-meta">{status}</span> : null}
+        ) : status ? (
+          <span className="tv-node__status tv-t-meta">
+            {status}
+            {late ? <span className="tv-node__late">+{late.delayMinutes} Min.</span> : null}
+          </span>
+        ) : null}
       </header>
       {slots.map(({ slot, index }) => {
         const slotKey = `${match.id}:${index}`;

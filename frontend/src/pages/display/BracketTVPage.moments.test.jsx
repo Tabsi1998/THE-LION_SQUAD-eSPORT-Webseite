@@ -184,3 +184,21 @@ test("Aufruf-Tafel ohne Aufrufe: „Als Nächstes geplant“ mit derselben Progn
   // Rundenname aus dem Server wie im Baum.
   expect(first).toHaveTextContent("Viertelfinale");
 });
+
+test("überall dieselbe Zeit: Karte und Fuß nennen dieselbe Prognose, die Folgespiele rücken nach", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  current = state("se8_live");
+  const live = current.matches_v2.find((match) => match.match_key === "A");
+  vi.setSystemTime(new Date(Date.parse(live.started_at) + 40 * 60000 + 5000));
+  renderTv();
+  const next = await screen.findByTestId("tv-next-up");
+  const time = /ca\. (\d{2}:\d{2})/.exec(next.textContent)[1];
+  const card = screen.getByTestId(`tv-match-${idOf(current, "B")}`);
+  expect(card.querySelector(".tv-node__status")).toHaveTextContent(`ca. ${time}`);
+  // Klein dabei, um wie viel es später wird - statt der alten Planzeit.
+  expect(card.querySelector(".tv-node__late")).toHaveTextContent("+40 Min.");
+  expect(card).not.toHaveTextContent("geplant ca.");
+  // Das Halbfinale E (nach A, B und C) rückt ebenfalls nach.
+  const semi = screen.getByTestId(`tv-match-${idOf(current, "E")}`);
+  expect(semi.querySelector(".tv-node__late")).toHaveTextContent(/^\+\d+ Min\.$/);
+});

@@ -134,7 +134,7 @@ function useElementSize(ref, measure) {
 const viewportSize = (element) => ({ w: element.clientWidth, h: element.clientHeight, base: stageBase(window.innerWidth, window.innerHeight) });
 const contentSize = (element) => ({ w: element.offsetWidth, h: element.offsetHeight });
 
-export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots = EMPTY, onReveal, champion = null, championParked = false, onChampionParked, onParkSpot, gong = null, active = true, resultTags = NO_MAP }) {
+export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots = EMPTY, onReveal, champion = null, championParked = false, onChampionParked, onParkSpot, gong = null, active = true, resultTags = NO_MAP, forecast = NO_MAP }) {
   const { motionOn, textSize, settings } = useTv();
   const viewportRef = useRef(null);
   const stageRef = useRef(null);
@@ -356,8 +356,9 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       marks,
       drawRows,
       drawStep,
+      forecast,
     };
-  }, [matches, stages, hiddenSlots, landing, champion, showGold, drawnGold, data?.tournament?.status, marks, drawRows, drawStep]);
+  }, [matches, stages, hiddenSlots, landing, champion, showGold, drawnGold, data?.tournament?.status, marks, drawRows, drawStep, forecast]);
 
   // ------------------------------------------------------------ Geparkte Siegerkarte: eine freie Ecke, sonst die Kopfleiste
   useLayoutEffect(() => {

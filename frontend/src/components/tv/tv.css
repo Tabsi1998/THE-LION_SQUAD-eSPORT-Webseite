@@ -534,6 +534,8 @@
 .tv-node__name { font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--tv-accent); }
 .tv-node__meta { color: var(--tv-faint); }
 .tv-node__status { flex-shrink: 0; text-align: right; color: var(--tv-faint); }
+/* Verzug (#1564): die neue Prognose steht als Zeit da, klein darunter in der Warn-Farbe, um wie viel später. */
+.tv-node__late { display: block; font-weight: 700; color: var(--tls-warn); }
 .tv-node__live { flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.45em; color: var(--tv-live); font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; }
 .tv-node--live { border-color: var(--tv-live); }
 .tv-node--live::after {

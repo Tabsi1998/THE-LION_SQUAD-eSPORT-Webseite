@@ -17,12 +17,12 @@ function playersOf(match, matches, nameOf) {
   return names.join(" vs. ");
 }
 
-export function TvNextUp({ matches = [], stations = [], nameOf = () => "" }) {
+export function TvNextUp({ matches = [], stations = [], nameOf = () => "", forecast = null }) {
   // Die Prognose rechnet in Minuten - jede Minute einmal neu genügt.
   const minute = useMinuteTick();
   const now = Math.max(Date.now(), minute * 60000);
   const live = matches.filter(isLiveMatch);
-  const [next] = nextUp(matches, { stations, now, limit: 1 });
+  const [next] = nextUp(matches, { stations, now, limit: 1, board: forecast });
   if (!live.length && !next) return null;
   return (
     <div className="tv-nextup" data-testid="tv-next-wrap">

@@ -21,7 +21,7 @@ import { championKey, championOf } from "@/lib/tvChampion";
 import { COLLECT_AFTER, createMomentQueue, momentsFromChange } from "@/lib/tvMoments";
 import { advance, changesAfter, firstIndex, isDue, onlyMomentSlides, serializePlaylist } from "@/lib/tvPlaylist";
 import { callsOf, newCalls } from "@/lib/tvCalls";
-import { nextUp } from "@/lib/tvForecast";
+import { forecastBoard, nextUp } from "@/lib/tvForecast";
 import { statsTiles } from "@/lib/tvStats";
 import { presentedBy, sponsorFor, sponsorPlan } from "@/lib/tvSponsors";
 import { tvScreenFor } from "@/lib/tvScreens";
@@ -284,7 +284,9 @@ function BracketTv() {
   const live = useMemo(() => matches.filter(isLiveMatch), [matches]);
   const calls = useMemo(() => callsOf(matches, stations, { reportMinutes: settings.report_minutes }), [matches, stations, settings.report_minutes]);
   // Was danach kommt (#1564): mit Prognose aus dem Planer und dem Verzug der Halle - jede Minute neu gerechnet.
-  const upcoming = useMemo(() => nextUp(matches, { stations, now: Math.max(Date.now(), minute * 60000), limit: 3, exclude: new Set(calls.map((call) => call.matchId)) }), [matches, stations, calls, minute]);
+  // Eine Prognose für Karten, Fuß und Aufruf-Tafel - überall dieselbe Zeit (#1564).
+  const forecast = useMemo(() => forecastBoard(matches, { stations, now: Math.max(Date.now(), minute * 60000) }), [matches, stations, minute]);
+  const upcoming = useMemo(() => nextUp(matches, { board: forecast, limit: 3, exclude: new Set(calls.map((call) => call.matchId)) }), [matches, forecast, calls]);
   const tiles = useMemo(() => statsTiles(matches, nameOf), [matches, nameOf]);
   const plan = sponsorPlan(settings, sponsors);
   const lastStage = lastStageId(matches, data?.stages || []);
@@ -415,6 +417,7 @@ function BracketTv() {
                     gong={settings.result_sound ? gong : null}
                     active={active === "tree"}
                     resultTags={resultTags}
+                    forecast={forecast}
                   />
                 </div>
               ) : null}
@@ -448,7 +451,7 @@ function BracketTv() {
       </main>
 
       <TvFooter qrValue={screen === "registration" ? registerUrl : publicUrl} kicker={screen === "registration" ? "Jetzt anmelden" : "Jetzt mitfiebern"} text={screen === "registration" ? "QR scannen und anmelden" : "QR scannen und Turnierbaum öffnen"}>
-        {screen === "playlist" && hasMatches && !parked ? <TvNextUp matches={matches} stations={stations} nameOf={nameOf} /> : null}
+        {screen === "playlist" && hasMatches && !parked ? <TvNextUp matches={matches} stations={stations} nameOf={nameOf} forecast={forecast} /> : null}
       </TvFooter>
       {needsClick ? <div className="tv-hint tv-t-meta" role="status" data-testid="tv-sound-hint">Für Ton einmal klicken</div> : null}
     </div>
