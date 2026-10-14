@@ -131,8 +131,10 @@ export function TvTreeNode({ match, regMap, podiumMap, findMatch }) {
   const solo = fate ? null : soloAdvance(match);
   const status = fate ? fate.label : live ? "" : walkover ? "kampflos" : solo ? "Freilos" : done ? formatMatchStatus(match.status) : shortPlanned(match) || formatMatchStatus(match.status);
   const goldCard = tree.goldCards.has(match.id);
-  const meta = heat ? [`${(match.slots || []).length} Spieler`, qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : ""].filter(Boolean).join(" · ") : "";
+  const meta = heat && !matchFate(match) ? [`${(match.slots || []).length} Spieler`, qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : ""].filter(Boolean).join(" · ") : "";
   const mark = tree.marks?.get(match.id) || "";
+  // Entfällt (Reset nicht nötig, zusammengelegt, gestrichen): wie im Web-Baum nur eine ruhige Zeile - der Kopf mit Grund.
+  if (fate) slots = [];
   if (solo) {
     // Freilos-Duell (#1259, wie im Web-Baum): eine Zeile, wer weiterkommt - keine leere Gegner-Zeile.
     const index = (match.slots || []).indexOf(solo.slot);

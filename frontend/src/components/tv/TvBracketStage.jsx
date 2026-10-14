@@ -8,7 +8,7 @@ import { matchRoundLabel } from "@/lib/tournamentLabels";
 import { CAMERA, cameraStops, centeredView, clampView, fitZoom, nearestStop, rectFits, stageTransform, unionRect, viewBetween, viewForRect } from "@/lib/tvCamera";
 import { isLiveMatch, liveZoomPlan } from "@/lib/tvLive";
 import { COLLECT_AFTER, MOMENT_MS } from "@/lib/tvMoments";
-import { TRAVEL, advancementsOf, planTravel, pointOnRoute, routeLength, routePath, travelRoute, travelTotal } from "@/lib/tvTravel";
+import { TRAVEL, advancementsOf, landFrame, planTravel, rideFrame, routeLength, routePath, travelRoute, travelTotal } from "@/lib/tvTravel";
 import { TV_STAGE_UNIT_PX, stageBase, treeBox, treeCssVars, treeMinZoom } from "@/lib/tvType";
 import { TvChampionCard, TvCollectiveCard, TvLiveBanner, TvResultCard, avatarOfRegistration, nameOfRegistration } from "./TvMoments";
 import { TvTreeContext, TvTreeNode } from "./TvTreeNode";
@@ -325,7 +325,8 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
     }
     const geometry = measureStage(stageRef.current);
     const paths = champion.segments.map((segment, index) => {
-      const route = routeBetween(geometry, segment.from, segment.to, null, null, colGapPx);
+      // Der goldene Weg liegt auf den gezeichneten Linien (#1564) - kein Bogen quer über den Baum.
+      const route = lineRoute(stageRef.current, geometry, segment.from, segment.to, null, null) || routeBetween(geometry, segment.from, segment.to, null, null, colGapPx);
       return route ? { id: `${segment.from}>${segment.to}`, index, d: routePath(route) } : null;
     }).filter(Boolean);
     setGoldPaths((current) => (JSON.stringify(current) === JSON.stringify(paths) ? current : paths));
@@ -530,24 +531,24 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
             const t = (elapsed - entry.delay) / entry.duration;
             if (!nodes?.comet) continue;
             if (t < 0) continue;
-            const segment = Math.min(0.55, 160 / Math.max(1, ride.length));
             if (t <= 1) {
-              const point = pointOnRoute(ride.route, t);
+              // Weich an, weich ab, leicht angehoben (lib/tvTravel.rideFrame); die Linie zeichnet sich hinter ihm her.
+              const frame = rideFrame(ride.route, t);
               nodes.comet.style.opacity = "1";
-              nodes.comet.style.transform = `translate(${point.x}px, ${point.y}px)`;
+              nodes.comet.style.transform = `translate(${frame.x}px, ${frame.y}px) scale(${frame.scale.toFixed(4)})`;
               if (nodes.trail) {
                 nodes.trail.style.opacity = "1";
-                nodes.trail.style.strokeDashoffset = String(segment - t);
+                nodes.trail.style.strokeDashoffset = String(1 - frame.drawn);
               }
               if (nodes.drop) nodes.drop.style.opacity = "1";
             } else {
+              // Weich aufsetzen: ausfedernd in den Platz, etwas kleiner, ausblenden (lib/tvTravel.landFrame).
               const end = ride.route.points[ride.route.points.length - 1];
               const share = Math.min(1, (elapsed - entry.delay - entry.duration) / TRAVEL.landMs);
-              const x = end.x + (ride.land.x - end.x) * share;
-              const y = end.y + (ride.land.y - end.y) * share;
-              nodes.comet.style.transform = `translate(${x}px, ${y}px) scale(${1 - 0.55 * share})`;
-              nodes.comet.style.opacity = String(1 - share);
-              if (nodes.trail) nodes.trail.style.opacity = String(1 - share);
+              const frame = landFrame(end, ride.land, share);
+              nodes.comet.style.transform = `translate(${frame.x}px, ${frame.y}px) scale(${frame.scale.toFixed(4)})`;
+              nodes.comet.style.opacity = String(frame.opacity);
+              if (nodes.trail) nodes.trail.style.opacity = String(frame.opacity);
               if (share >= 1 && !landed.has(ride.id)) {
                 landed.add(ride.id);
                 if (nodes.drop) nodes.drop.style.opacity = "0";
@@ -680,7 +681,12 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
           continue;
         }
         const startY = row ? row.y + row.h / 2 : card.y + card.h / 2;
-        const route = routeBetween(geometry, move.from.matchId, move.matchId, startY, slot.y + slot.h / 2, colGapPx);
+        const into = geometry.cards.get(move.matchId);
+        // Läufe derselben Runde stehen untereinander: der Name nimmt die Gasse rechts daneben - nie quer über Karten.
+        const gasse = into && Math.abs(into.x - card.x) < 2 ? card.x + card.w + colGapPx / 2 : null;
+        const route = gasse !== null
+          ? { kind: "line", points: [{ x: card.x + card.w, y: startY }, { x: gasse, y: startY }, { x: gasse, y: slot.y + slot.h / 2 }, { x: into.x + into.w, y: slot.y + slot.h / 2 }] }
+          : routeBetween(geometry, move.from.matchId, move.matchId, startY, slot.y + slot.h / 2, colGapPx);
         if (!route) {
           revealRef.current?.([slotKey]);
           continue;
@@ -821,13 +827,11 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
               <path key={path.id} d={path.d} pathLength="1" className="tv-gold-path" data-drawn={path.index < drawnGold ? "1" : undefined} data-testid="tv-gold-path" />
             ))}
             {(rides || []).map((ride) => (ride.kind === "drop" ? <path key={`d-${ride.id}`} d={routePath(ride.route)} className="tv-drop-line" data-tv-drop={ride.id} /> : null))}
-            {(rides || []).map((ride) => {
-              const segment = Math.min(0.55, 160 / Math.max(1, ride.length));
-              return (
-                <path key={`t-${ride.id}`} d={routePath(ride.route)} pathLength="1" className={`tv-trail ${ride.kind === "drop" ? "tv-trail--drop" : ""}`} data-tv-trail={ride.id}
-                  style={{ strokeDasharray: `${segment} ${1 + segment}`, strokeDashoffset: segment, opacity: 0 }} />
-              );
-            })}
+            {(rides || []).map((ride) => (
+              // Die Spur wächst vom Start bis zum Namen mit (strokeDashoffset 1 → 0), danach blendet sie aus.
+              <path key={`t-${ride.id}`} d={routePath(ride.route)} pathLength="1" className={`tv-trail ${ride.kind === "drop" ? "tv-trail--drop" : ""}`} data-tv-trail={ride.id}
+                style={{ strokeDasharray: "1 1", strokeDashoffset: 1, opacity: 0 }} />
+            ))}
           </svg>
         ) : null}
         {(rides || []).map((ride) => (

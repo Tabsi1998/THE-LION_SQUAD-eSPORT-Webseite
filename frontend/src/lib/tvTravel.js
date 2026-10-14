@@ -3,7 +3,9 @@
 // der Beste, der in A nicht weiterkommt). Dazu der Fahrplan der Fahrten (versetzt, zusammen höchstens etwa 4 Sekunden) und
 // der Weg einer Fahrt entlang der Linie.
 import { absoluteRank, normalizeSource } from "@/lib/slotSource";
+import { cubicBezier } from "framer-motion";
 import { isBronzeMatch, normalizeSection } from "@/lib/bracketPodium";
+import { EASE_MOVE, MOTION } from "@/lib/motion";
 
 const LOSER_SECTIONS = new Set(["lb", "loser"]);
 
@@ -91,7 +93,8 @@ export function isLoserTarget(target) {
 
 // ---------------------------------------------------------------- Fahrplan
 
-export const TRAVEL = Object.freeze({ maxMs: 4000, landMs: 280, stepMs: 260, dropDelayMs: 420, matchStaggerMs: 350, minRideMs: 600 });
+// Landen (#1564): so lang wie die langsame Stufe (MOTION.slow) - weich aufsetzen statt einrasten.
+export const TRAVEL = Object.freeze({ maxMs: 4000, landMs: 420, stepMs: 260, dropDelayMs: 420, matchStaggerMs: 350, minRideMs: 600 });
 
 /** Dauer einer Fahrt aus der Länge des Wegs (Bühnen-Punkte): lange Wege etwas schneller, ins Loser Bracket etwas ruhiger. */
 export function rideMs(length, kind = "win") {
@@ -194,4 +197,28 @@ export function pointOnRoute(route, t) {
     left -= piece;
   }
   return { ...list[list.length - 1] };
+}
+
+// ---------------------------------------------------------------- Flug mit Liebe zum Detail (#1564)
+// Am Beamer aus 5 m: weich anfahren, weich ankommen (dieselbe Kurve wie im Web-Baum, EASE_MOVE), der Name hebt sich im
+// Flug leicht an (höchstens 8 %) und setzt am Ziel wieder auf; die Linie zeichnet sich hinter ihm her. Beim Landen
+// gleitet er ausfedernd in den Platz (MOTION.ease), wird etwas kleiner und blendet aus - der Platz leuchtet kurz auf.
+const easeMove = cubicBezier(...EASE_MOVE);
+const easeOut = cubicBezier(...MOTION.ease);
+const LIFT = 0.08;
+
+/** Ein Bild des Flugs bei Anteil `t` (0 bis 1) der Flugzeit: Ort, Größe und wie viel der Linie schon gezeichnet ist. */
+export function rideFrame(route, t) {
+  const time = Math.max(0, Math.min(1, t));
+  const drawn = time <= 0 ? 0 : time >= 1 ? 1 : easeMove(time);
+  const point = pointOnRoute(route, drawn);
+  const scale = time <= 0 || time >= 1 ? 1 : 1 + LIFT * Math.sin(Math.PI * time);
+  return { x: point.x, y: point.y, scale, drawn };
+}
+
+/** Ein Bild des Landens bei Anteil `share` (0 bis 1): vom Ende der Linie in den Platz, kleiner, ausgeblendet. */
+export function landFrame(from, to, share) {
+  const time = Math.max(0, Math.min(1, share));
+  const eased = time >= 1 ? 1 : easeOut(time);
+  return { x: from.x + (to.x - from.x) * eased, y: from.y + (to.y - from.y) * eased, scale: 1 - 0.1 * eased, opacity: 1 - eased };
 }

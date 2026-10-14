@@ -289,7 +289,9 @@ async def main():
     await de16(data, reset=False)
     await ffa_states(data)
     out = {"_info": INFO, "_generated_at": generated_at.isoformat(), **{key: data[key] for key in sorted(data)}}
-    OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1, default=str) + "\n", encoding="utf-8", newline="\n")
+    # Je Zustand eine Zeile: klein genug fürs Repo, und ein neu erzeugter Zustand ist im Diff genau eine Zeile.
+    lines = [f"{json.dumps(key)}: {json.dumps(value, ensure_ascii=False, separators=(',', ':'), default=str)}" for key, value in out.items()]
+    OUT.write_text("{\n" + ",\n".join(lines) + "\n}\n", encoding="utf-8", newline="\n")
     for key in sorted(data):
         rows = [(m["match_key"], m.get("section"), m["round"], m.get("status"), len(m["slots"]), m.get("station_name"),
                  (m.get("scheduled_at") or "")[11:16], m.get("schedule_forecast"), m.get("merged_into_key"))

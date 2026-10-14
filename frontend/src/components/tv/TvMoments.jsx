@@ -1,3 +1,6 @@
+import { useEffect, useState } from "react";
+import { animate } from "framer-motion";
+import { useTv } from "./TvScreen";
 import { Trophy } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { initials } from "@/lib/slotSource";
@@ -5,6 +8,7 @@ import { formatBracketSection, matchRoundLabel } from "@/lib/tournamentLabels";
 import { matchName } from "@/lib/tvLive";
 import { advancementsOf, outcomeLabel, rankingOf } from "@/lib/tvTravel";
 import { isDuelMatch } from "@/lib/tvGrid";
+import { MOTION } from "@/lib/motion";
 
 // Die Momente über dem Turnierbaum (#1116, #1118, #1119): „Jetzt live“, das Ergebnis groß (aus 5 Metern lesbar, etwa
 // 3 Sekunden), die Sammelkarte für mehr als drei Ergebnisse auf einmal und die Siegerkarte. Alle Größen hängen an der
@@ -34,6 +38,34 @@ function Avatar({ name, avatar, className = "" }) {
   );
 }
 
+// Zahlen zählen hoch (#1564): so lange wie die langsame Stufe plus etwas, ausfedernd - erst nach dem Einblenden der Zeile.
+const COUNT_MS = 900;
+const COUNT_DELAY_MS = 350;
+const ROW_STAGGER_S = 0.09;
+
+/** Eine Zahl, die einmal von 0 hochzählt (framer-motion `animate`, nur Text). Ohne Bewegung steht sie sofort da. */
+function CountUp({ value, suffix = "", index = 0, testId }) {
+  const { motionOn } = useTv();
+  const target = Number(value);
+  const counts = motionOn && Number.isFinite(target) && target > 0;
+  const [shown, setShown] = useState(counts ? 0 : target);
+  useEffect(() => {
+    if (!counts) {
+      setShown(target);
+      return undefined;
+    }
+    const controls = animate(0, target, {
+      duration: COUNT_MS / 1000,
+      delay: COUNT_DELAY_MS / 1000 + index * ROW_STAGGER_S,
+      ease: [...MOTION.ease],
+      onUpdate: (latest) => setShown(Math.round(latest)),
+    });
+    return () => controls.stop();
+  }, [counts, target, index]);
+  const text = Number.isFinite(target) ? shown : value;
+  return <span className="tv-result__score font-display" data-testid={testId} data-count={counts ? "up" : undefined}>{text}{suffix}</span>;
+}
+
 const TAG_KICKER = { walkover: "Kampflos", corrected: "Korrigiert" };
 const TAG_TITLE = { walkover: "kampflos entschieden", corrected: "korrigiert" };
 
@@ -53,15 +85,18 @@ export function TvResultCard({ match, matches, registrations, lastStage = true, 
       <div className="tv-kicker tv-t-info">{resultKicker(match, tag)}</div>
       <div className="tv-result__title tv-t-title font-heading">{matchName(match)} {TAG_TITLE[tag] || "entschieden"}</div>
       <div className="tv-result__rows">
-        {outcomes.map((entry) => {
+        {outcomes.map((entry, index) => {
           const label = outcomeLabel(entry);
           const name = nameOf(entry.registrationId);
           return (
-            <div key={entry.registrationId} className={`tv-result__row tv-result__row--${entry.kind}`} data-testid={`tv-result-row-${entry.registrationId}`}>
+            // Gestaffelt (#1564): Platz für Platz, 90 ms Versatz.
+            <div key={entry.registrationId} className={`tv-result__row tv-result__row--${entry.kind}`} data-testid={`tv-result-row-${entry.registrationId}`} style={{ "--tv-i": index }}>
               <span className="tv-result__place font-display">{entry.rank}.</span>
               <Avatar name={name} avatar={avatarOf(entry.registrationId)} className="tv-result__avatar" />
               <span className="tv-result__name" data-tv-name="1">{name}</span>
-              {entry.score !== null && entry.score !== undefined ? <span className="tv-result__score font-display">{duel ? entry.score : `${entry.score} Pkt.`}</span> : <span />}
+              {entry.score !== null && entry.score !== undefined
+                ? <CountUp value={entry.score} suffix={duel ? "" : " Pkt."} index={index} testId={`tv-result-score-${entry.registrationId}`} />
+                : <span />}
               {label ? <span className={`tv-chip tv-chip--${entry.kind}`}>{label}</span> : <span />}
             </div>
           );
@@ -147,7 +182,10 @@ export function TvChampionCard({ champion, registrations, tournamentTitle = "", 
   }
   return (
     <div className="tv-moment tv-champion" role="status" data-testid={testId}>
-      <div className="tv-champion__top tv-t-info"><Trophy className="tv-icon" aria-hidden="true" /> Champion</div>
+      <div className="tv-champion__top tv-t-info">
+        {/* Der Pokal glänzt einmal (#1564) - ein Lichtstreif, nur Verschieben. */}
+        <span className="tv-champion__cup-shine" aria-hidden="true"><Trophy className="tv-icon tv-champion__trophy" /></span> Champion
+      </div>
       <Avatar name={name} avatar={avatarOf(champion.winnerId)} className="tv-champion__photo" />
       <div className="tv-champion__big font-heading" data-tv-name="1">{name}</div>
       <div className="tv-champion__sub tv-t-info">{championSubline(champion, tournamentTitle)}</div>

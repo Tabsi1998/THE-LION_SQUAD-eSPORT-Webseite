@@ -707,7 +707,8 @@ function TvStageCanvas({ stage, multi, blocks, sections, regMap, podiumMap, comp
         const rect = node.getBoundingClientRect();
         if (rect.height) anchors.set(node.getAttribute("data-slot-anchor"), local(rect));
       });
-      // Die Lücken über und unter den Blöcken sind die freien Querbahnen; Köpfe und Rundentitel sind Hindernisse.
+      // Die Lücken über und unter den Blöcken sind die freien Querbahnen; Köpfe und Rundentitel sind Hindernisse - vom
+      // Blocktitel nur Marke und Text, nicht die ganze Zeile (sonst sperrt er die Gassen darunter).
       const corridors = [];
       root.querySelectorAll("[data-tv-block]").forEach((node) => {
         const rect = node.getBoundingClientRect();
@@ -716,7 +717,7 @@ function TvStageCanvas({ stage, multi, blocks, sections, regMap, podiumMap, comp
         corridors.push(box.top - gap / 4, box.bottom + gap / 4);
       });
       const heads = [];
-      root.querySelectorAll(".tv-block__title, .tv-ko__round, .tv-tree__phase").forEach((node) => {
+      root.querySelectorAll(".tv-block__title > *, .tv-ko__round, .tv-tree__phase").forEach((node) => {
         const rect = node.getBoundingClientRect();
         if (rect.width && rect.height) heads.push(local(rect));
       });

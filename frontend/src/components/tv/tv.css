@@ -360,10 +360,10 @@
 .tv-nextup__item { display: flex; flex-direction: column; justify-content: center; gap: calc(var(--tv-u) * 0.2); min-width: 0; padding-left: calc(var(--tv-u) * 1.4); border-left: var(--tv-line-w) solid var(--tv-line); }
 .tv-nextup__kicker { color: var(--tv-gold); }
 .tv-nextup__item--live .tv-nextup__kicker { color: var(--tv-live); }
-.tv-nextup__what { font-weight: 700; overflow-wrap: anywhere; }
+.tv-nextup__what { font-size: var(--tv-fs-name); line-height: 1.15; font-weight: 700; overflow-wrap: anywhere; }
 .tv-nextup__who { overflow-wrap: anywhere; }
-.tv-nextup__when { font-weight: 700; color: var(--tv-text); }
-.tv-nextup__delay { font-weight: 700; color: var(--tls-warn); }
+.tv-nextup__when { font-size: var(--tv-fs-name); line-height: 1.15; font-weight: 700; color: var(--tv-text); }
+.tv-nextup__delay { font-size: var(--tv-fs-info); font-weight: 700; color: var(--tls-warn); }
 .tv-nextup__spot { font-size: var(--tv-fs-info); }
 .tv-sponsor { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; height: calc(var(--tv-u) * 4.6); width: calc(var(--tv-u) * 15); opacity: 0.9; }
 .tv-sponsor--main { height: calc(var(--tv-u) * 5.4); width: calc(var(--tv-u) * 18); }
@@ -578,19 +578,20 @@
 .tv-node--bye .tv-row__name { color: var(--tv-muted); font-style: italic; }
 .tv-row--gone .tv-row__name > .min-w-0 { text-decoration: line-through; text-decoration-thickness: 0.12em; color: var(--tv-faint); }
 .tv-row--gone .tv-avatar { opacity: 0.5; }
-.tv-row__gone { flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; color: var(--tv-muted); }
+.tv-row--gone .tv-row__name { flex-wrap: wrap; row-gap: 0; }
+.tv-row__gone { flex-basis: 100%; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; color: var(--tv-muted); }
 
 /* Bewegungen je Ereignis (#1564) - genau einmal, gesetzt von der Bühne. Am TV ruhiger als im Web: längere Zeiten, eine
    Bewegung nach der anderen. „Bewegung reduzieren“ schaltet sie oben für alle TV-Seiten ab (Endzustand sofort). */
 /* Auslosung: die Namen kommen nacheinander in die Läufe. */
 @keyframes tv-row-draw { from { opacity: 0; transform: translateX(calc(var(--tv-u) * -1.4)); } }
-.tv-row--draw { animation: tv-row-draw 0.5s var(--tls-ease) both; animation-delay: calc(var(--tv-i, 0) * var(--tv-draw-step, 60ms)); }
+.tv-row--draw { animation: tv-row-draw var(--tls-motion-slow) var(--tls-ease) both; animation-delay: calc(var(--tv-i, 0) * var(--tv-draw-step, 60ms)); }
 /* kampflos: das Wort im Kopf leuchtet zweimal auf. */
 @keyframes tv-mark-glow { 0%, 100% { background: transparent; } 50% { background: var(--tv-accent-soft); } }
-.tv-node[data-mark="walkover"] .tv-node__status { color: var(--tv-accent); font-weight: 700; border-radius: 2px; animation: tv-mark-glow 0.9s var(--tls-ease) 2; }
+.tv-node[data-mark="walkover"] .tv-node__status { color: var(--tv-accent); font-weight: 700; border-radius: 2px; animation: tv-mark-glow calc(var(--tls-motion-slow) * 2) var(--tls-ease) 2; }
 /* entfällt / zusammengelegt: die Karte tritt zurück. */
 @keyframes tv-node-recede { from { opacity: 1; } to { opacity: 0.55; } }
-.tv-node[data-mark="fate"] { animation: tv-node-recede 1.2s var(--tls-ease) both; }
+.tv-node[data-mark="fate"] { animation: tv-node-recede calc(var(--tls-motion-slow) * 3) var(--tls-ease) both; }
 
 /* Live-Spotlight (#1116): Station und Spielzeit groß unter dem laufenden Spiel. */
 .tv-spot {
@@ -750,7 +751,7 @@
    Station leuchtet kurz in Grün („frei“). */
 .tv-live-banner--event { border-color: var(--tv-accent); }
 .tv-live-banner__mark { width: 0.55em; height: 0.55em; flex-shrink: 0; background: var(--tv-accent); }
-.tv-live-banner__note { padding: 0.1em 0.5em; border-radius: 3px; color: var(--tv-green); background: var(--tv-green-soft); animation: tv-note-glow 1s var(--tls-ease) 0.4s 2; }
+.tv-live-banner__note { padding: 0.1em 0.5em; border-radius: 3px; color: var(--tv-green); background: var(--tv-green-soft); animation: tv-note-glow calc(var(--tls-motion-slow) * 2) var(--tls-ease) var(--tls-motion-slow) 2; }
 @keyframes tv-note-glow { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 0.18em var(--tv-green); } }
 .tv-champion {
   display: grid;
@@ -1370,3 +1371,20 @@
 .tv-best__gap { padding: 0.3em 0.7em; border: var(--tv-line-w) solid currentColor; border-radius: 2px; color: var(--tv-green); background: var(--tv-green-soft); font-weight: 700; font-variant-numeric: tabular-nums; }
 .tv-station__call { display: flex; align-items: center; gap: calc(var(--tv-u) * 2); }
 .tv-station__call .tv-call__go { margin-top: 0; }
+
+/* ---------------------------------------------------------------- Momente mit Liebe zum Detail (#1564)
+   Gleiche Kurve (--tls-ease) und gestaffelt statt gleichzeitig: die Plätze der Ergebnis-Karte kommen nacheinander,
+   die Zahlen zählen hoch (TvMoments.CountUp), der Pokal glänzt einmal. Nur Verschieben und Deckkraft. */
+.tv-result__row { animation: tv-rise var(--tls-motion-slow) var(--tls-ease) both; animation-delay: calc(0.25s + var(--tv-i, 0) * 0.09s); }
+.tv-result__score { font-variant-numeric: tabular-nums; }
+.tv-champion__cup-shine { position: relative; display: inline-flex; overflow: hidden; border-radius: 0.25em; }
+.tv-champion__trophy { width: 1.6em; height: 1.6em; }
+.tv-champion__cup-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, color-mix(in srgb, var(--tv-text) 80%, transparent) 50%, transparent 70%);
+  transform: translateX(-130%);
+  animation: tv-cup-shine calc(var(--tls-motion-slow) * 3) var(--tls-ease) calc(var(--tls-motion-slow) * 2) both;
+}
+@keyframes tv-cup-shine { to { transform: translateX(130%); } }

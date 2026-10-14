@@ -159,6 +159,15 @@ test("entfällt: die Karte tritt zurück (leise, gestrichelt) und sagt warum", a
   const card = renderGenerated(bracket, "GFR");
   expect(card.className).toContain("tv-node--void");
   expect(card).toHaveTextContent("entfällt · nicht nötig");
+  // Wie im Web-Baum eine ruhige Zeile: keine Namen- oder Freilos-Zeilen mehr darunter.
+  expect(card.querySelectorAll("[data-tv-slot]")).toHaveLength(0);
+});
+
+test("zusammengelegter Lauf (echter Umbau): nur der Kopf mit „zusammengelegt in …“, keine vier Freilos-Zeilen", async () => {
+  const bracket = await generated("ffa8_after_merge");
+  const card = renderGenerated(bracket, "C");
+  expect(card).toHaveTextContent("zusammengelegt in B");
+  expect(card.querySelectorAll("[data-tv-slot]")).toHaveLength(0);
 });
 
 test("eine Karte mit Bewegung „kampflos“ oder „entfällt“ trägt sie genau dann, wenn die Bühne sie setzt", async () => {

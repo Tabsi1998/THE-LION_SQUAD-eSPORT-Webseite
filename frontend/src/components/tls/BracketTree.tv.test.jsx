@@ -21,13 +21,17 @@ function layoutRects(bracket) {
   const left = { WB: 0, LB: 0, GF: 3000 };
   const byId = new Map(bracket.matches_v2.map((match) => [match.id, match]));
   window.Element.prototype.getBoundingClientRect = function rect() {
-    const block = this.getAttribute?.("data-tv-block");
+    // Der Blocktitel ist eine ganze Zeile über dem Block - nur Marke und Text darin sind wirklich belegt.
+    const titleOf = this.classList?.contains("tv-block__title") ? this : this.parentElement?.classList?.contains("tv-block__title") ? this.parentElement : null;
+    const block = titleOf ? titleOf.closest("[data-tv-block]")?.getAttribute("data-tv-block") : this.getAttribute?.("data-tv-block");
     if (block) {
       const own = bracket.matches_v2.filter((match) => String(match.section).toLowerCase() === block);
       const x1 = Math.min(...own.map((match) => left[match.section] + (match.round - 1) * 300));
       const x2 = Math.max(...own.map((match) => left[match.section] + (match.round - 1) * 300 + 240));
       const y1 = Math.min(...own.map((match) => top[match.section] + (match.order || 0) * 160)) - 60;
       const y2 = Math.max(...own.map((match) => top[match.section] + (match.order || 0) * 160 + 120));
+      if (titleOf === this) return { left: x1, top: y1, right: x2, bottom: y1 + 30, width: x2 - x1, height: 30, x: x1, y: y1, toJSON() {} };
+      if (titleOf) return { left: x1, top: y1, right: x1 + 200, bottom: y1 + 30, width: 200, height: 30, x: x1, y: y1, toJSON() {} };
       return { left: x1, top: y1, right: x2, bottom: y2, width: x2 - x1, height: y2 - y1, x: x1, y: y1, toJSON() {} };
     }
     const card = this.closest?.("[data-tv-card]");
