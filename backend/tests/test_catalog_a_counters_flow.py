@@ -158,3 +158,21 @@ async def test_siegquote_ab_dreissig_matches_und_migration_alter_gruppen(flow):
     mine = {a["tier_code"] async for a in flow.db.user_achievements.find({"user_id": me["id"]}, {"_id": 0, "tier_code": 1})}
     assert {"matches_played_1", "matches_played_2"} <= mine and "matches_played_3" not in mine and awarded >= 2
     assert "win_rate_5" in mine, "75 % ab 30 Matches ist Effizienz V"
+
+
+@pytest.mark.asyncio
+async def test_bracket_reset_zaehlt_nur_fuer_den_der_ihn_erzwungen_hat(flow):
+    """Reset-Spiel (#1549): wer es aus der Siegerrunde gewinnt, hat keinen Bracket Reset geschafft - den erzwingt nur,
+    wer aus dem Loser Bracket das erste Grand Final gewann (Platz aus „W:GF:1“)."""
+    me = await flow.add_user(name="Spielerin")
+    other = await flow.add_user(name="Gegner")
+    await world(flow, me, other)
+    await flow.db.matches_v2.insert_one({
+        "id": "m-reset-upper", "tournament_id": "t1", "status": "completed", "stage_number": 1, "round": 6, "order": 1,
+        "round_name": "Grand Final Reset", "completed_at": "2026-09-01T22:30:00+00:00", "updated_at": "2026-09-01T22:30:00+00:00",
+        "slots": [{"slot": 1, "registration_id": "r-ot-1", "source_result": {"from_match_key": "GF", "rank": 1, "flow": "W"}},
+                  {"slot": 2, "registration_id": "r-me-1", "source_result": {"from_match_key": "GF", "rank": 2, "flow": "W"}}],
+        "results": [{"registration_id": "r-me-1", "outcome": "winner", "score": 3}, {"registration_id": "r-ot-1", "outcome": "loser", "score": 1}],
+    })
+    values = await counters.compute(me["id"], {"bracket_resets_won"})
+    assert values["bracket_resets_won"] == 1, "m3 zählt (ohne Herkunft wie bisher), das Reset-Spiel aus der Siegerrunde nicht"
