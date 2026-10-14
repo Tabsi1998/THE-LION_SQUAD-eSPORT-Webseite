@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { useLoad } from "./useLoad";
 
 // Der zentrale Lade-Baustein der Website (#983, #984, #985): Laden, leer, Fehler und geladen getrennt; nur die zuletzt
@@ -72,6 +72,37 @@ test("ein gescheitertes Nachladen lässt den letzten Stand stehen und sagt es (s
   expect(result.current.stale).toBe(true);
   expect(result.current.problem).toBe("error");
   expect(fetcher).toHaveBeenLastCalledWith(expect.objectContaining({ previous: [{ id: 1 }] }));
+});
+
+// Wettlauf (#1570): Der Stand, den ein Nachladen als `previous` bekommt, darf nicht erst nach dem Effekt-Lauf der Seite
+// stimmen. React schreibt die geladenen Daten sofort ins Bild, führt die Effekte aber erst in einer späteren Aufgabe
+// aus - wer in diesem Spalt nachlädt (ein Klick, eine Invalidierung), hätte `previous` ohne den ersten Stand bekommen
+// und einen ausgefallenen Teil leer statt mit seinem letzten Stand gezeigt. Ein MutationObserver läuft unmittelbar nach
+// dem Schreiben ins Bild und vor jeder späteren Aufgabe, stellt den Spalt also immer her - nicht nur unter Last.
+test("Nachladen unmittelbar nach dem ersten Bild kennt den ersten Stand schon (previous)", async () => {
+  const fetcher = vi.fn()
+    .mockResolvedValueOnce([{ id: 1 }])
+    .mockRejectedValueOnce(serverError());
+  let load;
+  function Probe() {
+    load = useLoad("liste", fetcher);
+    return <p data-testid="stand">{load.data ? `Stand ${load.data.length}` : "leer"}</p>;
+  }
+  const { container } = render(<Probe />);
+  let reloaded;
+  const observer = new MutationObserver(() => {
+    if (!reloaded && load.data) {
+      observer.disconnect();
+      reloaded = load.reload();
+    }
+  });
+  observer.observe(container, { childList: true, subtree: true, characterData: true });
+  await screen.findByText("Stand 1");
+  await act(async () => { await reloaded; });
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(fetcher).toHaveBeenLastCalledWith(expect.objectContaining({ previous: [{ id: 1 }] }));
+  expect(load.data).toEqual([{ id: 1 }]);
+  expect(load.stale).toBe(true);
 });
 
 test("A langsam, B schnell: die spätere Antwort für A ändert B nicht, und A wird abgebrochen", async () => {
