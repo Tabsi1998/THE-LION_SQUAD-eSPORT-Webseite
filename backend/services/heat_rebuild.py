@@ -173,7 +173,7 @@ class _Graph:
 
     def awaits_draw(self, match: dict) -> bool:
         """Folgespiel einer gemischten Runde, die noch nicht ausgelost ist (#1548)."""
-        return group_awaits_draw(self.matches, ((match.get("settings") or {}).get("draw_group")))
+        return group_awaits_draw(self.matches, ((match.get("settings") or {}).get("draw_group")), match.get("stage_id"))
 
     def deliverable(self, slot: dict) -> bool:
         source = slot.get("source") or {}
@@ -183,7 +183,7 @@ class _Graph:
         if _live(origin):
             count = len(self.entries(origin))
         elif (str(origin.get("status") or "") in DECIDED_STATUSES
-              and group_awaits_draw(self.matches, (source.get("draw") or {}).get("group"))):
+              and group_awaits_draw(self.matches, (source.get("draw") or {}).get("group"), origin.get("stage_id"))):
             # Gemischt (#1548): die Quelle ist entschieden, ihr Weiterkommer wartet nur noch auf die Auslosung.
             count = len(origin.get("results") or [])
         else:

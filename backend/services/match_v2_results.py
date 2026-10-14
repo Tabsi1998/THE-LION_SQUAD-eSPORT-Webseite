@@ -23,7 +23,14 @@ from typing import Any
 from collections import defaultdict, deque
 
 from match_rules import RESULT_MAX_SCORE, RESULT_MAX_TIME_MS, match_allows_draw
-from services.advancement_draw import DRAW_RNG, assign_balanced, draw_group_of, group_sources, group_targets
+from services.advancement_draw import (
+    ANY_STAGE,
+    DRAW_RNG,
+    assign_balanced,
+    draw_group_of,
+    group_sources,
+    group_targets,
+)
 from services.match_result_errors import MatchResultError
 from services.round_labels import section_kind
 
@@ -551,8 +558,8 @@ def _auto_bye_result(winner: dict, now_iso: str) -> dict:
 DECIDED_OR_VOID = DECIDED_STATUSES | {"cancelled"}
 
 
-def _draw_open_targets(by_id: dict[str, dict], group: str) -> list[dict]:
-    return [target for target in group_targets(by_id.values(), group) if target.get("status") != "cancelled"]
+def _draw_open_targets(by_id: dict[str, dict], group: str, stage_id=ANY_STAGE) -> list[dict]:
+    return [target for target in group_targets(by_id.values(), group, stage_id) if target.get("status") != "cancelled"]
 
 
 def _group_is_drawn(targets: list[dict]) -> bool:
@@ -593,15 +600,15 @@ def _free_draw_slot(targets: list[dict], rng=None) -> tuple[dict, dict] | None:
 
 
 def _locate_target_slot(advancement: dict, target: dict, by_id: dict[str, dict], source_id: str,
-                        result_rank: int, rng=None) -> tuple[dict, dict | None, str | None]:
+                        result_rank: int, rng=None) -> tuple[dict, dict | None, tuple | None]:
     """Wohin ein Weiterkommer geht: fester Baum - der Platz aus dem Schema; gemischt - vor der Auslosung noch nirgends
-    (Rückgabe mit Gruppe), danach sein ausgeloster Platz."""
+    (Rückgabe mit Phase und Gruppe), danach sein ausgeloster Platz."""
     group = draw_group_of(target)
     if not group or target.get("status") == "cancelled":
         return target, _find_slot(target, int(advancement.get("to_slot") or 0)), None
-    targets = _draw_open_targets(by_id, group)
+    targets = _draw_open_targets(by_id, group, target.get("stage_id"))
     if not _group_is_drawn(targets):
-        return target, None, group
+        return target, None, (target.get("stage_id"), group)
     ranks = {int(result_rank), int(advancement.get("rank") or 0)}
     found = _drawn_slot(targets, source_id, advancement.get("flow"), ranks) or _free_draw_slot(targets, rng)
     if not found:
@@ -621,20 +628,22 @@ def _pot_ranks(source: dict, results: list[dict], gone: set[str]) -> tuple[dict[
 
 
 def run_draw(group: str, by_id: dict[str, dict], target_sets: dict[str, dict], now_iso: str, *,
-             decided_results: dict[str, list[dict]] | None = None, rng=None, draws: list[dict] | None = None,
-             trigger: str = "result", eliminated: set[str] | None = None) -> list[str]:
+             stage_id=ANY_STAGE, decided_results: dict[str, list[dict]] | None = None, rng=None,
+             draws: list[dict] | None = None, trigger: str = "result", eliminated: set[str] | None = None) -> list[str]:
     """Die Auslosung einer Gruppe, sobald **alle** Quellspiele entschieden sind (gespielt, gewertet, kampflos oder
     abgesagt). Der Topf: je Weiterleitung in die Gruppe der Teilnehmer auf diesem Platz - oder ein Freilos, wo es ihn
     nicht gibt. ``assign_balanced`` verteilt gleichmäßig. ``decided_results``: Ergebnisse, die noch nicht am Spiel
-    stehen (das gerade eingetragene). Rückgabe: die Folgespiele, die jetzt besetzt sind.
+    stehen (das gerade eingetragene). ``stage_id``: die Phase der Gruppe - ``by_id`` darf mehrere Phasen enthalten,
+    gelost wird nur in dieser. Rückgabe: die Folgespiele, die jetzt besetzt sind.
 
     Wie im festen Baum (#1553): wer ausgeschieden ist (``eliminated`` oder am Ergebnis als ``eliminated`` vermerkt)
     oder auf dem Sieger-Weg nicht erschienen ist, kommt nicht in den Topf - sein Platz wird ein Freilos."""
     decided_results = decided_results or {}
-    targets = _draw_open_targets(by_id, group)
+    targets = _draw_open_targets(by_id, group, stage_id)
     if not targets or _group_is_drawn(targets):
         return []
-    sources = sorted(group_sources(by_id.values(), group), key=lambda row: (row.get("round") or 0, row.get("order") or 0))
+    sources = sorted(group_sources(by_id.values(), group, stage_id),
+                     key=lambda row: (row.get("round") or 0, row.get("order") or 0))
     if not all(row["id"] in decided_results or str(row.get("status") or "") in DECIDED_OR_VOID for row in sources):
         return []
     target_ids = {target["id"] for target in targets}
@@ -723,23 +732,25 @@ def run_draw(group: str, by_id: dict[str, dict], target_sets: dict[str, dict], n
     return [target["id"] for target in targets]
 
 
-def group_awaits_draw(matches, group: str | None) -> bool:
-    """Ist die Gruppe noch nicht ausgelost? Dann sind ihre Plätze offen, obwohl Quellen schon entschieden sein können -
-    für den Lauf-Umbau (#1550) heißt das: nicht anfassen, die Plätze kommen mit der Auslosung."""
+def group_awaits_draw(matches, group: str | None, stage_id=ANY_STAGE) -> bool:
+    """Ist die Gruppe (in dieser Phase) noch nicht ausgelost? Dann sind ihre Plätze offen, obwohl Quellen schon
+    entschieden sein können - für den Lauf-Umbau (#1550) heißt das: nicht anfassen, die Plätze kommen mit der
+    Auslosung."""
     if not group:
         return False
-    targets = [row for row in group_targets(matches, group) if row.get("status") != "cancelled"]
+    targets = [row for row in group_targets(matches, group, stage_id) if row.get("status") != "cancelled"]
     return bool(targets) and not _group_is_drawn(targets)
 
 
 def run_ready_draws(by_id: dict[str, dict], target_sets: dict[str, dict], now_iso: str, *, rng=None,
                     draws: list[dict] | None = None, trigger: str = "walkover") -> list[str]:
     """Jede noch offene Auslosung, deren Runde inzwischen ganz entschieden ist - etwa weil der Lauf-Umbau den letzten
-    offenen Lauf abgesagt hat. Rückgabe: die jetzt besetzten Folgespiele."""
-    groups = sorted({group for row in by_id.values() if (group := draw_group_of(row))})
+    offenen Lauf abgesagt hat. Je Phase und Gruppe eine eigene Auslosung. Rückgabe: die jetzt besetzten Folgespiele."""
+    scopes = {(row.get("stage_id"), group) for row in by_id.values() if (group := draw_group_of(row))}
     drawn: list[str] = []
-    for group in groups:
-        drawn.extend(run_draw(group, by_id, target_sets, now_iso, rng=rng, draws=draws, trigger=trigger))
+    for stage_id, group in sorted(scopes, key=lambda scope: (str(scope[0] or ""), scope[1])):
+        drawn.extend(run_draw(group, by_id, target_sets, now_iso, stage_id=stage_id, rng=rng, draws=draws,
+                              trigger=trigger))
     return drawn
 
 
@@ -786,17 +797,17 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
         }
         match.update(change)
         target_sets.setdefault(match_id, {}).update(change)
-        waiting_groups: list[str] = []
+        waiting_groups: list[tuple] = []
         for advancement in match.get("advancement") or []:
             target = by_id.get(advancement.get("to_match_id"))
             if not target:
                 continue
             rank = int(advancement.get("rank") or 0)
-            target, target_slot, group = _locate_target_slot(advancement, target, by_id, match_id, rank, rng)
-            if group:
+            target, target_slot, waiting = _locate_target_slot(advancement, target, by_id, match_id, rank, rng)
+            if waiting:
                 # Gemischt (#1548): ausgelost wird erst, wenn die ganze Runde entschieden ist.
-                if group not in waiting_groups:
-                    waiting_groups.append(group)
+                if waiting not in waiting_groups:
+                    waiting_groups.append(waiting)
                 continue
             if not target_slot:
                 continue
@@ -827,8 +838,9 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
             # Siegerrunde, entfällt das Reset-Spiel („nicht nötig“) statt selbst zum Freilos zu werden; gewinnt die
             # Verliererrunde, ist es nötig und wird in der Kette ebenfalls kampflos entschieden.
             _apply_bracket_reset_rule(match, change["results"], by_id, by_key, target_sets, now_iso)
-        for group in waiting_groups if draw_now else []:
-            for drawn_id in run_draw(group, by_id, target_sets, now_iso, rng=rng, draws=draws, trigger="walkover"):
+        for stage_id, group in waiting_groups if draw_now else []:
+            for drawn_id in run_draw(group, by_id, target_sets, now_iso, stage_id=stage_id, rng=rng, draws=draws,
+                                     trigger="walkover"):
                 seen.discard(drawn_id)
                 queue.append(drawn_id)
 
@@ -1009,7 +1021,7 @@ def build_v2_result_application(
     target_sets: dict[str, dict] = {}
     overwritten_targets: set[str] = set()
     advanced_registration_ids: set[str] = set()
-    waiting_groups: list[str] = []
+    waiting_groups: list[tuple] = []
     draws: list[dict] = []
 
     for advancement in match.get("advancement") or []:
@@ -1033,11 +1045,11 @@ def build_v2_result_application(
                     409,
                 )
             advanced_registration_ids.add(result["registration_id"])
-        target, target_slot, group = _locate_target_slot(advancement, target, by_id, match["id"], result_rank, rng)
-        if group:
+        target, target_slot, waiting = _locate_target_slot(advancement, target, by_id, match["id"], result_rank, rng)
+        if waiting:
             # Gemischt (#1548): noch nicht ausgelost - der Platz ergibt sich, wenn die ganze Runde fertig ist.
-            if group not in waiting_groups:
-                waiting_groups.append(group)
+            if waiting not in waiting_groups:
+                waiting_groups.append(waiting)
             continue
         if not target_slot:
             raise MatchV2ResultError(f"Zielslot {advancement.get('to_slot')} in {target.get('match_key')} nicht gefunden")
@@ -1106,9 +1118,9 @@ def build_v2_result_application(
             "updated_at": now_iso,
         })
 
-    for group in waiting_groups:
-        run_draw(group, by_id, target_sets, now_iso, decided_results={match["id"]: results}, rng=rng, draws=draws,
-                 eliminated=eliminated)
+    for stage_id, group in waiting_groups:
+        run_draw(group, by_id, target_sets, now_iso, stage_id=stage_id, decided_results={match["id"]: results},
+                 rng=rng, draws=draws, eliminated=eliminated)
 
     reset_matches: list[dict] = []
     if force:
@@ -1180,7 +1192,8 @@ def build_redraw_application(stage_matches: list[dict], group: str, *, now_iso: 
         target["status"] = _status_after_slot_fill(target, preserve_terminal=False)
     target_sets: dict[str, dict] = {}
     draws: list[dict] = []
-    drawn = run_draw(group, by_id, target_sets, now_iso, rng=rng, draws=draws, trigger="redraw")
+    drawn = run_draw(group, by_id, target_sets, now_iso, stage_id=targets[0].get("stage_id"), rng=rng, draws=draws,
+                     trigger="redraw")
     if not drawn:
         raise MatchV2ResultError("Neu auslosen geht gerade nicht – die Runde davor ist nicht mehr fertig.", 409)
     resolve_walkovers(drawn, by_id, target_sets, now_iso, rng=rng, draws=draws)
@@ -1260,9 +1273,14 @@ def apply_deferred_draws(matches: list[dict], *, now_iso: str, rng=None) -> list
     Auslosungen zurück."""
     rng = rng or DRAW_RNG
     draws: list[dict] = []
-    league = [match for match in matches if match.get("stage_type") == "league" and not match.get("is_preview")]
-    if league and _league_shuffled(league) and not any(match.get("draw") for match in league):
-        draws.extend(build_league_redraw_application(league, now_iso=now_iso, rng=rng, trigger="build")["draws"])
+    leagues: dict[str, list[dict]] = defaultdict(list)
+    for match in matches:
+        if match.get("stage_type") == "league" and not match.get("is_preview"):
+            leagues[str(match.get("stage_id") or "")].append(match)
+    for _stage_id, league in sorted(leagues.items()):
+        # Je Liga-Phase ein eigenes Los - Spieltage und Heimrecht gehören zu genau einer Phase.
+        if _league_shuffled(league) and not any(match.get("draw") for match in league):
+            draws.extend(build_league_redraw_application(league, now_iso=now_iso, rng=rng, trigger="build")["draws"])
     by_id = {match["id"]: match for match in matches if match.get("id") and not match.get("is_preview")}
     drawn = run_ready_draws(by_id, {}, now_iso, rng=rng, draws=draws, trigger="walkover")
     if drawn:
