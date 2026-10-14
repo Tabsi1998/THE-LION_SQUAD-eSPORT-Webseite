@@ -514,12 +514,18 @@
 /* Linien (#1564): ein SVG je Phase, dieselbe Führung wie im Web-Baum (lib/bracketLines) - auch über die Blöcke. Der
    Abstieg ins Loser Bracket ist da, aber leise (dünn, gestrichelt, ruhige Farbe); Entfallenes gestrichelt und blass. */
 .tv-tree__stage { position: relative; }
+/* Schiene oder Eingang in der ersten Spalte, Weg aus der letzten (#1591): links und rechts eine halbe Gasse Platz. */
+.tv-tree__stage[data-lead="1"] { padding-inline: calc(var(--tv-u) * var(--tv-b-colGap) * 0.6); }
 .tv-tree__lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .tv-tree__lines .tls-bracket-line { fill: none; stroke: var(--tv-line-strong); stroke-width: 3px; }
 .tv-tree__lines .tls-bracket-line--drop { stroke: var(--tv-muted); stroke-width: 2px; stroke-dasharray: 6 10; opacity: 0.4; }
 .tv-tree__lines .tls-bracket-line--void { stroke-dasharray: 8 10; opacity: 0.4; }
 /* Gemischte Runden (#1548): die Schiene steht, der echte Weg über sie ist nur Bahn für die Fahrt der Auslosung. */
 .tv-tree__lines .tls-bracket-line--real { opacity: 0; }
+/* Übersicht (#1591): Abstiege und Einzelwege einer Gabel stehen am TV nur als Eingang bzw. Gabel da. */
+.tv-tree__lines .tls-bracket-line[data-demand="1"] { opacity: 0; }
+.tv-tree__lines .tls-bracket-line--stub { stroke: var(--tv-muted); stroke-width: 2px; opacity: 0.6; }
+.tv-tree__lines .tls-bracket-marker { fill: var(--tv-panel); stroke: var(--tv-muted); stroke-width: 2px; opacity: 0.8; }
 .tv-screen[data-tv-contrast="1"] .tv-tree__lines .tls-bracket-line { stroke: var(--tv-text); stroke-width: 4px; }
 .tv-screen[data-tv-contrast="1"] .tv-tree__lines .tls-bracket-line--drop { stroke-width: 3px; opacity: 0.8; }
 .tv-table { display: flex; flex-direction: column; gap: calc(var(--tv-u) * 1.4); }

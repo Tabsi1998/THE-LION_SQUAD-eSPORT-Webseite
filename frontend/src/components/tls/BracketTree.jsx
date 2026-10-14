@@ -1,3 +1,4 @@
+import { displayRoundLabels } from "@/lib/bracketNames";
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, createContext } from "react";
 import { Link, useInRouterContext } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
@@ -108,7 +109,8 @@ function usePath(matches, edges) {
 
 export function BracketTree({ data, compact = false, viewMode = "standard", onMatchClick, changedMatchIds = EMPTY_SET, mineId = null, layout = "auto", nodeRenderer = null, tvLayout = null, quietUpdate = false }) {
   const { matches_v2: matchesRaw, stages: stagesRaw, registrations: registrationsRaw } = data || {};
-  const matches_v2 = useMemo(() => matchesRaw || [], [matchesRaw]);
+  // Rundennamen je Abschnitt fortlaufend (#1591): das Loser Bracket beginnt mit „Loser Runde 1“.
+  const matches_v2 = useMemo(() => displayRoundLabels(matchesRaw || []), [matchesRaw]);
   const stages = useMemo(() => stagesRaw || [], [stagesRaw]);
   const registrations = useMemo(() => registrationsRaw || [], [registrationsRaw]);
   const isTv = viewMode === "tv";
@@ -493,6 +495,16 @@ function ChampionCard({ match, regMap }) {
   );
 }
 
+/** Geht es seitlich weiter (#1591)? `data-more` „left“, „right“ oder „both“ blendet den Rand aus (index.css). */
+function markMore(canvas) {
+  if (!canvas) return;
+  const left = canvas.scrollLeft > 1;
+  const right = canvas.scrollLeft + canvas.clientWidth < canvas.scrollWidth - 1;
+  const value = left && right ? "both" : left ? "left" : right ? "right" : "";
+  if (value) canvas.setAttribute("data-more", value);
+  else canvas.removeAttribute("data-more");
+}
+
 /**
  * Die Leinwand einer Phase am Desktop: links Hauptfeld und Loser Bracket untereinander, rechts Grand Final, Pokal und
  * Spiel um Platz 3. Die Linien liegen als ein SVG darüber und werden nur gemessen, wenn sich Daten oder Größen ändern
@@ -526,7 +538,9 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
     return map;
   }, [names, sections]);
   // Liegt ein Ziel einer Gruppe in der ersten Spalte (Loser-Runde 1), braucht die Schiene links eine Gasse.
-  const busLead = stageRails.some((rail) => rail.targets.some((id) => columnOf.get(id) === 0));
+  // Ebenso der Eingang eines Abstiegs (#1591), der in die erste Spalte des Loser Brackets führt.
+  const busLead = stageRails.some((rail) => rail.targets.some((id) => columnOf.get(id) === 0))
+    || stageEdges.some((edge) => edge.flow === "L" && edge.cross && columnOf.get(edge.to) === 0);
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -547,6 +561,12 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
       });
       const anchors = new Map();
       canvas.querySelectorAll("[data-slot-anchor]").forEach((node) => anchors.set(node.getAttribute("data-slot-anchor"), node.getBoundingClientRect()));
+      // Weiterkommer verlassen einen Lauf an der Zeile „kommen weiter“, die anderen an „Die anderen …“ (#1591).
+      const exits = new Map();
+      canvas.querySelectorAll("[data-exit-anchor]").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (rect.height) exits.set(node.getAttribute("data-exit-anchor"), rect.top + rect.height / 2 + oy);
+      });
       const corridors = [];
       canvas.querySelectorAll("section[data-testid^='bracket-section-']").forEach((node) => {
         const rect = local(node.getBoundingClientRect());
@@ -568,6 +588,7 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
           const anchor = anchors.get(`${id}:${slot}`);
           return anchor && anchor.height ? anchor.top + anchor.height / 2 + oy : undefined;
         },
+        exitY: (id, flow) => exits.get(`${id}:${flow}`),
         corridors: corridors.filter((y) => y > 2),
         obstacles,
         gap: COLUMN_GAP,
@@ -577,8 +598,10 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
       });
       const w = canvas.scrollWidth;
       const h = canvas.scrollHeight;
-      const key = `${w}x${h}|${lines.map((line) => `${line.id}:${line.d}`).join(";")}`;
-      setGeom((current) => (current.key === key ? current : { lines, w, h, key }));
+      const overflow = w > canvas.clientWidth + 1;
+      markMore(canvas);
+      const key = `${w}x${h}|${overflow}|${lines.map((line) => `${line.id}:${line.d}`).join(";")}`;
+      setGeom((current) => (current.key === key ? current : { lines, w, h, key, overflow }));
     };
     const schedule = () => {
       if (frame || typeof requestAnimationFrame !== "function") { if (!frame) measure(); return; }
@@ -588,6 +611,8 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
     if (typeof ResizeObserver === "undefined") return undefined;
     const observer = new ResizeObserver(schedule);
     if (contentRef.current) observer.observe(contentRef.current);
+    // Auch die Leinwand selbst: wird das Fenster schmaler, kommt der Hinweis zum Scrollen (#1591).
+    observer.observe(canvas);
     canvas.querySelectorAll("[data-node]").forEach((node) => observer.observe(node));
     return () => {
       observer.disconnect();
@@ -595,17 +620,49 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
     };
   }, [stageEdges, stageRails, columnOf, sections, byIdMatch]);
 
-  const block = (name) => (
+  const onScroll = useCallback((event) => markMore(event.currentTarget), []);
+
+  // Zeigen oder Tippen auf eine Karte (#1591): ihre Abstiege, die Äste in eine Schiene und die Einzelwege erscheinen.
+  // Nur Attribute an den Linien - die Karten rendern dafür nicht neu.
+  const focusRef = useRef(null);
+  const focusOn = useCallback((id) => {
+    const svg = canvasRef.current?.querySelector("[data-testid='bracket-connectors']");
+    if (!svg || focusRef.current === id) return;
+    focusRef.current = id;
+    svg.querySelectorAll("[data-focus]").forEach((node) => node.removeAttribute("data-focus"));
+    if (id) svg.querySelectorAll(`[data-rel~="${id}"]`).forEach((node) => node.setAttribute("data-focus", "1"));
+  }, []);
+  const onPointerOver = useCallback((event) => {
+    const node = event.target?.closest?.("[data-node]");
+    focusOn(node ? node.getAttribute("data-node") : null);
+  }, [focusOn]);
+  const onPointerLeave = useCallback(() => focusOn(null), [focusOn]);
+  useEffect(() => { focusRef.current = null; }, [geom.key]);
+
+  // Kompakt (#1591): hat das Loser Bracket mehr Runden als das Winner Bracket, stehen Grand Final, Reset und Pokal in
+  // der freien Spalte rechts neben dem Winner Bracket (über der letzten Loser-Runde) - untereinander statt nebeneinander.
+  // So passt ein Doppel-K.-o. mit 8 oder 16 Läufen bei 1440 px ohne Abschneiden.
+  const columnsOf = (group) => Math.max(0, ...left.filter((name) => sectionGroup(name) === group).map((name) => roundNumbers(sections[name]).length));
+  const mains = left.filter((name) => sectionGroup(name) === "main");
+  const compact = Boolean(right.length || champion) && mains.length === 1 && columnsOf("loser") > columnsOf("main");
+  const finals = order(right).filter((name) => sectionGroup(name) === "final");
+  // Nur K.-o. ohne Loser Bracket und ohne weitere Abschnitte: der Pokal steht unter dem Finale in der letzten Spalte,
+  // statt eine ganze Spalte breiter zu machen (#1591).
+  const championBelow = Boolean(champion) && !right.length && !left.some((name) => sectionGroup(name) === "loser") && mains.length === 1;
+  const others = order(right).filter((name) => sectionGroup(name) !== "final");
+
+  const block = (name, { stacked = false, trophy = false } = {}) => (
     <section key={name} className="space-y-3" data-testid={`bracket-section-${normalizeSection(name)}`}>
       <SectionTitle section={name} flowHint={sectionFlowHint(name, hasLoser, hasReset)} sticky={left.includes(name)} fit />
-      <div className="flex items-stretch" style={{ gap: COLUMN_GAP }}>
-        {roundNumbers(sections[name]).map((rn) => (
+      <div className={stacked ? "flex flex-col gap-6" : "flex items-stretch"} style={stacked ? undefined : { gap: COLUMN_GAP }}>
+        {roundNumbers(sections[name]).map((rn, index, all) => (
           <div key={rn} className="flex shrink-0 flex-col" style={{ width: CARD_WIDTH }}>
             <div className="mb-3 min-h-[1rem] px-1 text-[11px] font-bold uppercase tracking-wider text-muted-text" data-testid="bracket-round-title">
               {roundHeading(sections[name][rn], rn, formatBracketSection(name))}
             </div>
-            <div className="flex flex-1 flex-col justify-around gap-4">
+            <div className={`flex flex-1 flex-col gap-4 ${trophy && index === all.length - 1 ? "justify-center gap-8" : "justify-around"}`}>
               {sections[name][rn].map((match) => <MatchCard key={match.id} match={match} regMap={regMap} podiumMap={podiumMap} />)}
+              {trophy && index === all.length - 1 ? <ChampionCard match={champion} regMap={regMap} /> : null}
             </div>
           </div>
         ))}
@@ -614,24 +671,35 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
   );
 
   return (
-    <div ref={canvasRef} className="tls-bracket-canvas relative overflow-x-auto pb-4" data-testid="bracket-tree" data-stage={stageId}>
+    <>
+    {geom.overflow ? (
+      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-text" data-testid="bracket-scroll-hint">
+        <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />Der Baum ist breiter als das Fenster – seitlich scrollen.
+      </p>
+    ) : null}
+    <div ref={canvasRef} className="tls-bracket-canvas relative overflow-x-auto pb-4" data-testid="bracket-tree" data-stage={stageId} onPointerOver={onPointerOver} onPointerLeave={onPointerLeave} onScroll={onScroll}>
       <svg className="pointer-events-none absolute left-0 top-0" width={geom.w || "100%"} height={geom.h || "100%"} aria-hidden="true" data-testid="bracket-connectors">
         {geom.lines.map((line) => {
           // Gerüst der Schiene: an, solange dein Weg (noch vor der Auslosung) hierher führt - danach leuchtet der echte Weg.
           const onRail = !active ? false
             : line.spine ? [...(active.rails || [])].some((key) => key.startsWith(`${line.spine}:`))
-              : line.scaffold === "in" ? active.rails?.has(line.railKey) : false;
+              : line.scaffold === "in" ? (line.railKeys ? line.railKeys.some((key) => active.rails?.has(key)) : active.rails?.has(line.railKey)) : false;
           const state = active ? (onRail || active.edges.has(line.id) || (line.to === CHAMPION_ID && championId && active.ids.has(championId)) ? "on" : "off") : "";
-          const fresh = line.spine || line.scaffold ? undefined : motionState.fresh.get(`${line.from}>${line.to}`);
-          const quiet = line.flow === "L" && line.cross;
-          const real = Boolean(line.rail && !line.scaffold && !line.spine);
+          const fresh = line.spine || line.scaffold || line.fork || line.stub ? undefined : motionState.fresh.get(`${line.from}>${line.to}`);
+          const quiet = line.flow === "L" && line.cross && !line.stub;
+          const real = Boolean(line.rail && !line.scaffold && !line.spine && !line.stub);
           return (
             <path
               key={line.id}
               d={line.d}
-              pathLength={line.void || (quiet && fresh == null && !real) ? undefined : "1"}
-              className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : fresh != null ? "tls-bracket-line--fresh" : real ? "tls-bracket-line--real" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
+              pathLength={line.void || line.stub || (quiet && fresh == null && !real) ? undefined : "1"}
+              className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : line.stub ? "tls-bracket-line--stub" : fresh != null ? "tls-bracket-line--fresh" : real ? "tls-bracket-line--real" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
               style={{ "--tls-i": line.column, ...(fresh != null ? { "--tls-fresh-delay": `${fresh.delay}ms`, "--tls-fresh-duration": `${fresh.duration}ms` } : null) }}
+              data-id={line.id}
+              data-demand={line.demand ? "1" : undefined}
+              data-fork={line.fork ? "1" : undefined}
+              data-stub={line.stub ? "1" : undefined}
+              data-rel={line.rel ? line.rel.join(" ") : undefined}
               data-rail-spine={line.spine || undefined}
               data-rail-group={line.railGroup || undefined}
               data-real={real ? "1" : undefined}
@@ -646,18 +714,37 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
             />
           );
         })}
+        {/* Eingang (#1591): ein Marker am freien Ende - hier kommen Plätze aus einem anderen Abschnitt an. */}
+        {geom.lines.filter((line) => line.marker).map((line) => (
+          <circle key={`${line.id}:marker`} className="tls-bracket-marker" cx={line.marker.x} cy={line.marker.y} r={3.5} data-line-marker="1" data-rel={line.rel ? line.rel.join(" ") : undefined} data-path={active ? "off" : undefined} />
+        ))}
       </svg>
-      <div ref={contentRef} className="relative grid w-max items-center" data-rail-lead={busLead ? "1" : undefined} style={{ gridTemplateColumns: right.length || champion ? "max-content max-content" : "max-content", columnGap: COLUMN_GAP, paddingLeft: busLead ? COLUMN_GAP : undefined }}>
-        <div className="space-y-10">{order(left).map(block)}</div>
-        {right.length || champion ? (
-          <div className="flex flex-col justify-center gap-10">
-            {order(right).filter((name) => sectionGroup(name) === "final").map(block)}
-            {champion ? <div style={{ width: CARD_WIDTH }}><ChampionCard match={champion} regMap={regMap} /></div> : null}
-            {order(right).filter((name) => sectionGroup(name) !== "final").map(block)}
+      {compact ? (
+        <div ref={contentRef} className="relative w-max space-y-10" data-rail-lead={busLead ? "1" : undefined} data-layout="compact" style={{ paddingLeft: busLead ? COLUMN_GAP : undefined, paddingRight: COLUMN_GAP }}>
+          <div className="flex items-end" style={{ gap: COLUMN_GAP }}>
+            {block(mains[0])}
+            <div className="flex flex-col gap-8" style={{ width: CARD_WIDTH }}>
+              {finals.map((name) => block(name, { stacked: true }))}
+              {champion ? <ChampionCard match={champion} regMap={regMap} /> : null}
+              {others.map((name) => block(name, { stacked: true }))}
+            </div>
           </div>
-        ) : null}
-      </div>
+          {order(left).filter((name) => name !== mains[0]).map((name) => block(name))}
+        </div>
+      ) : (
+        <div ref={contentRef} className="relative grid w-max items-center" data-rail-lead={busLead ? "1" : undefined} style={{ gridTemplateColumns: right.length || (champion && !championBelow) ? "max-content max-content" : "max-content", columnGap: COLUMN_GAP, paddingLeft: busLead ? COLUMN_GAP : undefined }}>
+          <div className="space-y-10">{order(left).map((name) => block(name, { trophy: championBelow && name === mains[0] }))}</div>
+          {right.length || (champion && !championBelow) ? (
+            <div className="flex flex-col justify-center gap-10">
+              {finals.map((name) => block(name))}
+              {champion && !championBelow ? <div style={{ width: CARD_WIDTH }}><ChampionCard match={champion} regMap={regMap} /></div> : null}
+              {others.map((name) => block(name))}
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
+    </>
   );
 }
 
@@ -707,6 +794,9 @@ function TvStageCanvas({ stage, multi, blocks, sections, regMap, podiumMap, comp
   const stageEdges = useMemo(() => edges.filter((edge) => columnOf.has(edge.from) && columnOf.has(edge.to)), [edges, columnOf]);
   // Gemischte Runden (#1548): dieselben Sammelschienen wie im Web-Baum (bracketGraph.drawRails).
   const stageRails = useMemo(() => drawRails(treeBlocks.flatMap((block) => Object.values(block.rounds).flat())), [treeBlocks]);
+  // Führt eine Schiene oder ein Eingang (#1591) in die erste Spalte, braucht die Phase links eine Gasse.
+  const lead = stageRails.some((rail) => rail.targets.some((id) => columnOf.get(id) === 0))
+    || stageEdges.some((edge) => edge.flow === "L" && edge.cross && columnOf.get(edge.to) === 0);
 
   useLayoutEffect(() => {
     const root = ref.current;
@@ -764,8 +854,9 @@ function TvStageCanvas({ stage, multi, blocks, sections, regMap, podiumMap, comp
         matchOf: byIdMatch,
         isVoid: (id) => isCancelled(byIdMatch(id)),
       }).map((line) => ({ ...line, points: line.points.map((point) => `${Math.round(point.x * 10) / 10},${Math.round(point.y * 10) / 10}`).join(" ") }));
-      const w = root.offsetWidth || base.width / scale;
-      const h = root.offsetHeight || base.height / scale;
+      // Die Leinwand reicht so weit wie der Inhalt (#1591) - auch wenn eine Zeile breiter ist als die Phase.
+      const w = Math.max(root.offsetWidth, root.scrollWidth) || base.width / scale;
+      const h = Math.max(root.offsetHeight, root.scrollHeight) || base.height / scale;
       const key = `${Math.round(w)}x${Math.round(h)}|${lines.map((line) => `${line.id}:${line.d}`).join(";")}`;
       setGeom((current) => (current.key === key ? current : { lines, w, h, key }));
     };
@@ -785,22 +876,27 @@ function TvStageCanvas({ stage, multi, blocks, sections, regMap, podiumMap, comp
   }, [stageEdges, stageRails, columnOf, sections, gap, byIdMatch]);
 
   return (
-    <section ref={ref} className="tv-tree__stage" data-tv-stage={stage.id}>
+    <section ref={ref} className="tv-tree__stage" data-tv-stage={stage.id} data-lead={lead ? "1" : undefined}>
       <svg className="tv-tree__lines" width={geom.w || "100%"} height={geom.h || "100%"} aria-hidden="true" data-testid="bracket-connectors">
         {geom.lines.map((line) => {
-          const quiet = line.flow === "L" && line.cross;
+          const quiet = line.flow === "L" && line.cross && !line.stub;
           // Nach der Auslosung (#1548) bleibt die Schiene stehen; der echte Weg über sie ist unsichtbar da - auf ihm fährt
-          // der Name in der Auslosung an seinen gezogenen Platz.
-          const real = Boolean(line.rail && !line.scaffold && !line.spine);
+          // der Name in der Auslosung an seinen gezogenen Platz. Abstiege und Einzelwege einer Gabel stehen nur als Eingang
+          // bzw. Gabel da (#1591).
+          const real = Boolean(line.rail && !line.scaffold && !line.spine && !line.stub);
           return (
             // Die Linien zeichnen sich beim ersten Erscheinen einmal, Runde für Runde (#1076); der Abstieg und
             // Entfallenes stehen leise und gestrichelt.
             <path
               key={line.id}
               d={line.d}
-              pathLength={line.void || quiet || real ? undefined : "1"}
-              className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : real ? "tls-bracket-line--real" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
+              pathLength={line.void || quiet || real || line.stub ? undefined : "1"}
+              className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : line.stub ? "tls-bracket-line--stub" : real ? "tls-bracket-line--real" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
               style={{ "--tls-i": line.column }}
+              data-id={line.id}
+              data-demand={line.demand ? "1" : undefined}
+              data-fork={line.fork ? "1" : undefined}
+              data-stub={line.stub ? "1" : undefined}
               data-rail-spine={line.spine || undefined}
               data-rail-group={line.railGroup || undefined}
               data-real={real ? "1" : undefined}
@@ -814,6 +910,9 @@ function TvStageCanvas({ stage, multi, blocks, sections, regMap, podiumMap, comp
             />
           );
         })}
+        {geom.lines.filter((line) => line.marker).map((line) => (
+          <circle key={`${line.id}:marker`} className="tls-bracket-marker" cx={line.marker.x} cy={line.marker.y} r={5} data-line-marker="1" />
+        ))}
       </svg>
       {multi ? <h3 className="tv-tree__phase tv-t-head font-heading">{stage.name || `Phase ${stage.number || ""}`}</h3> : null}
       {arrangeTvBlocks(blocks, tvLayoutValue).map((row) => (

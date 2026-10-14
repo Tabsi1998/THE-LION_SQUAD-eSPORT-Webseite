@@ -265,6 +265,20 @@ button.tls-bracket-row[aria-pressed="true"] { background-color: rgb(var(--tls-ho
 /* Gemischte Gruppen (#1548): der echte Weg über die Sammelschiene zeigt sich auf deinem Weg und in der Bewegung. */
 .tls-bracket-canvas .tls-bracket-line--real { opacity: 0; }
 .tls-bracket-canvas .tls-bracket-line--real[data-path="on"] { opacity: 1; }
+/* Übersicht (#1591): Abstiege, Äste aus einem anderen Abschnitt und die Einzelwege einer Gabel erscheinen erst beim
+   Zeigen auf eine Karte, auf deinem Weg oder in der Bewegung. Am Ziel steht dafür ein Eingang: kurzer Strich, Marker. */
+.tls-bracket-canvas .tls-bracket-line[data-demand="1"]:not([data-path="on"]):not([data-focus="1"]):not([data-fresh="1"]) { opacity: 0; }
+.tls-bracket-canvas .tls-bracket-line[data-demand="1"][data-focus="1"]:not([data-path]) { opacity: 0.9; }
+/* Breiter als das Fenster (#1591): der Rand, hinter dem es weitergeht, blendet aus - nie hart abgeschnitten. */
+.tls-bracket-canvas[data-more="right"] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }
+.tls-bracket-canvas[data-more="left"] { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); }
+.tls-bracket-canvas[data-more="both"] { -webkit-mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
+/* Zeigen passiert oft: schnell ein- und ausblenden, nie träge. */
+.tls-bracket-canvas .tls-bracket-line[data-demand="1"] { transition-duration: var(--tls-motion-fast); }
+.tls-bracket-canvas .tls-bracket-line--stub { stroke: rgb(var(--tls-quiet-rgb) / 0.6); stroke-width: 1.5px; }
+.tls-bracket-canvas .tls-bracket-marker { fill: var(--tls-surface-0); stroke: rgb(var(--tls-quiet-rgb) / 0.75); stroke-width: 1.5px; transition: opacity var(--tls-motion-mid) var(--tls-ease), stroke var(--tls-motion-mid) var(--tls-ease); }
+.tls-bracket-canvas .tls-bracket-marker[data-path="off"] { opacity: 0.35; }
+.tls-bracket-canvas .tls-bracket-marker[data-focus="1"] { stroke: var(--tls-brand); }
 /* Ankommen: die Zielzeile leuchtet kurz und weich auf (nur Deckkraft einer Fläche). */
 .tls-bracket-row[data-landed]::after {
   content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 4px;

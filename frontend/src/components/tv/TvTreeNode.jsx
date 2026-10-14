@@ -1,3 +1,4 @@
+import { treeSlotLabel } from "@/lib/bracketNames";
 import { createContext, useContext, useMemo, useSyncExternalStore } from "react";
 import { isOut, isWalkover, matchFate, soloAdvance } from "@/lib/bracketGraph";
 import { Trophy } from "lucide-react";
@@ -176,7 +177,9 @@ export function TvTreeNode({ match, regMap, podiumMap, findMatch }) {
         const slotKey = `${match.id}:${index}`;
         const hidden = tree.hiddenSlots.has(slotKey);
         const shown = hidden ? { ...slot, registration_id: null, status: "pending" } : slot;
-        const info = describeSlot(shown, nameOf, findMatch);
+        const described = describeSlot(shown, nameOf, findMatch);
+        // Gelost (#1591): „Weiter aus Runde 1“ statt „Platz aus Runde 1“ - wie im Web-Baum.
+        const info = described.kind === "pending" ? { ...described, label: treeSlotLabel(shown, findMatch) || described.label } : described;
         const registrationId = hidden ? null : slot.registration_id || null;
         const result = registrationId ? resultOf(registrationId) : null;
         const outcome = registrationId ? byRegistration.get(registrationId) : null;

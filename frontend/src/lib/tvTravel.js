@@ -5,9 +5,8 @@
 import { absoluteRank, normalizeSource } from "@/lib/slotSource";
 import { cubicBezier } from "framer-motion";
 import { isBronzeMatch, normalizeSection } from "@/lib/bracketPodium";
+import { LOSER_SECTIONS } from "@/lib/bracketSections";
 import { EASE_MOVE, MOTION } from "@/lib/motion";
-
-const LOSER_SECTIONS = new Set(["lb", "loser"]);
 
 /** Die Wertung eines Spiels, nach Platz sortiert (1 = Sieger). Ohne Ergebnis leer. */
 export function rankingOf(match) {
