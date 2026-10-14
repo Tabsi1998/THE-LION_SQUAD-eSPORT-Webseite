@@ -222,6 +222,12 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
     && !["completed", "forfeit", "cancelled", "archived", "bye", "no_show", "disputed", "in_progress", "running", "waiting_result"].includes(match.status);
   const manualCount = matches.filter((match) => unstarted(match) && match.schedule_source === "manual").length;
   const missingIds = new Set((background?.warnings || []).filter((row) => row.type === "unknown_station").flatMap((row) => row.match_ids || []));
+  // Vorschau-Spiele plant der Planer nicht, darum meldet er sie auch nicht als „unbekannte Station“ (Fabian live 14.10.).
+  // Gleiche Wahrheit wie am Server: die Stationen aus seiner Antwort (station_query) - was daneben liegt, fehlt.
+  if (Array.isArray(background?.stations)) {
+    const known = new Set(background.stations.map((station) => station.id));
+    for (const match of matches) if (match.station_id && !known.has(match.station_id)) missingIds.add(match.id);
+  }
   const missingCount = matches.filter((match) => missingIds.has(match.id) && unstarted(match)).length;
 
   const releaseAll = async (scope, count) => {

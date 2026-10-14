@@ -540,6 +540,17 @@ describe("Praxis 14.10.: Stationen und Reihenfolge - eine Wahrheit für Kopf und
   });
 });
 
+// Fabian live 14.10.: Baum noch Vorschau, alte Termine auf einer gelöschten Station. Der Planer plant Vorschau-Spiele nicht
+// und meldet darum auch kein „unknown_station“ - wie am Server: keine Zuordnungen, keine Warnung dazu, nur seine Stationen.
+function previewOrphan() {
+  const state = fixture.orphan;
+  return {
+    ...state,
+    matches: state.matches.map((match) => ({ ...match, is_preview: true })),
+    plan: { ...state.plan, mode: "none", assignments: [], warnings: [] },
+  };
+}
+
 describe("Alle Termine von Hand lösen - die alte Planung auf einmal zurück an den Planer", () => {
   it("mit Rückfrage: 14 Spiele verlieren Termin und Station, danach öffnet die Vorschau von „Automatisch planen“", async () => {
     const user = userEvent.setup();
@@ -575,7 +586,7 @@ describe("Alle Termine von Hand lösen - die alte Planung auf einmal zurück an 
   });
 
   it("auch solange der Baum Vorschau ist (bis Check-in-Ende) - Vorschau-Spiele haben nie begonnen", async () => {
-    const state = { ...fixture.orphan, matches: fixture.orphan.matches.map((match) => ({ ...match, is_preview: true })) };
+    const state = previewOrphan();
     setup(state);
     await waitFor(() => expect(screen.getByRole("button", { name: "Nur Spiele an gelöschten Stationen lösen" })).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Alle Termine von Hand lösen" })).toBeInTheDocument();
@@ -584,7 +595,7 @@ describe("Alle Termine von Hand lösen - die alte Planung auf einmal zurück an 
 
   it("Vorschau-Spiele lassen sich ändern und ziehen - sonst kämen die 13 Spiele nicht von der gelöschten Station", async () => {
     const user = userEvent.setup();
-    const state = { ...fixture.orphan, matches: fixture.orphan.matches.map((match) => ({ ...match, is_preview: true })) };
+    const state = previewOrphan();
     setup(state);
     const order = await screen.findByTestId("mp-order");
     const buttons = await within(order).findAllByRole("button", { name: /ändern$/ });
