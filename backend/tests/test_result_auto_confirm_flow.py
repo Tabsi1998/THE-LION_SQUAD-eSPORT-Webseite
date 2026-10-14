@@ -151,3 +151,25 @@ async def test_league_objection_after_the_automatic_result_until_the_week_ends(f
     flow.act_as(player[b])
     page = (await flow.get(f"/api/matches/{other['id']}/page")).json()
     assert page["can_dispute"] is False
+
+
+@pytest.mark.asyncio
+async def test_league_opponent_always_has_24_hours_even_past_the_week_end(flow):
+    # Fabian (14.10.2026): spätestens zum Ende der Spielwoche - aber nie weniger als 24 Stunden zum Widersprechen.
+    _staff, _tournament, match, first, second, player = await league(flow, started_days_ago=7 - 1 / 24)
+    await report(flow, player[first], match, duel(first, second))
+    assert (await sweep(flow.db, now=later(hours=2)))["confirmed"] == 0, "die Woche ist um, die 24 Stunden noch nicht"
+    assert (await sweep(flow.db, now=later(hours=23)))["confirmed"] == 0
+    assert (await sweep(flow.db, now=later(hours=25)))["confirmed"] == 1
+
+
+@pytest.mark.asyncio
+async def test_league_match_agreed_outside_its_week_counts_48_hours_from_the_report(flow):
+    _staff, tournament, match, first, second, player = await league(flow, started_days_ago=6)
+    # Vereinbart außerhalb der Spielwoche (der Gegner hat zugestimmt): das Wochenende ist keine Obergrenze.
+    agreed = (now_utc() - timedelta(days=6, hours=2)).isoformat()
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"scheduled_at": agreed, "schedule_source": "accepted"}})
+    await report(flow, player[first], match, duel(first, second))
+    assert (await sweep(flow.db, now=later(hours=25)))["confirmed"] == 0
+    assert (await sweep(flow.db, now=later(hours=47)))["confirmed"] == 0
+    assert (await sweep(flow.db, now=later(hours=49)))["confirmed"] == 1

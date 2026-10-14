@@ -13,7 +13,16 @@ Hier steht nur die Rechnung auf den Spielen (Listen von dicts); das Schreiben ma
 """
 from __future__ import annotations
 
-from services.match_v2_results import _status_after_slot_fill
+import copy
+
+from services.match_v2_results import (
+    _cascade_clear_downstream,
+    _clear_slot,
+    _downstream_links,
+    _find_slot,
+    _reset_match_result_state,
+    _status_after_slot_fill,
+)
 
 # Ein Spiel hat begonnen, sobald es läuft, entschieden ist, in Klärung steht, gemeldet wurde oder eingetragen wird.
 STARTED_STATUSES = {"in_progress", "running", "waiting_result", "completed", "forfeit", "disputed"}
@@ -102,8 +111,9 @@ def swapped(match: dict, old_id: str, new_reg: dict) -> dict:
 
 
 def _bye_target(match: dict, by_id: dict[str, dict]) -> tuple[dict, dict] | None:
+    """Wohin der Sieger dieses Spiels weiterrückt (Sieger-Weg, Platz 1)."""
     for advancement in match.get("advancement") or []:
-        if advancement.get("rank") != 1:
+        if advancement.get("rank") != 1 or advancement.get("flow", "W") != "W":
             continue
         target = by_id.get(advancement.get("to_match_id"))
         slots = (target or {}).get("slots") or []
@@ -113,43 +123,70 @@ def _bye_target(match: dict, by_id: dict[str, dict]) -> tuple[dict, dict] | None
     return None
 
 
+def _first_real_match_open(match: dict, by_id: dict[str, dict], winner_id: str) -> bool:
+    """Den Weg des Freilos-Siegers entlang: weitere Freilos-Spiele zählen nicht (Kette aus #1549), das erste echte Spiel
+    darf noch nicht begonnen haben."""
+    current = match
+    for _ in range(len(by_id) + 1):
+        found = _bye_target(current, by_id)
+        if not found:
+            return True
+        target, slot = found
+        if slot.get("registration_id") != winner_id:
+            return False
+        if not is_auto_bye(target):
+            return not has_started(target)
+        current = target
+    return False
+
+
 def free_bye_place(matches: list[dict]) -> dict | None:
-    """Der erste leere Platz neben einem Freilos, dessen Folgespiel noch nicht begonnen hat."""
+    """Der erste leere Platz neben einem Freilos, dessen erstes echtes Folgespiel noch nicht begonnen hat."""
     fixed = _fixed(matches)
     by_id = {match.get("id"): match for match in fixed}
     ordered = sorted(fixed, key=lambda row: (row.get("stage_number") or 0, row.get("round") or 0,
                                              row.get("order") or 0))
     for match in ordered:
-        if not is_auto_bye(match) or len(slot_ids(match)) != 1:
+        if not is_auto_bye(match) or len(slot_ids(match)) != 1 or isinstance(match.get("pending_result"), dict):
             continue
         empty = next((slot for slot in match.get("slots") or []
                       if slot.get("status") == "bye" and (slot.get("source") or {}).get("type") == "seed"), None)
-        found = _bye_target(match, by_id)
-        if not empty or not found:
-            continue
-        target, target_slot = found
-        if has_started(target) or target_slot.get("registration_id") != slot_ids(match)[0]:
-            continue
-        return {"match": match, "slot": empty["slot"], "target": target, "target_slot": target_slot["slot"]}
+        if empty and _first_real_match_open(match, by_id, slot_ids(match)[0]):
+            return {"match": match, "slot": empty["slot"]}
     return None
 
 
-def reopened_bye(place: dict, new_reg: dict, now_iso: str) -> tuple[dict, dict]:
-    """Das Freilos-Spiel mit dem Nachrücker als zweite Seite (spielbar) und das Folgespiel ohne den Freilos-Sieger."""
-    match, target = place["match"], place["target"]
+def reopened_bye(place: dict, matches: list[dict], new_reg: dict, now_iso: str) -> dict[str, dict]:
+    """Was sich ändert, wenn der Nachrücker den leeren Platz neben dem Freilos nimmt: je Spiel die Felder zum Setzen.
+
+    Das Freilos-Spiel wird spielbar (beide Seiten, ohne Ergebnis). Was es weitergeschoben hat, nimmt die
+    Korrektur-Kaskade zurück (``_cascade_clear_downstream``): Zielplätze leeren, Ergebnisse, Metadaten und Status der
+    Folgespiele zurücksetzen - über die ganze Freilos-Kette. Ein Zielplatz ohne Herkunft (Freilos aus dem Bau) wird über
+    den Sieger-Weg gefunden und genauso zurückgesetzt."""
+    by_id = {match.get("id"): copy.deepcopy(match) for match in _fixed(matches)}
+    match = by_id[place["match"]["id"]]
+    winner_id = slot_ids(match)[0]
+    downstream = _downstream_links(list(by_id.values()))
+    sets: dict[str, dict] = {}
+    _cascade_clear_downstream(match["id"], by_id, downstream, sets, now_iso)
+    found = _bye_target(match, by_id)
+    if found:
+        target, _slot = found
+        slots = sets.get(target["id"], {}).get("slots") or target.get("slots") or []
+        slot = _find_slot({"slots": slots}, int(_slot.get("slot") or 0))
+        if slot and slot.get("registration_id") == winner_id and _clear_slot(slot):
+            target["slots"] = slots
+            sets.setdefault(target["id"], {}).update({"slots": slots, "updated_at": now_iso})
+            _reset_match_result_state(target, sets, now_iso)
+            _cascade_clear_downstream(target["id"], by_id, downstream, sets, now_iso)
     slots = [
         {**slot, "registration_id": new_reg["id"], "user_id": new_reg.get("user_id"), "status": "filled"}
         if slot.get("slot") == place["slot"] else dict(slot)
         for slot in match.get("slots") or []
     ]
-    reopened = {**match, "slots": slots, "status": "pending"}
-    match_set = {"slots": slots, "results": [], "result_meta": None, "updated_at": now_iso,
-                 "status": _status_after_slot_fill(reopened, preserve_terminal=False)}
-    target_slots = [
-        {**slot, "registration_id": None, "user_id": None, "source_result": None, "status": "pending"}
-        if slot.get("slot") == place["target_slot"] else dict(slot)
-        for slot in target.get("slots") or []
-    ]
-    target_status = _status_after_slot_fill({**target, "slots": target_slots}, preserve_terminal=False)
-    target_set = {"slots": target_slots, "status": target_status, "updated_at": now_iso}
-    return match_set, target_set
+    sets[match["id"]] = {
+        "slots": slots, "results": [], "result_meta": None, "completed_at": None, "completed_by": None,
+        "status": _status_after_slot_fill({**match, "slots": slots, "status": "pending"}, preserve_terminal=False),
+        "updated_at": now_iso,
+    }
+    return sets

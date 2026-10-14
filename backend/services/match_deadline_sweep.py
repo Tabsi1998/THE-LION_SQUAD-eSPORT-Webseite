@@ -14,7 +14,13 @@ import logging
 from datetime import datetime
 
 from models import new_id, now_utc
-from services.match_deadlines import NO_SHOW_RULE_TEXT, auto_confirm_due, no_show_deadline, single_report
+from services.match_deadlines import (
+    NO_SHOW_OPEN_STATUSES,
+    NO_SHOW_RULE_TEXT,
+    auto_confirm_due,
+    no_show_deadline,
+    single_report,
+)
 from services.match_timing import registration_name
 from services.match_v2_results import MatchV2ResultError
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
@@ -36,20 +42,45 @@ async def _audit(db, action: str, match: dict, data: dict) -> None:
     })
 
 
+async def _fresh(db, tournament_id: str, match_id: str) -> tuple[dict | None, dict | None, dict | None]:
+    """Turnier, Spiel und Phase so, wie sie jetzt sind - unter der Schreibsperre gelesen, nicht aus dem Lauf."""
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "creation_key": 0, "billing": 0})
+    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+    stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) \
+        if match and match.get("stage_id") else None
+    if not tournament or tournament.get("status") != "live":
+        return None, None, None
+    return tournament, match, stage
+
+
 async def _propose_no_show(db, tournament: dict, match: dict, info: dict, now: datetime) -> int:
-    proposal = {
-        "id": new_id(), "rule": info["rule"], "minutes": info["minutes"],
-        "due_at": info["due_at"].isoformat(), "created_at": now.isoformat(),
-    }
-    stored = await db.matches_v2.update_one({"id": match["id"], "no_show_proposal": None},
-                                            {"$set": {"no_show_proposal": proposal}})
-    if not getattr(stored, "modified_count", 0):
+    """Den Vorschlag schreiben - unter der Turniersperre mit frischem Stand, und nur für ein Spiel, das noch offen ist,
+    keine Meldung hat und nicht begonnen hat (dieselbe Prüfung steckt im Filter des Schreibens)."""
+    try:
+        async with mutation_lock(db, tournament_write_resource(tournament["id"]), wait_seconds=2.0):
+            tournament, match, stage = await _fresh(db, tournament["id"], match["id"])
+            info = no_show_deadline(match or {}, tournament, stage) if match else None
+            if not match or not info or info["due_at"] > now or match.get("no_show_proposal"):
+                return 0
+            filled = [slot["registration_id"] for slot in match.get("slots") or [] if slot.get("registration_id")]
+            proposal = {
+                "id": new_id(), "rule": info["rule"], "minutes": info["minutes"], "registration_ids": filled,
+                "due_at": info["due_at"].isoformat(), "created_at": now.isoformat(),
+            }
+            stored = await db.matches_v2.update_one(
+                {"id": match["id"], "no_show_proposal": None, "status": {"$in": sorted(NO_SHOW_OPEN_STATUSES)},
+                 "reports.0": {"$exists": False}, "started_at": None, "pending_result": None},
+                {"$set": {"no_show_proposal": proposal}},
+            )
+            if not getattr(stored, "modified_count", 0):
+                return 0
+    except MutationLockBusy:
+        logger.info("No-show proposal for match=%s waits for the tournament lock", match.get("id"))
         return 0
     await _audit(db, "match.no_show.proposed", match,
                  {"proposal_id": proposal["id"], "rule": info["rule"], "minutes": info["minutes"]})
     regs = await db.tournament_registrations.find(
-        {"id": {"$in": [slot["registration_id"] for slot in match.get("slots") or [] if slot.get("registration_id")]}},
-        {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1},
+        {"id": {"$in": filled}}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1},
     ).to_list(64)
     names = " gegen ".join(registration_name(reg) for reg in regs) if len(regs) == 2 else f"{len(regs)} Teilnehmer"
     label = match.get("round_name") or match.get("matchday_label") or match.get("match_key") or "Spiel"
@@ -67,10 +98,12 @@ async def _propose_no_show(db, tournament: dict, match: dict, info: dict, now: d
 
 
 async def _auto_confirm(db, tournament: dict, match_id: str, stage: dict | None, now: datetime) -> int:
+    """Die eine Meldung eintragen - unter der Turniersperre mit Turnier, Phase und Spiel, wie sie jetzt sind: eine
+    inzwischen geänderte Frist oder Austragung (vor Ort) gilt."""
     try:
         async with mutation_lock(db, tournament_write_resource(tournament["id"]), wait_seconds=5.0):
-            match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
-            due = auto_confirm_due(match or {}, tournament, stage)
+            tournament, match, stage = await _fresh(db, tournament["id"], match_id)
+            due = auto_confirm_due(match or {}, tournament, stage) if match else None
             report = single_report(match or {})
             if not match or not due or due > now or not report:
                 return 0

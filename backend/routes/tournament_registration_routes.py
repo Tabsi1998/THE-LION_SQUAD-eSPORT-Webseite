@@ -136,6 +136,17 @@ def _parse_dt(value):
         return None
 
 
+def _check_in_over(tournament: dict) -> bool:
+    """Ist der Check-in vorbei (#1551)? Mit gebautem Baum - oder im Check-in, wenn „Check-in endet“ schon vorbei ist,
+    auch bevor der Job den Baum gebaut hat."""
+    if tournament.get("check_in_closed_at"):
+        return True
+    until = _parse_dt(tournament.get("check_in_until"))
+    if until and until.tzinfo is None:
+        until = until.replace(tzinfo=timezone.utc)
+    return tournament.get("status") == "check_in" and bool(until) and now_utc() > until
+
+
 def _is_team_tournament(tournament: dict) -> bool:
     return (tournament.get("team_mode") or "solo") != "solo"
 
@@ -353,10 +364,14 @@ async def _place_fill_in(db, tid: str, reg: dict, actor_id: str | None) -> dict 
         place = free_bye_place(matches)
         if not place:
             return {"ok": False, "reason": "no_free_place", "detail": NO_PLACE_DETAIL}
-        match_set, target_set = reopened_bye(place, reg, now_utc().isoformat())
-        await db.matches_v2.update_one({"id": place["target"]["id"]}, {"$set": target_set})
-        await db.matches_v2.update_one({"id": place["match"]["id"]}, {"$set": match_set})
-        placement = {"ok": True, "kind": "bye", "match_id": place["match"]["id"]}
+        changes = reopened_bye(place, matches, reg, now_utc().isoformat())
+        # Folgespiele zuerst, das Freilos-Spiel zuletzt - wie beim Ergebnis-Weg.
+        for match_id, change in changes.items():
+            if match_id != place["match"]["id"]:
+                await db.matches_v2.update_one({"id": match_id}, {"$set": change})
+        await db.matches_v2.update_one({"id": place["match"]["id"]}, {"$set": changes[place["match"]["id"]]})
+        placement = {"ok": True, "kind": "bye", "match_id": place["match"]["id"],
+                     "reset_match_ids": sorted(match_id for match_id in changes if match_id != place["match"]["id"])}
     await _audit_tournament_action(db, "tournament.registration.fill_in", actor_id, tid, {"registration_id": reg["id"], **placement})
     return placement
 
@@ -929,9 +944,6 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
     # Eine Prüfung für alle Stellen (#1135): Knopf, Startseite, Erinnerungen, Mail und Discord fragen dieselbe Regel.
     if not self_checkin_allowed(tournament):
         raise HTTPException(status_code=403, detail="Bei Vor-Ort-Turnieren macht die Turnierleitung den Check-in.")
-    # Nach dem Check-in-Ende steht der Baum (#1551) - wer jetzt kommt, rückt nur über die Turnierleitung nach.
-    if tournament.get("check_in_closed_at"):
-        raise HTTPException(status_code=409, detail="Der Check-in ist beendet – bitte bei der Turnierleitung melden.")
     try:
         async with mutation_lock(db, tournament_write_resource(tid)):
             reg = await _find_self_registration(db, tid, me["id"])
@@ -941,8 +953,14 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
                 return {"ok": True, "idempotent_replay": True}
             if reg["status"] != "approved":
                 raise HTTPException(status_code=400, detail="Nicht check-in-fähig")
-            await db.tournament_registrations.update_one(
-                {"id": reg["id"]}, {"$set": {"status": "checked_in", "updated_at": now_utc().isoformat()}})
+            # Nach dem Check-in-Ende steht der Baum (#1551) - wer jetzt kommt, rückt nur über die Turnierleitung nach.
+            # Unter der Sperre frisch gelesen: das Ende (der Job hält dieselbe Sperre) kann nicht dazwischenkommen.
+            if _check_in_over(await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}):
+                raise HTTPException(status_code=409, detail="Der Check-in ist beendet – bitte bei der Turnierleitung melden.")
+            stored = await db.tournament_registrations.update_one(
+                {"id": reg["id"], "status": "approved"}, {"$set": {"status": "checked_in", "updated_at": now_utc().isoformat()}})
+            if not getattr(stored, "modified_count", 0):
+                return {"ok": True, "idempotent_replay": True}
             # Phase B v4.1: late check-in detection (check-in after start_date) → neg_late_checkin
             await _apply_late_checkin_hooks(db, tid, me["id"])
             await _apply_checked_in_badges(me["id"], tid)

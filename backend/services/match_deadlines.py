@@ -38,6 +38,8 @@ LIMITS = {
     "result_confirm_hours_league": 336,
 }
 NO_SHOW_RULE_TEXT = {"on_site": "ab Aufruf", "online": "ab Öffnung des Spiels"}
+# Liga: so lange hat der Gegner mindestens Zeit zu widersprechen, auch über das Ende der Spielwoche hinaus.
+LEAGUE_MIN_OBJECTION_HOURS = 24
 # Ein Spiel, für das „nicht erschienen“ noch gilt: beide Seiten stehen fest, es hat nicht begonnen.
 NO_SHOW_OPEN_STATUSES = {"ready", "scheduled"}
 # Ein Spiel, dessen gemeldetes Ergebnis nach der Frist gelten kann.
@@ -106,8 +108,7 @@ def no_show_deadline(match: dict, tournament: dict | None, stage: dict | None = 
     return {"rule": rule, "minutes": minutes, "base_at": base, "due_at": due}
 
 
-def matchday_end(match: dict, tournament: dict | None) -> datetime | None:
-    """Das Ende der Spielwoche dieses Spiels - nur in Formaten mit Spielwochen und mit Startdatum."""
+def _matchday_window(match: dict, tournament: dict | None):
     if not plays_in_matchdays(tournament or {}):
         return None
     number = matchday_number_of(match)
@@ -115,9 +116,22 @@ def matchday_end(match: dict, tournament: dict | None) -> datetime | None:
     if not number or not start:
         return None
     try:
-        return matchday_window(start, number, days=matchday_settings(tournament)["days"]).end
+        return matchday_window(start, number, days=matchday_settings(tournament)["days"])
     except MatchdayScheduleError:
         return None
+
+
+def matchday_end(match: dict, tournament: dict | None) -> datetime | None:
+    """Das Ende der Spielwoche dieses Spiels - nur in Formaten mit Spielwochen und mit Startdatum."""
+    window = _matchday_window(match, tournament)
+    return window.end if window else None
+
+
+def agreed_outside_week(match: dict, tournament: dict | None) -> bool:
+    """Liga: ein Termin außerhalb der Spielwoche, dem der Gegner zugestimmt hat (#1569 lässt ihn stehen)."""
+    window = _matchday_window(match, tournament)
+    scheduled = _parse(match.get("scheduled_at"))
+    return bool(window and scheduled and not window.contains(scheduled))
 
 
 def single_report(match: dict) -> dict | None:
@@ -141,10 +155,13 @@ def auto_confirm_due(match: dict, tournament: dict | None, stage: dict | None = 
     reported = _parse((report or {}).get("at"))
     if not reported:
         return None
-    week_end = matchday_end(match, tournament)
     if plays_in_matchdays(tournament or {}):
-        due = reported + timedelta(hours=setting("result_confirm_hours_league", tournament, stage))
-        if week_end and reported < week_end < due:
-            due = week_end
+        # Fabian (14.10.2026): 48 Stunden, spätestens zum Ende der Spielwoche - aber der Gegner hat immer mindestens
+        # 24 Stunden. Ein vereinbart außerhalb der Woche gespieltes Spiel hat das Wochenende nicht als Obergrenze.
+        hours = setting("result_confirm_hours_league", tournament, stage)
+        due = reported + timedelta(hours=hours)
+        week_end = None if agreed_outside_week(match, tournament) else matchday_end(match, tournament)
+        if week_end and week_end < due:
+            due = max(week_end, reported + timedelta(hours=min(hours, LEAGUE_MIN_OBJECTION_HOURS)))
         return due
     return reported + timedelta(minutes=setting("result_confirm_minutes_online", tournament, stage))

@@ -229,7 +229,9 @@ Minus, bei Best-of den Sieger je Spiel antippen, bei Mehrspieler-Spielen die Zie
 eine Notiz. Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Hat eine Seite gemeldet, sieht die andere die
 Meldung in Worten (mit Foto) und bestätigt mit **Stimmt** – oder **Stimmt nicht**. Bei Teams bestätigt die Teamleitung.
 Widerspricht die Gegenseite nicht, **gilt die Meldung nach der Frist**: online nach 15 Minuten, in Liga und Gruppen nach
-48 Stunden, spätestens zum Ende der Spielwoche. Vor Ort bestätigt wie bisher die Turnierleitung. Einspruch (3.7) bleibt
+48 Stunden, spätestens zum Ende der Spielwoche – die Gegenseite hat aber immer mindestens 24 Stunden. Ein Spiel, das mit
+Zustimmung des Gegners außerhalb seiner Spielwoche stattfindet, gilt 48 Stunden nach der Meldung. Vor Ort bestätigt wie
+bisher die Turnierleitung. Einspruch (3.7) bleibt
 danach möglich, in der Liga bis zum Ende der Spielwoche.
 
 **Die Turnierleitung trägt ein.** Dasselbe **Ergebnis-Fenster** öffnet sich an vier Orten, mit denselben Feldern und

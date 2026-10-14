@@ -19,6 +19,7 @@ from models import new_id, now_utc
 from routes.tournament_common import _ensure_tournament_unlocked, _resolve_tid, _serialized_tournament_write
 from routes.tournament_router import router
 from services.match_forfeit import apply_forfeit
+from services.match_deadlines import no_show_deadline
 from services.match_lead import lead_view
 from services.match_planning import ensure_tournament_accepts_results
 from services.match_v2_results import MatchV2ResultError
@@ -41,6 +42,10 @@ async def tournament_lead(tid: str, me: dict = Depends(get_current_user)):
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     return await lead_view(db, tournament, me)
+
+
+STALE_PROPOSAL_DETAIL = ("Der Vorschlag gilt nicht mehr: Das Spiel hat begonnen, eine Seite hat gemeldet "
+                         "oder die Paarung hat sich geändert. Bitte das Ergebnis-Fenster nutzen.")
 
 
 class NoShowDecision(BaseModel):
@@ -99,6 +104,14 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
     if body.registration_id not in filled:
         raise HTTPException(status_code=422, detail="Bitte die Seite wählen, die nicht erschienen ist.")
     await ensure_tournament_accepts_results(db, tournament_id)
+    # Gilt der Vorschlag noch? Dieselbe Paarung, nicht begonnen, keine Meldung, Frist um - sonst keine Wertung.
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "creation_key": 0, "billing": 0}) or {}
+    stage_id = match.get("stage_id")
+    stage = await db.tournament_stages.find_one({"id": stage_id}, {"_id": 0}) if stage_id else None
+    info = no_show_deadline(match, tournament, stage)
+    same_pairing = sorted(proposal.get("registration_ids") or filled) == sorted(filled)
+    if not same_pairing or not info or info["due_at"] > now:
+        raise HTTPException(status_code=409, detail=STALE_PROPOSAL_DETAIL)
     minutes = int(proposal.get("minutes") or 0)
     note = f"Nicht erschienen – Frist von {minutes} Minuten abgelaufen"
     try:
