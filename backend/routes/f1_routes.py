@@ -28,7 +28,7 @@ from services.laptime import format_lap_time, plausibility_warning, plausible_ra
 from models import (
     F1ChallengeCreate, F1ChallengeUpdate, F1TrackCreate, F1TrackUpdate,
     F1LapTimeCreate, F1LapTimeDelete, F1LapTimeUpdate,
-    F1GuestCreate, F1QueueCreate, F1QueueNext, F1QueueStart,
+    F1GuestCreate, F1GuestRename, F1QueueCreate, F1QueueNext, F1QueueStart,
     now_utc, new_id,
 )
 
@@ -1307,16 +1307,25 @@ async def create_guest(cid: str, body: F1GuestCreate, me: dict = Depends(get_cur
 
 
 @router.patch("/guests/{gid}")
-async def rename_guest(gid: str, body: F1GuestCreate, me: dict = Depends(get_current_user)):
-    """Umbenennen - auch, wenn ein Gast seinen Namen nicht mehr zeigen will (dann etwa „Gast 3“ eintragen)."""
+async def rename_guest(gid: str, body: F1GuestRename, me: dict = Depends(get_current_user)):
+    """Umbenennen - auch, wenn ein Gast seinen Namen nicht mehr zeigen will (dann etwa „Gast 3“ eintragen). Der Name
+    steht in Rangliste und Urkunde: nach der Veröffentlichung gilt dieselbe Sperre wie für Zeiten (Helfer nicht, Leitung
+    mit Begründung), und jedes Umbenennen steht im Protokoll - nur mit Kennungen. Den Ablauf nach der Frist macht der
+    Job ``expire_guest_names`` ohne diese Route."""
     db = get_db()
     guest = await db.f1_guests.find_one({"id": gid}, {"_id": 0})
     if not guest:
         raise HTTPException(status_code=404, detail="Gast nicht gefunden")
     await _require_f1_result_permission(me, guest["challenge_id"])
+    challenge = await db.f1_challenges.find_one({"id": guest["challenge_id"]}, {"_id": 0, "status": 1}) or {}
+    reason = _published_change_reason(challenge, me, body.change_reason)
     name = clean_guest_name(body.display_name)
     await ensure_unique_name(db, guest["challenge_id"], name, current_id=gid)
-    await db.f1_guests.update_one({"id": gid}, {"$set": {"display_name": name, "updated_at": now_utc().isoformat()}})
+    stamp = now_utc().isoformat()
+    await db.f1_guests.update_one({"id": gid}, {"$set": {"display_name": name, "updated_at": stamp}})
+    await db.audit_logs.insert_one({"id": new_id(), "action": "fastlap.guest.rename", "actor_id": me.get("id"), "target_id": gid,
+                                    "data": {"challenge_id": guest["challenge_id"], "reason": reason, "after_publishing": reason is not None},
+                                    "created_at": stamp})
     return guest_payload({**guest, "display_name": name})
 
 
@@ -1356,6 +1365,15 @@ async def _queue_attempts(db, challenge: dict, entry: dict) -> int:
     return await db.f1_lap_times.count_documents({**query, "user_id": entry.get("user_id"), **scope})
 
 
+PUBLIC_QUEUE_FIELDS = ("id", "state", "station", "display_name", "attempts_used")
+
+
+def _public_queue_rows(rows: list[dict]) -> list[dict]:
+    """Was alle sehen (TV, öffentliche Seite): Name, Station, Versuch und Platz - keine Kennungen von Konto oder Gast,
+    keine genaue Startzeit. ``id`` ist die Kennung des Listeneintrags (für die Bewegung beim Wechsel), keine Person."""
+    return [{**{key: row.get(key) for key in PUBLIC_QUEUE_FIELDS}, "position": index + 1} for index, row in enumerate(rows)]
+
+
 async def _queue_payload(db, challenge: dict, rows: list[dict]) -> list[dict]:
     user_ids = [row["user_id"] for row in rows if row.get("user_id")]
     users = {u["id"]: u for u in await db.users.find({"id": {"$in": user_ids}}, private_projection()).to_list(len(user_ids) + 10)} if user_ids else {}
@@ -1388,11 +1406,20 @@ async def get_queue(cid: str, track_id: str | None = None, access: str | None = 
     if c.get("event_id"):
         stations.update(row.get("name") for row in await db.stations.find({"event_id": c["event_id"]}, {"_id": 0, "name": 1}).to_list(200))
     stations.update(row.get("station") for row in rows)
+    on_track_rows, waiting_rows = await _queue_payload(db, c, on_track), await _queue_payload(db, c, waiting)
+    # Kennungen und Startzeit nur für die, die die Liste führen (#1585, Nachprüfung).
+    if not await _has_f1_staff_permission(user, c["id"], F1_RESULT_STAFF_ROLES):
+        on_track_rows, waiting_rows = _public_queue_rows(on_track_rows), _public_queue_rows(waiting_rows)
+    else:
+        for index, row in enumerate(waiting_rows):
+            row["position"] = index + 1
+        for index, row in enumerate(on_track_rows):
+            row["position"] = index + 1
     return {
         "challenge_id": c["id"],
         "max_attempts": _max_attempts(c),
-        "on_track": await _queue_payload(db, c, on_track),
-        "next": await _queue_payload(db, c, waiting),
+        "on_track": on_track_rows,
+        "next": waiting_rows,
         "stations": sorted(name for name in stations if name),
     }
 
@@ -1437,6 +1464,9 @@ async def move_up_in_queue(qid: str, me: dict = Depends(get_current_user)):
     entry = await _queue_entry(db, qid, me)
     try:
         async with mutation_lock(db, queue_resource(entry["challenge_id"]), wait_seconds=LAP_WAIT_SECONDS):
+            entry = await db.f1_queue.find_one({"id": qid}, {"_id": 0})
+            if not entry:
+                raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
             before = await db.f1_queue.find_one({"challenge_id": entry["challenge_id"], "state": "next", "order": {"$lt": entry["order"]}},
                                                 {"_id": 0, "id": 1, "order": 1}, sort=[("order", -1)])
             if before:
@@ -1451,16 +1481,30 @@ async def move_up_in_queue(qid: str, me: dict = Depends(get_current_user)):
 async def start_from_queue(qid: str, body: F1QueueStart | None = None, me: dict = Depends(get_current_user)):
     db = get_db()
     entry = await _queue_entry(db, qid, me)
-    station = _clean_station(body.station if body else None) or entry.get("station")
-    await db.f1_queue.update_one({"id": qid}, {"$set": {"state": "on_track", "station": station, "started_at": now_utc().isoformat()}})
+    try:
+        async with mutation_lock(db, queue_resource(entry["challenge_id"]), wait_seconds=LAP_WAIT_SECONDS):
+            # Frisch lesen: ein anderer Helfer kann den Eintrag gerade entfernt oder gestartet haben.
+            current = await db.f1_queue.find_one({"id": qid}, {"_id": 0})
+            if not current:
+                raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
+            station = _clean_station(body.station if body else None) or current.get("station")
+            await db.f1_queue.update_one({"id": qid}, {"$set": {"state": "on_track", "station": station, "started_at": now_utc().isoformat()}})
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=QUEUE_BUSY)
     return {"ok": True}
 
 
 @router.delete("/queue/{qid}")
 async def remove_from_queue(qid: str, me: dict = Depends(get_current_user)):
     db = get_db()
-    await _queue_entry(db, qid, me)
-    await db.f1_queue.delete_one({"id": qid})
+    entry = await _queue_entry(db, qid, me)
+    try:
+        async with mutation_lock(db, queue_resource(entry["challenge_id"]), wait_seconds=LAP_WAIT_SECONDS):
+            result = await db.f1_queue.delete_one({"id": qid})
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=QUEUE_BUSY)
+    if not getattr(result, "deleted_count", 0):
+        raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
     return {"ok": True}
 
 

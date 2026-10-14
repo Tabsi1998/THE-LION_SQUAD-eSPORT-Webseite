@@ -1183,6 +1183,11 @@ class F1GuestCreate(BaseModel):
     display_name: str = Field(max_length=200)
 
 
+class F1GuestRename(F1GuestCreate):
+    """Umbenennen (#1585) - nach der Veröffentlichung wie eine Zeitkorrektur nur mit Begründung."""
+    change_reason: Optional[str] = Field(default=None, max_length=500)
+
+
 class F1QueueCreate(BaseModel):
     """„Am Start / Als Nächstes“ (#1585): ein Konto oder ein Gast, auf einer Strecke, an einer Station (Freitext)."""
     user_id: Optional[str] = None

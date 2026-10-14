@@ -391,3 +391,111 @@ async def test_guest_names_expire_after_the_deadline(flow):
     assert rows[old["id"]]["display_name"] == f"Gast {old['number']}" and rows[old["id"]]["name_expired_at"]
     assert rows[fresh["id"]]["display_name"] == "Neue Nina"
     assert await expire_guest_names(flow.db) == 0
+
+
+# ------------------------------------------------------------------ Nachprüfung (Codex)
+
+RENAME_REASON = "Name auf Wunsch des Gastes gekürzt"
+
+
+@pytest.mark.asyncio
+async def test_after_publishing_a_guest_name_changes_only_by_the_lead_with_a_reason(flow):
+    cid, tid, _driver, lead, helper = await setup(flow)
+    guest = await add_guest(flow, cid, "Anna Kowalczyk")
+    await enter(flow, cid, tid, guest=guest)
+    await flow.db.f1_challenges.update_one({"id": cid}, {"$set": {"status": "results_published"}})
+    flow.act_as(helper)
+    response = await flow.patch(f"/api/f1/guests/{guest['id']}", json={"display_name": "Anna K.", "change_reason": RENAME_REASON})
+    assert response.status_code == 409
+    flow.act_as(lead)
+    response = await flow.patch(f"/api/f1/guests/{guest['id']}", json={"display_name": "Anna K."})
+    assert response.status_code == 409
+    assert (await flow.db.f1_guests.find_one({"id": guest["id"]}))["display_name"] == "Anna Kowalczyk"
+    response = await flow.patch(f"/api/f1/guests/{guest['id']}", json={"display_name": "Anna K.", "change_reason": RENAME_REASON})
+    assert response.status_code == 200, response.text
+    rows = await flow.db.audit_logs.find({"action": "fastlap.guest.rename"}, {"_id": 0}).to_list(10)
+    assert len(rows) == 1 and rows[0]["actor_id"] == lead["id"] and rows[0]["target_id"] == guest["id"]
+    assert rows[0]["data"]["reason"] == RENAME_REASON and rows[0]["data"]["after_publishing"] is True
+    # Nur Kennungen im Protokoll - keine Namen.
+    assert "Anna" not in str(rows[0]["data"])
+
+
+@pytest.mark.asyncio
+async def test_before_publishing_a_rename_is_logged_too(flow):
+    cid, *_ = await setup(flow)
+    guest = await add_guest(flow, cid, "Anna")
+    response = await flow.patch(f"/api/f1/guests/{guest['id']}", json={"display_name": "Anna K."})
+    assert response.status_code == 200
+    rows = await flow.db.audit_logs.find({"action": "fastlap.guest.rename"}, {"_id": 0}).to_list(10)
+    assert len(rows) == 1 and rows[0]["data"]["after_publishing"] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["start", "delete", "up"])
+async def test_every_queue_change_waits_for_the_queue_lock(flow, monkeypatch, action):
+    from routes import f1_routes
+    from services.mutation_lock import mutation_lock
+
+    cid, tid, driver, *_ = await setup(flow)
+    other = await flow.add_user(name="zweite")
+    await line_up(flow, cid, tid, user=other)
+    entry = await line_up(flow, cid, tid, user=driver)
+    monkeypatch.setattr(f1_routes, "LAP_WAIT_SECONDS", 0.2)
+    async with mutation_lock(flow.db, f1_routes.queue_resource(cid), wait_seconds=1, lease_seconds=30, retry_seconds=0.05):
+        if action == "start":
+            response = await flow.post(f"/api/f1/queue/{entry['id']}/start", json={})
+        elif action == "delete":
+            response = await flow.delete(f"/api/f1/queue/{entry['id']}")
+        else:
+            response = await flow.post(f"/api/f1/queue/{entry['id']}/up")
+    assert response.status_code == 409
+    row = await flow.db.f1_queue.find_one({"id": entry["id"]})
+    assert row is not None and row["state"] == "next"
+
+
+@pytest.mark.asyncio
+async def test_a_started_entry_that_was_removed_meanwhile_stays_removed(flow):
+    import asyncio
+
+    cid, tid, driver, *_ = await setup(flow)
+    entry = await line_up(flow, cid, tid, user=driver)
+    started, removed = await asyncio.gather(
+        flow.post(f"/api/f1/queue/{entry['id']}/start", json={"station": "Simulator 1"}),
+        flow.delete(f"/api/f1/queue/{entry['id']}"),
+    )
+    assert removed.status_code in (200, 404)
+    assert started.status_code in (200, 404)
+    assert await flow.db.f1_queue.count_documents({"challenge_id": cid, "state": "on_track"}) <= 1
+    assert await flow.db.f1_queue.count_documents({"challenge_id": cid}) == 0 or removed.status_code == 404
+
+
+PRIVATE_QUEUE_FIELDS = {"user_id", "guest_id", "participant_id", "started_at", "avatar_url", "track_id", "is_guest"}
+
+
+@pytest.mark.asyncio
+async def test_the_public_queue_shows_names_station_attempt_and_position_only(flow):
+    cid, tid, driver, *_ = await setup(flow)
+    guest = await add_guest(flow, cid, "Anna")
+    first = await line_up(flow, cid, tid, user=driver, station="Simulator 1")
+    await line_up(flow, cid, tid, guest=guest)
+    response = await flow.post(f"/api/f1/queue/{first['id']}/start", json={})
+    assert response.status_code == 200
+    flow.act_as(None)
+    data = await queue(flow, cid)
+    rows = data["on_track"] + data["next"]
+    assert [row["display_name"] for row in rows] == ["fahrerin", "Anna"]
+    for row in rows:
+        assert not PRIVATE_QUEUE_FIELDS & set(row), row
+    assert data["on_track"][0]["station"] == "Simulator 1" and data["on_track"][0]["attempts_used"] == 0
+    assert [row["position"] for row in data["next"]] == [1]
+    flow.act_as(await flow.add_user(name="fremd"))
+    assert not PRIVATE_QUEUE_FIELDS & set((await queue(flow, cid))["next"][0])
+
+
+@pytest.mark.asyncio
+async def test_the_team_sees_the_queue_with_its_ids(flow):
+    cid, tid, driver, _lead, helper = await setup(flow)
+    await line_up(flow, cid, tid, user=driver)
+    flow.act_as(helper)
+    row = (await queue(flow, cid))["next"][0]
+    assert row["user_id"] == driver["id"] and row["participant_id"] == driver["id"]

@@ -64,11 +64,14 @@ export function useLapBoardMotion(board, containerRef) {
       rankMoves(before.entries, board.entries).forEach((direction, key) => {
         const digit = rowNode(container, key)?.querySelector("[data-rank-digit]");
         if (!digit || typeof digit.animate !== "function") return;
-        // Kleines Überschwingen beim Aufsetzen - erst, wenn die Zeile fast angekommen ist.
-        digit.animate(direction === "up"
+        // Kleines Überschwingen beim Aufsetzen - erst, wenn die Zeile fast angekommen ist. Wie die Wege gemerkt: eine
+        // neue Zeit bricht die laufende ab, das Verlassen der Seite alle.
+        const name = `rank:${key}`;
+        running.current.get(name)?.cancel();
+        running.current.set(name, digit.animate(direction === "up"
           ? [{ transform: "scale(0.82)", opacity: 0.4 }, { transform: "scale(1.12)", opacity: 1, offset: 0.6 }, { transform: "scale(1)", opacity: 1 }]
           : [{ opacity: 0.4 }, { opacity: 1 }],
-        { duration: MOTION.slow, delay: FLIP_MS * 0.55, easing: `cubic-bezier(${MOTION.ease.join(", ")})`, fill: "backwards" });
+        { duration: MOTION.slow, delay: FLIP_MS * 0.55, easing: `cubic-bezier(${MOTION.ease.join(", ")})`, fill: "backwards" }));
       });
     }
     const until = Date.now() + CHIP_MS;

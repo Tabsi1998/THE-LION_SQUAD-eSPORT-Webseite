@@ -50,3 +50,23 @@ test("das Band geht nach ein paar Sekunden wieder", () => {
   act(() => { vi.advanceTimersByTime(BEST_MS + 100); });
   expect(marks.best).toBeNull();
 });
+
+test("die Platzziffer: eine neue Zeit bricht die laufende Bewegung ab, das Verlassen der Seite alle (Nachprüfung)", () => {
+  const animations = [];
+  const original = globalThis.Element.prototype.animate;
+  globalThis.Element.prototype.animate = vi.fn(() => { const animation = { cancel: vi.fn() }; animations.push(animation); return animation; });
+  try {
+    const { rerender, unmount } = render(<Probe board={boardOf("t1", [entry("a", 1, 80000), entry("b", 2, 81000)])} />);
+    rerender(<Probe board={boardOf("t1", [entry("b", 1, 79000), entry("a", 2, 80000)])} />);
+    expect(animations).toHaveLength(2);
+    rerender(<Probe board={boardOf("t1", [entry("a", 1, 78000), entry("b", 2, 79000)])} />);
+    expect(animations).toHaveLength(4);
+    expect(animations[0].cancel).toHaveBeenCalled();
+    expect(animations[1].cancel).toHaveBeenCalled();
+    unmount();
+    expect(animations[2].cancel).toHaveBeenCalled();
+    expect(animations[3].cancel).toHaveBeenCalled();
+  } finally {
+    globalThis.Element.prototype.animate = original;
+  }
+});

@@ -288,7 +288,9 @@ Im Reiter **Gast** einen Namen eintragen und **Anlegen** – fertig. Den Namen v
 auftauchen möchte, bekommt einen Spitznamen oder Initialen. Zwei Gäste mit demselben Namen gehen nicht (z. B. „Max B.“
 und „Max K.“). Gäste stehen in Rangliste, TV und Urkunde, aber nicht in Gewinnen, Jahreswertung und Erfolgen (3.2).
 Nach **90 Tagen** wird der Name von selbst zu „Gast 3“ (Datenschutz, siehe `DATA_PROTECTION.md`); die Zeit bleibt.
-Einen Gast später mit einem Konto verknüpfen geht noch nicht.
+Umbenannt wird ein Gast über die Schnittstelle der Verwaltung; nach **Ergebnisse veröffentlicht** nur durch die
+Turnierleitung mit Begründung, jedes Umbenennen steht im Protokoll. Einen Gast später mit einem Konto verknüpfen geht
+noch nicht. Die öffentliche Liste „Am Start / Als Nächstes“ zeigt nur Name, Station, Versuch und Platz.
 
 **Am Start / Als Nächstes**
 
