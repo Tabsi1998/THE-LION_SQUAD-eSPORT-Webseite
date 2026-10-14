@@ -1139,6 +1139,8 @@ class F1ChallengeUpdate(BaseModel):
     season_weight: Optional[float] = None
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
     site_banner_enabled: Optional[bool] = None
+    # Begründung, wenn nach der Veröffentlichung die Wertung geändert wird (#1584).
+    change_reason: Optional[str] = Field(default=None, max_length=500)
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
 

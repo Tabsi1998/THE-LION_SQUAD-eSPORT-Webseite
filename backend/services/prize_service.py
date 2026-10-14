@@ -141,11 +141,23 @@ async def auto_create_for_f1_challenge(challenge_id: str) -> int:
     Non-championship challenges create pickups per track. Championship challenges
     create pickups from the overall championship standings.
     """
+    return (await _sync_f1_prizes(challenge_id, review_stale=False))["created"]
+
+
+async def review_f1_prizes(challenge_id: str) -> dict:
+    """Gewinne nach einer Korrektur veröffentlichter Ergebnisse (#1584): fehlende für die neue Rangfolge anlegen; wer
+    nicht mehr auf dem Platz steht, behält seinen Gewinn - er bekommt ``needs_review`` („nach Korrektur prüfen“), auch
+    wenn er schon ausgegeben ist. Passt ein markierter Gewinn wieder, fällt die Markierung weg."""
+    return await _sync_f1_prizes(challenge_id, review_stale=True)
+
+
+async def _sync_f1_prizes(challenge_id: str, *, review_stale: bool) -> dict:
     db = get_db()
+    result = {"created": 0, "to_review": 0}
     challenge = await db.f1_challenges.find_one({"id": challenge_id}, {"_id": 0}) or {}
     prize_places = challenge.get("prize_places") or []
     if not challenge or not prize_places:
-        return 0
+        return result
 
     prize_ranks: list[tuple[int, dict]] = []
     for prize in prize_places:
@@ -156,15 +168,14 @@ async def auto_create_for_f1_challenge(challenge_id: str) -> int:
         if rank > 0:
             prize_ranks.append((rank, prize))
     if not prize_ranks:
-        return 0
+        return result
 
     tracks = await db.f1_tracks.find({"challenge_id": challenge_id}, {"_id": 0}).sort("order_index", 1).to_list(100)
     if not tracks:
-        return 0
+        return result
 
     slug_or_id = challenge.get("slug") or challenge_id
     deadline = (now_utc() + timedelta(days=DEFAULT_PICKUP_WINDOW_DAYS)).isoformat()
-    created = 0
 
     async def create_pickup(user_id: str, place: int, prize: dict, source_key: str, source_label: str, track: dict | None = None) -> bool:
         existing = await db.prize_pickups.find_one({
@@ -228,20 +239,39 @@ async def auto_create_for_f1_challenge(challenge_id: str) -> int:
     # Dieselbe Rangfolge wie Tabelle und Gesamtwertung (#1584, services/fastlap_standings.py).
     from services.fastlap_standings import challenge_standings, official_times, track_ranking
 
+    # Wer welchen Gewinn bekommt: (Person, Platz, Preis, Quelle, Bezeichnung, Strecke).
+    targets: list[tuple] = []
     if challenge.get("is_championship"):
         ranked, _per_track, _tracks = await challenge_standings(db, challenge, tracks)
         for place, prize in prize_ranks:
-            if place <= len(ranked) and await create_pickup(ranked[place - 1]["user_id"], place, prize, "championship", "Gesamtwertung"):
-                created += 1
-        return created
+            if place <= len(ranked):
+                targets.append((ranked[place - 1]["user_id"], place, prize, "championship", "Gesamtwertung", None))
+    else:
+        max_rank = max(rank for rank, _ in prize_ranks)
+        for track in tracks:
+            ranked = track_ranking(await official_times(db, challenge_id, track["id"]))[:max_rank]
+            for place, prize in prize_ranks:
+                if place <= len(ranked):
+                    targets.append((ranked[place - 1][0], place, prize, f"track:{track['id']}", track.get("name") or "Strecke", track))
+    for user_id, place, prize, source_key, source_label, track in targets:
+        if await create_pickup(user_id, place, prize, source_key, source_label, track):
+            result["created"] += 1
+    if not review_stale:
+        return result
 
-    max_rank = max(rank for rank, _ in prize_ranks)
-    for track in tracks:
-        ranked = track_ranking(await official_times(db, challenge_id, track["id"]))[:max_rank]
-        for place, prize in prize_ranks:
-            if place <= len(ranked) and await create_pickup(ranked[place - 1][0], place, prize, f"track:{track['id']}", track.get("name") or "Strecke", track):
-                created += 1
-    return created
+    wanted = {(source_key, place, user_id) for user_id, place, _prize, source_key, _label, _track in targets}
+    stamp = now_utc().isoformat()
+    async for pickup in db.prize_pickups.find({"source_type": "fastlap", "fastlap_challenge_id": challenge_id}, {"_id": 0}):
+        stale = (pickup.get("fastlap_source_key"), pickup.get("place"), pickup.get("user_id")) not in wanted
+        if stale:
+            result["to_review"] += 1
+        if stale != bool(pickup.get("needs_review")):
+            await db.prize_pickups.update_one({"id": pickup["id"]}, {"$set": {
+                "needs_review": stale,
+                "review_note": "Nach einer Korrektur der Ergebnisse nicht mehr auf diesem Platz - bitte prüfen." if stale else None,
+                "updated_at": stamp,
+            }})
+    return result
 
 
 async def mark_ready(pickup_id: str, actor_id: str) -> Optional[dict]:

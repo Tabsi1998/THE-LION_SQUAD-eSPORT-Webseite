@@ -15,6 +15,9 @@ class FakeCursor:
             items.sort(key=lambda item: item.get(field) or 0, reverse=sort_direction < 0)
         return FakeCursor(items)
 
+    def limit(self, count):
+        return FakeCursor(self.items[:count])
+
     async def to_list(self, _limit):
         return list(self.items)
 

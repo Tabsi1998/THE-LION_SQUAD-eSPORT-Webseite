@@ -18,7 +18,7 @@ from services.log_safe import log_safe
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.private_fields import private_projection
 from services.csv_safe import safe_cell
-from services.fastlap_standings import REFERENCE_SCOPE, effective_ms, penalty_ms, rank_laps, track_ranking
+from services.fastlap_standings import REFERENCE_SCOPE, effective_ms, load_laps, official_times, penalty_ms, rank_laps, track_ranking
 from services.laptime import format_lap_time, plausibility_warning, plausible_range
 from models import (
     F1ChallengeCreate, F1ChallengeUpdate, F1TrackCreate, F1TrackUpdate,
@@ -677,6 +677,7 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
     cid = await _resolve_cid(cid)
     existing = await db.f1_challenges.find_one({"id": cid}, {"_id": 0}) or {}
     raw = body.model_dump(exclude_unset=True)
+    change_reason = raw.pop("change_reason", None)
     # Event als Klammer (#1371): verbunden wird nur im Event - wie beim Turnier.
     if "event_id" in raw and (raw.pop("event_id") or None) != (existing.get("event_id") or None):
         raise HTTPException(status_code=400, detail="Zu welchem Event das gehört, änderst du im Event unter „Programm“.")
@@ -701,6 +702,11 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
             status_code=400,
             detail="Wenn Vereinsmitglieder von der offiziellen Wertung ausgeschlossen sind, müssen Vereins-Referenzzeiten erlaubt bleiben.",
         )
+    # Die Regel verschiebt Zeiten in die Referenzwertung (#1584): nach der Veröffentlichung wie eine Zeitkorrektur -
+    # nur die Turnierleitung, mit Begründung, im Protokoll, danach Gewinne und Saisonpunkte abgleichen.
+    rule_reason = None
+    if "block_club_member_results" in updates and bool(updates["block_club_member_results"]) != bool(existing.get("block_club_member_results")):
+        rule_reason = _published_change_reason(existing, me, change_reason)
     if "registration_enabled" in updates:
         updates["online_registration_enabled"] = updates.get("registration_enabled") is True
     if updates.get("online_registration_enabled") is False:
@@ -714,10 +720,11 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
             updates[k] = _iso(updates.get(k))
     updates["updated_at"] = now_utc().isoformat()
     await db.f1_challenges.update_one({"id": cid}, {"$set": updates})
+    moved = 0
     if updates.get("block_club_member_results") is True:
         member_ids = await db.memberships.distinct("user_id", {"member_status": {"$in": ["active", "honorary"]}})
         if member_ids:
-            await db.f1_lap_times.update_many(
+            moved_result = await db.f1_lap_times.update_many(
                 {
                     "challenge_id": cid,
                     "user_id": {"$in": member_ids},
@@ -725,6 +732,7 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
                 },
                 {"$set": {"score_scope": "club_reference", "updated_at": now_utc().isoformat()}},
             )
+            moved = getattr(moved_result, "modified_count", 0) or 0
     c = await db.f1_challenges.find_one({"id": cid}, {"_id": 0})
     await _annotate_reference_policy(c, include_counts=True)
     if existing.get("status") in LOCKED_STATUSES and c.get("status") not in LOCKED_STATUSES:
@@ -746,7 +754,62 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
             await auto_create_for_f1_challenge(c["id"])
         except Exception:
             logger.warning("[f1] Preise für %s nicht angelegt", log_safe(cid), exc_info=True)
+    if rule_reason is not None:
+        await db.audit_logs.insert_one({"id": new_id(), "action": "fastlap.challenge.member_rule", "actor_id": me.get("id"), "target_id": cid,
+                                        "data": {"block_club_member_results": bool(c.get("block_club_member_results")), "moved": moved,
+                                                 "reason": rule_reason}, "created_at": now_utc().isoformat()})
+        await _resync_published_results(db, cid, me, rule_reason)
     return c
+
+
+async def _resync_published_results(db, challenge_id: str, me: dict, reason: str | None) -> None:
+    """Nach einer Korrektur veröffentlichter Ergebnisse (#1584): Gewinne und Saisonpunkte an die neue Rangfolge
+    angleichen - dieselbe Rechnung wie beim Veröffentlichen, wiederholbar. Ausgegebene Gewinne werden nie entzogen,
+    sondern als „nach Korrektur prüfen“ markiert. Was sich geändert hat, steht im Protokoll."""
+    if reason is None:
+        return
+    challenge = await db.f1_challenges.find_one({"id": challenge_id}, {"_id": 0})
+    if not challenge or challenge.get("status") not in LOCKED_STATUSES:
+        return
+    try:
+        from services.prize_service import review_f1_prizes
+        prizes = await review_f1_prizes(challenge_id)
+        points = await _resync_f1_season_points(challenge)
+    except Exception:
+        logger.warning("[f1] Abgleich nach Korrektur in %s fehlgeschlagen", log_safe(challenge_id), exc_info=True)
+        return
+    await db.audit_logs.insert_one({"id": new_id(), "action": "fastlap.results.resync", "actor_id": me.get("id"), "target_id": challenge_id,
+                                    "data": {"reason": reason, "prizes_created": prizes["created"], "prizes_to_review": prizes["to_review"],
+                                             "season_points": points}, "created_at": now_utc().isoformat()})
+
+
+async def _resync_f1_season_points(challenge: dict) -> dict:
+    """Saisonpunkte je Strecke angleichen - in der Saison, in der sie beim Veröffentlichen vergeben wurden. Wurden keine
+    vergeben (keine aktive Saison damals), bleibt es dabei."""
+    from collections import Counter
+    from services.season_service import resync_source_points
+
+    db = get_db()
+    cid = challenge["id"]
+    tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).sort("order_index", 1).to_list(100)
+    source_ids = [f"{cid}:{track['id']}" for track in tracks]
+    awarded = await db.season_points.find({"source_type": "fastlap", "source_id": {"$in": source_ids}},
+                                          {"_id": 0, "season_id": 1, "source_id": 1}).to_list(None)
+    totals: Counter = Counter()
+    if not awarded:
+        return dict(totals)
+    season_by_source = {row["source_id"]: row["season_id"] for row in awarded}
+    fallback = Counter(row["season_id"] for row in awarded).most_common(1)[0][0]
+    weight = float(challenge.get("season_weight") or 1.0)
+    for track in tracks:
+        source_id = f"{cid}:{track['id']}"
+        ranked = track_ranking(await official_times(db, cid, track["id"]))
+        totals.update(await resync_source_points(
+            season_id=season_by_source.get(source_id, fallback), source_type="fastlap", source_id=source_id,
+            source_name=f"{challenge.get('title') or 'Fast Lap'} - {track.get('name') or 'Strecke'}",
+            ranking=[(uid, pos + 1) for pos, (uid, _) in enumerate(ranked)], weight=weight,
+        ))
+    return dict(totals)
 
 
 async def _award_f1_season_points(challenge: dict):
@@ -757,11 +820,7 @@ async def _award_f1_season_points(challenge: dict):
     tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).sort("order_index", 1).to_list(100)
     weight = float(challenge.get("season_weight") or 1.0)
     for track in tracks:
-        times = await db.f1_lap_times.find(
-            _official_time_query({"challenge_id": cid, "track_id": track["id"]}),
-            {"_id": 0},
-        ).to_list(5000)
-        ranked = track_ranking(times)
+        ranked = track_ranking(await official_times(db, cid, track["id"]))
         num_participants = max(len(ranked), 1)
         for pos, (uid, _) in enumerate(ranked):
             await award_points(
@@ -779,6 +838,10 @@ async def _award_f1_season_points(challenge: dict):
 async def delete_challenge(cid: str, me: dict = Depends(require_admin())):
     db = get_db()
     cid = await _resolve_cid(cid)
+    current = await db.f1_challenges.find_one({"id": cid}, {"_id": 0, "status": 1}) or {}
+    # Veröffentlichte Ergebnisse verschwinden nicht mit der Challenge (#1584) - dafür gibt es „Archiviert“.
+    if current.get("status") in LOCKED_STATUSES and await db.f1_lap_times.count_documents({"challenge_id": cid}):
+        raise HTTPException(status_code=409, detail="Die Ergebnisse sind veröffentlicht - eine Challenge mit Zeiten wird archiviert, nicht gelöscht.")
     await db.f1_challenges.delete_one({"id": cid})
     await db.f1_tracks.delete_many({"challenge_id": cid})
     await db.f1_lap_times.delete_many({"challenge_id": cid})
@@ -788,6 +851,14 @@ async def delete_challenge(cid: str, me: dict = Depends(require_admin())):
 
 
 # --- Tracks ---
+def _check_plausible_limits(track: dict) -> None:
+    """Plausibilität (#1584): die untere Grenze liegt unter der oberen - sonst fragte jede Zeit nach."""
+    low, high = plausible_range(track)
+    if low >= high:
+        raise HTTPException(status_code=400, detail="Die untere Grenze für plausible Zeiten muss unter der oberen liegen.")
+
+
+
 @router.post("/challenges/{cid}/tracks")
 async def add_track(cid: str, body: F1TrackCreate, me: dict = Depends(require_admin())):
     db = get_db()
@@ -796,6 +867,7 @@ async def add_track(cid: str, body: F1TrackCreate, me: dict = Depends(require_ad
     if not c:
         raise HTTPException(status_code=404)
     doc = body.model_dump()
+    _check_plausible_limits(doc)
     doc["id"] = new_id()
     doc["challenge_id"] = cid
     doc["created_at"] = now_utc().isoformat()
@@ -813,9 +885,7 @@ async def update_track(tid: str, body: F1TrackUpdate, me: dict = Depends(require
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     current = await db.f1_tracks.find_one({"id": tid}, {"_id": 0, "min_plausible_ms": 1, "max_plausible_ms": 1}) or {}
     # Plausibilität (#1584): die untere Grenze liegt unter der oberen - sonst fragte jede Zeit nach.
-    low, high = plausible_range({**current, **{k: v for k, v in updates.items() if k in ("min_plausible_ms", "max_plausible_ms")}})
-    if low >= high:
-        raise HTTPException(status_code=400, detail="Die untere Grenze für plausible Zeiten muss unter der oberen liegen.")
+    _check_plausible_limits({**current, **{k: v for k, v in updates.items() if k in ("min_plausible_ms", "max_plausible_ms")}})
     await db.f1_tracks.update_one({"id": tid}, {"$set": updates})
     tr = await db.f1_tracks.find_one({"id": tid}, {"_id": 0})
     return tr
@@ -852,7 +922,7 @@ async def leaderboard(cid: str, track_id: str | None = None, access: str | None 
     if not track:
         raise HTTPException(status_code=404, detail="Strecke nicht gefunden")
     # Alle Zeiten der Strecke: die Rangfunktion wertet nur gültige, zählt aber jede als Versuch (#1584).
-    times = await db.f1_lap_times.find({"challenge_id": cid, "track_id": track_id}, {"_id": 0}).to_list(5000)
+    times = await load_laps(db, {"challenge_id": cid, "track_id": track_id})
     ranked = rank_laps(times)
     show_reference = c.get("allow_club_reference_times", True) and c.get("show_club_reference_times", True)
     reference_ranked = rank_laps(times, REFERENCE_SCOPE)[:3] if show_reference else []
@@ -937,6 +1007,7 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_curre
         raise HTTPException(status_code=409, detail=LAP_BUSY)
     doc.pop("_id", None)
     await _audit_lap(db, "fastlap.time.create", me, doc, before=None, after=doc, reason=reason)
+    await _resync_published_results(db, cid, me, reason)
     doc["proof_url"] = safe_proof_url(doc.get("proof_url"))
     doc["time_str"] = _ms_to_time_str(body.time_ms)
     # Discord trigger: if this submission is the new P1 on this track
@@ -947,9 +1018,7 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_curre
             effective = effective_ms(doc)
             # Die bisherige Bestzeit aus der einen Rangfunktion (#1584); gleich schnell ist keine neue Bestzeit -
             # bei Gleichstand bleibt die früher gefahrene vorn.
-            others = await db.f1_lap_times.find(
-                {**_official_time_query({"challenge_id": cid, "track_id": body.track_id}), "id": {"$ne": doc["id"]}},
-                {"_id": 0}).to_list(5000)
+            others = await load_laps(db, {**_official_time_query({"challenge_id": cid, "track_id": body.track_id}), "id": {"$ne": doc["id"]}})
             ranked_before = rank_laps(others)
             prev_best = ranked_before[0]["effective_ms"] if ranked_before else None
             if prev_best is None or effective < prev_best:
@@ -1042,6 +1111,7 @@ async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(ge
         raise HTTPException(status_code=409, detail=LAP_BUSY)
     t = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     await _audit_lap(db, "fastlap.time.update", me, t or existing, before=existing, after=t, reason=reason)
+    await _resync_published_results(db, existing.get("challenge_id"), me, reason)
     if t:
         t["time_str"] = _ms_to_time_str(t["time_ms"])
         t["proof_url"] = safe_proof_url(t.get("proof_url"))
@@ -1059,6 +1129,7 @@ async def delete_time(time_id: str, body: F1LapTimeDelete | None = None, me: dic
     reason = _published_change_reason(challenge, me, body.change_reason if body else None)
     await db.f1_lap_times.delete_one({"id": time_id})
     await _audit_lap(db, "fastlap.time.delete", me, existing, before=existing, after=None, reason=reason)
+    await _resync_published_results(db, existing.get("challenge_id"), me, reason)
     return {"ok": True}
 
 

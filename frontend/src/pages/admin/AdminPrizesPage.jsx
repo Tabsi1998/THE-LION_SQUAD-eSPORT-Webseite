@@ -269,6 +269,7 @@ export default function AdminPrizesPage() {
                       <div className="font-semibold">{p.fastlap_challenge_title || p.tournament_title || "—"}</div>
                       {p.fastlap_source_label && <div className="text-xs text-[#29B6E8]">{p.fastlap_source_label}</div>}
                       {p.source_type === "fastlap" && <div className="text-[10px] uppercase tracking-widest text-white/35">Fast Lap</div>}
+                      <ReviewMark p={p} />
                       {p.source_type === "season" && <div className="text-xs text-[#e9c46a]">Verlosung{p.season_source_label ? ` · ${p.season_source_label}` : ""}</div>}
                     </td>
                     <td className="px-4 py-3">
@@ -323,6 +324,16 @@ export default function AdminPrizesPage() {
   );
 }
 
+// Nach einer Korrektur veröffentlichter Fast-Lap-Ergebnisse (#1584): der Gewinn bleibt, die Verwaltung prüft ihn.
+function ReviewMark({ p }) {
+  if (!p.needs_review) return null;
+  return (
+    <div data-testid={`prize-review-${p.id}`} title={p.review_note || ""} className="mt-1 inline-flex text-[10px] font-bold uppercase tracking-widest text-honor border border-honor/40 bg-honor/10 px-1.5 py-0.5 rounded-sm">
+      Nach Korrektur prüfen
+    </div>
+  );
+}
+
 function PrizeMobileCard({ p, updateStatus, markPickedUp, remove }) {
   const s = STATUS_LABEL[p.status] || STATUS_LABEL.pending;
   const Icn = s.icon;
@@ -338,6 +349,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove }) {
           <h2 className="mt-1 font-heading text-lg font-black uppercase leading-tight break-words">{p.fastlap_challenge_title || p.tournament_title || "Quelle offen"}</h2>
           {p.fastlap_source_label && <div className="mt-1 text-xs text-[#29B6E8]">{p.fastlap_source_label}</div>}
           {p.source_type === "season" && p.season_source_label && <div className="mt-1 text-xs text-[#e9c46a]">{p.season_source_label}</div>}
+          <ReviewMark p={p} />
         </div>
         <span className={`shrink-0 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-sm border ${s.color}`}>
           <Icn className="w-3 h-3" /> {s.label}

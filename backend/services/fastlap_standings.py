@@ -123,15 +123,38 @@ def championship_totals(tracks: list[dict], times_by_track: dict[str, list[dict]
     return standings, per_track
 
 
+# Zeiten werden seitenweise geladen (#1584): keine stille Obergrenze - eine abgeschnittene Liste wäre eine falsche
+# Rangfolge. Geblättert wird über ``_id``, damit neue Einträge während des Lesens nichts verschieben.
+LAP_PAGE_SIZE = 2000
+
+
+async def load_laps(db, query: dict) -> list[dict]:
+    """Alle Zeiten zu ``query``, vollständig."""
+    rows: list[dict] = []
+    last_id = None
+    while True:
+        page_query = query if last_id is None else {**query, "_id": {"$gt": last_id}}
+        page = await db.f1_lap_times.find(page_query).sort("_id", 1).limit(LAP_PAGE_SIZE).to_list(LAP_PAGE_SIZE)
+        for row in page:
+            last_id = row.pop("_id", None)
+            rows.append(row)
+        if len(page) < LAP_PAGE_SIZE or last_id is None:
+            return rows
+
+
 async def official_times(db, challenge_id: str, track_id: str) -> list[dict]:
-    return await db.f1_lap_times.find(official_query({"challenge_id": challenge_id, "track_id": track_id}), {"_id": 0}).to_list(5000)
+    return await load_laps(db, official_query({"challenge_id": challenge_id, "track_id": track_id}))
 
 
 async def challenge_standings(db, challenge: dict, tracks: list[dict] | None = None) -> tuple[list[dict], dict, list[dict]]:
-    """Die Championship einer Challenge aus der Datenbank: (Wertung, je Strecke, Strecken)."""
+    """Die Championship einer Challenge aus der Datenbank: (Wertung, je Strecke, Strecken) - alle Zeiten mit einer
+    Abfrage, nach Strecke gruppiert."""
     cid = challenge["id"]
     if tracks is None:
         tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).sort("order_index", 1).to_list(100)
-    times_by_track = {track["id"]: await official_times(db, cid, track["id"]) for track in tracks}
+    times_by_track: dict[str, list[dict]] = {track["id"]: [] for track in tracks}
+    for row in await load_laps(db, official_query({"challenge_id": cid})):
+        if row.get("track_id") in times_by_track:
+            times_by_track[row["track_id"]].append(row)
     standings, per_track = championship_totals(tracks, times_by_track, challenge.get("points_per_position"))
     return standings, per_track, tracks

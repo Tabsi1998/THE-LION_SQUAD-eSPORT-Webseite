@@ -260,3 +260,17 @@ test("Strecke: Plausibilitätsgrenzen werden zu Millisekunden", async () => {
   fireEvent.click(screen.getByTestId("f1-add-track-btn"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/f1/challenges/c-1/tracks", expect.objectContaining({ min_plausible_ms: 70000, max_plausible_ms: 150000 })));
 });
+
+test("nach der Veröffentlichung: „Vereinsmitglieder ausschließen“ ändern geht nur mit Begründung", async () => {
+  answerWith({ status: "results_published" });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  fireEvent.click(screen.getByTestId("f1-edit-block-members"));
+  promptMock.mockResolvedValueOnce(null);
+  fireEvent.click(screen.getByTestId("f1-edit-save"));
+  await waitFor(() => expect(promptMock).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+  promptMock.mockResolvedValueOnce("Mitglied fuhr irrtümlich offiziell");
+  fireEvent.click(screen.getByTestId("f1-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/challenges/c-1", expect.objectContaining({ block_club_member_results: true, change_reason: "Mitglied fuhr irrtümlich offiziell" })));
+});

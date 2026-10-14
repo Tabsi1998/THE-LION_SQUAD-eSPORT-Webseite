@@ -230,9 +230,14 @@ Eingetragene offizielle Zeiten zählen für Erfolge der Fahrer (zum Beispiel „
 Mit **Ergebnisse veröffentlicht** stehen Gewinne und Jahreswertungs-Punkte fest – die Zeiten sind dann gesperrt
 (ebenso im Status **Archiviert**). Das Fast-Lap-Team kann nichts mehr eintragen, ändern oder löschen; die App zeigt statt
 des Formulars einen Hinweis. Die **Turnierleitung** kann noch korrigieren, aber nur mit **Begründung** (mindestens
-10 Zeichen), die im **Protokoll** steht. Vor dem Veröffentlichen fragt die Seite nach. Wer den Status wieder
-zurücksetzt, öffnet die Zeiten – auch das steht im Protokoll. Schon vergebene Gewinne und Jahreswertungs-Punkte
-ändern sich dadurch nicht von selbst.
+10 Zeichen), die im **Protokoll** steht. Nach jeder solchen Korrektur gleicht die Website Gewinne und
+Jahreswertungs-Punkte an die neue Rangfolge an: Wer neu auf einem Preisplatz steht, bekommt seinen Gewinn; ein Gewinn,
+der nicht mehr passt, wird **nicht entzogen**, sondern steht unter **Admin → eSports → Gewinne** mit dem Vermerk
+**„Nach Korrektur prüfen“**. Die Punkte bleiben in der Saison, in der sie vergeben wurden. Dasselbe gilt, wenn ihr
+nach der Veröffentlichung **Vereinsmitglieder aus offizieller Wertung ausschließen** umstellt (auch nur mit
+Begründung). Eine veröffentlichte Challenge mit Zeiten lässt sich nicht löschen – archiviert sie. Vor dem
+Veröffentlichen fragt die Seite nach. Wer den Status wieder zurücksetzt, öffnet die Zeiten – auch das steht im
+Protokoll.
 
 ---
 

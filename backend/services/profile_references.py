@@ -95,15 +95,9 @@ async def _visible_challenge(challenge: dict | None) -> bool:
 
 async def _ranked_fastlap_entries(challenge_id: str, track_id: str, user_id: str, public_only: bool) -> dict | None:
     db = get_db()
-    times = await db.f1_lap_times.find(
-        {
-            "challenge_id": challenge_id,
-            "track_id": track_id,
-            "is_invalid": {"$ne": True},
-            "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}],
-        },
-        {"_id": 0},
-    ).to_list(5000)
+    from services.fastlap_standings import official_times
+
+    times = await official_times(db, challenge_id, track_id)
     if public_only:
         challenge = await db.f1_challenges.find_one(
             {"id": challenge_id},

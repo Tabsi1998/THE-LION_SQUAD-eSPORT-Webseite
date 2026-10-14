@@ -113,8 +113,8 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
         if not tid:
             continue
         # Pole aus der einen Rangfunktion (#1584): Strafe eingerechnet, Gleichstand - die früher gefahrene Zeit vorn.
-        from services.fastlap_standings import official_query, rank_laps
-        ranked = rank_laps(await db.f1_lap_times.find(official_query({"track_id": tid}), {"_id": 0}).to_list(5000))
+        from services.fastlap_standings import load_laps, official_query, rank_laps
+        ranked = rank_laps(await load_laps(db, official_query({"track_id": tid})))
         if ranked and ranked[0]["user_id"] == user_id:
             pole_count += 1
     p["pole_count"] = pole_count
