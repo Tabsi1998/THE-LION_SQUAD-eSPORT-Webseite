@@ -347,8 +347,9 @@ async def test_two_removals_in_a_row_leave_a_valid_bracket(flow):
         await play(flow, keys[key], filled(keys[key]))
     for victim in (regs[0], regs[1]):
         plan = (await flow.post(removal_url(tournament, victim), json={"kind": "withdrawn"})).json()["plan"]
-        response = await flow.post(removal_url(tournament, victim), json={"kind": "withdrawn", "plan_id": plan["id"]})
+        response = await flow.post(removal_url(tournament, victim), json={"kind": "withdrawn", "plan_id": plan["id"], "reason": "Krank"})
         assert response.status_code == 200, response.text
+        assert (await registration(flow, victim))["removal"]["reason"] == "Krank", "der Grund aus dem Bestätigen zählt"
     matches = await flow.matches(tournament)
     gone = {regs[0]["id"], regs[1]["id"]}
     assert all(not (gone & set(filled(m))) for m in matches if m["status"] not in {"completed", "forfeit", "cancelled"})

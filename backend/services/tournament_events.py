@@ -515,7 +515,7 @@ async def reject_removal(db, tournament: dict, plan_id: str | None, *, actor_id:
 
 
 async def confirm_removal(db, tournament: dict, registration: dict, plan_id: str | None, *, kind: str,
-                          actor_id: str | None) -> dict:
+                          actor_id: str | None, reason: str | None = None) -> dict:
     """Schritt 2: die Turnierleitung bestätigt. Der Plan wird aus dem aktuellen Stand neu gerechnet und nur angewendet,
     wenn er noch derselbe ist - sonst 409 mit dem neuen Vorschlag. Doppelt gesendet = einmal ausgeführt: ist die Person
     schon so eingetragen, gibt es nichts mehr zu tun."""
@@ -540,6 +540,8 @@ async def confirm_removal(db, tournament: dict, registration: dict, plan_id: str
     names = await _names(db, tid)
     for op in fresh["ops"]:
         op["text"] = describe_op(op, names)
+    if (reason or "").strip():
+        plan = {**plan, "reason": reason.strip()}
     applied = await _apply(db, tournament, registration, fresh, matches, original, plan=plan, now_iso=now_iso, actor_id=actor_id)
     await db.tournaments.update_one({"id": tid}, {"$set": {"participant_removal_plan": None}})
     tournament["participant_removal_plan"] = None

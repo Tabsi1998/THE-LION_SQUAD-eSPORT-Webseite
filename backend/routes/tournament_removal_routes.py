@@ -52,7 +52,8 @@ async def remove_participant(tid: str, reg_id: str, body: RemovalRequest, me: di
     tournament, registration = await _structure_staff(db, tid, reg_id, me)
     try:
         if body.plan_id:
-            return await confirm_removal(db, tournament, registration, body.plan_id, kind=body.kind, actor_id=me.get("id"))
+            return await confirm_removal(db, tournament, registration, body.plan_id, kind=body.kind, actor_id=me.get("id"),
+                                         reason=body.reason)
         return await propose_removal(db, tournament, registration, kind=body.kind, reason=body.reason, actor_id=me.get("id"))
     except TournamentEventError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
