@@ -21,14 +21,23 @@ const mockAuth: { user: { id: string; username: string } } = { user: { id: "u-1"
 jest.mock("../../auth/AuthContext", () => ({ useAuth: () => mockAuth }));
 jest.mock("../../live", () => ({ isGuestUser: () => false }));
 jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: jest.fn() }));
-const mockLive: { reload: null | (() => unknown) } = { reload: null };
-jest.mock("../../realtime/LiveChangesProvider", () => ({ useLiveRefresh: (load: () => unknown) => { mockLive.reload = load; } }));
+const mockLive: { reload: null | (() => unknown); enabled: boolean | undefined } = { reload: null, enabled: undefined };
+jest.mock("../../realtime/LiveChangesProvider", () => ({
+  useLiveRefresh: (load: () => unknown, _resources: unknown, options?: { enabled?: boolean }) => { mockLive.reload = load; mockLive.enabled = options?.enabled ?? true; },
+}));
 jest.mock("../../seasons/anchors", () => ({ useSeasonOverlay: () => null, SeasonAnchor: ({ children }: { children?: React.ReactNode }) => children ?? null }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 jest.mock("../../components/AddToCalendarButton", () => ({ AddToCalendarButton: () => null }));
 
 const navigate = jest.fn();
-const navigation = { navigate, setOptions: jest.fn(), addListener: jest.fn(() => () => {}), getParent: () => ({ navigate }) } as never;
+const mockListeners: Record<string, Array<() => void>> = {};
+const navigation = {
+  navigate, setOptions: jest.fn(), getParent: () => ({ navigate }),
+  addListener: jest.fn((event: string, listener: () => void) => {
+    (mockListeners[event] = mockListeners[event] || []).push(listener);
+    return () => { mockListeners[event] = (mockListeners[event] || []).filter((row) => row !== listener); };
+  }),
+} as never;
 const route = { key: "t", name: "TournamentDetail", params: { id: "cup" } } as never;
 
 function serve(state: string, tournament: Record<string, unknown> = {}, mineName?: string) {
@@ -261,6 +270,22 @@ describe("neue Zustände", () => {
     await render(<TournamentDetailScreen navigation={navigation} route={route} />);
     expect(await screen.findByTestId("tournament-own-out")).toHaveTextContent("Du bist ausgeschieden: Disqualifiziert");
   });
+});
+
+// Codex-Befund (#1586): der Detail-Screen bleibt im Stack gemountet - verdeckt kein Live-Abo und kein 10-s-Nachladen,
+// beim Zurückkommen einmal sofort frisch laden und das Abo wieder an.
+test("Live nur, solange die Turnierseite sichtbar ist", async () => {
+  serve("se6_live");
+  await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Lions Cup")).toBeTruthy());
+  expect(mockLive.enabled).toBe(true);
+  await act(async () => { (mockListeners.blur || []).forEach((listener) => listener()); });
+  expect(mockLive.enabled).toBe(false);
+  const loads = () => mockGet.mock.calls.filter(([url]) => url === "/tournaments/cup").length;
+  const before = loads();
+  await act(async () => { (mockListeners.focus || []).forEach((listener) => listener()); });
+  expect(mockLive.enabled).toBe(true);
+  await waitFor(() => expect(loads()).toBe(before + 1));
 });
 
 describe("Check-in", () => {

@@ -132,12 +132,17 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   // Zurück vom Event (#1184): nach Event-Anmeldung und „Spielst du auch mit?“ hat sich der Stand geändert - beim
   // Wiederkommen frisch laden (nur nach einem Weggehen; das erste Öffnen lädt der Effekt oben).
   // Sichtbar? Nur dann bewegt sich der Baum und vibriert ein Sieg (#1563) - verdeckt gibt es kein Nachholen.
+  // Der Screen bleibt im Stack gemountet (Codex-Befund #1586): verdeckt kein Live-Abo und kein 10-s-Nachladen; beim
+  // Zurückkommen lädt er einmal sofort frisch. Fokus über die Listener statt useIsFocused - gleiche Wirkung, auch ohne
+  // Navigations-Container (Tests).
   const focusedRef = useRef(true);
+  const [focused, setFocused] = useState(true);
   useEffect(() => {
     let away = false;
-    const offBlur = navigation.addListener?.("blur", () => { away = true; focusedRef.current = false; });
+    const offBlur = navigation.addListener?.("blur", () => { away = true; focusedRef.current = false; setFocused(false); });
     const offFocus = navigation.addListener?.("focus", () => {
       focusedRef.current = true;
+      setFocused(true);
       if (!away) return;
       away = false;
       void load();
@@ -147,7 +152,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
       offFocus?.();
     };
   }, [load, navigation]);
-  useLiveRefresh(load, TOURNAMENT_LIVE_RESOURCES, { fallbackMs: 10000 });
+  useLiveRefresh(load, TOURNAMENT_LIVE_RESOURCES, { enabled: focused, fallbackMs: 10000 });
 
   const registrations = bracket.registrations || [];
   const myTeamIds = useMemo(() => new Set(myTeams.map((team) => team.id).filter(Boolean)), [myTeams]);
