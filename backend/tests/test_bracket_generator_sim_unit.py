@@ -353,3 +353,34 @@ def test_correction_rebuilds_the_walkover_chain():
     assert "r4" in filled_ids(follow_up) and "r5" not in filled_ids(follow_up)
     assert_nobody_twice_ready(matches)
     play_through(matches, random.Random(5))
+
+
+def test_reset_rule_follows_origin_not_slot_number_when_rounds_are_shuffled(monkeypatch):
+    """Zufallsmischung der Folgerunden: der Sieger der Siegerrunde kann im Grand Final auf Platz 2 landen. Ob ein
+    Reset nötig ist, entscheidet seine Herkunft, nicht die Platznummer."""
+    import services.match_v2_results as results_module
+
+    monkeypatch.setattr(results_module.random, "choice", lambda candidates: candidates[-1])
+    matches = build(4, "double_elimination", tournament={"randomize_advancement_rounds": True})
+    by_key = {m["match_key"]: m for m in matches}
+    gf = by_key["GF"]
+    # Der niedrigere Seed gewinnt immer: r1 gewinnt die Siegerrunde, r2 die Verliererrunde.
+    while gf["status"] != "ready":
+        match = next(m for m in matches if m["status"] == "ready")
+        apply_result(matches, match, sorted(filled_ids(match), key=lambda reg: int(reg[1:])))
+    assert gf["status"] == "ready"
+    assert gf["slots"][1]["registration_id"] == "r1", "der Sieger der Siegerrunde sitzt gemischt auf Platz 2"
+    apply_result(matches, gf, ["r1", "r2"])
+    assert by_key["GFR"]["status"] == "cancelled", "Sieg der Siegerrunde: kein Reset, auch von Platz 2 aus"
+    raw = [{"registration_id": "r2", "rank": 1}, {"registration_id": "r1", "rank": 2}]
+    application = build_v2_result_application(gf, matches, raw, actor_id="staff", now_iso=NOW, force=True)
+    gf.update(application["match_set"])
+    for target_id, update in application["target_sets"].items():
+        next(m for m in matches if m["id"] == target_id).update(update)
+    assert by_key["GFR"]["status"] == "ready", "Sieg der Verliererrunde: Reset, auch von Platz 1 aus"
+
+
+def test_walkover_chain_runs_linear_over_long_cascades():
+    """Eine lange Freilos-Kette (2 Spieler in einem 64er-Baum) läuft in einem Durchgang durch."""
+    matches = build(2, "single_elimination", tournament={"max_participants": 64})
+    assert all(m["status"] in TERMINAL | {"ready"} for m in matches)

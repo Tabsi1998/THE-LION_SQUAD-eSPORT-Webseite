@@ -67,7 +67,10 @@ def decided_places(matches: list[dict]) -> dict[str, int]:
     by_kind: dict[str, list[dict]] = {}
     for match in decided:
         by_kind.setdefault(_section_kind(match), []).append(match)
-    has_loser_bracket = any(_section_kind(match) == "loser" for match in matches)
+    # Nur das Loser Bracket derselben Phase zählt - eines aus einer Vorrunde ändert nichts am Finale danach.
+    has_loser_bracket = any(
+        _section_kind(match) == "loser" and _safe_int(match.get("stage_number")) == last_stage for match in matches
+    )
 
     def last_of(kind: str) -> dict | None:
         rows = by_kind.get(kind) or []

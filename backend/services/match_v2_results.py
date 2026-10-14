@@ -20,10 +20,11 @@ from __future__ import annotations
 import math
 import random
 from typing import Any
-from collections import defaultdict
+from collections import defaultdict, deque
 
 from match_rules import RESULT_MAX_SCORE, RESULT_MAX_TIME_MS, match_allows_draw
 from services.match_result_errors import MatchResultError
+from services.round_labels import section_kind
 
 # Derselbe Fehler, unter dem Namen, unter dem ihn der Graph-Zweig eingeführt hat.
 # Beide Engines werfen jetzt dieselbe Klasse, damit ein Aufrufer nicht wissen
@@ -567,10 +568,10 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
     hätte. Kein Teilnehmer (nur Freilose): das Spiel entfällt und gibt alle Wege als Freilos weiter. Beides läuft
     rekursiv in die Folgespiele - beim Bau des Baums und nach jedem Ergebnis. Was sich ändert, steht danach in
     ``target_sets`` und in den Spielen selbst."""
-    queue = list(start_ids)
+    queue = deque(start_ids)
     seen: set[str] = set()
     while queue:
-        match_id = queue.pop(0)
+        match_id = queue.popleft()
         match = by_id.get(match_id)
         if not match or match_id in seen:
             continue
@@ -625,17 +626,32 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
             queue.append(target["id"])
 
 
-def _apply_bracket_reset_rule(match: dict, results: list[dict], by_id: dict[str, dict],
+def _came_from_lower_side(slot: dict | None, by_key: dict[str, dict], upper_slot: int) -> bool:
+    """Kam der Finalist aus der Verliererrunde? Die Herkunft des Platzes zählt (mit Zufallsmischung kann der Sieger
+    der Siegerrunde auf jedem Platz sitzen): ein ``L``-Weg oder ein Quellspiel im Loser Bracket. Ohne Herkunft gilt
+    die Platznummer aus dem Schema."""
+    if not slot:
+        return False
+    for origin in (slot.get("source_result") or {}, slot.get("source") or {}):
+        flow = origin.get("flow")
+        source = by_key.get(str(origin.get("from_match_key") or origin.get("match_key") or ""))
+        if flow in ("W", "L", "R"):
+            return flow == "L" or (source is not None and section_kind(source.get("section")) == "loser")
+    return int(slot.get("slot") or 0) != upper_slot
+
+
+def _apply_bracket_reset_rule(match: dict, results: list[dict], by_id: dict[str, dict], by_key: dict[str, dict],
                               target_sets: dict[str, dict], now_iso: str) -> None:
-    """Grand Final Reset (#1549): das Reset-Spiel zu diesem Spiel wird nur gespielt, wenn der Spieler aus dem
-    unteren Platz (Verliererrunde) gewinnt - sonst entfällt es, sauber abgeschlossen für Tabelle und Platzierungen."""
+    """Grand Final Reset (#1549): das Reset-Spiel zu diesem Spiel wird nur gespielt, wenn der Spieler aus der
+    Verliererrunde gewinnt - sonst entfällt es, sauber abgeschlossen für Tabelle und Platzierungen."""
     winner_slot = next((int(row.get("slot") or 0) for row in results if int(row.get("rank") or 0) == 1), None)
     for advancement in match.get("advancement") or []:
         target = by_id.get(advancement.get("to_match_id"))
         rule = ((target or {}).get("settings") or {}).get("bracket_reset") or {}
         if not target or rule.get("of_match_key") != match.get("match_key"):
             continue
-        needed = winner_slot is not None and winner_slot != int(rule.get("upper_slot") or 1)
+        needed = winner_slot is not None and _came_from_lower_side(
+            _find_slot(match, winner_slot), by_key, int(rule.get("upper_slot") or 1))
         change = {
             "status": _status_after_slot_fill(target, preserve_terminal=False) if needed else "cancelled",
             "results": [] if not needed else target.get("results") or [],
@@ -843,7 +859,7 @@ def build_v2_result_application(
 
     # Freilos-Kette und Reset-Regel erst jetzt - nach Korrektur und Kaskade steht fest, was in den Zielen gilt.
     resolve_walkovers(list(target_sets), by_id, target_sets, now_iso)
-    _apply_bracket_reset_rule(match, results, by_id, target_sets, now_iso)
+    _apply_bracket_reset_rule(match, results, by_id, by_key, target_sets, now_iso)
 
     match_set = {
         "results": results,
