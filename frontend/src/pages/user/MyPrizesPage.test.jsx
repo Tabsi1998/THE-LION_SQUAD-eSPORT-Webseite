@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Meine Gewinne: ein Turnierpreis nennt den Platz, ein Gewinn aus einer Verlosung (#641) heißt „Verlosung“ und
@@ -7,7 +7,8 @@ import { MemoryRouter } from "react-router-dom";
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, API_BASE: "" }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <main>{children}</main> }));
-vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
+const invalidation = { reload: null };
+vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: (callback) => { invalidation.reload = callback; } }));
 
 const { default: MyPrizesPage } = await import("./MyPrizesPage");
 
@@ -32,4 +33,58 @@ test("Turnierpreis mit Platz, Gewinn aus der Verlosung ohne", async () => {
   expect(raffle).toHaveTextContent("Größe nach Wahl");
   expect(within(raffle).getByRole("link", { name: "Adventkalender 2026 · Türchen 12" })).toHaveAttribute("href", "/advent");
   expect(screen.getByText(/Fast-Lap-Challenges und Verlosungen/)).toBeInTheDocument();
+});
+
+// Fehler statt leer (#984): beide Abrufe getrennt - ein Ausfall vernichtet den anderen Teil nicht und ist sichtbar.
+const CERT = { id: "c-1", title: "Urkunde Sommer-Cup", place: 1, tournament_title: "Sommer-Cup" };
+const serverError = () => Object.assign(new Error("boom"), { response: { status: 500, data: {} } });
+
+function serveParts({ prizes, certificates }) {
+  apiMock.get.mockImplementation((url) => {
+    const part = url === "/prizes/me" ? prizes : certificates;
+    return part instanceof Error ? Promise.reject(part) : Promise.resolve({ data: part });
+  });
+}
+
+test("beide Abrufe scheitern: Fehler mit „Nochmal versuchen“ statt „Noch keine Gewinne“", async () => {
+  serveParts({ prizes: serverError(), certificates: serverError() });
+  render(<MemoryRouter><MyPrizesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("public-error-state")).toHaveTextContent("Gewinne konnten nicht geladen werden");
+  expect(screen.queryByText("Noch keine Gewinne oder Urkunden.")).toBeNull();
+  serveParts({ prizes: [TOURNAMENT], certificates: [] });
+  fireEvent.click(screen.getByTestId("public-error-retry"));
+  expect(await screen.findByTestId("my-prize-p1")).toBeInTheDocument();
+});
+
+test("Urkunden scheitern, Gewinne kommen: Gewinne stehen, der Ausfall steht dabei", async () => {
+  serveParts({ prizes: [TOURNAMENT], certificates: serverError() });
+  render(<MemoryRouter><MyPrizesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("my-prize-p1")).toBeInTheDocument();
+  expect(screen.getByTestId("prizes-partial")).toHaveTextContent("Urkunden");
+});
+
+test("Gewinne scheitern, Urkunden kommen: Urkunden stehen, kein „Noch keine Gewinne“", async () => {
+  serveParts({ prizes: serverError(), certificates: [CERT] });
+  render(<MemoryRouter><MyPrizesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("my-certificate-c-1")).toBeInTheDocument();
+  expect(screen.getByTestId("prizes-partial")).toHaveTextContent("Gewinne");
+  expect(screen.queryByText("Noch keine Gewinne oder Urkunden.")).toBeNull();
+});
+
+test("erfolgreich leer: „Noch keine Gewinne oder Urkunden.“", async () => {
+  serveParts({ prizes: [], certificates: [] });
+  render(<MemoryRouter><MyPrizesPage /></MemoryRouter>);
+  expect(await screen.findByText("Noch keine Gewinne oder Urkunden.")).toBeInTheDocument();
+  expect(screen.queryByTestId("prizes-partial")).toBeNull();
+});
+
+test("Nachladen: scheitert ein Teil, bleibt sein letzter Stand stehen", async () => {
+  serveParts({ prizes: [TOURNAMENT], certificates: [CERT] });
+  render(<MemoryRouter><MyPrizesPage /></MemoryRouter>);
+  await screen.findByTestId("my-certificate-c-1");
+  serveParts({ prizes: [TOURNAMENT], certificates: serverError() });
+  await act(async () => { await invalidation.reload(); });
+  expect(screen.getByTestId("my-certificate-c-1")).toBeInTheDocument();
+  expect(screen.getByTestId("my-prize-p1")).toBeInTheDocument();
+  expect(screen.getByTestId("prizes-partial")).toHaveTextContent("Urkunden");
 });

@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { refreshCrowns } from "@/components/tls/LevelAvatarFrame";
 import { useNotificationFeed } from "@/hooks/useNotificationFeed";
+import { LoadNotice } from "@/components/tls/LoadState";
 import { isExternalUrl, notificationTarget, previewText } from "@/lib/notifications";
 import { NotificationRow } from "@/components/tls/NotificationRow";
 
@@ -201,7 +202,15 @@ export function NotificationBell() {
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain" aria-live="polite" aria-label="Benachrichtigungsliste">
-              {visible.length === 0 ? (
+              {feed.actionError ? (
+                <LoadNotice testId="notification-action-error" className="m-2" message={feed.actionError.message} onRetry={feed.actionError.retry} />
+              ) : null}
+              {/* Ein Ladefehler ist kein „Keine Benachrichtigungen.“ (#984). */}
+              {feed.status === "error" ? (
+                <LoadNotice testId="notification-load-error" className="m-2" message={feed.problem === "offline" ? "Ohne Netz. Die Benachrichtigungen laden, sobald das Netz wieder da ist." : "Die Benachrichtigungen konnten nicht geladen werden."} onRetry={feed.load} />
+              ) : feed.status === "loading" ? (
+                <div className="px-4 py-10 text-center text-sm text-white/40" role="status">Lade Benachrichtigungen …</div>
+              ) : visible.length === 0 ? (
                 <div className="px-4 py-10 text-center text-white/40">
                   <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <div className="text-sm">{tab === "unread" ? "Keine ungelesenen Benachrichtigungen." : "Keine Benachrichtigungen."}</div>
@@ -214,7 +223,7 @@ export function NotificationBell() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(index * 0.045, 0.4), duration: 0.2, ease: "easeOut" }}
                   >
-                    <NotificationRow bundle={bundle} onOpen={openBundle} onDelete={feed.deleteBundle} />
+                    <NotificationRow bundle={bundle} onOpen={openBundle} onDelete={feed.deleteBundle} pending={bundle.ids.some((id) => feed.pendingIds.has(id))} />
                   </motion.div>
                 ))
               )}

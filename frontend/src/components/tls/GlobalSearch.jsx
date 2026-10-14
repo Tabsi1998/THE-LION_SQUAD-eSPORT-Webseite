@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { CalendarDays, Clock, Newspaper, Search, Trophy, UserRound, Users, X } from "lucide-react";
+import { CalendarDays, Clock, Newspaper, RotateCcw, Search, Trophy, UserRound, Users, X } from "lucide-react";
 import { clearRecentSearches, forgetSearch, loadRecentSearches, rememberSearch } from "@/lib/recentSearches";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { asInstant, viennaDate } from "@/lib/vienna";
+import { useLoad } from "@/hooks/useLoad";
 
 const KIND_META = {
   tournament: { label: "Turnier", icon: Trophy },
@@ -34,9 +35,6 @@ export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [recent, setRecent] = useState(() => loadRecentSearches());
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const inputRef = useRef(null);
   const location = useLocation();
   const trimmed = query.trim();
@@ -63,28 +61,14 @@ export function GlobalSearch() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
-  useEffect(() => {
-    if (!open || trimmed.length < 2) {
-      setItems([]);
-      setLoading(false);
-      setError("");
-      return undefined;
-    }
-    const timer = window.setTimeout(async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const { data } = await api.get("/search", { params: { q: trimmed, limit: 5 } });
-        setItems(Array.isArray(data?.items) ? data.items : []);
-      } catch {
-        setItems([]);
-        setError("Suche ist gerade nicht erreichbar.");
-      } finally {
-        setLoading(false);
-      }
-    }, 180);
-    return () => window.clearTimeout(timer);
-  }, [open, trimmed]);
+  // Nur die Antwort auf den aktuellen Begriff zählt (#985): ein neuer Begriff, Leeren oder Schließen lässt eine laufende
+  // Suche verfallen (und bricht sie ab); Laden und Fehler gehören nur zur aktiven Suche.
+  const search = useLoad(open && trimmed.length >= 2 ? ["search", trimmed] : null, ({ signal }) => (
+    api.get("/search", { params: { q: trimmed, limit: 5 }, signal }).then(({ data }) => (Array.isArray(data?.items) ? data.items : []))
+  ), { debounceMs: 180 });
+  const items = useMemo(() => search.data || [], [search.data]);
+  const loading = search.status === "loading";
+  const error = search.status === "error" ? "Suche ist gerade nicht erreichbar." : "";
 
   const grouped = useMemo(() => {
     const map = new Map();
@@ -177,7 +161,12 @@ export function GlobalSearch() {
               ) : loading ? (
                 <div className="py-12 text-center text-xs font-display uppercase tracking-[0.3em] text-white/35">Suche läuft...</div>
               ) : error ? (
-                <div className="py-12 text-center text-sm text-[#FF3B30]">{error}</div>
+                <div className="py-12 text-center text-sm" role="alert">
+                  <p className="text-warn">{error}</p>
+                  <button type="button" onClick={search.reload} className="tls-hit mt-3 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:underline">
+                    <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Nochmal versuchen
+                  </button>
+                </div>
               ) : grouped.length ? (
                 <div className="space-y-4">
                   {grouped.map(([kind, rows]) => (

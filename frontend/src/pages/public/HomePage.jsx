@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { numberItems } from "@/lib/clubNumbers";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
@@ -25,8 +25,8 @@ import { formatAgo, formatWhen } from "@/lib/datetime";
 import { KIND_COLORS } from "@/lib/categoryColors";
 import { eventSortTime, scheduleLine } from "@/lib/eventDays";
 import { childSummary, nestUnderEvents } from "@/lib/eventGroups";
-import { PublicErrorState } from "@/components/tls/PublicEmptyState";
-import { problemKind } from "@/lib/loadProblem";
+import { LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
+import { useLoad } from "@/hooks/useLoad";
 
 const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
 
@@ -41,25 +41,19 @@ const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Vere
 // Zeiger. Mit „Bewegung reduzieren“ steht alles still und ist sofort da.
 
 export default function HomePage() {
-  const [state, setState] = useState(null);
   const [board, setBoard] = useState([]);
   const [heroRef, glowRef] = useHeroGlow();
   useDocumentTitle("Startseite", HOME_DESCRIPTION);
 
-  // Ein Fehler bei /home/state beendet das Laden (#983, #1152): ohne Stand Fehler mit „Nochmal versuchen“ statt ewiger
-  // Platzhalter; ein Fehler beim Nachladen lässt den letzten Stand stehen.
-  const [problem, setProblem] = useState(null);
-  const load = useCallback(() => {
-    api.get("/home/state").then(({ data }) => {
-      setState(data);
-      setProblem(null);
-    }).catch((error) => setProblem(problemKind(error)));
-  }, []);
+  // Ein Fehler bei /home/state beendet das Laden (#983, #1152; über useLoad): ohne Stand Fehler mit „Nochmal versuchen“
+  // statt ewiger Platzhalter; ein Fehler beim Nachladen lässt den letzten Stand stehen und sagt es.
+  const home = useLoad("home/state", ({ signal }) => api.get("/home/state", { signal }).then(({ data }) => data), { isEmpty: () => false });
+  const state = home.data;
+  const load = home.reload;
 
   useEffect(() => {
-    load();
     api.get("/board?active_only=true").then(({ data }) => setBoard(boardContacts(data, 4))).catch(() => setBoard([]));
-  }, [load]);
+  }, []);
 
   useApiInvalidation(load, ["home", "tournaments", "events", "news", "f1", "sponsors", "settings"]);
   useHomeStructuredData(state);
@@ -121,12 +115,17 @@ export default function HomePage() {
       {/* Sponsoren groß (#968). Die Partner stehen als kleineres Band im Footer direkt unter den Sponsoren. */}
       <SponsorTicker placement="home" spotlight />
 
-      {!state && problem && (
+      {home.status === "error" && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <PublicErrorState kind={problem === "offline" ? "offline" : "error"} title={problem === "offline" ? "Ohne Netz" : "Die Startseite konnte nicht laden"} onRetry={load} />
+          <LoadState load={home} errorTitle="Die Startseite konnte nicht geladen werden" />
         </div>
       )}
-      {!state && !problem && (
+      {home.stale && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <LoadStaleNotice load={home} />
+        </div>
+      )}
+      {home.status === "loading" && (
         <section className="border-b border-white/10 bg-[#080808]/35">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12 space-y-8">
             <SkeletonDetailHeader label="Lade Startseite" />

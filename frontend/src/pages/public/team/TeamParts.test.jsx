@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Team-Seite (#1191): Abschnitte „Angemeldet für“ und „Letzte Spiele“, Beitreten über den Einladungs-Link,
@@ -13,7 +13,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { TeamSchedule } = await import("./TeamSchedule");
 const { TeamJoinCard } = await import("./TeamJoinCard");
-const { TeamInviteSheet } = await import("./TeamInviteSheet");
+const { TeamInviteSheet, InviteMemberPanel } = await import("./TeamInviteSheet");
 
 const OVERVIEW = {
   upcoming: [{ registration_id: "r-1", status: "approved", status_label: "Angemeldet", tournament: { id: "t1", slug: "rl-herbst", title: "Rocket League Herbst-Cup", start_date: "2026-10-17T14:00:00Z", event_name: "Herbst-LAN" } }],
@@ -138,4 +138,49 @@ test("Kopf mit Logo und ohne Server-Antwort: Bild statt Platzhalter, Farbe des T
   expect(screen.queryByTestId("team-header-crown")).toBeNull();
   expect(screen.queryByTestId("team-game-plaque")).toBeNull();
   expect(screen.queryAllByTestId("team-face-you")).toHaveLength(0);
+});
+
+// Persönlich einladen (#985): nur die Antwort auf den aktuellen Begriff zählt; ein Fehler ist kein „Keine passenden“.
+function deferred() {
+  let resolve;
+  const promise = new Promise((res) => { resolve = res; });
+  return { promise, resolve };
+}
+
+test("Einladen-Suche: eine verspätete Antwort für den alten Begriff ändert die Treffer nicht", async () => {
+  const slow = deferred();
+  apiMock.get.mockImplementation((url) => {
+    if (url.endsWith("q=pix")) return Promise.resolve({ data: [{ id: "u-2", username: "pixelpanther" }] });
+    if (url.endsWith("q=pi")) return slow.promise;
+    return Promise.resolve({ data: [] });
+  });
+  render(<InviteMemberPanel team={{ id: "t-1" }} />);
+  const input = screen.getByPlaceholderText("Username suchen");
+  fireEvent.change(input, { target: { value: "pi" } });
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith(expect.stringMatching(/q=pi$/), expect.anything()));
+  fireEvent.change(input, { target: { value: "pix" } });
+  expect(await screen.findByText("@pixelpanther")).toBeInTheDocument();
+  await act(async () => slow.resolve({ data: [{ id: "u-9", username: "pilzkopf" }] }));
+  expect(screen.queryByText("@pilzkopf")).toBeNull();
+  expect(screen.getByText("@pixelpanther")).toBeInTheDocument();
+});
+
+test("Einladen-Suche: Leeren nach einer laufenden Suche zeigt danach keine Treffer", async () => {
+  const slow = deferred();
+  apiMock.get.mockImplementation(() => slow.promise);
+  render(<InviteMemberPanel team={{ id: "t-1" }} />);
+  const input = screen.getByPlaceholderText("Username suchen");
+  fireEvent.change(input, { target: { value: "pix" } });
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalled());
+  fireEvent.change(input, { target: { value: "" } });
+  await act(async () => slow.resolve({ data: [{ id: "u-2", username: "pixelpanther" }] }));
+  expect(screen.queryByText("@pixelpanther")).toBeNull();
+});
+
+test("Einladen-Suche: ein Fehler sagt das, statt „Keine passenden Benutzer“", async () => {
+  apiMock.get.mockRejectedValue(Object.assign(new Error("boom"), { response: { status: 500, data: {} } }));
+  render(<InviteMemberPanel team={{ id: "t-1" }} />);
+  fireEvent.change(screen.getByPlaceholderText("Username suchen"), { target: { value: "pix" } });
+  expect(await screen.findByTestId("team-invite-search-error")).toHaveTextContent("Suche hat nicht geklappt");
+  expect(screen.queryByText("Keine passenden Benutzer gefunden.")).toBeNull();
 });

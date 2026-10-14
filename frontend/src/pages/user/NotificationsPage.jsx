@@ -4,6 +4,8 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { NotificationRow } from "@/components/tls/NotificationRow";
 import { useNotificationFeed } from "@/hooks/useNotificationFeed";
+import { LoadNotice, LoadState } from "@/components/tls/LoadState";
+import { SkeletonList } from "@/components/tls/Skeleton";
 
 const TABS = [
   ["unread", "Ungelesen"],
@@ -61,19 +63,41 @@ export default function NotificationsPage() {
           ))}
         </div>
 
-        <div className="mt-4 border border-white/10 rounded-sm bg-[#0F0F10] overflow-hidden">
-          {visible.length === 0 ? (
-            <div className="px-4 py-14 text-center text-white/40">
-              <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <div className="text-sm">{tab === "unread" ? "Keine ungelesenen Benachrichtigungen." : "Keine Benachrichtigungen."}</div>
-            </div>
-          ) : (
-            visible.map((bundle) => (
-              <NotificationRow key={bundle.id} bundle={bundle} onOpen={feed.markRead} onDelete={feed.deleteBundle} testIdPrefix="notifications-row" />
-            ))
-          )}
+        {feed.actionError && (
+          <LoadNotice testId="notifications-action-error" className="mt-4" message={feed.actionError.message} onRetry={feed.actionError.retry} />
+        )}
+
+        {/* Ein Ladefehler ist kein „Keine Benachrichtigungen.“ (#984). */}
+        <div className="mt-4">
+          <LoadState
+            load={feed.feed}
+            loading={<SkeletonList rows={4} label="Lade Benachrichtigungen" />}
+            errorTitle="Benachrichtigungen konnten nicht geladen werden"
+            empty={<NoNotifications tab={tab} />}
+          >
+            {() => (
+              <div className="border border-white/10 rounded-sm bg-[#0F0F10] overflow-hidden">
+                {visible.length === 0 ? (
+                  <NoNotifications tab={tab} />
+                ) : (
+                  visible.map((bundle) => (
+                    <NotificationRow key={bundle.id} bundle={bundle} onOpen={feed.markRead} onDelete={feed.deleteBundle} pending={bundle.ids.some((id) => feed.pendingIds.has(id))} testIdPrefix="notifications-row" />
+                  ))
+                )}
+              </div>
+            )}
+          </LoadState>
         </div>
       </div>
     </PublicLayout>
+  );
+}
+
+function NoNotifications({ tab }) {
+  return (
+    <div className="px-4 py-14 text-center text-white/40">
+      <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" />
+      <div className="text-sm">{tab === "unread" ? "Keine ungelesenen Benachrichtigungen." : "Keine Benachrichtigungen."}</div>
+    </div>
   );
 }

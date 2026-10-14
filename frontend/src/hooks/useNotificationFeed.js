@@ -2,72 +2,182 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { bundleNotifications } from "@/lib/notifications";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useLoad } from "@/hooks/useLoad";
 
 const RESOURCES = ["admin/notifications", "notifications", "messages", "teams", "tournaments", "matches", "prizes"];
+const NO_ITEMS = [];
 
-// Die Benachrichtigungen des angemeldeten Nutzers, gebündelt (#255). Glocke
-// und Benachrichtigungsseite teilen Laden, Live-Aktualisierung und die
-// Aktionen; „geöffnet“ markiert alle Teile eines Bündels als gelesen.
+function notReadMessage(count, total) {
+  if (count === total && count === 1) return "Die Benachrichtigung konnte nicht als gelesen markiert werden.";
+  if (count === total) return "Die Benachrichtigungen konnten nicht als gelesen markiert werden.";
+  return `${count} ${count === 1 ? "Benachrichtigung konnte" : "Benachrichtigungen konnten"} nicht als gelesen markiert werden.`;
+}
+
+// Die Benachrichtigungen des angemeldeten Nutzers, gebündelt (#255). Glocke und Benachrichtigungsseite teilen Laden,
+// Live-Aktualisierung und die Aktionen; „geöffnet“ markiert alle Teile eines Bündels als gelesen.
+// Laden über useLoad (#984): ein Ladefehler ist kein „Keine Benachrichtigungen“, ein gescheitertes Nachladen lässt den
+// letzten Stand stehen. Gelesen markieren (#987): sofort sichtbar, ausstehende Einträge stehen in `pendingIds` (ein
+// zweiter Klick schickt nichts doppelt); was der Server ablehnt, wird wieder ungelesen und steht in `actionError` mit
+// `retry` - was geklappt hat, bleibt gelesen.
 export function useNotificationFeed({ enabled = true, onFresh } = {}) {
-  const [items, setItems] = useState([]);
   const knownIdsRef = useRef(new Set());
   const didPrimeRef = useRef(false);
   const onFreshRef = useRef(onFresh);
+  const pendingRef = useRef(new Set());
+  const retryRef = useRef({ ids: () => {}, all: () => {} });
+  const [pendingIds, setPendingIds] = useState(() => new Set());
+  // Bestätigt gelesen (nach Codex-Prüfung, #1546): ID → Nummer des letzten Abrufs, der vor dem Erfolg gestartet war.
+  // Eine Antwort aus so einem Abruf kennt das „gelesen“ noch nicht und darf es nicht zurücknehmen.
+  const fetchSeqRef = useRef(0);
+  const [confirmed, setConfirmed] = useState(() => new Map());
+  const [actionError, setActionError] = useState(null);
   useEffect(() => {
     onFreshRef.current = onFresh;
   }, [onFresh]);
 
-  const load = useCallback(async () => {
-    if (!enabled) {
-      setItems([]);
-      knownIdsRef.current = new Set();
-      didPrimeRef.current = false;
-      return;
-    }
-    try {
-      const { data } = await api.get("/admin/notifications");
-      const rows = Array.isArray(data) ? data : [];
-      setItems(rows);
-      if (didPrimeRef.current && onFreshRef.current) {
-        const fresh = rows.filter((item) => !item.read && item.id && !knownIdsRef.current.has(item.id));
-        if (fresh.length) onFreshRef.current(fresh, rows);
-      }
-      knownIdsRef.current = new Set(rows.map((item) => item.id).filter(Boolean));
-      didPrimeRef.current = true;
-    } catch {
-      setItems([]);
-    }
+  useEffect(() => {
+    if (enabled) return;
+    knownIdsRef.current = new Set();
+    didPrimeRef.current = false;
+    setActionError(null);
+    setConfirmed(new Map());
   }, [enabled]);
 
-  useEffect(() => { load(); }, [load]);
+  const fetchFeed = useCallback(async ({ signal }) => {
+    fetchSeqRef.current += 1;
+    const seq = fetchSeqRef.current;
+    const { data } = await api.get("/admin/notifications", { signal });
+    const rows = Array.isArray(data) ? [...data] : [];
+    // Die Nummer des Abrufs reist mit der Liste (nicht aufzählbar); geänderte Listen (mutate) haben keine.
+    Object.defineProperty(rows, "seq", { value: seq });
+    if (didPrimeRef.current && onFreshRef.current) {
+      const fresh = rows.filter((item) => !item.read && item.id && !knownIdsRef.current.has(item.id));
+      if (fresh.length) onFreshRef.current(fresh, rows);
+    }
+    knownIdsRef.current = new Set(rows.map((item) => item.id).filter(Boolean));
+    didPrimeRef.current = true;
+    return rows;
+  }, []);
+
+  const feed = useLoad(enabled ? "notifications" : null, fetchFeed);
+  const { reload: load, mutate } = feed;
   useLiveRefresh(load, RESOURCES, { fallbackMs: 30000, enabled });
 
+  // Ausstehende „gelesen“ liegen über dem Stand vom Server: ein Nachladen, während der POST unterwegs ist, bringt sie
+  // nicht wieder als ungelesen zurück.
+  const raw = feed.data || NO_ITEMS;
+  const items = useMemo(() => {
+    if (!pendingIds.size && !confirmed.size) return raw;
+    const overlay = (id) => pendingIds.has(id) || (confirmed.has(id) && !(raw.seq > confirmed.get(id)));
+    return raw.map((row) => (!row.read && overlay(row.id) ? { ...row, read: true } : row));
+  }, [raw, pendingIds, confirmed]);
+  // Kommt ein Stand aus einem Abruf, der nach dem Erfolg gestartet ist, gilt wieder ganz der Server.
+  useEffect(() => {
+    if (!raw.seq || !confirmed.size) return;
+    if (![...confirmed.values()].some((seq) => raw.seq > seq)) return;
+    setConfirmed((current) => new Map([...current].filter(([, seq]) => !(raw.seq > seq))));
+  }, [raw, confirmed]);
   const bundles = useMemo(() => bundleNotifications(items), [items]);
   const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
 
+  const setRead = useCallback((ids, read) => {
+    if (!ids.length) return;
+    mutate((rows) => rows.map((row) => (ids.includes(row.id) ? { ...row, read } : row)));
+  }, [mutate]);
+
+  const confirm = useCallback((ids) => {
+    if (!ids.length) return;
+    const seq = fetchSeqRef.current;
+    setConfirmed((current) => {
+      const next = new Map(current);
+      ids.forEach((id) => next.set(id, seq));
+      return next;
+    });
+  }, []);
+
+  const setPending = useCallback((ids, on) => {
+    ids.forEach((id) => (on ? pendingRef.current.add(id) : pendingRef.current.delete(id)));
+    setPendingIds(new Set(pendingRef.current));
+  }, []);
+
+  const markIds = useCallback(async (ids) => {
+    const todo = ids.filter((id) => !pendingRef.current.has(id));
+    if (!todo.length) return;
+    setActionError(null);
+    setPending(todo, true);
+    setRead(todo, true);
+    const results = await Promise.allSettled(todo.map((id) => api.post(`/admin/notifications/${id}/read`)));
+    const failed = todo.filter((_, index) => results[index].status === "rejected");
+    // Erst den Stand setzen, dann das Overlay abnehmen - sonst blitzt ein zwischendurch geladener alter Stand auf.
+    const done = todo.filter((id) => !failed.includes(id));
+    setRead(done, true);
+    confirm(done);
+    setPending(todo, false);
+    if (failed.length) {
+      setRead(failed, false);
+      setActionError({ message: notReadMessage(failed.length, todo.length), retry: () => retryRef.current.ids(failed) });
+    }
+  }, [confirm, setPending, setRead]);
+
   const markRead = useCallback(async (bundle) => {
     const ids = (bundle?.ids || []).filter((id) => items.some((item) => item.id === id && !item.read));
-    if (!ids.length) return;
-    setItems((rows) => rows.map((row) => (ids.includes(row.id) ? { ...row, read: true } : row)));
-    await Promise.allSettled(ids.map((id) => api.post(`/admin/notifications/${id}/read`)));
-  }, [items]);
+    await markIds(ids);
+  }, [items, markIds]);
 
   const markAllRead = useCallback(async () => {
-    setItems((rows) => rows.map((row) => ({ ...row, read: true })));
-    try { await api.post("/admin/notifications/read-all"); } catch {}
-  }, []);
+    const ids = items.filter((item) => !item.read && !pendingRef.current.has(item.id)).map((item) => item.id);
+    if (!ids.length) return;
+    setActionError(null);
+    setPending(ids, true);
+    setRead(ids, true);
+    try {
+      await api.post("/admin/notifications/read-all");
+      setRead(ids, true);
+      confirm(ids);
+      setPending(ids, false);
+    } catch {
+      setPending(ids, false);
+      setRead(ids, false);
+      setActionError({ message: notReadMessage(ids.length, ids.length), retry: () => retryRef.current.all() });
+      // Was der Server vielleicht doch geschafft hat, zeigt der nächste Stand.
+      load();
+    }
+  }, [confirm, items, load, setPending, setRead]);
+
+  useEffect(() => {
+    retryRef.current = { ids: markIds, all: markAllRead };
+  }, [markIds, markAllRead]);
 
   const deleteBundle = useCallback(async (bundle) => {
     const ids = bundle?.ids || [];
-    setItems((rows) => rows.filter((row) => !ids.includes(row.id)));
+    mutate((rows) => rows.filter((row) => !ids.includes(row.id)));
     const results = await Promise.allSettled(ids.map((id) => api.delete(`/admin/notifications/${id}`)));
     if (results.some((result) => result.status === "rejected")) load();
-  }, [load]);
+  }, [load, mutate]);
 
   const deleteRead = useCallback(async () => {
-    setItems((rows) => rows.filter((row) => !row.read));
+    mutate((rows) => rows.filter((row) => !row.read));
     try { await api.delete("/admin/notifications/read"); } catch { load(); }
-  }, [load]);
+  }, [load, mutate]);
 
-  return { items, bundles, unread, read: items.length - unread, load, markRead, markAllRead, deleteBundle, deleteRead };
+  const clearActionError = useCallback(() => setActionError(null), []);
+
+  return {
+    items,
+    bundles,
+    unread,
+    read: items.length - unread,
+    status: feed.status,
+    problem: feed.problem,
+    stale: feed.stale,
+    feed,
+    load,
+    markRead,
+    markAllRead,
+    deleteBundle,
+    deleteRead,
+    pendingIds,
+    actionError,
+    clearActionError,
+  };
 }
