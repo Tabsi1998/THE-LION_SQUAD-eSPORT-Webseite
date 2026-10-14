@@ -227,7 +227,8 @@ Wörtern:
 Am Handy kommt das Fenster von unten, am PC steht es in der Mitte. Je nach Spiel gibt es:
 
 - **Stand** mit großen Plus- und Minus-Knöpfen,
-- **Best of**: je Spiel den Sieger antippen,
+- **Best of**: je Spiel den Sieger antippen (nur, wo der höhere Stand gewinnt; wo der niedrigste gewinnt, gibt es den
+  Stand),
 - **Sieger** antippen (Spiele auf Zeit),
 - bei Mehrspieler-Spielen **Reihenfolge antippen** (wer zuerst im Ziel war, zuerst; ein zweiter Tipp nimmt zurück)
   oder **Punkte eintragen**; die Wahl merkt sich der Browser,
@@ -239,7 +240,17 @@ bekommen Bescheid.
 
 **Korrigieren:** Am Spiel steht dann **Ergebnis korrigieren**. Pflicht ist ein **Grund der Korrektur** (mindestens fünf
 Zeichen), er steht im Protokoll. In der Ansicht der Turnierleitung steht unter **Zuletzt eingetragen** der Knopf
-**Korrigieren**.
+**Korrigieren**. Das gilt auch für ein Spiel in Klärung, das schon ein Ergebnis hat.
+
+**Was der Server annimmt** (gleich für Ergebnis-Fenster, Meldung der Spieler und Wertung):
+
+- Stand, Punkte und Zeit sind Zahlen ab 0 (Stand höchstens 1 000 000 000, Zeit höchstens 24 Stunden).
+- Im K.-o. gibt es keinen Gleichstand – eine Seite muss gewinnen. In Gruppe, Liga und Swiss teilt Gleichstand den Platz.
+- Best of 3 heißt: der Sieger hat genau 2 gewonnene Spiele, die Gegenseite weniger.
+- Kommt ein anderer weiter, als zuerst eingetragen, setzt die Korrektur das Folgespiel zurück – auch wenn es schon
+  gespielt ist. Das Protokoll hält fest, welches Spiel zurückgesetzt wurde und welches Ergebnis es hatte. Läuft im
+  Folgespiel gerade das **Rückgängig**, wartet die Korrektur kurz.
+- Ergebnis, Wertung und Klärung setzt nur das Ergebnis-Fenster bzw. die Entscheidung – nicht die Matchplanung.
 
 **Wer darf eintragen?** Die Turnierleitung, und Helfer mit Ergebnis-Recht in ihrem Einsatz (Organisation,
 Schiedsrichter, Ergebnisdienst; die Stationsleitung an ihrer Station). Die Ansicht am Handy zeigt nur Spiele, für die

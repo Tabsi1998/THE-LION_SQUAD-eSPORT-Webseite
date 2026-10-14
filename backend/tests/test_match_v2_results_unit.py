@@ -463,13 +463,19 @@ def test_equal_scores_become_a_shared_place_where_that_is_allowed():
     assert places(results) == {"a": 1, "b": 1}
 
 
-def test_equal_scores_are_still_separated_in_a_knockout():
+def test_equal_scores_in_a_knockout_need_a_place_that_decides():
+    """#1035: nicht mehr die Reihenfolge der Liste - ohne angegebenen Platz ist es ein Eingabefehler."""
+    with pytest.raises(MatchV2ResultError, match="Gleichstand"):
+        normalize_v2_results(duel("WB"), [
+            {"registration_id": "a", "score": 2},
+            {"registration_id": "b", "score": 2},
+        ])
     results = normalize_v2_results(duel("WB"), [
-        {"registration_id": "a", "score": 2},
-        {"registration_id": "b", "score": 2},
+        {"registration_id": "a", "score": 2, "rank": 2},
+        {"registration_id": "b", "score": 2, "rank": 1},
     ])
 
-    assert sorted(places(results).values()) == [1, 2]
+    assert places(results) == {"a": 2, "b": 1}
 
 
 def test_a_clear_win_stays_a_clear_win():

@@ -18,12 +18,14 @@ import {
 // frontend/src/lib/resultEntry.cases.json. Ändert jemand die Rechnung auf einer Seite, wird der Test der anderen rot.
 type Case = { name: string; input: Record<string, any>; results?: unknown; error?: string; games?: unknown };
 type SentenceCase = { name: string; entry: ResultEntry; results: ResultRow[]; sentence: string };
-const CASES: Record<string, Case[]> & { sentence: SentenceCase[] } = JSON.parse(
+type KindCase = { name: string; entry: ResultEntry; heatMode?: "order" | "points"; kind: string };
+const CASES: Record<string, Case[]> & { sentence: SentenceCase[]; kind: KindCase[] } = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../../../frontend/src/lib/resultEntry.cases.json"), "utf8"),
 );
 
 const want = ({ results, error }: Case) => (error ? { error } : { results });
 
+test.each(CASES.kind)("Eingabe: $name", ({ entry, heatMode, kind }) => expect(inputKind(entry, heatMode)).toBe(kind));
 test.each(CASES.score)("1 gegen 1: $name", (item) => expect(scoreResults(item.input)).toEqual(want(item)));
 test.each(CASES.bestof)("Best-of: $name", (item) => expect(bestOfResults(item.input)).toEqual(want(item)));
 test.each(CASES.winner)("Zeitduell: $name", (item) => expect(winnerResults(item.input)).toEqual(want(item)));

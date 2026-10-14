@@ -4,6 +4,7 @@ from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime, timezone
 import uuid
 
+from match_rules import RESULT_MAX_SCORE, RESULT_MAX_TIME_MS
 # Der Passwortvertrag (#1033) steht in services/password_policy.py; MIN_PASSWORD_LENGTH bleibt hier abrufbar.
 from services.password_policy import MIN_PASSWORD_LENGTH, NewPassword  # noqa: F401
 
@@ -799,34 +800,40 @@ MatchStatus = Literal[
 ]
 
 
+# Ergebnis-Vertrag (#1035): Werte sind endliche Zahlen ab 0 bis zur Obergrenze (match_rules). Was danach gilt - alle
+# Teilnehmer genau einmal, Plätze passend zum Stand, kein Gleichstand im K.-o., Best-of -, prüft
+# services/match_v2_results für jeden Weg gleich.
+RESULT_MAX_ENTRIES = 256
+
+
 class MatchScoreReport(BaseModel):
     # Klassische Duelle melden zwei Punktstände. Graph-Matches können mehr als
     # zwei Teilnehmer haben und melden deshalb eine Platzierungsliste; welches
     # Feld gilt, entscheidet die Engine des Matches.
     score_a: int = Field(default=0, ge=0)
     score_b: int = Field(default=0, ge=0)
-    results: Optional[List["MatchV2ResultEntry"]] = None
-    screenshot_url: Optional[str] = None
-    note: Optional[str] = None
+    results: Optional[List["MatchV2ResultEntry"]] = Field(default=None, max_length=RESULT_MAX_ENTRIES)
+    screenshot_url: Optional[str] = Field(default=None, max_length=2048)
+    note: Optional[str] = Field(default=None, max_length=1000)
     # Foto vom Ergebnis (#1157): vorher über /matches/{id}/proof-photos hochgeladen.
     photo_id: Optional[str] = None
 
 
 class MatchV2ResultEntry(BaseModel):
-    registration_id: str
-    rank: Optional[int] = Field(default=None, ge=1)
-    score: Optional[float] = None
-    points: Optional[float] = None
-    time_ms: Optional[int] = Field(default=None, ge=0)
+    registration_id: str = Field(max_length=100)
+    rank: Optional[int] = Field(default=None, ge=1, le=RESULT_MAX_ENTRIES)
+    score: Optional[float] = Field(default=None, ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
+    points: Optional[float] = Field(default=None, ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
+    time_ms: Optional[int] = Field(default=None, ge=0, le=RESULT_MAX_TIME_MS)
     dnf: bool = False
     forfeit: bool = False
-    note: Optional[str] = None
+    note: Optional[str] = Field(default=None, max_length=500)
 
 
 class MatchV2ResultSubmit(BaseModel):
-    results: List[MatchV2ResultEntry] = Field(min_length=1)
-    proof_url: Optional[str] = None
-    note: Optional[str] = None
+    results: List[MatchV2ResultEntry] = Field(min_length=1, max_length=RESULT_MAX_ENTRIES)
+    proof_url: Optional[str] = Field(default=None, max_length=2048)
+    note: Optional[str] = Field(default=None, max_length=1000)
     # Ergebnis-Fenster (#1156, #1370): 10 Sekunden „Rückgängig“, erst danach geht es raus; Korrektur nur mit Grund.
     hold: bool = False
     reason: Optional[str] = Field(default=None, max_length=500)

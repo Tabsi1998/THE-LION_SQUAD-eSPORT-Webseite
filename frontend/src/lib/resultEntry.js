@@ -15,7 +15,8 @@ export const HEAT_MODE_KEY = "tls_result_heat_mode";
 export function inputKind(entry, heatMode = "order") {
   if (!entry || entry.kind !== "duel") return heatMode === "points" && entry?.ranking_mode !== "time" ? "points" : "order";
   if (entry.ranking_mode === "time") return "winner";
-  return Number(entry.best_of || 1) > 1 ? "bestof" : "score";
+  // Best-of zählt gewonnene Spiele - nur wo der höhere Stand gewinnt; so prüft es auch der Server (#1035).
+  return Number(entry.best_of || 1) > 1 && entry.ranking_mode !== "lower_score" ? "bestof" : "score";
 }
 
 export function winsNeeded(bestOf) {

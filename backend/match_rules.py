@@ -1,6 +1,11 @@
 """Shared match helpers for current duel-style match records."""
 from fastapi import HTTPException
 
+# Ergebnis-Vertrag (#1035): Obergrenzen für Werte eines Ergebnisses. Sie gelten im Modell der Anfrage (models.py) und
+# in der Prüfung jedes Ergebnisses (services/match_v2_results) - auch für Meldungen der Spieler.
+RESULT_MAX_SCORE = 1_000_000_000
+RESULT_MAX_TIME_MS = 24 * 60 * 60 * 1000
+
 
 def participant_ids(match: dict) -> list[str]:
     return [pid for pid in [match.get("participant_a_id"), match.get("participant_b_id")] if pid]

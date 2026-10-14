@@ -27,12 +27,14 @@ from datetime import datetime, timedelta
 from models import new_id, now_utc
 from services.match_forfeit import apply_forfeit
 from services.match_v2_results import (
+    DECIDED_STATUSES,
     LOCKED_DOWNSTREAM_STATUSES,
     MatchV2ResultError,
     _clear_slot,
     _status_after_slot_fill,
     build_v2_result_application,
-    normalize_v2_results,
+    checked_results,
+    ensure_correction_allowed,
 )
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from services.v2_result_submission import submit_v2_result
@@ -42,10 +44,7 @@ logger = logging.getLogger("tls.result_hold")
 HOLD_SECONDS = 10
 # Das „Rückgängig“ der Oberfläche zählt 10 Sekunden ab der Antwort; der Server wartet etwas länger.
 GRACE_SECONDS = 2
-REASON_MIN_LENGTH = 5
 NO_SHOW_NOTE = "Nicht erschienen"
-DECIDED_STATUSES = {"completed", "forfeit"}
-REASON_DETAIL = f"Bitte einen Grund für die Korrektur angeben (mindestens {REASON_MIN_LENGTH} Zeichen)."
 BUSY_DETAIL = "Für dieses Spiel wird gerade ein Ergebnis gespeichert. Bitte kurz warten oder „Rückgängig“ nutzen."
 # Felder einer Ergebniszeile, die das gehaltene Ergebnis aufhebt - dieselben, die der Ergebnis-Weg liest.
 RESULT_FIELDS = ("registration_id", "rank", "score", "points", "time_ms", "dnf", "forfeit", "note")
@@ -62,11 +61,6 @@ def ensure_no_hold(match: dict) -> None:
     """Liegt gerade ein Ergebnis für „Rückgängig“ bereit, nimmt das Spiel nichts anderes an (Meldung, Wertung, Ergebnis)."""
     if isinstance(match.get("pending_result"), dict):
         raise MatchV2ResultError(BUSY_DETAIL, 409)
-
-
-def has_result(match: dict) -> bool:
-    """Hat das Spiel schon ein Ergebnis - fertig oder in Klärung mit Ergebnis?"""
-    return str(match.get("status") or "") in DECIDED_STATUSES or bool(match.get("results"))
 
 
 def hold_view(match: dict | None, viewer_id: str | None = None) -> dict | None:
@@ -102,7 +96,7 @@ async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, 
                       proof_url: str | None, force: bool, reason: str | None) -> dict:
     """Ein Ergebnis für 10 Sekunden bereitlegen. Prüft alles wie beim Speichern - Fehler kommen sofort zurück."""
     actor_id = actor["id"]
-    normalized = normalize_v2_results(match, raw_results)
+    normalized = await checked_results(db, match, raw_results)
     existing = match.get("pending_result")
     if isinstance(existing, dict):
         same = existing.get("actor_id") == actor_id and _clean_rows(existing.get("results") or []) == _clean_rows(normalized)
@@ -110,17 +104,15 @@ async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, 
             return {"ok": True, "held": True, "hold": hold_view(match, actor_id), "idempotent_replay": True}
         raise MatchV2ResultError(BUSY_DETAIL, 409)
     reason_text = (reason or "").strip()
-    if has_result(match) and not force:
-        raise MatchV2ResultError("Dieses Spiel hat schon ein Ergebnis. Zum Korrigieren bitte einen Grund angeben.", 409)
-    if force and len(reason_text) < REASON_MIN_LENGTH:
-        raise MatchV2ResultError(REASON_DETAIL, 422)
+    # Dieselbe Regel wie beim direkten Speichern (services/match_v2_results): Korrektur nur mit Grund.
+    ensure_correction_allowed(match, force=force, reason=reason_text)
     forfeiting = _no_show(match, normalized)
     note_text = (note or "").strip() or (NO_SHOW_NOTE if forfeiting else "")
     # Probelauf: würde das Ergebnis so durchgehen (belegte Folgespiele, abgesagtes Spiel …)? Dann jetzt sagen, nicht in
     # 10 Sekunden.
     stage_matches = await db.matches_v2.find({"stage_id": match.get("stage_id")}, {"_id": 0}).to_list(3000)
-    build_v2_result_application(match, stage_matches, normalized, actor_id=actor_id, now_iso=now_utc().isoformat(),
-                                proof_url=proof_url, note=note_text, force=force)
+    trial = build_v2_result_application(match, stage_matches, normalized, actor_id=actor_id,
+                                        now_iso=now_utc().isoformat(), proof_url=proof_url, note=note_text, force=force)
     now = now_utc()
     hold = {
         "id": new_id(),
@@ -148,7 +140,10 @@ async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, 
     })
     schedule_publication(match["id"], HOLD_SECONDS + GRACE_SECONDS)
     held_match = {**match, "pending_result": hold}
-    return {"ok": True, "held": True, "hold": hold_view(held_match, actor_id), "idempotent_replay": False}
+    # Folgespiele, die diese Korrektur zurücksetzen würde (#1035) - die Oberfläche kann es vor Ablauf nennen.
+    reset_ids = [row["id"] for row in trial.get("reset_matches") or []]
+    return {"ok": True, "held": True, "hold": hold_view(held_match, actor_id), "reset_match_ids": reset_ids,
+            "idempotent_replay": False}
 
 
 async def _audit(db, action: str, match: dict, actor_id: str | None, data: dict) -> None:
@@ -328,6 +323,8 @@ async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | No
             target["slots"] = slots
             await db.matches_v2.update_one({"id": target["id"]}, {"$set": {
                 "slots": slots, "status": _status_after_slot_fill(target, preserve_terminal=False), "updated_at": now_iso,
+                # Meldungen gehörten zur alten Paarung (#1035).
+                **({"reports": []} if target.get("reports") else {}),
             }})
             cleared.append(target["id"])
     await db.matches_v2.update_one({"id": match["id"]}, {

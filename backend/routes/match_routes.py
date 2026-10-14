@@ -33,8 +33,12 @@ from models import (
 from services.competition_read import canonical_match_for_source, find_match_source
 from services.match_overview import operational_match_overviews, own_match_overviews
 from services.match_public_view import public_match_view, public_tournament_view
-from services.match_planning import ensure_station_slot_available, ensure_tournament_accepts_results
-from services.match_v2_results import MatchV2ResultError, normalize_v2_results
+from services.match_planning import (
+    ensure_plan_keeps_result_state,
+    ensure_station_slot_available,
+    ensure_tournament_accepts_results,
+)
+from services.match_v2_results import MatchV2ResultError, checked_results
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from services.rate_limit import enforce_rate_limit
 from services import word_filter
@@ -1011,6 +1015,7 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
             updates["schedule_source"] = "manual" if updates["scheduled_at"] else None
         if updates.get("scheduled_at") and v2_match.get("status") in {"pending", "ready", "preview"} and "status" not in updates:
             updates["status"] = "scheduled"
+        ensure_plan_keeps_result_state(v2_match, updates)
         await ensure_station_slot_available(db, v2_match, updates, "matches_v2")
         if updates and all(v2_match.get(key) == value for key, value in updates.items()):
             return {**v2_match, "idempotent_replay": True}
@@ -1062,7 +1067,7 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict) -> dict:
     # Jede Meldung wird geprüft wie ein Ergebnis der Turnierleitung: alle Teilnehmer genau einmal, Plätze passend
     # zum Spielstand. So vergleicht der Server zwei Meldungen inhaltlich - nicht nur ihre Schreibweise.
     try:
-        results = public_report_results(normalize_v2_results(match, [entry.model_dump(exclude_none=True) for entry in body.results]))
+        results = public_report_results(await checked_results(db, match, [entry.model_dump(exclude_none=True) for entry in body.results]))
     except MatchV2ResultError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     if is_duplicate_report(match, me["id"], results):
@@ -1250,7 +1255,10 @@ async def _forfeit_v2(db, match: dict, body: dict, me: dict, force: bool) -> dic
     except MatchV2ResultError as exc:
         raise HTTPException(status_code=exc.status_code if exc.status_code == 409 else 422, detail=str(exc))
     # Die Wertung samt Eintrag „nicht erschienen“ (walkover) - derselbe Weg wie das Ergebnis-Fenster (#1156).
-    return await apply_forfeit(db, match, forfeiting, note=note, actor_id=me["id"], force=force)
+    try:
+        return await apply_forfeit(db, match, forfeiting, note=note, actor_id=me["id"], force=force)
+    except MatchV2ResultError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
 
 @router.post("/{match_id}/forfeit")

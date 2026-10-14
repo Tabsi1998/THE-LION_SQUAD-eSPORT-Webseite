@@ -1,11 +1,28 @@
-"""Result validation and advancement for matches_v2."""
+"""Result validation and advancement for matches_v2.
+
+Der Ergebnis-Vertrag (#1035) steht hier an einer Stelle. Jeder Weg zu einem Ergebnis - Ergebnis-Fenster mit
+„Rückgängig“, direktes Eintragen, Meldung der Spieler, Wertung „nicht erschienen“ - prüft mit ``checked_results``
+bzw. ``normalize_v2_results`` und schreibt über ``submit_v2_result`` (services/v2_result_submission):
+
+- Alle belegten Teilnehmer genau einmal. Werte (Stand, Punkte, Zeit) sind endliche Zahlen ab 0 bis zur Obergrenze
+  (``RESULT_MAX_SCORE``, ``RESULT_MAX_TIME_MS``); was keine Zahl ist, ist ein Eingabefehler.
+- Der Platz folgt aus dem Stand; ein angegebener Platz zählt nur, wo kein Stand da ist oder der Stand gleich ist.
+- Gleichstand nur, wo das Format ihn erlaubt (Tabelle, Gruppe). Im K.-o. braucht gleicher Stand einen Platz, der
+  entscheidet - die Reihenfolge der Liste entscheidet nie.
+- Best-of (Duell): der Sieger hat genau die nötigen Siege, die Gegenseite weniger; mit „aufgegeben“ oder „nicht
+  erschienen“ höchstens so viele, wie gespielt werden konnten. Web und App rechnen gleich (resultEntry).
+- Hat ein Spiel schon ein Ergebnis (auch in Klärung), ist jede Änderung eine Korrektur: ``force`` und ein Grund
+  (``ensure_correction_allowed``). Setzt sie ein Folgespiel zurück, steht das in der Antwort und in der Historie.
+- Fehler sind Eingabefehler (422) oder Konflikte (409); Schreiben ist pro Turnier serialisiert (mutation_lock).
+"""
 from __future__ import annotations
 
+import math
 import random
 from typing import Any
 from collections import defaultdict
 
-from match_rules import match_allows_draw
+from match_rules import RESULT_MAX_SCORE, RESULT_MAX_TIME_MS, match_allows_draw
 from services.match_result_errors import MatchResultError
 
 # Derselbe Fehler, unter dem Namen, unter dem ihn der Graph-Zweig eingeführt hat.
@@ -15,6 +32,52 @@ MatchV2ResultError = MatchResultError
 
 
 LOCKED_DOWNSTREAM_STATUSES = {"in_progress", "waiting_result", "disputed", "completed", "forfeit"}
+# Ein Spiel in diesem Stand hat ein Ergebnis - es zu ändern ist eine Korrektur.
+DECIDED_STATUSES = {"completed", "forfeit"}
+CORRECTION_REASON_MIN_LENGTH = 5
+CORRECTION_REASON_DETAIL = f"Bitte einen Grund für die Korrektur angeben (mindestens {CORRECTION_REASON_MIN_LENGTH} Zeichen)."
+CORRECTION_FORCE_DETAIL = "Dieses Spiel hat schon ein Ergebnis. Zum Korrigieren bitte einen Grund angeben."
+
+
+def has_result(match: dict) -> bool:
+    """Hat das Spiel schon ein Ergebnis - fertig oder in Klärung mit Ergebnis?"""
+    return str(match.get("status") or "") in DECIDED_STATUSES or bool(match.get("results"))
+
+
+def ensure_correction_allowed(match: dict, *, force: bool, reason: str | None) -> None:
+    """Ein Spiel mit Ergebnis ändert sich nur als Korrektur: mit ``force`` und Grund - auf jedem Weg gleich."""
+    if not has_result(match):
+        return
+    if not force:
+        raise MatchV2ResultError(CORRECTION_FORCE_DETAIL, 409)
+    if len((reason or "").strip()) < CORRECTION_REASON_MIN_LENGTH:
+        raise MatchV2ResultError(CORRECTION_REASON_DETAIL, 422)
+
+
+def resolve_best_of(match: dict, stage: dict | None, tournament: dict | None) -> int:
+    """Best-of eines Spiels: am Spiel, in seinen Einstellungen, an der Phase oder am Turnier - sonst 1."""
+    value = match.get("best_of") or (match.get("settings") or {}).get("best_of") \
+        or ((stage or {}).get("settings") or {}).get("best_of") or (tournament or {}).get("best_of") or 1
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return 1
+
+
+async def result_best_of(db, match: dict) -> int:
+    """Best-of für die Prüfung: nur Duelle haben eins."""
+    if len(_filled_slots(match)) != 2:
+        return 1
+    stage = await db.tournament_stages.find_one({"id": match["stage_id"]}, {"_id": 0, "settings": 1}) \
+        if match.get("stage_id") else None
+    tournament = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "best_of": 1}) \
+        if match.get("tournament_id") else None
+    return resolve_best_of(match, stage, tournament)
+
+
+async def checked_results(db, match: dict, raw_results: list[dict]) -> list[dict]:
+    """Der Eingang für jedes neue Ergebnis und jede Meldung: der ganze Vertrag samt Best-of des Spiels."""
+    return normalize_v2_results(match, raw_results, best_of=await result_best_of(db, match))
 
 
 def public_recalculation_error(match: dict) -> dict:
@@ -38,22 +101,41 @@ def _slot_participant_map(match: dict) -> dict[str, dict]:
     return {slot["registration_id"]: slot for slot in _filled_slots(match)}
 
 
-def _as_number(value: Any) -> int | float | None:
+def _finite(value: Any, label: str) -> float | None:
+    """Eine Zahl aus der Eingabe - endlich und nicht negativ, sonst ein Eingabefehler (nie ein Serverfehler)."""
     if value is None or value == "":
         return None
     if isinstance(value, bool):
-        raise MatchV2ResultError("Score/Punkte duerfen kein Boolean sein")
-    if isinstance(value, (int, float)):
-        if value < 0:
-            raise MatchV2ResultError("Score/Punkte duerfen nicht negativ sein")
-        return value
+        raise MatchV2ResultError(f"{label} darf kein Wahrheitswert sein", 422)
     try:
         number = float(value)
-    except (TypeError, ValueError):
-        raise MatchV2ResultError(f"Ungültiger Zahlenwert: {value}")
+    except (TypeError, ValueError, OverflowError):
+        raise MatchV2ResultError(f"{label} muss eine Zahl sein", 422)
+    if not math.isfinite(number):
+        raise MatchV2ResultError(f"{label} muss eine endliche Zahl sein", 422)
     if number < 0:
-        raise MatchV2ResultError("Score/Punkte duerfen nicht negativ sein")
+        raise MatchV2ResultError(f"{label} darf nicht negativ sein", 422)
+    return number
+
+
+def _as_number(value: Any) -> int | float | None:
+    number = _finite(value, "Stand/Punkte")
+    if number is None:
+        return None
+    if number > RESULT_MAX_SCORE:
+        raise MatchV2ResultError(f"Stand/Punkte dürfen höchstens {RESULT_MAX_SCORE} sein", 422)
+    if isinstance(value, (int, float)):
+        return value
     return int(number) if number.is_integer() else number
+
+
+def _as_time_ms(value: Any) -> int | None:
+    number = _finite(value, "Zeit (time_ms)")
+    if number is None:
+        return None
+    if number > RESULT_MAX_TIME_MS:
+        raise MatchV2ResultError(f"Zeit (time_ms) darf höchstens {RESULT_MAX_TIME_MS} sein", 422)
+    return int(number)
 
 
 def _result_score_for_ranking(entry: dict) -> int | float:
@@ -66,16 +148,7 @@ def _result_score_for_ranking(entry: dict) -> int | float:
 
 
 def _time_for_ranking(entry: dict) -> int | float | None:
-    value = entry.get("time_ms")
-    if value in (None, ""):
-        return None
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        raise MatchV2ResultError(f"Ungültiger Zeitwert: {value}")
-    if number < 0:
-        raise MatchV2ResultError("time_ms darf nicht negativ sein")
-    return number
+    return _as_time_ms(entry.get("time_ms"))
 
 
 def _ranking_mode(match: dict) -> str:
@@ -175,24 +248,46 @@ def _auto_rank_results(match: dict, raw_results: list[dict]) -> list[dict]:
     allow_draw = match_allows_draw(match)
     ordered = sorted(
         enumerate(raw_results),
-        key=lambda item: (_placement_key(mode, item[1]), item[0]),
+        key=lambda item: (_placement_key(mode, item[1]), _stated_rank(item[1]), item[0]),
     )
 
     next_rows = [dict(entry) for entry in raw_results]
     rank = 0
     previous_key = None
+    previous_stated = None
     for position, (index, entry) in enumerate(ordered, start=1):
         key = _placement_key(mode, entry)
+        stated = _stated_rank(entry)
+        if previous_key is not None and key == previous_key and not allow_draw \
+                and (math.isinf(stated) or stated == previous_stated):
+            # Im K.-o. muss jemand weiterkommen - bei gleichem Stand sagt das nur ein angegebener Platz, nie die
+            # Reihenfolge der Liste.
+            raise MatchV2ResultError(
+                "Gleichstand geht in diesem Spiel nicht – eine Seite muss gewinnen. "
+                "Bei gleichem Stand bitte den Platz angeben, der entscheidet.", 422)
         # Gleichstand teilt sich den Platz, der nächste rückt entsprechend nach
         # hinten - 1, 1, 3 und nicht 1, 1, 2.
         if not (allow_draw and previous_key is not None and key == previous_key):
             rank = position
         next_rows[index]["rank"] = rank
         previous_key = key
+        previous_stated = stated
     return next_rows
 
 
-def normalize_v2_results(match: dict, raw_results: list[dict]) -> list[dict]:
+def _stated_rank(entry: dict) -> float:
+    """Der angegebene Platz - nur zum Entscheiden bei gleichem Stand; ohne Angabe ganz hinten."""
+    try:
+        return float(int(entry.get("rank")))
+    except (TypeError, ValueError):
+        return math.inf
+
+
+def normalize_v2_results(match: dict, raw_results: list[dict], *, best_of: int | None = None) -> list[dict]:
+    """Ein Ergebnis nach dem Vertrag prüfen und in die gespeicherte Form bringen (siehe Modulbeschreibung).
+
+    ``best_of``: nur angeben, wo das Spiel bekannt ist (``checked_results``); ohne Angabe keine Best-of-Prüfung - so
+    rechnet das Neuberechnen gespeicherter Ergebnisse weiter wie bisher."""
     participants = _slot_participant_map(match)
     if not participants:
         raise MatchV2ResultError("Match hat keine belegten Slots")
@@ -222,9 +317,7 @@ def normalize_v2_results(match: dict, raw_results: list[dict]) -> list[dict]:
         if rank in seen_ranks and not allow_draw:
             raise MatchV2ResultError(f"Rank {rank} ist mehrfach vergeben")
         seen_ranks.append(rank)
-        time_ms = int(entry["time_ms"]) if entry.get("time_ms") not in (None, "") else None
-        if time_ms is not None and time_ms < 0:
-            raise MatchV2ResultError("time_ms darf nicht negativ sein")
+        time_ms = _as_time_ms(entry.get("time_ms"))
         normalized.append({
             "registration_id": registration_id,
             "user_id": participants[registration_id].get("user_id"),
@@ -239,7 +332,31 @@ def normalize_v2_results(match: dict, raw_results: list[dict]) -> list[dict]:
         })
 
     _validate_placements(seen_ranks, len(participants), allow_draw)
-    return sorted(normalized, key=lambda item: item["rank"])
+    normalized = sorted(normalized, key=lambda item: item["rank"])
+    if _ranking_mode(match) == "higher_score":
+        _check_best_of(normalized, best_of)
+    return normalized
+
+
+def _check_best_of(results: list[dict], best_of: int | None) -> None:
+    """Best-of im Duell, wie Web und App es eingeben (resultEntry.bestOfResults): der Stand sind gewonnene Spiele.
+    Nur wo der höhere Stand gewinnt - nach Zeit oder niedrigstem Stand geben Web und App kein Best-of ein (inputKind)."""
+    if not best_of or best_of <= 1 or len(results) != 2:
+        return
+    values = [row["score"] if row.get("score") is not None else row.get("points") for row in results]
+    if all(value is None for value in values):
+        return
+    needed = best_of // 2 + 1
+    prefix = f"Best of {best_of}: "
+    if any(value is None or float(value) != int(value) for value in values):
+        raise MatchV2ResultError(prefix + "bitte je Seite die gewonnenen Spiele als ganze Zahl angeben.", 422)
+    winner, loser = (int(value) for value in values)
+    if max(winner, loser) > needed or winner + loser > best_of:
+        raise MatchV2ResultError(
+            prefix + f"höchstens {needed} gewonnene Spiele je Seite und {best_of} Spiele insgesamt.", 422)
+    flagged = any(row.get("dnf") or row.get("forfeit") for row in results)
+    if not flagged and (winner != needed or loser >= needed):
+        raise MatchV2ResultError(prefix + f"der Sieger braucht genau {needed} gewonnene Spiele.", 422)
 
 
 def _validate_placements(ranks: list[int], participant_count: int, allow_draw: bool) -> None:
@@ -401,13 +518,59 @@ def _status_after_slot_fill(match: dict, preserve_terminal: bool = True) -> str:
     return "pending"
 
 
-def _reset_match_result_state(match: dict, target_sets: dict[str, dict], now_iso: str) -> None:
+def _ensure_no_pending_result(match: dict) -> None:
+    """Liegt im Folgespiel gerade ein Ergebnis für „Rückgängig“ bereit, wartet die Korrektur - sonst ginge es ins Leere."""
+    if isinstance(match.get("pending_result"), dict):
+        name = match.get("round_name") or match.get("match_key") or "Im Folgespiel"
+        raise MatchV2ResultError(f"{name}: dort wird gerade ein Ergebnis eingetragen. Bitte kurz warten.", 409)
+
+
+PAIRING_CHANGED_REASON = "Paarung geändert"
+
+
+def _pairing_reset_fields(match: dict, now_iso: str) -> dict:
+    """Was zur alten Paarung eines Folgespiels gehörte (#1035): Meldungen, Beginn, Aufruf, Wertung und Einsprüche.
+    Einsprüche verschwinden nicht - sie bleiben als erledigt mit Grund „Paarung geändert“ in der Historie."""
+    disputes = [
+        row if not isinstance(row, dict) or row.get("resolved_at") else {
+            **row, "resolved_at": now_iso, "decision": "void", "decision_note": PAIRING_CHANGED_REASON,
+        }
+        for row in match.get("disputes") or []
+    ]
+    return {
+        "reports": [],
+        "started_at": None,
+        "called_at": None,
+        "forfeit_registration_id": None,
+        "admin_decision_note": None,
+        "admin_decision_by": None,
+        "admin_decision_at": None,
+        "status_before_dispute": None,
+        **({"disputes": disputes} if match.get("disputes") else {}),
+    }
+
+
+def _reset_match_result_state(match: dict, target_sets: dict[str, dict], now_iso: str,
+                              reset_log: list[dict] | None = None) -> None:
+    """Ein Folgespiel verliert sein Ergebnis, weil sich seine Paarung geändert hat. Was es vorher hatte, kommt in
+    ``reset_log`` - für die Antwort und die Historie (#1035). Was zur alten Paarung gehörte, fällt weg
+    (``_pairing_reset_fields``)."""
+    if reset_log is not None and (match.get("results") or str(match.get("status") or "") in LOCKED_DOWNSTREAM_STATUSES) \
+            and all(row["id"] != match["id"] for row in reset_log):
+        reset_log.append({
+            "id": match["id"],
+            "match_key": match.get("match_key"),
+            "status": match.get("status"),
+            "results": match.get("results") or [],
+            **({"forfeit_registration_id": match["forfeit_registration_id"]} if match.get("forfeit_registration_id") else {}),
+        })
     target_sets.setdefault(match["id"], {})
     target_sets[match["id"]].update({
         "results": [],
         "result_meta": None,
         "completed_at": None,
         "completed_by": None,
+        **_pairing_reset_fields(match, now_iso),
         "status": _status_after_slot_fill(match, preserve_terminal=False),
         "updated_at": now_iso,
     })
@@ -420,6 +583,7 @@ def _cascade_clear_downstream(
     target_sets: dict[str, dict],
     now_iso: str,
     visited: set[str] | None = None,
+    reset_log: list[dict] | None = None,
 ) -> None:
     visited = visited or set()
     if source_match_id in visited:
@@ -437,6 +601,7 @@ def _cascade_clear_downstream(
         source = slot.get("source_result") or {}
         if source.get("from_match_id") != source_match_id:
             continue
+        _ensure_no_pending_result(child)
         if not _clear_slot(slot):
             continue
         child["slots"] = slots
@@ -446,8 +611,8 @@ def _cascade_clear_downstream(
             "status": _status_after_slot_fill(child, preserve_terminal=False),
             "updated_at": now_iso,
         })
-        _reset_match_result_state(child, target_sets, now_iso)
-        _cascade_clear_downstream(child_id, by_id, downstream, target_sets, now_iso, visited)
+        _reset_match_result_state(child, target_sets, now_iso, reset_log)
+        _cascade_clear_downstream(child_id, by_id, downstream, target_sets, now_iso, visited, reset_log)
 
 
 def build_v2_result_application(
@@ -517,9 +682,8 @@ def build_v2_result_application(
                     f"Zielslot {target.get('match_key')}:{target_slot.get('slot')} ist bereits belegt. Für Korrektur force=true nutzen.",
                     409,
                 )
+            _ensure_no_pending_result(target)
             overwritten_targets.add(target["id"])
-            if target.get("status") in LOCKED_DOWNSTREAM_STATUSES:
-                overwritten_targets.add(target["id"])
 
         target_slot["registration_id"] = result["registration_id"]
         target_slot["user_id"] = result.get("user_id")
@@ -537,12 +701,16 @@ def build_v2_result_application(
             "updated_at": now_iso,
         }
 
+    reset_matches: list[dict] = []
     if force:
         for target_id in overwritten_targets:
             target = by_id[target_id]
             if target.get("status") in LOCKED_DOWNSTREAM_STATUSES or target.get("results"):
-                _reset_match_result_state(target, target_sets, now_iso)
-            _cascade_clear_downstream(target_id, by_id, downstream, target_sets, now_iso)
+                _reset_match_result_state(target, target_sets, now_iso, reset_matches)
+            else:
+                # Neue Paarung ohne Ergebnis: was zur alten gehörte, gilt nicht mehr.
+                target_sets[target_id].update(_pairing_reset_fields(target, now_iso))
+            _cascade_clear_downstream(target_id, by_id, downstream, target_sets, now_iso, reset_log=reset_matches)
 
     match_set = {
         "results": results,
@@ -563,4 +731,6 @@ def build_v2_result_application(
         "target_sets": target_sets,
         "results": results,
         "advanced": len(target_sets),
+        # Folgespiele, die diese Korrektur zurücksetzt - mit dem Ergebnis, das sie vorher hatten (#1035).
+        "reset_matches": reset_matches,
     }

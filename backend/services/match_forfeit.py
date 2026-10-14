@@ -33,6 +33,27 @@ async def record_walkover_incident(db, match: dict, forfeiting_registration_id: 
         logger.warning("Walkover incident failed for match=%s type=%s", match.get("id"), type(exc).__name__)
 
 
+async def revoke_walkover_incident(db, match_id: str, forfeiting_registration_id: str) -> bool:
+    """Gegenstück (#1035): gilt die Wertung nach einer Korrektur nicht mehr, fällt der Eintrag „nicht erschienen“ weg -
+    aber nur der aus diesem Spiel."""
+    try:
+        from badges import NEGATIVE_INCIDENTS
+
+        registration = await db.tournament_registrations.find_one(
+            {"id": forfeiting_registration_id}, {"_id": 0, "user_id": 1})
+        if not registration or not registration.get("user_id"):
+            return False
+        removed = await db.user_achievements.delete_one({
+            "user_id": registration["user_id"],
+            "tier_code": NEGATIVE_INCIDENTS["no_show"],
+            "context.match_id": match_id,
+        })
+        return bool(removed.deleted_count)
+    except Exception as exc:  # noqa: BLE001 - die Korrektur gilt auch ohne den Eintrag
+        logger.warning("Walkover incident revoke failed for match=%s type=%s", match_id, type(exc).__name__)
+        return False
+
+
 async def apply_forfeit(db, match: dict, forfeiting_registration_id: str, *, note: str, actor_id: str,
                         force: bool, reason: str | None = None, hold_id: str | None = None) -> dict:
     """Die Wertung schreiben: Platzierung über den Ergebnis-Weg, dann Stand und Begründung am Spiel."""
@@ -46,7 +67,8 @@ async def apply_forfeit(db, match: dict, forfeiting_registration_id: str, *, not
         note=note,
         force=force,
         audit_action="match.forfeit",
-        reason=reason,
+        # Eine Wertung als Korrektur (#1035): ihre Pflicht-Begründung ist zugleich der Grund der Korrektur.
+        reason=reason or (note if force else None),
         hold_id=hold_id,
     )
     updated = outcome.get("match") or match

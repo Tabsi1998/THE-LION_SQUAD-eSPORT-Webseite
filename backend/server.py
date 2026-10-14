@@ -4,11 +4,14 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 load_dotenv(ROOT / ".env")
 
+import math
 import os
 import logging
 import time
 from urllib.parse import urlparse
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -188,6 +191,26 @@ app = FastAPI(
     redoc_url=None if is_production else "/redoc",
     openapi_url=None if is_production else "/openapi.json",
 )
+
+
+def _json_safe(value):
+    """Nicht-endliche Zahlen (NaN, Infinity) gibt es in JSON nicht - in der Fehlerantwort stehen sie als Text."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_error(_request: Request, exc: RequestValidationError):
+    """Wie FastAPIs eigene Antwort (422 mit ``detail``), auch wenn die Anfrage NaN oder Infinity enthält (#1035):
+    solche Werte stehen in der Antwort als Text."""
+    return JSONResponse(status_code=422, content={"detail": _json_safe(jsonable_encoder(exc.errors()))})
+
+
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=list(trusted_http_hosts()),
