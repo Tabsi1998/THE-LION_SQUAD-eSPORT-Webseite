@@ -715,6 +715,8 @@ class TournamentCreate(BaseModel):
     heat_rebuild_mode: Literal["suggest", "auto"] = "suggest"
     # Leer: die Dauer kommt vom Spiel (Modus, #1554), sonst 30 Minuten - siehe services/match_duration.py.
     match_duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
+    # Puffer je Spiel (#1557): kommt auf die Dauer aus Spiel, Phase oder Turnier - siehe services/match_duration.py.
+    match_buffer_minutes: Optional[int] = Field(default=None, ge=0, le=120)
     # Spielmodus des Games (``games.match_modes[].mode``) - leer: der erste Modus.
     game_mode: Optional[str] = Field(default=None, max_length=40)
     stream_link: Optional[str] = None
@@ -801,6 +803,7 @@ class TournamentUpdate(BaseModel):
     grand_final_mode: Optional[Literal["none", "single", "reset"]] = None
     heat_rebuild_mode: Optional[Literal["suggest", "auto"]] = None
     match_duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
+    match_buffer_minutes: Optional[int] = Field(default=None, ge=0, le=120)
     game_mode: Optional[str] = Field(default=None, max_length=40)
     stream_link: Optional[str] = None
     twitch_channel: Optional[str] = None
@@ -1044,6 +1047,10 @@ class F1TrackCreate(BaseModel):
     order_index: int = 0
     # Zielzeit der Strecke in Millisekunden (#613, „Zielzeit geknackt“) - leer heißt: keine Zielzeit.
     target_time_ms: Optional[int] = Field(default=None, ge=0)
+    # Plausibilität je Strecke (#1584): Zeiten außerhalb brauchen beim Eintragen eine Bestätigung; leer = Standard
+    # (20 Sekunden bis 10 Minuten, services/laptime.py).
+    min_plausible_ms: Optional[int] = Field(default=None, ge=0)
+    max_plausible_ms: Optional[int] = Field(default=None, ge=0)
 
 
 class F1TrackUpdate(BaseModel):
@@ -1052,6 +1059,8 @@ class F1TrackUpdate(BaseModel):
     country: Optional[str] = None
     order_index: Optional[int] = None
     target_time_ms: Optional[int] = Field(default=None, ge=0)
+    min_plausible_ms: Optional[int] = Field(default=None, ge=0)
+    max_plausible_ms: Optional[int] = Field(default=None, ge=0)
 
 
 class F1ChallengeCreate(BaseModel):
@@ -1133,6 +1142,8 @@ class F1ChallengeUpdate(BaseModel):
     season_weight: Optional[float] = None
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
     site_banner_enabled: Optional[bool] = None
+    # Begründung, wenn nach der Veröffentlichung die Wertung geändert wird (#1584).
+    change_reason: Optional[str] = Field(default=None, max_length=500)
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
 
@@ -1146,6 +1157,9 @@ class F1LapTimeCreate(BaseModel):
     score_scope: Literal["official", "club_reference"] = "official"
     proof_url: Optional[str] = None
     admin_note: Optional[str] = None
+    # Unplausible Zeit bewusst bestätigt (#1584) und die Begründung einer Änderung nach der Veröffentlichung.
+    confirm_implausible: bool = False
+    change_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class F1LapTimeUpdate(BaseModel):
@@ -1155,6 +1169,12 @@ class F1LapTimeUpdate(BaseModel):
     score_scope: Optional[Literal["official", "club_reference"]] = None
     proof_url: Optional[str] = None
     admin_note: Optional[str] = None
+    confirm_implausible: bool = False
+    change_reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class F1LapTimeDelete(BaseModel):
+    change_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 # ---------- Stations ----------

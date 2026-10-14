@@ -67,8 +67,10 @@ async def _collect_user_penalties(user_id: str) -> list[dict]:
             "raw_time_str": _ms_to_time_str(l.get("time_ms")),
             "penalty_seconds": l.get("penalty_seconds", 0),
             "is_invalid": bool(l.get("is_invalid")),
-            "issued_by": l.get("created_by"),
-            "issued_at": l.get("updated_at") or l.get("created_at"),
+            # Aussteller ist, wer die Strafe gesetzt hat (#1584) - nicht, wer die Zeit eingetragen hat. Ältere
+            # Einträge ohne diesen Vermerk nennen weiter den Ersteller.
+            "issued_by": l.get("penalty_set_by") or l.get("created_by"),
+            "issued_at": l.get("penalty_set_at") or l.get("updated_at") or l.get("created_at"),
             "ref_id": l.get("id"),
         })
 

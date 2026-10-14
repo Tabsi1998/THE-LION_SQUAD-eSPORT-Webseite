@@ -337,21 +337,9 @@ async def season_standings(slug_or_id: str):
     for cid in f1_ids:
         tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).to_list(100)
         for tr in tracks:
-            times = await db.f1_lap_times.find(
-                {
-                    "challenge_id": cid,
-                    "track_id": tr["id"],
-                    "is_invalid": {"$ne": True},
-                    "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}],
-                },
-                {"_id": 0},
-            ).to_list(5000)
-            best_per_user: dict = {}
-            for t in times:
-                eff = t["time_ms"] + int(t.get("penalty_seconds", 0) * 1000)
-                if t["user_id"] not in best_per_user or eff < best_per_user[t["user_id"]]:
-                    best_per_user[t["user_id"]] = eff
-            sorted_u = sorted(best_per_user.items(), key=lambda x: x[1])
+            # Dieselbe Rangfolge wie die Tabelle (#1584): Gleichstand - die früher gefahrene Zeit vorn.
+            from services.fastlap_standings import official_times, track_ranking
+            sorted_u = track_ranking(await official_times(db, cid, tr["id"]))
             for pos, (uid, _) in enumerate(sorted_u):
                 pts = points_system[pos] if pos < len(points_system) else 0
                 add_points(uid, pts, pos == 0)

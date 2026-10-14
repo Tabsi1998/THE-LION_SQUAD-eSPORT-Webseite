@@ -530,6 +530,9 @@ export type F1Track = {
   country?: string | null;
   image_url?: string | null;
   order_index?: number;
+  // Plausible Zeiten je Strecke (#1584) - leer heißt Standard (20 Sekunden bis 10 Minuten).
+  min_plausible_ms?: number | null;
+  max_plausible_ms?: number | null;
 };
 
 export type F1Challenge = {

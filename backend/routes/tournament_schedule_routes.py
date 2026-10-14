@@ -11,8 +11,9 @@ from pydantic import BaseModel, Field
 
 from auth import get_current_user
 from database import get_db
+from services.match_deadlines import auto_confirm_due, no_show_deadline, opened_at
 from services.match_scheduler import apply_plan, plan_for_tournament
-from services.tournament_permissions import STATION_ASSIGN_ROLES, require_tournament_staff_permission
+from services.tournament_permissions import READ_STAFF_ROLES, STATION_ASSIGN_ROLES, require_tournament_staff_permission
 from routes.tournament_common import _ensure_tournament_unlocked, _resolve_tid, _serialized_tournament_write
 from routes.tournament_router import router
 
@@ -62,3 +63,39 @@ async def apply_schedule_plan(tid: str, body: SchedulePlanApply, me: dict = Depe
         raise HTTPException(status_code=409, detail="Der Plan hat sich inzwischen geändert - bitte noch einmal Planen.")
     result = await apply_plan(db, tournament, plan)
     return {**result, "assignments": plan["assignments"], "fingerprint": plan["fingerprint"]}
+
+
+def _iso(value) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _all_sides_known(match: dict) -> bool:
+    slots = [slot for slot in match.get("slots") or [] if (slot.get("source") or {}).get("type") != "bye" and slot.get("status") != "bye"]
+    return len(slots) >= 2 and all(slot.get("registration_id") for slot in slots)
+
+
+@router.get("/{tid}/schedule/deadlines")
+async def schedule_deadlines(tid: str, me: dict = Depends(get_current_user)):
+    """Fristen je Spiel für die Matchplan-Seite online und in der Liga (#1557): wann ein Spiel offen ist, wann
+    „nicht erschienen“ greift und wann eine einzelne Meldung von selbst gilt. Gerechnet wie die Fristen-Prüfung
+    (``services/match_deadlines``) - die Website zeigt nur an."""
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES, "tournament")
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "creation_key": 0, "billing": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    stages = {stage["id"]: stage for stage in await db.tournament_stages.find({"tournament_id": tid}, {"_id": 0}).to_list(200)}
+    matches = await db.matches_v2.find({"tournament_id": tid, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
+    rows = []
+    for match in matches:
+        stage = stages.get(match.get("stage_id") or "")
+        no_show = no_show_deadline(match, tournament, stage)
+        rows.append({
+            "match_id": match.get("id"),
+            "opened_at": _iso(opened_at(match, tournament)) if _all_sides_known(match) else None,
+            "no_show_due_at": _iso(no_show["due_at"]) if no_show else None,
+            "no_show_minutes": no_show["minutes"] if no_show else None,
+            "result_due_at": _iso(auto_confirm_due(match, tournament, stage)),
+        })
+    return {"matches": rows}

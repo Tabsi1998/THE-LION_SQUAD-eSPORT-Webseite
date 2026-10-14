@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { AddToCalendarButton } from "../../components/AddToCalendarButton";
 import { challengeIsOver } from "../../lib/afterEnd";
@@ -14,7 +14,8 @@ import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime } from "../../lib/format";
 import { getRegistrationState, hasOnlineRegistration } from "../../lib/registration";
 import { colors, radius } from "../../theme";
-import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload, PublicUser } from "../../types";
+import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload } from "../../types";
+import { parseLapTime, plausibilityText } from "../../lib/laptime";
 import { Button } from "../../components/Button";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
@@ -31,15 +32,19 @@ type Props = {
   };
 };
 
-type FastLapPage = { challenge: F1Challenge; trackId: string | null; leaderboard: F1LeaderboardPayload | null; managerUsers: PublicUser[]; usersProblem: LoadProblem | null };
-const NO_USERS: PublicUser[] = [];
+type FastLapPage = { challenge: F1Challenge; trackId: string | null; leaderboard: F1LeaderboardPayload | null };
+// Treffer der Personensuche (#1584): Kennung, Name, Bild, eine Zeile Zusammenhang - keine Kontoliste mehr.
+type DriverHit = { id: string; name: string; avatar_url?: string | null; context?: string; is_club_member?: boolean };
+// Nach „Ergebnisse veröffentlicht“ (#1584) ändert nur die Turnierleitung Zeiten - mit Begründung, auf der Website.
+const LOCKED_STATUSES = new Set(["results_published", "archived"]);
+const SEARCH_DELAY_MS = 250;
 
 export function FastLapDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   // Laden je Kennung (#1000): eine andere Challenge zeigt nie die vorige, verspätete Antworten werden verworfen, ein
   // gescheitertes Nachladen lässt den letzten Stand gekennzeichnet stehen. Die gewählte Strecke gilt nur für diese Kennung.
   const wantedTrack = useRef<{ id: string; track: string | null }>({ id: route.params.id, track: null });
-  const fetchChallenge = useCallback(async (id: string, previous: FastLapPage | null): Promise<FastLapPage> => {
+  const fetchChallenge = useCallback(async (id: string): Promise<FastLapPage> => {
     const challengeResult = await api.get<F1Challenge>(`/f1/challenges/${idSegment(id)}`);
     const nextChallenge = challengeResult.data;
     const wanted = wantedTrack.current.id === id ? wantedTrack.current.track : null;
@@ -47,26 +52,12 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
     const leaderboardResult = await api.get<F1LeaderboardPayload>(`/f1/challenges/${idSegment(nextChallenge.slug || nextChallenge.id)}/leaderboard`, {
       params: trackId ? { track_id: trackId } : undefined,
     });
-    let managerUsers: PublicUser[] = [];
-    let usersProblem: LoadProblem | null = null;
-    if (nextChallenge.can_manage_times) {
-      // Zuweisbare Personen sind ein Teil: kommen sie nicht, bleibt die Liste von vorhin, und die Karte sagt es.
-      try {
-        const usersResult = await api.get<PublicUser[]>(`/f1/challenges/${idSegment(nextChallenge.id)}/assignable-users`);
-        managerUsers = Array.isArray(usersResult.data) ? usersResult.data : [];
-      } catch (usersError) {
-        managerUsers = previous?.managerUsers ?? [];
-        usersProblem = loadProblem(usersError);
-      }
-    }
-    return { challenge: nextChallenge, trackId, leaderboard: leaderboardResult.data, managerUsers, usersProblem };
+    return { challenge: nextChallenge, trackId, leaderboard: leaderboardResult.data };
   }, []);
   const { data: page, loading, error: loadError, problem, stale, reload } = useKeyedLoad(route.params.id, fetchChallenge);
   const challenge = page?.challenge ?? null;
   const leaderboard = page?.leaderboard ?? null;
   const selectedTrackId = page?.trackId ?? null;
-  const managerUsers = page?.managerUsers ?? NO_USERS;
-  const usersProblem = page?.usersProblem ?? null;
   const load = useCallback(async (trackId?: string | null) => {
     wantedTrack.current = { id: route.params.id, track: trackId || null };
     await reload();
@@ -77,7 +68,10 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [managerSearch, setManagerSearch] = useState("");
-  const [selectedUserId, setSelectedUserId] = useState("");
+  const [driverHits, setDriverHits] = useState<DriverHit[]>([]);
+  const [usersProblem, setUsersProblem] = useState<LoadProblem | null>(null);
+  const [selectedUser, setSelectedUser] = useState<DriverHit | null>(null);
+  const selectedUserId = selectedUser?.id || "";
   const [timeInput, setTimeInput] = useState("");
   const [penaltyInput, setPenaltyInput] = useState("");
   const [proofUrl, setProofUrl] = useState("");
@@ -101,29 +95,39 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
   const showRegistrationInfo = hasOnlineRegistration(challenge) || challenge?.block_club_member_results || challenge?.allow_club_reference_times !== false;
   const participantCount = challenge?.participant_count || leaderboard?.entries.length || 0;
   const prizes = useMemo(() => formatPrizeItems(challenge?.prize_places, challenge?.prize_pool), [challenge?.prize_places, challenge?.prize_pool]);
-  const selectedUser = managerUsers.find((item) => item.id === selectedUserId);
   const forceReference = Boolean(challenge?.block_club_member_results && selectedUser?.is_club_member);
-  const filteredManagerUsers = useMemo(() => {
-    const q = managerSearch.trim().toLowerCase();
-    const source = q
-      ? managerUsers.filter((item) => `${item.display_name || ""} ${item.username || ""}`.toLowerCase().includes(q))
-      : managerUsers;
-    return source.slice(0, 8);
-  }, [managerSearch, managerUsers]);
+  const canEnterTimes = Boolean(challenge?.can_manage_times) && !LOCKED_STATUSES.has(String(challenge?.status || ""));
+  const challengeId = challenge?.id || "";
 
-  const submitManagedTime = useCallback(async () => {
-    if (!challenge?.can_manage_times || !activeTrackId || !selectedUserId || savingTime) return;
-    const timeMs = parseLapTime(timeInput);
+  // Personensuche (#1584): erst ab einem Zeichen, kurz gewartet; scheitert sie, sagt die Karte es.
+  useEffect(() => {
+    const needle = managerSearch.trim();
+    if (!canEnterTimes || !challengeId || !needle) {
+      setDriverHits([]);
+      setUsersProblem(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api.get<DriverHit[]>("/admin/people/search", { params: { purpose: "fastlap", context_id: challengeId, q: needle } })
+        .then((result) => {
+          if (cancelled) return;
+          setDriverHits(Array.isArray(result.data) ? result.data.slice(0, 8) : []);
+          setUsersProblem(null);
+        })
+        .catch((searchError) => {
+          if (cancelled) return;
+          setDriverHits([]);
+          setUsersProblem(loadProblem(searchError));
+        });
+    }, SEARCH_DELAY_MS);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [canEnterTimes, challengeId, managerSearch]);
+
+  const saveManagedTime = useCallback(async (timeMs: number, confirmImplausible: boolean) => {
+    if (!challenge || !activeTrackId || !selectedUserId) return;
     const penalty = Number(String(penaltyInput || "0").replace(",", ".")) || 0;
     const note = adminNote.trim();
-    if (!timeMs) {
-      Alert.alert("Zeit fehlt", "Bitte eine Zeit im Format m:ss.SSS oder Millisekunden eintragen.");
-      return;
-    }
-    if ((penalty > 0 || invalidLap) && note.length < 5) {
-      Alert.alert("Begruendung fehlt", "Bei Strafzeit oder Disqualifikation braucht es eine kurze Begruendung.");
-      return;
-    }
     setSavingTime(true);
     setError("");
     try {
@@ -136,6 +140,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
         admin_note: note || null,
         is_invalid: invalidLap,
         score_scope: forceReference ? "club_reference" : scoreScope,
+        ...(confirmImplausible ? { confirm_implausible: true } : {}),
       });
       setTimeInput("");
       setPenaltyInput("");
@@ -148,7 +153,31 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
     } finally {
       setSavingTime(false);
     }
-  }, [activeTrackId, adminNote, challenge, forceReference, invalidLap, load, penaltyInput, proofUrl, savingTime, scoreScope, selectedUserId, timeInput]);
+  }, [activeTrackId, adminNote, challenge, forceReference, invalidLap, load, penaltyInput, proofUrl, scoreScope, selectedUserId]);
+
+  const submitManagedTime = useCallback(() => {
+    if (!canEnterTimes || !activeTrackId || !selectedUserId || savingTime) return;
+    // Ein Parser für Website, App und Server (#1584): „90“ sind 90 Sekunden, Komma geht wie Punkt.
+    const timeMs = parseLapTime(timeInput);
+    const penalty = Number(String(penaltyInput || "0").replace(",", ".")) || 0;
+    if (!timeMs) {
+      Alert.alert("Zeit fehlt", "Bitte eine Zeit wie 1:24.587 oder 1:24,587 eintragen.");
+      return;
+    }
+    if ((penalty > 0 || invalidLap) && adminNote.trim().length < 5) {
+      Alert.alert("Begründung fehlt", "Bei Strafzeit oder Disqualifikation braucht es eine kurze Begründung.");
+      return;
+    }
+    const question = plausibilityText(timeMs, activeTrack);
+    if (question) {
+      Alert.alert("Zeit prüfen", question, [
+        { text: "Abbrechen", style: "cancel" },
+        { text: "Trotzdem speichern", onPress: () => { void saveManagedTime(timeMs, true); } },
+      ]);
+      return;
+    }
+    void saveManagedTime(timeMs, false);
+  }, [activeTrack, activeTrackId, adminNote, canEnterTimes, invalidLap, penaltyInput, saveManagedTime, savingTime, selectedUserId, timeInput]);
 
   if (!challenge && loading) {
     return (
@@ -305,7 +334,14 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
           </Card>
         ) : null}
 
-        {challenge.can_manage_times ? (
+        {challenge.can_manage_times && !canEnterTimes ? (
+          <Card style={styles.managerCard} testID="fastlap-locked">
+            <Heading>Ergebnisse veröffentlicht</Heading>
+            <Muted>Die Zeiten sind gesperrt. Ändern geht nur noch durch die Turnierleitung mit Begründung, in der Verwaltung auf der Website.</Muted>
+          </Card>
+        ) : null}
+
+        {canEnterTimes ? (
           <Card style={styles.managerCard}>
             <Heading>Zeit eintragen</Heading>
             <Muted>Für Admins und Fast-Lap-Team. Zeiten werden für die aktuell gewählte Strecke gespeichert.</Muted>
@@ -316,28 +352,29 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
               placeholder="Fahrer suchen ..."
               placeholderTextColor={colors.muted}
               style={styles.input}
+              testID="fastlap-driver-search"
             />
             <View style={styles.userGrid}>
-              {filteredManagerUsers.map((candidate) => (
+              {(selectedUser && !driverHits.some((hit) => hit.id === selectedUser.id) ? [selectedUser, ...driverHits] : driverHits).map((candidate) => (
                 <Pressable
                   key={candidate.id}
                   onPress={() => {
-                    setSelectedUserId(candidate.id);
+                    setSelectedUser(candidate);
                     if (challenge.block_club_member_results && candidate.is_club_member) setScoreScope("club_reference");
                   }}
                   style={[styles.userChoice, selectedUserId === candidate.id && styles.userChoiceActive]}
                 >
-                  <Body style={styles.strong}>{candidate.display_name || candidate.username || "Fahrer"}</Body>
-                  {candidate.username ? <Muted>@{candidate.username}</Muted> : null}
+                  <Body style={styles.strong}>{candidate.name || "Fahrer"}</Body>
+                  {candidate.context ? <Muted>{candidate.context}</Muted> : null}
                 </Pressable>
               ))}
             </View>
             <View style={styles.inputGrid}>
-              <TextInput value={timeInput} onChangeText={setTimeInput} placeholder="Zeit z.B. 1:24.587" placeholderTextColor={colors.muted} style={styles.input} keyboardType="numbers-and-punctuation" />
+              <TextInput value={timeInput} onChangeText={setTimeInput} placeholder="Zeit z.B. 1:24.587" placeholderTextColor={colors.muted} style={styles.input} keyboardType="numbers-and-punctuation" testID="fastlap-time-input" />
               <TextInput value={penaltyInput} onChangeText={setPenaltyInput} placeholder="Strafe Sekunden" placeholderTextColor={colors.muted} style={styles.input} keyboardType="numeric" />
             </View>
             <TextInput value={proofUrl} onChangeText={setProofUrl} placeholder="Proof URL optional" placeholderTextColor={colors.muted} style={styles.input} autoCapitalize="none" />
-            <TextInput value={adminNote} onChangeText={setAdminNote} placeholder={invalidLap || Number(penaltyInput) > 0 ? "Begruendung Pflicht" : "Notiz optional"} placeholderTextColor={colors.muted} style={[styles.input, styles.noteInput]} multiline />
+            <TextInput value={adminNote} onChangeText={setAdminNote} placeholder={invalidLap || Number(penaltyInput) > 0 ? "Begründung Pflicht" : "Notiz optional"} placeholderTextColor={colors.muted} style={[styles.input, styles.noteInput]} multiline />
             <View style={styles.metaRow}>
               <TogglePill label="Offizielle Wertung" active={!forceReference && scoreScope === "official"} disabled={forceReference} onPress={() => setScoreScope("official")} />
               <TogglePill label="Vereins-Referenz" active={forceReference || scoreScope === "club_reference"} onPress={() => setScoreScope("club_reference")} />
@@ -469,19 +506,6 @@ function Stat({ icon, label, value, tone = "cyan" }: { icon: keyof typeof Ionico
 
 function stripText(value: string) {
   return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function parseLapTime(value: string) {
-  const cleaned = value.trim().replace(",", ".");
-  if (!cleaned) return null;
-  if (/^\d+$/.test(cleaned)) return Number(cleaned);
-  const match = cleaned.match(/^(?:(\d+):)?(\d{1,2})(?:\.(\d{1,3}))?$/);
-  if (!match) return null;
-  const minutes = Number(match[1] || 0);
-  const seconds = Number(match[2] || 0);
-  const millis = Number((match[3] || "0").padEnd(3, "0"));
-  if (seconds >= 60) return null;
-  return minutes * 60000 + seconds * 1000 + millis;
 }
 
 const styles = StyleSheet.create({
