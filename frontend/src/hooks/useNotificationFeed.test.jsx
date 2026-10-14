@@ -118,6 +118,17 @@ test("Alle gelesen klappt: alles gelesen, kein Fehler", async () => {
   expect(result.current.actionError).toBeNull();
 });
 
+test("markRead nennt, was gescheitert ist - für Stellen ohne eigene Liste (Toast der Glocke)", async () => {
+  const { result } = await loaded();
+  apiMock.post.mockRejectedValueOnce(serverError());
+  let failed;
+  await act(async () => { failed = await result.current.markRead({ ids: ["n-1"] }); });
+  expect(failed).toEqual(["n-1"]);
+  apiMock.post.mockResolvedValueOnce({ data: {} });
+  await act(async () => { failed = await result.current.markRead({ ids: ["n-1"] }); });
+  expect(failed).toEqual([]);
+});
+
 // Nach Codex-Prüfung: ein Nachladen während „gelesen“ unterwegs ist, überschreibt die Markierung nicht; nach dem
 // erfolgreichen POST bleibt sie gesetzt.
 test("Rennen: Nachladen während Gelesen-Markieren - die Markierung bleibt, auch nach dem POST", async () => {
