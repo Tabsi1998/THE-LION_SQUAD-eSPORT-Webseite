@@ -7,7 +7,7 @@ import { useLoad } from "@/hooks/useLoad";
 const RESOURCES = ["admin/notifications", "notifications", "messages", "teams", "tournaments", "matches", "prizes"];
 const NO_ITEMS = [];
 
-function notReadMessage(count, total) {
+export function notReadMessage(count, total) {
   if (count === total && count === 1) return "Die Benachrichtigung konnte nicht als gelesen markiert werden.";
   if (count === total) return "Die Benachrichtigungen konnten nicht als gelesen markiert werden.";
   return `${count} ${count === 1 ? "Benachrichtigung konnte" : "Benachrichtigungen konnten"} nicht als gelesen markiert werden.`;
@@ -70,7 +70,7 @@ export function useNotificationFeed({ enabled = true, onFresh } = {}) {
 
   const markIds = useCallback(async (ids) => {
     const todo = ids.filter((id) => !pendingRef.current.has(id));
-    if (!todo.length) return;
+    if (!todo.length) return [];
     setActionError(null);
     setPending(todo, true);
     setRead(todo, true);
@@ -81,11 +81,13 @@ export function useNotificationFeed({ enabled = true, onFresh } = {}) {
       setRead(failed, false);
       setActionError({ message: notReadMessage(failed.length, todo.length), retry: () => retryRef.current.ids(failed) });
     }
+    return failed;
   }, [setPending, setRead]);
 
+  // Gibt zurück, was der Server abgelehnt hat - für Stellen ohne eigene Liste, etwa den Toast der Glocke.
   const markRead = useCallback(async (bundle) => {
     const ids = (bundle?.ids || []).filter((id) => items.some((item) => item.id === id && !item.read));
-    await markIds(ids);
+    return markIds(ids);
   }, [items, markIds]);
 
   const markAllRead = useCallback(async () => {

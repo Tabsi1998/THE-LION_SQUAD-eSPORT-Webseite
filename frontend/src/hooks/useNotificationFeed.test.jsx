@@ -117,3 +117,14 @@ test("Alle gelesen klappt: alles gelesen, kein Fehler", async () => {
   expect(result.current.unread).toBe(0);
   expect(result.current.actionError).toBeNull();
 });
+
+test("markRead nennt, was gescheitert ist - für Stellen ohne eigene Liste (Toast der Glocke)", async () => {
+  const { result } = await loaded();
+  apiMock.post.mockRejectedValueOnce(serverError());
+  let failed;
+  await act(async () => { failed = await result.current.markRead({ ids: ["n-1"] }); });
+  expect(failed).toEqual(["n-1"]);
+  apiMock.post.mockResolvedValueOnce({ data: {} });
+  await act(async () => { failed = await result.current.markRead({ ids: ["n-1"] }); });
+  expect(failed).toEqual([]);
+});

@@ -150,6 +150,48 @@ function PlainScreen({ error, report }) {
   );
 }
 
+/**
+ * Für optionale Teile über jeder Seite (#986): Abstimmung, Zeremonie, Saison-Bühne. Stürzt so ein Teil ab, fehlt nur
+ * er - die Seite darunter bleibt bedienbar, der Fehler wird gemeldet. Auf der nächsten Seite versucht er es wieder.
+ */
+export function OptionalBoundary({ children }) {
+  const { pathname } = useLocation();
+  return <Boundary resetKey={pathname} fallback={() => null}>{children}</Boundary>;
+}
+
+function RootCard() {
+  // Ganz außen gibt es weder Router noch Anmeldung: nur der Satz, „Neu laden“ und ein gewöhnlicher Link.
+  return (
+    <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center px-4 py-10">
+      <div className="max-w-xl w-full mx-auto border border-warn/30 bg-[#121212] rounded-sm p-6 text-center" role="alert" data-testid="root-error">
+        <div className="mx-auto mb-5 w-14 h-14 rounded-sm border border-warn/40 bg-warn/10 flex items-center justify-center text-warn">
+          <AlertTriangle className="w-7 h-7" />
+        </div>
+        <h1 className="font-heading text-2xl md:text-3xl font-black uppercase">Die Website konnte nicht angezeigt werden</h1>
+        <p className="mt-3 text-sm text-white/60">Lade die Seite neu. Hilft das nicht, probier es später noch einmal.</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs"
+          >
+            <RefreshCw className="w-4 h-4" /> Neu laden
+          </button>
+          <a href="/" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs">
+            <Home className="w-4 h-4" /> Startseite
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Die äußerste Grenze um den ganzen Appbaum (#986): auch ein Fehler in Anmeldung, Router oder Saison-Kontext lässt
+ * keinen leeren Bildschirm zurück. */
+export function RootErrorBoundary({ children }) {
+  return <Boundary fallback={() => <RootCard />}>{children}</Boundary>;
+}
+
 export function AppErrorBoundary({ children }) {
   const location = useLocation();
   const resetKey = `${location.pathname}${location.search}`;

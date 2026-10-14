@@ -17,7 +17,7 @@ import { BallotPopup } from "@/components/tls/BallotPopup";
 import { CookieConsentProvider } from "@/components/tls/CookieConsent";
 import { AnalyticsHead } from "@/components/tls/AnalyticsHead";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
-import { AppErrorBoundary } from "@/components/tls/AppErrorBoundary";
+import { AppErrorBoundary, OptionalBoundary, RootErrorBoundary } from "@/components/tls/AppErrorBoundary";
 import { BottomNav } from "@/components/tls/BottomNav";
 import { PageTransition } from "@/components/tls/PageTransition";
 import { RouteFallback, StartSplashGate } from "@/components/tls/RouteFallback";
@@ -201,7 +201,10 @@ const BoardPage = lazy(() => import("@/pages/public/ClubPages").then((m) => ({ d
 const CurrentSeasonRedirect = lazy(() => import("@/pages/public/CurrentSeasonRedirect"));
 
 function App() {
+  // Grenzen gegen Renderfehler (#986): ganz außen eine Karte für Fehler in Anmeldung, Router oder Saison-Kontext; die
+  // optionalen Teile über jeder Seite haben je eine eigene Grenze, damit ihr Fehler nicht die Seite darunter leert.
   return (
+    <RootErrorBoundary>
     <AuthProvider>
       <BrowserRouter>
         <SeasonProvider>
@@ -213,14 +216,14 @@ function App() {
             <ScrollManager />
             {/* Seitenwechsel mit der Übergangs-Funktion des Browsers (#1073) - nach ScrollManager, siehe dort. */}
             <ViewTransitions />
-            <AchievementCatchUp />
+            <OptionalBoundary><AchievementCatchUp /></OptionalBoundary>
             {/* Saison-Signale (#678): was gesammelt wurde, geht an den Server - nach dem Login auch das von vorher. */}
-            <SignalSync />
-            <CeremonyHost />
+            <OptionalBoundary><SignalSync /></OptionalBoundary>
+            <OptionalBoundary><CeremonyHost /></OptionalBoundary>
             {/* Abstimmung live (#844): offene Abstimmung mit eigenem Stimmrecht als Popup auf jeder Seite, nie im Admin. */}
-            <BallotPopup />
+            <OptionalBoundary><BallotPopup /></OptionalBoundary>
             {/* Jahreszeiten (#634): Deko-Ebenen über der ganzen Website, nie im Admin, nie klickbar. */}
-            <SeasonStage />
+            <OptionalBoundary><SeasonStage /></OptionalBoundary>
             <Toaster theme="dark" position="top-right" richColors />
             <StartSplashGate />
             <AppErrorBoundary>
@@ -422,6 +425,7 @@ function App() {
         </SeasonProvider>
       </BrowserRouter>
     </AuthProvider>
+    </RootErrorBoundary>
   );
 }
 
