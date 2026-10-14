@@ -5,6 +5,7 @@ structured: if a rule is ever changed, exactly one test should have to change
 with it.
 """
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -94,8 +95,10 @@ def test_without_any_choice_the_default_time_applies():
     resolution = resolve_matchday_time(match(), [], window)
 
     assert resolution.source == "default"
-    assert resolution.scheduled_at.weekday() == 6
-    assert resolution.scheduled_at.hour == 20
+    # Wiener Zeit (#1552): der Sonntag und die 20:00 gelten für die Spieler, nicht in UTC.
+    local = resolution.scheduled_at.astimezone(ZoneInfo("Europe/Vienna"))
+    assert local.weekday() == 6
+    assert local.hour == 20
     assert window.contains(resolution.scheduled_at)
 
 
@@ -104,8 +107,9 @@ def test_the_default_time_is_configurable():
 
     resolution = resolve_matchday_time(match(), [], window, weekday=4, hour=19, minute=30)
 
-    assert resolution.scheduled_at.weekday() == 4
-    assert (resolution.scheduled_at.hour, resolution.scheduled_at.minute) == (19, 30)
+    local = resolution.scheduled_at.astimezone(ZoneInfo("Europe/Vienna"))
+    assert local.weekday() == 4
+    assert (local.hour, local.minute) == (19, 30)
 
 
 def test_a_default_day_outside_a_short_week_gives_no_answer():
@@ -290,3 +294,80 @@ def test_a_manual_time_and_a_finished_match_are_never_touched():
 
 def test_formats_without_matchdays_get_nothing_written():
     assert schedule_writes({"id": "t", "format": "single_elim", "start_date": TUESDAY.isoformat()}, [fixture("m1", 1)], []) == []
+
+
+# ---------------------------------------------------------------- Wiener Zeit und Austragung (#1552)
+
+from services.matchday_schedule import plays_in_matchdays  # noqa: E402
+
+VIENNA = ZoneInfo("Europe/Vienna")
+
+
+def test_the_default_time_is_vienna_time_in_summer():
+    # Sommerzeit: 20:00 Wien ist 18:00 UTC.
+    window = matchday_window(datetime(2026, 7, 7, 16, 0, tzinfo=timezone.utc), 1)
+    moment = default_time_in(window)
+    assert moment == datetime(2026, 7, 12, 18, 0, tzinfo=timezone.utc)
+    assert moment.astimezone(VIENNA).strftime("%a %H:%M") == "Sun 20:00"
+
+
+def test_the_default_time_is_vienna_time_in_winter():
+    # Winterzeit: 20:00 Wien ist 19:00 UTC.
+    window = matchday_window(datetime(2026, 1, 6, 17, 0, tzinfo=timezone.utc), 1)
+    moment = default_time_in(window)
+    assert moment == datetime(2026, 1, 11, 19, 0, tzinfo=timezone.utc)
+    assert moment.astimezone(VIENNA).strftime("%a %H:%M") == "Sun 20:00"
+
+
+def test_the_default_day_is_the_vienna_weekday_even_late_at_night():
+    # Montag 23:30 Wien ist noch Montag, auch wenn es in UTC schon Montag 21:30 ist - und nie Sonntag.
+    window = matchday_window(datetime(2026, 7, 6, 21, 0, tzinfo=timezone.utc), 1)
+    moment = default_time_in(window, weekday=0, hour=23, minute=30)
+    assert moment.astimezone(VIENNA).strftime("%a %H:%M") == "Mon 23:30"
+    assert window.contains(moment)
+
+
+def test_a_local_one_day_group_phase_has_no_matchdays():
+    assert plays_in_matchdays({"format": "groups", "event_mode": "local"}) is False
+    assert plays_in_matchdays({"format": "groups", "event_mode": "online"}) is True
+    assert plays_in_matchdays({"format": "league"}) is True, "ohne Angabe gilt online"
+    assert plays_in_matchdays({"format": "single_elim", "event_mode": "online"}) is False
+
+
+def test_the_phase_decides_before_the_tournament():
+    online = {"format": "groups", "event_mode": "online"}
+    assert plays_in_matchdays(online, {"settings": {"event_mode": "local"}}) is False
+    assert plays_in_matchdays({"format": "groups", "event_mode": "local"}, {"settings": {"event_mode": "online"}}) is True
+
+
+def test_a_local_group_phase_gets_nothing_written():
+    assert schedule_writes(league(format="groups", event_mode="local"), [fixture("m1", 1)], []) == []
+
+
+def test_an_agreed_time_outside_the_week_still_counts():
+    """Beide Seiten haben sich geeinigt - der Lauf setzt das nicht still auf die Standardzeit zurück."""
+    window = matchday_window(TUESDAY, 1)
+    outside = TUESDAY + timedelta(days=9)
+    assert len(usable_proposals([proposal("reg-away", outside, status="accepted")], window)) == 1
+    resolution = resolve_matchday_time(match(), [proposal("reg-away", outside, status="accepted")], window)
+    assert resolution.source == "accepted" and resolution.scheduled_at == outside
+
+
+def test_an_agreed_time_in_the_match_is_not_overwritten_by_the_default():
+    window = matchday_window(TUESDAY, 1)
+    agreed = fixture("m1", 1, scheduled_at=(TUESDAY + timedelta(days=9)).isoformat(), schedule_source="accepted", status="scheduled")
+    assert schedule_writes(league(), [agreed], []) == []
+
+
+def test_a_week_boundary_keeps_the_vienna_wall_time_across_the_summer_time_change():
+    """Liga-Start Dienstag 18:00 Wien im Sommer: die zweite Woche beginnt Dienstag 18:00 Wien im Winter."""
+    start = datetime(2026, 10, 20, 16, 0, tzinfo=timezone.utc)  # 18:00 Wien, Sommerzeit
+    first, second = matchday_window(start, 1), matchday_window(start, 2)
+    assert first.end == second.start
+    assert second.start == datetime(2026, 10, 27, 17, 0, tzinfo=timezone.utc)  # 18:00 Wien, Winterzeit
+    assert second.start.astimezone(ZoneInfo("Europe/Vienna")).strftime("%a %H:%M") == "Tue 18:00"
+
+
+def test_a_write_says_what_it_expects_to_find_so_a_stale_run_cannot_overwrite():
+    writes = schedule_writes(league(), [fixture("m1", 1)], [])
+    assert writes[0]["expect"] == {"schedule_source": None, "scheduled_at": None, "status": "pending"}

@@ -1000,7 +1000,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("billing_orders", _safe_billing_orders), IntervalTrigger(seconds=120), id="billing_orders",
                   max_instances=1, coalesce=True)
-    # Geltende Spieltag-Termine in die Partien schreiben (#235): abgelaufene Fristen, neue Partien.
+    # Liga-Modus des Spielplaners (#235, #1552): geltende Spieltag-Termine online in Wiener Zeit schreiben,
+    # abgelaufene Antwortfristen an die Turnierleitung melden. Vor Ort plant der Planer über „Planen“.
     sched.add_job(_single_replica("matchday_schedule", _safe_matchday_schedule), IntervalTrigger(minutes=15), id="matchday_schedule",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("billing_sync", _safe_billing_sync), IntervalTrigger(minutes=10), id="billing_sync",

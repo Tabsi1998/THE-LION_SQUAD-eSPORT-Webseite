@@ -11,6 +11,7 @@ a tournament host would make them.
 import pathlib
 import sys
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 import pytest_asyncio
@@ -419,7 +420,8 @@ async def test_without_any_agreement_the_default_time_counts(flow):
     assert entries, "Spieltag 1 hat Partien"
     for entry in entries:
         assert entry["schedule_source"] == "default"
-        moment = datetime.fromisoformat(entry["scheduled_at"])
+        # Wiener Zeit (#1552): Sonntag 20:00 für die Spieler, nicht in UTC.
+        moment = datetime.fromisoformat(entry["scheduled_at"]).astimezone(ZoneInfo("Europe/Vienna"))
         assert moment.weekday() == 6 and moment.hour == 20, "Sonntag 20:00"
 
 
@@ -431,7 +433,7 @@ async def test_the_default_time_is_a_tournament_setting(flow):
     plan = (await flow.get(f"/api/tournaments/{tournament['id']}/matchdays")).json()
 
     assert plan["settings"] == {"days": 7, "weekday": 4, "hour": 19, "minute": 30}
-    moment = datetime.fromisoformat(plan["matchdays"][0]["matches"][0]["scheduled_at"])
+    moment = datetime.fromisoformat(plan["matchdays"][0]["matches"][0]["scheduled_at"]).astimezone(ZoneInfo("Europe/Vienna"))
     assert moment.weekday() == 4 and (moment.hour, moment.minute) == (19, 30)
 
 

@@ -12,8 +12,9 @@ from pydantic import BaseModel, Field
 from database import get_db
 from services.visibility import user_can_see
 from services.station_labels import attach_station_info
+from services.match_duration import effective_match_duration
 from services.tournament_permissions import READ_STAFF_ROLES, has_tournament_staff_permission
-from services.tournament_rules import tournament_modes
+from services.tournament_rules import match_policy, tournament_modes
 from services.permissions import is_confirmed_tournament_lead
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.heat_rebuild import evaluate_after_write
@@ -156,13 +157,8 @@ def _parse_plan_dt(value) -> datetime | None:
         return None
 
 
-def _plan_duration(match: dict, tournament: dict | None = None) -> int:
-    tournament = tournament or {}
-    raw = match.get("duration_minutes") or (match.get("settings") or {}).get("duration_minutes") or tournament.get("match_duration_minutes") or 30
-    try:
-        return max(1, int(raw))
-    except Exception:
-        return 30
+def _plan_duration(match: dict, tournament: dict | None = None, stage: dict | None = None) -> int:
+    return effective_match_duration(match, stage=stage, tournament=tournament)
 
 
 def _plan_match_label(match: dict) -> str:
@@ -274,7 +270,8 @@ def _planning_report(
             continue
         if not match.get("scheduled_at"):
             warnings.append({"type": "missing_time", "severity": "warning", "match_id": match.get("id"), "label": label, "message": f"{label}: keine Startzeit geplant."})
-        if not match.get("station_id"):
+        # Stationen gibt es nur vor Ort (#1552): online und Liga bekommen keine und auch keine Warnung dazu.
+        if not match.get("station_id") and match_policy(match, tournament)["event_mode"] == "local":
             warnings.append({"type": "missing_station", "severity": "warning", "match_id": match.get("id"), "label": label, "message": f"{label}: keine Station geplant."})
         scheduled = _parse_plan_dt(match.get("scheduled_at"))
         if scheduled and match.get("station_id"):
@@ -362,7 +359,7 @@ def _stage_defaults_for_tournament_format(tournament: dict, body: TournamentBrac
         # Eine Gruppe ist ein Round Robin, mehrere sind eine Gruppenphase.
         settings.setdefault("group_count", _default_group_count(tournament) if fmt == "groups" else 1)
     settings.setdefault("qualifiers_per_match", 2 if match_type == "ffa" else 1)
-    settings.setdefault("duration_minutes", int(tournament.get("match_duration_minutes") or 30))
+    settings.setdefault("duration_minutes", effective_match_duration(tournament=tournament))
     settings.setdefault("score_type", "points")
     settings.setdefault("calculation", "points")
     return {

@@ -130,6 +130,10 @@ CAPABILITIES: tuple[Capability, ...] = (
             "antworten mit applies=false. Rein lesend, die Termine werden berechnet."),
     _c("planning.check", "Planungsprüfung und Spielplan-Export",
        ["GET /api/tournaments/{tid}/planning-check", "GET /api/tournaments/{tid}/match-plan.csv"], [CLASSIC, GRAPH]),
+    _c("planning.schedule", "Spielplan planen (Vorschau) und übernehmen",
+       ["POST /api/tournaments/{tid}/schedule/plan", "POST /api/tournaments/{tid}/schedule/apply"], [GRAPH],
+       note="Der Spielplaner (#1552) schreibt Zeit und Station zusammen mit schedule_source; die Vorschau "
+            "schreibt nichts, Übernehmen alles auf einmal. Online nie Stationen."),
 
     # ---------- Matches lesen ----------
     _c("match.read", "Match ansehen",

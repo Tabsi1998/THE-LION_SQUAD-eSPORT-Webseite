@@ -25,6 +25,7 @@ import { HeatRebuildBar } from "./tournament/HeatRebuildBar";
 import { ParticipantRemovalActions } from "./tournament/ParticipantRemovalActions";
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
 import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
+import { planAndApplySchedule } from "@/lib/schedulePlan";
 
 export default function AdminTournamentEditPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
@@ -141,21 +142,11 @@ export default function AdminTournamentEditPage() {
   useEffect(() => { loadSafely(); }, [loadSafely]);
   useApiInvalidation(loadSafely, ["tournaments", "matches", "stations"]);
 
-  const autoAssignStations = async ({ silent = false, reload = true } = {}) => {
-    if (!stations.length) return null;
-    try {
-      const { data } = await api.post(`/stations/auto-assign?tournament_id=${encodeURIComponent(id)}&plan=true`);
-      if (!silent) {
-        toast.success(data.planned
-          ? `${data.assigned || 0} Match${Number(data.assigned) === 1 ? "" : "es"} mit Station und Startzeit geplant.`
-          : `${data.assigned || 0} Match${Number(data.assigned) === 1 ? "" : "es"} automatisch Stationen zugewiesen.`);
-      }
-      if (reload) load();
-      return data;
-    } catch (e) {
-      if (!silent) toast.error(formatRequestError(e, "Stationen konnten nicht automatisch zugewiesen werden."));
-      return null;
-    }
+  // Spielplaner (#1552): „Planen“ zeigt, was der Planer schreiben würde - Zeit und Station je Spiel, dazu
+  // Konflikte -, und erst „Übernehmen“ schreibt alles auf einmal. Nebenbei (Statuswechsel, An-/Abmeldung,
+  // Neuaufbau) wird nicht mehr still geplant; feste Termine bleiben, Konflikte stehen rot im Dialog.
+  const planSchedule = async () => {
+    if (await planAndApplySchedule({ tournamentId: id, confirm })) load();
   };
 
   const reset = async () => {
@@ -205,10 +196,7 @@ export default function AdminTournamentEditPage() {
       reason = String(answer).trim() || null;
     }
     try {
-      const { data } = await api.patch(`/tournaments/${id}/registrations/${rid}`, reason ? { status, status_reason: reason } : { status });
-      if (data?.auto_bracket_update?.preview === false && data.auto_bracket_update?.ok !== false) {
-        await autoAssignStations({ silent: true, reload: false });
-      }
+      await api.patch(`/tournaments/${id}/registrations/${rid}`, reason ? { status, status_reason: reason } : { status });
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Teilnehmerstatus konnte nicht gespeichert werden."));
@@ -231,7 +219,6 @@ export default function AdminTournamentEditPage() {
       const suffix = params.toString() ? `?${params.toString()}` : "";
       const { data } = await api.post(`/tournaments/${id}/bracket/from-format${suffix}`, structure || {});
       toast.success(data.preview ? `Turnierbaum-Vorschau mit ${data.match_count} Spielen neu aufgebaut.` : `Turnierbaum mit ${data.match_count} Spielen neu aufgebaut.`);
-      if (!data.preview) await autoAssignStations({ silent: true, reload: false });
       load();
     } catch (e) {
       if (e.response?.status === 409 && !force) {
@@ -255,9 +242,6 @@ export default function AdminTournamentEditPage() {
     })) return;
     try {
       const { data } = await api.delete(`/tournaments/${id}/registrations/${registration.id}`);
-      if (data?.auto_bracket_update?.preview === false && data.auto_bracket_update?.ok !== false) {
-        await autoAssignStations({ silent: true, reload: false });
-      }
       toast.success(data?.auto_bracket_update?.match_count
         ? `Teilnehmer entfernt. ${data.auto_bracket_update.preview === false ? "Turnierbaum" : "Vorschau"} neu gemischt.`
         : "Teilnehmer entfernt.");
@@ -285,9 +269,6 @@ export default function AdminTournamentEditPage() {
       if (data?.event_gate_warning) toast.warning(data.event_gate_warning);
       const replacement = data.replacement;
       const autoBracketUpdate = data.auto_bracket_update;
-      if (autoBracketUpdate?.preview === false && autoBracketUpdate?.ok !== false) {
-        await autoAssignStations({ silent: true, reload: false });
-      }
       if (!replacement && autoBracketUpdate?.ok === false) {
         toast.success(autoBracketUpdate.reason === "matches_started"
           ? "Teilnehmer hinzugefügt. Turnierbaum bleibt fix, weil bereits Spiele aktiv oder gewertet sind."
@@ -340,10 +321,7 @@ export default function AdminTournamentEditPage() {
           forceStart = !report.ok;
         }
       }
-      const { data } = await api.post(`/tournaments/${id}/status`, { status, force: forceStart });
-      if (["check_in", "live"].includes(status) && data?.auto_generated_bracket && data.auto_generated_bracket.ok !== false) {
-        await autoAssignStations({ silent: true, reload: false });
-      }
+      await api.post(`/tournaments/${id}/status`, { status, force: forceStart });
       toast.success(`Status: ${TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status}`);
       load();
     } catch (e) {
@@ -475,8 +453,8 @@ export default function AdminTournamentEditPage() {
   const canLockTournament = isTournamentLead && ["completed", "results_published", "archived", "cancelled"].includes(t.status);
   const toolActions = [
     t.can_assign_stations && stations.length > 0 && (
-      <button key="stations" type="button" onClick={() => autoAssignStations()} data-testid="admin-tr-auto-stations" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
-        <Zap className="w-3.5 h-3.5" /> Stationen automatisch
+      <button key="stations" type="button" onClick={() => planSchedule()} data-testid="admin-tr-plan-schedule" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
+        <Zap className="w-3.5 h-3.5" /> Planen
       </button>
     ),
     t.can_use_staff_tools && (

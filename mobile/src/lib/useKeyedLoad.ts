@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { loadProblem, type LoadProblem } from "../components/ListState";
 
 // Laden einer Detailseite mit Kennung (#1000). Drei Regeln an einer Stelle statt in jedem Screen:
@@ -38,7 +38,9 @@ export function useKeyedLoad<T>(key: string, fetcher: (key: string, previous: T 
   const generation = useRef(0);
   const fetcherRef = useRef(fetcher);
   const stateRef = useRef(state);
-  useEffect(() => {
+  // Im Layout-Effekt, nicht im normalen: der normale läuft erst nach dem Schreiben ins Bild (auf dem Gerät in einer späteren
+  // Aufgabe, #1570). Wer in diesem Spalt nachlädt, bekäme sonst als `previous` den Stand von vor dem Laden.
+  useLayoutEffect(() => {
     fetcherRef.current = fetcher;
     stateRef.current = state;
   });

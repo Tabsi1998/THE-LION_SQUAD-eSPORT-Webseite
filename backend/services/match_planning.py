@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 
+from services.match_duration import effective_match_duration
+
 
 ACTIVE_PLANNING_STATUSES = {"preview", "pending", "ready", "scheduled", "in_progress", "waiting_result"}
 RESULT_OPEN_TOURNAMENT_STATUSES = {"live", "paused"}
@@ -47,17 +49,10 @@ def _parse_dt(value) -> datetime | None:
         return None
 
 
-def _duration_minutes(match: dict, updates: dict | None = None) -> int:
-    updates = updates or {}
-    raw = (
-        updates.get("duration_minutes")
-        if "duration_minutes" in updates
-        else match.get("duration_minutes") or (match.get("settings") or {}).get("duration_minutes")
-    )
-    try:
-        return max(1, int(raw or 30))
-    except Exception:
-        return 30
+def _duration_minutes(match: dict, updates: dict | None = None, *, tournament: dict | None = None,
+                      stages: dict[str, dict] | None = None) -> int:
+    stage = (stages or {}).get(match.get("stage_id") or "")
+    return effective_match_duration(match, stage=stage, tournament=tournament, updates=updates)
 
 
 def _overlaps(start_a: datetime, minutes_a: int, start_b: datetime, minutes_b: int) -> bool:
@@ -75,9 +70,12 @@ async def ensure_station_slot_available(db, current_match: dict, updates: dict, 
     if not scheduled_at:
         return
 
-    duration = _duration_minutes(current_match, updates)
     tournament_id = current_match["tournament_id"]
     current_id = current_match["id"]
+    # Die Dauer kennt Phase und Turnier (#1552) - vorher galt hier ohne Wert am Spiel immer 30.
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0}) or {}
+    stages = {stage["id"]: stage for stage in await db.tournament_stages.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(200)}
+    duration = _duration_minutes(current_match, updates, tournament=tournament, stages=stages)
     queries = [
         ("matches_v2", {
             "tournament_id": tournament_id,
@@ -91,7 +89,7 @@ async def ensure_station_slot_available(db, current_match: dict, updates: dict, 
             other_start = _parse_dt(other.get("scheduled_at"))
             if not other_start:
                 continue
-            if _overlaps(scheduled_at, duration, other_start, _duration_minutes(other)):
+            if _overlaps(scheduled_at, duration, other_start, _duration_minutes(other, tournament=tournament, stages=stages)):
                 label = other.get("match_key") or other.get("round_name") or other.get("id")
                 raise HTTPException(
                     status_code=409,
