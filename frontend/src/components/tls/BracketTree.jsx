@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, createContext } from "react";
 import { Link, useInRouterContext } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { Trophy } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trophy } from "lucide-react";
 import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
 import { asInstant, viennaTime } from "@/lib/vienna";
 import { finderFor, initials } from "@/lib/slotSource";
@@ -124,7 +124,7 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
   const graph = useMemo(() => {
     const decisive = new Set(matches_v2.filter((match) => isBronzeMatch(match) || sectionGroup(match.section) === "final").map((match) => match.id));
     if (finalMatch) decisive.add(finalMatch.id);
-    return { edges, byId: new Map(matches_v2.map((match) => [match.id, match])), decisive, matches: matches_v2 };
+    return { edges, byId: new Map(matches_v2.map((match) => [match.id, match])), decisive, matches: matches_v2, finalId: finalMatch?.id || null };
   }, [edges, matches_v2, finalMatch]);
   const path = usePath(matches_v2, edges);
   const motionValue = useBracketMotion(isTv ? null : matches_v2, { quiet: quietUpdate });
@@ -283,6 +283,17 @@ function groupMatches(matches) {
 
 const roundNumbers = (rounds) => Object.keys(rounds).map(Number).sort((a, b) => a - b);
 
+/** Eine Runde, die der Umbau ganz gestrichen hat (#1575, abgekürzt), fällt aus der Ansicht weg - wie in Vorschau 2. */
+function withoutDroppedRounds(sections) {
+  const dropped = (list) => list.length > 0 && list.every((match) => String(match.status || "").toLowerCase() === "cancelled" && match.result_meta?.source === "heat_rebuild");
+  const out = {};
+  for (const [name, rounds] of Object.entries(sections)) {
+    const kept = Object.fromEntries(Object.entries(rounds).filter(([, list]) => !dropped(list)));
+    if (Object.keys(kept).length) out[name] = kept;
+  }
+  return out;
+}
+
 /** Der Fluss zwischen den Blöcken (#399): wer verliert, wechselt in die Verliererrunde. */
 function sectionFlowHint(section, hasLoser, hasReset = false) {
   const key = normalizeSection(section);
@@ -350,7 +361,7 @@ function WebStages({ stages, matches, regMap, podiumMap, steps, finalMatch, tour
   const byStage = useMemo(() => groupMatches(matches), [matches]);
   const stagesForView = stages.length ? stages : [{ id: "__default", name: "Turnierbaum", number: 1 }];
   return stagesForView.map((stage) => {
-    const sections = byStage[stage.id] || {};
+    const sections = withoutDroppedRounds(byStage[stage.id] || {});
     const names = Object.keys(sections);
     const multi = stagesForView.length > 1;
     const heading = multi ? (
@@ -427,12 +438,13 @@ function SectionSteps({ section, rounds, regMap, podiumMap, flowHint }) {
       <SectionTitle section={section} flowHint={flowHint} />
       <div className="space-y-3" data-testid="bracket-steps">
         <div className="flex items-center justify-between gap-3">
-          <button type="button" onClick={() => go(Math.max(0, current - 1))} disabled={current === 0} data-testid="bracket-step-prev" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-35">← Vorige</button>
-          <div className="text-center min-w-0">
+          <button type="button" onClick={() => go(Math.max(0, current - 1))} disabled={current === 0} data-testid="bracket-step-prev" aria-label="Vorige Runde" className="tls-btn tls-btn--quiet shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-sm disabled:opacity-35"><ChevronLeft className="h-5 w-5" aria-hidden="true" /></button>
+          <div className="text-center min-w-0 flex-1">
             <div className="text-[11px] font-bold uppercase tracking-wider text-muted-text" data-testid="bracket-step-label">Runde {current + 1} von {roundNums.length}</div>
-            <div className="font-heading text-sm font-black uppercase break-words" data-testid="bracket-round-title">{roundNameOf(rounds[rn][0], rn)}</div>
+            {/* Ganze Wörter (#1561): keine Silbentrennung wie sonst bei Überschriften am Handy, lieber zwei ausgeglichene Zeilen. */}
+            <div className="font-heading text-sm font-black uppercase leading-tight ![hyphens:none] [text-wrap:balance]" data-testid="bracket-round-title">{roundNameOf(rounds[rn][0], rn)}</div>
           </div>
-          <button type="button" onClick={() => go(Math.min(roundNums.length - 1, current + 1))} disabled={current >= roundNums.length - 1} data-testid="bracket-step-next" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-35">Nächste →</button>
+          <button type="button" onClick={() => go(Math.min(roundNums.length - 1, current + 1))} disabled={current >= roundNums.length - 1} data-testid="bracket-step-next" aria-label="Nächste Runde" className="tls-btn tls-btn--quiet shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-sm disabled:opacity-35"><ChevronRight className="h-5 w-5" aria-hidden="true" /></button>
         </div>
         <div key={rn} className="flex flex-col gap-3" data-step-dir={direction > 0 ? "next" : direction < 0 ? "prev" : undefined}>
           {rounds[rn].map((match) => <MatchCard key={match.id} match={match} regMap={regMap} podiumMap={podiumMap} />)}

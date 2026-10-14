@@ -207,7 +207,7 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
     >
       <span className="w-4 shrink-0 text-right font-display text-[11px] tabular-nums text-quiet">{seed || ""}</span>
       <SlotAvatar avatar={reg?.user?.avatar_url || reg?.avatar_url} label={label} empty={!reg} />
-      <span className={`min-w-0 flex-1 break-words leading-tight ${String(label || pending).length > 22 ? "text-xs" : "text-sm"} ${nameTone}`} data-pending={!label && pending ? "1" : undefined}>
+      <span className={`min-w-0 flex-1 break-words leading-tight ${String(label || pending).length > (heat ? 14 : 22) ? "text-xs" : "text-sm"} ${nameTone}`} data-pending={!label && pending ? "1" : undefined}>
         {bye ? "Freilos" : label || pending || "—"}
       </span>
       {isMine ? <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-brand">Du</span> : null}
@@ -313,7 +313,7 @@ function DuelCard({ match, regMap, podiumMap, decisive }) {
 
 function HeatCard({ match, regMap, podiumMap, decisive }) {
   const { active } = useContext(PathContext);
-  const { edges, matches } = useContext(GraphContext);
+  const { edges, matches, finalId } = useContext(GraphContext);
   const finished = useContext(FinishedContext);
   const mine = useContext(MineContext);
   const findMatch = useContext(FinderContext)(match);
@@ -335,8 +335,13 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
   const isMine = Boolean(mine) && slots.some((slot) => slot.registration_id === mine);
   const live = !finished && isLive(match);
   const name = match.match_type === "ffa" ? `Lauf ${match.match_key || ""}`.trim() : (match.match_key || "Spiel");
-  const field = filled === slots.length ? `${filled} Spieler` : filled ? `${filled} von ${slots.length} Spielern` : `${slots.length} Plätze`;
-  const meta = [field, qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : null].filter(Boolean).join(" · ");
+  // Gezählt werden nur Plätze, die noch jemand bekommen kann - ein Freilos-Platz („frei“) zählt nicht mit.
+  const seats = taken.length;
+  const field = filled === seats ? `${filled} Spieler` : filled ? `${filled} von ${seats} Spielern` : `${seats} ${seats === 1 ? "Platz" : "Plätze"}`;
+  // Der letzte Lauf ohne Folgespiel (#1561): danach kommt nur der Pokal - „2 kommen weiter“ wäre falsch.
+  const lastHeat = match.id === finalId && !exits.advance.length && !exits.drop.length;
+  const onward = lastHeat ? "Platz 1 gewinnt" : qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : null;
+  const meta = [field, onward].filter(Boolean).join(" · ");
   const empty = !filled && slots.every((slot) => !pendingLabel(slot, findMatch));
   const cutAt = qualifiers > 0 && exits.advance.length && qualifiers < rows.length ? qualifiers : 0;
   const cutText = `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter → ${exits.advance.join(", ")}`;

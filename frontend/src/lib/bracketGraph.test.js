@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { clone, decide, doubleElimination, find, heats, singleElimination } from "../../e2e/fixtures/tvBrackets.mjs";
+import { clone, decide, doubleElimination, find, singleElimination } from "../../e2e/fixtures/tvBrackets.mjs";
+// FFA-Bäume aus dem echten Generator und dem echten Umbau (scripts/make_ffa_bracket_fixture.py) - keine Handarbeit.
+import FFA from "../../e2e/fixtures/ffaGenerated.json";
 import { bracketEdges, diffBracket, heatExits, matchFate, orderEdges, pathFor, soloAdvance } from "./bracketGraph";
 
 // Turnierbaum neu (#1561): die Linien kommen aus den echten Quellen der Plätze („W:A:1“, `advancement`), nicht aus der
@@ -7,6 +9,9 @@ import { bracketEdges, diffBracket, heatExits, matchFate, orderEdges, pathFor, s
 // die ein neuer Stand auslöst.
 
 const pairs = (edges) => edges.map((edge) => `${edge.from}>${edge.to}:${edge.toSlot}`).sort();
+const ffa = (state) => structuredClone(FFA[state]);
+const keyOf = (bracket) => { const keys = new Map(bracket.matches_v2.map((match) => [match.id, match.match_key])); return (id) => keys.get(id); };
+const keyPairs = (bracket, edges) => { const key = keyOf(bracket); return edges.map((edge) => `${key(edge.from)}>${key(edge.to)}:${edge.toSlot}`).sort(); };
 
 describe("bracketEdges", () => {
   it("Single Elimination: jede Linie führt dorthin, wo der Sieger wirklich spielt - auch wenn die Reihenfolge nicht passt", () => {
@@ -33,10 +38,12 @@ describe("bracketEdges", () => {
     expect(fromTo("GF", "GFR").map((edge) => edge.rank).sort()).toEqual([1, 2]);
   });
 
-  it("FFA-Läufe: je Weiterkommer eine Linie in seinen Platz im Finale", () => {
-    const bracket = heats(8);
-    const edges = bracketEdges(bracket.matches_v2);
-    expect(pairs(edges)).toEqual(["m-A>m-C:1", "m-A>m-C:2", "m-B>m-C:3", "m-B>m-C:4"]);
+  it("FFA-Läufe (echter Generator, 16 Fahrer): 4 Läufe → 2 Läufe → Finale, je Weiterkommer eine Linie in seinen Platz", () => {
+    const bracket = ffa("ffa16");
+    expect(FFA.plan16).toEqual([[[4, 2], [4, 2], [4, 2], [4, 2]], [[4, 2], [4, 2]], [[4, 0]]]);
+    expect(keyPairs(bracket, bracketEdges(bracket.matches_v2))).toEqual([
+      "A>E:1", "A>E:3", "B>F:1", "B>F:3", "C>F:2", "C>F:4", "D>E:2", "D>E:4", "E>G:1", "E>G:3", "F>G:2", "F>G:4",
+    ]);
   });
 
   it("nimmt `advancement`, wenn ein Platz seine Herkunft nicht kennt", () => {
@@ -47,12 +54,19 @@ describe("bracketEdges", () => {
     expect(pairs(bracketEdges(matches))).toEqual(["a>b:2"]);
   });
 
-  it("Linien aus einem zusammengelegten Lauf sind ruhig („void“)", () => {
-    const bracket = heats(16);
-    const b = find(bracket, "B");
-    Object.assign(b, { status: "cancelled", merged_into_key: "A", merged_into: "m-A", result_meta: { source: "heat_rebuild", merged_into: "m-A" } });
-    const edges = bracketEdges(bracket.matches_v2).filter((edge) => edge.from === "m-B");
-    expect(edges.length).toBeGreaterThan(0);
+  it("nach dem Zusammenlegen (echter Umbau, 8 von 16): entfallene Läufe haben keine Linien mehr, A und B führen ins Finale E", () => {
+    const bracket = ffa("ffa8_after_merge");
+    const edges = bracketEdges(bracket.matches_v2);
+    expect(keyPairs(bracket, edges)).toEqual(["A>E:1", "A>E:3", "B>E:2", "B>E:4"]);
+    expect(edges.some((edge) => edge.void)).toBe(false);
+  });
+
+  it("eine Linie in ein entfallenes Spiel ist ruhig („void“)", () => {
+    const bracket = ffa("ffa16");
+    find(bracket, "G").status = "cancelled";
+    const key = keyOf(bracket);
+    const edges = bracketEdges(bracket.matches_v2).filter((edge) => key(edge.to) === "G");
+    expect(edges.length).toBe(4);
     expect(edges.every((edge) => edge.void)).toBe(true);
   });
 });
@@ -93,9 +107,10 @@ describe("matchFate", () => {
 
 describe("heatExits", () => {
   it("sagt, wohin die Weiterkommer gehen und was mit den anderen geschieht", () => {
-    const single = heats(8);
+    const single = ffa("ffa16");
     const edges = bracketEdges(single.matches_v2);
-    expect(heatExits(find(single, "A"), edges, single.matches_v2)).toEqual({ advance: ["C"], drop: [], qualifiers: 2 });
+    expect(heatExits(find(single, "A"), edges, single.matches_v2)).toEqual({ advance: ["E"], drop: [], qualifiers: 2 });
+    // Läufe mit Loser Bracket gibt es nur als eigenes Schema der Turnierleitung (der Server liest es wie dieses).
     const { heatDoubleElimination } = HEAT_DE;
     const de = heatDoubleElimination();
     const deEdges = bracketEdges(de.matches_v2);
@@ -144,29 +159,28 @@ describe("diffBracket", () => {
     expect(new Set(events.map((event) => event.key)).size).toBe(events.length);
   });
 
-  it("Auslosung: Namen kommen in die Setzplätze - nacheinander", () => {
-    const after = heats(8);
-    const before = clone(after);
+  it("Auslosung (echter Generator, 16 Fahrer): Namen kommen in die Setzplätze - nacheinander", () => {
+    const after = ffa("ffa16");
+    const before = structuredClone(after);
     for (const match of before.matches_v2) for (const slot of match.slots) if (slot.source?.type === "seed") slot.registration_id = null;
     const events = diffBracket(before.matches_v2, after.matches_v2);
     expect(events.every((event) => event.type === "draw")).toBe(true);
-    expect(events).toHaveLength(8);
-    expect(events.map((event) => event.index)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(events).toHaveLength(16);
+    expect(events.map((event) => event.index)).toEqual([...Array(16).keys()]);
   });
 
-  it("Läufe zusammengelegt: die Namen fließen aus dem alten Lauf in die Sammelkarte", () => {
-    const before = heats(16);
-    const after = clone(before);
-    const a = find(after, "A");
-    const b = find(after, "B");
-    const moved = b.slots.map((slot) => slot.registration_id);
-    a.slots = [...a.slots.slice(0, 2), ...b.slots.slice(0, 2).map((slot, index) => ({ ...slot, slot: 3 + index }))];
-    Object.assign(b, { status: "cancelled", merged_into_key: "A", merged_into: "m-A", slots: b.slots.map((slot) => ({ ...slot, registration_id: null, status: "bye", moved_to: "m-A" })) });
+  it("Läufe zusammengelegt (echter Umbau, 8 von 16): die Namen fließen aus den alten Läufen in die Sammelläufe", () => {
+    const before = ffa("ffa8_before_merge");
+    const after = ffa("ffa8_after_merge");
+    const key = keyOf(after);
     const events = diffBracket(before.matches_v2, after.matches_v2);
-    expect(events.find((event) => event.type === "fate")).toMatchObject({ matchId: "m-B", fate: "merged" });
-    const merges = events.filter((event) => event.type === "merge");
-    expect(merges.map((event) => event.registrationId)).toEqual(moved.slice(0, 2));
-    expect(merges[0]).toMatchObject({ matchId: "m-A", from: { matchId: "m-B" } });
+    expect(events.filter((event) => event.type === "fate").map((event) => `${key(event.matchId)}:${event.fate}`).sort())
+      .toEqual(["C:merged", "D:merged", "F:merged", "G:skipped"]);
+    const merges = events.filter((event) => event.type === "merge").map((event) => `${key(event.from.matchId)}>${key(event.matchId)}`).sort();
+    expect(merges).toEqual(["C>B", "C>B", "D>A", "D>A"]);
+    const playersOf = (bracket, matchKey) => find(bracket, matchKey).slots.map((slot) => slot.registration_id).filter(Boolean);
+    expect(events.filter((event) => event.type === "merge" && key(event.matchId) === "A").map((event) => event.registrationId).sort())
+      .toEqual(playersOf(before, "D").sort());
   });
 
   it("kampflos und ausgefallen werden gemeldet", () => {
