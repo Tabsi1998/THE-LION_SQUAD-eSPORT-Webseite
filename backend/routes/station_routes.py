@@ -13,8 +13,8 @@ from services.tournament_permissions import (
 )
 from services.match_calls import notify_match_called
 from services.station_runtime import notify_match_started
-from services.competition_read import find_match_source, load_competition_read_model
-from services.match_scheduler import plan_for_tournament
+from services.competition_read import find_match_source, load_competition_read_model, load_matches_by_query
+from services.match_scheduler import DONE_STATUSES, plan_for_tournament
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
@@ -422,5 +422,24 @@ async def delete_station(sid: str, me: dict = Depends(require_admin())):
     station = await db.stations.find_one({"id": sid}, {"_id": 0})
     if station and station.get("tournament_id"):
         await _ensure_tournament_unlocked(db, station["tournament_id"])
+    # Nicht löschen, solange ein Spiel daran hängt, das nicht vorbei ist (Praxis 14.10.): sonst behielte es die Kennung
+    # einer Station, die es nicht mehr gibt, samt fester Zeit - der Plan wäre nicht mehr zu lesen. Stilles Lösen wäre
+    # die andere Wahl, würfe aber von Hand gesetzte Zeiten weg, ohne dass es jemand sieht. Gespielte Spiele halten die
+    # Station nicht fest, sie behalten nur, wo sie gespielt wurden.
+    holding = sorted(
+        await load_matches_by_query(db, {"station_id": sid, "status": {"$nin": list(DONE_STATUSES)}}, per_store_limit=500),
+        key=lambda match: str(match.get("match_key") or ""),
+    )
+    if holding:
+        raise HTTPException(status_code=409, detail=station_in_use_message((station or {}).get("name"), holding))
     await db.stations.delete_one({"id": sid})
     return {"ok": True}
+
+
+def station_in_use_message(name: str | None, matches: list[dict]) -> str:
+    count = len(matches)
+    keys = [str(match.get("match_key")) for match in matches if match.get("match_key")]
+    named = f" ({', '.join(keys[:8])}{' …' if len(keys) > 8 else ''})" if keys else ""
+    games = "1 Spiel" if count == 1 else f"{count} Spiele"
+    return (f"Station „{name or 'ohne Namen'}“ ist noch für {games}{named} eingeplant, die nicht vorbei sind. "
+            "Erst im Matchplan auf eine andere Station legen oder die Termine lösen, dann löschen.")
