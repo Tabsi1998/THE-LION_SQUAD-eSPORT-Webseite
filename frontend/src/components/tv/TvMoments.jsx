@@ -144,10 +144,10 @@ export function TvCollectiveCard({ matches: shown, allMatches, registrations, is
  * Ereignisse (`kind` „event“: Auslosung, zusammengelegt, entfällt) - ohne Live-Punkt; `note` leuchtet kurz (die Station,
  * die frei wird).
  */
-export function TvLiveBanner({ text, kind = "live", note = "" }) {
+export function TvLiveBanner({ text, kind = "live", note = "", leaving = false }) {
   const live = kind === "live";
   return (
-    <div className={`tv-live-banner tv-t-info ${live ? "" : "tv-live-banner--event"}`} role="status" data-testid="tv-live-banner" data-kind={kind}>
+    <div className={`tv-live-banner tv-t-info ${live ? "" : "tv-live-banner--event"}`} role="status" data-testid="tv-live-banner" data-kind={kind} data-leaving={leaving ? "1" : undefined}>
       {live ? <span className="tv-live-dot-tv tv-live-dot" aria-hidden="true" /> : <span className="tv-live-banner__mark" aria-hidden="true" />}
       <span>{live ? `Jetzt live: ${text}` : text}</span>
       {note ? <span className="tv-live-banner__note" data-testid="tv-freed">{note}</span> : null}

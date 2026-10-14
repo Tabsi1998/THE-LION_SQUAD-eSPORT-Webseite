@@ -359,9 +359,11 @@
 .tv-nextup { flex: 1 1 auto; display: flex; align-items: stretch; gap: calc(var(--tv-u) * 2); min-width: 0; }
 .tv-nextup__item { display: flex; flex-direction: column; justify-content: center; gap: calc(var(--tv-u) * 0.2); min-width: 0; padding-left: calc(var(--tv-u) * 1.4); border-left: var(--tv-line-w) solid var(--tv-line); }
 .tv-nextup__kicker { color: var(--tv-gold); }
+.tv-nextup__item--in { animation: tv-rise var(--tls-motion-mid) var(--tls-ease) both; }
 .tv-nextup__item--live .tv-nextup__kicker { color: var(--tv-live); }
 .tv-nextup__what { font-size: var(--tv-fs-name); line-height: 1.15; font-weight: 700; overflow-wrap: anywhere; }
-.tv-nextup__who { overflow-wrap: anywhere; }
+/* Namen nie unter der Untergrenze für Namen (#1111) - auch im Fuß. */
+.tv-nextup__who { font-size: var(--tv-fs-name-min); line-height: 1.15; overflow-wrap: anywhere; }
 .tv-nextup__when { font-size: var(--tv-fs-name); line-height: 1.15; font-weight: 700; color: var(--tv-text); }
 .tv-nextup__delay { font-size: var(--tv-fs-info); font-weight: 700; color: var(--tls-warn); }
 .tv-nextup__spot { font-size: var(--tv-fs-info); }
@@ -565,7 +567,7 @@
 .tv-row--gold { background: var(--tv-gold-soft); box-shadow: inset calc(var(--tv-u) * 0.35) 0 0 var(--tv-gold); }
 .tv-row--gold .tv-row__name, .tv-row--gold .tv-row__score { color: var(--tv-gold); font-weight: 700; }
 /* Landen (#1117): der Platz leuchtet kurz auf, der Name gleitet hinein. */
-.tv-row--land::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: rgba(41, 182, 232, 0.45); animation: tv-land 1s ease-out forwards; }
+.tv-row--land::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: rgba(41, 182, 232, 0.45); animation: tv-land calc(var(--tls-motion-slow) * 2.4) var(--tls-ease) forwards; }
 .tv-row--land .tv-row__name { animation: tv-slide-in 0.55s var(--tls-ease) both; }
 @keyframes tv-land { from { opacity: 1; } to { opacity: 0; } }
 @keyframes tv-slide-in { from { opacity: 0; transform: translateX(calc(var(--tv-u) * -1.2)); } }
@@ -587,8 +589,13 @@
 @keyframes tv-row-draw { from { opacity: 0; transform: translateX(calc(var(--tv-u) * -1.4)); } }
 .tv-row--draw { animation: tv-row-draw var(--tls-motion-slow) var(--tls-ease) both; animation-delay: calc(var(--tv-i, 0) * var(--tv-draw-step, 60ms)); }
 /* kampflos: das Wort im Kopf leuchtet zweimal auf. */
-@keyframes tv-mark-glow { 0%, 100% { background: transparent; } 50% { background: var(--tv-accent-soft); } }
-.tv-node[data-mark="walkover"] .tv-node__status { color: var(--tv-accent); font-weight: 700; border-radius: 2px; animation: tv-mark-glow calc(var(--tls-motion-slow) * 2) var(--tls-ease) 2; }
+/* Nur Deckkraft (#1564): eine Fläche hinter dem Wort leuchtet zweimal auf - kein Malen von Hintergrund oder Schatten. */
+@keyframes tv-glow-pulse { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+.tv-node[data-mark="walkover"] .tv-node__status { position: relative; color: var(--tv-accent); font-weight: 700; }
+.tv-node[data-mark="walkover"] .tv-node__status::after {
+  content: ""; position: absolute; inset: -0.1em -0.3em; border-radius: 2px; background: var(--tv-accent-soft); opacity: 0; pointer-events: none;
+  animation: tv-glow-pulse calc(var(--tls-motion-slow) * 2) var(--tls-ease) 2;
+}
 /* entfällt / zusammengelegt: die Karte tritt zurück. */
 @keyframes tv-node-recede { from { opacity: 1; } to { opacity: 0.55; } }
 .tv-node[data-mark="fate"] { animation: tv-node-recede calc(var(--tls-motion-slow) * 3) var(--tls-ease) both; }
@@ -751,8 +758,14 @@
    Station leuchtet kurz in Grün („frei“). */
 .tv-live-banner--event { border-color: var(--tv-accent); }
 .tv-live-banner__mark { width: 0.55em; height: 0.55em; flex-shrink: 0; background: var(--tv-accent); }
-.tv-live-banner__note { padding: 0.1em 0.5em; border-radius: 3px; color: var(--tv-green); background: var(--tv-green-soft); animation: tv-note-glow calc(var(--tls-motion-slow) * 2) var(--tls-ease) var(--tls-motion-slow) 2; }
-@keyframes tv-note-glow { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 0.18em var(--tv-green); } }
+.tv-live-banner__note { position: relative; padding: 0.1em 0.5em; border-radius: 3px; color: var(--tv-green); background: var(--tv-green-soft); }
+.tv-live-banner__note::after {
+  content: ""; position: absolute; inset: -0.18em; border: 0.12em solid var(--tv-green); border-radius: 5px; opacity: 0; pointer-events: none;
+  animation: tv-glow-pulse calc(var(--tls-motion-slow) * 2) var(--tls-ease) var(--tls-motion-slow) 2;
+}
+/* Der Banner geht so, wie er kam - nach oben, ausblendend (statt einfach weg). */
+.tv-live-banner[data-leaving="1"] { animation: tv-drop-out var(--tls-motion-mid) var(--tls-ease) both; }
+@keyframes tv-drop-out { to { opacity: 0; transform: translate(-50%, -60%); } }
 .tv-champion {
   display: grid;
   justify-items: center;

@@ -27,17 +27,18 @@ export function TvNextUp({ matches = [], stations = [], nameOf = () => "" }) {
   return (
     <div className="tv-nextup" data-testid="tv-next-wrap">
       {live.length ? (
-        <div className="tv-nextup__item tv-nextup__item--live" data-testid="tv-now-playing">
+        <div key={live[0].id} className="tv-nextup__item tv-nextup__item--live tv-nextup__item--in" data-testid="tv-now-playing">
           <span className="tv-kicker tv-t-meta tv-nextup__kicker">Läuft{live.length > 1 ? ` · ${live.length} Spiele` : ""}</span>
           <b className="tv-t-info tv-nextup__what">{matchName(live[0])}</b>
-          <TvSpotlight match={live[0]} className="tv-nextup__spot" />
+          <TvSpotlight match={live[0]} className="tv-nextup__spot" testPrefix="tv-now-spot" />
         </div>
       ) : null}
       {next ? (
-        <div className="tv-nextup__item" data-testid="tv-next-up">
+        // Wechselt das nächste Spiel, kommt die neue Zeile weich herein (statt zu springen) - einmal je Spiel.
+        <div key={next.match.id} className="tv-nextup__item tv-nextup__item--in" data-testid="tv-next-up">
           <span className="tv-kicker tv-t-meta tv-nextup__kicker">Als Nächstes</span>
           <b className="tv-t-info tv-nextup__what">{[matchName(next.match), matchRoundLabel(next.match)].join(" · ")}</b>
-          <span className="tv-t-meta tv-muted tv-nextup__who" data-tv-name="1">{playersOf(next.match, matches, nameOf)}</span>
+          <span className="tv-muted tv-nextup__who" data-tv-name="1">{playersOf(next.match, matches, nameOf)}</span>
           <span className="tv-t-info tv-nextup__when">{forecastText(next)}</span>
           {next.delayText ? <span className="tv-t-meta tv-nextup__delay" data-testid="tv-next-delay">{next.delayText}</span> : null}
         </div>

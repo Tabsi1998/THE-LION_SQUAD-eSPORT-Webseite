@@ -5,6 +5,7 @@ import { resolveMediaUrl } from "@/lib/api";
 import { lastStageId } from "@/lib/bracketPodium";
 import { initials, isMatchDone } from "@/lib/slotSource";
 import { matchRoundLabel } from "@/lib/tournamentLabels";
+import { MOTION } from "@/lib/motion";
 import { CAMERA, cameraStops, centeredView, clampView, fitZoom, nearestStop, rectFits, stageTransform, unionRect, viewBetween, viewForRect } from "@/lib/tvCamera";
 import { isLiveMatch, liveZoomPlan } from "@/lib/tvLive";
 import { COLLECT_AFTER, MOMENT_MS } from "@/lib/tvMoments";
@@ -416,6 +417,13 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
     const area = () => vpRef.current;
     const size = () => contentSizeRef.current;
 
+    // Der Banner geht weich (MOTION.mid, gleiche Kurve wie beim Kommen) - nur ein abgebrochener Moment räumt sofort.
+    const hideBanner = async () => {
+      setBanner((current) => (current ? { ...current, leaving: true } : current));
+      if (motionRef.current) await sleep(MOTION.mid);
+      if (!session.cancelled) setBanner(null);
+    };
+
     const returnCamera = async () => {
       if (!area() || !size()) return;
       const current = planRef.current;
@@ -440,7 +448,7 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
           await returnCamera();
         } else await sleep(MOMENT_MS.live);
       } else await sleep(MOMENT_MS.live);
-      if (!session.cancelled) setBanner(null);
+      if (!session.cancelled) await hideBanner();
     };
 
     const travel = async (decided) => {
@@ -624,7 +632,7 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       if (!motionRef.current) {
         revealRef.current?.(keys);
         await sleep(MOMENT_MS.draw);
-        if (!session.cancelled) setBanner(null);
+        if (!session.cancelled) await hideBanner();
         return;
       }
       await focusCards([...new Set(rows.map((row) => row.matchId))], 900);
@@ -636,7 +644,7 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       await sleep(rows.length * step + ROW_IN_MS + DRAW_HOLD_MS);
       if (session.cancelled) return;
       setDrawRows(NO_MAP);
-      setBanner(null);
+      await hideBanner();
     };
 
     // Läufe zusammengelegt (#1564): die alten Läufe treten zurück, die Namen fliegen in den Sammellauf, die frei
@@ -659,7 +667,7 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
         await sleep(MOMENT_MS.merge);
         if (!session.cancelled) {
           setMarks(NO_MAP);
-          setBanner(null);
+          await hideBanner();
         }
         return;
       }
@@ -715,7 +723,7 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       await sleep(900);
       if (session.cancelled) return;
       setMarks(NO_MAP);
-      setBanner(null);
+      await hideBanner();
     };
 
     // Entfällt (#1564): Reset nicht nötig, gestrichen - die Karte tritt zurück, der Banner sagt warum.
@@ -729,7 +737,7 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       await sleep(MOMENT_MS.mark);
       if (session.cancelled) return;
       setMarks(NO_MAP);
-      setBanner(null);
+      await hideBanner();
     };
 
     const runChampion = async () => {
@@ -842,7 +850,7 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
         ))}
       </div>
       {plan?.mode === "tour" ? <div className="tv-vignette" aria-hidden="true" /> : null}
-      {banner ? <TvLiveBanner text={banner.text} kind={banner.kind} note={banner.note} /> : null}
+      {banner ? <TvLiveBanner text={banner.text} kind={banner.kind} note={banner.note} leaving={banner.leaving} /> : null}
       {card && cardMatches.length ? (
         <div className="tv-moment-layer">
           {card.many ? (

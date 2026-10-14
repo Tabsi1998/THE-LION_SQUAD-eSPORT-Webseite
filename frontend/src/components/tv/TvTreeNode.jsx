@@ -58,15 +58,15 @@ export function useSecondTick() {
 }
 
 /** Station und Spielzeit eines laufenden Spiels, sekundengenau („PC 3 · 12:34“, ohne Startzeit „Live“). */
-export function TvSpotlight({ match, className = "" }) {
+export function TvSpotlight({ match, className = "", testPrefix = "tv-spot" }) {
   const second = useSecondTick();
   const parts = spotlightParts(match, second * 1000);
   return (
-    <div className={`tv-spot ${className}`} data-testid={`tv-spot-${match.id}`}>
+    <div className={`tv-spot ${className}`} data-testid={`${testPrefix}-${match.id}`}>
       <span className="tv-live-dot-tv tv-live-dot" aria-hidden="true" />
       {parts.station ? <span className="tv-spot__station">{parts.station}</span> : null}
       {parts.station ? <span className="tv-spot__sep" aria-hidden="true">·</span> : null}
-      <span className="tv-spot__clock" data-testid={`tv-spot-clock-${match.id}`}>{parts.clock || "Live"}</span>
+      <span className="tv-spot__clock" data-testid={`${testPrefix}-clock-${match.id}`}>{parts.clock || "Live"}</span>
     </div>
   );
 }
