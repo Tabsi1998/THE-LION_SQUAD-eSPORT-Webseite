@@ -18,6 +18,7 @@ import { Button } from "../Button";
 import { FormInput } from "../FormInput";
 import { Body, Heading, Muted } from "../Text";
 import { BestOfInput, OrderInput, PointsInput, ScoreInput, WinnerInput } from "./ResultInputs";
+import { playMoment } from "../../lib/tournamentHaptics";
 
 // Das Ergebnis-Fenster der App (#1156): dieselbe Eingabe wie auf der Website - ein Blatt von unten, große Knöpfe, der
 // Satz vor dem Speichern und danach 10 Sekunden „Rückgängig“. Gespeichert wird mit `hold: true` (der Server hält das
@@ -84,6 +85,8 @@ export function ResultEntrySheet({ entry, onClose, onSaved }: { entry: ResultEnt
         hold: true,
         reason: correcting ? reason.trim() : null,
       });
+      // Ergebnis eingetragen (#1168): zweimal kurz, mit dem Satz und „Rückgängig“.
+      playMoment("result");
       onSaved({ matchId: entry.id, hold: data?.hold || null, sentence });
       onClose();
     } catch (err) {

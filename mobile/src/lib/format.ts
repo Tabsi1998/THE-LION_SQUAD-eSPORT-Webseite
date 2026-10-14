@@ -218,6 +218,8 @@ const STATUS_LABELS: Record<string, string> = {
   declined: "Abgelehnt",
   deleted: "Gelöscht",
   disputed: "In Klärung",
+  // Ausgeschieden (#1553): nur über den Umbauplan der Turnierleitung - wie im Web (tournamentLabels.js).
+  disqualified: "Disqualifiziert",
   draft: "Entwurf",
   escalated: "Turnierleitung nötig",
   finished: "Beendet",
@@ -269,6 +271,7 @@ const STATUS_LABELS: Record<string, string> = {
   unpublished: "Unveröffentlicht",
   waitlist: "Warteliste",
   waiting_result: "Wartet auf Ergebnis",
+  withdrawn: "Ausgetreten",
 };
 
 const EVENT_MODE_LABELS: Record<string, string> = {

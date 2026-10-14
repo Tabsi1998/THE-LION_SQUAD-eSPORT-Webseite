@@ -17,6 +17,11 @@ import { attemptsField, attemptsPayload } from "@/lib/fastLapEvent";
 const LOCKED_STATUSES = new Set(["results_published", "archived"]);
 const SCORING_FIELDS = ["block_club_member_results", "is_championship", "points_per_position", "prize_places", "season_weight"];
 
+// Nach „Ergebnisse veröffentlicht“ (#1584) ändern Wertungsregeln Rangfolge, Gewinne oder Saisonpunkte - nur mit
+// Begründung; danach gleicht der Server Gewinne und Punkte an. Dieselbe Liste wie SCORING_FIELDS in f1_routes.py.
+const LOCKED_STATUSES = new Set(["results_published", "archived"]);
+const SCORING_FIELDS = ["block_club_member_results", "is_championship", "points_per_position", "prize_places", "season_weight"];
+
 const F1_SEASON_WEIGHT_OPTIONS = [
   ["1", "Fast Lap Standard (x1.00)"],
   ["0.75", "Fun-Challenge (x0.75)"],

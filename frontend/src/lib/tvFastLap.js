@@ -12,6 +12,11 @@ function byRank(a, b) {
   return rank(a) - rank(b) || Number(a.time_ms) - Number(b.time_ms);
 }
 
+function byRank(a, b) {
+  const rank = (entry) => (Number.isFinite(Number(entry.rank)) ? Number(entry.rank) : Number.POSITIVE_INFINITY);
+  return rank(a) - rank(b) || Number(a.time_ms) - Number(b.time_ms);
+}
+
 function entriesOf(board) {
   return (board?.entries || []).filter((entry) => participantKey(entry) && Number.isFinite(Number(entry.time_ms)));
 }
