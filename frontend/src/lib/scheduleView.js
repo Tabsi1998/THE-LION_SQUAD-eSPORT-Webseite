@@ -30,6 +30,13 @@ function winnerIds(match) {
   return winners.length === 1 ? new Set(winners) : new Set();
 }
 
+// Wie im Turnierbaum (lib/bracketGraph heatText): voll „4 Spieler“, teils „2 von 4 Spielern“, noch leer „4 Plätze“.
+function heatCount(filled, seats) {
+  if (filled === seats) return `${filled} Spieler`;
+  if (filled) return `${filled} von ${seats} Spielern`;
+  return `${seats} ${seats === 1 ? "Platz" : "Plätze"}`;
+}
+
 /** Einträge in Spielreihenfolge: Runde, dann Reihenfolge im Baum. */
 export function scheduleEntries(bracket) {
   const matches = bracket?.matches_v2 || [];
@@ -73,7 +80,7 @@ export function scheduleEntries(bracket) {
         tone: statusTone(match),
         sides,
         // Mehr als zwei Plätze (Lauf, FFA): „Lauf A · 4 Spieler“ statt „A gegen B gegen C gegen D“ (Abnahme #1593).
-        heat: sides.length > 2 ? { name: `Lauf ${match.match_key || ""}`.trim(), count: `${filled} Spieler` } : null,
+        heat: sides.length > 2 ? { name: `Lauf ${match.match_key || ""}`.trim(), count: heatCount(filled, sides.length) } : null,
         mine: sides.some((side) => side.mine),
       };
     })

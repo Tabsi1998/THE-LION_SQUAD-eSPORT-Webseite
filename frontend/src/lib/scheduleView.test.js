@@ -75,4 +75,8 @@ test("Lauf mit mehr als zwei Plätzen: Name des Laufs und Zahl der Spieler statt
   const first = heats.find((entry) => entry.match.match_key === "A");
   expect(first.heat).toEqual({ name: "Lauf A", count: `${first.sides.filter((side) => side.id).length} Spieler` });
   expect(onsite.every((entry) => entry.heat === null)).toBe(true);
+  // Ein Lauf späterer Runden, dessen Plätze noch offen sind, nennt seine Plätze - nicht „0 Spieler“ (Abnahme #1593).
+  const open = heats.find((entry) => entry.sides.every((side) => !side.id));
+  expect(open.heat.count).toBe(`${open.sides.length} Plätze`);
+  expect(heats.every((entry) => !/^0 /.test(entry.heat.count))).toBe(true);
 });
