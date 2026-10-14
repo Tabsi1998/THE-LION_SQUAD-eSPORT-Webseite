@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { useParams, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { invalidationMatches, isStreamConnected, subscribeApiInvalidation, subscribeStreamState } from "@/lib/apiInvalidation";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { isTableFormat } from "@/components/tls/BracketTree";
 import { statusBadgeLabel } from "@/components/tls/StatusBadge";
@@ -44,6 +45,8 @@ const NO_TAGS = new Map();
 const HIGH = new Set(["champion", "result", "live", "draw", "merge", "mark"]);
 // Mehr Ereignisse auf einmal sind kein Live-Geschehen mehr (Neuaufbau, Nachladen) - dann ohne Moment ans Ende.
 const MAX_EVENTS = 48;
+// Worauf der TV hört - dieselbe Liste für das Nachladen und das Zählen der Meldungen aus dem Strom.
+const LIVE_RESOURCES = ["tournaments", "matches", "stations", "tv"];
 
 export default function BracketTVPage() {
   return (
@@ -130,9 +133,21 @@ function BracketTv() {
   // Nach einer Neuverbindung (#1564, wie die Turnierseite #1561): der nächste Stand holt Verpasstes nach - ohne Moment.
   const catchUpRef = useRef(false);
   const quietRef = useRef(false);
-  // Getrennt nach einer bestehenden Verbindung (Codex-Prüfung #1564): jede Ersatz-Abfrage holt nur nach - ohne Moment.
+  // Nachholen ist nur, was nicht über den Strom kam (Codex-Prüfung #1564, CI-Befund): eine Ersatz-Abfrage, während der
+  // Strom getrennt ist, und die Abfrage nach einer Neuverbindung. Kam vor der Abfrage eine Änderung über den Strom, ist
+  // es keine Nachhol-Abfrage - auch wenn der Strom danach kurz neu verbindet (EventSource tut das nach jedem Ende).
+  // Gezählt wird ohne Uhr: so stimmt es auch bei gestellter Uhr und auf langsamen Rechnern.
   const offlineRef = useRef(false);
   const everConnected = useRef(false);
+  // Eine Unterbrechung ist erst echt, wenn während der Trennung eine Ersatz-Abfrage im Takt lief (alle 15 s) - ein
+  // kurzes Neuverbinden des Stroms (wenige 100 ms) ist keine, danach wird nichts still nachgeholt.
+  const outageRef = useRef(false);
+  const eventSeqRef = useRef(0);
+  const usedEventRef = useRef(0);
+  // Wozu eine Abfrage läuft - Meldung aus dem Strom, Neuverbindung oder Takt (Ersatz-Abfrage): gezählt, nicht am
+  // Zustand des Stroms abgelesen. Ein Strom, der nach jeder Antwort kurz neu verbindet, ist fast immer „getrennt“.
+  const reconnectSeqRef = useRef(0);
+  const usedReconnectRef = useRef(0);
   const sponsors = useTvSponsors();
   const minute = useMinuteTick();
 
@@ -145,11 +160,17 @@ function BracketTv() {
 
   const load = useCallback(async () => {
     const seq = ++seqRef.current;
+    const driven = eventSeqRef.current > usedEventRef.current;
+    usedEventRef.current = eventSeqRef.current;
     if (catchUpRef.current) {
-      catchUpFromRef.current = catchUpFromRef.current ?? seq;
+      if (!driven) catchUpFromRef.current = catchUpFromRef.current ?? seq;
       catchUpRef.current = false;
     }
-    const offline = offlineRef.current;
+    const reconnected = reconnectSeqRef.current > usedReconnectRef.current;
+    usedReconnectRef.current = reconnectSeqRef.current;
+    // Ersatz-Abfrage im Takt bei getrenntem Strom: eine echte Unterbrechung - ruhig.
+    const offline = !driven && !reconnected && offlineRef.current;
+    if (offline) outageRef.current = true;
     try {
       const { data: br } = await api.get(`/tournaments/${id}/bracket/display`, displayKey ? { params: { key: displayKey } } : undefined);
       if (seq < appliedRef.current) return;
@@ -185,14 +206,29 @@ function BracketTv() {
     load();
   }, [load]);
   // Die TV-Anzeige läuft stundenlang: ohne Strom alle 15 s nachfragen. „tv“: ein widerrufener Schlüssel wirkt sofort.
-  const connected = useLiveRefresh(load, ["tournaments", "matches", "stations", "tv"], { fallbackMs: 15000 });
-  const wasConnected = useRef(connected);
+  useLiveRefresh(load, LIVE_RESOURCES, { fallbackMs: 15000 });
+  // Welche Abfrage eine Änderung aus dem Strom trägt: jede passende Meldung zählt mit.
+  useEffect(() => subscribeApiInvalidation((event) => {
+    if (invalidationMatches(event, LIVE_RESOURCES)) eventSeqRef.current += 1;
+  }), []);
+  // Der Zustand des Stroms direkt aus der Brücke, nicht über einen React-Effekt: so steht er fest, bevor die nächste
+  // Abfrage startet - auch wenn das Neuzeichnen auf einem langsamen Rechner länger dauert.
   useEffect(() => {
-    if (connected && !wasConnected.current) catchUpRef.current = true;
-    if (connected) everConnected.current = true;
-    offlineRef.current = !connected && everConnected.current;
-    wasConnected.current = connected;
-  }, [connected]);
+    let was = isStreamConnected();
+    if (was) everConnected.current = true;
+    return subscribeStreamState((isConnected) => {
+      if (isConnected && !was) {
+        reconnectSeqRef.current += 1;
+        if (outageRef.current) catchUpRef.current = true;
+      }
+      if (isConnected) {
+        everConnected.current = true;
+        outageRef.current = false;
+      }
+      offlineRef.current = !isConnected && everConnected.current;
+      was = isConnected;
+    });
+  }, []);
 
   const t = data?.tournament;
   const matches = useMemo(() => data?.matches_v2 || [], [data?.matches_v2]);
