@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { useParams, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { invalidationMatches, isStreamConnected, subscribeApiInvalidation, subscribeStreamState } from "@/lib/apiInvalidation";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { isTableFormat } from "@/components/tls/BracketTree";
 import { statusBadgeLabel } from "@/components/tls/StatusBadge";
@@ -12,14 +13,17 @@ import { TvChampionCard, avatarOfRegistration, nameOfRegistration } from "@/comp
 import { TvCallBoard } from "@/components/tv/TvCallBoard";
 import { TvLiveSlide, TvSlideBar, TvSponsorMoment, TvStatsSlide } from "@/components/tv/TvSlides";
 import { TvCheckInScreen, TvPauseScreen, TvRegistrationScreen } from "@/components/tv/TvScreens";
+import { TvNextUp } from "@/components/tv/TvNextUp";
 import { useLowMomentTimer, useMinuteTick, useTvSound, useTvSponsors } from "@/components/tv/tvHooks";
 import { lastStageId } from "@/lib/bracketPodium";
-import { bracketChanges, isLiveMatch } from "@/lib/tvLive";
+import { bracketChanges, bracketSnapshot, isLiveMatch } from "@/lib/tvLive";
+import { slotDraw } from "@/lib/bracketGraph";
 import { advancementsOf } from "@/lib/tvTravel";
 import { championKey, championOf } from "@/lib/tvChampion";
-import { COLLECT_AFTER, createMomentQueue } from "@/lib/tvMoments";
+import { COLLECT_AFTER, createMomentQueue, momentsFromChange } from "@/lib/tvMoments";
 import { advance, changesAfter, firstIndex, isDue, onlyMomentSlides, serializePlaylist } from "@/lib/tvPlaylist";
-import { callsOf, newCalls, nextPlanned } from "@/lib/tvCalls";
+import { callsOf, newCalls } from "@/lib/tvCalls";
+import { forecastBoard, nextUp } from "@/lib/tvForecast";
 import { statsTiles } from "@/lib/tvStats";
 import { presentedBy, sponsorFor, sponsorPlan } from "@/lib/tvSponsors";
 import { tvScreenFor } from "@/lib/tvScreens";
@@ -31,9 +35,18 @@ import { viennaTime } from "@/lib/vienna";
 // Liste an, der Baum zeigt den Moment, danach läuft die Folie zu Ende. Ohne Spiel wählt der TV selbst: Pause, Check-in
 // oder Anmeldung (#1123). Immer nur ein Moment; nach dem Neuladen gleich der aktuelle Stand - ohne Fahrten, Zoom oder
 // Konfetti. Mit Anzeige-Schlüssel im Link läuft die Seite ohne Anmeldung.
+// Seit #1564 hat jedes Turnier-Ereignis seinen Moment (Auslosung, zusammengelegt, kampflos, korrigiert, entfällt) - aus
+// demselben Vergleich wie der Web-Baum, genau einmal. Nach einer Neuverbindung holt der TV den Stand ruhig nach, wie
+// beim ersten Laden. Unten stehen „Läuft“ und „Als Nächstes“ mit Prognose und Verzug.
 
 const EMPTY = new Set();
-const HIGH = new Set(["champion", "result", "live"]);
+const NO_TAGS = new Map();
+// Momente, die auf dem Baum spielen (die anderen sind Folien: Sponsor, Zahlen).
+const HIGH = new Set(["champion", "result", "live", "draw", "merge", "mark"]);
+// Mehr Ereignisse auf einmal sind kein Live-Geschehen mehr (Neuaufbau, Nachladen) - dann ohne Moment ans Ende.
+const MAX_EVENTS = 48;
+// Worauf der TV hört - dieselbe Liste für das Nachladen und das Zählen der Meldungen aus dem Strom.
+const LIVE_RESOURCES = ["tournaments", "matches", "stations", "tv"];
 
 export default function BracketTVPage() {
   return (
@@ -117,12 +130,54 @@ function BracketTv() {
   const [loadError, setLoadError] = useState(null);
   const [keyRefused, setKeyRefused] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  // Nach einer Neuverbindung (#1564, wie die Turnierseite #1561): der nächste Stand holt Verpasstes nach - ohne Moment.
+  const catchUpRef = useRef(false);
+  // Der zuletzt still übernommene Stand (Codex-Prüfung #1564): beim Übernehmen festgehalten, nicht als Flag - so bleibt
+  // er Basis des Vergleichs, auch wenn React ihn mit einer späteren Antwort in einem Durchgang zeichnet.
+  const quietBaseRef = useRef(null);
+  // Nachholen ist nur, was nicht über den Strom kam (Codex-Prüfung #1564, CI-Befund): eine Ersatz-Abfrage, während der
+  // Strom getrennt ist, und die Abfrage nach einer Neuverbindung. Kam vor der Abfrage eine Änderung über den Strom, ist
+  // es keine Nachhol-Abfrage - auch wenn der Strom danach kurz neu verbindet (EventSource tut das nach jedem Ende).
+  // Gezählt wird ohne Uhr: so stimmt es auch bei gestellter Uhr und auf langsamen Rechnern.
+  const offlineRef = useRef(false);
+  const everConnected = useRef(false);
+  // Eine Unterbrechung ist erst echt, wenn während der Trennung eine Ersatz-Abfrage im Takt lief (alle 15 s) - ein
+  // kurzes Neuverbinden des Stroms (wenige 100 ms) ist keine, danach wird nichts still nachgeholt.
+  const outageRef = useRef(false);
+  const eventSeqRef = useRef(0);
+  const usedEventRef = useRef(0);
+  // Wozu eine Abfrage läuft - Meldung aus dem Strom, Neuverbindung oder Takt (Ersatz-Abfrage): gezählt, nicht am
+  // Zustand des Stroms abgelesen. Ein Strom, der nach jeder Antwort kurz neu verbindet, ist fast immer „getrennt“.
+  const reconnectSeqRef = useRef(0);
+  const usedReconnectRef = useRef(0);
   const sponsors = useTvSponsors();
   const minute = useMinuteTick();
 
+  // Abfragen können sich überholen (Codex-Nachprüfung #1564): jede bekommt beim Start ihre Nummer; eine Antwort, die
+  // älter ist als die zuletzt übernommene, wird verworfen. Ob eine Abfrage still ist, steht beim Start fest - an ihr
+  // selbst, nie geerbt: eine Abfrage zu einer Meldung aus dem Strom zeigt ihren Moment immer.
+  const seqRef = useRef(0);
+  const appliedRef = useRef(0);
+
   const load = useCallback(async () => {
+    const seq = ++seqRef.current;
+    const driven = eventSeqRef.current > usedEventRef.current;
+    usedEventRef.current = eventSeqRef.current;
+    const catchUp = catchUpRef.current && !driven;
+    catchUpRef.current = false;
+    const reconnected = reconnectSeqRef.current > usedReconnectRef.current;
+    usedReconnectRef.current = reconnectSeqRef.current;
+    // Ersatz-Abfrage im Takt bei getrenntem Strom: eine echte Unterbrechung - ruhig.
+    const offline = !driven && !reconnected && offlineRef.current;
+    if (offline) outageRef.current = true;
+    const quiet = catchUp || offline;
     try {
       const { data: br } = await api.get(`/tournaments/${id}/bracket/display`, displayKey ? { params: { key: displayKey } } : undefined);
+      if (seq < appliedRef.current) return;
+      appliedRef.current = seq;
+      // Ruhig, wenn es Nachholen ist: nach einer echten Unterbrechung und während der Strom getrennt ist (Ersatz-Abfrage).
+      // Nur setzen, nie löschen: eine spätere Antwort im selben Durchgang darf die stille Basis nicht wegnehmen.
+      if (quiet) quietBaseRef.current = br;
       setData(br);
       setLoadError(null);
       setKeyRefused(false);
@@ -150,7 +205,29 @@ function BracketTv() {
     load();
   }, [load]);
   // Die TV-Anzeige läuft stundenlang: ohne Strom alle 15 s nachfragen. „tv“: ein widerrufener Schlüssel wirkt sofort.
-  useLiveRefresh(load, ["tournaments", "matches", "stations", "tv"], { fallbackMs: 15000 });
+  useLiveRefresh(load, LIVE_RESOURCES, { fallbackMs: 15000 });
+  // Welche Abfrage eine Änderung aus dem Strom trägt: jede passende Meldung zählt mit.
+  useEffect(() => subscribeApiInvalidation((event) => {
+    if (invalidationMatches(event, LIVE_RESOURCES)) eventSeqRef.current += 1;
+  }), []);
+  // Der Zustand des Stroms direkt aus der Brücke, nicht über einen React-Effekt: so steht er fest, bevor die nächste
+  // Abfrage startet - auch wenn das Neuzeichnen auf einem langsamen Rechner länger dauert.
+  useEffect(() => {
+    let was = isStreamConnected();
+    if (was) everConnected.current = true;
+    return subscribeStreamState((isConnected) => {
+      if (isConnected && !was) {
+        reconnectSeqRef.current += 1;
+        if (outageRef.current) catchUpRef.current = true;
+      }
+      if (isConnected) {
+        everConnected.current = true;
+        outageRef.current = false;
+      }
+      offlineRef.current = !isConnected && everConnected.current;
+      was = isConnected;
+    });
+  }, []);
 
   const t = data?.tournament;
   const matches = useMemo(() => data?.matches_v2 || [], [data?.matches_v2]);
@@ -173,23 +250,42 @@ function BracketTv() {
   const [championState, setChampionState] = useState({ key: "", parked: false });
   const [parkSpot, setParkSpot] = useState("");
   const snapshotRef = useRef(null);
+  const previousRef = useRef(null);
+  const seenRef = useRef(new Set());
+  const [resultTags, setResultTags] = useState(NO_TAGS);
   const championKeyRef = useRef(null);
   const champion = useMemo(() => (data ? championOf(matches, data.stages || []) : null), [data, matches]);
 
   useEffect(() => {
     if (!data) return;
+    // Ein still übernommener Stand ist die neue Basis: was er gegenüber dem Gezeigten ändert, ist gesehen - ohne Moment,
+    // auch der Sieger. Verglichen wird erst ab ihm (er kann schon der aktuelle Stand sein).
+    const base = quietBaseRef.current;
+    quietBaseRef.current = null;
+    if (base && previousRef.current) {
+      const baseMatches = base.matches_v2 || [];
+      momentsFromChange(previousRef.current, baseMatches, { seen: seenRef.current });
+      previousRef.current = baseMatches;
+      snapshotRef.current = bracketSnapshot(baseMatches);
+      const baseKey = championKey(championOf(baseMatches, base.stages || []));
+      if (baseKey !== championKeyRef.current) {
+        championKeyRef.current = baseKey;
+        setChampionState({ key: baseKey, parked: Boolean(baseKey) });
+      }
+    }
     const { started, decided, snapshot } = bracketChanges(snapshotRef.current, matches);
     const first = snapshotRef.current === null;
     snapshotRef.current = snapshot;
+    // Jede Bewegung genau einmal: was der Vergleich findet, ist ab jetzt gesehen - auch wenn es gleich nicht gezeigt wird.
+    const previous = previousRef.current;
+    previousRef.current = matches;
+    const change = momentsFromChange(previous, matches, { seen: seenRef.current });
+    const hidden = typeof document !== "undefined" && document.hidden;
     const key = championKey(champion);
-    // Beim ersten Laden ist nichts neu: steht der Sieger schon fest, gleich das Endbild - ohne Konfetti.
-    if (first) {
-      championKeyRef.current = key;
-      setChampionState({ key, parked: Boolean(champion) });
-      return;
-    }
-    if (!showMoments) {
-      // Pause, Check-in, Anmeldung oder ein Bildschirm ohne Baum: nichts nachholen, nur den Stand merken.
+    // Beim ersten Laden ist nichts neu: steht der Sieger schon fest, gleich das Endbild - ohne Konfetti. Ebenso nach
+    // einer Neuverbindung, bei verdecktem Bildschirm und bei Riesen-Sprüngen: nichts nachholen, nur den Stand merken.
+    // Pause, Check-in, Anmeldung oder ein Bildschirm ohne Baum: genauso.
+    if (first || hidden || !showMoments || change.count > MAX_EVENTS) {
       championKeyRef.current = key;
       setChampionState({ key, parked: Boolean(champion) });
       return;
@@ -199,8 +295,16 @@ function BracketTv() {
       setChampionState({ key, parked: false });
       if (champion) queue.enqueue({ type: "champion", key });
     }
-    // Das Finale bekommt den Champion-Moment statt einer Ergebnis-Karte.
-    const results = decided.filter((matchId) => !champion || matchId !== champion.finalMatchId);
+    // Das Finale bekommt den Champion-Moment statt einer Ergebnis-Karte. Korrigierte Ergebnisse kommen wie neue.
+    const results = [...new Set([...decided, ...change.corrected])].filter((matchId) => !champion || matchId !== champion.finalMatchId);
+    if (change.walkovers.size || change.corrected.size) {
+      setResultTags((current) => {
+        const next = new Map(current);
+        change.walkovers.forEach((matchId) => next.set(matchId, "walkover"));
+        change.corrected.forEach((matchId) => next.set(matchId, "corrected"));
+        return next;
+      });
+    }
     if (results.length) {
       if (motionOn) {
         // Bis die Fahrt ankommt, zeigen die Ziel-Plätze noch, wer kommt - dann landet der Name dort.
@@ -208,7 +312,11 @@ function BracketTv() {
         for (const matchId of results) {
           const match = matches.find((row) => row.id === matchId);
           for (const move of advancementsOf(match, matches)) {
-            if (move.target && ["win", "drop"].includes(move.kind)) keys.push(`${move.target.matchId}:${move.target.slotIndex}`);
+            if (!move.target || !["win", "drop"].includes(move.kind)) continue;
+            // Gemischte Plätze (#1548) deckt die Auslosung auf, nicht das Ergebnis.
+            const target = matches.find((row) => row.id === move.target.matchId);
+            if (slotDraw(target?.slots?.[move.target.slotIndex])) continue;
+            keys.push(`${move.target.matchId}:${move.target.slotIndex}`);
           }
         }
         if (keys.length) setHidden((current) => new Set([...current, ...keys]));
@@ -216,6 +324,16 @@ function BracketTv() {
       if (results.length > COLLECT_AFTER) queue.enqueue({ type: "result", items: results });
       else results.forEach((matchId) => queue.enqueue({ type: "result", items: [matchId] }));
     }
+    // Auslosung und Zusammenlegen: bis der Moment sie zeigt, stehen die neuen Plätze noch leer.
+    if (motionOn) {
+      const keys = [];
+      for (const entry of change.moments) {
+        if (entry.type === "draw") entry.rows.forEach((row) => keys.push(`${row.matchId}:${row.slotIndex}`));
+        if (entry.type === "merge") entry.moves.forEach((move) => keys.push(`${move.matchId}:${move.slotIndex}`));
+      }
+      if (keys.length) setHidden((current) => new Set([...current, ...keys]));
+    }
+    change.moments.forEach((entry) => queue.enqueue(entry));
     if (started.length) queue.enqueue({ type: "live", matchIds: started });
     queue.next();
   }, [data, matches, champion, queue, motionOn, showMoments]);
@@ -240,7 +358,10 @@ function BracketTv() {
   // ------------------------------------------------------------ Inhalte der Folien
   const live = useMemo(() => matches.filter(isLiveMatch), [matches]);
   const calls = useMemo(() => callsOf(matches, stations, { reportMinutes: settings.report_minutes }), [matches, stations, settings.report_minutes]);
-  const upcoming = useMemo(() => nextPlanned(matches, calls, { limit: 3 }), [matches, calls]);
+  // Was danach kommt (#1564): mit Prognose aus dem Planer und dem Verzug der Halle - jede Minute neu gerechnet.
+  // Eine Prognose für Karten, Fuß und Aufruf-Tafel - überall dieselbe Zeit (#1564).
+  const forecast = useMemo(() => forecastBoard(matches, { stations, now: Math.max(Date.now(), minute * 60000) }), [matches, stations, minute]);
+  const upcoming = useMemo(() => nextUp(matches, { board: forecast, limit: 3, exclude: new Set(calls.map((call) => call.matchId)) }), [matches, forecast, calls]);
   const tiles = useMemo(() => statsTiles(matches, nameOf), [matches, nameOf]);
   const plan = sponsorPlan(settings, sponsors);
   const lastStage = lastStageId(matches, data?.stages || []);
@@ -370,6 +491,8 @@ function BracketTv() {
                     onParkSpot={setParkSpot}
                     gong={settings.result_sound ? gong : null}
                     active={active === "tree"}
+                    resultTags={resultTags}
+                    forecast={forecast}
                   />
                 </div>
               ) : null}
@@ -402,7 +525,9 @@ function BracketTv() {
         </div>
       </main>
 
-      <TvFooter qrValue={screen === "registration" ? registerUrl : publicUrl} kicker={screen === "registration" ? "Jetzt anmelden" : "Jetzt mitfiebern"} text={screen === "registration" ? "QR scannen und anmelden" : "QR scannen und Turnierbaum öffnen"} />
+      <TvFooter qrValue={screen === "registration" ? registerUrl : publicUrl} kicker={screen === "registration" ? "Jetzt anmelden" : "Jetzt mitfiebern"} text={screen === "registration" ? "QR scannen und anmelden" : "QR scannen und Turnierbaum öffnen"}>
+        {screen === "playlist" && hasMatches && !parked ? <TvNextUp matches={matches} stations={stations} nameOf={nameOf} forecast={forecast} /> : null}
+      </TvFooter>
       {needsClick ? <div className="tv-hint tv-t-meta" role="status" data-testid="tv-sound-hint">Für Ton einmal klicken</div> : null}
     </div>
   );

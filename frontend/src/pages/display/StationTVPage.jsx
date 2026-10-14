@@ -15,7 +15,7 @@ import { isMatchDone, plannedText } from "@/lib/slotSource";
 import { callsOf } from "@/lib/tvCalls";
 import { stationLineup } from "@/lib/tvGrid";
 import { isLiveMatch, matchName } from "@/lib/tvLive";
-import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
+import { formatBracketSection, matchRoundLabel } from "@/lib/tournamentLabels";
 
 // Stations-Ansicht (#1120): ein Bildschirm direkt an einer Station zeigt nur, was dort läuft oder als Nächstes kommt -
 // Durchgänge als Startaufstellung, Duelle als „A gegen B“. Ist das Spiel dort gerade entschieden, bleibt das Ergebnis
@@ -137,7 +137,7 @@ function StationTv() {
             <div className="tv-station__head">
               <div className="min-w-0">
                 <div className="tv-kicker tv-t-info">
-                  {mode === "live" ? "Läuft gerade" : mode === "done" ? "Gerade entschieden" : "Als Nächstes"} · {formatBracketSection(match.section)} · {formatRoundName(match.round_name, match.round)}
+                  {mode === "live" ? "Läuft gerade" : mode === "done" ? "Gerade entschieden" : "Als Nächstes"} · {formatBracketSection(match.section)} · {matchRoundLabel(match)}
                 </div>
                 <h2 className="tv-t-title font-heading font-black uppercase">{matchName(match)}</h2>
               </div>

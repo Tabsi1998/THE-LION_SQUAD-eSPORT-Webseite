@@ -3,12 +3,14 @@ import { BracketTree, isTableFormat } from "@/components/tls/BracketTree";
 import { runParticles } from "@/components/achievements/ceremony/particles";
 import { resolveMediaUrl } from "@/lib/api";
 import { lastStageId } from "@/lib/bracketPodium";
+import { slotDraw } from "@/lib/bracketGraph";
 import { initials, isMatchDone } from "@/lib/slotSource";
-import { formatRoundName } from "@/lib/tournamentLabels";
+import { matchRoundLabel } from "@/lib/tournamentLabels";
+import { MOTION } from "@/lib/motion";
 import { CAMERA, cameraStops, centeredView, clampView, fitZoom, nearestStop, rectFits, stageTransform, unionRect, viewBetween, viewForRect } from "@/lib/tvCamera";
 import { isLiveMatch, liveZoomPlan } from "@/lib/tvLive";
 import { COLLECT_AFTER, MOMENT_MS } from "@/lib/tvMoments";
-import { TRAVEL, advancementsOf, planTravel, pointOnRoute, routeLength, routePath, travelRoute, travelTotal } from "@/lib/tvTravel";
+import { TRAVEL, advancementsOf, landFrame, planTravel, rideFrame, routeLength, routePath, travelRoute, travelTotal } from "@/lib/tvTravel";
 import { TV_STAGE_UNIT_PX, stageBase, treeBox, treeCssVars, treeMinZoom } from "@/lib/tvType";
 import { TvChampionCard, TvCollectiveCard, TvLiveBanner, TvResultCard, avatarOfRegistration, nameOfRegistration } from "./TvMoments";
 import { TvTreeContext, TvTreeNode } from "./TvTreeNode";
@@ -19,9 +21,26 @@ import { useTv } from "./TvScreen";
 // Baum nicht neu auf, und die Kamera springt nicht. Immer nur ein Moment: Die Seite gibt ihn herein (`moment`), die
 // Bühne spielt ihn ab und meldet `onMomentDone`. Mit „Bewegung reduzieren“ fährt, zoomt und fliegt nichts: die Kamera
 // wechselt in ruhigen Schritten, Namen stehen sofort am neuen Platz, kein Konfetti.
+// Seit #1564 je Turnier-Ereignis ein Moment (lib/tvMoments.momentsFromChange): Weiterrücken fährt die gezeichnete Linie
+// entlang (dieselbe Führung wie im Web-Baum), die Auslosung lässt die Namen nacheinander in die Läufe kommen, beim
+// Zusammenlegen fliegen die Namen in den Sammellauf und die frei gewordene Station leuchtet kurz im Banner, „entfällt“
+// lässt die Karte zurücktreten. Für 5 m Abstand: große Banner, ruhiges Tempo, eine Bewegung nach der anderen.
 
 const FINISHED = new Set(["completed", "results_published", "archived", "cancelled"]);
 const EMPTY = new Set();
+const NO_MAP = new Map();
+// Auslosung: so viel Abstand zwischen zwei Namen - bei 40 Namen bleibt es unter 2 Sekunden, am TV ruhiger als im Web.
+const DRAW_TOTAL_MS = 1800;
+const DRAW_STEP = Object.freeze({ min: 40, max: 140 });
+// So lange stehen die Namen nach der Auslosung, bevor der Moment endet; so lange braucht eine Zeile zum Einblenden.
+const DRAW_HOLD_MS = 1400;
+const ROW_IN_MS = 500;
+
+/** „Switch 3 und Switch 4“ */
+function listText(items) {
+  if (items.length < 2) return items[0] || "";
+  return `${items.slice(0, -1).join(", ")} und ${items[items.length - 1]}`;
+}
 
 function frameOf(view, viewport) {
   return { x: view.x, y: view.y, w: viewport.w / view.zoom, h: viewport.h / view.zoom };
@@ -45,7 +64,7 @@ function measureStage(stage) {
     const rect = element.getBoundingClientRect();
     return { x: (rect.left - base.left) / scale, y: (rect.top - base.top) / scale, w: rect.width / scale, h: rect.height / scale };
   };
-  const out = { cards: new Map(), slots: new Map(), regs: new Map(), blocks: new Map() };
+  const out = { cards: new Map(), slots: new Map(), regs: new Map(), blocks: new Map(), local };
   stage.querySelectorAll("[data-tv-card]").forEach((element) => out.cards.set(element.getAttribute("data-tv-card"), local(element)));
   stage.querySelectorAll("[data-tv-slot]").forEach((element) => {
     const rect = local(element);
@@ -59,6 +78,25 @@ function measureStage(stage) {
     if (block) out.blocks.set(element.getAttribute("data-tv-card"), block.getAttribute("data-tv-block"));
   });
   return out;
+}
+
+/**
+ * Der Weg einer Fahrt entlang der gezeichneten Linie (#1564): dieselben Punkte wie die Linie im Baum (`data-points`,
+ * aus lib/bracketLines). Start in der Zeile des Namens: waagrecht bis zum ersten Knick, dann auf die Linie.
+ */
+function lineRoute(stage, geometry, fromMatch, toMatch, toSlot, startY) {
+  if (!stage || !geometry.local) return null;
+  const path = (toSlot && stage.querySelector(`path[data-from="${fromMatch}"][data-to="${toMatch}"][data-to-slot="${toSlot}"]`))
+    || stage.querySelector(`path[data-from="${fromMatch}"][data-to="${toMatch}"]`);
+  const raw = path?.getAttribute("data-points");
+  const svg = path?.ownerSVGElement;
+  if (!raw || !svg) return null;
+  const origin = geometry.local(svg);
+  const points = raw.split(" ").map((pair) => pair.split(",").map(Number)).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y))
+    .map(([x, y]) => ({ x: x + origin.x, y: y + origin.y }));
+  if (points.length < 2) return null;
+  const start = startY ?? points[0].y;
+  return { kind: "line", points: [{ x: points[0].x, y: start }, { x: points[1].x, y: start }, ...points.slice(1)] };
 }
 
 /** Ein Weg zwischen zwei Karten: im selben Block in der nächsten Spalte die Linie entlang, sonst ein ruhiger Bogen. */
@@ -97,7 +135,7 @@ function useElementSize(ref, measure) {
 const viewportSize = (element) => ({ w: element.clientWidth, h: element.clientHeight, base: stageBase(window.innerWidth, window.innerHeight) });
 const contentSize = (element) => ({ w: element.offsetWidth, h: element.offsetHeight });
 
-export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots = EMPTY, onReveal, champion = null, championParked = false, onChampionParked, onParkSpot, gong = null, active = true }) {
+export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots = EMPTY, onReveal, champion = null, championParked = false, onChampionParked, onParkSpot, gong = null, active = true, resultTags = NO_MAP, forecast = NO_MAP }) {
   const { motionOn, textSize, settings } = useTv();
   const viewportRef = useRef(null);
   const stageRef = useRef(null);
@@ -120,6 +158,9 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
   const tvLayout = useMemo(() => ({ columns, viewport: unitsW && unitsH ? { w: unitsW, h: unitsH } : null, minZoom, textSize }), [columns, unitsW, unitsH, minZoom, textSize]);
 
   const [banner, setBanner] = useState(null);
+  const [marks, setMarks] = useState(NO_MAP);
+  const [drawRows, setDrawRows] = useState(NO_MAP);
+  const [drawStep, setDrawStep] = useState(60);
   const [card, setCard] = useState(null);
   const [rides, setRides] = useState(null);
   const [landing, setLanding] = useState(EMPTY);
@@ -286,7 +327,8 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
     }
     const geometry = measureStage(stageRef.current);
     const paths = champion.segments.map((segment, index) => {
-      const route = routeBetween(geometry, segment.from, segment.to, null, null, colGapPx);
+      // Der goldene Weg liegt auf den gezeichneten Linien (#1564) - kein Bogen quer über den Baum.
+      const route = lineRoute(stageRef.current, geometry, segment.from, segment.to, null, null) || routeBetween(geometry, segment.from, segment.to, null, null, colGapPx);
       return route ? { id: `${segment.from}>${segment.to}`, index, d: routePath(route) } : null;
     }).filter(Boolean);
     setGoldPaths((current) => (JSON.stringify(current) === JSON.stringify(paths) ? current : paths));
@@ -312,8 +354,12 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       finished: FINISHED.has(String(data?.tournament?.status || "")),
       lastStageId: lastStageId(matches, stages),
       isTable: (match) => isTableFormat([match]),
+      marks,
+      drawRows,
+      drawStep,
+      forecast,
     };
-  }, [matches, stages, hiddenSlots, landing, champion, showGold, drawnGold, data?.tournament?.status]);
+  }, [matches, stages, hiddenSlots, landing, champion, showGold, drawnGold, data?.tournament?.status, marks, drawRows, drawStep, forecast]);
 
   // ------------------------------------------------------------ Geparkte Siegerkarte: eine freie Ecke, sonst die Kopfleiste
   useLayoutEffect(() => {
@@ -349,6 +395,10 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
   }, [parkSpot, onParkSpot]);
 
   // ------------------------------------------------------------ Momente
+  const tagsRef = useRef(resultTags);
+  useEffect(() => {
+    tagsRef.current = resultTags;
+  });
   const finishRef = useRef(onMomentDone);
   const revealRef = useRef(onReveal);
   const parkedRef = useRef(onChampionParked);
@@ -369,6 +419,13 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
     const area = () => vpRef.current;
     const size = () => contentSizeRef.current;
 
+    // Der Banner geht weich (MOTION.mid, gleiche Kurve wie beim Kommen) - nur ein abgebrochener Moment räumt sofort.
+    const hideBanner = async () => {
+      setBanner((current) => (current ? { ...current, leaving: true } : current));
+      if (motionRef.current) await sleep(MOTION.mid);
+      if (!session.cancelled) setBanner(null);
+    };
+
     const returnCamera = async () => {
       if (!area() || !size()) return;
       const current = planRef.current;
@@ -378,9 +435,9 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
     const runLive = async () => {
       const all = byId();
       const ids = (moment.matchIds || []).filter((id) => isLiveMatch(all.get(id)));
-      const zoom = liveZoomPlan(ids, [...all.values()], { roundLabel: (match) => formatRoundName(match?.round_name, match?.round) });
+      const zoom = liveZoomPlan(ids, [...all.values()], { roundLabel: matchRoundLabel });
       if (!zoom) return;
-      setBanner(zoom.text);
+      setBanner({ text: zoom.text, kind: "live" });
       if (motionRef.current && area() && size()) {
         const geometry = measureStage(stageRef.current);
         const rect = unionRect(zoom.matchIds.map((id) => geometry.cards.get(id)));
@@ -393,11 +450,14 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
           await returnCamera();
         } else await sleep(MOMENT_MS.live);
       } else await sleep(MOMENT_MS.live);
-      if (!session.cancelled) setBanner(null);
+      if (!session.cancelled) await hideBanner();
     };
+
+    const drawnSlot = (target) => Boolean(slotDraw(byId().get(target.matchId)?.slots?.[target.slotIndex]));
 
     const travel = async (decided) => {
       const geometry = measureStage(stageRef.current);
+      const stage = stageRef.current;
       const lastStage = lastStageId(dataRef.current?.matches_v2 || [], dataRef.current?.stages || []);
       const nameOf = nameOfRegistration(dataRef.current?.registrations || []);
       const avatarOf = avatarOfRegistration(dataRef.current?.registrations || []);
@@ -408,10 +468,15 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
         let drops = 0;
         for (const move of moves) {
           if (!move.target || !["win", "drop"].includes(move.kind)) continue;
+          // Gemischte Runde (#1548): wohin es geht, entscheidet erst die Auslosung - die fährt eigens über die Schiene.
+          if (drawnSlot(move.target)) continue;
           const slotKey = `${move.target.matchId}:${move.target.slotIndex}`;
           const source = geometry.regs.get(`${match.id}:${move.registrationId}`);
           const slot = geometry.slots.get(slotKey);
-          const route = source && slot ? routeBetween(geometry, match.id, move.target.matchId, source.y + source.h / 2, slot.y + slot.h / 2, colGapPx) : null;
+          // Entlang der gezeichneten Linie (#1564); ohne gemessene Linie wie bisher von Karte zu Karte.
+          const route = source && slot
+            ? lineRoute(stage, geometry, match.id, move.target.matchId, move.target.slot, source.y + source.h / 2) || routeBetween(geometry, match.id, move.target.matchId, source.y + source.h / 2, slot.y + slot.h / 2, colGapPx)
+            : null;
           if (!route) {
             revealRef.current?.([slotKey]);
             continue;
@@ -434,6 +499,11 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
           });
         }
       });
+      await fly(list);
+    };
+
+    /** Die Fahrten abspielen: Kamera mitnehmen, Namen über die Wege, landen, Platz aufdecken. */
+    const fly = async (list) => {
       if (!list.length) return;
       const schedule = planTravel(list);
       const timing = new Map(schedule.map((entry) => [entry.id, entry]));
@@ -475,24 +545,24 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
             const t = (elapsed - entry.delay) / entry.duration;
             if (!nodes?.comet) continue;
             if (t < 0) continue;
-            const segment = Math.min(0.55, 160 / Math.max(1, ride.length));
             if (t <= 1) {
-              const point = pointOnRoute(ride.route, t);
+              // Weich an, weich ab, leicht angehoben (lib/tvTravel.rideFrame); die Linie zeichnet sich hinter ihm her.
+              const frame = rideFrame(ride.route, t);
               nodes.comet.style.opacity = "1";
-              nodes.comet.style.transform = `translate(${point.x}px, ${point.y}px)`;
+              nodes.comet.style.transform = `translate(${frame.x}px, ${frame.y}px) scale(${frame.scale.toFixed(4)})`;
               if (nodes.trail) {
                 nodes.trail.style.opacity = "1";
-                nodes.trail.style.strokeDashoffset = String(segment - t);
+                nodes.trail.style.strokeDashoffset = String(1 - frame.drawn);
               }
               if (nodes.drop) nodes.drop.style.opacity = "1";
             } else {
+              // Weich aufsetzen: ausfedernd in den Platz, etwas kleiner, ausblenden (lib/tvTravel.landFrame).
               const end = ride.route.points[ride.route.points.length - 1];
               const share = Math.min(1, (elapsed - entry.delay - entry.duration) / TRAVEL.landMs);
-              const x = end.x + (ride.land.x - end.x) * share;
-              const y = end.y + (ride.land.y - end.y) * share;
-              nodes.comet.style.transform = `translate(${x}px, ${y}px) scale(${1 - 0.55 * share})`;
-              nodes.comet.style.opacity = String(1 - share);
-              if (nodes.trail) nodes.trail.style.opacity = String(1 - share);
+              const frame = landFrame(end, ride.land, share);
+              nodes.comet.style.transform = `translate(${frame.x}px, ${frame.y}px) scale(${frame.scale.toFixed(4)})`;
+              nodes.comet.style.opacity = String(frame.opacity);
+              if (nodes.trail) nodes.trail.style.opacity = String(frame.opacity);
               if (share >= 1 && !landed.has(ride.id)) {
                 landed.add(ride.id);
                 if (nodes.drop) nodes.drop.style.opacity = "0";
@@ -530,6 +600,9 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       if (!decided.length) return;
       if (settings.result_sound && gong) gong.play();
       setCard({ ids: decided.map((match) => match.id), many: decided.length > COLLECT_AFTER });
+      // Kampflos: der Kopf der Karte im Baum blinkt einmal, solange der Moment läuft.
+      const walkovers = decided.filter((match) => tagsRef.current.get(match.id) === "walkover").map((match) => match.id);
+      if (walkovers.length && motionRef.current) setMarks(new Map(walkovers.map((id) => [id, "walkover"])));
       await sleep(decided.length > COLLECT_AFTER ? MOMENT_MS.collective : MOMENT_MS.result);
       if (session.cancelled) return;
       setCard(null);
@@ -544,6 +617,184 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
         revealAll();
         if (planRef.current?.mode === "tour") await sleep(400);
       }
+    };
+
+    /** Fokus auf Karten, wenn die Kamera fährt und sie nicht schon im Bild sind. */
+    const focusCards = async (ids, ms = 900) => {
+      if (!motionRef.current || planRef.current?.mode !== "tour" || !area() || !size()) return;
+      const geometry = measureStage(stageRef.current);
+      const rect = unionRect(ids.map((id) => geometry.cards.get(id)));
+      if (!rect) return;
+      const zoom = viewRef.current.zoom;
+      if (!inside(rect, frameOf(viewRef.current, area()))) await moveTo(viewForRect(rect, size(), area(), { minZoom: zoom, maxZoom: zoom, fill: 1 }), ms);
+    };
+
+    // Auslosung (#1564): die Namen kommen nacheinander in die Läufe - CSS je Zeile (tv-row--draw), versetzt.
+    const runDraw = async () => {
+      const rows = moment.rows || [];
+      const keys = rows.map((row) => `${row.matchId}:${row.slotIndex}`);
+      const heats = new Set(rows.map((row) => row.matchId)).size;
+      const all = byId();
+      const mixed = rows.filter((row) => row.from);
+      // Gemischte Runde (#1548): „Auslosung · Halbfinale · 4 Namen auf 2 Spiele“ - sonst wie bisher für die Läufe.
+      const round = mixed.length ? matchRoundLabel(all.get(mixed[0].matchId)) : "";
+      setBanner({
+        text: mixed.length
+          ? `Auslosung · ${round} · ${rows.length} ${rows.length === 1 ? "Name" : "Namen"} auf ${heats} ${heats === 1 ? "Spiel" : "Spiele"}`
+          : `Auslosung · ${rows.length} ${rows.length === 1 ? "Name" : "Namen"} in ${heats} ${heats === 1 ? "Lauf" : "Läufen"}`,
+        kind: "event",
+      });
+      if (!motionRef.current) {
+        revealRef.current?.(keys);
+        await sleep(MOMENT_MS.draw);
+        if (!session.cancelled) await hideBanner();
+        return;
+      }
+      if (mixed.length) {
+        // Aus dem Quellspiel über die Schiene an den gezogenen Platz - auf der echten Linie (lineRoute), nacheinander.
+        await sleep(500);
+        if (session.cancelled) return;
+        const geometry = measureStage(stageRef.current);
+        const nameOf = nameOfRegistration(dataRef.current?.registrations || []);
+        const avatarOf = avatarOfRegistration(dataRef.current?.registrations || []);
+        const avatarSize = box.avatar * TV_STAGE_UNIT_PX;
+        const list = [];
+        for (const row of mixed) {
+          const slotKey = `${row.matchId}:${row.slotIndex}`;
+          const slot = geometry.slots.get(slotKey);
+          const source = geometry.regs.get(`${row.from.matchId}:${row.registrationId}`) || geometry.cards.get(row.from.matchId);
+          const slotNumber = all.get(row.matchId)?.slots?.[row.slotIndex]?.slot;
+          const route = slot && source ? lineRoute(stageRef.current, geometry, row.from.matchId, row.matchId, slotNumber, source.y + source.h / 2) : null;
+          if (!route) {
+            revealRef.current?.([slotKey]);
+            continue;
+          }
+          const name = nameOf(row.registrationId);
+          list.push({
+            id: `draw-${row.matchId}-${row.registrationId}`,
+            slotKey,
+            kind: "win",
+            matchIndex: list.length,
+            order: 0,
+            route,
+            length: routeLength(route),
+            land: { x: slot.x + box.padX * TV_STAGE_UNIT_PX + avatarSize / 2, y: slot.y + slot.h / 2 },
+            label: initials(name),
+            avatar: avatarOf(row.registrationId),
+            source: geometry.cards.get(row.from.matchId),
+            target: geometry.cards.get(row.matchId),
+          });
+        }
+        await fly(list);
+        if (session.cancelled) return;
+        revealRef.current?.(keys);
+        await sleep(DRAW_HOLD_MS);
+        if (!session.cancelled) await hideBanner();
+        return;
+      }
+      await focusCards([...new Set(rows.map((row) => row.matchId))], 900);
+      if (session.cancelled) return;
+      const step = Math.round(Math.max(DRAW_STEP.min, Math.min(DRAW_STEP.max, DRAW_TOTAL_MS / Math.max(1, rows.length))));
+      setDrawStep(step);
+      setDrawRows(new Map(rows.map((row) => [`${row.matchId}:${row.slotIndex}`, { index: row.index }])));
+      revealRef.current?.(keys);
+      await sleep(rows.length * step + ROW_IN_MS + DRAW_HOLD_MS);
+      if (session.cancelled) return;
+      setDrawRows(NO_MAP);
+      await hideBanner();
+    };
+
+    // Läufe zusammengelegt (#1564): die alten Läufe treten zurück, die Namen fliegen in den Sammellauf, die frei
+    // gewordene Station leuchtet kurz im Banner.
+    const runMerge = async () => {
+      const all = byId();
+      const moves = moment.moves || [];
+      const keys = moves.map((move) => `${move.matchId}:${move.slotIndex}`);
+      const into = [...new Set(moves.map((move) => all.get(move.matchId)?.match_key).filter(Boolean))];
+      const freed = moment.freed || [];
+      setBanner({
+        text: `Läufe zusammengelegt${into.length ? ` · jetzt ${into.length === 1 ? "Lauf" : "Läufe"} ${listText(into)}` : ""}`,
+        kind: "event",
+        note: freed.length ? `${listText(freed)} ${freed.length === 1 ? "ist" : "sind"} frei` : "",
+      });
+      const faded = [...(moment.merged || []), ...(moment.dropped || [])];
+      setMarks(new Map(faded.map((id) => [id, "fate"])));
+      if (!motionRef.current) {
+        revealRef.current?.(keys);
+        await sleep(MOMENT_MS.merge);
+        if (!session.cancelled) {
+          setMarks(NO_MAP);
+          await hideBanner();
+        }
+        return;
+      }
+      await sleep(600);
+      if (session.cancelled) return;
+      const geometry = measureStage(stageRef.current);
+      const nameOf = nameOfRegistration(dataRef.current?.registrations || []);
+      const avatarOf = avatarOfRegistration(dataRef.current?.registrations || []);
+      const avatarSize = box.avatar * TV_STAGE_UNIT_PX;
+      const list = [];
+      const order = new Map();
+      for (const move of moves) {
+        const slotKey = `${move.matchId}:${move.slotIndex}`;
+        const card = geometry.cards.get(move.from.matchId);
+        const row = geometry.slots.get(`${move.from.matchId}:${move.from.slotIndex}`);
+        const slot = geometry.slots.get(slotKey);
+        if (!card || !slot) {
+          revealRef.current?.([slotKey]);
+          continue;
+        }
+        const startY = row ? row.y + row.h / 2 : card.y + card.h / 2;
+        const into = geometry.cards.get(move.matchId);
+        // Läufe derselben Runde stehen untereinander: der Name nimmt die Gasse rechts daneben - nie quer über Karten.
+        const gasse = into && Math.abs(into.x - card.x) < 2 ? card.x + card.w + colGapPx / 2 : null;
+        const route = gasse !== null
+          ? { kind: "line", points: [{ x: card.x + card.w, y: startY }, { x: gasse, y: startY }, { x: gasse, y: slot.y + slot.h / 2 }, { x: into.x + into.w, y: slot.y + slot.h / 2 }] }
+          : routeBetween(geometry, move.from.matchId, move.matchId, startY, slot.y + slot.h / 2, colGapPx);
+        if (!route) {
+          revealRef.current?.([slotKey]);
+          continue;
+        }
+        const matchIndex = order.has(move.from.matchId) ? order.get(move.from.matchId) : order.size;
+        order.set(move.from.matchId, matchIndex);
+        const name = nameOf(move.registrationId);
+        list.push({
+          id: `merge-${move.matchId}-${move.registrationId}`,
+          slotKey,
+          kind: "win",
+          matchIndex,
+          order: list.filter((ride) => ride.matchIndex === matchIndex).length,
+          route,
+          length: routeLength(route),
+          land: { x: slot.x + box.padX * TV_STAGE_UNIT_PX + avatarSize / 2, y: slot.y + slot.h / 2 },
+          label: initials(name),
+          avatar: avatarOf(move.registrationId),
+          source: card,
+          target: geometry.cards.get(move.matchId),
+        });
+      }
+      await fly(list);
+      if (session.cancelled) return;
+      revealRef.current?.(keys);
+      await sleep(900);
+      if (session.cancelled) return;
+      setMarks(NO_MAP);
+      await hideBanner();
+    };
+
+    // Entfällt (#1564): Reset nicht nötig, gestrichen - die Karte tritt zurück, der Banner sagt warum.
+    const runMark = async () => {
+      const items = moment.items || [];
+      if (!items.length) return;
+      setBanner({ text: items.map((item) => `${item.name} · ${item.label}`).join("  ·  "), kind: "event" });
+      await focusCards(items.map((item) => item.matchId), 900);
+      if (session.cancelled) return;
+      if (motionRef.current) setMarks(new Map(items.map((item) => [item.matchId, moment.kind || "fate"])));
+      await sleep(MOMENT_MS.mark);
+      if (session.cancelled) return;
+      setMarks(NO_MAP);
+      await hideBanner();
     };
 
     const runChampion = async () => {
@@ -595,6 +846,9 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
         if (moment.type === "live") await runLive();
         else if (moment.type === "result") await runResult();
         else if (moment.type === "champion") await runChampion();
+        else if (moment.type === "draw") await runDraw();
+        else if (moment.type === "merge") await runMerge();
+        else if (moment.type === "mark") await runMark();
       } finally {
         session.finished = true;
         if (!session.cancelled) finishRef.current?.(moment.id);
@@ -613,6 +867,8 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       setRides(null);
       setChampionCenter(false);
       setConfetti(false);
+      setMarks(NO_MAP);
+      setDrawRows(NO_MAP);
     };
     // Nur ein neuer Moment startet den Ablauf - neue Daten laufen über die Refs mit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -636,13 +892,11 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
               <path key={path.id} d={path.d} pathLength="1" className="tv-gold-path" data-drawn={path.index < drawnGold ? "1" : undefined} data-testid="tv-gold-path" />
             ))}
             {(rides || []).map((ride) => (ride.kind === "drop" ? <path key={`d-${ride.id}`} d={routePath(ride.route)} className="tv-drop-line" data-tv-drop={ride.id} /> : null))}
-            {(rides || []).map((ride) => {
-              const segment = Math.min(0.55, 160 / Math.max(1, ride.length));
-              return (
-                <path key={`t-${ride.id}`} d={routePath(ride.route)} pathLength="1" className={`tv-trail ${ride.kind === "drop" ? "tv-trail--drop" : ""}`} data-tv-trail={ride.id}
-                  style={{ strokeDasharray: `${segment} ${1 + segment}`, strokeDashoffset: segment, opacity: 0 }} />
-              );
-            })}
+            {(rides || []).map((ride) => (
+              // Die Spur wächst vom Start bis zum Namen mit (strokeDashoffset 1 → 0), danach blendet sie aus.
+              <path key={`t-${ride.id}`} d={routePath(ride.route)} pathLength="1" className={`tv-trail ${ride.kind === "drop" ? "tv-trail--drop" : ""}`} data-tv-trail={ride.id}
+                style={{ strokeDasharray: "1 1", strokeDashoffset: 1, opacity: 0 }} />
+            ))}
           </svg>
         ) : null}
         {(rides || []).map((ride) => (
@@ -653,13 +907,13 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
         ))}
       </div>
       {plan?.mode === "tour" ? <div className="tv-vignette" aria-hidden="true" /> : null}
-      {banner ? <TvLiveBanner text={banner} /> : null}
+      {banner ? <TvLiveBanner text={banner.text} kind={banner.kind} note={banner.note} leaving={banner.leaving} /> : null}
       {card && cardMatches.length ? (
         <div className="tv-moment-layer">
           {card.many ? (
             <TvCollectiveCard matches={cardMatches} allMatches={matches} registrations={registrations} isLastStage={(match) => !lastStage || (match.stage_id || "__default") === lastStage} isTable={(match) => isTableFormat([match])} />
           ) : (
-            <TvResultCard match={cardMatches[0]} matches={matches} registrations={registrations} lastStage={!lastStage || (cardMatches[0].stage_id || "__default") === lastStage} table={isTableFormat([cardMatches[0]])} />
+            <TvResultCard match={cardMatches[0]} matches={matches} registrations={registrations} lastStage={!lastStage || (cardMatches[0].stage_id || "__default") === lastStage} table={isTableFormat([cardMatches[0]])} tag={resultTags.get(cardMatches[0].id) || ""} />
           )}
         </div>
       ) : null}
