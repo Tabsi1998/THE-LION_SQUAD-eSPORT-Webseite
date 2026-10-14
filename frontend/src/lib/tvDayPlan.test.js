@@ -93,3 +93,13 @@ test("Blöcke einer Bahn überdecken sich nie: was sich überschneidet, kommt in
   const wide = packLane([{ id: "a", from: 0, to: 1 }, { id: "b", from: 1, to: 2 }], plan, 0.3);
   expect(wide.blocks.map((block) => block.row)).toEqual([0, 1]);
 });
+
+test("nach dem Check-in-Ende (#1551) heißt der Hinweis nicht mehr „Check-in läuft“", () => {
+  const { event } = hallEvent({ now: NOW, stations: 6 });
+  const evening = event.tournaments.find((row) => row.title === "Abend-Turnier");
+  Object.assign(evening, { status: "check_in", check_in_from: new Date(NOW - 30 * 60000).toISOString(), check_in_until: new Date(NOW - 5 * 60000).toISOString() });
+  const hintOf = () => dayPlan(event, NOW).running.find((block) => block.title === "Abend-Turnier").hint;
+  expect(hintOf()).toMatch(/^Check-in läuft/);
+  evening.check_in_closed_at = new Date(NOW).toISOString();
+  expect(hintOf()).not.toMatch(/Check-in/);
+});

@@ -181,3 +181,24 @@ async def test_deadlines_are_fields_of_the_tournament_form(flow):
     assert (await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})).get("no_show_minutes_on_site") is None, "leer heißt Standard"
     refused = await flow.patch(f"/api/tournaments/{tournament['id']}", json={"no_show_minutes_on_site": 0})
     assert refused.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_a_replacement_drops_the_proposal_of_the_old_pairing(flow):
+    _staff, tournament, match, _first, second, _player = await bracket(flow, event_mode="local")
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"station_id": "station-1", "called_at": ago(12)}})
+    await sweep(flow.db)
+    await flow.post(f"/api/tournaments/{tournament['id']}/registrations/{second}/checkin", json={"status": "no_show"})
+    substitute = await flow.add_user(name="Ersatz")
+    replaced = await flow.post(f"/api/tournaments/{tournament['id']}/registrations",
+                               json={"user_id": substitute["id"], "status": "checked_in", "replace_registration_id": second})
+    assert replaced.status_code == 200, replaced.text
+    stored = await flow.reload(match)
+    assert not stored.get("no_show_proposal"), "der Vorschlag gehörte zur alten Paarung"
+    assert not [row for row in (await lead(flow, tournament))["attention"] if row["kind"] == "no_show"]
+
+
+def test_a_new_pairing_after_a_correction_drops_the_proposal_too():
+    from services.match_v2_results import _pairing_reset_fields
+    fields = _pairing_reset_fields({"no_show_proposal": {"id": "p1"}, "no_show_extended_until": "2026-10-31T17:00:00+00:00"}, "now")
+    assert fields["no_show_proposal"] is None and fields["no_show_extended_until"] is None

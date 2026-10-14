@@ -33,7 +33,8 @@ export function registrationOpen(tournament, now = Date.now()) {
 /** Läuft der Check-in? Nach Status - oder im Check-in-Zeitraum, solange das Turnier noch nicht begonnen hat. */
 export function checkInRunning(tournament, now = Date.now()) {
   const status = statusOf(tournament);
-  if (status === "check_in") return true;
+  // Nach dem Check-in-Ende (#1551) bleibt der Status „Check-in“ bis zum Start - der Baum steht, der TV zeigt ihn.
+  if (status === "check_in") return !tournament?.check_in_closed_at;
   if (!["scheduled", "registration_open", "registration_closed"].includes(status)) return false;
   const start = timeOf(tournament?.start_date);
   if (start !== null && now >= start) return false;

@@ -81,3 +81,7 @@ test("Anmeldung: freie Plätze aus der Zahl vom Server, Beginn mit Tag", () => {
   expect(registrationView({}, null, [{ status: "approved" }]).seatsText).toBe("");
   expect(dayAndTime(at(30), NOW)).toBe("Heute · 15:02");
 });
+
+test("nach dem Check-in-Ende (#1551) zeigt der TV wieder die Wiedergabeliste, auch wenn der Status noch Check-in ist", () => {
+  expect(tvScreenFor({ status: "check_in", check_in_closed_at: at(-2) }, { now: NOW })).toBe("playlist");
+});

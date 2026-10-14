@@ -541,6 +541,9 @@ def _pairing_reset_fields(match: dict, now_iso: str) -> dict:
         "reports": [],
         "started_at": None,
         "called_at": None,
+        # Frist „nicht erschienen“ (#1551): Vorschlag und Verlängerung gehörten zur alten Paarung.
+        "no_show_proposal": None,
+        "no_show_extended_until": None,
         "forfeit_registration_id": None,
         "admin_decision_note": None,
         "admin_decision_by": None,

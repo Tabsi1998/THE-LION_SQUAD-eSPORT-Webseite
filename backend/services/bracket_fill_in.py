@@ -96,6 +96,8 @@ def swapped(match: dict, old_id: str, new_reg: dict) -> dict:
         ]
     elif str(match.get("status") or "") in {"pending", "preview", "ready", "scheduled"}:
         change["status"] = _status_after_slot_fill({**match, "slots": slots}, preserve_terminal=False)
+        # Ein Vorschlag „nicht erschienen“ und seine Verlängerung gehörten zur alten Paarung (#1551).
+        change.update({"no_show_proposal": None, "no_show_extended_until": None})
     return change
 
 
