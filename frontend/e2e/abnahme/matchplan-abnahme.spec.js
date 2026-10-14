@@ -9,7 +9,7 @@ const { test, expect } = require("@playwright/test");
 // Abnahme-Stand; Konten und Kennungen schreibt scripts/seed_abnahme.py nach .local-testing/abnahme/state.json.
 
 const ENABLED = process.env.ABNAHME === "1";
-const STATE_FILE = path.join(__dirname, "..", "..", "..", ".local-testing", "abnahme", "state.json");
+const STATE_FILE = process.env.ABNAHME_STATE || path.join(__dirname, "..", "..", "..", ".local-testing", "abnahme", "state.json");
 const SHOTS = process.env.ABNAHME_SHOTS || "";
 const state = ENABLED && fs.existsSync(STATE_FILE) ? JSON.parse(fs.readFileSync(STATE_FILE, "utf8")) : null;
 

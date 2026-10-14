@@ -11,6 +11,8 @@ Zwei-Faktor), alles andere über die Routen der App, angemeldet wie im Browser:
   * Online-Turnier (K.-o., 8 Spieler, live, ein Ergebnis) und eine Liga (6 Spieler, Spieltag 1 gespielt)
   * Gruppen-Turnier online (8 Spieler, 2 Gruppen, erste Runde gespielt)
   * Liga beendet und Ergebnisse veröffentlicht, mit geteiltem 1. Platz (drei gleich auf) - für Podest und Sieger-Moment
+  * Praxis 14.10. (Fabian): Vor-Ort-Cup OHNE Stationen, einmal mit Vorschau-Baum, einmal nach dem Check-in mit der alten
+    Matchplanung (feste Zeiten, LE vor LC, G/LF/Finale 30 Min.) auf einer Station, die danach gelöscht wurde
   * eine Fast Lap mit Strecke und Zeiten
 
 Aufruf (der Stack läuft, siehe Anleitung):
@@ -30,7 +32,8 @@ import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 
-PROJECT = "lsw-abnahme"
+# Mehrere Stände nebeneinander: eigener Projektname (ABNAHME_PROJECT) und eigene Stand-Datei (ABNAHME_STATE).
+PROJECT = os.environ.get("ABNAHME_PROJECT", "lsw-abnahme")
 # Testwerte, nur für diesen lokalen Stack. Das TOTP-Geheimnis ist das Beispiel aus RFC 6238.
 TEST_PASSWORD = "Abnahme-Testpasswort-2026"
 TEST_TOTP_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
@@ -91,7 +94,7 @@ def host_main() -> int:
         print("Kein Ergebnis vom Seed - siehe Ausgabe oben.")
         return 1
     state = json.loads(line[len(marker):])
-    target = root / ".local-testing" / "abnahme" / "state.json"
+    target = pathlib.Path(os.environ.get("ABNAHME_STATE") or root / ".local-testing" / "abnahme" / "state.json")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(state, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     for row in completed.stdout.splitlines():
@@ -248,6 +251,20 @@ async def matches_of(admin: Session, tid: str) -> dict:
     return {row.get("match_key"): row for row in rows if not row.get("is_preview")}
 
 
+# Die alte Matchplanung aus der Praxis: Start (Wiener Uhr am Turniertag), eigene Dauer, auf der Station oder nicht.
+OLD_PLAN = {"A": ("15:30", None, True), "B": ("15:50", None, True), "C": ("16:10", None, True), "D": ("16:30", None, True),
+            "E": ("16:50", None, True), "F": ("17:10", None, True), "LA": ("17:30", None, True), "LB": ("17:50", None, True),
+            "G": ("18:10", 30, True), "LD": ("18:50", None, True), "LE": ("19:10", None, True), "LC": ("19:40", None, True),
+            "LF": ("19:50", 30, False), "FINAL": ("20:20", 30, True)}
+
+
+def vienna_on(day: datetime, clock: str) -> str:
+    from zoneinfo import ZoneInfo
+    hour, minute = (int(part) for part in clock.split(":"))
+    local = datetime(day.year, day.month, day.day, hour, minute, tzinfo=ZoneInfo("Europe/Vienna"))
+    return local.astimezone(timezone.utc).isoformat()
+
+
 CUP_STRUCTURE = {"name": "Läufe", "stage_type": "ffa_custom_bracket", "match_type": "ffa",
                  "settings": {"schema": CUP_SCHEMA, "match_size": 4, "qualifiers_per_match": 2, "min_players": 2}}
 CUP_FIELDS = {"format": "ffa_custom_bracket", "event_mode": "local", "schedule_mode": "fixed_by_staff",
@@ -357,6 +374,29 @@ async def inside_main() -> None:
         for status in ("completed", "results_published"):
             await admin.call("POST", f"/api/tournaments/{final['id']}/status", json={"status": status, "force": True})
         state["tournaments"]["league_published"] = final["id"]
+
+        # Praxis 14.10.: Vor-Ort-Cup ohne Stationen - Vorschau-Baum.
+        nostation = {**CUP_FIELDS, "match_buffer_minutes": None, "match_duration_minutes": 20}
+        bare_draft = await tournament(admin, game, f"Abnahme Cup ohne Stationen, Vorschau ({stamp})",
+                                      quarter(now_utc() + timedelta(days=17)), **nostation)
+        await register(admin, bare_draft, users["players"])
+        await admin.call("POST", f"/api/tournaments/{bare_draft['id']}/bracket/from-format?preview=true", json=CUP_STRUCTURE)
+        await admin.call("POST", f"/api/tournaments/{bare_draft['id']}/staff", json={"user_id": users["lead"]["id"], "role": "organizer"})
+        state["tournaments"]["practice_draft"] = bare_draft["id"]
+
+        # ... und nach dem Check-in: Baum fix, die alte Matchplanung auf „Station A“ gespeichert, die Station danach gelöscht.
+        day = quarter(now_utc() + timedelta(days=17))
+        practice = await tournament(admin, game, f"Abnahme Cup alte Planung ({stamp})", datetime.fromisoformat(vienna_on(day, "15:30")), **nostation)
+        await register(admin, practice, users["players"])
+        await admin.call("POST", f"/api/tournaments/{practice['id']}/bracket/from-format?preview=false", json=CUP_STRUCTURE)
+        await admin.call("POST", f"/api/tournaments/{practice['id']}/staff", json={"user_id": users["lead"]["id"], "role": "organizer"})
+        old_station = await admin.call("POST", "/api/stations", json={"name": "Station A", "device_type": "switch", "tournament_id": practice["id"]})
+        practice_matches = await matches_of(admin, practice["id"])
+        for key, (clock, minutes, on_station) in OLD_PLAN.items():
+            await admin.call("PATCH", f"/api/matches/{practice_matches[key]['id']}", json={
+                "scheduled_at": vienna_on(day, clock), "station_id": old_station["id"] if on_station else None, "duration_minutes": minutes})
+        await admin.call("DELETE", f"/api/stations/{old_station['id']}")
+        state["tournaments"]["practice_old_plan"] = practice["id"]
 
         # Fast Lap mit einer Strecke und Zeiten.
         challenge = await admin.call("POST", "/api/f1/challenges", json={"title": f"Abnahme Fast Lap ({stamp})", "game_id": game["id"],

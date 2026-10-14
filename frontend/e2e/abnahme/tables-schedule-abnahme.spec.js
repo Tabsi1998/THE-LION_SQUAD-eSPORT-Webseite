@@ -9,7 +9,7 @@ const { test, expect } = require("@playwright/test");
 // Läuft nur mit ABNAHME=1; Kennungen und Zugänge aus .local-testing/abnahme/state.json (scripts/seed_abnahme.py).
 
 const ENABLED = process.env.ABNAHME === "1";
-const STATE_FILE = path.join(__dirname, "..", "..", "..", ".local-testing", "abnahme", "state.json");
+const STATE_FILE = process.env.ABNAHME_STATE || path.join(__dirname, "..", "..", "..", ".local-testing", "abnahme", "state.json");
 const SHOTS = process.env.ABNAHME_SHOTS || "";
 const state = ENABLED && fs.existsSync(STATE_FILE) ? JSON.parse(fs.readFileSync(STATE_FILE, "utf8")) : null;
 const SIZES = { desktop: { width: 1440, height: 900 }, handy: { width: 375, height: 812 } };
