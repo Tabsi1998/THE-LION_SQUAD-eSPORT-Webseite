@@ -3,6 +3,7 @@ Bestätigen und Ablehnen mit den Rechten der Turnierleitung, Turnier-Sperre, Pro
 """
 import pathlib
 import sys
+from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -382,3 +383,68 @@ async def test_a_conflict_after_a_result_is_retried_once_and_then_queued(flow, m
     assert (await heat_rebuild.evaluate_after_write(flow.db, tournament["id"], actor_id=None, trigger="result"))["ok"]
     assert calls["n"] == 2
     assert (await stored(flow, tournament)).get("heat_rebuild_pending") is None
+
+
+# ---------------------------------------------------------------------------------------------- Backoff, Dedupe
+
+@pytest.mark.asyncio
+async def test_pending_retries_back_off_and_stop_after_the_limit(flow, monkeypatch):
+    import services.heat_rebuild as heat_rebuild
+
+    tournament, staff = await sixteen_scheme(flow, 10, "auto")
+    calls = {"n": 0}
+
+    async def always_conflict(db, tid, **kwargs):
+        calls["n"] += 1
+        raise heat_rebuild.HeatRebuildError(heat_rebuild.STALE_DETAIL, 409)
+
+    monkeypatch.setattr(heat_rebuild, "evaluate_heat_rebuild", always_conflict)
+    await heat_rebuild.evaluate_after_write(flow.db, tournament["id"], actor_id=None, trigger="result")
+    pending = (await stored(flow, tournament))["heat_rebuild_pending"]
+    assert pending["attempts"] == 0 and pending["next_at"] <= now_utc().isoformat()
+    expected_minutes = [1, 2, 5, 10]
+    for attempt in range(1, 5):
+        assert await heat_rebuild.process_pending_heat_rebuilds(flow.db) == 1
+        pending = (await stored(flow, tournament))["heat_rebuild_pending"]
+        assert pending["attempts"] == attempt
+        wait = (datetime.fromisoformat(pending["next_at"]) - now_utc()).total_seconds()
+        assert 60 * expected_minutes[attempt - 1] - 5 <= wait <= 60 * expected_minutes[attempt - 1] + 5, (attempt, wait)
+        # Noch nicht fällig: der Takt überspringt das Turnier.
+        before = calls["n"]
+        assert await heat_rebuild.process_pending_heat_rebuilds(flow.db) == 0
+        assert calls["n"] == before
+        await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"heat_rebuild_pending.next_at": "2000-01-01T00:00:00+00:00"}})
+    # Fünfter Versuch: Schluss - vermerkt, protokolliert, einmal gemeldet.
+    assert await heat_rebuild.process_pending_heat_rebuilds(flow.db) == 1
+    doc = await stored(flow, tournament)
+    assert doc.get("heat_rebuild_pending") is None
+    assert doc["heat_rebuild_incomplete"]["reason"] == "retries_exhausted"
+    assert (await audit_actions(flow, tournament)).count("tournament.heats.incomplete") == 1
+    assert await flow.db.notifications.count_documents({"user_id": staff["id"], "kind": "tournament_heat_rebuild"}) == 1
+    assert await heat_rebuild.process_pending_heat_rebuilds(flow.db) == 0
+    # „Neu prüfen“ von Hand setzt alles zurück - auch wenn es wieder schiefgeht, zählt es von vorn.
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"heat_rebuild_pending": {"attempts": 3, "next_at": "2000-01-01T00:00:00+00:00"}}})
+    monkeypatch.undo()
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/heat-rebuild/check")
+    assert response.status_code == 200, response.text
+    doc = await stored(flow, tournament)
+    assert doc.get("heat_rebuild_pending") is None and doc.get("heat_rebuild_incomplete") is None
+
+
+@pytest.mark.asyncio
+async def test_incomplete_notification_is_sent_once_per_incident(flow):
+    import services.heat_rebuild as heat_rebuild
+
+    tournament, staff = await sixteen_scheme(flow, 10, "auto")
+    for _ in range(3):
+        await heat_rebuild._notify_incomplete(flow.db, tournament, stage_id="s1", keys=["C"], reason="foreign_change")
+    assert await flow.db.notifications.count_documents({"user_id": staff["id"], "kind": "tournament_heat_rebuild"}) == 1
+    # Ein anderer Vorfall am selben Turnier innerhalb einer Stunde: Cooldown - erst danach wieder eine Nachricht.
+    await heat_rebuild._notify_incomplete(flow.db, tournament, stage_id="s1", keys=["C"], reason="retries_exhausted")
+    assert await flow.db.notifications.count_documents({"user_id": staff["id"], "kind": "tournament_heat_rebuild"}) == 1
+    await flow.db.notifications.update_many({"kind": "tournament_heat_rebuild"}, {"$set": {"created_at": (now_utc() - timedelta(hours=2)).isoformat()}})
+    await heat_rebuild._notify_incomplete(flow.db, tournament, stage_id="s1", keys=["C"], reason="retries_exhausted")
+    assert await flow.db.notifications.count_documents({"user_id": staff["id"], "kind": "tournament_heat_rebuild"}) == 2
+    # Derselbe Vorfall bleibt auch nach der Stunde einmalig.
+    await heat_rebuild._notify_incomplete(flow.db, tournament, stage_id="s1", keys=["C"], reason="foreign_change")
+    assert await flow.db.notifications.count_documents({"user_id": staff["id"], "kind": "tournament_heat_rebuild"}) == 2
