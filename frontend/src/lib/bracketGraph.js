@@ -75,6 +75,12 @@ export function slotDraw(slot) {
 export const drawGroupOf = (match) => (match?.settings?.draw_group ? String(match.settings.draw_group) : null);
 
 /**
+ * Der eindeutige Schlüssel einer Sammelschiene: Phase und Gruppe (#1561). Gruppen heißen je Phase gleich („WB:2“) - mit
+ * mehreren K.-o.-Phasen in einem Turnier dürfen sie sich nie vermischen.
+ */
+export const railKey = (stageId, group) => `${stageId || "-"}/${group}`;
+
+/**
  * Alle Linien: `{ id, from, to, toSlot, flow, rank, cross, void, rail? }`. `cross` = über die Grenze eines Abschnitts
  * (Winner → Loser Bracket, → Grand Final), `void` = das Quellspiel oder das Ziel entfällt.
  *
@@ -106,7 +112,7 @@ export function bracketEdges(matches = []) {
       const draw = slotDraw(slot);
       if (draw || group) {
         const origin = slot?.source_result?.from_match_key;
-        if (slot?.registration_id && origin) add(find(to)(origin), to, slot.slot, slot.source_result?.flow || normalizeSource(slot.source)?.flow, slot.source_result?.rank, String(draw?.group || group));
+        if (slot?.registration_id && origin) add(find(to)(origin), to, slot.slot, slot.source_result?.flow || normalizeSource(slot.source)?.flow, slot.source_result?.rank, railKey(to.stage_id, String(draw?.group || group)));
         continue;
       }
       const source = normalizeSource(slot?.source);
@@ -128,17 +134,21 @@ export function bracketEdges(matches = []) {
  * Die Sammelschienen der gemischten Runden (#1548): je Auslosungs-Gruppe die Quellspiele (mit Fluss - Sieger oder ins
  * Loser Bracket), die Zielspiele, der Klartext („Runde 1“) und ob schon gelost ist. Quellen wie am Server
  * (advancement_draw.group_sources): alle Spiele, die in ein Zielspiel der Gruppe weiterleiten.
- * `[{ group, label, sources: [{ id, flow }], targets: [id], drawn }]`, nach Gruppe sortiert - wie die App.
+ * `[{ key, stageId, group, label, sources: [{ id, flow }], targets: [id], drawn }]`, nach Gruppe (dann Phase) sortiert -
+ * wie die App. Je Phase getrennt: `key` = Phase und Gruppe (railKey).
  */
 export function drawRails(matches = []) {
   const list = (matches || []).filter(Boolean);
   const groups = new Map();
   for (const match of list) {
     const group = drawGroupOf(match);
-    if (group) groups.set(group, [...(groups.get(group) || []), match]);
+    if (!group) continue;
+    const key = railKey(match.stage_id, group);
+    if (!groups.has(key)) groups.set(key, { group, stageId: match.stage_id || null, targets: [] });
+    groups.get(key).targets.push(match);
   }
   const find = finderFor(list);
-  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([group, targets]) => {
+  return [...groups.entries()].sort(([keyA, a], [keyB, b]) => a.group.localeCompare(b.group) || keyA.localeCompare(keyB)).map(([key, { group, stageId, targets }]) => {
     const targetIds = new Set(targets.map((match) => match.id));
     const sources = new Map();
     for (const match of list) {
@@ -163,7 +173,7 @@ export function drawRails(matches = []) {
     // Gelost ist, wenn ein Ziel `draw` trägt oder ein Spieler schon einen Platz aus dem Los hat. Ein Freilos-Platz,
     // dessen Quelle der Umbau gestrichen hat (`source_result.skipped`, #1575), zählt nicht - der wartet weiter aufs Los.
     const drawn = targets.some((target) => target.draw || (target.slots || []).some((slot) => slotDraw(slot) && slot.source_result?.from_match_key && !slot.source_result?.skipped));
-    return { group, label, sources: [...sources.values()], targets: targets.map((match) => match.id), drawn };
+    return { key, stageId, group, label, sources: [...sources.values()], targets: targets.map((match) => match.id), drawn };
   });
 }
 
@@ -257,7 +267,7 @@ export function pathFor(registrationId, matches = [], edges = []) {
       if (source.flow === "L" && isDone(from) && winnerOf(from) === registrationId) continue;
       if (source.flow === "W" && isDone(from) && !advancedFrom(from, registrationId)) continue;
       result.rails = result.rails || new Set();
-      result.rails.add(`${rail.group}:${source.id}`);
+      result.rails.add(`${rail.key}:${source.id}`);
     }
   }
   return result;

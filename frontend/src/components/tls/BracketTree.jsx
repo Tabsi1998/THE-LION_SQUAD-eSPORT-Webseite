@@ -579,16 +579,16 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
           }
         }
         const bus = routeBus({ sources, targets: targetIds.map((id) => ({ id, rect: nodes.get(id) })), slotYs, obstacles, corridors: freeCorridors, gap: COLUMN_GAP, lanes });
-        rails.set(rail.group, bus);
+        rails.set(rail.key, bus);
         const column = columnOf.get(targetIds[0]) || 0;
-        const node = `rail:${rail.group}`;
-        lines.push({ id: `${node}:spine`, from: node, to: node, flow: "W", spine: rail.group, d: toPath(bus.spine), column });
+        const node = `rail:${rail.key}`;
+        lines.push({ id: `${node}:spine`, from: node, to: node, flow: "W", spine: rail.key, railGroup: rail.group, d: toPath(bus.spine), column });
         for (const source of sources) {
           const flow = rail.sources.find((entry) => entry.id === source.id)?.flow || "W";
-          lines.push({ id: `${node}:in:${source.id}`, from: source.id, to: node, flow, cross: source.cross, scaffold: "in", railKey: `${rail.group}:${source.id}`, rail: rail.group, d: toPath(bus.branchesIn.get(source.id)), column: columnOf.get(source.id) || 0 });
+          lines.push({ id: `${node}:in:${source.id}`, from: source.id, to: node, flow, cross: source.cross, scaffold: "in", railKey: `${rail.key}:${source.id}`, rail: rail.key, d: toPath(bus.branchesIn.get(source.id)), column: columnOf.get(source.id) || 0 });
         }
         for (const id of targetIds) {
-          lines.push({ id: `${node}:out:${id}`, from: node, to: id, flow: "W", scaffold: "out", rail: rail.group, d: toPath(bus.branchesOut.get(id)), column });
+          lines.push({ id: `${node}:out:${id}`, from: node, to: id, flow: "W", scaffold: "out", rail: rail.key, d: toPath(bus.branchesOut.get(id)), column });
         }
       }
       for (const edge of stageEdges) {
@@ -671,6 +671,7 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
               className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : fresh != null ? "tls-bracket-line--fresh" : real ? "tls-bracket-line--real" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
               style={{ "--tls-i": line.column, ...(fresh != null ? { "--tls-fresh-delay": `${fresh.delay}ms`, "--tls-fresh-duration": `${fresh.duration}ms` } : null) }}
               data-rail-spine={line.spine || undefined}
+              data-rail-group={line.railGroup || undefined}
               data-real={real ? "1" : undefined}
               data-to-slot={line.toSlot || undefined}
               data-from={line.from}
