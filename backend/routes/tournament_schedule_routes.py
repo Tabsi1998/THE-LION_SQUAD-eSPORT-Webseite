@@ -14,7 +14,7 @@ from auth import get_current_user
 from database import get_db
 from models import new_id, now_utc
 from services.match_deadlines import auto_confirm_due, no_show_deadline, opened_at
-from services.match_scheduler import DONE_STATUSES, RUNNING_STATUSES, apply_plan, plan_for_tournament
+from services.match_scheduler import DONE_STATUSES, RUNNING_STATUSES, apply_plan, plan_for_tournament, station_query
 from services.tournament_permissions import READ_STAFF_ROLES, STATION_ASSIGN_ROLES, require_tournament_staff_permission
 from routes.tournament_common import _ensure_tournament_unlocked, _resolve_tid, _serialized_tournament_write
 from routes.tournament_router import router
@@ -116,10 +116,12 @@ async def release_schedule(tid: str, body: ScheduleRelease, me: dict = Depends(g
     haben; Zeit, Station und Herkunft fallen weg, die eigene Dauer bleibt. Mit Protokolleintrag."""
     db = get_db()
     tid = await _resolve_tid(tid)
-    await _planning_tournament(db, tid, me)
+    tournament = await _planning_tournament(db, tid, me)
     await _ensure_tournament_unlocked(db, tid)
     matches = await db.matches_v2.find({"tournament_id": tid, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
-    known = {station["id"] for station in await db.stations.find({}, {"_id": 0, "id": 1}).to_list(5000) if station.get("id")}
+    # Dieselben Stationen wie der Planer (station_query): was er als unbekannt meldet, wird hier auch gelöst.
+    known = {station["id"] for station in await db.stations.find(station_query(tournament), {"_id": 0, "id": 1}).to_list(500)
+             if station.get("id")}
     chosen = []
     for match in matches:
         status = str(match.get("status") or "")

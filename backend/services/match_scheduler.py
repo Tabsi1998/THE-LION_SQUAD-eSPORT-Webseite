@@ -508,6 +508,16 @@ async def resolve_participant_keys(db, matches) -> dict[str, set[str]]:
     return keys
 
 
+def station_query(tournament: dict) -> dict:
+    """Die Stationen, die ein Turnier nutzen darf: eigene und die des Events ohne Turnier. Eine Stelle für Planer und
+    „Termine lösen“ - eine Station eines anderen Turniers/Events gilt für beide als unbekannt."""
+    tid = tournament["id"]
+    event_id = tournament.get("event_id")
+    if event_id:
+        return {"$or": [{"tournament_id": tid}, {"event_id": event_id, "tournament_id": {"$in": [None, ""]}}]}
+    return {"tournament_id": tid}
+
+
 async def load_plan_inputs(db, tournament: dict) -> dict:
     """Alles, was der Planer braucht: Spiele, Phasen, Stationen, Vorschläge - und was am selben Event sonst läuft."""
     tid = tournament["id"]
@@ -515,10 +525,7 @@ async def load_plan_inputs(db, tournament: dict) -> dict:
     stages = await db.tournament_stages.find({"tournament_id": tid}, {"_id": 0}).to_list(200)
     proposals = await db.match_schedule_proposals.find({"tournament_id": tid}, {"_id": 0, "match_collection": 0}).to_list(3000)
     event_id = tournament.get("event_id")
-    station_query = {"tournament_id": tid}
-    if event_id:
-        station_query = {"$or": [{"tournament_id": tid}, {"event_id": event_id, "tournament_id": {"$in": [None, ""]}}]}
-    stations = await db.stations.find(station_query, {"_id": 0}).to_list(500)
+    stations = await db.stations.find(station_query(tournament), {"_id": 0}).to_list(500)
     participant_keys = await resolve_participant_keys(db, matches)
     busy_elsewhere: list[dict] = []
     if event_id:

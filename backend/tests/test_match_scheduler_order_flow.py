@@ -254,6 +254,29 @@ async def test_releasing_only_the_deleted_station_keeps_the_others(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_station_of_another_tournament_counts_as_missing_like_in_the_planner(flow):
+    # Codex zu #1607: Die Station gibt es noch - aber bei einem anderen Turnier/Event. Der Planer meldet sie als
+    # unbekannt, also muss „nur gelöschte Stationen lösen“ sie auch lösen (eine Abfrage für beide).
+    tournament = await cup(flow, event_id=new_id())
+    other = {"id": new_id(), "name": "Fremd", "device_type": "switch", "event_id": new_id(), "tournament_id": new_id(),
+             "status": "free", "current_match_id": None}
+    await flow.db.stations.insert_one(dict(other))
+    own = await flow.post("/api/stations", json={"name": "Switch 1", "device_type": "switch", "tournament_id": tournament["id"]})
+    matches = await by_key(flow, tournament)
+    for key, station_id in (("A", other["id"]), ("B", own.json()["id"])):
+        await flow.db.matches_v2.update_one({"id": matches[key]["id"]}, {"$set": {
+            "scheduled_at": vienna("15:30"), "station_id": station_id, "schedule_source": "manual"}})
+    plan = (await flow.post(f"/api/tournaments/{tournament['id']}/schedule/plan")).json()
+    unknown = [item for item in plan["warnings"] if item["type"] == "unknown_station"]
+    assert [item["match_ids"] for item in unknown] == [[matches["A"]["id"]]]
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/release", json={"scope": "missing_stations"})
+    assert response.status_code == 200, response.text
+    assert response.json()["match_ids"] == [matches["A"]["id"]]
+    after = await by_key(flow, tournament)
+    assert after["A"]["station_id"] is None and after["B"]["station_id"] == own.json()["id"]
+
+
+@pytest.mark.asyncio
 async def test_a_started_match_keeps_its_time_and_station(flow):
     tournament, _station, matches = await fabians_case(flow)
     await flow.db.matches_v2.update_one({"id": matches["A"]["id"]}, {"$set": {"status": "in_progress", "started_at": vienna("15:31")}})
