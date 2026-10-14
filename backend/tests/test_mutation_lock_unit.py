@@ -148,10 +148,8 @@ class _VirtualDatetime:
 
 def _run_virtual(monkeypatch, scenario):
     """Führt ein Szenario mit steuerbarer Uhr aus - Sperre, Datenbank-Zeitstempel und Wartezeiten laufen virtuell."""
-    import services.mutation_lock as lock_module
-
-    monkeypatch.setattr(lock_module, "monotonic", lambda: asyncio.get_running_loop().time())
-    monkeypatch.setattr(lock_module, "datetime", _VirtualDatetime)
+    monkeypatch.setattr("services.mutation_lock.monotonic", lambda: asyncio.get_running_loop().time())
+    monkeypatch.setattr("services.mutation_lock.datetime", _VirtualDatetime)
     with asyncio.Runner(loop_factory=_VirtualTimeLoop) as runner:
         return runner.run(scenario())
 
@@ -349,8 +347,8 @@ def test_external_cancellation_stays_a_cancellation():
         task = asyncio.create_task(holder())
         await entered.wait()
         task.cancel()
-        with pytest.raises(asyncio.CancelledError):
-            await task
+        await asyncio.wait([task])
+        assert task.cancelled(), "die Aufgabe endet durch den Abbruch"
         assert db.mutation_locks.document is None
 
     asyncio.run(scenario())
@@ -405,8 +403,8 @@ def test_cancel_during_acquire_does_not_leave_the_lease_behind(monkeypatch):
         await db.mutation_locks.committed.wait()
         assert db.mutation_locks.document is not None
         task.cancel()
-        with pytest.raises(asyncio.CancelledError):
-            await task
+        await asyncio.wait([task])
+        assert task.cancelled(), "die Aufgabe endet durch den Abbruch"
         assert db.mutation_locks.document is None, "die gerade erworbene Sperre wird wieder freigegeben"
 
     _run_virtual(monkeypatch, scenario)

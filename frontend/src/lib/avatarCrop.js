@@ -12,9 +12,11 @@ export const INITIAL_AVATAR_CROP = Object.freeze({ zoom: 1, offsetX: 0, offsetY:
 /**
  * Sicherheitsprüfung für die Vorschau: nur eine echte Blob-Adresse aus `URL.createObjectURL` darf ins `<img>`.
  * Kein anderes Schema (`javascript:`, `data:`, `https:`), keine Leerzeichen, Anführungszeichen oder spitzen Klammern.
+ * Die Zeichenprüfung steht bewusst als eigener Ausdruck im Rückgabewert: so erkennt auch die Code-Analyse die
+ * Prüfung, wo die Adresse danach verwendet wird.
  */
 export function isSafeBlobUrl(value) {
-  return typeof value === "string" && /^blob:[A-Za-z0-9+.-]+:[^\s"'<>`]+$/.test(value);
+  return typeof value === "string" && !/[\s"'<>`]/.test(value) && /^blob:[A-Za-z0-9+.-]+:./.test(value);
 }
 
 function clamp(value, min, max) {
