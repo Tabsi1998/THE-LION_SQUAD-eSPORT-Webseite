@@ -23,7 +23,7 @@ EXPECTED = {
     "moderation_strikes": {"user_id_1", "source_1_ref_id_1", "erase_after_1"},
     # Frist nach der Kontolöschung (#1029)
     "consent_records": {"erase_after_1"},
-    "consent_decisions": {"erase_after_1"},
+    "consent_decisions": {"erase_after_1", "open_decision_unique"},
     "match_reports_v2": {"erase_after_1"},
     "contact_messages": {"erase_after_1"},
     "user_reports": {"erase_after_1"},

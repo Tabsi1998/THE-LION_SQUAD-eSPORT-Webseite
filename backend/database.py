@@ -432,6 +432,10 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     # Je eingefrorenem Preis höchstens ein Rechnungsauftrag (#1184). Nur Aufträge mit Schlüssel zählen - ältere haben
     # keinen und können den Aufbau nie blockieren; Dubletten ließen ohnehin nur einen gewöhnlichen Index zurück.
     ("billing_orders", "booking_key", "booking_key", {"partialFilterExpression": {"booking_key": {"$exists": True}}}),
+    # Je Konto, Mitglied, Zweck, Entscheidung und Fassung höchstens ein offener Einwilligungsauftrag (#1537): zwei
+    # gleichzeitige Klicks schicken dieselbe Kennung an Dolibarr. Abgeschlossene Aufträge bleiben außen vor.
+    ("consent_decisions", [("user_id", 1), ("member_id", 1), ("code", 1), ("decision", 1), ("version", 1)], "open_decision",
+     {"partialFilterExpression": {"status": {"$in": ["sent", "pending"]}}}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("platform_links", "user_id"),
