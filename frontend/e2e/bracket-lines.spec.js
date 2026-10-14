@@ -20,8 +20,8 @@ test.beforeAll(async () => {
   audit = await import("../src/lib/bracketLineAudit.mjs");
 });
 
-async function mockWeb(page, name) {
-  const data = CASES[name] || GENERATED[name];
+async function mockWeb(page, name, change = (data) => data) {
+  const data = change(structuredClone(CASES[name] || GENERATED[name]));
   const tournament = { ...data.tournament, status: "live" };
   const json = (body, status = 200) => (route) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   await page.addInitScript(() => {
@@ -195,6 +195,37 @@ for (const width of [1440, 375]) {
     await page.waitForTimeout(600);
     const bad = await page.locator("[data-pending='1']").evaluateAll((nodes) => nodes.filter((node) => node.offsetParent && (node.scrollWidth > node.clientWidth + 1 || node.getBoundingClientRect().height > parseFloat(getComputedStyle(node).lineHeight) * 1.5)).map((node) => node.textContent));
     expect(bad).toEqual([]);
+  });
+}
+
+// Laufendes Spiel mit langem Stationsnamen (break-ui): der Live-Hinweis steht in einer eigenen Zeile unter dem Titel und
+// kürzt mit „…“ - Titel und „4 Spieler · 2 kommen weiter“ brechen nicht Wort für Wort um.
+for (const width of [1440, 375]) {
+  test(`Web ${width}: laufendes Spiel mit langem Stationsnamen - Titel bleibt einzeilig`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const station = "Station Switch 3 - switch2 im großen Saal hinten links";
+    const live = (data) => {
+      const heat = data.matches_v2.find((match) => match.match_key === "C");
+      Object.assign(heat, { status: "in_progress", station_label: station, started_at: new Date(Date.now() - 167000).toISOString() });
+      return data;
+    };
+    const tournament = await mockWeb(page, "ffa16de_start", live);
+    await page.goto(`/tournaments/${tournament.slug}/bracket`);
+    const id = CASES.ffa16de_start.matches_v2.find((match) => match.match_key === "C").id;
+    const card = page.getByTestId(`bracket-heat-${id}`).first();
+    await expect(card).toBeVisible();
+    await card.scrollIntoViewIfNeeded();
+    const liveLine = card.locator("[data-live='1']");
+    await expect(liveLine).toContainText("Station Switch 3");
+    const lines = (locator) => locator.evaluate((node) => Math.round(node.getBoundingClientRect().height / parseFloat(getComputedStyle(node).lineHeight)));
+    expect(await lines(page.getByTestId(`bracket-heat-title-${id}`).first())).toBe(1);
+    expect(await lines(page.getByTestId(`bracket-heat-meta-${id}`).first())).toBe(1);
+    // Die Live-Zeile bleibt in der Karte; der volle Name steht im Titel-Attribut.
+    const box = await card.boundingBox();
+    const liveBox = await liveLine.boundingBox();
+    expect(liveBox.x + liveBox.width).toBeLessThanOrEqual(box.x + box.width + 1);
+    await expect(card.locator(`[title='${station}']`)).toHaveCount(1);
+    if (SHOTS) await card.screenshot({ path: `${SHOTS}/web-${width}-live-lange-station.png` });
   });
 }
 

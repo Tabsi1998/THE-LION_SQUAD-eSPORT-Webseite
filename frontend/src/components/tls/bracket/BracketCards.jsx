@@ -88,11 +88,14 @@ function LiveStatus({ match }) {
   if (finished && !isDone(match)) return <span className="text-quiet" data-testid="bracket-not-played">nicht gespielt</span>;
   if (!finished && isLive(match)) {
     const station = getStationLabel(match);
+    // Eigene Zeile unter dem Titel (#1591): ein langer Stationsname kürzt mit „…“ (voll im Titel-Attribut und im Blatt),
+    // die Spielzeit bleibt immer ganz.
+    const label = station || formatMatchStatus(status);
     return (
-      <span className="inline-flex items-center gap-1.5 text-live" data-live="1">
-        <span className="w-1.5 h-1.5 rounded-full bg-live tv-live-dot" aria-hidden="true" />
-        {station || formatMatchStatus(status)}
-        {match.started_at ? <>{" · "}<LiveClock startedAt={match.started_at} /></> : null}
+      <span className="flex min-w-0 items-center gap-1.5 text-live" data-live="1">
+        <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-live tv-live-dot" aria-hidden="true" />
+        <span className="min-w-0 truncate" title={label}>{label}</span>
+        {match.started_at ? <span className="shrink-0 tabular-nums">{"· "}<LiveClock startedAt={match.started_at} /></span> : null}
       </span>
     );
   }
@@ -266,15 +269,22 @@ function nodeClasses({ live, mine, changed }) {
 }
 
 function CardHead({ match, title, meta, sheetId, open, onToggle }) {
+  const finished = useContext(FinishedContext);
+  // Läuft das Spiel, steht der Live-Hinweis (Station, Spielzeit) in einer eigenen Zeile - sonst drückt er den Titel
+  // zusammen, bis „4 Spieler · 2 kommen weiter“ Wort für Wort untereinander steht (#1591).
+  const live = !finished && isLive(match);
   return (
     <button type="button" className="tls-bracket-head" aria-expanded={open} aria-controls={sheetId} onClick={onToggle}>
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         {title}
         {meta}
+        {live ? <span className="mt-0.5 block text-[11px]"><LiveStatus match={match} /></span> : null}
       </span>
-      <span className="shrink-0 text-[11px] text-muted-text">
-        <LiveStatus match={match} />
-      </span>
+      {live ? null : (
+        <span className="shrink-0 text-[11px] text-muted-text">
+          <LiveStatus match={match} />
+        </span>
+      )}
     </button>
   );
 }
