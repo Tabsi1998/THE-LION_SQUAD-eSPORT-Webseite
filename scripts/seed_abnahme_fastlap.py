@@ -28,6 +28,7 @@ import secrets
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit
 
 PROJECT = os.environ.get("ABNAHME_PROJECT", "lsw-abnahme")
 # Eigene Testkonten (fastlap-…), damit dieser Seed die Zugänge von seed_abnahme.py nie überschreibt. Passwort und
@@ -61,6 +62,26 @@ def host_main() -> int:
     target.write_text(json.dumps(json.loads(line[len(marker):]), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"Stand geschrieben: {target}")
     return 0
+
+
+# Nur ein lokaler Abnahme-Stand: Datenbank wie in .env.abnahme.example (tls_abnahme, auch mit Zusatz), keine Produktion,
+# öffentliche Adressen nur auf diesem Rechner. Sonst bricht der Seed ab, bevor er etwas schreibt (Codex-Prüfung #1598).
+ABNAHME_DB_PREFIX = "tls_abnahme"
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+PRODUCTION = {"production", "prod"}
+
+
+def guard_environment(env) -> None:
+    problems = []
+    if not str(env.get("DB_NAME") or "").startswith(ABNAHME_DB_PREFIX):
+        problems.append("Datenbank ist nicht die der Abnahme")
+    if {str(env.get(key) or "").strip().lower() for key in ("APP_ENV", "ENV", "ENVIRONMENT")} & PRODUCTION:
+        problems.append("Umgebung ist Produktion")
+    for key in ("FRONTEND_URL", "PUBLIC_BACKEND_URL"):
+        if (urlsplit(str(env.get(key) or "")).hostname or "") not in LOCAL_HOSTS:
+            problems.append(f"{key} zeigt nicht auf diesen Rechner")
+    if problems:
+        raise SystemExit("Abbruch, kein lokaler Abnahme-Stand: " + "; ".join(problems))
 
 
 def credentials() -> tuple[str, str]:
@@ -126,6 +147,7 @@ async def ensure_accounts(db) -> dict:
 
 
 async def inside_main() -> None:
+    guard_environment(os.environ)
     from database import get_db
 
     db = get_db()
