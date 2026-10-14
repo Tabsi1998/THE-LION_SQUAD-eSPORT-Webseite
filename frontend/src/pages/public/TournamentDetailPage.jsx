@@ -41,6 +41,9 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { GameDiscordTile } from "@/components/tls/DiscordServerTile";
 import { viennaDateTime } from "@/lib/vienna";
 import { ShareButton } from "@/components/tls/ShareButton";
+import { Podium } from "@/components/tls/podium/Podium";
+import { markPlacementShown, placementFor, placementShown } from "@/lib/placementMoment";
+import { ceremonyQueue } from "@/components/achievements/ceremony/queue";
 
 // Eigener Stand je Turnier und Konto (#1047): ein Wechsel des Turniers oder ein echter Kontowechsel baut die Seite
 // neu auf - Chat-Entwurf und Anhänge gehen weg, späte Antworten laufen ins Leere. Das erste Laden der Anmeldung
@@ -104,6 +107,15 @@ function TournamentDetailView() {
   }, [load]);
 
   useLiveRefresh(load, ["tournaments"], { fallbackMs: 10000 });
+
+  // Sieger-Moment (#1180): wer Platz 1 bis 3 belegt hat, bekommt nach dem Ende einmal je Browser seine Karte - über die
+  // Zeremonie-Warteschlange, also nie zugleich mit einem Erfolg.
+  useEffect(() => {
+    const placement = placementFor(t, standings);
+    if (!placement || placementShown(placement)) return;
+    markPlacementShown(placement);
+    ceremonyQueue.enqueue({ id: `placement-${placement.key}`, placement });
+  }, [t, standings]);
 
   const runAction = async (task, fallback) => {
     setActionError("");
@@ -187,10 +199,7 @@ function TournamentDetailView() {
   const hasRegisterAccess = t.access_link?.grants?.includes("register");
   const canSelfRegister = (registration.canRegister || hasRegisterAccess) && !clubMemberBlocked && !eventBlocked;
   const canSelfUnregister = !!myReg && (myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role)) && !["checked_in", "no_show", "rejected"].includes(myReg.status) && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
-  const podiumRows = standings
-    .filter((row) => Number(row.rank) >= 1 && Number(row.rank) <= 3)
-    .sort((a, b) => Number(a.rank) - Number(b.rank))
-    .slice(0, 3);
+  const podiumRows = standings.filter((row) => row && !Array.isArray(row.standings) && Number(row.rank) >= 1 && Number(row.rank) <= 3);
   const nextStep = timelineSteps(t).find((step) => step.next) || null;
   const finished = ["completed", "results_published", "archived"].includes(t.status);
   const subPage = (part) => `/tournaments/${t.slug || t.id}/${part}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
@@ -228,7 +237,10 @@ function TournamentDetailView() {
     primaryAction = <button type="button" disabled data-testid="tournament-closed-btn" className={`${primaryClass} border border-white/10 text-white/35 cursor-not-allowed`}>{registration.label}</button>;
   }
   const STATUS_ORDER = { checked_in: 0, approved: 1, pending: 2, waitlist: 3, rejected: 4, no_show: 5 };
-  const sortedRegs = [...regs].sort((a, b) => ((STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)) || ((a.seed ?? 999) - (b.seed ?? 999)));
+  // Nach dem Ende stehen die Teilnehmer nach ihrem Endplatz (geteilte Plätze gleich), sonst nach Status und Setzplatz -
+  // nie nach der Reihenfolge der Anmeldung, die man mit dem Podest verwechseln könnte (Abnahme #1593).
+  const finalRank = new Map(standings.filter((row) => row && !Array.isArray(row.standings) && row.registration_id && Number(row.rank) > 0).map((row) => [row.registration_id, Number(row.rank)]));
+  const sortedRegs = [...regs].sort((a, b) => ((finalRank.get(a.id) ?? 9999) - (finalRank.get(b.id) ?? 9999)) || ((STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)) || ((a.seed ?? 999) - (b.seed ?? 999)));
   const calendarItem = {
     id: t.id, slug: t.slug, kind: "tournament", title: t.title, start: t.start_date, end: t.end_date,
     location: t.location || null, detail: [t.game ? gameLabel(t.game) : null, formatTournamentDisplay(t)].filter(Boolean).join(" · "),
@@ -349,10 +361,13 @@ function TournamentDetailView() {
           )}
           {podiumRows.length > 0 && (
             <section>
-              <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Podium</h2>
-              <div className="grid sm:grid-cols-3 gap-3">
-                {podiumRows.map((row) => <PodiumCard key={row.registration_id || row.display_name || row.rank} row={row} />)}
-              </div>
+              <h2 className="font-heading text-2xl font-bold uppercase mb-8 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Podest</h2>
+              {/* Das Treppchen (#1339) - das Bild, das nach dem Sieger-Moment stehen bleibt. Vor „Ergebnisse
+                  veröffentlicht“ ist der Stand noch nicht bestätigt: dann steht es als „vorläufig“ da. */}
+              {t.status === "completed" && (
+                <p className="-mt-5 mb-6 text-sm text-white/55" data-testid="podium-provisional">Stand vorläufig – die Turnierleitung bestätigt die Ergebnisse noch.</p>
+              )}
+              <Podium rows={podiumRows} registrations={regs} />
             </section>
           )}
           {t.status === "live" && <TournamentLiveStreams tournament={t} />}
@@ -378,12 +393,16 @@ function TournamentDetailView() {
           <section id="teilnehmer" data-testid="tournament-participants">
             <h2 className="font-heading text-2xl font-bold uppercase mb-3">Teilnehmer ({regs.length})</h2>
             <div className="border border-white/10 rounded-sm divide-y divide-white/5 bg-[#121212]">
-              {sortedRegs.map((r, i) => {
+              {sortedRegs.map((r) => {
                 const mine = !!user && (r.user_id === user.id || r.is_mine);
                 return (
                   <div key={r.id} className={`flex items-center justify-between gap-3 px-4 py-3 ${mine ? "bg-[#FFD700]/5" : ""}`} data-testid={`tournament-participant-${r.id}`}>
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="font-display font-bold text-[#29B6E8] w-6">{r.seed ? `#${r.seed}` : i + 1}</span>
+                      {finalRank.size ? (
+                        <span className="font-display font-bold text-white/80 w-7 tabular-nums" title="Endplatz" data-testid={`tournament-participant-rank-${r.id}`}>{finalRank.has(r.id) ? `${finalRank.get(r.id)}.` : "–"}</span>
+                      ) : (
+                        <span className="font-display font-bold text-[#29B6E8] w-7" title="Setzplatz">{r.seed ? `#${r.seed}` : ""}</span>
+                      )}
                       <span className="text-white truncate">{r.display_name || r.ingame_name || r.user?.display_name || "—"}</span>
                       {r.team && <span className="text-white/45 text-xs truncate">[{r.team.tag || r.team.name}]{Number(r.team.member_count) > 0 ? ` · ${r.team.member_count} Spieler` : ""}</span>}
                       {mine && <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/50 rounded-sm px-1.5 py-0.5" data-testid={`tournament-participant-me-${r.id}`}>du</span>}
@@ -549,28 +568,6 @@ function TournamentChat({ tournament, user }) {
         )}
       </div>
     </section>
-  );
-}
-
-function PodiumCard({ row }) {
-  const rank = Number(row.rank) || 0;
-  const styles = {
-    1: "border-[#FFD700]/60 bg-[#FFD700]/10 text-[#FFD700]",
-    2: "border-white/35 bg-white/10 text-white",
-    3: "border-[#CD7F32]/55 bg-[#CD7F32]/10 text-[#CD7F32]",
-  };
-  const label = rank === 1 ? "Gold" : rank === 2 ? "Silber" : rank === 3 ? "Bronze" : "Platz";
-  return (
-    <div className={`rounded-sm border p-4 ${styles[rank] || "border-white/10 bg-[#121212] text-white"}`}>
-      <div className="text-[10px] font-bold uppercase tracking-widest">{label}</div>
-      <div className="mt-2 flex items-baseline gap-2">
-        <span className="font-heading text-4xl font-black">#{rank}</span>
-        <span className="min-w-0 truncate font-bold text-white">{row.display_name || row.ingame_name || row.user?.display_name || "Teilnehmer"}</span>
-      </div>
-      <div className="mt-2 text-xs text-white/50">
-        {row.points != null ? `${row.points} Punkte` : row.wins != null ? `${row.wins} Siege` : "Finalplatzierung"}
-      </div>
-    </div>
   );
 }
 

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, configure, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { emitApiInvalidation, setStreamConnected } from "@/lib/apiInvalidation";
 // TV-Bäume aus dem echten Generator, Planer, Umbau und den echten Routen (scripts/make_tv_bracket_fixture.py).
@@ -7,6 +7,9 @@ import TVG from "../../../e2e/fixtures/tvGenerated.json";
 // Turnierbaum-TV (#1564): jedes Turnier-Ereignis hat seinen Moment - genau einmal. Nach einer Neuverbindung holt der TV
 // den Stand ruhig nach (nichts fährt, nichts zoomt). „Bewegung reduzieren“: der Moment sagt es in Worten, nichts
 // bewegt sich. Unten steht „Als Nächstes“ mit Prognose und Verzug und was gerade läuft, mit Spielzeit.
+
+// Unter Last (ganzer Lauf parallel) braucht das Nachladen mit Entprellung länger als die üblichen 1 s.
+configure({ asyncUtilTimeout: 3000 });
 
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (value) => value }));
@@ -47,6 +50,12 @@ async function change(name) {
 }
 
 const main = () => screen.getByTestId("tv-main");
+
+/** Eine Ersatz-Abfrage ohne Strom: der TV fragt im Takt nach (15 s) - ohne Meldung aus dem Strom. */
+async function poll(name) {
+  current = state(name);
+  await act(async () => { vi.advanceTimersByTime(15000); });
+}
 
 beforeEach(() => {
   apiMock.get.mockReset();
@@ -89,10 +98,13 @@ test("kampflos: der Ergebnis-Moment sagt „kampflos“", async () => {
 });
 
 test("nach einer Neuverbindung holt der TV den Stand ruhig nach - kein Moment, nichts wird nachgeholt", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
   current = state("se8_live");
   renderTv();
   await screen.findByTestId("tv-tree");
   act(() => setStreamConnected(false));
+  // Eine echte Unterbrechung: während der Trennung läuft eine Ersatz-Abfrage (alle 15 s), noch ohne Neues.
+  await act(async () => { vi.advanceTimersByTime(15000); });
   current = state("se8_after_a");
   // Zurück: useLiveRefresh lädt einmal nach - das ist der Stand von „dazwischen“.
   act(() => setStreamConnected(true));
@@ -204,17 +216,16 @@ test("überall dieselbe Zeit: Karte und Fuß nennen dieselbe Prognose, die Folge
 });
 
 test("solange der Strom getrennt ist, lädt der TV ruhig nach (Ersatz-Abfrage) - keine Bewegungs-Salve, auch nicht beim Wiederverbinden", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
   current = state("se8_live");
   renderTv();
   await screen.findByTestId("tv-tree");
   act(() => setStreamConnected(false));
-  // Getrennt: der TV fragt im Takt nach (hier ausgelöst wie eine Ersatz-Abfrage) - jeder Stand kommt ohne Moment.
-  await change("se8_after_a");
-  const winner = state("se8_after_a").matches_v2.find((match) => match.match_key === "A").results.find((row) => row.rank === 1).registration_id;
-  await waitFor(() => expect(screen.getByTestId(`tv-match-${idOf(current, "E")}`).querySelector(`[data-tv-reg='${winner}']`)).not.toBeNull());
+  // Getrennt: der TV fragt im Takt nach - jeder Stand kommt ohne Moment.
+  await poll("se8_after_a");
+  await waitFor(() => expect(screen.getByTestId(`tv-match-${idOf(state("se8_after_a"), "A")}`)).toHaveTextContent("Beendet"));
   expect(main()).not.toHaveAttribute("data-moment");
-  await change("se8_corrected");
-  await waitFor(() => expect(screen.getByTestId(`tv-match-${idOf(current, "A")}`)).toHaveTextContent(/1/));
+  await poll("se8_corrected");
   await new Promise((resolve) => { setTimeout(resolve, 300); });
   expect(main()).not.toHaveAttribute("data-moment");
   expect(screen.queryByTestId("tv-result-card")).not.toBeInTheDocument();
@@ -223,6 +234,21 @@ test("solange der Strom getrennt ist, lädt der TV ruhig nach (Ersatz-Abfrage) -
   act(() => setStreamConnected(true));
   await waitFor(() => expect(screen.getByTestId(`tv-match-${current.matches_v2.find((match) => match.status === "forfeit").id}`)).toHaveAttribute("data-walkover", "1"));
   expect(main()).not.toHaveAttribute("data-moment");
+});
+
+test("eine Änderung kommt über den Strom, der danach kurz neu verbindet (wie EventSource nach jedem Ende): der Moment kommt", async () => {
+  current = state("se8_live");
+  renderTv();
+  await screen.findByTestId("tv-tree");
+  current = state("se8_after_a");
+  // Die Meldung kommt, gleich danach endet der Strom und verbindet neu - die Abfrage startet, während er getrennt ist.
+  await act(async () => {
+    emitApiInvalidation({ resource: "matches" });
+    setStreamConnected(false);
+    await new Promise((resolve) => { setTimeout(resolve, 200); });
+    setStreamConnected(true);
+  });
+  await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
 });
 
 // ---------------------------------------------------------------- Codex-Nachprüfung: überlappende Abfragen
@@ -274,26 +300,91 @@ test("zwei überlappende Abfragen, die Antworten vertauscht: der ältere Stand �
   expect(id).toBeTruthy();
 });
 
-test("Wiederverbinden mit überlappender Abfrage: der Nachholstand bleibt ruhig, egal welche Antwort zuerst kommt", async () => {
-  current = state("se8_live");
-  const pending = deferredBrackets();
-  renderTv();
-  await screen.findByTestId("tv-tree");
+/** Echte Unterbrechung (Ersatz-Abfrage im Takt), Neuverbinden mit Nachhol-Abfrage, dann eine echte Meldung aus dem Strom. */
+async function outageThenReconnectWithMessage(pending) {
   act(() => setStreamConnected(false));
-  // Wieder verbunden: die Nachhol-Abfrage startet, kurz danach eine zweite (neue Änderung gemeldet).
+  await act(async () => { vi.advanceTimersByTime(15000); });
+  await act(async () => { pending.shift()({ data: state("se8_live") }); });
   await act(async () => {
     setStreamConnected(true);
     await new Promise((resolve) => { setTimeout(resolve, 220); });
   });
+  // Während die Nachhol-Abfrage noch aussteht, meldet der Strom eine neue Änderung.
   await trigger();
   expect(pending).toHaveLength(2);
-  // Die spätere Abfrage antwortet zuerst - sie trägt alles Verpasste und muss ruhig sein.
+}
+
+test("Nachhol-Abfrage aussteht, eine neue Meldung kommt, deren Antwort zuerst: ihr Moment erscheint, die alte Antwort wird verworfen", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  current = state("se8_live");
+  const pending = deferredBrackets();
+  renderTv();
+  await screen.findByTestId("tv-tree");
+  await outageThenReconnectWithMessage(pending);
   await act(async () => { pending[1]({ data: state("se8_after_a") }); });
-  await waitFor(() => expect(screen.getByTestId(`tv-match-${idOf(state("se8_after_a"), "A")}`)).toHaveTextContent("Beendet"));
-  expect(main()).not.toHaveAttribute("data-moment");
-  // Die Nachhol-Abfrage kommt danach mit einem älteren Stand: verworfen - nichts springt zurück, nichts bewegt sich.
+  await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
+  // Die Nachhol-Abfrage kommt danach mit einem älteren Stand: verworfen - nichts springt zurück.
   await act(async () => { pending[0]({ data: state("se8_live") }); });
   await new Promise((resolve) => { setTimeout(resolve, 100); });
   expect(screen.getByTestId(`tv-match-${idOf(state("se8_after_a"), "A")}`)).toHaveTextContent("Beendet");
+});
+
+test("Nachhol-Abfrage aussteht, eine neue Meldung kommt, die Nachhol-Antwort zuerst: Verpasstes still, der neue Moment erscheint", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  current = state("se8_live");
+  const pending = deferredBrackets();
+  renderTv();
+  await screen.findByTestId("tv-tree");
+  await outageThenReconnectWithMessage(pending);
+  // Verpasst: A wurde während der Unterbrechung entschieden - still.
+  await act(async () => { pending[0]({ data: state("se8_after_a") }); });
+  await waitFor(() => expect(screen.getByTestId(`tv-match-${idOf(state("se8_after_a"), "A")}`)).toHaveTextContent("Beendet"));
   expect(main()).not.toHaveAttribute("data-moment");
+  // Neu gemeldet: das Ergebnis von A wurde korrigiert - dieser Moment kommt.
+  await act(async () => { pending[1]({ data: state("se8_corrected") }); });
+  await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
+  expect(screen.getByTestId("tv-result-card")).toHaveTextContent("Korrigiert");
+});
+
+test("kurzes Neuverbinden des Stroms (wenige 100 ms, z. B. Server oder Proxy) ist keine Unterbrechung - der Moment kommt", async () => {
+  current = state("se8_live");
+  renderTv();
+  await screen.findByTestId("tv-tree");
+  // Der Strom endet und steht 300 ms später wieder - so verhält sich EventSource bei jedem Neuverbinden.
+  act(() => setStreamConnected(false));
+  await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 300); }); });
+  act(() => setStreamConnected(true));
+  await change("se8_after_a");
+  await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
+});
+
+test("kurzes Neuverbinden, und die Abfrage danach bringt schon das neue Ergebnis (Meldung kommt gleich hinterher): der Moment kommt trotzdem", async () => {
+  current = state("se8_live");
+  renderTv();
+  await screen.findByTestId("tv-tree");
+  act(() => setStreamConnected(false));
+  // Das Ergebnis ist schon gespeichert, bevor der Strom wieder steht - die Abfrage nach dem Neuverbinden holt es.
+  current = state("se8_after_a");
+  await act(async () => {
+    setStreamConnected(true);
+    await new Promise((resolve) => { setTimeout(resolve, 250); });
+  });
+  await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
+});
+
+test("Nachhol-Antwort und Meldungs-Antwort im selben Render-Durchgang: nur der neue Moment, nichts Verpasstes", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  current = state("se8_live");
+  const pending = deferredBrackets();
+  renderTv();
+  await screen.findByTestId("tv-tree");
+  await outageThenReconnectWithMessage(pending);
+  // Beide Antworten kommen zusammen an: verpasst (A entschieden) und neu gemeldet (A korrigiert).
+  await act(async () => {
+    pending[0]({ data: state("se8_after_a") });
+    pending[1]({ data: state("se8_corrected") });
+  });
+  await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
+  // Der Moment ist die Korrektur - nicht das verpasste „entschieden“.
+  expect(screen.getByTestId("tv-result-card")).toHaveTextContent("Korrigiert");
 });

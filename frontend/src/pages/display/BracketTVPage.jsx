@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { useParams, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { invalidationMatches, isStreamConnected, subscribeApiInvalidation, subscribeStreamState } from "@/lib/apiInvalidation";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { isTableFormat } from "@/components/tls/BracketTree";
 import { statusBadgeLabel } from "@/components/tls/StatusBadge";
@@ -15,7 +16,7 @@ import { TvCheckInScreen, TvPauseScreen, TvRegistrationScreen } from "@/componen
 import { TvNextUp } from "@/components/tv/TvNextUp";
 import { useLowMomentTimer, useMinuteTick, useTvSound, useTvSponsors } from "@/components/tv/tvHooks";
 import { lastStageId } from "@/lib/bracketPodium";
-import { bracketChanges, isLiveMatch } from "@/lib/tvLive";
+import { bracketChanges, bracketSnapshot, isLiveMatch } from "@/lib/tvLive";
 import { slotDraw } from "@/lib/bracketGraph";
 import { advancementsOf } from "@/lib/tvTravel";
 import { championKey, championOf } from "@/lib/tvChampion";
@@ -44,6 +45,8 @@ const NO_TAGS = new Map();
 const HIGH = new Set(["champion", "result", "live", "draw", "merge", "mark"]);
 // Mehr Ereignisse auf einmal sind kein Live-Geschehen mehr (Neuaufbau, Nachladen) - dann ohne Moment ans Ende.
 const MAX_EVENTS = 48;
+// Worauf der TV hört - dieselbe Liste für das Nachladen und das Zählen der Meldungen aus dem Strom.
+const LIVE_RESOURCES = ["tournaments", "matches", "stations", "tv"];
 
 export default function BracketTVPage() {
   return (
@@ -129,35 +132,52 @@ function BracketTv() {
   const [lastUpdated, setLastUpdated] = useState(null);
   // Nach einer Neuverbindung (#1564, wie die Turnierseite #1561): der nächste Stand holt Verpasstes nach - ohne Moment.
   const catchUpRef = useRef(false);
-  const quietRef = useRef(false);
-  // Getrennt nach einer bestehenden Verbindung (Codex-Prüfung #1564): jede Ersatz-Abfrage holt nur nach - ohne Moment.
+  // Der zuletzt still übernommene Stand (Codex-Prüfung #1564): beim Übernehmen festgehalten, nicht als Flag - so bleibt
+  // er Basis des Vergleichs, auch wenn React ihn mit einer späteren Antwort in einem Durchgang zeichnet.
+  const quietBaseRef = useRef(null);
+  // Nachholen ist nur, was nicht über den Strom kam (Codex-Prüfung #1564, CI-Befund): eine Ersatz-Abfrage, während der
+  // Strom getrennt ist, und die Abfrage nach einer Neuverbindung. Kam vor der Abfrage eine Änderung über den Strom, ist
+  // es keine Nachhol-Abfrage - auch wenn der Strom danach kurz neu verbindet (EventSource tut das nach jedem Ende).
+  // Gezählt wird ohne Uhr: so stimmt es auch bei gestellter Uhr und auf langsamen Rechnern.
   const offlineRef = useRef(false);
   const everConnected = useRef(false);
+  // Eine Unterbrechung ist erst echt, wenn während der Trennung eine Ersatz-Abfrage im Takt lief (alle 15 s) - ein
+  // kurzes Neuverbinden des Stroms (wenige 100 ms) ist keine, danach wird nichts still nachgeholt.
+  const outageRef = useRef(false);
+  const eventSeqRef = useRef(0);
+  const usedEventRef = useRef(0);
+  // Wozu eine Abfrage läuft - Meldung aus dem Strom, Neuverbindung oder Takt (Ersatz-Abfrage): gezählt, nicht am
+  // Zustand des Stroms abgelesen. Ein Strom, der nach jeder Antwort kurz neu verbindet, ist fast immer „getrennt“.
+  const reconnectSeqRef = useRef(0);
+  const usedReconnectRef = useRef(0);
   const sponsors = useTvSponsors();
   const minute = useMinuteTick();
 
   // Abfragen können sich überholen (Codex-Nachprüfung #1564): jede bekommt beim Start ihre Nummer; eine Antwort, die
-  // älter ist als die zuletzt übernommene, wird verworfen. Das Nachholen nach einer Neuverbindung gehört genau zur
-  // ersten Abfrage danach - und zu jeder späteren, die vor ihr ankommt (sie trägt das Verpasste ebenso).
+  // älter ist als die zuletzt übernommene, wird verworfen. Ob eine Abfrage still ist, steht beim Start fest - an ihr
+  // selbst, nie geerbt: eine Abfrage zu einer Meldung aus dem Strom zeigt ihren Moment immer.
   const seqRef = useRef(0);
   const appliedRef = useRef(0);
-  const catchUpFromRef = useRef(null);
 
   const load = useCallback(async () => {
     const seq = ++seqRef.current;
-    if (catchUpRef.current) {
-      catchUpFromRef.current = catchUpFromRef.current ?? seq;
-      catchUpRef.current = false;
-    }
-    const offline = offlineRef.current;
+    const driven = eventSeqRef.current > usedEventRef.current;
+    usedEventRef.current = eventSeqRef.current;
+    const catchUp = catchUpRef.current && !driven;
+    catchUpRef.current = false;
+    const reconnected = reconnectSeqRef.current > usedReconnectRef.current;
+    usedReconnectRef.current = reconnectSeqRef.current;
+    // Ersatz-Abfrage im Takt bei getrenntem Strom: eine echte Unterbrechung - ruhig.
+    const offline = !driven && !reconnected && offlineRef.current;
+    if (offline) outageRef.current = true;
+    const quiet = catchUp || offline;
     try {
       const { data: br } = await api.get(`/tournaments/${id}/bracket/display`, displayKey ? { params: { key: displayKey } } : undefined);
       if (seq < appliedRef.current) return;
       appliedRef.current = seq;
-      // Ruhig, wenn es Nachholen ist: nach einer Neuverbindung und während der Strom getrennt ist (Ersatz-Abfrage).
-      const catchUp = catchUpFromRef.current !== null && seq >= catchUpFromRef.current;
-      if (catchUp) catchUpFromRef.current = null;
-      quietRef.current = catchUp || offline;
+      // Ruhig, wenn es Nachholen ist: nach einer echten Unterbrechung und während der Strom getrennt ist (Ersatz-Abfrage).
+      // Nur setzen, nie löschen: eine spätere Antwort im selben Durchgang darf die stille Basis nicht wegnehmen.
+      if (quiet) quietBaseRef.current = br;
       setData(br);
       setLoadError(null);
       setKeyRefused(false);
@@ -185,14 +205,29 @@ function BracketTv() {
     load();
   }, [load]);
   // Die TV-Anzeige läuft stundenlang: ohne Strom alle 15 s nachfragen. „tv“: ein widerrufener Schlüssel wirkt sofort.
-  const connected = useLiveRefresh(load, ["tournaments", "matches", "stations", "tv"], { fallbackMs: 15000 });
-  const wasConnected = useRef(connected);
+  useLiveRefresh(load, LIVE_RESOURCES, { fallbackMs: 15000 });
+  // Welche Abfrage eine Änderung aus dem Strom trägt: jede passende Meldung zählt mit.
+  useEffect(() => subscribeApiInvalidation((event) => {
+    if (invalidationMatches(event, LIVE_RESOURCES)) eventSeqRef.current += 1;
+  }), []);
+  // Der Zustand des Stroms direkt aus der Brücke, nicht über einen React-Effekt: so steht er fest, bevor die nächste
+  // Abfrage startet - auch wenn das Neuzeichnen auf einem langsamen Rechner länger dauert.
   useEffect(() => {
-    if (connected && !wasConnected.current) catchUpRef.current = true;
-    if (connected) everConnected.current = true;
-    offlineRef.current = !connected && everConnected.current;
-    wasConnected.current = connected;
-  }, [connected]);
+    let was = isStreamConnected();
+    if (was) everConnected.current = true;
+    return subscribeStreamState((isConnected) => {
+      if (isConnected && !was) {
+        reconnectSeqRef.current += 1;
+        if (outageRef.current) catchUpRef.current = true;
+      }
+      if (isConnected) {
+        everConnected.current = true;
+        outageRef.current = false;
+      }
+      offlineRef.current = !isConnected && everConnected.current;
+      was = isConnected;
+    });
+  }, []);
 
   const t = data?.tournament;
   const matches = useMemo(() => data?.matches_v2 || [], [data?.matches_v2]);
@@ -223,6 +258,21 @@ function BracketTv() {
 
   useEffect(() => {
     if (!data) return;
+    // Ein still übernommener Stand ist die neue Basis: was er gegenüber dem Gezeigten ändert, ist gesehen - ohne Moment,
+    // auch der Sieger. Verglichen wird erst ab ihm (er kann schon der aktuelle Stand sein).
+    const base = quietBaseRef.current;
+    quietBaseRef.current = null;
+    if (base && previousRef.current) {
+      const baseMatches = base.matches_v2 || [];
+      momentsFromChange(previousRef.current, baseMatches, { seen: seenRef.current });
+      previousRef.current = baseMatches;
+      snapshotRef.current = bracketSnapshot(baseMatches);
+      const baseKey = championKey(championOf(baseMatches, base.stages || []));
+      if (baseKey !== championKeyRef.current) {
+        championKeyRef.current = baseKey;
+        setChampionState({ key: baseKey, parked: Boolean(baseKey) });
+      }
+    }
     const { started, decided, snapshot } = bracketChanges(snapshotRef.current, matches);
     const first = snapshotRef.current === null;
     snapshotRef.current = snapshot;
@@ -230,14 +280,12 @@ function BracketTv() {
     const previous = previousRef.current;
     previousRef.current = matches;
     const change = momentsFromChange(previous, matches, { seen: seenRef.current });
-    const catchUp = quietRef.current;
-    quietRef.current = false;
     const hidden = typeof document !== "undefined" && document.hidden;
     const key = championKey(champion);
     // Beim ersten Laden ist nichts neu: steht der Sieger schon fest, gleich das Endbild - ohne Konfetti. Ebenso nach
     // einer Neuverbindung, bei verdecktem Bildschirm und bei Riesen-Sprüngen: nichts nachholen, nur den Stand merken.
     // Pause, Check-in, Anmeldung oder ein Bildschirm ohne Baum: genauso.
-    if (first || catchUp || hidden || !showMoments || change.count > MAX_EVENTS) {
+    if (first || hidden || !showMoments || change.count > MAX_EVENTS) {
       championKeyRef.current = key;
       setChampionState({ key, parked: Boolean(champion) });
       return;

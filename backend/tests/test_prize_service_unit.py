@@ -15,6 +15,9 @@ class FakeCursor:
             items.sort(key=lambda item: item.get(field) or 0, reverse=sort_direction < 0)
         return FakeCursor(items)
 
+    def limit(self, count):
+        return FakeCursor(self.items[:count])
+
     async def to_list(self, _limit):
         return list(self.items)
 
@@ -49,6 +52,16 @@ class FakeCollection:
     async def insert_one(self, doc):
         self.items.append(dict(doc))
         return SimpleNamespace(inserted_id=doc.get("id"))
+
+    async def update_one(self, query, update, upsert=False):
+        # Nur was der Upsert beim Anlegen braucht (#1584): $setOnInsert, wenn nichts passt.
+        if any(self._matches(item, query) for item in self.items):
+            return SimpleNamespace(upserted_id=None, matched_count=1)
+        if not upsert:
+            return SimpleNamespace(upserted_id=None, matched_count=0)
+        doc = {**query, **update.get("$setOnInsert", {})}
+        self.items.append(doc)
+        return SimpleNamespace(upserted_id=doc.get("id"), matched_count=0)
 
 
 class FakeDb:

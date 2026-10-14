@@ -42,3 +42,41 @@ describe("CeremonyHost", () => {
     expect(screen.getByTestId("achievement-unlock-overlay")).toHaveAttribute("data-reduced", "true");
   });
 });
+
+// Sieger-Moment (#1180): der Turnier-Platz läuft über denselben Host - eigene Karte, Teilen und Turnierbaum.
+describe("CeremonyHost: Turnier-Platz", () => {
+  const placement = {
+    key: "t1:r1", rank: 1, metal: "gold", title: "Champion", label: "Platz 1", name: "NeonFalke", team: false,
+    tournamentId: "t1", tournamentTitle: "Lions Smash Finale", tournamentPath: "/tournaments/smash-finale",
+  };
+
+  it("zeigt die Karte mit Platz, Name und Turnier; Schließen geht zum Nächsten", async () => {
+    authState.user = { id: "u1", ceremony_mode: "full" };
+    const user = (await import("@testing-library/user-event")).default.setup();
+    const queue = createCeremonyQueue({ now: () => 1 });
+    renderHost(queue);
+    act(() => { queue.enqueue({ id: "platz", placement }); queue.enqueue({ id: "erfolg", tiers: [tier("a")] }); });
+    const card = screen.getByTestId("placement-moment");
+    expect(card).toHaveAttribute("data-metal", "gold");
+    expect(card).toHaveTextContent("Champion");
+    expect(card).toHaveTextContent("NeonFalke");
+    expect(card).toHaveTextContent("Lions Smash Finale");
+    expect(screen.getByRole("link", { name: /Turnierbaum/ })).toHaveAttribute("href", "/tournaments/smash-finale/bracket");
+    expect(screen.queryByTestId("achievement-unlock-overlay")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Schließen" }));
+    await waitFor(() => expect(screen.queryByTestId("placement-moment")).toBeNull());
+    expect(screen.getByTestId("achievement-unlock-overlay")).toBeInTheDocument();
+  });
+
+  it("„dezent“ bzw. Bewegung reduzieren: dieselbe Karte, ohne Bewegung", () => {
+    authState.user = { id: "u1", ceremony_mode: "subtle" };
+    const queue = createCeremonyQueue({ now: () => 1 });
+    queue.enqueue({ id: "platz", placement: { ...placement, rank: 3, metal: "bronze", title: "Dritter Platz", team: true } });
+    renderHost(queue);
+    const card = screen.getByTestId("placement-moment");
+    expect(card).toHaveAttribute("data-reduced", "true");
+    expect(card).toHaveAttribute("data-metal", "bronze");
+    expect(card).toHaveTextContent("Dritter Platz");
+    expect(card).toHaveTextContent("mit deinem Team");
+  });
+});

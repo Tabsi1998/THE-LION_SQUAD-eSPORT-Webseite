@@ -21,31 +21,11 @@ def _parse_dt(value):
         return None
 
 
-def _official_time_query(extra: dict | None = None) -> dict:
-    return {
-        **(extra or {}),
-        "is_invalid": {"$ne": True},
-        "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}],
-    }
-
-
 async def _track_top_entries(db, challenge_id: str, track_id: str, max_rank: int) -> list[dict]:
-    rows = await db.f1_lap_times.find(
-        _official_time_query({"challenge_id": challenge_id, "track_id": track_id}),
-        {"_id": 0},
-    ).to_list(5000)
-    best_by_user: dict[str, dict] = {}
-    for row in rows:
-        uid = row.get("user_id")
-        if not uid:
-            continue
-        effective = int(row.get("time_ms") or 0) + int((row.get("penalty_seconds") or 0) * 1000)
-        if uid not in best_by_user or effective < best_by_user[uid]["effective_ms"]:
-            best_by_user[uid] = {**row, "effective_ms": effective}
-    ranked = sorted(best_by_user.values(), key=lambda item: item["effective_ms"])
-    for index, row in enumerate(ranked):
-        row["rank"] = index + 1
-    return ranked[:max_rank]
+    """Die vorderen Plätze aus der einen Rangfunktion (#1584) - dieselben wie Tabelle und Gewinne."""
+    from services.fastlap_standings import official_times, rank_laps
+
+    return rank_laps(await official_times(db, challenge_id, track_id))[:max_rank]
 
 
 async def schedule_f1_prize_reminders() -> dict:

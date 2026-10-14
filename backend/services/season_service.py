@@ -306,11 +306,36 @@ async def award_points(
         )
         if existing:
             return existing
+    doc = await _points_doc(db, season_id=season_id, user_id=user_id, team_id=team_id, source_type=source_type,
+                            source_id=source_id, source_name=source_name, rank=rank, num_participants=num_participants,
+                            weight=weight, bonus=bonus, bonus_reason=bonus_reason, farming_exempt=farming_exempt)
+    if source_id:
+        # Einmal je Saison, Quelle und Person (#1584): Upsert statt Lesen-dann-Schreiben.
+        key = {"season_id": season_id, "source_type": source_type, "source_id": source_id, "user_id": user_id, "team_id": team_id}
+        written = await db.season_points.update_one(key, {"$setOnInsert": doc}, upsert=True)
+        if getattr(written, "upserted_id", None) is None:
+            return await db.season_points.find_one(key, {"_id": 0})
+    else:
+        await db.season_points.insert_one(doc)
+    # Live-Einbettung „Rangliste“ (#569): neue Punkte = Nachricht im Discord aktualisieren.
+    from services.discord_embed_queue import request_refresh
+    request_refresh("ranking")
+    doc.pop("_id", None)
+    return doc
+
+
+def _points_values(rank: int | None, num_participants: int, weight: float, bonus: int, farming_multiplier: float) -> dict:
+    """Die Punkte-Formel an einer Stelle: Basis nach Platz × Gewicht × Teilnehmerfaktor + Bonus, dann Farming-Faktor."""
     base = base_points_for_rank(rank, participated=True)
     factor = participant_factor(num_participants)
-    raw = base * weight * factor + bonus
-    raw = round(raw, 1)
+    raw = round(base * weight * factor + bonus, 1)
+    return {"base_points": base, "participant_factor": factor, "raw_points": raw,
+            "total_points": round(raw * farming_multiplier, 1)}
 
+
+async def _points_doc(db, *, season_id: str, user_id: str | None, team_id: str | None, source_type: str, source_id: str | None,
+                      source_name: str | None, rank: int | None, num_participants: int, weight: float, bonus: int,
+                      bonus_reason: str | None, farming_exempt: bool) -> dict:
     farming_multiplier = 1.0
     farming_capped = False
     if user_id and not farming_exempt and source_type in FARMABLE_SOURCES:
@@ -318,9 +343,8 @@ async def award_points(
         if prior >= 4:
             farming_multiplier = 0.5
             farming_capped = True
-    final_total = round(raw * farming_multiplier, 1)
-
-    doc = {
+    values = _points_values(rank, num_participants, weight, bonus, farming_multiplier)
+    return {
         "id": new_id(),
         "season_id": season_id,
         "user_id": user_id,
@@ -330,24 +354,57 @@ async def award_points(
         "source_name": source_name,
         "rank": rank,
         "num_participants": num_participants,
-        "base_points": base,
+        "base_points": values["base_points"],
         "weight": weight,
-        "participant_factor": factor,
+        "participant_factor": values["participant_factor"],
         "bonus_points": bonus,
         "bonus_reason": bonus_reason,
         "farming_multiplier": farming_multiplier,
         "farming_capped": farming_capped,
         "farming_exempt": farming_exempt,
-        "raw_points": raw,
-        "total_points": final_total,
+        "raw_points": values["raw_points"],
+        "total_points": values["total_points"],
         "created_at": now_utc().isoformat(),
     }
-    await db.season_points.insert_one(doc)
-    # Live-Einbettung „Rangliste“ (#569): neue Punkte = Nachricht im Discord aktualisieren.
-    from services.discord_embed_queue import request_refresh
-    request_refresh("ranking")
-    doc.pop("_id", None)
-    return doc
+
+
+async def resync_source_points(*, season_id: str, source_type: SourceType, source_id: str, source_name: str | None,
+                               ranking: list[tuple[str, int]], weight: float) -> dict:
+    """Saisonpunkte einer Quelle an eine neue Rangfolge angleichen (#1584) - nach einer Korrektur veröffentlichter
+    Ergebnisse. Gerechnet wird in der Saison, in der die Punkte vergeben wurden, mit dem Gewicht der Quelle; Bonus und
+    Farming-Faktor bestehender Einträge bleiben. Wer nicht mehr in der Rangfolge steht, verliert die Punkte dieser Quelle.
+    ``ranking``: (Person, Platz), Platz 1 zuerst. Gibt die Zahl der geänderten, neuen und entfernten Einträge zurück."""
+    db = get_db()
+    num_participants = max(len(ranking), 1)
+    existing = {row.get("user_id"): row for row in await db.season_points.find(
+        {"season_id": season_id, "source_type": source_type, "source_id": source_id}, {"_id": 0}).to_list(None)}
+    counts = {"updated": 0, "added": 0, "removed": 0}
+    stamp = now_utc().isoformat()
+    for user_id, rank in ranking:
+        row = existing.pop(user_id, None)
+        if row is None:
+            doc = await _points_doc(db, season_id=season_id, user_id=user_id, team_id=None, source_type=source_type,
+                                    source_id=source_id, source_name=source_name, rank=rank, num_participants=num_participants,
+                                    weight=weight, bonus=0, bonus_reason=None, farming_exempt=False)
+            key = {"season_id": season_id, "source_type": source_type, "source_id": source_id, "user_id": user_id, "team_id": None}
+            written = await db.season_points.update_one(key, {"$setOnInsert": doc}, upsert=True)
+            if getattr(written, "upserted_id", None) is not None:
+                counts["added"] += 1
+            continue
+        # Das Gewicht kommt aus der Quelle (Wertungsgewicht der Challenge) - es kann sich mit Begründung ändern.
+        values = _points_values(rank, num_participants, weight, int(row.get("bonus_points") or 0), float(row.get("farming_multiplier") or 1.0))
+        if (row.get("rank") != rank or row.get("num_participants") != num_participants or row.get("total_points") != values["total_points"]
+                or row.get("weight") != weight):
+            await db.season_points.update_one({"id": row["id"]}, {"$set": {"rank": rank, "num_participants": num_participants,
+                                                                         "weight": weight, **values, "updated_at": stamp}})
+            counts["updated"] += 1
+    for row in existing.values():
+        await db.season_points.delete_one({"id": row["id"]})
+        counts["removed"] += 1
+    if any(counts.values()):
+        from services.discord_embed_queue import request_refresh
+        request_refresh("ranking")
+    return counts
 
 
 async def aggregate_leaderboard(

@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 
 // Spielplaner (#1552): „Zeitplan füllen“ auf der Stationsseite geht denselben Weg wie „Planen“ im Turnier -
@@ -16,6 +17,8 @@ vi.mock("@/lib/api", () => ({
 }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ isTournamentLead: true, user: { id: "admin-1" }, can: () => true }) }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
+const liveRefresh = vi.fn();
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (...args) => { liveRefresh(...args); return true; } }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div data-testid="admin-layout">{children}</div> }));
 vi.mock("@/components/tls/results/ResultWindow", () => ({ ResultWindowLoader: () => null }));
 vi.mock("@/components/tls/results/ResultUndoBar", () => ({ ResultUndoBar: () => null, useResultUndo: () => ({ pending: null, show: () => {} }) }));
@@ -46,7 +49,7 @@ beforeEach(() => {
 
 test("„Zeitplan füllen“ zeigt die Vorschau und schreibt erst nach „Übernehmen“ mit dem Fingerabdruck", async () => {
   const user = userEvent.setup();
-  render(<ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider>);
+  render(<MemoryRouter><ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider></MemoryRouter>);
   const button = await screen.findByTestId("stations-plan-schedule");
   await waitFor(() => expect(button).not.toBeDisabled());
 
@@ -82,7 +85,43 @@ test("offene Spiele zeigen die Dauer aus Turnier oder Spiel, auch ohne eigenen W
     }
     return Promise.resolve(routeFor(path));
   });
-  render(<ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider>);
+  render(<MemoryRouter><ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider></MemoryRouter>);
   expect(await screen.findByTestId("match-unassigned-m1")).toHaveTextContent("15 Min.");
   expect(screen.getByTestId("match-unassigned-m2")).toHaveTextContent("20 Min.");
+});
+
+
+// Stationen-Seite (#1557): alle Spieler eines Laufs, Belegung als Zeitleiste (dieselbe wie im Matchplan), live.
+function withMatches(matches, registrations = []) {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/bracket")) {
+      return Promise.resolve({ data: { tournament: { id: "t-1", title: "Winter Cup", event_mode: "local" }, stages: [], matches_v2: matches, registrations } });
+    }
+    return Promise.resolve(routeFor(path));
+  });
+}
+
+test("ein Lauf zeigt alle Spieler, nicht nur die ersten vier", async () => {
+  const registrations = Array.from({ length: 6 }, (_, index) => ({ id: `r${index + 1}`, display_name: `Fahrer ${index + 1}` }));
+  withMatches([{ ...MATCH, slots: registrations.map((reg, index) => ({ slot: index + 1, registration_id: reg.id })) }], registrations);
+  render(<MemoryRouter><ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider></MemoryRouter>);
+  const row = await screen.findByTestId("match-unassigned-m1");
+  expect(row).toHaveTextContent("Fahrer 5");
+  expect(row).toHaveTextContent("Fahrer 6");
+});
+
+test("Belegung je Station als Zeitleiste - dieselbe wie im Matchplan, mit Weg dorthin", async () => {
+  withMatches([{ ...MATCH, status: "scheduled", station_id: "st-1", scheduled_at: "2026-10-31T10:00:00+00:00", schedule_source: "planner" }]);
+  render(<MemoryRouter><ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider></MemoryRouter>);
+  expect(await screen.findByTestId("mp-lane-st-1")).toBeInTheDocument();
+  expect(screen.getByTestId("mp-bar-A1")).toHaveAttribute("data-state", "planned");
+  expect(screen.getByRole("link", { name: "Im Matchplan öffnen" })).toHaveAttribute("href", "/admin/tournaments/t-1?tab=matchplan");
+});
+
+test("Stationen und Spiele bleiben live: Änderungsstrom mit Ersatz-Takt", async () => {
+  render(<MemoryRouter><ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider></MemoryRouter>);
+  await screen.findByTestId("stations-plan-schedule");
+  const resources = liveRefresh.mock.calls.map(([, list, options]) => ({ list: list.join(","), fallback: options?.fallbackMs }));
+  expect(resources).toContainEqual({ list: "stations,matches,tournaments", fallback: 15000 });
 });

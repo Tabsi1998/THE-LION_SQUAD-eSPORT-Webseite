@@ -81,13 +81,92 @@ test("Spielplan: Freilos, noch offene Plätze, Station im Klartext und Datum", a
       </MemoryRouter>,
     );
     const bye = await screen.findByTestId("schedule-match-m1");
-    expect(bye).toHaveTextContent("Team A vs. Freilos");
+    expect(bye).toHaveTextContent("Team A gegen Freilos");
     expect(screen.getByTestId("schedule-station-m1")).toHaveTextContent("Station A · Switch 2");
     expect(bye).not.toHaveTextContent("Station Station");
     expect(screen.getByTestId("schedule-when-m1")).toHaveTextContent("Sa 23. Mai · 18:00");
-    expect(screen.getByTestId("schedule-match-m2")).toHaveTextContent("noch offen vs. noch offen");
+    expect(screen.getByTestId("schedule-match-m2")).toHaveTextContent("noch offen gegen noch offen");
     expect(screen.getByTestId("schedule-when-m2")).toHaveTextContent("Termin offen");
   } finally {
     vi.useRealTimers();
   }
+});
+
+// Neuer Spielplan (#1562) - mit den Daten aus dem echten Planer (scripts/make_table_schedule_fixture.py).
+const generated = (await import("../../../e2e/fixtures/tableScheduleGenerated.json")).default;
+
+function mockGenerated(set) {
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...set.tournament, slug: "cup" } });
+    if (path === `/tournaments/${set.tournament.id}/bracket`) return Promise.resolve({ data: set.bracket });
+    if (path === `/tournaments/${set.tournament.id}/matchdays`) return Promise.resolve({ data: set.matchdays || { applies: false, matchdays: [] } });
+    return Promise.reject(new Error(path));
+  });
+}
+
+const renderSchedule = () => render(
+  <MemoryRouter initialEntries={["/tournaments/cup/matches"]}>
+    <Routes>
+      <Route path="/tournaments/:slug/matches" element={<TournamentSchedulePage />} />
+      <Route path="/matches/:id" element={<div data-testid="match-page" />} />
+    </Routes>
+  </MemoryRouter>,
+);
+
+test("vor Ort: das laufende Spiel trägt die Live-Farbe, fertige und offene nicht", async () => {
+  mockGenerated(generated.onsite);
+  renderSchedule();
+  const live = generated.onsite.bracket.matches_v2.find((match) => match.status === "in_progress");
+  const done = generated.onsite.bracket.matches_v2.find((match) => match.status === "completed");
+  expect(await screen.findByTestId(`schedule-match-${live.id}`)).toHaveAttribute("data-tone", "live");
+  expect(screen.getByTestId(`schedule-match-${live.id}`).className).toContain("tls-bracket-live");
+  expect(screen.getByTestId(`schedule-status-${live.id}`)).toHaveAttribute("data-tone", "live");
+  expect(screen.getByTestId(`schedule-status-${live.id}`)).toHaveTextContent("Läuft");
+  expect(screen.getByTestId(`schedule-status-${done.id}`)).toHaveAttribute("data-tone", "done");
+  expect(screen.getByTestId(`schedule-match-${done.id}`).className).not.toContain("tls-bracket-live");
+  // Was der Planer nur vorhersagt, sagt es auch.
+  const forecast = generated.onsite.bracket.matches_v2.find((match) => match.schedule_forecast);
+  expect(screen.getByTestId(`schedule-forecast-${forecast.id}`)).toHaveTextContent("voraussichtlich");
+});
+
+test("Sicht je Station: eine Liste je Station nach Zeit, ein Spiel antippen öffnet die Spielseite", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  mockGenerated(generated.onsite);
+  renderSchedule();
+  await user.click(await screen.findByTestId("schedule-view-stations"));
+  const headings = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.firstElementChild.firstElementChild.textContent);
+  expect(headings).toEqual(["PC 1", "PC 2", "Switch 3"]);
+  // Das Gerät steht klein daneben, nicht im Namen (Abnahme #1593).
+  expect(screen.getByTestId("schedule-station-device-Switch 3")).toHaveTextContent("PC");
+  const first = generated.onsite.bracket.matches_v2.find((match) => match.status === "completed");
+  await user.click(screen.getByTestId(`schedule-line-${first.id}`));
+  expect(await screen.findByTestId("match-page")).toBeInTheDocument();
+});
+
+test("Nur meine Spiele: zeigt nur die Spiele der eigenen Anmeldung", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  mockGenerated(generated.onsite);
+  renderSchedule();
+  const toggle = await screen.findByTestId("schedule-only-mine");
+  expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await user.click(toggle);
+  expect(toggle).toHaveAttribute("aria-pressed", "true");
+  // Aktiver Filter in der Filter-Farbe, nicht in Gold - Gold ist Ehre (Abnahme #1593).
+  expect(toggle.className).toContain("tls-btn--secondary");
+  expect(toggle.className).not.toContain("tls-btn--honor");
+  const mineId = generated.onsite.bracket.registrations.find((reg) => reg.is_mine).id;
+  const cards = screen.getAllByTestId(/^schedule-match-/);
+  const mine = generated.onsite.bracket.matches_v2.filter((match) => match.slots.some((slot) => slot.registration_id === mineId));
+  expect(cards).toHaveLength(mine.length);
+  expect(cards.every((card) => card.getAttribute("data-mine") === "true")).toBe(true);
+});
+
+test("ohne eigene Anmeldung und ohne Stationen gibt es weder Filter noch Stations-Sicht", async () => {
+  mockGenerated({ ...generated.groups, bracket: { ...generated.groups.bracket, registrations: generated.groups.bracket.registrations.map(({ is_mine: _mine, ...reg }) => reg) } });
+  renderSchedule();
+  await screen.findAllByTestId(/^schedule-match-/);
+  expect(screen.queryByTestId("schedule-only-mine")).toBeNull();
+  expect(screen.queryByTestId("schedule-view-stations")).toBeNull();
+  // Gruppen: jede Karte nennt ihre Gruppe.
+  expect(screen.getAllByText(/Gruppe A · /).length).toBeGreaterThan(0);
 });

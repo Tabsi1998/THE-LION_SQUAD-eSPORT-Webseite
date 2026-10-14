@@ -1,5 +1,6 @@
 import React from "react";
-import { act, render, screen, waitFor } from "@testing-library/react-native";
+import { Alert } from "react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { FastLapDetailScreen } from "./FastLapDetailScreen";
 import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
@@ -7,8 +8,9 @@ import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 // oder kommt, bleibt er. Die Daten sind erfunden.
 
 const mockGet = jest.fn();
+const mockPost = jest.fn();
 jest.mock("../../lib/api", () => ({
-  api: { get: (...args: unknown[]) => mockGet(...args), post: jest.fn() },
+  api: { get: (...args: unknown[]) => mockGet(...args), post: (...args: unknown[]) => mockPost(...args) },
   errorMessage: (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback),
 }));
 jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: null }) }));
@@ -36,7 +38,10 @@ function answer(challenge: Record<string, unknown>) {
   });
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockPost.mockResolvedValue({ data: { id: "lap-1" } });
+});
 
 test("Kalender-Knopf an einer kommenden Challenge, nicht an einer beendeten", async () => {
   answer(CHALLENGE);
@@ -63,39 +68,76 @@ test("eine verspätete Antwort für die vorige Challenge wird verworfen (#1000)"
   });
 });
 
-test("zuweisbare Personen kommen nicht: die Challenge steht, die Seite sagt es statt einer leeren Liste (#1512)", async () => {
+// Fahrer über die Personensuche (#1584): Name tippen, Treffer aus /admin/people/search - die ganze Kontoliste
+// (assignable-users) lädt die App nicht mehr. Ein Parser für die Zeit (wie Website und Server), Rückfrage bei
+// unplausibler Zeit, nach der Veröffentlichung keine Eingabe mehr in der App.
+const SEARCH_HIT = { id: "u-7", name: "Max Fahrer", context: "Community" };
+
+function managed(extra: Record<string, unknown> = {}, search: () => Promise<unknown> = () => Promise.resolve({ data: [SEARCH_HIT] })) {
   mockGet.mockImplementation((path: string) => {
-    if (path === "/f1/challenges/hotlap") return Promise.resolve({ data: { ...CHALLENGE, can_manage_times: true } });
+    if (path === "/f1/challenges/hotlap") return Promise.resolve({ data: { ...CHALLENGE, can_manage_times: true, ...extra } });
     if (path.endsWith("/leaderboard")) return Promise.resolve({ data: { entries: [], track: { id: "tr1", name: "Spielberg" } } });
-    if (path.endsWith("/assignable-users")) return Promise.reject(Object.assign(new Error("Network Error"), { isAxiosError: true }));
+    if (path === "/admin/people/search") return search();
     return Promise.resolve({ data: [] });
   });
+}
+
+async function chooseDriver() {
+  await waitFor(() => expect(screen.getByTestId("fastlap-driver-search")).toBeTruthy());
+  await fireEvent.changeText(screen.getByTestId("fastlap-driver-search"), "max");
+  await waitFor(() => expect(screen.getByText("Max Fahrer")).toBeTruthy());
+  await fireEvent.press(screen.getByText("Max Fahrer"));
+}
+
+test("Fahrer über die Personensuche: gesucht wird mit Zweck und Challenge, die Kontoliste wird nie geladen", async () => {
+  managed();
   await render(<FastLapDetailScreen route={route} />);
-  await waitFor(() => expect(screen.getByTestId("fastlap-users-partial")).toBeTruthy());
-  expect(screen.getByText("Spielberg Hotlap")).toBeTruthy();
-  expect(screen.getByText("Zeit eintragen")).toBeTruthy();
+  await chooseDriver();
+  const searchCall = mockGet.mock.calls.find(([path]) => path === "/admin/people/search");
+  expect(searchCall?.[1]).toEqual({ params: { purpose: "fastlap", context_id: "c1", q: "max" } });
+  expect(mockGet.mock.calls.map(([path]) => path).some((path) => String(path).includes("assignable-users"))).toBe(false);
 });
 
-test("zuweisbare Personen: ein gescheitertes Nachladen behält die Liste von vorhin (#1512)", async () => {
-  let usersFail = false;
-  mockGet.mockImplementation((path: string) => {
-    if (path === "/f1/challenges/hotlap") return Promise.resolve({ data: { ...CHALLENGE, can_manage_times: true } });
-    if (path.endsWith("/leaderboard")) return Promise.resolve({ data: { entries: [], track: { id: "tr1", name: "Spielberg" } } });
-    if (path.endsWith("/assignable-users")) {
-      return usersFail
-        ? Promise.reject(Object.assign(new Error("Network Error"), { isAxiosError: true }))
-        : Promise.resolve({ data: [{ id: "u-7", username: "max", display_name: "Max Fahrer" }] });
-    }
-    return Promise.resolve({ data: [] });
-  });
+test("Suche geht nicht: die Challenge steht, die Karte sagt es statt einer leeren Liste", async () => {
+  managed({}, () => Promise.reject(Object.assign(new Error("Network Error"), { isAxiosError: true })));
   await render(<FastLapDetailScreen route={route} />);
-  await waitFor(() => expect(screen.getByText("Max Fahrer")).toBeTruthy());
-  expect(screen.queryByTestId("fastlap-users-partial")).toBeNull();
-  usersFail = true;
-  const [scroll] = screen.container.queryAll((node) => Boolean(node.props.refreshControl));
-  await act(async () => {
-    await scroll.props.refreshControl.props.onRefresh();
-  });
+  await waitFor(() => expect(screen.getByTestId("fastlap-driver-search")).toBeTruthy());
+  await fireEvent.changeText(screen.getByTestId("fastlap-driver-search"), "max");
   await waitFor(() => expect(screen.getByTestId("fastlap-users-partial")).toBeTruthy());
-  expect(screen.getByText("Max Fahrer")).toBeTruthy();
+  expect(screen.getByText("Spielberg Hotlap")).toBeTruthy();
+});
+
+test("„90“ sind 90 Sekunden, nicht 90 Millisekunden; Komma geht auch", async () => {
+  managed();
+  await render(<FastLapDetailScreen route={route} />);
+  await chooseDriver();
+  await fireEvent.changeText(screen.getByTestId("fastlap-time-input"), "90");
+  await fireEvent.press(screen.getByText("Zeit speichern"));
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/f1/challenges/c1/times", expect.objectContaining({ user_id: "u-7", time_ms: 90000 })));
+  await fireEvent.changeText(screen.getByTestId("fastlap-time-input"), "1:24,587");
+  await fireEvent.press(screen.getByText("Zeit speichern"));
+  await waitFor(() => expect(mockPost).toHaveBeenLastCalledWith("/f1/challenges/c1/times", expect.objectContaining({ time_ms: 84587 })));
+});
+
+test("unplausible Zeit: erst die Rückfrage, gespeichert wird nur mit Bestätigung", async () => {
+  managed();
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+  await render(<FastLapDetailScreen route={route} />);
+  await chooseDriver();
+  await fireEvent.changeText(screen.getByTestId("fastlap-time-input"), "12");
+  await fireEvent.press(screen.getByText("Zeit speichern"));
+  await waitFor(() => expect(alert).toHaveBeenCalled());
+  expect(String(alert.mock.calls[0][1])).toContain("0:12.000");
+  expect(mockPost).not.toHaveBeenCalled();
+  const buttons = (alert.mock.calls[0][2] || []) as Array<{ text?: string; onPress?: () => void }>;
+  await act(async () => { buttons.find((button) => button.text === "Trotzdem speichern")?.onPress?.(); });
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/f1/challenges/c1/times", expect.objectContaining({ time_ms: 12000, confirm_implausible: true })));
+  alert.mockRestore();
+});
+
+test("nach der Veröffentlichung keine Eingabe in der App - ein Satz sagt, wo es weitergeht", async () => {
+  managed({ status: "results_published" });
+  await render(<FastLapDetailScreen route={route} />);
+  await waitFor(() => expect(screen.getByTestId("fastlap-locked")).toBeTruthy());
+  expect(screen.queryByTestId("fastlap-driver-search")).toBeNull();
 });

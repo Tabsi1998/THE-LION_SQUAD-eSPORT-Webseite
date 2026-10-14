@@ -46,6 +46,9 @@ EXPECTED = {
     "discord_activity": {"user_day_unique"},
     "discord_guild_stats": {"guild_day_unique"},
     "discord_guild_active": {"guild_day_user_unique", "user_id_1", "day_1"},
+    # Fast Lap (#1584): ein Gewinn je Platz und Person, eine Punktezeile je Saison, Strecke und Person.
+    "prize_pickups": {"fastlap_place_user_unique"},
+    "season_points": {"fastlap_source_user_unique"},
 }
 
 

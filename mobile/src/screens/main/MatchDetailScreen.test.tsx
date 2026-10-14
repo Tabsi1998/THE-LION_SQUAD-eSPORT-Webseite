@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { MatchDetailScreen } from "./MatchDetailScreen";
 import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
@@ -18,7 +18,8 @@ jest.mock("../../auth/AuthContext", () => ({ useAuth: () => mockAuth }));
 jest.mock("../../live", () => ({ isGuestUser: () => false }));
 jest.mock("../../lib/chats", () => ({ markChatRead: jest.fn(async () => undefined) }));
 jest.mock("../../lib/cache", () => ({ ...jest.requireActual("../../lib/cache"), invalidateCache: jest.fn(async () => undefined) }));
-jest.mock("../../realtime/LiveChangesProvider", () => ({ useLiveRefresh: () => undefined }));
+const mockLiveReload: { current: null | (() => unknown) } = { current: null };
+jest.mock("../../realtime/LiveChangesProvider", () => ({ useLiveRefresh: (load: () => unknown) => { mockLiveReload.current = load; } }));
 jest.mock("../../components/CommendButton", () => ({ CommendButton: () => null }));
 jest.mock("../../components/ChatStickers", () => ({ MessageSticker: () => null, StickerButton: () => null, StickerPicker: () => null }));
 jest.mock("react-native-safe-area-context", () => ({ ...jest.requireActual("react-native-safe-area-context"), useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
@@ -92,6 +93,8 @@ test("Spieler melden: Sieger wählen, Spielstand freiwillig - die Platzierungsli
     screenshot_url: null, note: null, photo_id: null,
   }));
   expect(mockPost.mock.calls.some(([, body]) => body && "score_a" in (body as object))).toBe(false);
+  // Ergebnis eingetragen (#1168): zweimal kurz.
+  await waitFor(() => expect(jest.requireMock("expo-haptics").impactAsync).toHaveBeenCalledWith("light"));
 });
 
 test("die Gegenseite hat gemeldet (#1159): der Satz, „Stimmt“ schickt genau diese Meldung", async () => {
@@ -176,6 +179,26 @@ test("aufgerufen: Station und Countdown bis „antreten bis“", async () => {
     expect(screen.getByTestId("match-call-station")).toHaveTextContent("Bitte jetzt zu Station 3 · Switch 2");
     expect(screen.getByText("Antreten bis 14:31")).toBeTruthy();
     expect(screen.getByTestId("match-call-countdown")).toHaveTextContent("noch1:30");
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+// Aufruf (#1168): kommt der Aufruf, während die Seite offen ist, vibriert es dreimal kurz - beim Öffnen nicht (dann hat
+// schon die Benachrichtigung vibriert).
+test("Aufruf kommt bei offener Seite: dreimal kurz, beim Öffnen still", async () => {
+  jest.useFakeTimers({ now: new Date("2026-10-10T12:30:00Z"), doNotFake: ["nextTick", "setImmediate"] });
+  try {
+    const haptics = jest.requireMock("expo-haptics");
+    answer(PAGE);
+    await render(<MatchDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("match-report-form")).toBeTruthy());
+    expect((haptics.impactAsync as jest.Mock).mock.calls.filter(([style]) => style === "medium").length).toBe(0);
+    answer({ ...PAGE, call: { called_at: "2026-10-10T12:29:00Z", report_by: "2026-10-10T12:31:30Z", station_text: "Station 3" } });
+    await act(async () => { await mockLiveReload.current?.(); });
+    await waitFor(() => expect(screen.getByTestId("match-call")).toBeTruthy());
+    await act(async () => { jest.advanceTimersByTime(400); });
+    expect((haptics.impactAsync as jest.Mock).mock.calls.filter(([style]) => style === "medium").length).toBe(3);
   } finally {
     jest.useRealTimers();
   }

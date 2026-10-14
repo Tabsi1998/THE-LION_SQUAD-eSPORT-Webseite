@@ -62,6 +62,8 @@ test("eintragen mit Plus und Minus, Satz, dann Rückgängig", async () => {
   });
   expect(screen.getByTestId("result-undo-sentence")).toHaveTextContent("NeonFalke gewinnt 2:1 – weiter ins Finale");
   expect(screen.getByTestId("result-undo")).toHaveTextContent("Rückgängig (10)");
+  // Ergebnis eingetragen (#1168): zweimal kurz - der erste Stoß sofort, mit dem Satz.
+  expect(jest.requireMock("expo-haptics").impactAsync).toHaveBeenCalledWith("light");
 
   await act(async () => { await fireEvent.press(screen.getByTestId("result-undo")); });
   expect(mockPost).toHaveBeenCalledWith("/matches/m1/result/undo", { hold_id: "h1" });
@@ -120,4 +122,34 @@ test("eine verspätete Antwort für das vorige Turnier wird verworfen (#1000)", 
     newText: "FC 26 Herbst-Cup",
     oldText: "Altes Turnier",
   });
+});
+
+// „Nicht erschienen?“ (#1551, #1574): Frist um - die fehlende Seite kampflos werten (mit Rückfrage) oder +5 Min.
+// verlängern; derselbe Weg wie im Web (POST /tournaments/{tid}/lead/no-show/{match_id}).
+test("Nicht erschienen?: Seite wählen mit Rückfrage oder um 5 Minuten verlängern", async () => {
+  const { Alert } = jest.requireActual("react-native");
+  const alert = jest.spyOn(Alert, "alert").mockImplementation((...args: unknown[]) => {
+    const buttons = args[2] as Array<{ text: string; onPress?: () => void }>;
+    buttons.find((button) => button.text === "Kampflos werten")?.onPress?.();
+  });
+  mockGet.mockResolvedValue({ data: {
+    tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup" }, matches: [LATE], recent: [], counts: { open: 1 },
+    attention: [{ id: "ns-m2", kind: "no_show", title: "Nicht erschienen?", action: "no_show", match_id: "m2", station_text: "PC 4", label: "Halbfinale B",
+      names: "TurboTina gegen Frostbiss", detail: "10 Min. nach dem Aufruf um – kampflos werten oder verlängern.",
+      participants: [{ registration_id: "r3", name: "TurboTina" }, { registration_id: "r4", name: "Frostbiss" }] }],
+  } });
+  mockPost.mockResolvedValue({ data: { ok: true } });
+  await render(<TournamentLeadScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("lead-no-show-ns-m2")).toBeTruthy());
+  expect(screen.queryByTestId("lead-case-enter-ns-m2")).toBeNull();
+
+  await act(async () => { await fireEvent.press(screen.getByTestId("lead-no-show-extend-ns-m2")); });
+  expect(mockPost).toHaveBeenCalledWith("/tournaments/fc-cup/lead/no-show/m2", { action: "extend", minutes: 5 });
+  expect(screen.getByTestId("lead-notice")).toHaveTextContent("Frist um 5 Minuten verlängert.");
+
+  await act(async () => { await fireEvent.press(screen.getByTestId("lead-no-show-r4")); });
+  expect(alert).toHaveBeenCalledWith("Frostbiss nicht erschienen?", expect.any(String), expect.any(Array));
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/tournaments/fc-cup/lead/no-show/m2", { action: "confirm", registration_id: "r4" }));
+  await waitFor(() => expect(screen.getByTestId("lead-notice")).toHaveTextContent("Kampflos gewertet – beide Seiten bekommen Bescheid."));
+  alert.mockRestore();
 });
