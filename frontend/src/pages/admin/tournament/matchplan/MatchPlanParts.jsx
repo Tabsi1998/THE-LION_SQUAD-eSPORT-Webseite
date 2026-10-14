@@ -202,6 +202,9 @@ function stateText(item) {
   if (item.state === "done") return "erledigt";
   if (item.conflicts.length) return item.conflicts[0].text;
   if (item.fixed) return item.source === "accepted" ? "vereinbart - bleibt" : "fest - von Hand gesetzt";
+  if (item.draw === "ready") return "wartet auf Auslosung - der Topf steht";
+  if (item.draw === "waiting") return "wartet auf Auslosung";
+  if (item.draw === "instant") return "Prognose - das Los entscheidet, Plätze füllen sich einzeln";
   if (item.forecast) return "Prognose - Spieler stehen noch nicht fest";
   return "vom Planer";
 }

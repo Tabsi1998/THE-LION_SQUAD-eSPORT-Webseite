@@ -39,18 +39,22 @@ LONG = {16: "Der unglaublich lange Spielername Nummer Eins mit noch mehr Text da
 
 
 async def build(flow, count: int, mode: str, plan_size: int, *, shuffle: bool = False, duel: bool = False, double: bool = False,
-                custom: str | None = None):
-    """Ein Turnier wie im Betrieb. ``shuffle``: Gegner der nächsten Runde mischen (#1548); ``duel``: K.-o. mit Duellen
-    (Auto-Schema ``single_elimination``) statt FFA-Läufen."""
+                advancement: str | None = None, custom: str | None = None):
+    """Ein Turnier wie im Betrieb. ``shuffle``: Gegner der nächsten Runde mischen (#1548, Auslosung nach der Runde);
+    ``advancement``: einer der vier Modi (#1590, ``draw_show``/``instant``); ``duel``: K.-o. mit Duellen (Auto-Schema
+    ``single_elimination``) statt FFA-Läufen; ``custom``: eigenes Schema (#1591)."""
+    advancement = advancement or ("draw_round" if shuffle else "fixed")
+    shuffle = advancement != "fixed"
     tournament, _users, regs = await flow.with_participants(
         count, format=("double_elim" if double else "single_elim") if duel else "ffa_custom_bracket", heat_rebuild_mode=mode, status="registration_open",
-        title="Lions Smash-Cup" if duel else "Lions Kart-Cup", randomize_advancement_rounds=shuffle)
+        title="Lions Smash-Cup" if duel else "Lions Kart-Cup", randomize_advancement_rounds=shuffle, advancement_mode=advancement)
     for index, reg in enumerate(sorted(regs, key=lambda r: r.get("seed") or 0)):
         name = NAMES[index] if index < len(NAMES) else LONG.get(index, f"Fahrer {index + 1}")
         await flow.db.tournament_registrations.update_one({"id": reg["id"]}, {"$set": {"display_name": name, "ingame_name": name}})
+    suffix = {"fixed": "", "draw_round": "-gemischt", "draw_show": "-show", "instant": "-sofort"}[advancement]
     await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {
-        "max_participants": plan_size, "slug": f"{'smash' if duel else 'kart'}-cup-{count}{'-gemischt' if shuffle else ''}",
-        "randomize_advancement_rounds": shuffle}})
+        "max_participants": plan_size, "slug": f"{'smash' if duel else 'kart'}-cup-{count}{suffix}",
+        "randomize_advancement_rounds": shuffle, "advancement_mode": advancement}})
     if duel:
         # K.-o. mit Duellen: das Auto-Schema des Generators (kein eigenes Schema).
         schema = None
@@ -99,7 +103,9 @@ INFO = ("Erzeugt von scripts/make_ffa_bracket_fixture.py mit dem echten Generato
         "(#1575). Zustände: 16 Fahrer (Start, nach Runde 1), 10 von 16 (ausgeglichen), 8 von 16 vor und nach dem "
         "Zusammenlegen, 40 Fahrer mit langen Namen; Gegner mischen (#1548) je vor und nach der Auslosung für K.-o. mit 8 "
         "(se8_draw_*), mit 6 und Freilosen (se6_draw_*), Doppel-K.-o. mit 8 (de8_draw_*), Läufe mit 16 (ffa16_draw_*) und 8 "
-        "von 16 gemischt nach dem Zusammenlegen (ffa8_shuffle_merged). Nicht von Hand ändern - neu erzeugen.")
+        "von 16 gemischt nach dem Zusammenlegen (ffa8_shuffle_merged). Vier Modi (#1590): sofort zufällig je Zuweisung "
+        "(se8_instant_0..4: kein, ein, zwei und alle vier Spiele der Runde 1 entschieden; ffa16_instant_1 und _4) und "
+        "Show-Auslosung (se8_show_ready: Topf steht, se8_show_drawn: nach „Jetzt auslosen“). Nicht von Hand ändern - neu erzeugen.")
 
 
 async def main():
@@ -176,9 +182,41 @@ async def main():
         data["ffa40"] = await bracket(flow, t40)
     finally:
         await shutdown()
+    # Sofort zufällig (#1590): je Ergebnis kommt der Weiterkommer sofort auf einen zufälligen freien Platz - Zustände
+    # nach keinem, einem, zwei und allen vier Spielen der Runde 1 (K.-o. mit 8) bzw. nach einem und allen Läufen (16).
+    for name, duel, size, steps in (("se8_instant", True, 8, ("A", "B", "C", "D")), ("ffa16_instant", False, 16, ("A", "B", "C", "D"))):
+        flow, shutdown = make_flow()
+        try:
+            tournament, staff, _schema = await build(flow, size, "auto", size, duel=duel, advancement="instant")
+            await flow.start(tournament)
+            if duel:
+                data[f"{name}_0"] = await bracket(flow, tournament)
+            for index, key in enumerate(steps, start=1):
+                await results(flow, tournament, staff, [key])
+                if duel and index in (1, 2) or index == len(steps) or index == 1:
+                    data[f"{name}_{index}"] = await bracket(flow, tournament)
+        finally:
+            await shutdown()
+    # Show-Auslosung (#1590): alle vier Spiele der Runde 1 entschieden - der Topf steht, gelost wird per „Jetzt auslosen“.
+    flow, shutdown = make_flow()
+    try:
+        tournament, staff, _schema = await build(flow, 8, "auto", 8, duel=True, advancement="draw_show")
+        await flow.start(tournament)
+        await results(flow, tournament, staff, ["A", "B", "C", "D"])
+        data["se8_show_ready"] = await bracket(flow, tournament)
+        flow.act_as(staff)
+        second = next(m for m in await flow.matches(tournament) if m.get("round") == 2)
+        response = await flow.post(f"/api/tournaments/{tournament['id']}/stages/{second['stage_id']}/draw",
+                                   json={"group": second["settings"]["draw_group"]})
+        assert response.status_code == 200, response.text
+        data["se8_show_drawn"] = await bracket(flow, tournament)
+    finally:
+        await shutdown()
     states = ("ffa16", "ffa16_round1", "ffa10_balanced", "ffa8_before_merge", "ffa8_after_merge", "ffa40",
               "se8_draw_before", "se8_draw_after", "de8_draw_before", "de8_draw_after", "ffa16_draw_before", "ffa16_draw_after",
-              "se6_draw_before", "se6_draw_after", "ffa8_shuffle_merged")
+              "se6_draw_before", "se6_draw_after", "ffa8_shuffle_merged",
+              "se8_instant_0", "se8_instant_1", "se8_instant_2", "se8_instant_4", "ffa16_instant_1", "ffa16_instant_4",
+              "se8_show_ready", "se8_show_drawn")
     out = {"_info": INFO, "plan16": data["plan16"], "plan10": data["plan10"], "schema16": data["schema16"]}
     for key in states:
         out[key] = {name: value for name, value in data[key].items() if name not in {"structure", "matches"}}

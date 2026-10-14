@@ -347,6 +347,43 @@ describe("Bewegungen beim Live-Neuladen", () => {
     expect(drawn.map((node) => Number(node.style.getPropertyValue("--tls-i"))).sort((a, b) => a - b)).toEqual([...Array(16).keys()]);
   });
 
+  it("sofort zufällig (#1590, echter Generator): jede Zuweisung ist ein eigener Moment - der Name fährt über die Schiene, die anderen Plätze warten weiter", () => {
+    const start = ffa("se8_instant_0");
+    const one = ffa("se8_instant_1");
+    const { rerender } = render(<BracketTree data={start} layout="tree" />);
+    expect(flyers()).toBe(0);
+    expect(screen.getAllByText("Sieger aus Viertelfinale")).toHaveLength(4);
+    act(() => rerender(<BracketTree data={one} layout="tree" />));
+    // Genau ein Flug: der Weiterkommer aus A, über die Sammelschiene (Linie mit `rail`), nicht als Setzplatz-Pop.
+    expect(flyers()).toBe(1);
+    expect(document.querySelector("[data-motion='draw']")).toBeNull();
+    const landed = one.matches_v2.find((match) => match.settings?.draw_group && match.slots.some((slot) => slot.registration_id));
+    const line = document.querySelector(`path[data-from='${idOf(one, "A")}'][data-to='${landed.id}']`);
+    expect(line).toHaveAttribute("data-fresh", "1");
+    expect(line).toHaveAttribute("data-real", "1");
+    expect(screen.getAllByText("Sieger aus Viertelfinale")).toHaveLength(3);
+    // Die nächste Zuweisung: wieder genau ein Flug, die Schiene bleibt stehen, solange Plätze offen sind.
+    act(() => rerender(<BracketTree data={ffa("se8_instant_2")} layout="tree" />));
+    expect(flyers()).toBe(2);
+    expect(document.querySelector("path[data-rail-spine]")).not.toBeNull();
+    expect(screen.getAllByText("Sieger aus Viertelfinale")).toHaveLength(2);
+    act(() => rerender(<BracketTree data={ffa("se8_instant_4")} layout="tree" />));
+    expect(flyers()).toBe(4);
+    expect(screen.queryByText("Sieger aus Viertelfinale")).toBeNull();
+  });
+
+  it("Show-Auslosung (#1590): steht der Topf, zeigen die offenen Plätze „Auslosung bereit“ - nach dem Los fahren alle", () => {
+    const ready = ffa("se8_show_ready");
+    const { rerender } = render(<BracketTree data={ffa("se8_draw_before")} layout="tree" />);
+    expect(screen.getAllByText("Sieger aus Viertelfinale")).toHaveLength(4);
+    act(() => rerender(<BracketTree data={ready} layout="tree" />));
+    expect(screen.getAllByText("Auslosung bereit")).toHaveLength(4);
+    expect(flyers()).toBe(0);
+    act(() => rerender(<BracketTree data={ffa("se8_show_drawn")} layout="tree" />));
+    expect(screen.queryByText("Auslosung bereit")).toBeNull();
+    expect(flyers()).toBe(4);
+  });
+
   it("Zusammenlegen (echter Umbau): die Namen fließen in die Sammelläufe, die alten Läufe verblassen", () => {
     const { rerender } = render(<BracketTree data={ffa("ffa8_before_merge")} layout="tree" />);
     const after = ffa("ffa8_after_merge");

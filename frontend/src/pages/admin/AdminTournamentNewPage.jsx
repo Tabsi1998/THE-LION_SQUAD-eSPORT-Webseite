@@ -7,7 +7,7 @@ import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/
 import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
-import { ADVANCEMENT_MODE_HINT, ADVANCEMENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, advancementModeOf } from "./tournament/shared";
+import { ADVANCEMENT_MODE_OPTIONS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, advancementModeHint, drawShowMinutesPayload } from "./tournament/shared";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
@@ -92,7 +92,7 @@ export default function AdminTournamentNewPage() {
     discord_skip: false,
     auto_start_enabled: false,
     event_mode: "online", result_entry_mode: "", schedule_mode: "",
-    best_of: 1, bronze_match: false, grand_final_mode: "reset", heat_rebuild_mode: "suggest", seeding_mode: "random", randomize_advancement_rounds: false,
+    best_of: 1, bronze_match: false, grand_final_mode: "reset", heat_rebuild_mode: "suggest", seeding_mode: "random", advancement_mode: "fixed", draw_show_minutes: "",
     is_public: true, rules: "", prize_pool: "",
     banner_url: "",
     prize_places: [
@@ -157,6 +157,8 @@ export default function AdminTournamentNewPage() {
       if (!payload.schedule_mode) payload.schedule_mode = null;
       if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
       if (!event) payload.requires_event_registration = false;
+      // Show-Auslosung (#1590): leer heißt Vorgabe; die Minuten zählen nur in diesem Modus.
+      payload.draw_show_minutes = payload.advancement_mode === "draw_show" ? drawShowMinutesPayload(payload.draw_show_minutes) : null;
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
       // Filter empty prize places
       payload.prize_places = (payload.prize_places || [])
@@ -297,8 +299,11 @@ export default function AdminTournamentNewPage() {
             <TextField label="Best of" type="number" value={form.best_of} onChange={(v) => set("best_of", Number(v))} testId="new-tr-bestof" />
             <SelectField label="Seeding" value={form.seeding_mode} onChange={(v) => set("seeding_mode", v)} options={[["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]]} testId="new-tr-seeding" />
           </FormGrid>
-          {/* Gegner der nächsten Runde (#1548): fester Baum oder echtes Los nach jeder Runde. */}
-          <SelectField label="Gegner der nächsten Runde" value={advancementModeOf(form.randomize_advancement_rounds)} onChange={(v) => set("randomize_advancement_rounds", v === "shuffle")} options={ADVANCEMENT_MODE_OPTIONS} hint={ADVANCEMENT_MODE_HINT} testId="new-tr-advancement" />
+          {/* Weiterkommen in vier Modi (#1548, #1590): fester Baum, Auslosung nach der Runde, Show, sofort zufällig. */}
+          <SelectField label="Weiterkommen (Gegner der nächsten Runde)" value={form.advancement_mode} onChange={(v) => set("advancement_mode", v)} options={ADVANCEMENT_MODE_OPTIONS} hint={<span data-testid="new-tr-advancement-hint">{advancementModeHint(form.advancement_mode)}</span>} testId="new-tr-advancement" />
+          {form.advancement_mode === "draw_show" && (
+            <TextField label="Show-Auslosung: Erinnerung nach Minuten" type="number" min="1" max="240" value={form.draw_show_minutes} onChange={(v) => set("draw_show_minutes", v)} placeholder={String(DRAW_SHOW_MINUTES_DEFAULT)} hint={DRAW_SHOW_MINUTES_HINT} testId="new-tr-draw-show-minutes" />
+          )}
           {BRONZE_FORMATS.has(form.format) && (
             <CheckField label="Spiel um Platz 3 ermitteln" checked={form.bronze_match} onChange={(v) => set("bronze_match", v)} testId="new-tr-bronze" />
           )}

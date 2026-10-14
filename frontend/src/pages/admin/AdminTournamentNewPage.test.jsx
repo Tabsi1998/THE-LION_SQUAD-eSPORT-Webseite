@@ -117,16 +117,23 @@ test("Doppel-K.-o.: Grand Final wählbar, Vorgabe mit Reset, wird mitgeschickt",
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ format: "double_elim", grand_final_mode: "single" })));
 });
 
-// Gegner der nächsten Runde (#1548): Vorgabe fester Baum, „Zufällig mischen“ geht als randomize_advancement_rounds mit.
-test("Gegner der nächsten Runde: Vorgabe fester Baum, zufällig mischen wird mitgeschickt", async () => {
+// Weiterkommen in vier Modi (#1548, #1590): Vorgabe fester Baum; der Modus geht als advancement_mode mit, die
+// Show-Minuten nur bei der Show-Auslosung.
+test("Weiterkommen: Vorgabe fester Baum, der gewählte Modus wird mitgeschickt", async () => {
   apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
   apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
   renderAt("");
   const select = await screen.findByTestId("new-tr-advancement");
   expect(select).toHaveValue("fixed");
-  fireEvent.change(select, { target: { value: "shuffle" } });
+  expect(screen.getByTestId("new-tr-advancement-hint")).toHaveTextContent("Sieger aus A trifft Sieger aus B");
+  expect(screen.queryByTestId("new-tr-draw-show-minutes")).toBeNull();
+  fireEvent.change(select, { target: { value: "instant" } });
+  expect(screen.getByTestId("new-tr-advancement-hint")).toHaveTextContent(/sofort auf einen zufälligen freien Platz/);
+  fireEvent.change(select, { target: { value: "draw_show" } });
+  fireEvent.change(screen.getByTestId("new-tr-draw-show-minutes"), { target: { value: "15" } });
   fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Kart-Cup" } });
   fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
   fireEvent.submit(screen.getByTestId("new-tr-form"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ randomize_advancement_rounds: true })));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ advancement_mode: "draw_show", draw_show_minutes: 15 })));
+  expect(apiMock.post.mock.calls[0][1]).not.toHaveProperty("randomize_advancement_rounds");
 });

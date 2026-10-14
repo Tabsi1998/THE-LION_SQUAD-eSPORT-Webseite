@@ -79,25 +79,54 @@ export const GRAND_FINAL_OPTIONS = [
 ];
 export const GRAND_FINAL_HINT = "Beide Finalisten haben im Doppel-K.-o. ein zweites Leben. Ohne Reset hätte der Sieger der Siegerrunde nach nur einer Niederlage verloren.";
 
-// Gegner der nächsten Runde (#1548): fester Baum (Vorgabe) oder echtes Los nach jeder Runde. Am Server ein Ja/Nein
-// (`randomize_advancement_rounds`); an der Phase heißt leer „vom Turnier erben“.
+// Weiterkommen in vier Modi (#1548, #1590): am Server `advancement_mode`; der alte Schalter
+// `randomize_advancement_rounds` wird gelesen (an → Auslosung nach der Runde) und vom Server als Spiegel mitgeführt.
+// An der Phase heißt leer „vom Turnier erben“.
+export const ADVANCEMENT_MODES = ["fixed", "draw_round", "draw_show", "instant"];
 export const ADVANCEMENT_MODE_OPTIONS = [
   ["fixed", "Fester Baum (Standard): Wer weiterkommt, geht in das Spiel, das der Turnierbaum vorsieht"],
-  ["shuffle", "Zufällig mischen: Nach jeder Runde werden alle Weiterkommer neu ausgelost"],
+  ["draw_round", "Auslosung nach der Runde: Sind alle Spiele einer Runde fertig, lost der Server alle Weiterkommer auf einmal"],
+  ["draw_show", "Show-Auslosung: Die Runde wartet, bis die Turnierleitung „Jetzt auslosen“ tippt – TV und Baum zeigen vorher den Topf"],
+  ["instant", "Sofort zufällig: Jeder Weiterkommer kommt sofort auf einen zufälligen freien Platz der nächsten Runde"],
 ];
-export const ADVANCEMENT_MODE_HINT = "Zufällig mischen: Erst wenn alle Spiele einer Runde fertig sind, kommen alle Weiterkommer in einen Topf und werden gleichmäßig auf die nächsten Spiele verteilt – auch zwei aus demselben Spiel können sich wiedersehen. Laufen nur zwei Spiele in eines zusammen (z. B. das Finale), ändert sich nichts. In der Liga werden die Reihenfolge der Spieltage und das Heimrecht ausgelost. Die Turnierleitung kann neu auslosen, bis die Runde beginnt.";
+export const ADVANCEMENT_MODE_HINTS = {
+  fixed: "Die Zuordnung steht im Turnierbaum: Sieger aus A trifft Sieger aus B.",
+  draw_round: "Erst wenn alle Spiele einer Runde fertig sind, kommen alle Weiterkommer in einen Topf und werden gleichmäßig auf die nächsten Spiele verteilt – auch zwei aus demselben Spiel können sich wiedersehen. Laufen nur zwei Spiele in eines zusammen (z. B. das Finale), ändert sich nichts. In der Liga werden die Reihenfolge der Spieltage und das Heimrecht ausgelost. Neu auslosen geht, bis die Runde beginnt.",
+  draw_show: "Wie die Auslosung nach der Runde, nur lost erst die Turnierleitung mit „Jetzt auslosen“ (Turnierleitung-Ansicht, Reiter Spiele). Bis dahin steht im Baum „Auslosung bereit“. Nach der eingestellten Zeit erinnert der Server; nach noch einmal so viel Zeit lost er selbst.",
+  instant: "Ist ein Spiel fertig, kommt jeder Weiterkommer sofort auf einen zufälligen freien Platz der nächsten Runde (gleiche Runde, gleicher Abschnitt). Ein Spiel kann starten, sobald es voll ist – alles kann passieren. Neu auslosen geht für die Spiele, die noch nicht begonnen haben.",
+};
+export const ADVANCEMENT_MODE_HINT = ADVANCEMENT_MODE_HINTS.draw_round;
 export const STAGE_ADVANCEMENT_OPTIONS = [["", "Vom Turnier erben"], ...ADVANCEMENT_MODE_OPTIONS];
-export const advancementModeOf = (flag) => (flag ? "shuffle" : "fixed");
+export const DRAW_SHOW_MINUTES_DEFAULT = 10;
+export const DRAW_SHOW_MINUTES_HINT = "Nach so vielen Minuten erinnert der Server die Turnierleitung, nach noch einmal so vielen lost er selbst. Leer: 10 Minuten.";
+/** Der Modus eines Turniers, einer Phase oder eines Spiels - auch aus älteren Daten, die nur den Schalter kennen. */
+export function advancementModeOf(source) {
+  const value = source && typeof source === "object" ? source.advancement_mode : source;
+  if (ADVANCEMENT_MODES.includes(value)) return value;
+  const legacy = source && typeof source === "object" ? source.randomize_advancement_rounds : null;
+  if (legacy === true || source === true) return "draw_round";
+  return "fixed";
+}
+export const advancementModeHint = (mode) => ADVANCEMENT_MODE_HINTS[mode] || ADVANCEMENT_MODE_HINTS.fixed;
 export function stageAdvancementValue(settings) {
+  if (ADVANCEMENT_MODES.includes(settings?.advancement_mode)) return settings.advancement_mode;
   const value = settings?.randomize_advancement_rounds;
-  if (value === true) return "shuffle";
+  if (value === true) return "draw_round";
   if (value === false) return "fixed";
   return "";
 }
+/** Was die Phase speichert: Modus und Schalter im Gleichschritt, leer heißt erben. */
+export function stageAdvancementSettings(value) {
+  if (!ADVANCEMENT_MODES.includes(value)) return { advancement_mode: null, randomize_advancement_rounds: null };
+  return { advancement_mode: value, randomize_advancement_rounds: value !== "fixed" };
+}
 export function stageAdvancementSetting(value) {
-  if (value === "shuffle") return true;
-  if (value === "fixed") return false;
-  return null;
+  return stageAdvancementSettings(value).randomize_advancement_rounds;
+}
+/** Minuten der Show-Auslosung aus dem Formular: leer bleibt leer (Vorgabe), sonst eine ganze Zahl ab 1. */
+export function drawShowMinutesPayload(value) {
+  const number = Number.parseInt(String(value ?? "").trim(), 10);
+  return Number.isFinite(number) && number >= 1 ? Math.min(number, 240) : null;
 }
 
 // Neu auslosen (#1548): gleich wie am Server (`_draw_started`) - ist eines der Spiele aufgerufen, gestartet, gemeldet
@@ -108,7 +137,15 @@ export function drawStarted(match) {
     || !!match?.called_at || (match?.reports || []).length > 0 || !!match?.pending_result;
 }
 
-/** Die Auslosungs-Gruppen einer Phase: Runde, Spiele, ob schon gelost und ob neu auslosen noch geht. */
+/** Ein Platz, der sein Los schon hat (#1590, sofort zufällig: je Platz, nicht je Runde). */
+export const slotDrawn = (slot) => Boolean(slot?.source?.draw && (slot?.source_result?.draw_id || (slot?.registration_id && slot?.source_result?.from_match_key)));
+const slotOpen = (slot) => Boolean(slot?.source?.draw) && slot?.status === "pending" && !slot?.registration_id && !slot?.source_result;
+
+/**
+ * Die Auslosungs-Gruppen einer Phase: Runde, Spiele, Modus, ob schon gelost und ob neu auslosen noch geht. Show
+ * (#1590): `ready`, sobald der Topf steht und die Leitung losen darf. Sofort zufällig: `assigned`/`open` je Platz,
+ * neu auslosen nur für die Spiele, die noch nicht begonnen haben (`redrawKeys`).
+ */
 export function drawGroupsOf(matches = []) {
   const groups = new Map();
   for (const match of matches || []) {
@@ -119,15 +156,28 @@ export function drawGroupsOf(matches = []) {
   }
   return [...groups.entries()].map(([group, rows]) => {
     const sorted = [...rows].sort((a, b) => (a.order || 0) - (b.order || 0) || String(a.match_key).localeCompare(String(b.match_key)));
-    const drawn = sorted.some((row) => row.draw && typeof row.draw === "object");
+    const mode = advancementModeOf(sorted[0]?.settings);
+    const slots = sorted.flatMap((row) => row.slots || []);
+    const assigned = slots.filter(slotDrawn).length;
+    const open = slots.filter(slotOpen).length;
+    const drawn = mode === "instant" ? assigned > 0 : sorted.some((row) => row.draw && typeof row.draw === "object");
+    const unstarted = sorted.filter((row) => !drawStarted(row));
+    const canRedraw = mode === "instant"
+      ? unstarted.some((row) => (row.slots || []).some(slotDrawn))
+      : drawn && unstarted.length === sorted.length;
     return {
       group,
+      mode,
       label: sorted[0]?.round_name || `Runde ${sorted[0]?.round || ""}`.trim(),
       section: sorted[0]?.section || "",
       round: sorted[0]?.round || 0,
       matchKeys: sorted.map((row) => row.match_key),
+      redrawKeys: (mode === "instant" ? unstarted : sorted).map((row) => row.match_key),
       drawn,
-      canRedraw: drawn && !sorted.some(drawStarted),
+      ready: mode === "draw_show" && !drawn && sorted.some((row) => row.draw_ready && typeof row.draw_ready === "object"),
+      assigned,
+      open,
+      canRedraw,
     };
   }).sort((a, b) => a.round - b.round || a.group.localeCompare(b.group));
 }

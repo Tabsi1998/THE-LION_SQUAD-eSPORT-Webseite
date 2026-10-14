@@ -40,7 +40,10 @@ Das Skript läuft im Backend-Container und legt über die echten Routen an: Admi
 ein Spiel (Mario Kart 8, Grand Prix 12 Min.), den Vor-Ort-Cup (FFA 16, Winner und Loser Bracket, Gegner gemischt,
 4 Stationen) einmal mit Vorschau-Baum und einmal nach dem Check-in-Ende (Plan übernommen, live, zwei Läufe gewertet,
 einer läuft), ein Online-Turnier, eine Liga (erster Spieltag gespielt), ein Gruppen-Turnier (2 Gruppen), eine beendete
-Liga mit veröffentlichten Ergebnissen und geteiltem Platz 1 (Podest, Sieger-Moment) und eine Fast Lap mit Zeiten.
+Liga mit veröffentlichten Ergebnissen und geteiltem Platz 1 (Podest, Sieger-Moment), eine Fast Lap mit Zeiten und je ein
+Vor-Ort-Turnier (live, zwei Stationen, geplant, Turnierleitung eingeteilt) für die vier Modi des Weiterkommens
+(#1590): fester Baum und Auslosung nach der Runde (K.-o. 8), Show-Auslosung (FFA 16, drei von vier Läufen fertig,
+Erinnerung nach 3 Min.) und sofort zufällig (K.-o. 8, noch ohne Ergebnis).
 Spieler 1 spielt überall mit und ist der Spieler-Zugang der Tests. Es lässt sich mehrfach aufrufen: Konten
 bleiben, Turniere kommen dazu.
 

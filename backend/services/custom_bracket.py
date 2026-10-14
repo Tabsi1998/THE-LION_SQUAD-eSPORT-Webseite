@@ -26,7 +26,8 @@ from typing import Any
 
 from services.advancement_draw import (
     DRAW_RNG,
-    advancement_shuffle_enabled,
+    MIXED_MODES,
+    advancement_mode_of,
     mark_draw_groups,
     shuffle_league_rounds,
 )
@@ -858,7 +859,9 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
     """``rng``: Setzliste bei zufälligem Seeding. ``draw_rng``: das Los beim Mischen (#1548), sonst ``secrets``.
     ``defer_draws``: kein Los beim Bau (Strukturplan) - gelost wird beim Anwenden (``apply_deferred_draws``)."""
     settings = stage.get("settings") or {}
-    shuffle = advancement_shuffle_enabled(tournament, settings)
+    # Weiterkommen in vier Modi (#1590): jedes Spiel trägt den Modus, mit dem es gebaut wurde.
+    advancement_mode = advancement_mode_of(tournament, settings)
+    shuffle = advancement_mode in MIXED_MODES
     draw_rng = draw_rng or DRAW_RNG
     custom_schema = settings.get("schema") or settings.get("custom_schema") or settings.get("bracket_schema")
     league_draw = (shuffle and not preview and not defer_draws
@@ -934,6 +937,9 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
                 "score_type": settings.get("score_type") or "points",
                 "calculation": settings.get("calculation") or "points",
                 "randomize_advancement_rounds": shuffle,
+                # Nur ein gemischter Modus steht am Spiel (#1590) - der feste Baum bleibt, wie er immer gebaut wurde,
+                # damit ein Strukturplan aus der Zeit davor beim Anwenden denselben Baum ergibt.
+                **({"advancement_mode": advancement_mode} if shuffle else {}),
             },
             "status": "preview" if preview else ("ready" if not has_ref and filled_count >= min(min_players, len(slots)) else "pending"),
             "is_preview": bool(preview),

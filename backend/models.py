@@ -728,7 +728,11 @@ class TournamentCreate(BaseModel):
     # Auszeichnungen (#230): gestaltete Bilder für Platz 1 bis 3 ({"1": url, ...}); ohne Bild gilt die feste Vorlage.
     award_images: Optional[dict] = None
     seeding_mode: Literal["manual", "random", "ranking"] = "random"
-    randomize_advancement_rounds: bool = False
+    # Weiterkommen in vier Modi (#1590); der alte Schalter bleibt als Spiegel (services/advancement_draw).
+    advancement_mode: Optional[Literal["fixed", "draw_round", "draw_show", "instant"]] = None
+    randomize_advancement_rounds: Optional[bool] = None
+    # Show-Auslosung: Minuten bis zur Erinnerung an die Turnierleitung; nach noch einmal so vielen lost der Server.
+    draw_show_minutes: Optional[int] = Field(default=None, ge=1, le=240)
     # Phase 5: unified stream-per-object
     has_live_stream: bool = False
     stream_platform: Optional[StreamPlatform] = None
@@ -813,7 +817,9 @@ class TournamentUpdate(BaseModel):
     banner_url: Optional[str] = None
     award_images: Optional[dict] = None
     seeding_mode: Optional[Literal["manual", "random", "ranking"]] = None
+    advancement_mode: Optional[Literal["fixed", "draw_round", "draw_show", "instant"]] = None
     randomize_advancement_rounds: Optional[bool] = None
+    draw_show_minutes: Optional[int] = Field(default=None, ge=1, le=240)
     has_live_stream: Optional[bool] = None
     stream_platform: Optional[StreamPlatform] = None
     stream_url: Optional[str] = None

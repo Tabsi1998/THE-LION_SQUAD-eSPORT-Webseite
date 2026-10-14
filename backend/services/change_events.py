@@ -268,6 +268,8 @@ async def publish_api_change(method: str, path: str, status_code: int):
 TOURNAMENT_EVENT_TYPES = frozenset({
     "draw_done", "slot_filled", "slot_cleared", "walkover", "player_withdrawn", "player_disqualified",
     "heats_merged", "heats_rebalanced", "result_corrected", "round_started",
+    # Weiterkommen in vier Modi (#1590): Show-Runde bereit (Topf steht), ein Platz sofort zugewiesen.
+    "draw_ready", "draw_assigned",
 })
 
 

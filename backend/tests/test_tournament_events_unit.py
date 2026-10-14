@@ -435,6 +435,42 @@ def test_ffa_dq_after_a_heat_lets_the_next_place_move_up():
     assert_graph_valid(matches)
 
 
+@pytest.mark.parametrize("mode", [None, "instant"], ids=["fest", "sofort"])
+def test_ffa_dq_never_moves_up_who_already_played_on(mode):
+    """12 Fahrer (B:1 → E, B:2 → D): Lauf B ist gefahren, sein Zweiter hat in D schon gespielt und ist weiter. Fällt
+    der Erste aus, rückt nicht der Zweite auf (er säße dann in zwei spielbereiten Läufen), sondern der Dritte. Fest wie
+    sofort (#1590) - sofort wird so lange gebaut, bis das Los die beiden trennt."""
+    stage = {"id": "s", "number": 1, "stage_type": "ffa_custom_bracket", "match_type": "ffa",
+             "settings": {"match_size": 4, "qualifiers_per_match": 2, "min_players": 2}}
+    base = {"id": "t", "seeding_mode": "manual", "max_participants": 12, **({"advancement_mode": mode} if mode else {})}
+    for _attempt in range(40):
+        matches = build_matches_v2_from_schema(base, stage, registrations(12))
+        by_key = by_key_of(matches)
+        first, second, third, fourth = filled_ids(by_key["B"])
+        apply_result(matches, by_key["B"], [first, second, third, fourth])
+        seat_of_first = next(m for m in matches if m["round"] == 2 and first in filled_ids(m))
+        seat_of_second = next(m for m in matches if m["round"] == 2 and second in filled_ids(m))
+        if seat_of_first["id"] != seat_of_second["id"]:
+            break
+    assert seat_of_first["id"] != seat_of_second["id"]
+    # Die übrigen Läufe der Runde 1 fahren - dann fährt der Lauf des Zweiten, und er kommt weiter.
+    for key in "AC":
+        apply_result(matches, by_key[key], filled_ids(by_key[key]))
+    assert seat_of_second["status"] == "ready"
+    ranking = [second] + [reg for reg in filled_ids(seat_of_second) if reg != second]
+    apply_result(matches, seat_of_second, ranking)
+    assert any(second in filled_ids(m) for m in matches if m["round"] == 3), "der Zweite ist schon weiter"
+    assert seat_of_first["status"] in {"pending", "ready"}
+    plan = plan_removal(matches, first, kind="disqualified", now_iso=NOW)
+    assert first not in filled_ids(seat_of_first)
+    assert third in filled_ids(seat_of_first), "der Dritte rückt nach"
+    assert second not in filled_ids(seat_of_first), "wer schon weitergespielt hat, bleibt, wo er ist"
+    moved = next(op for op in plan["ops"] if op["kind"] == "readvanced")
+    assert moved["registration_id"] == third
+    assert_nobody_twice_ready(matches)
+    assert_graph_valid(matches)
+
+
 def test_ffa_dq_does_not_touch_a_heat_that_has_been_called_or_started():
     matches, stage = ffa(9)
     by_key = by_key_of(matches)
