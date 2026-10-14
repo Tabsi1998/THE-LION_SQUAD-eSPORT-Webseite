@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
@@ -9,6 +9,7 @@ import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 // ein privates Profil oeffentlich.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
+const keepaliveMock = vi.fn();
 const toastMock = { success: vi.fn(), error: vi.fn(), info: vi.fn(), message: vi.fn() };
 const refreshMock = vi.fn();
 
@@ -29,10 +30,13 @@ const USER = {
 vi.mock("@/lib/api", () => ({
   api: apiMock,
   formatRequestError: (error, fallback) => fallback || String(error),
+  keepaliveRequest: (...args) => keepaliveMock(...args),
   resolveMediaUrl: (value) => value || "",
 }));
+// Das angemeldete Konto ist veränderlich, damit ein Kontowechsel geprüft werden kann (#1048).
+const authState = { user: USER };
 vi.mock("@/context/AuthContext", () => ({
-  useAuth: () => ({ user: USER, refresh: refreshMock, isClubMember: true }),
+  useAuth: () => ({ user: authState.user, refresh: refreshMock, isClubMember: true }),
 }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/hooks/usePublicSiteSettings", () => ({ usePublicSiteSettings: () => ({ settings: {}, loading: false }) }));
@@ -57,8 +61,8 @@ function LocationProbe() {
   return <div data-testid="location-probe" data-path={location.pathname} data-search={location.search} />;
 }
 
-function renderPage(entries = ["/profile"]) {
-  return render(
+function pageTree(entries) {
+  return (
     <ConfirmDialogProvider>
       <MemoryRouter initialEntries={entries}>
         <ProfilePage />
@@ -67,7 +71,22 @@ function renderPage(entries = ["/profile"]) {
   );
 }
 
+function renderPage(entries = ["/profile"]) {
+  const view = render(pageTree(entries));
+  return { ...view, rerenderPage: () => view.rerender(pageTree(entries)) };
+}
+
+// Eine Anfrage, die erst antwortet, wenn der Test es sagt.
+function deferredPatch() {
+  const call = {};
+  apiMock.patch.mockImplementationOnce((url, body, config) => new Promise((resolve, reject) => {
+    Object.assign(call, { url, body, config, resolve: (data) => resolve({ data }), reject });
+  }));
+  return call;
+}
+
 beforeEach(() => {
+  authState.user = USER;
   apiMock.get.mockResolvedValue({ data: [] });
   apiMock.post.mockResolvedValue({ data: {} });
   apiMock.patch.mockImplementation((_url, body) => Promise.resolve({ data: { ...USER, ...body } }));
@@ -99,9 +118,11 @@ test("speichert nur das tatsaechlich geaenderte Feld", async () => {
   await user.type(screen.getByTestId("profile-bio"), "Neue Vorstellung.");
   await user.click(screen.getByTestId("profile-save"));
 
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/users/me", expect.anything()));
-  const [, payload] = apiMock.patch.mock.calls.at(-1);
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/users/me", expect.anything(), expect.anything()));
+  const [, payload, config] = apiMock.patch.mock.calls.at(-1);
   expect(payload).toEqual({ bio: "Neue Vorstellung." });
+  // Der Server prüft, dass noch dasselbe Konto angemeldet ist (#1048).
+  expect(config.headers["X-Expected-User-Id"]).toBe("u-1");
 });
 
 test("ein Schalter auf Privatsphaere speichert von selbst, ohne Speichern-Knopf", async () => {
@@ -293,6 +314,178 @@ test("?tab=inbox leitet zur eigenen Nachrichten-Seite weiter, mit to= direkt ins
 
   expect(await screen.findByTestId("messages-page-stub")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Inbox/i })).toBeNull();
+});
+
+// Speicher-Warteschlange (#1048): Autosave und „Speichern“ laufen hintereinander, nie gleichzeitig.
+test("ein zweiter Schalter wartet, bis der laufende Autosave fertig ist - nie zwei PATCH gleichzeitig", async () => {
+  const user = userEvent.setup();
+  const first = deferredPatch();
+  renderPage();
+  await waitForForm();
+  const toggle = await openPrivacyTab(user);
+
+  await user.click(toggle);
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
+  expect(first.body).toEqual({ privacy_public_profile: true });
+  // Ein zweiter Schalter, solange die erste Anfrage läuft: seine Anfrage darf die erste nicht überholen.
+  await user.click(screen.getByTestId("profile-privacy-achievements"));
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  expect(apiMock.patch).toHaveBeenCalledTimes(1);
+
+  // Der Server kennt nach der ersten Anfrage das öffentliche Profil.
+  apiMock.patch.mockImplementationOnce((_url, body) => Promise.resolve({ data: { ...USER, privacy_public_profile: true, ...body } }));
+  first.resolve({ ...USER, privacy_public_profile: true });
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2), { timeout: 2500 });
+  expect(apiMock.patch.mock.calls[1][1]).toEqual({ privacy_achievements_public: false });
+  await screen.findByText("Gespeichert.");
+  expect(screen.getByTestId("profile-privacy")).toBeChecked();
+  expect(screen.getByTestId("profile-privacy-achievements")).toHaveAttribute("aria-checked", "false");
+});
+
+test("Speichern während eines Autosaves reiht sich ein und schickt danach nur den Rest", async () => {
+  const user = userEvent.setup();
+  const first = deferredPatch();
+  renderPage();
+  await waitForForm();
+  await user.click(await openPrivacyTab(user));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
+
+  await user.click(screen.getByRole("button", { name: /Grunddaten/i }));
+  await user.clear(screen.getByTestId("profile-bio"));
+  await user.type(screen.getByTestId("profile-bio"), "Neu.");
+  await user.click(screen.getByTestId("profile-save"));
+  expect(apiMock.patch).toHaveBeenCalledTimes(1);
+
+  first.resolve({ ...USER, privacy_public_profile: true });
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
+  expect(apiMock.patch.mock.calls[1][1]).toEqual({ bio: "Neu." });
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Profil gespeichert."));
+  expect(toastMock.success).toHaveBeenCalledTimes(1);
+  expect(screen.getByTestId("profile-bio")).toHaveValue("Neu.");
+  expect(apiMock.patch).toHaveBeenCalledTimes(2);
+});
+
+test("Doppelklick auf Speichern schickt genau einen PATCH", async () => {
+  const user = userEvent.setup();
+  const first = deferredPatch();
+  renderPage();
+  await waitForForm();
+  await user.type(screen.getByTestId("profile-bio"), " Mehr.");
+  const form = screen.getByTestId("profile-save").closest("form");
+  // Zweimal abschicken, bevor React neu zeichnet - der Knopf ist dann noch nicht gesperrt.
+  fireEvent.submit(form);
+  fireEvent.submit(form);
+  first.resolve({ ...USER, bio: "Kurze Vorstellung. Mehr." });
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Profil gespeichert."));
+  expect(apiMock.patch).toHaveBeenCalledTimes(1);
+  expect(toastMock.info).not.toHaveBeenCalled();
+});
+
+test("Kontowechsel während des Speicherns: die alte Antwort landet nicht im neuen Konto", async () => {
+  const user = userEvent.setup();
+  const first = deferredPatch();
+  const view = renderPage();
+  await waitForForm();
+  await user.clear(screen.getByTestId("profile-bio"));
+  await user.type(screen.getByTestId("profile-bio"), "Von Konto eins.");
+  await user.click(screen.getByTestId("profile-save"));
+  expect(apiMock.patch).toHaveBeenCalledTimes(1);
+
+  authState.user = { ...USER, id: "u-2", username: "zweites", bio: "Konto zwei." };
+  view.rerenderPage();
+  await waitFor(() => expect(screen.getByTestId("profile-bio")).toHaveValue("Konto zwei."));
+
+  first.resolve({ ...USER, bio: "Von Konto eins." });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(screen.getByTestId("profile-bio")).toHaveValue("Konto zwei.");
+  expect(screen.queryByTestId("profile-unsaved")).toBeNull();
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  expect(apiMock.patch).toHaveBeenCalledTimes(1);
+});
+
+test("ein Fehler beim Autosave zeigt den Hinweis mit Erneut versuchen - die Eingabe bleibt", async () => {
+  const user = userEvent.setup();
+  apiMock.patch.mockImplementationOnce(() => Promise.reject(new Error("Serverfehler")));
+  renderPage();
+  await waitForForm();
+  const toggle = await openPrivacyTab(user);
+  await user.click(toggle);
+
+  await screen.findByText("Änderung konnte nicht gespeichert werden.", {}, { timeout: 2500 });
+  expect(toggle).toBeChecked();
+  await user.click(screen.getByTestId("profile-autosave-retry"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
+  expect(apiMock.patch.mock.calls[1][1]).toEqual({ privacy_public_profile: true });
+  await screen.findByText("Gespeichert.");
+  expect(screen.queryByTestId("profile-autosave-retry")).toBeNull();
+});
+
+test("ein Fehler beim Speichern zeigt in der Leiste Erneut versuchen", async () => {
+  const user = userEvent.setup();
+  apiMock.patch.mockImplementationOnce(() => Promise.reject(new Error("Serverfehler")));
+  renderPage();
+  await waitForForm();
+  await user.type(screen.getByTestId("profile-bio"), " Mehr.");
+  await user.click(screen.getByTestId("profile-save"));
+
+  expect(await screen.findByTestId("profile-save-error")).toHaveTextContent("Profil konnte nicht gespeichert werden.");
+  expect(screen.getByTestId("profile-bio")).toHaveValue("Kurze Vorstellung. Mehr.");
+  await user.click(screen.getByTestId("profile-save-retry"));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Profil gespeichert."));
+  expect(apiMock.patch.mock.calls[1][1]).toEqual({ bio: "Kurze Vorstellung. Mehr." });
+  expect(screen.queryByTestId("profile-save-error")).toBeNull();
+});
+
+// Tab schließen oder neu laden (#1048, nach Codex-Prüfung): ein wartender Autosave geht sofort per keepalive-fetch,
+// offene Änderungen ohne laufende Anfrage lösen die Warnung des Browsers aus.
+test("Tab wird verborgen: ein wartender Autosave geht sofort per keepalive, nicht per axios", async () => {
+  const user = userEvent.setup();
+  keepaliveMock.mockResolvedValueOnce({ ...USER, privacy_public_profile: true });
+  renderPage();
+  await waitForForm();
+  await user.click(await openPrivacyTab(user));
+  expect(keepaliveMock).not.toHaveBeenCalled();
+
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+  document.dispatchEvent(new Event("visibilitychange"));
+  expect(keepaliveMock).toHaveBeenCalledTimes(1);
+  expect(keepaliveMock).toHaveBeenCalledWith("PATCH", "/users/me", { privacy_public_profile: true }, { "X-Expected-User-Id": "u-1" });
+  await screen.findByText("Gespeichert.");
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+});
+
+test("pagehide schickt den wartenden Autosave ebenfalls per keepalive", async () => {
+  const user = userEvent.setup();
+  keepaliveMock.mockResolvedValueOnce({ ...USER, privacy_public_profile: true });
+  renderPage();
+  await waitForForm();
+  await user.click(await openPrivacyTab(user));
+  window.dispatchEvent(new Event("pagehide"));
+  expect(keepaliveMock).toHaveBeenCalledTimes(1);
+});
+
+test("beforeunload warnt bei offenen Änderungen, die nicht unterwegs sind - sonst nicht", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await waitForForm();
+  const clean = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(clean);
+  expect(clean.defaultPrevented).toBe(false);
+
+  await user.type(screen.getByTestId("profile-bio"), " Mehr.");
+  const dirty = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(dirty);
+  expect(dirty.defaultPrevented).toBe(true);
+
+  // Läuft das Speichern, ist die Änderung unterwegs - keine Warnung.
+  const first = deferredPatch();
+  await user.click(screen.getByTestId("profile-save"));
+  const saving = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(saving);
+  expect(saving.defaultPrevented).toBe(false);
+  first.resolve({ ...USER, bio: "Kurze Vorstellung. Mehr." });
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Profil gespeichert."));
 });
 
 // Freunde stehen seit #1143 unter Community → Spieler (/players); die Tafel ist dieselbe.

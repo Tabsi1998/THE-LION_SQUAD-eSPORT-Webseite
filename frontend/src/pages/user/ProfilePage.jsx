@@ -3,15 +3,14 @@ import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { gameLabel } from "@/lib/gameLabels";
-import { buildDirtyPayload, hasPayloadChanges, sameValue } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Save, Crown, UserCircle } from "lucide-react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, TABS, notificationPreferenceKey, tabRedirect } from "./profile/constants";
-import { profileFormPayload, profileToForm } from "./profile/form";
+import { ACCOUNT_CHANGED_MESSAGE } from "@/lib/profileSaveQueue";
 import { applyGroupLevel } from "./profile/visibility";
-import { useAutosave } from "./profile/useAutosave";
+import { useProfileSave } from "./profile/useAutosave";
 import { ProfileNav } from "./profile/ProfileNav";
 import { BasicTab } from "./profile/BasicTab";
 import { GamingTab } from "./profile/GamingTab";
@@ -60,37 +59,16 @@ export default function ProfilePage() {
     next.set("tab", nextTab);
     setParams(next);
   }, [params, setParams]);
-  const [form, setForm] = useState({});
+  // Formular und Speichern über eine Speicher-Warteschlange (#1048): Autosave und „Speichern“ laufen nacheinander.
+  const autosave = useProfileSave({ user, refresh });
+  const { form, setForm } = autosave;
   const [saving, setSaving] = useState(false);
+  const submittingRef = useRef(false);
   const [games, setGames] = useState([]);
-  const initialProfileFormRef = useRef(null);
-  const initialProfileUserIdRef = useRef("");
-  const autosave = useAutosave({
-    form,
-    setForm,
-    initialFormRef: initialProfileFormRef,
-    initialUserIdRef: initialProfileUserIdRef,
-    refresh,
-  });
 
   useEffect(() => {
     api.get("/games").then(({ data }) => setGames(Array.isArray(data) ? data : [])).catch(() => setGames([]));
   }, []);
-
-  useEffect(() => {
-    if (user) {
-      const nextForm = profileToForm(user);
-      setForm((current) => {
-        const sameUser = initialProfileUserIdRef.current === user.id;
-        const hasUnsavedLocalChanges = initialProfileFormRef.current
-          && !sameValue(profileFormPayload(current), profileFormPayload(initialProfileFormRef.current));
-        if (sameUser && hasUnsavedLocalChanges) return current;
-        initialProfileUserIdRef.current = user.id;
-        initialProfileFormRef.current = nextForm;
-        return nextForm;
-      });
-    }
-  }, [user]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -222,38 +200,35 @@ export default function ProfilePage() {
     return topic.defaultOn !== false;
   };
 
+  // „Speichern“ (und „Erneut versuchen“): reiht sich hinter einen laufenden Autosave. Ein zweiter Klick, bevor der
+  // erste fertig ist, tut nichts - auch wenn React den Knopf noch nicht gesperrt hat.
   const submit = async (e) => {
-    e.preventDefault();
-    autosave.cancel();
+    e?.preventDefault?.();
+    if (submittingRef.current) return;
+    const current = autosave.queue.getState();
+    if (!current.dirty && !current.busy) {
+      autosave.cancel();
+      toast.info("Keine Änderungen zum Speichern.");
+      return;
+    }
+    submittingRef.current = true;
     setSaving(true);
     try {
-      const payload = buildDirtyPayload(
-        profileFormPayload(form),
-        profileFormPayload(initialProfileFormRef.current || {}),
-      );
-      if (!hasPayloadChanges(payload)) {
-        toast.info("Keine Änderungen zum Speichern.");
-        return;
-      }
-      const { data } = await api.patch("/users/me", payload);
-      const savedForm = profileToForm(data);
-      initialProfileUserIdRef.current = data.id;
-      initialProfileFormRef.current = savedForm;
-      setForm(savedForm);
-      await refresh();
-      toast.success("Profil gespeichert.");
-    } catch (err) {
-      toast.error(formatRequestError(err, "Profil konnte nicht gespeichert werden."));
+      const result = await autosave.save();
+      if (result.ok) toast.success("Profil gespeichert.");
+      else if (result.reason === "account") toast.error(ACCOUNT_CHANGED_MESSAGE);
+      else if (result.error) toast.error(formatRequestError(result.error, "Profil konnte nicht gespeichert werden."));
     } finally {
+      submittingRef.current = false;
       setSaving(false);
     }
   };
 
   if (!user) return null;
 
-  // Die Speicherleiste zeigt, ob auf den Text-Reitern noch etwas ungespeichert ist.
-  const dirty = !!initialProfileFormRef.current
-    && hasPayloadChanges(buildDirtyPayload(profileFormPayload(form), profileFormPayload(initialProfileFormRef.current)));
+  // Die Speicherleiste zeigt, ob auf den Text-Reitern noch etwas ungespeichert ist - oder ob das Speichern scheiterte.
+  const dirty = autosave.dirty;
+  const saveFailed = autosave.status === "error" && !saving;
   return (
     <PublicLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
@@ -276,7 +251,11 @@ export default function ProfilePage() {
         </div>
 
         <div className="mt-8 lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10 lg:items-start">
-          <ProfileNav tab={tab} onSelect={setTab} onLogout={async () => { if (await logout?.()) navigate("/"); }} />
+          <ProfileNav tab={tab} onSelect={setTab} onLogout={async () => {
+            // Ein wartender Autosave geht noch ins richtige Konto, danach wird abgemeldet.
+            if (autosave.pending) await autosave.save();
+            if (await logout?.()) navigate("/");
+          }} />
 
           <form onSubmit={submit} className="mt-6 lg:mt-0 space-y-5 min-w-0">
             {tab === "basic" && <BasicTab form={form} set={set} />}
@@ -311,7 +290,14 @@ export default function ProfilePage() {
                 <button type="submit" disabled={saving} data-testid="profile-save" className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-6 py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50 text-xs">
                   <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
                 </button>
-                {dirty ? (
+                {saveFailed ? (
+                  <span role="alert" className="inline-flex flex-wrap items-center gap-2 text-xs text-warn" data-testid="profile-save-error">
+                    {formatRequestError(autosave.error, "Profil konnte nicht gespeichert werden.")} Deine Eingaben bleiben stehen.
+                    <button type="button" onClick={submit} data-testid="profile-save-retry" className="tls-hit min-h-11 px-3 border border-warn/30 rounded-sm font-bold uppercase tracking-wider hover:bg-warn/5">
+                      Erneut versuchen
+                    </button>
+                  </span>
+                ) : dirty ? (
                   <span className="text-xs text-[#FFD700]" data-testid="profile-unsaved">Ungespeicherte Änderungen</span>
                 ) : null}
               </div>

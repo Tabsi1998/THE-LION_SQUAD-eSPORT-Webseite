@@ -4,7 +4,7 @@ import secrets
 import re
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_current_user, get_optional_user, require_super, hash_token, require_area
@@ -847,7 +847,16 @@ async def get_user(user_id: str, me: dict = Depends(get_current_user)):
 
 @router.put("/me")
 @router.patch("/me")
-async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
+async def update_me(
+    body: UserUpdate,
+    me: dict = Depends(get_current_user),
+    x_expected_user_id: str | None = Header(default=None),
+):
+    # Speicher-Warteschlange (#1048, #1061): Web und App nennen das Konto, für das die Änderung gedacht ist. Ist
+    # inzwischen ein anderes angemeldet (anderer Tab, Kontowechsel), wird nichts geschrieben - ein leerer Wert auch nicht.
+    # Ohne Header wie bisher.
+    if x_expected_user_id is not None and x_expected_user_id != me["id"]:
+        raise HTTPException(409, "Du bist inzwischen mit einem anderen Konto angemeldet – die Änderung wurde nicht gespeichert.")
     db = get_db()
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}

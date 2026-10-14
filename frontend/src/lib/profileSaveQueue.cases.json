@@ -1,0 +1,197 @@
+{
+  "_hinweis": "Speicher-Warteschlange für Profil und Einstellungen (#1048, #1061): dieselben Fälle prüfen frontend/src/lib/profileSaveQueue.test.js und mobile/src/lib/profileSaveQueue.test.ts. Schritte: edit (lokale Änderung), flush (Speichern; mit Namen wird das Ergebnis gemerkt), respond/fail (Antwort auf Anfrage Nr. i), load (Serverstand von außen, etwa nach dem Neuladen der Sitzung; null = abgemeldet), stamp/merge (Teilstand vom Server mit Stempel), expect (Prüfung). Serverdaten tragen id (Konto) und updated_at (Revision). Namen sind erfunden.",
+  "scenarios": [
+    {
+      "name": "Änderungen während eines laufenden Speicherns gehen gesammelt mit dem nächsten Lauf",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "a": 0, "b": 0, "c": 0 },
+      "steps": [
+        { "edit": { "a": 1 } },
+        { "flush": "erster" },
+        { "expect": { "status": "saving", "open": 1, "requests": [{ "account": "u1", "payload": { "a": 1 } }] } },
+        { "edit": { "b": 1 } },
+        { "flush": null },
+        { "edit": { "c": 1 } },
+        { "flush": null },
+        { "expect": { "open": 1, "local": { "a": 1, "b": 1, "c": 1 } } },
+        { "respond": 0, "server": { "id": "u1", "updated_at": "2026-10-13T10:00:01+00:00", "a": 1, "b": 0, "c": 0 } },
+        { "expect": { "status": "saving", "open": 1, "local": { "a": 1, "b": 1, "c": 1 }, "results": { "erster": { "ok": true } }, "requests": [{ "account": "u1", "payload": { "a": 1 } }, { "account": "u1", "payload": { "b": 1, "c": 1 } }] } },
+        { "respond": 1, "server": { "id": "u1", "updated_at": "2026-10-13T10:00:02+00:00", "a": 1, "b": 1, "c": 1 } },
+        { "expect": { "status": "saved", "dirty": false, "open": 0, "local": { "a": 1, "b": 1, "c": 1 } } }
+      ]
+    },
+    {
+      "name": "eine Antwort überschreibt keine neuere Eingabe",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "name": "" },
+      "steps": [
+        { "edit": { "name": "A" } },
+        { "flush": null },
+        { "edit": { "name": "AB" } },
+        { "respond": 0, "server": { "id": "u1", "updated_at": "2026-10-13T10:00:01+00:00", "name": "A" } },
+        { "expect": { "local": { "name": "AB" }, "dirty": true, "status": "idle", "open": 0 } }
+      ]
+    },
+    {
+      "name": "unveränderte Felder übernehmen den Wert vom Server",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "handle": "", "bio": "" },
+      "steps": [
+        { "edit": { "handle": " Lion " } },
+        { "flush": null },
+        { "respond": 0, "server": { "id": "u1", "updated_at": "2026-10-13T10:00:01+00:00", "handle": "lion", "bio": "" } },
+        { "expect": { "local": { "handle": "lion", "bio": "" }, "dirty": false, "status": "saved" } }
+      ]
+    },
+    {
+      "name": "Doppelklick: das zweite Speichern ohne neue Änderung schickt nichts",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "bio": "" },
+      "steps": [
+        { "edit": { "bio": "Hallo" } },
+        { "flush": "klick1" },
+        { "flush": "klick2" },
+        { "expect": { "open": 1, "requests": [{ "account": "u1", "payload": { "bio": "Hallo" } }] } },
+        { "respond": 0, "server": { "id": "u1", "updated_at": "2026-10-13T10:00:01+00:00", "bio": "Hallo" } },
+        { "expect": { "results": { "klick1": { "ok": true }, "klick2": { "ok": true } }, "requests": [{ "account": "u1", "payload": { "bio": "Hallo" } }] } },
+        { "flush": "klick3" },
+        { "expect": { "results": { "klick3": { "ok": true, "nothing": true } }, "open": 0 } }
+      ]
+    },
+    {
+      "name": "manuelles Speichern wartet auf den laufenden Autosave und reiht sich ein",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "privacy": true, "bio": "" },
+      "steps": [
+        { "edit": { "privacy": false } },
+        { "flush": "autosave" },
+        { "edit": { "bio": "Neu" } },
+        { "flush": "speichern" },
+        { "expect": { "open": 1, "waiting": ["autosave", "speichern"], "requests": [{ "account": "u1", "payload": { "privacy": false } }] } },
+        { "respond": 0, "server": { "id": "u1", "updated_at": "2026-10-13T10:00:01+00:00", "privacy": false, "bio": "" } },
+        { "expect": { "open": 1, "waiting": ["speichern"], "results": { "autosave": { "ok": true } }, "requests": [{ "account": "u1", "payload": { "privacy": false } }, { "account": "u1", "payload": { "bio": "Neu" } }] } },
+        { "respond": 1, "server": { "id": "u1", "updated_at": "2026-10-13T10:00:02+00:00", "privacy": false, "bio": "Neu" } },
+        { "expect": { "results": { "speichern": { "ok": true } }, "status": "saved", "dirty": false } }
+      ]
+    },
+    {
+      "name": "Fehler: die Eingabe bleibt, der Hinweis steht, Erneut versuchen schickt alles noch einmal",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "a": 0, "b": 0 },
+      "steps": [
+        { "edit": { "a": 1 } },
+        { "flush": "erster" },
+        { "edit": { "b": 1 } },
+        { "flush": "zweiter" },
+        { "fail": 0, "error": "Serverfehler" },
+        { "expect": { "status": "error", "error": "Serverfehler", "dirty": true, "open": 0, "local": { "a": 1, "b": 1 }, "results": { "erster": { "ok": false, "error": "Serverfehler" }, "zweiter": { "ok": false, "error": "Serverfehler" } }, "requests": [{ "account": "u1", "payload": { "a": 1 } }] } },
+        { "flush": "nochmal" },
+        { "expect": { "status": "saving", "requests": [{ "account": "u1", "payload": { "a": 1 } }, { "account": "u1", "payload": { "a": 1, "b": 1 } }] } },
+        { "respond": 1, "server": { "id": "u1", "updated_at": "2026-10-13T10:00:01+00:00", "a": 1, "b": 1 } },
+        { "expect": { "status": "saved", "error": null, "dirty": false, "results": { "nochmal": { "ok": true } } } }
+      ]
+    },
+    {
+      "name": "Kontowechsel während des Speicherns: die alte Antwort wird verworfen, nichts geht ins neue Konto",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "a": 0, "b": 0 },
+      "steps": [
+        { "edit": { "a": 1 } },
+        { "flush": "alt" },
+        { "edit": { "b": 1 } },
+        { "flush": "wartend" },
+        { "load": { "id": "u2", "updated_at": "2026-10-13T09:00:00+00:00", "a": 5, "b": 5 } },
+        { "expect": { "account": "u2", "local": { "a": 5, "b": 5 }, "dirty": false, "status": "idle", "results": { "alt": { "ok": false, "reason": "account" }, "wartend": { "ok": false, "reason": "account" } } } },
+        { "respond": 0, "server": { "id": "u1", "updated_at": "2026-10-13T10:00:01+00:00", "a": 1, "b": 0 } },
+        { "expect": { "account": "u2", "local": { "a": 5, "b": 5 }, "dirty": false, "status": "idle", "open": 0 } },
+        { "flush": "danach" },
+        { "expect": { "results": { "danach": { "ok": true, "nothing": true } }, "requests": [{ "account": "u1", "payload": { "a": 1 } }] } }
+      ]
+    },
+    {
+      "name": "abgemeldet: offene Änderungen sind weg, ohne Konto wird nichts geschickt",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "a": 0 },
+      "steps": [
+        { "edit": { "a": 1 } },
+        { "load": null },
+        { "expect": { "account": null, "dirty": false, "local": {} } },
+        { "edit": { "a": 2 } },
+        { "flush": "ohne" },
+        { "expect": { "local": {}, "results": { "ohne": { "ok": false, "reason": "no-account" } }, "requests": [] } }
+      ]
+    },
+    {
+      "name": "ein älterer Serverstand (Revision) überschreibt keinen neueren",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "a": 0, "b": 0 },
+      "steps": [
+        { "edit": { "a": 1 } },
+        { "flush": null },
+        { "respond": 0, "server": { "id": "u1", "updated_at": "2026-10-13T10:00:02+00:00", "a": 1, "b": 0 } },
+        { "load": { "id": "u1", "updated_at": "2026-10-13T10:00:01+00:00", "a": 0, "b": 0 } },
+        { "expect": { "local": { "a": 1, "b": 0 }, "dirty": false } },
+        { "load": { "id": "u1", "a": 0, "b": 0 } },
+        { "expect": { "local": { "a": 1, "b": 0 }, "dirty": false } },
+        { "load": { "id": "u1", "updated_at": "2026-10-13T10:00:03+00:00", "a": 1, "b": 7 } },
+        { "expect": { "local": { "a": 1, "b": 7 }, "dirty": false } }
+      ]
+    },
+    {
+      "name": "Neuladen von außen: geänderte Felder bleiben, die anderen kommen vom Server",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "a": 0, "b": 0 },
+      "steps": [
+        { "edit": { "a": 1 } },
+        { "load": { "id": "u1", "updated_at": "2026-10-13T10:00:05+00:00", "a": 0, "b": 2 } },
+        { "expect": { "local": { "a": 1, "b": 2 }, "dirty": true, "open": 0 } }
+      ]
+    },
+    {
+      "name": "Neuladen während das Speichern läuft: die gesendeten Felder bleiben stehen",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "a": 0, "b": 0 },
+      "steps": [
+        { "edit": { "a": 1 } },
+        { "flush": null },
+        { "load": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "a": 0, "b": 0 } },
+        { "expect": { "local": { "a": 1, "b": 0 }, "status": "saving" } },
+        { "respond": 0, "server": { "id": "u1", "updated_at": "2026-10-13T10:00:01+00:00", "a": 1, "b": 0 } },
+        { "expect": { "local": { "a": 1, "b": 0 }, "dirty": false, "status": "saved" } }
+      ]
+    },
+    {
+      "name": "verschachtelte Einstellungen: nur geänderte Unterschlüssel bleiben lokal",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "prefs": { "push": true, "email": true } },
+      "steps": [
+        { "edit": { "prefs": { "push": false, "email": true } } },
+        { "load": { "id": "u1", "updated_at": "2026-10-13T10:00:05+00:00", "prefs": { "push": true, "email": false } } },
+        { "expect": { "local": { "prefs": { "push": false, "email": false } }, "dirty": true } }
+      ]
+    },
+    {
+      "name": "eine Antwort aus einem anderen Konto gilt als Fehler und ändert nichts",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "a": 0 },
+      "steps": [
+        { "edit": { "a": 1 } },
+        { "flush": "x" },
+        { "respond": 0, "server": { "id": "u2", "updated_at": "2026-10-13T10:00:01+00:00", "a": 9 } },
+        { "expect": { "status": "error", "error": "Du bist inzwischen mit einem anderen Konto angemeldet – die Änderung wurde nicht gespeichert.", "local": { "a": 1 }, "dirty": true, "account": "u1", "results": { "x": { "ok": false, "error": "Du bist inzwischen mit einem anderen Konto angemeldet – die Änderung wurde nicht gespeichert." } } } }
+      ]
+    },
+    {
+      "name": "Teilstand mit Stempel: kommt er nach einem Speichern an, wird er verworfen",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "prefs": { "push": true } },
+      "steps": [
+        { "stamp": "vorher" },
+        { "edit": { "prefs": { "push": false } } },
+        { "flush": null },
+        { "respond": 0, "server": { "id": "u1", "updated_at": "2026-10-13T10:00:01+00:00", "prefs": { "push": false } } },
+        { "merge": { "prefs": { "push": true, "email": true } }, "stamp": "vorher" },
+        { "expect": { "local": { "prefs": { "push": false } }, "dirty": false } },
+        { "stamp": "jetzt" },
+        { "merge": { "prefs": { "push": false, "email": true } }, "stamp": "jetzt" },
+        { "expect": { "local": { "prefs": { "push": false, "email": true } }, "dirty": false } }
+      ]
+    },
+    {
+      "name": "Teilstand ohne Speichern dazwischen: lokale Änderung bleibt, der Rest kommt dazu",
+      "server": { "id": "u1", "updated_at": "2026-10-13T10:00:00+00:00", "prefs": {} },
+      "steps": [
+        { "stamp": "start" },
+        { "edit": { "prefs": { "push": false } } },
+        { "merge": { "prefs": { "push": true, "email": true } }, "stamp": "start" },
+        { "expect": { "local": { "prefs": { "push": false, "email": true } }, "dirty": true } }
+      ]
+    }
+  ]
+}

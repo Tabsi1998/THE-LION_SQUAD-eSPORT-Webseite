@@ -14,6 +14,8 @@ import { friendsSharing } from "../../lib/eventRecap";
 import { availabilityText } from "../../lib/appLock";
 import { formatDateTime } from "../../lib/format";
 import { openLink } from "../../lib/openLink";
+import { ACCOUNT_CHANGED_MESSAGE } from "../../lib/profileSaveQueue";
+import { useProfileSaveQueue } from "../../lib/useProfileSaveQueue";
 import { WEB_BASE_URL } from "../../lib/siteUrls";
 import { isGuestUser } from "../../live";
 import { useAppLock } from "../../lock/AppLockProvider";
@@ -65,8 +67,6 @@ function Group({ title, children, testID }: { title: string; children: React.Rea
   );
 }
 
-const SETTING_FIELDS = ["privacy_public_profile", "privacy_achievements_public", "show_twitch_embed", "privacy_season_finds_public", "privacy_friends_see_registrations", "dm_privacy", "newsletter_consent", "notification_preferences"] as const;
-
 function settingsForm(user: Record<string, any> | null | undefined) {
   const u = user || {};
   return {
@@ -83,58 +83,73 @@ function settingsForm(user: Record<string, any> | null | undefined) {
   };
 }
 
+type SettingsForm = ReturnType<typeof settingsForm>;
+
 /** Benachrichtigungen, Sicherheit, Privatsphäre und Konto - nur mit Konto. Schalter speichern kurz nach dem letzten Tipp. */
 function AccountSettings() {
   const { user, logout, refreshMe } = useAuth();
   const navigation = useContext(NavigationContext);
   const appLock = useAppLock();
-  const [form, setForm] = useState(() => settingsForm(user as Record<string, any>));
   const [discordDm, setDiscordDm] = useState<DiscordDmState | null>(null);
-  const [message, setMessage] = useState("");
-  const [saving, setSaving] = useState(false);
   const [showTopics, setShowTopics] = useState(false);
-  const formRef = useRef(form);
-  formRef.current = form;
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Die vollständigen Benachrichtigungs-Vorgaben vom Server; das Konto selbst speichert nur Abweichungen. Sie gehören
+  // genau einem Konto - für jedes andere gelten sie nicht (nach Codex-Prüfung von #1528).
+  const preferenceDefaults = useRef<{ account: string | null; prefs: Record<string, boolean> }>({ account: null, prefs: {} });
+  const fromServer = useCallback((data: Record<string, any>) => {
+    const next = settingsForm(data);
+    const owner = data?.id != null ? String(data.id) : null;
+    const defaults = owner != null && preferenceDefaults.current.account === owner ? preferenceDefaults.current.prefs : {};
+    return { ...next, notification_preferences: { ...defaults, ...next.notification_preferences } };
+  }, []);
+  // Speicher-Warteschlange (#1061): ein PATCH zur Zeit, nur Geändertes, nie ins falsche Konto.
+  const saver = useProfileSaveQueue<SettingsForm>({
+    user: user as Record<string, any> | null,
+    fromServer,
+    onSaved: () => { void refreshMe().catch(() => {}); },
+  });
+  const form = saver.form;
+  const { queue } = saver;
 
+  // Je Konto neu laden. Kommt die Antwort erst, nachdem schon gespeichert wurde, verwirft die Warteschlange sie
+  // (Stempel); was inzwischen umgeschaltet wurde, bleibt ohnehin stehen. Eine Antwort für ein Konto, das nicht mehr
+  // angemeldet ist, wird ganz verworfen.
+  const account = user?.id != null ? String(user.id) : null;
   useEffect(() => {
+    setDiscordDm(null);
+    if (account == null) return undefined;
+    let current = true;
+    const stamp = queue.stamp();
     api.get<{ preferences?: Record<string, boolean>; discord?: DiscordDmState } | Record<string, boolean>>("/users/me/notification-preferences")
       .then(({ data }) => {
+        if (!current || queue.getState().account !== account) return;
         setDiscordDm(((data as any)?.discord as DiscordDmState | undefined) || null);
         const preferences = ((data as any)?.preferences || data || {}) as Record<string, boolean>;
-        setForm((current) => ({ ...current, notification_preferences: { ...current.notification_preferences, ...preferences } }));
+        preferenceDefaults.current = { account, prefs: preferences };
+        const confirmed = queue.getState().confirmed;
+        queue.merge({ notification_preferences: { ...(confirmed.notification_preferences || {}), ...preferences } }, stamp);
       })
       .catch(() => {});
-  }, []);
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
+    return () => {
+      current = false;
+    };
+  }, [account, queue]);
 
-  const save = useCallback(async () => {
-    setSaving(true);
-    setMessage("");
-    try {
-      const payload: Record<string, unknown> = {};
-      SETTING_FIELDS.forEach((key) => { payload[key] = formRef.current[key]; });
-      await api.patch("/users/me", payload);
-      setMessage("Gespeichert.");
-      await refreshMe().catch(() => {});
-    } catch (err) {
-      setMessage(errorMessage(err, "Einstellung konnte nicht gespeichert werden."));
-    } finally {
-      setSaving(false);
-    }
-  }, [refreshMe]);
-
-  const change = useCallback((key: keyof ReturnType<typeof settingsForm>, value: unknown) => {
-    setForm((current) => ({ ...current, [key]: value }));
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      void save();
-    }, 700);
-  }, [save]);
-  const changePreference = (key: string, value: boolean) => change("notification_preferences", { ...formRef.current.notification_preferences, [key]: value });
+  const change = useCallback((key: keyof SettingsForm, value: unknown) => {
+    queue.edit({ [key]: value } as Partial<SettingsForm>);
+    saver.schedule();
+  }, [queue, saver.schedule]);
+  const changePreference = (key: string, value: boolean) => {
+    queue.edit((current) => ({ ...current, notification_preferences: { ...current.notification_preferences, [key]: value } }));
+    saver.schedule();
+  };
+  const status = saver.state.status;
+  const message = status === "saving"
+    ? "Speichert …"
+    : status === "error"
+      ? (saver.state.error instanceof Error && saver.state.error.message === ACCOUNT_CHANGED_MESSAGE
+        ? ACCOUNT_CHANGED_MESSAGE
+        : errorMessage(saver.state.error, "Einstellung konnte nicht gespeichert werden."))
+      : status === "saved" ? "Gespeichert." : "";
 
   const visibleChannels = notificationChannels.filter((channel) => channel.key !== "discord" || Boolean(discordDm?.linked));
   const channelEnabled = (key: string) => {
@@ -171,6 +186,8 @@ function AccountSettings() {
               style: "destructive",
               onPress: async () => {
                 try {
+                  // Das Konto wird anonymisiert - ein wartender Schalter wird nicht mehr gespeichert.
+                  saver.cancel();
                   await api.post("/dsgvo/anonymize-me");
                   await logout();
                 } catch (error) {
@@ -260,13 +277,28 @@ function AccountSettings() {
         <BlockedUsersCard style={styles.card} />
       </Group>
 
-      {message ? <Muted style={message.includes("konnte") ? profileStyles.error : profileStyles.success} testID="settings-message">{saving ? "Speichert …" : message}</Muted> : null}
+      {message ? (
+        <View style={styles.saveState}>
+          <Muted style={status === "error" ? profileStyles.error : profileStyles.success} testID="settings-message">{message}</Muted>
+          {status === "error" ? (
+            <Pressable onPress={() => { void saver.save(); }} accessibilityRole="button" style={styles.expand} testID="settings-retry">
+              <Body style={styles.expandText}>Erneut versuchen</Body>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       <Group title="Konto" testID="settings-group-account">
         <Card style={styles.list}>
           <Row icon="create-outline" label="Profil bearbeiten" detail="Name, Bio, Spiele und Konten" onPress={() => navigation?.navigate("ProfileEdit" as never)} testID="settings-edit-profile" />
           <Row icon="document-lock-outline" label="Meine Daten" detail="Auskunft und Export auf der Website" onPress={() => openLink(`${WEB_BASE_URL}/privacy-account`)} testID="settings-data" border />
-          <Row icon="log-out-outline" label="Abmelden" detail="Dieses Gerät aus deinem Konto ausloggen." onPress={() => { void logout(); }} tone="danger" testID="settings-logout" border />
+          <Row icon="log-out-outline" label="Abmelden" detail="Dieses Gerät aus deinem Konto ausloggen." onPress={() => {
+            // Ein wartender Schalter geht noch ins richtige Konto, danach wird abgemeldet (#1061).
+            void (async () => {
+              if (saver.pending) await saver.save();
+              await logout();
+            })();
+          }} tone="danger" testID="settings-logout" border />
           <Row icon="trash-outline" label="Konto löschen" detail="Dauerhaft anonymisieren – wie auf der Website unter Datenschutz." onPress={deleteAccount} tone="danger" testID="settings-delete" border />
         </Card>
       </Group>
@@ -375,6 +407,9 @@ const styles = StyleSheet.create({
   },
   group: {
     gap: 8,
+  },
+  saveState: {
+    gap: 4,
   },
   groupTitle: {
     color: colors.white,

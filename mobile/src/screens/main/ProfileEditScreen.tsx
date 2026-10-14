@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Linking, ScrollView, StyleSheet, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -8,6 +8,8 @@ import { LINKABLE_PLATFORMS, PlatformLinkRows, type LinkedAccount } from "../../
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
+import { ACCOUNT_CHANGED_MESSAGE, type SaveResult } from "../../lib/profileSaveQueue";
+import { useProfileSaveQueue } from "../../lib/useProfileSaveQueue";
 import { Field, labelFor, profileStyles, setField, Toggle, WEB_BASE_URL } from "./profile/parts";
 import { colors } from "../../theme";
 
@@ -33,11 +35,35 @@ export function profileEditForm(user: Record<string, any> | null | undefined): R
   return form;
 }
 
+/** Formular → PATCH: Lieblingsspiele als Liste. */
+export function profileEditPayload(form: Record<string, any>): Record<string, any> {
+  return {
+    ...form,
+    favorite_games: String(form.favorite_games || "").split(",").map((value) => value.trim()).filter(Boolean),
+  };
+}
+
+function saveProblem(result: SaveResult) {
+  if (result.reason === "account") return ACCOUNT_CHANGED_MESSAGE;
+  if (result.error instanceof Error && result.error.message === ACCOUNT_CHANGED_MESSAGE) return ACCOUNT_CHANGED_MESSAGE;
+  return errorMessage(result.error, "Profil konnte nicht gespeichert werden.");
+}
+
 export function ProfileEditScreen() {
   const { user, refreshMe } = useAuth();
-  const [form, setForm] = useState<Record<string, any>>(() => profileEditForm(user as Record<string, any>));
+  // Speicher-Warteschlange (#1061): „Profil speichern“, der Discord-Schalter und neue Bilder schreiben nacheinander,
+  // nur Geändertes und nie ins falsche Konto. Was beim Speichern noch getippt wird, bleibt stehen.
+  const saver = useProfileSaveQueue<Record<string, any>>({
+    user: user as Record<string, any> | null,
+    fromServer: profileEditForm,
+    toPayload: profileEditPayload,
+    onSaved: () => { void refreshMe().catch(() => {}); },
+  });
+  const { form, setForm, queue } = saver;
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
   // Verknüpfte Konten (#459): nur lesen; verknüpfen läuft im Web (Rückruf der Plattform im Browser).
   const [links, setLinks] = useState<LinkedAccount[]>([]);
   // Welche Plattformen die Website eingerichtet hat (#521): nur dort gibt es den Knopf.
@@ -80,31 +106,37 @@ export function ProfileEditScreen() {
     ]);
   }, []);
 
-  const send = useCallback(async (payload: Record<string, unknown>, done: string) => {
+  // Speichern (Knopf und „Erneut versuchen“): reiht sich hinter einen laufenden Lauf. Zweimal tippen,
+  // bevor der erste fertig ist, schickt nichts doppelt.
+  const report = useCallback((result: SaveResult, done: string) => {
+    setFailed(!result.ok);
+    if (result.ok) setMessage(result.nothing ? "Keine Änderungen zum Speichern." : done);
+    else setMessage(saveProblem(result));
+  }, []);
+  const save = useCallback(async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setMessage("");
+    setFailed(false);
     try {
-      await api.patch("/users/me", payload);
-      await refreshMe().catch(() => {});
-      setMessage(done);
-    } catch (err) {
-      setMessage(errorMessage(err, "Profil konnte nicht gespeichert werden."));
+      report(await saver.save(), "Profil gespeichert.");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
-  }, [refreshMe]);
-  // Bilder vom Handy (#1153): hochgeladen wird sofort gespeichert - scheitert das Speichern, bleibt das alte Bild.
+  }, [report, saver]);
+  // Bilder vom Handy (#1153): hochgeladen wird sofort gespeichert. Scheitert nur das Speichern, ist das Bild schon
+  // hochgeladen - die neue Adresse bleibt als ungespeicherte Änderung stehen, und „Erneut versuchen“ speichert sie.
   const saveImage = useCallback(async (key: "avatar_url" | "banner_url", url: string) => {
-    await api.patch("/users/me", { [key]: url });
-    setField(setForm, key, url);
-    await refreshMe().catch(() => {});
-  }, [refreshMe]);
+    queue.edit({ [key]: url });
+    const result = await saver.save();
+    if (!result.ok) {
+      report(result, "");
+      throw result.error instanceof Error ? result.error : new Error(saveProblem(result));
+    }
+  }, [queue, report, saver]);
   const initials = String(form.display_name || user?.username || "?").trim().slice(0, 2).toUpperCase();
-  const save = useCallback(() => send({
-    ...Object.fromEntries(PROFILE_FIELDS.map((key) => [key, form[key]])),
-    discord_game_roles: form.discord_game_roles,
-    favorite_games: String(form.favorite_games || "").split(",").map((value) => value.trim()).filter(Boolean),
-  }, "Profil gespeichert."), [form, send]);
 
   return (
     <Screen padded={false}>
@@ -147,7 +179,11 @@ export function ProfileEditScreen() {
               label="Spiel-Rollen im Discord"
               detail="Mit Spielprofil (Spieler-ID) oder Team-Kader gibt dir der Bot die passende Rolle, etwa „CoD-Spieler“ – auf dem Server des Spiels und am Hauptserver. Aus: keine Spiel-Rollen; Vereinsrollen wie „Mitglied“ bleiben."
               value={form.discord_game_roles !== false}
-              onValueChange={(v) => { setField(setForm, "discord_game_roles", v); void send({ discord_game_roles: v }, "Gespeichert."); }}
+              onValueChange={(v) => {
+                setField(setForm, "discord_game_roles", v);
+                // Speichert sofort - läuft gerade „Profil speichern“, im Lauf danach.
+                void saver.save().then((result) => report(result, "Gespeichert."));
+              }}
             />
           ) : null}
           <Muted>Von Hand – diese Plattformen bieten keine Anmeldung:</Muted>
@@ -155,7 +191,12 @@ export function ProfileEditScreen() {
             <Field key={key} label={labelFor(key)} value={form[key]} onChangeText={(v) => setField(setForm, key, v)} />
           ))}
         </Card>
-        {message ? <Muted style={message.includes("konnte") ? profileStyles.error : profileStyles.success} testID="profile-edit-message">{message}</Muted> : null}
+        {message ? <Muted style={failed ? profileStyles.error : profileStyles.success} testID="profile-edit-message">{message}</Muted> : null}
+        {failed ? (
+          <Pressable onPress={() => { void save(); }} accessibilityRole="button" style={styles.retry} testID="profile-edit-retry">
+            <Body style={styles.retryText}>Erneut versuchen – deine Eingaben sind noch da</Body>
+          </Pressable>
+        ) : null}
         <Button label={saving ? "Speichert ..." : "Profil speichern"} onPress={() => { void save(); }} disabled={saving} testID="profile-edit-save" />
       </ScrollView>
     </Screen>
@@ -172,5 +213,13 @@ const styles = StyleSheet.create({
     gap: 16,
     padding: 18,
     paddingBottom: 36,
+  },
+  retry: {
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  retryText: {
+    color: colors.cyan,
+    fontWeight: "700",
   },
 });

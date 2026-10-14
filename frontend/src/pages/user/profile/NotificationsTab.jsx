@@ -26,7 +26,7 @@ export function NotificationsTab({ form, set, setNotificationPreference, notific
     <Section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-white/60">Steuere getrennt, ob Hinweise per E-Mail, Push, In-App oder als Discord-Direktnachricht ankommen. Account- und Sicherheitsmails bleiben immer aktiv.</p>
-        <AutosaveStatus status={autosave.status} message={autosave.message} />
+        <AutosaveStatus status={autosave.status} message={autosave.message} onRetry={autosave.retry} />
       </div>
 
       <div>
