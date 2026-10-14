@@ -1,6 +1,7 @@
 """Kalender-Ansicht (#1190, #1271): Versammlungen und eigene Helferschichten stehen für Mitglieder in `GET /api/calendar`,
 für alle anderen nicht; der Vorstand sieht seine Sitzungen. Ein mehrtägiges Event nennt an jedem Tag seinen Namen, damit
 die Liste es zu einer Zeile zusammenfassen kann. Der öffentliche Feed bleibt ohne Vereinstermine."""
+import contextlib
 import pathlib
 import sys
 
@@ -150,10 +151,8 @@ async def test_meetings_and_shifts_are_asked_at_once_and_one_failure_keeps_the_o
 
     async def meetings(db, user):
         # Wartet auf die Schicht-Abfrage - nacheinander gefragt, käme sie nicht rechtzeitig.
-        try:
+        with contextlib.suppress(asyncio.TimeoutError):
             await asyncio.wait_for(shifts_asked.wait(), timeout=1)
-        except asyncio.TimeoutError:
-            pass
         seen.append(shifts_asked.is_set())
         raise RuntimeError("Vereinsmodul antwortet nicht")
 

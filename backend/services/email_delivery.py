@@ -52,16 +52,77 @@ def fill_placeholders(text: str, values: dict, *, as_html: bool) -> str:
     return _PLACEHOLDER.sub(replace, text or "")
 
 
+# Tag-Anfänge und Schließer sind feste Wörter: die Suche danach läuft ohne Rückverfolgung.
+_BLOCK_TAGS = {
+    name: (re.compile(rf"(?i)<{name}"), re.compile(rf"(?i)</{name}>")) for name in ("script", "style")
+}
+_LI_OPEN = re.compile(r"(?i)<li")
+_TAG_OPEN = re.compile("<")
+
+
+def _strip_blocks(text: str) -> str:
+    """Entfernt `<script …>…</script>` und `<style …>…</style>` - linear in der Länge.
+
+    Gleiches Ergebnis wie `re.sub(r"(?is)<(script|style).*?>.*?</\\1>", "", text)`: vom Öffner bis zum ersten `>`,
+    dann bis zum ersten passenden Schließer dahinter. Fehlt das `>` oder der Schließer, findet sich auch ab einer
+    späteren Stelle keiner mehr - der Name wird dann nicht weiter gesucht."""
+    # Name -> nächster Öffner ab `pos` (None: ab hier kein Treffer mehr möglich).
+    upcoming = {name: opener.search(text) for name, (opener, _) in _BLOCK_TAGS.items()}
+    parts = []
+    pos = 0
+    while True:
+        for name, match in upcoming.items():
+            if match is not None and match.start() < pos:
+                upcoming[name] = _BLOCK_TAGS[name][0].search(text, pos)
+        candidates = [(match.start(), name, match) for name, match in upcoming.items() if match is not None]
+        if not candidates:
+            break
+        start, name, match = min(candidates)
+        gt = text.find(">", match.end())
+        if gt < 0:
+            break
+        close = _BLOCK_TAGS[name][1].search(text, gt + 1)
+        if close is None:
+            upcoming[name] = None
+            continue
+        parts.append(text[pos:start])
+        pos = close.end()
+    parts.append(text[pos:])
+    return "".join(parts)
+
+
+def _replace_tags(text: str, opener: re.Pattern, replacement: str, *, min_inner: int) -> str:
+    """Ersetzt jeden Tag vom Öffner bis zum ersten `>` - linear in der Länge.
+
+    Gleiches Ergebnis wie `re.sub(öffner + r"[^>]*>", …)` (min_inner=0) bzw. `re.sub(öffner + r"[^>]+>", …)`
+    (min_inner=1). Fehlt ab einer Stelle das `>`, gibt es dahinter keinen Tag mehr."""
+    parts = []
+    pos = 0
+    search_from = 0
+    while (match := opener.search(text, search_from)) is not None:
+        gt = text.find(">", match.end())
+        if gt < 0:
+            break
+        if gt - match.end() < min_inner:
+            search_from = match.start() + 1
+            continue
+        parts.append(text[pos:match.start()])
+        parts.append(replacement)
+        pos = search_from = gt + 1
+    parts.append(text[pos:])
+    return "".join(parts)
+
+
 def html_to_text(markup: str) -> str:
     """Create a readable plain-text alternative from our transactional HTML."""
     if not markup:
         return ""
 
-    text = re.sub(r"(?is)<(script|style).*?>.*?</\1>", "", markup)
+    text = _strip_blocks(markup)
     text = re.sub(r"(?i)<br\s*/?>", "\n", text)
-    text = re.sub(r"(?i)<li[^>]*>", "- ", text)
+    text = _replace_tags(text, _LI_OPEN, "- ", min_inner=0)
     text = re.sub(r"(?i)</(p|div|tr|h[1-6]|li)>", "\n", text)
-    text = re.sub(r"<[^>]+>", "", text)
+    text = _replace_tags(text, _TAG_OPEN, "", min_inner=1)
     text = html_lib.unescape(text)
 
     lines = [re.sub(r"[ \t]+", " ", line).strip() for line in text.splitlines()]

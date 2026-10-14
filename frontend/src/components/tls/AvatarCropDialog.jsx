@@ -79,8 +79,11 @@ export function AvatarCropDialog({ file, busy = false, onCancel, onApply, onLoad
     setDims(null);
     setCrop(INITIAL_AVATAR_CROP);
     // Nur eine echte Blob-Adresse kommt in die Vorschau; alles andere gilt als „Bild nicht ladbar“.
-    if (isSafeBlobUrl(next)) {
-      setUrl(next);
+    // `encodeURI` lässt eine echte Blob-Adresse unverändert; ändert es etwas, ist es keine. In die Vorschau geht die
+    // codierte Fassung - so ist die Adresse auch für die Code-Analyse geprüft.
+    const preview = encodeURI(next);
+    if (preview === next && isSafeBlobUrl(preview)) {
+      setUrl(preview);
       return () => URL.revokeObjectURL(next);
     }
     URL.revokeObjectURL(next);

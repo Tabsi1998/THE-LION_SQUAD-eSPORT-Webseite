@@ -385,8 +385,6 @@ def test_projection_and_sanitizer_cover_every_private_field():
 
 def test_a_new_field_in_the_central_list_reaches_projection_and_sanitizer(monkeypatch):
     """Gegenprobe im Kleinen: Projektion und Bereinigung lesen die Liste beim Aufruf, nicht beim Import."""
-    import services.private_fields as private_fields
-
-    monkeypatch.setattr(private_fields, "PRIVATE_USER_FIELDS", PRIVATE_USER_FIELDS | {"neues_geheimnis"})
-    assert private_fields.private_projection()["neues_geheimnis"] == 0
-    assert "neues_geheimnis" not in private_fields.strip_private({"id": "u1", "neues_geheimnis": "x"})
+    monkeypatch.setattr("services.private_fields.PRIVATE_USER_FIELDS", PRIVATE_USER_FIELDS | {"neues_geheimnis"})
+    assert private_projection()["neues_geheimnis"] == 0
+    assert "neues_geheimnis" not in strip_private({"id": "u1", "neues_geheimnis": "x"})

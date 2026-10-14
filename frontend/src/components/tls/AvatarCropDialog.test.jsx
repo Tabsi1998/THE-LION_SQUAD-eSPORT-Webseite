@@ -148,3 +148,14 @@ test("Vorschau übernimmt nur Blob-Adressen: eine andere Adresse wird nicht gese
   expect(screen.getByTestId("avatar-crop-view").querySelector("img")).toBeNull();
   expect(URL.revokeObjectURL).toHaveBeenCalledWith("javascript:alert(1)");
 });
+
+test("Vorschau übernimmt die Blob-Adresse nur unverändert: Sonderzeichen gelten als „nicht ladbar“", async () => {
+  const { AvatarCropDialog } = await import("./AvatarCropDialog");
+  const odd = "blob:http://localhost:3000/bild%20ä";
+  URL.createObjectURL = vi.fn(() => odd);
+  const onLoadError = vi.fn();
+  render(<AvatarCropDialog file={new File(["foto"], "ich.png", { type: "image/png" })} onCancel={vi.fn()} onApply={vi.fn()} onLoadError={onLoadError} />);
+  await waitFor(() => expect(onLoadError).toHaveBeenCalledTimes(1));
+  expect(screen.getByTestId("avatar-crop-view").querySelector("img")).toBeNull();
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith(odd);
+});

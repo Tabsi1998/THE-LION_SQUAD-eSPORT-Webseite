@@ -42,7 +42,7 @@ def _new_password_models():
 def test_contract_constants_live_in_one_place():
     assert policy.MIN_PASSWORD_LENGTH == 10
     assert policy.MAX_PASSWORD_BYTES == 72
-    assert models.MIN_PASSWORD_LENGTH == policy.MIN_PASSWORD_LENGTH
+    assert models.NewPassword is policy.NewPassword
 
 
 @pytest.mark.parametrize("value", [

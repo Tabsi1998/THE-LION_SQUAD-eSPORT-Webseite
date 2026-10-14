@@ -6,6 +6,7 @@ Kommen zwei Anmeldungen im selben Moment, darf die Rechnung „ist noch Platz?�
 sehen: Die Tests lassen beide Anfragen nach dem Zählen aufeinander warten, so wie mehrere Worker auf echtem
 MongoDB. Ohne Platzsperre würden beide den letzten Platz bekommen."""
 import asyncio
+import contextlib
 import pathlib
 import sys
 from datetime import timedelta
@@ -46,10 +47,8 @@ def counting_meets_after_summary(monkeypatch, parties: int = 2, timeout: float =
         result = await original(*args, **kwargs)
         if state["gated"] < parties:
             state["gated"] += 1
-            try:
+            with contextlib.suppress(asyncio.TimeoutError, asyncio.BrokenBarrierError):
                 await asyncio.wait_for(barrier.wait(), timeout)
-            except (asyncio.TimeoutError, asyncio.BrokenBarrierError):
-                pass
         return result
 
     monkeypatch.setattr(event_registration, "summary", gated)
