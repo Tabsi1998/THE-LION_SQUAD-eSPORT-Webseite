@@ -432,7 +432,7 @@ async def recent_unlocks(db, limit: int = 20) -> list[dict]:
 async def my_summary(db, user_id: str, groups: list[dict], awards: list[dict]) -> dict:
     """Die Kachel „Deine Erfolge“ (#619): Level-Stand, was als Nächstes dran ist, die letzte Freischaltung,
     Anzahl und Punkte - ohne den ganzen Katalog zu schicken."""
-    from services import xp
+    from services import xp_view as xp
     earned = [a for a in awards if not a.get("is_negative")]
     earned.sort(key=lambda a: str(a.get("earned_at") or ""), reverse=True)
     last = earned[0] if earned else None

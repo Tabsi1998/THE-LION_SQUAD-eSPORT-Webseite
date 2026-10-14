@@ -19,6 +19,7 @@ from contextlib import asynccontextmanager
 
 from database import get_db, init_indexes, close_client
 from badges import seed_badges
+from services.bootstrap import ensure_wiring
 from routes.auth_routes import router as auth_router
 from routes.passkey_routes import router as passkey_router
 from routes.user_routes import router as user_router
@@ -143,6 +144,7 @@ def validate_runtime_env():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_runtime_env()
+    ensure_wiring()  # Anmeldungen beim Import (#1420), siehe services/bootstrap.py
     ensure_storage_directories()
     logger.info("[THE LION SQUAD] Initializing indexes...")
     await init_indexes()

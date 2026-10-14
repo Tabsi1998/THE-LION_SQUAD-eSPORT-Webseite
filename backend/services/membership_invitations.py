@@ -69,7 +69,7 @@ async def _notify(user: dict, doc: dict) -> None:
 
     if not user.get("email") or not email_allowed(user, "membership_invited", "membership_updates"):
         return
-    from routes.phase_ef_routes import render_template
+    from services.mail_templates import render_template
     from services.mail_queue import enqueue_mail
 
     name = user.get("display_name") or user.get("username") or "du"

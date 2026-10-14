@@ -53,5 +53,8 @@ def parse_args() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
+    from services.bootstrap import ensure_wiring
+
+    ensure_wiring()  # Anmeldungen beim Import (#1420), siehe services/bootstrap.py
     args = parse_args()
     asyncio.run(reset_database(args.database, args.confirm))

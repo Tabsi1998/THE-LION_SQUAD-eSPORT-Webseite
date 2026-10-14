@@ -14,6 +14,7 @@ READ_CONSUMERS = (
     "routes/settings_routes.py",
     "routes/widget_routes.py",
     "routes/station_routes.py",
+    "services/achievement_progress.py",
     "services/match_notifications.py",
     "services/match_overview.py",
     "services/match_reminder.py",

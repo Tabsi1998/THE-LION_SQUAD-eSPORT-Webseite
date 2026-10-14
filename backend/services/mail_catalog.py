@@ -8,9 +8,8 @@ from __future__ import annotations
 import inspect
 from typing import Any
 
-from database import get_db
 from models import now_utc
-from services.email_delivery import fill_placeholders
+from services.mail_overrides import apply_override, substitute  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
 
 CATEGORIES = {
     "account": "Konto und Anmeldung",
@@ -114,21 +113,6 @@ def template_vars(key: str, fn: Any | None, db_doc: dict | None) -> list[str]:
     if db_doc and isinstance(db_doc.get("vars"), list):
         return [str(v) for v in db_doc["vars"]]
     return []
-
-
-def substitute(text: str, values: dict[str, Any], escape: bool) -> str:
-    """`{{variable}}` einsetzen: im HTML (escape=True) jeder Wert als Text, im Betreff einzeilig - siehe
-    services/email_delivery. Der Vorlagentext des Admins bleibt, wie er ist."""
-    return fill_placeholders(text, values, as_html=escape)
-
-
-async def apply_override(template_key: str, subject: str, html: str, values: dict[str, Any]) -> tuple[str, str]:
-    """Hat der Admin eine feste Vorlage überschrieben, gilt sein Betreff/HTML mit den Werten des Versands."""
-    db = get_db()
-    doc = await db.email_templates.find_one({"key": template_key, "override": True}, {"_id": 0, "subject": 1, "html": 1})
-    if not doc or not (doc.get("html") or "").strip():
-        return subject, html
-    return substitute(doc.get("subject") or subject, values, escape=False), substitute(doc["html"], values, escape=True)
 
 
 async def render(db, key: str, *, subject: str | None = None, html: str | None = None, values: dict[str, str] | None = None) -> dict:

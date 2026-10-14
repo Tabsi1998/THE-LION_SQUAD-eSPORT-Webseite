@@ -31,6 +31,7 @@ from models import new_id, now_utc
 from services import season_raffles as raffles
 from services import seasons
 from services.private_fields import private_projection
+from services.season_collections import PROGRESS, hunts_completed  # noqa: F401 - umgezogen (#1420)
 
 logger = logging.getLogger("tls.easter")
 
@@ -39,7 +40,6 @@ SIGNAL = "easter_egg"
 HUNTS = "easter_hunts"
 EGGS = "easter_eggs"
 FINDS = "easter_finds"
-PROGRESS = "easter_progress"
 CHANNELS = ("web", "app")
 DEFAULT_EGGS = {"web": 8, "app": 4}
 MAX_EGGS = 30
@@ -313,9 +313,9 @@ async def _count_for_achievements(user_id: str) -> int:
 
     try:
         await counters.record_signal(user_id, SIGNAL, 1, trusted=True)
-        from badges import evaluate_user_progress
+        from services.achievement_core import evaluator
 
-        return int(await evaluate_user_progress(user_id, {"signal"}, legacy=False) or 0)
+        return int(await evaluator()(user_id, {"signal"}, legacy=False) or 0)
     except Exception:  # noqa: BLE001 - ein Ei scheitert nie an den Erfolgen
         logger.warning("[easter] Erfolge nach dem Fund nicht geprüft", exc_info=True)
         try:
@@ -325,11 +325,6 @@ async def _count_for_achievements(user_id: str) -> int:
         except Exception:  # noqa: BLE001
             pass
         return 0
-
-
-async def hunts_completed(db, user_id: str) -> int:
-    """Wie oft jemand den Korb voll gemacht hat - für „Eierkönig“."""
-    return await db[PROGRESS].count_documents({"user_id": user_id, "completed_at": {"$ne": None}})
 
 
 # ------------------------------------------------------------------ Stand und Rangliste

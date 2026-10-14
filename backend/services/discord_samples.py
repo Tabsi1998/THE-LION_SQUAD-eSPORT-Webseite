@@ -207,7 +207,7 @@ def public_entries(entries: list[dict]) -> list[dict]:
 async def send_sample(key: str, via: str, admin: dict) -> dict:
     """Ein Beispiel echt senden: ``via="test"`` in den Testkanal, ``via="dm"`` an den Admin selbst."""
     from discord_service import REASON_TEXTS, build_embed, send_to
-    from services.discord_bot import bot, bot_settings
+    from services.discord_runtime import bot, bot_settings
     from services.discord_dm import discord_link_id
 
     db = get_db()

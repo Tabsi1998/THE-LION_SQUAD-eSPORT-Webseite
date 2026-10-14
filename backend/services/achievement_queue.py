@@ -20,6 +20,7 @@ from datetime import timedelta
 
 from database import get_db
 from models import new_id, now_utc
+from services.achievement_core import LEVEL_COLORS, MATERIAL_COLORS, evaluator  # noqa: F401 - Farben umgezogen (#1420)
 
 logger = logging.getLogger("tls.achievements.queue")
 
@@ -28,9 +29,6 @@ BUNDLE_WINDOW_SECONDS = 60
 BATCH = 100
 SWEEP_ACTIVE_MINUTES = 20
 STATE_ID = "achievement_queue_state"
-LEVEL_COLORS = {1: 0xCD7F32, 2: 0xC0C0C0, 3: 0xFFD700, 4: 0x29B6E8, 5: 0xFF3B30}
-# Erfolge II (#611): Farbe je Material für Einbettungen; das alte Level bleibt als Rückfall.
-MATERIAL_COLORS = {key: int(str(value["color"]).lstrip("#"), 16) for key, value in __import__("achievement_catalog").MATERIALS.items()}
 
 
 # ---------------------------------------------------------------- Auswerten
@@ -76,8 +74,7 @@ async def request_evaluation(user_ids, reason: str = "", sources=None) -> int:
 
 
 async def process_queue(limit: int = BATCH) -> dict:
-    from badges import evaluate_user_progress
-
+    evaluate_user_progress = evaluator()
     db = get_db()
     due = await db.achievement_eval_queue.find({"due_at": {"$lte": now_utc().isoformat()}}, {"_id": 0}).sort("due_at", 1).to_list(limit)
     awarded = 0

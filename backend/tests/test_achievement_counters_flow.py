@@ -20,6 +20,7 @@ from models import now_utc  # noqa: E402
 import achievement_catalog as catalog  # noqa: E402
 import badges  # noqa: E402
 from services import achievement_counters as counters  # noqa: E402
+from services import achievement_progress  # noqa: E402
 from services import achievement_queue  # noqa: E402
 from services import seasons  # noqa: E402
 
@@ -344,13 +345,14 @@ async def test_meldung_wertet_sofort_aus_und_nur_die_signal_zaehler(flow, monkey
     user = await flow.add_user(name="Gruselgast")
     flow.act_as(user)
     legacy_runs = []
-    real_legacy = badges.compute_user_progress
+    # Der alte Block steht seit #1420 in services/achievement_progress.py.
+    real_legacy = achievement_progress.compute_user_progress
 
     async def watched(user_id):
         legacy_runs.append(user_id)
         return await real_legacy(user_id)
 
-    monkeypatch.setattr(badges, "compute_user_progress", watched)
+    monkeypatch.setattr(achievement_progress, "compute_user_progress", watched)
     res = await flow.post("/api/achievements/signals", json={"items": [{"name": "halloween_pumpkin"}, {"name": "halloween_bats_scared", "count": 3}]})
     assert res.status_code == 200, res.text
     assert res.json()["accepted"] == 2 and res.json()["newly_awarded"] == 1, res.json()

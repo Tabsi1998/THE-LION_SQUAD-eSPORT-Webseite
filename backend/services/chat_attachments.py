@@ -19,12 +19,14 @@ import pathlib
 import uuid
 from datetime import timedelta
 from io import BytesIO
+from typing import Any, Awaitable, Callable
 
 from fastapi import HTTPException, UploadFile
 from PIL import Image
 
 from database import get_db
 from models import new_id, now_utc
+from services import wiring
 from services.permissions import holds_area
 from storage import PRIVATE_CHAT_DIR, ensure_directory
 
@@ -108,7 +110,7 @@ ANIMATED_IMAGE_FORMATS = {"GIF": ("image/gif", ".gif"), "WEBP": ("image/webp", "
 
 def _keep_animated_image(data: bytes) -> dict | None:
     """Das Bild unverändert, wenn es ein GIF oder ein animiertes WebP ist; sonst None."""
-    from routes.upload_routes import MAX_IMAGE_PIXELS
+    from services.image_upload import MAX_IMAGE_PIXELS
 
     try:
         with Image.open(BytesIO(data)) as img:
@@ -128,7 +130,7 @@ def _keep_animated_image(data: bytes) -> dict | None:
 
 
 async def _encode_uploaded_image(file: UploadFile, max_mb: int, *, keep_animated: bool = False) -> dict:
-    from routes.upload_routes import _encode_image_bytes, _read_upload_limited
+    from services.image_upload import _encode_image_bytes, _read_upload_limited
 
     data = await _read_upload_limited(file, max_mb * 1024 * 1024, max_mb)
     if keep_animated:
@@ -140,7 +142,7 @@ async def _encode_uploaded_image(file: UploadFile, max_mb: int, *, keep_animated
 
 
 def _upload_kind(file: UploadFile) -> str:
-    from routes.upload_routes import ALLOWED_IMAGE, ALLOWED_VIDEO, IMAGE_MIME_BY_EXT, VIDEO_MIME_ALIASES, VIDEO_MIME_BY_EXT
+    from services.image_upload import ALLOWED_IMAGE, ALLOWED_VIDEO, IMAGE_MIME_BY_EXT, VIDEO_MIME_ALIASES, VIDEO_MIME_BY_EXT
 
     declared = (file.content_type or "").split(";")[0].strip().lower()
     declared_video = VIDEO_MIME_ALIASES.get(declared, declared)
@@ -154,7 +156,7 @@ def _upload_kind(file: UploadFile) -> str:
 
 async def store_chat_upload(file: UploadFile, owner: dict, poster: UploadFile | None = None) -> dict:
     """Speichert einen Anhang als "pending". Erst eine Nachricht ordnet ihn einem Chat zu."""
-    from routes.upload_routes import VIDEO_SNIFF_BYTES, _detect_video_upload, _write_upload_stream_limited
+    from services.image_upload import VIDEO_SNIFF_BYTES, _detect_video_upload, _write_upload_stream_limited
 
     kind = _upload_kind(file)
     stem = uuid.uuid4().hex
@@ -239,6 +241,24 @@ async def claim_attachments(db, owner_id: str, attachment_ids: list[str] | None,
     return [public_attachment({**by_id[item], "status": "attached"}) for item in ids]
 
 
+# Wer den Team-, Turnier- oder Match-Chat lesen darf, wissen die Routen dieser Chats. Sie melden ihre Prüfung beim
+# Import hier an (#1420) - so importiert dieser Dienst keine Route. Ohne Anmeldung sieht niemand den Anhang.
+ChatAccess = Callable[[Any, dict, "dict | None"], Awaitable[bool]]
+_CHAT_ACCESS: dict[str, ChatAccess] = {}
+CHAT_KINDS = ("team", "tournament", "match")
+
+
+def register_chat_access(kind: str, check: ChatAccess) -> None:
+    _CHAT_ACCESS[kind] = check
+
+
+def _chat_check(kind: str | None) -> ChatAccess | None:
+    """Die Prüfung der Route; fehlt sie für einen Chat, einmal nachladen (services/wiring.py)."""
+    if kind in CHAT_KINDS and kind not in _CHAT_ACCESS:
+        wiring.ensure()
+    return _CHAT_ACCESS.get(kind) if kind else None
+
+
 async def can_access(attachment: dict, user: dict | None) -> bool:
     """Wer den Chat lesen darf, darf auch seine Anhänge sehen - niemand sonst."""
     # Bildprüfung (#415): bis zum Ergebnis nur Absender und Moderation; entfernt sieht hier niemand.
@@ -255,26 +275,9 @@ async def can_access(attachment: dict, user: dict | None) -> bool:
     db = get_db()
     if kind == "direct":
         return bool(user and user.get("id") in (context.get("user_ids") or []))
-    if kind == "team":
-        from routes.team_routes import _chat_allowed
-
-        team = await db.teams.find_one({"id": context.get("team_id")}, {"_id": 0})
-        return bool(team and _chat_allowed(team, user))
-    if kind == "tournament":
-        from routes.tournament_chat_routes import _can_use_tournament_chat
-
-        tournament = await db.tournaments.find_one({"id": context.get("tournament_id")}, {"_id": 0})
-        return bool(tournament and await _can_use_tournament_chat(tournament, user))
-    if kind == "match":
-        from routes.match_routes import _assert_match_visible, _find_match_any
-
-        try:
-            match, _collection = await _find_match_any(context.get("match_id"))
-            await _assert_match_visible(match, user)
-        except HTTPException:
-            return False
-        return True
-    return False
+    # Team-, Turnier- und Match-Chat: die Route des Chats entscheidet (``register_chat_access``).
+    check = _chat_check(kind)
+    return bool(check and await check(db, context, user))
 
 
 def _remove_files(doc: dict) -> None:

@@ -5,8 +5,7 @@ import asyncio
 import ssl
 import smtplib
 import ipaddress
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import timedelta
 from email.utils import parseaddr
 
 import aiosmtplib
@@ -16,8 +15,9 @@ import dns.reversename
 
 from database import get_db
 from models import new_id, now_utc
-from services.email_delivery import header_text, html_to_text, mailbox_domain
+from services.email_delivery import html_to_text, mailbox_domain
 from services.log_safe import log_safe, mask_addresses, mask_addresses_deep
+from services.mail_outbox import enqueue_mail  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
 
 logger = logging.getLogger("tls.mailqueue")
 
@@ -549,43 +549,6 @@ async def _dispatch(cfg: dict, to: str, subject: str, html: str) -> str:
     return await _resend_send(cfg, to, subject, html)
 
 
-async def enqueue_mail(
-    to: str,
-    subject: str,
-    html: str,
-    template_key: str = "custom",
-    scheduled_at: Optional[datetime] = None,
-    meta: Optional[dict] = None,
-    dedupe_key: Optional[str] = None,
-) -> dict:
-    """Enqueue a mail. If dedupe_key is set, will not re-queue if already exists."""
-    db = get_db()
-    if dedupe_key:
-        existing = await db.mail_jobs.find_one({"dedupe_key": dedupe_key})
-        if existing:
-            return {"ok": True, "id": existing["id"], "deduped": True}
-    job = {
-        "id": new_id(),
-        "to": to,
-        # Jede Mail der Website kommt hier vorbei: der Betreff bleibt eine Zeile - kein Wert hängt eine Kopfzeile an.
-        "subject": header_text(subject),
-        "html": html,
-        "template_key": template_key,
-        "status": "pending",
-        "attempts": 0,
-        "next_attempt_at": (scheduled_at or now_utc()).isoformat(),
-        "scheduled_at": (scheduled_at or now_utc()).isoformat(),
-        "last_error": None,
-        "message_id": None,
-        "meta": meta or {},
-        "dedupe_key": dedupe_key,
-        "created_at": now_utc().isoformat(),
-        "updated_at": now_utc().isoformat(),
-    }
-    await db.mail_jobs.insert_one(job)
-    return {"ok": True, "id": job["id"]}
-
-
 async def recover_stale_sending_jobs() -> int:
     """Move abandoned sending jobs back to pending.
 
@@ -767,22 +730,6 @@ async def process_mail_queue(batch: int = 10) -> dict:
             # Ohne Stacktrace: der trüge die Meldung samt Mail-Adresse ins Protokoll.
             logger.error("[mailqueue] dispatch crash (%s): %s", type(exc).__name__, log_safe(mask_addresses(exc), 300))
     return {"processed": len(jobs), "sent": sent, "recovered": recovered}
-
-
-async def smtp_test(to: str) -> dict:
-    """Direct synchronous SMTP test (does not use queue)."""
-    cfg = await get_mail_settings()
-    if cfg["provider"] != "smtp":
-        return {"ok": False, "reason": "Provider ist nicht auf SMTP gesetzt."}
-    if not cfg["smtp_host"]:
-        return {"ok": False, "reason": "SMTP Host fehlt."}
-    try:
-        from email_service import tpl_test
-        subject, html = tpl_test(branding="THE LION SQUAD")
-        msg_id = await _smtp_send(cfg, to, subject, html)
-        return {"ok": True, "id": msg_id}
-    except Exception as exc:
-        return {"ok": False, "reason": explain_smtp_error(exc), "raw_error": str(exc)[:500]}
 
 
 async def smtp_diagnose(to: str) -> dict:

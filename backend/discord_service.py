@@ -15,48 +15,30 @@ hält jeden Versuch fest, mit Kanal und Nachrichten-ID, damit spätere Pakete Na
 bearbeiten können.
 """
 import logging
-import os
-from urllib.parse import urlparse
 
 from database import get_db
 from models import new_id, now_utc
+from services.discord_links import (  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
+    _normalize_base_url,
+    _public_base_url,
+    _is_public_http_url,
+    _public_avatar_url,
+    _public_link_url,
+    build_embed,
+    resolve_buttons,
+)
+from services.discord_targets import (  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
+    EVENTS,
+    PRIVATE_TARGETS,
+    PUBLIC_TARGETS,
+    TARGET_LABELS,
+    TARGETS,
+    resolve_target,
+)
 
 logger = logging.getLogger("tls-arena.discord")
 PRIVATE_DISCORD_VISIBILITIES = {"members", "internal"}
 
-PUBLIC_TARGETS = ("community", "news", "events")
-# „test“ (#583): der Testkanal für die Vorschau - privat, fällt nie zurück.
-PRIVATE_TARGETS = ("board", "ops", "test", "members")
-TARGETS = PUBLIC_TARGETS + PRIVATE_TARGETS
-TARGET_LABELS = {
-    "community": "Community (Standard)", "news": "News", "events": "Events und Turniere",
-    "board": "Vorstand (privat)", "ops": "Betrieb (privat)", "test": "Test (privat)", "members": "Mitglieder (privat)",
-}
-# Ereignis → Ziel, Beschriftung, Standard. Neue Ereignisse sind aus, bis der Betreiber sie
-# einschaltet; was es vor #300 schon gab, bleibt an. Turnier-Meldungen sind an - seit #572 stehen
-# sie im Thread des Turniers, der Kanal bleibt ruhig. Erfolge gehen seit #566 in keinen Kanal
-# mehr - die Person selbst bekommt die Gratulation (#568).
-# ``game``: die Meldung kann einen Spielbezug haben - dann gilt die Routing-Regel (#627, services/discord_routing.py).
-EVENTS = {
-    "news.published": {"target": "news", "label": "News veröffentlicht", "default": False, "game": True},
-    "event.announced": {"target": "events", "label": "Event angekündigt", "default": False, "game": True},
-    # Nur für Mitglieder (#605): in den Mitgliederkanal; Internes an den Vorstand - ohne Text, nur Titel, Zeit, Ort.
-    "news.members": {"target": "members", "label": "News für Mitglieder", "default": False},
-    "event.members": {"target": "members", "label": "Event für Mitglieder", "default": False},
-    "news.internal": {"target": "board", "label": "News intern (Vorstand)", "default": False},
-    "event.internal": {"target": "board", "label": "Event intern (Vorstand)", "default": False},
-    "tournament.registration_open": {"target": "events", "label": "Turnier: Anmeldung offen", "default": True, "game": True},
-    "tournament.check_in": {"target": "events", "label": "Turnier: Check-in offen", "default": True, "game": True},
-    "tournament.live": {"target": "events", "label": "Turnier: jetzt live", "default": True, "game": True},
-    "tournament.completed": {"target": "events", "label": "Turnier: beendet", "default": True, "game": True},
-    "tournament.results_published": {"target": "events", "label": "Turnier: Ergebnisse veröffentlicht", "default": True, "game": True},
-    "tournament.stream_live": {"target": "events", "label": "Turnier: Teilnehmer streamt", "default": True, "game": True},
-    "f1.new_leader": {"target": "events", "label": "Fast Lap: neue Bestzeit", "default": True, "game": True},
-    "membership.application": {"target": "board", "label": "Neuer Mitgliedsantrag", "default": False},
-    "contact.request": {"target": "board", "label": "Neue Kontaktanfrage", "default": False},
-    # Vereinsgeburtstag (#644): einmal im Jahr ab 10:00 am Gründungstag - öffentlich, ohne Personenbezug.
-    "club.birthday": {"target": "community", "label": "Vereinsgeburtstag", "default": False},
-}
 # Warum nichts ankam - in Worten mit Klickweg, für Versand-Log, Admin und Betrieb & Logs.
 REASON_TEXTS = {
     "disabled": "Discord-Meldungen sind ausgeschaltet (Verbindungen → Discord → „Versand aktiv“).",
@@ -120,76 +102,8 @@ def allowed_in_target(item: dict | None, target: str) -> bool:
     return True
 
 
-def _normalize_base_url(value: str | None) -> str:
-    base = (value or "").strip().rstrip("/")
-    if not base:
-        return ""
-    if not base.startswith(("http://", "https://")):
-        base = f"https://{base}"
-    parsed = urlparse(base)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return ""
-    if parsed.path.rstrip("/") == "/api":
-        base = f"{parsed.scheme}://{parsed.netloc}"
-    return base
-
-
-async def _public_base_url() -> str:
-    env_base = _normalize_base_url(
-        os.getenv("PUBLIC_BACKEND_URL")
-        or os.getenv("PUBLIC_BASE_URL")
-        or os.getenv("FRONTEND_URL")
-        or os.getenv("PUBLIC_URL")
-    )
-    if env_base:
-        return env_base
-    db = get_db()
-    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "domain": 1}) or {}
-    return _normalize_base_url(branding.get("domain")) or "https://lionsquad.at"
-
-
-def _is_public_http_url(value: str | None) -> bool:
-    parsed = urlparse((value or "").strip())
-    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
-
-
-async def _public_avatar_url(value: str | None) -> str | None:
-    avatar_url = (value or "").strip()
-    if not avatar_url:
-        return None
-    parsed = urlparse(avatar_url)
-    if _is_public_http_url(avatar_url):
-        return avatar_url
-    if parsed.scheme:
-        return None
-    base = await _public_base_url()
-    if not base:
-        return None
-    raw_path = avatar_url.lstrip("/")
-    if raw_path.startswith("api/static/"):
-        path = f"/{raw_path}"
-    elif raw_path.startswith("uploads/"):
-        path = f"/api/static/{raw_path}"
-    else:
-        path = f"/api/static/uploads/{raw_path}"
-    candidate = f"{base}{path}"
-    return candidate if _is_public_http_url(candidate) else None
-
-
-async def _public_link_url(value: str | None) -> str | None:
-    link = (value or "").strip()
-    if not link:
-        return None
-    if _is_public_http_url(link):
-        return link
-    if urlparse(link).scheme:
-        return None
-    base = await _public_base_url()
-    return f"{base}/{link.lstrip('/')}" if base else None
-
-
 async def _get_discord_config() -> dict:
-    from services.discord_bot import bot_settings
+    from services.discord_runtime import bot_settings
 
     db = get_db()
     s = await db.settings.find_one({"id": "discord"}) or {}
@@ -218,7 +132,7 @@ async def game_ping(cfg: dict, event_key: str, item: dict | None, guild_id: str 
     kein Spiel, oder die Rolle gibt es auf dem Server nicht."""
     if not ping_enabled(cfg, event_key):
         return None
-    from services.discord_bot import bot
+    from services.discord_runtime import bot
     from services.discord_roles import ping_role_name
 
     return bot.role_id(await ping_role_name(get_db(), item), guild_id)
@@ -240,64 +154,10 @@ def event_enabled(cfg: dict, event_key: str) -> bool:
     return bool(spec["default"] if value is None else value)
 
 
-def resolve_target(cfg: dict, target: str, guild: dict | None = None) -> dict:
-    """Kanal und tatsächliches Ziel. Privat fällt nie zurück - auch nicht auf ein anderes privates Ziel.
-    Mit ``guild`` (ein Unterserver, #625): nur öffentliche Ziele, der Rückfall bleibt auf diesem Server - nie auf einen
-    anderen; ein privates Ziel ist dort ein Fehler. Ohne ``guild`` (oder mit dem Hauptserver): wie bisher."""
-    if target not in TARGETS:
-        target = "community"
-    if guild is not None and guild.get("role") != "main":
-        guild_id = str(guild.get("guild_id") or "")
-        if target in PRIVATE_TARGETS:
-            return {"target": target, "channel_id": "", "fallback": False, "guild_id": guild_id, "error": "private_on_sub"}
-        own = guild.get("channels") or {}
-        if target != "community" and own.get(target):
-            return {"target": target, "channel_id": own[target], "fallback": False, "guild_id": guild_id}
-        return {"target": "community", "channel_id": own.get("community") or "", "fallback": target != "community", "guild_id": guild_id}
-    channels = cfg.get("channels") or {}
-    if target in PRIVATE_TARGETS:
-        return {"target": target, "channel_id": channels.get(target) or "", "fallback": False}
-    if target != "community" and channels.get(target):
-        return {"target": target, "channel_id": channels[target], "fallback": False}
-    return {"target": "community", "channel_id": channels.get("community") or "", "fallback": target != "community"}
-
-
 async def target_channel(target: str, guild: dict | None = None) -> dict:
     """Wohin ein Ziel auf diesem Server heute ginge (#631): Kanal, tatsächliches Ziel, Rückfall - für die Vorschau beim
     Verteilen. Ohne ``guild`` der Hauptserver."""
     return resolve_target(await _get_discord_config(), target, guild)
-
-
-async def build_embed(title: str, description: str = "", *, color: int = 0x29B6E8, url: str | None = None,
-                      fields: list | None = None, image_url: str | None = None, footer: str | None = None) -> dict:
-    """Das Embed, wie Discord es bekommt - auch die Vorschau im Admin baut es hiermit (#303, #583)."""
-    embed = {"title": title[:256], "description": (description or "")[:4000], "color": color}
-    if footer:
-        embed["footer"] = {"text": str(footer)[:2048]}
-    embed_url = await _public_link_url(url)
-    if embed_url:
-        embed["url"] = embed_url
-    if fields:
-        embed["fields"] = [{"name": str(f["name"])[:256], "value": str(f["value"])[:1024], "inline": f.get("inline", True)} for f in fields[:10]]
-    image = await _public_avatar_url(image_url)
-    if image:
-        embed["image"] = {"url": image}
-    return embed
-
-
-async def resolve_buttons(buttons: list | None) -> list[dict]:
-    """Link-Knöpfe (#573): Website-Pfade werden volle Adressen wie der Link im Embed; was keine öffentliche
-    Adresse ergibt, fällt weg."""
-    out = []
-    for button in buttons or []:
-        if (button or {}).get("custom_id") and (button or {}).get("label"):
-            # Rückruf-Knopf (#885): keine Adresse, der Bot beantwortet den Klick privat.
-            out.append({"label": str(button["label"])[:80], "custom_id": str(button["custom_id"])[:100], "style": str(button.get("style") or "primary")})
-            continue
-        url = await _public_link_url((button or {}).get("url"))
-        if url and (button or {}).get("label"):
-            out.append({"label": str(button["label"])[:80], "url": url})
-    return out
 
 
 def _new_log(event_key: str, title: str, target: str, *, test: bool = False) -> dict:
@@ -330,7 +190,7 @@ async def _send_embed(channel_id: str, *, title: str, description: str, color: i
                       mention_role_ids: list[str] | None = None) -> dict:
     """Ein Embed über den Bot in genau diesen Kanal; das Log landet in email_logs - mit Nachrichten-ID. ``embed``
     (#866 Teil 2): schon im Aussehen der Gestaltung gerendert - dann wird nichts mehr gebaut; ``content`` darüber."""
-    from services.discord_bot import bot
+    from services.discord_runtime import bot
 
     db = get_db()
     if embed is None:
@@ -491,7 +351,7 @@ async def send_public_discord(item: dict | None, title: str, description: str = 
 
 async def target_status(db=None) -> dict:
     """Je Ziel: Kanal, wohin es wirklich geht, letzter Versuch."""
-    from services.discord_bot import read_state
+    from services.discord_runtime import read_state
 
     db = db if db is not None else get_db()
     cfg = await _get_discord_config()

@@ -24,16 +24,11 @@ from zoneinfo import ZoneInfo
 
 from models import now_utc
 from services import discord_design
+from services.discord_embed_queue import KINDS, _dirty, pending, request_refresh  # noqa: F401 - umgezogen (#1420)
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.discord.embeds")
 
-KINDS = {
-    "ranking": {"label": "Rangliste", "hint": "Die Jahreswertung der laufenden Saison: Top 10 mit Punkten und Link."},
-    "events": {"label": "Nächste Events", "hint": "Die nächsten fünf Events und Turniere mit Wiener Zeit und Stand der Anmeldung."},
-    # Erfolge II (#622): einmal je Woche neu, nur Personen mit öffentlichem Profil und öffentlichen Erfolgen.
-    "achievement_week": {"label": "Erfolg der Woche", "hint": "Die seltenste Freischaltung der letzten Woche – mit Person (nur öffentliche Profile), Material und Seltenheit."},
-}
 COLORS = {"ranking": 0xFFD700, "events": 0x29B6E8, "live": 0x9146FF, "achievement_week": 0xA66BFF}
 # Unterserver (#628): Rangliste und nächste Termine je Server - nur mit den Spielen dieses Servers. Der Erfolg der Woche
 # gilt für den ganzen Verein und bleibt am Hauptserver. Der Zustand steht am Server-Eintrag (``discord_guilds.embeds``).
@@ -53,17 +48,6 @@ REASON_TEXTS = {
     "server_off": "Der Server ist aus oder der Bot nicht mehr dort – nichts wird aktualisiert.",
     "no_games": "Diesem Server ist noch kein Spiel zugeordnet (Spiele → Spiel bearbeiten → Discord-Server).",
 }
-# Was geändert wurde und noch nicht in der Nachricht steht (ein API-Prozess, siehe change_events).
-_dirty: set[str] = set()
-
-
-def request_refresh(*kinds: str) -> None:
-    """Merken, dass sich etwas geändert hat; der Job alle 60 s bearbeitet dann die Nachricht."""
-    _dirty.update(kind for kind in kinds if kind in KINDS)
-
-
-def pending() -> set[str]:
-    return set(_dirty)
 
 
 def _dt(value) -> datetime | None:
@@ -305,7 +289,7 @@ async def refresh(db, kind: str, *, force: bool = False, now: datetime | None = 
     ``guild_id`` (#628): die Einbettung dieses Unterservers - nur mit den Spielen dieses Servers. Die Merkliste
     ``_dirty`` führt dann ``sweep``, nicht diese Funktion."""
     from discord_service import REASON_TEXTS as SEND_TEXTS
-    from services.discord_bot import bot, bot_settings
+    from services.discord_runtime import bot, bot_settings
 
     if kind not in KINDS or (guild_id and kind not in SUB_KINDS):
         raise KeyError(kind)
@@ -403,7 +387,7 @@ async def retire(db) -> dict:
     """Einmal aufräumen (#883): die angeheftete Nachricht einer weggefallenen Einbettung löscht der Bot - es ist seine eigene.
     Ihr Kanal geht als Vorschlag an die Stream-Meldungen, solange dort keiner steht; sind sie noch aus, steht „Wenn der Stream
     endet“ auf löschen. Eingeschaltet wird nichts. Ist der Bot gerade nicht verbunden, versucht es der nächste Lauf wieder."""
-    from services.discord_bot import bot
+    from services.discord_runtime import bot
 
     settings, embeds = await _config(db)
     streams = settings.get("streams") if isinstance(settings.get("streams"), dict) else {}
@@ -480,7 +464,7 @@ async def sweep(db, *, full: bool = False) -> dict:
 
 async def embeds_status(db) -> dict:
     """Für Verbindungen → Discord: je Einbettung Schalter, Kanal, Nachricht, letzter Stand, Fehler."""
-    from services.discord_bot import read_state
+    from services.discord_runtime import read_state
 
     _, embeds = await _config(db)
     names = {str(row.get("id")): row.get("name") for row in ((await read_state(db)).get("channels") or []) if row.get("id")}

@@ -32,7 +32,7 @@ class DistributeError(ValueError):
 
 async def staff_user(db, discord_user_id) -> dict | None:
     """Das verknüpfte Konto hinter einer Discord-Kennung - nur, wenn es Turnierleitung oder Vorstand ist."""
-    from services.discord_bot import linked_discord_ids
+    from services.discord_runtime import linked_discord_ids
     from services.permissions import areas_for
 
     user_id = (await linked_discord_ids(db)).get(str(discord_user_id))

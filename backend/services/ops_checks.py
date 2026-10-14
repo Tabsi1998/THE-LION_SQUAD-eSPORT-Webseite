@@ -375,7 +375,7 @@ async def check_error_groups(db) -> dict:
 async def check_scheduler() -> dict:
     label = "Scheduler"
     try:
-        from services.scheduler import get_scheduler_status
+        from services.scheduler_state import get_scheduler_status
 
         status = get_scheduler_status()
     except Exception as exc:  # noqa: BLE001

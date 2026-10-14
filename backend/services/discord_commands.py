@@ -22,7 +22,7 @@ APPLY_PATH = "/membership/apply"
 
 
 async def _linked_user_id(db, discord_user_id) -> str | None:
-    from services.discord_bot import linked_discord_ids
+    from services.discord_runtime import linked_discord_ids
 
     return (await linked_discord_ids(db)).get(str(discord_user_id))
 
@@ -237,7 +237,7 @@ def _scope_problem(scope: dict) -> dict | None:
 
 async def answer_turniere(db, guild_id=None, spiel: str | None = None, alle: bool = False, base_url: str = "") -> dict:
     """Offene Turnier-Anmeldungen - auf einem Spielserver nur dessen Spiele (#630)."""
-    from services.discord_bot import open_tournaments_text
+    from services.discord_runtime import open_tournaments_text
 
     scope = await server_scope(db, guild_id, game=spiel, everything=alle)
     problem = _scope_problem(scope)
@@ -253,7 +253,7 @@ async def answer_turniere(db, guild_id=None, spiel: str | None = None, alle: boo
 async def answer_naechstes_event(db, guild_id=None, spiel: str | None = None, alle: bool = False, base_url: str = "") -> dict:
     """Das nächste öffentliche Event - auf einem Spielserver das nächste mit einem Turnier seiner Spiele (Events selbst
     tragen kein Spiel), #630."""
-    from services.discord_bot import next_event_text
+    from services.discord_runtime import next_event_text
 
     scope = await server_scope(db, guild_id, game=spiel, everything=alle)
     problem = _scope_problem(scope)

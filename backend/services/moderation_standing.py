@@ -461,7 +461,7 @@ async def _notify(db, user_id: str, sanction: dict) -> None:
         logger.warning("[moderation] Benachrichtigung fehlgeschlagen: %s", exc)
     if user.get("email"):
         try:
-            from routes.phase_ef_routes import render_template
+            from services.mail_templates import render_template
             from services.mail_queue import enqueue_mail
             variables = _mail_vars(user, sanction)
             # Name und Grund nur als {{…}} - render_template setzt sie als Text ein.
@@ -481,7 +481,7 @@ async def _notify_lifted(db, user_id: str, sanction: dict, note: str | None) -> 
     user = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "display_name": 1, "username": 1}) or {}
     if user.get("email"):
         try:
-            from routes.phase_ef_routes import render_template
+            from services.mail_templates import render_template
             from services.mail_queue import enqueue_mail
             variables = {**_mail_vars(user, sanction), "note": note or ""}
             subject, html = await render_template("moderation_lifted", variables, fallback_subject="THE LION SQUAD – Maßnahme aufgehoben",
