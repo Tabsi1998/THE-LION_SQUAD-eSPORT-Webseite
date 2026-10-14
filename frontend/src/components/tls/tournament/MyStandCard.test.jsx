@@ -24,3 +24,11 @@ test("vor dem Ende oder ohne bestätigte Teilnahme gibt es nichts zu teilen", ()
   renderCard({ status: "completed" }, { status: "waitlist" });
   expect(screen.queryByTestId("share-stub")).toBeNull();
 });
+
+test("nach dem Check-in-Ende (#1551) gibt es keinen Knopf „Jetzt einchecken“ mehr", () => {
+  const { unmount } = render(<MemoryRouter><MyStandCard tournament={{ id: "t1", status: "check_in" }} registration={{ id: "r1", status: "approved" }} canCheckIn /></MemoryRouter>);
+  expect(screen.getByTestId("tournament-checkin-btn")).toBeInTheDocument();
+  unmount();
+  render(<MemoryRouter><MyStandCard tournament={{ id: "t1", status: "check_in", check_in_closed_at: "2026-10-31T16:50:00+00:00" }} registration={{ id: "r1", status: "approved" }} canCheckIn /></MemoryRouter>);
+  expect(screen.queryByTestId("tournament-checkin-btn")).toBeNull();
+});

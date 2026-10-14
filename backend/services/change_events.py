@@ -58,7 +58,6 @@ STAFF_STREAM_ROLES = frozenset({"tournament_admin", "club_admin", "superadmin"})
 USER_SCOPE = "user"
 # Held only in the in-memory buffer; stripped before an event reaches a client.
 TARGETS_KEY = "_target_user_ids"
-DETAILS_KEY = "details"
 EVENT_BUFFER_SIZE = 256
 SUBSCRIBER_QUEUE_SIZE = 100
 
@@ -179,13 +178,13 @@ def _event_for_scope(event: dict, visibility_scope: str, user_id: str | None = N
 
     resource = event.get("entity_type") or ""
     public_event = dict(event)
-    # Einzelheiten eines Fachereignisses (z. B. welche Auslosung) bekommt nur der staff-Strom.
-    public_event.pop(DETAILS_KEY, None)
     public_event.update({
         "entity_id": None,
         "path": f"/api/{resource}" if resource else "/api",
         "resource": resource,
     })
+    if isinstance(event.get("tournament_event"), dict):
+        public_event["tournament_event"] = _public_tournament_event(event["tournament_event"])
     return public_event
 
 
@@ -263,27 +262,48 @@ async def publish_api_change(method: str, path: str, status_code: int):
     _deliver(event)
 
 
-async def publish_draw_done(tournament_id: str, details: dict) -> None:
-    """Auslosung fertig (#1548): Typ ``draw_done`` - öffentlich nur „Turniere haben sich geändert“, der staff-Strom
-    bekommt Turnier, Phase, Gruppe und Kennung der Auslosung (``details``). Wer gelost hat, steht nur im Protokoll."""
-    event_id = str(uuid.uuid4())
-    event = {
-        "event_id": event_id,
-        "event_type": "draw_done",
-        "entity_type": "tournaments",
-        "entity_id": tournament_id,
-        "version": _next_version(),
-        "occurred_at": _utc_now(),
-        "visibility_scope": "public",
-        "dedupe_key": f"draw_done:{details.get('draw_id') or event_id}",
-        "id": event_id,
-        "method": "POST",
-        "path": f"/api/tournaments/{tournament_id}",
-        "resource": "tournaments",
-        "status": 200,
-        "ts": int(time.time() * 1000),
-        DETAILS_KEY: dict(details),
+# Anzeige-Ereignisse (#1553) für Web und TV: was sich im Baum getan hat, als Typ - damit eine Animation weiß, ob ein
+# Name kampflos weiterreist, ein Platz frei wird oder ein Ergebnis zurückgenommen wurde (#1561/#1564). Öffentlich ist
+# nur, was heute schon öffentlich ist: Typ, Turnier und Spiel-Kennungen - keine Namen.
+TOURNAMENT_EVENT_TYPES = frozenset({
+    "draw_done", "slot_filled", "slot_cleared", "walkover", "player_withdrawn", "player_disqualified",
+    "heats_merged", "heats_rebalanced", "result_corrected", "round_started",
+})
+
+
+# Öffentlich sagt ein Ausscheiden nur „ein Platz wurde frei“ - wer und warum, bleibt im Staff-Strom.
+PUBLIC_TOURNAMENT_EVENT_TYPES = {"player_withdrawn": "slot_cleared", "player_disqualified": "slot_cleared"}
+
+
+def _public_tournament_event(payload: dict) -> dict:
+    """Die öffentliche Sicht eines Anzeige-Ereignisses: Typ, Turnier und Spiel-Kennungen - keine Anmeldung, keine Art
+    des Ausscheidens (über die Teilnehmerliste wäre sie einer Person zuzuordnen)."""
+    event_type = str(payload.get("type") or "")
+    return {
+        "type": PUBLIC_TOURNAMENT_EVENT_TYPES.get(event_type, event_type),
+        "tournament_id": payload.get("tournament_id"),
+        "match_ids": list(payload.get("match_ids") or []),
     }
+
+
+async def publish_tournament_event(tournament_id: str, event_type: str, *, match_ids: Iterable[str | None] = (),
+                                   registration_id: str | None = None) -> None:
+    """Ein Anzeige-Ereignis auf den öffentlichen Strom - als ``tournament.event`` mit Ressource ``tournaments``, sodass
+    bestehende Leser nur neu laden und neue Leser den Typ lesen. Die Anmeldungs-Kennung und die Art des Ausscheidens
+    bekommt nur der Staff-Strom (``_public_tournament_event``)."""
+    if event_type not in TOURNAMENT_EVENT_TYPES or not tournament_id:
+        return
+    event = _build_api_change_event("POST", f"/api/tournaments/{tournament_id}/events", 200)
+    event.update({
+        "event_type": "tournament.event",
+        "dedupe_key": f"tournament.event:{event['event_id']}",
+        "tournament_event": {
+            "type": event_type,
+            "tournament_id": tournament_id,
+            "match_ids": [match_id for match_id in match_ids if match_id],
+            **({"registration_id": registration_id} if registration_id else {}),
+        },
+    })
     _event_buffer.append(event)
     _deliver(event)
 

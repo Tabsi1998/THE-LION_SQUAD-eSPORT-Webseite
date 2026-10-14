@@ -2,14 +2,15 @@
 
 Eine Auslosung entsteht beim Ergebnis, das eine Runde fertig macht (Person: wer es eingetragen hat), beim Bau, wenn eine
 Runde schon kampflos entschieden ist (Person: wer gebaut hat), oder mit „Neu auslosen“ durch die Turnierleitung. Das
-Protokoll (``audit_logs``) ist nur für die Verwaltung; öffentlich geht nur das Ereignis ohne Einzelheiten raus.
+Protokoll (``audit_logs``) ist nur für die Verwaltung; öffentlich geht nur das Anzeige-Ereignis ``draw_done`` raus
+(Typ, Turnier, Spiele - keine Namen, keine Person).
 """
 from __future__ import annotations
 
 import logging
 from collections import defaultdict
 
-from services.change_events import publish_draw_done
+from services.change_events import publish_tournament_event
 
 logger = logging.getLogger("tls.draws")
 
@@ -45,13 +46,9 @@ async def record_draws(db, draws: list[dict] | None, *, actor_id: str | None, to
             upsert=True,
         )
         try:
-            await publish_draw_done(target_id, {
-                "tournament_id": target_id,
-                "stage_id": draw.get("stage_id"),
-                "group": draw.get("group"),
-                "draw_id": draw["id"],
-                "kind": draw.get("kind") or "advancement",
-            })
+            # Anzeige-Ereignis (#1553) vom Typ ``draw_done``: öffentlich Typ, Turnier und die ausgelosten Spiele.
+            match_ids = list(dict.fromkeys(row.get("match_id") for row in draw.get("assignments") or [] if row.get("match_id")))
+            await publish_tournament_event(target_id, "draw_done", match_ids=match_ids)
         except Exception as exc:  # noqa: BLE001 - das Ereignis ist ein Hinweis, das Protokoll steht schon
             logger.warning("draw_done event failed type=%s", type(exc).__name__)
         count += 1

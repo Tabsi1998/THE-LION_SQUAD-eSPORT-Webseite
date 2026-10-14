@@ -75,13 +75,15 @@ async def test_draw_happens_when_the_round_is_done_and_lands_in_the_protocol(flo
     assert entry["data"]["draw_id"] == second[0]["draw"]["id"]
     assert {row["registration_id"] for row in entry["data"]["assignments"]} == {
         s["registration_id"] for m in second for s in m["slots"]}
-    events = [e for e in list(change_events._event_buffer)[before:] if e.get("event_type") == "draw_done"]
+    events = [e for e in list(change_events._event_buffer)[before:]
+              if (e.get("tournament_event") or {}).get("type") == "draw_done"]
     assert len(events) == 1
     public = change_events._event_for_scope(events[0], "public")
-    assert public["entity_id"] is None and "details" not in public
-    staff_view = change_events._event_for_scope(events[0], "staff")
-    assert staff_view["details"]["draw_id"] == entry["data"]["draw_id"]
-    assert "actor_id" not in staff_view["details"]
+    assert public["entity_id"] is None
+    assert public["tournament_event"] == {"type": "draw_done", "tournament_id": tournament["id"],
+                                          "match_ids": [m["id"] for m in second if m["id"] in public["tournament_event"]["match_ids"]]}
+    assert set(public["tournament_event"]["match_ids"]) == {m["id"] for m in second}
+    assert staff["id"] not in str(public) and staff["id"] not in str(change_events._event_for_scope(events[0], "staff"))
 
 
 @pytest.mark.asyncio

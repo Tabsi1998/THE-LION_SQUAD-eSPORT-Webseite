@@ -13,7 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import change_events  # noqa: E402
+from services import change_events, scheduler  # noqa: E402
 
 SIXTEEN = """[WB]
 # Runde 1
@@ -52,6 +52,12 @@ async def sixteen_scheme(flow, count: int, mode: str) -> tuple[dict, dict]:
     flow.act_as(staff)
     response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "check_in"})
     assert response.status_code == 200, response.text
+    # Der Baum entsteht mit dem Ende des Check-ins aus den Eingecheckten (#1551) - alle sind da, der Check-in endet.
+    await flow.db.tournament_registrations.update_many({"tournament_id": tournament["id"]}, {"$set": {"status": "checked_in"}})
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {
+        "check_in_until": (now_utc() - timedelta(minutes=1)).isoformat()}})
+    await scheduler._safe_status_transitions()
+    assert (await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0}))["check_in_closed_at"]
     return tournament, staff
 
 

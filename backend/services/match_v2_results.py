@@ -500,7 +500,8 @@ def _effective_status(match: dict, target_sets: dict[str, dict]) -> str:
     return str(target_sets.get(match.get("id") or "", {}).get("status") or match.get("status") or "pending")
 
 
-def _mark_slot_bye(slot: dict, source_match: dict, rank: int, flow: str | None, now_iso: str) -> None:
+def _mark_slot_bye(slot: dict, source_match: dict, rank: int, flow: str | None, now_iso: str,
+                   reason: str = "bye") -> None:
     slot["registration_id"] = None
     slot["user_id"] = None
     slot["source_result"] = {
@@ -509,10 +510,23 @@ def _mark_slot_bye(slot: dict, source_match: dict, rank: int, flow: str | None, 
         "rank": rank,
         "flow": flow,
         "skipped": True,
-        "reason": "bye",
+        "reason": reason,
         "confirmed_at": now_iso,
     }
     slot["status"] = "bye"
+
+
+# Ein Platz, den eine Disqualifikation oder ein Austritt (#1553) geleert hat, trägt den Grund und die Person.
+REMOVAL_REASONS = {"withdrawn", "disqualified"}
+
+
+def _removal_marker(match: dict) -> dict | None:
+    """Der Freilos-Platz dieses Spiels, der durch Disqualifikation oder Austritt frei wurde - wenn es einen gibt."""
+    for slot in match.get("slots") or []:
+        source_result = slot.get("source_result") or {}
+        if slot.get("status") == "bye" and source_result.get("reason") in REMOVAL_REASONS:
+            return source_result
+    return None
 
 
 def _auto_bye_result(winner: dict, now_iso: str) -> dict:
@@ -595,13 +609,27 @@ def _locate_target_slot(advancement: dict, target: dict, by_id: dict[str, dict],
     return found[0], found[1], None
 
 
+def _pot_ranks(source: dict, results: list[dict], gone: set[str]) -> tuple[dict[int, dict], dict[int, dict]]:
+    """Wer auf welchem Platz steht - für den Verlierer-Weg wie gewertet, für den Sieger-Weg ohne Ausgeschiedene
+    (#1553: im Lauf rücken die Nächsten auf, wie in ``build_v2_result_application``)."""
+    by_rank = {int(row.get("rank") or 0): row for row in results}
+    if not gone or source.get("match_type") != "ffa":
+        return by_rank, by_rank
+    staying = [row for row in sorted(results, key=lambda row: int(row.get("rank") or 0))
+               if row.get("registration_id") not in gone]
+    return by_rank, {index: row for index, row in enumerate(staying, start=1)}
+
+
 def run_draw(group: str, by_id: dict[str, dict], target_sets: dict[str, dict], now_iso: str, *,
              decided_results: dict[str, list[dict]] | None = None, rng=None, draws: list[dict] | None = None,
-             trigger: str = "result") -> list[str]:
+             trigger: str = "result", eliminated: set[str] | None = None) -> list[str]:
     """Die Auslosung einer Gruppe, sobald **alle** Quellspiele entschieden sind (gespielt, gewertet, kampflos oder
     abgesagt). Der Topf: je Weiterleitung in die Gruppe der Teilnehmer auf diesem Platz - oder ein Freilos, wo es ihn
     nicht gibt. ``assign_balanced`` verteilt gleichmäßig. ``decided_results``: Ergebnisse, die noch nicht am Spiel
-    stehen (das gerade eingetragene). Rückgabe: die Folgespiele, die jetzt besetzt sind."""
+    stehen (das gerade eingetragene). Rückgabe: die Folgespiele, die jetzt besetzt sind.
+
+    Wie im festen Baum (#1553): wer ausgeschieden ist (``eliminated`` oder am Ergebnis als ``eliminated`` vermerkt)
+    oder auf dem Sieger-Weg nicht erschienen ist, kommt nicht in den Topf - sein Platz wird ein Freilos."""
     decided_results = decided_results or {}
     targets = _draw_open_targets(by_id, group)
     if not targets or _group_is_drawn(targets):
@@ -617,7 +645,8 @@ def run_draw(group: str, by_id: dict[str, dict], target_sets: dict[str, dict], n
             results = decided_results[source["id"]]
         else:
             results = [] if source.get("status") == "cancelled" else source.get("results") or []
-        by_rank = {int(row.get("rank") or 0): row for row in results}
+        gone = set(eliminated or ()) | {row.get("registration_id") for row in results if row.get("eliminated")}
+        by_rank, winner_path = _pot_ranks(source, results, gone)
         for advancement in source.get("advancement") or []:
             target = by_id.get(advancement.get("to_match_id"))
             if not target or target["id"] not in target_ids:
@@ -627,13 +656,20 @@ def run_draw(group: str, by_id: dict[str, dict], target_sets: dict[str, dict], n
                 continue
             slots_by_target[target["id"]].append(int(slot.get("slot") or 0))
             rank = _advancement_result_rank(source, advancement)
-            result = by_rank.get(rank)
+            flow = advancement.get("flow")
+            result = (winner_path if flow == "W" else by_rank).get(rank)
+            reason = "bye"
+            if result and result.get("registration_id") in gone:
+                result, reason = None, "eliminated"
+            elif result and flow == "W" and result.get("forfeit"):
+                result, reason = None, "forfeit"
             entries.append({
                 "registration_id": (result or {}).get("registration_id"),
                 "user_id": (result or {}).get("user_id"),
                 "rank": int(result["rank"]) if result else rank,
-                "flow": advancement.get("flow"),
+                "flow": flow,
                 "source": source,
+                "reason": reason,
             })
     if not entries:
         return []
@@ -659,7 +695,7 @@ def run_draw(group: str, by_id: dict[str, dict], target_sets: dict[str, dict], n
             }
             slot["status"] = "filled"
         elif entry:
-            _mark_slot_bye(slot, source, entry["rank"], entry["flow"], now_iso)
+            _mark_slot_bye(slot, source, entry["rank"], entry["flow"], now_iso, reason=entry.get("reason") or "bye")
             slot["source_result"]["draw_id"] = draw_id
         assignments.append({
             "match_id": target_id,
@@ -718,6 +754,7 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
     ``target_sets`` und in den Spielen selbst."""
     queue = deque(start_ids)
     seen: set[str] = set()
+    by_key = {row.get("match_key"): row for row in by_id.values() if row.get("match_key")}
     while queue:
         match_id = queue.popleft()
         match = by_id.get(match_id)
@@ -734,10 +771,15 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
         if len(filled) > 1 or not any(slot.get("status") == "bye" for slot in slots):
             continue
         winner = filled[0] if filled else None
+        # Kampflos nach Disqualifikation oder Austritt (#1553): der Grund und die entfernte Person stehen am Ergebnis.
+        marker = _removal_marker(match) if winner else None
         change = {
             "results": [_auto_bye_result(winner, now_iso)] if winner else [],
             "status": "completed" if winner else "cancelled",
-            "result_meta": {"source": "auto_bye", "updated_at": now_iso, **({} if winner else {"reason": "no_participants"})},
+            "result_meta": {"source": "auto_bye", "updated_at": now_iso,
+                            **({} if winner else {"reason": "no_participants"}),
+                            **({"reason": marker["reason"], "removed_registration_id": marker.get("removed_registration_id")}
+                               if marker else {})},
             "completed_at": now_iso if winner else None,
             "completed_by": "system" if winner else None,
             "updated_at": now_iso,
@@ -780,6 +822,11 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
                 "updated_at": now_iso,
             })
             queue.append(target["id"])
+        if winner:
+            # Ein kampflos entschiedenes Grand Final (#1553) durchläuft die Reset-Regel wie ein gespieltes: gewinnt die
+            # Siegerrunde, entfällt das Reset-Spiel („nicht nötig“) statt selbst zum Freilos zu werden; gewinnt die
+            # Verliererrunde, ist es nötig und wird in der Kette ebenfalls kampflos entschieden.
+            _apply_bracket_reset_rule(match, change["results"], by_id, by_key, target_sets, now_iso)
         for group in waiting_groups if draw_now else []:
             for drawn_id in run_draw(group, by_id, target_sets, now_iso, rng=rng, draws=draws, trigger="walkover"):
                 seen.discard(drawn_id)
@@ -846,6 +893,9 @@ def _pairing_reset_fields(match: dict, now_iso: str) -> dict:
         "reports": [],
         "started_at": None,
         "called_at": None,
+        # Frist „nicht erschienen“ (#1551): Vorschlag und Verlängerung gehörten zur alten Paarung.
+        "no_show_proposal": None,
+        "no_show_extended_until": None,
         "forfeit_registration_id": None,
         "admin_decision_note": None,
         "admin_decision_by": None,
@@ -930,16 +980,30 @@ def build_v2_result_application(
     note: str | None = None,
     force: bool = False,
     rng=None,
+    eliminated: set[str] | None = None,
 ) -> dict:
-    """Ein Ergebnis anwenden: Weiterkommer in die Folgespiele, Freilos-Kette, Reset-Regel. Gemischt (#1548) wartet die
-    Folgerunde, bis die ganze Runde entschieden ist; dann wird gelost (``draws`` in der Antwort). ``rng``: nur Tests."""
+    """Ein Ergebnis anwenden: was am Spiel selbst steht (``match_set``) und was in den Folgespielen (``target_sets``).
+
+    Gemischt (#1548) wartet die Folgerunde, bis die ganze Runde entschieden ist; dann wird gelost (``draws`` in der
+    Antwort). ``rng``: nur Tests.
+
+    ``eliminated`` (#1553): Anmeldungen, die disqualifiziert oder ausgetreten sind. Sie rücken nirgends mehr ein - ihr
+    Zielplatz wird ein Freilos; in einem Lauf rückt auf dem Sieger-Weg der Nächstplatzierte auf. Wer nicht erschienen
+    ist (``forfeit``), kommt auf dem Sieger-Weg ebenfalls nicht weiter (ein Lauf mit zwei Fahrern und Quote zwei
+    schickte ihn sonst weiter); der Verlierer-Weg (Doppel-K.-o., Spiel um Platz 3) bleibt ihm offen."""
     if match.get("status") in {"cancelled"}:
         raise MatchV2ResultError("Abgebrochene Matches können kein Ergebnis erhalten")
     if match.get("status") in {"completed", "forfeit"} and not force:
         raise MatchV2ResultError("Match ist bereits abgeschlossen. Für Korrektur force=true nutzen.", 409)
 
     results = normalize_v2_results(match, raw_results)
+    eliminated = set(eliminated or ())
     result_by_rank = {entry["rank"]: entry for entry in results}
+    winner_path_by_rank = result_by_rank
+    if eliminated and match.get("match_type") == "ffa":
+        # Plätze rücken auf: der Sieger-Weg zählt nur, wer noch im Turnier ist.
+        winner_path_by_rank = {index: entry for index, entry in enumerate(
+            (entry for entry in results if entry["registration_id"] not in eliminated), start=1)}
     by_id, by_key = _target_lookup(stage_matches)
     downstream = _downstream_links(stage_matches)
     target_sets: dict[str, dict] = {}
@@ -953,10 +1017,16 @@ def build_v2_result_application(
         if not target:
             raise MatchV2ResultError(f"Zielmatch {advancement.get('to_match_key')} nicht gefunden")
         result_rank = _advancement_result_rank(match, advancement)
-        result = result_by_rank.get(result_rank)
-        if not result and not _rank_can_be_missing_because_of_bye(match, result_rank):
+        flow = advancement.get("flow")
+        result = (winner_path_by_rank if flow == "W" else result_by_rank).get(result_rank)
+        skip_reason = None
+        if result and result["registration_id"] in eliminated:
+            skip_reason = "eliminated"
+        elif result and flow == "W" and result.get("forfeit"):
+            skip_reason = "forfeit"
+        if not result and not skip_reason and not _rank_can_be_missing_because_of_bye(match, result_rank):
             raise MatchV2ResultError(f"Rank {result_rank} fehlt für Advancement")
-        if result:
+        if result and not skip_reason:
             if result["registration_id"] in advanced_registration_ids:
                 raise MatchV2ResultError(
                     "Teilnehmer darf aus demselben Match nicht mehrfach weitergeleitet werden",
@@ -971,6 +1041,23 @@ def build_v2_result_application(
             continue
         if not target_slot:
             raise MatchV2ResultError(f"Zielslot {advancement.get('to_slot')} in {target.get('match_key')} nicht gefunden")
+        if skip_reason:
+            existing_reg = target_slot.get("registration_id")
+            if existing_reg and existing_reg != result["registration_id"]:
+                if not force:
+                    raise MatchV2ResultError(
+                        f"Zielslot {target.get('match_key')}:{target_slot.get('slot')} ist bereits belegt. Für Korrektur force=true nutzen.",
+                        409,
+                    )
+                _ensure_no_pending_result(target)
+                overwritten_targets.add(target["id"])
+            _mark_slot_bye(target_slot, match, result_rank, flow, now_iso, reason=skip_reason)
+            target_sets.setdefault(target["id"], {}).update({
+                "slots": target.get("slots") or [],
+                "status": _status_after_slot_fill(target),
+                "updated_at": now_iso,
+            })
+            continue
         if not result:
             target_slot["registration_id"] = None
             target_slot["user_id"] = None
@@ -1020,7 +1107,8 @@ def build_v2_result_application(
         })
 
     for group in waiting_groups:
-        run_draw(group, by_id, target_sets, now_iso, decided_results={match["id"]: results}, rng=rng, draws=draws)
+        run_draw(group, by_id, target_sets, now_iso, decided_results={match["id"]: results}, rng=rng, draws=draws,
+                 eliminated=eliminated)
 
     reset_matches: list[dict] = []
     if force:

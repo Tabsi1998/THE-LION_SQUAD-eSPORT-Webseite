@@ -195,6 +195,7 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
             # Der Umbau-Vorschlag für die Läufe (#1550) gehört der Turnierleitung; Helfer sehen ihn am Turnier selbst.
             t.pop("heat_rebuild_plan", None)
             t.pop("heat_rebuild_dismissed", None)
+            t.pop("participant_removal_plan", None)
     # Das Event als Klammer (#1182): die Kennung des Events nur, wenn es für die Person sichtbar ist (#1473).
     await hide_unseen_event_links(db, user, tournaments)
     if compact:
@@ -227,9 +228,11 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
     # Was die Person hier darf (#1353): die Verwaltung zeigt Knöpfe nur nach diesen Feldern.
     t.update(await tournament_rights(user, t["id"]))
     if not t.get("can_manage_structure"):
-        # Der Umbau-Vorschlag für die Läufe (#1550) sieht nur, wer ihn auch bestätigen darf (Strukturrollen).
+        # Der Umbau-Vorschlag für die Läufe (#1550) und der für Austritt/Disqualifikation (#1553) sieht nur, wer ihn
+        # auch bestätigen darf (Strukturrollen).
         t.pop("heat_rebuild_plan", None)
         t.pop("heat_rebuild_dismissed", None)
+        t.pop("participant_removal_plan", None)
     if access_link:
         await touch_access_link(db, access_link, user)
         t["access_link"] = public_access_link_payload(access_link)
@@ -366,6 +369,8 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         "stream_link", "twitch_channel", "discord_link", "location",
         "banner_url", "stream_platform", "stream_url", "stream_title", "format_label",
         "result_entry_mode", "schedule_mode",
+        # Fristen (#1551): leer heißt wieder Standard.
+        "no_show_minutes_on_site", "no_show_minutes_online", "result_confirm_minutes_online", "result_confirm_hours_league",
     }
     updates = {k: v for k, v in raw_updates.items() if v is not None or k in nullable_fields}
     billing = await tournament_fees.billing_updates(raw_updates, existing, me)

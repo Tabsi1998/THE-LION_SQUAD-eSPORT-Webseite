@@ -133,6 +133,18 @@ def derive_public_phase(doc: dict, kind: str = "content", now: datetime | None =
             "now": now.isoformat(),
         }
 
+    # Check-in beendet, Baum steht (#1551): der Status bleibt „Check-in“, nach außen ist bis zum Start geschlossen.
+    if normalized_status == "check_in" and doc.get("check_in_closed_at"):
+        return {
+            "state": "registration_closed",
+            "label": _label("registration_closed"),
+            "raw_status": raw_status,
+            "target_at": _iso(start_target),
+            "next_transition_at": _iso(start_target),
+            "countdown_kind": "starts",
+            "now": now.isoformat(),
+        }
+
     if normalized_status == "check_in":
         return {
             "state": "check_in",

@@ -215,3 +215,78 @@ def test_no_rebalance_of_the_next_round_before_the_draw():
     seated = {key: len(filled(k[key])) for key in "IJKL"}
     assert sum(seated.values()) == 14
     assert abs(seated["I"] - seated["J"]) <= 1 and abs(seated["K"] - seated["L"]) <= 1
+
+
+# ---------------------------------------------------------------------------------------------- Austritt (#1553)
+
+def test_forfeit_on_the_winner_path_is_a_bye_in_the_draw():
+    """Wer nicht erschienen ist, kommt auf dem Sieger-Weg nicht weiter - auch gemischt nicht."""
+    matches, _stage = build_ffa()
+    k = keys(matches)
+    # Lauf A mit zwei Fahrern und Quote zwei: der Zweite ist nicht erschienen.
+    withdraw(k["A"], 2)
+    ranking = sorted(filled(k["A"]), key=lambda reg: int(reg[1:]))
+    raw = [{"registration_id": reg, "rank": index + 1, "forfeit": index == 1} for index, reg in enumerate(ranking)]
+    application = build_v2_result_application(k["A"], matches, raw, actor_id="staff", now_iso=NOW)
+    k["A"].update(application["match_set"])
+    for key in "BCDEFGH":
+        play(matches, k[key])
+    seated = {reg for key in "IJKL" for reg in filled(k[key])}
+    assert ranking[1] not in seated, "nicht erschienen - nicht weiter"
+    assert ranking[0] in seated and len(seated) == 15
+
+
+def test_removed_winner_before_the_draw_is_not_drawn():
+    from services.tournament_events import plan_removal
+
+    stage = {"id": "s", "number": 1, "stage_type": "single_elimination", "match_type": "duel", "settings": {}}
+    matches = build_matches_v2_from_schema({"id": "t", "seeding_mode": "manual", "max_participants": 8, **SHUFFLE},
+                                           stage, registrations(8))
+    k = keys(matches)
+    for key in "ABC":
+        play(matches, k[key])
+    gone = k["A"]["results"][0]["registration_id"]
+    plan_removal(matches, gone, kind="withdrawn", now_iso=NOW)
+    assert not any(filled(k[key]) for key in "EF"), "die Runde wartet weiter auf die Auslosung"
+    play(matches, k["D"])
+    seated = {reg for key in "EF" for reg in filled(k[key])}
+    assert gone not in seated and len(seated) == 3
+    walkovers = [k[key] for key in "EF" if k[key]["status"] == "completed"]
+    assert len(walkovers) == 1 and walkovers[0]["result_meta"]["source"] == "auto_bye"
+
+
+def test_removed_qualifier_before_the_draw_lets_the_next_move_up():
+    from services.tournament_events import plan_removal
+
+    matches, _stage = build_ffa()
+    k = keys(matches)
+    for key in "ABCDEFG":
+        play(matches, k[key])
+    order = [row["registration_id"] for row in k["A"]["results"]]
+    plan_removal(matches, order[0], kind="disqualified", now_iso=NOW)
+    assert not any(filled(k[key]) for key in "IJKL")
+    play(matches, k["H"])
+    seated = {reg for key in "IJKL" for reg in filled(k[key])}
+    assert order[0] not in seated
+    assert {order[1], order[2]} <= seated, "Platz 3 aus A rückt nach"
+    assert len(seated) == 16
+
+
+def test_removed_qualifier_after_the_draw_hands_the_drawn_seat_to_the_next():
+    from services.tournament_events import plan_removal
+
+    matches, _stage = build_ffa()
+    k = keys(matches)
+    for key in "ABCDEFGH":
+        play(matches, k[key])
+    order = [row["registration_id"] for row in k["A"]["results"]]
+    seat_of = {reg: (key, slot["slot"]) for key in "IJKL" for slot in k[key]["slots"] if (reg := slot.get("registration_id"))}
+    before = dict(seat_of)
+    plan_removal(matches, order[0], kind="withdrawn", now_iso=NOW)
+    after = {reg: (key, slot["slot"]) for key in "IJKL" for slot in k[key]["slots"] if (reg := slot.get("registration_id"))}
+    assert order[0] not in after
+    assert order[2] in after, "Platz 3 aus A rückt in einen ausgelosten Platz von A"
+    assert {after[order[1]], after[order[2]]} == {before[order[0]], before[order[1]]}
+    for reg, seat in before.items():
+        if reg not in order[:2]:
+            assert after[reg] == seat, "alle anderen bleiben, wo das Los sie hingesetzt hat"

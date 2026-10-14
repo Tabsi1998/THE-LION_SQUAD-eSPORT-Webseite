@@ -640,6 +640,12 @@ class TournamentCreate(BaseModel):
     # Mindestpause eines Spielers zwischen zwei Spielen, in Minuten - der Planer hält sie ein (#1552).
     match_break_minutes: int = Field(default=5, ge=0, le=240)
     auto_start_enabled: bool = False
+    # Fristen (#1551), leer = Standard (services/match_deadlines): nicht erschienen vor Ort 10 / online 15 Minuten,
+    # Ergebnis gilt online nach 15 Minuten, in der Liga nach 48 Stunden. Je Phase überschreibbar (settings).
+    no_show_minutes_on_site: Optional[int] = Field(default=None, ge=1, le=120)
+    no_show_minutes_online: Optional[int] = Field(default=None, ge=1, le=240)
+    result_confirm_minutes_online: Optional[int] = Field(default=None, ge=1, le=1440)
+    result_confirm_hours_league: Optional[int] = Field(default=None, ge=1, le=336)
     # Phase 7
     season_weight: float = 2.0
     visibility: Literal["public", "community", "members", "internal"] = "public"
@@ -712,6 +718,10 @@ class TournamentUpdate(BaseModel):
     match_schedule_response_hours: Optional[int] = Field(default=None, ge=1, le=720)
     match_break_minutes: Optional[int] = Field(default=None, ge=0, le=240)
     auto_start_enabled: Optional[bool] = None
+    no_show_minutes_on_site: Optional[int] = Field(default=None, ge=1, le=120)
+    no_show_minutes_online: Optional[int] = Field(default=None, ge=1, le=240)
+    result_confirm_minutes_online: Optional[int] = Field(default=None, ge=1, le=1440)
+    result_confirm_hours_league: Optional[int] = Field(default=None, ge=1, le=336)
     season_weight: Optional[float] = None
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
     site_banner_enabled: Optional[bool] = None
@@ -735,7 +745,10 @@ class RegistrationCreate(BaseModel):
 
 
 class RegistrationUpdate(BaseModel):
-    status: Optional[Literal["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"]] = None
+    # ``withdrawn`` (Austritt) und ``disqualified`` (#1553) setzt nur der Umbauplan über
+    # ``POST /registrations/{id}/removal`` - die Statusroute lehnt sie mit einem Hinweis ab.
+    status: Optional[Literal["pending", "approved", "rejected", "waitlist", "checked_in", "no_show",
+                             "withdrawn", "disqualified"]] = None
     seed: Optional[int] = None
     ingame_name: Optional[str] = None
     # Grund einer Absage (#1133): steht nur in der Nachricht an die Person, nicht an der Anmeldung.

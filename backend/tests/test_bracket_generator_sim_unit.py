@@ -494,3 +494,119 @@ def test_ffa_bracket_survives_random_dropouts_after_round_one(count: int, match_
         if match["status"] not in TERMINAL:
             continue
         assert len(match["slots"]) <= match_size + 2, f"{match['match_key']} hat {len(match['slots'])} Plätze"
+
+
+# ---------------------------------------------------------------------------------------------- Ausscheiden (#1553)
+
+def _remove(matches: list[dict], registration_id: str, kind: str, eliminated: set[str] | None = None) -> dict:
+    from services.tournament_events import plan_removal
+    return plan_removal(matches, registration_id, kind=kind, now_iso=NOW, eliminated=eliminated)
+
+
+def _assert_graph_valid(matches: list[dict]) -> None:
+    from services.competition_graph_validation import validate_competition_graph
+    from services.competition_snapshot import build_structure_snapshot
+    report = validate_competition_graph(build_structure_snapshot("t", stage_matches=matches))
+    assert report["valid"], [issue for issue in report["issues"] if issue["severity"] == "error"]
+
+
+def _seats_of(matches: list[dict], registration_id: str) -> frozenset:
+    return frozenset((m["id"], slot["slot"]) for m in matches for slot in m["slots"] if slot.get("registration_id") == registration_id)
+
+
+def _play_with_random_removals(matches: list[dict], rng: random.Random, *, stage: dict | None = None) -> set[str]:
+    """Spielt durch; zwischendurch werden zufällig Teilnehmer disqualifiziert oder treten aus (auch solche, die gerade
+    nicht spielbereit sind, etwa mit Freilos in der nächsten Runde). Nach jedem Schritt: niemand zweimal spielbereit,
+    Graph gültig; die Person sitzt danach in keinem offenen Spiel mehr und bekommt nie wieder einen Platz; am Ende ist
+    alles entschieden."""
+    removed: set[str] = set()
+    seats_at_removal: dict[str, frozenset] = {}
+    for _ in range(10_000):
+        ready = [match for match in matches if match["status"] == "ready"]
+        if not ready:
+            break
+        alive = sorted({reg for m in matches if m["status"] not in TERMINAL for reg in filled_ids(m)} - removed)
+        if len(alive) > 2 and rng.random() < 0.25:
+            victim = rng.choice(alive)
+            kind = rng.choice(["withdrawn", "disqualified"])
+            open_before = {m["id"] for m in matches if m["status"] not in TERMINAL}
+            plan = _remove(matches, victim, kind, removed)
+            removed.add(victim)
+            still_seated = {reg for m in matches if m["status"] not in TERMINAL and m.get("match_type") != "ffa" for reg in filled_ids(m)}
+            assert victim not in still_seated
+            assert all(op["kind"] != "forfeit" for op in plan["ops"]), "vor dem Start gibt es nur Freilose, keine Wertung"
+            for match in matches:
+                if match["id"] in open_before and match["status"] in TERMINAL:
+                    assert victim not in [row["registration_id"] for row in match.get("results") or []], \
+                        f"{victim} kam nach dem Ausscheiden noch weiter in {match['match_key']}"
+            if stage:
+                _rebuild(matches, stage)
+            seats_at_removal[victim] = _seats_of(matches, victim)
+            assert_nobody_twice_ready(matches)
+            _assert_graph_valid(matches)
+            continue
+        match = rng.choice(ready)
+        ranking = filled_ids(match)
+        rng.shuffle(ranking)
+        apply_result(matches, match, ranking)
+        if stage:
+            _rebuild(matches, stage)
+        assert_nobody_twice_ready(matches)
+    open_matches = [match["match_key"] for match in matches if match["status"] not in TERMINAL]
+    assert not open_matches, f"nicht erreichbar: {open_matches}"
+    _assert_graph_valid(matches)
+    for victim, seats in seats_at_removal.items():
+        assert _seats_of(matches, victim) == seats, f"{victim} hat nach dem Ausscheiden noch einen Platz bekommen"
+    return removed
+
+
+@pytest.mark.parametrize("count", range(3, 41))
+def test_single_elimination_survives_random_disqualifications(count: int):
+    matches = build(count, "single_elimination", tournament={"bronze_match": count % 2 == 0, "format": "single_elim"})
+    removed = _play_with_random_removals(matches, random.Random(count * 11))
+    final = max((m for m in matches if section_of(m) in {"WB", "MAIN"}), key=lambda m: m["round"])
+    assert final["status"] == "completed"
+    champion = final["results"][0]["registration_id"]
+    assert champion not in removed, "ein Ausgeschiedener gewinnt nie"
+
+
+@pytest.mark.parametrize("count", range(3, 41))
+def test_double_elimination_survives_random_disqualifications(count: int):
+    matches = build(count, "double_elimination")
+    removed = _play_with_random_removals(matches, random.Random(count * 13))
+    gf = sorted((m for m in matches if section_of(m) == "GF"), key=lambda m: m["round"])
+    assert gf and gf[0]["status"] in TERMINAL
+    rows = stage_standings(matches, registrations(count))
+    assert rows[0]["registration_id"] not in removed
+    # Reset-Regel auch nach einem kampflosen Grand Final: gewinnt die Siegerrunde, entfällt das Reset-Spiel.
+    if gf[0]["status"] == "completed" and len(gf) == 2:
+        champion = gf[0]["results"][0]["registration_id"]
+        upper = gf[0]["slots"][0].get("registration_id")
+        if champion == upper:
+            assert gf[1]["status"] == "cancelled" and gf[1]["result_meta"]["source"] == "bracket_reset", \
+                "Sieg der Siegerrunde (auch kampflos): das Reset-Spiel ist nicht nötig"
+        else:
+            assert gf[1]["status"] == "completed"
+
+
+@pytest.mark.parametrize("match_size,qualifiers", [(3, 1), (4, 2), (8, 2)])
+@pytest.mark.parametrize("count", range(3, 41))
+def test_ffa_bracket_survives_random_disqualifications(count: int, match_size: int, qualifiers: int):
+    stage = {"id": "s", "number": 1, "stage_type": "ffa_custom_bracket", "match_type": "ffa",
+             "settings": {"match_size": match_size, "qualifiers_per_match": qualifiers, "min_players": 2}}
+    base = {"id": "t", "seeding_mode": "manual", "max_participants": count}
+    matches = build_matches_v2_from_schema(base, stage, registrations(count))
+    _rebuild(matches, stage)
+    removed = _play_with_random_removals(matches, random.Random(count * 17 + match_size), stage=stage)
+    # Das Finale: der gefahrene Lauf der letzten Runde ohne Weg weiter. Ein früherer Lauf, dessen Weiterkommer alle
+    # ausgeschieden sind, hat ebenfalls keinen Weg mehr - er ist aber kein Finale.
+    last_round = max(m["round"] for m in matches if m["status"] == "completed")
+    finals = [m for m in matches if m["status"] == "completed" and not m.get("advancement") and m["round"] == last_round]
+    assert len(finals) == 1, f"genau ein Finale: {[m['match_key'] for m in finals]}"
+    assert len(finals[0]["results"]) <= match_size
+    for match in matches:
+        if match["status"] == "completed" and (match.get("result_meta") or {}).get("source") != "auto_bye":
+            assert len(match["results"]) >= 2, f"{match['match_key']} wurde mit {len(match['results'])} gespielt"
+        seated = [slot.get("registration_id") for slot in match["slots"] if slot.get("status") == "filled"]
+        if match["status"] not in TERMINAL:
+            assert not (set(seated) & removed)

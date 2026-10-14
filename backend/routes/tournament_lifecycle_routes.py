@@ -57,14 +57,20 @@ def _live_start_blocker(report: dict, force: bool) -> dict | None:
     }
 
 
-async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: str | None) -> dict | None:
-    """Convert stage previews into fixed matches when check-in starts."""
+# Wer in den festen Baum kommt: ohne Check-in alle Bestätigten, mit Check-in nur, wer eingecheckt hat (#1551).
+BRACKET_STATUSES = ("approved", "checked_in")
+CHECKED_IN_STATUSES = ("checked_in",)
+
+
+async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: str | None,
+                                               statuses: tuple[str, ...] = BRACKET_STATUSES) -> dict | None:
+    """Convert stage previews into fixed matches - at the end of the check-in or at the start."""
     tid = tournament["id"]
     stages = await db.tournament_stages.find({"tournament_id": tid}, {"_id": 0}).sort("number", 1).to_list(200)
     if not stages:
         return None
     registrations = await db.tournament_registrations.find(
-        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+        {"tournament_id": tid, "status": {"$in": list(statuses)}},
         {"_id": 0},
     ).to_list(5000)
     if len(registrations) < 2:
@@ -130,8 +136,11 @@ async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: s
     }
 
 
-async def _finalize_bracket_for_checkin(db, tournament: dict, actor_id: str | None) -> dict | None:
-    """Run the final bracket mix once when tournament check-in opens."""
+async def _finalize_bracket_for_checkin(
+    db, tournament: dict, actor_id: str | None, *, checked_in_only: bool = False,
+) -> dict | None:
+    """Run the final bracket mix once: when the check-in ends (only checked-in participants) or, without a check-in,
+    when the tournament starts (everyone approved). A fixed bracket stays as it is."""
     tid = tournament["id"]
     stage_count = await db.tournament_stages.count_documents({"tournament_id": tid})
     if not stage_count:
@@ -139,7 +148,8 @@ async def _finalize_bracket_for_checkin(db, tournament: dict, actor_id: str | No
         if stage_preview:
             stage_count = await db.tournament_stages.count_documents({"tournament_id": tid})
     if stage_count:
-        finalized = await _finalize_stage_previews_for_checkin(db, tournament, actor_id)
+        statuses = CHECKED_IN_STATUSES if checked_in_only else BRACKET_STATUSES
+        finalized = await _finalize_stage_previews_for_checkin(db, tournament, actor_id, statuses)
         return finalized
 
     v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
@@ -152,6 +162,27 @@ async def _finalize_bracket_for_checkin(db, tournament: dict, actor_id: str | No
         await db.matches_v2.delete_many({"tournament_id": tid})
 
     return None
+
+
+async def close_check_in(db, tournament: dict, actor_id: str | None) -> dict | None:
+    """Check-in-Ende (#1551, E5): der Baum entsteht aus denen, die eingecheckt sind - nicht schon beim Öffnen. Das
+    Turnier bleibt im Status „Check-in“ (der Status springt nicht mehr auf „Anmeldung geschlossen“ zurück); am Turnier
+    steht ``check_in_closed_at``. Ein zweiter Aufruf baut nichts neu und schreibt kein zweites Protokoll."""
+    tid = tournament["id"]
+    built = await _finalize_bracket_for_checkin(db, tournament, actor_id, checked_in_only=True)
+    if tournament.get("check_in_closed_at"):
+        return built
+    closed_at = now_utc().isoformat()
+    result = await db.tournaments.update_one(
+        {"id": tid, "check_in_closed_at": None},
+        {"$set": {"check_in_closed_at": closed_at, "updated_at": closed_at}},
+    )
+    if getattr(result, "modified_count", 0):
+        participant_count = await db.tournament_registrations.count_documents({"tournament_id": tid, "status": "checked_in"})
+        await _audit_tournament_action(db, "tournament.checkin.close", actor_id, tid, {
+            "participant_count": participant_count, "bracket_built": bool(built),
+        })
+    return built
 
 
 @router.post("/{tid}/lock")
@@ -307,12 +338,14 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     pause_set, pause_unset = _pause_change(t, prev, status, body)
     auto_generated_bracket = None
     planning = None
-    if prev != status and status == "check_in":
-        auto_generated_bracket = await _finalize_bracket_for_checkin(db, {**t, "status": status}, me.get("id"))
+    # Der Baum steht erst mit dem Ende des Check-ins (#1551): beim Öffnen bleibt die Vorschau.
     if prev != status and status == "live":
         try:
             fresh_t = {**t, "status": status}
-            auto_generated_bracket = await _finalize_bracket_for_checkin(db, fresh_t, me.get("id"))
+            if prev == "check_in":
+                auto_generated_bracket = await close_check_in(db, fresh_t, me.get("id"))
+            else:
+                auto_generated_bracket = await _finalize_bracket_for_checkin(db, fresh_t, me.get("id"))
         except HTTPException as exc:
             auto_generated_bracket = {"ok": False, "reason": "generator_error", "detail": exc.detail}
 
@@ -334,6 +367,8 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     if prev != status:
         changed_at = now_utc().isoformat()
         change: dict = {"$set": {"status": status, "updated_at": changed_at, **pause_set}}
+        if status == "check_in" and t.get("check_in_closed_at"):
+            pause_unset = {**pause_unset, "check_in_closed_at": ""}
         if pause_unset:
             change["$unset"] = pause_unset
         await db.tournaments.update_one({"id": tid}, change)

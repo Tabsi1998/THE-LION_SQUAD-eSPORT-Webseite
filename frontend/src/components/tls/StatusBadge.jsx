@@ -27,6 +27,9 @@ const STATUS_MAP = {
   waitlist: { label: "WARTELISTE", cls: WAITING },
   checked_in: { label: "EINGECHECKT", cls: BRAND },
   no_show: { label: "NICHT ERSCHIENEN", cls: OVER },
+  // Ausgeschieden (#1553): vorbei, leise.
+  withdrawn: { label: "AUSGETRETEN", cls: OVER },
+  disqualified: { label: "DISQUALIFIZIERT", cls: OVER },
   disputed: { label: "KLÄRUNG", cls: WARN },
   ready: { label: "BEREIT", cls: BRAND },
   scheduled: { label: "ANGEKÜNDIGT", cls: "bg-brand/10 text-brand border-brand/40" },
