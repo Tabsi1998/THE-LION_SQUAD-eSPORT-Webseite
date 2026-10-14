@@ -74,8 +74,9 @@ export function AdmissionScreen(_props: Props) {
   // nur etwas an, wenn beides noch stimmt - auch nach einem Wechsel hin und zurück.
   const meetingRef = useRef<number | null>(null);
   const epochRef = useRef(0);
-  // Ein Scan auf einmal (#1056): die Sperre steht sofort, nicht erst nach dem nächsten Zeichnen.
-  const busyRef = useRef(false);
+  // Ein Scan auf einmal (#1056): die Sperre steht sofort, nicht erst nach dem nächsten Zeichnen. Sie gehört dem Auftrag,
+  // der sie gesetzt hat - ein Wechsel der Versammlung gibt sie frei, und eine späte Antwort löst keine neuere (#1064).
+  const busyRef = useRef<object | null>(null);
   // Reihenfolge der Abfragen (#1063): nur die zuletzt gestartete zählt, und keine, die vor einem eigenen Scan losging.
   const loadSeq = useRef(0);
   const changeSeq = useRef(0);
@@ -95,6 +96,8 @@ export function AdmissionScreen(_props: Props) {
     meetingRef.current = id;
     epochRef.current += 1;
     gate.reset();
+    busyRef.current = null;
+    setBusy(false);
     setMeetingId(id);
     setResult(null);
     setUndoFor(null);
@@ -146,10 +149,21 @@ export function AdmissionScreen(_props: Props) {
     return { id, current: () => mounted.current && epochRef.current === epoch && meetingRef.current === id };
   };
 
+  /** Sperre für diesen Auftrag setzen; `release` löst sie nur, wenn sie noch ihm gehört. */
+  const lock = () => {
+    const owner = {};
+    busyRef.current = owner;
+    setBusy(true);
+    return () => {
+      if (busyRef.current !== owner) return;
+      busyRef.current = null;
+      if (mounted.current) setBusy(false);
+    };
+  };
+
   const admit = async (payload: { code?: string; number?: string }) => {
     if (!meeting || busyRef.current) return;
-    busyRef.current = true;
-    setBusy(true);
+    const release = lock();
     const job = ticket(meeting.id);
     try {
       const data = await admitMember(job.id, payload);
@@ -161,16 +175,14 @@ export function AdmissionScreen(_props: Props) {
     } catch (error) {
       if (job.current()) setResult(resultFromError(error));
     } finally {
-      busyRef.current = false;
-      if (mounted.current) setBusy(false);
+      release();
     }
   };
 
   const undo = async (row: AdmissionRow) => {
     const text = reason.trim();
     if (!meeting || busyRef.current || !text || undoFor?.meetingId !== meeting.id || undoFor.memberId !== row.member_id || meetingRef.current !== meeting.id) return;
-    busyRef.current = true;
-    setBusy(true);
+    const release = lock();
     const job = ticket(meeting.id);
     try {
       const data = await undoAdmission(job.id, row.member_id, text);
@@ -183,8 +195,7 @@ export function AdmissionScreen(_props: Props) {
     } catch (error) {
       if (job.current()) setResult(resultFromError(error, "Nicht zurückgenommen"));
     } finally {
-      busyRef.current = false;
-      if (mounted.current) setBusy(false);
+      release();
     }
   };
 

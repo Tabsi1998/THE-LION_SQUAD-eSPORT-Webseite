@@ -434,3 +434,37 @@ test("dieselbe Person in beiden Versammlungen: die Rücknahme-Form der vorigen i
   expect(screen.queryByTestId("admission-undo-confirm")).toBeNull();
   expect(mockPost).not.toHaveBeenCalled();
 });
+
+test("hängender Scan der vorigen Versammlung sperrt die neue nicht, und seine späte Antwort löst die neue Sperre nicht", async () => {
+  mockGet.mockResolvedValue({ data: { ready: true, meetings: [MEETING, OTHER] } });
+  await render(<AdmissionScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("admission-camera")).toBeTruthy());
+  const old = deferred<unknown>();
+  mockPost.mockReturnValueOnce(old.promise);
+  await scan("https://lionsquad.at/card/alt");
+  expect(mockPost).toHaveBeenLastCalledWith("/admin/admission/41/scan", { code: "https://lionsquad.at/card/alt" });
+
+  // Wechsel zu 42: Scan und Nummer gehen sofort, ohne auf die Antwort für 41 zu warten.
+  await fireEvent.press(screen.getByTestId("admission-meeting-42"));
+  expect(screen.getByTestId("admission-camera").props.onBarcodeScanned).toEqual(expect.any(Function));
+  await fireEvent.changeText(screen.getByTestId("admission-number"), "1042");
+  expect(screen.getByTestId("admission-number-submit").props.accessibilityState?.disabled ?? false).toBe(false);
+  await fireEvent.changeText(screen.getByTestId("admission-number"), "");
+  const fresh = deferred<unknown>();
+  mockPost.mockReturnValueOnce(fresh.promise);
+  await scan("https://lionsquad.at/card/neu");
+  expect(mockPost).toHaveBeenLastCalledWith("/admin/admission/42/scan", { code: "https://lionsquad.at/card/neu" });
+  expect(mockPost).toHaveBeenCalledTimes(2);
+
+  // Die späte Antwort für 41 gibt die laufende Sperre von 42 nicht frei.
+  await act(async () => old.resolve({ data: { ok: true, admission: { member_id: 9, name: "Max Beispiel", state: "present", voting: true }, counts: { ...MEETING.counts, present: 3 } } }));
+  expect(screen.getByTestId("admission-camera").props.onBarcodeScanned).toBeUndefined();
+  expect(screen.getByTestId("admission-number-submit").props.accessibilityState?.disabled).toBe(true);
+  expect(screen.queryByTestId("admission-result")).toBeNull();
+
+  await act(async () => fresh.resolve({ data: { ok: true, already: false, admission: { member_id: 11, name: "Nora Neu", state: "present", voting: true },
+    counts: { ...OTHER.counts, present: 6 }, headline: "Anwesend: Nora Neu, stimmberechtigt" } }));
+  expect(screen.getByTestId("admission-result-headline")).toHaveTextContent("Anwesend: Nora Neu, stimmberechtigt");
+  expect(screen.getByTestId("admission-counts")).toHaveTextContent(/^6 anwesend/);
+  expect(screen.getByTestId("admission-camera").props.onBarcodeScanned).toEqual(expect.any(Function));
+});
