@@ -7,18 +7,27 @@ vi.mock("@/components/achievements/ceremony/sounds", async (importOriginal) => (
 
 const { PreviewTab } = await import("./PreviewTab");
 
+// Warum so gezielt gearbeitet wird: Die Vorschau zeichnet über 140 Abzeichen (je ein SVG mit vielen Knoten), und jeder
+// Schalter rendert sie alle neu; `getAllByRole` prüft zudem für jeden Treffer die Zugänglichkeit über die berechneten
+// Stile aller Vorfahren. In jsdom ist beides teuer und war auf einem ausgelasteten CI-Runner der Grund, warum zwei
+// Tests die 5-s-Grenze rissen. Deshalb: Rollen mit `hidden: true` abfragen und nach der Prüfung der vollen Galerie
+// per Suche auf ein Motiv verengen, wo der Test die Galerie nicht mehr braucht.
+const SINGLE_MOTIF = "stopwatch";
+
 describe("Vorschau im Erfolge-Admin (E8/E10)", () => {
   beforeEach(() => playCeremonySound.mockClear());
 
   it("zeigt alle Motive im Material, die Materialreihe und reagiert auf die Schalter", () => {
     render(<MemoryRouter><PreviewTab /></MemoryRouter>);
     const gallery = screen.getByTestId("preview-gallery");
-    expect(within(gallery).getAllByRole("button").length).toBeGreaterThanOrEqual(140);
+    expect(within(gallery).getAllByRole("button", { hidden: true }).length).toBeGreaterThanOrEqual(140);
     expect(screen.getByTestId("preview-count")).toHaveTextContent(/\d+ Motive/);
     const row = screen.getByTestId("preview-material-row");
-    expect(within(row).getAllByRole("img")).toHaveLength(9);
+    expect(within(row).getAllByRole("img", { hidden: true })).toHaveLength(9);
     expect(within(row).getByTestId("preview-material-legendary").querySelector("[data-lion-crest]")).not.toBeNull();
 
+    // Ab hier genügt ein Motiv in der Galerie: Die Schalter rendern sonst jedes Mal alle 140+ Abzeichen neu.
+    fireEvent.change(screen.getByTestId("preview-search"), { target: { value: SINGLE_MOTIF } });
     fireEvent.change(screen.getByTestId("preview-material"), { target: { value: "diamond" } });
     expect(within(gallery).getByTestId("preview-motif-stopwatch").querySelector("svg")).toHaveAttribute("data-material", "diamond");
     fireEvent.click(screen.getByTestId("preview-locked"));
@@ -40,6 +49,7 @@ describe("Vorschau im Erfolge-Admin (E8/E10)", () => {
 
   it("spielt eine Zeremonie aus Material, Kategorie und Ablauf ab – mit Klang und weniger Bewegung als Schalter", async () => {
     render(<MemoryRouter initialEntries={["/admin/achievements?tab=preview"]}><PreviewTab /></MemoryRouter>);
+    fireEvent.change(screen.getByTestId("preview-search"), { target: { value: SINGLE_MOTIF } });
     fireEvent.change(screen.getByTestId("ceremony-material"), { target: { value: "legendary" } });
     fireEvent.change(screen.getByTestId("ceremony-category"), { target: { value: "club" } });
     expect(screen.getByTestId("ceremony-reduced")).toHaveAttribute("aria-pressed", "true");
