@@ -30,6 +30,30 @@ export function stationCounts(states = []) {
   return { ...counts, text };
 }
 
+const HALL_RANK = { busy: 0, in_use: 0, reserved: 1, broken: 2 };
+
+/**
+ * Die Stationen der Halle (#1564, Teil von #1555): heute legt jedes Turnier seine Stationen selbst an, dieselbe Switch
+ * steht dann je Turnier einmal da. Bis die Stationen dem Event gehören, zählt eine Station mit gleichem Namen (ohne
+ * Groß-/Kleinschreibung und doppelte Leerzeichen) und gleichem Gerät nur einmal. Es gilt der lebhafteste Stand -
+ * belegt vor aufgerufen vor defekt vor frei -, `ids` nennt alle Kennungen (für Spiele, die eine davon tragen).
+ */
+export function hallStations(stations = []) {
+  const groups = new Map();
+  for (const station of stations || []) {
+    if (!station?.id) continue;
+    const name = String(station.name || station.label || station.id).trim().replace(/\s+/g, " ").toLowerCase();
+    const key = `${name}|${String(station.device_type || "").toLowerCase()}`;
+    const group = groups.get(key) || [];
+    if (!group.some((entry) => entry.id === station.id)) group.push(station);
+    groups.set(key, group);
+  }
+  return [...groups.values()].map((group) => {
+    const ranked = [...group].sort((a, b) => (HALL_RANK[String(a.status || "").toLowerCase()] ?? 9) - (HALL_RANK[String(b.status || "").toLowerCase()] ?? 9));
+    return { ...ranked[0], ids: ranked.map((station) => station.id) };
+  });
+}
+
 /** Stationen in einer ruhigen Reihenfolge: nach Name, Zahlen richtig („PC 2“ vor „PC 10“). */
 export function sortStations(stations = []) {
   return [...(stations || [])].sort((a, b) => String(a.name || a.label || a.id).localeCompare(String(b.name || b.label || b.id), "de", { numeric: true }));

@@ -431,6 +431,10 @@ test.describe("TV III: Ablauf im Raum (Meilenstein 60)", () => {
 
     // Ein Ergebnis während der Zahlen: die Zahlen machen Platz, das Ergebnis kommt zuerst.
     expect(await runUntil(page, async () => (await slideOf(page)) === "stats", 30_000)).toBe(true);
+    // Die gestellte Uhr springt in Schritten von Sekunden, der nachgestellte Strom endet nach jeder Antwort: für den TV
+    // sieht das wie eine Unterbrechung aus (Ersatz-Abfragen im Takt), danach holt er einmal still nach (#1564). Dieser
+    // Test prüft ein Ergebnis bei stehender Verbindung - also erst die Verbindung ein paar Hundert Millisekunden stehen lassen.
+    await page.waitForTimeout(800);
     T.decide(bracket, "D");
     state.bracket = T.clone(bracket);
     state.push();

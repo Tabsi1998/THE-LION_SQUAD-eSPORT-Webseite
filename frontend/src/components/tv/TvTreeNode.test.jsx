@@ -106,3 +106,73 @@ test("am TV: ein zusammengelegter Lauf nennt den Sammellauf (#1561, echter Umbau
   renderNode(bracket, "C");
   expect(screen.getByTestId(`tv-match-${find(bracket, "C").id}`)).toHaveTextContent("zusammengelegt in B");
 });
+
+// ---------------------------------------------------------------- #1564: dieselben Regeln wie im Web-Baum
+// TV-Bäume aus dem echten Generator und den echten Routen, so wie der Beamer sie bekommt (scripts/make_tv_bracket_fixture.py).
+const generated = async (name) => structuredClone((await import("../../../e2e/fixtures/tvGenerated.json")).default[name]);
+const keyed = (bracket, key) => bracket.matches_v2.find((match) => match.match_key === key);
+
+function renderGenerated(bracket, key, tree = {}) {
+  const match = keyed(bracket, key);
+  const regMap = new Map(bracket.registrations.map((reg) => [reg.id, reg]));
+  const value = { matches: bracket.matches_v2, hiddenSlots: new Set(), landing: new Set(), goldCards: new Set(), goldRows: new Set(), finished: false, lastStageId: null, isTable: () => false, ...tree };
+  render(
+    <TvTreeContext.Provider value={value}>
+      <TvTreeNode match={match} regMap={regMap} podiumMap={buildPodiumMap(bracket.matches_v2, bracket.stages)} findMatch={finderFor(bracket.matches_v2)(match)} />
+    </TvTreeContext.Provider>,
+  );
+  return screen.getByTestId(`tv-match-${match.id}`);
+}
+
+test("Freilos-Duell als eine Zeile: „Freilos: … kommt weiter“ - ohne leere Gegner-Zeile", async () => {
+  const bracket = await generated("se6");
+  const card = renderGenerated(bracket, "A");
+  const name = bracket.registrations.find((reg) => reg.id === keyed(bracket, "A").slots[0].registration_id).display_name;
+  expect(card).toHaveAttribute("data-bye", "1");
+  expect(card).toHaveTextContent(`Freilos: ${name} kommt weiter`);
+  expect(card.querySelectorAll("[data-tv-slot]")).toHaveLength(1);
+});
+
+test("kampflos: der Kopf sagt „kampflos“, wer nicht angetreten ist, steht durchgestrichen und blass", async () => {
+  const bracket = await generated("se8_walkover");
+  const match = bracket.matches_v2.find((row) => row.status === "forfeit");
+  const card = renderGenerated(bracket, match.match_key);
+  expect(card).toHaveAttribute("data-walkover", "1");
+  expect(card.querySelector(".tv-node__status")).toHaveTextContent("kampflos");
+  const gone = match.results.find((row) => row.forfeit).registration_id;
+  const row = card.querySelector(`[data-tv-reg='${gone}']`);
+  expect(row.className).toContain("tv-row--gone");
+  expect(row).toHaveTextContent("nicht angetreten");
+});
+
+test("ausgefallen im Lauf: nicht ins Ziel gekommen - durchgestrichen, mit Wort statt nur Farbe", async () => {
+  const bracket = await generated("ffa16_round1");
+  const card = renderGenerated(bracket, "A");
+  const out = keyed(bracket, "A").results.find((row) => row.dnf).registration_id;
+  const row = card.querySelector(`[data-tv-reg='${out}']`);
+  expect(row.className).toContain("tv-row--gone");
+  expect(row).toHaveTextContent("ausgefallen");
+});
+
+test("entfällt: die Karte tritt zurück (leise, gestrichelt) und sagt warum", async () => {
+  const bracket = await generated("de16_no_reset");
+  const card = renderGenerated(bracket, "GFR");
+  expect(card.className).toContain("tv-node--void");
+  expect(card).toHaveTextContent("entfällt · nicht nötig");
+  // Wie im Web-Baum eine ruhige Zeile: keine Namen- oder Freilos-Zeilen mehr darunter.
+  expect(card.querySelectorAll("[data-tv-slot]")).toHaveLength(0);
+});
+
+test("zusammengelegter Lauf (echter Umbau): nur der Kopf mit „zusammengelegt in …“, keine vier Freilos-Zeilen", async () => {
+  const bracket = await generated("ffa8_after_merge");
+  const card = renderGenerated(bracket, "C");
+  expect(card).toHaveTextContent("zusammengelegt in B");
+  expect(card.querySelectorAll("[data-tv-slot]")).toHaveLength(0);
+});
+
+test("eine Karte mit Bewegung „kampflos“ oder „entfällt“ trägt sie genau dann, wenn die Bühne sie setzt", async () => {
+  const bracket = await generated("se8_walkover");
+  const match = bracket.matches_v2.find((row) => row.status === "forfeit");
+  const card = renderGenerated(bracket, match.match_key, { marks: new Map([[match.id, "walkover"]]) });
+  expect(card).toHaveAttribute("data-mark", "walkover");
+});

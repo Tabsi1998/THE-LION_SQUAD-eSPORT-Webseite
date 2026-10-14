@@ -114,3 +114,51 @@ test("der Weg folgt der Linie und endet am Ziel-Platz; ins Loser Bracket ein ruh
   expect(end.y).toBeCloseTo(600);
   expect(routePath(curve)).toMatch(/^M100 50C/);
 });
+
+// ---------------------------------------------------------------- #1564: Flug mit Liebe zum Detail
+import { landFrame, rideFrame } from "./tvTravel";
+
+describe("Flug am Beamer (#1564): weich an, weich ab, leicht angehoben, weich gelandet", () => {
+  const route = { kind: "line", points: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 200, y: 100 }] };
+
+  it("startet langsam, ist in der Mitte etwa auf halbem Weg und kommt weich an", () => {
+    expect(rideFrame(route, 0)).toMatchObject({ x: 0, y: 0, scale: 1, drawn: 0 });
+    const early = rideFrame(route, 0.15);
+    // Ein gleichmäßiger Flug wäre bei 15 % schon 45 Punkte weit - weich angefahren deutlich weniger.
+    expect(early.drawn).toBeLessThan(0.15);
+    const middle = rideFrame(route, 0.5);
+    expect(middle.drawn).toBeGreaterThan(0.4);
+    expect(middle.drawn).toBeLessThan(0.7);
+    expect(rideFrame(route, 1)).toMatchObject({ x: 200, y: 100, scale: 1, drawn: 1 });
+  });
+
+  it("der Name hebt sich im Flug leicht an (höchstens 8 %) und setzt am Ziel wieder auf", () => {
+    const scales = Array.from({ length: 21 }, (_, index) => rideFrame(route, index / 20).scale);
+    expect(Math.max(...scales)).toBeGreaterThan(1.05);
+    expect(Math.max(...scales)).toBeLessThanOrEqual(1.08);
+    expect(scales[0]).toBe(1);
+    expect(scales[20]).toBe(1);
+  });
+
+  it("die Linie zeichnet sich hinter dem Namen her - genau bis zu ihm", () => {
+    for (const t of [0.2, 0.4, 0.8]) {
+      const frame = rideFrame(route, t);
+      const along = 300 * frame.drawn;
+      const expected = along <= 100 ? { x: along, y: 0 } : along <= 200 ? { x: 100, y: along - 100 } : { x: along - 100, y: 100 };
+      expect(frame.x).toBeCloseTo(expected.x, 5);
+      expect(frame.y).toBeCloseTo(expected.y, 5);
+    }
+  });
+
+  it("Landen: gleitet in den Platz, wird etwas kleiner und blendet aus - weich auslaufend", () => {
+    const from = { x: 200, y: 100 };
+    const to = { x: 220, y: 100 };
+    expect(landFrame(from, to, 0)).toMatchObject({ x: 200, y: 100, scale: 1, opacity: 1 });
+    const half = landFrame(from, to, 0.5);
+    // Ausfedern: nach der Hälfte der Zeit schon mehr als die Hälfte des Wegs.
+    expect(half.x).toBeGreaterThan(210);
+    expect(half.scale).toBeGreaterThan(0.9);
+    expect(landFrame(from, to, 1)).toMatchObject({ x: 220, y: 100, opacity: 0 });
+    expect(landFrame(from, to, 1).scale).toBeCloseTo(0.9, 5);
+  });
+});

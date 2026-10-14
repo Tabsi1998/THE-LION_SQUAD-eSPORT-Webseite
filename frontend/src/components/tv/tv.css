@@ -354,6 +354,19 @@
 .tv-qr { flex-shrink: 0; background: #ffffff; padding: calc(var(--tv-u) * 0.55); border-radius: 2px; line-height: 0; }
 .tv-qr > span { width: var(--tv-qr) !important; height: var(--tv-qr) !important; }
 .tv-sponsors { flex: 1 1 auto; min-width: 0; max-width: 58%; }
+/* „Läuft“ und „Als Nächstes“ (#1564): immer im Fuß, auch während der Kamerafahrt. Der Verzug in der Warn-Farbe, aber
+   immer in Worten. Lange Namen brechen um, nie „…“. */
+.tv-nextup { flex: 1 1 auto; display: flex; align-items: stretch; gap: calc(var(--tv-u) * 2); min-width: 0; }
+.tv-nextup__item { display: flex; flex-direction: column; justify-content: center; gap: calc(var(--tv-u) * 0.2); min-width: 0; padding-left: calc(var(--tv-u) * 1.4); border-left: var(--tv-line-w) solid var(--tv-line); }
+.tv-nextup__kicker { color: var(--tv-gold); }
+.tv-nextup__item--in { animation: tv-rise var(--tls-motion-mid) var(--tls-ease) both; }
+.tv-nextup__item--live .tv-nextup__kicker { color: var(--tv-live); }
+.tv-nextup__what { font-size: var(--tv-fs-name); line-height: 1.15; font-weight: 700; overflow-wrap: anywhere; }
+/* Namen nie unter der Untergrenze für Namen (#1111) - auch im Fuß. */
+.tv-nextup__who { font-size: var(--tv-fs-name-min); line-height: 1.15; overflow-wrap: anywhere; }
+.tv-nextup__when { font-size: var(--tv-fs-name); line-height: 1.15; font-weight: 700; color: var(--tv-text); }
+.tv-nextup__delay { font-size: var(--tv-fs-info); font-weight: 700; color: var(--tls-warn); }
+.tv-nextup__spot { font-size: var(--tv-fs-info); }
 .tv-sponsor { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; height: calc(var(--tv-u) * 4.6); width: calc(var(--tv-u) * 15); opacity: 0.9; }
 .tv-sponsor--main { height: calc(var(--tv-u) * 5.4); width: calc(var(--tv-u) * 18); }
 .tv-screen[data-tv-contrast="1"] .tv-sponsor { opacity: 1; }
@@ -498,8 +511,17 @@
 }
 .tv-ko__cards { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: space-around; gap: calc(var(--tv-u) * var(--tv-b-gap)); }
 .tv-ko__card { position: relative; }
-.tv-ko .tls-bracket-line { stroke: var(--tv-line-strong); stroke-width: 3px; }
-.tv-screen[data-tv-contrast="1"] .tv-ko .tls-bracket-line { stroke: #ffffff; stroke-width: 4px; }
+/* Linien (#1564): ein SVG je Phase, dieselbe Führung wie im Web-Baum (lib/bracketLines) - auch über die Blöcke. Der
+   Abstieg ins Loser Bracket ist da, aber leise (dünn, gestrichelt, ruhige Farbe); Entfallenes gestrichelt und blass. */
+.tv-tree__stage { position: relative; }
+.tv-tree__lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.tv-tree__lines .tls-bracket-line { fill: none; stroke: var(--tv-line-strong); stroke-width: 3px; }
+.tv-tree__lines .tls-bracket-line--drop { stroke: var(--tv-muted); stroke-width: 2px; stroke-dasharray: 6 10; opacity: 0.4; }
+.tv-tree__lines .tls-bracket-line--void { stroke-dasharray: 8 10; opacity: 0.4; }
+/* Gemischte Runden (#1548): die Schiene steht, der echte Weg über sie ist nur Bahn für die Fahrt der Auslosung. */
+.tv-tree__lines .tls-bracket-line--real { opacity: 0; }
+.tv-screen[data-tv-contrast="1"] .tv-tree__lines .tls-bracket-line { stroke: var(--tv-text); stroke-width: 4px; }
+.tv-screen[data-tv-contrast="1"] .tv-tree__lines .tls-bracket-line--drop { stroke-width: 3px; opacity: 0.8; }
 .tv-table { display: flex; flex-direction: column; gap: calc(var(--tv-u) * 1.4); }
 .tv-table__grid {
   display: grid;
@@ -514,6 +536,8 @@
 .tv-node__name { font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--tv-accent); }
 .tv-node__meta { color: var(--tv-faint); }
 .tv-node__status { flex-shrink: 0; text-align: right; color: var(--tv-faint); }
+/* Verzug (#1564): die neue Prognose steht als Zeit da, klein darunter in der Warn-Farbe, um wie viel später. */
+.tv-node__late { display: block; font-weight: 700; color: var(--tls-warn); }
 .tv-node__live { flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.45em; color: var(--tv-live); font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; }
 .tv-node--live { border-color: var(--tv-live); }
 .tv-node--live::after {
@@ -547,11 +571,38 @@
 .tv-row--gold { background: var(--tv-gold-soft); box-shadow: inset calc(var(--tv-u) * 0.35) 0 0 var(--tv-gold); }
 .tv-row--gold .tv-row__name, .tv-row--gold .tv-row__score { color: var(--tv-gold); font-weight: 700; }
 /* Landen (#1117): der Platz leuchtet kurz auf, der Name gleitet hinein. */
-.tv-row--land::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: rgba(41, 182, 232, 0.45); animation: tv-land 1s ease-out forwards; }
+.tv-row--land::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: rgba(41, 182, 232, 0.45); animation: tv-land calc(var(--tls-motion-slow) * 2.4) var(--tls-ease) forwards; }
 .tv-row--land .tv-row__name { animation: tv-slide-in 0.55s var(--tls-ease) both; }
 @keyframes tv-land { from { opacity: 1; } to { opacity: 0; } }
 @keyframes tv-slide-in { from { opacity: 0; transform: translateX(calc(var(--tv-u) * -1.2)); } }
 .tv-screen[data-tv-motion="off"] .tv-row--land::after { display: none; }
+
+/* #1564 - dieselben Regeln wie im Web-Baum, lesbar aus 5 m: Entfallenes tritt zurück (blass, gestrichelt, mit Grund im
+   Kopf), wer ausgefallen ist, steht durchgestrichen und mit Wort da (nie nur Farbe), ein Freilos ist eine Zeile. */
+.tv-node--void { opacity: 0.55; border-style: dashed; }
+.tv-screen[data-tv-contrast="1"] .tv-node--void { opacity: 0.85; }
+.tv-node--bye .tv-row__name { color: var(--tv-muted); font-style: italic; }
+.tv-row--gone .tv-row__name > .min-w-0 { text-decoration: line-through; text-decoration-thickness: 0.12em; color: var(--tv-faint); }
+.tv-row--gone .tv-avatar { opacity: 0.5; }
+.tv-row--gone .tv-row__name { flex-wrap: wrap; row-gap: 0; }
+.tv-row__gone { flex-basis: 100%; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; color: var(--tv-muted); }
+
+/* Bewegungen je Ereignis (#1564) - genau einmal, gesetzt von der Bühne. Am TV ruhiger als im Web: längere Zeiten, eine
+   Bewegung nach der anderen. „Bewegung reduzieren“ schaltet sie oben für alle TV-Seiten ab (Endzustand sofort). */
+/* Auslosung: die Namen kommen nacheinander in die Läufe. */
+@keyframes tv-row-draw { from { opacity: 0; transform: translateX(calc(var(--tv-u) * -1.4)); } }
+.tv-row--draw { animation: tv-row-draw var(--tls-motion-slow) var(--tls-ease) both; animation-delay: calc(var(--tv-i, 0) * var(--tv-draw-step, 60ms)); }
+/* kampflos: das Wort im Kopf leuchtet zweimal auf. */
+/* Nur Deckkraft (#1564): eine Fläche hinter dem Wort leuchtet zweimal auf - kein Malen von Hintergrund oder Schatten. */
+@keyframes tv-glow-pulse { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+.tv-node[data-mark="walkover"] .tv-node__status { position: relative; color: var(--tv-accent); font-weight: 700; }
+.tv-node[data-mark="walkover"] .tv-node__status::after {
+  content: ""; position: absolute; inset: -0.1em -0.3em; border-radius: 2px; background: var(--tv-accent-soft); opacity: 0; pointer-events: none;
+  animation: tv-glow-pulse calc(var(--tls-motion-slow) * 2) var(--tls-ease) 2;
+}
+/* entfällt / zusammengelegt: die Karte tritt zurück. */
+@keyframes tv-node-recede { from { opacity: 1; } to { opacity: 0.55; } }
+.tv-node[data-mark="fate"] { animation: tv-node-recede calc(var(--tls-motion-slow) * 3) var(--tls-ease) both; }
 
 /* Live-Spotlight (#1116): Station und Spielzeit groß unter dem laufenden Spiel. */
 .tv-spot {
@@ -707,6 +758,18 @@
   animation: tv-drop-in 0.5s var(--tls-ease) both;
 }
 .tv-screen[data-tv-contrast="1"] .tv-live-banner { background: #000000; }
+/* Ereignis-Banner (#1564): Auslosung, zusammengelegt, entfällt - in der Markenfarbe statt Live-Rot. Die frei gewordene
+   Station leuchtet kurz in Grün („frei“). */
+.tv-live-banner--event { border-color: var(--tv-accent); }
+.tv-live-banner__mark { width: 0.55em; height: 0.55em; flex-shrink: 0; background: var(--tv-accent); }
+.tv-live-banner__note { position: relative; padding: 0.1em 0.5em; border-radius: 3px; color: var(--tv-green); background: var(--tv-green-soft); }
+.tv-live-banner__note::after {
+  content: ""; position: absolute; inset: -0.18em; border: 0.12em solid var(--tv-green); border-radius: 5px; opacity: 0; pointer-events: none;
+  animation: tv-glow-pulse calc(var(--tls-motion-slow) * 2) var(--tls-ease) var(--tls-motion-slow) 2;
+}
+/* Der Banner geht so, wie er kam - nach oben, ausblendend (statt einfach weg). */
+.tv-live-banner[data-leaving="1"] { animation: tv-drop-out var(--tls-motion-mid) var(--tls-ease) both; }
+@keyframes tv-drop-out { to { opacity: 0; transform: translate(-50%, -60%); } }
 .tv-champion {
   display: grid;
   justify-items: center;
@@ -986,6 +1049,8 @@
 }
 .tv-call-next__who { font-weight: 700; }
 .tv-call-next__time { color: var(--tv-muted); white-space: nowrap; }
+.tv-call-next__when { display: flex; flex-direction: column; align-items: flex-end; }
+.tv-call-next__delay { font-weight: 700; color: var(--tls-warn); white-space: nowrap; }
 .tv-calls--empty { justify-content: center; }
 .tv-calls__quiet { display: grid; gap: calc(var(--tv-u) * 1); justify-items: center; text-align: center; padding: calc(var(--tv-u) * 3) 0; }
 .tv-calls__upcoming { display: grid; gap: calc(var(--tv-u) * 1.2); }
@@ -1270,6 +1335,8 @@
 }
 .tv-nownext__live { color: var(--tv-live); }
 .tv-nownext__title { font-size: calc(var(--tv-fs-head) * 1.25); line-height: 1.1; font-weight: 900; text-transform: uppercase; overflow-wrap: anywhere; }
+.tv-nownext__match { font-weight: 700; overflow-wrap: anywhere; }
+.tv-nownext__delay { color: var(--tls-warn); }
 
 /* ------------------------------------------ Fast Lap (#1127): Bestzeit-Moment und Zeilen, die an ihren Platz gleiten */
 .tv-lap-face { width: calc(var(--tv-u) * 3.6); height: calc(var(--tv-u) * 3.6); font-size: var(--tv-fs-meta); }
@@ -1321,3 +1388,20 @@
 .tv-best__gap { padding: 0.3em 0.7em; border: var(--tv-line-w) solid currentColor; border-radius: 2px; color: var(--tv-green); background: var(--tv-green-soft); font-weight: 700; font-variant-numeric: tabular-nums; }
 .tv-station__call { display: flex; align-items: center; gap: calc(var(--tv-u) * 2); }
 .tv-station__call .tv-call__go { margin-top: 0; }
+
+/* ---------------------------------------------------------------- Momente mit Liebe zum Detail (#1564)
+   Gleiche Kurve (--tls-ease) und gestaffelt statt gleichzeitig: die Plätze der Ergebnis-Karte kommen nacheinander,
+   die Zahlen zählen hoch (TvMoments.CountUp), der Pokal glänzt einmal. Nur Verschieben und Deckkraft. */
+.tv-result__row { animation: tv-rise var(--tls-motion-slow) var(--tls-ease) both; animation-delay: calc(0.25s + var(--tv-i, 0) * 0.09s); }
+.tv-result__score { font-variant-numeric: tabular-nums; }
+.tv-champion__cup-shine { position: relative; display: inline-flex; overflow: hidden; border-radius: 0.25em; }
+.tv-champion__trophy { width: 1.6em; height: 1.6em; }
+.tv-champion__cup-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, color-mix(in srgb, var(--tv-text) 80%, transparent) 50%, transparent 70%);
+  transform: translateX(-130%);
+  animation: tv-cup-shine calc(var(--tls-motion-slow) * 3) var(--tls-ease) calc(var(--tls-motion-slow) * 2) both;
+}
+@keyframes tv-cup-shine { to { transform: translateX(130%); } }

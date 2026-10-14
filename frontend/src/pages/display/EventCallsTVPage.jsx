@@ -6,8 +6,9 @@ import { TvFooter, TvHeader, TvPill } from "@/components/tv/TvParts";
 import { TvCallBoard } from "@/components/tv/TvCallBoard";
 import { avatarOfRegistration, nameOfRegistration } from "@/components/tv/TvMoments";
 import { useEventHall } from "@/components/tv/useEventHall";
-import { useTvSound } from "@/components/tv/tvHooks";
-import { callsOf, newCalls, nextPlanned } from "@/lib/tvCalls";
+import { useMinuteTick, useTvSound } from "@/components/tv/tvHooks";
+import { callsOf, newCalls } from "@/lib/tvCalls";
+import { nextUp } from "@/lib/tvForecast";
 
 // Aufruf-Tafel für ein ganzes Event (#1122): ein Bildschirm nur für Aufrufe, über alle Turniere des Events - wer jetzt an
 // welche Station soll, mit Countdown. Ohne Aufrufe „Gerade keine Aufrufe“ und die nächsten geplanten Spiele. Der Gong
@@ -26,7 +27,9 @@ function EventCallsTv() {
   const { settings } = useTv();
   const { event, stations, matches, registrations, tournamentOfMatch, loadError, lastUpdated, load } = useEventHall(id);
   const calls = useMemo(() => callsOf(matches, stations, { reportMinutes: settings.report_minutes }), [matches, stations, settings.report_minutes]);
-  const upcoming = useMemo(() => nextPlanned(matches, calls, { limit: 3 }), [matches, calls]);
+  // Was danach kommt (#1564): mit Prognose und Verzug - jede Minute neu gerechnet.
+  const minute = useMinuteTick();
+  const upcoming = useMemo(() => nextUp(matches, { stations, now: Math.max(Date.now(), minute * 60000), limit: 3, exclude: new Set(calls.map((call) => call.matchId)) }), [matches, stations, calls, minute]);
   const nameOf = useMemo(() => nameOfRegistration(registrations), [registrations]);
   const avatarOf = useMemo(() => avatarOfRegistration(registrations), [registrations]);
   const titles = new Set(matches.map((match) => tournamentOfMatch(match)).filter(Boolean));
