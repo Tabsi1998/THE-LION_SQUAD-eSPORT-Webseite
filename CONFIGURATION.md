@@ -41,7 +41,9 @@ Mit `false` lassen sich Einrichtung und Anmeldung abschalten.
 1. Mit bestätigter E-Mail-Adresse anmelden und gegebenenfalls Admin-MFA abschließen.
 2. Unter **Einstellungen → Sicherheit → Passkeys** einen Namen und das aktuelle Passwort
    eingeben, „Passkey hinzufügen“ wählen und den Gerätedialog bestätigen.
-3. Abmelden und **Mit Passkey anmelden** testen. Die Geräte-PIN, Fingerabdruck oder
+3. Abmelden und die Anmeldung testen: Ins E-Mail-Feld tippen, der Browser schlägt den
+   Passkey dort selbst vor (#1520). Browser ohne diesen Vorschlag zeigen darunter den Link
+   **Mit Passkey anmelden**. Die Geräte-PIN, Fingerabdruck oder
    Gesichtserkennung wird vom Gerät geprüft. Ein Passkey zählt als zweiter Faktor (kein Code danach); die Zwei-Faktor-Anmeldung muss für Adminbereiche trotzdem eingerichtet sein.
 4. Einen zweiten Passkey bzw. den bisherigen Passwort-Zugang als Rückfall behalten.
    Entfernen ist im Profil mit Passwortbestätigung möglich; bestehende Sitzungen

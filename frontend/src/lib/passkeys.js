@@ -105,34 +105,72 @@ export async function passkeyAutofillAvailable() {
 
 // Die Anfrage des Servers gilt fünf Minuten; so lange sitzt mancher vor dem Login.
 const AUTOFILL_REARM_MS = 4 * 60 * 1000;
+// Lehnt der Browser schneller ab, kann er den Vorschlag gar nicht zeigen - dann nicht immer wieder fragen.
+const AUTOFILL_INSTANT_REJECT_MS = 2000;
+
+async function runAlone(task) {
+  try {
+    return { started: true, value: await task() };
+  } catch (error) {
+    return { started: true, error };
+  }
+}
 
 /**
- * Der Browser schlägt gespeicherte Passkeys im E-Mail-Feld vor (#348). Die Anfrage bleibt im
- * Hintergrund offen und wird vor Ablauf erneuert. Liefert eine Funktion zum Beenden - nötig,
- * bevor „Mit Passkey anmelden“ eine eigene Anfrage startet, denn es darf nur eine geben.
+ * Der Browser schlägt gespeicherte Passkeys im E-Mail-Feld vor (#348, #1520) - statt eines eigenen Knopfs.
+ * Die Anfrage bleibt im Hintergrund offen und wird vor Ablauf erneuert. `exclusive` lässt die Prüfung am
+ * Server nur laufen, wenn nicht schon eine andere Anmeldung läuft (kein doppeltes Anmelden). Abbruch und eine
+ * abgelehnte Auswahl bleiben still; `onError` hört nur, was der Server ablehnt. Danach endet der Vorschlag:
+ * sonst böte der Browser denselben Passkey gleich wieder an. `onEnd` meldet, dass der Vorschlag nicht mehr
+ * läuft und die Seite den Weg über „Mit Passkey anmelden“ zeigen soll; neu starten darf nur die Seite.
+ * Liefert eine Funktion zum Beenden: beim Verlassen der Seite, beim Absenden des Passworts und bevor eine
+ * eigene Passkey-Anfrage startet - es darf nur eine geben.
  */
-export function startPasskeyAutofill({ remember = () => true, onSignedIn, onError }) {
+export function startPasskeyAutofill({ remember = () => true, exclusive = runAlone, onSignedIn, onError, onEnd }) {
   let stopped = false;
   let controller = null;
   let timer = null;
+  const end = () => {
+    if (stopped) return;
+    stopped = true;
+    onEnd?.();
+  };
   const arm = async () => {
     if (stopped) return;
     controller = new AbortController();
+    let options;
     try {
-      const { data: options } = await api.post("/auth/passkeys/login/options", {}, { skipInvalidation: true });
-      if (stopped) return;
+      ({ data: options } = await api.post("/auth/passkeys/login/options", {}, { skipInvalidation: true }));
+    } catch {
+      end();
+      return;
+    }
+    if (stopped) return;
+    const asked = Date.now();
+    let credential;
+    try {
       timer = setTimeout(() => controller.abort(), AUTOFILL_REARM_MS);
-      const credential = await navigator.credentials.get({ publicKey: credentialOptions(options), mediation: "conditional", signal: controller.signal });
-      clearTimeout(timer);
-      if (stopped) return;
-      const data = await verifyLogin(options, credential, remember());
-      onSignedIn(data);
+      credential = await navigator.credentials.get({ publicKey: credentialOptions(options), mediation: "conditional", signal: controller.signal });
     } catch (error) {
-      clearTimeout(timer);
       if (stopped) return;
       if (error?.name === "AbortError") { arm(); return; }
-      onError?.(error);
+      if (error?.name === "NotAllowedError" && Date.now() - asked >= AUTOFILL_INSTANT_REJECT_MS) { arm(); return; }
+      end();
+      return;
+    } finally {
+      clearTimeout(timer);
     }
+    if (stopped) return;
+    const attempt = await exclusive(() => verifyLogin(options, credential, remember()));
+    if (!attempt.started) return;
+    if (attempt.error) {
+      if (stopped) return;
+      onError?.(attempt.error);
+      end();
+      return;
+    }
+    stopped = true;
+    onSignedIn(attempt.value);
   };
   arm();
   return () => {

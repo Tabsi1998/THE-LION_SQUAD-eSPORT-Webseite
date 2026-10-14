@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -98,18 +98,116 @@ test("„Nicht mehr fragen“ gilt – und wer schon einen Passkey hat, wird gar
   expect(screen.queryByTestId("passkey-offer")).toBeNull();
 });
 
-test("kann der Browser Passkeys vorschlagen, startet das im Hintergrund und endet vor dem Knopf", async () => {
+// #1520: kein Knopf „Passkey verwenden“ mehr. Kann der Browser Passkeys im E-Mail-Feld vorschlagen, läuft das still
+// im Hintergrund; nur ohne diese Fähigkeit bleibt ein unauffälliger Link.
+function autofillStarted() {
   const stop = vi.fn();
   passkeys.passkeyAutofillAvailable.mockResolvedValue(true);
   passkeys.startPasskeyAutofill.mockReturnValue(stop);
-  passkeys.signInWithPasskey.mockResolvedValue({ id: "u1" });
-  const user = userEvent.setup();
+  return stop;
+}
+const autofillArgs = () => passkeys.startPasskeyAutofill.mock.calls.at(-1)[0];
+
+test("kann der Browser Passkeys vorschlagen, startet das beim Laden – ohne Knopf und ohne Link", async () => {
+  autofillStarted();
   renderPage();
   await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1));
   expect(screen.getByTestId("login-email")).toHaveAttribute("autocomplete", "username webauthn");
-  await user.click(await screen.findByTestId("login-passkey"));
+  expect(screen.queryByTestId("login-passkey")).toBeNull();
+  expect(screen.queryByRole("button", { name: /passkey/i })).toBeNull();
+  expect(screen.getByText(/schlägt dein Browser ihn hier vor/)).toBeInTheDocument();
+  expect(autofillArgs().remember()).toBe(true);
+});
+
+test("ein gewählter Passkey meldet an und folgt dem Ziel; verlangt der Server einen Code, kommt der Schritt", async () => {
+  autofillStarted();
+  renderPage();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalled());
+  autofillArgs().onSignedIn({ mfa_required: true, mfa_ticket: "ticket-1" });
+  expect(authState.setMfaTicket).toHaveBeenCalledWith("ticket-1");
+  autofillArgs().onSignedIn({ id: "u1" });
+  expect(authState.setUser).toHaveBeenCalledWith({ id: "u1" });
+  await waitFor(() => expect(screen.getByText("mitgliederbereich")).toBeInTheDocument());
+});
+
+test("Absenden des Passworts bricht den Vorschlag ab; scheitert das Passwort, schlägt der Browser wieder vor", async () => {
+  const stop = autofillStarted();
+  authState.login.mockResolvedValue({ ok: false, error: "Falsches Passwort" });
+  const user = userEvent.setup();
+  renderPage();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1));
+  await fillAndSubmit(user);
   expect(stop).toHaveBeenCalled();
+  expect(authState.login).toHaveBeenCalledTimes(1);
+  expect(await screen.findByText("Falsches Passwort")).toBeInTheDocument();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(2));
+});
+
+test("prüft der Server gerade einen Passkey, startet das Passwort keine zweite Anmeldung", async () => {
+  autofillStarted();
+  const user = userEvent.setup();
+  renderPage();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalled());
+  let finish;
+  const running = autofillArgs().exclusive(() => new Promise((resolve) => { finish = resolve; }));
+  await user.type(screen.getByTestId("login-email"), "paula@lionsquad-test.at");
+  await user.type(screen.getByTestId("login-password"), "geheim-geheim-42");
+  await user.click(screen.getByTestId("login-submit"));
+  expect(authState.login).not.toHaveBeenCalled();
+  finish({ id: "u1" });
+  expect(await running).toEqual({ started: true, value: { id: "u1" } });
+});
+
+test("beim Verlassen der Seite endet der Vorschlag", async () => {
+  const stop = autofillStarted();
+  const { unmount } = renderPage();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalled());
+  unmount();
+  expect(stop).toHaveBeenCalled();
+});
+
+test("ohne Vorschlag im Browser bleibt ein unauffälliger Link mit dem bisherigen Weg", async () => {
+  passkeys.signInWithPasskey.mockResolvedValue({ id: "u1" });
+  const user = userEvent.setup();
+  renderPage();
+  const link = await screen.findByTestId("login-passkey");
+  expect(link).toHaveTextContent("Mit Passkey anmelden");
+  expect(link.className).not.toMatch(/tls-btn/);
+  expect(passkeys.startPasskeyAutofill).not.toHaveBeenCalled();
+  await user.click(link);
   await waitFor(() => expect(passkeys.signInWithPasskey).toHaveBeenCalledWith({ remember: true }));
+  await waitFor(() => expect(screen.getByText("mitgliederbereich")).toBeInTheDocument());
+});
+
+test("endet der Vorschlag von selbst, erscheint der Link", async () => {
+  autofillStarted();
+  renderPage();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalled());
+  expect(screen.queryByTestId("login-passkey")).toBeNull();
+  act(() => autofillArgs().onEnd());
+  expect(await screen.findByTestId("login-passkey")).toBeInTheDocument();
+});
+
+test("nach einer Server-Ablehnung startet der Vorschlag erst wieder beim Fokus aufs Feld – höchstens einmal", async () => {
+  autofillStarted();
+  const user = userEvent.setup();
+  renderPage();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1));
+  act(() => {
+    autofillArgs().onError(new Error("Diesen Passkey kennt der Server nicht."));
+    autofillArgs().onEnd();
+  });
+  expect(await screen.findByTestId("login-passkey")).toBeInTheDocument();
+  expect(screen.getByText("Diesen Passkey kennt der Server nicht.")).toBeInTheDocument();
+  expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1);
+
+  await user.click(screen.getByTestId("login-email"));
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(2));
+  act(() => autofillArgs().onEnd());
+  await user.click(screen.getByTestId("login-password"));
+  await user.click(screen.getByTestId("login-email"));
+  expect(await screen.findByTestId("login-passkey")).toBeInTheDocument();
+  expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(2);
 });
 
 // Ziel nach dem Anmelden (#1225): „Registrieren“ nimmt das Ziel mit, oben steht, wofür man sich anmeldet, und ein Ziel

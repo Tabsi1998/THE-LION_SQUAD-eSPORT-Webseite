@@ -44,6 +44,7 @@ export function AuthTextField({
   description,
   error,
   testId,
+  onFocus,
 }) {
   const ids = fieldIds(id, description, error);
 
@@ -57,6 +58,7 @@ export function AuthTextField({
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onFocus={onFocus}
         required={required}
         minLength={minLength}
         autoComplete={autoComplete}
