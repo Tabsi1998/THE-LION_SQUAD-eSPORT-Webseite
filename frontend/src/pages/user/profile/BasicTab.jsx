@@ -10,14 +10,16 @@ import { Field, Input, Row, Section } from "./fields";
 // Sicherheit.
 const selectClass = "w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white";
 
-export function BasicTab({ form, set }) {
+// Speichern von selbst (#1048): Textfelder mit `set` (nach der Tipp-Pause oder beim Verlassen), Auswahl, Datum und Bilder
+// mit `setNow` (sofort). Ungültiges hat seinen Hinweis am Feld (`errors`) und wird nicht gespeichert.
+export function BasicTab({ form, set, setNow = set, errors = {} }) {
   const rawCountry = form.country || "";
   const country = isCountryCode(rawCountry) ? rawCountry.toUpperCase() : rawCountry;
   const unknownCountry = country && !isCountryCode(country);
   return (
     <Section>
-      <Field label="Anzeigename">
-        <Input value={form.display_name} onChange={(v) => set("display_name", v)} testId="profile-display-name" />
+      <Field label="Anzeigename" error={errors.display_name} errorTestId="profile-display-name-error">
+        <Input value={form.display_name} onChange={(v) => set("display_name", v)} testId="profile-display-name" required invalid={!!errors.display_name} />
         <p className="text-[11px] text-white/45 mt-1.5">So heißt du überall: im Profil, in Teams, Turnieren und Ranglisten.</p>
       </Field>
       <Row>
@@ -28,16 +30,16 @@ export function BasicTab({ form, set }) {
         <textarea value={form.bio || ""} onChange={(e) => set("bio", e.target.value)} rows={4} data-testid="profile-bio" className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white" />
       </Field>
       <Row>
-        <Field label="Geburtsdatum"><GermanDateField id="profile-birth-date" value={form.birth_date} onChange={(v) => set("birth_date", v)} testId="profile-birth-date" /></Field>
+        <Field label="Geburtsdatum"><GermanDateField id="profile-birth-date" value={form.birth_date} onChange={(v) => setNow("birth_date", v)} testId="profile-birth-date" /></Field>
         <Field label="Geschlecht">
-          <select value={form.gender || ""} onChange={(e) => set("gender", e.target.value)} className={selectClass}>
+          <select value={form.gender || ""} onChange={(e) => setNow("gender", e.target.value)} className={selectClass}>
             {GENDER_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </Field>
       </Row>
       <Row>
         <Field label="Land">
-          <select value={country} onChange={(e) => set("country", e.target.value)} data-testid="profile-country" className={selectClass}>
+          <select value={country} onChange={(e) => setNow("country", e.target.value)} data-testid="profile-country" className={selectClass}>
             <option value="">Keine Angabe</option>
             {unknownCountry ? <option value={country}>Bisher: {country}</option> : null}
             {COUNTRY_OPTIONS.map(({ code, name }) => <option key={code} value={code}>{name}</option>)}
@@ -46,8 +48,8 @@ export function BasicTab({ form, set }) {
         <Field label="Stadt"><Input value={form.city} onChange={(v) => set("city", v)} /></Field>
       </Row>
       <Row>
-        <Field label="Avatar"><ImageUpload value={form.avatar_url} onChange={(v) => set("avatar_url", v)} testId="profile-avatar" variant="square" crop="round" allowLibrary /></Field>
-        <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="profile-banner" variant="wide" crop="banner" allowLibrary /></Field>
+        <Field label="Avatar"><ImageUpload value={form.avatar_url} onChange={(v) => setNow("avatar_url", v)} testId="profile-avatar" variant="square" crop="round" allowLibrary /></Field>
+        <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => setNow("banner_url", v)} testId="profile-banner" variant="wide" crop="banner" allowLibrary /></Field>
       </Row>
     </Section>
   );

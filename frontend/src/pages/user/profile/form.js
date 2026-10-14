@@ -101,6 +101,26 @@ export function profileFormPayload(form) {
   return payload;
 }
 
+// Eine Website-Adresse: mit oder ohne https://, mit Punkt im Namen, ohne Leerzeichen.
+const WEBSITE_PATTERN = /^(https?:\/\/)?[\p{L}\p{N}-]+(\.[\p{L}\p{N}-]+)*\.\p{L}{2,}(:\d+)?([/?#]\S*)?$/iu;
+
+/**
+ * Prüfung vor dem Speichern von selbst (#1048): was hier einen Hinweis hat, geht nicht an den Server. Der Hinweis steht
+ * am Feld, die Eingabe bleibt stehen.
+ */
+export function profileFieldErrors(form) {
+  const errors = {};
+  if (!form) return errors;
+  if (typeof form.display_name === "string" && !form.display_name.trim()) {
+    errors.display_name = "Bitte gib einen Anzeigenamen ein – so heißt du überall.";
+  }
+  const website = typeof form.website === "string" ? form.website.trim() : "";
+  if (website && !WEBSITE_PATTERN.test(website)) {
+    errors.website = "Bitte gib eine Adresse wie https://lionsquad.at ein.";
+  }
+  return errors;
+}
+
 export function flattenAchievementTiers(data) {
   return (data?.groups || []).flatMap((group) =>
     (group.tiers || []).map((tier) => ({
