@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import re
+import time
 from datetime import timedelta
 
 from pymongo.errors import DuplicateKeyError
@@ -62,6 +63,11 @@ APPLICATIONS_KIND = "applications"
 
 
 # ---------------------------------------------------------------- Prüfung
+
+def clock() -> float:
+    """Die Uhr des Servers für das Zeitfenster - eine eigene Stelle, damit Tests sie festhalten können."""
+    return time.time()
+
 
 def read_header(value: str | None) -> dict | None:
     """Was der Kopf trägt - None, wenn er nicht vom Modul stammt (wie ``VereineHookRules::readHeader``)."""

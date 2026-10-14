@@ -142,13 +142,19 @@ async def test_a_wrong_signature_is_refused_and_changes_nothing(flow, fake):
 
 
 @pytest.mark.asyncio
-async def test_a_stale_or_future_moment_is_refused(flow, fake):
+async def test_a_stale_or_future_moment_is_refused(flow, fake, monkeypatch):
+    """Die Uhr steht fest - kein Sekundenwechsel zwischen Signieren und Prüfen. Die Grenze gilt in beide Richtungen."""
     await connect_signed(flow)
+    now = 1_790_000_000
+    monkeypatch.setattr(vereine_webhooks, "clock", lambda: now + 0.9)
     body = body_of()
-    assert (await deliver(flow, body, stamp=int(time.time()) - 301)).status_code == 401
-    assert (await deliver(flow, body, stamp=int(time.time()) + 301)).status_code == 401
+    for stamp in (now - 400, now + 400, now - 301, now + 301):
+        assert (await deliver(flow, body, stamp=stamp)).status_code == 401, stamp
     assert await flow.db.dolibarr_pending.count_documents({}) == 0
-    assert (await deliver(flow, body, stamp=int(time.time()) - 200)).status_code == 200
+    assert await flow.db.dolibarr_webhook_events.count_documents({}) == 0
+    assert (await deliver(flow, body, stamp=now + 300)).status_code == 200, "300 s in die Zukunft gilt noch"
+    await flow.db.dolibarr_webhook_events.delete_many({})
+    assert (await deliver(flow, body, stamp=now - 300)).status_code == 200, "300 s in die Vergangenheit ebenso"
 
 
 @pytest.mark.asyncio

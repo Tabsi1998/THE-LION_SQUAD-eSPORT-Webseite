@@ -15,7 +15,6 @@ import re
 
 import hmac
 import secrets
-import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -917,7 +916,7 @@ async def vereine_signed_webhook(request: Request):
         vereine_webhooks.logger.warning("[dolibarr] signierter Webhook abgewiesen: zu groß")
         raise HTTPException(413, "Zu groß.")
     header = request.headers.get(vereine_webhooks.HEADER)
-    problem = vereine_webhooks.verify(header, body, known, time.time())
+    problem = vereine_webhooks.verify(header, body, known, vereine_webhooks.clock())
     if problem:
         vereine_webhooks.logger.warning("[dolibarr] signierter Webhook abgewiesen: %s", problem)
         if problem == "header":
