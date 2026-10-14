@@ -448,3 +448,40 @@ async def test_incomplete_notification_is_sent_once_per_incident(flow):
     # Derselbe Vorfall bleibt auch nach der Stunde einmalig.
     await heat_rebuild._notify_incomplete(flow.db, tournament, stage_id="s1", keys=["C"], reason="foreign_change")
     assert await flow.db.notifications.count_documents({"user_id": staff["id"], "kind": "tournament_heat_rebuild"}) == 2
+
+
+# ---------------------------------------------------------------------------------------------- Spieldauer (#1554)
+
+@pytest.mark.asyncio
+async def test_a_merged_heat_takes_its_duration_from_the_game_and_the_replan_uses_it(flow):
+    """Zusammengelegte Läufe bekommen keine Dauer eingefroren; das Neu-Planen nach dem Umbau rechnet mit dem Spiel."""
+    from datetime import datetime as _dt
+
+    game = {"id": new_id(), "name": "Mario Kart", "slug": "mk", "setup_minutes": 3,
+            "match_modes": [{"mode": "gp4", "label": "Grand Prix 4 Rennen", "minutes": 12, "per_game": False}]}
+    await flow.db.games.insert_one(dict(game))
+    start = (now_utc() + timedelta(hours=1)).replace(microsecond=0).isoformat()
+    tournament, _users, _regs = await flow.with_participants(
+        10, format="ffa_custom_bracket", heat_rebuild_mode="auto", status="registration_open", game_id=game["id"],
+        match_duration_minutes=None, event_mode="local", schedule_mode="fixed_by_staff", result_entry_mode=None, start_date=start)
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"max_participants": 16}})
+    await flow.db.tournament_stages.insert_one({
+        "id": new_id(), "tournament_id": tournament["id"], "number": 1, "name": "Läufe",
+        "stage_type": "ffa_custom_bracket", "match_type": "ffa", "status": "pending",
+        "settings": {"schema": SIXTEEN, "match_size": 4, "qualifiers_per_match": 2, "min_players": 2},
+        "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(),
+    })
+    await flow.db.stations.insert_one({"id": new_id(), "name": "1", "device_type": "switch", "tournament_id": tournament["id"],
+                                       "status": "free", "current_match_id": None})
+    flow.act_as(await flow.add_staff())
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "check_in"})
+    assert response.status_code == 200, response.text
+
+    by_key = await heats(flow, tournament)
+    assert by_key["D"]["status"] == "cancelled" and by_key["D"]["merged_into"] == by_key["C"]["id"]
+    first_round = [by_key[key] for key in ("A", "B", "C")]
+    assert all(heat.get("duration_minutes") is None and "duration_minutes" not in (heat.get("settings") or {}) for heat in first_round)
+    times = sorted(_dt.fromisoformat(heat["scheduled_at"]) for heat in first_round)
+    assert all(heat["schedule_source"] == "planner" for heat in first_round)
+    # Eine Station: die Läufe folgen im Abstand der Spieldauer aus dem Spiel (12 Min. Grand Prix + 3 Min. Aufbau).
+    assert [(later - earlier).total_seconds() / 60 for earlier, later in zip(times, times[1:])] == [15, 15]
