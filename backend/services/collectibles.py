@@ -10,28 +10,12 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from services import seasons
-from services.achievement_counters import SIGNAL_RULES, SIGNALS, VIENNA
+from services.achievement_core import SIGNAL_RULES, SIGNALS, VIENNA
+from services.season_collections import COLLECTIBLE_SIGNALS, COLLECTIBLES, total_of  # noqa: F401 - umgezogen (#1420)
 
-# Reihenfolge wie im Jahr, beginnend mit dem Herbst. ``icon`` wählt die kleine Figur in Web und App.
-COLLECTIBLES: tuple[dict, ...] = (
-    {"signal": "halloween_bats_scared", "season": "halloween", "label": "Fledermäuse verscheucht", "icon": "bat"},
-    {"signal": "halloween_ghosts_freed", "season": "halloween", "label": "Geister befreit", "icon": "ghost"},
-    {"signal": "halloween_cat_petted", "season": "halloween", "label": "Katze angestupst", "icon": "cat"},
-    {"signal": "halloween_pumpkin", "season": "halloween", "label": "Gruselnächte erlebt", "icon": "pumpkin"},
-    {"signal": "snowflakes_clicked", "season": "snow", "label": "Schneeflocken gefangen", "icon": "snowflake"},
-    {"signal": "advent_door", "season": "advent_calendar", "label": "Türchen geöffnet", "icon": "door"},
-    {"signal": "online_at_new_year", "season": "new_year", "label": "Silvester um Mitternacht dabei", "icon": "rocket"},
-    {"signal": "easter_egg", "season": "easter_hunt", "label": "Ostereier gefunden", "icon": "egg"},
-)
-COLLECTIBLE_SIGNALS: tuple[str, ...] = tuple(item["signal"] for item in COLLECTIBLES)
 SEASON_ORDER: tuple[str, ...] = tuple(dict.fromkeys(item["season"] for item in COLLECTIBLES))
 # Kurze Namen für die Karte - „Schneefall“ und „Ostereiersuche“ heißen dort Winter und Ostern.
 SEASON_LABELS = {"halloween": "Halloween", "snow": "Winter", "advent_calendar": "Adventkalender", "new_year": "Silvester", "easter_hunt": "Ostern"}
-
-
-def total_of(signals: dict[str, dict]) -> int:
-    """Alle Fundstücke zusammen - der Zähler für den „Sammler“."""
-    return sum(int((signals.get(name) or {}).get("count") or 0) for name in COLLECTIBLE_SIGNALS)
 
 
 def _in_window(day: str, window: dict | None) -> bool:

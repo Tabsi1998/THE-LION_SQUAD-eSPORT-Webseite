@@ -113,7 +113,7 @@ async def _save_state(db, **fields) -> None:
 
 async def sync(db, *, now: datetime | None = None) -> dict:
     """Melden, aktualisieren, abschließen - einmal je Twitch-Abruf."""
-    from services.discord_bot import bot, bot_settings
+    from services.discord_runtime import bot, bot_settings
 
     current = now or now_utc()
     settings = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}

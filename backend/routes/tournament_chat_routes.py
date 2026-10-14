@@ -10,7 +10,7 @@ from services import moderation_standing
 from auth import get_current_user
 from models import now_utc, new_id
 from services.user_notifications import create_user_notification
-from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments
+from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments, register_chat_access
 from services import word_filter
 from services.log_safe import log_safe
 from routes.tournament_common import (
@@ -69,6 +69,15 @@ async def _can_use_tournament_chat(tournament: dict, user: dict | None) -> bool:
         {"id": 1},
     )
     return bool(team_registration)
+
+
+async def _attachment_allowed(db, context: dict, user: dict | None) -> bool:
+    """Anhänge im Turnier-Chat sieht, wer den Turnier-Chat nutzen darf (services/chat_attachments.py)."""
+    tournament = await db.tournaments.find_one({"id": context.get("tournament_id")}, {"_id": 0})
+    return bool(tournament and await _can_use_tournament_chat(tournament, user))
+
+
+register_chat_access("tournament", _attachment_allowed)
 
 
 def _user_label(user: dict | None) -> str:

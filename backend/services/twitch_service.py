@@ -133,8 +133,8 @@ def _parse_dt(value: str | None) -> datetime | None:
 
 async def _evaluate_streamer(user_id: str):
     try:
-        from badges import evaluate_user_progress
-        await evaluate_user_progress(user_id)
+        from services.achievement_core import evaluator
+        await evaluator()(user_id)
     except Exception as exc:
         logger.debug("[twitch] achievement evaluation failed for %s: %s", user_id, exc)
 

@@ -11,7 +11,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
-from services import discord_bot, discord_guilds, discord_roles  # noqa: E402
+from services import discord_bot, discord_guilds, discord_roles, discord_runtime  # noqa: E402
 
 MAIN, COD, OFF = "810000000000000001", "810000000000000002", "810000000000000003"
 PAULA, OTTO, LEON = "210000000000000001", "210000000000000002", "210000000000000003"
@@ -155,7 +155,7 @@ async def test_missing_roles_are_only_created_with_the_switch_and_the_limit_carr
     runner, main, cod, _, _ = await setup(flow)
     await discord_guilds.update_guild(flow.db, COD, {"create_roles": True})
     cod.roles = [role for role in cod.roles if role.name != "CoD-Spieler"]
-    monkeypatch.setattr(discord_bot, "SYNC_LIMIT", 3)
+    monkeypatch.setattr(discord_runtime, "SYNC_LIMIT", 3)  # die Rollen gleicht die Laufzeit ab (#1420)
     first = await runner.sync_roles()
     assert first["changes"] == 3 and first["servers"][MAIN]["limited"] is True, "höchstens drei Änderungen - der Rest kommt im nächsten Lauf"
     created = (await flow.db.discord_guilds.find_one({"guild_id": COD}, {"_id": 0, "roles_sync": 1}))["roles_sync"]["created"]

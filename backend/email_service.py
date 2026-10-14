@@ -663,7 +663,7 @@ async def send_template(
     except TypeError as e:
         return {"ok": False, "reason": f"template args error: {e}"}
     # E-Mail-Vorlagen (#437 A): hat der Admin diese Vorlage überschrieben, gilt sein Betreff/HTML mit denselben Werten.
-    from services.mail_catalog import apply_override
+    from services.mail_overrides import apply_override
     subject, html = await apply_override(template_key, subject, html, kwargs)
     html = await _with_email_sponsors(html)
     if queue:
@@ -674,3 +674,21 @@ async def send_template(
             dedupe_key=dedupe_key, meta=mail_meta,
         )
     return await send_mail(to, subject, html, template_key=template_key)
+
+
+async def smtp_test(to: str) -> dict:
+    """Direct synchronous SMTP test (does not use queue). Steht seit #1420 hier bei der Testvorlage, nicht in
+    services/mail_queue.py - die Warteschlange importiert email_service sonst im Kreis."""
+    from services.mail_queue import _smtp_send, explain_smtp_error, get_mail_settings
+
+    cfg = await get_mail_settings()
+    if cfg["provider"] != "smtp":
+        return {"ok": False, "reason": "Provider ist nicht auf SMTP gesetzt."}
+    if not cfg["smtp_host"]:
+        return {"ok": False, "reason": "SMTP Host fehlt."}
+    try:
+        subject, html = tpl_test(branding="THE LION SQUAD")
+        msg_id = await _smtp_send(cfg, to, subject, html)
+        return {"ok": True, "id": msg_id}
+    except Exception as exc:
+        return {"ok": False, "reason": explain_smtp_error(exc), "raw_error": str(exc)[:500]}

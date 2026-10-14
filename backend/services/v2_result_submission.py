@@ -255,7 +255,7 @@ async def submit_v2_result(
         await db.matches_v2.update_one({"id": target_id}, {"$set": update})
     await db.matches_v2.update_one({"id": match["id"]}, {"$set": application["match_set"]})
     if withdrawn:
-        from services.match_forfeit import revoke_walkover_incident
+        from services.walkover_incidents import revoke_walkover_incident
         for row in withdrawn:
             await revoke_walkover_incident(db, row["match_id"], row["registration_id"])
 
