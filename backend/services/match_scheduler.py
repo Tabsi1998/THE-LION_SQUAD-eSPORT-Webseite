@@ -327,7 +327,7 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                 "schedule_source": "planner",
                 "changed": previous_at != moment or match.get("station_id") != station["id"] or match.get("schedule_source") != "planner",
                 "previous": {"scheduled_at": match.get("scheduled_at"), "station_id": match.get("station_id"),
-                             "schedule_source": match.get("schedule_source")},
+                             "schedule_source": match.get("schedule_source"), "status": match.get("status")},
             })
         if stage_ends:
             # Die nächste Phase beginnt frühestens nach dem letzten Spiel dieser Phase plus Pause.
@@ -452,23 +452,25 @@ async def load_plan_inputs(db, tournament: dict) -> dict:
         others = await db.tournaments.find(
             {"event_id": event_id, "id": {"$ne": tid}, "status": {"$nin": list(TOURNAMENT_DONE_STATUSES)}}, {"_id": 0, "id": 1, "title": 1},
         ).to_list(100)
-        for other in others:
-            other_matches = await db.matches_v2.find(
-                {"tournament_id": other["id"], "is_preview": {"$ne": True}, "scheduled_at": {"$nin": [None, ""]},
-                 "status": {"$nin": list(DONE_STATUSES)}},
-                {"_id": 0, "id": 1, "slots": 1, "scheduled_at": 1, "started_at": 1, "duration_minutes": 1, "settings": 1, "match_key": 1},
-            ).to_list(3000)
-            other_keys = await resolve_participant_keys(db, other_matches)
-            for match in other_matches:
-                start = _parse(match.get("started_at")) or _parse(match.get("scheduled_at"))
-                if not start:
-                    continue
-                participants = {key for key in participants_of(match, other_keys) if key.startswith("user:")}
-                busy_elsewhere.append({
-                    "match_id": match["id"], "participants": participants, "start": start,
-                    "end": start + timedelta(minutes=effective_match_duration(match)),
-                    "label": f"{other.get('title') or 'Turnier'} {match.get('match_key') or ''}".strip(),
-                })
+        # Gesammelt laden: ein Zugriff für die Spiele aller anderen Turniere, einmal Anmeldungen und Teams auflösen.
+        title_by_id = {other["id"]: other.get("title") or "Turnier" for other in others}
+        other_matches = await db.matches_v2.find(
+            {"tournament_id": {"$in": sorted(title_by_id)}, "is_preview": {"$ne": True}, "scheduled_at": {"$nin": [None, ""]},
+             "status": {"$nin": list(DONE_STATUSES)}},
+            {"_id": 0, "id": 1, "tournament_id": 1, "slots": 1, "scheduled_at": 1, "started_at": 1, "duration_minutes": 1,
+             "settings": 1, "match_key": 1},
+        ).to_list(5000) if title_by_id else []
+        other_keys = await resolve_participant_keys(db, other_matches) if other_matches else {}
+        for match in other_matches:
+            start = _parse(match.get("started_at")) or _parse(match.get("scheduled_at"))
+            if not start:
+                continue
+            participants = {key for key in participants_of(match, other_keys) if key.startswith("user:")}
+            busy_elsewhere.append({
+                "match_id": match["id"], "participants": participants, "start": start,
+                "end": start + timedelta(minutes=effective_match_duration(match)),
+                "label": f"{title_by_id.get(match.get('tournament_id'), 'Turnier')} {match.get('match_key') or ''}".strip(),
+            })
     return {"matches": matches, "stages": stages, "stations": stations, "proposals": proposals, "busy_elsewhere": busy_elsewhere,
             "participant_keys": participant_keys}
 
@@ -482,8 +484,9 @@ async def plan_for_tournament(db, tournament: dict, now: datetime | None = None)
 async def apply_plan(db, tournament: dict, plan: dict) -> dict:
     """Alles auf einmal schreiben: Zeit, Station, Dauer und Quelle je Spiel.
 
-    Jedes Spiel nur, wenn es noch so dasteht wie in der Vorschau (Compare-and-Set auf Zeit, Station und Quelle):
-    was inzwischen von Hand gesetzt, vereinbart oder anders geplant wurde, bleibt - der Aufrufer plant dann neu.
+    Jedes Spiel nur, wenn es noch so dasteht wie in der Vorschau (Compare-and-Set auf Zeit, Station, Quelle und
+    Stand, und nicht gestartet): was inzwischen von Hand gesetzt, vereinbart, gestartet oder anders geplant wurde,
+    bleibt - der Aufrufer plant dann neu.
     """
     now_iso = datetime.now(timezone.utc).isoformat()
     written = 0
@@ -496,25 +499,26 @@ async def apply_plan(db, tournament: dict, plan: dict) -> dict:
             "schedule_written_at": now_iso,
             "updated_at": now_iso,
         }
+        previous = item.get("previous") or {}
         if item["schedule_source"] == "planner":
             update["station_id"] = item["station_id"]
             update["duration_minutes"] = item["duration_minutes"]
             update["schedule_forecast"] = bool(item.get("forecast"))
-            if not item.get("forecast"):
-                current = await db.matches_v2.find_one({"id": item["match_id"]}, {"_id": 0, "status": 1}) or {}
-                if current.get("status") in {"pending", "ready", "scheduled"}:
-                    update["status"] = "scheduled"
+            # Der Stand aus der Vorschau, nicht neu gelesen: der Filter unten stellt sicher, dass er noch gilt.
+            if not item.get("forecast") and previous.get("status") in {"pending", "ready", "scheduled"}:
+                update["status"] = "scheduled"
         elif item.get("status"):
             update["status"] = item["status"]
-        previous = item.get("previous") or {}
         guard = {
             "id": item["match_id"],
             "scheduled_at": previous.get("scheduled_at"),
             "schedule_source": previous.get("schedule_source"),
+            "status": previous.get("status"),
+            "started_at": None,
         }
         if item["schedule_source"] == "planner":
             guard["station_id"] = previous.get("station_id")
-        if previous.get("schedule_source") in KEPT_SOURCES:
+        if previous.get("schedule_source") in KEPT_SOURCES or previous.get("status") in RUNNING_STATUSES | DONE_STATUSES:
             continue
         result = await db.matches_v2.update_one(guard, {"$set": update})
         written += int(bool(result.matched_count))

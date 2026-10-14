@@ -396,7 +396,8 @@ def schedule_writes(tournament: dict, matches, proposals=None, stages=None) -> l
             writes.append({
                 "match_id": entry["match_id"], "matchday": matchday["number"], "update": update,
                 # Was die Partie beim Lesen hatte: geschrieben wird nur, wenn es noch so ist (Compare-and-Set).
-                "expect": {"schedule_source": match.get("schedule_source"), "scheduled_at": match.get("scheduled_at")},
+                "expect": {"schedule_source": match.get("schedule_source"), "scheduled_at": match.get("scheduled_at"),
+                           "status": match.get("status")},
             })
     return writes
 
@@ -409,7 +410,8 @@ async def apply_schedule_writes(db, writes) -> int:
     for write in writes:
         expect = write.get("expect") or {}
         result = await db.matches_v2.update_one(
-            {"id": write["match_id"], "schedule_source": expect.get("schedule_source"), "scheduled_at": expect.get("scheduled_at")},
+            {"id": write["match_id"], "schedule_source": expect.get("schedule_source"), "scheduled_at": expect.get("scheduled_at"),
+             "status": expect.get("status"), "started_at": None},
             {"$set": {**write["update"], "updated_at": now_iso}},
         )
         written += int(bool(result.matched_count))

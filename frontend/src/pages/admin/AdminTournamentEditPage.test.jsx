@@ -568,7 +568,7 @@ test("„Planen“ zeigt die Vorschau und schreibt erst nach „Übernehmen“",
   apiMock.post.mockImplementation((url) => {
     if (String(url).includes("/schedule/plan")) {
       return Promise.resolve({ data: {
-        mode: "stations", fingerprint: "abc123",
+        mode: "stations", fingerprint: "abc123", planned_at: "2026-10-31T09:58:00+00:00",
         assignments: [
           { match_id: "m1", label: "A1", scheduled_at: "2026-10-31T10:00:00+00:00", station_name: "1", forecast: false, changed: true },
           { match_id: "m2", label: "F", scheduled_at: "2026-10-31T10:35:00+00:00", station_name: "1", forecast: true, changed: true },
@@ -599,7 +599,7 @@ test("„Planen“ zeigt die Vorschau und schreibt erst nach „Übernehmen“",
 
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(
     expect.stringContaining("/tournaments/t-1/schedule/apply"),
-    expect.objectContaining({ fingerprint: "abc123" })
+    expect.objectContaining({ fingerprint: "abc123", planned_at: "2026-10-31T09:58:00+00:00" })
   ));
 });
 

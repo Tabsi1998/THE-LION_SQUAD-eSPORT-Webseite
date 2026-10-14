@@ -66,7 +66,7 @@ async def test_planning_shows_a_preview_and_applying_writes_time_and_station_at_
     assert all(not match.get("scheduled_at") and not match.get("station_id") for match in await flow.matches(tournament)), \
         "die Vorschau schreibt nichts"
 
-    applied = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply", json={"fingerprint": plan["fingerprint"]})
+    applied = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply", json={"fingerprint": plan["fingerprint"], "planned_at": plan["planned_at"]})
     assert applied.status_code == 200, applied.text
     assert applied.json()["written"] == 3
     matches = {match["match_key"]: match for match in await flow.matches(tournament)}
@@ -86,7 +86,7 @@ async def test_planning_shows_a_preview_and_applying_writes_time_and_station_at_
 async def test_an_outdated_preview_is_refused_instead_of_applied(flow):
     _staff, tournament, _users, _registrations = await built(flow, **on_site_fields())
     await stations(flow, tournament, "1")
-    stale = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply", json={"fingerprint": "veraltet"})
+    stale = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply", json={"fingerprint": "veraltet", "planned_at": now_utc().isoformat()})
     assert stale.status_code == 409, stale.text
     assert "Planen" in stale.json()["detail"]
 
@@ -101,7 +101,7 @@ async def test_a_time_set_by_hand_stays_through_apply(flow):
     assert updated.status_code == 200, updated.text
 
     planned = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/plan")
-    applied = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply", json={"fingerprint": planned.json()["fingerprint"]})
+    applied = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply", json={"fingerprint": planned.json()["fingerprint"], "planned_at": planned.json()["planned_at"]})
     assert applied.status_code == 200, applied.text
     kept = await flow.reload(match)
     assert kept["schedule_source"] == "manual" and kept["scheduled_at"] == fixed.isoformat() and kept["station_id"] == station["id"]
@@ -249,3 +249,120 @@ async def test_a_team_member_playing_elsewhere_at_the_event_is_not_booked_twice(
     assert datetime.fromisoformat(item["scheduled_at"]) >= datetime.fromisoformat(start) + timedelta(minutes=40 + 5)
     others = [item for item in planned.json()["assignments"] if item["match_id"] != mine["id"] and item["round"] == 1]
     assert all(datetime.fromisoformat(item["scheduled_at"]) == datetime.fromisoformat(start) for item in others)
+
+
+# ---------------------------------------------------------------- Codex-Nachprüfung zu #1569
+
+def begun_fields(**extra):
+    start = (now_utc() - timedelta(hours=1)).replace(microsecond=0)
+    return {"event_mode": "local", "schedule_mode": "fixed_by_staff", "result_entry_mode": None, "start_date": start.isoformat(), **extra}
+
+
+@pytest.mark.asyncio
+async def test_a_preview_of_a_started_tournament_can_still_be_applied_minutes_later(flow):
+    from services.match_scheduler import plan_for_tournament
+
+    _staff, tournament, _users, _registrations = await built(flow, **begun_fields())
+    await stations(flow, tournament, "1", "2")
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    # Die Vorschau entstand vor zwei Minuten - Übernehmen rechnet mit genau diesem Anker, nicht mit „jetzt“.
+    preview = await plan_for_tournament(flow.db, stored, now=now_utc() - timedelta(minutes=2))
+    applied = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply",
+                              json={"fingerprint": preview["fingerprint"], "planned_at": preview["planned_at"]})
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["written"] == 3
+
+    # Eine Vorschau, die älter als zehn Minuten ist, gilt nicht mehr.
+    old = await plan_for_tournament(flow.db, stored, now=now_utc() - timedelta(minutes=11))
+    stale = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/apply",
+                            json={"fingerprint": old["fingerprint"], "planned_at": old["planned_at"]})
+    assert stale.status_code == 409, stale.text
+    assert "Planen" in stale.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_a_match_started_between_preview_and_apply_stays_started(flow):
+    from services.match_scheduler import apply_plan, plan_for_tournament
+
+    _staff, tournament, _users, _registrations = await built(flow, **begun_fields())
+    await stations(flow, tournament, "1", "2")
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    anchor = now_utc().replace(microsecond=0)
+    await apply_plan(flow.db, stored, await plan_for_tournament(flow.db, stored, now=anchor))
+    # Zehn Minuten später eine neue Vorschau: alle Zeiten rücken, jedes Spiel gilt als geändert.
+    later = await plan_for_tournament(flow.db, stored, now=anchor + timedelta(minutes=10))
+    assert all(item["changed"] for item in later["assignments"])
+
+    # Dazwischen startet die Stations-Crew ein Spiel.
+    first = sorted(await flow.matches(tournament), key=lambda row: (row["round"], row["match_key"]))[0]
+    started_at = now_utc().isoformat()
+    await flow.db.matches_v2.update_one({"id": first["id"]}, {"$set": {"status": "in_progress", "started_at": started_at}})
+
+    result = await apply_plan(flow.db, stored, later)
+    assert result["written"] == 2
+    kept = await flow.reload(first)
+    assert kept["status"] == "in_progress" and kept["started_at"] == started_at and kept["scheduled_at"] == first["scheduled_at"]
+
+
+class _Counting:
+    """Zählt Abfragen je Sammlung - damit der Lader nicht je Turnier am Event erneut liest."""
+
+    def __init__(self, db, calls):
+        self._db, self.calls = db, calls
+
+    def __getattr__(self, name):
+        return _CountingCollection(name, getattr(self._db, name), self.calls)
+
+
+class _CountingCollection:
+    def __init__(self, name, collection, calls):
+        self._name, self._collection, self.calls = name, collection, calls
+
+    def __getattr__(self, method):
+        attr = getattr(self._collection, method)
+        if method in {"find", "find_one", "distinct"}:
+            def counted(*args, **kwargs):
+                self.calls[(self._name, method)] = self.calls.get((self._name, method), 0) + 1
+                return attr(*args, **kwargs)
+            return counted
+        return attr
+
+
+@pytest.mark.asyncio
+async def test_the_other_tournaments_of_the_event_are_loaded_together(flow):
+    from services.match_scheduler import load_plan_inputs
+
+    _staff, tournament, users, _registrations = await built(flow, **begun_fields(event_id="ev-2"))
+    await stations(flow, tournament, "1")
+    start = (await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0}))["start_date"]
+    for index in range(3):
+        tid = f"t-other-{index}"
+        await flow.db.tournaments.insert_one({"id": tid, "slug": tid, "title": f"Anderes {index}", "format": "single_elim", "status": "live",
+                                              "event_mode": "local", "event_id": "ev-2", "start_date": start, "created_at": now_utc().isoformat()})
+        await flow.db.teams.insert_one({"id": f"team-{index}", "name": f"Team {index}", "leader_id": f"cap-{index}", "member_ids": [f"cap-{index}", users[index]["id"]]})
+        await flow.db.tournament_registrations.insert_one({"id": f"reg-o-{index}", "tournament_id": tid, "team_id": f"team-{index}", "user_id": f"cap-{index}", "status": "approved"})
+        await flow.db.matches_v2.insert_one({"id": f"m-o-{index}", "tournament_id": tid, "match_key": "X", "round": 1, "status": "scheduled", "match_type": "duel",
+                                              "scheduled_at": start, "slots": [{"slot": 1, "registration_id": f"reg-o-{index}", "user_id": f"cap-{index}"},
+                                                                               {"slot": 2, "registration_id": None}], "created_at": now_utc().isoformat()})
+    calls: dict = {}
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    inputs = await load_plan_inputs(_Counting(flow.db, calls), stored)
+    assert len(inputs["busy_elsewhere"]) == 3
+    assert {f"user:{users[index]['id']}" for index in range(3)} <= set().union(*(row["participants"] for row in inputs["busy_elsewhere"]))
+    for collection in ("matches_v2", "tournament_registrations", "teams", "team_members"):
+        assert calls.get((collection, "find"), 0) <= 2, (collection, calls)
+
+
+@pytest.mark.asyncio
+async def test_station_moves_wait_for_a_running_tournament_action(flow):
+    from services.mutation_lock import mutation_lock, tournament_write_resource
+
+    # Wie in database.init_audit_indexes: nur mit dem eindeutigen Index sperrt die Sperre auch im Speicher.
+    await flow.db.mutation_locks.create_index("resource", unique=True)
+    _staff, tournament, _users, _registrations = await built(flow, **begun_fields())
+    station, = await stations(flow, tournament, "1")
+    match = sorted(await flow.matches(tournament), key=lambda row: (row["round"], row["match_key"]))[0]
+    async with mutation_lock(flow.db, tournament_write_resource(tournament["id"])):
+        blocked = await flow.post(f"/api/stations/{station['id']}/assign/{match['id']}")
+    assert blocked.status_code == 409, blocked.text
+    assert not (await flow.reload(match)).get("station_id")

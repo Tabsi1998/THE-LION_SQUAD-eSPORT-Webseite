@@ -15,6 +15,7 @@ from services.match_calls import notify_match_called
 from services.station_runtime import notify_match_started
 from services.competition_read import find_match_source, load_competition_read_model
 from services.match_scheduler import plan_for_tournament
+from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
 TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
@@ -33,6 +34,23 @@ async def _require_station_permission(user: dict, tournament_id: str, station_id
     )
     if not allowed:
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
+
+
+class _tournament_lock:
+    """Aufruf, Start, Freigeben und Umlegen laufen unter demselben Turnier-Lock wie das Übernehmen des Spielplans
+    (#1552): so startet kein Spiel, während der Planer es gerade schreibt - und umgekehrt."""
+
+    def __init__(self, db, tournament_id: str):
+        self._lease = mutation_lock(db, tournament_write_resource(tournament_id))
+
+    async def __aenter__(self):
+        try:
+            return await self._lease.__aenter__()
+        except MutationLockBusy:
+            raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
+
+    async def __aexit__(self, *exc):
+        return await self._lease.__aexit__(*exc)
 
 
 async def _find_match_for_station(db, match_id: str) -> tuple[str, dict | None]:
@@ -296,6 +314,12 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
     candidates = [item for item in candidates if _match_has_minimum_participants(item[1])]
     candidates.sort(key=lambda item: _match_sort_key(item[1]))
 
+    async with _tournament_lock(db, tournament_id):
+        assigned = await _start_on_free_stations(db, stations, candidates, start_now)
+    return {"assigned": len(assigned), "items": assigned, "planned": False}
+
+
+async def _start_on_free_stations(db, stations, candidates, start_now: bool) -> list[dict]:
     assigned = []
     used_match_ids: set[str] = set()
     for station in stations:
@@ -320,7 +344,7 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
         await _assign_match_to_station(db, station, match, collection_name, start_now=start_now)
         used_match_ids.add(match["id"])
         assigned.append({"station_id": station["id"], "match_id": match["id"], "match_type": collection_name})
-    return {"assigned": len(assigned), "items": assigned, "planned": False}
+    return assigned
 
 
 @router.post("/{sid}/assign/{match_id}")
@@ -335,7 +359,9 @@ async def assign_match(sid: str, match_id: str, start_now: bool = False,
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
     await _ensure_tournament_unlocked(db, match["tournament_id"])
     await _require_station_permission(me, match["tournament_id"], sid)
-    await _assign_match_to_station(db, station, match, collection_name, start_now=start_now)
+    async with _tournament_lock(db, match["tournament_id"]):
+        current = await db.matches_v2.find_one({"id": match_id}, {"_id": 0}) or match
+        await _assign_match_to_station(db, station, current, collection_name, start_now=start_now)
     return {"ok": True}
 
 
@@ -352,10 +378,11 @@ async def clear_station(sid: str, me: dict = Depends(get_current_user)):
             await _require_station_permission(me, match["tournament_id"], sid)
         elif not is_global_tournament_admin(me):
             raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
-        if collection_name:
-            # Freigeben beendet auch einen Aufruf (#1122).
-            await db[collection_name].update_one({"id": s["current_match_id"]}, {
-                "$set": {"station_id": None, "updated_at": now_utc().isoformat()}, "$unset": {"called_at": ""}})
+        if collection_name and match:
+            # Freigeben beendet auch einen Aufruf (#1122) - unter dem Turnier-Lock wie der Planer.
+            async with _tournament_lock(db, match["tournament_id"]):
+                await db[collection_name].update_one({"id": s["current_match_id"]}, {
+                    "$set": {"station_id": None, "updated_at": now_utc().isoformat()}, "$unset": {"called_at": ""}})
     elif not is_global_tournament_admin(me):
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
     await db.stations.update_one({"id": sid}, {"$set": {

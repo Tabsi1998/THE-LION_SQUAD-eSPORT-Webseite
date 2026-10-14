@@ -22,7 +22,8 @@ export async function planAndApplySchedule({ tournamentId, confirm }) {
       tone: errors.length ? "danger" : "info",
     });
     if (!ok) return false;
-    const { data } = await api.post(`/tournaments/${encodeURIComponent(tournamentId)}/schedule/apply`, { fingerprint: plan.fingerprint });
+    const { data } = await api.post(`/tournaments/${encodeURIComponent(tournamentId)}/schedule/apply`,
+      { fingerprint: plan.fingerprint, planned_at: plan.planned_at });
     toast.success(`${countOf(data.written, "Spiel", "Spiele")} geplant.`);
     return true;
   } catch (e) {

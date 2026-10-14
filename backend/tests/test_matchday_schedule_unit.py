@@ -370,4 +370,4 @@ def test_a_week_boundary_keeps_the_vienna_wall_time_across_the_summer_time_chang
 
 def test_a_write_says_what_it_expects_to_find_so_a_stale_run_cannot_overwrite():
     writes = schedule_writes(league(), [fixture("m1", 1)], [])
-    assert writes[0]["expect"] == {"schedule_source": None, "scheduled_at": None}
+    assert writes[0]["expect"] == {"schedule_source": None, "scheduled_at": None, "status": "pending"}

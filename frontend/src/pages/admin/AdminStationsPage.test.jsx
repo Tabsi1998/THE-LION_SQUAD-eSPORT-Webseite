@@ -36,7 +36,7 @@ beforeEach(() => {
   apiMock.get.mockImplementation((url) => Promise.resolve(routeFor(String(url))));
   apiMock.post.mockImplementation((url) => {
     if (String(url).includes("/schedule/plan")) {
-      return Promise.resolve({ data: { mode: "stations", fingerprint: "fp-1", warnings: [], assignments: [
+      return Promise.resolve({ data: { mode: "stations", fingerprint: "fp-1", planned_at: "2026-10-31T09:58:00+00:00", warnings: [], assignments: [
         { match_id: "m1", label: "A1", scheduled_at: "2026-10-31T10:00:00+00:00", station_name: "1", forecast: false, changed: true },
       ] } });
     }
@@ -61,7 +61,7 @@ test("„Zeitplan füllen“ zeigt die Vorschau und schreibt erst nach „Übern
 
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(
     expect.stringContaining("/tournaments/t-1/schedule/apply"),
-    expect.objectContaining({ fingerprint: "fp-1" })
+    expect.objectContaining({ fingerprint: "fp-1", planned_at: "2026-10-31T09:58:00+00:00" })
   ));
   expect(apiMock.post.mock.calls.some(([url]) => String(url).includes("auto-assign"))).toBe(false);
 });
