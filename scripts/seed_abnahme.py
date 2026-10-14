@@ -452,7 +452,9 @@ async def inside_main() -> None:
             for match_key, (clock, minutes, on_station) in OLD_PLAN.items():
                 await admin.call("PATCH", f"/api/matches/{practice_matches[match_key]['id']}", json={
                     "scheduled_at": vienna_on(day, clock), "station_id": old_station["id"] if on_station else None, "duration_minutes": minutes})
-            await admin.call("DELETE", f"/api/stations/{old_station['id']}")
+            # Altdaten wie vor #1611 herstellen: das Station-Dokument direkt entfernen, die Spiele behalten ihre station_id (die
+            # Route lehnt das Löschen ab, solange geplante Spiele daran hängen).
+            await db.stations.delete_one({"id": old_station["id"]})
             state["tournaments"][key] = practice["id"]
 
         # Fast Lap mit einer Strecke und Zeiten.
