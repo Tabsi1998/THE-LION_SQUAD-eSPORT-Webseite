@@ -23,8 +23,8 @@ import { billingFormError, formToBilling, positionsToForm } from "@/lib/pricing"
 import { appendEmbedToken } from "@/components/tls/RichContent";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
+import { EventProgramPanel, useEventProgram } from "@/pages/admin/event/EventProgramPanel";
 import { toast } from "sonner";
-import { Flag, Trophy } from "lucide-react";
 
 const ACCENT = "#9F7AEA";
 const CREATE_STATUS_OPTIONS = [
@@ -43,30 +43,12 @@ export default function AdminEventEditPage() {
   const [event, setEvent] = useState(isNew ? {} : null);
   const [missing, setMissing] = useState(false);
   const [meta, setMeta] = useState({ types: [], statuses: [], visibilities: [] });
-  const [sponsors, setSponsors] = useState([]);
-  const [sponsorsError, setSponsorsError] = useState("");
-  const [tournaments, setTournaments] = useState([]);
-  const [f1Challenges, setF1Challenges] = useState([]);
   const [partners, setPartners] = useState([]);
 
   useEffect(() => {
     api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {});
-    // Event-Sponsoren (#1354): eine eigene kleine Auswahl (Name und Logo) für alle, die Events bearbeiten - nicht mehr
-    // die Sponsorenliste der Redaktion. Jede Liste lädt für sich; fehlt ein Recht, steht dort ein Satz.
-    Promise.allSettled([
-      api.get("/admin/choices/sponsors"),
-      api.get("/tournaments?include_drafts=true"),
-      api.get("/f1/challenges?include_drafts=true"),
-      api.get("/partners"),
-    ]).then(([s, t, f, p]) => {
-      if (s.status === "fulfilled") setSponsors(Array.isArray(s.value.data) ? s.value.data : []);
-      else setSponsorsError(s.reason?.response?.status === 403
-        ? "Dafür fehlt dir das Recht, Event-Sponsoren zu wählen – die gewählten bleiben erhalten."
-        : "Die Event-Sponsoren lassen sich gerade nicht laden – die gewählten bleiben erhalten.");
-      if (t.status === "fulfilled") setTournaments(t.value.data || []);
-      if (f.status === "fulfilled") setF1Challenges(f.value.data || []);
-      if (p.status === "fulfilled") setPartners(Array.isArray(p.value.data) ? p.value.data : []);
-    });
+    // Turniere, Fast Laps und Sponsoren kommen seit #1371 aus dem Programm des Events (useEventProgram).
+    api.get("/partners").then(({ data }) => setPartners(Array.isArray(data) ? data : [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -107,13 +89,17 @@ export default function AdminEventEditPage() {
   }
   return (
     <AdminLayout>
-      <EventForm key={event.id || "new"} event={event} meta={meta} sponsors={sponsors} sponsorsError={sponsorsError} tournaments={tournaments} f1Challenges={f1Challenges} partners={partners} onDone={() => navigate("/admin/events")} />
+      <EventForm key={event.id || "new"} event={event} meta={meta} partners={partners} onDone={() => navigate("/admin/events")} />
     </AdminLayout>
   );
 }
 
-function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments = [], f1Challenges = [], partners = [], onDone }) {
+function EventForm({ event, meta, partners = [], onDone }) {
   const isNew = !event?.id;
+  // Programm (#1371): Turniere und Fast Laps des Events, Vorbelegung und die Sponsoren, die beim Event erscheinen.
+  const { program, failed: programFailed, reload: reloadProgram } = useEventProgram(event?.id);
+  // Eine alte eigene Sponsoren-Auswahl am Event gilt, bis sie hier aufgehoben wird (#1371).
+  const [clearOwnSponsors, setClearOwnSponsors] = useState(false);
   // Kosten und Abrechnung (#315, #322): eigener Zustand, nur für den Bereich Finanzen sichtbar
   // und nur dann Teil des Speicherns - der Server lehnt es sonst mit 403 ab.
   const { can } = useAuth();
@@ -174,7 +160,6 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
     organizer_url: source.organizer_url || "",
     owned_by_club: source.owned_by_club ?? true,
     show_sponsors: source.show_sponsors ?? true,
-    sponsor_ids: source.sponsor_ids || [],
     partner_ids: source.partner_ids || [],
     is_online: source.is_online ?? false,
     is_hybrid: source.is_hybrid ?? false,
@@ -195,19 +180,7 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
   });
   const [form, setForm] = useState(() => formFromEvent(event, isNew));
   const [saving, setSaving] = useState(false);
-  const [relatedTournamentIds, setRelatedTournamentIds] = useState([]);
-  const [relatedF1Ids, setRelatedF1Ids] = useState([]);
   const eventTypes = (meta.types || []).filter((t) => !meta.primary_types || meta.primary_types.includes(t.k) || t.k === form.event_type);
-
-  useEffect(() => {
-    if (!event?.id) {
-      setRelatedTournamentIds([]);
-      setRelatedF1Ids([]);
-      return;
-    }
-    setRelatedTournamentIds(tournaments.filter((t) => t.event_id === event.id).map((t) => t.id));
-    setRelatedF1Ids(f1Challenges.filter((c) => c.event_id === event.id).map((c) => c.id));
-  }, [event?.id, tournaments, f1Challenges]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   // Zurück auf einen Tag: Start und Ende aus dem ersten und letzten Tag übernehmen, damit nichts leer steht.
@@ -224,11 +197,8 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
     }
     setDaysForm(next);
   };
-  const eventSponsorOptions = sponsors.filter((s) => s.is_active !== false && s.show_on_events === true);
   const insertProgramEmbed = (kind, item) => {
     setForm((f) => ({ ...f, program: appendEmbedToken(f.program, kind, item) }));
-    if (kind === "tournament" && !relatedTournamentIds.includes(item.id)) setRelatedTournamentIds((ids) => [...ids, item.id]);
-    if (kind === "fastlap" && !relatedF1Ids.includes(item.id)) setRelatedF1Ids((ids) => [...ids, item.id]);
   };
 
   const normalizeEventPayload = (source) => {
@@ -238,7 +208,6 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
     if (payload.max_participants) payload.max_participants = parseInt(payload.max_participants);
     if (payload.allow_companions) payload.max_companions_per_registration = parseInt(payload.max_companions_per_registration || 1);
     else payload.max_companions_per_registration = 0;
-    payload.sponsor_ids = payload.owned_by_club && payload.show_sponsors ? (payload.sponsor_ids || []) : [];
     payload.bring_along = textToBring(payload.bring_along_text);
     delete payload.bring_along_text;
     payload.banner_style = payload.banner_style || "auto";
@@ -246,21 +215,6 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
   };
 
   const originalEventPayload = () => normalizeEventPayload(formFromEvent(event, false));
-
-  const syncRelatedItems = async (eventId) => {
-    const jobs = [];
-    tournaments.forEach((t) => {
-      const selected = relatedTournamentIds.includes(t.id);
-      if (selected && t.event_id !== eventId) jobs.push(api.patch(`/tournaments/${t.id}`, { event_id: eventId }));
-      if (!selected && t.event_id === eventId) jobs.push(api.patch(`/tournaments/${t.id}`, { event_id: null }));
-    });
-    f1Challenges.forEach((c) => {
-      const selected = relatedF1Ids.includes(c.id);
-      if (selected && c.event_id !== eventId) jobs.push(api.patch(`/f1/challenges/${c.id}`, { event_id: eventId }));
-      if (!selected && c.event_id === eventId) jobs.push(api.patch(`/f1/challenges/${c.id}`, { event_id: null }));
-    });
-    if (jobs.length) await Promise.all(jobs);
-  };
 
   const submit = async (ev) => {
     ev.preventDefault();
@@ -290,10 +244,8 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
       if (canFinance && billingDirty) payload.billing = formToBilling(billingForm);
       if (locationsDirty) payload.locations = formToLocations(locationsForm);
       if (daysDirty) payload.days = formToDays(daysForm);
-      let savedEvent;
       if (isNew) {
-        const { data } = await api.post("/events", payload);
-        savedEvent = data;
+        await api.post("/events", payload);
       } else {
         const { highlights, ...rest } = payload;
         const patch = buildDirtyPayload(rest, originalEventPayload());
@@ -301,21 +253,14 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
         if (canFinance && billingDirty) patch.billing = formToBilling(billingForm);
         if (locationsDirty) patch.locations = formToLocations(locationsForm);
         if (daysDirty) patch.days = formToDays(daysForm);
-        const relatedChanged = tournaments.some((t) => relatedTournamentIds.includes(t.id) !== (t.event_id === event.id))
-          || f1Challenges.some((c) => relatedF1Ids.includes(c.id) !== (c.event_id === event.id));
-        if (!hasPayloadChanges(patch) && !relatedChanged) {
+        if (clearOwnSponsors) patch.sponsor_ids = [];
+        if (!hasPayloadChanges(patch)) {
           toast.info("Keine Änderungen zum Speichern.");
           setSaving(false);
           return;
         }
-        if (hasPayloadChanges(patch)) {
-          const { data } = await api.patch(`/events/${event.id}`, patch);
-          savedEvent = data;
-        } else {
-          savedEvent = event;
-        }
+        await api.patch(`/events/${event.id}`, patch);
       }
-      await syncRelatedItems(savedEvent.id);
       toast.success("Gespeichert.");
       onDone();
     } catch (err) {
@@ -444,7 +389,7 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
         )}
       </FormSection>
 
-      <FormSection title="Programm und eSports-Inhalte" accent={ACCENT}>
+      <FormSection title="Programm" accent={ACCENT}>
         <FieldLabel label="Programm / Tagesablauf">
           <MarkdownEditor
             value={form.program}
@@ -455,38 +400,11 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
             helperText="Markdown plus Turnier-/Fast-Lap-Karten. HTML wird nicht roh gerendert."
           />
         </FieldLabel>
-        {(tournaments.length > 0 || f1Challenges.length > 0) && (
-          <div className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A] space-y-3">
-            <div>
-              <div className="text-[11px] uppercase tracking-widest font-bold text-white/60">Verknüpfte eSports-Inhalte</div>
-              <p className="mt-1 text-xs text-white/45">Diese Zuordnung erscheint direkt auf der Eventseite.</p>
-            </div>
-            {tournaments.length > 0 && (
-              <RelationSelect
-                icon={Trophy}
-                label="Turniere"
-                options={tournaments}
-                selected={relatedTournamentIds}
-                onChange={setRelatedTournamentIds}
-                labelKey="title"
-                accent="text-[#FFD700]"
-                onEmbed={(item) => insertProgramEmbed("tournament", item)}
-              />
-            )}
-            {f1Challenges.length > 0 && (
-              <RelationSelect
-                icon={Flag}
-                label="Fast-Lap Challenges"
-                options={f1Challenges}
-                selected={relatedF1Ids}
-                onChange={setRelatedF1Ids}
-                labelKey="title"
-                accent="text-[#29B6E8]"
-                onEmbed={(item) => insertProgramEmbed("fastlap", item)}
-              />
-            )}
-          </div>
-        )}
+        {/* Event als Klammer (#1371): Turniere und Fast Laps werden hier angelegt oder hinzugefügt - nur hier. */}
+        <div className="space-y-2">
+          <div className="text-[11px] uppercase tracking-widest font-bold text-white/60">Turniere und Fast Laps</div>
+          <EventProgramPanel eventId={event?.id} program={program} failed={programFailed} reload={reloadProgram} onEmbed={insertProgramEmbed} />
+        </div>
       </FormSection>
 
       <FormSection title="Live-Stream (optional)" accent="#FF3B30">
@@ -507,25 +425,9 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
           <CheckField label="Event von uns" checked={form.owned_by_club} onChange={(v) => set("owned_by_club", v)} accent={ACCENT} />
           <CheckField label="Sponsoren beim Event anzeigen" checked={form.show_sponsors} onChange={(v) => set("show_sponsors", v)} disabled={!form.owned_by_club} accent={ACCENT} />
         </FormGrid>
-        {form.owned_by_club && form.show_sponsors && sponsorsError && (
-          <p className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A] text-sm text-white/55" data-testid="event-sponsors-error">{sponsorsError}</p>
-        )}
-        {form.owned_by_club && form.show_sponsors && eventSponsorOptions.length > 0 && (
-          <div className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A]" data-testid="event-sponsors">
-            <div className="text-[11px] uppercase tracking-widest font-bold text-white/60 mb-3">Event-Sponsoren</div>
-            <FormGrid cols={3}>
-              {eventSponsorOptions.map((s) => (
-                <CheckField
-                  key={s.id}
-                  label={s.name}
-                  checked={(form.sponsor_ids || []).includes(s.id)}
-                  onChange={(checked) => set("sponsor_ids", checked ? [...(form.sponsor_ids || []), s.id] : (form.sponsor_ids || []).filter((id) => id !== s.id))}
-                  accent="#FFD700"
-                />
-              ))}
-            </FormGrid>
-            <p className="mt-2 text-[11px] text-white/40">Hier erscheinen nur Sponsoren mit aktivem Events-Haken. Leer lassen = alle Event-Sponsoren ohne Event-Einschränkung.</p>
-          </div>
+        {/* Event-Sponsoren (#1371): festgelegt beim Sponsor (Redaktion: bei allen oder bei ausgewählten Events) - hier nur angezeigt. */}
+        {form.owned_by_club && form.show_sponsors && (
+          <EventSponsorsInfo isNew={isNew} sponsors={program?.sponsors} clearOwn={clearOwnSponsors} onClearOwn={setClearOwnSponsors} />
         )}
         <PartnerPicker partners={partners} value={form.partner_ids} onChange={(v) => set("partner_ids", v)} testPrefix="event-partner" hint="Das Event erscheint auf der Partnerseite unter „Gemeinsam“, und die Eventseite nennt den Partner." />
       </FormSection>
@@ -540,27 +442,28 @@ function EventForm({ event, meta, sponsors = [], sponsorsError = "", tournaments
   );
 }
 
-function RelationSelect({ icon: Icon, label, options, selected, onChange, labelKey, accent, onEmbed }) {
-  const toggle = (id) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+function EventSponsorsInfo({ isNew, sponsors, clearOwn, onClearOwn }) {
+  const names = (sponsors?.items || []).map((item) => item.name).filter(Boolean);
   return (
-    <div>
-      <div className="text-[11px] uppercase tracking-widest font-bold text-white/50 mb-2">{label}</div>
-      <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
-        {options.map((item) => (
-          <div key={item.id} className="flex items-center gap-2 text-sm text-white/75 border border-white/5 hover:border-white/15 rounded-sm px-2 py-2">
-            <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
-              <input type="checkbox" checked={selected.includes(item.id)} onChange={() => toggle(item.id)} className="accent-[#9F7AEA]" />
-              <Icon className={`w-3.5 h-3.5 ${accent} shrink-0`} />
-              <span className="truncate">{item[labelKey] || item.name}</span>
-            </label>
-            {onEmbed && (
-              <button type="button" onClick={() => onEmbed(item)} className="shrink-0 text-[10px] uppercase tracking-wider font-bold text-[#29B6E8] hover:text-white">
-                Ins Programm
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
+    <div className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A] space-y-2" data-testid="event-sponsors">
+      <div className="text-[11px] uppercase tracking-widest font-bold text-white/60">Event-Sponsoren</div>
+      {!isNew && sponsors && (
+        <p className="text-sm text-white/75" data-testid="event-sponsors-list">
+          {names.length ? `Erscheinen beim Event: ${names.join(", ")}.` : "Beim Event erscheinen gerade keine Sponsoren."}
+        </p>
+      )}
+      {sponsors?.own_choice && (
+        <CheckField
+          label="Alte eigene Auswahl dieses Events aufheben – dann gilt, was beim Sponsor steht"
+          checked={clearOwn}
+          onChange={onClearOwn}
+          accent={ACCENT}
+          testId="event-sponsors-clear-own"
+        />
+      )}
+      <p className="text-[11px] text-white/45">
+        Welche Sponsoren bei welchem Event erscheinen, legt die Redaktion beim Sponsor fest: bei allen Events oder bei ausgewählten.
+      </p>
     </div>
   );
 }

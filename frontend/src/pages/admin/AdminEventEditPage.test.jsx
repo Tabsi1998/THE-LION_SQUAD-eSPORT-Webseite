@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 // Event als eigene Seite (#434): Anlegen unter /admin/events/new, Bearbeiten unter
 // /admin/events/:id mit den Daten aus der Liste; Speichern führt zurück zur Liste.
 
-const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn() };
+const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_err, fallback) => fallback, resolveMediaUrl: (url) => url }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/DiscordPreview", () => ({ DiscordPreview: () => <div data-testid="discord-preview" /> }));
@@ -226,30 +226,75 @@ test("Anmeldung im Discord: Vorgabe an, Hinweis bei externem Link, Abwahl geht m
   expect(patch.discord_registration).toBe(false);
 });
 
-// Event-Sponsoren (#1354): eine eigene kleine Auswahl für alle, die Events bearbeiten - nicht die Sponsorenliste der
-// Redaktion. Fehlt das Recht, steht ein Satz statt eines leeren Kastens.
-test("Event-Sponsoren kommen aus der eigenen Auswahl – nie aus der Sponsorenliste der Redaktion", async () => {
+// Event-Sponsoren (#1371): festgelegt beim Sponsor - das Event zeigt nur an, wer erscheint, und schickt keine eigene
+// Auswahl. Eine alte Auswahl am Event lässt sich aufheben.
+const PROGRAM = {
+  event: { id: "ev-1", name: "Halloween Night", window: "am 31.10.2026", location: "Vereinsheim" },
+  tournaments: [{ id: "t1", title: "Kart-Cup", start_date: "2026-10-31T15:00:00Z" }],
+  fastlaps: [],
+  candidates: { tournaments: [{ id: "t2", title: "Rocket-Cup", start_date: "2026-10-31T17:00:00Z" }], fastlaps: [{ id: "f1", title: "Hotlap" }] },
+  defaults: { tournament: {}, fastlap: {} },
+  sponsors: { items: [{ id: "sp-1", name: "Pixelbäckerei" }], own_choice: false },
+};
+
+function serveProgram(program = PROGRAM) {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/events/meta") return { data: META };
     if (url.startsWith("/events?")) return { data: EVENTS };
-    if (url === "/admin/choices/sponsors") return { data: [{ id: "sp-1", name: "Pixelbäckerei", logo_url: null, show_on_events: true }] };
+    if (url === "/events/ev-1/program") return { data: program };
     return { data: [] };
   });
+}
+
+test("Event-Sponsoren: nur Anzeige aus den Angaben beim Sponsor, keine Auswahl im Event", async () => {
+  serveProgram();
+  apiMock.patch.mockResolvedValue({ data: EVENTS[0] });
   renderAt("/admin/events/ev-1");
-  expect(await screen.findByTestId("event-sponsors")).toHaveTextContent("Pixelbäckerei");
-  expect(apiMock.get.mock.calls.map(([url]) => url)).not.toContain("/sponsors/admin");
+  expect(await screen.findByTestId("event-sponsors-list")).toHaveTextContent("Erscheinen beim Event: Pixelbäckerei.");
+  expect(screen.getByTestId("event-sponsors")).toHaveTextContent("legt die Redaktion beim Sponsor fest");
+  expect(screen.queryByTestId("event-sponsors-clear-own")).toBeNull();
+  expect(apiMock.get.mock.calls.map(([url]) => url)).not.toContain("/admin/choices/sponsors");
+
+  fireEvent.change(screen.getByTestId("event-name"), { target: { value: "Halloween Night 2026" } });
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("sponsor_ids");
 });
 
-test("fehlt das Recht für Event-Sponsoren, steht ein Satz – das Formular bleibt bedienbar", async () => {
-  apiMock.get.mockImplementation(async (url) => {
-    if (url === "/events/meta") return { data: META };
-    if (url.startsWith("/events?")) return { data: EVENTS };
-    if (url === "/admin/choices/sponsors") throw { response: { status: 403, data: { detail: "fehlt" } } };
-    return { data: [] };
-  });
+test("alte eigene Sponsoren-Auswahl: Haken hebt sie beim Speichern auf", async () => {
+  serveProgram({ ...PROGRAM, sponsors: { items: [{ id: "sp-1", name: "Pixelbäckerei" }], own_choice: true } });
+  apiMock.patch.mockResolvedValue({ data: EVENTS[0] });
   renderAt("/admin/events/ev-1");
-  expect(await screen.findByTestId("event-sponsors-error")).toHaveTextContent("Dafür fehlt dir das Recht, Event-Sponsoren zu wählen");
-  expect(screen.getByTestId("event-name")).toHaveValue("Halloween Night");
+  fireEvent.click(await screen.findByTestId("event-sponsors-clear-own"));
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/ev-1", { sponsor_ids: [] }));
+});
+
+// Event als Klammer (#1371): Turniere und Fast Laps werden im Programm des Events angelegt, hinzugefügt und gelöst.
+test("Programm: Liste, „+ Turnier in diesem Event“, Bestehendes hinzufügen und Lösen", async () => {
+  serveProgram();
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  apiMock.delete.mockResolvedValue({ data: { ok: true } });
+  renderAt("/admin/events/ev-1");
+  expect(await screen.findByTestId("event-program-item-t1")).toHaveTextContent("Kart-Cup");
+  expect(screen.getByTestId("event-program-new-tournament")).toHaveAttribute("href", "/admin/tournaments/new?event=ev-1");
+  expect(screen.getByTestId("event-program-new-fastlap")).toHaveAttribute("href", "/admin/f1/new?event=ev-1");
+  expect(screen.getByTestId("event-program-panel")).toHaveTextContent("am 31.10.2026");
+
+  fireEvent.change(screen.getByTestId("event-program-choice"), { target: { value: "tournament:t2" } });
+  fireEvent.click(screen.getByTestId("event-program-add-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/events/ev-1/program", { kind: "tournament", item_id: "t2" }));
+
+  fireEvent.click(screen.getByTestId("event-program-remove-t1"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/events/ev-1/program/tournament/t1"));
+  // Das Formular selbst ändert keine Turniere mehr.
+  expect(apiMock.patch.mock.calls.filter(([url]) => url.startsWith("/tournaments"))).toEqual([]);
+});
+
+test("Programm bei einem neuen Event: erst speichern", async () => {
+  renderAt("/admin/events/new");
+  expect(await screen.findByTestId("event-program-new")).toHaveTextContent("sobald das Event gespeichert ist");
+  expect(screen.queryByTestId("event-program-new-tournament")).toBeNull();
 });
 
 // Verteilen (#1359): die Turnierleitung sendet den Newsletter ihres Events einmal; ein zweites Mal nur Redaktion und System.

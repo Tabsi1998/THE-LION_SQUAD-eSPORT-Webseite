@@ -34,7 +34,7 @@ Challenge macht, darf dort **Zeiten eintragen und ändern**, aber keine Challeng
 
 | Funktion | Was passiert | Einstellen unter |
 | --- | --- | --- |
-| **Challenge** | Titel, Beschreibung, Banner, Fahrzeug, Wetter, Fahrhilfen, Controller, Plattform, Event, Sichtbarkeit | Challenge öffnen, Formular oben |
+| **Challenge** | Titel, Beschreibung, Banner, Fahrzeug, Wetter, Fahrhilfen, Controller, Plattform, Sichtbarkeit (das Event: im Event unter „Programm“) | Challenge öffnen, Formular oben |
 | **Strecken** | Eine oder mehrere Strecken mit Bild, Land, Zielzeit und Reihenfolge | Challenge öffnen, Kasten „Strecken“ |
 | **Championship** | Mehrere Strecken, Punkte nach Platz je Strecke, dazu eine Gesamtwertung | Haken „Championship“ beim Anlegen |
 | **Zeiten** | Zeit, Strafsekunden, Beleg, ungültig markieren | Challenge öffnen, Kasten „Zeiten eintragen“ |
@@ -110,8 +110,9 @@ Ausnahmen um.
 | **Archiviert** / **Abgesagt** | abgelegt |
 
 **Sichtbarkeit** (Öffentlich, Nur registrierte Community, Nur Vereinsmitglieder, Nur intern) bestimmt, wer die
-Challenge sehen darf, unabhängig vom Status. **Zugehöriges Event** verknüpft die Challenge mit einem Event; das
-braucht auch die Hallen-Tafel am TV.
+Challenge sehen darf, unabhängig vom Status. Zu einem Event gehört die Challenge, wenn sie **im Event** angelegt oder
+hinzugefügt wird (Event → **Programm** → **+ Fast Lap** oder **Bestehendes hinzufügen**, seit #1371); im Formular steht nur
+„Gehört zu … – ändern im Event“. Das braucht auch die Hallen-Tafel am TV.
 
 ### 3.2 Wertung: Strecken und Championship
 

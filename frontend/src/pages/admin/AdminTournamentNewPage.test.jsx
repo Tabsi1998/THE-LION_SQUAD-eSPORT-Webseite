@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // „Turnier anlegen“ mit Voreinstellung aus dem Leitfaden (#368): Format, Teilnahme, Teamgröße,
@@ -14,6 +14,7 @@ vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const AdminTournamentNewPage = (await import("./AdminTournamentNewPage")).default;
+const { toDateTimeLocalInput } = await import("@/lib/datetime");
 
 function renderAt(search) {
   return render(
@@ -52,4 +53,48 @@ test("ohne Voreinstellung kein Hinweis und die Standardwerte", async () => {
   expect(await screen.findByTestId("new-tr-format")).toHaveValue("single_elim");
   expect(screen.queryByTestId("new-tr-preset-hint")).not.toBeInTheDocument();
   expect(screen.getByTestId("new-tr-bestof")).toHaveValue(1);
+});
+
+// „+ Turnier in diesem Event“ (#1371): mit ?event= kommen Ort, Tag, Partner und Discord-Einstellungen vom Event; angelegt
+// wird über das Event. Ohne Event gibt es keine Event-Auswahl mehr im Formular.
+test("im Event: Vorbelegung vom Event, Ort nur als Zeile, Anlegen über das Event", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/ev-1/program") {
+      return { data: {
+        event: { id: "ev-1", name: "Herbst-LAN", window: "vom 14.11.2026 bis 15.11.2026" },
+        defaults: { tournament: { start_date: "2026-11-14T10:00:00+01:00", location: "Vereinsheim · Telfs", partner_ids: [], discord_skip: true, discord_registration: false, event_mode: "local" } },
+      } };
+    }
+    if (url === "/games") return { data: [{ id: "g1", name: "Mario Kart 8" }] };
+    return { data: [] };
+  });
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  renderAt("?event=ev-1");
+  expect(await screen.findByTestId("new-tr-event-hint")).toHaveTextContent("Herbst-LAN");
+  expect(screen.getByTestId("new-tr-event")).toHaveTextContent("Gehört zu Herbst-LAN");
+  // Das Feld zeigt die Uhrzeit des Geräts (wie überall in der Verwaltung) - erwartet wird daher dieselbe Umrechnung.
+  await waitFor(() => expect(screen.getByTestId("new-tr-start")).toHaveValue(toDateTimeLocalInput("2026-11-14T10:00:00+01:00")));
+  expect(screen.getByTestId("new-tr-discord-skip")).toBeChecked();
+  expect(screen.getByTestId("new-tr-event-mode")).toHaveValue("local");
+  expect(screen.getByTestId("new-tr-location-event")).toHaveTextContent("Vereinsheim · Telfs");
+  expect(screen.queryByTestId("new-tr-location")).toBeNull();
+
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Kart-Cup" } });
+  fireEvent.change(screen.getByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/events/ev-1/tournaments", expect.objectContaining({ title: "Kart-Cup", location: "Vereinsheim · Telfs", discord_skip: true })));
+  expect(apiMock.post.mock.calls[0][1]).not.toHaveProperty("event_id");
+});
+
+test("ohne Event: keine Event-Auswahl, nur der Hinweis, angelegt über /tournaments", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  renderAt("");
+  expect(await screen.findByTestId("new-tr-event")).toHaveTextContent("Gehört zu keinem Event");
+  expect(screen.getByTestId("new-tr-location")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Freies Turnier" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ title: "Freies Turnier", requires_event_registration: false })));
+  expect(apiMock.post.mock.calls.at(-1)[1]).not.toHaveProperty("event_id");
 });

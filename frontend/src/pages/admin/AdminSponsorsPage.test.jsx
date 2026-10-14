@@ -88,3 +88,28 @@ test("Sponsor aus Dolibarr: Dolibarr-Felder gesperrt, Website-Felder frei; Hande
   expect(screen.queryByTestId("sponsor-locked-hint")).toBeNull();
   expect(screen.getByTestId("sponsor-name")).not.toBeDisabled();
 });
+
+// Event-Sponsoren (#1371): nur der Sponsor sagt, wo er erscheint - „bei allen Events“ oder „bei ausgewählten Events“.
+test("Events: bei allen leert die Auswahl, bei ausgewählten verlangt mindestens ein Event", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/sponsors") return { data: SOURCE_OFF };
+    if (url === "/sponsors/admin") return { data: [{ id: "s3", name: "Pixelbäckerei", tier: "gold", is_active: true, show_on_events: true, event_ids: ["e1"] }] };
+    if (url.startsWith("/events")) return { data: [{ id: "e1", name: "Herbst-LAN" }, { id: "e2", name: "Winter-LAN" }] };
+    return { data: [] };
+  });
+  apiMock.patch.mockResolvedValue({ data: {} });
+  render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
+  fireEvent.click((await screen.findByTestId("sponsor-card-s3")).querySelector("button"));
+  expect(screen.getByTestId("sponsor-event-scope-selected")).toBeChecked();
+  expect(await screen.findByTestId("sponsor-event-list")).toHaveTextContent("Herbst-LAN");
+
+  fireEvent.click(screen.getByLabelText("Herbst-LAN"));
+  fireEvent.click(screen.getByTestId("sponsor-save"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Wähle mindestens ein Event – oder „bei allen Events“."));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByTestId("sponsor-event-scope-all"));
+  expect(screen.queryByTestId("sponsor-event-list")).toBeNull();
+  fireEvent.click(screen.getByTestId("sponsor-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/sponsors/s3", expect.objectContaining({ show_on_events: true, event_ids: [] })));
+});

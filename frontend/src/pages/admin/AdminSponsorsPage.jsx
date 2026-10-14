@@ -280,6 +280,8 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
     order_index: sponsor?.order_index ?? 0,
   });
   const [saving, setSaving] = useState(false);
+  // Event-Sponsoren (#1371): nur hier wird festgelegt, bei welchen Events der Sponsor erscheint - bei allen oder bei ausgewählten.
+  const [eventScope, setEventScope] = useState((sponsor?.event_ids || []).length ? "selected" : "all");
   const [placementsTouched, setPlacementsTouched] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setPlacement = (k, v) => {
@@ -298,10 +300,17 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
 
   const save = async (e) => {
     e.preventDefault();
+    const selectedEvents = form.show_on_events && eventScope === "selected";
+    if (selectedEvents && !(form.event_ids || []).length) {
+      toast.error("Wähle mindestens ein Event – oder „bei allen Events“.");
+      return;
+    }
     setSaving(true);
     try {
-      if (sponsor) await api.patch(`/sponsors/${sponsor.id}`, form);
-      else await api.post("/sponsors", form);
+      // „bei allen Events“ leert die Auswahl; ohne Haken „Events“ bleibt sie für später stehen.
+      const payload = { ...form, event_ids: form.show_on_events && eventScope === "all" ? [] : form.event_ids };
+      if (sponsor) await api.patch(`/sponsors/${sponsor.id}`, payload);
+      else await api.post("/sponsors", payload);
       toast.success("Gespeichert.");
       onSaved();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
@@ -366,9 +375,23 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
           <CheckField label="PDFs" checked={form.show_on_pdf === true} onChange={(v) => setPlacement("show_on_pdf", v)} testId="sponsor-show-pdf" />
           <CheckField label="E-Mails" checked={form.show_in_emails === true} onChange={(v) => setPlacement("show_in_emails", v)} testId="sponsor-show-emails" accent="#18C29C" />
         </FormGrid>
-        {events.length > 0 && (
-          <div className="border border-white/10 rounded-sm p-3 bg-[#0A0A0A]">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-2">Nur bestimmte Events</div>
+        {form.show_on_events && (
+          <div className="border border-white/10 rounded-sm p-3 bg-[#0A0A0A] space-y-2" data-testid="sponsor-event-scope">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Bei welchen Events</div>
+            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+              {[["all", "Bei allen Events"], ["selected", "Bei ausgewählten Events"]].map(([value, label]) => (
+                <label key={value} className="inline-flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="sponsor-event-scope" value={value} checked={eventScope === value} onChange={() => setEventScope(value)} data-testid={`sponsor-event-scope-${value}`} className="accent-[#29B6E8]" />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <p className="text-[10px] text-white/40">Nur hier wird festgelegt, wo der Sponsor erscheint – das Event zeigt es nur an.</p>
+          </div>
+        )}
+        {form.show_on_events && eventScope === "selected" && events.length > 0 && (
+          <div className="border border-white/10 rounded-sm p-3 bg-[#0A0A0A]" data-testid="sponsor-event-list">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-2">Ausgewählte Events</div>
             <div className="max-h-28 overflow-y-auto space-y-1">
               {events.map((ev) => (
                 <CheckField
@@ -380,7 +403,6 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
                 />
               ))}
             </div>
-            <p className="mt-2 text-[10px] text-white/40">Nur relevant, wenn „Events” aktiv ist. Leer lassen = bei allen eigenen Events erlaubt.</p>
           </div>
         )}
         <SponsorPlacementPreview sponsor={form} />

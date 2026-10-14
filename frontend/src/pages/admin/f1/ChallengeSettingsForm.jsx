@@ -4,6 +4,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { FormActions, FormColumns, FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
+import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
@@ -104,9 +105,8 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
         aside={(
           <>
             <FormSection title="Veröffentlichung und Zeitplan" hint="Live und Beendet werden anhand von Start/Ende automatisch geschaltet.">
-              {events.length > 0 && (
-                <SelectField label="Zugehöriges Event" value={form.event_id || ""} onChange={(v) => set("event_id", v)} options={[["", "— kein Event —"], ...events.map((e) => [e.id, e.name])]} testId="f1-edit-event" />
-              )}
+              {/* Event als Klammer (#1371): verbunden wird nur im Event. */}
+              <EventMembershipLine eventId={form.event_id} events={events} testId="f1-edit-event" />
               <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={[["public", "Öffentlich"], ["community", "Nur registrierte Community"], ["members", "Nur Vereinsmitglieder"], ["internal", "Nur intern"]]} testId="f1-edit-visibility" />
               <TextField label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v)=>set("start_date", v)} testId="f1-edit-start" />
               <TextField label="Ende Challenge/Event" type="datetime-local" value={form.end_date} onChange={(v)=>set("end_date", v)} testId="f1-edit-end" />

@@ -195,6 +195,13 @@ Team-Turniere meldet weiter die Teamleitung auf der Turnierseite an, Turniere an
 Auswahl (`GET …/play-along`) zeigt nur Turniere und Fast Laps, die die Person sehen darf. Code:
 `services/event_play_along.py`.
 
+**Event als Klammer in der Verwaltung (#1371):** Turniere und Fast Laps verbindet nur noch das Event – Abschnitt
+„Programm“ (`GET/POST /api/events/{id}/program`, `DELETE …/program/{kind}/{id}`, Anlegen mit Vorbelegung über
+`POST /api/events/{id}/tournaments` und `…/fastlaps`). Das ist Turnierleitung mit Zwei-Faktor wie das Bearbeiten des Events;
+Helfer eines Turniers (auch Organisation) ordnen nichts zu. Turnier- und Fast-Lap-Formular ändern das Event nicht. Welche
+Sponsoren bei welchem Event erscheinen, legt nur die **Redaktion** beim Sponsor fest (bei allen oder bei ausgewählten Events);
+das Event zeigt sie an und nimmt keine eigene Auswahl mehr an. Code: `services/event_program.py`.
+
 In der App fragt die Team-Seite dieselben Rollen wie der Server: Team bearbeiten und Squads dürfen Leitung,
 Co-Leitung, Turnierleitung, Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und
 Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen dabei –

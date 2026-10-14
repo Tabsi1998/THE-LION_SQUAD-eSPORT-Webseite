@@ -574,6 +574,11 @@ async def delete_challenge_staff(cid: str, assignment_id: str, me: dict = Depend
 
 @router.post("/challenges")
 async def create_challenge(body: F1ChallengeCreate, me: dict = Depends(require_admin())):
+    return await create_challenge_doc(body, me)
+
+
+async def create_challenge_doc(body: F1ChallengeCreate, me: dict) -> dict:
+    """Anlegen ohne Route - auch für „+ Fast Lap“ im Event (#1371, ``event_program_routes``)."""
     db = get_db()
     doc = body.model_dump()
     doc["slug"] = await unique_slug(db.f1_challenges, doc.get("slug") or doc.get("title"), fallback="fastlap")
@@ -603,6 +608,9 @@ async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends
     cid = await _resolve_cid(cid)
     existing = await db.f1_challenges.find_one({"id": cid}, {"_id": 0}) or {}
     raw = body.model_dump(exclude_unset=True)
+    # Event als Klammer (#1371): verbunden wird nur im Event - wie beim Turnier.
+    if "event_id" in raw and (raw.pop("event_id") or None) != (existing.get("event_id") or None):
+        raise HTTPException(status_code=400, detail="Zu welchem Event das gehört, änderst du im Event unter „Programm“.")
     nullable_fields = {
         "description", "event_id", "vehicle", "weather", "assists_allowed", "controller_type",
         "platform", "banner_url", "twitch_channel", "stream_platform",

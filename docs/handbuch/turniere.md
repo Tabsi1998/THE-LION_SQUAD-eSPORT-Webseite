@@ -65,13 +65,19 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
 5. Rechts im Kasten **Wann**: **Veröffentlichung** (**Entwurf** oder **Angekündigt**), **Start Event/Turnier**,
    **Anmeldung endet**. Unter „Weitere Zeiten und Sonderfälle“: **Ende**, **Anmeldung öffnet**, **Check-in öffnet**,
    **Check-in endet**, **Nur Einladung**, **Anmeldung über Discord erlauben**, **Vereinsmitglieder von der Selbstanmeldung
-   ausschließen** und, wenn ein Event gewählt ist, **Anmeldung nur mit Event-Anmeldung**. Unter dem Kasten warnt
+   ausschließen** und, wenn das Turnier zu einem Event gehört, **Anmeldung nur mit Event-Anmeldung**. Unter dem Kasten warnt
    **Planung prüfen** bei widersprüchlichen Zeiten.
-6. Weiter unten, aufklappbar: **Darstellung und Regeln** (Slug, Plattform, **Event**, Beschreibung, Banner, **Regeln**,
+6. Weiter unten, aufklappbar: **Darstellung und Regeln** (Slug, Plattform, Beschreibung, Banner, **Regeln**,
    Partner), **Spieloptionen** (Best of, Seeding, Folgerunden mischen, Spiel um Platz 3), **Preise**, **Streaming und
    externe Links**. Schreibt die **Regeln** hinein, bevor die Anmeldung aufgeht – was ihr festlegt (Frist bis zum
    Forfeit, Streitfall-Ablauf, Beweise), steht dann für alle fest.
-7. **Turnier erstellen**. Du landest im Turnier. Gibt es schon genug Teilnehmer, steht die Meldung „Vorschau mit n
+7. **Turnier erstellen**. Du landest im Turnier.
+
+**Turnier für ein Event (seit #1371):** Ein Turnier gehört zu einem Event, wenn du es **im Event** anlegst oder dort
+hinzufügst – nicht im Turnier. Event öffnen → Abschnitt **Programm** → **+ Turnier in diesem Event**. Das Formular kommt mit
+Ort, Tag, Partnern und den Discord-Einstellungen des Events; der Tag muss im Zeitraum des Events liegen. Ein schon
+angelegtes Turnier holst du dort über **Bestehendes hinzufügen**, **Lösen** nimmt es wieder heraus. Im Turnier steht nur
+noch die Zeile „Gehört zu … – ändern im Event“, und der Ort kommt vom Event (ein eigener Ort nur ohne Event). Gibt es schon genug Teilnehmer, steht die Meldung „Vorschau mit n
    Spielen angelegt“ da.
 
 ### 2.2 Anmeldung öffnen

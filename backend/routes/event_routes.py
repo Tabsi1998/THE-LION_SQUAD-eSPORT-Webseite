@@ -589,10 +589,11 @@ async def event_meta():
             {"k": "cancelled", "l": "Abgesagt"},
         ],
         "visibilities": [
-            {"k": "public", "l": "Öffentlich"},
-            {"k": "community", "l": "Nur registrierte Community"},
-            {"k": "members", "l": "Nur Vereinsmitglieder"},
-            {"k": "internal", "l": "Nur intern"},
+            # „short“: das Wort für Listen (#1373) - die Eventliste zeigt nie den Rohwert.
+            {"k": "public", "l": "Öffentlich", "short": "Alle"},
+            {"k": "community", "l": "Nur registrierte Community", "short": "Community"},
+            {"k": "members", "l": "Nur Vereinsmitglieder", "short": "Mitglieder"},
+            {"k": "internal", "l": "Nur intern", "short": "Intern"},
         ],
     }
 
@@ -686,6 +687,10 @@ async def create_event_recap_draft(event_id: str, me: dict = Depends(require_adm
     event, _ = await _find_event(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    # Rückblick erst nach dem Event (#1373) - dieselbe Regel wie die Eventliste und die Event-Seite.
+    from services.event_recap import is_over
+    if not is_over(event):
+        raise HTTPException(status_code=400, detail="Einen Rückblick gibt es erst, wenn das Event vorbei ist.")
     existing = await db.news_posts.find_one(
         {"linked_event_ids": event["id"], "category": "recap", "recap_source_event_id": event["id"]},
         {"_id": 0},
@@ -966,10 +971,18 @@ async def _billing_updates(raw: dict, existing: dict | None, me: dict) -> dict |
     return pricing.bump_version((existing or {}).get("billing"), offer)
 
 
+def _refuse_event_sponsor_choice(values: dict) -> None:
+    """Event-Sponsoren (#1371): welche Sponsoren bei welchem Event erscheinen, legt die Redaktion beim Sponsor fest.
+    Das Event nimmt keine eigene Auswahl mehr an - nur noch das Aufheben einer alten (leere Liste)."""
+    if values.get("sponsor_ids"):
+        raise HTTPException(400, "Welche Sponsoren beim Event erscheinen, legt die Redaktion beim Sponsor fest.")
+
+
 @router.post("")
 async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
     db = get_db()
     doc = body.model_dump()
+    _refuse_event_sponsor_choice(doc)
     doc["partner_ids"] = await partner_pages.clean_partner_ids(db, doc.get("partner_ids"))
     billing = await _billing_updates(body.model_dump(exclude_unset=True), None, me)
     doc["billing"] = billing if billing is not None else pricing.normalize_offer(None)
@@ -1022,6 +1035,7 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
         "contact", "program", "stream_platform",
     }
     raw = body.model_dump(exclude_unset=True)
+    _refuse_event_sponsor_choice(raw)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if "partner_ids" in updates:
         updates["partner_ids"] = await partner_pages.clean_partner_ids(db, updates["partner_ids"])
