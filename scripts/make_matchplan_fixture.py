@@ -14,6 +14,7 @@ Zustände:
   live            Turnier läuft seit 70 Minuten: zwei Läufe fertig, einer läuft an der Station, Vorschau mit Verzug
   big             Worst Case: 24 Spieler Doppel-K.-o. (über 40 Spiele), 8 Stationen (eine defekt, bleibt leer), lange Namen
   online          Online-Turnier: Planer ohne Stationen, Fristen je Spiel
+  online_draft    Online-Turnier mit Vorschau-Baum: die Spiele stehen als Vorschau da
   league          Liga online: Spielwochen mit Fristen
 
 Nach einer Änderung an Planer, Generator oder Fristen neu erzeugen (mit der Backend-Umgebung, z. B. dem Venv von
@@ -254,6 +255,26 @@ async def online_state(out):
         await shutdown()
 
 
+async def online_draft_state(out):
+    """Online, Baum noch Vorschau (Anmeldung offen): die Spiele stehen als Vorschau da."""
+    flow, shutdown = make_flow()
+    try:
+        staff = await flow.add_staff()
+        start = quarter(now_utc() + timedelta(days=3))
+        tournament, _users, regs = await flow.with_participants(
+            8, format="single_elim", title="Online-Abend (Vorschau)", event_mode="online", schedule_mode="player_proposal",
+            start_date=start.isoformat())
+        await named(flow, regs, NAMES)
+        flow.act_as(staff)
+        response = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=true")
+        assert response.status_code == 200, response.text
+        out["online_draft"] = await snapshot(flow, tournament)
+        deadlines = await flow.get(f"/api/tournaments/{tournament['id']}/schedule/deadlines")
+        out["online_draft"]["deadlines"] = deadlines.json()
+    finally:
+        await shutdown()
+
+
 async def league_state(out):
     flow, shutdown = make_flow()
     try:
@@ -288,6 +309,7 @@ async def main():
     await live_state(out)
     await big_state(out)
     await online_state(out)
+    await online_draft_state(out)
     await league_state(out)
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1, default=str) + "\n", encoding="utf-8", newline="\n")
     for key in ("preview", "applied", "conflict"):
@@ -297,6 +319,7 @@ async def main():
     print("live", len(out["live"]["plan"]["assignments"]), [w["type"] for w in out["live"]["plan"]["warnings"]])
     print("big", len(out["big"]["matches"]), out["big"]["plan"]["mode"], len(out["big"]["plan"]["assignments"]))
     print("online", out["online"]["plan"]["mode"], len(out["online"]["deadlines"]["matches"]))
+    print("online_draft", out["online_draft"]["plan"]["mode"], sum(1 for m in out["online_draft"]["matches"] if m.get("is_preview")))
     print("league", out["league"]["plan"]["mode"], len(out["league"]["matchdays"].get("matchdays") or []))
 
 

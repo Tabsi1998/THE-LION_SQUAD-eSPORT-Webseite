@@ -341,7 +341,7 @@ export function PlanNotice({ tone = "info", testId, children }) {
  * Ein Spiel von Hand: Start (Wiener Uhr), Station, eigene Dauer. Ersetzt die alte „Matchplanung“ an den Spielkarten im
  * Reiter „Spiele“. Leere Dauer erbt (daneben steht, woher), leerer Start gibt den Termin an den Planer zurück.
  */
-export function MatchEditor({ item, match, stations, stage, tournament, game, onSave, onClose }) {
+export function MatchEditor({ item, match, stations, stage, tournament, game, onSave, onClose, withStation = true }) {
   const inherited = matchDurationSource(match ? { ...match, duration_minutes: null } : {}, { stage, tournament, game });
   const [start, setStart] = useState(viennaInputValue(match?.scheduled_at));
   const [stationId, setStationId] = useState(match?.station_id || "");
@@ -354,7 +354,8 @@ export function MatchEditor({ item, match, stations, stage, tournament, game, on
     setBusy(true);
     const result = await onSave(item, {
       scheduled_at: start ? fromViennaInput(start) : null,
-      station_id: stationId || null,
+      // Online und Liga haben keine Station - das Feld fehlt, die Station bleibt, wie sie ist.
+      ...(withStation ? { station_id: stationId || null } : {}),
       duration_minutes: ownDurationPayload(duration),
     });
     setBusy(false);
@@ -369,7 +370,7 @@ export function MatchEditor({ item, match, stations, stage, tournament, game, on
           <input id={`${id}-start`} type="datetime-local" className="mp-input" value={start} onChange={(e) => setStart(e.target.value)} />
           <span className="mp-field__hint">Leer: der Planer plant das Spiel wieder.</span>
         </div>
-        <div className="mp-field">
+        {withStation && <div className="mp-field">
           <label className="mp-field__label" htmlFor={`${id}-station`}>Station</label>
           <select id={`${id}-station`} className="mp-input" value={stationId} onChange={(e) => setStationId(e.target.value)}>
             <option value="">Ohne Station</option>
@@ -377,7 +378,7 @@ export function MatchEditor({ item, match, stations, stage, tournament, game, on
               <option key={station.id} value={station.id}>{station.name}{station.status === "broken" ? " (defekt)" : ""}</option>
             ))}
           </select>
-        </div>
+        </div>}
         <div className="mp-field">
           <label className="mp-field__label" htmlFor={`${id}-duration`}>Eigene Dauer (Min.)</label>
           <input id={`${id}-duration`} type="number" min="1" className="mp-input" value={duration} placeholder={String(inherited.minutes)}

@@ -3020,6 +3020,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-round__title span, .mp-week__title span { font-size: 12px; font-weight: 400; color: rgba(255, 255, 255, 0.5); white-space: nowrap; }
 .mp-round__list, .mp-week__list { display: grid; gap: 4px; margin-top: 6px; }
 .mp-remote { display: grid; gap: 2px; padding: 8px 10px; border-radius: 2px; background: var(--tls-surface-2); font-size: 13.5px; color: #fff; }
+.mp-remote__action { justify-self: start; margin-top: 4px; }
 .mp-remote__names { color: rgba(255, 255, 255, 0.85); overflow-wrap: anywhere; }
 .mp-remote__state { font-size: 12.5px; color: rgba(255, 255, 255, 0.55); }
 .mp-remote[data-tone="done"] { opacity: 0.6; }

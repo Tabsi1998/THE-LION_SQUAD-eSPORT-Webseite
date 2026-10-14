@@ -8,6 +8,7 @@ import { dependencyGraph } from "@/lib/matchFlow";
 import { matchDurationSource } from "@/lib/matchDuration";
 import { applySchedulePlan, moveMatch, requestSchedulePlan, updateMatchPlan } from "@/lib/schedulePlan";
 import { matchRights } from "@/lib/tournamentRights";
+import { planViewMode } from "@/lib/matchPlanMode";
 import { viennaTime } from "@/lib/vienna";
 import { StationTimeline } from "./StationTimeline";
 import { FlowGraph } from "./FlowGraph";
@@ -21,23 +22,7 @@ import { LeagueWeeks, OnlineRounds } from "./MatchPlanRemote";
 // useLiveRefresh, dazu jede Minute, weil die Prognose mit der Uhr wandert). Online und Liga: keine Stationen.
 
 const LIVE_STATUSES = new Set(["live", "paused"]);
-// Wie services/matchday_schedule.MATCHDAY_FORMATS: diese Formate spielen online in Spielwochen.
-const LEAGUE_FORMATS = new Set(["league", "round_robin", "groups"]);
 const CLOCK_MS = 30_000;
-
-function fallbackMode(tournament) {
-  const eventMode = tournament?.event_mode || "online";
-  if (eventMode === "local" || eventMode === "hybrid") return "local";
-  return LEAGUE_FORMATS.has(tournament?.format) ? "league" : "online";
-}
-
-// Die Ansicht folgt dem Turnier. Der Planer bestätigt sie („stations“, „matchdays“); „none“ heißt nur „nichts (neu) zu
-// planen“ - etwa solange der Baum Vorschau ist - und ist nie ein Grund, auf „online“ zu springen (Praxis-Fehler nach #1589).
-function modeOf(plan, tournament) {
-  if (plan?.mode === "matchdays") return "league";
-  if (plan?.mode === "stations" || plan?.mode === "mixed") return "local";
-  return fallbackMode(tournament);
-}
 
 function Section({ title, note, children, testId }) {
   return (
@@ -79,7 +64,8 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   }, [fixedNow]);
   const now = useMemo(() => fixedNow || new Date(clock), [fixedNow, clock]);
 
-  const mode = modeOf(background, tournament);
+  // Dieselbe Regel wie der Planer (lib/matchPlanMode): vor Ort nur „local“, Spielwochen nur online; „none“ ändert nichts.
+  const mode = planViewMode({ tournament, stages, matches, plan: background });
 
   const refreshPlan = useCallback(async () => {
     if (!canPlan) return null;
@@ -188,13 +174,16 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
     return result;
   };
 
-  const editor = (item, close) => {
+  const editor = (item, close, { withStation = true } = {}) => {
     const match = matchById.get(item.id);
     return (
       <MatchEditor item={item} match={match} stations={stations} stage={stages.find((stage) => stage.id === match?.stage_id) || null}
-        tournament={tournament} game={durationGame} onSave={saveMatch} onClose={close} />
+        tournament={tournament} game={durationGame} onSave={saveMatch} onClose={close} withStation={withStation} />
     );
   };
+  // Online und Liga: ohne Station, nur Start und Dauer - mit denselben Rechten je Spiel.
+  const remoteEditor = (match, close) => editor({ id: match.id, key: match.match_key || "Spiel" }, close, { withStation: false });
+  const canEditMatch = (match) => Boolean(match) && !match.is_preview && matchRights(tournament, match).plan;
 
   const release = async (item) => {
     const result = await moveMatch(item.id, { release: true });
@@ -282,8 +271,10 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
           </div>
         </>
       )}
-      {mode === "online" && <OnlineRounds tournament={tournament} matches={matches} registrations={registrations} deadlines={deadlines} error={remoteError} />}
-      {mode === "league" && <LeagueWeeks tournament={tournament} matches={matches} registrations={registrations} matchdays={matchdays} error={remoteError} />}
+      {mode === "online" && <OnlineRounds tournament={tournament} matches={matches} registrations={registrations} deadlines={deadlines} error={remoteError}
+        canEdit={canEditMatch} editor={remoteEditor} />}
+      {mode === "league" && <LeagueWeeks tournament={tournament} matches={matches} registrations={registrations} matchdays={matchdays} error={remoteError}
+        canEdit={canEditMatch} editor={remoteEditor} />}
     </div>
   );
 }

@@ -439,6 +439,63 @@ describe("Handy: Liste je Station", () => {
   });
 });
 
+// Codex zu #1601: Online und Liga hatten nach dem Entfernen der alten Planung kein „ändern“ mehr, hybrid fiel ohne
+// Antwort des Planers auf „vor Ort“, und Online-Vorschau-Spiele fehlten.
+describe("online, Liga, hybrid: dieselben Regeln wie der Planer", () => {
+  it("online: je Spiel „ändern“ mit Start und Dauer - ohne Station", async () => {
+    const user = userEvent.setup();
+    const state = fixture.online;
+    setup(state);
+    const online = await screen.findByTestId("mp-online");
+    const open = state.matches.find((row) => !row.is_preview && !["completed", "forfeit", "bye"].includes(row.status));
+    await user.click(within(online).getByRole("button", { name: `${open.match_key} ändern` }));
+    const editor = within(online).getByTestId("mp-editor");
+    expect(within(editor).queryByLabelText("Station")).toBeNull();
+    fireEvent.change(within(editor).getByLabelText("Start"), { target: { value: "2026-11-02T20:15" } });
+    fireEvent.change(within(editor).getByLabelText("Eigene Dauer (Min.)"), { target: { value: "40" } });
+    await user.click(within(editor).getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith(`/matches/${open.id}`,
+      { scheduled_at: "2026-11-02T19:15:00.000Z", duration_minutes: 40 }));
+  });
+
+  it("Liga: je Partie „ändern“ in der Spielwoche", async () => {
+    const user = userEvent.setup();
+    const state = fixture.league;
+    setup(state);
+    const league = await screen.findByTestId("mp-league");
+    const entry = state.matchdays.matchdays[0].matches[0];
+    const match = state.matches.find((row) => row.id === entry.match_id);
+    await waitFor(() => expect(within(league).getByRole("button", { name: `${match.match_key} ändern` })).toBeInTheDocument());
+    await user.click(within(league).getAllByRole("button", { name: `${match.match_key} ändern` })[0]);
+    expect(within(league).getByTestId("mp-editor")).toBeInTheDocument();
+  });
+
+  it("ohne Recht auf Termine kein „ändern“ online", async () => {
+    const state = fixture.online;
+    setup({ ...state, tournament: { ...state.tournament, can_plan_matches: false, staff_scopes: [] } });
+    const online = await screen.findByTestId("mp-online");
+    expect(within(online).queryByRole("button", { name: /ändern$/ })).toBeNull();
+  });
+
+  it("online mit Vorschau-Baum: die Spiele stehen da, als Vorschau gekennzeichnet, ohne „ändern“", async () => {
+    const state = fixture.online_draft;
+    expect(state.matches.every((row) => row.is_preview)).toBe(true);
+    setup(state);
+    const online = await screen.findByTestId("mp-online");
+    expect(online).not.toHaveTextContent("Noch keine Spiele");
+    expect(within(online).getAllByText(/Vorschau/).length).toBeGreaterThan(0);
+    expect(within(online).queryByRole("button", { name: /ändern$/ })).toBeNull();
+    expect(within(online).getAllByRole("listitem")).toHaveLength(state.matches.length);
+  });
+
+  it("hybrid ohne Antwort des Planers: Online-Ansicht wie beim Planer, nicht die Stationen", () => {
+    const state = fixture.online;
+    setup({ ...state, tournament: { ...state.tournament, event_mode: "hybrid", can_assign_stations: false } });
+    expect(screen.getByTestId("mp-online")).toBeInTheDocument();
+    expect(screen.queryByTestId("mp-timeline")).toBeNull();
+  });
+});
+
 describe("online und Liga: keine Stationen, keine Zeitleiste je Station", () => {
   it("online: Runden mit Fristen je Spiel, ohne Stationsfelder", async () => {
     setup(fixture.online);
