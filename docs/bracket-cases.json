@@ -1,0 +1,59 @@
+{
+ "_info": "Gemeinsame Erwartungen für den Turnierbaum (#1561 Web, #1563 App) auf den echten Bäumen aus docs/bracket-trees.json (scripts/make_app_bracket_fixture.py). Spiele stehen als Kürzel, Personen als Name. Linie: \"Quelle>Ziel:Platz Fluss\", dahinter \" quer\" (über die Grenze eines Abschnitts) und \" entfällt\" (Quelle oder Ziel abgesagt). App: mobile/src/lib/bracketGraph.test.ts. Web: frontend/src/lib/bracketGraph.js rechnet dieselben Fälle (nach #1581).",
+ "edges": [
+  {"state": "se6_live", "edges": ["A>E:1 W", "B>E:2 W", "C>F:1 W", "D>F:2 W", "E>G:1 W", "F>G:2 W"]},
+  {"state": "de4_reset_cancelled", "edges": ["A>C:1 W", "B>C:2 W", "A>LA:1 L quer", "B>LA:2 L quer", "LA>LB:1 W", "C>LB:2 L quer", "C>GF:1 W quer", "LB>GF:2 W quer", "GF>GFR:1 W entfällt", "GF>GFR:2 W entfällt"]},
+  {"state": "ffa16", "edges": ["A>E:1 W", "A>E:3 W", "D>E:2 W", "D>E:4 W", "B>F:1 W", "B>F:3 W", "C>F:2 W", "C>F:4 W", "E>G:1 W", "E>G:3 W", "F>G:2 W", "F>G:4 W"]},
+  {"state": "ffa8_before_merge", "edges": ["A>E:1 W", "D>E:2 W", "B>F:1 W", "C>F:2 W", "E>G:1 W", "F>G:2 W"]},
+  {"state": "ffa8_after_merge", "edges": ["A>E:1 W", "A>E:3 W", "B>E:2 W", "B>E:4 W"]},
+  {"state": "league6", "edges": []}
+ ],
+ "fate": [
+  {"state": "de4_reset_cancelled", "fates": {"GFR": {"kind": "reset", "label": "entfällt · nicht nötig"}}},
+  {"state": "ffa8_after_merge", "fates": {"C": {"kind": "merged", "into": "B", "label": "zusammengelegt in B"}, "D": {"kind": "merged", "into": "A", "label": "zusammengelegt in A"}, "F": {"kind": "merged", "into": "E", "label": "zusammengelegt in E"}, "G": {"kind": "skipped", "label": "entfällt"}}},
+  {"state": "se6_live", "fates": {}}
+ ],
+ "soloAdvance": [
+  {"state": "se6_live", "solo": {"A": "NeonFalke", "C": "KartKönigin", "D": "BoostBerta"}},
+  {"state": "de4_reset_cancelled", "solo": {}},
+  {"state": "ffa8_before_merge", "solo": {}}
+ ],
+ "walkover": [
+  {"state": "se6_done", "walkover": ["F"]},
+  {"state": "se6_live", "walkover": []},
+  {"state": "de4_reset_cancelled", "walkover": []}
+ ],
+ "heatExits": [
+  {"state": "ffa16", "exits": {"A": {"advance": ["E"], "drop": [], "qualifiers": 2}, "E": {"advance": ["G"], "drop": [], "qualifiers": 2}, "G": {"advance": [], "drop": [], "qualifiers": 2}}},
+  {"state": "ffa8_before_merge", "exits": {"A": {"advance": ["E"], "drop": [], "qualifiers": 1}, "G": {"advance": [], "drop": [], "qualifiers": 2}}},
+  {"state": "ffa8_after_merge", "exits": {"A": {"advance": ["E"], "drop": [], "qualifiers": 2}, "C": {"advance": [], "drop": [], "qualifiers": 1}, "E": {"advance": [], "drop": [], "qualifiers": 2}}}
+ ],
+ "path": [
+  {"state": "ffa16_round1", "player": "NeonFalke", "matches": ["A", "E", "G"], "edges": ["A>E:1", "E>G:1", "E>G:3"], "ahead": ["G"]},
+  {"state": "se6_done", "player": "NeonFalke", "matches": ["A", "E", "G"], "edges": ["A>E:1", "E>G:1"], "ahead": []},
+  {"state": "de4_reset_cancelled", "player": "PixelPaula", "matches": ["A", "LA", "LB", "GF", "GFR"], "edges": ["A>LA:1", "LA>LB:1", "LB>GF:2"], "ahead": []},
+  {"state": "se6_live", "player": "BoostBerta", "matches": ["D", "F", "G"], "edges": ["D>F:2", "F>G:2"], "ahead": ["G"]}
+ ],
+ "finalMatch": [
+  {"state": "se6_done", "final": "G"},
+  {"state": "de4_reset_cancelled", "final": "GF"},
+  {"state": "ffa16", "final": "G"},
+  {"state": "ffa8_after_merge", "final": "E"},
+  {"state": "league6", "final": null},
+  {"state": "groups8", "final": null},
+  {"state": "swiss6", "final": null}
+ ],
+ "diff": [
+  {"from": "ffa16", "to": "ffa16_round1", "events": ["result:A", "result:B", "result:C", "result:D", "advance:E:NeonFalke:A", "advance:E:PixelPaula:D", "advance:E:SchnellSchnecke:A", "advance:E:DriftDaniel:D", "advance:F:KartKönigin:B", "advance:F:LuckyLion:C", "advance:F:TurboTom:B", "advance:F:BoostBerta:C"]},
+  {"from": "ffa8_before_merge", "to": "ffa8_after_merge", "events": ["merge:A:PixelPaula:D", "merge:A:SchnellSchnecke:D", "merge:B:LuckyLion:C", "merge:B:TurboTom:C", "fate:C:merged", "fate:D:merged", "fate:F:merged", "fate:G:skipped"]},
+  {"from": "se6_live", "to": "se6_done", "events": ["result:E", "result:F", "result:G", "advance:G:NeonFalke:E", "advance:G:KartKönigin:F", "walkover:F"]}
+ ],
+ "heatText": [
+  {"state": "ffa16", "match": "A", "text": {"name": "Lauf A", "meta": "4 Spieler · 2 kommen weiter", "cut": "2 kommen weiter → E", "rest": "Die anderen scheiden aus", "free": ""}},
+  {"state": "ffa16", "match": "G", "text": {"name": "Lauf G", "meta": "4 Plätze · Platz 1 gewinnt", "cut": "", "rest": "", "free": ""}},
+  {"state": "ffa8_before_merge", "match": "A", "text": {"name": "Lauf A", "meta": "2 Spieler · 1 kommt weiter", "cut": "1 kommt weiter → E", "rest": "Die anderen scheiden aus", "free": "2 Plätze frei"}},
+  {"state": "ffa8_before_merge", "match": "E", "text": {"name": "Lauf E", "meta": "2 Plätze · 1 kommt weiter", "cut": "1 kommt weiter → G", "rest": "Die anderen scheiden aus", "free": "2 Plätze frei"}},
+  {"state": "ffa8_after_merge", "match": "E", "text": {"name": "Lauf E", "meta": "4 Plätze · Platz 1 gewinnt", "cut": "", "rest": "", "free": ""}},
+  {"state": "ffa16_round1", "match": "E", "text": {"name": "Lauf E", "meta": "4 Spieler · 2 kommen weiter", "cut": "2 kommen weiter → G", "rest": "Die anderen scheiden aus", "free": ""}}
+ ]
+}

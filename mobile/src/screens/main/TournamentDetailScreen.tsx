@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, AppState, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AddToCalendarButton } from "../../components/AddToCalendarButton";
 import { tournamentIsOver } from "../../lib/afterEnd";
@@ -16,6 +16,13 @@ import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime, formatStatus, formatTournamentFormat, formatWhen } from "../../lib/format";
 import { stationText } from "../../lib/matchText";
 import { describeSlot, finderFor, isMatchDone, plannedText } from "../../lib/slotSource";
+import type { BracketMatch } from "../../lib/bracketGraph";
+import { motionPlan, wonJustNow, type MotionPlan } from "../../lib/bracketMotion";
+import { playMoment } from "../../lib/tournamentHaptics";
+import { checkInState, matchStatusText, standingsTables, treeKind } from "../../lib/tournamentView";
+import { BracketCanvas } from "../../components/tournament/bracket/BracketCanvas";
+import { ScheduleList } from "../../components/tournament/ScheduleList";
+import { StandingsTables } from "../../components/tournament/StandingsTables";
 import { getRegistrationState } from "../../lib/registration";
 import { TeamDayCard } from "../../components/tournament/TeamDayCard";
 import { ResultShareCard } from "../../components/ResultShareCard";
@@ -124,10 +131,13 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
 
   // Zurück vom Event (#1184): nach Event-Anmeldung und „Spielst du auch mit?“ hat sich der Stand geändert - beim
   // Wiederkommen frisch laden (nur nach einem Weggehen; das erste Öffnen lädt der Effekt oben).
+  // Sichtbar? Nur dann bewegt sich der Baum und vibriert ein Sieg (#1563) - verdeckt gibt es kein Nachholen.
+  const focusedRef = useRef(true);
   useEffect(() => {
     let away = false;
-    const offBlur = navigation.addListener?.("blur", () => { away = true; });
+    const offBlur = navigation.addListener?.("blur", () => { away = true; focusedRef.current = false; });
     const offFocus = navigation.addListener?.("focus", () => {
+      focusedRef.current = true;
       if (!away) return;
       away = false;
       void load();
@@ -146,6 +156,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     return registrations.find((registration) => registration.is_mine || registration.user_id === user?.id || (registration.team_id && myTeamIds.has(registration.team_id)));
   }, [myTeamIds, registrations, tournament?.my_registration, user?.id]);
   const registered = Boolean(ownRegistration?.id && !["cancelled", "rejected", "no_show"].includes(String(ownRegistration.status || "")));
+  // Ausgeschieden (#1553): Austritt oder Disqualifikation über die Turnierleitung - ein klarer Satz statt „angemeldet“.
+  const ownOut = ["withdrawn", "disqualified"].includes(String(ownRegistration?.status || ""));
   const registration = useMemo(() => getRegistrationState(tournament, "Anmeldung"), [tournament]);
   const isTeamTournament = Boolean(tournament && (tournament.team_mode || "solo") !== "solo");
   const gameFields = useMemo(() => tournament?.game?.effective_player_id_fields || tournament?.game?.player_id_fields || [], [tournament?.game]);
@@ -165,7 +177,10 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const canSelfRegister = Boolean(!guest && !registered && registration.canRegister && !clubMemberBlocked && !eventBlocked);
   // Vor Ort checkt die Turnierleitung ein (#1135) - wie im Web: kein Knopf, sondern der Hinweis mit dem Zeitfenster.
   const staffOnlyCheckIn = String(tournament?.event_mode || "online") === "local";
-  const canCheckIn = Boolean(!staffOnlyCheckIn && canManageOwnRegistration && ownRegistration?.status === "approved" && tournament?.status === "check_in");
+  // Check-in-Ende (#1551, #1574): ist er vorbei, nimmt der Server nichts mehr an (409) - dann kein Knopf, sondern der Satz.
+  const checkInNow = checkInState(tournament);
+  const canCheckIn = Boolean(!staffOnlyCheckIn && canManageOwnRegistration && ownRegistration?.status === "approved" && checkInNow.open);
+  const checkInOver = Boolean(!staffOnlyCheckIn && ownRegistration?.status === "approved" && checkInNow.over && ["check_in", "live", "paused"].includes(String(tournament?.status || "")));
   const checkInWindow = [
     tournament?.check_in_from ? `ab ${formatDateTime(tournament.check_in_from)}` : "",
     tournament?.check_in_until ? `bis ${formatDateTime(tournament.check_in_until)}` : "",
@@ -181,7 +196,37 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     registrations.forEach((registration) => map.set(registration.id, registration));
     return map;
   }, [registrations]);
-  const allMatches = bracket.matches_v2 || [];
+  const allMatches = (bracket.matches_v2 || NO_ROWS) as BracketMatch[];
+  const stages = bracket.stages || NO_ROWS;
+  const kind = treeKind(stages, tournament?.format, allMatches);
+  const nameOf = useCallback((id: string) => participantLabel(regMap.get(id)), [regMap]);
+  const statusOf = useCallback((id: string) => String(regMap.get(id)?.status || ""), [regMap]);
+  const statusById = useMemo(() => new Map(registrations.map((row) => [row.id, String(row.status || "")])), [registrations]);
+  const tables = useMemo(() => standingsTables(standings, tournament?.format, ownRegistration?.id || null, statusById), [ownRegistration?.id, standings, statusById, tournament?.format]);
+  const openMatch = useCallback((id: string) => navigation.navigate("MatchDetail", { id }), [navigation]);
+  // Bewegung und Sieger-Moment (#1563, #1168): aus dem Vergleich alter/neuer Stand beim Live-Nachladen - genau einmal,
+  // nur sichtbar (Seite im Vordergrund, App aktiv, Baum offen), kein Nachholen beim ersten Stand.
+  const previousMatches = useRef<BracketMatch[] | null>(null);
+  const [plan, setPlan] = useState<MotionPlan | null>(null);
+  const [crowned, setCrowned] = useState(false);
+  const tabRef = useRef<TabKey>("overview");
+  useEffect(() => {
+    const before = previousMatches.current;
+    if (!bracket.matches_v2 || before === allMatches) return undefined;
+    previousMatches.current = allMatches;
+    if (!before) return undefined;
+    const visible = focusedRef.current && AppState.currentState !== "background";
+    const next = motionPlan(before, allMatches, { active: visible });
+    if (next && tabRef.current === "bracket") setPlan(next);
+    if (visible && wonJustNow(before, allMatches, ownRegistration?.id, stages)) {
+      setCrowned(true);
+      return playMoment("win");
+    }
+    // Dein Weiterkommen (Fabian, 14.10.): einmal kurz - im selben Moment, in dem dein Name in die nächste Runde gleitet.
+    const mine = ownRegistration?.id;
+    if (mine && next && [...next.rows.values()].some((rows) => rows.get(mine)?.type === "advance" || rows.get(mine)?.type === "draw")) return playMoment("advance");
+    return undefined;
+  }, [allMatches, bracket.matches_v2, ownRegistration?.id, stages]);
   const matchFinder = useMemo(() => finderFor(allMatches), [allMatches]);
   const upcomingMatches = useMemo(() => {
     const open = allMatches.filter((match) => OPEN_MATCH_STATUSES.has(String(match.status || "")));
@@ -190,7 +235,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     return (ownOpen.length ? ownOpen : open).slice(0, 5);
   }, [allMatches, ownRegistration?.id]);
   const finalStandings = useMemo(() => {
-    const rows = standings.length ? standings : tournament?.standings || [];
+    // Gruppen kommen als `[{group, standings}]` - die stehen als Tabellen unter „Tabelle“, nicht als „Teilnehmer“.
+    const rows = (standings.length ? standings : tournament?.standings || []).filter((row: any) => !Array.isArray(row?.standings));
     return [...rows].sort((a, b) => standingRank(a, 999) - standingRank(b, 999));
   }, [standings, tournament?.standings]);
   const completedMatches = useMemo(
@@ -242,6 +288,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     setError("");
     try {
       await api.post(`/tournaments/${tournament.id}/checkin`);
+      // Check-in geschafft (#1168): einmal kurz - der neue Stand „Eingecheckt“ steht gleich darunter.
+      playMoment("checkIn");
       await load();
     } catch (err) {
       setError(errorMessage(err, "Check-in konnte nicht gespeichert werden."));
@@ -319,7 +367,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
-        <SegmentedTabs items={tabs} value={tab} onChange={setTab} />
+        <SegmentedTabs items={tabs} value={tab} onChange={(next) => { tabRef.current = next; setTab(next); }} />
 
         {tab === "overview" ? (
           <>
@@ -372,6 +420,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                     <Muted>Teilnehmen kannst du mit einem Konto.</Muted>
                     <Button label="Anmelden oder registrieren" variant="secondary" onPress={() => openSignIn()} testID="tournament-sign-in" />
                   </>
+                ) : registered && ownOut ? (
+                  <Muted style={styles.warning} testID="tournament-own-out">Du bist ausgeschieden: {formatStatus(ownRegistration?.status)}</Muted>
                 ) : registered ? (
                   <>
                     <Muted style={styles.success}>Du bist angemeldet: {formatStatus(ownRegistration?.status)}</Muted>
@@ -380,6 +430,9 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                       <Muted>Bezahlt wird erst, wenn deine Teilnahme bestätigt ist.</Muted>
                     ) : null}
                     {canCheckIn ? <Button label={busy ? "Check-in läuft ..." : "Jetzt einchecken"} onPress={checkIn} disabled={busy} testID="tournament-checkin" /> : null}
+                    {checkInOver ? (
+                      <Muted style={styles.checkInHint} testID="tournament-checkin-over">Check-in vorbei – einchecken geht nicht mehr. Bist du da, melde dich bei der Turnierleitung.</Muted>
+                    ) : null}
                     {staffOnlyCheckIn && (tournament.check_in_from || tournament.check_in_until) && ["approved", "checked_in"].includes(String(ownRegistration?.status || "")) ? (
                       <Muted style={styles.checkInHint} testID="tournament-checkin-local">
                         {ownRegistration?.status === "checked_in"
@@ -482,23 +535,46 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
         ) : null}
 
         {tab === "bracket" ? (
-          <Card style={styles.card}>
-            <Heading>Turnierbaum</Heading>
-            {allMatches.length ? <BracketView payload={bracket} regMap={regMap} onOpenMatch={(id) => navigation.navigate("MatchDetail", { id })} /> : <Muted>Noch kein Turnierbaum veröffentlicht.</Muted>}
-          </Card>
+          kind === "table" ? (
+            // Gruppen, Liga, Swiss (#1563): eine Tabelle statt Baum-Spalten, der Spielplan einen Tipp weiter.
+            <Card style={styles.card}>
+              <Heading>Tabelle</Heading>
+              <StandingsTables tables={tables} empty="Die Tabelle steht, sobald Ergebnisse da sind." />
+              {allMatches.length ? <Button label="Zum Spielplan" variant="secondary" onPress={() => { tabRef.current = "matches"; setTab("matches"); }} /> : null}
+            </Card>
+          ) : (
+            <Card style={styles.card}>
+              <Heading>Turnierbaum</Heading>
+              {allMatches.length ? (
+                <BracketCanvas
+                  matches={allMatches}
+                  stages={stages}
+                  format={tournament.format}
+                  nameOf={nameOf}
+                  statusOf={statusOf}
+                  mineId={ownRegistration?.id || null}
+                  plan={plan}
+                  crowned={crowned}
+                  onOpenMatch={openMatch}
+                />
+              ) : <Muted>Noch kein Turnierbaum veröffentlicht.</Muted>}
+            </Card>
+          )
         ) : null}
 
         {tab === "matches" ? (
           <Card style={styles.card}>
-            <Heading>{isFinished ? "Match-Historie" : "Matchplan"}</Heading>
-            {allMatches.length ? allMatches.map((match) => <MatchCard key={match.id} match={match} regMap={regMap} onPress={() => navigation.navigate("MatchDetail", { id: match.id })} />) : <Muted>Noch keine Matches veröffentlicht.</Muted>}
+            <Heading>{isFinished ? "Match-Historie" : "Spielplan"}</Heading>
+            {allMatches.length ? (
+              <ScheduleList matches={allMatches} stages={stages} format={tournament.format} nameOf={nameOf} mineId={ownRegistration?.id || null} onOpen={openMatch} />
+            ) : <Muted>Noch keine Matches veröffentlicht.</Muted>}
           </Card>
         ) : null}
 
         {tab === "standings" ? (
           <Card style={styles.card}>
             <Heading>{isFinished ? "Finale Rangliste" : "Rangliste"}</Heading>
-            {finalStandings.length ? finalStandings.map((standing, index) => (
+            {kind === "table" ? <StandingsTables tables={tables} empty="Rangliste wird angezeigt, sobald Ergebnisse vorhanden sind." /> : finalStandings.length ? finalStandings.map((standing, index) => (
               <StandingRow key={`${standing.registration_id || standing.name || standing.display_name || index}`} standing={standing} index={index} />
             )) : <Muted>Rangliste wird angezeigt, sobald Ergebnisse vorhanden sind.</Muted>}
           </Card>
@@ -721,43 +797,6 @@ function RegistrationModal({
   );
 }
 
-function BracketView({ payload, regMap, onOpenMatch }: { payload: BracketPayload; regMap: Map<string, any>; onOpenMatch?: (id: string) => void }) {
-  const matchesV2 = payload.matches_v2 || [];
-  const sections = useMemo(() => {
-    const source = matchesV2;
-    const grouped = new Map<string, Map<number, any[]>>();
-    source.forEach((match) => {
-      const section = match.section || match.bracket || "MAIN";
-      const round = Number(match.round || 1);
-      if (!grouped.has(section)) grouped.set(section, new Map());
-      const sectionMap = grouped.get(section)!;
-      sectionMap.set(round, [...(sectionMap.get(round) || []), match]);
-    });
-    return Array.from(grouped.entries()).map(([section, roundMap]) => ({
-      section,
-      rounds: Array.from(roundMap.entries()).sort((a, b) => a[0] - b[0]),
-    }));
-  }, [matchesV2]);
-
-  return (
-    <View style={styles.bracketWrap}>
-      {sections.map((section) => (
-        <View key={section.section} style={styles.bracketSection}>
-          <Muted style={styles.sectionLabel}>{formatSection(section.section)}</Muted>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rounds}>
-            {section.rounds.map(([round, matches]) => (
-              <View key={`${section.section}-${round}`} style={styles.roundCol}>
-                <Muted style={styles.roundTitle}>{matches[0]?.round_name || `Runde ${round}`}</Muted>
-                {matches.map((match) => <MatchCard key={match.id} match={match} regMap={regMap} compact onPress={match.id ? () => onOpenMatch?.(match.id) : undefined} />)}
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      ))}
-    </View>
-  );
-}
-
 function CompletedTournamentSummary({
   completedAt,
   participantCount,
@@ -864,7 +903,7 @@ function MatchCard({ match, regMap, compact = false, onPress }: { match: any; re
     <View style={[styles.matchCard, compact && styles.matchCardCompact]} testID={`match-card-${match.id}`}>
       <View style={styles.matchHead}>
         <Muted style={styles.matchKey}>{match.match_key || match.round_name || "Match"}</Muted>
-        <Muted style={styles.status}>{formatStatus(match.status)}</Muted>
+        <Muted style={styles.status}>{matchStatusText(match)}</Muted>
       </View>
       {rows.map((row: any) => (
         <View key={String(row.id)} style={[styles.matchRow, row.winner && styles.matchWinner]}>
@@ -923,15 +962,6 @@ function matchIncludesRegistration(match: any, registrationId: string) {
   if (!registrationId) return false;
   if (match.participant_a_id === registrationId || match.participant_b_id === registrationId) return true;
   return Boolean((match.slots || []).some((slot: any) => slot.registration_id === registrationId));
-}
-
-function formatSection(value: string) {
-  const normalized = String(value || "MAIN").toLowerCase();
-  if (["winner", "wb"].includes(normalized)) return "Winner Bracket";
-  if (["loser", "lb"].includes(normalized)) return "Loser Bracket";
-  if (["grand_final", "gf"].includes(normalized)) return "Grand Final";
-  if (normalized === "bronze") return "Bronze Match";
-  return value || "Main";
 }
 
 function formatTeamMode(value?: string | null) {

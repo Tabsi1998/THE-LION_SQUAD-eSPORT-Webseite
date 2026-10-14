@@ -1,0 +1,8010 @@
+{
+ "_info": "Erzeugt von scripts/make_app_bracket_fixture.py mit den echten Generatoren und Umbauten (#1551, #1553, #1571, #1575) über die echten Routen. Gemeinsam für App (mobile/src/lib/bracketGraph.test.ts) und Website; die Erwartungen stehen in docs/bracket-cases.json. Nicht von Hand ändern - neu erzeugen.",
+ "de4_reset_cancelled": {
+  "note": "Doppel-K.-o. 4: Setzplatz 1 gewinnt das Grand Final aus der Siegerrunde - GFR entfällt (bracket_reset)",
+  "format": "double_elim",
+  "stages": [
+   {
+    "id": "7bf5f12e-3fe8-4297-aadb-89e40ca811c6",
+    "stage_type": "double_elimination",
+    "match_type": "duel",
+    "name": "Phase 1"
+   }
+  ],
+  "registrations": [
+   {
+    "id": "f03e69c8-5a38-47ba-8266-674a303eec83",
+    "display_name": "NeonFalke",
+    "status": "checked_in",
+    "seed": 1
+   },
+   {
+    "id": "70c05e0e-bffd-4b55-aeaa-96b1da44667d",
+    "display_name": "KartKönigin",
+    "status": "checked_in",
+    "seed": 2
+   },
+   {
+    "id": "9d44dbbc-f32a-47ce-84d9-280e7d0b48cc",
+    "display_name": "LuckyLion",
+    "status": "checked_in",
+    "seed": 3
+   },
+   {
+    "id": "06f49d50-9fe6-4468-8500-8bbf366f749d",
+    "display_name": "PixelPaula",
+    "status": "checked_in",
+    "seed": 4
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "32e4c03f-b3a2-4aa9-be32-9d39aa3422bd",
+    "match_key": "GF",
+    "stage_id": "7bf5f12e-3fe8-4297-aadb-89e40ca811c6",
+    "section": "GF",
+    "round": 4,
+    "round_name": "Grand Final",
+    "order": 6,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "e044c646-2faf-4750-9798-3f768d9a5acc",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "e044c646-2faf-4750-9798-3f768d9a5acc",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "f03e69c8-5a38-47ba-8266-674a303eec83",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "W:C:1"
+      },
+      "source_result": {
+       "from_match_id": "b2d65e0b-c0e6-404a-ad4a-956fd882e5da",
+       "from_match_key": "C",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.586918+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "06f49d50-9fe6-4468-8500-8bbf366f749d",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LB",
+       "rank": 1,
+       "raw": "W:LB:1"
+      },
+      "source_result": {
+       "from_match_id": "08ad24f1-60cb-4069-8636-743d5816b0b3",
+       "from_match_key": "LB",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.595513+00:00"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "f03e69c8-5a38-47ba-8266-674a303eec83",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "06f49d50-9fe6-4468-8500-8bbf366f749d",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "e044c646-2faf-4750-9798-3f768d9a5acc",
+    "match_key": "GFR",
+    "stage_id": "7bf5f12e-3fe8-4297-aadb-89e40ca811c6",
+    "section": "GF",
+    "round": 5,
+    "round_name": "Grand Final Reset",
+    "order": 7,
+    "match_type": "duel",
+    "status": "cancelled",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "f03e69c8-5a38-47ba-8266-674a303eec83",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "GF",
+       "rank": 1,
+       "raw": "W:GF:1"
+      },
+      "source_result": {
+       "from_match_id": "32e4c03f-b3a2-4aa9-be32-9d39aa3422bd",
+       "from_match_key": "GF",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.601252+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "06f49d50-9fe6-4468-8500-8bbf366f749d",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "GF",
+       "rank": 2,
+       "raw": "W:GF:2"
+      },
+      "source_result": {
+       "from_match_id": "32e4c03f-b3a2-4aa9-be32-9d39aa3422bd",
+       "from_match_key": "GF",
+       "rank": 2,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.601252+00:00"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "bracket_reset": {
+      "of_match_key": "GF",
+      "upper_slot": 1
+     },
+     "min_players": 2
+    },
+    "result_meta": {
+     "source": "bracket_reset",
+     "needed": false
+    }
+   },
+   {
+    "id": "732373ca-cf23-4825-8db9-afb3ca22340b",
+    "match_key": "LA",
+    "stage_id": "7bf5f12e-3fe8-4297-aadb-89e40ca811c6",
+    "section": "LB",
+    "round": 2,
+    "round_name": "Loser Runde 1",
+    "order": 4,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "08ad24f1-60cb-4069-8636-743d5816b0b3",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "06f49d50-9fe6-4468-8500-8bbf366f749d",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "L:A:1"
+      },
+      "source_result": {
+       "from_match_id": "2067fa5a-2dd6-40db-b49a-af6a0a87b7dd",
+       "from_match_key": "A",
+       "rank": 2,
+       "flow": "L",
+       "confirmed_at": "2026-10-14T13:52:00.578086+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "9d44dbbc-f32a-47ce-84d9-280e7d0b48cc",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "L:B:1"
+      },
+      "source_result": {
+       "from_match_id": "fdda1c92-6d76-4537-bc2b-6a72e7a2f47b",
+       "from_match_key": "B",
+       "rank": 2,
+       "flow": "L",
+       "confirmed_at": "2026-10-14T13:52:00.583725+00:00"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "06f49d50-9fe6-4468-8500-8bbf366f749d",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "9d44dbbc-f32a-47ce-84d9-280e7d0b48cc",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "08ad24f1-60cb-4069-8636-743d5816b0b3",
+    "match_key": "LB",
+    "stage_id": "7bf5f12e-3fe8-4297-aadb-89e40ca811c6",
+    "section": "LB",
+    "round": 3,
+    "round_name": "Loser Runde 2",
+    "order": 5,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "32e4c03f-b3a2-4aa9-be32-9d39aa3422bd",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "06f49d50-9fe6-4468-8500-8bbf366f749d",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "LA",
+       "rank": 1,
+       "raw": "W:LA:1"
+      },
+      "source_result": {
+       "from_match_id": "732373ca-cf23-4825-8db9-afb3ca22340b",
+       "from_match_key": "LA",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.592502+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "70c05e0e-bffd-4b55-aeaa-96b1da44667d",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "L",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "L:C:1"
+      },
+      "source_result": {
+       "from_match_id": "b2d65e0b-c0e6-404a-ad4a-956fd882e5da",
+       "from_match_key": "C",
+       "rank": 2,
+       "flow": "L",
+       "confirmed_at": "2026-10-14T13:52:00.586918+00:00"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "06f49d50-9fe6-4468-8500-8bbf366f749d",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "70c05e0e-bffd-4b55-aeaa-96b1da44667d",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "2067fa5a-2dd6-40db-b49a-af6a0a87b7dd",
+    "match_key": "A",
+    "stage_id": "7bf5f12e-3fe8-4297-aadb-89e40ca811c6",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Winner Runde 1",
+    "order": 1,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "b2d65e0b-c0e6-404a-ad4a-956fd882e5da",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "732373ca-cf23-4825-8db9-afb3ca22340b",
+      "to_slot": 1,
+      "flow": "L",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "f03e69c8-5a38-47ba-8266-674a303eec83",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "06f49d50-9fe6-4468-8500-8bbf366f749d",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "f03e69c8-5a38-47ba-8266-674a303eec83",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "06f49d50-9fe6-4468-8500-8bbf366f749d",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "fdda1c92-6d76-4537-bc2b-6a72e7a2f47b",
+    "match_key": "B",
+    "stage_id": "7bf5f12e-3fe8-4297-aadb-89e40ca811c6",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Winner Runde 1",
+    "order": 2,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "b2d65e0b-c0e6-404a-ad4a-956fd882e5da",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "732373ca-cf23-4825-8db9-afb3ca22340b",
+      "to_slot": 2,
+      "flow": "L",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "70c05e0e-bffd-4b55-aeaa-96b1da44667d",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "9d44dbbc-f32a-47ce-84d9-280e7d0b48cc",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "70c05e0e-bffd-4b55-aeaa-96b1da44667d",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "9d44dbbc-f32a-47ce-84d9-280e7d0b48cc",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "b2d65e0b-c0e6-404a-ad4a-956fd882e5da",
+    "match_key": "C",
+    "stage_id": "7bf5f12e-3fe8-4297-aadb-89e40ca811c6",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Winner Runde 2",
+    "order": 3,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "08ad24f1-60cb-4069-8636-743d5816b0b3",
+      "to_slot": 2,
+      "flow": "L",
+      "rank": 1
+     },
+     {
+      "to_match_id": "32e4c03f-b3a2-4aa9-be32-9d39aa3422bd",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "f03e69c8-5a38-47ba-8266-674a303eec83",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "W:A:1"
+      },
+      "source_result": {
+       "from_match_id": "2067fa5a-2dd6-40db-b49a-af6a0a87b7dd",
+       "from_match_key": "A",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.578086+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "70c05e0e-bffd-4b55-aeaa-96b1da44667d",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "W:B:1"
+      },
+      "source_result": {
+       "from_match_id": "fdda1c92-6d76-4537-bc2b-6a72e7a2f47b",
+       "from_match_key": "B",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.583725+00:00"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "f03e69c8-5a38-47ba-8266-674a303eec83",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "70c05e0e-bffd-4b55-aeaa-96b1da44667d",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   }
+  ],
+  "round_labels": {
+   "GF": "Grand Final",
+   "GFR": "Grand Final Reset",
+   "LA": "Loser Runde 1",
+   "LB": "Loser Runde 2",
+   "A": "Winner Runde 1",
+   "B": "Winner Runde 1",
+   "C": "Winner Final"
+  }
+ },
+ "ffa16": {
+  "note": "FFA 16: 4 Läufe → 2 Läufe → Finale, ausgelost",
+  "format": "ffa_custom_bracket",
+  "stages": [
+   {
+    "id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "name": "Läufe"
+   }
+  ],
+  "registrations": [
+   {
+    "id": "d57247ac-f570-40a4-bef2-a91305718bba",
+    "display_name": "NeonFalke",
+    "status": "checked_in",
+    "seed": 1
+   },
+   {
+    "id": "2314c675-85d3-4ebd-b9d3-c55429bb0fce",
+    "display_name": "KartKönigin",
+    "status": "checked_in",
+    "seed": 2
+   },
+   {
+    "id": "9141cf1e-3083-40fa-b2e6-8782668b0860",
+    "display_name": "LuckyLion",
+    "status": "checked_in",
+    "seed": 3
+   },
+   {
+    "id": "d55999a5-660d-4af1-89b0-c67164a9b672",
+    "display_name": "PixelPaula",
+    "status": "checked_in",
+    "seed": 4
+   },
+   {
+    "id": "fea40375-a30d-4980-bf85-ac6a655c1ab6",
+    "display_name": "DriftDaniel",
+    "status": "checked_in",
+    "seed": 5
+   },
+   {
+    "id": "d5f2478d-3ea2-40d5-a9ea-c96df1335fc7",
+    "display_name": "BoostBerta",
+    "status": "checked_in",
+    "seed": 6
+   },
+   {
+    "id": "837076d9-456f-4eb1-8d3c-99af96152c04",
+    "display_name": "TurboTom",
+    "status": "checked_in",
+    "seed": 7
+   },
+   {
+    "id": "f0d44623-4123-4346-a597-02ac57ebbd61",
+    "display_name": "SchnellSchnecke",
+    "status": "checked_in",
+    "seed": 8
+   },
+   {
+    "id": "4a8df67a-985f-45e7-bbf1-957b8d43768b",
+    "display_name": "KurvenKarl",
+    "status": "checked_in",
+    "seed": 9
+   },
+   {
+    "id": "8547ad19-5caa-4689-8123-b1cd47efb6d1",
+    "display_name": "NitroNina",
+    "status": "checked_in",
+    "seed": 10
+   },
+   {
+    "id": "41c502e1-a42a-459a-9891-b5d426e09eea",
+    "display_name": "BlitzBea",
+    "status": "checked_in",
+    "seed": 11
+   },
+   {
+    "id": "68839379-aa1a-437d-bec6-d0a5cefb41b4",
+    "display_name": "RaketenRudi",
+    "status": "checked_in",
+    "seed": 12
+   },
+   {
+    "id": "e8702dba-4c29-4779-8023-4e7a3008009b",
+    "display_name": "SternSeppi",
+    "status": "checked_in",
+    "seed": 13
+   },
+   {
+    "id": "5cec4de2-cba4-4643-88f6-2c40c47bf61e",
+    "display_name": "GipfelGabi",
+    "status": "checked_in",
+    "seed": 14
+   },
+   {
+    "id": "695acf8b-695f-4624-ad96-57acfb34aeee",
+    "display_name": "PistenPaul",
+    "status": "checked_in",
+    "seed": 15
+   },
+   {
+    "id": "4da0cf89-1094-4c2d-adde-d20a59e5470b",
+    "display_name": "ZickZackZoe",
+    "status": "checked_in",
+    "seed": 16
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "7ce7fe66-08d6-4985-ae66-052788a1cb68",
+    "match_key": "A",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 1,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "25c718c5-10ec-4927-a07b-51a3ff39a23d",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "25c718c5-10ec-4927-a07b-51a3ff39a23d",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "d57247ac-f570-40a4-bef2-a91305718bba",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "f0d44623-4123-4346-a597-02ac57ebbd61",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "4a8df67a-985f-45e7-bbf1-957b8d43768b",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 9,
+       "raw": "9"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "4da0cf89-1094-4c2d-adde-d20a59e5470b",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 16,
+       "raw": "16"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "8b4cecbc-7ae6-47d3-ad66-ae9f14221ab9",
+    "match_key": "B",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 2,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "05f7804e-a150-4758-a3e1-58752a8f06df",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "05f7804e-a150-4758-a3e1-58752a8f06df",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "2314c675-85d3-4ebd-b9d3-c55429bb0fce",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "837076d9-456f-4eb1-8d3c-99af96152c04",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "8547ad19-5caa-4689-8123-b1cd47efb6d1",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 10,
+       "raw": "10"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "695acf8b-695f-4624-ad96-57acfb34aeee",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 15,
+       "raw": "15"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "1621544c-8997-44e1-bb0d-8b291dd1a35e",
+    "match_key": "C",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 3,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "05f7804e-a150-4758-a3e1-58752a8f06df",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "05f7804e-a150-4758-a3e1-58752a8f06df",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "9141cf1e-3083-40fa-b2e6-8782668b0860",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "d5f2478d-3ea2-40d5-a9ea-c96df1335fc7",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "41c502e1-a42a-459a-9891-b5d426e09eea",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 11,
+       "raw": "11"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "5cec4de2-cba4-4643-88f6-2c40c47bf61e",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 14,
+       "raw": "14"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "28cc69ab-1ea0-49ac-b2b5-524e5f3b04e9",
+    "match_key": "D",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 4,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "25c718c5-10ec-4927-a07b-51a3ff39a23d",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "25c718c5-10ec-4927-a07b-51a3ff39a23d",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "d55999a5-660d-4af1-89b0-c67164a9b672",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "fea40375-a30d-4980-bf85-ac6a655c1ab6",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "68839379-aa1a-437d-bec6-d0a5cefb41b4",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 12,
+       "raw": "12"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "e8702dba-4c29-4779-8023-4e7a3008009b",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 13,
+       "raw": "13"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "25c718c5-10ec-4927-a07b-51a3ff39a23d",
+    "match_key": "E",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Halbfinale",
+    "order": 5,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "aad1a843-8728-4ddb-936d-8418c42cfe08",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "aad1a843-8728-4ddb-936d-8418c42cfe08",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "W:A:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 1,
+       "raw": "W:D:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 2,
+       "raw": "W:A:2"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 2,
+       "raw": "W:D:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "05f7804e-a150-4758-a3e1-58752a8f06df",
+    "match_key": "F",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Halbfinale",
+    "order": 6,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "aad1a843-8728-4ddb-936d-8418c42cfe08",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "aad1a843-8728-4ddb-936d-8418c42cfe08",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "W:B:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "W:C:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 2,
+       "raw": "W:B:2"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 2,
+       "raw": "W:C:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "aad1a843-8728-4ddb-936d-8418c42cfe08",
+    "match_key": "G",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Finale",
+    "order": 7,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 1,
+       "raw": "W:E:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 1,
+       "raw": "W:F:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 2,
+       "raw": "W:E:2"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 2,
+       "raw": "W:F:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   }
+  ],
+  "round_labels": {
+   "A": "Runde 1",
+   "B": "Runde 1",
+   "C": "Runde 1",
+   "D": "Runde 1",
+   "E": "Halbfinale",
+   "F": "Halbfinale",
+   "G": "Finale"
+  }
+ },
+ "ffa16_round1": {
+  "note": "FFA 16 nach Runde 1: je 2 weiter, Lauf E läuft an Switch 2",
+  "format": "ffa_custom_bracket",
+  "stages": [
+   {
+    "id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "name": "Läufe"
+   }
+  ],
+  "registrations": [
+   {
+    "id": "d57247ac-f570-40a4-bef2-a91305718bba",
+    "display_name": "NeonFalke",
+    "status": "checked_in",
+    "seed": 1
+   },
+   {
+    "id": "2314c675-85d3-4ebd-b9d3-c55429bb0fce",
+    "display_name": "KartKönigin",
+    "status": "checked_in",
+    "seed": 2
+   },
+   {
+    "id": "9141cf1e-3083-40fa-b2e6-8782668b0860",
+    "display_name": "LuckyLion",
+    "status": "checked_in",
+    "seed": 3
+   },
+   {
+    "id": "d55999a5-660d-4af1-89b0-c67164a9b672",
+    "display_name": "PixelPaula",
+    "status": "checked_in",
+    "seed": 4
+   },
+   {
+    "id": "fea40375-a30d-4980-bf85-ac6a655c1ab6",
+    "display_name": "DriftDaniel",
+    "status": "checked_in",
+    "seed": 5
+   },
+   {
+    "id": "d5f2478d-3ea2-40d5-a9ea-c96df1335fc7",
+    "display_name": "BoostBerta",
+    "status": "checked_in",
+    "seed": 6
+   },
+   {
+    "id": "837076d9-456f-4eb1-8d3c-99af96152c04",
+    "display_name": "TurboTom",
+    "status": "checked_in",
+    "seed": 7
+   },
+   {
+    "id": "f0d44623-4123-4346-a597-02ac57ebbd61",
+    "display_name": "SchnellSchnecke",
+    "status": "checked_in",
+    "seed": 8
+   },
+   {
+    "id": "4a8df67a-985f-45e7-bbf1-957b8d43768b",
+    "display_name": "KurvenKarl",
+    "status": "checked_in",
+    "seed": 9
+   },
+   {
+    "id": "8547ad19-5caa-4689-8123-b1cd47efb6d1",
+    "display_name": "NitroNina",
+    "status": "checked_in",
+    "seed": 10
+   },
+   {
+    "id": "41c502e1-a42a-459a-9891-b5d426e09eea",
+    "display_name": "BlitzBea",
+    "status": "checked_in",
+    "seed": 11
+   },
+   {
+    "id": "68839379-aa1a-437d-bec6-d0a5cefb41b4",
+    "display_name": "RaketenRudi",
+    "status": "checked_in",
+    "seed": 12
+   },
+   {
+    "id": "e8702dba-4c29-4779-8023-4e7a3008009b",
+    "display_name": "SternSeppi",
+    "status": "checked_in",
+    "seed": 13
+   },
+   {
+    "id": "5cec4de2-cba4-4643-88f6-2c40c47bf61e",
+    "display_name": "GipfelGabi",
+    "status": "checked_in",
+    "seed": 14
+   },
+   {
+    "id": "695acf8b-695f-4624-ad96-57acfb34aeee",
+    "display_name": "PistenPaul",
+    "status": "checked_in",
+    "seed": 15
+   },
+   {
+    "id": "4da0cf89-1094-4c2d-adde-d20a59e5470b",
+    "display_name": "ZickZackZoe",
+    "status": "checked_in",
+    "seed": 16
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "7ce7fe66-08d6-4985-ae66-052788a1cb68",
+    "match_key": "A",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 1,
+    "match_type": "ffa",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "25c718c5-10ec-4927-a07b-51a3ff39a23d",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "25c718c5-10ec-4927-a07b-51a3ff39a23d",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "d57247ac-f570-40a4-bef2-a91305718bba",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "f0d44623-4123-4346-a597-02ac57ebbd61",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "4a8df67a-985f-45e7-bbf1-957b8d43768b",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 9,
+       "raw": "9"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "4da0cf89-1094-4c2d-adde-d20a59e5470b",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 16,
+       "raw": "16"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "d57247ac-f570-40a4-bef2-a91305718bba",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "f0d44623-4123-4346-a597-02ac57ebbd61",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "4a8df67a-985f-45e7-bbf1-957b8d43768b",
+      "rank": 3,
+      "score": 9.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "4da0cf89-1094-4c2d-adde-d20a59e5470b",
+      "rank": 4,
+      "score": 6.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "8b4cecbc-7ae6-47d3-ad66-ae9f14221ab9",
+    "match_key": "B",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 2,
+    "match_type": "ffa",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "05f7804e-a150-4758-a3e1-58752a8f06df",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "05f7804e-a150-4758-a3e1-58752a8f06df",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "2314c675-85d3-4ebd-b9d3-c55429bb0fce",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "837076d9-456f-4eb1-8d3c-99af96152c04",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "8547ad19-5caa-4689-8123-b1cd47efb6d1",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 10,
+       "raw": "10"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "695acf8b-695f-4624-ad96-57acfb34aeee",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 15,
+       "raw": "15"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "2314c675-85d3-4ebd-b9d3-c55429bb0fce",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "837076d9-456f-4eb1-8d3c-99af96152c04",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "8547ad19-5caa-4689-8123-b1cd47efb6d1",
+      "rank": 3,
+      "score": 9.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "695acf8b-695f-4624-ad96-57acfb34aeee",
+      "rank": 4,
+      "score": 6.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "1621544c-8997-44e1-bb0d-8b291dd1a35e",
+    "match_key": "C",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 3,
+    "match_type": "ffa",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "05f7804e-a150-4758-a3e1-58752a8f06df",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "05f7804e-a150-4758-a3e1-58752a8f06df",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "9141cf1e-3083-40fa-b2e6-8782668b0860",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "d5f2478d-3ea2-40d5-a9ea-c96df1335fc7",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "41c502e1-a42a-459a-9891-b5d426e09eea",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 11,
+       "raw": "11"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "5cec4de2-cba4-4643-88f6-2c40c47bf61e",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 14,
+       "raw": "14"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "9141cf1e-3083-40fa-b2e6-8782668b0860",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "d5f2478d-3ea2-40d5-a9ea-c96df1335fc7",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "41c502e1-a42a-459a-9891-b5d426e09eea",
+      "rank": 3,
+      "score": 9.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "5cec4de2-cba4-4643-88f6-2c40c47bf61e",
+      "rank": 4,
+      "score": 6.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "28cc69ab-1ea0-49ac-b2b5-524e5f3b04e9",
+    "match_key": "D",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 4,
+    "match_type": "ffa",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "25c718c5-10ec-4927-a07b-51a3ff39a23d",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "25c718c5-10ec-4927-a07b-51a3ff39a23d",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "d55999a5-660d-4af1-89b0-c67164a9b672",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "fea40375-a30d-4980-bf85-ac6a655c1ab6",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "68839379-aa1a-437d-bec6-d0a5cefb41b4",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 12,
+       "raw": "12"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "e8702dba-4c29-4779-8023-4e7a3008009b",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 13,
+       "raw": "13"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "d55999a5-660d-4af1-89b0-c67164a9b672",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "fea40375-a30d-4980-bf85-ac6a655c1ab6",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "68839379-aa1a-437d-bec6-d0a5cefb41b4",
+      "rank": 3,
+      "score": 9.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "e8702dba-4c29-4779-8023-4e7a3008009b",
+      "rank": 4,
+      "score": 6.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "25c718c5-10ec-4927-a07b-51a3ff39a23d",
+    "match_key": "E",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Halbfinale",
+    "order": 5,
+    "match_type": "ffa",
+    "status": "in_progress",
+    "started_at": "2026-10-31T13:00:00+00:00",
+    "called_at": "2026-10-31T13:00:00+00:00",
+    "duration_minutes": 30,
+    "station_text": "Switch 2",
+    "advancement": [
+     {
+      "to_match_id": "aad1a843-8728-4ddb-936d-8418c42cfe08",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "aad1a843-8728-4ddb-936d-8418c42cfe08",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "d57247ac-f570-40a4-bef2-a91305718bba",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "W:A:1"
+      },
+      "source_result": {
+       "from_match_id": "7ce7fe66-08d6-4985-ae66-052788a1cb68",
+       "from_match_key": "A",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.622117+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "d55999a5-660d-4af1-89b0-c67164a9b672",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 1,
+       "raw": "W:D:1"
+      },
+      "source_result": {
+       "from_match_id": "28cc69ab-1ea0-49ac-b2b5-524e5f3b04e9",
+       "from_match_key": "D",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.640991+00:00"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "f0d44623-4123-4346-a597-02ac57ebbd61",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 2,
+       "raw": "W:A:2"
+      },
+      "source_result": {
+       "from_match_id": "7ce7fe66-08d6-4985-ae66-052788a1cb68",
+       "from_match_key": "A",
+       "rank": 2,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.622117+00:00"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "fea40375-a30d-4980-bf85-ac6a655c1ab6",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 2,
+       "raw": "W:D:2"
+      },
+      "source_result": {
+       "from_match_id": "28cc69ab-1ea0-49ac-b2b5-524e5f3b04e9",
+       "from_match_key": "D",
+       "rank": 2,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.640991+00:00"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "05f7804e-a150-4758-a3e1-58752a8f06df",
+    "match_key": "F",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Halbfinale",
+    "order": 6,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "aad1a843-8728-4ddb-936d-8418c42cfe08",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "aad1a843-8728-4ddb-936d-8418c42cfe08",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "2314c675-85d3-4ebd-b9d3-c55429bb0fce",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "W:B:1"
+      },
+      "source_result": {
+       "from_match_id": "8b4cecbc-7ae6-47d3-ad66-ae9f14221ab9",
+       "from_match_key": "B",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.627667+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "9141cf1e-3083-40fa-b2e6-8782668b0860",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "W:C:1"
+      },
+      "source_result": {
+       "from_match_id": "1621544c-8997-44e1-bb0d-8b291dd1a35e",
+       "from_match_key": "C",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.634461+00:00"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "837076d9-456f-4eb1-8d3c-99af96152c04",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 2,
+       "raw": "W:B:2"
+      },
+      "source_result": {
+       "from_match_id": "8b4cecbc-7ae6-47d3-ad66-ae9f14221ab9",
+       "from_match_key": "B",
+       "rank": 2,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.627667+00:00"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "d5f2478d-3ea2-40d5-a9ea-c96df1335fc7",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 2,
+       "raw": "W:C:2"
+      },
+      "source_result": {
+       "from_match_id": "1621544c-8997-44e1-bb0d-8b291dd1a35e",
+       "from_match_key": "C",
+       "rank": 2,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.634461+00:00"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "aad1a843-8728-4ddb-936d-8418c42cfe08",
+    "match_key": "G",
+    "stage_id": "a6e64b47-2d09-46a7-bb08-259be8d7578a",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Finale",
+    "order": 7,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 1,
+       "raw": "W:E:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 1,
+       "raw": "W:F:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 2,
+       "raw": "W:E:2"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 2,
+       "raw": "W:F:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   }
+  ],
+  "round_labels": {
+   "A": "Runde 1",
+   "B": "Runde 1",
+   "C": "Runde 1",
+   "D": "Runde 1",
+   "E": "Halbfinale",
+   "F": "Halbfinale",
+   "G": "Finale"
+  }
+ },
+ "ffa40": {
+  "note": "FFA 40 mit langen, Emoji- und E-Mail-Namen",
+  "format": "ffa_custom_bracket",
+  "stages": [
+   {
+    "id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "name": "Läufe"
+   }
+  ],
+  "registrations": [
+   {
+    "id": "b244fe68-0dd0-4c4c-a0b5-b8dfa1b2a600",
+    "display_name": "NeonFalke",
+    "status": "checked_in",
+    "seed": 1
+   },
+   {
+    "id": "e751b123-5ab8-4f38-8b12-46709ae39c20",
+    "display_name": "KartKönigin",
+    "status": "checked_in",
+    "seed": 2
+   },
+   {
+    "id": "e21c01da-0382-48e9-9eee-b013615fd1f4",
+    "display_name": "LuckyLion",
+    "status": "checked_in",
+    "seed": 3
+   },
+   {
+    "id": "6fced348-5415-47cd-b8c2-83214126e93c",
+    "display_name": "PixelPaula",
+    "status": "checked_in",
+    "seed": 4
+   },
+   {
+    "id": "dfd88d92-4d4e-4d1a-a757-2a0ecc5b5afd",
+    "display_name": "DriftDaniel",
+    "status": "checked_in",
+    "seed": 5
+   },
+   {
+    "id": "7766d51a-a29c-4383-b8ab-9ec599cea661",
+    "display_name": "BoostBerta",
+    "status": "checked_in",
+    "seed": 6
+   },
+   {
+    "id": "165dd1cc-a822-4ab8-b298-943b20b1c9ee",
+    "display_name": "TurboTom",
+    "status": "checked_in",
+    "seed": 7
+   },
+   {
+    "id": "05a038a7-d20a-4f1b-84c8-859c9a38513f",
+    "display_name": "SchnellSchnecke",
+    "status": "checked_in",
+    "seed": 8
+   },
+   {
+    "id": "99e5402c-f140-4d92-80c8-6259839e9153",
+    "display_name": "KurvenKarl",
+    "status": "checked_in",
+    "seed": 9
+   },
+   {
+    "id": "cc523e8c-33cb-4b43-b2e8-4e613d2189c7",
+    "display_name": "NitroNina",
+    "status": "checked_in",
+    "seed": 10
+   },
+   {
+    "id": "55e7f1f7-c3ee-4827-976d-b23ebdac3c50",
+    "display_name": "BlitzBea",
+    "status": "checked_in",
+    "seed": 11
+   },
+   {
+    "id": "e47dd869-076a-4f68-a3dd-4f7d97d44800",
+    "display_name": "RaketenRudi",
+    "status": "checked_in",
+    "seed": 12
+   },
+   {
+    "id": "d4920f0e-a9e9-4fba-8fe8-8c93aa8cc70e",
+    "display_name": "SternSeppi",
+    "status": "checked_in",
+    "seed": 13
+   },
+   {
+    "id": "156a73b6-9572-4208-b854-3bf5edd56bf7",
+    "display_name": "GipfelGabi",
+    "status": "checked_in",
+    "seed": 14
+   },
+   {
+    "id": "6a06aad5-7fff-457f-986b-8cd2629f84a0",
+    "display_name": "PistenPaul",
+    "status": "checked_in",
+    "seed": 15
+   },
+   {
+    "id": "e9fec5d6-ccc4-4411-86ac-6aa64d41a8d6",
+    "display_name": "ZickZackZoe",
+    "status": "checked_in",
+    "seed": 16
+   },
+   {
+    "id": "ceb54c64-181f-4bd4-aa45-05bf77d5a314",
+    "display_name": "Der unglaublich lange Spielername Nummer Eins mit noch mehr Text dahinter",
+    "status": "checked_in",
+    "seed": 17
+   },
+   {
+    "id": "27b22a4b-afad-4a44-ac25-5261944cc946",
+    "display_name": "Aleksandra Wiśniewska-Kowalczyk",
+    "status": "checked_in",
+    "seed": 18
+   },
+   {
+    "id": "2f3df78c-8d2b-41ab-84ba-95e975287532",
+    "display_name": "🦁 Löwenherz",
+    "status": "checked_in",
+    "seed": 19
+   },
+   {
+    "id": "64419658-5a18-4023-94be-b710e2e5ad86",
+    "display_name": "Nguyễn Thị Thanh Hương",
+    "status": "checked_in",
+    "seed": 20
+   },
+   {
+    "id": "c403192f-2ca3-4f54-8fa8-b06220b6ef9d",
+    "display_name": "bartholomew.fitzgerald@northwind-industries.example",
+    "status": "checked_in",
+    "seed": 21
+   },
+   {
+    "id": "a5c54340-ad9b-4663-98b2-c1379c191348",
+    "display_name": "Jo",
+    "status": "checked_in",
+    "seed": 22
+   },
+   {
+    "id": "4e796827-c248-4f84-9d45-d61bf06f95a8",
+    "display_name": "Fahrer 23",
+    "status": "checked_in",
+    "seed": 23
+   },
+   {
+    "id": "713bd664-a5aa-459f-9133-9d40b3af0459",
+    "display_name": "Fahrer 24",
+    "status": "checked_in",
+    "seed": 24
+   },
+   {
+    "id": "735a33d5-cd2c-48f2-9b8b-6746dde3952a",
+    "display_name": "Fahrer 25",
+    "status": "checked_in",
+    "seed": 25
+   },
+   {
+    "id": "b77a781a-a53b-4b4c-8e6e-784088f3ce8a",
+    "display_name": "Fahrer 26",
+    "status": "checked_in",
+    "seed": 26
+   },
+   {
+    "id": "f6b2c919-440e-467e-a969-95e29c19abbc",
+    "display_name": "Fahrer 27",
+    "status": "checked_in",
+    "seed": 27
+   },
+   {
+    "id": "9f449fad-423d-4e78-9b5c-3a1cd82c5555",
+    "display_name": "Fahrer 28",
+    "status": "checked_in",
+    "seed": 28
+   },
+   {
+    "id": "f1a53812-1377-4c68-8a0b-c82fe225023a",
+    "display_name": "Fahrer 29",
+    "status": "checked_in",
+    "seed": 29
+   },
+   {
+    "id": "b4063d84-6a53-40c7-93f0-90ae5025475c",
+    "display_name": "Fahrer 30",
+    "status": "checked_in",
+    "seed": 30
+   },
+   {
+    "id": "bc78ffee-191b-454d-81e2-a19c55b471d6",
+    "display_name": "Fahrer 31",
+    "status": "checked_in",
+    "seed": 31
+   },
+   {
+    "id": "66ffccc7-359c-492c-ac7b-82eee6ff0453",
+    "display_name": "Fahrer 32",
+    "status": "checked_in",
+    "seed": 32
+   },
+   {
+    "id": "7de3f0ab-9716-4343-972e-0956d0239dc5",
+    "display_name": "Fahrer 33",
+    "status": "checked_in",
+    "seed": 33
+   },
+   {
+    "id": "98f7841e-3ef4-4cb7-b2d0-7fd084a35bb7",
+    "display_name": "Fahrer 34",
+    "status": "checked_in",
+    "seed": 34
+   },
+   {
+    "id": "d72268bd-9737-449f-98a9-c9e8612db72d",
+    "display_name": "Fahrer 35",
+    "status": "checked_in",
+    "seed": 35
+   },
+   {
+    "id": "e4bd0564-b3b3-4cd6-8162-680052d3bb8c",
+    "display_name": "Fahrer 36",
+    "status": "checked_in",
+    "seed": 36
+   },
+   {
+    "id": "b6813fa1-72ef-4d5e-979d-97c32c302b38",
+    "display_name": "Fahrer 37",
+    "status": "checked_in",
+    "seed": 37
+   },
+   {
+    "id": "6b8839fb-e92e-4d47-8623-9048122c891f",
+    "display_name": "Fahrer 38",
+    "status": "checked_in",
+    "seed": 38
+   },
+   {
+    "id": "7b99cb86-d9e9-4015-8087-0cf5ab174b2c",
+    "display_name": "Fahrer 39",
+    "status": "checked_in",
+    "seed": 39
+   },
+   {
+    "id": "61f69e27-d9cb-4a52-860f-b832ed6233c2",
+    "display_name": "Fahrer 40",
+    "status": "checked_in",
+    "seed": 40
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "08c38cfc-ee3e-47b2-9efa-2f9f001c1f0a",
+    "match_key": "A",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 1,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "953779f6-1fb7-45a8-8b2e-afa7c2f0ddbc",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "953779f6-1fb7-45a8-8b2e-afa7c2f0ddbc",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "b244fe68-0dd0-4c4c-a0b5-b8dfa1b2a600",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "64419658-5a18-4023-94be-b710e2e5ad86",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 20,
+       "raw": "20"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "c403192f-2ca3-4f54-8fa8-b06220b6ef9d",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 21,
+       "raw": "21"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "61f69e27-d9cb-4a52-860f-b832ed6233c2",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 40,
+       "raw": "40"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "93db79c2-d572-4b41-99c1-94f11e381eee",
+    "match_key": "B",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 2,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "66c42263-0853-482e-a927-650bb7567649",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "66c42263-0853-482e-a927-650bb7567649",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "e751b123-5ab8-4f38-8b12-46709ae39c20",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "2f3df78c-8d2b-41ab-84ba-95e975287532",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 19,
+       "raw": "19"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "a5c54340-ad9b-4663-98b2-c1379c191348",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 22,
+       "raw": "22"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "7b99cb86-d9e9-4015-8087-0cf5ab174b2c",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 39,
+       "raw": "39"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "66a82015-d0ab-421b-8a13-567d72f92c01",
+    "match_key": "C",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 3,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "23bb43ee-40f2-4569-9043-db15c622f81e",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "23bb43ee-40f2-4569-9043-db15c622f81e",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "e21c01da-0382-48e9-9eee-b013615fd1f4",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "27b22a4b-afad-4a44-ac25-5261944cc946",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 18,
+       "raw": "18"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "4e796827-c248-4f84-9d45-d61bf06f95a8",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 23,
+       "raw": "23"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "6b8839fb-e92e-4d47-8623-9048122c891f",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 38,
+       "raw": "38"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "19c13d14-cf87-4946-81bd-7e24d49c1506",
+    "match_key": "D",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 4,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "b2ff3557-b9f3-4e9f-a58b-9b619277aa88",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "b2ff3557-b9f3-4e9f-a58b-9b619277aa88",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "6fced348-5415-47cd-b8c2-83214126e93c",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "ceb54c64-181f-4bd4-aa45-05bf77d5a314",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 17,
+       "raw": "17"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "713bd664-a5aa-459f-9133-9d40b3af0459",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 24,
+       "raw": "24"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "b6813fa1-72ef-4d5e-979d-97c32c302b38",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 37,
+       "raw": "37"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "9611c58f-0155-4061-a497-e5464a98ce7e",
+    "match_key": "E",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 5,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "31edff46-742a-4f39-8df1-b55825bc9473",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "31edff46-742a-4f39-8df1-b55825bc9473",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "dfd88d92-4d4e-4d1a-a757-2a0ecc5b5afd",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "e9fec5d6-ccc4-4411-86ac-6aa64d41a8d6",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 16,
+       "raw": "16"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "735a33d5-cd2c-48f2-9b8b-6746dde3952a",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 25,
+       "raw": "25"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "e4bd0564-b3b3-4cd6-8162-680052d3bb8c",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 36,
+       "raw": "36"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "4162999a-5ee4-401f-98b5-f88886e83a46",
+    "match_key": "F",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 6,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "31edff46-742a-4f39-8df1-b55825bc9473",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "31edff46-742a-4f39-8df1-b55825bc9473",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "7766d51a-a29c-4383-b8ab-9ec599cea661",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "6a06aad5-7fff-457f-986b-8cd2629f84a0",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 15,
+       "raw": "15"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "b77a781a-a53b-4b4c-8e6e-784088f3ce8a",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 26,
+       "raw": "26"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "d72268bd-9737-449f-98a9-c9e8612db72d",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 35,
+       "raw": "35"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "8067f059-02d1-4802-939a-702f7c1fe642",
+    "match_key": "G",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 7,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "b2ff3557-b9f3-4e9f-a58b-9b619277aa88",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "b2ff3557-b9f3-4e9f-a58b-9b619277aa88",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "165dd1cc-a822-4ab8-b298-943b20b1c9ee",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "156a73b6-9572-4208-b854-3bf5edd56bf7",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 14,
+       "raw": "14"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "f6b2c919-440e-467e-a969-95e29c19abbc",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 27,
+       "raw": "27"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "98f7841e-3ef4-4cb7-b2d0-7fd084a35bb7",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 34,
+       "raw": "34"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "cc547123-84d0-4a8b-8b8a-400e8fd2ae55",
+    "match_key": "H",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 8,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "23bb43ee-40f2-4569-9043-db15c622f81e",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "23bb43ee-40f2-4569-9043-db15c622f81e",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "05a038a7-d20a-4f1b-84c8-859c9a38513f",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "d4920f0e-a9e9-4fba-8fe8-8c93aa8cc70e",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 13,
+       "raw": "13"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "9f449fad-423d-4e78-9b5c-3a1cd82c5555",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 28,
+       "raw": "28"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "7de3f0ab-9716-4343-972e-0956d0239dc5",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 33,
+       "raw": "33"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "f8d041cb-fd39-40d6-847a-a4475adc0f4d",
+    "match_key": "I",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 9,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "66c42263-0853-482e-a927-650bb7567649",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "66c42263-0853-482e-a927-650bb7567649",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "99e5402c-f140-4d92-80c8-6259839e9153",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 9,
+       "raw": "9"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "e47dd869-076a-4f68-a3dd-4f7d97d44800",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 12,
+       "raw": "12"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "f1a53812-1377-4c68-8a0b-c82fe225023a",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 29,
+       "raw": "29"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "66ffccc7-359c-492c-ac7b-82eee6ff0453",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 32,
+       "raw": "32"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "49afa84f-4533-4454-a038-d9f0e6196e96",
+    "match_key": "J",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 10,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "953779f6-1fb7-45a8-8b2e-afa7c2f0ddbc",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "953779f6-1fb7-45a8-8b2e-afa7c2f0ddbc",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "cc523e8c-33cb-4b43-b2e8-4e613d2189c7",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 10,
+       "raw": "10"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "55e7f1f7-c3ee-4827-976d-b23ebdac3c50",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 11,
+       "raw": "11"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "b4063d84-6a53-40c7-93f0-90ae5025475c",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 30,
+       "raw": "30"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "bc78ffee-191b-454d-81e2-a19c55b471d6",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 31,
+       "raw": "31"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "953779f6-1fb7-45a8-8b2e-afa7c2f0ddbc",
+    "match_key": "K",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 11,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "50d328c2-a43c-49ab-ad97-340a48f73f0a",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "50d328c2-a43c-49ab-ad97-340a48f73f0a",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "W:A:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "J",
+       "rank": 1,
+       "raw": "W:J:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 2,
+       "raw": "W:A:2"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "J",
+       "rank": 2,
+       "raw": "W:J:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "66c42263-0853-482e-a927-650bb7567649",
+    "match_key": "L",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 12,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "50d328c2-a43c-49ab-ad97-340a48f73f0a",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     },
+     {
+      "to_match_id": "c9b13591-51c2-443b-987d-285ac9e10fac",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "W:B:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "I",
+       "rank": 1,
+       "raw": "W:I:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 2,
+       "raw": "W:B:2"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "I",
+       "rank": 2,
+       "raw": "W:I:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "23bb43ee-40f2-4569-9043-db15c622f81e",
+    "match_key": "M",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 13,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "c9b13591-51c2-443b-987d-285ac9e10fac",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     },
+     {
+      "to_match_id": "9fa6bcef-ffe8-4962-bc8c-cd2b87a21c2a",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "W:C:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "H",
+       "rank": 1,
+       "raw": "W:H:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 2,
+       "raw": "W:C:2"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "H",
+       "rank": 2,
+       "raw": "W:H:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "b2ff3557-b9f3-4e9f-a58b-9b619277aa88",
+    "match_key": "N",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 14,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "9fa6bcef-ffe8-4962-bc8c-cd2b87a21c2a",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "9fa6bcef-ffe8-4962-bc8c-cd2b87a21c2a",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 1,
+       "raw": "W:D:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "G",
+       "rank": 1,
+       "raw": "W:G:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 2,
+       "raw": "W:D:2"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "G",
+       "rank": 2,
+       "raw": "W:G:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "31edff46-742a-4f39-8df1-b55825bc9473",
+    "match_key": "O",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 15,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "c9b13591-51c2-443b-987d-285ac9e10fac",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "9fa6bcef-ffe8-4962-bc8c-cd2b87a21c2a",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 1,
+       "raw": "W:E:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 1,
+       "raw": "W:F:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 2,
+       "raw": "W:E:2"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 2,
+       "raw": "W:F:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "50d328c2-a43c-49ab-ad97-340a48f73f0a",
+    "match_key": "P",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Runde 3",
+    "order": 16,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "ac8b86e8-d5c6-4523-a096-80fd90c9b20f",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "ac8b86e8-d5c6-4523-a096-80fd90c9b20f",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "K",
+       "rank": 1,
+       "raw": "W:K:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "K",
+       "rank": 2,
+       "raw": "W:K:2"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "L",
+       "rank": 2,
+       "raw": "W:L:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 3,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "c9b13591-51c2-443b-987d-285ac9e10fac",
+    "match_key": "Q",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Runde 3",
+    "order": 17,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "ac8b86e8-d5c6-4523-a096-80fd90c9b20f",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     },
+     {
+      "to_match_id": "ee6aa4a3-a6a6-4d2e-b704-4f43da5c737c",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "L",
+       "rank": 1,
+       "raw": "W:L:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "O",
+       "rank": 1,
+       "raw": "W:O:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "M",
+       "rank": 2,
+       "raw": "W:M:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 3,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "9fa6bcef-ffe8-4962-bc8c-cd2b87a21c2a",
+    "match_key": "R",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Runde 3",
+    "order": 18,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "ee6aa4a3-a6a6-4d2e-b704-4f43da5c737c",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "ee6aa4a3-a6a6-4d2e-b704-4f43da5c737c",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "M",
+       "rank": 1,
+       "raw": "W:M:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "N",
+       "rank": 1,
+       "raw": "W:N:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "N",
+       "rank": 2,
+       "raw": "W:N:2"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "O",
+       "rank": 2,
+       "raw": "W:O:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "ac8b86e8-d5c6-4523-a096-80fd90c9b20f",
+    "match_key": "S",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 4,
+    "round_name": "Halbfinale",
+    "order": 19,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "f3c47379-35ae-470a-b727-4b377cfd626d",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "f3c47379-35ae-470a-b727-4b377cfd626d",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "P",
+       "rank": 1,
+       "raw": "W:P:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "P",
+       "rank": 2,
+       "raw": "W:P:2"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "Q",
+       "rank": 2,
+       "raw": "W:Q:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 3,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "ee6aa4a3-a6a6-4d2e-b704-4f43da5c737c",
+    "match_key": "T",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 4,
+    "round_name": "Halbfinale",
+    "order": 20,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "f3c47379-35ae-470a-b727-4b377cfd626d",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "f3c47379-35ae-470a-b727-4b377cfd626d",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "Q",
+       "rank": 1,
+       "raw": "W:Q:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "R",
+       "rank": 1,
+       "raw": "W:R:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "R",
+       "rank": 2,
+       "raw": "W:R:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 3,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "f3c47379-35ae-470a-b727-4b377cfd626d",
+    "match_key": "U",
+    "stage_id": "cc8a2684-8880-493d-a7e2-d128ae277d66",
+    "section": "WB",
+    "round": 5,
+    "round_name": "Finale",
+    "order": 21,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "S",
+       "rank": 1,
+       "raw": "W:S:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "T",
+       "rank": 1,
+       "raw": "W:T:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "S",
+       "rank": 2,
+       "raw": "W:S:2"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "T",
+       "rank": 2,
+       "raw": "W:T:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   }
+  ],
+  "round_labels": {
+   "A": "Runde 1",
+   "B": "Runde 1",
+   "C": "Runde 1",
+   "D": "Runde 1",
+   "E": "Runde 1",
+   "F": "Runde 1",
+   "G": "Runde 1",
+   "H": "Runde 1",
+   "I": "Runde 1",
+   "J": "Runde 1",
+   "K": "Runde 2",
+   "L": "Runde 2",
+   "M": "Runde 2",
+   "N": "Runde 2",
+   "O": "Runde 2",
+   "P": "Runde 3",
+   "Q": "Runde 3",
+   "R": "Runde 3",
+   "S": "Halbfinale",
+   "T": "Halbfinale",
+   "U": "Finale"
+  }
+ },
+ "ffa8_after_merge": {
+  "note": "FFA 8 von 16 nach dem Zusammenlegen: merged_into_key, Freilos-Plätze source_unfulfillable",
+  "format": "ffa_custom_bracket",
+  "stages": [
+   {
+    "id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "name": "Läufe"
+   }
+  ],
+  "registrations": [
+   {
+    "id": "171029f3-78f8-4cec-ab2f-f49640b8a74f",
+    "display_name": "NeonFalke",
+    "status": "checked_in",
+    "seed": 1
+   },
+   {
+    "id": "a48643a7-eb14-4d30-9bd2-3ca10c72dc8e",
+    "display_name": "KartKönigin",
+    "status": "checked_in",
+    "seed": 2
+   },
+   {
+    "id": "57c75f97-a9c2-4633-8e8c-9937a3fe8ce3",
+    "display_name": "LuckyLion",
+    "status": "checked_in",
+    "seed": 3
+   },
+   {
+    "id": "fbb14fd7-383e-4e30-8196-03358e4c481f",
+    "display_name": "PixelPaula",
+    "status": "checked_in",
+    "seed": 4
+   },
+   {
+    "id": "2e9d3da7-de12-456d-8525-8ed57c4467cc",
+    "display_name": "DriftDaniel",
+    "status": "checked_in",
+    "seed": 5
+   },
+   {
+    "id": "906fe5ea-2a69-4de8-99b2-405e9f56a132",
+    "display_name": "BoostBerta",
+    "status": "checked_in",
+    "seed": 6
+   },
+   {
+    "id": "8e771c95-0c61-4fa9-9795-6602d1967564",
+    "display_name": "TurboTom",
+    "status": "checked_in",
+    "seed": 7
+   },
+   {
+    "id": "3d1a4ad6-2c6b-4a05-8d27-156bd291af1a",
+    "display_name": "SchnellSchnecke",
+    "status": "checked_in",
+    "seed": 8
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "8d44d2e1-f430-4ff8-b33f-ff6e2b0a20d1",
+    "match_key": "A",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 1,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "9efd8bcc-3e30-45dc-b30c-dfc3e68fd346",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "9efd8bcc-3e30-45dc-b30c-dfc3e68fd346",
+      "to_slot": 3,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "171029f3-78f8-4cec-ab2f-f49640b8a74f",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "fbb14fd7-383e-4e30-8196-03358e4c481f",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "3d1a4ad6-2c6b-4a05-8d27-156bd291af1a",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "2e9d3da7-de12-456d-8525-8ed57c4467cc",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "7947441a-b6f7-4545-b702-bbde283a2473",
+    "match_key": "B",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 2,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "9efd8bcc-3e30-45dc-b30c-dfc3e68fd346",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     },
+     {
+      "to_match_id": "9efd8bcc-3e30-45dc-b30c-dfc3e68fd346",
+      "to_slot": 4,
+      "flow": "W",
+      "rank": 2
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "a48643a7-eb14-4d30-9bd2-3ca10c72dc8e",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "57c75f97-a9c2-4633-8e8c-9937a3fe8ce3",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     },
+     {
+      "slot": 3,
+      "registration_id": "8e771c95-0c61-4fa9-9795-6602d1967564",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     },
+     {
+      "slot": 4,
+      "registration_id": "906fe5ea-2a69-4de8-99b2-405e9f56a132",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "0b3f2bc4-1898-4a7c-99cc-206de86f9898",
+    "match_key": "C",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 3,
+    "match_type": "ffa",
+    "status": "cancelled",
+    "duration_minutes": 30,
+    "merged_into": "7947441a-b6f7-4545-b702-bbde283a2473",
+    "merged_into_key": "B",
+    "slots": [
+     {
+      "slot": 1,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 11,
+       "raw": "11"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 14,
+       "raw": "14"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    },
+    "result_meta": {
+     "source": "heat_rebuild",
+     "reason": "merged"
+    }
+   },
+   {
+    "id": "ed269d17-4b15-428d-8ade-64a7e8a236db",
+    "match_key": "D",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 4,
+    "match_type": "ffa",
+    "status": "cancelled",
+    "duration_minutes": 30,
+    "merged_into": "8d44d2e1-f430-4ff8-b33f-ff6e2b0a20d1",
+    "merged_into_key": "A",
+    "slots": [
+     {
+      "slot": 1,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 12,
+       "raw": "12"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 13,
+       "raw": "13"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    },
+    "result_meta": {
+     "source": "heat_rebuild",
+     "reason": "merged"
+    }
+   },
+   {
+    "id": "9efd8bcc-3e30-45dc-b30c-dfc3e68fd346",
+    "match_key": "E",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Finale",
+    "order": 5,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "W:A:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "W:B:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 2,
+       "raw": "W:A:2"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 2,
+       "raw": "W:B:2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "79328658-a52d-4cef-aa76-f08fe3a26949",
+    "match_key": "F",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Halbfinale",
+    "order": 6,
+    "match_type": "ffa",
+    "status": "cancelled",
+    "duration_minutes": 30,
+    "merged_into": "9efd8bcc-3e30-45dc-b30c-dfc3e68fd346",
+    "merged_into_key": "E",
+    "slots": [
+     {
+      "slot": 1,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:B:1",
+       "was": {
+        "flow": "W",
+        "match_key": "B",
+        "rank": 1
+       }
+      }
+     },
+     {
+      "slot": 2,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:C:1",
+       "was": {
+        "flow": "W",
+        "match_key": "C",
+        "rank": 1
+       }
+      },
+      "source_result": {
+       "from_match_id": "0b3f2bc4-1898-4a7c-99cc-206de86f9898",
+       "from_match_key": "C",
+       "rank": 1,
+       "flow": "W",
+       "skipped": true,
+       "reason": "merged",
+       "confirmed_at": "2026-10-14T13:52:00.666172+00:00"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:B:2",
+       "was": {
+        "flow": "W",
+        "match_key": "B",
+        "rank": 2
+       }
+      }
+     },
+     {
+      "slot": 4,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:C:2",
+       "was": {
+        "flow": "W",
+        "match_key": "C",
+        "rank": 2
+       }
+      },
+      "source_result": {
+       "from_match_id": "0b3f2bc4-1898-4a7c-99cc-206de86f9898",
+       "from_match_key": "C",
+       "rank": 2,
+       "flow": "W",
+       "skipped": true,
+       "reason": "source_unfulfillable",
+       "confirmed_at": "2026-10-14T13:52:00.655687+00:00"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    },
+    "result_meta": {
+     "source": "heat_rebuild",
+     "reason": "merged"
+    }
+   },
+   {
+    "id": "50406a30-7cdd-461e-b8b2-aba9d9e440e2",
+    "match_key": "G",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Finale",
+    "order": 7,
+    "match_type": "ffa",
+    "status": "cancelled",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:E:1",
+       "was": {
+        "flow": "W",
+        "match_key": "E",
+        "rank": 1
+       }
+      }
+     },
+     {
+      "slot": 2,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:F:1",
+       "was": {
+        "flow": "W",
+        "match_key": "F",
+        "rank": 1
+       }
+      },
+      "source_result": {
+       "from_match_id": "79328658-a52d-4cef-aa76-f08fe3a26949",
+       "from_match_key": "F",
+       "rank": 1,
+       "flow": "W",
+       "skipped": true,
+       "reason": "merged",
+       "confirmed_at": "2026-10-14T13:52:00.666172+00:00"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:E:2",
+       "was": {
+        "flow": "W",
+        "match_key": "E",
+        "rank": 2
+       }
+      }
+     },
+     {
+      "slot": 4,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:F:2",
+       "was": {
+        "flow": "W",
+        "match_key": "F",
+        "rank": 2
+       }
+      },
+      "source_result": {
+       "from_match_id": "79328658-a52d-4cef-aa76-f08fe3a26949",
+       "from_match_key": "F",
+       "rank": 2,
+       "flow": "W",
+       "skipped": true,
+       "reason": "source_unfulfillable",
+       "confirmed_at": "2026-10-14T13:52:00.655687+00:00"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    },
+    "result_meta": {
+     "source": "heat_rebuild",
+     "reason": "shortened"
+    }
+   }
+  ],
+  "round_labels": {
+   "A": "Runde 1",
+   "B": "Runde 1",
+   "C": "Runde 1",
+   "D": "Runde 1",
+   "E": "Finale",
+   "F": "Halbfinale",
+   "G": "Finale"
+  }
+ },
+ "ffa8_before_merge": {
+  "note": "FFA 8 von 16: Läufe unterbesetzt, Vorschlag offen",
+  "format": "ffa_custom_bracket",
+  "stages": [
+   {
+    "id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "stage_type": "ffa_custom_bracket",
+    "match_type": "ffa",
+    "name": "Läufe"
+   }
+  ],
+  "registrations": [
+   {
+    "id": "171029f3-78f8-4cec-ab2f-f49640b8a74f",
+    "display_name": "NeonFalke",
+    "status": "checked_in",
+    "seed": 1
+   },
+   {
+    "id": "a48643a7-eb14-4d30-9bd2-3ca10c72dc8e",
+    "display_name": "KartKönigin",
+    "status": "checked_in",
+    "seed": 2
+   },
+   {
+    "id": "57c75f97-a9c2-4633-8e8c-9937a3fe8ce3",
+    "display_name": "LuckyLion",
+    "status": "checked_in",
+    "seed": 3
+   },
+   {
+    "id": "fbb14fd7-383e-4e30-8196-03358e4c481f",
+    "display_name": "PixelPaula",
+    "status": "checked_in",
+    "seed": 4
+   },
+   {
+    "id": "2e9d3da7-de12-456d-8525-8ed57c4467cc",
+    "display_name": "DriftDaniel",
+    "status": "checked_in",
+    "seed": 5
+   },
+   {
+    "id": "906fe5ea-2a69-4de8-99b2-405e9f56a132",
+    "display_name": "BoostBerta",
+    "status": "checked_in",
+    "seed": 6
+   },
+   {
+    "id": "8e771c95-0c61-4fa9-9795-6602d1967564",
+    "display_name": "TurboTom",
+    "status": "checked_in",
+    "seed": 7
+   },
+   {
+    "id": "3d1a4ad6-2c6b-4a05-8d27-156bd291af1a",
+    "display_name": "SchnellSchnecke",
+    "status": "checked_in",
+    "seed": 8
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "8d44d2e1-f430-4ff8-b33f-ff6e2b0a20d1",
+    "match_key": "A",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 1,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "9efd8bcc-3e30-45dc-b30c-dfc3e68fd346",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "171029f3-78f8-4cec-ab2f-f49640b8a74f",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "2e9d3da7-de12-456d-8525-8ed57c4467cc",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 9,
+       "raw": "9"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 16,
+       "raw": "16"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "7947441a-b6f7-4545-b702-bbde283a2473",
+    "match_key": "B",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 2,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "79328658-a52d-4cef-aa76-f08fe3a26949",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "a48643a7-eb14-4d30-9bd2-3ca10c72dc8e",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "906fe5ea-2a69-4de8-99b2-405e9f56a132",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 10,
+       "raw": "10"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 15,
+       "raw": "15"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "0b3f2bc4-1898-4a7c-99cc-206de86f9898",
+    "match_key": "C",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 3,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "79328658-a52d-4cef-aa76-f08fe3a26949",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "57c75f97-a9c2-4633-8e8c-9937a3fe8ce3",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "8e771c95-0c61-4fa9-9795-6602d1967564",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 11,
+       "raw": "11"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 14,
+       "raw": "14"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "ed269d17-4b15-428d-8ade-64a7e8a236db",
+    "match_key": "D",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 4,
+    "match_type": "ffa",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "9efd8bcc-3e30-45dc-b30c-dfc3e68fd346",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "fbb14fd7-383e-4e30-8196-03358e4c481f",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "3d1a4ad6-2c6b-4a05-8d27-156bd291af1a",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 12,
+       "raw": "12"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 13,
+       "raw": "13"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "9efd8bcc-3e30-45dc-b30c-dfc3e68fd346",
+    "match_key": "E",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Halbfinale",
+    "order": 5,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "50406a30-7cdd-461e-b8b2-aba9d9e440e2",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "W:A:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 1,
+       "raw": "W:D:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:A:2",
+       "was": {
+        "flow": "W",
+        "match_key": "A",
+        "rank": 2
+       }
+      },
+      "source_result": {
+       "from_match_id": "8d44d2e1-f430-4ff8-b33f-ff6e2b0a20d1",
+       "from_match_key": "A",
+       "rank": 2,
+       "flow": "W",
+       "skipped": true,
+       "reason": "source_unfulfillable",
+       "confirmed_at": "2026-10-14T13:52:00.655687+00:00"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:D:2",
+       "was": {
+        "flow": "W",
+        "match_key": "D",
+        "rank": 2
+       }
+      },
+      "source_result": {
+       "from_match_id": "ed269d17-4b15-428d-8ade-64a7e8a236db",
+       "from_match_key": "D",
+       "rank": 2,
+       "flow": "W",
+       "skipped": true,
+       "reason": "source_unfulfillable",
+       "confirmed_at": "2026-10-14T13:52:00.655687+00:00"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "79328658-a52d-4cef-aa76-f08fe3a26949",
+    "match_key": "F",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Halbfinale",
+    "order": 6,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "50406a30-7cdd-461e-b8b2-aba9d9e440e2",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "W:B:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "W:C:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:B:2",
+       "was": {
+        "flow": "W",
+        "match_key": "B",
+        "rank": 2
+       }
+      },
+      "source_result": {
+       "from_match_id": "7947441a-b6f7-4545-b702-bbde283a2473",
+       "from_match_key": "B",
+       "rank": 2,
+       "flow": "W",
+       "skipped": true,
+       "reason": "source_unfulfillable",
+       "confirmed_at": "2026-10-14T13:52:00.655687+00:00"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:C:2",
+       "was": {
+        "flow": "W",
+        "match_key": "C",
+        "rank": 2
+       }
+      },
+      "source_result": {
+       "from_match_id": "0b3f2bc4-1898-4a7c-99cc-206de86f9898",
+       "from_match_key": "C",
+       "rank": 2,
+       "flow": "W",
+       "skipped": true,
+       "reason": "source_unfulfillable",
+       "confirmed_at": "2026-10-14T13:52:00.655687+00:00"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "50406a30-7cdd-461e-b8b2-aba9d9e440e2",
+    "match_key": "G",
+    "stage_id": "908070d2-9aaa-4242-872e-170bbc786b5d",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Finale",
+    "order": 7,
+    "match_type": "ffa",
+    "status": "pending",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 1,
+       "raw": "W:E:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 1,
+       "raw": "W:F:1"
+      }
+     },
+     {
+      "slot": 3,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:E:2",
+       "was": {
+        "flow": "W",
+        "match_key": "E",
+        "rank": 2
+       }
+      },
+      "source_result": {
+       "from_match_id": "9efd8bcc-3e30-45dc-b30c-dfc3e68fd346",
+       "from_match_key": "E",
+       "rank": 2,
+       "flow": "W",
+       "skipped": true,
+       "reason": "source_unfulfillable",
+       "confirmed_at": "2026-10-14T13:52:00.655687+00:00"
+      }
+     },
+     {
+      "slot": 4,
+      "status": "bye",
+      "source": {
+       "type": "bye",
+       "raw": "W:F:2",
+       "was": {
+        "flow": "W",
+        "match_key": "F",
+        "rank": 2
+       }
+      },
+      "source_result": {
+       "from_match_id": "79328658-a52d-4cef-aa76-f08fe3a26949",
+       "from_match_key": "F",
+       "rank": 2,
+       "flow": "W",
+       "skipped": true,
+       "reason": "source_unfulfillable",
+       "confirmed_at": "2026-10-14T13:52:00.655687+00:00"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 4,
+     "qualifiers_per_match": 2,
+     "min_players": 2
+    }
+   }
+  ],
+  "round_labels": {
+   "A": "Runde 1",
+   "B": "Runde 1",
+   "C": "Runde 1",
+   "D": "Runde 1",
+   "E": "Halbfinale",
+   "F": "Halbfinale",
+   "G": "Finale"
+  }
+ },
+ "groups8": {
+  "note": "Gruppen 8 in 2 Gruppen: Tabelle je Gruppe",
+  "format": "groups",
+  "stages": [
+   {
+    "id": "51ce31e5-057e-451a-8f4e-4e33aa2a96bd",
+    "stage_type": "round_robin_groups",
+    "match_type": "duel",
+    "name": "Gruppenphase"
+   }
+  ],
+  "registrations": [
+   {
+    "id": "34415775-8db1-4c64-bcf5-0c09791d1fa2",
+    "display_name": "NeonFalke",
+    "status": "approved",
+    "seed": 1
+   },
+   {
+    "id": "395b121a-937b-4c7f-9eb2-cca70f94a1f6",
+    "display_name": "KartKönigin",
+    "status": "approved",
+    "seed": 2
+   },
+   {
+    "id": "f67c102d-5a22-4937-8192-531e197ecf9c",
+    "display_name": "LuckyLion",
+    "status": "approved",
+    "seed": 3
+   },
+   {
+    "id": "7d0c0e9c-367c-4a05-a14d-675b4f5426af",
+    "display_name": "PixelPaula",
+    "status": "approved",
+    "seed": 4
+   },
+   {
+    "id": "05afed5b-26db-4663-97ad-4a713c5cd4b4",
+    "display_name": "DriftDaniel",
+    "status": "approved",
+    "seed": 5
+   },
+   {
+    "id": "c66b163d-891d-420d-8440-a2bda1e67540",
+    "display_name": "BoostBerta",
+    "status": "approved",
+    "seed": 6
+   },
+   {
+    "id": "ac2de741-fa33-47f2-a1e6-3ac5aa32ea3c",
+    "display_name": "TurboTom",
+    "status": "approved",
+    "seed": 7
+   },
+   {
+    "id": "c1b9c6f6-40a0-40d3-8ce6-b2893e193427",
+    "display_name": "SchnellSchnecke",
+    "status": "approved",
+    "seed": 8
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "fe2a982a-6688-4cc2-9f94-00b183c30960",
+    "match_key": "A",
+    "stage_id": "51ce31e5-057e-451a-8f4e-4e33aa2a96bd",
+    "section": "group_A",
+    "round": 1,
+    "round_name": "Spieltag 1",
+    "order": 1,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "group_id": "4b57d3a9-a645-43b8-8e8d-5182805c54c0",
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "34415775-8db1-4c64-bcf5-0c09791d1fa2",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "c1b9c6f6-40a0-40d3-8ce6-b2893e193427",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "34415775-8db1-4c64-bcf5-0c09791d1fa2",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "c1b9c6f6-40a0-40d3-8ce6-b2893e193427",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "11061c35-1ccb-4ce9-ae9d-39d93582c826",
+    "match_key": "B",
+    "stage_id": "51ce31e5-057e-451a-8f4e-4e33aa2a96bd",
+    "section": "group_A",
+    "round": 1,
+    "round_name": "Spieltag 1",
+    "order": 2,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "group_id": "4b57d3a9-a645-43b8-8e8d-5182805c54c0",
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "7d0c0e9c-367c-4a05-a14d-675b4f5426af",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "05afed5b-26db-4663-97ad-4a713c5cd4b4",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "7d0c0e9c-367c-4a05-a14d-675b4f5426af",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "05afed5b-26db-4663-97ad-4a713c5cd4b4",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "49f12dff-5bd0-4cbd-8207-1381c7047f1b",
+    "match_key": "C",
+    "stage_id": "51ce31e5-057e-451a-8f4e-4e33aa2a96bd",
+    "section": "group_A",
+    "round": 2,
+    "round_name": "Spieltag 2",
+    "order": 3,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "group_id": "4b57d3a9-a645-43b8-8e8d-5182805c54c0",
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "34415775-8db1-4c64-bcf5-0c09791d1fa2",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "05afed5b-26db-4663-97ad-4a713c5cd4b4",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "5f8ab9fa-09dd-4dd2-accd-614f2ed6fa2d",
+    "match_key": "D",
+    "stage_id": "51ce31e5-057e-451a-8f4e-4e33aa2a96bd",
+    "section": "group_A",
+    "round": 2,
+    "round_name": "Spieltag 2",
+    "order": 4,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "group_id": "4b57d3a9-a645-43b8-8e8d-5182805c54c0",
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "c1b9c6f6-40a0-40d3-8ce6-b2893e193427",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "7d0c0e9c-367c-4a05-a14d-675b4f5426af",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "57a4f7d2-8774-4055-97d1-5ddd52558c1c",
+    "match_key": "E",
+    "stage_id": "51ce31e5-057e-451a-8f4e-4e33aa2a96bd",
+    "section": "group_A",
+    "round": 3,
+    "round_name": "Spieltag 3",
+    "order": 5,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "group_id": "4b57d3a9-a645-43b8-8e8d-5182805c54c0",
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "34415775-8db1-4c64-bcf5-0c09791d1fa2",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "7d0c0e9c-367c-4a05-a14d-675b4f5426af",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "c2eb7e0c-8549-484e-a1ee-caa0821b811f",
+    "match_key": "F",
+    "stage_id": "51ce31e5-057e-451a-8f4e-4e33aa2a96bd",
+    "section": "group_A",
+    "round": 3,
+    "round_name": "Spieltag 3",
+    "order": 6,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "group_id": "4b57d3a9-a645-43b8-8e8d-5182805c54c0",
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "05afed5b-26db-4663-97ad-4a713c5cd4b4",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "c1b9c6f6-40a0-40d3-8ce6-b2893e193427",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "bbe5375e-b2e1-47ed-9248-c2e2825344f5",
+    "match_key": "G",
+    "stage_id": "51ce31e5-057e-451a-8f4e-4e33aa2a96bd",
+    "section": "group_B",
+    "round": 1,
+    "round_name": "Spieltag 1",
+    "order": 7,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "group_id": "1570713f-0801-4c93-bacf-dcc753dd38b5",
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "395b121a-937b-4c7f-9eb2-cca70f94a1f6",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "ac2de741-fa33-47f2-a1e6-3ac5aa32ea3c",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "395b121a-937b-4c7f-9eb2-cca70f94a1f6",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "ac2de741-fa33-47f2-a1e6-3ac5aa32ea3c",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "5e048cf5-b9eb-48f4-8921-f5e2b39d567c",
+    "match_key": "H",
+    "stage_id": "51ce31e5-057e-451a-8f4e-4e33aa2a96bd",
+    "section": "group_B",
+    "round": 1,
+    "round_name": "Spieltag 1",
+    "order": 8,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "group_id": "1570713f-0801-4c93-bacf-dcc753dd38b5",
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "f67c102d-5a22-4937-8192-531e197ecf9c",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "c66b163d-891d-420d-8440-a2bda1e67540",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "f67c102d-5a22-4937-8192-531e197ecf9c",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "c66b163d-891d-420d-8440-a2bda1e67540",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "64611b7a-3e74-4f32-9b8b-b61161634dd2",
+    "match_key": "I",
+    "stage_id": "51ce31e5-057e-451a-8f4e-4e33aa2a96bd",
+    "section": "group_B",
+    "round": 2,
+    "round_name": "Spieltag 2",
+    "order": 9,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "group_id": "1570713f-0801-4c93-bacf-dcc753dd38b5",
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "395b121a-937b-4c7f-9eb2-cca70f94a1f6",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "c66b163d-891d-420d-8440-a2bda1e67540",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "77b3f72d-b411-4bdd-8344-7087a14f1e9b",
+    "match_key": "J",
+    "stage_id": "51ce31e5-057e-451a-8f4e-4e33aa2a96bd",
+    "section": "group_B",
+    "round": 2,
+    "round_name": "Spieltag 2",
+    "order": 10,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "group_id": "1570713f-0801-4c93-bacf-dcc753dd38b5",
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "ac2de741-fa33-47f2-a1e6-3ac5aa32ea3c",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "f67c102d-5a22-4937-8192-531e197ecf9c",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "ba64621a-f8e0-477d-a1b2-b8b154b872f1",
+    "match_key": "K",
+    "stage_id": "51ce31e5-057e-451a-8f4e-4e33aa2a96bd",
+    "section": "group_B",
+    "round": 3,
+    "round_name": "Spieltag 3",
+    "order": 11,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "group_id": "1570713f-0801-4c93-bacf-dcc753dd38b5",
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "395b121a-937b-4c7f-9eb2-cca70f94a1f6",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "f67c102d-5a22-4937-8192-531e197ecf9c",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "5a3ed6da-74cf-44ff-b81d-11e274513395",
+    "match_key": "L",
+    "stage_id": "51ce31e5-057e-451a-8f4e-4e33aa2a96bd",
+    "section": "group_B",
+    "round": 3,
+    "round_name": "Spieltag 3",
+    "order": 12,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "group_id": "1570713f-0801-4c93-bacf-dcc753dd38b5",
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "c66b163d-891d-420d-8440-a2bda1e67540",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "ac2de741-fa33-47f2-a1e6-3ac5aa32ea3c",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   }
+  ],
+  "round_labels": {
+   "A": "Spieltag 1",
+   "B": "Spieltag 1",
+   "C": "Spieltag 2",
+   "D": "Spieltag 2",
+   "E": "Spieltag 3",
+   "F": "Spieltag 3",
+   "G": "Spieltag 1",
+   "H": "Spieltag 1",
+   "I": "Spieltag 2",
+   "J": "Spieltag 2",
+   "K": "Spieltag 3",
+   "L": "Spieltag 3"
+  },
+  "standings": [
+   {
+    "group": {
+     "id": "4b57d3a9-a645-43b8-8e8d-5182805c54c0",
+     "name": "Gruppe A",
+     "group_key": "A",
+     "section": "group_A"
+    },
+    "standings": [
+     {
+      "registration_id": "34415775-8db1-4c64-bcf5-0c09791d1fa2",
+      "display_name": "NeonFalke",
+      "rank": 1,
+      "played": 1,
+      "won": 1,
+      "lost": 0,
+      "drawn": 0,
+      "points": 3,
+      "score_for": 15.0,
+      "score_against": 12.0
+     },
+     {
+      "registration_id": "7d0c0e9c-367c-4a05-a14d-675b4f5426af",
+      "display_name": "PixelPaula",
+      "rank": 2,
+      "played": 1,
+      "won": 1,
+      "lost": 0,
+      "drawn": 0,
+      "points": 3,
+      "score_for": 15.0,
+      "score_against": 12.0
+     },
+     {
+      "registration_id": "c1b9c6f6-40a0-40d3-8ce6-b2893e193427",
+      "display_name": "SchnellSchnecke",
+      "rank": 3,
+      "played": 1,
+      "won": 0,
+      "lost": 1,
+      "drawn": 0,
+      "points": 0,
+      "score_for": 12.0,
+      "score_against": 15.0
+     },
+     {
+      "registration_id": "05afed5b-26db-4663-97ad-4a713c5cd4b4",
+      "display_name": "DriftDaniel",
+      "rank": 4,
+      "played": 1,
+      "won": 0,
+      "lost": 1,
+      "drawn": 0,
+      "points": 0,
+      "score_for": 12.0,
+      "score_against": 15.0
+     }
+    ]
+   },
+   {
+    "group": {
+     "id": "1570713f-0801-4c93-bacf-dcc753dd38b5",
+     "name": "Gruppe B",
+     "group_key": "B",
+     "section": "group_B"
+    },
+    "standings": [
+     {
+      "registration_id": "395b121a-937b-4c7f-9eb2-cca70f94a1f6",
+      "display_name": "KartKönigin",
+      "rank": 1,
+      "played": 1,
+      "won": 1,
+      "lost": 0,
+      "drawn": 0,
+      "points": 3,
+      "score_for": 15.0,
+      "score_against": 12.0
+     },
+     {
+      "registration_id": "f67c102d-5a22-4937-8192-531e197ecf9c",
+      "display_name": "LuckyLion",
+      "rank": 2,
+      "played": 1,
+      "won": 1,
+      "lost": 0,
+      "drawn": 0,
+      "points": 3,
+      "score_for": 15.0,
+      "score_against": 12.0
+     },
+     {
+      "registration_id": "ac2de741-fa33-47f2-a1e6-3ac5aa32ea3c",
+      "display_name": "TurboTom",
+      "rank": 3,
+      "played": 1,
+      "won": 0,
+      "lost": 1,
+      "drawn": 0,
+      "points": 0,
+      "score_for": 12.0,
+      "score_against": 15.0
+     },
+     {
+      "registration_id": "c66b163d-891d-420d-8440-a2bda1e67540",
+      "display_name": "BoostBerta",
+      "rank": 4,
+      "played": 1,
+      "won": 0,
+      "lost": 1,
+      "drawn": 0,
+      "points": 0,
+      "score_for": 12.0,
+      "score_against": 15.0
+     }
+    ]
+   }
+  ]
+ },
+ "league6": {
+  "note": "Liga 6: Spieltag 1 und 2 teils gespielt",
+  "format": "round_robin",
+  "stages": [
+   {
+    "id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "stage_type": "round_robin_groups",
+    "match_type": "duel",
+    "name": "Phase 1"
+   }
+  ],
+  "registrations": [
+   {
+    "id": "7dae1b46-4c08-4c07-ad36-52ff889fe6f8",
+    "display_name": "NeonFalke",
+    "status": "checked_in",
+    "seed": 1
+   },
+   {
+    "id": "00760c67-b53d-46f9-88ca-ea3a69ad83ff",
+    "display_name": "KartKönigin",
+    "status": "checked_in",
+    "seed": 2
+   },
+   {
+    "id": "da8862c0-650a-4c9f-956e-031bef0b152f",
+    "display_name": "LuckyLion",
+    "status": "checked_in",
+    "seed": 3
+   },
+   {
+    "id": "a90e425a-8aac-4a9d-849e-2d1d295ae0a1",
+    "display_name": "PixelPaula",
+    "status": "checked_in",
+    "seed": 4
+   },
+   {
+    "id": "b9681987-d6c5-4656-91c8-2be7d42e6ec0",
+    "display_name": "DriftDaniel",
+    "status": "checked_in",
+    "seed": 5
+   },
+   {
+    "id": "b34086bc-1874-4d65-8994-24f0532bb142",
+    "display_name": "BoostBerta",
+    "status": "checked_in",
+    "seed": 6
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "37244f27-e454-455f-aadc-7c95e8099af7",
+    "match_key": "A",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 1,
+    "round_name": "Spieltag 1",
+    "order": 1,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "7dae1b46-4c08-4c07-ad36-52ff889fe6f8",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "b34086bc-1874-4d65-8994-24f0532bb142",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "7dae1b46-4c08-4c07-ad36-52ff889fe6f8",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "b34086bc-1874-4d65-8994-24f0532bb142",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "ad4a592e-ce8b-471b-9759-a7465e7955ab",
+    "match_key": "B",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 1,
+    "round_name": "Spieltag 1",
+    "order": 2,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "00760c67-b53d-46f9-88ca-ea3a69ad83ff",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "b9681987-d6c5-4656-91c8-2be7d42e6ec0",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "00760c67-b53d-46f9-88ca-ea3a69ad83ff",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "b9681987-d6c5-4656-91c8-2be7d42e6ec0",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "bcb2bb97-a4ad-4e21-8b3f-45119556bb74",
+    "match_key": "C",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 1,
+    "round_name": "Spieltag 1",
+    "order": 3,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "da8862c0-650a-4c9f-956e-031bef0b152f",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "a90e425a-8aac-4a9d-849e-2d1d295ae0a1",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "da8862c0-650a-4c9f-956e-031bef0b152f",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "a90e425a-8aac-4a9d-849e-2d1d295ae0a1",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "4a8adc09-6a78-4327-930c-32851adb2663",
+    "match_key": "D",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 2,
+    "round_name": "Spieltag 2",
+    "order": 4,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "7dae1b46-4c08-4c07-ad36-52ff889fe6f8",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "b9681987-d6c5-4656-91c8-2be7d42e6ec0",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "7dae1b46-4c08-4c07-ad36-52ff889fe6f8",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "b9681987-d6c5-4656-91c8-2be7d42e6ec0",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "ea0faf4e-c5da-4d8b-80d2-500ba8fdce9b",
+    "match_key": "E",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 2,
+    "round_name": "Spieltag 2",
+    "order": 5,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "b34086bc-1874-4d65-8994-24f0532bb142",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "a90e425a-8aac-4a9d-849e-2d1d295ae0a1",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "b34086bc-1874-4d65-8994-24f0532bb142",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "a90e425a-8aac-4a9d-849e-2d1d295ae0a1",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "08c0521c-dc46-4671-b5af-6052edce747a",
+    "match_key": "F",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 2,
+    "round_name": "Spieltag 2",
+    "order": 6,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "00760c67-b53d-46f9-88ca-ea3a69ad83ff",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "da8862c0-650a-4c9f-956e-031bef0b152f",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "9eae6e76-dc30-49a5-a0de-41a705d54c43",
+    "match_key": "G",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 3,
+    "round_name": "Spieltag 3",
+    "order": 7,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "7dae1b46-4c08-4c07-ad36-52ff889fe6f8",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "a90e425a-8aac-4a9d-849e-2d1d295ae0a1",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "3dfc7c92-5bf1-4f45-bbb0-84f6fe785aa7",
+    "match_key": "H",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 3,
+    "round_name": "Spieltag 3",
+    "order": 8,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "b9681987-d6c5-4656-91c8-2be7d42e6ec0",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "da8862c0-650a-4c9f-956e-031bef0b152f",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "d7bd0ca9-15af-4f75-93c1-800baea53983",
+    "match_key": "I",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 3,
+    "round_name": "Spieltag 3",
+    "order": 9,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "b34086bc-1874-4d65-8994-24f0532bb142",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "00760c67-b53d-46f9-88ca-ea3a69ad83ff",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "58bc4a52-66c4-40f6-a46c-b193bc3a7a68",
+    "match_key": "J",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 4,
+    "round_name": "Spieltag 4",
+    "order": 10,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "7dae1b46-4c08-4c07-ad36-52ff889fe6f8",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "da8862c0-650a-4c9f-956e-031bef0b152f",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "cb3bb08b-67e2-428e-bc39-71fcff342e02",
+    "match_key": "K",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 4,
+    "round_name": "Spieltag 4",
+    "order": 11,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "a90e425a-8aac-4a9d-849e-2d1d295ae0a1",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "00760c67-b53d-46f9-88ca-ea3a69ad83ff",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "a5056d44-87ff-4627-bdf8-5239d2fc190f",
+    "match_key": "L",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 4,
+    "round_name": "Spieltag 4",
+    "order": 12,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "b9681987-d6c5-4656-91c8-2be7d42e6ec0",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "b34086bc-1874-4d65-8994-24f0532bb142",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "35ffc530-b3e6-4241-959a-b22a84f70f06",
+    "match_key": "M",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 5,
+    "round_name": "Spieltag 5",
+    "order": 13,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "7dae1b46-4c08-4c07-ad36-52ff889fe6f8",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "00760c67-b53d-46f9-88ca-ea3a69ad83ff",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "64b68d79-c40d-4e46-ba7a-0058cfa54c7b",
+    "match_key": "N",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 5,
+    "round_name": "Spieltag 5",
+    "order": 14,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "da8862c0-650a-4c9f-956e-031bef0b152f",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "b34086bc-1874-4d65-8994-24f0532bb142",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "b14d1b43-8db2-4856-a5fe-2df7ae3f17d4",
+    "match_key": "O",
+    "stage_id": "4fb342e1-f761-4ed9-a584-2b4a321a076e",
+    "section": "round_robin",
+    "round": 5,
+    "round_name": "Spieltag 5",
+    "order": 15,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "a90e425a-8aac-4a9d-849e-2d1d295ae0a1",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "b9681987-d6c5-4656-91c8-2be7d42e6ec0",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   }
+  ],
+  "round_labels": {
+   "A": "Spieltag 1",
+   "B": "Spieltag 1",
+   "C": "Spieltag 1",
+   "D": "Spieltag 2",
+   "E": "Spieltag 2",
+   "F": "Spieltag 2",
+   "G": "Spieltag 3",
+   "H": "Spieltag 3",
+   "I": "Spieltag 3",
+   "J": "Spieltag 4",
+   "K": "Spieltag 4",
+   "L": "Spieltag 4",
+   "M": "Spieltag 5",
+   "N": "Spieltag 5",
+   "O": "Spieltag 5"
+  },
+  "standings": [
+   {
+    "registration_id": "7dae1b46-4c08-4c07-ad36-52ff889fe6f8",
+    "display_name": "NeonFalke",
+    "rank": 1,
+    "played": 2,
+    "won": 2,
+    "lost": 0,
+    "drawn": 0,
+    "points": 6,
+    "score_for": 30.0,
+    "score_against": 24.0
+   },
+   {
+    "registration_id": "00760c67-b53d-46f9-88ca-ea3a69ad83ff",
+    "display_name": "KartKönigin",
+    "rank": 2,
+    "played": 1,
+    "won": 1,
+    "lost": 0,
+    "drawn": 0,
+    "points": 3,
+    "score_for": 15.0,
+    "score_against": 12.0
+   },
+   {
+    "registration_id": "da8862c0-650a-4c9f-956e-031bef0b152f",
+    "display_name": "LuckyLion",
+    "rank": 3,
+    "played": 1,
+    "won": 1,
+    "lost": 0,
+    "drawn": 0,
+    "points": 3,
+    "score_for": 15.0,
+    "score_against": 12.0
+   },
+   {
+    "registration_id": "b34086bc-1874-4d65-8994-24f0532bb142",
+    "display_name": "BoostBerta",
+    "rank": 4,
+    "played": 2,
+    "won": 1,
+    "lost": 1,
+    "drawn": 0,
+    "points": 3,
+    "score_for": 27.0,
+    "score_against": 27.0
+   },
+   {
+    "registration_id": "a90e425a-8aac-4a9d-849e-2d1d295ae0a1",
+    "display_name": "PixelPaula",
+    "rank": 5,
+    "played": 2,
+    "won": 0,
+    "lost": 2,
+    "drawn": 0,
+    "points": 0,
+    "score_for": 24.0,
+    "score_against": 30.0
+   },
+   {
+    "registration_id": "b9681987-d6c5-4656-91c8-2be7d42e6ec0",
+    "display_name": "DriftDaniel",
+    "rank": 6,
+    "played": 2,
+    "won": 0,
+    "lost": 2,
+    "drawn": 0,
+    "points": 0,
+    "score_for": 24.0,
+    "score_against": 30.0
+   }
+  ]
+ },
+ "se6_done": {
+  "note": "K.-o. 6 von 8 fertig gespielt: Finale entschieden, Pokal vergeben",
+  "format": "single_elim",
+  "stages": [
+   {
+    "id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "stage_type": "single_elimination",
+    "match_type": "duel",
+    "name": "Phase 1"
+   }
+  ],
+  "registrations": [
+   {
+    "id": "c99a4902-626f-49f0-83fd-bf188099ebb0",
+    "display_name": "NeonFalke",
+    "status": "checked_in",
+    "seed": 1
+   },
+   {
+    "id": "bfee2e38-181f-4c0c-ac3c-7b8d0e56f0d3",
+    "display_name": "KartKönigin",
+    "status": "checked_in",
+    "seed": 2
+   },
+   {
+    "id": "fadfd510-e9a1-4690-a61b-0c8f50e2d439",
+    "display_name": "LuckyLion",
+    "status": "disqualified",
+    "seed": 3
+   },
+   {
+    "id": "d23222f1-700a-4886-b1df-d1263f079320",
+    "display_name": "PixelPaula",
+    "status": "checked_in",
+    "seed": 4
+   },
+   {
+    "id": "58b523f1-62af-4977-b171-df1e9dc06fd3",
+    "display_name": "DriftDaniel",
+    "status": "checked_in",
+    "seed": 5
+   },
+   {
+    "id": "e9a796e6-b15d-4f5c-8afb-0e2aa516da0c",
+    "display_name": "BoostBerta",
+    "status": "checked_in",
+    "seed": 6
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "acd82261-c084-4b30-a70f-ec85773aae3a",
+    "match_key": "A",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 1,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "7a9a2585-d846-4db9-a837-0e8bdb17cdf1",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "c99a4902-626f-49f0-83fd-bf188099ebb0",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "c99a4902-626f-49f0-83fd-bf188099ebb0",
+      "rank": 1,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    },
+    "result_meta": {
+     "source": "auto_bye"
+    }
+   },
+   {
+    "id": "3665a1a8-38aa-470f-81ee-cf839409deaf",
+    "match_key": "B",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 2,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "7a9a2585-d846-4db9-a837-0e8bdb17cdf1",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "d23222f1-700a-4886-b1df-d1263f079320",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "58b523f1-62af-4977-b171-df1e9dc06fd3",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "d23222f1-700a-4886-b1df-d1263f079320",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "58b523f1-62af-4977-b171-df1e9dc06fd3",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "6be8be22-46e1-47dd-9a28-5cb00016cc67",
+    "match_key": "C",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 3,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "50c468db-4585-4258-80b4-b6b4510a3bf2",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "bfee2e38-181f-4c0c-ac3c-7b8d0e56f0d3",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "bfee2e38-181f-4c0c-ac3c-7b8d0e56f0d3",
+      "rank": 1,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    },
+    "result_meta": {
+     "source": "auto_bye"
+    }
+   },
+   {
+    "id": "a3893bdb-eb2d-48bb-b37a-73055dbce4e5",
+    "match_key": "D",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 4,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "50c468db-4585-4258-80b4-b6b4510a3bf2",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      },
+      "source_result": {
+       "skipped": true,
+       "reason": "disqualified",
+       "removed_registration_id": "fadfd510-e9a1-4690-a61b-0c8f50e2d439",
+       "confirmed_at": "2026-10-14T13:52:00.539171+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "e9a796e6-b15d-4f5c-8afb-0e2aa516da0c",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "e9a796e6-b15d-4f5c-8afb-0e2aa516da0c",
+      "rank": 1,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    },
+    "result_meta": {
+     "source": "auto_bye",
+     "reason": "disqualified"
+    }
+   },
+   {
+    "id": "7a9a2585-d846-4db9-a837-0e8bdb17cdf1",
+    "match_key": "E",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 5,
+    "match_type": "duel",
+    "status": "completed",
+    "started_at": "2026-10-31T13:00:00+00:00",
+    "duration_minutes": 30,
+    "station_text": "PC 3",
+    "advancement": [
+     {
+      "to_match_id": "9304cab4-f1a9-4597-b5bf-25755ecb7cd7",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "c99a4902-626f-49f0-83fd-bf188099ebb0",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "W:A:1"
+      },
+      "source_result": {
+       "from_match_id": "acd82261-c084-4b30-a70f-ec85773aae3a",
+       "from_match_key": "A",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.512404+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "d23222f1-700a-4886-b1df-d1263f079320",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "W:B:1"
+      },
+      "source_result": {
+       "from_match_id": "3665a1a8-38aa-470f-81ee-cf839409deaf",
+       "from_match_key": "B",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.524063+00:00"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "c99a4902-626f-49f0-83fd-bf188099ebb0",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "d23222f1-700a-4886-b1df-d1263f079320",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "50c468db-4585-4258-80b4-b6b4510a3bf2",
+    "match_key": "F",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 6,
+    "match_type": "duel",
+    "status": "forfeit",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "9304cab4-f1a9-4597-b5bf-25755ecb7cd7",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "forfeit_registration_id": "e9a796e6-b15d-4f5c-8afb-0e2aa516da0c",
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "bfee2e38-181f-4c0c-ac3c-7b8d0e56f0d3",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "W:C:1"
+      },
+      "source_result": {
+       "from_match_id": "6be8be22-46e1-47dd-9a28-5cb00016cc67",
+       "from_match_key": "C",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.512404+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "e9a796e6-b15d-4f5c-8afb-0e2aa516da0c",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 1,
+       "raw": "W:D:1"
+      },
+      "source_result": {
+       "from_match_id": "a3893bdb-eb2d-48bb-b37a-73055dbce4e5",
+       "from_match_key": "D",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.539171+00:00"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "bfee2e38-181f-4c0c-ac3c-7b8d0e56f0d3",
+      "rank": 1,
+      "forfeit": false
+     },
+     {
+      "registration_id": "e9a796e6-b15d-4f5c-8afb-0e2aa516da0c",
+      "rank": 2,
+      "forfeit": true
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "9304cab4-f1a9-4597-b5bf-25755ecb7cd7",
+    "match_key": "G",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Runde 3",
+    "order": 7,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "c99a4902-626f-49f0-83fd-bf188099ebb0",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 1,
+       "raw": "W:E:1"
+      },
+      "source_result": {
+       "from_match_id": "7a9a2585-d846-4db9-a837-0e8bdb17cdf1",
+       "from_match_key": "E",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.554573+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "bfee2e38-181f-4c0c-ac3c-7b8d0e56f0d3",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 1,
+       "raw": "W:F:1"
+      },
+      "source_result": {
+       "from_match_id": "50c468db-4585-4258-80b4-b6b4510a3bf2",
+       "from_match_key": "F",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.550537+00:00"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "c99a4902-626f-49f0-83fd-bf188099ebb0",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "bfee2e38-181f-4c0c-ac3c-7b8d0e56f0d3",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   }
+  ],
+  "round_labels": {
+   "A": "Viertelfinale",
+   "B": "Viertelfinale",
+   "C": "Viertelfinale",
+   "D": "Viertelfinale",
+   "E": "Halbfinale",
+   "F": "Halbfinale",
+   "G": "Finale"
+  },
+  "standings": [
+   {
+    "registration_id": "c99a4902-626f-49f0-83fd-bf188099ebb0",
+    "display_name": "NeonFalke",
+    "rank": 1,
+    "played": 3,
+    "won": 3,
+    "lost": 0,
+    "points": 30.0
+   },
+   {
+    "registration_id": "bfee2e38-181f-4c0c-ac3c-7b8d0e56f0d3",
+    "display_name": "KartKönigin",
+    "rank": 2,
+    "played": 3,
+    "won": 2,
+    "lost": 0,
+    "points": 12.0
+   },
+   {
+    "registration_id": "d23222f1-700a-4886-b1df-d1263f079320",
+    "display_name": "PixelPaula",
+    "rank": 3,
+    "played": 2,
+    "won": 1,
+    "lost": 0,
+    "points": 27.0
+   },
+   {
+    "registration_id": "e9a796e6-b15d-4f5c-8afb-0e2aa516da0c",
+    "display_name": "BoostBerta",
+    "rank": 4,
+    "played": 2,
+    "won": 1,
+    "lost": 0,
+    "points": 0
+   },
+   {
+    "registration_id": "58b523f1-62af-4977-b171-df1e9dc06fd3",
+    "display_name": "DriftDaniel",
+    "rank": 5,
+    "played": 1,
+    "won": 0,
+    "lost": 0,
+    "points": 12.0
+   },
+   {
+    "registration_id": "fadfd510-e9a1-4690-a61b-0c8f50e2d439",
+    "display_name": "LuckyLion",
+    "rank": 6,
+    "played": 0,
+    "won": 0,
+    "lost": 0,
+    "points": 0
+   }
+  ]
+ },
+ "se6_live": {
+  "note": "K.-o. 6 von 8: Freilos-Duelle, B gespielt, Disqualifikation in D, ein Spiel läuft an PC 3",
+  "format": "single_elim",
+  "stages": [
+   {
+    "id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "stage_type": "single_elimination",
+    "match_type": "duel",
+    "name": "Phase 1"
+   }
+  ],
+  "registrations": [
+   {
+    "id": "c99a4902-626f-49f0-83fd-bf188099ebb0",
+    "display_name": "NeonFalke",
+    "status": "checked_in",
+    "seed": 1
+   },
+   {
+    "id": "bfee2e38-181f-4c0c-ac3c-7b8d0e56f0d3",
+    "display_name": "KartKönigin",
+    "status": "checked_in",
+    "seed": 2
+   },
+   {
+    "id": "fadfd510-e9a1-4690-a61b-0c8f50e2d439",
+    "display_name": "LuckyLion",
+    "status": "disqualified",
+    "seed": 3
+   },
+   {
+    "id": "d23222f1-700a-4886-b1df-d1263f079320",
+    "display_name": "PixelPaula",
+    "status": "checked_in",
+    "seed": 4
+   },
+   {
+    "id": "58b523f1-62af-4977-b171-df1e9dc06fd3",
+    "display_name": "DriftDaniel",
+    "status": "checked_in",
+    "seed": 5
+   },
+   {
+    "id": "e9a796e6-b15d-4f5c-8afb-0e2aa516da0c",
+    "display_name": "BoostBerta",
+    "status": "checked_in",
+    "seed": 6
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "acd82261-c084-4b30-a70f-ec85773aae3a",
+    "match_key": "A",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 1,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "7a9a2585-d846-4db9-a837-0e8bdb17cdf1",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "c99a4902-626f-49f0-83fd-bf188099ebb0",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 1,
+       "raw": "1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 8,
+       "raw": "8"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "c99a4902-626f-49f0-83fd-bf188099ebb0",
+      "rank": 1,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    },
+    "result_meta": {
+     "source": "auto_bye"
+    }
+   },
+   {
+    "id": "3665a1a8-38aa-470f-81ee-cf839409deaf",
+    "match_key": "B",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 2,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "7a9a2585-d846-4db9-a837-0e8bdb17cdf1",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "d23222f1-700a-4886-b1df-d1263f079320",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 4,
+       "raw": "4"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "58b523f1-62af-4977-b171-df1e9dc06fd3",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 5,
+       "raw": "5"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "d23222f1-700a-4886-b1df-d1263f079320",
+      "rank": 1,
+      "score": 15.0,
+      "forfeit": false
+     },
+     {
+      "registration_id": "58b523f1-62af-4977-b171-df1e9dc06fd3",
+      "rank": 2,
+      "score": 12.0,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "6be8be22-46e1-47dd-9a28-5cb00016cc67",
+    "match_key": "C",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 3,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "50c468db-4585-4258-80b4-b6b4510a3bf2",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "bfee2e38-181f-4c0c-ac3c-7b8d0e56f0d3",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 2,
+       "raw": "2"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 7,
+       "raw": "7"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "bfee2e38-181f-4c0c-ac3c-7b8d0e56f0d3",
+      "rank": 1,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    },
+    "result_meta": {
+     "source": "auto_bye"
+    }
+   },
+   {
+    "id": "a3893bdb-eb2d-48bb-b37a-73055dbce4e5",
+    "match_key": "D",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 1,
+    "round_name": "Runde 1",
+    "order": 4,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "50c468db-4585-4258-80b4-b6b4510a3bf2",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "status": "bye",
+      "source": {
+       "type": "seed",
+       "seed": 3,
+       "raw": "3"
+      },
+      "source_result": {
+       "skipped": true,
+       "reason": "disqualified",
+       "removed_registration_id": "fadfd510-e9a1-4690-a61b-0c8f50e2d439",
+       "confirmed_at": "2026-10-14T13:52:00.539171+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "e9a796e6-b15d-4f5c-8afb-0e2aa516da0c",
+      "status": "filled",
+      "source": {
+       "type": "seed",
+       "seed": 6,
+       "raw": "6"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "e9a796e6-b15d-4f5c-8afb-0e2aa516da0c",
+      "rank": 1,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    },
+    "result_meta": {
+     "source": "auto_bye",
+     "reason": "disqualified"
+    }
+   },
+   {
+    "id": "7a9a2585-d846-4db9-a837-0e8bdb17cdf1",
+    "match_key": "E",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 5,
+    "match_type": "duel",
+    "status": "in_progress",
+    "started_at": "2026-10-31T13:00:00+00:00",
+    "called_at": "2026-10-31T13:00:00+00:00",
+    "duration_minutes": 30,
+    "station_text": "PC 3",
+    "advancement": [
+     {
+      "to_match_id": "9304cab4-f1a9-4597-b5bf-25755ecb7cd7",
+      "to_slot": 1,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "c99a4902-626f-49f0-83fd-bf188099ebb0",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "A",
+       "rank": 1,
+       "raw": "W:A:1"
+      },
+      "source_result": {
+       "from_match_id": "acd82261-c084-4b30-a70f-ec85773aae3a",
+       "from_match_key": "A",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.512404+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "d23222f1-700a-4886-b1df-d1263f079320",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "B",
+       "rank": 1,
+       "raw": "W:B:1"
+      },
+      "source_result": {
+       "from_match_id": "3665a1a8-38aa-470f-81ee-cf839409deaf",
+       "from_match_key": "B",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.524063+00:00"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "50c468db-4585-4258-80b4-b6b4510a3bf2",
+    "match_key": "F",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 2,
+    "round_name": "Runde 2",
+    "order": 6,
+    "match_type": "duel",
+    "status": "ready",
+    "duration_minutes": 30,
+    "advancement": [
+     {
+      "to_match_id": "9304cab4-f1a9-4597-b5bf-25755ecb7cd7",
+      "to_slot": 2,
+      "flow": "W",
+      "rank": 1
+     }
+    ],
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "bfee2e38-181f-4c0c-ac3c-7b8d0e56f0d3",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "C",
+       "rank": 1,
+       "raw": "W:C:1"
+      },
+      "source_result": {
+       "from_match_id": "6be8be22-46e1-47dd-9a28-5cb00016cc67",
+       "from_match_key": "C",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.512404+00:00"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "e9a796e6-b15d-4f5c-8afb-0e2aa516da0c",
+      "status": "filled",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "D",
+       "rank": 1,
+       "raw": "W:D:1"
+      },
+      "source_result": {
+       "from_match_id": "a3893bdb-eb2d-48bb-b37a-73055dbce4e5",
+       "from_match_key": "D",
+       "rank": 1,
+       "flow": "W",
+       "confirmed_at": "2026-10-14T13:52:00.539171+00:00"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "9304cab4-f1a9-4597-b5bf-25755ecb7cd7",
+    "match_key": "G",
+    "stage_id": "792832e6-90e6-4cab-b929-cecb063a935a",
+    "section": "WB",
+    "round": 3,
+    "round_name": "Runde 3",
+    "order": 7,
+    "match_type": "duel",
+    "status": "pending",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "E",
+       "rank": 1,
+       "raw": "W:E:1"
+      }
+     },
+     {
+      "slot": 2,
+      "status": "pending",
+      "source": {
+       "type": "rank",
+       "flow": "W",
+       "match_key": "F",
+       "rank": 1,
+       "raw": "W:F:1"
+      }
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   }
+  ],
+  "round_labels": {
+   "A": "Viertelfinale",
+   "B": "Viertelfinale",
+   "C": "Viertelfinale",
+   "D": "Viertelfinale",
+   "E": "Halbfinale",
+   "F": "Halbfinale",
+   "G": "Finale"
+  }
+ },
+ "swiss6": {
+  "note": "Swiss 6: zwei Runden gespielt, Tabelle mit Buchholz",
+  "format": "swiss",
+  "stages": [
+   {
+    "id": "cc448f42-cdc2-4bd3-8230-6db0c9ee0f83",
+    "stage_type": "swiss",
+    "match_type": "duel",
+    "name": "Schweizer System"
+   }
+  ],
+  "registrations": [
+   {
+    "id": "f139747d-dd41-4db3-bad4-4b32c7fb30f7",
+    "display_name": "NeonFalke",
+    "status": "approved",
+    "seed": 1
+   },
+   {
+    "id": "6f3ac53b-d0dc-4a88-87e1-d458eebfb98a",
+    "display_name": "KartKönigin",
+    "status": "approved",
+    "seed": 2
+   },
+   {
+    "id": "54cfc19a-f1ca-46a0-b3c0-1786fa0d1f13",
+    "display_name": "LuckyLion",
+    "status": "approved",
+    "seed": 3
+   },
+   {
+    "id": "ea3d0e0f-7ecf-41e1-b185-0905c83c9edc",
+    "display_name": "PixelPaula",
+    "status": "approved",
+    "seed": 4
+   },
+   {
+    "id": "d51d6afc-d71c-48d1-8d53-5f2ba994aaee",
+    "display_name": "DriftDaniel",
+    "status": "approved",
+    "seed": 5
+   },
+   {
+    "id": "33bca793-8a4b-4b59-bf69-6ca1409ce8c2",
+    "display_name": "BoostBerta",
+    "status": "approved",
+    "seed": 6
+   }
+  ],
+  "matches_v2": [
+   {
+    "id": "d9612b4d-705f-48b1-ae9e-9031211d7285",
+    "match_key": "S1-1",
+    "stage_id": "cc448f42-cdc2-4bd3-8230-6db0c9ee0f83",
+    "section": "swiss",
+    "round": 1,
+    "round_name": "Swiss Runde 1",
+    "order": 1,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "54cfc19a-f1ca-46a0-b3c0-1786fa0d1f13",
+      "status": "filled",
+      "source": {
+       "type": "direct",
+       "raw": "swiss"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "f139747d-dd41-4db3-bad4-4b32c7fb30f7",
+      "status": "filled",
+      "source": {
+       "type": "direct",
+       "raw": "swiss"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "54cfc19a-f1ca-46a0-b3c0-1786fa0d1f13",
+      "rank": 1,
+      "forfeit": false
+     },
+     {
+      "registration_id": "f139747d-dd41-4db3-bad4-4b32c7fb30f7",
+      "rank": 2,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "976e2da4-b30c-4203-b603-545ca95bab46",
+    "match_key": "S1-2",
+    "stage_id": "cc448f42-cdc2-4bd3-8230-6db0c9ee0f83",
+    "section": "swiss",
+    "round": 1,
+    "round_name": "Swiss Runde 1",
+    "order": 2,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "6f3ac53b-d0dc-4a88-87e1-d458eebfb98a",
+      "status": "filled",
+      "source": {
+       "type": "direct",
+       "raw": "swiss"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "d51d6afc-d71c-48d1-8d53-5f2ba994aaee",
+      "status": "filled",
+      "source": {
+       "type": "direct",
+       "raw": "swiss"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "6f3ac53b-d0dc-4a88-87e1-d458eebfb98a",
+      "rank": 1,
+      "forfeit": false
+     },
+     {
+      "registration_id": "d51d6afc-d71c-48d1-8d53-5f2ba994aaee",
+      "rank": 2,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "dbcd0aaf-9238-461e-991a-ed0d78f349c9",
+    "match_key": "S1-3",
+    "stage_id": "cc448f42-cdc2-4bd3-8230-6db0c9ee0f83",
+    "section": "swiss",
+    "round": 1,
+    "round_name": "Swiss Runde 1",
+    "order": 3,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "ea3d0e0f-7ecf-41e1-b185-0905c83c9edc",
+      "status": "filled",
+      "source": {
+       "type": "direct",
+       "raw": "swiss"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "33bca793-8a4b-4b59-bf69-6ca1409ce8c2",
+      "status": "filled",
+      "source": {
+       "type": "direct",
+       "raw": "swiss"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "ea3d0e0f-7ecf-41e1-b185-0905c83c9edc",
+      "rank": 1,
+      "forfeit": false
+     },
+     {
+      "registration_id": "33bca793-8a4b-4b59-bf69-6ca1409ce8c2",
+      "rank": 2,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "afe3065d-0820-410a-b9e1-428e8528dfe9",
+    "match_key": "S2-1",
+    "stage_id": "cc448f42-cdc2-4bd3-8230-6db0c9ee0f83",
+    "section": "swiss",
+    "round": 2,
+    "round_name": "Swiss Runde 2",
+    "order": 1,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "ea3d0e0f-7ecf-41e1-b185-0905c83c9edc",
+      "status": "filled",
+      "source": {
+       "type": "direct",
+       "raw": "swiss"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "54cfc19a-f1ca-46a0-b3c0-1786fa0d1f13",
+      "status": "filled",
+      "source": {
+       "type": "direct",
+       "raw": "swiss"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "ea3d0e0f-7ecf-41e1-b185-0905c83c9edc",
+      "rank": 1,
+      "forfeit": false
+     },
+     {
+      "registration_id": "54cfc19a-f1ca-46a0-b3c0-1786fa0d1f13",
+      "rank": 2,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "9c3a3c21-d114-4e1e-bb99-b85140be0e23",
+    "match_key": "S2-2",
+    "stage_id": "cc448f42-cdc2-4bd3-8230-6db0c9ee0f83",
+    "section": "swiss",
+    "round": 2,
+    "round_name": "Swiss Runde 2",
+    "order": 2,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "6f3ac53b-d0dc-4a88-87e1-d458eebfb98a",
+      "status": "filled",
+      "source": {
+       "type": "direct",
+       "raw": "swiss"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "33bca793-8a4b-4b59-bf69-6ca1409ce8c2",
+      "status": "filled",
+      "source": {
+       "type": "direct",
+       "raw": "swiss"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "6f3ac53b-d0dc-4a88-87e1-d458eebfb98a",
+      "rank": 1,
+      "forfeit": false
+     },
+     {
+      "registration_id": "33bca793-8a4b-4b59-bf69-6ca1409ce8c2",
+      "rank": 2,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   },
+   {
+    "id": "fa646d4f-6102-4e6e-9cd5-acbb70d6f9a2",
+    "match_key": "S2-3",
+    "stage_id": "cc448f42-cdc2-4bd3-8230-6db0c9ee0f83",
+    "section": "swiss",
+    "round": 2,
+    "round_name": "Swiss Runde 2",
+    "order": 3,
+    "match_type": "duel",
+    "status": "completed",
+    "duration_minutes": 30,
+    "slots": [
+     {
+      "slot": 1,
+      "registration_id": "f139747d-dd41-4db3-bad4-4b32c7fb30f7",
+      "status": "filled",
+      "source": {
+       "type": "direct",
+       "raw": "swiss"
+      }
+     },
+     {
+      "slot": 2,
+      "registration_id": "d51d6afc-d71c-48d1-8d53-5f2ba994aaee",
+      "status": "filled",
+      "source": {
+       "type": "direct",
+       "raw": "swiss"
+      }
+     }
+    ],
+    "results": [
+     {
+      "registration_id": "f139747d-dd41-4db3-bad4-4b32c7fb30f7",
+      "rank": 1,
+      "forfeit": false
+     },
+     {
+      "registration_id": "d51d6afc-d71c-48d1-8d53-5f2ba994aaee",
+      "rank": 2,
+      "forfeit": false
+     }
+    ],
+    "settings": {
+     "match_size": 2,
+     "qualifiers_per_match": 1,
+     "min_players": 2
+    }
+   }
+  ],
+  "round_labels": {
+   "S1-1": "Swiss Runde 1",
+   "S1-2": "Swiss Runde 1",
+   "S1-3": "Swiss Runde 1",
+   "S2-1": "Swiss Runde 2",
+   "S2-2": "Swiss Runde 2",
+   "S2-3": "Swiss Runde 2"
+  },
+  "standings": [
+   {
+    "registration_id": "ea3d0e0f-7ecf-41e1-b185-0905c83c9edc",
+    "display_name": "PixelPaula",
+    "rank": 1,
+    "played": 2,
+    "won": 2,
+    "lost": 0,
+    "drawn": 0,
+    "points": 2,
+    "buchholz": 1
+   },
+   {
+    "registration_id": "6f3ac53b-d0dc-4a88-87e1-d458eebfb98a",
+    "display_name": "KartKönigin",
+    "rank": 2,
+    "played": 2,
+    "won": 2,
+    "lost": 0,
+    "drawn": 0,
+    "points": 2,
+    "buchholz": 0
+   },
+   {
+    "registration_id": "54cfc19a-f1ca-46a0-b3c0-1786fa0d1f13",
+    "display_name": "LuckyLion",
+    "rank": 3,
+    "played": 2,
+    "won": 1,
+    "lost": 1,
+    "drawn": 0,
+    "points": 1,
+    "buchholz": 3
+   },
+   {
+    "registration_id": "f139747d-dd41-4db3-bad4-4b32c7fb30f7",
+    "display_name": "NeonFalke",
+    "rank": 4,
+    "played": 2,
+    "won": 1,
+    "lost": 1,
+    "drawn": 0,
+    "points": 1,
+    "buchholz": 1
+   },
+   {
+    "registration_id": "33bca793-8a4b-4b59-bf69-6ca1409ce8c2",
+    "display_name": "BoostBerta",
+    "rank": 5,
+    "played": 2,
+    "won": 0,
+    "lost": 2,
+    "drawn": 0,
+    "points": 0,
+    "buchholz": 4
+   },
+   {
+    "registration_id": "d51d6afc-d71c-48d1-8d53-5f2ba994aaee",
+    "display_name": "DriftDaniel",
+    "rank": 6,
+    "played": 2,
+    "won": 0,
+    "lost": 2,
+    "drawn": 0,
+    "points": 0,
+    "buchholz": 3
+   }
+  ]
+ }
+}

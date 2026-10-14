@@ -137,6 +137,7 @@ jest.mock("react-native-reanimated", () => {
       return ref.current;
     },
     useAnimatedStyle: (updater) => updater(),
+    useAnimatedProps: (updater) => updater(),
     useFrameCallback: (callback, autostart = true) => {
       const ref = React.useRef(null);
       if (!ref.current) {
@@ -158,8 +159,11 @@ jest.mock("react-native-reanimated", () => {
     withDelay: (_ms, value) => value,
     withRepeat: (value) => value,
     cancelAnimation: () => {},
-    Easing: { linear: (t) => t, quad: (t) => t * t, inOut: (fn) => fn, out: (fn) => fn, in: (fn) => fn },
+    Easing: { linear: (t) => t, quad: (t) => t * t, cubic: (t) => t * t * t, inOut: (fn) => fn, out: (fn) => fn, in: (fn) => fn },
     __frameCallbacks: frameCallbacks,
+    // CSS-Animationen (Turnierbaum, #1563): im Test laufen sie nicht - die Regeln werden nur durchgereicht.
+    css: { keyframes: (frames) => frames, create: (styles) => styles },
+    cubicBezier: () => "cubic-bezier",
   };
 });
 
