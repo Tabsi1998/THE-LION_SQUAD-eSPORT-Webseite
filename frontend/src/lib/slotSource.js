@@ -127,7 +127,8 @@ export function plannedText(match, now = new Date()) {
 export function initials(label) {
   const text = String(label || "").trim();
   if (!text) return "";
-  let words = text.split(/[\s_.-]+/).filter(Boolean);
+  // Emoji und Klammern am Wortanfang zählen nicht (#1561): „🦁 Löwenherz“ → L, „[LSQ] Tabsi“ → LT.
+  let words = text.split(/[\s_.-]+/).map((word) => word.replace(/^[^\p{L}\p{N}]+/u, "")).filter(Boolean);
   if (words.length === 1) {
     const parts = words[0].replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2").split(" ").filter(Boolean);
     if (parts.length > 1) words = parts;

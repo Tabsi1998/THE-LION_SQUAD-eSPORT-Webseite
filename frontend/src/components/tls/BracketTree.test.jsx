@@ -41,7 +41,7 @@ describe("isTableFormat", () => {
 // „Platz“ vor dem Spiel, Runde für Runde am Handy, „Dein nächstes Spiel“ für Angemeldete.
 const { render, screen, act } = await import("@testing-library/react");
 const userEvent = (await import("@testing-library/user-event")).default;
-const { BracketTree, connectorTargets, nextMatchFor } = await import("./BracketTree");
+const { BracketTree, nextMatchFor } = await import("./BracketTree");
 
 function knockout() {
   const reg = (id, name) => ({ id, display_name: name, user: {} });
@@ -57,13 +57,6 @@ function knockout() {
 }
 
 describe("BracketTree", () => {
-  it("verteilt die Verbindungslinien auf die nächste Runde", () => {
-    expect(connectorTargets(4, 2)).toEqual([0, 0, 1, 1]);
-    expect(connectorTargets(2, 2)).toEqual([0, 1]);
-    expect(connectorTargets(3, 1)).toEqual([0, 0, 0]);
-    expect(connectorTargets(2, 4)).toEqual([]);
-  });
-
   it("sagt bei leeren Plätzen späterer Runden im Klartext, wer kommt (#1113) - Setzplätze bleiben leer", () => {
     const data = knockout();
     data.matches_v2.push(
@@ -141,13 +134,13 @@ describe("BracketTree", () => {
     };
     render(<BracketTree data={data} />);
     // Zweizeilig statt abgeschnitten (#833): der Name oben, Spielerzahl und Weiterkommer darunter.
-    expect(screen.getByTestId("bracket-heat-title-h1")).toHaveTextContent("Durchgang A");
+    expect(screen.getByTestId("bracket-heat-title-h1")).toHaveTextContent("Lauf A");
     expect(screen.getByTestId("bracket-heat-meta-h1")).toHaveTextContent("4 Spieler · 2 kommen weiter");
     expect(screen.getByTestId("bracket-heat-h1")).not.toHaveTextContent("Platz");
     expect(screen.getByTestId("bracket-heat-h1")).not.toHaveTextContent("#");
     const played = screen.getByTestId("bracket-heat-h2").textContent;
     expect(played.indexOf("Ben")).toBeLessThan(played.indexOf("Anna"));
-    expect(played).toContain("#1");
+    expect(screen.getByTestId("bracket-heat-h2").querySelector("[data-rank='1']")).toHaveTextContent("1");
   });
 });
 
@@ -193,18 +186,19 @@ describe("Turniere I", () => {
       await userEvent.unhover(screen.getAllByText("Koblauchgeist")[0]);
       expect(screen.getByTestId("bracket-match-v2-m2")).not.toHaveAttribute("data-path");
 
-      // Fokus wie nach einem Tippen (nicht „focus-visible“): kein Weg - die Partie öffnet sich ja.
-      act(() => screen.getByTestId("bracket-match-v2-m2").focus());
+      // Fokus wie nach einem Tippen (nicht „focus-visible“): kein Vorschau-Weg - das Tippen selbst entscheidet.
+      const row = (name) => screen.getAllByText(name)[0].closest("button");
+      act(() => row("Angos").focus());
       expect(screen.getByTestId("bracket-match-v2-m1")).not.toHaveAttribute("data-path");
-      act(() => screen.getByTestId("bracket-match-v2-m2").blur());
-      // Tastatur-Fokus: die Wege der Spieler dieser Partie.
+      act(() => row("Angos").blur());
+      // Tastatur-Fokus auf einem Namen: der Weg dieses Spielers.
       const realMatches = window.Element.prototype.matches;
       window.Element.prototype.matches = function matches(selector) { return selector === ":focus-visible" ? true : realMatches.call(this, selector); };
       try {
-        act(() => screen.getByTestId("bracket-match-v2-m2").focus());
+        act(() => row("Angos").focus());
         expect(screen.getByTestId("bracket-match-v2-m2")).toHaveAttribute("data-path", "on");
         expect(screen.getByTestId("bracket-match-v2-m1")).toHaveAttribute("data-path", "off");
-        act(() => screen.getByTestId("bracket-match-v2-m2").blur());
+        act(() => row("Angos").blur());
         expect(screen.getByTestId("bracket-match-v2-m1")).not.toHaveAttribute("data-path");
       } finally {
         window.Element.prototype.matches = realMatches;

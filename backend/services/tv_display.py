@@ -171,7 +171,7 @@ TOURNAMENT_FIELDS = ("id", "slug", "title", "status", "format", "format_label", 
                      "check_in_until", "max_participants", "round_sponsors")
 STAGE_FIELDS = ("id", "name", "number", "stage_type", "match_type")
 MATCH_FIELDS = ("id", "tournament_id", "stage_id", "stage_number", "stage_type", "match_type", "match_key", "section",
-                "round", "round_name", "matchday_number", "matchday_label", "order", "match_index", "status",
+                "round", "round_name", "round_label", "matchday_number", "matchday_label", "order", "match_index", "status",
                 "scheduled_at", "started_at", "completed_at", "duration_minutes", "station_id", "station_name",
                 "station_label", "winner_id", "is_preview", "called_at")
 # Wer zum Check-in zählt (#1123) und wer einen Platz belegt (wie die Anmeldung: offen, bestätigt, eingecheckt).

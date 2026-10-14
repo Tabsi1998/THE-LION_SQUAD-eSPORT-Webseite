@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -23,6 +23,9 @@ export default function TournamentBracketPage() {
   const [data, setData] = useState(null);
   // Eigene Anmeldung (#399): „Dein nächstes Spiel“ und der Ring um die eigenen Knoten.
   const [mineId, setMineId] = useState(null);
+  // Nach einer Neuverbindung (#1561): der nächste Stand holt Verpasstes nach - ohne Bewegung, sofort am Ende.
+  const [quietUpdate, setQuietUpdate] = useState(false);
+  const catchUp = useRef(false);
   const tournament = data?.tournament;
   const seoDescription = seoTextPreview(tournament?.description, "Live-Turnierbaum von THE LION SQUAD eSports mit Runden, Matches und Ergebnissen.");
   useDocumentTitle(`${tournament?.title || "Turnier"} Turnierbaum`, seoDescription, {
@@ -36,6 +39,8 @@ export default function TournamentBracketPage() {
     const { data: t } = await api.get(`/tournaments/${slug}`, accessConfig);
     const { data: br } = await api.get(`/tournaments/${t.id}/bracket`, accessConfig);
     setMineId(t?.my_registration?.id || null);
+    setQuietUpdate(catchUp.current);
+    catchUp.current = false;
     setData(br);
   }, [slug, accessToken]);
 
@@ -43,7 +48,12 @@ export default function TournamentBracketPage() {
     load();
   }, [load]);
 
-  useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 7000 });
+  const connected = useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 7000 });
+  const wasConnected = useRef(connected);
+  useEffect(() => {
+    if (connected && !wasConnected.current) catchUp.current = true;
+    wasConnected.current = connected;
+  }, [connected]);
   // Das zuletzt geänderte Match bekommt für einige Sekunden einen Rahmen (#225).
   const changedMatches = useChangedKeys(data?.matches_v2, (match) => match.id, matchResultSignature);
 
@@ -89,11 +99,11 @@ export default function TournamentBracketPage() {
           )}
         </div>
         {(data.matches_v2?.length || 0) === 0 ? (
-          <div className="border border-white/10 rounded-sm bg-[#121212] p-12 text-center">
-            <div className="text-white/50 font-display tracking-widest">TURNIERBAUM WURDE NOCH NICHT GENERIERT</div>
+          <div className="border border-white/10 rounded-sm bg-surface-1 p-12 text-center">
+            <div className="text-muted-text font-display tracking-widest">TURNIERBAUM WURDE NOCH NICHT GENERIERT</div>
           </div>
         ) : (
-          <BracketTree data={data} changedMatchIds={changedMatches} mineId={mineId} />
+          <BracketTree data={data} changedMatchIds={changedMatches} mineId={mineId} quietUpdate={quietUpdate} />
         )}
       </div>
     </PublicLayout>
