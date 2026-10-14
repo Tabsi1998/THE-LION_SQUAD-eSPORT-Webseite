@@ -279,10 +279,8 @@ class InterleavedReads:
         if self._gated >= self._parties:
             return
         self._gated += 1
-        try:
+        with contextlib.suppress(asyncio.TimeoutError, asyncio.BrokenBarrierError):
             await asyncio.wait_for(self._barrier.wait(), self._timeout)
-        except (asyncio.TimeoutError, asyncio.BrokenBarrierError):
-            pass
 
 
 class _InterleavedCollection:

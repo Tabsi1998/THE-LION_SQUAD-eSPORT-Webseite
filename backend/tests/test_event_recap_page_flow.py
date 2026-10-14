@@ -183,7 +183,7 @@ async def test_you_were_there_only_for_participants(flow):
 @pytest.mark.asyncio
 async def test_team_counts_who_was_in_it_then_not_today(flow):
     """Codex-Prüfung: wer einem Team erst nach dem Event beitritt, war nicht dabei - weder „Du warst dabei“ noch Zahl."""
-    lena, noah, mia = await seed(flow)
+    await seed(flow)
     late = await flow.add_user(role="player", name="lars")
     await flow.db.teams.update_one({"id": "team-rocket"}, {"$push": {"member_ids": late["id"]}})
     await flow.db.team_members.insert_one({"team_id": "team-rocket", "user_id": late["id"], "joined_at": "2026-08-01T10:00:00+00:00"})

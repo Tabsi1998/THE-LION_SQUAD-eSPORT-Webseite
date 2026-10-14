@@ -93,7 +93,7 @@ test("Vorschau-Adresse: nur echte Blob-Adressen, nichts anderes landet im Bild",
   expect(isSafeBlobUrl("blob:http://localhost:3000/0f6c1a2e-9a1b-4c7e-8d2f-1b2c3d4e5f60")).toBe(true);
   expect(isSafeBlobUrl("blob:https://lionsquad.at/abc-123")).toBe(true);
   for (const bad of ["javascript:alert(1)", "https://example.com/bild.png", "data:image/png;base64,AAAA", " blob:http://x/1",
-    'blob:http://x/1" onerror="alert(1)', "blob:http://x/<script>", "blob:", "", null, undefined, 42, {}]) {
+    'blob:http://x/1" onerror="alert(1)', "blob:http://x/<script>", "blob:", "blob:http:", "blob:http://x/1\n", "blob:null/1", "", null, undefined, 42, {}]) {
     expect(isSafeBlobUrl(bad)).toBe(false);
   }
 });

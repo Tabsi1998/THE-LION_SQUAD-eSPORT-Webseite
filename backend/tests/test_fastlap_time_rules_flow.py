@@ -6,6 +6,7 @@ Strafsekunden zwischen 0 und einer Stunde (keine Gutschrift, keine NaN), Nachwei
 bei Strafe oder ungültiger Runde, Vereins-Referenz nur wenn erlaubt, und die Versuchsgrenze auch dann, wenn eine
 Korrektur die Zeit in die offizielle Wertung verschiebt."""
 import asyncio
+import contextlib
 import pathlib
 import sys
 
@@ -176,10 +177,8 @@ def meet_after_the_check(monkeypatch, parties: int = 2, timeout: float = 0.3):
         result = await original(*args, **kwargs)
         if state["gated"] < parties:
             state["gated"] += 1
-            try:
+            with contextlib.suppress(asyncio.TimeoutError, asyncio.BrokenBarrierError):
                 await asyncio.wait_for(barrier.wait(), timeout)
-            except (asyncio.TimeoutError, asyncio.BrokenBarrierError):
-                pass
         return result
 
     monkeypatch.setattr(f1_routes, "check_lap_time", gated)

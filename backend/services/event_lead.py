@@ -184,7 +184,8 @@ async def _claim_event_gate(db, event: dict, now: str, since: str) -> None:
     try:
         await db.event_message_gates.update_one({"_id": event["id"]}, {"$setOnInsert": {"last_at": ""}}, upsert=True)
     except DuplicateKeyError:
-        pass
+        # Zwei Tipps im selben Moment: der Eintrag steht schon, die bedingte Zeile darunter entscheidet.
+        logger.debug("Nachricht an alle: Sperr-Eintrag gleichzeitig angelegt")
     gate = await db.event_message_gates.update_one({"_id": event["id"], "last_at": {"$lt": since}}, {"$set": {"last_at": now}})
     if not gate.modified_count:
         raise LeadError(429, "Gerade ist schon eine Nachricht an alle hinausgegangen. Bitte kurz warten.")

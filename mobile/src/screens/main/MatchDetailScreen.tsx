@@ -22,7 +22,6 @@ import { useKeyedLoad } from "../../lib/useKeyedLoad";
 import {
   continuesMessageGroup,
   formatChatTime,
-  formatDateTime,
   formatEventMode,
   formatResultEntryMode,
   formatScheduleMode,

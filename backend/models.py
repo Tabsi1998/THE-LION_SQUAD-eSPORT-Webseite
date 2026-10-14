@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 import uuid
 
 from match_rules import RESULT_MAX_SCORE, RESULT_MAX_TIME_MS
-# Der Passwortvertrag (#1033) steht in services/password_policy.py; MIN_PASSWORD_LENGTH bleibt hier abrufbar.
-from services.password_policy import MIN_PASSWORD_LENGTH, NewPassword  # noqa: F401
+# Der Passwortvertrag (#1033) steht in services/password_policy.py.
+from services.password_policy import NewPassword
 
 
 def now_utc():
