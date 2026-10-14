@@ -134,6 +134,10 @@ CAPABILITIES: tuple[Capability, ...] = (
        ["POST /api/tournaments/{tid}/schedule/plan", "POST /api/tournaments/{tid}/schedule/apply"], [GRAPH],
        note="Der Spielplaner (#1552) schreibt Zeit und Station zusammen mit schedule_source; die Vorschau "
             "schreibt nichts, Übernehmen alles auf einmal. Online nie Stationen."),
+    _c("planning.deadlines", "Fristen je Spiel lesen (Matchplan online und Liga)",
+       ["GET /api/tournaments/{tid}/schedule/deadlines"], [GRAPH],
+       note="Matchplan-Seite (#1557): offen seit, „nicht erschienen“ ab, Ergebnis gilt ab - gerechnet von "
+            "services/match_deadlines, rein lesend, nur für das Team des Turniers."),
 
     # ---------- Matches lesen ----------
     _c("match.read", "Match ansehen",
