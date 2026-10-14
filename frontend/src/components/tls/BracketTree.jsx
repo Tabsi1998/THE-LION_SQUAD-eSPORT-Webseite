@@ -683,7 +683,7 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
           // Gerüst der Schiene: an, solange dein Weg (noch vor der Auslosung) hierher führt - danach leuchtet der echte Weg.
           const onRail = !active ? false
             : line.spine ? [...(active.rails || [])].some((key) => key.startsWith(`${line.spine}:`))
-              : line.scaffold === "in" ? active.rails?.has(line.railKey) : false;
+              : line.scaffold === "in" ? (line.railKeys ? line.railKeys.some((key) => active.rails?.has(key)) : active.rails?.has(line.railKey)) : false;
           const state = active ? (onRail || active.edges.has(line.id) || (line.to === CHAMPION_ID && championId && active.ids.has(championId)) ? "on" : "off") : "";
           const fresh = line.spine || line.scaffold || line.fork || line.stub ? undefined : motionState.fresh.get(`${line.from}>${line.to}`);
           const quiet = line.flow === "L" && line.cross && !line.stub;

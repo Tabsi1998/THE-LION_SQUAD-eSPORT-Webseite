@@ -67,6 +67,7 @@ function collect(page, { root, card, heads }) {
         id: path.getAttribute("data-id") || `${path.getAttribute("data-from")}>${path.getAttribute("data-to")}`,
         d: path.getAttribute("d"),
         spine: path.getAttribute("data-rail-spine") || undefined,
+        dashed: path.classList.contains("tls-bracket-line--drop"),
         focus: path.getAttribute("data-focus") === "1",
       }));
       const markers = [...svg.querySelectorAll("[data-line-marker]")].filter(visible).map((node) => ({ x: Number(node.getAttribute("cx")), y: Number(node.getAttribute("cy")) }));
@@ -138,6 +139,32 @@ test("Web 1440: „[FINAL]“ im Schema - Grand Final neben dem Winner Bracket, 
   expect(await clipped(page)).toEqual([]);
   expect(check(await collect(page, WEB))).toEqual([]);
 });
+
+// Zeigen auf jede Karte (#1591): was dann erscheint, hängt an, ist nur waagrecht und senkrecht, Marker sitzen auf dem
+// Linienende, gestrichelte Abstiege bilden kein Bündel - bei 1440 und im schmalen Fenster (775).
+for (const width of [1440, 775]) {
+  for (const name of ["ffa16de_start", "de8_fixed"]) {
+    test(`Web ${width} ${name}: Zeigen auf jede Karte - sauber, kein Bündel, Marker auf dem Ende`, async ({ page, isMobile }) => {
+      test.skip(Boolean(isMobile), "Zeigen gibt es nur mit Maus");
+      await page.setViewportSize({ width, height: 1000 });
+      const tournament = await mockWeb(page, name);
+      await page.goto(`/tournaments/${tournament.slug}/bracket`);
+      await expect(page.getByTestId("bracket-tree").first()).toBeVisible();
+      await page.waitForTimeout(1600);
+      expect(check(await collect(page, WEB))).toEqual([]);
+      const problems = [];
+      for (const match of CASES[name].matches_v2) {
+        const card = page.locator(`[data-testid='bracket-tree'] [data-node='${match.id}']`).first();
+        // Ohne zu scrollen (die Köpfe kleben beim waagrechten Scrollen links): das Zeigen als Ereignis an der Karte.
+        await card.evaluate((node) => node.dispatchEvent(new window.PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" })));
+        await page.waitForTimeout(120);
+        problems.push(...check(await collect(page, WEB), { focusOnly: true }).map((text) => `${match.match_key}: ${text}`));
+        if (SHOTS && ["LA", "C"].includes(match.match_key) && width === 775) await page.screenshot({ path: `${SHOTS}/web-775-${name}-zeigen-${match.match_key}.png` });
+      }
+      expect(problems).toEqual([]);
+    });
+  }
+}
 
 test("Web 1100: zu breit - die Leinwand scrollt, der Hinweis steht da, der Rand blendet aus", async ({ page, isMobile }) => {
   test.skip(Boolean(isMobile), "Desktop-Leinwand");

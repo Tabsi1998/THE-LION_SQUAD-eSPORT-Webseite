@@ -88,7 +88,8 @@ export function routeEdge({ a, b, toY, fromY, obstacles = [], corridors = [], ga
   }
   // Gasse rechts neben der Quelle; die Mitte gehört den normalen Knicken, Spuren liegen links davon.
   const outKey = `out:${Math.round(a.right)}`;
-  const gx1 = a.right + 8 + (lanes(outKey) % 4) * 4;
+  // Spuren 8 px auseinander (#1591): zwei gestrichelte Abstiege nebeneinander bleiben zwei lesbare Linien.
+  const gx1 = a.right + 6 + (lanes(outKey) % 2) * 8;
   // Ziel: Gasse links vor der Zielkarte - gibt es links keine (erste Spalte), dann rechts daneben.
   const enterLeft = b.left - gap > -1;
   // Alle Wege in dieselbe Karte nehmen dieselbe Senkrechte davor (#1591) - dort laufen sie zu einer Gabel zusammen,
@@ -97,7 +98,7 @@ export function routeEdge({ a, b, toY, fromY, obstacles = [], corridors = [], ga
   const xEnd = enterLeft ? b.left : b.right;
   const candidates = [...corridors].sort((p, q) => (Math.abs(p - startY) + Math.abs(p - endY)) - (Math.abs(q - startY) + Math.abs(q - endY)));
   for (const corridor of candidates) {
-    const y = corridor + ((lanes(`row:${Math.round(corridor)}`) % 5) - 2) * 3;
+    const y = corridor + ((lanes(`row:${Math.round(corridor)}`) % 3) - 1) * 8;
     const points = [{ x: a.right, y: startY }, { x: gx1, y: startY }, { x: gx1, y }, { x: gx2, y }, { x: gx2, y: endY }, { x: xEnd, y: endY }];
     if (!pathHits(points, others) && !pathHits(points.slice(1, -1), [a, b])) return points;
   }
@@ -215,11 +216,55 @@ export function stageLines({ edges = [], rails = [], nodes, slotY = () => undefi
       add({ id: `${node}:entry`, from: node, to: node, flow: "L", stub: true, marker: entry[0], rail: railKey, rel: [...targetIds, ...sources.filter((source) => source.cross).map((source) => source.id)], column }, entry);
     }
     add({ id: `${node}:spine`, from: node, to: node, flow: "W", spine: railKey, railGroup: rail.group, column }, [{ x: bus.x, y: spineTop }, { x: bus.x, y: spineBottom }]);
-    for (const source of sources) {
-      let points = bus.branchesIn.get(source.id);
-      // Ein Abstieg mündet in den Eingang oben an der Schiene.
-      if (source.cross) points = [...points.slice(0, -1), { x: bus.x, y: spineTop - STUB }];
-      add({ id: `${node}:in:${source.id}`, from: source.id, to: node, flow: flowOf(source.id), cross: source.cross, scaffold: "in", railKey: `${railKey}:${source.id}`, rail: railKey, demand: source.cross || undefined, rel: source.cross ? [source.id, ...targetIds] : undefined, column: columnOf.get(source.id) || 0 }, points);
+    const entryY = spineTop - STUB;
+    // Ein Abstieg mündet genau in den Eingang oben an der Schiene - nur waagrecht und senkrecht (#1591).
+    const intoEntry = (points) => {
+      const out = points.map((point) => ({ ...point }));
+      const n = out.length;
+      if (n >= 3 && out[n - 3].x === out[n - 2].x) {
+        out[n - 2].y = entryY;
+        out[n - 1] = { x: bus.x, y: entryY };
+        return out;
+      }
+      return [...out, { x: bus.x, y: entryY }];
+    };
+    const inLine = (source, points, extra = {}) => add({ id: `${node}:in:${source.id}`, from: source.id, to: node, flow: flowOf(source.id), cross: source.cross, scaffold: "in", railKey: `${railKey}:${source.id}`, rail: railKey, demand: source.cross || undefined, rel: source.cross ? [source.id, ...targetIds] : undefined, column: columnOf.get(source.id) || 0, ...extra }, points);
+    for (const source of sources) if (!source.cross) inLine(source, bus.branchesIn.get(source.id));
+    // Mehrere Abstiege aus derselben Spalte (#1591): ein gemeinsamer Strang statt eines Bündels - je Quelle ein Stamm
+    // bis in die Gasse, dort hinunter (jedes Stück zeigt sich, sobald eine Quelle darüber gezeigt wird), dann ein Weg.
+    const columns = new Map();
+    for (const source of sources.filter((entry) => entry.cross)) {
+      const key = Math.round(source.rect.right);
+      if (!columns.has(key)) columns.set(key, []);
+      columns.get(key).push(source);
+    }
+    for (const group of columns.values()) {
+      const routes = new Map(group.map((source) => [source.id, intoEntry(bus.branchesIn.get(source.id))]));
+      const template = routes.get(group[0].id);
+      const gutter = template.length >= 4 && template[1].x === template[2].x && template[0].y === template[1].y ? template[1].x : null;
+      if (group.length < 2 || gutter == null) {
+        for (const source of group) inLine(source, routes.get(source.id));
+        continue;
+      }
+      const turn = template[2].y;
+      const ordered = [...group].sort((p, q) => Math.abs(routes.get(q.id)[0].y - turn) - Math.abs(routes.get(p.id)[0].y - turn));
+      const stemY = (source) => routes.get(source.id)[0].y;
+      const stems = ordered.map((source) => [{ x: source.rect.right, y: stemY(source) }, { x: gutter, y: stemY(source) }]);
+      if (stems.some((points, index) => pathHits(points, obstacles.filter((rect) => rect !== ordered[index].rect)))) {
+        for (const source of group) inLine(source, routes.get(source.id));
+        continue;
+      }
+      ordered.forEach((source, index) => inLine(source, stems[index]));
+      const relOf = (count) => [...ordered.slice(0, count).map((source) => source.id), ...targetIds];
+      const railKeys = (count) => ordered.slice(0, count).map((source) => `${railKey}:${source.id}`);
+      const base = { to: node, flow: "L", cross: true, scaffold: "in", rail: railKey, demand: true, column: columnOf.get(ordered[0].id) || 0 };
+      for (let index = 0; index < ordered.length - 1; index += 1) {
+        add({ ...base, id: `${node}:drop:${index}`, from: ordered[index].id, rel: relOf(index + 1), railKeys: railKeys(index + 1) },
+          [{ x: gutter, y: stemY(ordered[index]) }, { x: gutter, y: stemY(ordered[index + 1]) }]);
+      }
+      const last = ordered[ordered.length - 1];
+      add({ ...base, id: `${node}:drop:tail`, from: last.id, rel: relOf(ordered.length), railKeys: railKeys(ordered.length) },
+        [{ x: gutter, y: stemY(last) }, ...template.slice(2)]);
     }
     for (const id of targetIds) add({ id: `${node}:out:${id}`, from: node, to: id, flow: "W", scaffold: "out", rail: railKey, column }, [{ x: bus.x, y: outY.get(id) }, { x: nodes.get(id).left, y: outY.get(id) }]);
   }

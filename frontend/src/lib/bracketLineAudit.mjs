@@ -5,10 +5,14 @@
 //   3. Keine zwei senkrechten Strecken verschiedener Linien laufen dicht nebeneinander (gedrängt).
 //   4. Kein Punkt außerhalb der Leinwand, keine Strecke durch eine Karte.
 //   5. Je Gruppe genau eine sichtbare Schiene.
+//   6. Nur waagrecht und senkrecht - keine schräge Strecke.
+//   7. Jeder Marker sitzt genau auf einem Linienende.
+//   8. Gestrichelte Linien (Abstiege) halten zueinander mindestens 8 px Abstand - kein Bündel.
 // Punkte, Karten und Marker im selben Koordinatensystem (dem der Leinwand).
 
 const TOLERANCE = 1.5;
 const CROWD = 6;
+const CROWD_DASHED = 8;
 const CROWD_MIN_RUN = 12;
 
 /** „M10 20 L30 20 …“ → Punkte (wie lib/bracketLines.toPath sie schreibt). */
@@ -73,6 +77,13 @@ const overlap = (a1, a2, b1, b2) => Math.min(Math.max(a1, a2), Math.max(b1, b2))
 export function auditLines({ lines = [], boxes = [], obstacles = [], markers = [], bounds = null, endpoints = true }) {
   const problems = [];
   const segments = lines.flatMap(segmentsOf);
+  for (const segment of segments) {
+    if (!vertical(segment) && !horizontal(segment)) problems.push(`${segment.line.id}: schräge Strecke bei ${Math.round(segment.p.x)},${Math.round(segment.p.y)}`);
+  }
+  const ends = lines.flatMap((line) => (line.points.length ? [line.points[0], line.points[line.points.length - 1]] : []));
+  for (const marker of markers) {
+    if (!ends.some((point) => Math.abs(point.x - marker.x) <= 0.6 && Math.abs(point.y - marker.y) <= 0.6)) problems.push(`Marker bei ${Math.round(marker.x)},${Math.round(marker.y)} sitzt auf keinem Linienende`);
+  }
   for (const line of lines) {
     if (endpoints && line.points.length) {
       for (const point of [line.points[0], line.points[line.points.length - 1]]) {
@@ -104,9 +115,12 @@ export function auditLines({ lines = [], boxes = [], obstacles = [], markers = [
         const distance = Math.abs(a.p.x - b.p.x);
         if (distance < 0.5 && run > TOLERANCE) problems.push(`${a.line.id} und ${b.line.id}: senkrecht überlagert bei x ${Math.round(a.p.x)}`);
         else if (a.line !== b.line && distance >= 0.5 && distance < CROWD && run > CROWD_MIN_RUN) problems.push(`${a.line.id} und ${b.line.id}: gedrängt bei x ${Math.round(a.p.x)}`);
+        else if (a.line !== b.line && a.line.dashed && b.line.dashed && distance >= 0.5 && distance < CROWD_DASHED && run > CROWD_MIN_RUN) problems.push(`${a.line.id} und ${b.line.id}: gestrichelt dicht nebeneinander bei x ${Math.round(a.p.x)}`);
       } else if (horizontal(a) && horizontal(b)) {
         const run = overlap(a.p.x, a.q.x, b.p.x, b.q.x);
-        if (Math.abs(a.p.y - b.p.y) < 0.5 && run > TOLERANCE) problems.push(`${a.line.id} und ${b.line.id}: waagrecht überlagert bei y ${Math.round(a.p.y)}`);
+        const gap = Math.abs(a.p.y - b.p.y);
+        if (gap < 0.5 && run > TOLERANCE) problems.push(`${a.line.id} und ${b.line.id}: waagrecht überlagert bei y ${Math.round(a.p.y)}`);
+        else if (a.line !== b.line && a.line.dashed && b.line.dashed && gap < CROWD_DASHED && run > CROWD_MIN_RUN) problems.push(`${a.line.id} und ${b.line.id}: gestrichelt dicht übereinander bei y ${Math.round(a.p.y)}`);
       }
     }
   }

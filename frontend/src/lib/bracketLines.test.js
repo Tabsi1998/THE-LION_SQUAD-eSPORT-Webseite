@@ -220,6 +220,16 @@ describe("stageLines: übersichtlich (#1591)", () => {
     });
   }
 
+  for (const state of ["ffa16de_start", "ffa16de_round1", "de8_fixed"]) {
+    it(`${state}: auch was erst beim Zeigen kommt: nur waagrecht/senkrecht, Marker am Linienende, kein gestricheltes Bündel`, () => {
+      const stage = stageOf(structuredClone(LINES[state]));
+      // Gestrichelt sind die Abstiege; zeigt man das Ziel, kommen alle auf einmal - kein Bündel (mindestens 8 px).
+      const lines = stage.lines.map((line) => ({ ...line, dashed: line.flow === "L" && line.cross && !line.stub }));
+      const found = auditLines({ lines, boxes: [...stage.rects.values()], markers: lines.filter((line) => line.marker).map((line) => line.marker), bounds: stage.bounds, endpoints: false });
+      expect(found.filter((text) => /schräg|Marker|gestrichelt/.test(text))).toEqual([]);
+    });
+  }
+
   it("Abstiege ins Loser Bracket kommen erst beim Zeigen - am Ziel steht ein Eingang mit Marker", () => {
     const { lines, byId } = stageOf(structuredClone(LINES.de8_fixed));
     const drops = lines.filter((line) => line.flow === "L" && line.cross && !line.stub);

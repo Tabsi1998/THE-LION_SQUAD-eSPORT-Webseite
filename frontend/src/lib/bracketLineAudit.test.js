@@ -62,3 +62,25 @@ describe("bracketLineAudit", () => {
     expect(auditLines({ lines, boxes: cards, bounds: { w: 400, h: 200 }, endpoints: false })).toContainEqual(expect.stringContaining("Schienen"));
   });
 });
+
+describe("bracketLineAudit: Feinheiten (#1591)", () => {
+  const cards = [box(0, 0), box(200, 0)];
+  it("meldet schräge Strecken", () => {
+    const lines = [{ id: "a", points: [{ x: 100, y: 30 }, { x: 150, y: 30 }, { x: 160, y: 40 }, { x: 200, y: 40 }] }];
+    expect(auditLines({ lines, boxes: cards, bounds: { w: 400, h: 200 } })).toContainEqual(expect.stringContaining("schräg"));
+  });
+
+  it("ein Marker sitzt genau auf einem Linienende", () => {
+    const lines = [{ id: "stub", points: [{ x: 188, y: 30 }, { x: 200, y: 30 }] }];
+    expect(auditLines({ lines, boxes: cards, markers: [{ x: 188, y: 30 }], bounds: { w: 400, h: 200 } })).toEqual([]);
+    expect(auditLines({ lines, boxes: cards, markers: [{ x: 188, y: 30 }, { x: 150, y: 90 }], bounds: { w: 400, h: 200 } })).toContainEqual(expect.stringContaining("Marker"));
+  });
+
+  it("gestrichelte Linien halten mindestens 8 px Abstand", () => {
+    const lines = [
+      { id: "a", dashed: true, points: [{ x: 100, y: 10 }, { x: 140, y: 10 }, { x: 140, y: 50 }, { x: 200, y: 50 }] },
+      { id: "b", dashed: true, points: [{ x: 100, y: 12 }, { x: 147, y: 12 }, { x: 147, y: 55 }, { x: 200, y: 55 }] },
+    ];
+    expect(auditLines({ lines, boxes: cards, bounds: { w: 400, h: 200 } })).toContainEqual(expect.stringContaining("gestrichelt"));
+  });
+});
