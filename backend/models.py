@@ -633,6 +633,10 @@ class TournamentCreate(BaseModel):
     matchday_days: int = Field(default=7, ge=1, le=31)
     default_match_weekday: int = Field(default=6, ge=0, le=6)
     default_match_time: str = "20:00"
+    # Antwortfrist für Terminvorschläge in Stunden (#1552) - vorher fest 72.
+    match_schedule_response_hours: int = Field(default=72, ge=1, le=720)
+    # Mindestpause eines Spielers zwischen zwei Spielen, in Minuten - der Planer hält sie ein (#1552).
+    match_break_minutes: int = Field(default=5, ge=0, le=240)
     auto_start_enabled: bool = False
     # Fristen (#1551), leer = Standard (services/match_deadlines): nicht erschienen vor Ort 10 / online 15 Minuten,
     # Ergebnis gilt online nach 15 Minuten, in der Liga nach 48 Stunden. Je Phase überschreibbar (settings).
@@ -708,6 +712,8 @@ class TournamentUpdate(BaseModel):
     matchday_days: Optional[int] = Field(default=None, ge=1, le=31)
     default_match_weekday: Optional[int] = Field(default=None, ge=0, le=6)
     default_match_time: Optional[str] = None
+    match_schedule_response_hours: Optional[int] = Field(default=None, ge=1, le=720)
+    match_break_minutes: Optional[int] = Field(default=None, ge=0, le=240)
     auto_start_enabled: Optional[bool] = None
     no_show_minutes_on_site: Optional[int] = Field(default=None, ge=1, le=120)
     no_show_minutes_online: Optional[int] = Field(default=None, ge=1, le=240)

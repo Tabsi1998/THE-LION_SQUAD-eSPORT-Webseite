@@ -1,5 +1,5 @@
 """Station routes."""
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
@@ -14,6 +14,8 @@ from services.tournament_permissions import (
 from services.match_calls import notify_match_called
 from services.station_runtime import notify_match_started
 from services.competition_read import find_match_source, load_competition_read_model
+from services.match_scheduler import plan_for_tournament
+from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
 TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
@@ -32,6 +34,23 @@ async def _require_station_permission(user: dict, tournament_id: str, station_id
     )
     if not allowed:
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
+
+
+class _tournament_lock:
+    """Aufruf, Start, Freigeben und Umlegen laufen unter demselben Turnier-Lock wie das Übernehmen des Spielplans
+    (#1552): so startet kein Spiel, während der Planer es gerade schreibt - und umgekehrt."""
+
+    def __init__(self, db, tournament_id: str):
+        self._lease = mutation_lock(db, tournament_write_resource(tournament_id))
+
+    async def __aenter__(self):
+        try:
+            return await self._lease.__aenter__()
+        except MutationLockBusy:
+            raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
+
+    async def __aexit__(self, *exc):
+        return await self._lease.__aexit__(*exc)
 
 
 async def _find_match_for_station(db, match_id: str) -> tuple[str, dict | None]:
@@ -80,24 +99,6 @@ def _match_has_minimum_participants(match: dict) -> bool:
         except (TypeError, ValueError):
             minimum = 2
     return _match_participant_count(match) >= minimum
-
-
-def _parse_dt(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
-    except Exception:
-        return None
-
-
-def _duration_for_match(match: dict, tournament: dict) -> int:
-    duration = match.get("duration_minutes") or (match.get("settings") or {}).get("duration_minutes") or tournament.get("match_duration_minutes") or 30
-    try:
-        return max(1, int(duration))
-    except Exception:
-        return 30
 
 
 @router.get("")
@@ -162,6 +163,17 @@ async def update_station(sid: str, body: StationUpdate, me: dict = Depends(requi
     return s
 
 
+async def release_station(db, station_id: str, expected_match_id: str | None) -> bool:
+    """Die Station freigeben - nur, wenn sie noch das Spiel hält, das der Aufrufer gesehen hat (Compare-and-Set).
+    Hält sie inzwischen ein anderes, bleibt das stehen; die Antwort sagt, ob freigegeben wurde."""
+    result = await db.stations.update_one(
+        {"id": station_id, "current_match_id": expected_match_id},
+        {"$set": {"current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()},
+         "$unset": {"called_at": ""}},
+    )
+    return bool(result.matched_count)
+
+
 async def _forget_call(db, match_id: str | None) -> None:
     """Der Aufruf eines Spiels ist vorbei (gestartet, freigegeben, umgeplant): „aufgerufen um“ fällt weg."""
     if match_id:
@@ -178,16 +190,6 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
         raise HTTPException(status_code=409, detail="Station ist bereits belegt. Bitte zuerst freigeben.")
     if start_now and not _match_has_minimum_participants(match):
         raise HTTPException(status_code=409, detail="Match hat zu wenige Teilnehmer und kann nicht gestartet werden.")
-    await db.stations.update_many(
-        {"current_match_id": match["id"], "id": {"$ne": station["id"]}, "status": {"$ne": "broken"}},
-        {"$set": {"current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()},
-         "$unset": {"called_at": ""}},
-    )
-    # Umlegen von einer defekten Station (#1160): sie gibt das Spiel ab, bleibt aber defekt.
-    await db.stations.update_many(
-        {"current_match_id": match["id"], "id": {"$ne": station["id"]}, "status": "broken"},
-        {"$set": {"current_match_id": None, "current_match_type": None, "updated_at": now_utc().isoformat()}, "$unset": {"called_at": ""}},
-    )
     now_iso = now_utc().isoformat()
     match_updates = {
         "station_id": station["id"],
@@ -215,7 +217,25 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
         called_at = station.get("called_at") if same_call and station.get("called_at") else now_iso
         match_updates["called_at"] = called_at
         station_updates["called_at"] = called_at
-    await db.stations.update_one({"id": station["id"]}, station_change)
+    # Die Station nur belegen, wenn sie jetzt noch frei (oder schon für dieses Spiel reserviert) ist - nicht gegen
+    # den Stand, den der Aufrufer gelesen hat (Compare-and-Set; zwei Zuweisungen zugleich sahen beide „frei“).
+    claimed = await db.stations.update_one(
+        {"id": station["id"], "status": {"$ne": "broken"},
+         "$or": [{"current_match_id": None}, {"current_match_id": {"$exists": False}}, {"current_match_id": match["id"]}]},
+        station_change,
+    )
+    if not claimed.matched_count:
+        raise HTTPException(status_code=409, detail="Station ist inzwischen belegt. Bitte zuerst freigeben.")
+    await db.stations.update_many(
+        {"current_match_id": match["id"], "id": {"$ne": station["id"]}, "status": {"$ne": "broken"}},
+        {"$set": {"current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()},
+         "$unset": {"called_at": ""}},
+    )
+    # Umlegen von einer defekten Station (#1160): sie gibt das Spiel ab, bleibt aber defekt.
+    await db.stations.update_many(
+        {"current_match_id": match["id"], "id": {"$ne": station["id"]}, "status": "broken"},
+        {"$set": {"current_match_id": None, "current_match_type": None, "updated_at": now_utc().isoformat()}, "$unset": {"called_at": ""}},
+    )
     await db[collection_name].update_one({"id": match["id"]}, match_change)
     if start_now:
         before = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "status": 1}) or {}
@@ -286,16 +306,20 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     await _ensure_tournament_unlocked(db, tournament_id)
     await require_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "tournament")
+    if plan and not start_now:
+        # Planen heißt seit #1552: der Spielplaner rechnet Zeit und Station zusammen - hier nur als Vorschau.
+        # Geschrieben wird allein über POST /tournaments/{tid}/schedule/apply mit dem Fingerabdruck der Vorschau.
+        computed = await plan_for_tournament(db, tournament)
+        return {"assigned": 0, "items": [], "planned": True, **computed}
     station_query = {"tournament_id": tournament_id, "status": {"$ne": "broken"}}
-    if start_now or not plan:
-        station_query = {
-            **station_query,
-            "status": {"$in": ["free", "reserved"]},
-            "$or": [{"current_match_id": None}, {"current_match_id": {"$exists": False}}],
-        }
+    station_query = {
+        **station_query,
+        "status": {"$in": ["free", "reserved"]},
+        "$or": [{"current_match_id": None}, {"current_match_id": {"$exists": False}}],
+    }
     stations = await db.stations.find(station_query, {"_id": 0}).sort("name", 1).to_list(200)
     if not stations:
-        return {"assigned": 0, "items": [], "planned": bool(plan and not start_now)}
+        return {"assigned": 0, "items": [], "planned": False}
     status_filter = ["ready", "scheduled"] if start_now else ["preview", "pending", "ready", "scheduled"]
     station_filter = {"$in": [None, ""]} if not start_now else {"$in": [None, "", *[station["id"] for station in stations]]}
     allowed_station_ids = set(station_filter["$in"])
@@ -309,31 +333,12 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
     candidates = [item for item in candidates if _match_has_minimum_participants(item[1])]
     candidates.sort(key=lambda item: _match_sort_key(item[1]))
 
-    if plan and not start_now:
-        start_at = _parse_dt(tournament.get("start_date")) or now_utc()
-        station_available_at = {station["id"]: start_at for station in stations}
-        assigned = []
-        for collection_name, match in candidates:
-            station = min(stations, key=lambda item: (station_available_at[item["id"]], item.get("name") or item["id"]))
-            scheduled_at = station_available_at[station["id"]]
-            duration_minutes = _duration_for_match(match, tournament)
-            await db[collection_name].update_one({"id": match["id"]}, {"$set": {
-                "station_id": station["id"],
-                "scheduled_at": scheduled_at.isoformat(),
-                "duration_minutes": duration_minutes,
-                "status": "scheduled" if match.get("status") in {"pending", "ready", "scheduled"} else match.get("status"),
-                "updated_at": now_utc().isoformat(),
-            }})
-            station_available_at[station["id"]] = scheduled_at + timedelta(minutes=duration_minutes)
-            assigned.append({
-                "station_id": station["id"],
-                "match_id": match["id"],
-                "match_type": collection_name,
-                "scheduled_at": scheduled_at.isoformat(),
-                "duration_minutes": duration_minutes,
-            })
-        return {"assigned": len(assigned), "items": assigned, "planned": True}
+    async with _tournament_lock(db, tournament_id):
+        assigned = await _start_on_free_stations(db, stations, candidates, start_now)
+    return {"assigned": len(assigned), "items": assigned, "planned": False}
 
+
+async def _start_on_free_stations(db, stations, candidates, start_now: bool) -> list[dict]:
     assigned = []
     used_match_ids: set[str] = set()
     for station in stations:
@@ -358,7 +363,7 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
         await _assign_match_to_station(db, station, match, collection_name, start_now=start_now)
         used_match_ids.add(match["id"])
         assigned.append({"station_id": station["id"], "match_id": match["id"], "match_type": collection_name})
-    return {"assigned": len(assigned), "items": assigned, "planned": False}
+    return assigned
 
 
 @router.post("/{sid}/assign/{match_id}")
@@ -373,7 +378,11 @@ async def assign_match(sid: str, match_id: str, start_now: bool = False,
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
     await _ensure_tournament_unlocked(db, match["tournament_id"])
     await _require_station_permission(me, match["tournament_id"], sid)
-    await _assign_match_to_station(db, station, match, collection_name, start_now=start_now)
+    async with _tournament_lock(db, match["tournament_id"]):
+        # Station und Spiel unter dem Lock frisch lesen - der Stand von oben kann schon überholt sein.
+        station = await db.stations.find_one({"id": sid}, {"_id": 0}) or station
+        _collection, current = await _find_match_for_station(db, match_id)
+        await _assign_match_to_station(db, station, current or match, collection_name, start_now=start_now)
     return {"ok": True}
 
 
@@ -390,15 +399,20 @@ async def clear_station(sid: str, me: dict = Depends(get_current_user)):
             await _require_station_permission(me, match["tournament_id"], sid)
         elif not is_global_tournament_admin(me):
             raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
-        if collection_name:
-            # Freigeben beendet auch einen Aufruf (#1122).
-            await db[collection_name].update_one({"id": s["current_match_id"]}, {
-                "$set": {"station_id": None, "updated_at": now_utc().isoformat()}, "$unset": {"called_at": ""}})
+        if collection_name and match:
+            # Freigeben beendet auch einen Aufruf (#1122) - Spiel und Station zusammen unter dem Turnier-Lock, und die
+            # Station nur, wenn sie noch dieses Spiel hält (ein inzwischen zugewiesenes bleibt).
+            async with _tournament_lock(db, match["tournament_id"]):
+                held = await db.stations.find_one({"id": sid}, {"_id": 0, "current_match_id": 1}) or {}
+                if held.get("current_match_id") != s["current_match_id"]:
+                    raise HTTPException(status_code=409, detail="Die Station hält inzwischen ein anderes Spiel. Bitte neu laden.")
+                await db[collection_name].update_one({"id": s["current_match_id"]}, {
+                    "$set": {"station_id": None, "updated_at": now_utc().isoformat()}, "$unset": {"called_at": ""}})
+                await release_station(db, sid, expected_match_id=s["current_match_id"])
+            return {"ok": True}
     elif not is_global_tournament_admin(me):
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
-    await db.stations.update_one({"id": sid}, {"$set": {
-        "current_match_id": None, "current_match_type": None, "status": "free", "updated_at": now_utc().isoformat()},
-        "$unset": {"called_at": ""}})
+    await release_station(db, sid, expected_match_id=s.get("current_match_id"))
     return {"ok": True}
 
 

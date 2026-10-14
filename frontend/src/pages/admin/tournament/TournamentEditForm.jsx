@@ -83,6 +83,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     matchday_days: source.matchday_days ?? 7,
     default_match_weekday: source.default_match_weekday ?? 6,
     default_match_time: source.default_match_time || "20:00",
+    match_schedule_response_hours: source.match_schedule_response_hours ?? 72,
+    match_break_minutes: source.match_break_minutes ?? 5,
     twitch_channel: source.twitch_channel || "",
     twitch_enabled: !!source.twitch_enabled,
     has_live_stream: !!source.has_live_stream,
@@ -145,6 +147,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     matchday_days: tournament.matchday_days ?? 7,
     default_match_weekday: tournament.default_match_weekday ?? 6,
     default_match_time: tournament.default_match_time || "20:00",
+    match_schedule_response_hours: tournament.match_schedule_response_hours ?? 72,
+    match_break_minutes: tournament.match_break_minutes ?? 5,
     twitch_channel: tournament.twitch_channel || "",
     twitch_enabled: !!tournament.twitch_enabled,
     has_live_stream: !!tournament.has_live_stream,
@@ -208,7 +212,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
     normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
     ["team_size", "max_participants", "min_participants", "best_of", "match_duration_minutes",
-      "matchday_days", "default_match_weekday"].forEach((key) => {
+      "matchday_days", "default_match_weekday", "match_schedule_response_hours", "match_break_minutes"].forEach((key) => {
       if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);
     });
     payload.season_weight = Number(payload.season_weight || 0);
@@ -347,6 +351,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
                 <TextField label="Spieltag dauert (Tage)" type="number" min="1" max="31" value={f.matchday_days} onChange={(v)=>set("matchday_days", v)} testId="tr-edit-matchday-days" />
                 <SelectInput label="Standardtag" value={String(f.default_match_weekday ?? 6)} onChange={(v)=>set("default_match_weekday", Number(v))} options={WEEKDAY_OPTIONS} />
                 <TextField label="Standarduhrzeit" type="time" value={f.default_match_time} onChange={(v)=>set("default_match_time", v)} testId="tr-edit-matchday-time" />
+                <TextField label="Antwortfrist (Stunden)" type="number" min="1" max="720" value={f.match_schedule_response_hours} onChange={(v)=>set("match_schedule_response_hours", v)} hint="So lange hat die Gegenseite Zeit, auf einen Terminvorschlag zu antworten. Danach meldet es der Lauf der Turnierleitung." testId="tr-edit-response-hours" />
               </FormGrid>
             </div>
           )}
@@ -367,6 +372,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
               <CheckField label="Folgerunden zufällig mischen" hint="Runde 1 steht ab dem Check-in-Ende fest; qualifizierte Spieler werden in die nächste Runde zufällig auf freie Zielslots verteilt." checked={!!f.randomize_advancement_rounds} onChange={(v)=>set("randomize_advancement_rounds", v)} className="md:col-span-2" />
               <TextField label="Best of" type="number" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"/>
               <TextField label="Matchdauer Min." type="number" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"/>
+              <TextField label="Mindestpause Min." type="number" min="0" max="240" value={f.match_break_minutes} onChange={(v)=>set("match_break_minutes",v)} hint="So lange hat ein Spieler zwischen zwei Spielen mindestens frei; der Planer hält das ein." testId="tr-edit-break"/>
               <SeasonWeightField value={f.season_weight} onChange={(v)=>set("season_weight",v)} />
             </FormGrid>
             <DeadlineFields form={f} onChange={set} />

@@ -16,6 +16,8 @@ import random
 import uuid
 from datetime import datetime, timezone
 
+from services.match_duration import effective_match_duration
+
 WIN_POINTS = 1.0
 DRAW_POINTS = 0.5
 DECIDED_STATUSES = {"completed", "forfeit"}
@@ -177,7 +179,7 @@ def swiss_round_documents(
         return []
 
     settings = stage.get("settings") or {}
-    duration = int(settings.get("duration_minutes") or tournament.get("match_duration_minutes") or 30)
+    duration = effective_match_duration(stage=stage, tournament=tournament)
     now = datetime.now(timezone.utc).isoformat()
     round_name = f"Swiss Runde {round_number}"
 
