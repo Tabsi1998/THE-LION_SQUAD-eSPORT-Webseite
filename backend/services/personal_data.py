@@ -173,7 +173,8 @@ CLUB_CONTENT = frozenset({
 
 NO_PERSON = frozenset({
     "advent_views", "badges", "cms_nav", "cms_pages", "competition_write_usage", "discord_guild_stats",
-    "discord_welcomes", "dolibarr_public", "email_templates", "event_message_gates", "feedback_entries", "games", "mastodon_apps",
+    "discord_welcomes", "dolibarr_public", "dolibarr_webhook_events", "email_templates", "event_message_gates", "feedback_entries",
+    "games", "mastodon_apps",
     "meeting_admission_counts", "mutation_locks", "ops_alert_log", "ops_alert_state", "ops_check_runs", "ops_errors",
     "ops_slow_requests", "ops_vitals", "partners", "schema_migration_lock", "schema_migrations", "site_banner_stats",
     "sponsors", "sticker_builtin_packs", "user_badges", "youtube_videos",
