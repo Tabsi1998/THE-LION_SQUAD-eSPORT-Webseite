@@ -626,12 +626,24 @@ async def queue_member(db, settings: dict, member_id: int) -> None:
     )
 
 
+async def retry_or_drop(db, entry: dict) -> None:
+    """Ein Eintrag in dolibarr_pending ist gescheitert: später noch einmal, nach dem letzten Versuch weg."""
+    if entry.get("attempts", 0) + 1 >= PENDING_MAX_ATTEMPTS:
+        # Der regelmäßige Abgleich holt es nach.
+        await db.dolibarr_pending.delete_one({"key": entry["key"]})
+        return
+    retry = (now_utc() + timedelta(seconds=30 * (entry.get("attempts", 0) + 1))).isoformat()
+    await db.dolibarr_pending.update_one({"key": entry["key"]}, {"$set": {"due_at": retry}, "$inc": {"attempts": 1}})
+
+
 async def process_pending(db=None) -> dict:
     db = db if db is not None else get_db()
     settings = await load_settings(db)
     if settings["mode"] != "live":
         return {"ok": False, "skipped": settings["mode"]}
-    due = await db.dolibarr_pending.find({"instance": instance_key(settings), "due_at": {"$lte": now_utc().isoformat()}}, {"_id": 0}).to_list(50)
+    # Einträge mit `kind` gehören anderen Verarbeitern (offene Anträge: services/vereine_webhooks.py, #1540).
+    due = await db.dolibarr_pending.find({"instance": instance_key(settings), "kind": {"$exists": False}, "due_at": {"$lte": now_utc().isoformat()}},
+                                         {"_id": 0}).to_list(50)
     if not due:
         return {"ok": True, "processed": 0}
     processed = 0
@@ -648,12 +660,8 @@ async def process_pending(db=None) -> dict:
                 if link:
                     await end_membership_of_gone_member(db, link)
                 await db.dolibarr_pending.delete_one({"key": entry["key"]})
-            elif entry.get("attempts", 0) + 1 >= PENDING_MAX_ATTEMPTS:
-                # Der regelmäßige Abgleich holt es nach.
-                await db.dolibarr_pending.delete_one({"key": entry["key"]})
             else:
-                retry = (now_utc() + timedelta(seconds=30 * (entry.get("attempts", 0) + 1))).isoformat()
-                await db.dolibarr_pending.update_one({"key": entry["key"]}, {"$set": {"due_at": retry}, "$inc": {"attempts": 1}})
+                await retry_or_drop(db, entry)
             continue
         if link:
             await apply_summary(db, settings, link, summary)

@@ -87,6 +87,28 @@ Schlüssel tatsächlich.
 Diese Geheimnisse liegen verschlüsselt in MongoDB. `SETTINGS_ENCRYPTION_KEY` muss deshalb stabil
 bleiben und separat gesichert werden.
 
+### Dolibarr: signierte Webhooks (Modul „Vereine“)
+
+Das Vereinsmodul meldet Änderungen als signierten Hinweis; die Website liest danach über die API nach.
+
+1. In Dolibarr unter **Einrichtung → Vereine → Webhooks** ein Ziel anlegen: Adresse
+   `https://<deine-domain>/api/integrations/dolibarr/vereine-webhook`, als Benutzer den API-Benutzer der Website
+   (braucht „Änderungsfeed verfolgen“). Dolibarr zeigt Schlüssel-Kennung und Geheimnis **genau einmal**.
+2. Beides in die `.env` des Servers, nie ins Repository:
+
+   ```env
+   DOLIBARR_WEBHOOK_SECRETS=<Kennung>:<Geheimnis>
+   ```
+
+   Bei einem Schlüsselwechsel in Dolibarr den neuen Schlüssel mit Komma dazuschreiben, den alten nach dem
+   Wechsel entfernen. Danach `docker compose up -d --force-recreate backend`.
+3. Unter **Admin → Dolibarr → Funktionen** steht „Benachrichtigung aus Dolibarr (signierter Webhook)“ dann auf
+   „eingerichtet“. Den „Alten Webhook-Weg“ dort abschalten, sobald der signierte Webhook zustellt;
+   **Betrieb → Checks** zeigt gelb, solange der alte Weg noch an ist.
+
+Ohne Geheimnis antwortet der Empfänger mit 503 und nimmt nichts an. Der regelmäßige Abgleich alle 10 Minuten
+bleibt in jedem Fall – ein Hinweis kann verloren gehen.
+
 ## 6. Rechtliches und Einwilligungsversionen
 
 Unter `Einstellungen → Rechtliches` echte Vereinsdaten, Datenschutzkontakt und ergänzende
