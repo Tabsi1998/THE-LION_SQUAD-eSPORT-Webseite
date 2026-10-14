@@ -7,6 +7,8 @@ import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
+import { useLoad } from "@/hooks/useLoad";
+import { LoadNotice } from "@/components/tls/LoadState";
 
 // „Einladen“ auf der Team-Seite (#1191): Link mit QR-Code - wer ihn öffnet, landet im Team und tippt nur noch
 // „Beitreten“. Neu erzeugen macht den alten Link ungültig. Darunter der Join-Code als Rückfall und die Suche nach
@@ -110,37 +112,24 @@ export function TeamInviteSheet({ team, onClose }) {
 
 export function InviteMemberPanel({ team }) {
   const [query, setQuery] = useState("");
-  const [candidates, setCandidates] = useState([]);
-  const [loading, setLoading] = useState(false);
   const { submitting: inviting, submitOnce } = useSubmissionGuard();
   const [inviteError, setInviteError] = useState("");
 
-  useEffect(() => {
-    const needle = query.trim();
-    if (needle.length < 2) {
-      setCandidates([]);
-      return undefined;
-    }
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const { data } = await api.get(`/teams/${team.id}/invite-candidates?q=${encodeURIComponent(needle)}`);
-        setCandidates(data || []);
-      } catch {
-        setCandidates([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 220);
-    return () => clearTimeout(timer);
-  }, [query, team.id]);
+  // Nur die Antwort auf den aktuellen Begriff zählt (#985): ein neuer Begriff oder ein leeres Feld lässt eine laufende
+  // Suche verfallen. Ein Fehler ist kein „Keine passenden Benutzer“.
+  const needle = query.trim();
+  const search = useLoad(needle.length >= 2 ? ["invite-candidates", team.id, needle] : null, ({ signal }) => (
+    api.get(`/teams/${team.id}/invite-candidates?q=${encodeURIComponent(needle)}`, { signal }).then(({ data }) => (Array.isArray(data) ? data : []))
+  ), { debounceMs: 220 });
+  const candidates = search.data || [];
+  const loading = search.status === "loading";
 
   const invite = async (user) => {
     setInviteError("");
     const attempt = await submitOnce(async () => {
       await api.post(`/teams/${team.id}/invites`, { user_id: user.id });
       toast.success(`${user.display_name || user.username} eingeladen.`);
-      setCandidates((rows) => rows.map((row) => row.id === user.id ? { ...row, has_pending_invite: true } : row));
+      search.mutate((rows) => rows.map((row) => row.id === user.id ? { ...row, has_pending_invite: true } : row));
     });
     if (attempt.started && attempt.error) {
       const message = formatRequestError(attempt.error, "Einladung konnte nicht gesendet werden.");
@@ -182,7 +171,8 @@ export function InviteMemberPanel({ team }) {
             </button>
           </div>
         ))}
-        {query.trim().length >= 2 && !loading && candidates.length === 0 && <div className="text-xs text-white/35">Keine passenden Benutzer gefunden.</div>}
+        {search.status === "empty" && <div className="text-xs text-white/35">Keine passenden Benutzer gefunden.</div>}
+        {search.status === "error" && <LoadNotice testId="team-invite-search-error" message="Die Suche hat nicht geklappt." onRetry={search.reload} />}
         {inviteError && <AuthFormAlert id="team-invite-error">{inviteError}</AuthFormAlert>}
       </div>
     </section>

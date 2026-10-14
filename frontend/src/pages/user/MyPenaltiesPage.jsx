@@ -2,13 +2,14 @@
  * P0 — User Penalty Log.
  * Shows every penalty issued against the current user with full reason/context.
  */
-import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { ModerationStandingCard } from "@/components/tls/ModerationStandingCard";
 import { SkeletonList } from "@/components/tls/Skeleton";
+import { LoadState } from "@/components/tls/LoadState";
+import { useLoad } from "@/hooks/useLoad";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AlertTriangle, Clock, Flag, ShieldAlert, ArrowRight } from "lucide-react";
@@ -23,18 +24,9 @@ const KIND_META = {
 
 export default function MyPenaltiesPage() {
   useDocumentTitle("Meine Strafen", "Übersicht aller Strafen mit Begründung.");
-  const [data, setData] = useState({ count: 0, items: [] });
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(() => {
-    setLoading(true);
-    api.get("/penalties/me")
-      .then(({ data }) => setData(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-  useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["penalties", "matches", "f1"]);
+  // „Saubere Weste“ nur nach einer erfolgreichen, leeren Antwort (#984) - ein Ladefehler ist keine Entwarnung.
+  const penalties = useLoad("penalties/me", ({ signal }) => api.get("/penalties/me", { signal }).then(({ data }) => ({ count: 0, ...data, items: data?.items || [] })));
+  useApiInvalidation(penalties.reload, ["penalties", "matches", "f1"]);
 
   return (
     <PublicLayout>
@@ -50,19 +42,24 @@ export default function MyPenaltiesPage() {
         <div className="mt-8"><ModerationStandingCard /></div>
 
         <div className="mt-8" data-testid="my-penalties-list">
-          {loading ? (
-            <SkeletonList rows={3} label="Lade Strafen" />
-          ) : data.items.length === 0 ? (
-            <div className="border border-dashed border-white/15 rounded-sm p-12 text-center">
-              <ShieldAlert className="w-10 h-10 text-[#00FF88] mx-auto mb-3" />
-              <div className="font-heading text-xl font-bold uppercase">Saubere Weste</div>
-              <p className="mt-2 text-white/60 text-sm">Keine Strafen, keine ungültigen Runden, keine Forfeits — keep it up!</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {data.items.map((p) => <PenaltyCard key={p.ref_id} p={p} />)}
-            </div>
-          )}
+          <LoadState
+            load={penalties}
+            loading={<SkeletonList rows={3} label="Lade Strafen" />}
+            errorTitle="Deine Strafen konnten nicht geladen werden"
+            empty={(
+              <div className="border border-dashed border-white/15 rounded-sm p-12 text-center">
+                <ShieldAlert className="w-10 h-10 text-[#00FF88] mx-auto mb-3" />
+                <div className="font-heading text-xl font-bold uppercase">Saubere Weste</div>
+                <p className="mt-2 text-white/60 text-sm">Keine Strafen, keine ungültigen Runden, keine Forfeits — keep it up!</p>
+              </div>
+            )}
+          >
+            {(data) => (
+              <div className="space-y-3">
+                {data.items.map((p) => <PenaltyCard key={p.ref_id} p={p} />)}
+              </div>
+            )}
+          </LoadState>
         </div>
       </div>
     </PublicLayout>

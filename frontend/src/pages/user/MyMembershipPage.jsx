@@ -13,8 +13,8 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet, Users, ShieldCheck } from "lucide-react";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
-import { PublicErrorState } from "@/components/tls/PublicEmptyState";
-import { problemKind } from "@/lib/loadProblem";
+import { LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
+import { useLoad } from "@/hooks/useLoad";
 
 const STATUS_LABELS = {
   active: "Aktives Mitglied", honorary: "Ehrenmitglied",
@@ -28,24 +28,18 @@ const TYPE_LABELS = {
 
 export default function MyMembershipPage() {
   const { user } = useAuth();
-  const [data, setData] = useState(null);
-
-  // Ein Fehler beendet das Laden (#983, #1152): ohne Stand der Fehler mit „Nochmal versuchen“, mit Stand bleibt er.
-  const [problem, setProblem] = useState(null);
-  const load = useCallback(() => {
-    api.get("/membership/me").then(({ data }) => {
-      setData(data);
-      setProblem(null);
-    }).catch((error) => setProblem(problemKind(error)));
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  // Ein Fehler beendet das Laden (#983, #1152; über useLoad): ohne Stand der Fehler mit „Nochmal versuchen“, mit Stand
+  // bleibt er stehen - mit Hinweis.
+  const membership = useLoad("membership/me", ({ signal }) => api.get("/membership/me", { signal }).then(({ data }) => data), { isEmpty: () => false });
+  const data = membership.data;
+  const load = membership.reload;
   useApiInvalidation(load, ["membership", "users"]);
 
-  if (!data && problem) {
+  if (membership.status === "error") {
     return (
       <PublicLayout>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <PublicErrorState kind={problem === "offline" ? "offline" : "error"} title={problem === "offline" ? "Ohne Netz" : "Mitgliedschaft konnte nicht geladen werden"} onRetry={load} />
+          <LoadState load={membership} errorTitle="Mitgliedschaft konnte nicht geladen werden" />
         </div>
       </PublicLayout>
     );
@@ -65,6 +59,7 @@ export default function MyMembershipPage() {
         <Link to="/members/area" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#FFD700]">
           <ArrowLeft className="w-3.5 h-3.5" /> Mitgliederbereich
         </Link>
+        <LoadStaleNotice load={membership} className="mt-6" />
 
         {/* Hero card */}
         <div className="mt-8 border border-[#FFD700]/40 bg-gradient-to-br from-[#FFD700]/15 via-[#FFD700]/5 to-transparent rounded-sm p-6 md:p-8 relative overflow-hidden">
