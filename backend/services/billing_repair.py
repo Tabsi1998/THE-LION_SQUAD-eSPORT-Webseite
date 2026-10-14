@@ -8,6 +8,9 @@ Einsortieren nach: jede verbindliche Anmeldung mit eingefrorenem Preis, zu dem e
 dieselbe ``repair_order`` - genau einmal, der eindeutige ``booking_key`` fängt auch ein Rennen mit der Anmeldung ab.
 
 Ohne eingefrorenen Preis friert der Job nichts ein: ein Preis entsteht nur mit der Zusage der zahlenden Person.
+Ausgelassen werden auch Anmeldungen zu abgesagten oder gelöschten Events und Turnieren - und alte Preise ohne Hash:
+ohne ``booking_key`` könnten zwei Läufe gleichzeitig je einen Auftrag anlegen. Sie zählen als ``needs_review`` und
+stehen im Log; nachgeholt werden sie von Hand oder über die Wiederholung der Anmeldung.
 """
 from __future__ import annotations
 
@@ -19,19 +22,26 @@ logger = logging.getLogger("tls.billing")
 
 BATCH = 200
 OPEN_BILLING = [None, "pending"]
+CLOSED_PARENTS = {"cancelled"}
 
 
 def _candidates(statuses) -> dict:
     return {"status": {"$in": list(statuses)}, "billing_status": {"$in": OPEN_BILLING}, "price_snapshot.total_cents": {"$gt": 0}}
 
 
-async def _missing(db, kind: str, rows: list[dict]) -> list[dict]:
-    """Die Anmeldungen dieser Charge, zu deren eingefrorenem Preis kein Auftrag besteht (auch kein stornierter)."""
+async def _missing(db, kind: str, rows: list[dict], counts: dict) -> list[dict]:
+    """Die Anmeldungen dieser Charge, zu deren eingefrorenem Preis kein Auftrag besteht (auch kein stornierter).
+
+    Ein Preis ohne Hash hat keinen ``booking_key`` - ohne ihn ist das Nachholen nicht sicher genau einmal. Er wird
+    nicht geraten, sondern als ``needs_review`` gezählt und gemeldet."""
     keys = {row["id"]: billing_orders.booking_key(kind, row["id"], row.get("price_snapshot")) for row in rows}
+    for row_id, key in keys.items():
+        if not key:
+            counts["needs_review"] += 1
+            logger.warning("Rechnungsauftrag nicht nachgeholt: Preis ohne Hash, Nacharbeit nötig (%s %s)", kind, row_id)
     known = {order["booking_key"] async for order in db.billing_orders.find(
         {"booking_key": {"$in": [key for key in keys.values() if key]}}, {"_id": 0, "booking_key": 1})}
-    # Preise ohne Hash (sehr alt) prüft ``repair_order`` selbst über die Anmeldung.
-    return [row for row in rows if not keys[row["id"]] or keys[row["id"]] not in known]
+    return [row for row in rows if keys[row["id"]] and keys[row["id"]] not in known]
 
 
 async def _repair_kind(db, kind: str, collection, parents, statuses, parent_field: str, repair, counts: dict) -> None:
@@ -40,9 +50,11 @@ async def _repair_kind(db, kind: str, collection, parents, statuses, parent_fiel
 
     async def flush():
         counts["looked"] += len(batch)
-        for row in await _missing(db, kind, batch):
-            parent = await parents.find_one({"id": row.get(parent_field)}, {"_id": 0, "id": 1, "billing": 1})
-            if not parent:
+        for row in await _missing(db, kind, batch, counts):
+            parent = await parents.find_one({"id": row.get(parent_field)}, {"_id": 0, "id": 1, "billing": 1, "status": 1})
+            if not parent or parent.get("status") in CLOSED_PARENTS:
+                # Gelöscht oder abgesagt: keine Rechnung im Nachhinein.
+                counts["skipped"] += 1
                 continue
             try:
                 if await repair(db, parent, row):
@@ -70,7 +82,7 @@ async def _repair_tournament(db, tournament: dict, registration: dict):
 
 async def repair_missing_orders(db) -> dict:
     """Jeden eingefrorenen Preis ohne Auftrag nachholen - Event-Anmeldungen und Turnier-Startgelder."""
-    counts = {"looked": 0, "repaired": 0, "errors": 0}
+    counts = {"looked": 0, "repaired": 0, "errors": 0, "skipped": 0, "needs_review": 0}
     await _repair_kind(db, "event", db.event_registrations, db.events, event_registration.ACTIVE_STATUSES, "event_id",
                        _repair_event, counts)
     await _repair_kind(db, "tournament", db.tournament_registrations, db.tournaments, tournament_fees.BILLABLE_STATUSES,

@@ -11,7 +11,8 @@ from pymongo.errors import DuplicateKeyError
 from starlette.concurrency import run_in_threadpool
 from database import get_db
 from auth import (
-    password_fields, verify_user_password, verify_and_upgrade_password, create_access_token, create_refresh_token,
+    password_fields, verify_user_password_async, verify_and_upgrade_password, run_password_work, create_access_token,
+    create_refresh_token,
     set_auth_cookies, clear_auth_cookies, get_current_user, get_optional_user, _decode,
     hash_token, refresh_expires_at, as_utc_datetime, token_remembers,
 )
@@ -33,6 +34,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 logger = logging.getLogger("tls.auth")
 
 BRUTE_FORCE_MAX = 7
+LOGIN_PER_IP_PER_MINUTE = 30
 BRUTE_FORCE_WINDOW_MIN = 15
 REFRESH_REPLAY_GRACE_SECONDS = 10
 # Dasselbe Gerät der App (Kennung in `X-Device-Id`, #942) darf eine gerade gedrehte Erneuerung länger wiederholen:
@@ -700,6 +702,9 @@ async def login(body: UserLogin, request: Request, response: Response):
     db = get_db()
     if not (await load_auth_settings(db))["password_login_enabled"]:
         raise HTTPException(status_code=403, detail="Die Anmeldung mit E-Mail und Passwort ist derzeit deaktiviert.")
+    # Je Adresse (#1510): bremst, bevor ein Passwort geprüft wird - auch über viele verschiedene E-Mails hinweg.
+    # Großzügig genug für viele Geräte hinter einem Anschluss (Vereinsabend, LAN).
+    await enforce_rate_limit(request, "auth:login:ip", limit=LOGIN_PER_IP_PER_MINUTE, window_seconds=60)
     email = body.email.lower().strip()
     identifier = _client_identifier(request, email)
     await _check_brute_force(db, identifier)
@@ -986,6 +991,9 @@ async def mobile_login(body: UserLogin, request: Request):
     db = get_db()
     if not (await load_auth_settings(db))["password_login_enabled"]:
         raise HTTPException(status_code=403, detail="Die Anmeldung mit E-Mail und Passwort ist derzeit deaktiviert.")
+    # Je Adresse (#1510): bremst, bevor ein Passwort geprüft wird - auch über viele verschiedene E-Mails hinweg.
+    # Großzügig genug für viele Geräte hinter einem Anschluss (Vereinsabend, LAN).
+    await enforce_rate_limit(request, "auth:login:ip", limit=LOGIN_PER_IP_PER_MINUTE, window_seconds=60)
     email = body.email.lower().strip()
     identifier = _client_identifier(request, email)
     await _check_brute_force(db, identifier)
@@ -1362,7 +1370,7 @@ async def setup_mfa(body: MfaPasswordBody, request: Request, user: dict = Depend
     full = await db.users.find_one({"id": user["id"]})
     if not full or not full.get("password_login_available", full.get("auth_provider") != "google"):
         raise HTTPException(status_code=400, detail="Bitte zuerst ein eigenes Passwort über Passwort vergessen setzen.")
-    if not verify_user_password(full, body.current_password):
+    if not await verify_user_password_async(full, body.current_password):
         raise HTTPException(status_code=400, detail="Aktuelles Passwort falsch")
     secret = generate_totp_secret()
     now = now_utc()
@@ -1420,7 +1428,7 @@ async def disable_mfa(body: MfaDisableBody, request: Request, user: dict = Depen
     full = await db.users.find_one({"id": user["id"]})
     if not full or not full.get("mfa_enabled"):
         raise HTTPException(status_code=400, detail="MFA ist nicht aktiviert.")
-    if not verify_user_password(full, body.current_password):
+    if not await verify_user_password_async(full, body.current_password):
         raise HTTPException(status_code=400, detail="Aktuelles Passwort falsch")
     if not await _verify_mfa_code(db, full, body.code):
         raise HTTPException(status_code=400, detail="MFA- oder Wiederherstellungscode ist ungültig.")
@@ -1527,11 +1535,11 @@ async def change_password(body: ChangePasswordBody, request: Request, user: dict
     await enforce_rate_limit(request, "auth:change-password:user", limit=8, window_seconds=900, subject=user["id"])
     db = get_db()
     full = await db.users.find_one({"id": user["id"]})
-    if not full or not verify_user_password(full, body.current_password):
+    if not full or not await verify_user_password_async(full, body.current_password):
         raise HTTPException(status_code=400, detail="Aktuelles Passwort falsch")
     await db.users.update_one(
         {"id": user["id"]},
-        {"$set": {**password_fields(body.new_password),
+        {"$set": {**await run_password_work(password_fields, body.new_password),
                   "updated_at": now_utc().isoformat()}},
     )
     await db.refresh_tokens.update_many(

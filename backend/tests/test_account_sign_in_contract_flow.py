@@ -1,13 +1,20 @@
 """Anmeldung und Passwort ändern einheitlich (#1510), über die echten Routen gegen die Datenbank im Speicher.
 
 Vertrag:
-- Eine abgelehnte Anmeldung (Web und App) sieht immer gleich aus - gleiche Antwort, gleicher Prüfaufwand (genau ein
-  vollwertiger Hash-Vergleich), egal ob es zur E-Mail ein Konto gibt und in welchem Zustand es ist.
+- Eine abgelehnte Anmeldung (Web und App) sieht immer gleich aus - gleiche Antwort, gleicher Prüfaufwand (so viele
+  vollwertige Hash-Vergleiche, wie die Eingabe Formen hat, ``auth.password_work``), egal ob es zur E-Mail ein Konto gibt
+  und in welchem Zustand es ist. Erst nach dem richtigen Passwort darf die Antwort den Zustand nennen.
+- Vor jeder Prüfung bremst eine Grenze je Adresse, auch über viele E-Mails hinweg; bcrypt läuft im begrenzten Pool,
+  nie im Event-Loop.
 - Jeder Konto-Endpunkt, der ein Passwort prüft, ist begrenzt - auch „Passwort ändern“.
 Erfundene Konten und Testpasswörter."""
 import ast
+import asyncio
 import pathlib
 import sys
+import threading
+import time
+import unicodedata
 
 import bcrypt
 import pytest
@@ -17,11 +24,13 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
 
-from auth import hash_password, password_fields  # noqa: E402
+import auth  # noqa: E402
+from auth import hash_password, password_fields, password_work  # noqa: E402
 
 BACKEND = pathlib.Path(__file__).resolve().parents[1]
 PASSWORD = "Loewen-Testpasswort-1"
 WRONG = "Falsches-Testpasswort-2"
+WRONG_DECOMPOSED = unicodedata.normalize("NFD", "Löwen-falsch-Grüße")
 LOGIN_PATHS = ("/api/auth/login", "/api/auth/mobile/login")
 
 
@@ -48,15 +57,22 @@ async def account(flow, **fields) -> dict:
     return user
 
 
+class _Checks(list):
+    def __init__(self):
+        super().__init__()
+        self.threads: list[int] = []
+
+
 @pytest.fixture
 def hash_checks(monkeypatch):
     """Zählt die vollwertigen Hash-Vergleiche (gegen einen echten bcrypt-Hash) und merkt sich deren Kosten."""
     real = bcrypt.checkpw
-    seen: list[bytes] = []
+    seen = _Checks()
 
     def counting(candidate, stored):
         if isinstance(stored, (bytes, bytearray)) and bytes(stored).startswith(b"$2") and len(stored) == 60:
             seen.append(bytes(stored[:7]))
+            seen.threads.append(threading.get_ident())
         return real(candidate, stored)
 
     monkeypatch.setattr(bcrypt, "checkpw", counting)
@@ -68,8 +84,13 @@ def cost_prefix() -> bytes:
 
 
 async def rejected_states(flow) -> dict[str, str]:
-    """Je Zustand eine E-Mail, mit der die Anmeldung mit ``WRONG`` scheitert."""
+    """Je Zustand eine E-Mail, mit der die Anmeldung mit falschem Passwort scheitert."""
     known = await account(flow)
+    legacy = await account(flow, password_hash=bcrypt.hashpw(PASSWORD.encode("utf-8"), bcrypt.gensalt()).decode("utf-8"))
+    await flow.db.users.update_one({"id": legacy["id"]}, {"$unset": {"password_contract": ""}})
+    banned = await account(flow, is_banned=True)
+    inactive = await account(flow, is_active=False)
+    unverified = await account(flow, email_verified=False)
     invited = await account(flow, password_hash="!pending_invite", password_setup_required=True)
     reinvited = await account(flow, password_setup_required=True)
     without_hash = await account(flow)
@@ -77,6 +98,10 @@ async def rejected_states(flow) -> dict[str, str]:
     return {
         "kein Konto": f"niemand-{new_id()[:6]}@example.com",
         "falsches Passwort": known["email"],
+        "Konto von vor dem Vertrag": legacy["email"],
+        "gesperrt": banned["email"],
+        "deaktiviert": inactive["email"],
+        "E-Mail unbestätigt": unverified["email"],
         "Einladung offen": invited["email"],
         "Einladung erneut": reinvited["email"],
         "ohne Passwort": without_hash["email"],
@@ -85,14 +110,18 @@ async def rejected_states(flow) -> dict[str, str]:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("path", LOGIN_PATHS)
-@pytest.mark.parametrize("attempt", [WRONG, "x" * 100], ids=["kurz", "lang"])
+@pytest.mark.parametrize("attempt", [WRONG, "x" * 100, WRONG_DECOMPOSED], ids=["kurz", "lang", "zerlegt"])
 async def test_a_rejected_sign_in_looks_the_same_in_every_account_state(flow, hash_checks, path, attempt):
     answers = {}
+    expected = [cost_prefix()] * password_work(attempt)
+    loop_thread = threading.get_ident()
     for state, email in (await rejected_states(flow)).items():
         hash_checks.clear()
+        hash_checks.threads.clear()
         response = await flow.post(path, json={"email": email, "password": attempt})
         answers[state] = (response.status_code, response.json())
-        assert hash_checks == [cost_prefix()], f"{state}: genau ein vollwertiger Vergleich mit denselben Kosten"
+        assert hash_checks == expected, f"{state}: dieselbe Zahl vollwertiger Vergleiche mit denselben Kosten"
+        assert loop_thread not in hash_checks.threads, f"{state}: bcrypt läuft nicht im Event-Loop"
     assert len(set(map(repr, answers.values()))) == 1, answers
     assert answers["kein Konto"] == (401, {"detail": "Ungültige Zugangsdaten"})
 
@@ -112,10 +141,59 @@ async def test_the_right_password_still_signs_in_and_names_an_open_invitation(fl
     known = await account(flow)
     assert (await flow.post(path, json={"email": known["email"], "password": PASSWORD})).status_code == 200
 
-    # Gegenprobe: wer das richtige Passwort kennt, erfährt, dass erst der Einladungslink dran ist.
-    reinvited = await account(flow, password_setup_required=True)
-    response = await flow.post(path, json={"email": reinvited["email"], "password": PASSWORD})
-    assert response.status_code == 403 and "Einladungslink" in response.json()["detail"]
+    # Gegenprobe: erst wer das richtige Passwort kennt, erfährt, warum es nicht weitergeht.
+    for fields, part in (({"password_setup_required": True}, "Einladungslink"), ({"is_banned": True}, "gesperrt"),
+                         ({"is_active": False}, "deaktiviert"), ({"email_verified": False}, "nicht bestätigt")):
+        holder = await account(flow, **fields)
+        response = await flow.post(path, json={"email": holder["email"], "password": PASSWORD})
+        assert response.status_code == 403 and part in response.json()["detail"], fields
+
+
+def per_address_limit() -> int:
+    from routes import auth_routes
+
+    assert auth_routes.LOGIN_PER_IP_PER_MINUTE >= 30, "großzügig genug für viele Geräte hinter einem Anschluss"
+    return auth_routes.LOGIN_PER_IP_PER_MINUTE
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", LOGIN_PATHS)
+async def test_sign_in_is_limited_per_address_before_any_password_check(flow, hash_checks, path):
+    known = await account(flow)
+    for number in range(per_address_limit()):
+        response = await flow.post(path, json={"email": f"niemand-{number}@example.com", "password": WRONG})
+        assert response.status_code == 401, number
+    hash_checks.clear()
+    for email in (f"niemand-{new_id()[:6]}@example.com", known["email"]):
+        for password in (WRONG, PASSWORD):
+            response = await flow.post(path, json={"email": email, "password": password})
+            assert response.status_code == 429, (email, password)
+    assert list(hash_checks) == [], "über der Grenze wird kein Passwort mehr geprüft"
+
+
+@pytest.mark.asyncio
+async def test_password_checks_run_in_a_bounded_pool(monkeypatch):
+    state = {"active": 0, "peak": 0}
+    threads = set()
+    lock = threading.Lock()
+
+    def slow(candidate, stored):
+        with lock:
+            state["active"] += 1
+            state["peak"] = max(state["peak"], state["active"])
+            threads.add(threading.get_ident())
+        time.sleep(0.05)
+        with lock:
+            state["active"] -= 1
+        return False
+
+    auth._stand_in_hash()
+    monkeypatch.setattr(bcrypt, "checkpw", slow)
+    count = auth.PASSWORD_WORKERS * 3
+    results = await asyncio.gather(*(auth.verify_and_upgrade_password(None, None, WRONG) for _ in range(count)))
+    assert results == [False] * count
+    assert 1 < state["peak"] <= auth.PASSWORD_WORKERS, state
+    assert threading.get_ident() not in threads
 
 
 async def change(flow, current: str):
@@ -142,7 +220,7 @@ async def test_change_password_is_limited_per_account(flow):
     assert (await change(flow, PASSWORD)).status_code == 200
 
 
-PASSWORD_CHECKS = {"verify_user_password", "verify_and_upgrade_password", "verify_password"}
+PASSWORD_CHECKS = {"verify_user_password", "verify_user_password_async", "verify_and_upgrade_password", "verify_password"}
 LIMITS = {"enforce_rate_limit", "_check_brute_force"}
 
 

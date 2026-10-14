@@ -5,6 +5,7 @@ Anmeldung einen fehlenden Auftrag nach. Wer aber nicht wiederholt - die Person i
 schon freigegeben oder nachrücken lassen -, bliebe ohne Auftrag. Der Rechnungs-Job holt jeden eingefrorenen Preis ohne
 Auftrag selbst nach, genau einmal. Ohne eingefrorenen Preis friert er nichts ein; das bleibt der Anmeldung vorbehalten.
 Erfundene Konten."""
+import asyncio
 import pathlib
 import sys
 from datetime import timedelta
@@ -195,6 +196,58 @@ async def test_one_broken_row_does_not_stop_the_others(flow, monkeypatch):
     second = await billing_repair.repair_missing_orders(flow.db)
     assert (second["repaired"], second["errors"]) == (1, 0)
     assert len(await orders(flow, paula, "event")) == 1 and len(await orders(flow, wanda, "event")) == 1
+
+
+SNAPSHOT = {"total_cents": 2000, "currency": "EUR", "invoice_timing": "on_confirm", "recipient": {}}
+
+
+async def gap(flow, collection, parent_field, parent_id, user, digest, status):
+    row = {"id": f"g-{user['username']}-{parent_id}", parent_field: parent_id, "user_id": user["id"], "status": status, "seat_count": 1,
+           "registration_type": "solo", "billing_status": "pending", "price_snapshot": {**SNAPSHOT, **({"hash": digest} if digest else {})}}
+    await collection.insert_one(row)
+    return row
+
+
+@pytest.mark.asyncio
+async def test_no_order_afterwards_for_a_cancelled_or_deleted_event_or_tournament(flow):
+    """Codex-Prüfung #1539: abgesagt oder gelöscht heißt keine Rechnung im Nachhinein. Gegenprobe: dieselbe Lücke bei
+    einem laufenden Event wird nachgeholt."""
+    admin = await person(flow, "chef", role="superadmin")
+    paula = await person(flow, "paula")
+    open_event = await paid_event(flow, admin)
+    cancelled_event = await paid_event(flow, admin)
+    cup = await paid_cup(flow, admin)
+    await flow.db.events.update_one({"id": cancelled_event["id"]}, {"$set": {"status": "cancelled"}})
+    await flow.db.tournaments.update_one({"id": cup["id"]}, {"$set": {"status": "cancelled"}})
+    await gap(flow, flow.db.event_registrations, "event_id", cancelled_event["id"], paula, "h-a", "registered")
+    await gap(flow, flow.db.event_registrations, "event_id", "geloescht", paula, "h-b", "registered")
+    await gap(flow, flow.db.tournament_registrations, "tournament_id", cup["id"], paula, "h-c", "approved")
+    await gap(flow, flow.db.tournament_registrations, "tournament_id", "geloescht", paula, "h-d", "approved")
+
+    result = await billing_repair.repair_missing_orders(flow.db)
+    assert (result["repaired"], result["skipped"]) == (0, 4), result
+    assert await flow.db.billing_orders.count_documents({}) == 0
+
+    await gap(flow, flow.db.event_registrations, "event_id", open_event["id"], paula, "h-e", "registered")
+    assert (await billing_repair.repair_missing_orders(flow.db))["repaired"] == 1
+    assert [row["booking_key"] async for row in flow.db.billing_orders.find({}, {"_id": 0})] == [f"event:g-paula-{open_event['id']}:h-e"]
+
+
+@pytest.mark.asyncio
+async def test_a_price_without_hash_is_reported_not_guessed_even_with_two_workers(flow):
+    """Codex-Prüfung #1539: ohne Hash kein ``booking_key`` - zwei Läufe könnten je einen Auftrag anlegen. Der Job lässt
+    solche Preise aus und zählt sie als Nacharbeit. Gegenprobe: mit Hash ergeben zwei gleichzeitige Läufe einen Auftrag."""
+    admin = await person(flow, "chef", role="superadmin")
+    event = await paid_event(flow, admin)
+    old, new = await person(flow, "alt"), await person(flow, "neu")
+    await gap(flow, flow.db.event_registrations, "event_id", event["id"], old, None, "registered")
+    await gap(flow, flow.db.event_registrations, "event_id", event["id"], new, "h-neu", "registered")
+
+    first, second = await asyncio.gather(billing_repair.repair_missing_orders(flow.db), billing_repair.repair_missing_orders(flow.db))
+    assert first["needs_review"] == 1 and second["needs_review"] == 1
+    assert await orders(flow, old, "event") == [], "ohne Hash nichts raten"
+    assert len(await orders(flow, new, "event")) == 1, "zwei Läufe, ein Auftrag"
+    assert (await billing_repair.repair_missing_orders(flow.db))["repaired"] == 0
 
 
 @pytest.mark.asyncio

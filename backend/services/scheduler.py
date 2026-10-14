@@ -296,7 +296,7 @@ async def _safe_billing_orders():
         from database import get_db
         from services import billing_repair
         repaired = await billing_repair.repair_missing_orders(get_db())
-        if repaired.get("repaired") or repaired.get("errors"):
+        if repaired.get("repaired") or repaired.get("errors") or repaired.get("needs_review"):
             logger.info(f"[scheduler] billing_repair {repaired}")
     except Exception as exc:
         _log_task_failure("billing_repair", exc)
