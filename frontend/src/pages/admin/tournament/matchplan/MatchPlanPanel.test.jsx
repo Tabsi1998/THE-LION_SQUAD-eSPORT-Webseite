@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 import fixture from "../../../../../e2e/fixtures/matchplanGenerated.json";
 import { buildTimeline, timeScale } from "@/lib/matchTimeline";
 import { viennaTime } from "@/lib/vienna";
@@ -39,6 +40,7 @@ function setup(state, { plan = state.plan, now = fixture.generated_at, extra = {
   const onChanged = vi.fn();
   const view = render(
     <MemoryRouter>
+    <ConfirmDialogProvider>
     <MatchPlanPanel
       tournament={state.tournament}
       matches={state.matches}
@@ -51,6 +53,7 @@ function setup(state, { plan = state.plan, now = fixture.generated_at, extra = {
       now={new Date(now)}
       {...extra}
     />
+    </ConfirmDialogProvider>
     </MemoryRouter>,
   );
   return { ...view, onChanged };
@@ -175,10 +178,10 @@ describe("Ansicht springt nicht und bleibt nie leer", () => {
     apiMock.post.mockRejectedValue(Object.assign(new Error("403"), { response: { status: 403, data: { detail: "Keine Turnierberechtigung für diese Aktion" } } }));
     apiMock.patch.mockResolvedValue({ data: {} });
     render(
-      <MemoryRouter>
+      <MemoryRouter><ConfirmDialogProvider>
         <MatchPlanPanel tournament={state.tournament} matches={state.matches} stages={state.stages} stations={state.stations}
           registrations={state.registrations} durationGame={state.duration_game} now={new Date(fixture.generated_at)} />
-      </MemoryRouter>,
+      </ConfirmDialogProvider></MemoryRouter>,
     );
     expect(await screen.findByTestId("mp-plan-error")).toHaveTextContent("Keine Turnierberechtigung für diese Aktion");
     expect(bar("A")).toBeInTheDocument();
@@ -199,10 +202,10 @@ describe("Ansicht springt nicht und bleibt nie leer", () => {
     apiMock.get.mockRejectedValue(new Error("weg"));
     apiMock.post.mockResolvedValue({ data: state.plan });
     render(
-      <MemoryRouter>
+      <MemoryRouter><ConfirmDialogProvider>
         <MatchPlanPanel tournament={state.tournament} matches={state.matches} stages={state.stages} stations={state.stations}
           registrations={state.registrations} durationGame={state.duration_game} now={new Date(fixture.generated_at)} />
-      </MemoryRouter>,
+      </ConfirmDialogProvider></MemoryRouter>,
     );
     expect(await screen.findByTestId("mp-remote-error")).toHaveTextContent("Fristen");
   });
@@ -493,6 +496,87 @@ describe("online, Liga, hybrid: dieselben Regeln wie der Planer", () => {
     setup({ ...state, tournament: { ...state.tournament, event_mode: "hybrid", can_assign_stations: false } });
     expect(screen.getByTestId("mp-online")).toBeInTheDocument();
     expect(screen.queryByTestId("mp-timeline")).toBeNull();
+  });
+});
+
+describe("Praxis 14.10.: Stationen und Reihenfolge - eine Wahrheit für Kopf und Zeitleiste", () => {
+  it("gelöschte Station: Kopf „Noch keine Station“, Bahn „Gelöschte Station“, Warnungen in Worten", async () => {
+    const state = fixture.orphan;
+    setup(state);
+    await waitFor(() => expect(screen.getByTestId("mp-warnings")).toHaveTextContent("die es nicht mehr gibt"));
+    expect(screen.getByTestId("mp-settings")).toHaveTextContent("Noch keine Station");
+    expect(screen.getByTestId(`mp-lane-${state.deleted_station_id}`)).toHaveAttribute("data-name", "Gelöschte Station");
+    expect(screen.getByTestId("mp-warnings")).toHaveTextContent(/LE ist fest um 19:10, aber LC ist erst um 20:00 vorbei\./);
+    expect(bar("LE")).toHaveAttribute("data-conflict", "true");
+  });
+
+  it("auf die gelöschte Station lässt sich nichts ziehen - mit Grund, ohne Anfrage", async () => {
+    const state = fixture.orphan;
+    setup(state);
+    await waitFor(() => expect(screen.getByTestId("mp-warnings")).toBeInTheDocument());
+    const lanes = screen.getAllByTestId(/^mp-lane-/).map((lane) => lane.getAttribute("data-testid").replace("mp-lane-", ""));
+    const handle = bar("LF");
+    const dy = (lanes.indexOf(state.deleted_station_id) - lanes.indexOf("none")) * 64;
+    fireEvent.pointerDown(handle, { pointerId: 1, button: 0, clientX: 200, clientY: 300 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 200, clientY: 300 + dy });
+    expect(screen.getByTestId("mp-ghost")).toHaveAttribute("data-blocked", "true");
+    expect(screen.getByTestId("mp-drag-status")).toHaveTextContent("Diese Station gibt es nicht mehr");
+    fireEvent.pointerUp(handle, { pointerId: 1, clientX: 200, clientY: 300 + dy });
+    await act(async () => {});
+    expect(apiMock.patch).not.toHaveBeenCalled();
+  });
+
+  it("die Stationen des Events stehen im Kopf und in der Auswahl beim Ändern", async () => {
+    const user = userEvent.setup();
+    const state = fixture.event_stations;
+    const hall = state.plan.stations.find((row) => row.scope === "event");
+    setup(state);
+    await waitFor(() => expect(screen.getByTestId("mp-settings")).toHaveTextContent(hall.name));
+    expect(screen.getByTestId("mp-settings")).toHaveTextContent("Event");
+    const first = state.matches.find((row) => row.match_key === "A");
+    expect(first).toBeTruthy();
+    await user.click(within(screen.getByTestId("mp-order")).getAllByRole("button", { name: /ändern$/ })[0]);
+    expect(within(screen.getByTestId("mp-editor")).getByRole("option", { name: new RegExp(hall.name) })).toBeInTheDocument();
+  });
+});
+
+describe("Alle Termine von Hand lösen - die alte Planung auf einmal zurück an den Planer", () => {
+  it("mit Rückfrage: 14 Spiele verlieren Termin und Station, danach öffnet die Vorschau von „Automatisch planen“", async () => {
+    const user = userEvent.setup();
+    const state = fixture.orphan;
+    const { onChanged } = setup(state);
+    await waitFor(() => expect(screen.getByTestId("mp-warnings")).toBeInTheDocument());
+    apiMock.post.mockImplementation((url) => {
+      if (String(url).includes("/schedule/release")) return Promise.resolve({ data: { released: 14, match_ids: [], scope: "all" } });
+      return Promise.resolve({ data: fixture.local.preview.plan });
+    });
+    await user.click(screen.getByRole("button", { name: "Alle Termine von Hand lösen" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("14 Spiele verlieren ihre festen Termine und Stationen");
+    expect(apiMock.post.mock.calls.some(([url]) => url.includes("/schedule/release"))).toBe(false);
+    await user.click(within(dialog).getByRole("button", { name: "Termine lösen" }));
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`/tournaments/${state.tournament.id}/schedule/release`, { scope: "all" }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(await screen.findByTestId("mp-preview")).toBeInTheDocument();
+  });
+
+  it("bei gelöschten Stationen auch nur deren Spiele", async () => {
+    const user = userEvent.setup();
+    const state = fixture.orphan;
+    setup(state);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Nur Spiele an gelöschten Stationen lösen" })).toBeInTheDocument());
+    apiMock.post.mockImplementation((url) => (String(url).includes("/schedule/release")
+      ? Promise.resolve({ data: { released: 13 } }) : Promise.resolve({ data: fixture.local.preview.plan })));
+    await user.click(screen.getByRole("button", { name: "Nur Spiele an gelöschten Stationen lösen" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("13 Spiele");
+    await user.click(within(dialog).getByRole("button", { name: "Termine lösen" }));
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`/tournaments/${state.tournament.id}/schedule/release`, { scope: "missing_stations" }));
+  });
+
+  it("ohne feste Termine oder ohne Planungsrecht kein Knopf", () => {
+    setup(fixture.local.applied);
+    expect(screen.queryByRole("button", { name: "Alle Termine von Hand lösen" })).toBeNull();
   });
 });
 
