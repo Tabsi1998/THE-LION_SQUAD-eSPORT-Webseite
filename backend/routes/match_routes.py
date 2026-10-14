@@ -3,6 +3,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 
+from pymongo import ReturnDocument
 from fastapi import APIRouter, HTTPException, Depends, Request
 from database import get_db
 from services.chat_attachments import register_chat_access
@@ -37,6 +38,7 @@ from services.match_duration import load_duration_game, with_effective_durations
 from services.match_public_view import public_match_view, public_tournament_view
 from services.match_planning import (
     STATION_GONE,
+    restore_change,
     ensure_plan_keeps_result_state,
     ensure_station_open,
     ensure_station_slot_available,
@@ -1050,12 +1052,14 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         station_moved = "station_id" in updates and updates["station_id"] != v2_match.get("station_id")
         if v2_match.get("called_at") and (status_moved or station_moved):
             change["$unset"] = {"called_at": ""}
-        await db.matches_v2.update_one({"id": match_id}, change)
+        before = await db.matches_v2.find_one_and_update({"id": match_id}, change, projection={"_id": 0},
+                                                         return_document=ReturnDocument.BEFORE) or v2_match
         if new_station and not await station_open_for_matches(db, new_station):
-            # Die Station wurde zwischen Prüfung und Schreiben gelöscht (Codex zu #1611): zurück, nur wenn noch unser Stand.
+            # Die Station wurde zwischen Prüfung und Schreiben gelöscht (Codex zu #1611): exakt zurück auf den Stand vor
+            # dem Schreiben (auch ein entferntes „aufgerufen um“) - nur, wenn das Spiel noch so dasteht wie geschrieben.
             await db.matches_v2.update_one(
                 {"id": match_id, "station_id": new_station, "updated_at": updates["updated_at"]},
-                {"$set": {key: v2_match.get(key) for key in updates}})
+                restore_change(before, [*updates, *change.get("$unset", {})]))
             raise HTTPException(status_code=409, detail=STATION_GONE)
         if station_moved and v2_match.get("station_id"):
             # Umlegen (#1160): die alte Station gibt das Spiel ab - eine defekte bleibt defekt, sonst ist sie frei.

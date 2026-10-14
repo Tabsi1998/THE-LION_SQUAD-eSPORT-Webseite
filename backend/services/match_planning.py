@@ -63,6 +63,17 @@ async def station_open_for_matches(db, station_id: str) -> bool:
     return bool(await db.stations.find_one({"id": station_id, "deleting": {"$ne": True}}, {"_id": 0, "id": 1}))
 
 
+def restore_change(before: dict, keys) -> dict:
+    """Die Änderung, die ``keys`` exakt auf ``before`` zurücksetzt: was es vorher gab, per $set, was nicht, per $unset."""
+    keys = set(keys)
+    change: dict = {}
+    if kept := {key: before[key] for key in keys if key in before}:
+        change["$set"] = kept
+    if gone := {key: "" for key in keys if key not in before}:
+        change["$unset"] = gone
+    return change
+
+
 async def ensure_station_open(db, station_id: str) -> None:
     """Vor dem Zuweisen. Löschen markiert zuerst und prüft dann; wer zuweist, prüft vorher und nach dem Schreiben noch
     einmal (``station_open_for_matches``) - so sieht in jeder Reihenfolge einer den anderen."""

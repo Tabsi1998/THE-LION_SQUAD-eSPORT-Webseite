@@ -139,6 +139,9 @@ async def test_a_deletion_while_a_match_is_being_put_on_the_station_is_caught_af
 async def test_applying_a_plan_onto_a_station_being_deleted_writes_nothing_there(flow):
     tournament, station, matches = await on_site_cup(flow)
     match = matches[0]
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"schedule_forecast": True, "updated_at": "vorher"},
+                                                              "$unset": {"schedule_written_at": ""}})
+    match = await flow.db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
     await flow.db.stations.update_one({"id": station["id"]}, {"$set": {"deleting": True}})
     plan = {"assignments": [{
         "match_id": match["id"], "changed": True, "schedule_source": "planner", "station_id": station["id"],
@@ -151,6 +154,8 @@ async def test_applying_a_plan_onto_a_station_being_deleted_writes_nothing_there
     assert any(item.get("type") == "station_gone" for item in result["warnings"])
     after = await flow.db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
     assert after.get("station_id") == match.get("station_id") and after.get("scheduled_at") == match.get("scheduled_at")
+    # Alles, was der Plan gesetzt hat, steht wieder wie vorher - auch Prognose und Schreib-Metadaten (Codex zu #1611).
+    assert after == match
 
 
 @pytest.mark.asyncio
@@ -163,3 +168,36 @@ async def test_a_failed_deletion_takes_its_mark_back(flow):
     # Und die Station nimmt danach wieder Spiele an.
     response = await flow.patch(f"/api/matches/{matches[1]['id']}", json={"station_id": station["id"]})
     assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
+async def test_a_failure_while_deleting_takes_the_mark_back(flow, monkeypatch):
+    # Codex zu #1611: bräche das Löschen nach dem Markieren ab, bliebe die Station sonst für immer gesperrt.
+    _tournament, station, matches = await on_site_cup(flow)
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Datenbank weg")
+
+    monkeypatch.setattr(station_routes, "load_matches_by_query", broken)
+    with pytest.raises(RuntimeError):
+        await flow.delete(f"/api/stations/{station['id']}")
+    assert not (await flow.db.stations.find_one({"id": station["id"]})).get("deleting")
+
+
+@pytest.mark.asyncio
+async def test_the_patch_rollback_restores_the_match_exactly(flow, monkeypatch):
+    # Codex zu #1611: auch ein per $unset entferntes „aufgerufen um“ kommt zurück, und nichts Neues bleibt stehen.
+    _tournament, station, matches = await on_site_cup(flow)
+    await flow.db.matches_v2.update_one({"id": matches[0]["id"]}, {"$set": {"called_at": "2026-10-14T18:00:00+00:00"}})
+    before = await flow.db.matches_v2.find_one({"id": matches[0]["id"]}, {"_id": 0})
+    original = match_routes.ensure_station_open
+
+    async def delete_in_between(db, station_id):
+        await original(db, station_id)
+        await flow.delete(f"/api/stations/{station['id']}")
+
+    monkeypatch.setattr(match_routes, "ensure_station_open", delete_in_between)
+    response = await flow.patch(f"/api/matches/{matches[0]['id']}", json={
+        "station_id": station["id"], "scheduled_at": (now_utc() + timedelta(hours=4)).isoformat()})
+    assert response.status_code == 409, response.text
+    assert await flow.db.matches_v2.find_one({"id": matches[0]["id"]}, {"_id": 0}) == before

@@ -435,14 +435,19 @@ async def delete_station(sid: str, me: dict = Depends(require_admin())):
         {"$set": {"deleting": True}})
     if not marked.matched_count:
         raise HTTPException(status_code=409, detail="Die Station hält gerade ein Spiel oder wird schon gelöscht. Bitte neu laden.")
-    holding = sorted(
-        await load_matches_by_query(db, {"station_id": sid, "status": {"$nin": list(DONE_STATUSES)}}, per_store_limit=500),
-        key=lambda match: str(match.get("match_key") or ""),
-    )
-    if holding:
-        await db.stations.update_one({"id": sid, "deleting": True}, {"$unset": {"deleting": ""}})
-        raise HTTPException(status_code=409, detail=station_in_use_message(station.get("name"), holding))
-    await db.stations.delete_one({"id": sid, "deleting": True})
+    deleted = False
+    try:
+        holding = sorted(
+            await load_matches_by_query(db, {"station_id": sid, "status": {"$nin": list(DONE_STATUSES)}}, per_store_limit=500),
+            key=lambda match: str(match.get("match_key") or ""),
+        )
+        if holding:
+            raise HTTPException(status_code=409, detail=station_in_use_message(station.get("name"), holding))
+        deleted = bool((await db.stations.delete_one({"id": sid, "deleting": True})).deleted_count)
+    finally:
+        # Was nicht gelöscht wurde (Spiele gefunden, Fehler), bleibt benutzbar - sonst wäre es für immer gesperrt.
+        if not deleted:
+            await db.stations.update_one({"id": sid, "deleting": True}, {"$unset": {"deleting": ""}})
     return {"ok": True}
 
 
