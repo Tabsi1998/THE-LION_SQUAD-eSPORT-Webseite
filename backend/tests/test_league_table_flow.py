@@ -349,3 +349,40 @@ async def test_a_shared_place_counts_for_both_in_season_prizes_and_awards(flow):
 
     awards = {doc["registration_id"]: doc["rank"] for doc in await flow.db.tournament_awards.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(50)}
     assert {awards[rid] for rid in winners} == {1} and {awards[rid] for rid in losers} == {3}
+
+
+async def shared_first_place(flow):
+    """Liga mit vier, erster Spieltag mit gleichen Ergebnissen: zwei teilen sich Platz 1."""
+    staff, tournament, users, regs = await league_of(flow)
+    winners = []
+    for match in round_matches(await flow.matches(tournament), 1):
+        first, _second = await report(flow, staff, match, 3, 1)
+        winners.append(first)
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    return stored, users, regs, winners
+
+
+@pytest.mark.asyncio
+async def test_the_migration_preview_sees_the_shared_place_too(flow):
+    from services.competition_read import load_competition_read_model
+    from services.migration_dryrun import tournament_fingerprint
+
+    tournament, _users, regs, winners = await shared_first_place(flow)
+    snapshot = (await load_competition_read_model(flow.db, tournament["id"])).structure_snapshot()
+
+    fingerprint = tournament_fingerprint(tournament, snapshot, regs)
+
+    assert fingerprint["placements"]["1"] == sorted(winners)
+    assert "2" not in fingerprint["placements"]
+
+
+@pytest.mark.asyncio
+async def test_both_holders_of_a_shared_first_place_count_a_tournament_win(flow):
+    from services.achievement_progress import compute_user_progress
+
+    _tournament, users, regs, winners = await shared_first_place(flow)
+    user_of = {reg["id"]: user["id"] for reg, user in zip(regs, users)}
+
+    progress = [await compute_user_progress(user_of[rid]) for rid in winners]
+
+    assert [entry["tournaments_won"] for entry in progress] == [1, 1]

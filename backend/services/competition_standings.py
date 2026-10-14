@@ -621,12 +621,14 @@ def registration_tournament_achievement_progress(
     snapshot: dict,
     registrations: list[dict],
     registration_ids: set[str],
+    *,
+    tournament: dict | None = None,
 ) -> dict:
     """Return one tournament's win/podium/fourth-place badge flags."""
 
     ranks = {
         rank
-        for rank, group in placements_for_structure(snapshot, registrations).items()
+        for rank, group in placements_for_structure(snapshot, registrations, tournament=tournament).items()
         for placement in group
         if placement.get("registration_id") in registration_ids
     }
