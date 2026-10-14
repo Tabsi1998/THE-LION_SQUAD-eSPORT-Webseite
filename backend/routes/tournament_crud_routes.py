@@ -191,6 +191,10 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     for t in tournaments:
         await _enrich_tournament(t, user)
         _expose_offer(t, finance)
+        if not is_admin:
+            # Der Umbau-Vorschlag für die Läufe (#1550) gehört der Turnierleitung; Helfer sehen ihn am Turnier selbst.
+            t.pop("heat_rebuild_plan", None)
+            t.pop("heat_rebuild_dismissed", None)
     # Das Event als Klammer (#1182): die Kennung des Events nur, wenn es für die Person sichtbar ist (#1473).
     await hide_unseen_event_links(db, user, tournaments)
     if compact:
@@ -220,12 +224,12 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
         suffix = f"?{urlencode({'access': access})}" if access else ""
         return RedirectResponse(url=f"/api/tournaments/{quote(str(t['slug']), safe='')}{suffix}", status_code=301)
     await _enrich_tournament(t, user)
-    if not (is_admin or is_assigned):
-        # Der Umbau-Vorschlag für die Läufe (#1550) ist Sache der Turnierleitung.
-        t.pop("heat_rebuild_plan", None)
-        t.pop("heat_rebuild_dismissed", None)
     # Was die Person hier darf (#1353): die Verwaltung zeigt Knöpfe nur nach diesen Feldern.
     t.update(await tournament_rights(user, t["id"]))
+    if not t.get("can_manage_structure"):
+        # Der Umbau-Vorschlag für die Läufe (#1550) sieht nur, wer ihn auch bestätigen darf (Strukturrollen).
+        t.pop("heat_rebuild_plan", None)
+        t.pop("heat_rebuild_dismissed", None)
     if access_link:
         await touch_access_link(db, access_link, user)
         t["access_link"] = public_access_link_payload(access_link)

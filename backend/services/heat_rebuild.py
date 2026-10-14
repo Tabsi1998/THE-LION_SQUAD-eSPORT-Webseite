@@ -559,6 +559,24 @@ def _fingerprint(match: dict) -> str:
     return json.dumps(match, sort_keys=True, default=str, separators=(",", ":"))
 
 
+STALE_DETAIL = "Ein Lauf hat sich inzwischen geändert (aufgerufen, gestartet oder entschieden). Bitte neu prüfen."
+
+
+def _doc_fields(match: dict) -> dict:
+    return {key: value for key, value in match.items() if key not in {"id", "_id"}}
+
+
+def _unchanged_filter(before: dict) -> dict:
+    """Der Lauf steht noch so da wie gelesen: Stand, Aufruf, Beginn, Zeitstempel (``None`` trifft auch „fehlt“)."""
+    return {
+        "id": before["id"],
+        "status": before.get("status") or "pending",
+        "called_at": before.get("called_at"),
+        "started_at": before.get("started_at"),
+        "updated_at": before.get("updated_at"),
+    }
+
+
 def rebuild_heats(matches: list[dict], *, cap: int, quota: int, min_players: int = 2, structural: bool = True,
                   now_iso: str | None = None) -> dict:
     """Der Planer: baut die Läufe einer Phase im Speicher um (siehe Modulbeschreibung) und sagt, was er getan hat.
@@ -658,15 +676,28 @@ async def _persist(db, tournament: dict, stage: dict, matches: list[dict], origi
         codes = sorted({issue.get("code") for issue in report.get("issues") or [] if issue.get("severity") == "error"})
         logger.error("Lauf-Umbau abgelehnt: Graph ungültig tournament=%s codes=%s", tid, codes)
         raise HeatRebuildError("Der Umbau ergäbe keinen gültigen Turnierbaum und wurde nicht gespeichert.", 409)
-    changed: list[str] = []
-    for match in matches:
-        before = original.get(match["id"])
-        if before is not None and _fingerprint(before) == _fingerprint(match):
-            continue
-        changed.append(match["id"])
-        await db.matches_v2.update_one({"id": match["id"]}, {"$set": {key: value for key, value in match.items() if key != "id"}})
-        if before and before.get("station_id") and match.get("status") == "cancelled":
+    changed = [match for match in matches if _fingerprint(original.get(match["id"]) or {}) != _fingerprint(match)]
+    # Compare-and-Set (Codex-Prüfung zu #1575): jeder Lauf wird nur geschrieben, wenn er noch so dasteht wie gelesen -
+    # Stand, Aufruf, Beginn und Zeitstempel. Die Stationsrouten laufen heute ohne die Turnier-Schreibsperre; ein
+    # dazwischen aufgerufener oder gestarteter Lauf darf nicht mit dem alten Bild überschrieben werden.
+    for match in changed:
+        if await db.matches_v2.count_documents(_unchanged_filter(original[match["id"]])) != 1:
+            raise HeatRebuildError(STALE_DETAIL, 409)
+    written: list[dict] = []
+    for match in changed:
+        before = original[match["id"]]
+        result = await db.matches_v2.update_one(_unchanged_filter(before), {"$set": _doc_fields(match)})
+        if result.matched_count != 1:
+            # Ein Lauf hat sich zwischen Prüfung und Schreiben geändert: das Geschriebene zurück, nichts bleibt halb.
+            for row in written:
+                await db.matches_v2.update_one({"id": row["id"]}, {"$set": _doc_fields(row)})
+            raise HeatRebuildError(STALE_DETAIL, 409)
+        written.append(before)
+    for match in changed:
+        before = original[match["id"]]
+        if before.get("station_id") and match.get("status") == "cancelled":
             await release_station_for_match(db, before, "matches_v2")
+    changed = [match["id"] for match in changed]
     for op in ops:
         await _audit(db, AUDIT_ACTIONS.get(op.get("kind"), "tournament.heats.adjusted"), tid, actor_id, {
             "engine": GRAPH, "stage_id": stage.get("id"), "trigger": trigger, **({"plan_id": plan_id} if plan_id else {}), **op,

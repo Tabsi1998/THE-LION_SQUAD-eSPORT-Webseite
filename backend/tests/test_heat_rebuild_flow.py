@@ -231,3 +231,64 @@ async def test_mode_is_a_tournament_field_with_suggest_as_default(flow):
     assert updated.status_code == 200, updated.text
     assert updated.json()["heat_rebuild_mode"] == "auto"
     assert (await flow.put(f"/api/tournaments/{tid}", json={"heat_rebuild_mode": "sofort"})).status_code == 422
+
+
+# ---------------------------------------------------------------------------------------------- Codex-Nacharbeit
+
+@pytest.mark.asyncio
+async def test_a_heat_called_between_reading_and_writing_stays_untouched(flow, monkeypatch):
+    """Compare-and-Set: wird ein Lauf aufgerufen, während der Umbau schon gerechnet ist, schreibt der Umbau nichts -
+    auch nicht halb. (Die Stationsrouten laufen heute ohne die Turnier-Schreibsperre; #1569 holt sie nach.)"""
+    import services.heat_rebuild as heat_rebuild
+
+    tournament, _staff = await sixteen_scheme(flow, 10, "suggest")
+    plan = (await stored(flow, tournament))["heat_rebuild_plan"]
+    heat_c = (await heats(flow, tournament))["C"]
+    real_validate = heat_rebuild.validate_competition_graph
+    sync_matches = flow.db.matches_v2._AsyncMongoMockCollection__collection
+
+    def validate_while_a_station_calls(snapshot):
+        # Zwischen Lesen und Schreiben: eine Station ruft C auf.
+        sync_matches.update_one({"id": heat_c["id"]}, {"$set": {"called_at": now_utc().isoformat()}})
+        return real_validate(snapshot)
+
+    monkeypatch.setattr(heat_rebuild, "validate_competition_graph", validate_while_a_station_calls)
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/heat-rebuild/confirm", json={"plan_id": plan["id"]})
+    assert response.status_code == 409, response.text
+    by_key = await heats(flow, tournament)
+    assert by_key["D"]["status"] == "ready" and by_key["D"].get("merged_into") is None
+    assert len([s for s in by_key["C"]["slots"] if s["status"] == "filled"]) == 2
+    assert by_key["C"].get("called_at")
+    assert sorted(len([s for s in by_key[k]["slots"] if s["status"] == "pending"]) for k in ("E", "F")) == [2, 4]
+    assert "tournament.heats.merged" not in await audit_actions(flow, tournament)
+
+
+@pytest.mark.asyncio
+async def test_the_list_route_hides_the_plan_from_everyone_but_the_tournament_lead(flow):
+    tournament, staff = await sixteen_scheme(flow, 10, "suggest")
+    flow.act_as(None)
+    rows = (await flow.get("/api/tournaments")).json()
+    row = next(r for r in rows if r["id"] == tournament["id"])
+    assert "heat_rebuild_plan" not in row and "heat_rebuild_dismissed" not in row
+    player = await flow.add_user(name="Spieler")
+    flow.act_as(player)
+    row = next(r for r in (await flow.get("/api/tournaments")).json() if r["id"] == tournament["id"])
+    assert "heat_rebuild_plan" not in row
+    flow.act_as(staff)
+    row = next(r for r in (await flow.get("/api/tournaments")).json() if r["id"] == tournament["id"])
+    assert row["heat_rebuild_plan"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_the_detail_route_shows_the_plan_only_to_structure_staff(flow):
+    tournament, _staff = await sixteen_scheme(flow, 10, "suggest")
+    url = f"/api/tournaments/{tournament['id']}"
+    for role, visible in (("stream_operator", False), ("station_manager", False), ("scorekeeper", False), ("referee", True), ("organizer", True)):
+        helper = await flow.add_user(name=f"Helfer {role}")
+        await flow.db.tournament_staff_assignments.insert_one({
+            "id": new_id(), "tournament_id": tournament["id"], "user_id": helper["id"], "role": role,
+            "scope": "tournament", "is_active": True})
+        flow.act_as(helper)
+        data = (await flow.get(url)).json()
+        assert ("heat_rebuild_plan" in data) is visible, role
+        assert "heat_rebuild_dismissed" not in data or visible
