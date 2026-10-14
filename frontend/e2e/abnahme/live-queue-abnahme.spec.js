@@ -139,7 +139,7 @@ test.describe("Abnahme: Live-Warteschlange vor Ort", () => {
     expect(problems).toEqual([]);
   });
 
-  test("Turnierleitung am Handy (375 px): Stationen, Uhr, Matchplan nur Prognose", async ({ page }) => {
+  test("Turnierleitung am Handy (375 px): Stationen mit Aufruf, Matchplan nur Prognose", async ({ page }) => {
     test.setTimeout(150_000);
     await page.setViewportSize({ width: 375, height: 812 });
     await signIn(page, "lead");
@@ -147,7 +147,9 @@ test.describe("Abnahme: Live-Warteschlange vor Ort", () => {
     await page.goto(`/tournaments/${slug}/leitung`);
     await expect(page.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true");
     await expect(page.getByTestId("lead-tab-results")).toBeInViewport();
-    await expect(page.getByTestId("live-board").locator("[role='timer']").first()).toBeVisible();
+    // Nach dem Test mit zwei Helfern ist Runde 1 vorbei - hier zählt, dass jede Station mit Aufruf oder Knopf dasteht.
+    await expect(page.getByTestId("live-board").locator("[data-testid^='live-station-']").first()).toBeVisible();
+    await expect(page.getByTestId("live-board").locator("[data-state='called']").first()).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
     await shot(page, "leitung-375.png");
 
