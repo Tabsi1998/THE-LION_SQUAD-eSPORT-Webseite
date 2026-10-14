@@ -5,10 +5,10 @@
 #   docker compose -p lsw-abnahme --env-file .env.abnahme.example -f docker-compose.yml -f docker-compose.abnahme.yml up -d --build
 services:
   mongodb:
-    container_name: lsw-abnahme-mongodb
+    container_name: ${ABNAHME_PROJECT:-lsw-abnahme}-mongodb
 
   backend:
-    container_name: lsw-abnahme-backend
+    container_name: ${ABNAHME_PROJECT:-lsw-abnahme}-backend
     build:
       context: ${ABNAHME_SOURCE:-.}/backend
     environment:
@@ -18,6 +18,6 @@ services:
       DISABLE_SCHEDULER: "true"
 
   frontend:
-    container_name: lsw-abnahme-frontend
+    container_name: ${ABNAHME_PROJECT:-lsw-abnahme}-frontend
     build:
       context: ${ABNAHME_SOURCE:-.}/frontend

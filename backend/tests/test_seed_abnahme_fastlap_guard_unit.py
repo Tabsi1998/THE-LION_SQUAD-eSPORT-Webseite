@@ -19,7 +19,7 @@ def load():
 
 
 GOOD = {"DB_NAME": "tls_abnahme", "APP_ENV": "development", "FRONTEND_URL": "http://127.0.0.1:24100",
-        "PUBLIC_BACKEND_URL": "http://localhost:24100"}
+        "PUBLIC_BACKEND_URL": "http://localhost:24100", "MONGO_URL": "mongodb://abnahme:nur-test@mongodb:27017/?authSource=admin"}
 
 
 def test_a_local_acceptance_stack_is_fine():
@@ -44,6 +44,11 @@ def test_the_backend_of_the_acceptance_stack_has_no_public_backend_url():
     {"PUBLIC_BACKEND_URL": "https://lionsquad.at"},
     {"PUBLIC_BACKEND_URL": "http://127.0.0.1.lionsquad.at"},
     {"FRONTEND_URL": ""},
+    # Codex zu #1610: Datenbank nur der Compose-Dienst „mongodb“ oder dieser Rechner.
+    {"MONGO_URL": ""},
+    {"MONGO_URL": "mongodb://abnahme:nur-test@db.lionsquad.at:27017"},
+    {"MONGO_URL": "mongodb+srv://abnahme:nur-test@cluster0.example.net"},
+    {"MONGO_URL": "mongodb://mongodb:27017,db.lionsquad.at:27017/?replicaSet=rs0"},
 ])
 def test_anything_else_stops_before_writing(change):
     with pytest.raises(SystemExit):

@@ -69,6 +69,23 @@ def host_main() -> int:
 ABNAHME_DB_PREFIX = "tls_abnahme"
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 PRODUCTION = {"production", "prod"}
+MONGO_HOSTS = {"mongodb", *LOCAL_HOSTS}
+
+
+
+def mongo_hosts(url: str) -> list[str] | None:
+    """Die Hosts einer Mongo-Adresse (auch mehrere, durch Komma) - None, wenn es keine einfache mongodb://-Adresse ist
+    (mongodb+srv:// zeigt immer auf einen entfernten Cluster)."""
+    if not url.startswith("mongodb://"):
+        return None
+    hosts = url[len("mongodb://"):].split("/", 1)[0].split("?", 1)[0].rsplit("@", 1)[-1]
+    return [entry[1:entry.find("]")] if entry.startswith("[") else entry.split(":", 1)[0] for entry in hosts.split(",")]
+
+
+def mongo_is_local(url: str) -> bool:
+    # Nur der Compose-Dienst „mongodb“ des Abnahme-Stacks oder dieser Rechner (Codex zu #1610).
+    hosts = mongo_hosts(url)
+    return bool(hosts) and all(host in MONGO_HOSTS for host in hosts)
 
 
 def guard_environment(env) -> None:
@@ -85,6 +102,8 @@ def guard_environment(env) -> None:
             continue
         if (urlsplit(value).hostname or "") not in LOCAL_HOSTS:
             problems.append(f"{key} zeigt nicht auf diesen Rechner")
+    if not mongo_is_local(str(env.get("MONGO_URL") or "")):
+        problems.append("MONGO_URL zeigt nicht auf die Datenbank des Abnahme-Stacks")
     if problems:
         raise SystemExit("Abbruch, kein lokaler Abnahme-Stand: " + "; ".join(problems))
 

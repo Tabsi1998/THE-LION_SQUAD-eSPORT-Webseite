@@ -1,0 +1,102 @@
+const fs = require("node:fs");
+const path = require("node:path");
+const { test, expect } = require("@playwright/test");
+const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession");
+
+// Abnahme gegen den echten Server: der Praxis-Fall vom 14.10. (Fabian, Kart-Cup FFA 16 Doppel-K.-o.). Ein Cup vor Ort
+// ohne Stationen - einmal mit Vorschau-Baum, einmal mit der alten Matchplanung auf einer gelöschten Station (LE vor LC,
+// G/LF/Finale 30 Min.). Erwartet: Kopf und Zeitleiste sagen dasselbe („Noch keine Station“, Bahn „Gelöschte Station“
+// mit Warnung), feste Termine vor ihren Vorspielen stehen rot in Worten, nichts springt, keine Fehler.
+// Läuft nur mit ABNAHME=1 (docs/entwicklung/abnahme-lokal.md).
+
+const SHOTS = process.env.ABNAHME_SHOTS || "";
+const SIZES = { desktop: { width: 1440, height: 900 }, handy: { width: 375, height: 812 } };
+
+async function shot(page, name) {
+  if (!SHOTS) return;
+  fs.mkdirSync(SHOTS, { recursive: true });
+  await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: true });
+}
+
+test.describe("Abnahme: Praxis-Fall 14.10. - Cup ohne Stationen, alte Matchplanung", () => {
+  test.skip(!ENABLED, "nur für die lokale Abnahme (ABNAHME=1, siehe docs/entwicklung/abnahme-lokal.md)");
+  test.skip(ENABLED && !state?.tournaments?.practice_old_plan, `Kein passender Seed-Stand: ${STATE_FILE}`);
+  test.describe.configure({ mode: "serial", timeout: 180_000 });
+
+  test("admin: alle Termine von Hand lösen, Station anlegen, automatisch planen, übernehmen", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "Größe stellt der Test selbst ein");
+    test.skip(!state?.tournaments?.practice_release, "Seed ohne den Fall zum Lösen");
+    await page.setViewportSize(SIZES.desktop);
+    await signIn(page, "admin");
+    const problems = watch(page);
+    const tid = state.tournaments.practice_release;
+    await page.goto(`/admin/tournaments/${tid}?tab=matchplan`);
+    await expect(page.getByTestId("mp-warnings")).toContainText("die es nicht mehr gibt");
+    await shot(page, "loesen-1-vorher");
+    await page.getByRole("button", { name: "Alle Termine von Hand lösen" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("14 Spiele verlieren ihre festen Termine und Stationen");
+    await dialog.getByRole("button", { name: "Termine lösen" }).click();
+    await expect(page.getByTestId("mp-preview")).toBeVisible();
+    await expect(page.getByTestId("mp-warnings")).not.toContainText("die es nicht mehr gibt");
+    await shot(page, "loesen-2-geloest-ohne-station");
+    // Wie Fabian: eine Station anlegen, dann neu planen und übernehmen.
+    const csrf = (await page.context().cookies()).find((cookie) => cookie.name === "csrf_token")?.value;
+    const created = await page.request.post("/api/stations", { data: { name: "Switch 1", device_type: "switch", tournament_id: tid },
+      headers: { "x-csrf-token": csrf || "" } });
+    expect(created.status(), await created.text()).toBe(200);
+    await page.reload();
+    await page.getByRole("button", { name: "Automatisch planen" }).click();
+    const preview = page.getByTestId("mp-preview");
+    await expect(preview).toContainText("14 Spiele bekommen Zeit und Station");
+    await shot(page, "loesen-3-vorschau");
+    await preview.getByRole("button", { name: "Übernehmen" }).click();
+    await expect(preview).toHaveCount(0);
+    await expect(page.locator("[data-testid^='mp-lane-'][data-name='Switch 1']")).toContainText("14 Spiele");
+    await expect(page.getByTestId("mp-warnings")).toHaveCount(0);
+    await page.waitForTimeout(1_000);
+    await shot(page, "loesen-4-neu-geplant");
+    expect(problems).toEqual([]);
+  });
+
+  for (const role of ["admin", "lead"]) {
+    for (const [size, viewport] of Object.entries(SIZES)) {
+      test(`${role} ${size}: alte Planung auf gelöschter Station und Vorschau-Baum ohne Stationen`, async ({ page }, testInfo) => {
+        test.skip(testInfo.project.name !== "chromium", "Größe stellt der Test selbst ein");
+        await page.setViewportSize(viewport);
+        await signIn(page, role);
+        const problems = watch(page);
+
+        await page.goto(`/admin/tournaments/${state.tournaments.practice_old_plan}?tab=matchplan`);
+        const warnings = page.getByTestId("mp-warnings");
+        await expect(warnings).toContainText("die es nicht mehr gibt");
+        await expect(warnings).toContainText("LE ist fest um 19:10, aber LC ist erst um 20:00 vorbei.");
+        await expect(warnings).toContainText("FINAL ist fest um 20:20, aber LF ist erst um 20:20 vorbei.");
+        await expect(page.getByTestId("mp-settings")).toContainText("Noch keine Station");
+        await expect(page.locator(".mp")).toHaveAttribute("data-mode", "local");
+        if (size === "desktop") {
+          await expect(page.locator("[data-testid^='mp-lane-'][data-name='Gelöschte Station']")).toHaveCount(1);
+          await expect(page.locator("[data-testid^='mp-lane-'][data-name='Station']")).toHaveCount(0);
+          await expect(page.getByTestId("mp-bar-LE")).toHaveAttribute("data-conflict", "true");
+        } else {
+          await expect(page.getByTestId("mp-agenda")).toContainText("Gelöschte Station");
+        }
+        await page.waitForTimeout(1_500);
+        await shot(page, `${role}-${size}-alte-planung`);
+        await page.getByTestId("admin-tr-tab-stages").click();
+        await expect(page.getByTestId("stages-matchplan-hint")).toBeVisible();
+        await page.getByTestId("admin-tr-tab-matchplan").click();
+        await expect(page.getByTestId("mp-warnings")).toContainText("die es nicht mehr gibt");
+
+        await page.goto(`/admin/tournaments/${state.tournaments.practice_draft}?tab=matchplan`);
+        await expect(page.locator(".mp")).toHaveAttribute("data-mode", "local");
+        await expect(page.getByTestId("mp-plan-note")).toContainText("Vorschau");
+        await expect(page.getByTestId("mp-settings")).toContainText("Noch keine Station");
+        await page.waitForTimeout(1_500);
+        await expect(page.locator(".mp")).toHaveAttribute("data-mode", "local");
+        await shot(page, `${role}-${size}-vorschau-ohne-stationen`);
+        expect(problems).toEqual([]);
+      });
+    }
+  }
+});
