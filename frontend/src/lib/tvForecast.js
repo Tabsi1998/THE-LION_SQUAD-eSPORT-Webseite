@@ -37,6 +37,85 @@ function stationOf(match, stations) {
   return /^\d+$/.test(raw) ? `Station ${raw}` : raw;
 }
 
+/** Ein kleiner Min-Heap (Codex-Nachprüfung #1564): das nächste bereite Spiel in O(log n) statt jedes Mal sortieren. */
+function minHeap(before) {
+  const items = [];
+  const swap = (a, b) => { [items[a], items[b]] = [items[b], items[a]]; };
+  return {
+    get size() { return items.length; },
+    push(item) {
+      items.push(item);
+      let index = items.length - 1;
+      while (index > 0) {
+        const parent = (index - 1) >> 1;
+        if (before(items[parent], items[index]) <= 0) break;
+        swap(parent, index);
+        index = parent;
+      }
+    },
+    pop() {
+      const top = items[0];
+      const last = items.pop();
+      if (items.length) {
+        items[0] = last;
+        let index = 0;
+        for (;;) {
+          const left = index * 2 + 1;
+          const right = left + 1;
+          let smallest = index;
+          if (left < items.length && before(items[left], items[smallest]) < 0) smallest = left;
+          if (right < items.length && before(items[right], items[smallest]) < 0) smallest = right;
+          if (smallest === index) break;
+          swap(index, smallest);
+          index = smallest;
+        }
+      }
+      return top;
+    },
+  };
+}
+
+/**
+ * In welcher Reihenfolge die offenen Spiele gerechnet werden: nach den Linien (ein Spiel erst nach seinen offenen
+ * Vorspielen), unter den bereiten das nach Plan früheste (Zeit, Runde, Reihenfolge, dann Lage in der Liste). Spiele in
+ * einem Kreis der Linien fehlen. Liefert `{ order: [Spiel], open, before }`.
+ */
+function planOrder(list) {
+  const before = new Map();
+  for (const edge of bracketEdges(list)) {
+    if (edge.void) continue;
+    if (!before.has(edge.to)) before.set(edge.to, new Set());
+    before.get(edge.to).add(edge.from);
+  }
+  const open = list.filter(isOpen);
+  const position = new Map(list.map((match, index) => [match.id, index]));
+  const openIds = new Set(open.map((match) => match.id));
+  const waitingOn = new Map(open.map((match) => [match.id, new Set([...(before.get(match.id) || [])].filter((id) => openIds.has(id)))]));
+  const after = new Map();
+  for (const [id, preds] of waitingOn) for (const pred of preds) after.set(pred, [...(after.get(pred) || []), id]);
+  const byPlan = (a, b) => (timeOf(a.scheduled_at) ?? Number.MAX_SAFE_INTEGER) - (timeOf(b.scheduled_at) ?? Number.MAX_SAFE_INTEGER)
+    || (a.round || 0) - (b.round || 0) || (a.order || 0) - (b.order || 0) || position.get(a.id) - position.get(b.id);
+  const ready = minHeap(byPlan);
+  for (const match of open) if (!waitingOn.get(match.id).size) ready.push(match);
+  const openById = new Map(open.map((match) => [match.id, match]));
+  const order = [];
+  while (ready.size) {
+    const match = ready.pop();
+    order.push(match);
+    for (const next of after.get(match.id) || []) {
+      const preds = waitingOn.get(next);
+      preds.delete(match.id);
+      if (!preds.size) ready.push(openById.get(next));
+    }
+  }
+  return { order, open, before };
+}
+
+/** Die Reihenfolge der Rechnung als Kennungen - für Prüfungen. */
+export function forecastOrder(matches = []) {
+  return planOrder((matches || []).filter((match) => match?.id)).order.map((match) => match.id);
+}
+
 /** Eine Prognose aus geplanter und voraussichtlicher Zeit - mit Verzug in Worten; ein alter Plan ist kein Verzug. */
 function entryOf(match, at, eta, stations) {
   const late = at === null || eta === null ? 0 : Math.max(0, Math.round((eta - at) / MINUTE));
@@ -66,12 +145,7 @@ function entryOf(match, at, eta, stations) {
  */
 export function forecastBoard(matches = [], { stations = [], now = Date.now() } = {}) {
   const list = (matches || []).filter((match) => match?.id);
-  const before = new Map();
-  for (const edge of bracketEdges(list)) {
-    if (edge.void) continue;
-    if (!before.has(edge.to)) before.set(edge.to, new Set());
-    before.get(edge.to).add(edge.from);
-  }
+  const { order, open, before } = planOrder(list);
   const ends = new Map();
   const free = new Map();
   const block = (stationId, end) => {
@@ -84,10 +158,10 @@ export function forecastBoard(matches = [], { stations = [], now = Date.now() } 
     ends.set(match.id, end);
     block(match.station_id, end);
   }
-  const open = list.filter(isOpen).sort((a, b) => (timeOf(a.scheduled_at) ?? Number.MAX_SAFE_INTEGER) - (timeOf(b.scheduled_at) ?? Number.MAX_SAFE_INTEGER)
-    || (a.round || 0) - (b.round || 0) || (a.order || 0) - (b.order || 0));
+  // Reihenfolge aus den Linien (planOrder): ein Spiel erst nach seinen Vorspielen; ein Kreis bekommt keine Uhrzeit.
+  // Abhängig ist ein Spiel nur über seine Linien - nicht über „alle Spiele der Runde“.
   const board = new Map();
-  for (const match of open) {
+  for (const match of order) {
     const at = timeOf(match.scheduled_at);
     let eta = at;
     if (eta !== null) {
@@ -96,14 +170,16 @@ export function forecastBoard(matches = [], { stations = [], now = Date.now() } 
       if (earliest !== null && earliest - eta >= MINUTE) eta = earliest;
       if (eta < now) eta = now;
     }
-    const entry = entryOf(match, at, eta, stations);
-    board.set(match.id, entry);
-    if (entry.eta !== null) {
-      const end = entry.eta + minutesOf(match) * MINUTE;
+    board.set(match.id, entryOf(match, at, eta, stations));
+    // Auch ein alter Plan (nur in der Anzeige ausgeblendet) belegt seine Station und hält seine Folgespiele auf.
+    if (eta !== null) {
+      const end = eta + minutesOf(match) * MINUTE;
       ends.set(match.id, end);
       block(match.station_id, end);
     }
   }
+  // Was übrig bleibt, hängt in einem Kreis (oder an einem): keine Prognose.
+  for (const match of open) if (!board.has(match.id)) board.set(match.id, { ...entryOf(match, timeOf(match.scheduled_at), null, stations), cycle: true });
   return board;
 }
 
