@@ -158,9 +158,12 @@ async def test_retention_purges_old_mail_and_audit_rows(flow):
     fresh = (now_utc() - timedelta(days=10)).isoformat()
     await flow.db.email_logs.insert_many([{"id": "e-old", "created_at": old}, {"id": "e-new", "created_at": fresh}])
     await flow.db.audit_logs.insert_many([{"id": "a-old", "created_at": (now_utc() - timedelta(days=800)).isoformat()}, {"id": "a-new", "created_at": old}])
+    # Nachrichten an alle Angemeldeten (#1372) laufen mit der Frist des Adminprotokolls ab.
+    await flow.db.event_messages.insert_many([{"id": "m-old", "created_at": (now_utc() - timedelta(days=800)).isoformat()}, {"id": "m-new", "created_at": old}])
     removed = await ops_alerts.purge_old_logs(flow.db)
-    assert removed == {"email_logs": 1, "audit_logs": 1}
+    assert removed == {"email_logs": 1, "audit_logs": 1, "event_messages": 1}
+    assert [r["id"] for r in await flow.db.event_messages.find({}, {"_id": 0}).to_list(10)] == ["m-new"]
     assert [r["id"] for r in await flow.db.email_logs.find({}, {"_id": 0}).to_list(10)] == ["e-new"]
     assert [r["id"] for r in await flow.db.audit_logs.find({}, {"_id": 0}).to_list(10)] == ["a-new"]
     await ops_alerts.save_alert_settings(flow.db, {"retention_days": {"email_logs": 7}})
-    assert (await ops_alerts.purge_old_logs(flow.db)) == {"email_logs": 1, "audit_logs": 0}
+    assert (await ops_alerts.purge_old_logs(flow.db)) == {"email_logs": 1, "audit_logs": 0, "event_messages": 0}

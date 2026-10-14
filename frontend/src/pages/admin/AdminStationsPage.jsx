@@ -367,7 +367,7 @@ export default function AdminStationsPage() {
                     <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{formatDeviceType(s.device_type)}</div>
                     <div className="font-heading text-lg font-bold">{s.name}</div>
                   </div>
-                  {isTournamentLead && <button onClick={() => del(s.id)} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>}
+                  {isTournamentLead && <button onClick={() => del(s.id)} className="p-1 text-white/40 hover:text-live"><Trash2 className="w-4 h-4" /></button>}
                 </div>
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <StatusBadge status={s.status} />

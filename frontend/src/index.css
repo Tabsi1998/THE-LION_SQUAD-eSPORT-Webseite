@@ -2679,3 +2679,10 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   opacity: 0;
   transition: opacity var(--tls-motion-mid) var(--tls-ease);
 }
+
+/* Drucken einer Arbeitsliste (#1372): nur das Blatt (.tls-print-sheet), ohne Kopf, Fuß und Bedienelemente der Seite. */
+@media print {
+  body:has(.tls-print-sheet) * { visibility: hidden; }
+  .tls-print-sheet, .tls-print-sheet * { visibility: visible; }
+  .tls-print-sheet { position: absolute; top: 0; left: 0; width: 100%; }
+}
