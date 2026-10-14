@@ -27,6 +27,12 @@ def test_a_local_acceptance_stack_is_fine():
     load().guard_environment({**GOOD, "DB_NAME": "tls_abnahme_2"})
 
 
+def test_the_backend_of_the_acceptance_stack_has_no_public_backend_url():
+    # Im Abnahme-Stand ist PUBLIC_BACKEND_URL nur Build-Argument des Frontends (Codex-Prüfung): fehlt sie, kein Abbruch.
+    env = {key: value for key, value in GOOD.items() if key != "PUBLIC_BACKEND_URL"}
+    load().guard_environment(env)
+
+
 @pytest.mark.parametrize("change", [
     {"DB_NAME": "tls"},
     {"DB_NAME": "lionsquad"},

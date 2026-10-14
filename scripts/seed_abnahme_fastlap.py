@@ -77,8 +77,13 @@ def guard_environment(env) -> None:
         problems.append("Datenbank ist nicht die der Abnahme")
     if {str(env.get(key) or "").strip().lower() for key in ("APP_ENV", "ENV", "ENVIRONMENT")} & PRODUCTION:
         problems.append("Umgebung ist Produktion")
-    for key in ("FRONTEND_URL", "PUBLIC_BACKEND_URL"):
-        if (urlsplit(str(env.get(key) or "")).hostname or "") not in LOCAL_HOSTS:
+    # FRONTEND_URL setzt der Abnahme-Stand immer; PUBLIC_BACKEND_URL ist dort nur Build-Argument des Frontends und
+    # fehlt im Backend - geprüft wird sie nur, wenn sie gesetzt ist.
+    for key, required in (("FRONTEND_URL", True), ("PUBLIC_BACKEND_URL", False)):
+        value = str(env.get(key) or "")
+        if not value and not required:
+            continue
+        if (urlsplit(value).hostname or "") not in LOCAL_HOSTS:
             problems.append(f"{key} zeigt nicht auf diesen Rechner")
     if problems:
         raise SystemExit("Abbruch, kein lokaler Abnahme-Stand: " + "; ".join(problems))
