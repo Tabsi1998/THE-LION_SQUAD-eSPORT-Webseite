@@ -19,6 +19,15 @@ from services.tournament_permissions import (
     require_tournament_staff_permission,
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
+from services.bracket_fill_in import (
+    NO_PLACE_DETAIL,
+    FillInRefused,
+    free_bye_place,
+    reopened_bye,
+    replacement_targets,
+    slot_ids,
+    swapped,
+)
 from services.competition_versions import persist_competition_versions
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from models import RegistrationCreate, RegistrationUpdate, RegistrationAdminCreate, now_utc, new_id
@@ -69,7 +78,50 @@ async def _notify_registration(db, tid: str, registration: dict, status: str, *,
         logger.warning("Registration notification failed for tournament=%s type=%s", _log_safe(tid), type(exc).__name__)
 
 
-BRACKET_REFRESH_LOCKED_STATUSES = {"check_in", "live", "paused", "completed", "results_published", "archived", "cancelled"}
+# Im Check-in wächst die Vorschau noch mit (#1551) - fest wird der Baum erst mit dem Check-in-Ende; ein fester Baum
+# bleibt beim Auffrischen ohnehin unberührt.
+BRACKET_REFRESH_LOCKED_STATUSES = {"live", "paused", "completed", "results_published", "archived", "cancelled"}
+# Solange der Baum nicht steht, rücken Wartende von selbst nach (#1551).
+WAITLIST_MOVE_UP_STATUSES = {"scheduled", "registration_open", "registration_closed", "check_in"}
+ACTIVE_REGISTRATION_STATUSES = ["pending", "approved", "checked_in"]
+
+
+async def _bracket_is_fixed(db, tid: str) -> bool:
+    return bool(await db.matches_v2.count_documents({"tournament_id": tid, "is_preview": {"$ne": True}}))
+
+
+async def _move_up_from_waitlist(db, tid: str, actor_id: str | None, *, exclude_id: str | None = None) -> list[str]:
+    """Bis zum Check-in-Ende (#1551): wird ein Platz frei (Absage, „Nicht erschienen“, Abmeldung), rückt die älteste
+    Anmeldung der Warteliste nach - mit Nachricht „nachgerückt“ und Startgeld wie bei einer Freigabe. Steht der Baum,
+    entscheidet die Turnierleitung (Nachrücker auf einen freien Platz)."""
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not tournament or tournament.get("status") not in WAITLIST_MOVE_UP_STATUSES or tournament.get("check_in_closed_at"):
+        return []
+    if await _bracket_is_fixed(db, tid):
+        return []
+    taken = await db.tournament_registrations.count_documents({"tournament_id": tid, "status": {"$in": ACTIVE_REGISTRATION_STATUSES}})
+    free = int(tournament.get("max_participants") or 32) - taken
+    if free <= 0:
+        return []
+    waiting = await db.tournament_registrations.find(
+        {"tournament_id": tid, "status": "waitlist", **({"id": {"$ne": exclude_id}} if exclude_id else {})}, {"_id": 0},
+    ).sort("created_at", 1).to_list(free)
+    moved: list[str] = []
+    for reg in waiting:
+        now_iso = now_utc().isoformat()
+        result = await db.tournament_registrations.update_one(
+            {"id": reg["id"], "status": "waitlist"}, {"$set": {"status": "approved", "updated_at": now_iso}})
+        if not getattr(result, "modified_count", 0):
+            continue
+        reg = {**reg, "status": "approved", "updated_at": now_iso}
+        payer = await db.users.find_one({"id": reg.get("user_id")}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1}) \
+            if reg.get("user_id") else None
+        if payer:
+            await tournament_fees.freeze_price(db, reg, tournament, payer=payer)
+        await _notify_registration(db, tid, reg, "approved", previous="waitlist", actor_id=actor_id)
+        await _audit_tournament_action(db, "tournament.registration.waitlist_moved_up", actor_id, tid, {"registration_id": reg["id"]})
+        moved.append(reg["id"])
+    return moved
 
 
 def _parse_dt(value):
@@ -240,46 +292,28 @@ async def _refresh_tournament_previews_after_registration(db, tournament: dict, 
     return await _create_initial_stage_bracket_preview(db, tournament, actor_id)
 
 
-async def _replace_registration_in_open_matches(db, tid: str, old_reg_id: str, new_reg: dict,
-                                                actor_id: str | None) -> dict:
-    new_reg_id = new_reg["id"]
-    v2_matches = await db.matches_v2.find({
-        "tournament_id": tid,
-        "slots.registration_id": old_reg_id,
-    }, {"_id": 0}).to_list(1000)
-    blocked = [
-        m.get("id") for m in v2_matches
-        if m.get("status") in {"completed", "forfeit"}
-    ]
-    if blocked:
-        raise HTTPException(
-            status_code=409,
-            detail="Teilnehmer kommt bereits in abgeschlossenen Matches vor. Erst Bracket korrigieren oder neu generieren.",
-        )
+async def _tournament_v2_matches(db, tid: str) -> list[dict]:
+    return await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
 
+
+async def _replacement_targets_or_409(db, tid: str, old_reg_id: str) -> list[dict]:
+    """Wo ein Nachrücker die Person ersetzt (#1551) - auch über ein Freilos hinweg, aber nie nach Beginn ihres ersten
+    echten Spiels (Liga: höchstens ein Spieltag gespielt)."""
+    try:
+        return replacement_targets(await _tournament_v2_matches(db, tid), old_reg_id)
+    except FillInRefused as exc:
+        raise HTTPException(status_code=409, detail=exc.detail) from None
+
+
+async def _replace_registration_in_open_matches(db, tid: str, old_reg_id: str, new_reg: dict,
+                                                actor_id: str | None, targets: list[dict] | None = None) -> dict:
+    new_reg_id = new_reg["id"]
+    if targets is None:
+        targets = await _replacement_targets_or_409(db, tid, old_reg_id)
     now = now_utc().isoformat()
-    v2_count = 0
-    for match in v2_matches:
-        slots = []
-        changed = False
-        for slot in match.get("slots") or []:
-            slot = dict(slot)
-            if slot.get("registration_id") == old_reg_id:
-                slot["registration_id"] = new_reg_id
-                slot["user_id"] = new_reg.get("user_id")
-                slot["status"] = "filled"
-                changed = True
-            slots.append(slot)
-        if not changed:
-            continue
-        filled = sum(1 for slot in slots if slot.get("status") == "filled" and slot.get("registration_id"))
-        min_players = int((match.get("settings") or {}).get("min_players") or 2)
-        status = "ready" if filled >= min_players and match.get("status") in {"pending", "preview"} else match.get("status")
-        await db.matches_v2.update_one(
-            {"id": match["id"]},
-            {"$set": {"slots": slots, "status": status, "updated_at": now}},
-        )
-        v2_count += 1
+    for match in targets:
+        await db.matches_v2.update_one({"id": match["id"]}, {"$set": {**swapped(match, old_reg_id, new_reg), "updated_at": now}})
+    v2_count = len(targets)
 
     await _audit_tournament_action(
         db,
@@ -289,6 +323,42 @@ async def _replace_registration_in_open_matches(db, tid: str, old_reg_id: str, n
         {"old_registration_id": old_reg_id, "new_registration_id": new_reg_id, "v2_matches": v2_count},
     )
     return {"v2_matches": v2_count}
+
+
+async def _place_fill_in(db, tid: str, reg: dict, actor_id: str | None) -> dict | None:
+    """Nachrücker nach dem Baubau (#1551): wer jetzt bestätigt oder eingecheckt wird, bekommt genau einen freien Platz -
+    zuerst den einer Person „Nicht erschienen“, sonst einen leeren Platz neben einem Freilos. Ohne festen Baum (Vorschau)
+    oder wenn die Person schon im Baum steht: nichts zu tun (``None``)."""
+    if reg.get("status") not in {"approved", "checked_in"}:
+        return None
+    matches = await _tournament_v2_matches(db, tid)
+    fixed = [match for match in matches if not match.get("is_preview")]
+    if not fixed or any(reg["id"] in slot_ids(match) for match in fixed):
+        return None
+    in_tree = sorted({reg_id for match in fixed for reg_id in slot_ids(match)})
+    absent = await db.tournament_registrations.find(
+        {"tournament_id": tid, "status": "no_show", "id": {"$in": in_tree}}, {"_id": 0, "id": 1, "seed": 1},
+    ).to_list(len(in_tree) + 1)
+    placement = None
+    for row in sorted(absent, key=lambda item: (item.get("seed") is None, item.get("seed") or 0, item["id"])):
+        try:
+            targets = replacement_targets(matches, row["id"])
+        except FillInRefused:
+            continue
+        if targets:
+            await _replace_registration_in_open_matches(db, tid, row["id"], reg, actor_id, targets)
+            placement = {"ok": True, "kind": "no_show", "match_id": targets[0]["id"], "replaced_registration_id": row["id"]}
+            break
+    if placement is None:
+        place = free_bye_place(matches)
+        if not place:
+            return {"ok": False, "reason": "no_free_place", "detail": NO_PLACE_DETAIL}
+        match_set, target_set = reopened_bye(place, reg, now_utc().isoformat())
+        await db.matches_v2.update_one({"id": place["target"]["id"]}, {"$set": target_set})
+        await db.matches_v2.update_one({"id": place["match"]["id"]}, {"$set": match_set})
+        placement = {"ok": True, "kind": "bye", "match_id": place["match"]["id"]}
+    await _audit_tournament_action(db, "tournament.registration.fill_in", actor_id, tid, {"registration_id": reg["id"], **placement})
+    return placement
 
 
 async def _apply_late_checkin_hooks(db, tid: str, user_id: str) -> None:
@@ -616,20 +686,13 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
         raise HTTPException(status_code=400, detail="Display-Name oder Account ist erforderlich")
     old_reg_id = payload.get("replace_registration_id")
     old = None
+    replace_targets: list[dict] | None = None
     if old_reg_id:
         old = await db.tournament_registrations.find_one({"id": old_reg_id, "tournament_id": tid}, {"_id": 0})
         if not old:
             raise HTTPException(status_code=404, detail="Zu ersetzende Anmeldung nicht gefunden")
-        v2_blocked = await db.matches_v2.count_documents({
-            "tournament_id": tid,
-            "status": {"$in": ["completed", "forfeit"]},
-            "slots.registration_id": old_reg_id,
-        })
-        if v2_blocked:
-            raise HTTPException(
-                status_code=409,
-                detail="Teilnehmer kommt bereits in abgeschlossenen Matches vor. Erst Bracket korrigieren oder neu generieren.",
-            )
+        # Vor dem Eintragen prüfen (#1551): ein Freilos hindert nicht mehr, ein begonnenes erstes Spiel schon.
+        replace_targets = await _replacement_targets_or_409(db, tid, old_reg_id)
 
     reg = {
         "id": new_id(),
@@ -669,10 +732,12 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
             {"id": old_reg_id},
             {"$set": {"status": "no_show", "updated_at": now_utc().isoformat()}},
         )
-        replacement = await _replace_registration_in_open_matches(db, tid, old_reg_id, reg, me.get("id"))
+        replacement = await _replace_registration_in_open_matches(db, tid, old_reg_id, reg, me.get("id"), replace_targets)
     auto_bracket_update = None
+    placement = None
     if not old_reg_id and reg["status"] in {"approved", "checked_in"}:
         auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
+        placement = await _place_fill_in(db, tid, reg, me.get("id"))
 
     # Turnier nur mit Event-Anmeldung (#875): die Turnierleitung darf übergehen - mit Hinweis und im Audit.
     gate = await tournament_event_gate.check(db, tournament, user=user if user and not team else None, team=team) if (user or team) else None
@@ -693,6 +758,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
     return {
         "registration": reg,
         "replacement": replacement,
+        "placement": placement,
         "auto_bracket_update": auto_bracket_update,
         "idempotent_replay": False,
         "event_gate_warning": (gate["text"] + " Trotzdem eingetragen.") if overridden else None,
@@ -722,6 +788,10 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
     if updates.get("status") and updates["status"] != previous_status:
         await _notify_registration(db, tid, reg, updates["status"], previous=previous_status, reason=status_reason, actor_id=me.get("id"))
+    if updates.get("status") in {"rejected", "waitlist", "no_show"}:
+        reg["waitlist_moved_up"] = await _move_up_from_waitlist(db, tid, me.get("id"), exclude_id=reg_id)
+    if updates.get("status") in {"approved", "checked_in"} and updates["status"] != previous_status:
+        reg["placement"] = await _place_fill_in(db, tid, reg, me.get("id"))
     if updates.get("status") in {"approved", "checked_in", "rejected", "waitlist", "no_show"}:
         tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
         if tournament:
@@ -779,8 +849,11 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
                 tid,
                 {"registration_id": reg_id, "from_status": reg.get("status"), "to_status": status},
             )
+            moved_up = await _move_up_from_waitlist(db, tid, me.get("id"), exclude_id=reg_id) if status == "no_show" else []
             updated = await db.tournament_registrations.find_one({"id": reg_id}, {"_id": 0})
-            return {**updated, "idempotent_replay": False}
+            # Nach dem Check-in-Ende: wer jetzt eingecheckt wird, rückt auf einen freien Platz nach (#1551).
+            placement = await _place_fill_in(db, tid, updated, me.get("id")) if status == "checked_in" else None
+            return {**updated, "waitlist_moved_up": moved_up, "placement": placement, "idempotent_replay": False}
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
 
@@ -804,14 +877,16 @@ async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_curr
         raise HTTPException(status_code=403)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if is_staff and (tournament or {}).get("status") == "check_in":
+        # Nur ein fester Baum hält die Person (#1551) - die Vorschau während des Check-ins wächst noch mit.
         v2_slots = await db.matches_v2.count_documents({
             "tournament_id": tid,
             "slots.registration_id": reg_id,
+            "is_preview": {"$ne": True},
         })
         if v2_slots:
             raise HTTPException(
                 status_code=409,
-                detail="Nach Check-in-Start bleibt der Turnierbaum fix. Teilnehmer als 'Nicht erschienen' markieren und per Ersatzspieler ersetzen.",
+                detail="Nach dem Check-in-Ende bleibt der Turnierbaum fix. Teilnehmer als 'Nicht erschienen' markieren und per Ersatzspieler ersetzen.",
             )
     if (is_own_registration or is_team_manager) and not is_staff:
         if reg.get("status") == "checked_in" or (tournament or {}).get("status") in {"live", "paused", "completed", "results_published", "archived"}:
@@ -825,6 +900,7 @@ async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_curr
             raise HTTPException(status_code=409, detail="Abmeldung ist nicht mehr möglich, weil bereits Spiele aktiv oder gewertet sind.")
     await tournament_fees.close_price(db, reg, "Abmeldung")
     await db.tournament_registrations.delete_one({"id": reg_id})
+    await _move_up_from_waitlist(db, tid, me.get("id"))
     auto_bracket_update = None
     if tournament:
         auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
@@ -851,6 +927,9 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
     # Eine Prüfung für alle Stellen (#1135): Knopf, Startseite, Erinnerungen, Mail und Discord fragen dieselbe Regel.
     if not self_checkin_allowed(tournament):
         raise HTTPException(status_code=403, detail="Bei Vor-Ort-Turnieren macht die Turnierleitung den Check-in.")
+    # Nach dem Check-in-Ende steht der Baum (#1551) - wer jetzt kommt, rückt nur über die Turnierleitung nach.
+    if tournament.get("check_in_closed_at"):
+        raise HTTPException(status_code=409, detail="Der Check-in ist beendet – bitte bei der Turnierleitung melden.")
     try:
         async with mutation_lock(db, tournament_write_resource(tid)):
             reg = await _find_self_registration(db, tid, me["id"])

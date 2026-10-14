@@ -794,7 +794,8 @@ def _next_status(doc: dict, now: datetime, kind: str = "tournament") -> str | No
         return "check_in"
     if status == "registration_open" and reg_until and now > reg_until:
         return "registration_closed"
-    if status == "check_in" and check_until and now > check_until:
+    # Turniere bleiben nach dem Check-in-Ende im Check-in (#1551): das Ende baut den Baum (_close_due_checkins).
+    if status == "check_in" and check_until and now > check_until and kind != "tournament":
         return "registration_closed"
     if status in ("scheduled", "registration_open", "registration_closed", "check_in", "checkin_open") and start and now >= start:
         if kind == "tournament" and not auto_start_enabled:
@@ -804,16 +805,21 @@ def _next_status(doc: dict, now: datetime, kind: str = "tournament") -> str | No
 
 
 async def _prepare_tournament_transition(db, doc: dict, next_status: str) -> bool:
-    if next_status not in {"check_in", "live"}:
+    # Das Öffnen des Check-ins legt nichts fest (#1551) - der Baum entsteht mit dessen Ende oder beim Start.
+    if next_status != "live":
         return True
     try:
         from routes.tournament_common import _collect_plan_matches, _planning_report
         from routes.tournament_lifecycle_routes import (
             _finalize_bracket_for_checkin,
             _live_start_blocker,
+            close_check_in,
         )
         tournament = {**doc, "status": next_status}
-        await _finalize_bracket_for_checkin(db, tournament, None)
+        if doc.get("status") == "check_in":
+            await close_check_in(db, tournament, None)
+        else:
+            await _finalize_bracket_for_checkin(db, tournament, None)
         if next_status == "live":
             matches, current = await _collect_plan_matches(db, doc["id"])
             participant_count = await db.tournament_registrations.count_documents({
@@ -904,6 +910,31 @@ async def _transition_tournament(db, stale: dict, now: datetime, now_iso: str) -
     return True
 
 
+async def _close_due_checkins(db, now: datetime) -> int:
+    """Check-in-Ende (#1551): je Turnier, dessen „Check-in endet“ vorbei ist, einmal den Baum aus den Eingecheckten
+    bauen - unter derselben Schreibsperre wie die Turnierleitung. ``check_in_closed_at`` macht es einmalig."""
+    from routes.tournament_lifecycle_routes import close_check_in
+    from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
+
+    closed = 0
+    cursor = db.tournaments.find({"status": "check_in"}, {"_id": 0, "id": 1, "check_in_until": 1, "check_in_closed_at": 1})
+    stale_docs = [doc async for doc in cursor if not doc.get("check_in_closed_at")]
+    for stale in stale_docs:
+        until = _parse_dt(stale.get("check_in_until"))
+        if not until or now <= until:
+            continue
+        try:
+            async with mutation_lock(db, tournament_write_resource(stale["id"]), wait_seconds=STATUS_LOCK_WAIT_SECONDS):
+                doc = await db.tournaments.find_one({"id": stale["id"]}, {"_id": 0})
+                if not doc or doc.get("status") != "check_in" or doc.get("check_in_closed_at"):
+                    continue
+                await close_check_in(db, doc, None)
+                closed += 1
+        except MutationLockBusy:
+            logger.info("[scheduler] check-in close %s skipped, tournament busy", stale.get("id"))
+    return closed
+
+
 async def _safe_status_transitions():
     try:
         from database import get_db
@@ -911,7 +942,7 @@ async def _safe_status_transitions():
         db = get_db()
         now = datetime.now(timezone.utc)
         now_iso = now_utc().isoformat()
-        changed = 0
+        changed = await _close_due_checkins(db, now)
         for collection_name, kind in (("tournaments", "tournament"), ("f1_challenges", "f1"), ("events", "event")):
             cursor = db[collection_name].find(
                 {"status": {"$in": ["scheduled", "registration_open", "registration_closed", "check_in", "checkin_open", "live"]}},
