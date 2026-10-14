@@ -9,7 +9,7 @@ const DONE_STATUSES = new Set(["completed", "finished", "reported", "confirmed"]
 const MAIN_PODIUM = new Set([...MAIN_SECTIONS].filter(Boolean));
 
 export function normalizeSection(section) {
-  return String(section || "MAIN").toLowerCase();
+  return sectionKey(section || "MAIN") || "main";
 }
 
 export function isCompleted(match) {
@@ -87,7 +87,7 @@ export function buildPodiumMap(allMatches = [], stages = []) {
     const section = normalizeSection(match.section);
     if (isBronzeMatch(match)) return false;
     if (FINAL_SECTIONS.has(section)) return match === decidingGrandFinal;
-    return !hasGrandFinal && ["main", "wb", "winner"].includes(section) && Number(match.round || 1) === maxRoundBySection.get(section);
+    return !hasGrandFinal && MAIN_PODIUM.has(section) && Number(match.round || 1) === maxRoundBySection.get(section);
   };
   // Vergibt das Finale selbst schon Platz 3 (ein Durchgang mit mehreren Spielern, #1119), zählt kein anderes Spiel für
   // Platz 3 - sonst stünde der Zweite des Loser-Bracket-Finales, der ja ins Grand Final kam, auch auf dem Podest.
