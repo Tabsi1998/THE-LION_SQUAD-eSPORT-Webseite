@@ -84,10 +84,22 @@ export function forecastBoard(matches = [], { stations = [], now = Date.now() } 
     ends.set(match.id, end);
     block(match.station_id, end);
   }
-  const open = list.filter(isOpen).sort((a, b) => (timeOf(a.scheduled_at) ?? Number.MAX_SAFE_INTEGER) - (timeOf(b.scheduled_at) ?? Number.MAX_SAFE_INTEGER)
-    || (a.round || 0) - (b.round || 0) || (a.order || 0) - (b.order || 0));
+  // Reihenfolge aus den Linien (Codex-Prüfung #1564): ein Spiel erst, wenn alle offenen Vorspiele gerechnet sind -
+  // unter den bereiten das nach Plan früheste. Ein Kreis in den Linien (kaputte Daten) bekommt keine Uhrzeit, ebenso
+  // alles, was an ihm hängt. Abhängig ist ein Spiel nur über seine Linien - nicht über „alle Spiele der Runde“.
+  const open = list.filter(isOpen);
+  const openIds = new Set(open.map((match) => match.id));
+  const waitingOn = new Map(open.map((match) => [match.id, new Set([...(before.get(match.id) || [])].filter((id) => openIds.has(id)))]));
+  const after = new Map();
+  for (const [id, preds] of waitingOn) for (const pred of preds) after.set(pred, [...(after.get(pred) || []), id]);
+  const byPlan = (a, b) => (timeOf(a.scheduled_at) ?? Number.MAX_SAFE_INTEGER) - (timeOf(b.scheduled_at) ?? Number.MAX_SAFE_INTEGER)
+    || (a.round || 0) - (b.round || 0) || (a.order || 0) - (b.order || 0);
+  const ready = open.filter((match) => !waitingOn.get(match.id).size);
   const board = new Map();
-  for (const match of open) {
+  const openById = new Map(open.map((match) => [match.id, match]));
+  while (ready.length) {
+    ready.sort(byPlan);
+    const match = ready.shift();
     const at = timeOf(match.scheduled_at);
     let eta = at;
     if (eta !== null) {
@@ -96,14 +108,21 @@ export function forecastBoard(matches = [], { stations = [], now = Date.now() } 
       if (earliest !== null && earliest - eta >= MINUTE) eta = earliest;
       if (eta < now) eta = now;
     }
-    const entry = entryOf(match, at, eta, stations);
-    board.set(match.id, entry);
-    if (entry.eta !== null) {
-      const end = entry.eta + minutesOf(match) * MINUTE;
+    board.set(match.id, entryOf(match, at, eta, stations));
+    // Auch ein alter Plan (nur in der Anzeige ausgeblendet) belegt seine Station und hält seine Folgespiele auf.
+    if (eta !== null) {
+      const end = eta + minutesOf(match) * MINUTE;
       ends.set(match.id, end);
       block(match.station_id, end);
     }
+    for (const next of after.get(match.id) || []) {
+      const preds = waitingOn.get(next);
+      preds.delete(match.id);
+      if (!preds.size) ready.push(openById.get(next));
+    }
   }
+  // Was übrig bleibt, hängt in einem Kreis (oder an einem): keine Prognose.
+  for (const match of open) if (!board.has(match.id)) board.set(match.id, { ...entryOf(match, timeOf(match.scheduled_at), null, stations), cycle: true });
   return board;
 }
 

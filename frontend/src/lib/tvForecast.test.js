@@ -131,3 +131,44 @@ describe("forecastBoard: eine Prognose für Karte und Fuß", () => {
     for (const match of bracket.matches_v2) expect(board.get(match.id).delayMinutes, match.match_key).toBeLessThan(DELAY_SHOWN_FROM);
   });
 });
+
+// ---------------------------------------------------------------- Codex-Prüfung (#1564)
+describe("forecastBoard: Reihenfolge aus den Linien, nicht aus der Zeit", () => {
+  it("steht ein Folgespiel im Plan zu früh, kommt es trotzdem erst nach seinen Vorspielen", () => {
+    const bracket = state("se8_live");
+    const a = byKey(bracket, "A");
+    const e = byKey(bracket, "E");
+    // Falsch sortierte Daten: das Halbfinale E steht im Plan vor seinen Vorspielen.
+    e.scheduled_at = new Date(Date.parse(a.scheduled_at) - 60 * 60000).toISOString();
+    const now = Date.parse(a.started_at) + 40 * 60000;
+    const board = forecastBoard(bracket.matches_v2, { now });
+    const end = (key) => board.get(byKey(bracket, key).id).eta + 30 * 60000;
+    expect(board.get(e.id).eta).toBeGreaterThanOrEqual(end("B"));
+  });
+
+  it("ein Kreis in den Linien (kaputte Daten): für die betroffenen Spiele keine Prognose", () => {
+    const bracket = state("se8_planned");
+    const a = byKey(bracket, "A");
+    const e = byKey(bracket, "E");
+    // A hängt von E ab, E von A: so etwas darf nie eine Uhrzeit bekommen.
+    a.slots[0].source = { type: "rank", flow: "W", match_key: "E", rank: 1, raw: "W:E:1" };
+    const board = forecastBoard(bracket.matches_v2, { now: GENERATED });
+    expect(board.get(a.id).eta).toBeNull();
+    expect(board.get(e.id).eta).toBeNull();
+    expect(board.get(byKey(bracket, "G").id).eta).toBeNull();
+    expect(board.get(byKey(bracket, "B").id).eta).not.toBeNull();
+  });
+
+  it("ein alter Plan (nur ausgeblendet) blockiert trotzdem seine Station - das Spiel danach kommt nicht zu früh", () => {
+    const bracket = state("se8_planned");
+    const b = byKey(bracket, "B");
+    const d = byKey(bracket, "D");
+    expect(d.station_id).toBe(b.station_id);
+    const now = Date.parse(b.scheduled_at) + 200 * 60000;
+    const board = forecastBoard(bracket.matches_v2, { now });
+    expect(board.get(b.id).stale).toBe(true);
+    const next = board.get(d.id);
+    // D wartet auf B an derselben Station: entweder ebenfalls alter Plan (ausgeblendet) oder nach Bs Ende.
+    expect(next.stale || next.eta >= now + 30 * 60000).toBe(true);
+  });
+});

@@ -202,3 +202,25 @@ test("überall dieselbe Zeit: Karte und Fuß nennen dieselbe Prognose, die Folge
   const semi = screen.getByTestId(`tv-match-${idOf(current, "E")}`);
   expect(semi.querySelector(".tv-node__late")).toHaveTextContent(/^\+\d+ Min\.$/);
 });
+
+test("solange der Strom getrennt ist, lädt der TV ruhig nach (Ersatz-Abfrage) - keine Bewegungs-Salve, auch nicht beim Wiederverbinden", async () => {
+  current = state("se8_live");
+  renderTv();
+  await screen.findByTestId("tv-tree");
+  act(() => setStreamConnected(false));
+  // Getrennt: der TV fragt im Takt nach (hier ausgelöst wie eine Ersatz-Abfrage) - jeder Stand kommt ohne Moment.
+  await change("se8_after_a");
+  const winner = state("se8_after_a").matches_v2.find((match) => match.match_key === "A").results.find((row) => row.rank === 1).registration_id;
+  await waitFor(() => expect(screen.getByTestId(`tv-match-${idOf(current, "E")}`).querySelector(`[data-tv-reg='${winner}']`)).not.toBeNull());
+  expect(main()).not.toHaveAttribute("data-moment");
+  await change("se8_corrected");
+  await waitFor(() => expect(screen.getByTestId(`tv-match-${idOf(current, "A")}`)).toHaveTextContent(/1/));
+  await new Promise((resolve) => { setTimeout(resolve, 300); });
+  expect(main()).not.toHaveAttribute("data-moment");
+  expect(screen.queryByTestId("tv-result-card")).not.toBeInTheDocument();
+  // Wieder verbunden: der Nachlade-Stand bleibt ruhig ...
+  current = state("se8_walkover");
+  act(() => setStreamConnected(true));
+  await waitFor(() => expect(screen.getByTestId(`tv-match-${current.matches_v2.find((match) => match.status === "forfeit").id}`)).toHaveAttribute("data-walkover", "1"));
+  expect(main()).not.toHaveAttribute("data-moment");
+});

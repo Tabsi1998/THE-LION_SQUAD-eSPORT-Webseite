@@ -130,13 +130,17 @@ function BracketTv() {
   // Nach einer Neuverbindung (#1564, wie die Turnierseite #1561): der nächste Stand holt Verpasstes nach - ohne Moment.
   const catchUpRef = useRef(false);
   const quietRef = useRef(false);
+  // Getrennt nach einer bestehenden Verbindung (Codex-Prüfung #1564): jede Ersatz-Abfrage holt nur nach - ohne Moment.
+  const offlineRef = useRef(false);
+  const everConnected = useRef(false);
   const sponsors = useTvSponsors();
   const minute = useMinuteTick();
 
   const load = useCallback(async () => {
     try {
       const { data: br } = await api.get(`/tournaments/${id}/bracket/display`, displayKey ? { params: { key: displayKey } } : undefined);
-      quietRef.current = catchUpRef.current;
+      // Ruhig, wenn es Nachholen ist: nach einer Neuverbindung und während der Strom getrennt ist (Ersatz-Abfrage).
+      quietRef.current = catchUpRef.current || offlineRef.current;
       catchUpRef.current = false;
       setData(br);
       setLoadError(null);
@@ -169,6 +173,8 @@ function BracketTv() {
   const wasConnected = useRef(connected);
   useEffect(() => {
     if (connected && !wasConnected.current) catchUpRef.current = true;
+    if (connected) everConnected.current = true;
+    offlineRef.current = !connected && everConnected.current;
     wasConnected.current = connected;
   }, [connected]);
 
