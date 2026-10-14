@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileText, RefreshC
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SkeletonTable } from "@/components/tls/Skeleton";
+import { TableScroll } from "@/components/tls/TableScroll";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ATTENTION_ORDER, PAYMENT_TONE, csvFilename, formatCents, parseEuro, sourcesFrom, summaryLines, syncLine, toCsv } from "@/lib/billing";
 import { viennaDateTime } from "@/lib/vienna";
@@ -224,9 +225,9 @@ export default function AdminFinancePage() {
                 {Object.entries(KIND_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </label>
-            <label className="flex flex-col gap-1">
+            <label className="flex flex-col gap-1 min-w-0 max-w-full">
               <span className="uppercase tracking-wider text-white/45 font-bold">Veranstaltung</span>
-              <select value={filters.source} onChange={(ev) => setFilters((f) => ({ ...f, source: ev.target.value }))} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm min-w-[12rem]" data-testid="finance-filter-source">
+              <select value={filters.source} onChange={(ev) => setFilters((f) => ({ ...f, source: ev.target.value }))} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm min-w-[min(12rem,100%)] max-w-full" data-testid="finance-filter-source">
                 <option value="">Alle</option>
                 {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
@@ -274,7 +275,7 @@ export default function AdminFinancePage() {
                       <button type="button" onClick={() => openDetail(item.order_id)} className="text-[11px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">Auftrag ansehen</button>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <input value={caseReason[item.id] || ""} onChange={(ev) => setCaseReason((c) => ({ ...c, [item.id]: ev.target.value }))} placeholder="Grund, z. B. „Gutschrift GA2026-0003 angelegt, 20 € am 24.09. überwiesen“" className="flex-1 min-w-[16rem] bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs" aria-label="Grund für die Erledigung" data-testid={`finance-case-reason-${item.id}`} />
+                      <input value={caseReason[item.id] || ""} onChange={(ev) => setCaseReason((c) => ({ ...c, [item.id]: ev.target.value }))} placeholder="Grund, z. B. „Gutschrift GA2026-0003 angelegt, 20 € am 24.09. überwiesen“" className="flex-1 min-w-[min(16rem,100%)] bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs" aria-label="Grund für die Erledigung" data-testid={`finance-case-reason-${item.id}`} />
                       <button type="button" disabled={!!busy || (caseReason[item.id] || "").trim().length < 3} onClick={() => run(`case-${item.id}`, () => api.post(`/admin/finance/cases/${item.id}/resolve`, { reason: caseReason[item.id].trim() }), "Prüffall erledigt.")} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40" data-testid={`finance-case-resolve-${item.id}`}>
                         Erledigt
                       </button>
@@ -285,8 +286,8 @@ export default function AdminFinancePage() {
             </div>
           )}
 
-          <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-            <table className="w-full text-sm">
+          <TableScroll label="Offene Rechnungsaufträge" testId="finance-open-scroll" className="mt-6">
+            <table className="w-full min-w-[46rem] text-sm">
               <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
                 <tr>
                   <th className="text-left px-4 py-3">Angebot</th>
@@ -344,7 +345,7 @@ export default function AdminFinancePage() {
                 {!data.open.length && <tr><td colSpan="5" className="text-center py-10 text-white/40">Keine offenen Rechnungsaufträge.</td></tr>}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
 
           {filters.attention && !data.invoiced?.length && (
             <div className="mt-8 text-sm text-white/50" data-testid="finance-attention-empty">Kein Beleg in dieser Auswahl.</div>
@@ -353,8 +354,8 @@ export default function AdminFinancePage() {
             <div className="mt-8">
               <h2 className="font-heading text-xl font-black uppercase">{filters.attention ? `Angelegte Rechnungen · ${capitalize(data.attention_labels?.[filters.attention] || "")}` : "Angelegte Rechnungen"}</h2>
               <p className="mt-1 text-xs text-white/45">Nummer, Freigabe und Zahlungen kommen aus Dolibarr; offene Belege liest die Website alle zehn Minuten nach, bezahlte einmal am Tag. Der Stand daneben sagt, wie frisch das ist.</p>
-              <div className="mt-3 border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-                <table className="w-full text-sm">
+              <TableScroll label="Angelegte Rechnungen" testId="finance-invoiced-scroll" className="mt-3">
+                <table className="w-full min-w-[52rem] text-sm">
                   <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
                     <tr>
                       <th className="text-left px-4 py-3">Rechnung</th>
@@ -403,7 +404,7 @@ export default function AdminFinancePage() {
                     })}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             </div>
           )}
 

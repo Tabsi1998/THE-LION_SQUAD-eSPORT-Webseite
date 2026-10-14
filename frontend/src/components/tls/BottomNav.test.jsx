@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 // Die Handy-Leiste (#1143, #1144): dieselben fünf Einträge wie die App - Home · Events · Community · Verein · Profil.
 // Der aktive Eintrag leuchtet auf allen seinen Seiten; ein Tipp darauf bringt auf der Übersicht ganz nach oben.
@@ -78,3 +78,33 @@ test("Tipp auf den aktiven Eintrag: auf der Übersicht ganz nach oben statt neu 
   expect(scrollTo).not.toHaveBeenCalled();
   scrollTo.mockRestore();
 });
+
+// #989: die Jahreswertung bleibt markiert, auch wenn /seasons/current auf die konkrete Saison weiterleitet oder der
+// Link gleich auf die Saison zeigt - und nur Community leuchtet.
+test("Jahreswertung: Weiterleitung und direkter Link auf die Saison markieren Community", () => {
+  expect(activeSection("/seasons/jahreswertung-2026")).toBe("community");
+  expect(activeSection("/seasons/jahreswertung-2026/")).toBe("community");
+  expect(activeSection("/seasonsx")).toBeNull();
+  expect(activeSection("/admin/seasons")).toBeNull();
+
+  const marked = () => ["home", "events", "community", "verein", "profile"].filter((key) => screen.getByTestId(`bottom-nav-${key}`).getAttribute("aria-current") === "page");
+  for (const start of ["/seasons/current", "/seasons/jahreswertung-2026"]) {
+    const view = render(
+      <MemoryRouter initialEntries={[start]}>
+        <Routes>
+          <Route path="/seasons/current" element={<Navigate to="/seasons/jahreswertung-2026" replace />} />
+          <Route path="/seasons/:slug" element={<SeasonProbe />} />
+        </Routes>
+        <BottomNav />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("season-path")).toHaveTextContent("/seasons/jahreswertung-2026");
+    expect(marked()).toEqual(["community"]);
+    view.unmount();
+  }
+});
+
+function SeasonProbe() {
+  const { pathname } = useLocation();
+  return <span data-testid="season-path">{pathname}</span>;
+}

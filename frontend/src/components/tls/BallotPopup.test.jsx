@@ -94,3 +94,32 @@ test("im Admin still, Nicht-Mitglieder fragen gar nicht; ohne Feed fragt die Sei
     vi.useRealTimers();
   }
 });
+
+// #986: kaputte Antworten (keine Liste, Abstimmung ohne Antworten oder Stimmrechte) zeigen nichts Kaputtes und reißen
+// die Seite nicht mit - was brauchbar ist, bleibt.
+test("kaputte Antworten vom Server: nichts stürzt ab, brauchbare Abstimmungen bleiben", async () => {
+  const { normalizeBallots } = await import("./BallotPopup");
+  expect(normalizeBallots({ ballots: { length: 1 } }).ballots).toEqual([]);
+  expect(normalizeBallots(null).ballots).toEqual([]);
+  expect(normalizeBallots("kaputt").ballots).toEqual([]);
+  expect(normalizeBallots({ ballots: [BALLOT], poll_seconds: "15" }).poll_seconds).toBe(15);
+  const cleaned = normalizeBallots({ ballots: [null, "x", { ...BALLOT, id: undefined }, { ...BALLOT, id: 9, options: { length: 2 }, rights: "alle" }, { ...BALLOT, options: [null, { code: "yes", label: "Ja" }], rights: [null, OWN] }] }).ballots;
+  expect(cleaned.map((ballot) => ballot.id)).toEqual([9, 7]);
+  expect(cleaned[0].options).toEqual([]);
+  expect(cleaned[0].rights).toEqual([]);
+  expect(cleaned[1].options).toEqual([{ code: "yes", label: "Ja" }]);
+  expect(cleaned[1].rights).toEqual([OWN]);
+
+  apiMock.get.mockResolvedValue({ data: { ballots: { length: 1 }, poll_seconds: 0 } });
+  const first = show();
+  await act(async () => { await Promise.resolve(); });
+  expect(apiMock.get).toHaveBeenCalled();
+  expect(screen.queryByTestId("ballot-popup")).toBeNull();
+  first.unmount();
+
+  apiMock.get.mockResolvedValue({ data: { ballots: [{ ...BALLOT, options: "kaputt", rights: { length: 1 } }], poll_seconds: 0 } });
+  show();
+  expect(await screen.findByTestId("ballot-popup")).toHaveTextContent("Entlastung des Vorstands");
+  expect(screen.getByTestId("ballot-popup-cast")).toBeDisabled();
+  expect(screen.getByTestId("ballot-popup-unusable")).toHaveTextContent("Diese Abstimmung lässt sich hier gerade nicht anzeigen");
+});
