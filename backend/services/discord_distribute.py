@@ -147,6 +147,20 @@ async def send(db, *, text, target: str = "community", guild_ids=None, title=Non
             "target": target, "servers": results}
 
 
+async def send_draft(db, discord_user_id, draft: dict) -> str:
+    """„Senden“ unter der Vorschau von ``/verteilen`` (#1045): die Berechtigung gilt im Moment der Bestätigung.
+
+    Zwischen Vorschau und Knopf können Minuten liegen. Gesendet wird nur, wenn hinter derselben Discord-Kennung noch
+    dasselbe Konto steht und es noch verteilen darf - sonst geht nichts hinaus, und die Antwort ist ``NOT_STAFF``."""
+    user = await staff_user(db, discord_user_id)
+    if not user or user.get("id") != (draft.get("user") or {}).get("id"):
+        return NOT_STAFF
+    drafted = draft["plan"]
+    result = await send(db, text=drafted["text"], target=drafted["target"], guild_ids=[row["guild_id"] for row in drafted["servers"]],
+                        title=drafted["title"], author=draft["author"], origin=draft["origin"], actor_id=user["id"], via="discord")
+    return result_text(result)
+
+
 async def draft_from_discord(db, discord_user_id, text, target: str = "community", server: str | None = None, title=None,
                              *, author: str = "", guild_id=None) -> dict:
     """``/verteilen``: prüft, wer fragt, und baut die Vorschau - gesendet wird erst mit dem Knopf."""
