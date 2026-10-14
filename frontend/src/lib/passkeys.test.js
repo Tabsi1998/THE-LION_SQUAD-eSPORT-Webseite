@@ -198,3 +198,52 @@ describe("startPasskeyAutofill", () => {
     expect(navigator.credentials.get).not.toHaveBeenCalled();
   });
 });
+
+// #1520: Knopf und Vorschlag teilen sich die Anfrage am Server - die Optionen kommen nacheinander, und der Vorschlag
+// bekommt weder eine leere Liste noch ein Zeitlimit mit.
+describe("Optionen für Knopf und Vorschlag", () => {
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  test("leere Liste und Zeitlimit fallen beim Vorschlag weg, der Knopf fragt ohne mediation", async () => {
+    const autofill = (await import("./passkeys")).startPasskeyAutofill;
+    const calls = [];
+    navigator.credentials = { get: vi.fn((request) => { calls.push(request); return new Promise(() => {}); }) };
+    api.post.mockReset();
+    api.post.mockResolvedValue({ data: { challenge: "AQID", rpId: "club.example", allowCredentials: [], timeout: 60000 } });
+    const stop = autofill({ onSignedIn: vi.fn() });
+    await flush();
+    expect(calls[0].mediation).toBe("conditional");
+    expect(calls[0].publicKey).not.toHaveProperty("allowCredentials");
+    expect(calls[0].publicKey).not.toHaveProperty("timeout");
+    expect(calls[0].publicKey.rpId).toBe("club.example");
+    stop();
+    signInWithPasskey({ remember: true });
+    await flush();
+    expect(calls[1].mediation).toBeUndefined();
+    expect(calls[1].publicKey).not.toHaveProperty("allowCredentials");
+  });
+
+  test("eine noch laufende Anfrage des Vorschlags überholt die des Knopfs nicht", async () => {
+    const autofill = (await import("./passkeys")).startPasskeyAutofill;
+    navigator.credentials = { get: vi.fn(() => new Promise(() => {})) };
+    const answers = [];
+    api.post.mockReset();
+    api.post.mockImplementation(() => new Promise((resolve) => answers.push(resolve)));
+    const stop = autofill({ onSignedIn: vi.fn() });
+    await flush();
+    expect(answers).toHaveLength(1);
+    stop();
+    signInWithPasskey({ remember: true });
+    await flush();
+    // Die zweite Anfrage geht erst los, wenn die erste beantwortet ist.
+    expect(answers).toHaveLength(1);
+    answers[0]({ data: { challenge: "AQID", rpId: "club.example" } });
+    await flush();
+    expect(answers).toHaveLength(2);
+    answers[1]({ data: { challenge: "BAUG", rpId: "club.example" } });
+    await flush();
+    // Der beendete Vorschlag fragt den Browser nicht mehr; nur der Knopf tut es.
+    expect(navigator.credentials.get).toHaveBeenCalledTimes(1);
+    expect(navigator.credentials.get.mock.calls[0][0].mediation).toBeUndefined();
+  });
+});

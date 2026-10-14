@@ -34,13 +34,15 @@ export default function LoginPage() {
   const [err, setErr] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [verificationRequired, setVerificationRequired] = useState(false);
-  const [passkeysEnabled, setPasskeysEnabled] = useState(false);
+  // Passkeys an dieser Website: "unknown" bis der Server antwortet, dann "on" oder "off".
+  const [passkeyStatus, setPasskeyStatus] = useState(() => (passkeysSupported() ? "unknown" : "off"));
+  const passkeysEnabled = passkeyStatus === "on";
   const [remember, setRemember] = useState(readRemember);
   const [offerPasskey, setOfferPasskey] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
   // Vorschlag im E-Mail-Feld (#1520): "checking" bis klar ist, ob der Browser das kann, "on" solange er läuft,
-  // "off" ohne ihn, "ended" wenn er von selbst endete (etwa nach einer Ablehnung durch den Server). Ohne
-  // Vorschlag zeigt die Seite den Link „Mit Passkey anmelden“.
+  // "off" ohne ihn, "ended" wenn er von selbst endete (etwa nach einer Ablehnung durch den Server). Der Knopf
+  // „Mit Passkey anmelden“ steht unabhängig davon immer da: nicht jeder Browser zeigt jeden Passkey im Feld.
   const [autofill, setAutofill] = useState("checking");
   const [autofillRound, setAutofillRound] = useState(0);
   // Neu starten nur nach einer Handlung: Passwort gescheitert, oder - höchstens einmal je Seitenaufruf - der
@@ -51,8 +53,10 @@ export default function LoginPage() {
   rememberRef.current = remember;
   const passwordForm = settings.password_login_enabled !== false;
   useEffect(() => {
-    if (passkeysSupported()) api.get("/auth/passkeys/status").then(({ data }) => setPasskeysEnabled(data.enabled === true)).catch(() => {});
+    if (!passkeysSupported()) return;
+    api.get("/auth/passkeys/status").then(({ data }) => setPasskeyStatus(data.enabled === true ? "on" : "off")).catch(() => setPasskeyStatus("off"));
   }, []);
+  const passkeysOff = passkeyStatus === "off";
 
   const finishPasskeySignIn = (data) => {
     if (data.mfa_required) {
@@ -69,10 +73,11 @@ export default function LoginPage() {
     stopAutofillRef.current = null;
   };
 
-  // Gespeicherte Passkeys schlägt der Browser im E-Mail-Feld von selbst vor (#348, #1520). Die Prüfung am Server
-  // läuft über dieselbe Sperre wie das Formular - so gibt es nie zwei Anmeldungen zugleich.
+  // Gespeicherte Passkeys schlägt der Browser im E-Mail-Feld von selbst vor (#348, #1520). Die Anfrage startet
+  // sofort, ohne auf den Status zu warten: wer schnell ins Feld klickt, sieht den Vorschlag sonst erst beim zweiten
+  // Mal. Die Prüfung am Server läuft über dieselbe Sperre wie das Formular - nie zwei Anmeldungen zugleich.
   useEffect(() => {
-    if (!passkeysEnabled || mfaTicket || !passwordForm) {
+    if (passkeysOff || mfaTicket || !passwordForm) {
       setAutofill("off");
       return undefined;
     }
@@ -98,7 +103,7 @@ export default function LoginPage() {
       stopAutofill();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [passkeysEnabled, mfaTicket, passwordForm, autofillRound]);
+  }, [passkeysOff, mfaTicket, passwordForm, autofillRound]);
 
   const restartAutofillOnFocus = () => {
     if (autofill !== "ended" || focusRestartsLeftRef.current < 1) return;
@@ -117,7 +122,12 @@ export default function LoginPage() {
     stopAutofill();
     const attempt = await submitOnce(() => signInWithPasskey({ remember }));
     if (!attempt.started) return;
-    if (attempt.error) { setErr(passkeyError(attempt.error)); return; }
+    if (attempt.error) {
+      setErr(passkeyError(attempt.error));
+      // Abgebrochen oder abgelehnt: der Vorschlag im E-Mail-Feld darf wieder laufen.
+      setAutofillRound((round) => round + 1);
+      return;
+    }
     finishPasskeySignIn(attempt.value);
   };
 
@@ -325,20 +335,16 @@ export default function LoginPage() {
           </div>
         )}
         {!mfaTicket && <GoogleAuthButton label="Mit Google einloggen" returnPath={next} intent="login" remember={remember} />}
-        {/* Ohne Passwort-Formular gibt es kein Feld für den Vorschlag: dann bleibt der Passkey ein eigener Knopf. */}
-        {!mfaTicket && passkeysEnabled && !passwordForm && (
+        {/* Der sichtbare Weg zum Passkey (FIDO-Empfehlung, wie bei Google, GitHub, Apple): öffnet den Dialog des
+            Browsers ohne E-Mail - mit allen Passkeys dieser Website, auch vom Handy oder Sicherheitsschlüssel. */}
+        {!mfaTicket && passkeysEnabled && (
           <div className="mt-4 space-y-2">
             <button type="button" disabled={loading} onClick={passkeyLogin} data-testid="login-passkey"
               className="tls-btn tls-btn--secondary w-full min-h-11 py-3 rounded-sm font-bold disabled:opacity-50">Mit Passkey anmelden</button>
-            {err && <AuthFormAlert id="passkey-error">{err}</AuthFormAlert>}
+            {!passwordForm && err && <AuthFormAlert id="passkey-error">{err}</AuthFormAlert>}
           </div>
         )}
         <div className="mt-6 text-sm text-white/60 text-center space-y-2">
-          {/* Browser ohne Vorschlag im E-Mail-Feld (#1520): ein unauffälliger Weg zum Passkey. */}
-          {!mfaTicket && passkeysEnabled && passwordForm && (autofill === "off" || autofill === "ended") && (
-            <div><button type="button" disabled={loading} onClick={passkeyLogin} data-testid="login-passkey"
-              className="min-h-11 text-white/60 hover:text-[#29B6E8] underline-offset-4 hover:underline disabled:opacity-50">Mit Passkey anmelden</button></div>
-          )}
           {settings.registration_enabled !== false && (
             <div>Kein Account? <Link to={`/register${nextQuery(next)}`} className="text-[#29B6E8] hover:text-white font-bold" data-testid="login-register-link">Registrieren</Link></div>
           )}

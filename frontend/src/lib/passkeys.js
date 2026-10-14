@@ -19,6 +19,8 @@ export function credentialOptions(options, registration = false) {
   for (const field of ["allowCredentials", "excludeCredentials"]) {
     if (options[field]) publicKey[field] = options[field].map((item) => ({ ...item, id: decodeCredentialBytes(item.id) }));
   }
+  // Ohne E-Mail (discoverable): keine Liste statt einer leeren - der Browser zeigt dann alle Passkeys dieser Website.
+  if (Array.isArray(publicKey.allowCredentials) && publicKey.allowCredentials.length === 0) delete publicKey.allowCredentials;
   if (registration) publicKey.user = { ...options.user, id: decodeCredentialBytes(options.user.id) };
   return publicKey;
 }
@@ -88,8 +90,22 @@ async function verifyLogin(options, credential, remember) {
   }
 }
 
+// Der Server merkt sich je Browser nur die jüngste Anmelde-Anfrage. Darum laufen die Anfragen nach Optionen
+// nacheinander: die Antwort einer abgebrochenen Anfrage darf nie die einer neueren überholen.
+let optionsQueue = Promise.resolve();
+
+function loginOptions() {
+  const request = optionsQueue.then(() => api.post("/auth/passkeys/login/options", {}, { skipInvalidation: true }));
+  optionsQueue = request.catch(() => {});
+  return request.then(({ data }) => data);
+}
+
+/**
+ * Der sichtbare Weg (#1520, FIDO-Empfehlung): „Mit Passkey anmelden“ öffnet den Dialog des Browsers - ohne E-Mail,
+ * mit allen Passkeys dieser Website, auch solchen auf dem Handy (QR-Code) oder einem Sicherheitsschlüssel.
+ */
 export async function signInWithPasskey({ remember = true } = {}) {
-  const { data: options } = await api.post("/auth/passkeys/login/options", {}, { skipInvalidation: true });
+  const options = await loginOptions();
   const credential = await navigator.credentials.get({ publicKey: credentialOptions(options) });
   return verifyLogin(options, credential, remember);
 }
@@ -117,12 +133,13 @@ async function runAlone(task) {
 }
 
 /**
- * Der Browser schlägt gespeicherte Passkeys im E-Mail-Feld vor (#348, #1520) - statt eines eigenen Knopfs.
+ * Der Browser schlägt gespeicherte Passkeys im E-Mail-Feld vor (#348, #1520) - zusätzlich zum Knopf
+ * „Mit Passkey anmelden“: nicht jeder Browser zeigt jeden Passkey im Feld an (etwa einen vom Handy).
  * Die Anfrage bleibt im Hintergrund offen und wird vor Ablauf erneuert. `exclusive` lässt die Prüfung am
  * Server nur laufen, wenn nicht schon eine andere Anmeldung läuft (kein doppeltes Anmelden). Abbruch und eine
  * abgelehnte Auswahl bleiben still; `onError` hört nur, was der Server ablehnt. Danach endet der Vorschlag:
  * sonst böte der Browser denselben Passkey gleich wieder an. `onEnd` meldet, dass der Vorschlag nicht mehr
- * läuft und die Seite den Weg über „Mit Passkey anmelden“ zeigen soll; neu starten darf nur die Seite.
+ * läuft; neu starten darf nur die Seite.
  * Liefert eine Funktion zum Beenden: beim Verlassen der Seite, beim Absenden des Passworts und bevor eine
  * eigene Passkey-Anfrage startet - es darf nur eine geben.
  */
@@ -140,7 +157,7 @@ export function startPasskeyAutofill({ remember = () => true, exclusive = runAlo
     controller = new AbortController();
     let options;
     try {
-      ({ data: options } = await api.post("/auth/passkeys/login/options", {}, { skipInvalidation: true }));
+      options = await loginOptions();
     } catch {
       end();
       return;
@@ -150,7 +167,9 @@ export function startPasskeyAutofill({ remember = () => true, exclusive = runAlo
     let credential;
     try {
       timer = setTimeout(() => controller.abort(), AUTOFILL_REARM_MS);
-      credential = await navigator.credentials.get({ publicKey: credentialOptions(options), mediation: "conditional", signal: controller.signal });
+      // Die Zeit regelt hier die Seite selbst (Erneuern vor Ablauf); ein Zeitlimit des Servers beendete den Vorschlag früher.
+      const { timeout: _timeout, ...publicKey } = credentialOptions(options);
+      credential = await navigator.credentials.get({ publicKey, mediation: "conditional", signal: controller.signal });
     } catch (error) {
       if (stopped) return;
       if (error?.name === "AbortError") { arm(); return; }
