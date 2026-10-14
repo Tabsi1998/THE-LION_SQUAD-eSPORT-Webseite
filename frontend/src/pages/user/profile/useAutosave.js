@@ -81,6 +81,12 @@ export function useProfileSave({ user, refresh }) {
     cancel();
     return queue.flush();
   }, [cancel, queue]);
+  // Feld verlassen: was in der Tipp-Pause wartet, geht sofort. Ein gescheiterter Lauf wird dabei nicht still
+  // wiederholt - dafür gibt es „Erneut versuchen“.
+  const savePending = useCallback(() => {
+    if (!timer.current) return Promise.resolve({ ok: true, nothing: true });
+    return saveNow();
+  }, [saveNow]);
   // Nach der Tipp-Pause speichern.
   const saveSoon = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -174,6 +180,24 @@ export function useProfileSave({ user, refresh }) {
     };
   }, [flushBeforeLeaving, queue]);
 
+  // Was beim Verlassen verloren ginge: ungültige Entwürfe oder ein gescheiterter Lauf (Offenes, das nur noch wartet,
+  // geht beim Verlassen von selbst ab und zählt nicht). null heißt: nichts offen.
+  const openIssue = useCallback(() => {
+    const fields = Object.keys(draftsRef.current);
+    const current = queue.getState();
+    const failed = !!current.error && current.dirty && !current.busy;
+    if (!fields.length && !failed) return null;
+    return { fields, failed };
+  }, [queue]);
+  // „Verwerfen und weiter“: Entwürfe weg, nicht Gespeichertes zurück auf den Serverstand.
+  const discard = useCallback(() => {
+    cancel();
+    draftsRef.current = {};
+    setDrafts({});
+    const current = queue.getState();
+    if (current.dirty && !current.busy) queue.edit(() => current.confirmed);
+  }, [cancel, queue]);
+
   const setForm = useCallback((action) => {
     const current = queue.getState();
     const shown = { ...current.local, ...draftsRef.current };
@@ -213,7 +237,10 @@ export function useProfileSave({ user, refresh }) {
     pending: timerActive,
     saveSoon,
     saveNow,
+    savePending,
     cancel,
     retry: saveNow,
+    openIssue,
+    discard,
   };
 }

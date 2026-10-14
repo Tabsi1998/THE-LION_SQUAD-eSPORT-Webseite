@@ -12,6 +12,7 @@ const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() }
 const keepaliveMock = vi.fn();
 const toastMock = { success: vi.fn(), error: vi.fn(), info: vi.fn(), message: vi.fn() };
 const refreshMock = vi.fn();
+const logoutMock = vi.fn();
 
 const USER = {
   id: "u-1",
@@ -36,7 +37,7 @@ vi.mock("@/lib/api", () => ({
 // Das angemeldete Konto ist veränderlich, damit ein Kontowechsel geprüft werden kann (#1048).
 const authState = { user: USER };
 vi.mock("@/context/AuthContext", () => ({
-  useAuth: () => ({ user: authState.user, refresh: refreshMock, isClubMember: true }),
+  useAuth: () => ({ user: authState.user, refresh: refreshMock, logout: logoutMock, isClubMember: true }),
 }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/hooks/usePublicSiteSettings", () => ({ usePublicSiteSettings: () => ({ settings: {}, loading: false }) }));
@@ -656,3 +657,96 @@ test("Darstellung: Saison-Deko und Töne stehen in den Einstellungen", async () 
   expect(screen.getByTestId("profile-tab-appearance")).toHaveAttribute("aria-current", "page");
 });
 
+
+// Seite verlassen mit offener Eingabe (#1048, nach Codex-Prüfung von #1535): beforeunload greift nur beim Entladen -
+// Links, Zurück und Abmelden in der Webseite halten an und fragen im Dialog der Seite.
+function renderWithRoutes() {
+  return render(
+    <ConfirmDialogProvider>
+      <MemoryRouter initialEntries={["/profile"]}>
+        <Routes>
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/u/:username" element={<div data-testid="own-profile-stub" />} />
+        </Routes>
+      </MemoryRouter>
+    </ConfirmDialogProvider>
+  );
+}
+
+test("Verlassen mit leerem Namen fragt im Dialog: Zurück zum Feld bleibt, Verwerfen geht weiter", async () => {
+  const user = userEvent.setup();
+  renderWithRoutes();
+  await waitForForm();
+  await user.clear(screen.getByTestId("profile-display-name"));
+
+  await user.click(screen.getByTestId("settings-to-profile"));
+  const dialog = await screen.findByTestId("confirm-dialog");
+  expect(dialog).toHaveTextContent("Nicht gespeicherte Änderungen: Name ist leer. Verwerfen und weiter?");
+  expect(screen.getByTestId("confirm-dialog-confirm")).toHaveTextContent("Verwerfen und weiter");
+  await user.click(screen.getByTestId("confirm-dialog-cancel"));
+  expect(screen.queryByTestId("own-profile-stub")).toBeNull();
+  await waitFor(() => expect(screen.getByTestId("profile-display-name")).toHaveFocus());
+  expect(screen.getByTestId("profile-display-name")).toHaveValue("");
+
+  await user.click(screen.getByTestId("settings-to-profile"));
+  await user.click(await screen.findByTestId("confirm-dialog-confirm"));
+  expect(await screen.findByTestId("own-profile-stub")).toBeInTheDocument();
+  expect(apiMock.patch).not.toHaveBeenCalled();
+});
+
+test("Verlassen mit nur wartendem, gültigem Text speichert sofort und fragt nicht", async () => {
+  const user = userEvent.setup();
+  renderWithRoutes();
+  await waitForForm();
+  await user.type(screen.getByTestId("profile-bio"), " Mehr.");
+
+  await user.click(screen.getByTestId("settings-to-profile"));
+  expect(await screen.findByTestId("own-profile-stub")).toBeInTheDocument();
+  expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+  expect(apiMock.patch).toHaveBeenCalledTimes(1);
+  expect(apiMock.patch.mock.calls[0][1]).toEqual({ bio: "Kurze Vorstellung. Mehr." });
+});
+
+test("Verlassen nach gescheitertem Speichern fragt ebenfalls", async () => {
+  const user = userEvent.setup();
+  // Der Server bleibt weg - auch der neue Versuch beim Verlassen des Felds scheitert.
+  apiMock.patch.mockImplementation(() => Promise.reject(new Error("Serverfehler")));
+  renderWithRoutes();
+  await waitForForm();
+  await user.type(screen.getByTestId("profile-bio"), " Mehr.");
+  await user.tab();
+  await waitFor(() => expect(screen.getByTestId("profile-autosave-status")).toHaveAttribute("data-status", "error"));
+
+  await user.click(screen.getByTestId("settings-to-profile"));
+  expect(await screen.findByTestId("confirm-dialog")).toHaveTextContent("Das Speichern ist fehlgeschlagen.");
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  expect(await screen.findByTestId("own-profile-stub")).toBeInTheDocument();
+});
+
+test("ein anderer Reiter mit leerem Namen ist kein Verlassen - kein Dialog, der Entwurf bleibt", async () => {
+  const user = userEvent.setup();
+  renderWithRoutes();
+  await waitForForm();
+  await user.clear(screen.getByTestId("profile-display-name"));
+  await user.click(screen.getByRole("button", { name: /Socials/i }));
+  expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+  await user.click(screen.getByRole("button", { name: /Grunddaten/i }));
+  expect(screen.getByTestId("profile-display-name")).toHaveValue("");
+});
+
+test("Abmelden mit leerem Namen fragt erst; Zurück zum Feld meldet nicht ab", async () => {
+  const user = userEvent.setup();
+  logoutMock.mockResolvedValue(true);
+  renderWithRoutes();
+  await waitForForm();
+  await user.clear(screen.getByTestId("profile-display-name"));
+
+  await user.click(screen.getByTestId("settings-logout"));
+  await user.click(await screen.findByTestId("confirm-dialog-cancel"));
+  expect(logoutMock).not.toHaveBeenCalled();
+
+  await user.click(screen.getByTestId("settings-logout"));
+  await user.click(await screen.findByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(logoutMock).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+});

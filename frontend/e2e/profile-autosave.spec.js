@@ -110,3 +110,32 @@ test("Serverfehler: Nicht gespeichert, Erneut versuchen speichert, die Eingabe b
   await expect(status).toContainText("Gespeichert");
   expect(server.user.bio).toBe("Trotz Fehler");
 });
+
+// Seite verlassen mit offener Eingabe (nach Codex-Prüfung von #1535): Link und „Vor/Zurück“ des Browsers halten an.
+test("Verlassen mit leerem Namen: Link und Browser-Vor halten an, Dialog der Seite, Verwerfen geht weiter", async ({ page }) => {
+  const server = await mockServer(page);
+  await page.goto("/profile?tab=basic");
+  await expect(page.getByTestId("profile-display-name")).toHaveValue("NeonFalke");
+  // Ein Verlaufseintrag nach vorn: einmal zur eigenen Profilseite und zurück.
+  await page.getByTestId("settings-to-profile").click();
+  await expect(page).toHaveURL(/\/u\/neonfalke/);
+  await page.goBack();
+  await expect(page.getByTestId("profile-display-name")).toHaveValue("NeonFalke");
+
+  await page.getByTestId("profile-display-name").fill("");
+  // Link: Dialog, „Zurück zum Feld“ bleibt auf der Seite.
+  await page.getByTestId("settings-to-profile").click();
+  await expect(page.getByTestId("confirm-dialog")).toContainText("Name ist leer.");
+  await page.getByTestId("confirm-dialog-cancel").click();
+  await expect(page).toHaveURL(/\/profile/);
+  await expect(page.getByTestId("profile-display-name")).toBeFocused();
+
+  // Browser-Vor: die Adresse bleibt, der Dialog kommt.
+  await page.goForward();
+  await expect(page.getByTestId("confirm-dialog")).toBeVisible();
+  await expect(page).toHaveURL(/\/profile/);
+  await expect(page.getByTestId("profile-display-name")).toHaveValue("");
+  await page.getByTestId("confirm-dialog-confirm").click();
+  await expect(page).toHaveURL(/\/u\/neonfalke/);
+  expect(server.patches).toEqual([]);
+});

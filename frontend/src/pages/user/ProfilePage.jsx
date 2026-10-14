@@ -4,7 +4,9 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { gameLabel } from "@/lib/gameLabels";
 import { toast } from "sonner";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { useNavigationGuard } from "@/lib/navigationGuard";
 import { Crown, UserCircle } from "lucide-react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, TABS, notificationPreferenceKey, tabRedirect } from "./profile/constants";
@@ -36,6 +38,19 @@ import { AutosaveStatus } from "./profile/SwitchRow";
 const FORM_TABS = new Set(["basic", "gaming", "socials"]);
 // Regler speichern nach der Pause wie Text - jeder Zwischenwert beim Ziehen wäre sonst ein eigener Lauf.
 const SLIDER_SETTINGS = new Set(["ceremony_volume"]);
+// Beim Verlassen mit offener, ungültiger Eingabe (#1048, nach Codex-Prüfung): was fehlt und wo das Feld steht.
+const LEAVE_REASONS = { display_name: "Name ist leer.", website: "Website ist keine gültige Adresse." };
+const FIELD_PLACES = {
+  display_name: { tab: "basic", testId: "profile-display-name" },
+  website: { tab: "socials", testId: "profile-website" },
+};
+
+function leaveDescription(issue) {
+  const reasons = issue.fields.map((key) => LEAVE_REASONS[key] || "Eine Eingabe ist ungültig.");
+  if (issue.failed) reasons.push("Das Speichern ist fehlgeschlagen.");
+  return `Nicht gespeicherte Änderungen: ${reasons.join(" ")} Verwerfen und weiter?`;
+}
+
 // ?tab=sessions war der eigene Reiter für Geräte; seit #258 steckt er in
 // „Sicherheit“, alte Links landen dort.
 const TAB_ALIASES = { sessions: "security" };
@@ -65,6 +80,54 @@ export default function ProfilePage() {
   // Formular und Speichern über eine Speicher-Warteschlange (#1048): jede Änderung speichert von selbst, nacheinander.
   const autosave = useProfileSave({ user, refresh });
   const { form, setForm, saveSoon, saveNow } = autosave;
+
+  // Seite verlassen (Link, Zurück, Abmelden): Wartendes geht sofort ab. Bleibt etwas offen, das nicht gespeichert werden
+  // kann (ungültig oder gescheitert), fragt ein Dialog: verwerfen und weiter, oder zurück zum Feld.
+  const confirm = useConfirm();
+  const { pathname } = useLocation();
+  const askingRef = useRef(false);
+  const confirmLeave = async () => {
+    const issue = autosave.openIssue();
+    if (!issue) return true;
+    if (askingRef.current) return false;
+    askingRef.current = true;
+    let leave = false;
+    try {
+      leave = await confirm({
+        title: "Nicht gespeicherte Änderungen",
+        description: leaveDescription(issue),
+        confirmLabel: "Verwerfen und weiter",
+        cancelLabel: "Zurück zum Feld",
+        tone: "danger",
+      });
+    } finally {
+      askingRef.current = false;
+    }
+    if (leave) {
+      autosave.discard();
+      return true;
+    }
+    const place = FIELD_PLACES[issue.fields[0]];
+    if (place) {
+      if (place.tab !== tab) setTab(place.tab);
+      setTimeout(() => document.querySelector(`[data-testid="${place.testId}"]`)?.focus(), 0);
+    }
+    return false;
+  };
+  useNavigationGuard({
+    blocks: (nextPathname) => {
+      // Ein anderer Reiter (?tab=) ist kein Verlassen.
+      if (nextPathname === pathname) return false;
+      if (autosave.openIssue()) return true;
+      void autosave.savePending();
+      return false;
+    },
+    onBlocked: (proceed) => {
+      void confirmLeave().then((leave) => {
+        if (leave) proceed();
+      });
+    },
+  });
   const [games, setGames] = useState([]);
 
   useEffect(() => {
@@ -234,7 +297,8 @@ export default function ProfilePage() {
 
         <div className="mt-8 lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10 lg:items-start">
           <ProfileNav tab={tab} onSelect={setTab} onLogout={async () => {
-            // Offenes geht noch ins richtige Konto, danach wird abgemeldet.
+            // Offenes geht noch ins richtige Konto, danach wird abgemeldet - Ungültiges oder Gescheitertes erst nach Rückfrage.
+            if (!(await confirmLeave())) return;
             if (autosave.pending || autosave.dirty) await saveNow();
             if (await logout?.()) navigate("/");
           }} />
@@ -242,7 +306,7 @@ export default function ProfilePage() {
           {/* Enter in einem Feld und das Verlassen eines Felds speichern sofort - es gibt keinen Speichern-Knopf. */}
           <form
             onSubmit={(e) => { e.preventDefault(); void saveNow(); }}
-            onBlur={() => { void saveNow(); }}
+            onBlur={() => { void autosave.savePending(); }}
             noValidate
             className="mt-6 lg:mt-0 space-y-5 min-w-0"
           >
