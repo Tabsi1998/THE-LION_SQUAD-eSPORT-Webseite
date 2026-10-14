@@ -19,6 +19,9 @@ from services.email_delivery import html_to_text, mailbox_domain
 from services.log_safe import log_safe, mask_addresses, mask_addresses_deep
 from services.mail_outbox import enqueue_mail  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
 
+# Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
+__all__ = ["enqueue_mail"]
+
 logger = logging.getLogger("tls.mailqueue")
 
 # Felder, die die Liste der Warteschlange nie zeigt (#1418): die ganze Adresse, der Mailtext und der Schlüssel gegen
