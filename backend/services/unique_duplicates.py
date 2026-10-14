@@ -32,6 +32,8 @@ MANUAL = {
                                         "Entscheidung; die Personen fragen und die falsche Verknüpfung im Admin lösen.",
     "billing_orders.booking_key": "Mehrere Rechnungsaufträge für dieselbe Buchung - mit der Buchhaltung klären, welcher "
                                   "gilt, und die anderen im Finanzbereich stornieren.",
+    "consent_decisions.open_decision": "Mehrere offene Einwilligungsaufträge für dieselbe Entscheidung - sie sind Nachweise "
+                                       "und werden nie gelöscht: die überzähligen von Hand auf status „superseded“ setzen.",
 }
 # Index -> Reihenfolge, deren erste Zeile bleibt (sonst die älteste).
 KEEP_ORDER = {

@@ -501,6 +501,14 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return [row for row in data if isinstance(row, dict)]
 
+    async def my_consents(self, who: dict) -> list[dict]:
+        """Die eigenen Einwilligungen über die Bindung oder die Mitgliedsnummer (#1537) - das Modul prüft selbst, für
+        wen die Website spricht. Dasselbe Format wie `member_consents`; entschieden wird nur über `decide_consent`."""
+        data = await self._get("/vereine/me/consents", dict(who))
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
     async def decide_consent(self, member_id: int, payload: dict) -> dict:
         """Zustimmen oder widerrufen - ohne Wiederholung durch den Client; die `reference` macht den
         Auftrag wiederholbar, falls der Aufrufer es noch einmal versucht."""

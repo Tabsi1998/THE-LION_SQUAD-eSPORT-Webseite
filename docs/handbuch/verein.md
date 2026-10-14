@@ -120,7 +120,7 @@ anfragen** bzw. den Einladungscode vom Vorstand). Eine Mitgliedsnummer allein re
 
 **Meine Mitgliedschaft** (`/members/membership`): Karte, Mitgliedsart, „Mitglied seit“, Funktion im Verein, **Austritt
 erklären** (mit Wunschdatum, der letzte Tag wird in der Mitgliederverwaltung gerechnet), **Meine Einwilligungen**
-(**Ich stimme zu** erst nach dem Lesen der Fassung, **Widerrufen** jederzeit), der eigene Eintrag im Mitgliederverzeichnis
+(auch in der App; **Ich stimme zu** erst nach dem Lesen der Fassung, **Widerrufen** jederzeit, der Text der zugestimmten Fassung bleibt lesbar), der eigene Eintrag im Mitgliederverzeichnis
 (**Im Mitgliederverzeichnis zeigen**, Gamertag, Spiele, Plattformen, Kurztext, **Eintrag speichern**) und **Nummer öffentlich**.
 
 ### 3.4 Vorstand und Stellvertretungen
