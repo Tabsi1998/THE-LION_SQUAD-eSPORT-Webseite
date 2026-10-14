@@ -16,6 +16,7 @@ widerrufbar. Die Antwort für den Schlüssel ist schmaler als die für die Turni
 from __future__ import annotations
 
 import copy
+import re
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
@@ -173,7 +174,7 @@ STAGE_FIELDS = ("id", "name", "number", "stage_type", "match_type")
 MATCH_FIELDS = ("id", "tournament_id", "stage_id", "stage_number", "stage_type", "match_type", "match_key", "section",
                 "round", "round_name", "round_label", "matchday_number", "matchday_label", "order", "match_index", "status",
                 "scheduled_at", "started_at", "completed_at", "duration_minutes", "station_id", "station_name",
-                "station_label", "winner_id", "is_preview", "called_at")
+                "station_label", "winner_id", "is_preview", "called_at", "merged_into_key")
 # Wer zum Check-in zählt (#1123) und wer einen Platz belegt (wie die Anmeldung: offen, bestätigt, eingecheckt).
 CHECKIN_STATUSES = ("approved", "checked_in")
 SEAT_STATUSES = ("pending", "approved", "checked_in")
@@ -181,6 +182,9 @@ SLOT_FIELDS = ("slot", "registration_id", "status", "seed", "source")
 SOURCE_FIELDS = ("type", "flow", "match_key", "rank", "seed", "raw")
 RESULT_FIELDS = ("registration_id", "rank", "score", "points", "qualified")
 MATCH_SETTING_FIELDS = ("match_size", "qualifiers_per_match", "duration_minutes")
+# Grand Final Reset und entfallene Spiele (#1561): die Regel und die öffentlichen Gründe - nie Konten oder Notizen.
+RESET_RULE_FIELDS = ("of_match_key", "upper_slot")
+RESULT_META_FIELDS = ("source", "reason", "needed")
 STATION_FIELDS = ("id", "name", "label", "device_type", "status")
 
 
@@ -197,7 +201,17 @@ def _display_match(match: dict) -> dict:
             row["source"] = _pick(slot["source"], SOURCE_FIELDS)
         out["slots"].append(row)
     out["results"] = [_pick(row, RESULT_FIELDS) for row in match.get("results") or []]
-    out["settings"] = _pick(match.get("settings") or {}, MATCH_SETTING_FIELDS)
+    settings = match.get("settings") or {}
+    out["settings"] = _pick(settings, MATCH_SETTING_FIELDS)
+    if isinstance(settings.get("bracket_reset"), dict):
+        out["settings"]["bracket_reset"] = _pick(settings["bracket_reset"], RESET_RULE_FIELDS)
+    if isinstance(match.get("result_meta"), dict):
+        meta = _pick(match["result_meta"], RESULT_META_FIELDS)
+        # Nur Kennwörter („merged“, „shortened“) - nie freier Text der Turnierleitung.
+        if isinstance(meta.get("reason"), str) and not re.fullmatch(r"[a-z_]{1,40}", meta["reason"]):
+            meta.pop("reason")
+        if meta:
+            out["result_meta"] = meta
     if isinstance(match.get("station"), dict):
         out["station"] = _pick(match["station"], STATION_FIELDS)
     return out

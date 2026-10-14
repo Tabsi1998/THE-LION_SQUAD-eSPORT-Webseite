@@ -90,3 +90,19 @@ test("im Duell: wer ausscheidet, wird blasser; der goldene Weg leuchtet in der Z
   expect(card.querySelector("[data-tv-reg='r1']").className).toContain("tv-row--gold");
   expect(card.querySelector("[data-tv-reg='r8']").className).toContain("tv-row--out");
 });
+
+test("am TV: ein nicht nötiges Reset-Spiel und ein zusammengelegter Lauf sagen, warum sie entfallen (#1561)", async () => {
+  const { doubleElimination } = await import("../../../e2e/fixtures/tvBrackets.mjs");
+  const bracket = decide(decide(decide(decide(decide(decide(doubleElimination(4, { reset: true }), "A"), "B"), "C"), "LA"), "LB"), "GF");
+  // Der Sieger des Winner Bracket gewinnt das Grand Final - wie der Server: Reset entfällt (result_meta über den TV-Schlüssel).
+  expect(find(bracket, "GFR").status).toBe("cancelled");
+  renderNode(bracket, "GFR");
+  expect(screen.getByTestId("tv-match-m-GFR")).toHaveTextContent("entfällt · nicht nötig");
+});
+
+test("am TV: ein zusammengelegter Lauf nennt den Sammellauf (#1561, echter Umbau)", async () => {
+  const FFA = (await import("../../../e2e/fixtures/ffaGenerated.json")).default;
+  const bracket = structuredClone(FFA.ffa8_after_merge);
+  renderNode(bracket, "C");
+  expect(screen.getByTestId(`tv-match-${find(bracket, "C").id}`)).toHaveTextContent("zusammengelegt in B");
+});

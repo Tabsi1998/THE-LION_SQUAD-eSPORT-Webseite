@@ -7,7 +7,8 @@ import { absoluteRank, finderFor, normalizeSource } from "@/lib/slotSource";
 
 const DONE = new Set(["completed", "finished", "reported", "confirmed", "forfeit"]);
 const LIVE = new Set(["running", "in_progress"]);
-const LOSER_SECTIONS = new Set(["lb", "loser", "losers", "lower"]);
+// Dieselben Namen wie der Server (services/round_labels.LOSER_SECTIONS) - bracketGraph.test.js hält beide gleich.
+export const LOSER_SECTIONS = new Set(["lb", "loser", "losers", "lower", "lower_bracket", "loser bracket", "looser"]);
 const FINAL_SECTIONS = new Set(["gf", "grand_final"]);
 
 const statusOf = (match) => String(match?.status || "").toLowerCase();
@@ -17,7 +18,7 @@ export const isCancelled = (match) => statusOf(match) === "cancelled";
 
 /** Grobe Lage eines Abschnitts: main, loser, final oder bronze. */
 export function sectionGroup(section) {
-  const key = String(section || "MAIN").toLowerCase();
+  const key = String(section || "MAIN").trim().toLowerCase();
   if (LOSER_SECTIONS.has(key)) return "loser";
   if (FINAL_SECTIONS.has(key)) return "final";
   if (key === "bronze" || key === "tp" || key.includes("third") || key.includes("platz 3")) return "bronze";

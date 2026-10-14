@@ -299,7 +299,7 @@ function sectionFlowHint(section, hasLoser, hasReset = false) {
   const key = normalizeSection(section);
   if (!hasLoser) return "";
   if (["wb", "winner", "main"].includes(key)) return "Wer hier verliert, spielt im Loser Bracket weiter.";
-  if (["lb", "loser"].includes(key)) return "Wer hier verliert, scheidet aus; der Sieger trifft im Grand Final auf den Sieger des Winner Bracket.";
+  if (sectionGroup(section) === "loser") return "Wer hier verliert, scheidet aus; der Sieger trifft im Grand Final auf den Sieger des Winner Bracket.";
   if (["gf", "grand_final"].includes(key)) {
     return hasReset
       ? "Sieger der Siegerrunde gegen Sieger der Verliererrunde. Gewinnt die Verliererrunde, folgt ein Reset-Spiel - sonst entfällt es."
@@ -596,8 +596,8 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
             <path
               key={line.id}
               d={line.d}
-              pathLength={line.void ? undefined : "1"}
-              className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : fresh != null ? "tls-bracket-line--fresh" : "tls-bracket-line--draw"}`}
+              pathLength={line.void || (quiet && fresh == null) ? undefined : "1"}
+              className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : fresh != null ? "tls-bracket-line--fresh" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
               style={{ "--tls-i": line.column, ...(fresh != null ? { "--tls-fresh-delay": `${fresh}ms` } : null) }}
               data-from={line.from}
               data-to={line.to}
@@ -636,7 +636,7 @@ function TvStageTree({ stages, matches, regMap, podiumMap, compact, onMatchClick
         const stageSections = byStage[stage.id] || {};
         const blocks = Object.keys(stageSections).map((name) => ({ name, rounds: stageSections[name] }));
         if (!blocks.length) return null;
-        const hasLoser = blocks.some((block) => ["lb", "loser"].includes(normalizeSection(block.name)));
+        const hasLoser = blocks.some((block) => sectionGroup(block.name) === "loser");
         const hasReset = hasResetMatch(stageSections);
         return (
           <section key={stage.id} className="tv-tree__stage" data-tv-stage={stage.id}>

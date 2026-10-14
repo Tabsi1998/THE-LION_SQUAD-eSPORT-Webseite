@@ -48,7 +48,7 @@ afterEach(() => {
 const lines = () => [...document.querySelectorAll("[data-testid='bracket-connectors'] path")].map((path) => `${path.getAttribute("data-from")}>${path.getAttribute("data-to")}`);
 
 describe("Linien aus den echten Quellen", () => {
-  it("Double Elimination mit Reset: Linien ins Loser Bracket, ins Grand Final und in den Reset", () => {
+  it("Double Elimination mit Reset: Linien ins Loser Bracket, ins Grand Final und in den Reset", async () => {
     render(<BracketTree data={doubleElimination(4, { reset: true })} layout="tree" />);
     const drawn = lines();
     expect(drawn).toContain("m-A>m-C");
@@ -56,9 +56,23 @@ describe("Linien aus den echten Quellen", () => {
     expect(drawn).toContain("m-LB>m-GF");
     expect(drawn).toContain("m-C>m-GF");
     expect(drawn).toContain("m-GF>m-GFR");
-    // Der Fall ins Loser Bracket ist leise gestrichelt.
+    // Der Fall ins Loser Bracket ist immer da, nur leise gestrichelt; auf dem angetippten Weg voll sichtbar.
     const drop = document.querySelector("[data-testid='bracket-connectors'] path[data-from='m-A'][data-to='m-LA']");
     expect(drop).toHaveAttribute("data-flow", "L");
+    expect(drop).toHaveClass("tls-bracket-line--drop");
+    expect(drop).not.toHaveAttribute("pathLength");
+    const { readFileSync } = await import("node:fs");
+    const css = readFileSync(`${process.cwd()}/src/index.css`, "utf8");
+    expect(css).not.toMatch(/data-cross="1"\]:not\(\[data-path="on"\]\)\s*\{\s*opacity:\s*0;/);
+    expect(css).toMatch(/\.tls-bracket-line--drop\s*\{[^}]*stroke-dasharray/);
+  });
+
+  it("andere Namen für das Loser Bracket (lower_bracket) zählen wie „LB“", () => {
+    const data = doubleElimination(4);
+    for (const match of data.matches_v2) if (match.section === "LB") match.section = "lower_bracket";
+    render(<BracketTree data={data} layout="tree" />);
+    expect(screen.getByTestId("bracket-section-lower_bracket")).toHaveTextContent("scheidet aus");
+    expect(document.querySelector("path[data-from='m-A'][data-to='m-LA']")).toHaveAttribute("data-cross", "1");
   });
 
   it("alte Bäume ohne Herkunft der Plätze bekommen ihre Linien wie früher nach der Reihenfolge - am Web und am TV", () => {

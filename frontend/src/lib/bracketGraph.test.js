@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { clone, decide, doubleElimination, find, singleElimination } from "../../e2e/fixtures/tvBrackets.mjs";
 // FFA-Bäume aus dem echten Generator und dem echten Umbau (scripts/make_ffa_bracket_fixture.py) - keine Handarbeit.
 import FFA from "../../e2e/fixtures/ffaGenerated.json";
-import { bracketEdges, diffBracket, heatExits, matchFate, orderEdges, pathFor, soloAdvance } from "./bracketGraph";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { LOSER_SECTIONS, bracketEdges, diffBracket, heatExits, matchFate, orderEdges, pathFor, sectionGroup, soloAdvance } from "./bracketGraph";
 
 // Turnierbaum neu (#1561): die Linien kommen aus den echten Quellen der Plätze („W:A:1“, `advancement`), nicht aus der
 // Reihenfolge der Spiele. Dazu: was mit einem Spiel geschah (entfällt, zusammengelegt), dein Weg und die Bewegungen,
@@ -191,5 +193,18 @@ describe("diffBracket", () => {
     const types = diffBracket(before.matches_v2, after.matches_v2).map((event) => `${event.type}:${event.matchId}`);
     expect(types).toContain("walkover:m-A");
     expect(types).toContain("fate:m-B");
+  });
+});
+
+describe("sectionGroup", () => {
+  it("kennt dieselben Namen für das Loser Bracket wie der Server (services/round_labels.LOSER_SECTIONS)", () => {
+    const source = readFileSync(path.join(process.cwd(), "../backend/services/round_labels.py"), "utf8");
+    const set = /^LOSER_SECTIONS = \{([^}]*)\}/m.exec(source)[1];
+    const server = [...set.matchAll(/"([^"]+)"/g)].map((match) => match[1]).sort();
+    expect([...LOSER_SECTIONS].sort()).toEqual(server);
+    for (const name of server) expect(sectionGroup(name.toUpperCase()), name).toBe("loser");
+    expect(sectionGroup("lower_bracket")).toBe("loser");
+    expect(sectionGroup("Loser Bracket")).toBe("loser");
+    expect(sectionGroup("WB")).toBe("main");
   });
 });

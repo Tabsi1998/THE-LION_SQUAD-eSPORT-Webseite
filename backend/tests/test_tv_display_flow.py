@@ -347,3 +347,29 @@ async def test_keys_are_listed_without_the_secret_and_only_under_tv(flow):
         assert (await flow.post("/api/tv/keys", json={"tournament_id": tournament["id"]})).status_code == 403, role
         deleted = await flow.delete(f"/api/tv/keys/{created['id']}")
         assert deleted.status_code == 403, role
+
+
+def test_the_tv_learns_about_the_reset_and_why_a_match_is_dropped_but_nothing_personal():
+    """Grand Final Reset und entfallene Spiele (#1561): der TV bekommt die Reset-Regel und die öffentlichen Gründe aus
+    `result_meta` (Quelle, Grund, nötig) - keine Konten, keine Notizen, keine Zeitstempel der Turnierleitung."""
+    payload = {"tournament": {"id": "t1"}, "registrations": [], "stages": [], "matches_v2": [
+        {"id": "gfr", "match_key": "GFR", "section": "GF", "round": 5, "status": "cancelled", "slots": [], "results": [],
+         "settings": {"bracket_reset": {"of_match_key": "GF", "upper_slot": 1, "intern": "x"}, "match_size": 2, "schema": "geheim"},
+         "result_meta": {"source": "bracket_reset", "needed": False, "reason": None, "updated_at": "2026-10-31T12:00:00Z",
+                         "confirmed_by": "user-1", "note": "Notiz der Turnierleitung"}},
+        {"id": "c", "match_key": "C", "section": "WB", "round": 1, "status": "cancelled", "slots": [], "results": [],
+         "merged_into": "b", "merged_into_key": "B", "result_meta": {"source": "heat_rebuild", "reason": "merged", "merged_into": "b"}},
+        {"id": "a", "match_key": "A", "section": "WB", "round": 1, "status": "completed", "slots": [], "results": []},
+        {"id": "d", "match_key": "D", "section": "WB", "round": 1, "status": "forfeit", "slots": [], "results": [],
+         "result_meta": {"source": "admin", "reason": "Kam 20 Minuten zu spät, laut Herrn X"}},
+    ]}
+    matches = {match["id"]: match for match in tv_display.display_bracket_payload(payload)["matches_v2"]}
+    assert matches["gfr"]["settings"]["bracket_reset"] == {"of_match_key": "GF", "upper_slot": 1}
+    assert "schema" not in matches["gfr"]["settings"]
+    assert matches["gfr"]["result_meta"] == {"source": "bracket_reset", "needed": False, "reason": None}
+    assert matches["c"]["result_meta"] == {"source": "heat_rebuild", "reason": "merged"}
+    assert matches["c"]["merged_into_key"] == "B"
+    assert "result_meta" not in matches["a"]
+    # Freier Text als Grund bleibt intern.
+    assert matches["d"]["result_meta"] == {"source": "admin"}
+    assert "user-1" not in json.dumps(matches) and "Notiz" not in json.dumps(matches)
