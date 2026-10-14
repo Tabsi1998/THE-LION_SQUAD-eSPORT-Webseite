@@ -313,7 +313,7 @@ export default function AdminF1EditPage() {
     })) return;
     try {
       await api.patch(`/f1/challenges/${id}`, { status });
-      toast.success(`Status: ${status}`);
+      toast.success(`Status: ${Object.fromEntries(F1_STATUS_OPTIONS)[status] || status}`);
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Challenge-Status konnte nicht gespeichert werden."));
@@ -525,7 +525,7 @@ export default function AdminF1EditPage() {
       </div>
 
       {linkGuest && (
-        <FastLapGuestLinkDialog guest={linkGuest} onClose={() => setLinkGuest(null)} onLinked={() => { loadTimes(); loadGuests(); loadQueue(); }} />
+        <FastLapGuestLinkDialog challengeId={challenge.id} guest={linkGuest} onClose={() => setLinkGuest(null)} onLinked={() => { loadTimes(); loadGuests(); loadQueue(); }} />
       )}
 
       {/* Edit Time Modal */}

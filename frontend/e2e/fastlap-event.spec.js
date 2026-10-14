@@ -102,7 +102,10 @@ function fakeBackend({ lead = true, worst = false } = {}) {
       : { id: "fan-1", display_name: "Fan", username: "fan", role: "user" }));
     await page.route("**/api/settings/public", (route) => json(route, { club_name: "THE LION SQUAD", tagline: "eSports", domain: "lionsquad.at" }));
     await page.route("**/api/sponsors**", (route) => json(route, []));
-    await page.route("**/api/admin/people/search**", (route) => json(route, state.users.slice(0, 2).map((u) => ({ id: u.id, name: u.name, context: "Community" }))));
+    // Wie der Server: die Suche für Fahrer braucht die Challenge (context_id), sonst fehlt das Recht.
+    await page.route("**/api/admin/people/search**", (route) => (new URL(route.request().url()).searchParams.get("context_id") === "c-1"
+      ? json(route, state.users.slice(0, 2).map((u) => ({ id: u.id, name: u.name, context: "Community" })))
+      : json(route, { detail: "Dafür fehlt dir das Recht: Fahrer und Team einer Fast Lap." }, 403)));
     await page.route(/\/api\/f1\/challenges\/(c-1|event-fastlap)(\?.*)?$/, (route) => json(route, state.challenge));
     await page.route(/\/api\/f1\/challenges\/c-1\/leaderboard/, (route) => json(route, { challenge: state.challenge, ...board() }));
     await page.route(/\/api\/f1\/challenges\/c-1\/(staff|friends)/, (route) => json(route, []));

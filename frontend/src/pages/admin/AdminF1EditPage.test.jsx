@@ -244,6 +244,15 @@ test("Ergebnisse veröffentlichen fragt nach, weil danach Zeiten gesperrt sind",
   expect(apiMock.patch).not.toHaveBeenCalled();
 });
 
+test("nach dem Statuswechsel steht der Status auf Deutsch da, nicht als Kennung (Abnahme #1598)", async () => {
+  answerWith({ status: "live" });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  toastMock.success.mockReset();
+  fireEvent.change(screen.getByTestId("f1-status-select"), { target: { value: "results_published" } });
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Status: Ergebnisse veröffentlicht"));
+});
+
 test("Ende erreicht: die Seite sagt, dass die Leitung bestätigt", async () => {
   answerWith({ status: "live", end_date: "2026-01-01T10:00:00Z", public_phase: { state: "completed" } });
   renderPage();
