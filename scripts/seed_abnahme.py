@@ -8,7 +8,9 @@ Zwei-Faktor), alles andere über die Routen der App, angemeldet wie im Browser:
   * Spiel Mario Kart 8 Deluxe (Grand Prix 12 Min.), 16 Spieler, ein Helfer, die Turnierleitung, ein Admin
   * Vor-Ort-Cup mit Vorschau-Baum (Anmeldung offen): FFA 16, Winner und Loser Bracket, Gegner gemischt, 4 Stationen
   * derselbe Cup nach dem Check-in-Ende: fixer Baum, Plan übernommen, live, zwei Läufe gewertet, einer läuft
-  * Online-Turnier (K.-o., 8 Spieler, live, ein Ergebnis) und eine Liga (6 Spieler, Spielwochen)
+  * Online-Turnier (K.-o., 8 Spieler, live, ein Ergebnis) und eine Liga (6 Spieler, Spieltag 1 gespielt)
+  * Gruppen-Turnier online (8 Spieler, 2 Gruppen, erste Runde gespielt)
+  * Liga beendet und Ergebnisse veröffentlicht, mit geteiltem 1. Platz (drei gleich auf) - für Podest und Sieger-Moment
   * eine Fast Lap mit Strecke und Zeiten
 
 Aufruf (der Stack läuft, siehe Anleitung):
@@ -219,6 +221,28 @@ async def result(admin: Session, match: dict):
         "results": [{"registration_id": reg, "rank": index + 1, "score": max(0, 15 - 3 * index)} for index, reg in enumerate(ranking)]})
 
 
+async def duel(admin: Session, match: dict, winner: str, loser: str, scores=(3, 1), draw: bool = False):
+    """Ein Duell werten: Sieger Platz 1, Verlierer Platz 2 - unentschieden beide Platz 1 mit gleichem Stand."""
+    await admin.call("POST", f"/api/matches/{match['id']}/result", json={"results": [
+        {"registration_id": winner, "rank": 1, "score": scores[0]},
+        {"registration_id": loser, "rank": 1 if draw else 2, "score": scores[0] if draw else scores[1]},
+    ]})
+
+
+def pair(match: dict) -> list:
+    return [slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id")]
+
+
+async def play_round(admin: Session, tid: str, round_number: int):
+    """Alle offenen Duelle einer Runde: der erste Platz gewinnt, das erste Spiel endet unentschieden."""
+    rows = sorted([row for row in (await matches_of(admin, tid)).values() if int(row.get("round") or 0) == round_number],
+                  key=lambda row: row.get("match_key") or "")
+    for index, match in enumerate(rows):
+        players = pair(match)
+        if len(players) == 2 and match.get("status") not in {"completed", "forfeit", "bye"}:
+            await duel(admin, match, players[0], players[1], scores=(3, index % 3), draw=index == 0)
+
+
 async def matches_of(admin: Session, tid: str) -> dict:
     rows = await admin.call("GET", f"/api/tournaments/{tid}/matches-v2")
     return {row.get("match_key"): row for row in rows if not row.get("is_preview")}
@@ -241,6 +265,8 @@ async def inside_main() -> None:
     admin = await Session.login(ACCOUNTS["admin"]["email"], True)
     state = {"accounts": {key: {"email": ACCOUNTS[key]["email"], "password": TEST_PASSWORD, "totp": TEST_TOTP_SECRET if ACCOUNTS[key]["mfa"] else None}
                           for key in ACCOUNTS}, "tournaments": {}}
+    # Spieler 1 (NeonFalke) spielt überall mit: eigene Spiele, „Nur meine“, „Deine Gruppe“, „Du“, Sieger-Moment.
+    state["accounts"]["player"] = {"email": "spieler01@abnahme.lionsquad.at", "password": TEST_PASSWORD, "totp": None}
     try:
         game = await ensure_game(admin, db)
         stamp = now_utc().strftime("%d.%m. %H:%M")
@@ -300,7 +326,37 @@ async def inside_main() -> None:
         await register(admin, league, users["players"][:6])
         await admin.call("POST", f"/api/tournaments/{league['id']}/bracket/from-format?preview=false")
         await admin.call("POST", f"/api/tournaments/{league['id']}/status", json={"status": "live", "force": True})
+        await play_round(admin, league["id"], 1)
         state["tournaments"]["league"] = league["id"]
+
+        # Gruppen online: 8 Spieler in 2 Gruppen, erste Runde gespielt - „Deine Gruppe“ für Spieler 1.
+        groups = await tournament(admin, game, f"Abnahme Gruppen ({stamp})", now_utc() - timedelta(hours=1),
+                                  format="groups", event_mode="online", schedule_mode="player_proposal", max_participants=8)
+        await register(admin, groups, users["players"][:8])
+        await admin.call("POST", f"/api/tournaments/{groups['id']}/groups/generate", json={"group_count": 2})
+        await admin.call("POST", f"/api/tournaments/{groups['id']}/status", json={"status": "live", "force": True})
+        await play_round(admin, groups["id"], 1)
+        state["tournaments"]["groups"] = groups["id"]
+
+        # Liga beendet, Ergebnisse veröffentlicht: Spieler 1, 2 und 3 schlagen sich im Kreis und je den vierten mit 3:1 -
+        # drei teilen sich Platz 1 (Podest mit geteiltem Platz, Sieger-Moment für Spieler 1).
+        final = await tournament(admin, game, f"Abnahme Liga beendet ({stamp})", quarter(now_utc() - timedelta(days=30)),
+                                 format="league", event_mode="online", schedule_mode="player_proposal", max_participants=4)
+        await register(admin, final, users["players"][:4])
+        await admin.call("POST", f"/api/tournaments/{final['id']}/bracket/from-format?preview=false")
+        await admin.call("POST", f"/api/tournaments/{final['id']}/status", json={"status": "live", "force": True})
+        regs = {reg["user_id"]: reg["id"] for reg in await admin.call("GET", f"/api/tournaments/{final['id']}/registrations")}
+        one, two, three, four = (regs[player["id"]] for player in users["players"][:4])
+        beats = {frozenset((one, two)): one, frozenset((two, three)): two, frozenset((three, one)): three}
+        for match in (await matches_of(admin, final["id"])).values():
+            players = pair(match)
+            if len(players) != 2:
+                continue
+            winner = beats.get(frozenset(players)) or next(reg for reg in players if reg != four)
+            await duel(admin, match, winner, next(reg for reg in players if reg != winner), scores=(3, 1))
+        for status in ("completed", "results_published"):
+            await admin.call("POST", f"/api/tournaments/{final['id']}/status", json={"status": status, "force": True})
+        state["tournaments"]["league_published"] = final["id"]
 
         # Fast Lap mit einer Strecke und Zeiten.
         challenge = await admin.call("POST", "/api/f1/challenges", json={"title": f"Abnahme Fast Lap ({stamp})", "game_id": game["id"],
@@ -312,6 +368,10 @@ async def inside_main() -> None:
         state["fastlap"] = challenge["id"]
     finally:
         await admin.close()
+    slugs = {}
+    for key, tid in state["tournaments"].items():
+        slugs[key] = (await db.tournaments.find_one({"id": tid}, {"_id": 0, "slug": 1}) or {}).get("slug")
+    state["slugs"] = slugs
     print("Konten: Admin, Turnierleitung, Helfer, 16 Spieler. Turniere:", ", ".join(state["tournaments"]))
     print("ABNAHME-STATE " + json.dumps(state, ensure_ascii=False))
 
