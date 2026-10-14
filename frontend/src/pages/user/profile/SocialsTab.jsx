@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { BadgeCheck, ExternalLink, Lock, Unlink } from "lucide-react";
-import { Row, Section } from "./fields";
+import { FieldError, Row, Section } from "./fields";
 import { ProfileSwitch } from "./SwitchRow";
 import { SOCIAL_PLATFORMS, normalizeSocialInput, socialProfileUrl } from "./socials";
 import { MANUAL_PLATFORM_OF, NOT_LINKABLE, PLATFORM_BY_FIELD, PLATFORM_LABELS, formatLinkedAt, linkForField, platformsOff } from "@/lib/platformLinks";
@@ -30,7 +30,7 @@ function whileTyping(key, value) {
 
 const byKey = Object.fromEntries(SOCIAL_PLATFORMS.map((platform) => [platform.k, platform]));
 
-function ManualField({ platform, value, onChange, note = "" }) {
+function ManualField({ platform, value, onChange, note = "", error = "" }) {
   const Icon = platform.icon;
   const testId = testIdFor(platform.k);
   const preview = socialProfileUrl(platform.k, value);
@@ -46,9 +46,11 @@ function ManualField({ platform, value, onChange, note = "" }) {
           onBlur={(e) => onChange(normalizeSocialInput(platform.k, e.target.value))}
           placeholder={platform.placeholder}
           data-testid={testId}
-          className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white"
+          aria-invalid={error ? true : undefined}
+          className={`w-full bg-[#0A0A0A] border ${error ? "border-warn/60" : "border-white/10"} focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white`}
         />
       </label>
+      <FieldError message={error} testId={`${testId}-error`} />
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
         {preview ? (
           <a href={preview} target="_blank" rel="noopener noreferrer" data-testid={`${testId}-preview`} className="inline-flex items-center gap-1 text-[11px] text-white/45 hover:text-[#29B6E8] break-all">
@@ -135,7 +137,8 @@ function LinkRow({ platformKey, link, available, form, set, onLink, onUnlink, in
   );
 }
 
-export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlink = () => {} }) {
+// Speichern von selbst (#1048): Textfelder mit `set`, Schalter mit `setNow`; Ungültiges steht in `errors`.
+export function SocialsTab({ form, set, setNow = set, errors = {}, links = null, onLink = () => {}, onUnlink = () => {} }) {
   const available = links?.available || {};
   const delivers = links?.platforms || {};
   const linkedRows = links?.links || [];
@@ -184,7 +187,7 @@ export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlin
           <ProfileSwitch
             label="Twitch-Live-Embed im öffentlichen Profil zeigen"
             checked={!!form.show_twitch_embed}
-            onCheckedChange={(checked) => set("show_twitch_embed", checked)}
+            onCheckedChange={(checked) => setNow("show_twitch_embed", checked)}
             testId="profile-twitch-embed"
             className="mt-0.5"
           />
@@ -200,7 +203,7 @@ export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlin
           <ProfileSwitch
             label="Meinen Steam-Status im Mitgliederbereich zeigen"
             checked={!!form.show_steam_status}
-            onCheckedChange={(checked) => set("show_steam_status", checked)}
+            onCheckedChange={(checked) => setNow("show_steam_status", checked)}
             testId="profile-steam-status"
             className="mt-0.5"
           />
@@ -216,7 +219,7 @@ export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlin
           <ProfileSwitch
             label="Spiel-Rollen im Discord"
             checked={form.discord_game_roles !== false}
-            onCheckedChange={(checked) => set("discord_game_roles", checked)}
+            onCheckedChange={(checked) => setNow("discord_game_roles", checked)}
             testId="profile-discord-game-roles"
             className="mt-0.5"
           />
@@ -229,11 +232,11 @@ export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlin
           {manualRows.map((keys) => (
             <Row key={keys.join("+")}>
               {keys.map((key) => (
-                <ManualField key={key} platform={byKey[key]} value={form[key]} onChange={(v) => set(key, v)} note={NOT_LINKABLE[key] || ""} />
+                <ManualField key={key} platform={byKey[key]} value={form[key]} onChange={(v) => set(key, v)} note={NOT_LINKABLE[key] || ""} error={errors[key]} />
               ))}
             </Row>
           ))}
-          <ManualField platform={byKey.website} value={form.website} onChange={(v) => set("website", v)} />
+          <ManualField platform={byKey.website} value={form.website} onChange={(v) => set("website", v)} error={errors.website} />
         </div>
       </div>
     </Section>
