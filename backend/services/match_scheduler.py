@@ -459,7 +459,7 @@ async def load_plan_inputs(db, tournament: dict) -> dict:
              "status": {"$nin": list(DONE_STATUSES)}},
             {"_id": 0, "id": 1, "tournament_id": 1, "slots": 1, "scheduled_at": 1, "started_at": 1, "duration_minutes": 1,
              "settings": 1, "match_key": 1},
-        ).to_list(5000) if title_by_id else []
+        ).to_list(None) if title_by_id else []  # vollständig: ein stilles Kappen ließe Konflikte unbemerkt
         other_keys = await resolve_participant_keys(db, other_matches) if other_matches else {}
         for match in other_matches:
             start = _parse(match.get("started_at")) or _parse(match.get("scheduled_at"))
@@ -523,3 +523,19 @@ async def apply_plan(db, tournament: dict, plan: dict) -> dict:
         result = await db.matches_v2.update_one(guard, {"$set": update})
         written += int(bool(result.matched_count))
     return {"written": written, "mode": plan.get("mode"), "warnings": plan.get("warnings") or []}
+
+
+async def replan_after_heat_rebuild(db, tournament: dict, stage: dict | None) -> dict:
+    """Nach einem Umbau der Phase (Läufe zusammengelegt, #1575): die noch nicht gestarteten Spiele der Phase vor Ort
+    neu planen - mit denselben Regeln und Guards wie „Übernehmen“ (Quelle ``planner``, von Hand gesetzte und
+    vereinbarte Termine bleiben, Compare-and-Set je Spiel). Online und Liga: nichts; dort gibt es keine Stationen.
+
+    Bewusst ohne eigenen Turnier-Lock: der Umbau läuft bereits unter ``_serialized_tournament_write``, und die Sperre
+    ist nicht wiedereintrittsfähig. Der Compare-and-Set in ``apply_plan`` schützt die Schreibvorgänge.
+    """
+    if stage is None or match_policy({}, tournament, stage)["event_mode"] != "local" or plays_in_matchdays(tournament, stage):
+        return {"applies": False, "written": 0, "warnings": []}
+    plan = await plan_for_tournament(db, tournament)
+    stage_plan = {**plan, "assignments": [item for item in plan["assignments"] if item.get("stage_id") == stage.get("id")]}
+    result = await apply_plan(db, tournament, stage_plan)
+    return {"applies": True, "written": result["written"], "warnings": plan.get("warnings") or []}
