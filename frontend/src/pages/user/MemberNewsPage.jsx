@@ -1,26 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { newsCategoryLabel } from "@/lib/newsCategories";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLoad } from "@/hooks/useLoad";
+import { LoadState } from "@/components/tls/LoadState";
 import { Pin, ArrowLeft, Newspaper, Crown } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
 
 export default function MemberNewsPage() {
-  const [list, setList] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(() => {
-    setLoading(true);
-    api.get("/news?visibility=members").then(({ data }) => {
-      // backend doesn't filter visibility query; we filter client-side
-      setList(data.filter((n) => n.visibility === "members" || n.visibility === "internal"));
-    }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
-  useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["news"]);
+  // „Keine internen News“ nur nach einer erfolgreichen Antwort ohne interne Beiträge (#984). Der Server filtert die
+  // Sichtbarkeit nicht - das macht die Seite.
+  const news = useLoad("news/members", ({ signal }) => api.get("/news?visibility=members", { signal }).then(({ data }) => (
+    (Array.isArray(data) ? data : []).filter((n) => n.visibility === "members" || n.visibility === "internal")
+  )));
+  useApiInvalidation(news.reload, ["news"]);
 
   return (
     <PublicLayout>
@@ -34,16 +29,21 @@ export default function MemberNewsPage() {
           Vereinsinterne Ankündigungen, Vorstandsmitteilungen und Mitglieder-Nachrichten — nur für offizielle Vereinsmitglieder.
         </p>
 
-        {loading ? (
-          <SkeletonCards count={3} className="mt-10" label="Lade News" />
-        ) : list.length === 0 ? (
-          <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
-            <Newspaper className="w-10 h-10 mx-auto opacity-40 mb-3" />
-            <div className="font-heading font-bold text-lg">Keine internen News</div>
-            <div className="text-sm mt-1">Aktuell gibt es keine vereinsinternen Beiträge.</div>
-          </div>
-        ) : (
-          <div className="mt-10 space-y-3">
+        <div className="mt-10">
+          <LoadState
+            load={news}
+            loading={<SkeletonCards count={3} label="Lade News" />}
+            errorTitle="Interne News konnten nicht geladen werden"
+            empty={(
+              <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
+                <Newspaper className="w-10 h-10 mx-auto opacity-40 mb-3" />
+                <div className="font-heading font-bold text-lg">Keine internen News</div>
+                <div className="text-sm mt-1">Aktuell gibt es keine vereinsinternen Beiträge.</div>
+              </div>
+            )}
+          >
+            {(list) => (
+          <div className="space-y-3">
             {list.map((n) => (
               <Link
                 key={n.id}
@@ -61,7 +61,9 @@ export default function MemberNewsPage() {
               </Link>
             ))}
           </div>
-        )}
+            )}
+          </LoadState>
+        </div>
       </section>
     </PublicLayout>
   );

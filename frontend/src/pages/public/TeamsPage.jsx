@@ -34,8 +34,9 @@ import { SideSheet } from "@/components/tls/SideSheet";
 import { TeamHeader } from "@/pages/public/team/TeamHeader";
 import { inviteTokenFrom, memberRole, ROLE_LABELS } from "@/lib/teamPage";
 import { AUTO_COLOR, TEAM_COLORS } from "@/lib/teamColors";
-import { PublicErrorState } from "@/components/tls/PublicEmptyState";
-import { problemKind } from "@/lib/loadProblem";
+import { LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
+import { SkeletonCards } from "@/components/tls/Skeleton";
+import { useLoad } from "@/hooks/useLoad";
 import { ShareButton } from "@/components/tls/ShareButton";
 
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "", color: AUTO_COLOR };
@@ -56,22 +57,11 @@ function TeamList() {
   );
 
   const { user } = useAuth();
-  const [list, setList] = useState([]);
-  const [levels, setLevels] = useState({});
-  const [crowns, setCrowns] = useState({});
   const [editing, setEditing] = useState(null);
 
-  const load = useCallback(async () => {
-    const { data } = await api.get("/teams?limit=90");
-    setList(data);
-    try {
-      const { data: lvl } = await api.get("/teams/levels");
-      setLevels(lvl?.levels || {});
-      setCrowns(lvl?.crowns || {});
-    } catch {}
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+  // „KEINE TEAMS“ nur nach einer erfolgreichen, leeren Antwort (#984); ohne Level bleiben die Teams stehen.
+  const teams = useLoad("teams", fetchTeamList, { isEmpty: (data) => data.list.length === 0 });
+  const load = teams.reload;
   useApiInvalidation(load, ["teams"]);
 
   return (
@@ -101,14 +91,36 @@ function TeamList() {
             <h2 className="mt-10 font-heading text-2xl font-black uppercase">Teams entdecken</h2>
           </div>
         ) : null}
-        <Reveal className="tls-reveal-grid tls-dim-siblings mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
-          {list.map((t) => <TeamCard key={t.id} team={t} levelInfo={levels[t.id]} crown={crowns[t.id] || null} />)}
-          {list.length === 0 && <div className="col-span-full text-center py-20 text-white/40 font-display tracking-widest">KEINE TEAMS</div>}
-        </Reveal>
+        <div className="mt-10">
+          <LoadState
+            load={teams}
+            loading={<SkeletonCards count={6} image={false} label="Lade Teams" />}
+            errorTitle="Die Teams konnten nicht geladen werden"
+            empty={<div className="text-center py-20 text-white/40 font-display tracking-widest">KEINE TEAMS</div>}
+          >
+            {({ list, levels, crowns }) => (
+              <Reveal className="tls-reveal-grid tls-dim-siblings grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
+                {list.map((t) => <TeamCard key={t.id} team={t} levelInfo={levels[t.id]} crown={crowns[t.id] || null} />)}
+              </Reveal>
+            )}
+          </LoadState>
+        </div>
       </div>
       {editing && <TeamModal team={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </PublicLayout>
   );
+}
+
+async function fetchTeamList({ signal, previous }) {
+  const { data } = await api.get("/teams?limit=90", { signal });
+  let levels = previous?.levels || {};
+  let crowns = previous?.crowns || {};
+  try {
+    const { data: lvl } = await api.get("/teams/levels", { signal });
+    levels = lvl?.levels || {};
+    crowns = lvl?.crowns || {};
+  } catch {}
+  return { list: Array.isArray(data) ? data : [], levels, crowns };
 }
 
 function TeamCard({ team: t, levelInfo, crown = null }) {
@@ -166,11 +178,7 @@ function TeamDetail({ id }) {
   const nav = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const [team, setTeam] = useState(null);
-  const [missing, setMissing] = useState(false);
-  const [levelInfo, setLevelInfo] = useState(null);
   // Termine und letzte Spiele (#1191) aus den Team-Anmeldungen; Einladen mit Link und QR-Code im Blatt.
-  const [overview, setOverview] = useState(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const inviteToken = inviteTokenFrom(location.search);
   const [editing, setEditing] = useState(null);
@@ -179,34 +187,16 @@ function TeamDetail({ id }) {
   const [actionError, setActionError] = useState("");
   const confirm = useConfirm();
 
-  const load = useCallback(async () => {
-    const { data } = await api.get(`/teams/${id}`);
-    setTeam(data);
-    setMissing(false);
-    try {
-      const { data: lvl } = await api.get(`/teams/${id}/level`);
-      setLevelInfo(lvl);
-    } catch {}
-    try {
-      const { data: plan } = await api.get(`/teams/${id}/overview`);
-      setOverview(plan);
-    } catch { setOverview(null); }
-  }, [id]);
-  // Laden (#983, #1152): 404/403 heißt „nicht gefunden“; ohne Netz oder bei einem Serverfehler bleibt ein schon
-  // geladenes Team stehen, sonst steht der Fehler mit „Nochmal versuchen“ da - nie ein ewiges „Lade Team“.
-  const [problem, setProblem] = useState(null);
-  const refresh = useCallback(() => load().then(() => setProblem(null)).catch((error) => {
-    const kind = problemKind(error);
-    if (kind === "notFound" || kind === "denied") {
-      setTeam(null);
-      setMissing(true);
-      setProblem(null);
-    } else {
-      setProblem(kind);
-    }
-  }), [load]);
-
-  useEffect(() => { refresh(); }, [refresh]);
+  // Laden (#983, #1152) über useLoad: 404/403 heißt „nicht gefunden“; ohne Netz oder bei einem Serverfehler bleibt ein
+  // schon geladenes Team stehen (mit Hinweis), sonst steht der Fehler mit „Nochmal versuchen“ da - nie ein ewiges
+  // „Lade Team“. Wechselt das Team, ist das alte sofort weg; eine verspätete Antwort für das alte verfällt.
+  const teamLoad = useLoad(["team", id], fetchTeamDetail);
+  const missing = teamLoad.problem === "notFound" || teamLoad.problem === "denied";
+  const team = missing ? null : teamLoad.data?.team || null;
+  const levelInfo = teamLoad.data?.levelInfo || null;
+  const overview = teamLoad.data?.overview || null;
+  const refresh = teamLoad.reload;
+  const load = refresh;
   useApiInvalidation(refresh, ["teams"]);
 
   // Beigetreten über den Einladungs-Link: Schlüssel aus der Adresse, Seite neu.
@@ -235,11 +225,11 @@ function TeamDetail({ id }) {
       </PublicLayout>
     );
   }
-  if (!team && problem) {
+  if (!team && teamLoad.status === "error") {
     return (
       <PublicLayout>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
-          <PublicErrorState kind={problem} title={problem === "offline" ? "Ohne Netz" : "Team konnte nicht geladen werden"} onRetry={refresh} />
+          <LoadState load={teamLoad} errorTitle="Team konnte nicht geladen werden" />
         </div>
       </PublicLayout>
     );
@@ -359,6 +349,11 @@ function TeamDetail({ id }) {
         )}
       </TeamHeader>
 
+      {teamLoad.stale && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <LoadStaleNotice load={teamLoad} />
+        </div>
+      )}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           {inviteToken && !isMember ? <TeamJoinCard teamId={team.id} token={inviteToken} user={user} onJoined={joinedByLink} /> : null}
@@ -474,6 +469,22 @@ function TeamDetail({ id }) {
       {inviteOpen && <TeamInviteSheet team={team} onClose={() => setInviteOpen(false)} />}
     </PublicLayout>
   );
+}
+
+async function fetchTeamDetail({ key, signal, previous }) {
+  const id = JSON.parse(key)[1];
+  const { data: team } = await api.get(`/teams/${id}`, { signal });
+  let levelInfo = previous?.levelInfo || null;
+  try {
+    const { data: lvl } = await api.get(`/teams/${id}/level`, { signal });
+    levelInfo = lvl;
+  } catch {}
+  let overview = null;
+  try {
+    const { data: plan } = await api.get(`/teams/${id}/overview`, { signal });
+    overview = plan;
+  } catch {}
+  return { team, levelInfo, overview };
 }
 
 function TeamChat({ team, user }) {

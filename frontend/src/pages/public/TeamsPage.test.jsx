@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 
 // Team-Seite: Termine und letzte Spiele (#1191), „Einladen“ mit Link und QR-Code, Beitreten über den Link.
@@ -12,7 +12,8 @@ vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) =
 vi.mock("@/components/tls/BrandedQRCode", () => ({ BrandedQRCode: ({ value }) => <div data-testid="branded-qr-code" data-value={value} /> }));
 const confirmMock = vi.fn();
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
-vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
+const invalidation = { reload: null };
+vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: (callback, resources = []) => { if (resources.includes("teams")) invalidation.reload = callback; } }));
 vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
 vi.mock("@/hooks/useChats", () => ({ useChatRead: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
@@ -297,4 +298,63 @@ describe("Admin-Rollen am fremden Team (#1479)", () => {
     expect(screen.queryByTestId("team-edit-open")).toBeNull();
     expect(screen.queryByTestId("team-mfa-setup")).toBeNull();
   });
+});
+
+// Team-Liste (#984): „KEINE TEAMS“ nur nach einer erfolgreichen, leeren Antwort - nie beim Laden oder nach einem Fehler.
+function renderList() {
+  return render(
+    <MemoryRouter initialEntries={["/teams"]}>
+      <Routes>
+        <Route path="/teams" element={<TeamsPage />} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
+const serverError = () => Object.assign(new Error("boom"), { response: { status: 500, data: {} } });
+
+test("Team-Liste: ein Serverfehler zeigt den Fehler mit „Nochmal versuchen“ statt „KEINE TEAMS“", async () => {
+  authState.user = null;
+  serve(TEAM, { "/teams?limit=90": serverError(), "/teams/levels": { levels: {}, crowns: {} } });
+  renderList();
+  expect(await screen.findByTestId("public-error-state")).toHaveTextContent("Teams konnten nicht geladen werden");
+  expect(screen.queryByText("KEINE TEAMS")).toBeNull();
+  serve(TEAM, { "/teams?limit=90": [TEAM], "/teams/levels": { levels: {}, crowns: {} } });
+  fireEvent.click(screen.getByTestId("public-error-retry"));
+  expect(await screen.findByTestId("team-card-LRK")).toBeInTheDocument();
+});
+
+test("Team-Liste: erfolgreich leer heißt „KEINE TEAMS“; beim Laden steht es nicht da", async () => {
+  authState.user = null;
+  let release;
+  apiMock.get.mockImplementation((url) => (url === "/teams?limit=90"
+    ? new Promise((resolve) => { release = () => resolve({ data: [] }); })
+    : Promise.resolve({ data: { levels: {}, crowns: {} } })));
+  renderList();
+  expect(screen.queryByText("KEINE TEAMS")).toBeNull();
+  await waitFor(() => expect(release).toBeTypeOf("function"));
+  await act(async () => release());
+  expect(await screen.findByText("KEINE TEAMS")).toBeInTheDocument();
+});
+
+test("Team-Liste: ohne Level bleiben die Teams stehen; ein gescheitertes Nachladen lässt die Liste stehen", async () => {
+  authState.user = null;
+  serve(TEAM, { "/teams?limit=90": [TEAM], "/teams/levels": serverError() });
+  renderList();
+  expect(await screen.findByTestId("team-card-LRK")).toBeInTheDocument();
+  serve(TEAM, { "/teams?limit=90": serverError() });
+  await act(async () => { await invalidation.reload(); });
+  expect(screen.getByTestId("team-card-LRK")).toBeInTheDocument();
+  expect(screen.getByTestId("load-stale")).toBeInTheDocument();
+});
+
+test("Team-Seite: ein gescheitertes Nachladen lässt das Team stehen und sagt es (#983)", async () => {
+  serve(TEAM);
+  renderAt("/teams/t-1");
+  expect(await screen.findByText("Lions Rocket")).toBeInTheDocument();
+  serve(TEAM, { "/teams/t-1": serverError() });
+  await act(async () => { await invalidation.reload(); });
+  expect(screen.getByText("Lions Rocket")).toBeInTheDocument();
+  expect(screen.getByTestId("load-stale")).toBeInTheDocument();
+  expect(screen.queryByTestId("public-error-state")).toBeNull();
 });

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
 import { API_BASE, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLoad } from "@/hooks/useLoad";
+import { LoadNotice, LoadState } from "@/components/tls/LoadState";
 import { Award, Download, Gift, CheckCircle2, Clock, XCircle, MapPin, Trophy, Users, CalendarDays } from "lucide-react";
 import { Link } from "react-router-dom";
 import { asInstant, viennaDate } from "@/lib/vienna";
@@ -28,28 +29,28 @@ function daysUntil(value) {
   return Math.ceil((date.getTime() - Date.now()) / 86400000);
 }
 
+const PART_LABEL = { prizes: "Deine Gewinne", certificates: "Deine Urkunden" };
+
+// Gewinne und Urkunden kommen aus zwei Abrufen (#984): scheitert einer, bleibt der andere stehen und der Ausfall ist
+// sichtbar - beim Nachladen mit dem letzten Stand des ausgefallenen Teils. Scheitern beide, ist es ein Ladefehler.
+async function fetchPrizes({ signal, previous }) {
+  const [prizes, certificates] = await Promise.allSettled([
+    api.get("/prizes/me", { signal }),
+    api.get("/prizes/me/certificates", { signal }),
+  ]);
+  if (prizes.status === "rejected" && certificates.status === "rejected") throw prizes.reason;
+  return {
+    items: prizes.status === "fulfilled" ? prizes.value.data || [] : previous?.items || [],
+    certificates: certificates.status === "fulfilled" ? certificates.value.data || [] : previous?.certificates || [],
+    failed: [prizes.status === "rejected" && "prizes", certificates.status === "rejected" && "certificates"].filter(Boolean),
+  };
+}
+
+const prizesEmpty = (data) => !data.failed.length && !data.items.length && !data.certificates.length;
+
 export default function MyPrizesPage() {
-  const [items, setItems] = useState([]);
-  const [certificates, setCertificates] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(() => {
-    setLoading(true);
-    Promise.allSettled([
-      api.get("/prizes/me"),
-      api.get("/prizes/me/certificates"),
-    ]).then(([prizesResult, certificatesResult]) => {
-      setItems(prizesResult.status === "fulfilled" ? prizesResult.value.data || [] : []);
-      setCertificates(certificatesResult.status === "fulfilled" ? certificatesResult.value.data || [] : []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
-  useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["prizes", "tournaments", "f1"]);
-
-  const open = items.filter((p) => ["pending", "ready"].includes(p.status));
-  const closed = items.filter((p) => ["picked_up", "expired"].includes(p.status));
-  const ready = items.filter((p) => p.status === "ready");
+  const prizes = useLoad("prizes/me", fetchPrizes, { isEmpty: prizesEmpty });
+  useApiInvalidation(prizes.reload, ["prizes", "tournaments", "f1"]);
 
   return (
     <PublicLayout>
@@ -60,47 +61,71 @@ export default function MyPrizesPage() {
           Hier siehst du deine Preise aus TLS-Turnieren, Fast-Lap-Challenges und Verlosungen, deine Urkunden und ob Gewinne schon zur Abholung bereit sind.
         </p>
 
-        {!loading && (items.length > 0 || certificates.length > 0) && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-            <PrizeStat icon={Gift} label="Offen" value={open.length} color="#FFD700" />
-            <PrizeStat icon={MapPin} label="Abholbereit" value={ready.length} color="#29B6E8" />
-            <PrizeStat icon={CheckCircle2} label="Abgeholt" value={closed.filter((p) => p.status === "picked_up").length} color="#00FF88" />
-            <PrizeStat icon={Award} label="Urkunden" value={certificates.length} color="#A855F7" />
-          </div>
-        )}
-
-        {loading && <SkeletonCards count={3} image={false} label="Lade Gewinne" />}
-
-        {!loading && items.length === 0 && certificates.length === 0 && (
-          <div className="border border-white/10 bg-[#121212] rounded-sm p-12 text-center">
-            <Award className="w-12 h-12 text-white/20 mx-auto mb-3" />
-            <p className="text-white/60">Noch keine Gewinne oder Urkunden.</p>
-            <Link to="/tournaments" className="tls-btn tls-btn--primary inline-block mt-4 px-5 py-2 font-bold uppercase tracking-wider rounded-sm">Aktuelle Turniere</Link>
-          </div>
-        )}
-
-        {!loading && certificates.length > 0 && (
-          <section className="mb-10">
-            <h2 className="text-lg font-heading font-bold uppercase tracking-widest text-[#FFD700] mb-4">Meine Urkunden</h2>
-            <div className="grid sm:grid-cols-2 gap-4">{certificates.map((item) => <CertificateCard key={item.id} item={item} />)}</div>
-          </section>
-        )}
-
-        {open.length > 0 && (
-          <section className="mb-10">
-            <h2 className="text-lg font-heading font-bold uppercase tracking-widest text-[#29B6E8] mb-4">Offene Gewinne</h2>
-            <div className="grid sm:grid-cols-2 gap-4">{open.map((p) => <PrizeCard key={p.id} p={p} highlight />)}</div>
-          </section>
-        )}
-
-        {closed.length > 0 && (
-          <section>
-            <h2 className="text-lg font-heading font-bold uppercase tracking-widest text-white/60 mb-4">Archiv</h2>
-            <div className="grid sm:grid-cols-2 gap-4">{closed.map((p) => <PrizeCard key={p.id} p={p} />)}</div>
-          </section>
-        )}
+        <LoadState
+          load={prizes}
+          loading={<SkeletonCards count={3} image={false} label="Lade Gewinne" />}
+          errorTitle="Deine Gewinne konnten nicht geladen werden"
+          empty={(
+            <div className="border border-white/10 bg-[#121212] rounded-sm p-12 text-center">
+              <Award className="w-12 h-12 text-white/20 mx-auto mb-3" />
+              <p className="text-white/60">Noch keine Gewinne oder Urkunden.</p>
+              <Link to="/tournaments" className="tls-btn tls-btn--primary inline-block mt-4 px-5 py-2 font-bold uppercase tracking-wider rounded-sm">Aktuelle Turniere</Link>
+            </div>
+          )}
+        >
+          {(data) => <PrizesView data={data} onRetry={prizes.reload} />}
+        </LoadState>
       </div>
     </PublicLayout>
+  );
+}
+
+function PrizesView({ data, onRetry }) {
+  const { items, certificates, failed } = data;
+  const open = items.filter((p) => ["pending", "ready"].includes(p.status));
+  const closed = items.filter((p) => ["picked_up", "expired"].includes(p.status));
+  const ready = items.filter((p) => p.status === "ready");
+  return (
+    <>
+      {failed.length > 0 && (
+        <LoadNotice
+          testId="prizes-partial"
+          className="mb-8"
+          message={`${failed.map((part) => PART_LABEL[part]).join(" und ")} konnten gerade nicht geladen werden.`}
+          onRetry={onRetry}
+        />
+      )}
+
+      {(items.length > 0 || certificates.length > 0) && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          <PrizeStat icon={Gift} label="Offen" value={open.length} color="#FFD700" />
+          <PrizeStat icon={MapPin} label="Abholbereit" value={ready.length} color="#29B6E8" />
+          <PrizeStat icon={CheckCircle2} label="Abgeholt" value={closed.filter((p) => p.status === "picked_up").length} color="#00FF88" />
+          <PrizeStat icon={Award} label="Urkunden" value={certificates.length} color="#A855F7" />
+        </div>
+      )}
+
+      {certificates.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-lg font-heading font-bold uppercase tracking-widest text-[#FFD700] mb-4">Meine Urkunden</h2>
+          <div className="grid sm:grid-cols-2 gap-4">{certificates.map((item) => <CertificateCard key={item.id} item={item} />)}</div>
+        </section>
+      )}
+
+      {open.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-lg font-heading font-bold uppercase tracking-widest text-[#29B6E8] mb-4">Offene Gewinne</h2>
+          <div className="grid sm:grid-cols-2 gap-4">{open.map((p) => <PrizeCard key={p.id} p={p} highlight />)}</div>
+        </section>
+      )}
+
+      {closed.length > 0 && (
+        <section>
+          <h2 className="text-lg font-heading font-bold uppercase tracking-widest text-white/60 mb-4">Archiv</h2>
+          <div className="grid sm:grid-cols-2 gap-4">{closed.map((p) => <PrizeCard key={p.id} p={p} />)}</div>
+        </section>
+      )}
+    </>
   );
 }
 

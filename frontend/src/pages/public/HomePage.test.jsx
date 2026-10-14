@@ -180,3 +180,17 @@ test("ein Event mit seinen Turnieren und Fast Laps ist eine Zeile (#1182)", asyn
   expect(screen.queryByTestId("home-next-fastlap-lan-lap")).toBeNull();
   expect(screen.getByTestId("home-next-tournament-cup")).toBeInTheDocument();
 });
+
+test("ein gescheitertes Nachladen lässt die Startseite stehen und sagt es (#983)", async () => {
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/home/state" ? stateWith(12) : [] }));
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+  await screen.findByTestId("home-next-tournament-cup");
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/home/state") throw Object.assign(new Error("boom"), { response: { status: 503, data: {} } });
+    return { data: [] };
+  });
+  await act(async () => { await invalidate({ resource: "tournaments" }); });
+  expect(screen.getByTestId("home-next-tournament-cup")).toBeInTheDocument();
+  expect(screen.getByTestId("load-stale")).toHaveTextContent("letzten Stand");
+  expect(screen.queryByTestId("public-error-state")).toBeNull();
+});
