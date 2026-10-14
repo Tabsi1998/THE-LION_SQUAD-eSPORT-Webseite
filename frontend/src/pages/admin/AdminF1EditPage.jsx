@@ -250,7 +250,7 @@ export default function AdminF1EditPage() {
                   <div className="min-w-0"><div className="text-sm font-bold truncate">{tr.name}</div><div className="text-[10px] text-white/50">{tr.country}</div></div>
                 </button>
                 {isTournamentLead && <button onClick={() => setEditTrack({ ...tr, target_time: formatLapTime(tr.target_time_ms) })} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Strecke bearbeiten"><Pencil className="w-3.5 h-3.5" /></button>}
-                {isTournamentLead && <button onClick={() => delTrack(tr.id)} className="p-1 text-white/40 hover:text-[#FF3B30]" title="Strecke löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
+                {isTournamentLead && <button onClick={() => delTrack(tr.id)} className="p-1 text-white/40 hover:text-live" title="Strecke löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
               </div>
             ))}
           </div>

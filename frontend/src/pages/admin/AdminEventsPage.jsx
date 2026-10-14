@@ -4,23 +4,22 @@ import { api, formatRequestError } from "@/lib/api";
 import { eventTypeLabel } from "@/lib/eventTypes";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { SkeletonLines } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
 import { sortByNearestDate } from "@/lib/contentSort";
 import { toast } from "sonner";
-import { Plus, X, Trash2, Calendar, UserCheck, Search, Download, FileText } from "lucide-react";
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { Plus, Trash2, Calendar, UserCheck, Search, Download, FileText } from "lucide-react";
+import { viennaDate } from "@/lib/vienna";
 
 // Event-Liste. Anlegen und Bearbeiten sind seit #434 eigene Seiten (`/admin/events/new`,
 // `/admin/events/:id`) statt eines Fensters über der Liste - mit Zurück im Browser und Links aus
-// dem Dashboard. Die Anmeldungen bleiben ein Fenster, weil sie eine Tabelle und kein Formular sind.
+// dem Dashboard. Die Anmeldungen stehen seit #1372 auf der Arbeitsseite /events/<slug>/leitung (Suche, Einlass,
+// Nachricht an alle) - „Anm.“ führt dorthin.
 export default function AdminEventsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [meta, setMeta] = useState({ types: [], statuses: [], visibilities: [] });
-  const [registrationsEvent, setRegistrationsEvent] = useState(null);
   const [creatingRecapId, setCreatingRecapId] = useState(null);
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
@@ -250,7 +249,7 @@ export default function AdminEventsPage() {
                     </td>
                     <td className="px-4 py-3 text-center space-x-1 whitespace-nowrap">
                       {e.has_registration && (
-                        <button onClick={() => setRegistrationsEvent(e)} data-testid={`event-registrations-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10 inline-flex items-center gap-1">
+                        <button onClick={() => navigate(`/events/${e.slug || e.id}/leitung`)} data-testid={`event-registrations-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10 inline-flex items-center gap-1">
                           <UserCheck className="w-3 h-3" /> Anm.
                         </button>
                       )}
@@ -272,121 +271,6 @@ export default function AdminEventsPage() {
           </div>
         </div>
       )}
-
-      {registrationsEvent && <EventRegistrationsModal event={registrationsEvent} onClose={() => setRegistrationsEvent(null)} onChanged={load} />}
     </AdminLayout>
-  );
-}
-
-const EVENT_REGISTRATION_STATUSES = [
-  ["registered", "Angemeldet"],
-  ["waitlist", "Warteliste"],
-  ["checked_in", "Eingecheckt"],
-  ["no_show", "Nicht erschienen"],
-  ["cancelled", "Storniert"],
-];
-
-function EventRegistrationsModal({ event, onClose, onChanged }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data: next } = await api.get(`/events/${event.id}/registrations`);
-      setData(next);
-    } catch (err) {
-      toast.error(formatRequestError(err, "Anmeldungen konnten nicht geladen werden."));
-    } finally {
-      setLoading(false);
-    }
-  }, [event.id]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const updateStatus = async (registration, status) => {
-    try {
-      await api.patch(`/events/${event.id}/registrations/${registration.id}`, { status });
-      await load();
-      onChanged();
-    } catch (err) {
-      toast.error(formatRequestError(err, "Anmeldung konnte nicht aktualisiert werden."));
-    }
-  };
-
-  const summary = data?.summary || event.registration_summary || {};
-  const registrations = data?.registrations || [];
-
-  return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl bg-[#121212] border border-white/10 rounded-sm">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <div>
-            <div className="text-[11px] uppercase tracking-widest font-bold text-[#29B6E8]">Event-Anmeldungen</div>
-            <h2 className="font-heading font-black uppercase mt-1">{event.name}</h2>
-          </div>
-          <button type="button" onClick={onClose} className="text-white/60 hover:text-white"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="p-5 space-y-5 max-h-[75vh] overflow-y-auto">
-          <div className="grid sm:grid-cols-4 gap-3">
-            <Stat label="Reservierte Plätze" value={`${summary.reserved_seats || 0}${summary.max_participants ? `/${summary.max_participants}` : ""}`} />
-            <Stat label="Anmeldungen" value={summary.registered_count || 0} />
-            <Stat label="Begleitpersonen" value={summary.companion_count || 0} />
-            <Stat label="Warteliste" value={summary.waitlist_count || 0} />
-          </div>
-          <div className="border border-white/10 rounded-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[820px]">
-                <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
-                  <tr>
-                    <th className="text-left px-4 py-3">Person</th>
-                    <th className="text-left px-4 py-3">Plätze</th>
-                    <th className="text-left px-4 py-3">Status</th>
-                    <th className="text-left px-4 py-3">Notiz</th>
-                    <th className="text-left px-4 py-3">Angelegt</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {registrations.map((registration) => (
-                    <tr key={registration.id}>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold">{registration.display_name || "Unbekannt"}</div>
-                        <div className="text-xs text-white/40">{registration.email || registration.user_id}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div>{registration.seat_count || 1}</div>
-                        {!!registration.companion_count && <div className="text-xs text-white/40">+{registration.companion_count} Begleitp.</div>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <select value={registration.status || "registered"} onChange={(e) => updateStatus(registration, e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs">
-                          {EVENT_REGISTRATION_STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-white/55 max-w-xs truncate">{registration.note || "—"}</td>
-                      <td className="px-4 py-3 text-xs text-white/45">{registration.created_at ? viennaDateTime(registration.created_at, { dateStyle: "medium", timeStyle: "short" }) : "—"}</td>
-                    </tr>
-                  ))}
-                  {!loading && registrations.length === 0 && (
-                    <tr><td colSpan="5" className="py-10 text-center text-white/40">Noch keine Anmeldungen</td></tr>
-                  )}
-                  {loading && (
-                    <tr><td colSpan="5" className="p-3"><SkeletonLines lines={3} label="Lade Anmeldungen" /></td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value }) {
-  return (
-    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
-      <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
-      <div className="mt-1 font-heading text-2xl font-black">{value}</div>
-    </div>
   );
 }
