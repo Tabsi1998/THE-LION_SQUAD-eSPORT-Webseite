@@ -30,6 +30,7 @@ from services.v2_result_submission import submit_v2_result
 
 logger = logging.getLogger("tls.match_deadlines")
 
+REMOVED_STATUSES = ["withdrawn", "disqualified"]
 SWEEP_STATUSES = ["ready", "scheduled", "in_progress", "running", "waiting_result"]
 
 
@@ -63,6 +64,9 @@ async def _propose_no_show(db, tournament: dict, match: dict, info: dict, now: d
             if not match or not info or info["due_at"] > now or match.get("no_show_proposal"):
                 return 0
             filled = [slot["registration_id"] for slot in match.get("slots") or [] if slot.get("registration_id")]
+            # Ausgeschiedene (Austritt, Disqualifikation #1553) erscheinen nicht mehr - dafür gibt es keinen Vorschlag.
+            if await db.tournament_registrations.count_documents({"id": {"$in": filled}, "status": {"$in": REMOVED_STATUSES}}):
+                return 0
             proposal = {
                 "id": new_id(), "rule": info["rule"], "minutes": info["minutes"], "registration_ids": filled,
                 "due_at": info["due_at"].isoformat(), "created_at": now.isoformat(),
