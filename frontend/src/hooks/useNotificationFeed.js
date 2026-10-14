@@ -26,6 +26,10 @@ export function useNotificationFeed({ enabled = true, onFresh } = {}) {
   const pendingRef = useRef(new Set());
   const retryRef = useRef({ ids: () => {}, all: () => {} });
   const [pendingIds, setPendingIds] = useState(() => new Set());
+  // Bestätigt gelesen (nach Codex-Prüfung, #1546): ID → Nummer des letzten Abrufs, der vor dem Erfolg gestartet war.
+  // Eine Antwort aus so einem Abruf kennt das „gelesen“ noch nicht und darf es nicht zurücknehmen.
+  const fetchSeqRef = useRef(0);
+  const [confirmed, setConfirmed] = useState(() => new Map());
   const [actionError, setActionError] = useState(null);
   useEffect(() => {
     onFreshRef.current = onFresh;
@@ -36,11 +40,16 @@ export function useNotificationFeed({ enabled = true, onFresh } = {}) {
     knownIdsRef.current = new Set();
     didPrimeRef.current = false;
     setActionError(null);
+    setConfirmed(new Map());
   }, [enabled]);
 
   const fetchFeed = useCallback(async ({ signal }) => {
+    fetchSeqRef.current += 1;
+    const seq = fetchSeqRef.current;
     const { data } = await api.get("/admin/notifications", { signal });
-    const rows = Array.isArray(data) ? data : [];
+    const rows = Array.isArray(data) ? [...data] : [];
+    // Die Nummer des Abrufs reist mit der Liste (nicht aufzählbar); geänderte Listen (mutate) haben keine.
+    Object.defineProperty(rows, "seq", { value: seq });
     if (didPrimeRef.current && onFreshRef.current) {
       const fresh = rows.filter((item) => !item.read && item.id && !knownIdsRef.current.has(item.id));
       if (fresh.length) onFreshRef.current(fresh, rows);
@@ -57,7 +66,17 @@ export function useNotificationFeed({ enabled = true, onFresh } = {}) {
   // Ausstehende „gelesen“ liegen über dem Stand vom Server: ein Nachladen, während der POST unterwegs ist, bringt sie
   // nicht wieder als ungelesen zurück.
   const raw = feed.data || NO_ITEMS;
-  const items = useMemo(() => (pendingIds.size ? raw.map((row) => (pendingIds.has(row.id) && !row.read ? { ...row, read: true } : row)) : raw), [raw, pendingIds]);
+  const items = useMemo(() => {
+    if (!pendingIds.size && !confirmed.size) return raw;
+    const overlay = (id) => pendingIds.has(id) || (confirmed.has(id) && !(raw.seq > confirmed.get(id)));
+    return raw.map((row) => (!row.read && overlay(row.id) ? { ...row, read: true } : row));
+  }, [raw, pendingIds, confirmed]);
+  // Kommt ein Stand aus einem Abruf, der nach dem Erfolg gestartet ist, gilt wieder ganz der Server.
+  useEffect(() => {
+    if (!raw.seq || !confirmed.size) return;
+    if (![...confirmed.values()].some((seq) => raw.seq > seq)) return;
+    setConfirmed((current) => new Map([...current].filter(([, seq]) => !(raw.seq > seq))));
+  }, [raw, confirmed]);
   const bundles = useMemo(() => bundleNotifications(items), [items]);
   const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
 
@@ -65,6 +84,16 @@ export function useNotificationFeed({ enabled = true, onFresh } = {}) {
     if (!ids.length) return;
     mutate((rows) => rows.map((row) => (ids.includes(row.id) ? { ...row, read } : row)));
   }, [mutate]);
+
+  const confirm = useCallback((ids) => {
+    if (!ids.length) return;
+    const seq = fetchSeqRef.current;
+    setConfirmed((current) => {
+      const next = new Map(current);
+      ids.forEach((id) => next.set(id, seq));
+      return next;
+    });
+  }, []);
 
   const setPending = useCallback((ids, on) => {
     ids.forEach((id) => (on ? pendingRef.current.add(id) : pendingRef.current.delete(id)));
@@ -80,14 +109,16 @@ export function useNotificationFeed({ enabled = true, onFresh } = {}) {
     const results = await Promise.allSettled(todo.map((id) => api.post(`/admin/notifications/${id}/read`)));
     const failed = todo.filter((_, index) => results[index].status === "rejected");
     // Erst den Stand setzen, dann das Overlay abnehmen - sonst blitzt ein zwischendurch geladener alter Stand auf.
-    setRead(todo.filter((id) => !failed.includes(id)), true);
+    const done = todo.filter((id) => !failed.includes(id));
+    setRead(done, true);
+    confirm(done);
     setPending(todo, false);
     if (failed.length) {
       setRead(failed, false);
       setActionError({ message: notReadMessage(failed.length, todo.length), retry: () => retryRef.current.ids(failed) });
     }
     return failed;
-  }, [setPending, setRead]);
+  }, [confirm, setPending, setRead]);
 
   // Gibt zurück, was der Server abgelehnt hat - für Stellen ohne eigene Liste, etwa den Toast der Glocke.
   const markRead = useCallback(async (bundle) => {
@@ -104,6 +135,7 @@ export function useNotificationFeed({ enabled = true, onFresh } = {}) {
     try {
       await api.post("/admin/notifications/read-all");
       setRead(ids, true);
+      confirm(ids);
       setPending(ids, false);
     } catch {
       setPending(ids, false);
@@ -112,7 +144,7 @@ export function useNotificationFeed({ enabled = true, onFresh } = {}) {
       // Was der Server vielleicht doch geschafft hat, zeigt der nächste Stand.
       load();
     }
-  }, [items, load, setPending, setRead]);
+  }, [confirm, items, load, setPending, setRead]);
 
   useEffect(() => {
     retryRef.current = { ids: markIds, all: markAllRead };
