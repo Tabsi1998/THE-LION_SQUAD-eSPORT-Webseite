@@ -152,18 +152,70 @@ describe("startPasskeyAutofill", () => {
     expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
-  test("eine spätere Ablehnung (Zeitablauf) holt still eine neue Anfrage", async () => {
+  const optionRequests = () => api.post.mock.calls.filter(([url]) => url === "/auth/passkeys/login/options").length;
+
+  test("ein Abbruch durch die Person - auch nach Minuten - beendet den Vorschlag ohne neue Optionen", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     const calls = pendingGets();
     const onError = vi.fn();
-    const stop = autofill({ onSignedIn: vi.fn(), onError });
+    const onEnd = vi.fn();
+    autofill({ onSignedIn: vi.fn(), onError, onEnd });
     await flush();
     vi.setSystemTime(Date.now() + 90_000);
     calls[0].reject(named("NotAllowedError"));
     await flush();
     expect(onError).not.toHaveBeenCalled();
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(1);
+    expect(optionRequests()).toBe(1);
+  });
+
+  test("ein fremder Abbruch beendet ebenfalls; nur der eigene Ablauf-Timer erneuert", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const calls = pendingGets();
+    const onEnd = vi.fn();
+    const stop = autofill({ onSignedIn: vi.fn(), onEnd });
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    // Der eigene Timer läuft ab: still erneuern, einmal je Ablauf.
+    vi.advanceTimersByTime(4 * 60 * 1000);
+    await vi.waitFor(() => expect(calls).toHaveLength(2));
+    expect(optionRequests()).toBe(2);
+    expect(onEnd).not.toHaveBeenCalled();
+    // Ein Abbruch, den nicht der Timer auslöst, beendet endgültig.
+    calls[1].reject(named("AbortError"));
+    await vi.waitFor(() => expect(onEnd).toHaveBeenCalledTimes(1));
     expect(calls).toHaveLength(2);
+    expect(optionRequests()).toBe(2);
     stop();
+  });
+
+  test("Beenden wartet, bis der Browser die abgebrochene Anfrage abgeschlossen hat - höchstens eine Sekunde", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    // Wie ein echter Browser: die Ablehnung nach dem Abbruch kommt verzögert.
+    const lateReject = (delay) => vi.fn((request) => new Promise((_resolve, reject) => {
+      request.signal.addEventListener("abort", () => setTimeout(() => reject(named("AbortError")), delay));
+    }));
+    navigator.credentials = { get: lateReject(300) };
+    let stop = autofill({ onSignedIn: vi.fn() });
+    await vi.waitFor(() => expect(navigator.credentials.get).toHaveBeenCalledTimes(1));
+    let done = false;
+    stop().then(() => { done = true; });
+    await vi.advanceTimersByTimeAsync(299);
+    expect(done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(done).toBe(true);
+    expect(navigator.credentials.get).toHaveBeenCalledTimes(1);
+
+    // Hängt der Browser, gibt das Beenden nach einer Sekunde trotzdem frei.
+    navigator.credentials = { get: lateReject(60_000) };
+    stop = autofill({ onSignedIn: vi.fn() });
+    await vi.waitFor(() => expect(navigator.credentials.get).toHaveBeenCalledTimes(1));
+    done = false;
+    stop().then(() => { done = true; });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(done).toBe(true);
   });
 
   test("lehnt der Server ab, steht der Grund da und der Vorschlag endet - keine Schleife aus Optionen und Prüfung", async () => {
@@ -196,5 +248,54 @@ describe("startPasskeyAutofill", () => {
     expect(onError).not.toHaveBeenCalled();
     expect(onEnd).toHaveBeenCalledTimes(1);
     expect(navigator.credentials.get).not.toHaveBeenCalled();
+  });
+});
+
+// #1520: Knopf und Vorschlag teilen sich die Anfrage am Server - die Optionen kommen nacheinander, und der Vorschlag
+// bekommt weder eine leere Liste noch ein Zeitlimit mit.
+describe("Optionen für Knopf und Vorschlag", () => {
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  test("leere Liste und Zeitlimit fallen beim Vorschlag weg, der Knopf fragt ohne mediation", async () => {
+    const autofill = (await import("./passkeys")).startPasskeyAutofill;
+    const calls = [];
+    navigator.credentials = { get: vi.fn((request) => { calls.push(request); return new Promise(() => {}); }) };
+    api.post.mockReset();
+    api.post.mockResolvedValue({ data: { challenge: "AQID", rpId: "club.example", allowCredentials: [], timeout: 60000 } });
+    const stop = autofill({ onSignedIn: vi.fn() });
+    await flush();
+    expect(calls[0].mediation).toBe("conditional");
+    expect(calls[0].publicKey).not.toHaveProperty("allowCredentials");
+    expect(calls[0].publicKey).not.toHaveProperty("timeout");
+    expect(calls[0].publicKey.rpId).toBe("club.example");
+    stop();
+    signInWithPasskey({ remember: true });
+    await flush();
+    expect(calls[1].mediation).toBeUndefined();
+    expect(calls[1].publicKey).not.toHaveProperty("allowCredentials");
+  });
+
+  test("eine noch laufende Anfrage des Vorschlags überholt die des Knopfs nicht", async () => {
+    const autofill = (await import("./passkeys")).startPasskeyAutofill;
+    navigator.credentials = { get: vi.fn(() => new Promise(() => {})) };
+    const answers = [];
+    api.post.mockReset();
+    api.post.mockImplementation(() => new Promise((resolve) => answers.push(resolve)));
+    const stop = autofill({ onSignedIn: vi.fn() });
+    await flush();
+    expect(answers).toHaveLength(1);
+    stop();
+    signInWithPasskey({ remember: true });
+    await flush();
+    // Die zweite Anfrage geht erst los, wenn die erste beantwortet ist.
+    expect(answers).toHaveLength(1);
+    answers[0]({ data: { challenge: "AQID", rpId: "club.example" } });
+    await flush();
+    expect(answers).toHaveLength(2);
+    answers[1]({ data: { challenge: "BAUG", rpId: "club.example" } });
+    await flush();
+    // Der beendete Vorschlag fragt den Browser nicht mehr; nur der Knopf tut es.
+    expect(navigator.credentials.get).toHaveBeenCalledTimes(1);
+    expect(navigator.credentials.get.mock.calls[0][0].mediation).toBeUndefined();
   });
 });
