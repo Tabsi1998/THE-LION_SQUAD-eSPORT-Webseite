@@ -9,9 +9,9 @@ title = "THE LION SQUAD secret scan"
 useDefault = true
 
 [[allowlists]]
-description = "The settings encryption key of the CI's throwaway stack. It stands in ci.yml for anyone to read and protects no real data; the tests, the route inventory and the local check's container smoke use the same value."
+description = "The settings encryption key of the CI's throwaway stack (also the local acceptance stack, .env.abnahme.example). It stands in ci.yml for anyone to read and protects no real data; the tests, the route inventory and the local check's container smoke use the same value."
 condition = "AND"
-paths = ['''^(\.github/workflows/ci\.yml|backend/tests/flow_harness\.py|backend/tests/test_runtime_security_unit\.py|scripts/route-inventory\.py|scripts/local_check\.py)$''']
+paths = ['''^(\.github/workflows/ci\.yml|backend/tests/flow_harness\.py|backend/tests/test_runtime_security_unit\.py|scripts/route-inventory\.py|scripts/local_check\.py|\.env\.abnahme\.example)$''']
 regexTarget = "secret"
 regexes = ['''^NQBHeGtQg5HYMo1HzvJtSQPN7X8YpJrZDvw-XMz0Bm8=$''']
 
@@ -23,9 +23,9 @@ regexTarget = "secret"
 regexes = ['''^route-inventory-secret-with-at-least-32-chars$''']
 
 [[allowlists]]
-description = "The TOTP test secret from RFC 6238: base32 of 12345678901234567890."
+description = "The TOTP test secret from RFC 6238: base32 of 12345678901234567890 - also the two-factor secret of the local acceptance stack's test accounts (scripts/seed_abnahme.py)."
 condition = "AND"
-paths = ['''^backend/tests/test_totp_secret_store_unit\.py$''']
+paths = ['''^(backend/tests/test_totp_secret_store_unit\.py|scripts/seed_abnahme\.py)$''']
 regexTarget = "secret"
 regexes = ['''^GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ$''']
 
@@ -99,3 +99,10 @@ condition = "AND"
 paths = ['''^frontend/e2e/fixtures/ffaGenerated\.json$''']
 regexTarget = "secret"
 regexes = ['''^(1d53fac7-bdb2-4351-a6ab-1f8e0e5adff6|2bab3a2f-53a4-4021-af11-458ee0955578|84a0f042-d626-4e54-910a-22ba39c95b10|97e39310-bdeb-4fca-966a-703c4359de41|9c4ecb0d-a8d7-44d6-8773-8013f0cf46d5|bc8fbae0-1135-4369-be8e-5a3e81f1f689|ccaf65c5-b8e8-4520-bca8-4e767985efa4|da458179-22b1-4b09-97d5-9301099181f4)$''']
+
+[[allowlists]]
+description = "The made-up password of the local acceptance stack's test accounts (docs/entwicklung/abnahme-lokal.md); they exist only in that local Docker database."
+condition = "AND"
+paths = ['''^scripts/seed_abnahme\.py$''']
+regexTarget = "secret"
+regexes = ['''^Abnahme-Testpasswort-2026$''']
