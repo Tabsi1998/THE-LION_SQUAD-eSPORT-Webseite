@@ -201,3 +201,53 @@ async def test_the_patch_rollback_restores_the_match_exactly(flow, monkeypatch):
         "station_id": station["id"], "scheduled_at": (now_utc() + timedelta(hours=4)).isoformat()})
     assert response.status_code == 409, response.text
     assert await flow.db.matches_v2.find_one({"id": matches[0]["id"]}, {"_id": 0}) == before
+
+
+@pytest.mark.asyncio
+async def test_the_patch_rollback_leaves_a_foreign_change_alone(flow, monkeypatch):
+    # Codex zu #1611: Hat inzwischen jemand anderes das Spiel geändert (hier: „aufgerufen um“, das der PATCH entfernt
+    # hatte, ist wieder gesetzt), wird nicht zurückgesetzt - sonst überschriebe der Rollback die fremde Änderung.
+    _tournament, station, matches = await on_site_cup(flow)
+    await flow.db.matches_v2.update_one({"id": matches[0]["id"]}, {"$set": {"called_at": "2026-10-14T18:00:00+00:00"}})
+    original_open = match_routes.ensure_station_open
+    original_check = match_routes.station_open_for_matches
+
+    async def delete_in_between(db, station_id):
+        await original_open(db, station_id)
+        await flow.delete(f"/api/stations/{station['id']}")
+
+    async def foreign_change_then_check(db, station_id):
+        await flow.db.matches_v2.update_one({"id": matches[0]["id"]}, {"$set": {"called_at": "fremd"}})
+        return await original_check(db, station_id)
+
+    monkeypatch.setattr(match_routes, "ensure_station_open", delete_in_between)
+    monkeypatch.setattr(match_routes, "station_open_for_matches", foreign_change_then_check)
+    response = await flow.patch(f"/api/matches/{matches[0]['id']}", json={"station_id": station["id"]})
+    assert response.status_code == 409, response.text
+    after = await flow.db.matches_v2.find_one({"id": matches[0]["id"]}, {"_id": 0})
+    assert after["called_at"] == "fremd" and after["station_id"] == station["id"], "fremde Änderung bleibt stehen"
+
+
+@pytest.mark.asyncio
+async def test_the_plan_rollback_leaves_a_foreign_change_alone_and_warns(flow, monkeypatch):
+    tournament, station, matches = await on_site_cup(flow)
+    match = matches[0]
+    original_check = match_scheduler.station_open_for_matches
+
+    async def foreign_change_then_check(db, station_id):
+        await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"schedule_source": "manual"}})
+        await flow.db.stations.delete_one({"id": station["id"]})
+        return await original_check(db, station_id)
+
+    monkeypatch.setattr(match_scheduler, "station_open_for_matches", foreign_change_then_check)
+    planned_at = (now_utc() + timedelta(hours=3)).isoformat()
+    plan = {"assignments": [{
+        "match_id": match["id"], "changed": True, "schedule_source": "planner", "station_id": station["id"],
+        "scheduled_at": planned_at, "forecast": False,
+        "previous": {"scheduled_at": match.get("scheduled_at"), "schedule_source": match.get("schedule_source"),
+                     "status": match.get("status"), "station_id": match.get("station_id")},
+    }]}
+    result = await match_scheduler.apply_plan(flow.db, tournament, plan)
+    assert any(item.get("type") == "station_gone" for item in result["warnings"])
+    after = await flow.db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
+    assert after["schedule_source"] == "manual" and after["scheduled_at"] == planned_at, "fremde Änderung bleibt stehen"

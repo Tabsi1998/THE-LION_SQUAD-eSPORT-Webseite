@@ -39,6 +39,7 @@ from services.match_public_view import public_match_view, public_tournament_view
 from services.match_planning import (
     STATION_GONE,
     restore_change,
+    written_state,
     ensure_plan_keeps_result_state,
     ensure_station_open,
     ensure_station_slot_available,
@@ -1057,9 +1058,11 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         if new_station and not await station_open_for_matches(db, new_station):
             # Die Station wurde zwischen Prüfung und Schreiben gelöscht (Codex zu #1611): exakt zurück auf den Stand vor
             # dem Schreiben (auch ein entferntes „aufgerufen um“) - nur, wenn das Spiel noch so dasteht wie geschrieben.
-            await db.matches_v2.update_one(
-                {"id": match_id, "station_id": new_station, "updated_at": updates["updated_at"]},
-                restore_change(before, [*updates, *change.get("$unset", {})]))
+            back = await db.matches_v2.update_one(
+                written_state(match_id, change), restore_change(before, [*updates, *change.get("$unset", {})]))
+            if not back.matched_count:
+                logger.warning("[match] %s an gelöschter Station %s, inzwischen fremd geändert - nicht zurückgesetzt",
+                               _log_safe(match_id), _log_safe(new_station))
             raise HTTPException(status_code=409, detail=STATION_GONE)
         if station_moved and v2_match.get("station_id"):
             # Umlegen (#1160): die alte Station gibt das Spiel ab - eine defekte bleibt defekt, sonst ist sie frei.

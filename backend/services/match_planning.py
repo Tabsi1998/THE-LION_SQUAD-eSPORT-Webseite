@@ -74,6 +74,13 @@ def restore_change(before: dict, keys) -> dict:
     return change
 
 
+def written_state(match_id: str, change: dict) -> dict:
+    """Filter auf den vollständigen Nachzustand einer Änderung: alle gesetzten Felder mit ihrem Wert, alle entfernten
+    noch fehlend. Nur dann ist ein Rollback sicher - sonst hat inzwischen jemand anderes geändert."""
+    return {"id": match_id, **(change.get("$set") or {}),
+            **{key: {"$exists": False} for key in (change.get("$unset") or {})}}
+
+
 async def ensure_station_open(db, station_id: str) -> None:
     """Vor dem Zuweisen. Löschen markiert zuerst und prüft dann; wer zuweist, prüft vorher und nach dem Schreiben noch
     einmal (``station_open_for_matches``) - so sieht in jeder Reihenfolge einer den anderen."""
