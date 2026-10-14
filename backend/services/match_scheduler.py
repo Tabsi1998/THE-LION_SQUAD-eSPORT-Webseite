@@ -28,6 +28,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
+from services.advancement_draw import draw_group_of, prerequisite_ids
 from services.match_audience import playing_ids, teams_by_id
 from services.match_duration import effective_match_duration, load_duration_game, load_duration_games
 from services.matchday_schedule import plays_in_matchdays, schedule_writes
@@ -158,6 +159,7 @@ class _Board:
 
 
 def _predecessors(match: dict, by_key: dict[tuple, dict]) -> list[dict]:
+    """Die Vorspiele laut Platz-Herkunft (``slot.source``)."""
     found = []
     for slot in match.get("slots") or []:
         source = _source(slot)
@@ -168,11 +170,43 @@ def _predecessors(match: dict, by_key: dict[tuple, dict]) -> list[dict]:
     return found
 
 
-def _chain_lengths(matches: list[dict], by_key: dict[tuple, dict]) -> dict[str, int]:
+def _predecessor_map(matches: list[dict], by_key: dict[tuple, dict]) -> dict[str, list[dict]]:
+    """Worauf jedes Spiel wartet. Gemischt (#1548) wartet eine Folgerunde auf **alle** Spiele der Runde davor - die
+    Auslosung passiert erst, wenn sie fertig ist (``advancement_draw.prerequisite_ids``); sonst die Platz-Herkunft."""
+    by_id = {match["id"]: match for match in matches}
+    direct = {match["id"]: _predecessors(match, by_key) for match in matches}
+    groups: dict[tuple, list[dict]] = {}
+    for match in matches:
+        group = draw_group_of(match)
+        if group:
+            groups.setdefault((match.get("stage_id"), group), []).append(match)
+    group_needs: dict[tuple, dict[str, dict]] = {}
+    for (stage_id, group), mates in groups.items():
+        needed: dict[str, dict] = {}
+        stage_rows = [row for row in matches if row.get("stage_id") == stage_id]
+        for match_id in prerequisite_ids(mates[0], stage_rows):
+            if match_id in by_id:
+                needed[match_id] = by_id[match_id]
+        for mate in mates:
+            for previous in direct[mate["id"]]:
+                needed.setdefault(previous["id"], previous)
+        group_needs[(stage_id, group)] = needed
+    result: dict[str, list[dict]] = {}
+    for match in matches:
+        found = {previous["id"]: previous for previous in direct[match["id"]]}
+        group = draw_group_of(match)
+        if group:
+            found.update(group_needs[(match.get("stage_id"), group)])
+        found.pop(match["id"], None)
+        result[match["id"]] = list(found.values())
+    return result
+
+
+def _chain_lengths(matches: list[dict], predecessors: dict[str, list[dict]]) -> dict[str, int]:
     """Wie viele Spiele hängen noch an diesem - die längste Kette bis zum Finale geht zuerst."""
     successors: dict[str, list[str]] = {}
     for match in matches:
-        for previous in _predecessors(match, by_key):
+        for previous in predecessors.get(match["id"], []):
             successors.setdefault(previous["id"], []).append(match["id"])
     lengths: dict[str, int] = {}
 
@@ -283,7 +317,8 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                 warnings.append({"type": "player_overlap", "severity": "error", "match_id": match["id"], "other_match_id": other["id"],
                                  "message": f"{_label(match)} und {_label(other)}: ein Spieler ist zur selben Zeit in beiden Spielen."})
 
-    chains = _chain_lengths(matches, by_key)
+    predecessors = _predecessor_map(matches, by_key)
+    chains = _chain_lengths(matches, predecessors)
     assignments: list[dict] = []
     stage_floor = horizon
     stage_numbers = sorted({int(match.get("stage_number") or 0) for match in candidates})
@@ -292,7 +327,7 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
         stage_ends: list[datetime] = [end for match, _start, end in fixed if int(match.get("stage_number") or 0) == stage_number]
         while remaining:
             ready = [match for match in remaining.values()
-                     if all(previous["id"] not in remaining for previous in _predecessors(match, by_key))]
+                     if all(previous["id"] not in remaining for previous in predecessors.get(match["id"], []))]
             if not ready:
                 for match in remaining.values():
                     warnings.append({"type": "unplaced", "severity": "error", "match_id": match["id"],
@@ -303,7 +338,7 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
             del remaining[match["id"]]
             lower = stage_floor
             forecast = _unresolved(match)
-            for previous in _predecessors(match, by_key):
+            for previous in predecessors.get(match["id"], []):
                 if str(previous.get("status") or "") not in DONE_STATUSES:
                     forecast = True
                 end = board.ends.get(previous["id"])
@@ -346,7 +381,7 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
     for match, start, _end in fixed:
         if match.get("schedule_source") not in KEPT_SOURCES:
             continue
-        for previous in _predecessors(match, by_key):
+        for previous in predecessors.get(match["id"], []):
             end = board.ends.get(previous["id"])
             if end is not None and end + timedelta(minutes=pause) > start:
                 warnings.append({"type": "too_early", "severity": "error", "match_id": match["id"], "other_match_id": previous["id"],

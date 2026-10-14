@@ -10,8 +10,10 @@ import { Fld } from "./PrizeEditor";
 import { ResultWindowLoader } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { SelectField, modeLabel } from "./TournamentEditForm";
+import { DrawControls } from "./DrawControls";
+import { sourceLabel } from "@/lib/slotSource";
 import { durationSourceText, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
-import { DEFAULT_FFA_SCHEMA, EVENT_MODE_OPTIONS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, applyStageType, matchSectionKey, sectionSortIndex, sortMatchesForPlan, stageConfigFor, stationDisplay } from "./shared";
+import { ADVANCEMENT_MODE_HINT, DEFAULT_FFA_SCHEMA, EVENT_MODE_OPTIONS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, STAGE_ADVANCEMENT_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, applyStageType, matchSectionKey, sectionSortIndex, sortMatchesForPlan, stageAdvancementSetting, stageAdvancementValue, stageConfigFor, stationDisplay } from "./shared";
 
 // Die Dauer-Kette (#1554): Turnier, Phasen und das Spiel (Modi), damit jedes Feld sagen kann, was ohne eigenen Wert gilt.
 const DurationContext = createContext({ tournament: null, game: null, stageById: new Map() });
@@ -46,6 +48,7 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
     result_entry_mode: "",
     schedule_mode: "",
     grand_final: "",
+    advancement: "",
     schema: DEFAULT_FFA_SCHEMA,
   });
   const confirm = useConfirm();
@@ -72,6 +75,7 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
           result_entry_mode: form.result_entry_mode || null,
           schedule_mode: form.schedule_mode || null,
           grand_final: form.grand_final || null,
+          randomize_advancement_rounds: stageAdvancementSetting(form.advancement),
           schema: form.schema || "",
           score_type: "points",
           calculation: "points",
@@ -133,6 +137,7 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
               <SelectField label="Ergebniserfassung" value={form.result_entry_mode} onChange={(v)=>set("result_entry_mode", v)} options={[["", "Vom Turnier erben"], ...RESULT_ENTRY_MODE_OPTIONS.filter(([value]) => value)]} />
               <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
               {form.stage_type === "double_elimination" && <GrandFinalField value={form.grand_final} onChange={(v)=>set("grand_final", v)} testId="stage-new-grand-final" />}
+              <AdvancementField value={form.advancement} onChange={(v)=>set("advancement", v)} testId="stage-new-advancement" />
               <div className="md:col-span-3 text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
                 Leer lassen, wenn diese Phase die Turnier-Regeln nutzt. Overrides sind sinnvoll, wenn z.B. Gruppen online gespielt werden, das Finale aber vor Ort mit Staff-Erfassung läuft.
               </div>
@@ -184,6 +189,16 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
   );
 }
 
+// Gegner der nächsten Runde je Phase (#1548): leer erbt die Turnier-Einstellung (Vorgabe: fester Baum).
+function AdvancementField({ value, onChange, testId }) {
+  return (
+    <div className="block md:col-span-3">
+      <SelectField label="Gegner der nächsten Runde" value={value} onChange={onChange} options={STAGE_ADVANCEMENT_OPTIONS} testId={testId} />
+      <div className="text-[11px] text-white/40 mt-1.5">{ADVANCEMENT_MODE_HINT}</div>
+    </div>
+  );
+}
+
 // Grand Final je Phase (#1549): leer erbt die Turnier-Einstellung (Vorgabe: mit Reset-Spiel).
 function GrandFinalField({ value, onChange, testId }) {
   return (
@@ -211,6 +226,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
     result_entry_mode: settings.result_entry_mode || "",
     schedule_mode: settings.schedule_mode || "",
     grand_final: settings.grand_final || "",
+    advancement: stageAdvancementValue(settings),
     schema: settings.schema || "",
   });
   const confirm = useConfirm();
@@ -232,6 +248,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
       result_entry_mode: form.result_entry_mode || null,
       schedule_mode: form.schedule_mode || null,
       grand_final: form.grand_final || null,
+      randomize_advancement_rounds: stageAdvancementSetting(form.advancement),
       schema: form.schema || "",
       score_type: settings.score_type || "points",
       calculation: settings.calculation || "points",
@@ -359,6 +376,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
               <SelectField label="Ergebniserfassung" value={form.result_entry_mode} onChange={(v)=>set("result_entry_mode", v)} options={[["", "Vom Turnier erben"], ...RESULT_ENTRY_MODE_OPTIONS.filter(([value]) => value)]} />
               <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
               {form.stage_type === "double_elimination" && <GrandFinalField value={form.grand_final} onChange={(v)=>set("grand_final", v)} testId={`stage-grand-final-${stage.id}`} />}
+              <AdvancementField value={form.advancement} onChange={(v)=>set("advancement", v)} testId={`stage-advancement-${stage.id}`} />
             </div>
             <div className="text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
               Leer bedeutet: diese Phase erbt die Turnier-Regeln. Overrides gelten für Match-Hub, Terminabstimmung und Ergebnisfluss dieser Phase.
@@ -377,6 +395,8 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
         )}
         {showMatchList && (
           <div className="space-y-3">
+            {/* Gegner mischen (#1548): Auslosungen dieser Phase und „Neu auslosen“ mit dem Aufbau-Recht. */}
+            {canManageStructure && <DrawControls tournamentId={tournamentId} stage={stage} matches={matches} onChanged={onChanged} />}
             {sectionTabs.length > 1 && (
               <div className="flex flex-wrap gap-2">
                 <button
@@ -452,7 +472,7 @@ function MatchV2Card({ match, regById, stations = [], tournamentStartDate = null
       <div className="mt-3 grid sm:grid-cols-2 gap-2">
         {(match.slots || []).map((slot) => (
           <div key={slot.slot} className={`px-3 py-2 rounded-sm border text-sm ${slot.status === "filled" ? "border-[#29B6E8]/30 bg-[#29B6E8]/5" : "border-white/10 bg-[#121212]"}`}>
-            <span className="text-white/40 mr-2">#{slot.slot}</span>{slot.registration_id ? labelFor(slot.registration_id) : slot.source?.raw || "Offen"}
+            <span className="text-white/40 mr-2">#{slot.slot}</span>{slot.registration_id ? labelFor(slot.registration_id) : (slot.source?.draw ? sourceLabel(slot.source) : slot.source?.raw) || "Offen"}
           </div>
         ))}
       </div>
