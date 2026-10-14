@@ -9,7 +9,7 @@ import inspect
 from typing import Any
 
 from models import now_utc
-from services.mail_overrides import apply_override, substitute  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
+from services.mail_overrides import substitute  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
 
 CATEGORIES = {
     "account": "Konto und Anmeldung",

@@ -14,7 +14,7 @@ import logging
 from models import now_utc
 from services.v2_match_flows import results_for_forfeit
 from services.v2_result_submission import submit_v2_result
-from services.walkover_incidents import record_walkover_incident, revoke_walkover_incident  # noqa: F401 - umgezogen (#1420)
+from services.walkover_incidents import record_walkover_incident  # noqa: F401 - umgezogen (#1420)
 
 logger = logging.getLogger("tls.match")
 

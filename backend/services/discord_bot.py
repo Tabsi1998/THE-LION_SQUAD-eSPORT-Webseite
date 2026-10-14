@@ -39,10 +39,6 @@ from models import now_utc
 from services import discord_runtime
 from services.discord_runtime import (  # noqa: F401 - die alten Namen bleiben hier erreichbar (#1420)
     ROLE_KEYS,
-    DEFAULT_ROLES,
-    SYNC_LIMIT,
-    THREAD_ARCHIVE_MINUTES,
-    MAX_BUTTONS,
     bot_settings,
     desired_roles,
     role_diff,
@@ -50,10 +46,8 @@ from services.discord_runtime import (  # noqa: F401 - die alten Namen bleiben h
     link_view,
     answer_kwargs,
     command_targets,
-    attachments,
     counted_user,
     club_day,
-    _when,
     next_event_text,
     open_tournaments_text,
     achievements_text,
@@ -61,11 +55,9 @@ from services.discord_runtime import (  # noqa: F401 - die alten Namen bleiben h
     no_guild_text,
     SYNC_TEXTS,
     CHANNEL_TEXTS,
-    allowed_mentions,
     channel_row,
     sorted_channels,
     status_text,
-    _dt,
     linked_discord_ids,
     wanted_roles_by_user,
     record_state,
@@ -75,6 +67,28 @@ from services.discord_runtime import (  # noqa: F401 - die alten Namen bleiben h
     bot,
 )
 from services.private_fields import private_projection
+
+# Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
+__all__ = [
+    "ROLE_KEYS",
+    "bot_settings",
+    "desired_roles",
+    "role_diff",
+    "clean_buttons",
+    "link_view",
+    "answer_kwargs",
+    "command_targets",
+    "next_event_text",
+    "open_tournaments_text",
+    "friendly_bot_error",
+    "SYNC_TEXTS",
+    "CHANNEL_TEXTS",
+    "channel_row",
+    "sorted_channels",
+    "wanted_roles_by_user",
+    "BotRunner",
+    "bot",
+]
 
 logger = logging.getLogger("tls.discord.bot")
 

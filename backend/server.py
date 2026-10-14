@@ -583,7 +583,7 @@ async def readiness():
         checks["scheduler"] = True
     else:
         try:
-            from services.scheduler import get_scheduler_status
+            from services.scheduler_state import get_scheduler_status
             checks["scheduler"] = bool(get_scheduler_status().get("running"))
         except Exception:
             checks["scheduler"] = False

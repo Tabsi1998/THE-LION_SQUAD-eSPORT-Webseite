@@ -27,6 +27,9 @@ from services import discord_design
 from services.discord_embed_queue import KINDS, _dirty, pending, request_refresh  # noqa: F401 - umgezogen (#1420)
 from services.log_safe import log_safe
 
+# Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
+__all__ = ["pending", "request_refresh"]
+
 logger = logging.getLogger("tls.discord.embeds")
 
 COLORS = {"ranking": 0xFFD700, "events": 0x29B6E8, "live": 0x9146FF, "achievement_week": 0xA66BFF}
