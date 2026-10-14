@@ -534,3 +534,90 @@ test("an ein Spiel gebundener Ergebnisdienst: Ergebnis-Knopf nur bei seinem Spie
   expect(await screen.findByTestId("matchplan-result-m-mine")).toBeInTheDocument();
   expect(screen.queryByTestId("matchplan-result-m-other")).toBeNull();
 });
+
+// Spielplaner (#1552): kein stilles Mitlaufen mehr. „Planen“ zeigt die Vorschau, „Übernehmen“ schreibt alles
+// auf einmal - und ein Statuswechsel plant nichts nebenbei.
+function renderPageWithStation() {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/stations")) return Promise.resolve({ data: [{ id: "st-1", name: "1", device_type: "switch2", status: "free" }] });
+    return Promise.resolve(routeFor(path));
+  });
+  return renderPage();
+}
+
+test("ein Statuswechsel plant keine Stationen mehr nebenbei", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockImplementation((url) => {
+    if (String(url).includes("/status")) return Promise.resolve({ data: { status: "check_in", auto_generated_bracket: { ok: true, match_count: 3 } } });
+    return Promise.resolve({ data: {} });
+  });
+  renderPageWithStation();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  apiMock.post.mockClear();
+
+  await user.selectOptions(screen.getByTestId("admin-tr-status-select"), "check_in");
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(expect.stringContaining("/status"), expect.anything()));
+  const urls = apiMock.post.mock.calls.map(([url]) => String(url));
+  expect(urls.some((url) => url.includes("auto-assign") || url.includes("/schedule/"))).toBe(false);
+});
+
+test("„Planen“ zeigt die Vorschau und schreibt erst nach „Übernehmen“", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockImplementation((url) => {
+    if (String(url).includes("/schedule/plan")) {
+      return Promise.resolve({ data: {
+        mode: "stations", fingerprint: "abc123",
+        assignments: [
+          { match_id: "m1", label: "A1", scheduled_at: "2026-10-31T10:00:00+00:00", station_name: "1", forecast: false, changed: true },
+          { match_id: "m2", label: "F", scheduled_at: "2026-10-31T10:35:00+00:00", station_name: "1", forecast: true, changed: true },
+        ],
+        warnings: [{ type: "too_early", severity: "error", match_id: "m3", message: "B1 ist fest um 10:00 UTC, aber A1 ist erst um 10:30 UTC vorbei." }],
+      } });
+    }
+    if (String(url).includes("/schedule/apply")) return Promise.resolve({ data: { written: 2, warnings: [] } });
+    return Promise.resolve({ data: {} });
+  });
+  renderPageWithStation();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  const tools = screen.getByTestId("admin-tr-tools");
+  await user.click(tools.querySelector("summary"));
+  expect(screen.queryByTestId("admin-tr-auto-stations")).not.toBeInTheDocument();
+
+  await user.click(screen.getByTestId("admin-tr-plan-schedule"));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(expect.stringContaining("/tournaments/t-1/schedule/plan")));
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog).toHaveTextContent("2 Spiele");
+  expect(dialog).toHaveTextContent("1 Konflikt");
+  expect(dialog).toHaveTextContent("B1 ist fest um 10:00 UTC");
+  expect(dialog).toHaveTextContent("voraussichtlich");
+  expect(apiMock.post.mock.calls.some(([url]) => String(url).includes("/schedule/apply"))).toBe(false);
+
+  await user.click(screen.getByRole("button", { name: "Übernehmen" }));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(
+    expect.stringContaining("/tournaments/t-1/schedule/apply"),
+    expect.objectContaining({ fingerprint: "abc123" })
+  ));
+});
+
+test("ein Online-Turnier bekommt beim Planen keine Stationen, nur den Hinweis", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockImplementation((url) => {
+    if (String(url).includes("/schedule/plan")) {
+      return Promise.resolve({ data: { mode: "none", reason: "Online-Turnier: Termine werden abgestimmt, Stationen gibt es nur vor Ort.", fingerprint: "x", assignments: [], warnings: [] } });
+    }
+    return Promise.resolve({ data: {} });
+  });
+  renderPageWithStation();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tools").querySelector("summary"));
+
+  await user.click(screen.getByTestId("admin-tr-plan-schedule"));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(expect.stringContaining("/schedule/plan")));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(apiMock.post.mock.calls.some(([url]) => String(url).includes("/schedule/apply"))).toBe(false);
+});

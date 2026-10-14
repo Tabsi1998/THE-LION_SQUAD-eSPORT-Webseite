@@ -1,5 +1,5 @@
 """Station routes."""
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
@@ -14,6 +14,7 @@ from services.tournament_permissions import (
 from services.match_calls import notify_match_called
 from services.station_runtime import notify_match_started
 from services.competition_read import find_match_source, load_competition_read_model
+from services.match_scheduler import apply_plan, plan_for_tournament
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
 TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
@@ -80,24 +81,6 @@ def _match_has_minimum_participants(match: dict) -> bool:
         except (TypeError, ValueError):
             minimum = 2
     return _match_participant_count(match) >= minimum
-
-
-def _parse_dt(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
-    except Exception:
-        return None
-
-
-def _duration_for_match(match: dict, tournament: dict) -> int:
-    duration = match.get("duration_minutes") or (match.get("settings") or {}).get("duration_minutes") or tournament.get("match_duration_minutes") or 30
-    try:
-        return max(1, int(duration))
-    except Exception:
-        return 30
 
 
 @router.get("")
@@ -286,16 +269,26 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     await _ensure_tournament_unlocked(db, tournament_id)
     await require_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "tournament")
+    if plan and not start_now:
+        # Planen heißt seit #1552: der Spielplaner rechnet Zeit und Station zusammen (Abhängigkeiten, kein Spieler
+        # doppelt, feste Termine bleiben, online keine Stationen) und schreibt mit Quelle „planner“.
+        computed = await plan_for_tournament(db, tournament)
+        result = await apply_plan(db, tournament, computed)
+        items = [
+            {"station_id": item["station_id"], "match_id": item["match_id"], "match_type": "matches_v2",
+             "scheduled_at": item["scheduled_at"], "duration_minutes": item.get("duration_minutes")}
+            for item in computed["assignments"] if item.get("changed")
+        ]
+        return {"assigned": result["written"], "items": items, "planned": True, "mode": computed["mode"], "warnings": computed["warnings"]}
     station_query = {"tournament_id": tournament_id, "status": {"$ne": "broken"}}
-    if start_now or not plan:
-        station_query = {
-            **station_query,
-            "status": {"$in": ["free", "reserved"]},
-            "$or": [{"current_match_id": None}, {"current_match_id": {"$exists": False}}],
-        }
+    station_query = {
+        **station_query,
+        "status": {"$in": ["free", "reserved"]},
+        "$or": [{"current_match_id": None}, {"current_match_id": {"$exists": False}}],
+    }
     stations = await db.stations.find(station_query, {"_id": 0}).sort("name", 1).to_list(200)
     if not stations:
-        return {"assigned": 0, "items": [], "planned": bool(plan and not start_now)}
+        return {"assigned": 0, "items": [], "planned": False}
     status_filter = ["ready", "scheduled"] if start_now else ["preview", "pending", "ready", "scheduled"]
     station_filter = {"$in": [None, ""]} if not start_now else {"$in": [None, "", *[station["id"] for station in stations]]}
     allowed_station_ids = set(station_filter["$in"])
@@ -308,31 +301,6 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
     ]
     candidates = [item for item in candidates if _match_has_minimum_participants(item[1])]
     candidates.sort(key=lambda item: _match_sort_key(item[1]))
-
-    if plan and not start_now:
-        start_at = _parse_dt(tournament.get("start_date")) or now_utc()
-        station_available_at = {station["id"]: start_at for station in stations}
-        assigned = []
-        for collection_name, match in candidates:
-            station = min(stations, key=lambda item: (station_available_at[item["id"]], item.get("name") or item["id"]))
-            scheduled_at = station_available_at[station["id"]]
-            duration_minutes = _duration_for_match(match, tournament)
-            await db[collection_name].update_one({"id": match["id"]}, {"$set": {
-                "station_id": station["id"],
-                "scheduled_at": scheduled_at.isoformat(),
-                "duration_minutes": duration_minutes,
-                "status": "scheduled" if match.get("status") in {"pending", "ready", "scheduled"} else match.get("status"),
-                "updated_at": now_utc().isoformat(),
-            }})
-            station_available_at[station["id"]] = scheduled_at + timedelta(minutes=duration_minutes)
-            assigned.append({
-                "station_id": station["id"],
-                "match_id": match["id"],
-                "match_type": collection_name,
-                "scheduled_at": scheduled_at.isoformat(),
-                "duration_minutes": duration_minutes,
-            })
-        return {"assigned": len(assigned), "items": assigned, "planned": True}
 
     assigned = []
     used_match_ids: set[str] = set()

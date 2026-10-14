@@ -36,7 +36,6 @@ DYNAMIC = {
     "routes/match_routes.py:dispute:getattr(db, collection)": MATCHES,
     "routes/phase_fg_routes.py:_clear_media_references:getattr(db, collection)": MEDIA,
     "routes/station_routes.py:_assign_match_to_station:db[collection_name]": MATCHES,
-    "routes/station_routes.py:auto_assign_stations:db[collection_name]": MATCHES,
     "routes/station_routes.py:clear_station:db[collection_name]": MATCHES,
     "services/account_erasure.py:_clean:getattr(db, collection)": MEDIA,
     "services/account_erasure.py:erase_related:getattr(db, name)": "account_erasure.PURGED",

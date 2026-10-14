@@ -8,7 +8,13 @@ times inside that week, and the rules the operator asked for are:
   why a league plays a return leg: `_auto_league_schema` swaps the sides, so
   everybody holds home advantage for half of their fixtures.
 * If nobody offers anything, a configured default applies - Sunday 20:00 for
-  example - and it has to fall inside that week.
+  example - and it has to fall inside that week. The default is Vienna wall
+  time (#1552): "20:00" means 20:00 for the players, in summer and in winter.
+* What both sides agreed on counts even outside the week - an agreement is
+  never silently reset to the default (#1552).
+
+Only phases that are played in weeks take part: a local one-day group phase
+has rounds, not matchdays, and is left to the station planner (#1552).
 
 Slot zero is the home side. That is not a new convention invented here: the
 league generator writes each fixture as ``[home, away]`` and mirrors it for the
@@ -22,9 +28,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+from services.tournament_rules import match_policy
 
 MATCHDAY_DAYS = 7
-# Sunday 20:00 UTC, the example the operator gave. Every caller may override it.
+# Die Standardzeit ist Wiener Uhrzeit (#1552): die Spieler lesen „20:00“ als 20:00 bei sich, nicht als UTC.
+LOCAL_TZ = ZoneInfo("Europe/Vienna")
+# Sunday 20:00 Vienna, the example the operator gave. Every caller may override it.
 DEFAULT_WEEKDAY = 6
 DEFAULT_HOUR = 20
 DEFAULT_MINUTE = 0
@@ -142,26 +153,34 @@ def default_time_in(window: MatchdayWindow, *, weekday: int = DEFAULT_WEEKDAY,
         raise MatchdayScheduleError("Wochentag muss zwischen 0 (Montag) und 6 (Sonntag) liegen")
     if not 0 <= hour <= 23 or not 0 <= minute <= 59:
         raise MatchdayScheduleError("Uhrzeit liegt außerhalb des Tages")
-    day = window.start.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    while day.weekday() != weekday or day < window.start:
+    # In Wiener Wanduhrzeit suchen: ein Tag weiter ist dort immer 24 Stunden Wanduhr, auch über die Umstellung,
+    # und erst das Ergebnis wird wieder UTC - so bleibt „20:00“ im Sommer wie im Winter 20:00.
+    local_start = window.start.astimezone(LOCAL_TZ)
+    day = local_start.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    while day.weekday() != weekday or day < local_start:
         day += timedelta(days=1)
-        if day >= window.end + timedelta(days=7):
+        if day.astimezone(timezone.utc) >= window.end + timedelta(days=7):
             return None
-    return day if window.contains(day) else None
+    moment = day.astimezone(timezone.utc)
+    return moment if window.contains(moment) else None
 
 
 def usable_proposals(proposals, window: MatchdayWindow) -> list[dict]:
     """Proposals that could still decide this matchday.
 
-    Withdrawn or declined offers are out, and so is anything outside the week -
-    a time in the wrong week cannot become this matchday's time.
+    Withdrawn or declined offers are out, and so is an open offer outside the
+    week - a time in the wrong week cannot become this matchday's time. What
+    both sides accepted counts wherever it lies: the agreement is theirs, and
+    the run must not reset it to the default (#1552).
     """
     usable = []
     for proposal in proposals or []:
         if (proposal or {}).get("status") in {"declined", "withdrawn", "countered"}:
             continue
         moment = _parse((proposal or {}).get("scheduled_at"))
-        if moment is None or not window.contains(moment):
+        if moment is None:
+            continue
+        if (proposal or {}).get("status") != "accepted" and not window.contains(moment):
             continue
         usable.append({**proposal, "_moment": moment})
     return usable
@@ -205,10 +224,20 @@ def resolve_matchday_time(match: dict, proposals, window: MatchdayWindow, *,
 # but a round is not a week - saying so keeps the caller from inventing weeks
 # for a single elimination tree.
 MATCHDAY_FORMATS = frozenset({"league", "round_robin", "groups"})
+MATCHDAY_STAGE_TYPES = frozenset({"league", "round_robin_groups", "ffa_league"})
 
 
-def plays_in_matchdays(tournament: dict) -> bool:
-    return (tournament or {}).get("format") in MATCHDAY_FORMATS
+def plays_in_matchdays(tournament: dict, stage: dict | None = None) -> bool:
+    """Spielwochen gibt es nur online (#1552): vor Ort hat eine Gruppenphase Runden an einem Tag, die der
+    Stationsplaner legt. Die Phase entscheidet vor dem Turnier (Vorrang wie in ``tournament_rules``)."""
+    tournament = tournament or {}
+    if stage is not None and stage.get("stage_type"):
+        weekly_format = stage.get("stage_type") in MATCHDAY_STAGE_TYPES
+    else:
+        weekly_format = tournament.get("format") in MATCHDAY_FORMATS
+    if not weekly_format:
+        return False
+    return match_policy({}, tournament, stage)["event_mode"] != "local"
 
 
 def matchday_settings(tournament: dict) -> dict:
@@ -245,16 +274,24 @@ def matchday_settings(tournament: dict) -> dict:
     return {"days": days, "weekday": weekday, "hour": hour, "minute": minute}
 
 
-def build_matchday_plan(tournament: dict, matches, proposals=None) -> dict:
+def build_matchday_plan(tournament: dict, matches, proposals=None, stages=None) -> dict:
     """Group the fixtures into weeks and say what time each one counts as.
 
     Returns ``applies: False`` for formats that have rounds rather than weeks,
     so the caller can fall back to its existing grouping instead of pretending
-    a single elimination bracket has matchdays.
+    a single elimination bracket has matchdays. With ``stages`` given, a match
+    only takes part when its own phase plays in weeks.
     """
     settings = matchday_settings(tournament)
     start = _parse((tournament or {}).get("start_date"))
-    if not plays_in_matchdays(tournament) or start is None:
+    if start is None:
+        return {"applies": False, "settings": settings, "matchdays": []}
+    stage_by_id = {(stage or {}).get("id"): stage for stage in stages or []}
+    if stages:
+        matches = [match for match in matches or [] if plays_in_matchdays(tournament, stage_by_id.get((match or {}).get("stage_id")))]
+        if not matches:
+            return {"applies": False, "settings": settings, "matchdays": []}
+    elif not plays_in_matchdays(tournament):
         return {"applies": False, "settings": settings, "matchdays": []}
 
     by_proposal: dict[str, list] = {}
@@ -319,15 +356,17 @@ def current_matchday_number(plan: dict, now: datetime | None = None) -> int | No
 # TV-Anzeigen lesen aber `scheduled_at` aus der Partie - sie kannten den geltenden Termin nicht.
 # Entscheidung vom 15.09.: Ja, schreiben - mit der Quelle daneben, damit ein Admin sieht, warum
 # die Partie dort steht. Ein von der Turnierleitung gesetzter Termin (`schedule_source`
-# "manual") wird nie überschrieben; erledigte oder laufende Partien auch nicht.
+# "manual") wird nie überschrieben, ein vereinbarter ("accepted") auch nicht (#1552); erledigte oder
+# laufende Partien ebenso wenig.
 
 SCHEDULE_SOURCES = ("accepted", "home", "default", "manual")
+KEPT_SOURCES = frozenset({"manual", "accepted"})
 FROZEN_MATCH_STATUSES = frozenset({"running", "in_progress", "waiting_result", "completed", "archived", "forfeit", "bye", "no_show"})
 
 
-def schedule_writes(tournament: dict, matches, proposals=None) -> list[dict]:
+def schedule_writes(tournament: dict, matches, proposals=None, stages=None) -> list[dict]:
     """Was je Partie zu schreiben ist - reine Rechnung, ohne Datenbank, deshalb testbar."""
-    plan = build_matchday_plan(tournament, matches, proposals)
+    plan = build_matchday_plan(tournament, matches, proposals, stages)
     if not plan.get("applies"):
         return []
     by_id = {(match or {}).get("id"): match for match in matches or []}
@@ -337,7 +376,7 @@ def schedule_writes(tournament: dict, matches, proposals=None) -> list[dict]:
             match = by_id.get(entry["match_id"]) or {}
             if not entry.get("scheduled_at"):
                 continue
-            if match.get("schedule_source") == "manual" or match.get("status") in FROZEN_MATCH_STATUSES:
+            if match.get("schedule_source") in KEPT_SOURCES or match.get("status") in FROZEN_MATCH_STATUSES:
                 continue
             resolved = _parse(entry["scheduled_at"])
             current = _parse(match.get("scheduled_at"))
@@ -355,20 +394,79 @@ def schedule_writes(tournament: dict, matches, proposals=None) -> list[dict]:
 
 
 async def persist_matchday_schedule(db, tournament: dict) -> dict:
-    """Den geltenden Termin aller Spieltag-Partien eines Turniers nachtragen."""
-    if not plays_in_matchdays(tournament):
-        return {"applies": False, "written": 0}
+    """Den geltenden Termin aller Spieltag-Partien eines Turniers nachtragen - und abgelaufene Fristen an die
+    Turnierleitung melden (#1552)."""
     tid = tournament["id"]
+    stages = await db.tournament_stages.find({"tournament_id": tid}, {"_id": 0}).to_list(200)
+    if not plays_in_matchdays(tournament) and not any(plays_in_matchdays(tournament, stage) for stage in stages):
+        return {"applies": False, "written": 0, "escalated": 0}
     matches = await db.matches_v2.find({"tournament_id": tid, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
     proposals = await db.match_schedule_proposals.find({"tournament_id": tid}, {"_id": 0, "match_collection": 0}).to_list(3000)
-    writes = schedule_writes(tournament, matches, proposals)
+    writes = schedule_writes(tournament, matches, proposals, stages)
     for write in writes:
         await db.matches_v2.update_one({"id": write["match_id"]}, {"$set": {**write["update"], "updated_at": datetime.now(timezone.utc).isoformat()}})
-    return {"applies": True, "written": len(writes)}
+    escalated = await escalate_overdue_proposals(db, tournament, matches)
+    return {"applies": True, "written": len(writes), "escalated": escalated}
+
+
+# ---------------------------------------------------------------- Eskalation (#1552)
+#
+# Läuft die Antwortfrist eines Terminvorschlags ab, stand das bisher nur in der Partie („escalated“), gesetzt
+# beim Öffnen der Matchseite, ohne dass jemand davon erfuhr. Jetzt meldet der Lauf es der Turnierleitung -
+# einmal je Partie, festgehalten in `schedule_escalated_at`.
+
+OPEN_SCHEDULE_STATUSES = frozenset({"proposed", "declined", "escalated"})
+
+
+async def _tournament_staff_user_ids(db, tournament_id: str) -> set[str]:
+    from services.permissions import tournament_lead_filter
+
+    leads = await db.users.find({**tournament_lead_filter(), "is_active": True, "is_banned": {"$ne": True}}, {"_id": 0, "id": 1}).to_list(200)
+    ids = {row.get("id") for row in leads if row.get("id")}
+    assignments = await db.tournament_staff_assignments.find(
+        {"tournament_id": tournament_id, "is_active": {"$ne": False}, "role": "organizer", "scope": "tournament"},
+        {"_id": 0, "user_id": 1},
+    ).to_list(200)
+    ids.update(row.get("user_id") for row in assignments if row.get("user_id"))
+    return ids
+
+
+async def escalate_overdue_proposals(db, tournament: dict, matches) -> int:
+    from services.user_notifications import create_user_notification
+
+    now = datetime.now(timezone.utc)
+    overdue = [
+        match for match in matches or []
+        if match.get("schedule_status") in OPEN_SCHEDULE_STATUSES and not match.get("schedule_escalated_at")
+        and (_parse(match.get("schedule_deadline_at")) or now) < now
+        and match.get("status") not in FROZEN_MATCH_STATUSES
+    ]
+    if not overdue:
+        return 0
+    staff_ids = await _tournament_staff_user_ids(db, tournament["id"])
+    title = (tournament or {}).get("title") or "Turnier"
+    for match in overdue:
+        now_iso = now.isoformat()
+        await db.matches_v2.update_one({"id": match["id"]}, {"$set": {
+            "schedule_status": "escalated", "schedule_escalated_at": now_iso, "updated_at": now_iso,
+        }})
+        label = match.get("match_key") or match.get("round_name") or "Spiel"
+        for user_id in sorted(staff_ids):
+            await create_user_notification(
+                user_id,
+                f"Termin offen: {title}",
+                f"{label}: die Antwortfrist für den Terminvorschlag ist abgelaufen. Bitte einen Termin festlegen.",
+                url=f"/matches/{match.get('id')}",
+                kind="schedule_escalation",
+                meta={"category": "match_reminders", "dedupe_key": f"schedule_escalation:{match.get('id')}",
+                      "match_id": match.get("id"), "tournament_id": tournament.get("id")},
+            )
+    return len(overdue)
 
 
 async def persist_all_matchday_schedules(db, limit: int = 50) -> dict:
-    """Der Scheduler-Lauf: alle laufenden Ligen, Round Robins und Gruppen - auch abgelaufene Fristen."""
+    """Der Scheduler-Lauf, Liga-Modus des Planers (#1552): alle laufenden Ligen, Round Robins und Gruppen, die
+    online in Spielwochen spielen - Standardzeit, Heimrecht, abgelaufene Fristen."""
     counts = {"tournaments": 0, "written": 0}
     query = {"format": {"$in": sorted(MATCHDAY_FORMATS)}, "status": {"$nin": ["draft", "completed", "results_published", "archived", "cancelled"]}}
     async for tournament in db.tournaments.find(query, {"_id": 0}).limit(limit):
