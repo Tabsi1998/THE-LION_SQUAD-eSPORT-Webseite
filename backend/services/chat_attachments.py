@@ -26,6 +26,7 @@ from PIL import Image
 
 from database import get_db
 from models import new_id, now_utc
+from services import wiring
 from services.permissions import holds_area
 from storage import PRIVATE_CHAT_DIR, ensure_directory
 
@@ -244,10 +245,18 @@ async def claim_attachments(db, owner_id: str, attachment_ids: list[str] | None,
 # Import hier an (#1420) - so importiert dieser Dienst keine Route. Ohne Anmeldung sieht niemand den Anhang.
 ChatAccess = Callable[[Any, dict, "dict | None"], Awaitable[bool]]
 _CHAT_ACCESS: dict[str, ChatAccess] = {}
+CHAT_KINDS = ("team", "tournament", "match")
 
 
 def register_chat_access(kind: str, check: ChatAccess) -> None:
     _CHAT_ACCESS[kind] = check
+
+
+def _chat_check(kind: str | None) -> ChatAccess | None:
+    """Die Prüfung der Route; fehlt sie für einen Chat, einmal nachladen (services/wiring.py)."""
+    if kind in CHAT_KINDS and kind not in _CHAT_ACCESS:
+        wiring.ensure()
+    return _CHAT_ACCESS.get(kind) if kind else None
 
 
 async def can_access(attachment: dict, user: dict | None) -> bool:
@@ -267,7 +276,7 @@ async def can_access(attachment: dict, user: dict | None) -> bool:
     if kind == "direct":
         return bool(user and user.get("id") in (context.get("user_ids") or []))
     # Team-, Turnier- und Match-Chat: die Route des Chats entscheidet (``register_chat_access``).
-    check = _CHAT_ACCESS.get(kind)
+    check = _chat_check(kind)
     return bool(check and await check(db, context, user))
 
 

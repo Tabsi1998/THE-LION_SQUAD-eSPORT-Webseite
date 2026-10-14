@@ -2,13 +2,16 @@
 
 Die Auswertung selbst (``badges.evaluate_user_progress``) vergibt Stufen, schreibt XP und stellt Folge-Auswertungen in
 die Warteschlange - sie steht also über der Warteschlange und den Zählern. Damit die beiden sie trotzdem aufrufen
-können (Warteschlange abarbeiten, nächtlicher Abgleich), meldet badges.py sie beim Import hier an. Der Server lädt
-badges.py beim Start; ohne Anmeldung gibt es einen klaren Fehler statt einer stillen Lücke.
+können (Warteschlange abarbeiten, nächtlicher Abgleich), meldet badges.py sie beim Import hier an. Jeder Einstiegspunkt
+lädt badges.py über services/bootstrap.py; fehlt die Anmeldung trotzdem, holt ``evaluator`` sie einmal nach, sonst gibt
+es einen klaren Fehler statt einer stillen Lücke.
 """
 from __future__ import annotations
 
 from typing import Awaitable, Callable
 from zoneinfo import ZoneInfo
+
+from services import wiring
 
 # Phase B v4.1: Vorfall-Typ -> negative Stufe (Admin, Wertung „nicht erschienen“, Streit, Abbruch).
 NEGATIVE_INCIDENTS = {
@@ -91,7 +94,10 @@ def register_evaluator(evaluate: Evaluator) -> None:
 
 
 def evaluator() -> Evaluator:
-    """Die angemeldete Auswertung; ohne Anmeldung ein Fehler, bevor etwas aus der Warteschlange genommen wird."""
+    """Die angemeldete Auswertung; ohne Anmeldung einmal nachladen (services/wiring.py), sonst ein Fehler, bevor etwas
+    aus der Warteschlange genommen wird."""
+    if _evaluator is None:
+        wiring.ensure()
     if _evaluator is None:
         raise RuntimeError("Erfolge-Auswertung nicht angemeldet - badges.py wurde nicht geladen")
     return _evaluator

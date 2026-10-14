@@ -17,6 +17,7 @@ from typing import Callable
 
 from database import get_db
 from models import now_utc
+from services import wiring as _wiring_safety_net
 from services.dolibarr_policy import CLUB_TZ
 from services.secret_store import decrypt_secret
 from services.private_fields import private_projection
@@ -354,6 +355,9 @@ def register_wiring(wire: Wiring) -> None:
 
 
 def wiring() -> Wiring:
+    """Die angemeldete Verdrahtung; ohne Anmeldung einmal nachladen (services/wiring.py), sonst ein Fehler."""
+    if _wiring is None:
+        _wiring_safety_net.ensure()
     if _wiring is None:
         raise RuntimeError("Discord-Bot: Ereignisse nicht angemeldet - services/discord_bot.py wurde nicht geladen")
     return _wiring
@@ -409,6 +413,7 @@ class BotRunner:
         self._commands_lock = asyncio.Lock()
 
     async def start_if_enabled(self) -> bool:
+        _wiring_safety_net.ensure()  # Anmeldungen beim Import (#1420), siehe services/bootstrap.py
         db = get_db()
         settings = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
         view = bot_settings(settings)

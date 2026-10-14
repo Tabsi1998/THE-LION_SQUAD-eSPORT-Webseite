@@ -218,4 +218,7 @@ async def _main() -> None:
 
 
 if __name__ == "__main__":
+    from services import wiring
+
+    wiring.ensure()  # Anmeldungen beim Import (#1420), siehe services/bootstrap.py
     asyncio.run(_main())

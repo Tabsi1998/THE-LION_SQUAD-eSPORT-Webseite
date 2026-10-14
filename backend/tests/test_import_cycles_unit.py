@@ -172,7 +172,7 @@ LEAVES = (
     "services.discord_runtime", "services.discord_links", "services.discord_targets", "services.discord_plain_text",
     "services.discord_embed_queue", "services.discord_bracket_state", "services.image_upload", "services.mail_templates",
     "services.mail_overrides", "services.mail_outbox", "services.scheduler_state", "services.dolibarr_ballot_state",
-    "services.passkey_config",
+    "services.passkey_config", "services.wiring",
 )
 FEATURES = {
     "badges", "discord_service", "email_service", "services.discord_bot", "services.xp", "services.achievement_queue",

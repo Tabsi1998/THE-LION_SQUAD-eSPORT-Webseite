@@ -22,7 +22,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from services import scheduler_state
+from services import scheduler_state, wiring
 from services.scheduler_state import get_scheduler_status  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
 
 logger = logging.getLogger("tls.scheduler")
@@ -926,6 +926,7 @@ def start_scheduler() -> AsyncIOScheduler:
     global _scheduler
     if _scheduler:
         return _scheduler
+    wiring.ensure()  # Anmeldungen beim Import (#1420), siehe services/bootstrap.py
     sched = AsyncIOScheduler(timezone="UTC")
     sched.add_job(_single_replica("mail_queue", _safe_mail_queue), IntervalTrigger(seconds=30), id="mail_queue",
                   max_instances=1, coalesce=True)
