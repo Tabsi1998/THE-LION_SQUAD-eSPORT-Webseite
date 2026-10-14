@@ -260,3 +260,114 @@ async def test_a_club_member_account_gets_the_times_as_reference_when_members_ar
     lap = await flow.db.f1_lap_times.find_one({"user_id": member["id"]})
     assert lap["score_scope"] == "club_reference" and lap["moved_by_member_rule"] is True
     assert (await board(flow, cid, tid))["entries"] == []
+
+
+# ------------------------------------------------------------------ Nachprüfung: Sperren koordinieren (Codex)
+# Verknüpfen, Zeiten eintragen/korrigieren/löschen, in die Liste setzen und Veröffentlichen laufen unter einer Sperre je
+# Challenge (``write_resource``) und prüfen Gast-Status, Veröffentlichung und Begründung erst darin. ``InterleavedReads``
+# lässt beide Anfragen den alten Stand lesen, bevor eine schreibt - wie zwei Worker auf echtem MongoDB.
+
+from flow_harness import InterleavedReads  # noqa: E402
+
+
+def gate_reads(monkeypatch, flow, collection, parties=2):
+    from routes import f1_routes
+
+    gate = InterleavedReads(flow.db, collection, parties=parties, timeout=0.5)
+    monkeypatch.setattr(f1_routes, "get_db", lambda: gate)
+    return gate
+
+
+@pytest.mark.asyncio
+async def test_a_guest_time_racing_the_link_never_stays_a_guest_time(flow, monkeypatch):
+    cid, tid, _lead, _helper = await setup(flow)
+    guest = await add_guest(flow, cid)
+    account = await flow.add_user(name="konto")
+    await enter(flow, cid, tid, guest=guest, time_ms=80000)
+    gate_reads(monkeypatch, flow, "f1_guests")
+    entered, linked = await asyncio.gather(
+        flow.post(f"/api/f1/challenges/{cid}/times", json={"guest_id": guest["id"], "track_id": tid, "time_ms": 81000}),
+        link(flow, guest, account),
+    )
+    assert linked.status_code == 200, linked.text
+    assert entered.status_code in (200, 400, 409)
+    assert await flow.db.f1_lap_times.count_documents({"challenge_id": cid, "user_id": None}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_queue_entry_racing_the_link_never_stays_a_guest_entry(flow, monkeypatch):
+    cid, tid, _lead, _helper = await setup(flow)
+    guest = await add_guest(flow, cid)
+    account = await flow.add_user(name="konto")
+    gate_reads(monkeypatch, flow, "f1_guests")
+    queued, linked = await asyncio.gather(
+        flow.post(f"/api/f1/challenges/{cid}/queue", json={"guest_id": guest["id"], "track_id": tid}),
+        link(flow, guest, account),
+    )
+    assert linked.status_code == 200, linked.text
+    assert queued.status_code in (200, 400, 409)
+    assert await flow.db.f1_queue.count_documents({"challenge_id": cid, "guest_id": guest["id"]}) == 0
+
+
+@pytest.mark.asyncio
+async def test_publishing_racing_the_link_never_skips_reason_and_prizes(flow, monkeypatch):
+    cid, tid, _lead, _helper = await setup(flow, prize_places=[{"place": 1, "label": "1. Platz", "value": "Pokal"}])
+    guest = await add_guest(flow, cid)
+    account, runner_up = await flow.add_user(name="konto"), await flow.add_user(name="zweiter")
+    await enter(flow, cid, tid, guest=guest, time_ms=70000)
+    await enter(flow, cid, tid, user=runner_up, time_ms=80000)
+    gate_reads(monkeypatch, flow, "f1_challenges")
+    published, linked = await asyncio.gather(
+        flow.patch(f"/api/f1/challenges/{cid}", json={"status": "results_published"}),
+        link(flow, guest, account),
+    )
+    assert published.status_code == 200, published.text
+    winners = {row["user_id"] for row in await flow.db.prize_pickups.find(
+        {"fastlap_challenge_id": cid, "place": 1, "needs_review": {"$ne": True}}, {"_id": 0}).to_list(10)}
+    if linked.status_code == 200:
+        # Verknüpft vor der Veröffentlichung: das Konto ist Platz 1 und hat den Gewinn.
+        assert winners == {account["id"]}
+    else:
+        # Nach der Veröffentlichung fehlt die Begründung - es bleibt beim Gast, der Gewinn beim Zweiten.
+        assert linked.status_code == 409
+        assert winners == {runner_up["id"]}
+        assert await flow.db.f1_lap_times.count_documents({"user_id": account["id"]}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_correction_racing_the_link_cannot_make_a_member_time_official(flow, monkeypatch):
+    cid, tid, _lead, _helper = await setup(flow, block_club_member_results=True)
+    guest = await add_guest(flow, cid)
+    member = await flow.add_user(name="mitglied")
+    await flow.db.memberships.insert_one({"id": new_id(), "user_id": member["id"], "member_status": "active"})
+    lap = await enter(flow, cid, tid, guest=guest, time_ms=80000)
+    gate_reads(monkeypatch, flow, "f1_lap_times")
+    corrected, linked = await asyncio.gather(
+        flow.patch(f"/api/f1/times/{lap['id']}", json={"time_ms": 79000, "score_scope": "official"}),
+        link(flow, guest, member),
+    )
+    assert linked.status_code == 200, linked.text
+    assert corrected.status_code in (200, 400, 409)
+    row = await flow.db.f1_lap_times.find_one({"id": lap["id"]})
+    assert row["user_id"] == member["id"] and row["score_scope"] == "club_reference"
+
+
+@pytest.mark.asyncio
+async def test_everything_at_once_finishes_without_a_deadlock(flow):
+    cid, tid, _lead, _helper = await setup(flow, prize_places=[{"place": 1, "label": "1. Platz", "value": "Pokal"}])
+    guest = await add_guest(flow, cid)
+    other_guest = await add_guest(flow, cid, "Ben")
+    account = await flow.add_user(name="konto")
+    lap = await enter(flow, cid, tid, guest=other_guest, time_ms=80000)
+    calls = [
+        link(flow, guest, account),
+        flow.post(f"/api/f1/challenges/{cid}/times", json={"guest_id": guest["id"], "track_id": tid, "time_ms": 81000}),
+        flow.post(f"/api/f1/challenges/{cid}/queue", json={"guest_id": guest["id"], "track_id": tid}),
+        flow.patch(f"/api/f1/times/{lap['id']}", json={"time_ms": 79500}),
+        flow.patch(f"/api/f1/challenges/{cid}", json={"status": "completed"}),
+        flow.post(f"/api/f1/challenges/{cid}/queue/next", json={}),
+        flow.patch(f"/api/f1/guests/{other_guest['id']}", json={"display_name": "Ben K."}),
+    ]
+    answers = await asyncio.wait_for(asyncio.gather(*calls), timeout=20)
+    assert all(response.status_code < 500 for response in answers), [response.text for response in answers]
+    assert await flow.db.f1_lap_times.count_documents({"challenge_id": cid, "guest_id": guest["id"], "user_id": None}) == 0

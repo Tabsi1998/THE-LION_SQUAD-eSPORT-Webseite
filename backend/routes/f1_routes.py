@@ -3,6 +3,7 @@ import io
 import csv
 import logging
 import math
+from contextlib import asynccontextmanager
 from urllib.parse import quote, urlencode, urlsplit
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse, StreamingResponse
@@ -159,6 +160,28 @@ async def check_lap_time(db, challenge: dict, lap: dict, *, current: dict | None
 
 
 router = APIRouter(prefix="/api/f1", tags=["f1"])
+
+# Eine Sperre je Challenge für alles, was über Wertung und Personen entscheidet (#1585, Nachprüfung): Zeiten eintragen,
+# korrigieren, löschen, in die Liste „Am Start“ setzen, einen Gast verknüpfen und die Challenge ändern (auch
+# Veröffentlichen und Zurücknehmen). Wer sie hält, liest Gast-Status, Veröffentlichung und Begründung frisch - sonst
+# könnte etwa eine Zeit nach dem Verknüpfen noch als Gast landen. Reihenfolge, damit sich nichts gegenseitig blockiert:
+# diese Sperre zuerst, darin die Gast-Sperre, die Listen-Sperre, die Versuchs-Sperre je Person und zuletzt die
+# Abgleich-Sperre (``results_resource``). Keine Route nimmt eine davon und danach diese.
+WRITE_WAIT_SECONDS = 10.0
+WRITE_BUSY = "Gerade wird an dieser Fast Lap gespeichert - bitte gleich noch einmal versuchen."
+
+
+def write_resource(challenge_id: str) -> str:
+    return f"fastlap:{challenge_id}:write"
+
+
+@asynccontextmanager
+async def challenge_write(challenge_id: str):
+    try:
+        async with mutation_lock(get_db(), write_resource(challenge_id), wait_seconds=WRITE_WAIT_SECONDS):
+            yield
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=WRITE_BUSY)
 logger = logging.getLogger("tls.f1")
 # Fast-Lap-Zeiten für alle Challenges: Turnierleitung, Club-Admin, Superadmin; sonst nur mit Einsatz
 # in der Challenge (f1_staff_assignments).
@@ -712,8 +735,13 @@ async def create_challenge_doc(body: F1ChallengeCreate, me: dict) -> dict:
 @router.put("/challenges/{cid}")
 @router.patch("/challenges/{cid}")
 async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends(require_admin())):
-    db = get_db()
     cid = await _resolve_cid(cid)
+    async with challenge_write(cid):
+        return await _update_challenge_locked(cid, body, me)
+
+
+async def _update_challenge_locked(cid: str, body: F1ChallengeUpdate, me: dict):
+    db = get_db()
     existing = await db.f1_challenges.find_one({"id": cid}, {"_id": 0}) or {}
     raw = body.model_dump(exclude_unset=True)
     change_reason = raw.pop("change_reason", None)
@@ -1059,9 +1087,14 @@ async def championship_standings(cid: str, access: str | None = None, user=Depen
 
 @router.post("/challenges/{cid}/times")
 async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_current_user)):
-    db = get_db()
     cid = await _resolve_cid(cid)
-    # Verify
+    async with challenge_write(cid):
+        return await _add_time_locked(cid, body, me)
+
+
+async def _add_time_locked(cid: str, body: F1LapTimeCreate, me: dict):
+    db = get_db()
+    # Unter der Schreib-Sperre frisch: Veröffentlichung, Begründung und ob der Gast inzwischen verknüpft ist.
     c = await db.f1_challenges.find_one({"id": cid})
     if not c:
         raise HTTPException(status_code=404)
@@ -1185,10 +1218,23 @@ async def list_times(cid: str, track_id: str | None = None, user_id: str | None 
     return times
 
 
+async def _lap_challenge_id(time_id: str) -> str:
+    lap = await get_db().f1_lap_times.find_one({"id": time_id}, {"_id": 0, "challenge_id": 1})
+    if not lap:
+        raise HTTPException(404, "Lap-Time nicht gefunden")
+    return lap.get("challenge_id")
+
+
 @router.put("/times/{time_id}")
 @router.patch("/times/{time_id}")
 async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(get_current_user)):
+    async with challenge_write(await _lap_challenge_id(time_id)):
+        return await _update_time_locked(time_id, body, me)
+
+
+async def _update_time_locked(time_id: str, body: F1LapTimeUpdate, me: dict):
     db = get_db()
+    # Frisch unter der Sperre: ein Verknüpfen kann die Zeit gerade einem Konto (und der Mitglieder-Regel) gegeben haben.
     existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Lap-Time nicht gefunden")
@@ -1234,6 +1280,11 @@ async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(ge
 
 @router.delete("/times/{time_id}")
 async def delete_time(time_id: str, body: F1LapTimeDelete | None = None, me: dict = Depends(get_current_user)):
+    async with challenge_write(await _lap_challenge_id(time_id)):
+        return await _delete_time_locked(time_id, body, me)
+
+
+async def _delete_time_locked(time_id: str, body: F1LapTimeDelete | None, me: dict):
     db = get_db()
     existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     if not existing:
@@ -1398,7 +1449,16 @@ async def guest_link_preview(gid: str, user_id: str, me: dict = Depends(get_curr
 
 @router.post("/guests/{gid}/link")
 async def link_guest(gid: str, body: F1GuestLink, me: dict = Depends(get_current_user)):
+    known = await get_db().f1_guests.find_one({"id": gid}, {"_id": 0, "challenge_id": 1})
+    if not known:
+        raise HTTPException(status_code=404, detail="Gast nicht gefunden")
+    async with challenge_write(known["challenge_id"]):
+        return await _link_guest_locked(gid, body, me)
+
+
+async def _link_guest_locked(gid: str, body: F1GuestLink, me: dict):
     db = get_db()
+    # Alles frisch unter der Schreib-Sperre: Gast, Veröffentlichung und Begründung.
     guest = await _guest_for_link(db, gid, me)
     cid = guest["challenge_id"]
     if not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
@@ -1425,15 +1485,16 @@ async def link_guest(gid: str, body: F1GuestLink, me: dict = Depends(get_current
             if member_rule:
                 lap_update.update(score_scope="club_reference", moved_by_member_rule=True)
             moved = await db.f1_lap_times.update_many({"challenge_id": cid, "guest_id": gid, "user_id": None}, {"$set": lap_update})
-            async for row in db.f1_queue.find({"challenge_id": cid, "guest_id": gid}, {"_id": 0}):
-                twin = await db.f1_queue.find_one({"challenge_id": cid, "track_id": row.get("track_id"), "user_id": body.user_id}, {"_id": 0})
-                if twin:
-                    # Nie zweimal in der Liste: wer schon am Start ist, bleibt; sonst bleibt der frühere Platz.
-                    keep_guest = row.get("state") == "on_track" or (twin.get("state") != "on_track" and row.get("order", 0) < twin.get("order", 0))
-                    await db.f1_queue.delete_one({"id": twin["id"] if keep_guest else row["id"]})
-                    if not keep_guest:
-                        continue
-                await db.f1_queue.update_one({"id": row["id"]}, {"$set": {"user_id": body.user_id, "guest_id": None}})
+            async with mutation_lock(db, queue_resource(cid), wait_seconds=LAP_WAIT_SECONDS):
+                for row in await db.f1_queue.find({"challenge_id": cid, "guest_id": gid}, {"_id": 0}).to_list(None):
+                    twin = await db.f1_queue.find_one({"challenge_id": cid, "track_id": row.get("track_id"), "user_id": body.user_id}, {"_id": 0})
+                    if twin:
+                        # Nie zweimal in der Liste: wer schon am Start ist, bleibt; sonst bleibt der frühere Platz.
+                        keep_guest = row.get("state") == "on_track" or (twin.get("state") != "on_track" and row.get("order", 0) < twin.get("order", 0))
+                        await db.f1_queue.delete_one({"id": twin["id"] if keep_guest else row["id"]})
+                        if not keep_guest:
+                            continue
+                    await db.f1_queue.update_one({"id": row["id"]}, {"$set": {"user_id": body.user_id, "guest_id": None}})
             await db.f1_guests.update_one({"id": gid}, {"$set": {"linked_user_id": body.user_id, "linked_at": stamp,
                                                                   "linked_by": me["id"], "updated_at": stamp}})
     except MutationLockBusy:
@@ -1565,8 +1626,14 @@ async def get_queue(cid: str, track_id: str | None = None, access: str | None = 
 
 @router.post("/challenges/{cid}/queue")
 async def add_to_queue(cid: str, body: F1QueueCreate, me: dict = Depends(get_current_user)):
-    db = get_db()
     cid = await _resolve_cid(cid)
+    async with challenge_write(cid):
+        return await _add_to_queue_locked(cid, body, me)
+
+
+async def _add_to_queue_locked(cid: str, body: F1QueueCreate, me: dict):
+    db = get_db()
+    # Unter der Schreib-Sperre: ein Gast, der gerade verknüpft wird, landet nicht mehr als Gast in der Liste.
     await _require_f1_result_permission(me, cid)
     if bool(body.user_id) == bool(body.guest_id):
         raise HTTPException(status_code=400, detail="Bitte genau einen Fahrer oder einen Gast wählen.")
