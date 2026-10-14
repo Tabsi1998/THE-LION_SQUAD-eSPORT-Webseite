@@ -8,6 +8,7 @@ badges.py beim Start; ohne Anmeldung gibt es einen klaren Fehler statt einer sti
 from __future__ import annotations
 
 from typing import Awaitable, Callable
+from zoneinfo import ZoneInfo
 
 # Phase B v4.1: Vorfall-Typ -> negative Stufe (Admin, Wertung „nicht erschienen“, Streit, Abbruch).
 NEGATIVE_INCIDENTS = {
@@ -47,6 +48,37 @@ NEGATIVE_INCIDENTS = {
     "setup_jenga":       "neg_setup_jenga",
 }
 
+
+# Farben der Gratulation (#568): je Level, seit Erfolge II (#611) je Material - das Level bleibt der Rückfall.
+LEVEL_COLORS = {1: 0xCD7F32, 2: 0xC0C0C0, 3: 0xFFD700, 4: 0x29B6E8, 5: 0xFF3B30}
+# Erfolge II (#611): Farbe je Material für Einbettungen; das alte Level bleibt als Rückfall.
+MATERIAL_COLORS = {key: int(str(value["color"]).lstrip("#"), 16) for key, value in __import__("achievement_catalog").MATERIALS.items()}
+
+# Sammlungen der Zähler (#616) und der Signale (#678) - die Mitglieder-Aktivität und die Fundstücke lesen sie mit.
+VIENNA = ZoneInfo("Europe/Vienna")
+STATS = "user_achievement_stats"
+SIGNALS = "user_signals"
+# Name → Regeln: höchstens so oft je Tag, nur in dieser Saison (wenn gesetzt), nur in diesen Phasen.
+# ``live``: zählt nur im Augenblick selbst und lässt sich nicht nachmelden (Silvester um Mitternacht, App geöffnet).
+# ``server``: zählt nur der Server selbst, wenn er das Ereignis geprüft hat (Türchen geöffnet) - ein Client kann es nicht melden.
+SIGNAL_RULES: dict[str, dict] = {
+    "halloween_pumpkin": {"per_day": 1, "season": "halloween"},
+    "halloween_bats_scared": {"per_day": 30, "season": "halloween"},
+    "halloween_ghosts_freed": {"per_day": 20, "season": "halloween"},
+    "halloween_cat_petted": {"per_day": 10, "season": "halloween"},
+    "snowflakes_clicked": {"per_day": 200, "season": "snow"},
+    "online_at_new_year": {"per_day": 1, "season": "new_year", "phases": {"pre_countdown", "countdown", "show", "fade"}, "live": True},
+    "konami": {"per_day": 1},
+    "lost_404": {"per_day": 1},
+    "logo_clicks": {"per_day": 100},
+    "explorer_done": {"per_day": 1},
+    "calendar_used": {"per_day": 1},
+    "member_card_added": {"per_day": 1},
+    "app_open": {"per_day": 1, "live": True},
+    "tutorial_done": {"per_day": 1},
+    "advent_door": {"per_day": 24, "season": "advent_calendar", "server": True},
+    "easter_egg": {"per_day": 50, "season": "easter_hunt"},
+}
 
 Evaluator = Callable[..., Awaitable[int]]
 _evaluator: Evaluator | None = None

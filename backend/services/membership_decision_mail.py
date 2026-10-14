@@ -15,7 +15,7 @@ NO_ADDRESS = "no_address"
 async def queue_decision_mail(user: dict | None, *, approved: bool, note: str = "", application_id: str | None = None) -> str:
     """Die Entscheidung in die Mail-Warteschlange legen. Zurück kommt, was passiert ist:
     ``queued``, ``switched_off`` (die Person will keine Mitgliedschafts-Mails) oder ``no_address``."""
-    from routes.phase_ef_routes import render_template
+    from services.mail_templates import render_template
     from services.mail_queue import enqueue_mail
     from services.notification_preferences import email_allowed
 

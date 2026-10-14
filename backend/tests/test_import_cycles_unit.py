@@ -22,7 +22,7 @@ BACKEND = Path(__file__).resolve().parents[1]
 SKIP_DIRS = {"tests", "static", "__pycache__", ".venv", "venv"}
 
 # Grundlinie nach #1420. Vorher: 94 Befunde in Code Scanning.
-MAX_CYCLIC_IMPORTS = 94
+MAX_CYCLIC_IMPORTS = 24
 
 
 def _module_name(path: Path) -> str:

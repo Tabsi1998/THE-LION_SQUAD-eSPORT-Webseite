@@ -95,7 +95,7 @@ async def events_channel(guild: dict | None = None, members: bool = False) -> st
 
 async def note_message(db, tournament_id: str, message_id: str | None, guild_id: str | None = None, members: bool = False) -> None:
     """Eine neue Nachricht des Bots im Thread. Stand bis eben der Endstand zuletzt, muss er wieder nach unten."""
-    from services import discord_bracket
+    from services import discord_bracket_state as discord_bracket
 
     if not message_id:
         return
@@ -225,7 +225,7 @@ async def deliver(db, tournament: dict, message: dict, *, in_thread: dict | None
 async def status_changed(db, tournament: dict, prev: str | None, status: str) -> dict:
     """Ein Statuswechsel eines Turniers: die Meldung (in den Thread), danach das Bracket (#571).
     Ein Fehler im Discord hält den Wechsel nie auf."""
-    from services import discord_bracket
+    from services import discord_bracket_state as discord_bracket
     from services.discord_announcements import TOURNAMENT_STATUS, designed_tournament
 
     if not status or prev == status or not tournament.get("id"):

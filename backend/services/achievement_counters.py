@@ -17,18 +17,14 @@ import logging
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Awaitable, Callable
-from zoneinfo import ZoneInfo
 
 from database import get_db
 from models import now_utc
 from services import achievement_progress
-from services.achievement_core import evaluator
+from services.achievement_core import SIGNAL_RULES, SIGNALS, STATS, VIENNA, evaluator  # noqa: F401 - umgezogen (#1420)
 from services.private_fields import private_projection
 
 logger = logging.getLogger("tls.achievements.counters")
-VIENNA = ZoneInfo("Europe/Vienna")
-STATS = "user_achievement_stats"
-SIGNALS = "user_signals"
 STALE_SECONDS = 600
 LOGO_CLICKS_FOR_TAMER = 20
 
@@ -380,7 +376,7 @@ async def _onboarding(ctx):
 async def _advent(ctx):
     """Die meisten Türchen in einem Advent (#641) - aus den echten Öffnungen, nicht aus dem Signal: „Alle Türchen“
     heißt 24 von 24 im selben Jahr."""
-    from services.advent_calendar import doors_in_best_year
+    from services.season_collections import doors_in_best_year
     return await doors_in_best_year(ctx.db, ctx.user_id)
 
 
@@ -392,7 +388,7 @@ async def _eggs(ctx):
 @counter("easter_hunts_completed", "signal")
 async def _egg_king(ctx):
     """Wie oft jemand bei der Ostereiersuche (#646) alle Eier gefunden hat - aus den Körben, nicht aus dem Signal."""
-    from services.easter_hunt import hunts_completed
+    from services.season_collections import hunts_completed
     return await hunts_completed(ctx.db, ctx.user_id)
 
 
@@ -404,7 +400,7 @@ async def _bats(ctx):
 @counter("season_collectibles_total", "signal")
 async def _collectibles(ctx):
     """Alle Saison-Fundstücke zusammen (#678) - die Liste steht in services/collectibles.py."""
-    from services.collectibles import total_of
+    from services.season_collections import total_of
     return total_of(await ctx.signals())
 
 
@@ -834,27 +830,6 @@ async def reconcile(days: int = 7, limit: int = 5000) -> dict:
 
 # ------------------------------------------------------------------ Signale
 
-# Name → Regeln: höchstens so oft je Tag, nur in dieser Saison (wenn gesetzt), nur in diesen Phasen.
-# ``live``: zählt nur im Augenblick selbst und lässt sich nicht nachmelden (Silvester um Mitternacht, App geöffnet).
-# ``server``: zählt nur der Server selbst, wenn er das Ereignis geprüft hat (Türchen geöffnet) - ein Client kann es nicht melden.
-SIGNAL_RULES: dict[str, dict] = {
-    "halloween_pumpkin": {"per_day": 1, "season": "halloween"},
-    "halloween_bats_scared": {"per_day": 30, "season": "halloween"},
-    "halloween_ghosts_freed": {"per_day": 20, "season": "halloween"},
-    "halloween_cat_petted": {"per_day": 10, "season": "halloween"},
-    "snowflakes_clicked": {"per_day": 200, "season": "snow"},
-    "online_at_new_year": {"per_day": 1, "season": "new_year", "phases": {"pre_countdown", "countdown", "show", "fade"}, "live": True},
-    "konami": {"per_day": 1},
-    "lost_404": {"per_day": 1},
-    "logo_clicks": {"per_day": 100},
-    "explorer_done": {"per_day": 1},
-    "calendar_used": {"per_day": 1},
-    "member_card_added": {"per_day": 1},
-    "app_open": {"per_day": 1, "live": True},
-    "tutorial_done": {"per_day": 1},
-    "advent_door": {"per_day": 24, "season": "advent_calendar", "server": True},
-    "easter_egg": {"per_day": 50, "season": "easter_hunt"},
-}
 # So viele Tage zurück lässt sich nachmelden (#678): wer ohne Anmeldung gesammelt hat, verliert die Woche nicht.
 REPLAY_DAYS = 7
 

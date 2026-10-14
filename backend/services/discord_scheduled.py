@@ -68,7 +68,7 @@ def day_docs(doc: dict) -> list[tuple[str, dict]]:
 
 def scheduled_payload(kind: str, doc: dict, origin: str, now: datetime | None = None) -> dict | None:
     """Was Discord bekommt - reine Rechnung, damit Vorschau und Abgleich dasselbe zeigen."""
-    from services.discord_announcements import plain_text
+    from services.discord_plain_text import plain_text
 
     start = _dt(doc.get("start_date"))
     if not start:

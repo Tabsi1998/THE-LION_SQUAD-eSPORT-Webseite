@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from database import get_db
 from auth import require_area
 from models import now_utc, new_id
-from services.email_delivery import fill_placeholders
+from services.mail_templates import render_template  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
 from services.permissions import user_has_area
 from services.stream_visibility import homepage_visibility, reason_text
 from services.log_safe import log_safe
@@ -265,18 +265,6 @@ async def admin_reset_template(key: str, me: dict = Depends(require_area("system
         return await reset_template(get_db(), key, DEFAULT_EMAIL_TEMPLATES)
     except ValueError as exc:
         raise HTTPException(404, str(exc))
-
-
-async def render_template(key: str, vars_: dict, fallback_subject: str = "", fallback_html: str = "") -> tuple[str, str]:
-    """Vorlage aus der Datenbank (oder der Ersatztext des Aufrufers) mit `{{var}}`-Werten: im HTML jeder Wert als
-    Text, im Betreff einzeilig (services/email_delivery). Werte gehören deshalb immer als `{{var}}` in den
-    Ersatztext, nie direkt hineingeschrieben."""
-    db = get_db()
-    t = await db.email_templates.find_one({"key": key}, {"_id": 0})
-    subj = (t and t.get("subject")) or fallback_subject
-    html = (t and t.get("html")) or fallback_html
-    values = vars_ or {}
-    return fill_placeholders(subj, values, as_html=False), fill_placeholders(html, values, as_html=True)
 
 
 # ============= Discord Counter (manual mods +1) =============

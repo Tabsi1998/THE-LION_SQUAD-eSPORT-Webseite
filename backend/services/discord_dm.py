@@ -53,7 +53,7 @@ MATERIAL_LINES = {
 def achievement_content(notification: dict, name: str = "") -> dict:
     """Die Gratulation (#568): persönlich, kurz, mit Erfolgsnamen, Punkten, einem Satz und der Farbe des wertvollsten
     Materials (#622) und Weg zum Profil; bei „Legendär“ die Teilen-Karte als Bild, wenn sie geteilt werden darf."""
-    from services.achievement_queue import LEVEL_COLORS, MATERIAL_COLORS
+    from services.achievement_core import LEVEL_COLORS, MATERIAL_COLORS
 
     meta = notification.get("meta") or {}
     awards = [award for award in (meta.get("awards") or []) if award.get("name")]

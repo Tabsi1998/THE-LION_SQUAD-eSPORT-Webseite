@@ -22,12 +22,11 @@ from fastapi import HTTPException
 from models import new_id, now_utc
 from services import season_raffles as raffles
 from services import seasons
+from services.season_collections import DOORS, OPENINGS, doors_in_best_year  # noqa: F401 - umgezogen (#1420)
 
 SEASON = "advent_calendar"
-DOORS = 24
 DOOR_DAYS = tuple(range(1, DOORS + 1))
 DOOR_COLLECTION = "advent_doors"
-OPENINGS = "advent_openings"
 VIEWS = "advent_views"
 SIGNAL = "advent_door"
 
@@ -230,7 +229,7 @@ def _link(door: dict) -> dict | None:
 
 
 async def _news_card(db, ref: str, viewer: dict | None) -> dict | None:
-    from routes.news_routes import _published_now
+    from services.news_publish import published_now as _published_now
     from services.visibility import user_can_see
 
     post = await db.news_posts.find_one({"id": ref}, {"_id": 0, "id": 1, "slug": 1, "title": 1, "excerpt": 1, "banner_url": 1, "published": 1, "published_at": 1, "visibility": 1})
@@ -470,9 +469,9 @@ async def _count_for_achievements(user_id: str) -> int:
 
     try:
         await counters.record_signal(user_id, SIGNAL, 1, trusted=True)
-        from badges import evaluate_user_progress
+        from services.achievement_core import evaluator
 
-        return int(await evaluate_user_progress(user_id, {"signal"}, legacy=False) or 0)
+        return int(await evaluator()(user_id, {"signal"}, legacy=False) or 0)
     except Exception:  # noqa: BLE001 - ein Türchen scheitert nie an den Erfolgen
         import logging
 
@@ -705,9 +704,3 @@ async def editor_options(db) -> dict:
 
 
 # ------------------------------------------------------------------ Für die Erfolge und den Datenschutz
-
-async def doors_in_best_year(db, user_id: str) -> int:
-    """Die meisten Türchen in einem Advent - „Alle Türchen“ heißt 24 von 24 im selben Jahr."""
-    rows = await db[OPENINGS].find({"user_id": user_id}, {"_id": 0, "year": 1}).to_list(DOORS * 100)
-    per_year = Counter(int(row.get("year") or 0) for row in rows)
-    return max(per_year.values(), default=0)
