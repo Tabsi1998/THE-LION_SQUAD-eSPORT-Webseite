@@ -242,6 +242,56 @@ async def test_sending_posts_once_per_server_with_footer_log_and_audit(flow, bot
 
 
 @pytest.mark.asyncio
+async def test_sending_from_discord_checks_the_permission_again_at_the_confirmation(flow, bot):
+    """#1045: zwischen Vorschau und „Senden“ vergehen bis zu fünf Minuten. Gesendet wird nur, wenn dieselbe Person
+    beim Bestätigen noch verteilen darf - über dasselbe verknüpfte Konto wie bei der Vorschau."""
+    await setup(flow, bot)
+    referee = await flow.add_user(role="tournament_admin", name="schiri")
+    other = await flow.add_user(role="tournament_admin", name="andere")
+    await link(flow, referee, "11")
+
+    async def draft():
+        made = await discord_distribute.draft_from_discord(flow.db, "11", "Server-Wartung heute ab 20 Uhr.", "community", author="Schiri Sam")
+        assert made["ok"] and made["sendable"]
+        return made
+
+    async def audits():
+        return await flow.db.audit_logs.count_documents({"action": "discord.distribute"})
+
+    # Noch berechtigt: es geht hinaus, wie bisher.
+    sent = await discord_distribute.send_draft(flow.db, "11", await draft())
+    assert sent.startswith("Gesendet an 2 Server") and len(bot.posted) == 2 and await audits() == 1
+    bot.posted.clear()
+
+    # Rolle inzwischen weg, gesperrt oder deaktiviert: nichts geht hinaus, kein Eintrag.
+    for change, undo in (({"role": "player"}, {"role": "tournament_admin"}), ({"is_banned": True}, {"is_banned": False}),
+                         ({"is_active": False}, {"is_active": True})):
+        pending = await draft()
+        await flow.db.users.update_one({"id": referee["id"]}, {"$set": change})
+        assert await discord_distribute.send_draft(flow.db, "11", pending) == discord_distribute.NOT_STAFF, change
+        assert bot.posted == [] and await audits() == 1, change
+        await flow.db.users.update_one({"id": referee["id"]}, {"$set": undo})
+
+    # Verknüpfung inzwischen gelöst oder auf ein anderes Konto umgezogen: ebenso nicht.
+    pending = await draft()
+    await flow.db.platform_links.delete_many({"external_id": "11"})
+    assert await discord_distribute.send_draft(flow.db, "11", pending) == discord_distribute.NOT_STAFF
+    await link(flow, other, "11")
+    assert await discord_distribute.send_draft(flow.db, "11", pending) == discord_distribute.NOT_STAFF
+    assert bot.posted == [] and await audits() == 1
+
+    # Gegenprobe: eine frische Vorschau des neuen Kontos geht hinaus.
+    assert (await discord_distribute.send_draft(flow.db, "11", await draft())).startswith("Gesendet an 2 Server")
+
+
+def test_the_discord_confirmation_sends_through_the_checked_path():
+    """Wächter zu #1045: der Knopf „Senden“ im Bot ruft ``send_draft`` (prüft erneut), nie ``send`` direkt."""
+    source = pathlib.Path(discord_bot.__file__).read_text(encoding="utf-8")
+    assert "discord_distribute.send_draft(" in source
+    assert "discord_distribute.send(" not in source
+
+
+@pytest.mark.asyncio
 async def test_the_admin_form_previews_first_and_sends_on_the_second_call(flow, bot):
     await setup(flow, bot)
     options = (await flow.get("/api/settings/discord/distribute")).json()
