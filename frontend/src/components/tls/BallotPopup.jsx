@@ -13,6 +13,27 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 const QUIET_PREFIXES = ["/admin", "/display", "/setup", "/consent"];
 
+const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+/**
+ * Die Antwort des Servers in eine sichere Form (#986): nur echte Listen, nur Abstimmungen mit Kennung, Antworten mit
+ * Code und Stimmrechte als Objekte. Eine kaputte Antwort heißt „keine Abstimmung“ statt eines Absturzes.
+ */
+export function normalizeBallots(data) {
+  const ballots = Array.isArray(data?.ballots) ? data.ballots : [];
+  return {
+    poll_seconds: Number(data?.poll_seconds) || 0,
+    ballots: ballots
+      .filter((ballot) => isObject(ballot) && ballot.id != null && ballot.id !== "")
+      .map((ballot) => ({
+        ...ballot,
+        question: typeof ballot.question === "string" ? ballot.question : "",
+        options: (Array.isArray(ballot.options) ? ballot.options : []).filter((option) => isObject(option) && option.code != null && option.code !== ""),
+        rights: (Array.isArray(ballot.rights) ? ballot.rights : []).filter((right) => isObject(right) && right.right_id != null),
+      })),
+  };
+}
+
 export function rightLabel(right) {
   return right.for === "proxy" ? `Vollmacht für ${right.name || "ein Mitglied"}` : "Deine Stimme";
 }
@@ -49,7 +70,7 @@ export function BallotPopup({ quietPrefixes = QUIET_PREFIXES }) {
     if (!active) return;
     try {
       const { data } = await api.get("/membership/me/ballots/open");
-      setView(data);
+      setView(normalizeBallots(data));
     } catch {
       // still: ein Fehler beim Nachsehen soll keine Seite stören
     }
@@ -70,6 +91,7 @@ export function BallotPopup({ quietPrefixes = QUIET_PREFIXES }) {
   const pending = view.ballots.filter((ballot) => !later.has(ballot.id));
   const ballot = pending[0] || null;
   const waiting = view.ballots.filter((item) => later.has(item.id) && item.can_vote);
+  const usable = Boolean(ballot && ballot.options.length && ballot.rights.some((right) => right.can_use));
 
   const postpone = (id) => {
     setLater((current) => new Set([...current, id]));
@@ -119,6 +141,11 @@ export function BallotPopup({ quietPrefixes = QUIET_PREFIXES }) {
             ) : (
               <>
                 <p className="text-xs text-white/55" data-testid="ballot-popup-open-note">Offene Abstimmung: Deine Stimme wird mit deinem Namen gespeichert. Eine Stimme lässt sich nicht ändern.</p>
+                {!usable ? (
+                  <p className="text-sm text-white/75" role="status" data-testid="ballot-popup-unusable">
+                    Diese Abstimmung lässt sich hier gerade nicht anzeigen. Lade die Seite neu oder wende dich an die Versammlungsleitung.
+                  </p>
+                ) : null}
                 <div className="space-y-4">
                   {ballot.rights.filter((right) => right.can_use).map((right) => (
                     <Choice key={right.right_id} ballot={ballot} right={right} disabled={busy} chosen={chosen[`${ballot.id}:${right.right_id}`]}
