@@ -314,7 +314,7 @@ export default function AdminF1EditPage() {
       </div>
 
       {locked && (
-        <div data-testid="f1-published-lock" className="mb-5 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 text-sm text-white/80">
+        <div data-testid="f1-published-lock" className="mb-5 border border-honor/30 bg-honor/5 rounded-sm p-3 text-sm text-white/80">
           Ergebnisse veröffentlicht: Zeiten sind gesperrt. Ändern, Nachtragen und Löschen gehen nur noch durch die Turnierleitung mit Begründung - jede Änderung steht im Protokoll.
         </div>
       )}

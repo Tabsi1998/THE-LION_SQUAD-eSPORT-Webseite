@@ -511,7 +511,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
 
   if (locked && !isTournamentLead) {
     return (
-      <div data-testid="fastlap-locked" className="mb-5 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-4 text-sm text-white/75">
+      <div data-testid="fastlap-locked" className="mb-5 border border-honor/30 bg-honor/5 rounded-sm p-4 text-sm text-white/75">
         Die Ergebnisse sind veröffentlicht. Zeiten ändert jetzt nur noch die Turnierleitung, mit Begründung.
       </div>
     );
