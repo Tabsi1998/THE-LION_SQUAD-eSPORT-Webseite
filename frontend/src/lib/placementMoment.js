@@ -1,7 +1,8 @@
 // Sieger-Moment und Podest (#1180, #1339): wer nach dem Ende einen Moment bekommt und wie das Treppchen steht.
 // Reine Funktionen - Rangliste und eigene Zeile (`is_mine`) kommen vom Server, gemerkt wird je Browser.
 
-const FINISHED = new Set(["completed", "results_published", "archived"]);
+// Der Endstand gilt erst mit „Ergebnisse veröffentlicht“ (Statusvertrag); „Beendet“ heißt nur: die Spiele sind durch.
+const CONFIRMED = new Set(["results_published", "archived"]);
 const STORAGE_PREFIX = "tls-placement-moment:";
 
 // Metall nur an Kante und Ziffer (#1339) - die Werte stehen als Farb-Rollen in styles/system.css.
@@ -17,9 +18,9 @@ function flatRows(standings) {
   return list.filter((row) => row && !Array.isArray(row.standings) && row.registration_id);
 }
 
-/** Der eigene Platz 1 bis 3 eines beendeten Turniers - oder `null`. */
+/** Der eigene Platz 1 bis 3 eines Turniers mit veröffentlichten Ergebnissen - oder `null`. */
 export function placementFor(tournament, standings) {
-  if (!tournament || !FINISHED.has(String(tournament.status || ""))) return null;
+  if (!tournament || !CONFIRMED.has(String(tournament.status || ""))) return null;
   const mine = flatRows(standings).find((row) => row.is_mine);
   const rank = Number(mine?.rank);
   const look = PLACEMENT_LOOKS[rank];

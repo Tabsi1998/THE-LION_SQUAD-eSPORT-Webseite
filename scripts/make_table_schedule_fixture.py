@@ -159,7 +159,8 @@ async def finished(flow):
             seeds = {r["id"]: r.get("seed") or 99 for r in regs}
             winner, loser = sorted(filled, key=lambda rid: seeds[rid])
             await report(flow, staff, match, winner, loser, scores=(2, 0))
-    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"status": "completed"}})
+    # Endstand bestätigt (Statusvertrag): erst „Ergebnisse veröffentlicht“ löst den Sieger-Moment aus.
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"status": "results_published"}})
     champion_id = sorted(regs, key=lambda r: r.get("seed") or 99)[0]["id"]
     viewer = users[[r["id"] for r in regs].index(champion_id)]
     return await read(flow, tournament, viewer, "standings", "bracket")
@@ -168,7 +169,7 @@ async def finished(flow):
 async def main():
     out = {"_info": ("Erzeugt von scripts/make_table_schedule_fixture.py mit den echten Generatoren und Routen (#1562): Liga mit "
                      "6 (zwei Spieltage, Unentschieden, Pfeile), Gruppen mit 8 und mit 64 (8 Gruppen, Worst-Case-Namen), K.-o. vor "
-                     "Ort mit Planer und Stationen (ein Spiel läuft, eins fertig), beendeter K.-o. mit 8 (Podest). "
+                     "Ort mit Planer und Stationen (ein Spiel läuft, eins fertig), beendeter K.-o. mit 8 und veröffentlichten Ergebnissen (Podest). "
                      "Nicht von Hand ändern - neu erzeugen.")}
     for key, build in [("league", league), ("groups", lambda f: groups(f, 8, 2, "gruppen-cup")),
                        ("groups64", lambda f: groups(f, 64, 8, "gruppen-cup-64")), ("onsite", on_site), ("finished", finished)]:

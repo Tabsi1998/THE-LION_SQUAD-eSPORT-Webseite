@@ -327,3 +327,21 @@ test("beendet: Treppchen mit Platz 1 in der Mitte, der eigene Platz kommt einmal
   await screen.findByTestId("podium");
   expect(ceremonyQueue.getCurrent()).toBeNull();
 });
+
+test("beendet, aber noch nicht veröffentlicht: Podest als „vorläufig“, noch kein Sieger-Moment", async () => {
+  const generated = (await import("../../../e2e/fixtures/tableScheduleGenerated.json")).default;
+  const { ceremonyQueue } = await import("@/components/achievements/ceremony/queue");
+  const { tournament, standings, bracket } = generated.finished;
+  window.localStorage.clear();
+  ceremonyQueue.clear();
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...tournament, status: "completed", slug: "cup", id: "t1" } });
+    if (path === "/tournaments/t1/registrations") return Promise.resolve({ data: bracket.registrations });
+    if (path === "/tournaments/t1/standings") return Promise.resolve({ data: standings });
+    return Promise.resolve({ data: [] });
+  });
+  renderPage();
+  await screen.findByTestId("podium");
+  expect(screen.getByTestId("podium-provisional")).toHaveTextContent("vorläufig");
+  expect(ceremonyQueue.getCurrent()).toBeNull();
+});

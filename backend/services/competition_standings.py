@@ -115,6 +115,8 @@ def stage_standings(matches: list[dict], registrations: list[dict]) -> list[dict
     rank_map = {
         registration["id"]: {
             "registration_id": registration["id"],
+            # Team-Kennung wie in der öffentlichen Anmeldung (#1593): „mit deinem Team“ auch im K.-o.
+            "team_id": registration.get("team_id"),
             "display_name": _display_name(registration),
             "played": 0,
             "won": 0,
@@ -176,6 +178,7 @@ def elimination_standings(matches: list[dict], registrations: list[dict]) -> lis
     rank_map = {
         registration["id"]: {
             "registration_id": registration["id"],
+            "team_id": registration.get("team_id"),
             "display_name": _display_name(registration),
             "furthest_round": 0,
             "wins": 0,
@@ -268,9 +271,7 @@ def _round_robin_rows(matches: list[dict], registrations: list[dict]) -> list[di
     rows = list(stats.values())
     for row in rows:
         row["score_diff"] = row["score_for"] - row["score_against"]
-    rows.sort(key=lambda row: (row["points"], row["won"], row["score_diff"]), reverse=True)
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
+    _rank_with_ties(rows, lambda row: (row["points"], row["won"], row["score_diff"]))
     return rows
 
 
@@ -281,6 +282,21 @@ def round_robin_standings(matches: list[dict], registrations: list[dict]) -> lis
 
 def swiss_standings(matches: list[dict], registrations: list[dict]) -> list[dict]:
     return _with_form_and_movement(_swiss_rows, matches, registrations)
+
+
+def _rank_with_ties(rows: list[dict], key) -> None:
+    """Wettbewerbsrang (#1593): wer in jedem Kriterium gleich steht, teilt den Platz - 1, 2, 2, 4.
+
+    Sonst hinge der Platz an der Reihenfolge der Anmeldungen, und Podest und Pfeile wären zufällig.
+    """
+    rows.sort(key=key, reverse=True)
+    previous = None
+    for index, row in enumerate(rows, start=1):
+        value = key(row)
+        if value != previous:
+            rank = index
+            previous = value
+        row["rank"] = rank
 
 
 FORM_LENGTH = 5
@@ -386,9 +402,7 @@ def _swiss_rows(matches: list[dict], registrations: list[dict]) -> list[dict]:
         row["buchholz"] = sum(stats[opponent]["points"] for opponent in row["opponents"] if opponent in stats)
         row.pop("opponents", None)
     rows = list(stats.values())
-    rows.sort(key=lambda row: (row["points"], row["buchholz"], row["won"]), reverse=True)
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
+    _rank_with_ties(rows, lambda row: (row["points"], row["buchholz"], row["won"]))
     return rows
 
 

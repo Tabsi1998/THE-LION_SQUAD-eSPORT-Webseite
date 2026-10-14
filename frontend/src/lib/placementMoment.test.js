@@ -29,6 +29,10 @@ test("Platz 2 und 3 still in Silber und Bronze, Platz 4 bekommt nichts", () => {
 
 test("vor dem Ende, ohne eigene Zeile oder bei Gruppentabellen gibt es keinen Moment", () => {
   expect(placementFor({ ...tournament, status: "live" }, standings)).toBeNull();
+  // „Beendet“ ist noch nicht der bestätigte Endstand - erst „Ergebnisse veröffentlicht“ (Statusvertrag).
+  expect(placementFor({ ...tournament, status: "completed" }, standings)).toBeNull();
+  expect(placementFor({ ...tournament, status: "results_published" }, standings)).not.toBeNull();
+  expect(placementFor({ ...tournament, status: "archived" }, standings)).not.toBeNull();
   expect(placementFor(tournament, standings.map(({ is_mine: _mine, ...row }) => row))).toBeNull();
   expect(placementFor(fixture.groups.tournament, fixture.groups.standings)).toBeNull();
 });

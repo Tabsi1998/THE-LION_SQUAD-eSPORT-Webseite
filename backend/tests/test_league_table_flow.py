@@ -204,3 +204,111 @@ async def test_each_group_table_has_form_movement_and_the_own_row(flow):
     rows = [row for entry in groups for row in entry["standings"]]
     assert all(row["form"] and "previous_rank" in row and "score_diff" in row for row in rows)
     assert [row["registration_id"] for row in rows if row.get("is_mine")] == [registrations[0]["id"]]
+
+
+# ---------------------------------------------------------------- Gleichstand (Codex-Befund zu #1593)
+
+async def report(flow, staff, match, first_score, second_score):
+    first, second = [slot["registration_id"] for slot in match["slots"]]
+    flow.act_as(staff)
+    draw = first_score == second_score
+    response = await flow.post(f"/api/matches/{match['id']}/result", json={"results": [
+        {"registration_id": first, "rank": 1, "score": first_score},
+        {"registration_id": second, "rank": 1 if draw else 2, "score": second_score},
+    ]})
+    assert response.status_code == 200, response.text
+    return first, second
+
+
+def round_matches(matches, round_number):
+    return sorted([m for m in matches if int(m.get("round") or 0) == round_number], key=lambda m: m.get("order") or 0)
+
+
+@pytest.mark.asyncio
+async def test_rows_equal_in_every_criterion_share_their_place(flow):
+    staff, tournament, _users, _regs = await league_of(flow)
+    for match in round_matches(await flow.matches(tournament), 1):
+        await report(flow, staff, match, 3, 1)
+
+    rows = await table(flow, tournament)
+
+    # Zwei Sieger mit 3:1, zwei Verlierer mit 1:3 - Wettbewerbsrang 1, 1, 3, 3 statt 1, 2, 3, 4 nach Zufall.
+    assert sorted(row["rank"] for row in rows.values()) == [1, 1, 3, 3]
+
+
+@pytest.mark.asyncio
+async def test_a_tie_on_place_three_is_shared_and_the_next_place_skips(flow):
+    staff, tournament, _users, _regs = await league_of(flow, count=6)
+    clear, close, level = round_matches(await flow.matches(tournament), 1)
+    clear_winner, _ = await report(flow, staff, clear, 3, 0)
+    close_winner, _ = await report(flow, staff, close, 3, 1)
+    drawn = await report(flow, staff, level, 1, 1)
+
+    rows = await table(flow, tournament)
+
+    assert rows[clear_winner]["rank"] == 1
+    assert rows[close_winner]["rank"] == 2
+    assert [rows[rid]["rank"] for rid in drawn] == [3, 3]
+    assert sorted(row["rank"] for row in rows.values()) == [1, 2, 3, 3, 5, 6]
+
+
+@pytest.mark.asyncio
+async def test_the_movement_uses_the_shared_places_of_the_previous_matchday(flow):
+    staff, tournament, _users, _regs = await league_of(flow)
+    for match in round_matches(await flow.matches(tournament), 1):
+        await report(flow, staff, match, 3, 1)
+    after_first = await table(flow, tournament)
+    assert sorted(row["rank"] for row in after_first.values()) == [1, 1, 3, 3]
+    for match in round_matches(await flow.matches(tournament), 2):
+        await report(flow, staff, match, 2, 0)
+
+    after_second = await table(flow, tournament)
+
+    assert {rid: row["previous_rank"] for rid, row in after_second.items()} == {rid: row["rank"] for rid, row in after_first.items()}
+
+
+@pytest.mark.asyncio
+async def test_a_swiss_table_shares_places_too(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(4, format="swiss")
+    await flow.start(tournament)
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/swiss/next-round")
+    assert response.status_code == 200, response.text
+    for match in round_matches(await flow.matches(tournament), 1):
+        await report(flow, staff, match, 2, 0)
+
+    rows = await table(flow, tournament)
+
+    assert sorted(row["rank"] for row in rows.values()) == [1, 1, 3, 3]
+
+
+@pytest.mark.asyncio
+async def test_a_knockout_team_row_says_it_is_a_team(flow):
+    """Sieger-Moment „mit deinem Team“: auch im K.-o. trägt die eigene Zeile die Team-Kennung (öffentlich wie in der Anmeldung)."""
+    staff = await flow.add_staff()
+    member = await flow.add_user(name="Mitglied")
+    flow.act_as(staff)
+    tournament = await flow.create_tournament(format="single_elim", team_mode="team", team_size=2, max_participants=4)
+    team_ids = []
+    for index in range(4):
+        team_id = new_id()
+        team_ids.append(team_id)
+        await flow.db.teams.insert_one({"id": team_id, "name": f"Team {index + 1}", "member_ids": []})
+        if index == 0:
+            await flow.db.team_members.insert_one({"team_id": team_id, "user_id": member["id"], "role": "member"})
+        await flow.db.tournament_registrations.insert_one({
+            "id": new_id(), "tournament_id": tournament["id"], "team_id": team_id,
+            "display_name": f"Team {index + 1}", "status": "approved", "seed": index + 1})
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false")
+    assert response.status_code == 200, response.text
+    await flow.start(tournament)
+    for match in round_matches(await flow.matches(tournament), 1):
+        await report(flow, staff, match, 2, 0)
+
+    flow.act_as(member)
+    rows = await table(flow, tournament)
+
+    mine = [row for row in rows.values() if row.get("is_mine")]
+    assert len(mine) == 1 and mine[0]["team_id"] == team_ids[0]
+    assert all(row.get("team_id") in team_ids for row in rows.values())

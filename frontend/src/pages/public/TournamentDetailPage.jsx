@@ -359,7 +359,11 @@ function TournamentDetailView() {
           {podiumRows.length > 0 && (
             <section>
               <h2 className="font-heading text-2xl font-bold uppercase mb-8 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Podest</h2>
-              {/* Das Treppchen (#1339) - das Bild, das nach dem Sieger-Moment stehen bleibt. */}
+              {/* Das Treppchen (#1339) - das Bild, das nach dem Sieger-Moment stehen bleibt. Vor „Ergebnisse
+                  veröffentlicht“ ist der Stand noch nicht bestätigt: dann steht es als „vorläufig“ da. */}
+              {t.status === "completed" && (
+                <p className="-mt-5 mb-6 text-sm text-white/55" data-testid="podium-provisional">Stand vorläufig – die Turnierleitung bestätigt die Ergebnisse noch.</p>
+              )}
               <Podium rows={podiumRows} registrations={regs} />
             </section>
           )}
