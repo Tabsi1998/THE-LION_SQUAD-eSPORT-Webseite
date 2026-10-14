@@ -16,8 +16,8 @@ from datetime import datetime, timedelta, timezone
 from models import now_utc
 from services import dolibarr_identity, dolibarr_meetings
 from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key, load_settings
+from services.dolibarr_ballot_state import STATE_ID, feed_state, load_state  # noqa: F401 - umgezogen (#1420)
 
-STATE_ID = "dolibarr_ballot_watch"
 MIN_VERSION = (1, 7, 0)
 LIVE_SECONDS = 5
 IDLE_SECONDS = 60
@@ -58,10 +58,6 @@ async def _notify_opened(db, user_ids: list[str], ballot_ids: set[int]) -> int:
                                                   meta={"dedupe_key": f"ballot:{ballot['id']}", "ballot_id": ballot["id"]})
             sent += 1 if note else 0
     return sent
-
-
-async def load_state(db) -> dict:
-    return await db.settings.find_one({"id": STATE_ID}, {"_id": 0}) or {"id": STATE_ID}
 
 
 async def poll(db, *, now=None) -> dict:
@@ -119,8 +115,3 @@ async def poll(db, *, now=None) -> dict:
 async def run_due() -> dict:
     from database import get_db
     return await poll(get_db())
-
-
-async def feed_state(db) -> str:
-    """„ok“, „forbidden“ oder „error“ - ohne Feed fragen offene Seiten am Versammlungstag selbst nach."""
-    return str((await load_state(db)).get("feed") or "")

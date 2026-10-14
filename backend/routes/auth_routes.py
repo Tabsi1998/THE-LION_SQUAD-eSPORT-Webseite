@@ -1019,7 +1019,7 @@ async def mobile_login(body: UserLogin, request: Request):
 
 async def _passkey_enroll_ticket(db, user_id: str) -> str | None:
     """Gerade mit Passwort angemeldet (#919): die App darf ohne neue Passworteingabe einen Passkey anlegen."""
-    from routes.passkey_routes import issue_enroll_ticket
+    from services.passkey_config import issue_enroll_ticket
 
     try:
         return await issue_enroll_ticket(db, user_id)

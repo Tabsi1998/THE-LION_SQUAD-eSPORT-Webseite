@@ -68,4 +68,7 @@ async def main(argv: list[str] | None = None, *, db=None, out=None, err=None) ->
 
 
 if __name__ == "__main__":
+    from services.bootstrap import ensure_wiring
+
+    ensure_wiring()  # Anmeldungen beim Import (#1420), siehe services/bootstrap.py
     raise SystemExit(asyncio.run(main()))

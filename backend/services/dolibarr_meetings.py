@@ -246,7 +246,7 @@ async def open_ballots(db, user: dict, *, today: date | None = None) -> dict:
     shown = [ballot for ballot in views if ballot["status"] == "open"
              and (ballot["can_vote"] or (ballot["secret"] and any(right["state"] == "open" for right in ballot["rights"])))]
     live = any(ballot["day"] == now and ballot["status"] in ("released", "open") for ballot in views)
-    from services import dolibarr_ballot_watch
+    from services import dolibarr_ballot_state as dolibarr_ballot_watch
 
     poll = (60 if await dolibarr_ballot_watch.feed_state(db) == "ok" else 15) if live else 0
     return {"available": True, "ballots": shown, "live": live, "poll_seconds": poll}

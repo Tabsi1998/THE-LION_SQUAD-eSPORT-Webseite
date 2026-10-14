@@ -31,7 +31,7 @@ CROSSREF_TEXT_MAX = 200
 
 def routable(event_key: str) -> bool:
     """Kann diese Ereignisart einen Spielbezug haben (und ist sie öffentlich)?"""
-    from discord_service import EVENTS, PRIVATE_TARGETS
+    from services.discord_targets import EVENTS, PRIVATE_TARGETS
 
     spec = EVENTS.get(event_key) or {}
     return bool(spec.get("game")) and spec.get("target") not in PRIVATE_TARGETS
@@ -61,7 +61,7 @@ async def game_of(db, item: dict | None) -> dict | None:
 async def plan(db, cfg: dict, event_key: str, item: dict | None, target: str) -> dict:
     """Wohin diese Meldung geht. ``game``: der Spielserver (Eintrag), der sie voll bekommt, oder None; ``main``:
     "full", "crossref" oder None; ``reason``: warum es beim Hauptserver bleibt."""
-    from discord_service import PRIVATE_TARGETS, resolve_target
+    from services.discord_targets import PRIVATE_TARGETS, resolve_target
     from services.discord_guild_store import guild_for_game
 
     rule = rule_for(cfg, event_key)

@@ -55,7 +55,7 @@ async def note_document_open(db, user: dict | None, doc_id: str) -> bool:
 
 async def note_profile_completion(db, user_id: str) -> bool:
     """Ist das Profil jetzt vollständig und war es das noch nie, den Zeitpunkt festhalten - True, wenn gerade gesetzt."""
-    from badges import PROFILE_FIELDS, compute_profile_completeness
+    from services.achievement_progress import PROFILE_FIELDS, compute_profile_completeness
 
     projection = {"_id": 0, "id": 1, "profile_completed_at": 1, **{key: 1 for key, _weight in PROFILE_FIELDS}}
     user = await db.users.find_one({"id": user_id}, projection)
@@ -150,7 +150,7 @@ async def admitted_meetings(db, user_id: str, member_id: int | None = None) -> s
 async def _keep(db, user_id: str, numbers: dict, stamp: str, reason: str, *, always: bool = False) -> bool:
     """Zahlen in den Stand der Zähler schreiben - True, wenn sich eine geändert hat; dann wird ausgewertet. Ohne
     Änderung wird nichts geschrieben, außer ``always``: dann wandert nur der Zeitpunkt „zuletzt gelesen“ weiter."""
-    from services.achievement_counters import STATS
+    from services.achievement_core import STATS
 
     doc = await db[STATS].find_one({"user_id": user_id}, {"_id": 0, RECORD: 1}) or {}
     current = doc.get(RECORD) or {}
@@ -196,7 +196,7 @@ async def refresh_due(db=None) -> dict:
     Recht, hört der Lauf auf und der letzte Stand bleibt."""
     from database import get_db
     from services import dolibarr_identity
-    from services.achievement_counters import STATS
+    from services.achievement_core import STATS
     from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings
     from services.dolibarr_participations import members_by_user
     from services.membership_service import ACTIVE_STATUSES

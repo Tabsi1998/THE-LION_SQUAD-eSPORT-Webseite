@@ -60,7 +60,7 @@ def summarize(payload: dict | None) -> dict:
 
 async def guild_id(db) -> str:
     """Die Server-ID: eingetragen unter „Discord-Bot“, sonst der Server, mit dem der Bot verbunden ist."""
-    from services.discord_bot import bot_settings, read_state
+    from services.discord_runtime import bot_settings, read_state
 
     settings = await db.settings.find_one({"id": "discord"}, {"_id": 0, "bot_guild_id": 1}) or {}
     configured = bot_settings(settings)["guild_id"]

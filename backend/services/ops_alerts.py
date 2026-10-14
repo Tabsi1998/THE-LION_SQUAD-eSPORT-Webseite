@@ -176,7 +176,7 @@ async def notify(db, kind: str, title: str, description: str = "", fields: list[
             logger.warning("[ops] Discord-Alarm %s fehlgeschlagen", alert_key, exc_info=True)
     if rule.get("email") and settings["emails"] and (spec is None or spec.get("email_allowed") is not False):
         try:
-            from services.mail_queue import enqueue_mail
+            from services.mail_outbox import enqueue_mail
 
             for address in settings["emails"]:
                 await enqueue_mail(address, f"[Betrieb] {title}"[:180], _mail_html(title, description, fields), template_key="ops_alert",
@@ -220,7 +220,7 @@ async def send_test_alert(db) -> dict:
         except Exception:  # noqa: BLE001
             logger.warning("[ops] Test-Alarm Discord fehlgeschlagen", exc_info=True)
     if any_email:
-        from services.mail_queue import enqueue_mail
+        from services.mail_outbox import enqueue_mail
 
         for address in settings["emails"]:
             await enqueue_mail(address, "[Betrieb] Testalarm", _mail_html("Testalarm aus Betrieb → Alarme", "Wenn diese Mail ankommt, passen Adresse und Versand.", fields),

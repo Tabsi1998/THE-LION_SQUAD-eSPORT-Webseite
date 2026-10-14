@@ -1332,7 +1332,7 @@ async def update_smtp_settings(body: SmtpSettings, me: dict = Depends(require_cl
 
 @settings_router.post("/smtp/test")
 async def smtp_send_test(body: TestEmailBody, me: dict = Depends(require_club_admin())):
-    from services.mail_queue import smtp_test
+    from email_service import smtp_test
     return await smtp_test(body.to)
 
 

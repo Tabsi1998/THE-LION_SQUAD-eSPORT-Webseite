@@ -242,6 +242,9 @@ async def main():
 
 
 if __name__ == "__main__":
+    from services.bootstrap import ensure_wiring
+
+    ensure_wiring()  # Anmeldungen beim Import (#1420), siehe services/bootstrap.py
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

@@ -16,10 +16,11 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from models import now_utc
 from services import event_days
+from services.discord_runtime import _dt  # umgezogen (#1420), hier weiter erreichbar
 
 logger = logging.getLogger("tls.discord.scheduled")
 
@@ -47,19 +48,6 @@ REASON_TEXTS = {
 }
 
 
-def _dt(value) -> datetime | None:
-    if not value:
-        return None
-    if isinstance(value, datetime):
-        parsed = value
-    else:
-        try:
-            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        except ValueError:
-            return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
-
-
 def _settings_view(discord_settings: dict | None) -> dict:
     stored = (discord_settings or {}).get(SETTINGS_KEY) if isinstance((discord_settings or {}).get(SETTINGS_KEY), dict) else {}
     return {"enabled": bool(stored.get("enabled")), "internal": bool(stored.get("internal")),
@@ -80,7 +68,7 @@ def day_docs(doc: dict) -> list[tuple[str, dict]]:
 
 def scheduled_payload(kind: str, doc: dict, origin: str, now: datetime | None = None) -> dict | None:
     """Was Discord bekommt - reine Rechnung, damit Vorschau und Abgleich dasselbe zeigen."""
-    from services.discord_announcements import plain_text
+    from services.discord_plain_text import plain_text
 
     start = _dt(doc.get("start_date"))
     if not start:
@@ -242,7 +230,7 @@ async def _plan(db, kind: str, doc: dict, cfg: dict, origin: str, now: datetime)
 async def sync(db, *, now: datetime | None = None, limit: int = MAX_OPS_PER_RUN) -> dict:
     """Abgleich: anlegen, ändern, absagen - je Server, höchstens ``limit`` Aufrufe je Lauf (Discord-Limits).
     Der Hauptserver steht wie bisher in ``discord_scheduled_event``, Unterserver je Server in ``discord_scheduled_guilds``."""
-    from services.discord_bot import bot, bot_settings
+    from services.discord_runtime import bot, bot_settings
 
     current = now or now_utc()
     settings = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}

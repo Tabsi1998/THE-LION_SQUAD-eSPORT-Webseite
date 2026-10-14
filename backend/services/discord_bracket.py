@@ -30,13 +30,11 @@ import logging
 from datetime import datetime, timedelta
 
 from models import now_utc
+from services.discord_bracket_state import FIELD, GUILD_FIELD, _dirty, _state_at, pending, request_refresh  # noqa: F401 - umgezogen (#1420)
 from services.bracket_common import DONE, LIVE, TABLE_STAGE_TYPES, VIENNA, _dt, _safe_int, _score, round_label, section_label
 
 logger = logging.getLogger("tls.discord.bracket")
 
-FIELD = "discord_bracket_embed"
-# Spielserver (#628): je Server derselbe Stand wie am Hauptserver; welcher Server, sagt die Regel von „Turnier: jetzt live“.
-GUILD_FIELD = "discord_bracket_by_guild"
 ROUTE_KEY = "tournament.live"
 MIN_EDIT_SECONDS = 60
 MAX_FIELDS = 12
@@ -44,16 +42,6 @@ FIELD_LIMIT = 1000
 TOTAL_LIMIT = 5500
 TOP_TABLE = 8
 FINAL_STATUSES = {"completed", "results_published", "archived"}
-_dirty: dict[str, bool] = {}   # Turnier-ID → letzte Fassung („Endstand“) gewünscht
-
-
-def request_refresh(tournament_id: str, *, final: bool = False) -> None:
-    if tournament_id:
-        _dirty[tournament_id] = bool(_dirty.get(tournament_id)) or final
-
-
-def pending() -> dict[str, bool]:
-    return dict(_dirty)
 
 
 def match_line(match: dict, names: dict[str, str]) -> str:
@@ -220,14 +208,6 @@ async def build_with_image(db, tournament: dict, now: datetime | None = None, *,
     return raw, image
 
 
-def _state_at(tournament: dict, field: str) -> dict:
-    """Der gespeicherte Stand einer Bahn - ``discord_bracket_embed`` oder ``discord_bracket_by_guild.<Server>``."""
-    value = tournament
-    for part in field.split("."):
-        value = (value or {}).get(part) if isinstance(value, dict) else None
-    return value if isinstance(value, dict) else {}
-
-
 async def _lanes(db, cfg: dict, tournament: dict, members: bool) -> tuple[list[dict], dict | None]:
     """Wo das Bracket steht (#628): Mitglieder-Turniere im Mitglieder-Thread (#910); sonst nach der Regel von „Turnier:
     jetzt live“ - auf dem Spielserver im Turnier-Thread dort, am Hauptserver nur bei „beide voll“ (sonst steht dort der
@@ -316,7 +296,7 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
 async def _refresh_lane(db, tournament: dict, lane: dict, message, *, force: bool, final: bool, current: datetime) -> dict:
     """Eine Bahn: posten, pinnen, bearbeiten - der Endstand als letzte Nachricht im Thread (#572)."""
     from discord_service import REASON_TEXTS
-    from services.discord_bot import bot
+    from services.discord_runtime import bot
 
     tournament_id = tournament["id"]
     field, thread_id = lane["field"], lane["thread_id"]
