@@ -21,7 +21,7 @@ test.describe.configure({ mode: "serial" });
 async function shot(target, name) {
   if (!SHOTS) return;
   fs.mkdirSync(SHOTS, { recursive: true });
-  await target.screenshot({ path: path.join(SHOTS, `${name}.png`) });
+  await target.screenshot({ path: path.join(SHOTS, `${name}.png`), animations: "disabled" });
 }
 
 async function csrfHeaders(page) {

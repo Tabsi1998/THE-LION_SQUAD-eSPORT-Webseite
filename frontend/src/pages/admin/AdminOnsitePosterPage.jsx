@@ -84,7 +84,7 @@ export default function AdminOnsitePosterPage() {
               <div className="rounded-[6px] border-2 border-[#0A0A0A] p-[2.5%] w-[62%]">
                 <BrandedQRCode value={url} size={440} accent="#0A0A0A" className="!w-full !h-auto [&_svg]:w-full [&_svg]:h-auto" />
               </div>
-              <p className="mt-[4%] font-heading font-black uppercase text-[clamp(22px,5vw,44px)] leading-none">Scannen &amp; mitspielen</p>
+              <p className="mt-[4%] text-center font-heading font-black uppercase text-[clamp(22px,5vw,44px)] leading-none">Scannen &amp; mitspielen</p>
               <p className="mt-3 max-w-[30ch] text-center text-[clamp(13px,2.1vw,19px)] leading-snug text-[#0A0A0A]/75">
                 Auch ohne Vereinsmitgliedschaft. Konto anlegen oder anmelden, dann „Mitspielen“ – Plätze und Warteliste wie immer.
               </p>
