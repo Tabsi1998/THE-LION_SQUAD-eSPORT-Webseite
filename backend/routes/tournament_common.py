@@ -405,6 +405,11 @@ async def _ensure_tournament_unlocked(db, tid: str) -> dict:
     return tournament
 
 
+# Wer als Teilnehmer sein Turnier sieht (#1592): nur aktive Anmeldungen - positiv aufgezählt, damit ein neuer oder
+# unbekannter Status (ausgetreten, disqualifiziert, abgelehnt, storniert …) nie still Sicht gibt.
+PARTICIPANT_STATUSES = frozenset({"pending", "approved", "waitlist", "checked_in"})
+
+
 async def _user_tournament_participation_ids(db, user: dict | None) -> set[str]:
     if not user:
         return set()
@@ -416,7 +421,7 @@ async def _user_tournament_participation_ids(db, user: dict | None) -> set[str]:
         if row.get("team_id")
     ]
     query = {
-        "status": {"$nin": ["rejected", "no_show"]},
+        "status": {"$in": list(PARTICIPANT_STATUSES)},
         "$or": [{"user_id": user["id"]}],
     }
     if team_ids:

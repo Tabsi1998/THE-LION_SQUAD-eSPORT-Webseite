@@ -422,3 +422,29 @@ async def test_participant_does_not_learn_the_hidden_event(flow):
     assert body.get("event_id") is None and "event" not in body
     bracket = (await flow.get(f"/api/tournaments/{tournament['id']}/bracket")).json()
     assert bracket["tournament"].get("event_id") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["rejected", "no_show", "withdrawn", "disqualified", "cancelled", "irgendwas"])
+async def test_only_active_registrations_count_as_participant(flow, status):
+    """Ausgetreten, disqualifiziert, abgelehnt, nicht erschienen, storniert oder unbekannt: keine Sicht mehr (Codex #1597)."""
+    tournament = await members_tournament(flow)
+    user = await guest(flow)
+    await flow.register(tournament, user, status=status)
+    match = {"id": new_id(), "tournament_id": tournament["id"], "round": 1, "status": "ready", "slots": []}
+    await flow.db.matches_v2.insert_one(dict(match))
+    assert (await flow.get(f"/api/tournaments/{tournament['slug']}")).status_code == 403
+    assert (await flow.get(f"/api/tournaments/{tournament['id']}/bracket")).status_code == 403
+    assert (await flow.get(f"/api/matches/{match['id']}")).status_code == 403
+    listed = {row["id"] for row in (await flow.get("/api/tournaments")).json()}
+    assert tournament["id"] not in listed
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["pending", "approved", "waitlist", "checked_in"])
+async def test_active_registrations_see_their_tournament(flow, status):
+    tournament = await members_tournament(flow)
+    user = await guest(flow)
+    await flow.register(tournament, user, status=status)
+    assert (await flow.get(f"/api/tournaments/{tournament['slug']}")).status_code == 200
+    assert (await flow.get(f"/api/tournaments/{tournament['id']}/bracket")).status_code == 200
