@@ -20,7 +20,7 @@ from datetime import timedelta
 
 from database import get_db
 from models import new_id, now_utc
-from services.achievement_core import LEVEL_COLORS, MATERIAL_COLORS, evaluator  # noqa: F401 - Farben umgezogen (#1420)
+from services.achievement_core import evaluator
 
 logger = logging.getLogger("tls.achievements.queue")
 

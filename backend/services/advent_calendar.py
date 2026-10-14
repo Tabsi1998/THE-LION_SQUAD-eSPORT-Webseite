@@ -22,7 +22,7 @@ from fastapi import HTTPException
 from models import new_id, now_utc
 from services import season_raffles as raffles
 from services import seasons
-from services.season_collections import DOORS, OPENINGS, doors_in_best_year  # noqa: F401 - umgezogen (#1420)
+from services.season_collections import DOORS, OPENINGS  # noqa: F401 - umgezogen (#1420)
 
 SEASON = "advent_calendar"
 DOOR_DAYS = tuple(range(1, DOORS + 1))
