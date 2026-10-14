@@ -19,6 +19,7 @@ import pathlib
 import uuid
 from datetime import timedelta
 from io import BytesIO
+from typing import Any, Awaitable, Callable
 
 from fastapi import HTTPException, UploadFile
 from PIL import Image
@@ -239,6 +240,16 @@ async def claim_attachments(db, owner_id: str, attachment_ids: list[str] | None,
     return [public_attachment({**by_id[item], "status": "attached"}) for item in ids]
 
 
+# Wer den Team-, Turnier- oder Match-Chat lesen darf, wissen die Routen dieser Chats. Sie melden ihre Prüfung beim
+# Import hier an (#1420) - so importiert dieser Dienst keine Route. Ohne Anmeldung sieht niemand den Anhang.
+ChatAccess = Callable[[Any, dict, "dict | None"], Awaitable[bool]]
+_CHAT_ACCESS: dict[str, ChatAccess] = {}
+
+
+def register_chat_access(kind: str, check: ChatAccess) -> None:
+    _CHAT_ACCESS[kind] = check
+
+
 async def can_access(attachment: dict, user: dict | None) -> bool:
     """Wer den Chat lesen darf, darf auch seine Anhänge sehen - niemand sonst."""
     # Bildprüfung (#415): bis zum Ergebnis nur Absender und Moderation; entfernt sieht hier niemand.
@@ -255,26 +266,9 @@ async def can_access(attachment: dict, user: dict | None) -> bool:
     db = get_db()
     if kind == "direct":
         return bool(user and user.get("id") in (context.get("user_ids") or []))
-    if kind == "team":
-        from routes.team_routes import _chat_allowed
-
-        team = await db.teams.find_one({"id": context.get("team_id")}, {"_id": 0})
-        return bool(team and _chat_allowed(team, user))
-    if kind == "tournament":
-        from routes.tournament_chat_routes import _can_use_tournament_chat
-
-        tournament = await db.tournaments.find_one({"id": context.get("tournament_id")}, {"_id": 0})
-        return bool(tournament and await _can_use_tournament_chat(tournament, user))
-    if kind == "match":
-        from routes.match_routes import _assert_match_visible, _find_match_any
-
-        try:
-            match, _collection = await _find_match_any(context.get("match_id"))
-            await _assert_match_visible(match, user)
-        except HTTPException:
-            return False
-        return True
-    return False
+    # Team-, Turnier- und Match-Chat: die Route des Chats entscheidet (``register_chat_access``).
+    check = _CHAT_ACCESS.get(kind)
+    return bool(check and await check(db, context, user))
 
 
 def _remove_files(doc: dict) -> None:

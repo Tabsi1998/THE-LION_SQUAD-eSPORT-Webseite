@@ -358,6 +358,7 @@ def wiring() -> Wiring:
         raise RuntimeError("Discord-Bot: Ereignisse nicht angemeldet - services/discord_bot.py wurde nicht geladen")
     return _wiring
 
+
 def confirm_view(on_send, *, timeout: float = 300.0):
     """„Senden“ und „Abbrechen“ unter der Vorschau von ``/verteilen`` (#631). Die Vorschau sieht nur, wer gefragt hat -
     also kann auch nur diese Person drücken. Ein zweiter Klick tut nichts; nach fünf Minuten verfällt die Vorschau."""

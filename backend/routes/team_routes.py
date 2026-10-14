@@ -11,7 +11,7 @@ from auth import get_current_user, get_optional_user
 from models import TeamCreate, TeamUpdate, now_utc, new_id
 from services.notification_preferences import send_user_template
 from services.user_notifications import build_public_url, create_user_notification
-from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments
+from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments, register_chat_access
 from services.query_filters import safe_regex
 from services import word_filter
 from services.log_safe import log_safe
@@ -116,6 +116,15 @@ def _user_label(user: dict | None) -> str:
 
 def _chat_allowed(team: dict, user: dict | None) -> bool:
     return bool(user and (_can_manage(team, user) or _is_member(team, user)))
+
+
+async def _attachment_allowed(db, context: dict, user: dict | None) -> bool:
+    """Anhänge im Team-Chat sieht, wer den Chat des Teams lesen darf (services/chat_attachments.py)."""
+    team = await db.teams.find_one({"id": context.get("team_id")}, {"_id": 0})
+    return bool(team and _chat_allowed(team, user))
+
+
+register_chat_access("team", _attachment_allowed)
 
 
 async def _add_team_member(db, team_id: str, user_id: str, role: str = "member") -> None:

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from database import get_db
+from services.chat_attachments import register_chat_access
 from services.permissions import is_confirmed_tournament_lead, is_tournament_lead, tournament_lead_filter
 from services import moderation_standing
 from auth import get_current_user, get_optional_user
@@ -399,6 +400,19 @@ async def _assert_match_visible(match: dict, user: dict | None) -> None:
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
     if not await lead_can_see(user, t.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Match ist nicht sichtbar")
+
+
+async def _attachment_allowed(db, context: dict, user: dict | None) -> bool:
+    """Anhänge im Match-Chat sieht, wer das Match sehen darf (services/chat_attachments.py)."""
+    try:
+        match, _collection = await _find_match_any(context.get("match_id"))
+        await _assert_match_visible(match, user)
+    except HTTPException:
+        return False
+    return True
+
+
+register_chat_access("match", _attachment_allowed)
 
 
 async def _rewrite_matchday_schedule(db, tournament_id: str | None) -> None:

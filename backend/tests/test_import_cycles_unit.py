@@ -21,8 +21,8 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 SKIP_DIRS = {"tests", "static", "__pycache__", ".venv", "venv"}
 
-# Grundlinie nach #1420. Vorher: 94 Befunde in Code Scanning.
-MAX_CYCLIC_IMPORTS = 24
+# Grundlinie nach #1420. Vorher: 94 Befunde in Code Scanning, 437 nach dieser Zählung.
+MAX_CYCLIC_IMPORTS = 0
 
 
 def _module_name(path: Path) -> str:
@@ -164,6 +164,43 @@ def test_import_cycles_do_not_grow():
         f"{len(findings)} Import-Kreis-Befunde (erlaubt: {MAX_CYCLIC_IMPORTS}). "
         "Gemeinsames in ein Blatt-Modul ziehen statt nach oben zu importieren:\n" + "\n".join(findings)
     )
+
+
+# Die Blatt-Module aus #1420: Sie dürfen - auch über Umwege - nichts von dem importieren, was auf ihnen aufbaut.
+LEAVES = (
+    "services.achievement_core", "services.achievement_progress", "services.xp_view", "services.season_collections",
+    "services.discord_runtime", "services.discord_links", "services.discord_targets", "services.discord_plain_text",
+    "services.discord_embed_queue", "services.discord_bracket_state", "services.image_upload", "services.mail_templates",
+    "services.mail_overrides", "services.mail_outbox", "services.scheduler_state", "services.dolibarr_ballot_state",
+    "services.passkey_config",
+)
+FEATURES = {
+    "badges", "discord_service", "email_service", "services.discord_bot", "services.xp", "services.achievement_queue",
+    "services.achievement_counters", "services.scheduler",
+}
+
+
+def _reachable(graph: dict[str, set[str]], start: str) -> set[str]:
+    seen: set[str] = set()
+    stack = [start]
+    while stack:
+        for target in graph.get(stack.pop(), ()):
+            if target not in seen:
+                seen.add(target)
+                stack.append(target)
+    return seen
+
+
+def test_leaf_modules_do_not_reach_back_into_the_features():
+    graph, _ = build_graph()
+    problems = {}
+    for leaf in LEAVES:
+        assert leaf in graph, f"{leaf} fehlt"
+        reached = _reachable(graph, leaf)
+        bad = sorted(reached & FEATURES) + sorted(name for name in reached if name.startswith("routes."))
+        if bad:
+            problems[leaf] = bad
+    assert problems == {}, problems
 
 
 def test_counter_sees_a_known_cycle(tmp_path, monkeypatch):

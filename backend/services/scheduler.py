@@ -22,6 +22,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from services import scheduler_state
+from services.scheduler_state import get_scheduler_status  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
+
 logger = logging.getLogger("tls.scheduler")
 
 _scheduler: AsyncIOScheduler | None = None
@@ -1041,6 +1044,7 @@ def start_scheduler() -> AsyncIOScheduler:
                   id="year_review_notices", max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched
+    scheduler_state.set_running(sched)
     logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · f1_prize_reminders 5m · birthday 6h · twitch 90s · game_server_sync 60s · mobile_push_receipts 5m)")
     return sched
 
@@ -1051,16 +1055,4 @@ def stop_scheduler():
         with suppress(Exception):
             _scheduler.shutdown(wait=False)
         _scheduler = None
-
-
-def get_scheduler_status() -> dict:
-    if not _scheduler:
-        return {"running": False, "jobs": []}
-    jobs = []
-    for job in _scheduler.get_jobs():
-        jobs.append({
-            "id": job.id,
-            "name": job.name,
-            "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
-        })
-    return {"running": _scheduler.running, "jobs": jobs}
+        scheduler_state.set_running(None)
