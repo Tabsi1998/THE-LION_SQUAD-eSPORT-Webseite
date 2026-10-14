@@ -482,6 +482,10 @@ async def test_a_merged_heat_takes_its_duration_from_the_game_and_the_replan_use
     flow.act_as(await flow.add_staff())
     response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "check_in"})
     assert response.status_code == 200, response.text
+    # Der Baum entsteht mit dem Ende des Check-ins (#1551) - wie in sixteen_scheme.
+    await flow.db.tournament_registrations.update_many({"tournament_id": tournament["id"]}, {"$set": {"status": "checked_in"}})
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"check_in_until": (now_utc() - timedelta(minutes=1)).isoformat()}})
+    await scheduler._safe_status_transitions()
 
     by_key = await heats(flow, tournament)
     assert by_key["D"]["status"] == "cancelled" and by_key["D"]["merged_into"] == by_key["C"]["id"]
