@@ -529,6 +529,9 @@ async def _safe_dolibarr_pending():
     try:
         from services.dolibarr_sync import process_pending
         await process_pending()
+        # Offene Anträge nach einem signierten Webhook (#1540) - dieselbe Warteschlange, eigener Verarbeiter.
+        from services.vereine_webhooks import process_pending_applications
+        await process_pending_applications()
     except Exception as exc:
         _log_task_failure("dolibarr_pending", exc)
 

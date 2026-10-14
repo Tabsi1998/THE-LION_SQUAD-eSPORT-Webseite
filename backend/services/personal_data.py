@@ -120,7 +120,7 @@ PERSONAL: dict[str, Entry] = {
     "dolibarr_identities": Entry(DELETED, ("dolibarr_identities",)),
     "dolibarr_honours": Entry(DELETED, ("dolibarr_honours",)),
     "dolibarr_invoice_cache": Entry(DELETED, note="Zwischenspeicher der Rechnungen aus der Mitgliederverwaltung"),
-    "dolibarr_pending": Entry(KEPT, note="Abgleich mit der Mitgliederverwaltung je Mitgliedsnummer, ohne Konto"),
+    "dolibarr_pending": Entry(KEPT, note="Abgleich mit der Mitgliederverwaltung je Mitgliedsnummer (oder „offene Anträge nachlesen“), ohne Konto"),
     "dolibarr_participations": Entry(KEPT, note="Teilnahmen in der Mitgliederakte, je Mitgliedsnummer - Sache des Vereins"),
     "billing_orders": Entry(OVERWRITTEN, ("billing_orders",)),
     "billing_customers": Entry(DELETED, ("billing_customers",)),
@@ -173,7 +173,8 @@ CLUB_CONTENT = frozenset({
 
 NO_PERSON = frozenset({
     "advent_views", "badges", "cms_nav", "cms_pages", "competition_write_usage", "consent_text_versions", "discord_guild_stats",
-    "discord_welcomes", "dolibarr_public", "email_templates", "event_message_gates", "feedback_entries", "games", "mastodon_apps",
+    "discord_welcomes", "dolibarr_public", "dolibarr_webhook_events", "email_templates", "event_message_gates", "feedback_entries",
+    "games", "mastodon_apps",
     "meeting_admission_counts", "mutation_locks", "ops_alert_log", "ops_alert_state", "ops_check_runs", "ops_errors",
     "ops_slow_requests", "ops_vitals", "partners", "schema_migration_lock", "schema_migrations", "site_banner_stats",
     "sponsors", "sticker_builtin_packs", "user_badges", "youtube_videos",

@@ -346,3 +346,24 @@ def test_tournament_achievement_progress_counts_stage_champion():
         "podium_finishes": 1,
         "rank_4_count": 0,
     }
+
+
+def test_decided_places_only_look_at_the_last_stage():
+    """Mehrphasig (#1549): ein Loser Bracket in Phase 1 ändert nichts daran, dass das FFA-Finale der Phase 2 alle
+    seine Plätze vergibt."""
+    stage_one_loser = {
+        "id": "lb-final", "tournament_id": "t1", "stage_id": "s1", "stage_number": 1, "round": 3, "section": "LB",
+        "slots": [{"slot": 1, "registration_id": "r3", "status": "filled"}, {"slot": 2, "registration_id": "r2", "status": "filled"}],
+        "results": [{"registration_id": "r3", "rank": 1}, {"registration_id": "r2", "rank": 2}],
+        "status": "completed",
+    }
+    stage_two_final = {
+        "id": "ffa-final", "tournament_id": "t1", "stage_id": "s2", "stage_number": 2, "round": 1, "section": "MAIN",
+        "slots": [{"slot": index, "registration_id": reg, "status": "filled"} for index, reg in enumerate(["r1", "r2", "r3"], start=1)],
+        "results": [{"registration_id": "r2", "rank": 1}, {"registration_id": "r1", "rank": 2}, {"registration_id": "r3", "rank": 3}],
+        "status": "completed",
+    }
+
+    rows = stage_standings([stage_one_loser, stage_two_final], REGISTRATIONS)
+
+    assert [row["registration_id"] for row in rows] == ["r2", "r1", "r3"]

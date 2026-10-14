@@ -68,6 +68,16 @@ export const AUTO_STAGE_TYPES = new Set([
 export const FFA_STAGE_TYPES = new Set(["simple", "ffa_single_elimination", "ffa_custom_bracket", "ffa_league"]);
 
 export const BRONZE_FORMATS = new Set(["single_elim"]);
+
+// Grand Final beim Doppel-K.-o. (#1549): Vorgabe mit Reset - wer aus der Verliererrunde das erste Finale gewinnt,
+// hat beide Seiten einmal geschlagen; der Sieger der Siegerrunde bekommt dann sein zweites Leben im Reset-Spiel.
+export const GRAND_FINAL_FORMATS = new Set(["double_elim"]);
+export const GRAND_FINAL_OPTIONS = [
+  ["reset", "Mit Reset-Spiel (Standard): Gewinnt die Verliererrunde das Finale, wird ein zweites Finale gespielt"],
+  ["single", "Ein Finale: Sieger der Siegerrunde gegen Sieger der Verliererrunde, ohne Reset"],
+  ["none", "Kein Grand Final: Der Sieger der Siegerrunde gewinnt das Turnier"],
+];
+export const GRAND_FINAL_HINT = "Beide Finalisten haben im Doppel-K.-o. ein zweites Leben. Ohne Reset hätte der Sieger der Siegerrunde nach nur einer Niederlage verloren.";
 // Nur diese Formate spielen in Wochen; ein K.-o.-Baum hat Runden, keine Woche.
 // Muss zu MATCHDAY_FORMATS in services/matchday_schedule.py passen.
 

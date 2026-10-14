@@ -9,6 +9,10 @@ The schema is intentionally small and explicit:
 Numeric tokens are seed slots. Reference tokens use FLOW:MATCH:RANK. W picks
 qualified ranks, L picks non-qualified ranks after the configured qualifiers,
 and R picks the raw absolute rank.
+
+Ein Duell, dessen beide Plätze ``W:X:1`` und ``W:X:2`` desselben Duells X sind,
+ist ein Reset-Spiel (Grand Final Reset, #1549): es wird nur gespielt, wenn in X
+der Spieler aus Platz 2 gewinnt - Platz 1 von X ist die Siegerrunde.
 """
 from __future__ import annotations
 
@@ -21,6 +25,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from services.match_duration import effective_match_duration
+from services.match_v2_results import resolve_walkovers
 
 
 ASSIGNMENT_RE = re.compile(r"^(?P<key>[A-Za-z0-9_.-]+)\s*=\s*\[(?P<slots>.*)\]\s*$")
@@ -255,10 +260,55 @@ def _auto_single_elim_schema(slot_count: int, bronze_match: bool = False) -> str
     return "\n".join(lines)
 
 
-def _auto_double_elim_schema(slot_count: int) -> str:
+GRAND_FINAL_MODES = ("none", "single", "reset")
+DEFAULT_GRAND_FINAL_MODE = "reset"
+
+# Wie die Verlierer der Winner-Runden 2, 3, … ins Loser Bracket einsortiert werden (#1549). Je Baumgröße eine
+# Reihenfolge je Abstiegsrunde; per Simulation gewählt (scratchpad lb_ordering_sim.py): ein Wiedersehen zweier
+# Spieler ist damit frühestens in Loser-Runde log2(N) möglich - bei 8 Spielern das Loser-Halbfinale, bei 16 das
+# Loser-Viertelfinale. Früher geht es mathematisch nicht; „natural“ hätte in jeder zweiten Runde Wiedersehen.
+LOSER_DROP_ORDERINGS = {
+    4: ("natural",),
+    8: ("reverse", "natural"),
+    16: ("reverse", "natural", "natural"),
+    32: ("reverse_half_shift", "half_shift", "natural", "natural"),
+    64: ("half_shift", "reverse", "reverse_half_shift", "reverse", "natural"),
+}
+
+
+def _ordered(keys: list[str], ordering: str) -> list[str]:
+    half = len(keys) // 2
+    if ordering == "reverse":
+        return list(reversed(keys))
+    if ordering == "half_shift":
+        return keys[half:] + keys[:half]
+    if ordering == "reverse_half_shift":
+        return list(reversed(keys[:half])) + list(reversed(keys[half:]))
+    return list(keys)
+
+
+def _loser_drop_ordering(bracket_size: int, drop_index: int) -> str:
+    orderings = LOSER_DROP_ORDERINGS.get(bracket_size) or LOSER_DROP_ORDERINGS[64]
+    return orderings[drop_index] if drop_index < len(orderings) else "natural"
+
+
+def grand_final_mode(tournament: dict, stage_settings: dict | None = None) -> str:
+    """Grand Final: keines, eines oder mit Reset - Phase vor Turnier, Vorgabe mit Reset (Entscheidung E4)."""
+    for value in ((stage_settings or {}).get("grand_final"), tournament.get("grand_final_mode")):
+        if value in GRAND_FINAL_MODES:
+            return value
+    return DEFAULT_GRAND_FINAL_MODE
+
+
+def _auto_double_elim_schema(slot_count: int, grand_final: str = DEFAULT_GRAND_FINAL_MODE) -> str:
     bracket_size = _next_power_of_two(max(2, slot_count))
     if bracket_size == 2:
-        return "[WB]\n# Winner Bracket\nA=[1,2]\n\n[GF]\n# Finale\nGF=[W:A:1,L:A:1]"
+        lines = ["[WB]", "# Winner Bracket", "A=[1,2]"]
+        if grand_final != "none":
+            lines += ["", "[GF]", "# Grand Final", "GF=[W:A:1,L:A:1]"]
+        if grand_final == "reset":
+            lines += ["# Grand Final Reset", "GFR=[W:GF:1,W:GF:2]"]
+        return "\n".join(lines)
 
     lines = ["[WB]"]
     sources = [str(seed) for seed in _seed_positions(bracket_size)]
@@ -292,11 +342,13 @@ def _auto_double_elim_schema(slot_count: int) -> str:
         lb_prev.append(key)
 
     lb_round_num = 2
-    for wb_round in wb_rounds[1:]:
+    for drop_index, wb_round in enumerate(wb_rounds[1:]):
         drop_round: list[str] = []
         lines.append(f"# Loser Runde {lb_round_num}")
         lb_round_num += 1
-        for idx, wb_key in enumerate(wb_round):
+        # Gespiegelt einsortieren: wer in Winner-Runde 1 gegeneinander spielte, trifft sich hier nicht wieder.
+        dropping = _ordered(list(wb_round), _loser_drop_ordering(bracket_size, drop_index))
+        for idx, wb_key in enumerate(dropping):
             if idx >= len(lb_prev):
                 break
             key = f"L{_match_key(lb_key_index)}"
@@ -317,37 +369,85 @@ def _auto_double_elim_schema(slot_count: int) -> str:
 
     wb_final = wb_rounds[-1][0]
     lb_final = lb_prev[0]
+    if grand_final == "none":
+        return "\n".join(lines)
     lines.append("")
     lines.append("[GF]")
     lines.append("# Grand Final")
     lines.append(f"GF=[W:{wb_final}:1,W:{lb_final}:1]")
+    if grand_final == "reset":
+        lines.append("# Grand Final Reset")
+        lines.append("GFR=[W:GF:1,W:GF:2]")
     return "\n".join(lines)
+
+
+def _snake_split(items: list, count: int) -> list[list]:
+    """Verteilt in Schlangenlinie auf ``count`` Listen - Größen unterscheiden sich um höchstens 1."""
+    count = max(1, min(int(count or 1), len(items) or 1))
+    buckets: list[list] = [[] for _ in range(count)]
+    for index, item in enumerate(items):
+        row, position = divmod(index, count)
+        buckets[position if row % 2 == 0 else count - 1 - position].append(item)
+    return [bucket for bucket in buckets if bucket]
+
+
+def heat_quota(size: int, match_size: int, qualifiers_per_match: int) -> int:
+    """Wie viele aus einem Lauf dieser Größe weiterkommen: die Quote der vollen Laufgröße, anteilig aufgerundet -
+    mindestens einer, und mindestens einer scheidet aus. Für #1550 (Zusammenlegen) dieselbe Regel."""
+    if size <= 1:
+        return 1
+    share = math.ceil(size * qualifiers_per_match / max(1, match_size))
+    return max(1, min(share, size - 1))
+
+
+def ffa_heat_plan(participants: int, match_size: int, qualifiers_per_match: int) -> list[list[tuple[int, int]]]:
+    """Läufe je Ebene als (Größe, Weiterkommer): so wenige Läufe wie die Laufgröße erlaubt, ausgeglichen (Unterschied
+    höchstens 1, nie ein Lauf mit einem Spieler), Ebene für Ebene, bis die Übrigen in einen Lauf passen - das Finale.
+    5 Spieler bei Laufgröße 4 ergeben 3 + 2 (nicht 4 + 1), 9 ergeben 3 + 3 + 3, 40 brauchen fünf Ebenen."""
+    match_size = max(2, int(match_size or 4))
+    qualifiers_per_match = max(1, min(int(qualifiers_per_match or 2), match_size - 1))
+    remaining = max(1, int(participants or 1))
+    levels: list[list[tuple[int, int]]] = []
+    while remaining > match_size:
+        heat_count = max(1, min(math.ceil(remaining / match_size), remaining // 2))
+        sizes = [len(bucket) for bucket in _snake_split(list(range(remaining)), heat_count)]
+        levels.append([(size, heat_quota(size, match_size, qualifiers_per_match)) for size in sizes])
+        remaining = sum(quota for _size, quota in levels[-1])
+    levels.append([(remaining, 0)])
+    return levels
 
 
 def _auto_ffa_custom_schema(slot_count: int, match_size: int, qualifiers_per_match: int) -> str:
     bracket_size = max(2, slot_count)
-    match_size = max(2, int(match_size or 4))
-    qualifiers_per_match = max(1, min(int(qualifiers_per_match or 2), match_size))
-    sources = [str(seed) for seed in range(1, bracket_size + 1)]
-    lines = ["[WB]", "# Runde 1"]
+    levels = ffa_heat_plan(bracket_size, match_size, qualifiers_per_match)
+    lines = ["[WB]"]
     next_key_index = 0
-    heat_keys: list[str] = []
-    for idx in range(0, len(sources), match_size):
-        key = _match_key(next_key_index)
-        next_key_index += 1
-        heat_keys.append(key)
-        lines.append(f"{key}=[{','.join(sources[idx:idx + match_size])}]")
-
-    if len(heat_keys) > 1:
-        final_sources = [
+    tokens: list[str] = [str(seed) for seed in range(1, bracket_size + 1)]
+    for level_index, level in enumerate(levels):
+        if level_index == len(levels) - 1 and len(levels) > 1:
+            lines += ["", "# Finale"]
+        elif level_index == len(levels) - 2 and len(levels) > 2:
+            lines += ["", "# Halbfinale"]
+        elif level_index > 0:
+            lines += ["", f"# Runde {level_index + 1}"]
+        else:
+            lines.append("# Runde 1")
+        heats = _snake_split(tokens, len(level))
+        keys: list[str] = []
+        for heat in heats:
+            key = _match_key(next_key_index)
+            next_key_index += 1
+            keys.append(key)
+            lines.append(f"{key}=[{','.join(heat)}]")
+        # Die Weiterkommer der nächsten Ebene: erst alle Laufsieger, dann alle Zweiten - in Schlangenlinie verteilt,
+        # damit die Sieger verschiedener Läufe nicht im selben Lauf landen.
+        max_quota = max((quota for _size, quota in level), default=0)
+        tokens = [
             f"W:{key}:{rank}"
-            for key in heat_keys
-            for rank in range(1, qualifiers_per_match + 1)
+            for rank in range(1, max_quota + 1)
+            for key, (_size, quota) in zip(keys, level)
+            if rank <= quota
         ]
-        key = _match_key(next_key_index)
-        lines.append("")
-        lines.append("# Finale")
-        lines.append(f"{key}=[{','.join(final_sources)}]")
     return "\n".join(lines)
 
 
@@ -540,7 +640,7 @@ def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], pr
         return _auto_single_elim_schema(size, bool(tournament.get("bronze_match")))
     if (stage.get("stage_type") or "") == "double_elimination":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
-        return _auto_double_elim_schema(size)
+        return _auto_double_elim_schema(size, grand_final_mode(tournament, settings))
     if (stage.get("stage_type") or "") == "custom_bracket":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
         return _auto_single_elim_schema(size, bool(tournament.get("bronze_match")))
@@ -707,51 +807,36 @@ def _compact_entry_seed_slots(docs: list[dict], preview: bool) -> None:
 
 
 def _apply_auto_byes(docs: list[dict]) -> None:
+    """Freilose beim Bau (#1549): ein Spiel mit genau einem Teilnehmer und keinem offenen Zufluss ist kampflos
+    entschieden - der Sieger geht nur den Sieger-Weg weiter, nie ins Loser Bracket oder Spiel um Platz 3. Dieselbe
+    Kette läuft später nach jedem Ergebnis (services/match_v2_results.resolve_walkovers)."""
     by_id = {doc["id"]: doc for doc in docs}
-    for doc in sorted(docs, key=lambda item: (item.get("round") or 0, item.get("order") or 0)):
-        if doc.get("is_preview") or doc.get("match_type") != "duel" or doc.get("status") == "completed":
-            continue
-        slots = doc.get("slots") or []
-        filled = [slot for slot in slots if slot.get("status") == "filled" and slot.get("registration_id")]
-        unresolved = [slot for slot in slots if slot.get("status") == "pending"]
-        if len(filled) != 1 or unresolved or not any(slot.get("status") == "bye" for slot in slots):
-            continue
-        winner = filled[0]
-        now = _now_utc().isoformat()
-        doc["results"] = [{
-            "registration_id": winner.get("registration_id"),
-            "user_id": winner.get("user_id"),
-            "slot": winner.get("slot"),
-            "rank": 1,
-            "score": None,
-            "points": None,
-            "time_ms": None,
-            "dnf": False,
-            "forfeit": False,
-            "note": "Auto-Advance durch Bye",
-            "reported_by": "system",
-            "reported_at": now,
-        }]
-        doc["status"] = "completed"
-        doc["result_meta"] = {"source": "auto_bye", "updated_at": now}
-        doc["updated_at"] = now
-        for advancement in doc.get("advancement") or []:
-            if advancement.get("rank") != 1:
-                continue
-            target = by_id.get(advancement.get("to_match_id"))
-            if not target:
-                continue
-            target_slot = next(
-                (slot for slot in (target.get("slots") or []) if slot.get("slot") == advancement.get("to_slot")),
-                None,
-            )
-            if not target_slot:
-                continue
-            target_slot["registration_id"] = winner.get("registration_id")
-            target_slot["user_id"] = winner.get("user_id")
-            target_slot["status"] = "filled"
-            target["status"] = _ready_status_for_slots(target.get("slots") or [], int((target.get("settings") or {}).get("min_players") or 2))
-            target["updated_at"] = now
+    ordered = sorted(docs, key=lambda item: (item.get("round") or 0, item.get("order") or 0))
+    resolve_walkovers([doc["id"] for doc in ordered], by_id, {}, _now_utc().isoformat())
+
+
+def _reset_rule(spec: BracketMatchSpec, by_key: dict[str, BracketMatchSpec]) -> dict | None:
+    """Ein Duell aus ``W:X:1`` und ``W:X:2`` desselben Duells X ist das Reset-Spiel zu X (Modulbeschreibung)."""
+    sources = spec.sources
+    if len(sources) != 2 or any(source.get("type") != "rank" or source.get("flow") != "W" for source in sources):
+        return None
+    keys = {source["match_key"] for source in sources}
+    if len(keys) != 1 or {int(source["rank"]) for source in sources} != {1, 2}:
+        return None
+    origin = by_key.get(next(iter(keys)))
+    if not origin or len(origin.sources) != 2:
+        return None
+    return {"of_match_key": origin.key, "upper_slot": 1}
+
+
+def _effective_qualifiers(doc: dict, default: int) -> int:
+    """Die Quote eines Laufs ist, was der Baum von ihm weiterleitet (#1549: kleinere Läufe schicken weniger weiter).
+    Nur für Läufe ohne Verlierer-Weg - sonst verschöbe sich die Zählung von ``L:``-Verweisen."""
+    advancement = doc.get("advancement") or []
+    if not advancement or any(entry.get("flow") != "W" for entry in advancement):
+        return default
+    ranks = {int(entry.get("rank") or 0) for entry in advancement}
+    return max(1, min(max(ranks), default)) if ranks else default
 
 
 def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: list[dict],
@@ -776,6 +861,7 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
 
     docs: list[dict] = []
     by_key: dict[str, dict] = {}
+    spec_by_key = {spec.key: spec for spec in specs}
     for spec in specs:
         slots = []
         has_ref = False
@@ -820,15 +906,17 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
             "results": [],
             "advancement": [],
             "settings": {
-                "min_players": min_players,
+                # Ein Spiel braucht nie mehr Teilnehmer, als es Plätze hat - sonst bliebe ein kleiner Lauf ewig offen.
+                "min_players": max(1, min(min_players, len(slots))),
                 "match_size": len(slots),
                 "qualifiers_per_match": qualifiers_per_match,
+                **({"bracket_reset": reset_rule} if (reset_rule := _reset_rule(spec, spec_by_key)) else {}),
                 "score_type": settings.get("score_type") or "points",
                 "calculation": settings.get("calculation") or "points",
                 "duration_minutes": effective_match_duration(stage=stage, tournament=tournament),
                 "randomize_advancement_rounds": bool(settings.get("randomize_advancement_rounds") or tournament.get("randomize_advancement_rounds")),
             },
-            "status": "preview" if preview else ("ready" if not has_ref and filled_count >= min_players else "pending"),
+            "status": "preview" if preview else ("ready" if not has_ref and filled_count >= min(min_players, len(slots)) else "pending"),
             "is_preview": bool(preview),
             "generation_mode": "preview" if preview else "seeded",
             "scheduled_at": None,
@@ -855,6 +943,8 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
                 "to_match_id": doc["id"],
                 "to_slot": slot["slot"],
             })
+    for doc in docs:
+        doc["settings"]["qualifiers_per_match"] = _effective_qualifiers(doc, qualifiers_per_match)
 
     _compact_entry_seed_slots(docs, preview)
 

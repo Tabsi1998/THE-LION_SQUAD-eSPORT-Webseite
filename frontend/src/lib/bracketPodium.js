@@ -15,6 +15,10 @@ export function isCompleted(match) {
   return DONE_STATUSES.has(String(match?.status || "").toLowerCase());
 }
 
+export function isCancelled(match) {
+  return String(match?.status || "").toLowerCase() === "cancelled";
+}
+
 export function isBronzeMatch(match) {
   const haystack = [
     match?.section,
@@ -48,7 +52,8 @@ export function lastStageMatches(matches = [], stages = []) {
  * um Platz 3. `null`, wenn es keins gibt (Liga, Gruppen, Schweizer System haben eine Tabelle statt eines Finales).
  */
 export function finalMatchOf(matches = [], stages = []) {
-  const pool = lastStageMatches(matches, stages).filter((match) => !isBronzeMatch(match));
+  // Ein Reset-Spiel, das nicht nötig war („entfällt“, #1549), ist kein Finale - das erste Grand Final hat entschieden.
+  const pool = lastStageMatches(matches, stages).filter((match) => !isBronzeMatch(match) && !isCancelled(match));
   const grandFinals = pool.filter((match) => FINAL_SECTIONS.has(normalizeSection(match.section)));
   const candidates = grandFinals.length ? grandFinals : pool.filter((match) => MAIN_SECTIONS.has(normalizeSection(match.section)));
   if (!candidates.length) return null;
@@ -75,9 +80,13 @@ export function buildPodiumMap(allMatches = [], stages = []) {
     maxRoundBySection.set(section, Math.max(maxRoundBySection.get(section) || 0, round));
   }
   const hasGrandFinal = matchesV2.some((match) => FINAL_SECTIONS.has(normalizeSection(match.section)));
+  // Mit Reset-Spiel (#1549) entscheidet das letzte Grand Final, das nicht entfallen ist - nie beide zugleich.
+  const decidingGrandFinal = hasGrandFinal ? finalMatchOf(matchesV2, stages) : null;
   const isFinal = (match) => {
     const section = normalizeSection(match.section);
-    return !isBronzeMatch(match) && (FINAL_SECTIONS.has(section) || (!hasGrandFinal && ["main", "wb", "winner"].includes(section) && Number(match.round || 1) === maxRoundBySection.get(section)));
+    if (isBronzeMatch(match)) return false;
+    if (FINAL_SECTIONS.has(section)) return match === decidingGrandFinal;
+    return !hasGrandFinal && ["main", "wb", "winner"].includes(section) && Number(match.round || 1) === maxRoundBySection.get(section);
   };
   // Vergibt das Finale selbst schon Platz 3 (ein Durchgang mit mehreren Spielern, #1119), zählt kein anderes Spiel für
   // Platz 3 - sonst stünde der Zweite des Loser-Bracket-Finales, der ja ins Grand Final kam, auch auf dem Podest.

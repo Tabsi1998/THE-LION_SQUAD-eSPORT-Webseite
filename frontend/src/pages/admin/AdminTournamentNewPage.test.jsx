@@ -98,3 +98,21 @@ test("ohne Event: keine Event-Auswahl, nur der Hinweis, angelegt über /tourname
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ title: "Freies Turnier", requires_event_registration: false })));
   expect(apiMock.post.mock.calls.at(-1)[1]).not.toHaveProperty("event_id");
 });
+
+// Grand Final (#1549): nur beim Doppel-K.-o. wählbar, Vorgabe „mit Reset“, geht als `grand_final_mode` mit.
+test("Doppel-K.-o.: Grand Final wählbar, Vorgabe mit Reset, wird mitgeschickt", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  renderAt("");
+  expect(await screen.findByTestId("new-tr-format")).toHaveValue("single_elim");
+  expect(screen.queryByTestId("new-tr-grand-final")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("new-tr-format"), { target: { value: "double_elim" } });
+  const select = screen.getByTestId("new-tr-grand-final");
+  expect(select).toHaveValue("reset");
+  expect(select).toHaveTextContent("Reset");
+  fireEvent.change(select, { target: { value: "single" } });
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Kart-Cup" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ format: "double_elim", grand_final_mode: "single" })));
+});

@@ -75,7 +75,7 @@ def round_label(match: dict, *, max_rounds: dict[tuple, int] | None = None, kind
     if section == "bronze":
         return "Spiel um Platz 3"
     if section == "grand_final":
-        return "Grand Final"
+        return "Grand Final Reset" if "reset" in name.lower() else "Grand Final"
     if kind == "table":
         if name and not GENERIC_ROUND.match(name):
             return name

@@ -621,3 +621,19 @@ test("ein Online-Turnier bekommt beim Planen keine Stationen, nur den Hinweis", 
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(apiMock.post.mock.calls.some(([url]) => String(url).includes("/schedule/apply"))).toBe(false);
 });
+
+// Grand Final (#1549): im Bearbeiten-Formular nur beim Doppel-K.-o., mit dem gespeicherten Wert.
+test("Bearbeiten: Grand Final nur beim Doppel-K.-o., gespeicherter Wert vorbelegt", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation((url) => Promise.resolve(String(url).includes("/tournaments/t-1") && !String(url).includes("/t-1/")
+    ? { data: { ...TOURNAMENT, format: "double_elim", grand_final_mode: "none" } }
+    : routeFor(String(url))));
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  const select = await screen.findByTestId("tr-edit-grand-final");
+  expect(select).toHaveValue("none");
+  await user.selectOptions(select, "reset");
+  await user.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ grand_final_mode: "reset" })));
+});

@@ -134,6 +134,8 @@ def test_the_scan_sees_every_way_of_reaching_a_collection():
     found = collections_in_code()
     # get_db().upload_events (upload_routes), self.db/ctx.db (achievement_counters), db[modul.KONSTANTE] (advent_calendar).
     assert {"upload_events", "user_signals", "season_raffles", "dolibarr_identities", "discord_guilds"} <= found
+    # Ereignis-Kennungen der signierten Webhooks (#1540): ohne Mitgliedsnummer, also ohne Personenbezug, nach sieben Tagen weg.
+    assert "dolibarr_webhook_events" in found and "dolibarr_webhook_events" in personal_data.NO_PERSON
 
 
 def test_every_dynamic_access_is_listed_with_a_reason():

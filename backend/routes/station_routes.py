@@ -381,8 +381,8 @@ async def assign_match(sid: str, match_id: str, start_now: bool = False,
     async with _tournament_lock(db, match["tournament_id"]):
         # Station und Spiel unter dem Lock frisch lesen - der Stand von oben kann schon überholt sein.
         station = await db.stations.find_one({"id": sid}, {"_id": 0}) or station
-        current = await db.matches_v2.find_one({"id": match_id}, {"_id": 0}) or match
-        await _assign_match_to_station(db, station, current, collection_name, start_now=start_now)
+        _collection, current = await _find_match_for_station(db, match_id)
+        await _assign_match_to_station(db, station, current or match, collection_name, start_now=start_now)
     return {"ok": True}
 
 

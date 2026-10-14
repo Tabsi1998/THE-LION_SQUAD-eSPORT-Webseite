@@ -73,3 +73,30 @@ test("Liga und Gruppen haben kein Finale - dort gibt es keinen goldenen Weg", ()
   play(league, ["A", "B", "C"]);
   expect(championOf(league.matches_v2, league.stages)).toBeNull();
 });
+
+// Grand Final Reset (#1549): ein nicht nötiges Reset-Spiel („entfällt“) hält den Champion nicht auf; ein gespieltes
+// entscheidet.
+test("Doppel-K.-o. mit Reset: entfällt der Reset, steht der Champion nach dem ersten Finale", () => {
+  const bracket = doubleElimination(4, { reset: true });
+  play(bracket, ["A", "B", "C", "LA", "LB"]);
+  expect(find(bracket, "GF").slots.map((slot) => slot.registration_id)).toEqual(["r1", "r2"]);
+  decide(bracket, "GF", ["r1", "r2"]);
+  expect(find(bracket, "GFR").status).toBe("cancelled");
+  const champion = championOf(bracket.matches_v2, bracket.stages);
+  expect(champion.winnerId).toBe("r1");
+  expect(champion.finalMatchId).toBe(find(bracket, "GF").id);
+  expect(champion.podium).toEqual([{ rank: 1, registrationId: "r1" }, { rank: 2, registrationId: "r2" }, { rank: 3, registrationId: "r3" }]);
+});
+
+test("Doppel-K.-o. mit Reset: gewinnt das Loser Bracket das erste Finale, entscheidet das Reset-Spiel", () => {
+  const bracket = doubleElimination(4, { reset: true });
+  play(bracket, ["A", "B", "C", "LA", "LB"]);
+  decide(bracket, "GF", ["r2", "r1"]);
+  expect(find(bracket, "GFR").status).toBe("ready");
+  expect(championOf(bracket.matches_v2, bracket.stages)).toBeNull();
+  decide(bracket, "GFR", ["r1", "r2"]);
+  const champion = championOf(bracket.matches_v2, bracket.stages);
+  expect(champion.winnerId).toBe("r1");
+  expect(champion.finalMatchId).toBe(find(bracket, "GFR").id);
+  expect(champion.podium.slice(0, 2)).toEqual([{ rank: 1, registrationId: "r1" }, { rank: 2, registrationId: "r2" }]);
+});
