@@ -31,7 +31,7 @@ from models import new_id, now_utc
 from services import season_raffles as raffles
 from services import seasons
 from services.private_fields import private_projection
-from services.season_collections import PROGRESS, hunts_completed  # noqa: F401 - umgezogen (#1420)
+from services.season_collections import PROGRESS  # noqa: F401 - umgezogen (#1420)
 
 logger = logging.getLogger("tls.easter")
 

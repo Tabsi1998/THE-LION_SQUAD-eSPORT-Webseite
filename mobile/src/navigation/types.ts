@@ -1,11 +1,16 @@
 import type { NavigatorScreenParams } from "@react-navigation/native";
 
+/** Hilfe beim Anmelden (#996): Link zum Zurücksetzen des Passworts oder neue Bestätigungs-Mail. */
+export type LoginHelpKind = "password" | "verification";
+
 // Gast zuerst (#918): Die App startet ohne Konto. Anmelden und Registrieren liegen im Stapel über den Tabs - erreichbar aus
 // dem Profil-Tab, dem Hinweis beim ersten Start und überall, wo man ein Konto braucht; danach geht es zurück, woher man kam.
 export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   Login: undefined;
   Register: undefined;
+  // Passwort vergessen oder Bestätigungs-Mail (#996): die E-Mail aus der Anmeldung kommt mit.
+  LoginHelp: { kind: LoginHelpKind; email?: string };
 };
 
 // Fünf Tabs für alle (#1143, Fabians Wahl B): Home · Events · Community · Verein · Profil. Jeder Tab ist ein eigener Stapel

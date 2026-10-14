@@ -30,9 +30,11 @@ from services.achievement_core import NEGATIVE_INCIDENTS  # umgezogen (#1420), h
 from services.achievement_progress import (  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
     PROFILE_FIELDS,
     compute_profile_completeness,
-    compute_user_progress,
 )
 from services import xp
+
+# Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
+__all__ = ["PROFILE_FIELDS", "compute_profile_completeness"]
 
 logger = logging.getLogger("tls.achievements")
 
