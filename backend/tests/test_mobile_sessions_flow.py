@@ -15,7 +15,7 @@ from flow_harness import make_flow  # noqa: E402
 from routes import auth_routes  # noqa: E402
 from services.auth_sessions import purge_stale_app_sessions  # noqa: E402
 
-PASSWORD = "pw-42"
+PASSWORD = "pw-loewe-42"
 # Kopfzeilen sind ASCII: die App baut den Namen als „Modell / System“ (deviceIdentity.ts).
 PIXEL = {"User-Agent": "okhttp/4.12.0", "X-Device-Id": "geraet-pixel-9", "X-Device-Name": "Pixel 9 / Android 16"}
 TABLET = {"User-Agent": "okhttp/4.12.0", "X-Device-Id": "geraet-tab-s9", "X-Device-Name": "Galaxy Tab S9 / Android 15"}

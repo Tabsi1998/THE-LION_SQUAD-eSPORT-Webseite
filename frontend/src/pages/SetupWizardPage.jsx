@@ -4,6 +4,7 @@ import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
+import { PASSWORD_RULE_HINT, passwordProblem } from "@/lib/passwordRules";
 import { Logo } from "@/components/tls/Logo";
 import { Sparkles, Mail, Server, Lock, Check, ArrowRight, ChevronLeft, ShieldCheck, AlertTriangle } from "lucide-react";
 
@@ -84,7 +85,8 @@ export default function SetupWizardPage() {
   const validateStep = () => {
     if (step === 1 && !data.club_name) { toast.error("Vereinsname ist Pflicht"); return false; }
     if (step === 2 && data.new_admin_password) {
-      if (data.new_admin_password.length < 10) { toast.error("Passwort min. 10 Zeichen"); return false; }
+      const problem = passwordProblem(data.new_admin_password);
+      if (problem) { toast.error(problem); return false; }
       if (data.new_admin_password !== data.new_admin_password_confirm) { toast.error("Passwörter stimmen nicht überein"); return false; }
     }
     return true;
@@ -201,7 +203,7 @@ export default function SetupWizardPage() {
               <p className="text-white/60 text-sm mb-4">
                 Optional — leer lassen um das aktuelle Passwort beizubehalten.
               </p>
-              <Field type="password" label="Neues Passwort (min. 10 Zeichen)" testId="wizard-new-pw" value={data.new_admin_password} onChange={(v) => upd("new_admin_password", v)} />
+              <Field type="password" label="Neues Passwort" hint={PASSWORD_RULE_HINT} testId="wizard-new-pw" value={data.new_admin_password} onChange={(v) => upd("new_admin_password", v)} />
               <Field type="password" label="Passwort bestätigen" testId="wizard-new-pw-confirm" value={data.new_admin_password_confirm} onChange={(v) => upd("new_admin_password_confirm", v)} />
             </div>
           )}
@@ -298,12 +300,13 @@ export default function SetupWizardPage() {
   );
 }
 
-function Field({ label, value, onChange, testId, type = "text", placeholder = "" }) {
+function Field({ label, value, onChange, testId, type = "text", placeholder = "", hint = "" }) {
   return (
     <label className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
       <input type={type} value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} placeholder={placeholder}
         className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+      {hint ? <div className="text-[11px] text-white/50 mt-1">{hint}</div> : null}
     </label>
   );
 }

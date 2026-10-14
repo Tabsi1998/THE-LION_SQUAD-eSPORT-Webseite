@@ -23,6 +23,7 @@ export const MAIL_TEMPLATE_LABELS = {
   team_chat_mention: "Team-Chat-Erwähnung",
   newsletter_news: "Newsletter: News",
   newsletter_event: "Newsletter: Event",
+  event_message: "Event: Nachricht an alle",
   contact_autoreply: "Kontakt-Antwort",
   contact_admin_notify: "Kontaktmeldung",
   test: "Testmail",
