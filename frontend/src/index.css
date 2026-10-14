@@ -352,6 +352,78 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   .tls-bracket-champion.is-crowned::before, .tls-bracket-champion.is-crowned .tls-bracket-trophy { animation: none; }
 }
 
+/* Rangliste (#1562, #1179): Liga- und Gruppentabellen. Sieg hell in Cyan, Unentschieden mit Rahmen, Niederlage grau;
+   die eigene Zeile trägt einen leisen Cyan-Grund und „Du“; Pfeile seit dem vorigen Spieltag. Rot bleibt Live. */
+.tls-standing-row { border-top: 1px solid rgb(255 255 255 / 0.05); transition: background-color var(--tls-motion-fast) var(--tls-ease); }
+.tls-standing-row:first-child { border-top: 0; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-standing-row:hover { background-color: rgb(255 255 255 / 0.025); }
+}
+.tls-standing-row[data-mine="true"] { background-color: rgb(var(--tls-brand-rgb) / 0.08); box-shadow: inset 0 0 0 1px rgb(var(--tls-brand-rgb) / 0.28); }
+.tls-standing-name { overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.3; }
+.tls-standing-me {
+  flex: none; display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--tls-brand); background: rgb(var(--tls-brand-rgb) / 0.12);
+}
+.tls-standing-move {
+  display: inline-flex; align-items: center; gap: 1px; font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif;
+  font-size: 12px; font-weight: 700; line-height: 1;
+}
+.tls-standing-move[data-dir="up"] { color: var(--tls-brand); }
+.tls-standing-move[data-dir="down"] { color: var(--tls-quiet); }
+.tls-standing-form { display: inline-flex; gap: 3px; vertical-align: middle; }
+.tls-standing-form__dot {
+  display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 3px;
+  font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 11px; font-weight: 700; line-height: 1;
+}
+.tls-standing-form__dot[data-result="W"] { color: var(--tls-surface-0); background: var(--tls-brand); }
+.tls-standing-form__dot[data-result="D"] { color: var(--tls-text-muted); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.28); }
+.tls-standing-form__dot[data-result="L"] { color: rgb(255 255 255 / 0.55); background: rgb(255 255 255 / 0.1); }
+/* Das jüngste Spiel steht rechts und ist eine Spur kräftiger umrandet. */
+.tls-standing-form__dot:last-child { outline: 1px solid rgb(255 255 255 / 0.35); outline-offset: 1px; }
+@media (max-width: 420px) {
+  .tls-standing-form { gap: 2px; }
+  .tls-standing-form__dot { width: 13px; height: 13px; font-size: 9px; }
+}
+
+/* Spielplan (#1562) im Bild des Turnierbaums: Status nach Rolle - Live rot mit leisem Puls, fertig ruhig, offen grau. */
+.tls-sched-card { color: inherit; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-sched-card:hover { border-color: rgb(var(--tls-brand-rgb) / 0.45); }
+}
+.tls-sched-card:focus-visible, .tls-sched-line:focus-visible { outline: 2px solid var(--tls-brand); outline-offset: 2px; }
+.tls-sched-name { overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.3; }
+.tls-sched-status {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; white-space: nowrap; color: var(--tls-text-muted);
+}
+.tls-sched-status[data-tone="live"] { color: var(--tls-live); }
+.tls-sched-status[data-tone="done"] { color: rgb(255 255 255 / 0.45); }
+.tls-sched-status[data-tone="cancelled"] { color: rgb(255 255 255 / 0.35); text-decoration: line-through; }
+.tls-sched-status__dot {
+  width: 6px; height: 6px; border-radius: 999px; background: var(--tls-live);
+  animation: tls-live-dot 1.8s ease-out infinite;
+}
+.tls-sched-line {
+  display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  padding: 10px 12px; color: inherit; transition: background-color var(--tls-motion-fast) var(--tls-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .tls-sched-line:hover { background-color: rgb(255 255 255 / 0.035); }
+}
+.tls-sched-line[data-mine="true"] { background-color: rgb(var(--tls-brand-rgb) / 0.08); }
+.tls-sched-line[data-tone="live"] { box-shadow: inset 0 0 0 1px rgb(var(--tls-live-rgb) / 0.4); }
+.tls-sched-line[data-tone="done"] .tls-sched-name { color: rgb(255 255 255 / 0.6); }
+.tls-sched-line__time { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 14px; font-weight: 700; color: rgb(255 255 255 / 0.8); }
+@media (max-width: 479px) {
+  .tls-sched-line { grid-template-columns: 5.25rem minmax(0, 1fr); }
+  .tls-sched-line > .tls-sched-status { grid-column: 2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-sched-status__dot { animation: none; }
+}
+
 /* TV mode */
 .tv-bg {
   background: radial-gradient(ellipse at top, #001a26 0%, #000 60%);
