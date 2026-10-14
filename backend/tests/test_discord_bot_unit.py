@@ -153,3 +153,28 @@ def test_callback_buttons_keep_their_id_and_style():
     assert (first.custom_id, first.style.name, first.url) == ("tls:reg:event:e1", "success", None)
     assert (second.custom_id, second.style.name) == ("tls:unreg:event:e1", "danger")
     assert third.style.name == "link" and third.url == "https://lionsquad.at/events/lan"
+
+
+def test_the_runtime_gets_events_and_commands_from_discord_bot():
+    """#1420: Die Laufzeit (discord_runtime) kennt die Funktionen nicht - discord_bot hängt Ereignisse und Befehle an,
+    sobald ein Client entsteht. Geprüft ohne Netz an einem echten, nicht verbundenen Client."""
+    import discord
+    from discord import app_commands
+
+    from services import discord_runtime
+
+    assert discord_runtime.wiring() is discord_bot.wire and discord_bot.bot is discord_runtime.bot
+
+    async def wire_once():
+        client = discord.Client(intents=discord.Intents.default())
+        tree = app_commands.CommandTree(client)
+        discord_bot.wire(discord_runtime.BotRunner(), client, tree, {"guild_id": "", "count_messages": True}, db=None)
+        names = sorted(command.name for command in tree.get_commands())
+        events = [name for name in ("on_ready", "on_guild_join", "on_member_join", "on_member_remove", "on_message") if hasattr(client, name)]
+        await client.close()
+        return names, events
+
+    names, events = asyncio.run(wire_once())
+    assert names == ["abmelden", "anmelden", "bracket", "meine-erfolge", "mitglied", "naechstes-event", "rangliste", "status",
+                     "turniere", "verknuepfen", "verteilen", "wer-streamt"]
+    assert events == ["on_ready", "on_guild_join", "on_member_join", "on_member_remove", "on_message"]

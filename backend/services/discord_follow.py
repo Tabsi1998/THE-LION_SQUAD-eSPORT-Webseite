@@ -65,7 +65,7 @@ def _news(channels: list[dict]) -> list[dict]:
 async def overview(db) -> dict:
     """Der Sammelkanal, je eingeschaltetem Unterserver seine Ankündigungskanäle, die gewählte Quelle und der Stand."""
     from services import discord_guilds
-    from services.discord_bot import bot
+    from services.discord_runtime import bot
 
     collector = await collector_id(db)
     online = bot.connected_guild_ids() is not None
@@ -109,7 +109,7 @@ async def overview(db) -> dict:
 
 async def setup(db, guild_id: str, source_channel_id: str) -> dict:
     """Dem Ankündigungskanal dieses Unterservers folgen - in den Sammelkanal. Kein Erfolg ohne Grund in Worten."""
-    from services.discord_bot import bot
+    from services.discord_runtime import bot
 
     guild = await db.discord_guilds.find_one({"guild_id": str(guild_id)}, {"_id": 0})
     if not guild:

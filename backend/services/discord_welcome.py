@@ -63,7 +63,7 @@ async def render(db, text: str, name: str = "") -> dict:
 
 async def greet(db, discord_user_id, name: str = "", *, is_bot: bool = False) -> dict:
     """Beitritt zum Server: einmal je Person die Willkommensnachricht - ohne Erlaubnis still."""
-    from services.discord_bot import bot
+    from services.discord_runtime import bot
 
     if is_bot:
         return {"ok": False, "reason": "bot_account"}
@@ -99,7 +99,7 @@ async def welcome_status(db, settings: dict | None = None) -> dict:
 async def send_test(db, admin: dict, text: str | None = None) -> dict:
     """„An mich senden“: die Nachricht als Direktnachricht an das eigene verknüpfte Konto - zählt nicht, merkt nichts."""
     from discord_service import REASON_TEXTS
-    from services.discord_bot import bot
+    from services.discord_runtime import bot
     from services.discord_dm_basics import discord_link_id
 
     discord_id = await discord_link_id(db, admin["id"])

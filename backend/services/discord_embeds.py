@@ -305,7 +305,7 @@ async def refresh(db, kind: str, *, force: bool = False, now: datetime | None = 
     ``guild_id`` (#628): die Einbettung dieses Unterservers - nur mit den Spielen dieses Servers. Die Merkliste
     ``_dirty`` führt dann ``sweep``, nicht diese Funktion."""
     from discord_service import REASON_TEXTS as SEND_TEXTS
-    from services.discord_bot import bot, bot_settings
+    from services.discord_runtime import bot, bot_settings
 
     if kind not in KINDS or (guild_id and kind not in SUB_KINDS):
         raise KeyError(kind)
@@ -403,7 +403,7 @@ async def retire(db) -> dict:
     """Einmal aufräumen (#883): die angeheftete Nachricht einer weggefallenen Einbettung löscht der Bot - es ist seine eigene.
     Ihr Kanal geht als Vorschlag an die Stream-Meldungen, solange dort keiner steht; sind sie noch aus, steht „Wenn der Stream
     endet“ auf löschen. Eingeschaltet wird nichts. Ist der Bot gerade nicht verbunden, versucht es der nächste Lauf wieder."""
-    from services.discord_bot import bot
+    from services.discord_runtime import bot
 
     settings, embeds = await _config(db)
     streams = settings.get("streams") if isinstance(settings.get("streams"), dict) else {}
@@ -480,7 +480,7 @@ async def sweep(db, *, full: bool = False) -> dict:
 
 async def embeds_status(db) -> dict:
     """Für Verbindungen → Discord: je Einbettung Schalter, Kanal, Nachricht, letzter Stand, Fehler."""
-    from services.discord_bot import read_state
+    from services.discord_runtime import read_state
 
     _, embeds = await _config(db)
     names = {str(row.get("id")): row.get("name") for row in ((await read_state(db)).get("channels") or []) if row.get("id")}

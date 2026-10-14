@@ -316,7 +316,7 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
 async def _refresh_lane(db, tournament: dict, lane: dict, message, *, force: bool, final: bool, current: datetime) -> dict:
     """Eine Bahn: posten, pinnen, bearbeiten - der Endstand als letzte Nachricht im Thread (#572)."""
     from discord_service import REASON_TEXTS
-    from services.discord_bot import bot
+    from services.discord_runtime import bot
 
     tournament_id = tournament["id"]
     field, thread_id = lane["field"], lane["thread_id"]

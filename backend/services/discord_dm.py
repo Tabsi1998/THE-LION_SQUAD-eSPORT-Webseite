@@ -100,7 +100,7 @@ async def dm_state(db, user: dict) -> dict:
 async def send_discord_dm_for_notification(notification: dict, category: str | None = None) -> int:
     """Eine Benachrichtigung als Direktnachricht: 1, wenn zugestellt, sonst 0 - mit Log und Merker."""
     from discord_service import REASON_TEXTS, build_embed, resolve_buttons
-    from services.discord_bot import bot, bot_settings
+    from services.discord_runtime import bot, bot_settings
 
     user_id = notification.get("user_id")
     kind = str(notification.get("kind") or "")

@@ -16,10 +16,11 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from models import now_utc
 from services import event_days
+from services.discord_runtime import _dt  # umgezogen (#1420), hier weiter erreichbar
 
 logger = logging.getLogger("tls.discord.scheduled")
 
@@ -45,19 +46,6 @@ REASON_TEXTS = {
     "per_day": "Das Event hat mehrere Tage – je Tag ein Termin statt eines für alles.",
     "day_removed": "Diesen Tag gibt es nicht mehr.",
 }
-
-
-def _dt(value) -> datetime | None:
-    if not value:
-        return None
-    if isinstance(value, datetime):
-        parsed = value
-    else:
-        try:
-            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        except ValueError:
-            return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
 def _settings_view(discord_settings: dict | None) -> dict:
@@ -242,7 +230,7 @@ async def _plan(db, kind: str, doc: dict, cfg: dict, origin: str, now: datetime)
 async def sync(db, *, now: datetime | None = None, limit: int = MAX_OPS_PER_RUN) -> dict:
     """Abgleich: anlegen, ändern, absagen - je Server, höchstens ``limit`` Aufrufe je Lauf (Discord-Limits).
     Der Hauptserver steht wie bisher in ``discord_scheduled_event``, Unterserver je Server in ``discord_scheduled_guilds``."""
-    from services.discord_bot import bot, bot_settings
+    from services.discord_runtime import bot, bot_settings
 
     current = now or now_utc()
     settings = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}

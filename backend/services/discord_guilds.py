@@ -322,7 +322,7 @@ async def send_test(db, guild_id: str, *, confirmed: bool = False) -> dict:
     """Testnachricht (#624): am Hauptserver in den privaten Testkanal (wie „Test“ bei den Kanälen); am Unterserver in
     dessen Systemkanal - der ist öffentlich, darum nur nach Bestätigung."""
     from discord_service import _new_log, _send_embed, send_to
-    from services.discord_bot import bot
+    from services.discord_runtime import bot
 
     row = await db[COLLECTION].find_one({"guild_id": str(guild_id)}, {"_id": 0})
     if not row:
@@ -373,7 +373,7 @@ async def own_status(db, user_id: str, guild_ids: list[str], *, now=None) -> dic
     """„Du bist dabei“ - immer nur für die eigene Person (#626). Der Bot prüft, das Ergebnis gilt fünf Minuten;
     Beitritt und Austritt meldet der Bot sofort (``note_membership``). Unbekannt (Bot offline) bleibt None und wird
     nicht gemerkt. Ohne verknüpftes Discord gibt es keinen Status."""
-    from services.discord_bot import bot
+    from services.discord_runtime import bot
     from services.discord_dm_basics import discord_link_id
 
     discord_id = await discord_link_id(db, user_id)
@@ -447,7 +447,7 @@ async def greet_linked(db, user_id: str, discord_id: str) -> dict:
     """Nach dem Verknüpfen (#626): eine Direktnachricht mit den Servern zu den eigenen Spielen - nur DM, nie ein Kanal;
     einmal je Discord-Konto. Steht wie jede Direktnachricht im Discord-Log (ohne Inhalt zum erneuten Senden)."""
     from discord_service import REASON_TEXTS, build_embed, resolve_buttons
-    from services.discord_bot import bot, bot_settings
+    from services.discord_runtime import bot, bot_settings
     from services.discord_dm_basics import DM_TARGET
 
     person = await db.users.find_one({"id": user_id}, {"_id": 0, "discord_servers_greeted_for": 1}) or {}

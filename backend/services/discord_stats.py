@@ -28,7 +28,7 @@ SERIES_DAYS = 30
 
 def day_of(moment=None) -> str:
     """Der Vereinstag (Wien) - derselbe wie beim Zählen für die Erfolge."""
-    from services.discord_bot import club_day
+    from services.discord_runtime import club_day
 
     return club_day(moment)
 
@@ -83,7 +83,7 @@ async def overview(db, *, now=None) -> dict:
     """Je Server (sortiert wie das Verzeichnis): Nachrichten, aktive verknüpfte Konten, Beitritte und Austritte über 7
     und 30 Tage, dazu die Nachrichten der letzten 30 Tage als Reihe (ältester Tag zuerst). Verlassene Server fehlen."""
     from services import discord_guilds
-    from services.discord_bot import bot_settings
+    from services.discord_runtime import bot_settings
 
     current = now or now_utc()
     days = [day_of(current - timedelta(days=offset)) for offset in range(SERIES_DAYS - 1, -1, -1)]   # ältester zuerst
