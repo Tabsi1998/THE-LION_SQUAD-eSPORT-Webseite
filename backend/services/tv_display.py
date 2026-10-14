@@ -176,7 +176,7 @@ STAGE_SETTING_FIELDS = ("duration_minutes", "game_mode", "best_of")
 MATCH_FIELDS = ("id", "tournament_id", "stage_id", "stage_number", "stage_type", "match_type", "match_key", "section",
                 "round", "round_name", "matchday_number", "matchday_label", "order", "match_index", "status",
                 "scheduled_at", "started_at", "completed_at", "duration_minutes", "station_id", "station_name",
-                "station_label", "winner_id", "is_preview", "called_at", "best_of")
+                "station_label", "winner_id", "is_preview", "called_at", "best_of", "effective_duration_minutes")
 # Wer zum Check-in zählt (#1123) und wer einen Platz belegt (wie die Anmeldung: offen, bestätigt, eingecheckt).
 CHECKIN_STATUSES = ("approved", "checked_in")
 SEAT_STATUSES = ("pending", "approved", "checked_in")

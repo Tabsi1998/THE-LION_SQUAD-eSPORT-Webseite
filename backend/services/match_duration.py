@@ -117,6 +117,17 @@ def effective_match_duration(match: dict | None = None, *, stage: dict | None = 
     return max(1, int(default))
 
 
+def with_effective_durations(matches, *, stages=(), tournament: dict | None = None, game: dict | None = None) -> list:
+    """Schreibt je Spiel ``effective_duration_minutes`` in eine Antwort (nie in die Datenbank) - für App und TV, die die
+    Kette nicht selbst rechnen. Die Website rechnet mit ``lib/matchDuration.js`` und ``duration_game``."""
+    stage_by_id = {(stage or {}).get("id"): stage for stage in stages or [] if isinstance(stage, dict)}
+    for match in matches or []:
+        if isinstance(match, dict):
+            match["effective_duration_minutes"] = effective_match_duration(
+                match, stage=stage_by_id.get(match.get("stage_id")), tournament=tournament, game=game)
+    return matches
+
+
 async def load_duration_games(db, tournaments, extra: tuple[str, ...] = ()) -> dict[str, dict]:
     """Die Games mehrerer Turniere in einer Abfrage, nach Kennung - für Aufrufer, die viele Turniere planen.
     ``extra``: weitere Felder des Games, die der Aufrufer braucht (der Planer etwa ``station_devices``)."""

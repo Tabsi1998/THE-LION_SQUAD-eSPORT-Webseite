@@ -231,3 +231,25 @@ async def test_the_bracket_payload_names_the_game_duration_data(flow):
     bracket = (await flow.get(f"/api/tournaments/{tournament['id']}/bracket")).json()
     assert bracket["duration_game"]["match_modes"][0]["minutes"] == 12
     assert bracket["duration_game"]["setup_minutes"] == 3
+
+
+# ---------------------------------------------------------------- Anzeigen ohne eigene Kette (App, TV)
+
+@pytest.mark.asyncio
+async def test_bracket_match_page_and_tv_name_the_effective_duration(flow):
+    """App und TV rechnen die Kette nicht selbst: die Antworten nennen je Spiel die Dauer, die gilt (Codex zu #1578)."""
+    from services.tv_display import display_bracket_payload
+
+    await as_admin(flow)
+    game = await new_game(flow)
+    tournament = await on_site(flow, game_id=game["id"], match_duration_minutes=None)
+    bracket = (await flow.get(f"/api/tournaments/{tournament['id']}/bracket")).json()
+    assert {match["effective_duration_minutes"] for match in bracket["matches_v2"]} == {15}
+    assert {match["effective_duration_minutes"] for match in display_bracket_payload(bracket)["matches_v2"]} == {15}
+
+    match = bracket["matches_v2"][0]
+    await flow.put(f"/api/matches/{match['id']}", json={"duration_minutes": 20})
+    page = (await flow.get(f"/api/matches/{match['id']}/page")).json()
+    assert page["match"]["effective_duration_minutes"] == 20
+    other = next(row for row in bracket["matches_v2"] if row["id"] != match["id"])
+    assert (await flow.get(f"/api/matches/{other['id']}/page")).json()["match"]["effective_duration_minutes"] == 15
