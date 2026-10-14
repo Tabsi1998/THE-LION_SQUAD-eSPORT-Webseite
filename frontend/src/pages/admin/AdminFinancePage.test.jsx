@@ -262,3 +262,21 @@ test("der Hinweis auf fehlende Konditionen öffnet den Reiter Rechnungsangaben",
   expect(screen.getByTestId("finance-tab-rechnungsangaben")).toHaveAttribute("aria-selected", "true");
   expect(screen.queryByTestId("finance-summary")).toBeNull();
 });
+
+// #990: am Handy werden die Tabellen nicht abgeschnitten - sie liegen in einer Fläche, die seitlich scrollt (Wischen
+// oder Tastatur), mit Namen für Screenreader. Ob es wirklich überläuft, misst der Browser-Test bei 390 px.
+test("die Tabellen liegen in einer seitlich scrollbaren, bedienbaren Fläche statt abgeschnitten", async () => {
+  render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
+  await screen.findByTestId("finance-order-o1");
+  await screen.findByTestId("finance-invoice-o2");
+  for (const [testId, name, row] of [["finance-open-scroll", "Offene Rechnungsaufträge", "finance-order-o1"], ["finance-invoiced-scroll", "Angelegte Rechnungen", "finance-invoice-o2"]]) {
+    const region = screen.getByTestId(testId);
+    expect(region).toHaveAttribute("role", "region");
+    expect(region).toHaveAccessibleName(name);
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(region.className).toContain("overflow-x-auto");
+    expect(region.className).not.toContain("overflow-hidden");
+    expect(within(region).getByTestId(row)).toBeInTheDocument();
+    expect(region.querySelector("table").className).toMatch(/min-w-\[/);
+  }
+});

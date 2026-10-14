@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { AdventCalendarDialog } from "@/advent/AdventCalendarDialog";
+import { OptionalBoundary } from "@/components/tls/AppErrorBoundary";
 import { openAdventCalendar } from "@/advent/calendarDialog";
 import "./advent-calendar-widget.css";
 
@@ -89,7 +90,8 @@ export function MenuEntry({ season, onClose }) {
 
 /** Das Fenster des Kalenders - die Bühne zeigt es, solange die Saison läuft (auch in der Vorschau). */
 export function Overlay() {
-  return <AdventCalendarDialog />;
+  // Der Kalender ist keine Deko: stürzt er ab, steht ein Hinweis mit „Nochmal versuchen“ (#986), die Bühne bleibt still.
+  return <OptionalBoundary><AdventCalendarDialog /></OptionalBoundary>;
 }
 
 export const season = { key: "advent_calendar", accent: ACCENT, Widget, MenuEntry, Overlay };
