@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
@@ -25,20 +25,23 @@ import { colors } from "../../theme";
 // „Braucht Aufmerksamkeit“ (#1160): was hängt, mit dem passenden Knopf (Eintragen, Ansehen, Umlegen) - Erledigtes
 // verschwindet von selbst. Reiter „Ergebnisse“: alle offenen Spiele, zuerst was fehlt, dann nach Station; „Eintragen“
 // öffnet das Ergebnis-Fenster, danach 10 Sekunden „Rückgängig“. Nur für die Turnierleitung dieses Turniers.
+// „Nicht erschienen?“ (#1551, #1563): ist die Frist um, liegt ein Vorschlag am Spiel - die fehlende Seite kampflos werten
+// (mit Rückfrage, weil es das Spiel entscheidet) oder die Frist um 5 Minuten verlängern. Wie im Web.
 
 type Props = NativeStackScreenProps<TournamentStackParamList, "TournamentLead">;
 
 type AttentionItem = {
   id: string;
-  kind: "result_missing" | "dispute" | "report_conflict" | "station_broken" | string;
+  kind: "result_missing" | "dispute" | "report_conflict" | "station_broken" | "no_show" | string;
   title: string;
   detail?: string;
-  action: "enter" | "view" | "move" | string;
+  action: "enter" | "view" | "move" | "no_show" | string;
   match_id?: string;
   match_ids?: string[];
   station_text?: string;
   label?: string;
   names?: string;
+  participants?: Array<{ registration_id: string; name?: string }>;
 };
 
 type LeadView = {
@@ -110,6 +113,27 @@ export function TournamentLeadScreen({ route }: Props) {
     }
   };
 
+  // „Nicht erschienen?“ (#1551): kampflos werten oder verlängern - derselbe Weg wie im Web.
+  const decideNoShow = async (item: AttentionItem, body: { action: "confirm"; registration_id: string } | { action: "extend"; minutes: number }) => {
+    setDeciding(true);
+    try {
+      await api.post(`/tournaments/${idSegment(view?.tournament?.slug || route.params.id)}/lead/no-show/${item.match_id}`, body);
+      setNotice(body.action === "extend" ? `Frist um ${body.minutes} Minuten verlängert.` : "Kampflos gewertet – beide Seiten bekommen Bescheid.");
+      await load();
+    } catch (err) {
+      setNotice(errorMessage(err, "Das hat nicht geklappt."));
+    } finally {
+      setDeciding(false);
+    }
+  };
+  const confirmNoShow = (item: AttentionItem, side: { registration_id: string; name?: string }) => {
+    const name = side.name || "Teilnehmer";
+    Alert.alert(`${name} nicht erschienen?`, `${name} verliert dieses Spiel kampflos. Die Gegenseite kommt weiter.`, [
+      { text: "Abbrechen", style: "cancel" },
+      { text: "Kampflos werten", style: "destructive", onPress: () => { void decideNoShow(item, { action: "confirm", registration_id: side.registration_id }); } },
+    ]);
+  };
+
   // Streitfall entscheiden (#1158): „Ergebnis bleibt“ mit einem Tipp - beide Seiten bekommen Bescheid.
   const keepResult = async (item: ResultEntry, note: string | null) => {
     setDeciding(true);
@@ -168,10 +192,18 @@ export function TournamentLeadScreen({ route }: Props) {
                   </View>
                   {item.action === "move" ? (
                     <Button label="Umlegen" variant="secondary" onPress={() => setMovingId(movingId === item.id ? "" : item.id)} disabled={deciding} testID={`lead-case-move-${item.id}`} />
-                  ) : item.match_id && byId[item.match_id]?.can_enter ? (
+                  ) : item.action === "no_show" ? null : item.match_id && byId[item.match_id]?.can_enter ? (
                     <Button label="Eintragen" onPress={() => setOpenId(item.match_id as string)} disabled={deciding} testID={`lead-case-enter-${item.id}`} />
                   ) : null}
                 </View>
+                {item.action === "no_show" ? (
+                  <View style={styles.stack} testID={`lead-no-show-${item.id}`}>
+                    {(item.participants || []).map((side) => (
+                      <Button key={side.registration_id} label={`${side.name || "Teilnehmer"} nicht erschienen`} variant="secondary" onPress={() => confirmNoShow(item, side)} disabled={deciding} testID={`lead-no-show-${side.registration_id}`} />
+                    ))}
+                    <Button label="+5 Min. verlängern" variant="quiet" onPress={() => { void decideNoShow(item, { action: "extend", minutes: 5 }); }} disabled={deciding} testID={`lead-no-show-extend-${item.id}`} />
+                  </View>
+                ) : null}
                 {movingId === item.id ? (
                   <View style={styles.stack} testID={`lead-case-stations-${item.id}`}>
                     <Muted style={styles.hint}>Auf welche Station?</Muted>

@@ -3,6 +3,7 @@ import {
   formatChatTime,
   formatEventType,
   formatMembershipStatus,
+  formatStatus,
   formatMembershipType,
   formatNewsCategory,
   formatRole,
@@ -131,4 +132,9 @@ test("formatWhen: heute, morgen, Wochentag mit Monat, Jahr nur außerhalb des la
   expect(formatWhen("2026-05-20T22:01:00Z", { now })).toBe("morgen 00:01");
   expect(formatWhen("2025-05-23T16:00:00Z", { now })).toBe("Fr 23. Mai 2025 · 18:00");
   expect(formatWhen(null, { now, fallback: "Noch kein Termin" })).toBe("Noch kein Termin");
+});
+
+test("Ausgeschieden (#1553): ausgetreten und disqualifiziert auf Deutsch wie im Web (tournamentLabels.js)", () => {
+  expect(formatStatus("withdrawn")).toBe("Ausgetreten");
+  expect(formatStatus("disqualified")).toBe("Disqualifiziert");
 });

@@ -45,6 +45,7 @@ import { countdown, type MatchCall } from "../../lib/matchCall";
 import { asInstant, viennaTime } from "../../lib/vienna";
 import type { CatalogSticker } from "../../lib/stickers";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
+import { playMoment } from "../../lib/tournamentHaptics";
 
 const MATCH_LIVE_RESOURCES = ["matches", "matches-v2", "tournaments"];
 
@@ -137,6 +138,17 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const page = data?.page ?? null;
   const chat = data?.chat ?? NO_CHAT;
   const notice = (stale ? problem : null) || data?.partProblem || null;
+  // Aufruf (#1168): kommt er, während die Seite offen ist, dreimal kurz - im selben Moment wie die Aufruf-Karte. Beim
+  // Öffnen bleibt es still (da hat die Benachrichtigung schon vibriert).
+  const callKey = page ? String(page.call?.called_at || (page.call ? "call" : "")) : null;
+  const lastCall = useRef<string | null>(null);
+  useEffect(() => {
+    if (callKey === null) return undefined;
+    const before = lastCall.current;
+    lastCall.current = callKey;
+    if (before === null || !callKey || callKey === before) return undefined;
+    return playMoment("call");
+  }, [callKey]);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -335,6 +347,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     setSuccess("");
     try {
       const { data } = await api.post<{ awaiting_confirmation?: boolean }>(`/matches/${idSegment(route.params.id)}/report`, payload);
+      playMoment("result");
       await refreshAfterResult();
       setSuccess(data?.awaiting_confirmation === false ? "Ergebnis bestätigt – das Spiel ist entschieden." : "Ergebnis gemeldet.");
       return true;
