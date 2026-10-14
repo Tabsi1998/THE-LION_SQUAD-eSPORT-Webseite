@@ -31,7 +31,7 @@ export default function AdminDutyPage() {
       </div>
 
       {failed && !data && (
-        <p className="rounded-sm border border-[#FF3B30]/30 bg-[#FF3B30]/5 px-4 py-3 text-sm text-white/70" data-testid="duty-error">
+        <p className="rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-white/70" data-testid="duty-error">
           Dein Dienst konnte nicht geladen werden. Versuch es gleich noch einmal.
         </p>
       )}
