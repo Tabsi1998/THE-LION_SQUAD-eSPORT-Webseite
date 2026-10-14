@@ -34,7 +34,7 @@ import { SideSheet } from "@/components/tls/SideSheet";
 import { TeamHeader } from "@/pages/public/team/TeamHeader";
 import { inviteTokenFrom, memberRole, ROLE_LABELS } from "@/lib/teamPage";
 import { AUTO_COLOR, TEAM_COLORS } from "@/lib/teamColors";
-import { LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
+import { LoadNotice, LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
 import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useLoad } from "@/hooks/useLoad";
 import { ShareButton } from "@/components/tls/ShareButton";
@@ -60,8 +60,12 @@ function TeamList() {
   const [editing, setEditing] = useState(null);
 
   // „KEINE TEAMS“ nur nach einer erfolgreichen, leeren Antwort (#984); ohne Level bleiben die Teams stehen.
-  const teams = useLoad("teams", fetchTeamList, { isEmpty: (data) => data.list.length === 0 });
-  const load = teams.reload;
+  // Level sind Zusatzdaten (nach Codex-Prüfung): sie halten die Liste nicht auf, ein Ausfall zeigt sich nur bei den Level.
+  const teams = useLoad("teams", ({ signal }) => api.get("/teams?limit=90", { signal }).then(({ data }) => (Array.isArray(data) ? data : [])));
+  const teamLevels = useLoad("teams/levels", ({ signal }) => api.get("/teams/levels", { signal }).then(({ data }) => ({ levels: data?.levels || {}, crowns: data?.crowns || {} })), { isEmpty: () => false });
+  const levels = teamLevels.data?.levels || {};
+  const crowns = teamLevels.data?.crowns || {};
+  const load = () => Promise.all([teams.reload(), teamLevels.reload()]);
   useApiInvalidation(load, ["teams"]);
 
   return (
@@ -98,10 +102,15 @@ function TeamList() {
             errorTitle="Die Teams konnten nicht geladen werden"
             empty={<div className="text-center py-20 text-white/40 font-display tracking-widest">KEINE TEAMS</div>}
           >
-            {({ list, levels, crowns }) => (
+            {(list) => (
+              <>
+              {teamLevels.status === "error" && (
+                <LoadNotice testId="teams-levels-error" className="mb-5" message="Die Team-Level konnten gerade nicht geladen werden." onRetry={teamLevels.reload} />
+              )}
               <Reveal className="tls-reveal-grid tls-dim-siblings grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
                 {list.map((t) => <TeamCard key={t.id} team={t} levelInfo={levels[t.id]} crown={crowns[t.id] || null} />)}
               </Reveal>
+              </>
             )}
           </LoadState>
         </div>
@@ -109,18 +118,6 @@ function TeamList() {
       {editing && <TeamModal team={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </PublicLayout>
   );
-}
-
-async function fetchTeamList({ signal, previous }) {
-  const { data } = await api.get("/teams?limit=90", { signal });
-  let levels = previous?.levels || {};
-  let crowns = previous?.crowns || {};
-  try {
-    const { data: lvl } = await api.get("/teams/levels", { signal });
-    levels = lvl?.levels || {};
-    crowns = lvl?.crowns || {};
-  } catch {}
-  return { list: Array.isArray(data) ? data : [], levels, crowns };
 }
 
 function TeamCard({ team: t, levelInfo, crown = null }) {
@@ -190,12 +187,16 @@ function TeamDetail({ id }) {
   // Laden (#983, #1152) über useLoad: 404/403 heißt „nicht gefunden“; ohne Netz oder bei einem Serverfehler bleibt ein
   // schon geladenes Team stehen (mit Hinweis), sonst steht der Fehler mit „Nochmal versuchen“ da - nie ein ewiges
   // „Lade Team“. Wechselt das Team, ist das alte sofort weg; eine verspätete Antwort für das alte verfällt.
-  const teamLoad = useLoad(["team", id], fetchTeamDetail);
+  // Level und Übersicht laden unabhängig (nach Codex-Prüfung): das Team steht, sobald /teams/:id da ist; ein Ausfall
+  // zeigt sich nur an seinem Bereich.
+  const teamLoad = useLoad(["team", id], ({ signal }) => api.get(`/teams/${id}`, { signal }).then(({ data }) => data), { isEmpty: () => false });
+  const levelLoad = useLoad(["team-level", id], ({ signal }) => api.get(`/teams/${id}/level`, { signal }).then(({ data }) => data), { isEmpty: () => false });
+  const overviewLoad = useLoad(["team-overview", id], ({ signal }) => api.get(`/teams/${id}/overview`, { signal }).then(({ data }) => data), { isEmpty: () => false });
   const missing = teamLoad.problem === "notFound" || teamLoad.problem === "denied";
-  const team = missing ? null : teamLoad.data?.team || null;
-  const levelInfo = teamLoad.data?.levelInfo || null;
-  const overview = teamLoad.data?.overview || null;
-  const refresh = teamLoad.reload;
+  const team = missing ? null : teamLoad.data || null;
+  const levelInfo = levelLoad.data || null;
+  const overview = overviewLoad.data || null;
+  const refresh = () => Promise.all([teamLoad.reload(), levelLoad.reload(), overviewLoad.reload()]);
   const load = refresh;
   useApiInvalidation(refresh, ["teams"]);
 
@@ -357,6 +358,9 @@ function TeamDetail({ id }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           {inviteToken && !isMember ? <TeamJoinCard teamId={team.id} token={inviteToken} user={user} onJoined={joinedByLink} /> : null}
+          {overviewLoad.status === "error" && overviewLoad.problem !== "notFound" && (
+            <LoadNotice testId="team-overview-error" message="Termine und letzte Spiele konnten gerade nicht geladen werden." onRetry={overviewLoad.reload} />
+          )}
           <TeamSchedule overview={overview} />
           {(team.awards || []).length > 0 && (
             <section data-testid="team-awards">
@@ -443,6 +447,9 @@ function TeamDetail({ id }) {
         </div>
         <aside className="space-y-4">
           {levelInfo && <TeamLevelPanel info={levelInfo} />}
+          {levelLoad.status === "error" && levelLoad.problem !== "notFound" && (
+            <LoadNotice testId="team-level-error" message="Das Team-Level konnte gerade nicht geladen werden." onRetry={levelLoad.reload} />
+          )}
           {actionError && <AuthFormAlert id="team-action-error">{actionError}</AuthFormAlert>}
           {user && !isMember && (
             <form onSubmit={join} className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
@@ -469,22 +476,6 @@ function TeamDetail({ id }) {
       {inviteOpen && <TeamInviteSheet team={team} onClose={() => setInviteOpen(false)} />}
     </PublicLayout>
   );
-}
-
-async function fetchTeamDetail({ key, signal, previous }) {
-  const id = JSON.parse(key)[1];
-  const { data: team } = await api.get(`/teams/${id}`, { signal });
-  let levelInfo = previous?.levelInfo || null;
-  try {
-    const { data: lvl } = await api.get(`/teams/${id}/level`, { signal });
-    levelInfo = lvl;
-  } catch {}
-  let overview = null;
-  try {
-    const { data: plan } = await api.get(`/teams/${id}/overview`, { signal });
-    overview = plan;
-  } catch {}
-  return { team, levelInfo, overview };
 }
 
 function TeamChat({ team, user }) {

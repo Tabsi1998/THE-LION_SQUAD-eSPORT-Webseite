@@ -54,7 +54,10 @@ export function useNotificationFeed({ enabled = true, onFresh } = {}) {
   const { reload: load, mutate } = feed;
   useLiveRefresh(load, RESOURCES, { fallbackMs: 30000, enabled });
 
-  const items = feed.data || NO_ITEMS;
+  // Ausstehende „gelesen“ liegen über dem Stand vom Server: ein Nachladen, während der POST unterwegs ist, bringt sie
+  // nicht wieder als ungelesen zurück.
+  const raw = feed.data || NO_ITEMS;
+  const items = useMemo(() => (pendingIds.size ? raw.map((row) => (pendingIds.has(row.id) && !row.read ? { ...row, read: true } : row)) : raw), [raw, pendingIds]);
   const bundles = useMemo(() => bundleNotifications(items), [items]);
   const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
 
@@ -76,6 +79,8 @@ export function useNotificationFeed({ enabled = true, onFresh } = {}) {
     setRead(todo, true);
     const results = await Promise.allSettled(todo.map((id) => api.post(`/admin/notifications/${id}/read`)));
     const failed = todo.filter((_, index) => results[index].status === "rejected");
+    // Erst den Stand setzen, dann das Overlay abnehmen - sonst blitzt ein zwischendurch geladener alter Stand auf.
+    setRead(todo.filter((id) => !failed.includes(id)), true);
     setPending(todo, false);
     if (failed.length) {
       setRead(failed, false);
@@ -96,6 +101,7 @@ export function useNotificationFeed({ enabled = true, onFresh } = {}) {
     setRead(ids, true);
     try {
       await api.post("/admin/notifications/read-all");
+      setRead(ids, true);
       setPending(ids, false);
     } catch {
       setPending(ids, false);
