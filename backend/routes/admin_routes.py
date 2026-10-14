@@ -851,7 +851,7 @@ async def system_status(me: dict = Depends(require_any_admin())):
         for status in ("pending", "sending", "sent", "failed", "skipped"):
             queue_counts[status] = await db.mail_jobs.count_documents({"status": status})
     try:
-        from services.scheduler import get_scheduler_status
+        from services.scheduler_state import get_scheduler_status
         scheduler = get_scheduler_status()
     except Exception as exc:
         logger.warning("scheduler status failed", exc_info=True)
