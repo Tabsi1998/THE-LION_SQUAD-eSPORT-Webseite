@@ -291,9 +291,9 @@ export default function ProfilePage() {
                   <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
                 </button>
                 {saveFailed ? (
-                  <span role="alert" className="inline-flex flex-wrap items-center gap-2 text-xs text-[#FF3B30]" data-testid="profile-save-error">
+                  <span role="alert" className="inline-flex flex-wrap items-center gap-2 text-xs text-warn" data-testid="profile-save-error">
                     {formatRequestError(autosave.error, "Profil konnte nicht gespeichert werden.")} Deine Eingaben bleiben stehen.
-                    <button type="button" onClick={submit} data-testid="profile-save-retry" className="tls-hit min-h-11 px-3 border border-[#FF3B30]/40 rounded-sm font-bold uppercase tracking-wider hover:bg-[#FF3B30]/10">
+                    <button type="button" onClick={submit} data-testid="profile-save-retry" className="tls-hit min-h-11 px-3 border border-warn/30 rounded-sm font-bold uppercase tracking-wider hover:bg-warn/5">
                       Erneut versuchen
                     </button>
                   </span>

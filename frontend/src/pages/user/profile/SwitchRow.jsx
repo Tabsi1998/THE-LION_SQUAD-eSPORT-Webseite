@@ -59,7 +59,7 @@ export function AutosaveStatus({ status, message, onRetry }) {
           type="button"
           onClick={() => { void onRetry(); }}
           data-testid="profile-autosave-retry"
-          className="tls-hit min-h-11 px-3 border border-[#FF3B30]/40 rounded-sm font-bold uppercase tracking-wider hover:bg-[#FF3B30]/10"
+          className="tls-hit min-h-11 px-3 border border-warn/30 rounded-sm font-bold uppercase tracking-wider hover:bg-warn/5"
         >
           Erneut versuchen
         </button>
