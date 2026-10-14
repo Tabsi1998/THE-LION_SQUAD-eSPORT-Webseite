@@ -26,6 +26,13 @@ def get_db():
     return _db
 
 
+async def ensure_event_photo_indexes(db) -> None:
+    """Fotos vom Event (#1185, #1186): eindeutige Schlüssel, auf denen „genau einmal“ und die Höchstzahl ruhen.
+    Steht hier und nicht in services/event_photos.py, damit database.py nichts aus services braucht (#1420)."""
+    await db.gallery_album_notices.create_index([("album_id", 1), ("user_id", 1)], unique=True)
+    await db.gallery_submission_quota.create_index([("album_id", 1), ("owner_id", 1)], unique=True)
+
+
 async def init_indexes():
     db = get_db()
     # Users
@@ -243,7 +250,6 @@ async def init_indexes():
     await db.gallery_submissions.create_index([("album_id", 1), ("owner_id", 1)])
     await db.gallery_submissions.create_index("status")
     # Fotos vom Event (#1185, #1186): Quittung je Album und Person, Zähler je Person und Album - beide eindeutig.
-    from services.event_photos import ensure_indexes as ensure_event_photo_indexes
     await ensure_event_photo_indexes(db)
     # News indexes for category / pinning
     await db.news_posts.create_index("category")

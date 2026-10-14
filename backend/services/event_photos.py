@@ -16,7 +16,7 @@ zweiter, überlappender Lauf findet es nicht mehr). Je Album und Person steht vo
 
 **Fotos einsenden (#1186).** Mitglieder schicken vom ersten Event-Tag bis sieben Tage nach dem letzten bis zu 20 Bilder
 ins Album des Events - nur mit dem Haken „Die Personen auf den Fotos sind einverstanden“. Jedes Bild geht durch
-denselben Weg wie jeder Bild-Upload (``routes.upload_routes._encode_image_bytes``: nur PNG, JPG oder WebP, Größe und
+denselben Weg wie jeder Bild-Upload (``services.image_upload._encode_image_bytes``: nur PNG, JPG oder WebP, Größe und
 Pixel begrenzt, neu gespeichert - EXIF mit GPS-Ort und Kamera fällt weg) und durch die Bildprüfung. Die Höchstzahl hält
 ein Zähler je Person und Album (``gallery_submission_quota``), der vor dem Hochladen atomar hochzählt und bei einem Fehler
 oder einer Ablehnung wieder zurückzählt - parallele Uploads kommen so nicht darüber. Es liegt privat in
@@ -36,6 +36,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, UploadFile
 
+from database import ensure_event_photo_indexes
 from models import new_id, now_utc
 from services.private_fields import private_projection
 from storage import GALLERY_SUBMISSION_DIR, PUBLIC_UPLOAD_DIR, ensure_directory
@@ -124,10 +125,8 @@ async def _media_counts(db, album_id: str) -> tuple[int, int, str | None]:
     return len(items) - videos, videos, newest
 
 
-async def ensure_indexes(db) -> None:
-    """Eindeutige Schlüssel, auf denen „genau einmal“ und die Höchstzahl ruhen (auch von database.py aufgerufen)."""
-    await db.gallery_album_notices.create_index([("album_id", 1), ("user_id", 1)], unique=True)
-    await db.gallery_submission_quota.create_index([("album_id", 1), ("owner_id", 1)], unique=True)
+# Eindeutige Schlüssel, auf denen „genau einmal“ und die Höchstzahl ruhen - angelegt in database.py (#1420).
+ensure_indexes = ensure_event_photo_indexes
 
 
 def _is_duplicate(exc: Exception) -> bool:
@@ -342,7 +341,7 @@ async def find_album(db, album_id_or_slug: str) -> dict:
 
 async def store_submission(db, album: dict, user: dict, file: UploadFile, *, consent: bool, credit: bool) -> dict:
     """Ein Foto prüfen, ohne EXIF neu speichern und als „wartet auf Freigabe“ ablegen."""
-    from routes.upload_routes import _encode_image_bytes, _read_upload_limited
+    from services.image_upload import _encode_image_bytes, _read_upload_limited
     from services.visibility import user_can_see
 
     if not await may_submit(user):

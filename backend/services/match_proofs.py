@@ -8,7 +8,7 @@ Ein Beweisfoto ist persönlich (Gesichter, Bildschirme, Wohnzimmer). Deshalb:
   öffentliche Upload-Adresse. Wer nicht darf, bekommt 404 (wie bei Chat-Anhängen - sonst ließe sich prüfen, ob es
   ein Foto gibt).
 - Beim Hochladen wird das Bild geprüft und neu gespeichert (derselbe Weg wie jeder Bild-Upload,
-  ``routes.upload_routes._encode_image_bytes``): nur PNG, JPG oder WebP, Größe und Pixel begrenzt, Drehung übernommen,
+  ``services.image_upload._encode_image_bytes``): nur PNG, JPG oder WebP, Größe und Pixel begrenzt, Drehung übernommen,
   EXIF mit GPS-Ort und Kamera fällt dabei weg.
 - Bildprüfung wie im Chat (#415): bis das Ergebnis da ist, sieht das Foto nur, wer es hochgeladen hat.
 - Gelöscht wird es mit dem Turnier, mit dem Konto (Kontolöschung) und sonst 30 Tage nach dem Hochladen - außer das
@@ -59,7 +59,7 @@ def public_proof(doc: dict) -> dict:
 
 async def store_proof(db, match: dict, owner: dict, registration_id: str | None, file: UploadFile) -> dict:
     """Ein Foto prüfen, neu speichern (ohne EXIF) und als „pending“ ablegen."""
-    from routes.upload_routes import MAX_BYTES, MAX_IMAGE_UPLOAD_MB, _encode_image_bytes, _read_upload_limited
+    from services.image_upload import MAX_BYTES, MAX_IMAGE_UPLOAD_MB, _encode_image_bytes, _read_upload_limited
 
     data = await _read_upload_limited(file, MAX_BYTES, MAX_IMAGE_UPLOAD_MB)
     suffix = pathlib.Path(file.filename or "").suffix.lower()

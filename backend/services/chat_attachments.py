@@ -108,7 +108,7 @@ ANIMATED_IMAGE_FORMATS = {"GIF": ("image/gif", ".gif"), "WEBP": ("image/webp", "
 
 def _keep_animated_image(data: bytes) -> dict | None:
     """Das Bild unverändert, wenn es ein GIF oder ein animiertes WebP ist; sonst None."""
-    from routes.upload_routes import MAX_IMAGE_PIXELS
+    from services.image_upload import MAX_IMAGE_PIXELS
 
     try:
         with Image.open(BytesIO(data)) as img:
@@ -128,7 +128,7 @@ def _keep_animated_image(data: bytes) -> dict | None:
 
 
 async def _encode_uploaded_image(file: UploadFile, max_mb: int, *, keep_animated: bool = False) -> dict:
-    from routes.upload_routes import _encode_image_bytes, _read_upload_limited
+    from services.image_upload import _encode_image_bytes, _read_upload_limited
 
     data = await _read_upload_limited(file, max_mb * 1024 * 1024, max_mb)
     if keep_animated:
@@ -140,7 +140,7 @@ async def _encode_uploaded_image(file: UploadFile, max_mb: int, *, keep_animated
 
 
 def _upload_kind(file: UploadFile) -> str:
-    from routes.upload_routes import ALLOWED_IMAGE, ALLOWED_VIDEO, IMAGE_MIME_BY_EXT, VIDEO_MIME_ALIASES, VIDEO_MIME_BY_EXT
+    from services.image_upload import ALLOWED_IMAGE, ALLOWED_VIDEO, IMAGE_MIME_BY_EXT, VIDEO_MIME_ALIASES, VIDEO_MIME_BY_EXT
 
     declared = (file.content_type or "").split(";")[0].strip().lower()
     declared_video = VIDEO_MIME_ALIASES.get(declared, declared)
@@ -154,7 +154,7 @@ def _upload_kind(file: UploadFile) -> str:
 
 async def store_chat_upload(file: UploadFile, owner: dict, poster: UploadFile | None = None) -> dict:
     """Speichert einen Anhang als "pending". Erst eine Nachricht ordnet ihn einem Chat zu."""
-    from routes.upload_routes import VIDEO_SNIFF_BYTES, _detect_video_upload, _write_upload_stream_limited
+    from services.image_upload import VIDEO_SNIFF_BYTES, _detect_video_upload, _write_upload_stream_limited
 
     kind = _upload_kind(file)
     stem = uuid.uuid4().hex
