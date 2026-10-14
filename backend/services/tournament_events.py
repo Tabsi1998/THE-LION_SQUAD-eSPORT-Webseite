@@ -44,9 +44,11 @@ from services.competition_usage import GRAPH, record_write
 from services.competition_versions import persist_competition_versions
 from services.heat_rebuild import STALE_DETAIL, _doc_fields, _replan_schedule, _unchanged_filter, evaluate_after_write
 from services.match_notifications import notify_match_result_confirmed
+from services.advancement_draw import draw_group_of, group_targets
 from services.match_v2_results import (
     _status_after_slot_fill,
     build_v2_result_application,
+    group_awaits_draw,
     has_result,
     resolve_walkovers,
 )
@@ -79,6 +81,7 @@ DISPLAY_BY_OP = {
     "annulled": "slot_cleared",
     "cancelled": "slot_cleared",
     "readvanced": "slot_filled",
+    "draw_excluded": "slot_cleared",
 }
 
 
@@ -151,13 +154,16 @@ def _apply_application(match: dict, by_id: dict[str, dict], application: dict) -
 
 
 def _forfeit(match: dict, matches: list[dict], by_id: dict[str, dict], registration_id: str, kind: str,
-             now_iso: str, ops: list[dict], eliminated: set[str]) -> None:
+             now_iso: str, ops: list[dict], eliminated: set[str], draws: list[dict] | None = None) -> None:
     """Die Wertung über den Ergebnis-Anwender: Person zuletzt, kein Weg führt sie weiter (``eliminated``)."""
     application = build_v2_result_application(
         match, matches, results_for_forfeit(match, registration_id), actor_id="system", now_iso=now_iso,
         note=REMOVAL_LABELS[kind], force=has_result(match), eliminated=eliminated | {registration_id},
     )
     _apply_application(match, by_id, application)
+    if draws is not None:
+        # Gemischt (#1548): entscheidet die Wertung die Runde, ist die Folgerunde ausgelost - fürs Protokoll.
+        draws.extend(application.get("draws") or [])
     match.update({
         "status": "forfeit",
         "forfeit_registration_id": registration_id,
@@ -190,7 +196,7 @@ def _cancel(match: dict, kind: str, registration_id: str, now_iso: str, *, annul
 
 
 def _plan_table(stage_matches: list[dict], matches: list[dict], by_id: dict[str, dict], registration_id: str,
-                kind: str, now_iso: str, ops: list[dict], eliminated: set[str]) -> dict:
+                kind: str, now_iso: str, ops: list[dict], eliminated: set[str], draws: list[dict] | None = None) -> dict:
     """50-Prozent-Regel (E12): gespielt sind entschiedene Spiele, gesamt alle noch gültigen der Person."""
     mine = [m for m in stage_matches if _seats(m, registration_id) and str(m.get("status") or "") != "cancelled"
             and not m.get("is_preview")]
@@ -207,18 +213,50 @@ def _plan_table(stage_matches: list[dict], matches: list[dict], by_id: dict[str,
             if len(_filled(match)) < 2:
                 _cancel(match, kind, registration_id, now_iso, annulled=False, ops=ops)
             else:
-                _forfeit(match, matches, by_id, registration_id, kind, now_iso, ops, eliminated)
+                _forfeit(match, matches, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
     return {"mode": "forfeit", "played": len(played), "total": total}
 
 
 def _plan_swiss(stage_matches: list[dict], matches: list[dict], by_id: dict[str, dict], registration_id: str,
-                kind: str, now_iso: str, ops: list[dict], eliminated: set[str]) -> dict:
+                kind: str, now_iso: str, ops: list[dict], eliminated: set[str], draws: list[dict] | None = None) -> dict:
     for match in sorted((m for m in stage_matches if _seats(m, registration_id) and _is_live(m)), key=_sort_key):
         if len(_filled(match)) < 2:
             _cancel(match, kind, registration_id, now_iso, annulled=False, ops=ops)
         else:
-            _forfeit(match, matches, by_id, registration_id, kind, now_iso, ops, eliminated)
+            _forfeit(match, matches, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
     return {"mode": "swiss"}
+
+
+def _feeds_undrawn_draw(match: dict, by_id: dict[str, dict]) -> bool:
+    """Gemischt (#1548): leitet dieses Spiel in eine Runde weiter, die noch nicht ausgelost ist?"""
+    return any(group_awaits_draw(by_id.values(), draw_group_of(by_id.get(entry.get("to_match_id"))))
+               for entry in match.get("advancement") or [])
+
+
+def _exclude_from_draw(match: dict, registration_id: str, now_iso: str, ops: list[dict]) -> None:
+    """Vor der Auslosung sitzt die Person noch nirgends: ihre Zeile im Ergebnis wird als ausgeschieden vermerkt, die
+    Auslosung lässt sie aus (im Lauf rückt der Nächste auf, im Duell wird ihr Platz ein Freilos)."""
+    rows = [row for row in match.get("results") or []
+            if row.get("registration_id") == registration_id and not row.get("eliminated")]
+    if not rows:
+        return
+    for row in rows:
+        row["eliminated"] = True
+    match["updated_at"] = now_iso
+    ops.append({"kind": "draw_excluded", "match_id": match["id"], "match_key": match.get("match_key"),
+                "round_name": match.get("round_name"), "registration_id": registration_id})
+
+
+def _drawn_seats(by_id: dict[str, dict], group: str, heat_id: str) -> list[tuple[dict, dict]]:
+    """Die ausgelosten Plätze, die dieser Lauf in der Gruppe belegt (auch frei gewordene) - nach seinem Rang."""
+    seats = [
+        (target, slot)
+        for target in group_targets(by_id.values(), group) if target.get("status") != "cancelled"
+        for slot in target.get("slots") or []
+        if (slot.get("source_result") or {}).get("from_match_id") == heat_id
+        and (slot.get("source_result") or {}).get("flow") == "W"
+    ]
+    return sorted(seats, key=lambda seat: int((seat[1].get("source_result") or {}).get("rank") or 0))
 
 
 def _readvance(heat: dict, by_id: dict[str, dict], registration_id: str, now_iso: str, ops: list[dict],
@@ -230,9 +268,19 @@ def _readvance(heat: dict, by_id: dict[str, dict], registration_id: str, now_iso
     survivors = [row for row in sorted(heat.get("results") or [], key=lambda row: int(row.get("rank") or 0))
                  if row.get("registration_id") and row["registration_id"] not in gone and not row.get("forfeit")]
     entries = []
+    drawn_seats: dict[str, list[tuple[dict, dict]]] = {}
     for entry in sorted((e for e in heat.get("advancement") or [] if e.get("flow") == "W"), key=lambda e: int(e.get("rank") or 0)):
         target = by_id.get(entry.get("to_match_id"))
-        slot = next((s for s in (target or {}).get("slots") or [] if int(s.get("slot") or 0) == int(entry.get("to_slot") or 0)), None)
+        group = draw_group_of(target)
+        if group:
+            # Gemischt (#1548): ausgelost sitzt der Weiterkommer nicht auf dem Platz aus dem Schema, sondern auf seinem
+            # ausgelosten Platz - der k-te Weiterkommer dieses Laufs auf dem k-ten Platz, den der Lauf in der Gruppe hat.
+            seats = drawn_seats.setdefault(group, _drawn_seats(by_id, group, heat["id"]))
+            if not seats:
+                continue
+            target, slot = seats.pop(0)
+        else:
+            slot = next((s for s in (target or {}).get("slots") or [] if int(s.get("slot") or 0) == int(entry.get("to_slot") or 0)), None)
         if target and slot and _rebuildable(target):
             rank = int(entry.get("rank") or 0)
             wanted = survivors[rank - 1] if 0 < rank <= len(survivors) else None
@@ -263,6 +311,10 @@ def _readvance(heat: dict, by_id: dict[str, dict], registration_id: str, now_iso
                             "registration_id": wanted["registration_id"], "rank": int(wanted.get("rank") or 0),
                             "replaced": current})
             continue
+        if draw_group_of(target):
+            # Ausgelost: der Platz bleibt ein Freilos. Quelle und Weiterleitung aus dem Schema bleiben, wie sie sind -
+            # ein ausgeloster Platz gehört nicht zu der Weiterleitung, die im Schema auf ihn zeigt.
+            continue
         # Niemand rückt nach: der Platz ist „Quelle unerfüllbar“ wie beim Lauf-Umbau - der Lauf schickt für diesen
         # Rang niemanden mehr, damit ein Platz genau dann eine Lauf-Quelle hat, wenn ein Eintrag auf ihn zeigt.
         source = slot.get("source") or {}
@@ -281,11 +333,16 @@ def _readvance(heat: dict, by_id: dict[str, dict], registration_id: str, now_iso
 
 
 def _plan_bracket(stage_matches: list[dict], matches: list[dict], by_id: dict[str, dict], registration_id: str,
-                  kind: str, now_iso: str, ops: list[dict], eliminated: set[str]) -> dict:
+                  kind: str, now_iso: str, ops: list[dict], eliminated: set[str], draws: list[dict] | None = None) -> dict:
     # Erst die gefahrenen Läufe: wer dort weitergekommen ist, macht seinen Platz im Folgelauf für den Nächsten frei.
     for heat in sorted(stage_matches, key=_sort_key):
-        if heat.get("match_type") == "ffa" and str(heat.get("status") or "") in {"completed", "forfeit"} \
-                and any(row.get("registration_id") == registration_id for row in heat.get("results") or []):
+        if str(heat.get("status") or "") not in {"completed", "forfeit"} \
+                or not any(row.get("registration_id") == registration_id for row in heat.get("results") or []):
+            continue
+        if _feeds_undrawn_draw(heat, by_id):
+            # Gemischt (#1548): die Folgerunde ist noch nicht ausgelost - die Auslosung lässt die Person aus.
+            _exclude_from_draw(heat, registration_id, now_iso, ops)
+        elif heat.get("match_type") == "ffa":
             _readvance(heat, by_id, registration_id, now_iso, ops, eliminated)
     chain: list[str] = []
     for match in sorted(stage_matches, key=_sort_key):
@@ -304,7 +361,7 @@ def _plan_bracket(stage_matches: list[dict], matches: list[dict], by_id: dict[st
                         "round_name": match.get("round_name"), "remaining": _filled(match)})
             continue
         if _started(match) and len(_filled(match)) >= 2:
-            _forfeit(match, matches, by_id, registration_id, kind, now_iso, ops, eliminated)
+            _forfeit(match, matches, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
             continue
         for slot in _seats(match, registration_id):
             _clear_seat(slot, registration_id, kind, now_iso)
@@ -316,10 +373,14 @@ def _plan_bracket(stage_matches: list[dict], matches: list[dict], by_id: dict[st
     if chain:
         before = {match_id: str(by_id[match_id].get("status") or "") for match_id in by_id}
         target_sets: dict[str, dict] = {}
-        resolve_walkovers(chain, by_id, target_sets, now_iso)
+        drawn_before = len(draws) if draws is not None else 0
+        resolve_walkovers(chain, by_id, target_sets, now_iso, draws=draws)
+        # Was das Los entschieden hat (kampflose Spiele der neu ausgelosten Runde), steht in der Auslosung - nicht als
+        # Umbauschritt: sonst hinge der Vorschlag am Zufall und wäre beim Bestätigen „nicht mehr aktuell“.
+        drawn_ids = {row.get("match_id") for draw in (draws or [])[drawn_before:] for row in draw.get("assignments") or []}
         for match_id in target_sets:
             match = by_id.get(match_id)
-            if not match or before.get(match_id) == match.get("status"):
+            if not match or before.get(match_id) == match.get("status") or match_id in drawn_ids:
                 continue
             if match.get("status") == "completed":
                 ops.append({"kind": "walkover", "match_id": match_id, "match_key": match.get("match_key"),
@@ -349,6 +410,7 @@ def plan_removal(matches: list[dict], registration_id: str, *, kind: str, now_is
     for match in live:
         stages[str(match.get("stage_id") or "")].append(match)
     ops: list[dict] = []
+    draws: list[dict] = []
     outcomes: list[tuple[dict, bool]] = []
     for _stage_id, stage_matches in sorted(stages.items(), key=lambda item: int((item[1][0]).get("stage_number") or 0)):
         involved = [m for m in stage_matches if _seats(m, registration_id)
@@ -358,11 +420,11 @@ def plan_removal(matches: list[dict], registration_id: str, *, kind: str, now_is
         had_live = any(_is_live(m) for m in involved)
         stage_kind = _stage_kind(stage_matches)
         if stage_kind == "table":
-            outcome = _plan_table(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated)
+            outcome = _plan_table(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
         elif stage_kind == "swiss":
-            outcome = _plan_swiss(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated)
+            outcome = _plan_swiss(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
         else:
-            outcome = _plan_bracket(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated)
+            outcome = _plan_bracket(stage_matches, live, by_id, registration_id, kind, now_iso, ops, eliminated, draws)
         outcomes.append((outcome, had_live))
     # Mehrere Phasen (Gruppen, dann K.-o.): der Modus der Phase, in der die Person noch offene Spiele hatte.
     summary = next((outcome for outcome, had_live in outcomes if had_live), outcomes[-1][0] if outcomes else {"mode": "bracket"})
@@ -377,7 +439,9 @@ def plan_removal(matches: list[dict], registration_id: str, *, kind: str, now_is
     for op in ops:
         op["display_event"] = DISPLAY_BY_OP.get(op.get("kind"), "slot_cleared")
     return {"registration_id": registration_id, "kind": kind, "ops": ops, "changed_ids": changed,
-            "mode": summary.get("mode") or "bracket", "played": summary.get("played"), "total": summary.get("total")}
+            "mode": summary.get("mode") or "bracket", "played": summary.get("played"), "total": summary.get("total"),
+            # Auslosungen, die der Umbau auslöst (#1548) - geschrieben werden sie erst mit der Bestätigung.
+            "draws": draws}
 
 
 # ---------------------------------------------------------------------------------------------- Texte und Hash
@@ -416,6 +480,8 @@ def describe_op(op: dict, names: dict[str, str] | None = None) -> str:
         return f"{where}: entfällt."
     if kind == "readvanced":
         return f"{where}: {_name(names, op.get('registration_id'))} rückt nach (Platz {op.get('rank')} aus {op.get('from_match_key')})."
+    if kind == "draw_excluded":
+        return f"{where}: {_name(names, op.get('registration_id'))} kommt nicht in die Auslosung der nächsten Runde."
     return f"{where}: {kind}"
 
 
@@ -631,6 +697,11 @@ async def _apply(db, tournament: dict, registration: dict, fresh: dict, matches:
     for op in fresh["ops"]:
         if op.get("kind") in {"walkover", "forfeit", "readvanced"}:
             await publish_tournament_event(tid, op["display_event"], match_ids=[op.get("match_id")])
+    # Gemischt (#1548): hat der Umbau eine Runde entschieden, steht die Auslosung im Protokoll (Person: wer bestätigt
+    # hat) und geht als Anzeige-Ereignis ``draw_done`` raus - wie beim Ergebnis.
+    if fresh.get("draws"):
+        from services.draw_records import record_draws
+        await record_draws(db, fresh["draws"], actor_id=actor_id, tournament_id=tid)
     await publish_api_change("POST", f"/api/matches-v2/{tid}/removal", 200)
     await publish_api_change("POST", f"/api/tournaments/{tid}/registrations/{registration['id']}/removal", 200)
     # Ein 409 im Lauf-Planer wird dort abgefangen; der nächste Auslöser prüft neu.

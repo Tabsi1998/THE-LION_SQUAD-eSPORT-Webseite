@@ -189,6 +189,10 @@ CAPABILITIES: tuple[Capability, ...] = (
         "POST /api/tournaments/{tid}/registrations/{reg_id}/removal/reject"], [GRAPH],
        note="#1553: Ereignis → Umbauplan (Format × Ereignis) → Vorschlag → Bestätigung der Turnierleitung; K.-o. "
             "kampflos weiter ohne Loser-Bracket, Liga/Gruppen 50-Prozent-Regel, Swiss nicht mehr paaren, Läufe rücken auf."),
+    _c("structure.redraw", "Gegner der nächsten Runde neu auslosen",
+       ["POST /api/tournaments/{tid}/stages/{stage_id}/redraw"], [GRAPH],
+       note="#1548: gemischt lost der Server nach jeder fertigen Runde von selbst aus; die Turnierleitung lost eine "
+            "Runde (oder bei der Liga die Spieltage) neu aus, bis eines der Spiele beginnt."),
 )
 
 

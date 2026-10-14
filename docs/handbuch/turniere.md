@@ -68,7 +68,7 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
    ausschließen** und, wenn das Turnier zu einem Event gehört, **Anmeldung nur mit Event-Anmeldung**. Unter dem Kasten warnt
    **Planung prüfen** bei widersprüchlichen Zeiten.
 6. Weiter unten, aufklappbar: **Darstellung und Regeln** (Slug, Plattform, Beschreibung, Banner, **Regeln**,
-   Partner), **Spieloptionen** (Best of, Seeding, Folgerunden mischen, Spiel um Platz 3), **Preise**, **Streaming und
+   Partner), **Spieloptionen** (Best of, Seeding, Gegner der nächsten Runde, Spiel um Platz 3), **Preise**, **Streaming und
    externe Links**. Schreibt die **Regeln** hinein, bevor die Anmeldung aufgeht – was ihr festlegt (Frist bis zum
    Forfeit, Streitfall-Ablauf, Beweise), steht dann für alle fest.
 7. **Turnier erstellen**. Du landest im Turnier.
@@ -224,8 +224,16 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
   frei, sagt die Seite es. Gezielt ersetzt **Teilnehmer hinzufügen** mit **Ersetzt Nicht-Erschienen** – auch eine
   Person mit Freilos.
 - Teilnehmer im festen Baum lassen sich nicht einfach entfernen. Stattdessen **Nicht erschienen** setzen und ersetzen.
-- Mit dem Haken **Folgerunden zufällig mischen** (Spieloptionen) steht Runde 1 ab dem Ende des Check-ins fest, die
-  Folgerunden werden zufällig besetzt.
+- **Gegner der nächsten Runde** (Spieloptionen, auch je Phase): **Fester Baum** (Standard) oder **Zufällig mischen**.
+  Gemischt steht Runde 1 ab dem Ende des Check-ins fest. Erst wenn **alle** Spiele einer Runde fertig sind, kommen alle
+  Weiterkommer in einen Topf und werden gleichmäßig auf die Spiele der nächsten Runde verteilt – echtes Los, auch zwei
+  aus demselben Spiel können sich wiedersehen. Im Doppel-K.-o. wird im Loser Bracket nur innerhalb derselben
+  Loser-Runde gemischt; laufen nur zwei Spiele in eines zusammen (Finale, Grand Final, Spiel um Platz 3), ändert sich
+  nichts. Bis zur Auslosung steht im Baum „Platz aus Runde 1“. Jede Auslosung steht mit Zeitpunkt, Person und Ergebnis
+  im Protokoll. **Neu auslosen** (Reiter Spiele, Kasten „Auslosung“) geht, bis eines der Spiele der Runde aufgerufen
+  oder gestartet ist. In der **Liga** werden Reihenfolge der Spieltage und Heimrecht ausgelost (jeder spielt trotzdem
+  genau einmal je Hin- und Rückrunde gegen jeden); **Spieltage neu auslosen** geht bis Spieltag 1 beginnt. Die
+  Einstellung gilt, sobald der Turnierbaum neu gebaut wird (Vorschau oder Ende des Check-ins).
 - **Turnier starten** (Status **Live**) prüft vorher die Planung. Gibt es Konflikte oder Hinweise, fragt die Seite
   „Mit Hinweisen live schalten?“. Ohne ein spielbares Spiel lässt sich das Turnier nicht starten.
 
@@ -329,6 +337,8 @@ im Protokoll und unter ihren Strafen) und **+5 Min. verlängern**. Die Fristen s
   Spieler zweimal gleichzeitig an und hält die **Mindestpause** (Bearbeiten → Erweiterte Spieloptionen, Vorgabe
   5 Minuten) ein. Von Hand gesetzte Termine bleiben stehen; liegen sie zu früh oder doppelt, meldet die Vorschau das
   rot. Nebenbei (Statuswechsel, An- oder Abmeldung) wird nicht mehr geplant. Online-Turniere bekommen keine Stationen.
+  Kennt das Spiel **Geräte für Stationen** (3.12), nimmt der Planer nur Stationen mit passendem Gerätetyp; die Dauer je
+  Spiel kommt aus der einen Dauer-Regel (3.12).
 - **PDF Hochformat / Querformat** liefert einen Aushang der Stationen.
 - Der Status einer Station (frei, belegt, reserviert, defekt) lässt sich ändern.
 
@@ -369,6 +379,52 @@ Strafen stehen unter **Admin → eSports → Strafen**, die Jahreswertung unter 
 - **TV** aufstellen und aufrufen lassen, damit Spieler selbst sehen, wo sie hinmüssen.
 - **Check-in** vorher: Online-Spieler checken selbst ein, vor Ort druckt **PDF Check-in** die Liste zum Abhaken.
 - **Nicht erschienen** früh setzen, Ersatz einsetzen, und die Frist vorher in den Regeln nennen.
+
+### 3.12 Spieldauer und Spiel-Daten
+
+Wie lange ein Spiel geplant wird, steht an **einer** Stelle fest (seit #1554) – Planer, „Ergebnis fehlt“,
+Planungsprüfung, Matchplan-Export, Turnierbaum und TV rechnen gleich:
+
+1. **Dauer am Spiel selbst** (Matchplan → Matchplanung → **Dauer Min.**),
+2. sonst die **Spieldauer der Phase**,
+3. sonst die **Matchdauer des Turniers** (Bearbeiten → Erweiterte Spieloptionen),
+4. sonst die **Dauer des Spielmodus** aus der Spiele-Verwaltung,
+5. sonst **30 Minuten**.
+
+Leere Felder erben. Neben jedem Dauer-Feld steht, was ohne eigenen Wert gilt, etwa **„vom Spiel: 15 Min. (Grand Prix
+4 Rennen)“** oder **„vom Turnier: 45 Min.“**. Erzeugte Spiele und Phasen bekommen keine Dauer mehr hineinkopiert:
+Änderst du die Matchdauer des Turniers oder die Dauer im Spiel, gilt das sofort für alle Spiele ohne eigenen Wert –
+beim nächsten **Planen** stimmen die Zeiten. Ein neues Turnier lässt die Matchdauer leer und nimmt die des Spiels.
+
+**Spiel-Daten pflegen:** **Admin → eSports → Spiele → Spiel bearbeiten**, Abschnitt **Für Turniere**. Alles ist
+freiwillig:
+
+| Feld | Wofür |
+| --- | --- |
+| **Dauer je Modus** | Name und Minuten je Modus, z. B. „Grand Prix 4 Rennen“ 12 Min. Der erste Modus ist die Vorgabe; im Turnier wählt **Spielmodus** einen anderen. **Minuten je Einzelspiel** heißt: die Minuten gelten pro Spiel, Best-of zählt mit. |
+| **Spieler je Lauf vor Ort / online** | Wie viele gleichzeitig an einer Station bzw. in einer Lobby spielen. Füllt bei Mehrspieler-Bäumen die **Spielgröße** vor. |
+| **Best-of-Vorgabe** | Füllt **Best of** vor, wenn im Turnier das Spiel gewählt wird. |
+| **Aufbau- und Wechselzeit** | Minuten je Spiel an der Station; kommt zur Dauer aus dem Modus dazu (nicht zu einer Dauer am Turnier). |
+| **Geräte für Stationen** | Der Planer nimmt nur Stationen mit einem dieser Geräte (Switch, Switch 2, PC, PS5, Xbox …). Nichts gewählt: jede Station. Eine Station, die fest diesem Spiel zugeordnet ist, passt immer. |
+| **Punktetabelle** | Punkte je Platz, z. B. `15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1` oder `4-3-2-1`. Wird gespeichert; die Wertung rechnet noch nicht damit. |
+
+**Best-of als Erwartungswert:** Ist die Dauer **je Einzelspiel** angegeben, plant der Planer die Mitte aus kürzestem und
+längstem Verlauf: Best of 1 = 1 Spiel, **Best of 3 = 2,5**, Best of 5 = 4, Best of 7 = 5,5 Spiele. Minuten = aufgerundet
+(Spiele × Minuten je Spiel) + Aufbauzeit. Beispiel: 4 Minuten je Rennen, Best of 3, 3 Minuten Aufbau → 10 + 3 = **13 Min.**
+Eine Dauer am Turnier, an der Phase oder am Spiel ist immer die ganze Dauer, ohne Multiplikation.
+
+**Beispiel Mario Kart 8 Deluxe** (Vorschlag, nicht angelegt – so tragt ihr es selbst ein):
+
+| Feld | Wert |
+| --- | --- |
+| Dauer je Modus | „Grand Prix 4 Rennen“ 12 Min. (Vorgabe) · „Einzelrennen“ 4 Min., Minuten je Einzelspiel |
+| Spieler je Lauf vor Ort / online | 4 / 12 |
+| Best-of-Vorgabe | keine (Grand Prix ist ein Lauf) |
+| Aufbau- und Wechselzeit | 3 Min. |
+| Geräte für Stationen | Switch (bei Mario Kart World: Switch 2) |
+| Punktetabelle | `15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1` (12er-Lobby) bzw. `4-3-2-1` (4 an einer Station) |
+
+Im Turnier dann **Matchdauer** leer lassen: dort steht „vom Spiel: 15 Min. (Grand Prix 4 Rennen)“.
 
 ---
 

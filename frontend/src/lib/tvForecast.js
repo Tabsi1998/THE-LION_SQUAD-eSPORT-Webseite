@@ -4,12 +4,12 @@
 // ist das seine Startzeit plus geplanter Dauer, und überzieht es, „jetzt“. Ist die geplante Zeit schon vorbei und das
 // Spiel noch nicht gestartet, beginnt es frühestens jetzt. Alles reine Rechnung - die Uhr gibt der Aufrufer.
 import { bracketEdges } from "@/lib/bracketGraph";
+import { effectiveMatchDuration } from "@/lib/matchDuration";
 import { isMatchDone } from "@/lib/slotSource";
 import { isLiveMatch, stationName } from "@/lib/tvLive";
 import { asInstant, viennaTime } from "@/lib/vienna";
 
 const MINUTE = 60000;
-const DEFAULT_MINUTES = 30;
 // Ab so viel Verschiebung sagt der TV „Verzug“ - darunter ist es Rauschen.
 export const DELAY_SHOWN_FROM = 5;
 // Mehr als drei Stunden hinter dem Plan ist kein Verzug mehr, sondern ein alter Plan: dann nur die Station.
@@ -23,7 +23,8 @@ function timeOf(value) {
 }
 
 function minutesOf(match) {
-  return Number(match?.duration_minutes || match?.settings?.duration_minutes || DEFAULT_MINUTES) || DEFAULT_MINUTES;
+  // Die Dauer aus einer Stelle (lib/matchDuration, #1554) - am TV rechnet sie der Server schon aus.
+  return Number(match?.effective_duration_minutes) || effectiveMatchDuration(match);
 }
 
 /** Die Station im Klartext: aus dem Spiel, sonst aus der Liste der Stationen. */

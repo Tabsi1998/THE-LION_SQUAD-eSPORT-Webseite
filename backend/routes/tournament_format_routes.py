@@ -14,7 +14,6 @@ from services.graph_swiss import (
     swiss_round_documents,
 )
 from services.competition_versions import persist_competition_versions
-from services.match_duration import effective_match_duration
 from models import now_utc, new_id
 from routes.tournament_common import (
     _audit_tournament_action,
@@ -55,7 +54,6 @@ async def _dedicated_stage(db, tournament: dict, stage_type: str, settings: dict
             "qualifiers_per_match": 1,
             "score_type": "points",
             "calculation": "points",
-            "duration_minutes": effective_match_duration(tournament=tournament),
             **settings,
         },
         "status": "pending",

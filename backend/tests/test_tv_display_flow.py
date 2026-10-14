@@ -399,26 +399,22 @@ def test_the_tv_knows_the_forecast_and_who_dropped_out_but_no_notes():
     assert "geheim" not in json.dumps(matches) and "u1" not in json.dumps(matches)
 
 
-def test_the_tv_knows_the_draw_but_nobody_who_drew():
-    """Gegner gemischt (#1548, #1564): der TV zeichnet den Los-Knoten und die echte Herkunft - er bekommt die Gruppe am
-    Folgespiel, das Los am Platz, aus welchem Spiel der Platz besetzt wurde, und die Auslosung selbst (Kennung, Gruppe,
-    Zeitpunkt). Nie die Person, nie interne Felder der Herkunft."""
+def test_the_tv_learns_about_mixed_groups_and_where_each_player_really_came_from():
+    """Gegner mischen (#1548, #1561): der TV braucht die Gruppe, den Klartext der Plätze, ob gelost ist und die echte
+    Herkunft je Platz - ohne Konten (`user_id`) und ohne Zeitstempel der Bestätigung."""
     payload = {"tournament": {"id": "t1"}, "registrations": [], "stages": [], "matches_v2": [
         {"id": "e", "match_key": "E", "section": "WB", "round": 2, "status": "ready", "results": [],
-         "settings": {"draw_group": "WB:2", "match_size": 2, "intern": "x"},
-         "draw": {"id": "d1", "group": "WB:2", "drawn_at": "2026-10-31T15:00:00+00:00", "trigger": "result", "by": "user-1"},
-         "slots": [
-             {"slot": 1, "registration_id": "r1", "status": "filled",
-              "source": {"type": "rank", "flow": "W", "match_key": "B", "rank": 1, "raw": "W:B:1", "draw": {"group": "WB:2", "label": "Runde 1", "x": 1}},
-              "source_result": {"from_match_id": "b", "from_match_key": "B", "rank": 1, "flow": "W", "draw_id": "d1",
-                                "confirmed_at": "2026-10-31T15:00:00+00:00", "user_id": "u9"}},
-         ]},
+         "settings": {"draw_group": "WB:2", "match_size": 2},
+         "draw": {"id": "d1", "group": "WB:2", "drawn_at": "2026-10-31T12:00:00Z", "trigger": "result", "by": "user-9"},
+         "slots": [{"slot": 1, "registration_id": "r1", "user_id": "user-1", "status": "filled",
+                    "source": {"type": "rank", "flow": "W", "match_key": "A", "rank": 1, "raw": "W:A:1", "draw": {"group": "WB:2", "label": "Runde 1"}},
+                    "source_result": {"from_match_id": "c", "from_match_key": "C", "rank": 1, "flow": "W", "draw_id": "d1",
+                                      "confirmed_at": "2026-10-31T12:00:00Z"}}]},
     ]}
     match = tv_display.display_bracket_payload(payload)["matches_v2"][0]
     assert match["settings"]["draw_group"] == "WB:2"
-    assert "intern" not in match["settings"]
-    assert match["draw"] == {"id": "d1", "group": "WB:2", "drawn_at": "2026-10-31T15:00:00+00:00"}
+    assert match["draw"] == {"id": "d1", "group": "WB:2", "drawn_at": "2026-10-31T12:00:00Z"}
     slot = match["slots"][0]
     assert slot["source"]["draw"] == {"group": "WB:2", "label": "Runde 1"}
-    assert slot["source_result"] == {"from_match_key": "B"}
-    assert "user-1" not in json.dumps(match) and "u9" not in json.dumps(match)
+    assert slot["source_result"] == {"from_match_id": "c", "from_match_key": "C", "rank": 1, "flow": "W", "draw_id": "d1"}
+    assert "user-1" not in json.dumps(match) and "user-9" not in json.dumps(match)

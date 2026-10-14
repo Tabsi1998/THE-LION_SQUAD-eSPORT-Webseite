@@ -256,7 +256,10 @@ def test_v2_generator_builds_auto_single_elim_schema_and_byes():
     assert by_key["A"]["status"] == "completed"
     assert by_key["A"]["results"][0]["registration_id"] == "r1"
     assert by_key["C"]["slots"][0]["registration_id"] == "r1"
-    assert all(match["duration_minutes"] == 9 for match in matches)
+    # Keine eingefrorene Dauer (#1554): die Spiele folgen dem Turnier über die eine Kette.
+    from services.match_duration import effective_match_duration
+    assert all("duration_minutes" not in match and "duration_minutes" not in match["settings"] for match in matches)
+    assert all(effective_match_duration(match, stage=stage, tournament=tournament) == 9 for match in matches)
 
 
 def test_v2_auto_single_elim_adds_bronze_match_from_semifinal_losers():

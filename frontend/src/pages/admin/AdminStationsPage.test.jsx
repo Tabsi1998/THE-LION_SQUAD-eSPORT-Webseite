@@ -65,3 +65,24 @@ test("„Zeitplan füllen“ zeigt die Vorschau und schreibt erst nach „Übern
   ));
   expect(apiMock.post.mock.calls.some(([url]) => String(url).includes("auto-assign"))).toBe(false);
 });
+
+// Codex zu #1578: ohne eingefrorene Dauer rechnet die Stationsseite mit derselben Kette wie der Rest der Website.
+test("offene Spiele zeigen die Dauer aus Turnier oder Spiel, auch ohne eigenen Wert", async () => {
+  const game = { match_modes: [{ mode: "gp4", label: "Grand Prix", minutes: 12 }], setup_minutes: 3 };
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/bracket")) {
+      return Promise.resolve({ data: {
+        tournament: { id: "t-1", title: "Winter Cup", match_duration_minutes: null },
+        stages: [{ id: "s1", settings: {} }],
+        duration_game: game,
+        matches_v2: [{ ...MATCH, stage_id: "s1" }, { ...MATCH, id: "m2", match_key: "A2", stage_id: "s1", duration_minutes: 20 }],
+        registrations: [],
+      } });
+    }
+    return Promise.resolve(routeFor(path));
+  });
+  render(<ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider>);
+  expect(await screen.findByTestId("match-unassigned-m1")).toHaveTextContent("15 Min.");
+  expect(screen.getByTestId("match-unassigned-m2")).toHaveTextContent("20 Min.");
+});

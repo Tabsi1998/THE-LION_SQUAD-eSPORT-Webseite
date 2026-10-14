@@ -7,7 +7,7 @@ import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/
 import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
-import { GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS } from "./tournament/shared";
+import { ADVANCEMENT_MODE_HINT, ADVANCEMENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, advancementModeOf } from "./tournament/shared";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
@@ -297,7 +297,8 @@ export default function AdminTournamentNewPage() {
             <TextField label="Best of" type="number" value={form.best_of} onChange={(v) => set("best_of", Number(v))} testId="new-tr-bestof" />
             <SelectField label="Seeding" value={form.seeding_mode} onChange={(v) => set("seeding_mode", v)} options={[["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]]} testId="new-tr-seeding" />
           </FormGrid>
-          <CheckField label="Folgerunden zufällig mischen" hint="Runde 1 bleibt nach Check-in fix; qualifizierte Spieler werden in die nächste Runde zufällig verteilt." checked={!!form.randomize_advancement_rounds} onChange={(v) => set("randomize_advancement_rounds", v)} testId="new-tr-randomize-advancement" />
+          {/* Gegner der nächsten Runde (#1548): fester Baum oder echtes Los nach jeder Runde. */}
+          <SelectField label="Gegner der nächsten Runde" value={advancementModeOf(form.randomize_advancement_rounds)} onChange={(v) => set("randomize_advancement_rounds", v === "shuffle")} options={ADVANCEMENT_MODE_OPTIONS} hint={ADVANCEMENT_MODE_HINT} testId="new-tr-advancement" />
           {BRONZE_FORMATS.has(form.format) && (
             <CheckField label="Spiel um Platz 3 ermitteln" checked={form.bronze_match} onChange={(v) => set("bronze_match", v)} testId="new-tr-bronze" />
           )}

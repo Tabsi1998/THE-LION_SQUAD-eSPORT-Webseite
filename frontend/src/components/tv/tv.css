@@ -518,6 +518,8 @@
 .tv-tree__lines .tls-bracket-line { fill: none; stroke: var(--tv-line-strong); stroke-width: 3px; }
 .tv-tree__lines .tls-bracket-line--drop { stroke: var(--tv-muted); stroke-width: 2px; stroke-dasharray: 6 10; opacity: 0.4; }
 .tv-tree__lines .tls-bracket-line--void { stroke-dasharray: 8 10; opacity: 0.4; }
+/* Gemischte Runden (#1548): die Schiene steht, der echte Weg über sie ist nur Bahn für die Fahrt der Auslosung. */
+.tv-tree__lines .tls-bracket-line--real { opacity: 0; }
 .tv-screen[data-tv-contrast="1"] .tv-tree__lines .tls-bracket-line { stroke: var(--tv-text); stroke-width: 4px; }
 .tv-screen[data-tv-contrast="1"] .tv-tree__lines .tls-bracket-line--drop { stroke-width: 3px; opacity: 0.8; }
 .tv-table { display: flex; flex-direction: column; gap: calc(var(--tv-u) * 1.4); }

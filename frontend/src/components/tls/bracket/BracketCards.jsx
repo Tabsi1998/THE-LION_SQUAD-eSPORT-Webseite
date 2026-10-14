@@ -1,13 +1,15 @@
 import { useContext, useEffect, useId, useRef, useState } from "react";
+import { animate } from "framer-motion";
 import { Link, useInRouterContext } from "react-router-dom";
 import { resolveMediaUrl } from "@/lib/api";
 import { formatMatchStatus } from "@/lib/tournamentLabels";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
 import { describeSlot, initials } from "@/lib/slotSource";
-import { heatExits, isDone, isLive, isOut, isWalkover, matchFate, soloAdvance } from "@/lib/bracketGraph";
+import { MOTION, motionAllowed } from "@/lib/motion";
+import { heatText, isDone, isLive, isOut, isWalkover, matchFate, soloAdvance } from "@/lib/bracketGraph";
 import { useBracketMotionState, useRowFlight } from "./bracketMotion";
 import {
-  FinderContext, FinishedContext, GraphContext, MatchLinkContext, MineContext, PathContext, nodePathState, useMatchChanged,
+  DurationContext, FinderContext, FinishedContext, GraphContext, MatchLinkContext, MineContext, PathContext, nodePathState, useMatchChanged,
 } from "./context";
 
 // Die Karten des Web-Baums (#1340, #1178, #1259, #1561): ruhig - Setzplatz, Name, Ergebnis. Zeit, Station und Kennung
@@ -108,7 +110,7 @@ function MatchLink({ match, children, className }) {
 function MatchSheet({ match, id }) {
   const time = formatNodeDateTime(match?.scheduled_at);
   const station = getStationLabel(match);
-  const duration = match?.duration_minutes || match?.settings?.duration_minutes;
+  const duration = useContext(DurationContext)(match);
   return (
     <div id={id} className="tls-bracket-sheet" role="group" aria-label={`Spiel ${match.match_key || ""}`.trim()}>
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-text">
@@ -137,6 +139,29 @@ function useSheet() {
     };
   }, [open]);
   return { open, setOpen, ref };
+}
+
+/**
+ * Eine Zahl, die bei einem neuen Ergebnis hochzählt statt zu springen (framer-motion, nur der Text ändert sich).
+ * Gerendert wird immer der Endwert - ohne Bewegung (oder „Bewegung reduzieren“) steht er sofort da.
+ */
+function CountUp({ value, run = false, delay = 0 }) {
+  const ref = useRef(null);
+  const number = Number(value);
+  useEffect(() => {
+    const node = ref.current;
+    if (!run || !node || !Number.isFinite(number) || number <= 0 || !motionAllowed()) return undefined;
+    node.textContent = "0";
+    const controls = animate(0, number, {
+      duration: MOTION.slow / 1000,
+      delay: delay / 1000,
+      ease: [...MOTION.ease],
+      onUpdate: (current) => { node.textContent = String(Math.round(current)); },
+      onComplete: () => { node.textContent = String(number); },
+    });
+    return () => { controls.stop(); node.textContent = String(number); };
+  }, [run, number, delay]);
+  return <span ref={ref} className="tabular-nums">{value}</span>;
 }
 
 /** Bild oder Kürzel (#833) - gestrichelt nur für freie Plätze. */
@@ -170,7 +195,7 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
   const bye = !reg && isByeSlot(slot);
   const pending = reg || bye ? "" : pendingLabel(slot, findMatch);
   const rowMotion = regId ? state.rows.get(`${match.id}:${regId}`) || null : null;
-  useRowFlight(ref, rowMotion, done);
+  useRowFlight(ref, rowMotion, done, slot?.slot ?? null);
   const podium = podiumMeta(podiumRank);
   const out = Boolean(reg) && (isOut(result) || OUT_REGISTRATION.has(String(reg?.status || "").toLowerCase()));
   const isMine = Boolean(mine) && regId === mine;
@@ -178,7 +203,8 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
   const blink = walkover && isWinner && state.blink.has(match.id);
   const nameTone = out ? "text-quiet line-through" : podium?.text || (isWinner ? "text-white font-semibold" : isLoser ? "text-quiet" : qualified ? "text-white font-semibold" : label ? "text-white/85" : pending ? "text-muted-text italic" : "text-white/25");
   const seed = slot?.seed || reg?.seed || null;
-  const draw = rowMotion?.type === "draw";
+  // Setzplatz-Auslosung: die Namen kommen nacheinander herein. Gemischte Runde (mit Herkunft): der Name fährt.
+  const draw = rowMotion?.type === "draw" && !rowMotion.from;
   const motion = draw ? "draw" : blink ? "blink" : undefined;
   const style = draw ? { "--tls-i": rowMotion.index, "--tls-draw-step": `${state.drawStep}ms` } : undefined;
   const handlers = regId ? {
@@ -215,14 +241,14 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
       {podium ? <span className={`shrink-0 px-1 py-0.5 rounded-sm border text-[10px] font-display font-bold ${podium.badge}`}>{podium.label}</span> : null}
       {heat ? (
         <span className="flex shrink-0 items-center gap-1.5">
-          {played && score != null ? <span className="font-display text-xs tabular-nums text-quiet">{score} P</span> : null}
+          {played && score != null ? <span className="font-display text-xs tabular-nums text-quiet"><CountUp value={score} run={pop} delay={(rank ? rank - 1 : 0) * 60} /> P</span> : null}
           <span className={`tls-bracket-rank ${qualified ? "is-qualified" : ""}`} data-rank={rank || undefined} data-motion={pop && rank ? "pop" : undefined} style={rank ? { "--tls-i": rank - 1 } : undefined}>
             {played && rank ? rank : ""}
           </span>
         </span>
       ) : score != null ? (
         <span key={score} className={`tls-score-tick shrink-0 font-display text-base font-bold tabular-nums ${podium?.text || (isWinner ? "text-brand" : "text-quiet")}`} data-motion={pop ? "pop" : undefined} style={pop ? { "--tls-i": isWinner ? 0 : 1 } : undefined}>
-          {score}
+          <CountUp value={score} run={pop} delay={isWinner ? 0 : 60} />
         </span>
       ) : null}
     </Tag>
@@ -330,22 +356,18 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
     ? [...taken].sort((a, b) => (resultMap.get(a.registration_id)?.rank || 99) - (resultMap.get(b.registration_id)?.rank || 99))
     : taken;
   const filled = slots.filter((slot) => slot.registration_id).length;
-  const exits = heatExits(match, edges, matches);
-  const qualifiers = exits.qualifiers;
+  // Die Wörter der Karte aus einer Regel mit der App (lib/bracketGraph.heatText): „4 Spieler · 2 kommen weiter“,
+  // „2 kommen weiter → E“, „Die anderen …“, „2 Plätze frei“; der letzte Lauf: „Platz 1 gewinnt“.
+  const text = heatText(match, edges, matches, finalId);
+  const qualifiers = Number(match.settings?.qualifiers_per_match || 0);
   const isMine = Boolean(mine) && slots.some((slot) => slot.registration_id === mine);
   const live = !finished && isLive(match);
-  const name = match.match_type === "ffa" ? `Lauf ${match.match_key || ""}`.trim() : (match.match_key || "Spiel");
-  // Gezählt werden nur Plätze, die noch jemand bekommen kann - ein Freilos-Platz („frei“) zählt nicht mit.
-  const seats = taken.length;
-  const field = filled === seats ? `${filled} Spieler` : filled ? `${filled} von ${seats} Spielern` : `${seats} ${seats === 1 ? "Platz" : "Plätze"}`;
-  // Der letzte Lauf ohne Folgespiel (#1561): danach kommt nur der Pokal - „2 kommen weiter“ wäre falsch.
-  const lastHeat = match.id === finalId && !exits.advance.length && !exits.drop.length;
-  const onward = lastHeat ? "Platz 1 gewinnt" : qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : null;
-  const meta = [field, onward].filter(Boolean).join(" · ");
+  const name = text.name;
+  const meta = text.meta;
   const empty = !filled && slots.every((slot) => !pendingLabel(slot, findMatch));
-  const cutAt = qualifiers > 0 && exits.advance.length && qualifiers < rows.length ? qualifiers : 0;
-  const cutText = `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter → ${exits.advance.join(", ")}`;
-  const dropText = exits.drop.length ? `Die anderen → ${exits.drop.join(", ")}` : exits.advance.length ? "Die anderen scheiden aus" : "";
+  const cutAt = qualifiers > 0 && text.cut && qualifiers < rows.length ? qualifiers : 0;
+  const cutText = text.cut;
+  const dropText = text.rest;
   return (
     <div
       ref={sheet.ref}
@@ -395,10 +417,10 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
         );
       })}
       {freeCount && !empty ? (
-        <div className="px-3 py-1.5 text-xs italic text-quiet" data-testid={`bracket-heat-free-${match.id}`}>{freeCount} {freeCount === 1 ? "Platz" : "Plätze"} frei</div>
+        <div className="px-3 py-1.5 text-xs italic text-quiet" data-testid={`bracket-heat-free-${match.id}`}>{text.free}</div>
       ) : null}
       {dropText && !empty ? (
-        <div className="px-3 pb-2 pt-1 text-[11px] text-muted-text" data-testid={exits.drop.length ? `bracket-heat-drop-${match.id}` : `bracket-heat-out-${match.id}`}>{dropText}</div>
+        <div className="px-3 pb-2 pt-1 text-[11px] text-muted-text" data-testid={dropText.startsWith("Die anderen →") ? `bracket-heat-drop-${match.id}` : `bracket-heat-out-${match.id}`}>{dropText}</div>
       ) : null}
       <MatchSheet match={match} id={sheetId} />
     </div>

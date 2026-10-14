@@ -279,6 +279,32 @@ describe("Bewegungen beim Live-Neuladen", () => {
     expect(flyers()).toBe(calls);
   });
 
+  it("kommt ein neuer Stand mitten in der Bewegung, springt alles sofort ans Ende - nichts hängt", () => {
+    window.Element.prototype.animate = vi.fn(() => ({ finished: new Promise(() => {}), cancel() {}, onfinish: null }));
+    const before = singleElimination(8);
+    const middle = decide(clone(before), "A");
+    const after = decide(clone(middle), "B");
+    const { rerender } = render(<BracketTree data={before} layout="tree" />);
+    act(() => rerender(<BracketTree data={middle} layout="tree" />));
+    expect(document.querySelectorAll("[data-bracket-flyer]").length).toBeGreaterThan(0);
+    act(() => rerender(<BracketTree data={after} layout="tree" />));
+    // Der erste Flug ist gelandet (kein Abbild mehr von NeonFalke), sein Ziel ist sichtbar.
+    const landed = within(screen.getByTestId("bracket-match-v2-m-E")).getByText("NeonFalke").closest("[data-row]");
+    expect(landed.style.opacity).toBe("");
+    expect([...document.querySelectorAll("[data-bracket-flyer]")].some((node) => node.textContent.includes("NeonFalke"))).toBe(false);
+  });
+
+  it("Punkte zählen hoch, statt zu springen - am Ende steht der echte Wert", async () => {
+    const before = singleElimination(8);
+    const after = decide(clone(before), "A");
+    const { rerender } = render(<BracketTree data={before} layout="tree" />);
+    act(() => rerender(<BracketTree data={after} layout="tree" />));
+    const score = screen.getByTestId("bracket-match-v2-m-A").querySelector("[data-motion='pop'] span");
+    expect(score.textContent).toBe("0");
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 900)); });
+    expect(score.textContent).toBe("22");
+  });
+
   it("nach einer Neuverbindung wird nichts nachgeholt", () => {
     const before = singleElimination(8);
     const after = decide(clone(before), "A");
@@ -362,5 +388,86 @@ describe("Worst Case (break-ui)", () => {
     unmountEmpty();
     render(<BracketTree data={decide(doubleElimination(16, { reset: true }), "A")} layout="tree" />);
     expect(screen.getByTestId("bracket-match-v2-m-GFR")).toBeInTheDocument();
+  });
+});
+
+// Gegner mischen (#1548): echte Daten aus dem Generator - Sammelschiene vor und nach der Auslosung, Weg, Bewegung.
+describe("Gemischte Gruppen im Baum", () => {
+  const path = (from, to) => document.querySelector(`[data-testid='bracket-connectors'] path[data-from='${from}'][data-to='${to}']`);
+
+  it("vor der Auslosung: eine Schiene, Äste aus allen Quellen und in alle Ziele, keine festen Einzel-Linien", () => {
+    const data = ffa("se8_draw_before");
+    const id = (key) => idOf(data, key);
+    render(<BracketTree data={data} layout="tree" />);
+    expect(document.querySelector("path[data-rail-spine='WB:2']")).not.toBeNull();
+    for (const key of ["A", "B", "C", "D"]) {
+      expect(path(id(key), "rail:WB:2"), `Ast aus ${key}`).not.toBeNull();
+      expect(path(id(key), id("E"))).toBeNull();
+      expect(path(id(key), id("F"))).toBeNull();
+    }
+    expect(path("rail:WB:2", id("E"))).not.toBeNull();
+    expect(path("rail:WB:2", id("F"))).not.toBeNull();
+    expect(screen.getByTestId(`bracket-match-v2-${id("E")}`)).toHaveTextContent("Platz aus Runde 1");
+  });
+
+  it("nach der Auslosung: die Schiene bleibt; der echte Weg leuchtet nur auf deinem Weg", () => {
+    const data = ffa("se8_draw_after");
+    const id = (key) => idOf(data, key);
+    render(<BracketTree data={data} layout="tree" />);
+    expect(document.querySelector("path[data-rail-spine='WB:2']")).not.toBeNull();
+    const target = data.matches_v2.find((match) => match.slots.some((slot) => slot.source_result?.from_match_key === "C" && slot.registration_id));
+    const player = target.slots.find((slot) => slot.source_result?.from_match_key === "C").registration_id;
+    const real = path(id("C"), target.id);
+    expect(real).toHaveAttribute("data-real", "1");
+    expect(real).not.toHaveAttribute("data-path");
+    const name = data.registrations.find((reg) => reg.id === player).display_name;
+    fireEvent.click(within(screen.getByTestId(`bracket-match-v2-${target.id}`)).getByText(name));
+    expect(real).toHaveAttribute("data-path", "on");
+    expect(screen.getByTestId(`bracket-match-v2-${id("C")}`)).toHaveAttribute("data-path", "on");
+  });
+
+  it("die Auslosung bewegt die Namen über die Schiene - gestaffelt, der Weg zieht hinter ihnen her", () => {
+    const before = ffa("se8_draw_before");
+    const after = ffa("se8_draw_after");
+    const { rerender } = render(<BracketTree data={before} layout="tree" />);
+    act(() => rerender(<BracketTree data={after} layout="tree" />));
+    expect(window.Element.prototype.animate.mock.calls.length).toBeGreaterThanOrEqual(4);
+    const fresh = [...document.querySelectorAll("path[data-real='1'][data-fresh='1']")];
+    expect(fresh).toHaveLength(4);
+    const delays = fresh.map((node) => parseInt(node.style.getPropertyValue("--tls-fresh-delay"), 10)).sort((a, b) => a - b);
+    expect(new Set(delays).size).toBe(4);
+  });
+
+  it("„Bewegung reduzieren“: nach der Auslosung sofort der Endzustand", () => {
+    reduce = true;
+    const { rerender } = render(<BracketTree data={ffa("se8_draw_before")} layout="tree" />);
+    act(() => rerender(<BracketTree data={ffa("se8_draw_after")} layout="tree" />));
+    expect(window.Element.prototype.animate.mock.calls.length).toBe(0);
+    expect(document.querySelector("[data-fresh]")).toBeNull();
+  });
+
+  it("Doppel-K.-o.: jede Gruppe hat ihre Schiene in ihrem Abschnitt; vor der ersten Loser-Spalte ist Platz dafür", () => {
+    render(<BracketTree data={ffa("de8_draw_before")} layout="tree" />);
+    const spines = [...document.querySelectorAll("path[data-rail-spine]")].map((node) => node.getAttribute("data-rail-spine")).sort();
+    expect(spines).toEqual(["LB:2", "LB:3", "WB:2"]);
+    // Die Schienen bleiben in ihrem Abschnitt: Winner-Schiene im Winner Bracket, Loser-Schienen im Loser Bracket.
+    expect(screen.getByTestId("bracket-tree").querySelector("[data-rail-lead='1']")).not.toBeNull();
+  });
+
+  it("Läufe in eine gemischte Gruppe sagen „2 kommen weiter → E, F“ (wie die App)", () => {
+    const data = ffa("ffa16_draw_before");
+    render(<BracketTree data={data} layout="tree" />);
+    expect(screen.getByTestId(`bracket-heat-cut-${idOf(data, "D")}`)).toHaveTextContent("2 kommen weiter → E, F");
+  });
+
+  it("vor der Auslosung leuchtet dein Weg bis zur Schiene - nur dein Ast und die Schiene", () => {
+    const data = ffa("se8_draw_before");
+    const a = find(data, "A");
+    const winner = data.registrations.find((reg) => reg.id === a.results.find((row) => row.rank === 1).registration_id).display_name;
+    render(<BracketTree data={data} layout="tree" />);
+    fireEvent.click(within(screen.getByTestId(`bracket-match-v2-${a.id}`)).getByText(winner));
+    expect(path(a.id, "rail:WB:2")).toHaveAttribute("data-path", "on");
+    expect(document.querySelector("path[data-rail-spine='WB:2']")).toHaveAttribute("data-path", "on");
+    expect(path(idOf(data, "B"), "rail:WB:2")).toHaveAttribute("data-path", "off");
   });
 });
