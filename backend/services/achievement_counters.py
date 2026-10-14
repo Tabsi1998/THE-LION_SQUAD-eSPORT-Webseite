@@ -205,15 +205,19 @@ class Context:
     async def track_bests(self) -> dict[str, tuple[str, int]]:
         """Die schnellste gültige Zeit aller je Strecke, auf der die Person gefahren ist: (Person, Zeit)."""
         async def load():
-            from services.fastlap_standings import effective_ms, official_query
+            # Die Spitze aus der einen Rangfunktion (#1584): Gleichstand - die früher gefahrene Zeit vorn.
+            from services.fastlap_standings import official_query, rank_laps
             ids = list({row.get("track_id") for row in await self.lap_times() if row.get("track_id")})
-            best: dict[str, tuple[str, int]] = {}
+            by_track: dict[str, list[dict]] = {}
             if ids:
-                async for row in self.db.f1_lap_times.find(official_query({"track_id": {"$in": ids}}), {"_id": 0, "user_id": 1, "track_id": 1, "time_ms": 1, "penalty_seconds": 1}):
-                    ms = effective_ms(row)
-                    tid = row.get("track_id")
-                    if tid and (tid not in best or ms < best[tid][1]):
-                        best[tid] = (row.get("user_id"), ms)
+                async for row in self.db.f1_lap_times.find(official_query({"track_id": {"$in": ids}}), {"_id": 0, "id": 1, "user_id": 1, "track_id": 1, "time_ms": 1, "penalty_seconds": 1, "created_at": 1}):
+                    if row.get("track_id"):
+                        by_track.setdefault(row["track_id"], []).append(row)
+            best: dict[str, tuple[str, int]] = {}
+            for tid, rows in by_track.items():
+                ranked = rank_laps(rows)
+                if ranked:
+                    best[tid] = (ranked[0]["user_id"], ranked[0]["effective_ms"])
             return best
         return await self._memo("track_bests", load)
 

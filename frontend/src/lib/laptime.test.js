@@ -1,29 +1,42 @@
-import { formatLapTime, parseLapTime } from "./laptime";
+import { formatLapTime, parseLapTime, plausibilityText, plausibilityWarning } from "./laptime";
+import cases from "./laptime.cases.json";
 
-// Zielzeit je Strecke (#613): Text ↔ Millisekunden, tolerant bei Komma und fehlenden Stellen, streng bei Unsinn.
+// Ein Zeit-Parser (#1584): dieselben Fälle wie App (mobile/src/lib/laptime.test.ts) und Server
+// (backend/tests/test_fastlap_laptime_unit.py) - alle lesen laptime.cases.json.
 
-test("parseLapTime: Minuten, Sekunden, Tausendstel - mit Punkt oder Komma, auch ohne Minuten", () => {
-  expect(parseLapTime("1:32.450")).toBe(92450);
-  expect(parseLapTime("1:32,45")).toBe(92450);
-  expect(parseLapTime("1:32")).toBe(92000);
-  expect(parseLapTime("92.45")).toBe(92450);
-  expect(parseLapTime("  0:59.9 ")).toBe(59900);
-  expect(parseLapTime("125")).toBe(125000);
+test.each(cases.parse)("parseLapTime($input) = $ms", ({ input, ms }) => {
+  expect(parseLapTime(input)).toBe(ms);
 });
 
-test("parseLapTime: leer ist keine Zielzeit, Unsinn ist NaN", () => {
-  expect(parseLapTime("")).toBeNull();
+test.each(cases.empty)("leer ist keine Zeit: %j", (text) => {
+  expect(parseLapTime(text)).toBeNull();
+});
+
+test.each(cases.invalid)("Unsinn ist NaN: %s", (text) => {
+  expect(Number.isNaN(parseLapTime(text))).toBe(true);
+});
+
+test("parseLapTime: null und undefined sind keine Zeit", () => {
   expect(parseLapTime(null)).toBeNull();
-  expect(Number.isNaN(parseLapTime("schnell"))).toBe(true);
-  expect(Number.isNaN(parseLapTime("1:75.000"))).toBe(true);
-  expect(Number.isNaN(parseLapTime("1:2:3"))).toBe(true);
+  expect(parseLapTime(undefined)).toBeNull();
 });
 
-test("formatLapTime: m:ss.mmm, leer ohne Wert", () => {
-  expect(formatLapTime(92450)).toBe("1:32.450");
-  expect(formatLapTime(59900)).toBe("0:59.900");
-  expect(formatLapTime(0)).toBe("0:00.000");
+test.each(cases.format)("formatLapTime($ms) = $text und zurück", ({ ms, text }) => {
+  expect(formatLapTime(ms)).toBe(text);
+  expect(parseLapTime(text)).toBe(ms);
+});
+
+test("formatLapTime: leer ohne Wert", () => {
   expect(formatLapTime(null)).toBe("");
   expect(formatLapTime(undefined)).toBe("");
-  expect(parseLapTime(formatLapTime(725123))).toBe(725123);
+});
+
+test.each(cases.plausibility)("plausibilityWarning($ms) = $warning", ({ ms, track, warning }) => {
+  expect(plausibilityWarning(ms, track)).toBe(warning);
+});
+
+test("plausibilityText nennt Zeit und Grenzen", () => {
+  expect(plausibilityText(15000, {})).toBe("0:15.000 ist schneller als die erwartete Untergrenze 0:20.000. Trotzdem speichern?");
+  expect(plausibilityText(700000, { max_plausible_ms: 650000 })).toBe("11:40.000 ist langsamer als die erwartete Obergrenze 10:50.000. Trotzdem speichern?");
+  expect(plausibilityText(80000, {})).toBe("");
 });

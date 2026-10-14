@@ -273,14 +273,3 @@ export function formatMemberSince(value, precision = "day") {
   }
   return viennaDate(date, { dateStyle: "long" });
 }
-
-export function parseTimeStr(str) {
-  if (!str) return null;
-  const trimmed = String(str).trim();
-  const m = trimmed.match(/^(?:(\d+):)?(\d{1,2})\.(\d{1,3})$/);
-  if (!m) return null;
-  const mins = parseInt(m[1] || "0", 10);
-  const secs = parseInt(m[2], 10);
-  const mils = parseInt(m[3].padEnd(3, "0"), 10);
-  return mins * 60000 + secs * 1000 + mils;
-}

@@ -112,13 +112,10 @@ async def compute_user_progress(user_id: str) -> dict[str, int]:
     for tid in distinct_tracks:
         if not tid:
             continue
-        best = await db.f1_lap_times.find_one(
-            {"track_id": tid, "is_invalid": {"$ne": True},
-             "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}]},
-            {"_id": 0, "user_id": 1, "time_ms": 1},
-            sort=[("time_ms", 1)],
-        )
-        if best and best.get("user_id") == user_id:
+        # Pole aus der einen Rangfunktion (#1584): Strafe eingerechnet, Gleichstand - die früher gefahrene Zeit vorn.
+        from services.fastlap_standings import official_query, rank_laps
+        ranked = rank_laps(await db.f1_lap_times.find(official_query({"track_id": tid}), {"_id": 0}).to_list(5000))
+        if ranked and ranked[0]["user_id"] == user_id:
             pole_count += 1
     p["pole_count"] = pole_count
 

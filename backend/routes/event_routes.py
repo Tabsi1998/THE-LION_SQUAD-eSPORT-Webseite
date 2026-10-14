@@ -259,39 +259,18 @@ async def _tournament_recap_podium(db, tournament: dict) -> list[dict]:
 
 
 async def _fastlap_recap_podium(db, challenge: dict) -> list[dict]:
-    tracks = await db.f1_tracks.find({"challenge_id": challenge["id"]}, {"_id": 0}).sort("order_index", 1).to_list(100)
-    if not tracks:
+    """Podest im Rückblick-Bericht - dieselbe Rechnung wie die Rückblick-Seite (#1584, services/event_recap.py): mit
+    einer Strecke die schnellsten gültigen Zeiten, mit mehreren die Wertung über alle Strecken."""
+    from services.event_recap import fastlap_podium, fastlap_summaries, load_users
+
+    summary = (await fastlap_summaries(db, [challenge])).get(challenge["id"])
+    if not summary or not summary["tracks"]:
         return []
-    track = tracks[0]
-    times = await db.f1_lap_times.find(
-        {"challenge_id": challenge["id"], "track_id": track["id"], "score_scope": {"$ne": "reference"}},
-        {"_id": 0},
-    ).to_list(2000)
-    best: dict[str, dict] = {}
-    for row in times:
-        user_id = row.get("user_id")
-        if not user_id or row.get("time_ms") is None:
-            continue
-        effective = int(row.get("time_ms") or 0) + int(float(row.get("penalty_seconds") or 0) * 1000)
-        if user_id not in best or effective < best[user_id]["effective_ms"]:
-            best[user_id] = {**row, "effective_ms": effective}
-    if not best:
-        return []
-    users = {
-        user["id"]: user for user in await db.users.find(
-            {"id": {"$in": list(best.keys())}},
-            {"_id": 0, "id": 1, "username": 1, "display_name": 1},
-        ).to_list(500)
-    }
-    rows = sorted(best.items(), key=lambda item: item[1]["effective_ms"])[:3]
-    return [
-        {
-            "rank": index,
-            "name": users.get(user_id, {}).get("display_name") or users.get(user_id, {}).get("username") or "Teilnehmer",
-            "detail": f"{lap['effective_ms'] / 1000:.3f}s auf {track.get('name') or 'Strecke'}",
-        }
-        for index, (user_id, lap) in enumerate(rows, start=1)
-    ]
+    users = await load_users(db, summary["drivers"])
+    result = fastlap_podium(summary, users)
+    suffix = f" auf {result['track']}" if result.get("track") else ""
+    return [{"rank": row["rank"], "name": row["name"], "detail": f"{row['detail']}{suffix}" if row.get("detail") else ""}
+            for row in result["podium"]]
 
 
 async def _build_event_recap_payload(db, event: dict) -> dict:

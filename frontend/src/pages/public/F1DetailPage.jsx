@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { API, api, formatRequestError, parseTimeStr, resolveMediaUrl } from "@/lib/api";
+import { API, api, formatRequestError, resolveMediaUrl } from "@/lib/api";
+import { parseLapTime, plausibilityText } from "@/lib/laptime";
+import { PersonPicker } from "@/components/tls/PersonPicker";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -20,13 +22,15 @@ import { safeHttpUrl } from "@/lib/safeLink";
 import { seoTextPreview } from "@/lib/textPreview";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
-import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { ShareButton } from "@/components/tls/ShareButton";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { tournamentIsOver } from "@/lib/afterEnd";
 
 const PUBLIC_RESULT_STATUSES = new Set(["completed", "results_published", "archived"]);
+// Nach „Ergebnisse veröffentlicht“ (#1584) ändert nur die Turnierleitung Zeiten - mit Begründung.
+const LOCKED_STATUSES = new Set(["results_published", "archived"]);
 
 function f1ResultQuery(values = {}) {
   const params = new URLSearchParams();
@@ -378,9 +382,12 @@ export default function F1DetailPage() {
 
 function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
   const confirm = useConfirm();
-  const [users, setUsers] = useState([]);
+  const prompt = usePrompt();
+  const { isTournamentLead } = useAuth();
+  // Fahrer aus der Personensuche (#1584) - nicht mehr die ganze Kontoliste.
+  const [driver, setDriver] = useState(null);
   const [times, setTimes] = useState([]);
-  const [form, setForm] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "", score_scope: "official" });
+  const [form, setForm] = useState({ time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "", score_scope: "official" });
   const { submitting: saving, submitOnce } = useSubmissionGuard();
   const [actionError, setActionError] = useState("");
   const set = (key, value) => { setForm((current) => ({ ...current, [key]: value })); setActionError(""); };
@@ -389,13 +396,6 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
     setActionError(message);
     toast.error(message);
   };
-
-  useEffect(() => {
-    if (!challenge?.id) return;
-    api.get(`/f1/challenges/${challenge.id}/assignable-users`)
-      .then(({ data }) => setUsers(data || []))
-      .catch(() => setUsers([]));
-  }, [challenge?.id]);
 
   const loadTimes = useCallback(async () => {
     if (!challenge?.id || !trackId) return;
@@ -413,8 +413,23 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
 
   useApiInvalidation(loadTimes, ["f1"]);
 
-  const selectedUser = users.find((item) => item.id === form.user_id);
-  const forceReferenceScope = !!challenge?.block_club_member_results && !!selectedUser?.is_club_member;
+  const forceReferenceScope = !!challenge?.block_club_member_results && !!driver?.is_club_member;
+  const locked = LOCKED_STATUSES.has(challenge?.status);
+  const track = (challenge?.tracks || []).find((item) => item.id === trackId) || null;
+
+  // Nach der Veröffentlichung (#1584): ohne Begründung keine Änderung. null heißt abgebrochen.
+  const changeReason = async (what) => {
+    if (!locked) return {};
+    const reason = await prompt({
+      title: "Begründung nötig",
+      description: `Die Ergebnisse sind veröffentlicht. ${what} geht nur mit Begründung (mind. 10 Zeichen) - sie steht im Protokoll.`,
+      placeholder: "z. B. Zeitnahme-Fehler laut Video",
+      confirmLabel: "Mit Begründung speichern",
+      required: true,
+    });
+    const text = typeof reason === "string" ? reason.trim() : "";
+    return text ? { change_reason: text } : null;
+  };
 
   useEffect(() => {
     if (forceReferenceScope && form.score_scope !== "club_reference") {
@@ -424,9 +439,13 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
 
   const submit = async (event) => {
     event.preventDefault();
-    const ms = parseTimeStr(form.time_str);
+    if (!driver) {
+      failAction("Bitte zuerst den Fahrer suchen und wählen.");
+      return;
+    }
+    const ms = parseLapTime(form.time_str);
     if (!ms) {
-      failAction("Ungültiges Zeitformat. Beispiel: 1:24.587");
+      failAction("Ungültiges Zeitformat. Beispiel: 1:24.587 oder 1:24,587");
       return;
     }
     const penalty = Number(form.penalty_seconds) || 0;
@@ -435,9 +454,16 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
       return;
     }
     setActionError("");
+    // Unplausible Zeit (#1584): erst fragen, dann mit Bestätigung schicken.
+    const question = plausibilityText(ms, track);
+    if (question && !await confirm({ title: "Zeit prüfen", description: question, confirmLabel: "Trotzdem speichern", tone: "info" })) return;
+    const reason = await changeReason("Eine Zeit nachtragen");
+    if (!reason) return;
     const attempt = await submitOnce(async () => {
       await api.post(`/f1/challenges/${challenge.id}/times`, {
-        user_id: form.user_id,
+        ...(question ? { confirm_implausible: true } : {}),
+        ...reason,
+        user_id: driver.id,
         track_id: trackId,
         time_ms: ms,
         penalty_seconds: penalty,
@@ -458,14 +484,20 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
   const deleteTime = async (time) => {
     setActionError("");
     const attempt = await submitOnce(async () => {
-      const ok = await confirm({
-        title: "Zeit löschen?",
-        description: `${time.user?.display_name || time.user?.username || "Fahrer"} - ${time.time_str} wird aus der Challenge entfernt.`,
-        confirmLabel: "Zeit löschen",
-        tone: "danger",
-      });
-      if (!ok) return;
-      await api.delete(`/f1/times/${time.id}`);
+      if (locked) {
+        const reason = await changeReason("Eine Zeit löschen");
+        if (!reason) return;
+        await api.delete(`/f1/times/${time.id}`, { data: reason });
+      } else {
+        const ok = await confirm({
+          title: "Zeit löschen?",
+          description: `${time.user?.display_name || time.user?.username || "Fahrer"} - ${time.time_str} wird aus der Challenge entfernt.`,
+          confirmLabel: "Zeit löschen",
+          tone: "danger",
+        });
+        if (!ok) return;
+        await api.delete(`/f1/times/${time.id}`);
+      }
       toast.success("Zeit gelöscht.");
       await loadTimes();
       onSaved();
@@ -474,6 +506,14 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
       failAction(formatRequestError(attempt.error, "Zeit konnte nicht gelöscht werden."));
     }
   };
+
+  if (locked && !isTournamentLead) {
+    return (
+      <div data-testid="fastlap-locked" className="mb-5 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-4 text-sm text-white/75">
+        Die Ergebnisse sind veröffentlicht. Zeiten ändert jetzt nur noch die Turnierleitung, mit Begründung.
+      </div>
+    );
+  }
 
   return (
     <div className="mb-5 border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4">
@@ -486,16 +526,10 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
           {currentUser && <div className="text-[10px] uppercase tracking-widest text-white/35">{currentUser.display_name || currentUser.username}</div>}
         </div>
         <div className="grid md:grid-cols-[minmax(12rem,1fr)_9rem_11rem_8rem_auto] gap-2 items-end">
-          <label className="block">
-            <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Fahrer</span>
-            <select value={form.user_id} onChange={(e) => set("user_id", e.target.value)} required data-testid="fastlap-user" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-              <option value="">- auswählen -</option>
-              {users.map((item) => <option key={item.id} value={item.id}>{item.display_name || item.username}</option>)}
-            </select>
-          </label>
+          <PersonPicker purpose="fastlap" contextId={challenge.id} value={driver} onChange={(person) => { setDriver(person); setActionError(""); }} label="Fahrer" placeholder="Fahrer suchen …" testId="fastlap-user" />
           <label className="block">
             <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Zeit</span>
-            <input value={form.time_str} onChange={(e) => set("time_str", e.target.value)} required placeholder="1:24.587" data-testid="fastlap-time" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display tabular-nums" />
+            <input value={form.time_str} onChange={(e) => set("time_str", e.target.value)} required placeholder="1:24.587" inputMode="decimal" data-testid="fastlap-time" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display tabular-nums" />
           </label>
           <label className="block">
             <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Wertung</span>

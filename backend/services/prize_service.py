@@ -135,51 +135,6 @@ async def auto_create_for_tournament(tid: str) -> int:
     return created
 
 
-def _effective_lap_ms(row: dict) -> int:
-    return int(row.get("time_ms") or 0) + int((row.get("penalty_seconds") or 0) * 1000)
-
-
-def _rank_best_laps(times: list[dict]) -> list[dict]:
-    best_per_user: dict[str, dict] = {}
-    for row in times:
-        uid = row.get("user_id")
-        if not uid:
-            continue
-        effective = _effective_lap_ms(row)
-        if uid not in best_per_user or effective < best_per_user[uid]["effective_ms"]:
-            best_per_user[uid] = {**row, "effective_ms": effective}
-    return sorted(best_per_user.values(), key=lambda row: row["effective_ms"])
-
-
-def _official_f1_time_query(extra: dict | None = None) -> dict:
-    return {
-        **(extra or {}),
-        "is_invalid": {"$ne": True},
-        "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}],
-    }
-
-
-async def _f1_championship_rankings(db, challenge: dict, tracks: list[dict]) -> list[dict]:
-    points_system = challenge.get("points_per_position") or [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
-    totals: dict[str, dict] = {}
-    for track in tracks:
-        times = await db.f1_lap_times.find(
-            _official_f1_time_query({"challenge_id": challenge["id"], "track_id": track["id"]}),
-            {"_id": 0},
-        ).to_list(5000)
-        for pos, row in enumerate(_rank_best_laps(times)):
-            uid = row.get("user_id")
-            if not uid:
-                continue
-            pts = points_system[pos] if pos < len(points_system) else 0
-            totals.setdefault(uid, {"user_id": uid, "points": 0, "wins": 0, "races": 0})
-            totals[uid]["points"] += pts
-            totals[uid]["races"] += 1
-            if pos == 0:
-                totals[uid]["wins"] += 1
-    return sorted(totals.values(), key=lambda row: (row["points"], row["wins"], row["races"]), reverse=True)
-
-
 async def auto_create_for_f1_challenge(challenge_id: str) -> int:
     """Build PrizePickups for Fast-Lap results when results are published.
 
@@ -270,8 +225,11 @@ async def auto_create_for_f1_challenge(challenge_id: str) -> int:
         logger.info("[prizes] created f1 pickup %s place %s challenge %s", _log_safe(doc.get("id")), place, _log_safe(challenge_id))
         return True
 
+    # Dieselbe Rangfolge wie Tabelle und Gesamtwertung (#1584, services/fastlap_standings.py).
+    from services.fastlap_standings import challenge_standings, official_times, track_ranking
+
     if challenge.get("is_championship"):
-        ranked = await _f1_championship_rankings(db, challenge, tracks)
+        ranked, _per_track, _tracks = await challenge_standings(db, challenge, tracks)
         for place, prize in prize_ranks:
             if place <= len(ranked) and await create_pickup(ranked[place - 1]["user_id"], place, prize, "championship", "Gesamtwertung"):
                 created += 1
@@ -279,13 +237,9 @@ async def auto_create_for_f1_challenge(challenge_id: str) -> int:
 
     max_rank = max(rank for rank, _ in prize_ranks)
     for track in tracks:
-        times = await db.f1_lap_times.find(
-            _official_f1_time_query({"challenge_id": challenge_id, "track_id": track["id"]}),
-            {"_id": 0},
-        ).to_list(5000)
-        ranked = _rank_best_laps(times)[:max_rank]
+        ranked = track_ranking(await official_times(db, challenge_id, track["id"]))[:max_rank]
         for place, prize in prize_ranks:
-            if place <= len(ranked) and await create_pickup(ranked[place - 1]["user_id"], place, prize, f"track:{track['id']}", track.get("name") or "Strecke", track):
+            if place <= len(ranked) and await create_pickup(ranked[place - 1][0], place, prize, f"track:{track['id']}", track.get("name") or "Strecke", track):
                 created += 1
     return created
 

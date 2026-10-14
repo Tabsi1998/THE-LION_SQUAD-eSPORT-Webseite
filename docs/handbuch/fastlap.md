@@ -69,9 +69,12 @@ Challenge macht, darf dort **Zeiten eintragen und ändern**, aber keine Challeng
 Auf der Seite der Challenge (**Admin → eSports → Fast Lap → Challenge öffnen**) im Kasten **Strecken**:
 
 1. Unter **Neue Strecke** den **Namen** eintragen.
-2. Optional **Streckenbild**, **Land** und **Zielzeit** (Format `m:ss.mmm`, zum Beispiel `1:32.450`).
+2. Optional **Streckenbild**, **Land** und **Zielzeit** (Format `m:ss.mmm`, zum Beispiel `1:32.450`), dazu
+   **Plausibel ab** und **Plausibel bis**: Zeiten außerhalb dieser Grenzen fragen beim Eintragen nach („Trotzdem
+   speichern?“). Leer heißt Standard – 20 Sekunden bis 10 Minuten.
 3. Auf **Hinzufügen** klicken. Mit dem Stift-Symbol neben einer Strecke ändert ihr sie (dort gibt es zusätzlich die
-   **Reihenfolge**), mit dem Mülleimer löscht ihr sie – dabei werden **alle Zeiten dieser Strecke mit gelöscht**.
+   **Reihenfolge**), mit dem Mülleimer löscht ihr sie – dabei werden **alle Zeiten dieser Strecke mit gelöscht**. Nach
+   „Ergebnisse veröffentlicht“ lässt sich eine Strecke mit Zeiten nicht mehr löschen.
 
 Die **Zielzeit** ist eine Marke zum Knacken: Wer sie unterbietet, sammelt den Erfolg „Zielzeit geknackt“.
 
@@ -89,8 +92,10 @@ Wer Zeiten eintragen soll, ohne sonst etwas verwalten zu dürfen:
 ### 2.4 Freigeben
 
 Setzt den **Status** der Challenge (Auswahl rechts oben auf der Challenge-Seite) auf **Angekündigt**, sobald sie sichtbar sein
-soll. **Live** und **Beendet** schalten sich anhand von **Start** und **Ende** von selbst. Von Hand stellt ihr den Status nur für
-Ausnahmen um.
+soll. **Live** schaltet sich mit dem **Start** von selbst. **Beendet** setzt die Turnierleitung von Hand, wenn die Zeiten
+geprüft sind: Erst dann entstehen die Gewinn-Einträge, mit **Ergebnisse veröffentlicht** auch die Jahreswertungs-Punkte.
+Öffentlich steht nach dem **Ende** trotzdem schon „Beendet“, und auf der Challenge-Seite im Admin erinnert ein Hinweis
+daran, den Status zu setzen.
 
 ---
 
@@ -105,8 +110,8 @@ Ausnahmen um.
 | **Einreichung offen** / **Einreichung geschlossen** | die Anzeige „Online-Einreichung“ auf der öffentlichen Seite (siehe 3.3) |
 | **Live** | läuft |
 | **Pausiert** | angehalten |
-| **Beendet** | vorbei, die Ergebnisse sind sichtbar |
-| **Ergebnisse veröffentlicht** | offiziell, löst die Jahreswertungs-Punkte aus |
+| **Beendet** | vorbei, die Ergebnisse sind sichtbar, die Gewinn-Einträge entstehen (setzt die Turnierleitung) |
+| **Ergebnisse veröffentlicht** | offiziell, löst die Jahreswertungs-Punkte aus, die Zeiten sind gesperrt (siehe 3.11) |
 | **Archiviert** / **Abgesagt** | abgelegt |
 
 **Sichtbarkeit** (Öffentlich, Nur registrierte Community, Nur Vereinsmitglieder, Nur intern) bestimmt, wer die
@@ -117,7 +122,11 @@ hinzugefügt wird (Event → **Programm** → **+ Fast Lap** oder **Bestehendes 
 ### 3.2 Wertung: Strecken und Championship
 
 - **Eine Strecke:** Die Rangliste ist die beste Zeit je Fahrer. Die **wirksame Zeit** ist Rundenzeit **plus
-  Strafsekunden**. Ungültig markierte Zeiten zählen nicht.
+  Strafsekunden** (auf Tausendstel gerundet). Ungültig markierte Zeiten und Vereins-Referenzzeiten zählen nicht.
+- **Gleichstand:** Haben zwei dieselbe wirksame Zeit, liegt **die früher gefahrene** (früher eingetragene) vorn. Diese
+  eine Regel gilt überall: Rangliste, TV, Gewinne, Jahreswertung, Event-Rückblick, Widget und Profil.
+- **Versuche:** Die Zahl „Versuche“ zählt alle Zeiten einer Person in der Wertung, **auch ungültige** – genau wie die
+  Grenze **Max Versuche**.
 - **Championship:** Auf jeder Strecke gibt es nach Platz Punkte: Platz 1 bekommt 25, dann 18, 15, 12, 10, 8, 6, 4, 2
   und Platz 10 einen Punkt. Alles darunter keinen. Die Punkte werden über alle Strecken addiert. Bei Gleichstand
   entscheiden die Siege. Das ist die **Gesamtwertung**, die auf der öffentlichen Seite als „Championship
@@ -141,7 +150,9 @@ eingetragen.“
 Auf der Seite der Challenge, Kasten **Zeiten eintragen**. Zuerst links bei **Strecken** die Strecke anklicken, dann:
 
 1. **Fahrer** suchen und wählen.
-2. **Zeit (m:ss.SSS)**, zum Beispiel `1:24.587`.
+2. **Zeit (m:ss.SSS)**, zum Beispiel `1:24.587` – mit Punkt oder Komma (`1:24,587`), auch ohne Minuten (`84.587`).
+   Eine Zahl ohne Komma sind Sekunden (`90` = 1:30.000). Liegt die Zeit außerhalb der plausiblen Grenzen der Strecke
+   (Standard 20 Sekunden bis 10 Minuten), fragt die Seite nach; gespeichert wird erst mit **Trotzdem speichern**.
 3. **Wertung**: **Offizielle Wertung** oder **Vereins-Referenz**.
 4. Optional **Strafe (s)** und **Proof URL** (Link auf Screenshot oder Video).
 5. Mit **Strafe** gibt es ein Pflichtfeld **Begründung für Strafe** (mindestens 5 Zeichen). Ohne Begründung wird nicht
@@ -168,8 +179,10 @@ Bei jeder Zeit in der Liste gibt es ein Stift-Symbol. Im Fenster **Zeit bearbeit
 - **Als ungültig markieren (zählt nicht für Rangliste)**. Die Zeit bleibt in der Liste stehen, durchgestrichen,
   mit dem Vermerk „INVALID“, und zählt nicht für die Rangliste.
 
-Mit dem Mülleimer löscht ihr eine Zeit ganz (mit Rückfrage). Besser als Löschen ist **ungültig markieren**, denn
-dann ist nachvollziehbar, was passiert ist.
+Mit dem Mülleimer löscht ihr eine Zeit ganz (mit Rückfrage, im Admin und auf der öffentlichen Seite). Besser als
+Löschen ist **ungültig markieren**, denn dann ist nachvollziehbar, was passiert ist. Eintragen, Ändern, Löschen und
+Strafen stehen im **Protokoll** (**Admin → System → Betrieb & Logs → Ereignisse**, Adminaktionen), mit Person und Zeitpunkt; die Strafen-Liste nennt als
+Aussteller, wer die Strafe gesetzt hat.
 
 ### 3.6 Vereins-Referenzzeiten
 
@@ -195,7 +208,7 @@ veröffentlicht** und fehlen Einträge, gibt es den Knopf **Gewinne erzeugen**.
 
 Auf der öffentlichen Seite der Challenge: eine **Strecken-Rangliste** je Strecke und, bei Championship, die
 **Gesamtwertung** mit Punkten. Bei einer Championship gibt es, sobald die Challenge **Beendet**, **Ergebnisse veröffentlicht** oder **Archiviert** ist,
-**Gesamtwertung-PDF** und **Gesamtwertungs-Urkunden**. Im Admin stehen oben auf der Challenge-Seite **CSV** (alle Zeiten) und **PDF**
+**Gesamtwertung-PDF** und **Gesamtwertungs-Urkunden**. Im Admin stehen oben auf der Challenge-Seite **CSV** (die Bestzeit je Fahrer und Strecke) und **PDF**
 (Rangliste, für die gewählte Strecke). Die Liste aller Challenges exportiert ihr mit **CSV**.
 
 ### 3.9 Bestzeit-Moment
@@ -212,13 +225,24 @@ Auf der öffentlichen Seite der Challenge: eine **Strecken-Rangliste** je Streck
 
 Eingetragene offizielle Zeiten zählen für Erfolge der Fahrer (zum Beispiel „Zielzeit geknackt“). Referenzzeiten zählen dafür nicht.
 
+### 3.11 Nach „Ergebnisse veröffentlicht“
+
+Mit **Ergebnisse veröffentlicht** stehen Gewinne und Jahreswertungs-Punkte fest – die Zeiten sind dann gesperrt
+(ebenso im Status **Archiviert**). Das Fast-Lap-Team kann nichts mehr eintragen, ändern oder löschen; die App zeigt statt
+des Formulars einen Hinweis. Die **Turnierleitung** kann noch korrigieren, aber nur mit **Begründung** (mindestens
+10 Zeichen), die im **Protokoll** steht. Vor dem Veröffentlichen fragt die Seite nach. Wer den Status wieder
+zurücksetzt, öffnet die Zeiten – auch das steht im Protokoll. Schon vergebene Gewinne und Jahreswertungs-Punkte
+ändern sich dadurch nicht von selbst.
+
 ---
 
 ## 4. Wenn etwas nicht klappt
 
 | Fehlerbild | Ursache | Lösung |
 | --- | --- | --- |
-| „Ungültiges Zeitformat (m:ss.SSS)“ | Die Zeit hat ein anderes Format | So schreiben: `1:24.587` (Minuten, Doppelpunkt, Sekunden, Punkt, Tausendstel) |
+| „Zeit bitte als m:ss.mmm angeben …“ / „Ungültiges Zeitformat“ | Die Zeit hat ein anderes Format | So schreiben: `1:24.587` oder `1:24,587` (Minuten, Doppelpunkt, Sekunden, Punkt oder Komma, Tausendstel); mit Minuten höchstens 59 Sekunden |
+| „Zeit prüfen … Trotzdem speichern?“ / „wirkt unplausibel“ | Die Zeit liegt außerhalb der plausiblen Grenzen der Strecke | Zeit prüfen; stimmt sie, **Trotzdem speichern**. Grenzen bei der Strecke unter **Plausibel ab / bis** |
+| „Die Ergebnisse sind veröffentlicht …“ | Die Challenge steht auf **Ergebnisse veröffentlicht** oder **Archiviert** | Nur die Turnierleitung ändert noch, mit Begründung (mind. 10 Zeichen) |
 | „Zielzeit bitte als m:ss.mmm angeben“ | Dasselbe bei der Zielzeit einer Strecke | Zum Beispiel `1:32.450` |
 | „Bei Strafzeit ist eine Begründung (mind. 5 Zeichen) Pflicht.“ | Strafe oder ungültig ohne Begründung | Im Feld **Begründung** mindestens fünf Zeichen eintragen |
 | „Bitte zuerst den Fahrer suchen und wählen.“ | Der Fahrer wurde nur getippt, nicht aus der Liste gewählt | Namen tippen und in der Trefferliste anklicken |

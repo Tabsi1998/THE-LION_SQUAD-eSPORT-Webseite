@@ -6,18 +6,19 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
+const confirmMock = vi.fn(async () => true);
+const promptMock = vi.fn(async () => "");
 vi.mock("@/lib/api", () => ({
   API: "http://test.local/api",
   api: apiMock,
   formatRequestError: (_err, fallback) => fallback,
-  parseTimeStr: (value) => value,
   resolveMediaUrl: (value) => value || "",
 }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/ImageUpload", () => ({ ImageUpload: () => <div data-testid="image-upload" /> }));
 vi.mock("@/components/tls/MarkdownEditor", () => ({ MarkdownEditor: ({ testId }) => <textarea data-testid={testId} readOnly /> }));
 vi.mock("@/components/tls/AccessLinksPanel", () => ({ AccessLinksPanel: () => <div data-testid="access-links" /> }));
-vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock, usePrompt: () => promptMock }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ isAdmin: true, isTournamentLead: true, user: { id: "admin-1" } }) }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: toastMock }));
@@ -41,7 +42,16 @@ beforeEach(() => {
   });
   apiMock.patch.mockReset();
   apiMock.patch.mockResolvedValue({ data: CHALLENGE });
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValue({ data: { id: "time-1" } });
+  apiMock.delete.mockReset();
+  apiMock.delete.mockResolvedValue({ data: { ok: true } });
   toastMock.info.mockReset();
+  toastMock.error.mockReset();
+  confirmMock.mockReset();
+  confirmMock.mockResolvedValue(true);
+  promptMock.mockReset();
+  promptMock.mockResolvedValue("");
 });
 
 test("die Einstellungen stehen im Rahmen: Inhalt links, Veröffentlichung rechts, Speichern-Leiste", async () => {
@@ -151,4 +161,102 @@ test("Nachweis-Link nur bei http(s)", async () => {
   const links = screen.getAllByRole("link", { name: "Proof" });
   expect(links).toHaveLength(1);
   expect(links[0]).toHaveAttribute("href", "https://example.test/clip");
+});
+
+// #1584: ein Parser (Komma und Punkt), Rückfrage bei unplausibler Zeit und beim Löschen, Begründung nach der
+// Veröffentlichung, Plausibilitätsgrenzen je Strecke, Hinweis am Ende.
+const TIMES = [{ id: "t-1", attempt_number: 1, time_ms: 84587, time_str: "1:24.587", user: { display_name: "Erika" } }];
+
+function answerWith(challenge) {
+  apiMock.get.mockImplementation(async (url) => {
+    if (String(url).startsWith("/f1/challenges/c-1?")) return { data: { ...CHALLENGE, tracks: [{ id: "tr-1", name: "Spa" }], ...challenge } };
+    if (url === "/admin/people/search") return { data: [{ id: "u-7", name: "Erika Beispiel", context: "Community" }] };
+    if (String(url).startsWith("/f1/challenges/c-1/times")) return { data: TIMES };
+    return { data: [] };
+  });
+}
+
+async function chooseDriverAndType(value) {
+  fireEvent.change(screen.getByTestId("f1-add-time-user-search"), { target: { value: "eri" } });
+  fireEvent.click(await screen.findByTestId("f1-add-time-user-option-u-7"));
+  fireEvent.change(screen.getByTestId("f1-add-time-value"), { target: { value } });
+  fireEvent.click(screen.getByTestId("f1-add-time-submit"));
+}
+
+test("Zeit mit Komma: 1:24,587 geht als 84587 ms", async () => {
+  answerWith({});
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  await chooseDriverAndType("1:24,587");
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/f1/challenges/c-1/times", expect.objectContaining({ time_ms: 84587 })));
+  expect(confirmMock).not.toHaveBeenCalled();
+});
+
+test("unplausible Zeit: erst nachfragen; Nein speichert nichts, Ja schickt die Bestätigung mit", async () => {
+  answerWith({});
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  confirmMock.mockResolvedValueOnce(false);
+  await chooseDriverAndType("12");
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  expect(confirmMock.mock.calls[0][0].description).toContain("0:12.000");
+  expect(apiMock.post).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByTestId("f1-add-time-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/f1/challenges/c-1/times", expect.objectContaining({ time_ms: 12000, confirm_implausible: true })));
+});
+
+test("Löschen fragt nach; Abbrechen löscht nichts", async () => {
+  answerWith({});
+  renderPage();
+  await screen.findByText("Erika");
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("f1-delete-time-t-1"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  expect(apiMock.delete).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByTestId("f1-delete-time-t-1"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/f1/times/t-1", undefined));
+});
+
+test("nach der Veröffentlichung: Löschen und Eintragen nur mit Begründung", async () => {
+  answerWith({ status: "results_published" });
+  renderPage();
+  await screen.findByText("Erika");
+  expect(screen.getByTestId("f1-published-lock")).toHaveTextContent("Ergebnisse veröffentlicht");
+  promptMock.mockResolvedValueOnce(null);
+  fireEvent.click(screen.getByTestId("f1-delete-time-t-1"));
+  await waitFor(() => expect(promptMock).toHaveBeenCalledTimes(1));
+  expect(apiMock.delete).not.toHaveBeenCalled();
+  promptMock.mockResolvedValueOnce("Doppelt eingetragen laut Video");
+  fireEvent.click(screen.getByTestId("f1-delete-time-t-1"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/f1/times/t-1", { data: { change_reason: "Doppelt eingetragen laut Video" } }));
+  promptMock.mockResolvedValueOnce("Nachtrag aus der Zeitnahme");
+  await chooseDriverAndType("1:24.587");
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/f1/challenges/c-1/times", expect.objectContaining({ change_reason: "Nachtrag aus der Zeitnahme" })));
+});
+
+test("Ergebnisse veröffentlichen fragt nach, weil danach Zeiten gesperrt sind", async () => {
+  answerWith({ status: "live" });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.change(screen.getByTestId("f1-status-select"), { target: { value: "results_published" } });
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+});
+
+test("Ende erreicht: die Seite sagt, dass die Leitung bestätigt", async () => {
+  answerWith({ status: "live", end_date: "2026-01-01T10:00:00Z", public_phase: { state: "completed" } });
+  renderPage();
+  expect(await screen.findByTestId("f1-end-reached")).toHaveTextContent("Gewinne und Saisonpunkte");
+});
+
+test("Strecke: Plausibilitätsgrenzen werden zu Millisekunden", async () => {
+  answerWith({});
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  fireEvent.change(screen.getByTestId("f1-new-track-name"), { target: { value: "Monza" } });
+  fireEvent.change(screen.getByTestId("f1-new-track-min"), { target: { value: "1:10" } });
+  fireEvent.change(screen.getByTestId("f1-new-track-max"), { target: { value: "2:30" } });
+  fireEvent.click(screen.getByTestId("f1-add-track-btn"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/f1/challenges/c-1/tracks", expect.objectContaining({ min_plausible_ms: 70000, max_plausible_ms: 150000 })));
 });

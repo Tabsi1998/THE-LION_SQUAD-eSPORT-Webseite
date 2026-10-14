@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { API, api, formatRequestError, parseTimeStr, resolveMediaUrl } from "@/lib/api";
-import { formatLapTime, parseLapTime } from "@/lib/laptime";
+import { API, api, formatRequestError, resolveMediaUrl } from "@/lib/api";
+import { formatLapTime, parseLapTime, plausibilityText } from "@/lib/laptime";
 import { safeHttpUrl } from "@/lib/safeLink";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
@@ -12,10 +12,21 @@ import { toast } from "sonner";
 import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ChallengeSettingsForm } from "./f1/ChallengeSettingsForm";
 import { F1StaffPanel } from "./f1/F1StaffPanel";
+
+// Nach „Ergebnisse veröffentlicht“ (#1584) ändert nur die Turnierleitung Zeiten - mit Begründung, die im Protokoll steht.
+const LOCKED_STATUSES = new Set(["results_published", "archived"]);
+const OPEN_STATUSES = new Set(["scheduled", "registration_open", "registration_closed", "live", "paused"]);
+
+function trackLimits(track) {
+  const min = parseLapTime(track.min_time);
+  const max = parseLapTime(track.max_time);
+  if (Number.isNaN(min) || Number.isNaN(max)) return null;
+  return { min_plausible_ms: min, max_plausible_ms: max };
+}
 
 const F1_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -42,11 +53,12 @@ export default function AdminF1EditPage() {
   const [staffError, setStaffError] = useState("");
   const [times, setTimes] = useState([]);
   const [activeTrack, setActiveTrack] = useState(null);
-  const [newTrack, setNewTrack] = useState({ name: "", image_url: "", country: "", target_time: "" });
+  const [newTrack, setNewTrack] = useState({ name: "", image_url: "", country: "", target_time: "", min_time: "", max_time: "" });
   const [editTrack, setEditTrack] = useState(null);
   const [newTime, setNewTime] = useState({ time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "", score_scope: "official" });
   const [editTime, setEditTime] = useState(null);
   const confirm = useConfirm();
+  const prompt = usePrompt();
   const setNewTrackField = (k, v) => setNewTrack((track) => ({ ...track, [k]: v }));
   const setEditTrackField = (k, v) => setEditTrack((track) => ({ ...(track || {}), [k]: v }));
 
@@ -93,10 +105,12 @@ export default function AdminF1EditPage() {
     // Zielzeit (#613): leer = keine; unlesbar = Hinweis statt Speichern.
     const targetMs = parseLapTime(newTrack.target_time);
     if (Number.isNaN(targetMs)) { toast.error("Zielzeit bitte als m:ss.mmm angeben, z. B. 1:32.450."); return; }
+    const limits = trackLimits(newTrack);
+    if (!limits) { toast.error("Plausible Zeiten bitte als m:ss.mmm angeben, z. B. 1:10.000."); return; }
     try {
-      const { target_time: _targetText, ...fields } = newTrack;
-      await api.post(`/f1/challenges/${id}/tracks`, { ...fields, target_time_ms: targetMs, order_index: tracks.length });
-      setNewTrack({ name: "", image_url: "", country: "", target_time: "" });
+      const { target_time: _targetText, min_time: _minText, max_time: _maxText, ...fields } = newTrack;
+      await api.post(`/f1/challenges/${id}/tracks`, { ...fields, ...limits, target_time_ms: targetMs, order_index: tracks.length });
+      setNewTrack({ name: "", image_url: "", country: "", target_time: "", min_time: "", max_time: "" });
       toast.success("Strecke hinzugefügt.");
       load();
     } catch (err) { toast.error(formatRequestError(err, "Strecke konnte nicht hinzugefügt werden.", { name: newTrack.name })); }
@@ -122,6 +136,8 @@ export default function AdminF1EditPage() {
     if (!editTrack) return;
     const targetMs = parseLapTime(editTrack.target_time);
     if (Number.isNaN(targetMs)) { toast.error("Zielzeit bitte als m:ss.mmm angeben, z. B. 1:32.450."); return; }
+    const limits = trackLimits(editTrack);
+    if (!limits) { toast.error("Plausible Zeiten bitte als m:ss.mmm angeben, z. B. 1:10.000."); return; }
     try {
       await api.patch(`/f1/tracks/${editTrack.id}`, {
         name: editTrack.name,
@@ -129,6 +145,7 @@ export default function AdminF1EditPage() {
         country: editTrack.country || "",
         order_index: Number(editTrack.order_index) || 0,
         target_time_ms: targetMs,
+        ...limits,
       });
       toast.success("Strecke gespeichert.");
       setEditTrack(null);
@@ -136,16 +153,46 @@ export default function AdminF1EditPage() {
     } catch (err) { toast.error(formatRequestError(err, "Strecke konnte nicht gespeichert werden.", { name: editTrack.name })); }
   };
 
+  const locked = LOCKED_STATUSES.has(challenge?.status);
+  const currentTrack = tracks.find((track) => track.id === activeTrack) || null;
+
+  // Unplausible Zeit (#1584): erst fragen, dann mit Bestätigung schicken. null heißt abgebrochen.
+  const plausibilityConsent = async (ms) => {
+    const question = plausibilityText(ms, currentTrack);
+    if (!question) return {};
+    const ok = await confirm({ title: "Zeit prüfen", description: question, confirmLabel: "Trotzdem speichern", tone: "info" });
+    return ok ? { confirm_implausible: true } : null;
+  };
+
+  // Nach der Veröffentlichung (#1584): ohne Begründung keine Änderung. null heißt abgebrochen.
+  const changeReason = async (what) => {
+    if (!locked) return {};
+    const reason = await prompt({
+      title: "Begründung nötig",
+      description: `Die Ergebnisse sind veröffentlicht. ${what} geht nur mit Begründung (mind. 10 Zeichen) - sie steht im Protokoll.`,
+      placeholder: "z. B. Zeitnahme-Fehler laut Video",
+      confirmLabel: "Mit Begründung speichern",
+      required: true,
+    });
+    const text = typeof reason === "string" ? reason.trim() : "";
+    if (!text) return null;
+    return { change_reason: text };
+  };
+
   const addTime = async (e) => {
     e.preventDefault();
     if (!driver) { toast.error("Bitte zuerst den Fahrer suchen und wählen."); return; }
-    const ms = parseTimeStr(newTime.time_str);
-    if (!ms) { toast.error("Ungültiges Zeitformat (m:ss.SSS)"); return; }
+    const ms = parseLapTime(newTime.time_str);
+    if (!ms) { toast.error("Zeit bitte als m:ss.mmm angeben, z. B. 1:24.587 oder 1:24,587."); return; }
     const pen = Number(newTime.penalty_seconds) || 0;
     if (pen > 0 && (newTime.admin_note || "").trim().length < 5) {
       toast.error("Bei Strafzeit ist eine Begründung (mind. 5 Zeichen) Pflicht.");
       return;
     }
+    const consent = await plausibilityConsent(ms);
+    if (!consent) return;
+    const reason = await changeReason("Eine Zeit nachtragen");
+    if (!reason) return;
     try {
       await api.post(`/f1/challenges/${id}/times`, {
         user_id: driver.id, track_id: activeTrack,
@@ -153,6 +200,8 @@ export default function AdminF1EditPage() {
         proof_url: newTime.proof_url || null,
         admin_note: newTime.admin_note?.trim() || null,
         score_scope: newTime.score_scope || "official",
+        ...consent,
+        ...reason,
       });
       setNewTime({ ...newTime, time_str: "", proof_url: "", admin_note: "", penalty_seconds: 0 });
       toast.success("Zeit eingetragen.");
@@ -160,9 +209,20 @@ export default function AdminF1EditPage() {
     } catch (err) { toast.error(formatRequestError(err, "Zeit konnte nicht eingetragen werden.")); }
   };
 
-  const delTime = async (tid) => {
+  const delTime = async (time) => {
+    // Rückfrage beim Löschen (#1584) - nach der Veröffentlichung mit Begründung statt Ja/Nein.
+    let reason = {};
+    if (locked) {
+      reason = await changeReason("Eine Zeit löschen");
+      if (!reason) return;
+    } else if (!await confirm({
+      title: "Zeit löschen?",
+      description: `${time.user?.display_name || time.user?.username || "Fahrer"} - ${time.time_str} wird aus der Challenge entfernt.`,
+      confirmLabel: "Zeit löschen",
+      tone: "danger",
+    })) return;
     try {
-      await api.delete(`/f1/times/${tid}`);
+      await api.delete(`/f1/times/${time.id}`, reason.change_reason ? { data: reason } : undefined);
       toast.success("Zeit gelöscht.");
       loadTimes();
     } catch (err) {
@@ -173,8 +233,8 @@ export default function AdminF1EditPage() {
   const saveEdit = async () => {
     if (!editTime) return;
     try {
-      const ms = editTime.time_str ? parseTimeStr(editTime.time_str) : editTime.time_ms;
-      if (editTime.time_str && !ms) { toast.error("Ungültiges Zeitformat"); return; }
+      const ms = editTime.time_str ? parseLapTime(editTime.time_str) : editTime.time_ms;
+      if (editTime.time_str && !ms) { toast.error("Zeit bitte als m:ss.mmm angeben, z. B. 1:24.587 oder 1:24,587."); return; }
       const pen = Number(editTime.penalty_seconds) || 0;
       const inv = !!editTime.is_invalid;
       const note = (editTime.admin_note || "").trim();
@@ -182,6 +242,10 @@ export default function AdminF1EditPage() {
         toast.error("Bei Strafzeit oder Invalid-Markierung ist eine Begründung (mind. 5 Zeichen) Pflicht.");
         return;
       }
+      const consent = ms !== editTime.time_ms ? await plausibilityConsent(ms) : {};
+      if (!consent) return;
+      const reason = await changeReason("Eine Zeit ändern");
+      if (!reason) return;
       await api.patch(`/f1/times/${editTime.id}`, {
         time_ms: ms,
         penalty_seconds: pen,
@@ -189,6 +253,8 @@ export default function AdminF1EditPage() {
         proof_url: editTime.proof_url || null,
         admin_note: note || null,
         score_scope: editTime.score_scope || "official",
+        ...consent,
+        ...reason,
       });
       toast.success("Zeit aktualisiert.");
       setEditTime(null);
@@ -197,6 +263,13 @@ export default function AdminF1EditPage() {
   };
 
   const setStatus = async (status) => {
+    // Veröffentlichen sperrt die Zeiten und legt Gewinne und Saisonpunkte an (#1584) - erst fragen.
+    if (status === "results_published" && !await confirm({
+      title: "Ergebnisse veröffentlichen?",
+      description: "Danach legt die Seite Gewinne und Saisonpunkte an und sperrt die Zeiten. Änderungen gehen nur noch durch die Turnierleitung mit Begründung.",
+      confirmLabel: "Veröffentlichen",
+      tone: "info",
+    })) return;
     try {
       await api.patch(`/f1/challenges/${id}`, { status });
       toast.success(`Status: ${status}`);
@@ -234,6 +307,16 @@ export default function AdminF1EditPage() {
         </div>
       </div>
 
+      {locked && (
+        <div data-testid="f1-published-lock" className="mb-5 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 text-sm text-white/80">
+          Ergebnisse veröffentlicht: Zeiten sind gesperrt. Ändern, Nachtragen und Löschen gehen nur noch durch die Turnierleitung mit Begründung - jede Änderung steht im Protokoll.
+        </div>
+      )}
+      {!locked && OPEN_STATUSES.has(challenge.status) && challenge.public_phase?.state === "completed" && (
+        <div data-testid="f1-end-reached" className="mb-5 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-3 text-sm text-white/80">
+          Die Zeit ist um. Bitte die Zeiten prüfen und den Status auf „Beendet“ oder „Ergebnisse veröffentlicht“ setzen - erst dann entstehen Gewinne und Saisonpunkte.
+        </div>
+      )}
       {isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="fastlap" targetId={challenge.id} /></div>}
       {isTournamentLead && <ChallengeSettingsForm key={challenge.updated_at || challenge.id} challenge={challenge} onSaved={load} />}
       {isTournamentLead && <F1StaffPanel challengeId={challenge.id} staff={staff} staffError={staffError} onChanged={load} />}
@@ -249,7 +332,7 @@ export default function AdminF1EditPage() {
                   {tr.image_url && <img src={resolveMediaUrl(tr.image_url)} className="w-10 h-7 object-cover rounded-sm" alt="" />}
                   <div className="min-w-0"><div className="text-sm font-bold truncate">{tr.name}</div><div className="text-[10px] text-white/50">{tr.country}</div></div>
                 </button>
-                {isTournamentLead && <button onClick={() => setEditTrack({ ...tr, target_time: formatLapTime(tr.target_time_ms) })} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Strecke bearbeiten"><Pencil className="w-3.5 h-3.5" /></button>}
+                {isTournamentLead && <button onClick={() => setEditTrack({ ...tr, target_time: formatLapTime(tr.target_time_ms), min_time: formatLapTime(tr.min_plausible_ms), max_time: formatLapTime(tr.max_plausible_ms) })} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Strecke bearbeiten"><Pencil className="w-3.5 h-3.5" /></button>}
                 {isTournamentLead && <button onClick={() => delTrack(tr.id)} className="p-1 text-white/40 hover:text-live" title="Strecke löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
               </div>
             ))}
@@ -264,6 +347,10 @@ export default function AdminF1EditPage() {
               <ImageUpload value={editTrack.image_url || ""} onChange={(v) => setEditTrackField("image_url", v)} label="Streckenbild" testId="f1-edit-track-image-upload" variant="wide" allowLibrary />
               <input placeholder="Land" value={editTrack.country || ""} onChange={(e) => setEditTrackField("country", e.target.value)} data-testid="f1-edit-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <input placeholder="Zielzeit (m:ss.mmm, leer = keine)" value={editTrack.target_time || ""} onChange={(e) => setEditTrackField("target_time", e.target.value)} data-testid="f1-edit-track-target" title="Wer diese Zeit unterbietet, sammelt dafür den Erfolg „Zielzeit geknackt“." className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <div className="grid grid-cols-2 gap-2">
+                <input placeholder="Plausibel ab (Standard 0:20)" value={editTrack.min_time || ""} onChange={(e) => setEditTrackField("min_time", e.target.value)} data-testid="f1-edit-track-min" title="Schnellere Zeiten brauchen beim Eintragen eine Bestätigung." className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+                <input placeholder="Plausibel bis (Standard 10:00)" value={editTrack.max_time || ""} onChange={(e) => setEditTrackField("max_time", e.target.value)} data-testid="f1-edit-track-max" title="Langsamere Zeiten brauchen beim Eintragen eine Bestätigung." className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              </div>
               <input type="number" placeholder="Reihenfolge" value={editTrack.order_index ?? 0} onChange={(e) => setEditTrackField("order_index", e.target.value)} data-testid="f1-edit-track-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <button data-testid="f1-edit-track-save" className="w-full px-3 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#1E95C2]">
                 Strecke speichern
@@ -276,6 +363,10 @@ export default function AdminF1EditPage() {
             <ImageUpload value={newTrack.image_url} onChange={(v) => setNewTrackField("image_url", v)} label="Streckenbild" testId="f1-new-track-image-upload" variant="wide" allowLibrary />
             <input placeholder="Land" value={newTrack.country} onChange={(e) => setNewTrackField("country", e.target.value)} data-testid="f1-new-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             <input placeholder="Zielzeit (m:ss.mmm, leer = keine)" value={newTrack.target_time} onChange={(e) => setNewTrackField("target_time", e.target.value)} data-testid="f1-new-track-target" title="Wer diese Zeit unterbietet, sammelt dafür den Erfolg „Zielzeit geknackt“." className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            <div className="grid grid-cols-2 gap-2">
+              <input placeholder="Plausibel ab (Standard 0:20)" value={newTrack.min_time} onChange={(e) => setNewTrackField("min_time", e.target.value)} data-testid="f1-new-track-min" title="Schnellere Zeiten brauchen beim Eintragen eine Bestätigung." className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <input placeholder="Plausibel bis (Standard 10:00)" value={newTrack.max_time} onChange={(e) => setNewTrackField("max_time", e.target.value)} data-testid="f1-new-track-max" title="Langsamere Zeiten brauchen beim Eintragen eine Bestätigung." className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            </div>
             <button data-testid="f1-add-track-btn" className="w-full px-3 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#1E95C2] inline-flex items-center justify-center gap-2">
               <Plus className="w-3.5 h-3.5" /> Hinzufügen
             </button>
@@ -293,7 +384,7 @@ export default function AdminF1EditPage() {
                 </div>
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Zeit (m:ss.SSS)</div>
-                  <input value={newTime.time_str} onChange={(e) => setNewTime({ ...newTime, time_str: e.target.value })} placeholder="1:24.587" required data-testid="f1-add-time-value" className="w-36 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display text-lg tabular-nums" />
+                  <input value={newTime.time_str} onChange={(e) => setNewTime({ ...newTime, time_str: e.target.value })} placeholder="1:24.587" inputMode="decimal" required data-testid="f1-add-time-value" className="w-36 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display text-lg tabular-nums" />
                 </div>
                 <div className="min-w-[170px]">
                   <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Wertung</div>
@@ -351,7 +442,7 @@ export default function AdminF1EditPage() {
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => delTime(t.id)} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => delTime(t)} data-testid={`f1-delete-time-${t.id}`} title="Zeit löschen" className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
                 ))}

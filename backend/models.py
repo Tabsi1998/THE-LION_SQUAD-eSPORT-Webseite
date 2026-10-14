@@ -1044,6 +1044,10 @@ class F1TrackCreate(BaseModel):
     order_index: int = 0
     # Zielzeit der Strecke in Millisekunden (#613, „Zielzeit geknackt“) - leer heißt: keine Zielzeit.
     target_time_ms: Optional[int] = Field(default=None, ge=0)
+    # Plausibilität je Strecke (#1584): Zeiten außerhalb brauchen beim Eintragen eine Bestätigung; leer = Standard
+    # (20 Sekunden bis 10 Minuten, services/laptime.py).
+    min_plausible_ms: Optional[int] = Field(default=None, ge=0)
+    max_plausible_ms: Optional[int] = Field(default=None, ge=0)
 
 
 class F1TrackUpdate(BaseModel):
@@ -1052,6 +1056,8 @@ class F1TrackUpdate(BaseModel):
     country: Optional[str] = None
     order_index: Optional[int] = None
     target_time_ms: Optional[int] = Field(default=None, ge=0)
+    min_plausible_ms: Optional[int] = Field(default=None, ge=0)
+    max_plausible_ms: Optional[int] = Field(default=None, ge=0)
 
 
 class F1ChallengeCreate(BaseModel):
@@ -1146,6 +1152,9 @@ class F1LapTimeCreate(BaseModel):
     score_scope: Literal["official", "club_reference"] = "official"
     proof_url: Optional[str] = None
     admin_note: Optional[str] = None
+    # Unplausible Zeit bewusst bestätigt (#1584) und die Begründung einer Änderung nach der Veröffentlichung.
+    confirm_implausible: bool = False
+    change_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class F1LapTimeUpdate(BaseModel):
@@ -1155,6 +1164,12 @@ class F1LapTimeUpdate(BaseModel):
     score_scope: Optional[Literal["official", "club_reference"]] = None
     proof_url: Optional[str] = None
     admin_note: Optional[str] = None
+    confirm_implausible: bool = False
+    change_reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class F1LapTimeDelete(BaseModel):
+    change_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 # ---------- Stations ----------
