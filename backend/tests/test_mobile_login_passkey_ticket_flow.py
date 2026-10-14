@@ -27,7 +27,7 @@ async def flow(monkeypatch):
 
 async def member(flow, email="paula@club-mail.at"):
     user = await flow.add_user(role="player", name="paula")
-    await flow.db.users.update_one({"id": user["id"]}, {"$set": {"email": email, "email_verified": True, "mfa_enabled": False, "password_hash": hash_password("geheim-42")}})
+    await flow.db.users.update_one({"id": user["id"]}, {"$set": {"email": email, "email_verified": True, "mfa_enabled": False, "password_hash": hash_password("geheim-loewe-42")}})
     flow.act_as(None)
     return user
 
@@ -35,7 +35,7 @@ async def member(flow, email="paula@club-mail.at"):
 @pytest.mark.asyncio
 async def test_password_login_in_the_app_brings_a_one_time_passkey_ticket(flow, monkeypatch):
     user = await member(flow)
-    response = await flow.post("/api/auth/mobile/login", json={"email": "paula@club-mail.at", "password": "geheim-42"})
+    response = await flow.post("/api/auth/mobile/login", json={"email": "paula@club-mail.at", "password": "geheim-loewe-42"})
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["access_token"] and isinstance(body["passkey_ticket"], str) and len(body["passkey_ticket"]) >= 32
@@ -57,5 +57,5 @@ async def test_password_login_in_the_app_brings_a_one_time_passkey_ticket(flow, 
 async def test_without_app_passkeys_the_login_has_no_ticket(flow, monkeypatch):
     monkeypatch.setenv("PASSKEY_APK_KEY_HASHES", "")
     await member(flow)
-    body = (await flow.post("/api/auth/mobile/login", json={"email": "paula@club-mail.at", "password": "geheim-42"})).json()
+    body = (await flow.post("/api/auth/mobile/login", json={"email": "paula@club-mail.at", "password": "geheim-loewe-42"})).json()
     assert body["access_token"] and body["passkey_ticket"] is None
