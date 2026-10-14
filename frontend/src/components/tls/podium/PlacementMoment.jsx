@@ -34,9 +34,8 @@ export function PlacementMoment({ plan, onClose, reduced = false }) {
       data-metal={placement.metal}
       data-reduced={reduced ? "true" : undefined}
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={motionTransition("mid")}
+      animate={{ opacity: 1, transition: motionTransition("mid") }}
+      exit={{ opacity: 0, transition: motionTransition("fast") }}
       onClick={onClose}
     >
       <div className="tls-placement__backdrop" aria-hidden="true" />
@@ -47,9 +46,9 @@ export function PlacementMoment({ plan, onClose, reduced = false }) {
         data-play={reduced ? undefined : "run"}
         onClick={(event) => event.stopPropagation()}
         initial={reduced ? { opacity: 0 } : { opacity: 0, transform: "translateY(12px) scale(0.97)" }}
-        animate={{ opacity: 1, transform: "translateY(0px) scale(1)" }}
-        exit={{ opacity: 0 }}
-        transition={motionTransition("slow")}
+        animate={{ opacity: 1, transform: "translateY(0px) scale(1)", transition: motionTransition("slow") }}
+        // Gehen geht schneller als Kommen - wer schließt, will weiter.
+        exit={{ opacity: 0, transition: motionTransition("fast") }}
       >
         <button type="button" onClick={onClose} className="tls-placement__close" aria-label="Schließen" data-testid="placement-moment-close">
           <X className="h-5 w-5" />

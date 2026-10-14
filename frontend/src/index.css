@@ -427,7 +427,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 /* Podest (#1339): Treppchen mit Metall nur an Kante und Ziffer. Die Bewegung (einmal beim Erscheinen) ist ruhig: die
    Stufen heben sich nacheinander zum Sieger hin (60 ms Abstand), die Ziffer schwingt kaum merklich über, über die Krone
    läuft ein kurzer Glanz. Nur transform und opacity; „Bewegung reduzieren“ lässt alles stehen. */
-.tls-podium { --tls-metal-rgb: var(--tls-honor-rgb); max-width: 640px; margin-inline: auto; }
+.tls-podium { --tls-metal-rgb: var(--tls-honor-rgb); max-width: 640px; margin-inline: auto; padding-top: 30px; }
 .tls-podium__stage { display: grid; grid-template-columns: 30fr 40fr 30fr; align-items: end; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .tls-podium__col { display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; }
 .tls-podium__col[data-metal="gold"] { --tls-metal-rgb: var(--tls-honor-rgb); }
@@ -476,7 +476,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   .tls-podium__col[data-place="1"] .tls-podium__digit { font-size: 38px; }
 }
 @keyframes tls-podium-rise {
-  from { opacity: 0; transform: translateY(calc(16px * var(--tls-motion-on))); }
+  from { opacity: 0; transform: translateY(calc(var(--tls-rise, 16px) * var(--tls-motion-on))); }
   to { opacity: 1; transform: none; }
 }
 @keyframes tls-podium-digit {
@@ -510,6 +510,10 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   animation: tls-podium-glint calc(var(--tls-motion-slow) * 2) var(--tls-ease) both;
   animation-delay: calc(2 * 60ms + var(--tls-motion-slow) + var(--tls-motion-mid));
 }
+/* Drucken (Urkunden-Ansicht, Ergebnis-Aushang): das Treppchen steht immer da, auch ohne Sichtbarwerden. */
+@media print {
+  .tls-podium[data-play] .tls-podium__col { opacity: 1; animation: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .tls-podium[data-play] .tls-podium__col, .tls-podium[data-play] .tls-podium__digit, .tls-podium[data-play] .tls-podium__crown { animation: none; opacity: 1; }
   .tls-podium[data-play] .tls-podium__crown::after { animation: none; opacity: 0; }
@@ -525,7 +529,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   position: relative; width: 100%; max-width: 26rem; padding: 28px 24px 22px; border-radius: 10px; text-align: center; outline: none;
   background: linear-gradient(180deg, var(--tls-surface-2) 0%, var(--tls-surface-0) 100%);
   border: 1px solid rgb(var(--tls-metal-rgb) / 0.35);
-  box-shadow: inset 0 3px 0 rgb(var(--tls-metal-rgb)), 0 28px 60px -28px rgb(var(--tls-metal-rgb) / 0.45), 0 18px 40px -20px rgb(0 0 0 / 0.9);
+  box-shadow: inset 0 3px 0 rgb(var(--tls-metal-rgb)), 0 24px 48px -28px rgb(var(--tls-metal-rgb) / 0.22), 0 18px 40px -20px rgb(0 0 0 / 0.9);
 }
 .tls-placement__close { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 6px; color: rgb(255 255 255 / 0.55); transition: color var(--tls-motion-fast) var(--tls-ease); }
 .tls-placement__close:focus-visible { outline: 2px solid var(--tls-brand); outline-offset: 2px; }
@@ -540,6 +544,9 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-placement__name { margin-top: 10px; font-size: 16px; font-weight: 600; color: #fff; overflow-wrap: anywhere; }
 .tls-placement__tournament { margin-top: 2px; font-size: 14px; color: var(--tls-text-muted); overflow-wrap: anywhere; }
 .tls-placement__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 20px; }
+/* Große Schrift am kleinen Handy: Knöpfe brechen um, statt aus der Karte zu ragen. */
+.tls-placement__actions > * { max-width: 100%; white-space: normal; text-align: center; }
+@media (max-width: 359px) { .tls-placement__card { padding: 24px 16px 18px; } }
 .tls-placement__icon::after {
   content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
   background: linear-gradient(90deg, transparent 25%, rgb(255 255 255 / 0.6) 50%, transparent 75%);
@@ -548,6 +555,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   animation: tls-podium-digit var(--tls-motion-mid) var(--tls-ease) both; animation-delay: var(--tls-motion-mid);
 }
 .tls-placement__card[data-play="run"] .tls-placement__line {
+  --tls-rise: 8px;
   animation: tls-podium-rise var(--tls-motion-slow) var(--tls-ease) both;
   animation-delay: calc(var(--tls-motion-mid) + var(--tls-i, 0) * 60ms);
 }

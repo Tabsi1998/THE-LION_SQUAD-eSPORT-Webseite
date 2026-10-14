@@ -171,7 +171,7 @@ export default function TournamentSchedulePage() {
         {(hasMine || showViews) && (
           <div className="mt-8 flex flex-wrap items-center gap-2" data-testid="schedule-toolbar">
             {showViews && (
-              <div role="group" aria-label="Ansicht" className="inline-flex gap-1" data-testid="schedule-view">
+              <div role="group" aria-label="Ansicht" className="flex flex-wrap gap-1" data-testid="schedule-view">
                 {VIEWS.map((option) => (
                   <button key={option.key} type="button" onClick={() => setView(option.key)} aria-pressed={activeView === option.key} data-testid={`schedule-view-${option.key}`} className={`tls-btn ${activeView === option.key ? "tls-btn--secondary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-wider`}>
                     {option.label}
@@ -340,7 +340,7 @@ function StationView({ entries, changedMatches }) {
   return (
     <div className="mt-8 grid gap-8 lg:grid-cols-2" data-testid="schedule-stations">
       {stations.map((station) => (
-        <section key={station.key} aria-labelledby={`station-${station.key}`} data-testid={`schedule-station-group-${station.key}`}>
+        <section key={station.key} className="min-w-0" aria-labelledby={`station-${station.key}`} data-testid={`schedule-station-group-${station.key}`}>
           <h2 id={`station-${station.key}`} className="flex items-baseline justify-between gap-3 font-heading text-lg md:text-xl font-black uppercase">
             <span className="min-w-0 truncate">{station.label}</span>
             <span className="shrink-0 font-body text-xs font-semibold normal-case tracking-normal text-white/45">{station.entries.length} {station.entries.length === 1 ? "Spiel" : "Spiele"}</span>

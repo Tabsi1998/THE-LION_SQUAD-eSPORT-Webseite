@@ -80,7 +80,9 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
   const columns = COLUMNS[kind] || COLUMNS.league;
   const span = columns.length + 2 + (certificateHref ? 1 : 0);
   return (
-    <div className="tls-standings border border-white/10 rounded-md bg-[var(--tls-surface-1)] overflow-hidden">
+    // Bei großer Schrift (200 %) am Handy schiebt sich die Tabelle seitlich, statt die Punkte abzuschneiden.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
+    <div role="region" aria-label={label} tabIndex={0} className="tls-standings border border-white/10 rounded-md bg-[var(--tls-surface-1)] overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]">
       <table className="w-full text-sm tabular-nums" aria-label={label}>
         <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
           <tr className="border-b border-white/10">
