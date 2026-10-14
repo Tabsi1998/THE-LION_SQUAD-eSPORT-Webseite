@@ -158,7 +158,19 @@ def per_address_limit() -> int:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("path", LOGIN_PATHS)
-async def test_sign_in_is_limited_per_address_before_any_password_check(flow, hash_checks, path):
+async def test_sign_in_is_limited_per_address_before_any_password_check(flow, hash_checks, path, monkeypatch):
+    from datetime import datetime, timezone
+
+    from services import rate_limit
+
+    class Frozen(datetime):
+        """Die Uhr steht mitten in einem Fenster - sonst kippt der Test, wenn er über eine Minutengrenze läuft."""
+
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 14, 12, 0, 30, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(rate_limit, "datetime", Frozen)
     known = await account(flow)
     for number in range(per_address_limit()):
         response = await flow.post(path, json={"email": f"niemand-{number}@example.com", "password": WRONG})
