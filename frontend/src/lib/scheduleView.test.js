@@ -80,3 +80,15 @@ test("Lauf mit mehr als zwei Plätzen: Name des Laufs und Zahl der Spieler statt
   expect(open.heat.count).toBe(`${open.sides.length} Plätze`);
   expect(heats.every((entry) => !/^0 /.test(entry.heat.count))).toBe(true);
 });
+
+test("Vorschau-Baum, vorgeplant (Fabian live 14.10.): die Spiele stehen mit Zeit da - alle nur „voraussichtlich“", () => {
+  const bracket = fixture.onsite.bracket;
+  const preview = { ...bracket, matches_v2: bracket.matches_v2.map((match) => ({ ...match, is_preview: true, status: "preview",
+    started_at: null, completed_at: null, results: [], schedule_forecast: false })) };
+  const entries = scheduleEntries(preview);
+  expect(entries).toHaveLength(bracket.matches_v2.length);
+  expect(entries.every((entry) => entry.forecast)).toBe(true);
+  // Sobald der Baum fix ist, nur die echten Spiele.
+  const mixed = { ...bracket, matches_v2: [...bracket.matches_v2, { ...bracket.matches_v2[0], id: "alt", is_preview: true }] };
+  expect(scheduleEntries(mixed)).toHaveLength(bracket.matches_v2.length);
+});

@@ -196,7 +196,7 @@ export function PlanWarnings({ items, warnings }) {
 }
 
 function stateText(item) {
-  if (item.preview) return "noch ohne Zeit - Baum ist Vorschau";
+  if (item.preview && (item.start === null || item.start === undefined)) return "noch ohne Zeit - Baum ist Vorschau";
   if (item.start === null || item.start === undefined) return "noch ohne Zeit";
   if (item.state === "running") return `läuft ${item.elapsedMinutes} Min.`;
   if (item.state === "done") return "erledigt";
@@ -239,7 +239,7 @@ export function OrderList({ items, laneNames, canEdit, onRelease, editor }) {
                       <Pin className="h-3 w-3" aria-hidden="true" /> lösen
                     </button>
                   )}
-                  {editor && editable(item) && !item.preview && item.state === "planned" && (
+                  {editor && editable(item) && item.state === "planned" && (
                     <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small" aria-label={`${item.key} ändern`} aria-expanded={open === item.id}
                       onClick={() => setOpen(open === item.id ? null : item.id)}>
                       ändern
@@ -291,7 +291,7 @@ export function StationAgenda({ timeline, canEdit = false, onRelease, editor }) 
                     <span className="mp-agenda__state" data-warn={item.conflicts.length ? "true" : undefined}>
                       {next?.id === item.id && item.state === "planned" ? "als Nächstes · " : ""}{stateText(item)}
                     </span>
-                    {editor && editable(item) && item.state === "planned" && !item.preview && (
+                    {editor && editable(item) && item.state === "planned" && (
                       <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small mp-agenda__action" aria-label={`${item.key} ändern`}
                         aria-expanded={open === item.id} onClick={() => setOpen(open === item.id ? null : item.id)}>ändern</button>
                     )}
@@ -320,7 +320,7 @@ export function StationAgenda({ timeline, canEdit = false, onRelease, editor }) 
                   <span className="mp-agenda__key"><span className="mp-pill" data-tone={item.tone}>{TONE_LABEL[item.tone]}</span> {item.key}</span>
                   <span className="mp-agenda__names">{item.names.join(" · ")}</span>
                   <span className="mp-agenda__state">{stateText(item)}</span>
-                  {editor && editable(item) && !item.preview && item.state === "planned" && (
+                  {editor && editable(item) && item.state === "planned" && (
                     <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small mp-agenda__action" aria-label={`${item.key} ändern`}
                       aria-expanded={open === item.id} onClick={() => setOpen(open === item.id ? null : item.id)}>ändern</button>
                   )}

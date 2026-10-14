@@ -69,7 +69,7 @@ export function StationTimeline({ timeline, editable = false, canMoveItem = null
     return () => clearTimeout(timer);
   }, [instant]);
 
-  const movable = (item) => editable && !busy && item.state === "planned" && !item.preview && (!canMoveItem || canMoveItem(item));
+  const movable = (item) => editable && !busy && item.state === "planned" && (!canMoveItem || canMoveItem(item));
 
   const describe = (next, item) => {
     const blocking = dropConflicts(timeline, item.id, next.laneId, next.start);

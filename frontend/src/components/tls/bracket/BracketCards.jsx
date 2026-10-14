@@ -120,7 +120,7 @@ function MatchSheet({ match, id }) {
   return (
     <div id={id} className="tls-bracket-sheet" role="group" aria-label={`Spiel ${match.match_key || ""}`.trim()}>
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-text">
-        {time ? <span>{time}</span> : null}
+        {time ? <span>{time}{match?.schedule_forecast || match?.is_preview ? " · voraussichtlich" : ""}</span> : null}
         {duration ? <span>{duration} Min.</span> : null}
         {station ? <span className="text-brand">{station}</span> : null}
         {!time && !station && !duration ? <span>Zeit und Station folgen</span> : null}

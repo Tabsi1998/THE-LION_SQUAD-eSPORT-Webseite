@@ -90,6 +90,9 @@ async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: s
         if not matches:
             continue
         _apply_match_plan(matches, match_plan, _v2_plan_key)
+        # Vorgeplant, aber der fixe Baum hat andere Spiele (z. B. weniger Eingecheckte): was nicht passt, bleibt ohne
+        # Termin, und der Matchplan sagt „Baum hat sich geändert - neu planen“ (bis zum nächsten Übernehmen).
+        tree_changed = bool(match_plan) and {_v2_plan_key(match) for match in existing_matches} != {_v2_plan_key(match) for match in matches}
         if existing_matches:
             match_ids = await db.matches_v2.distinct("id", {"stage_id": stage["id"]})
             if match_ids:
@@ -100,7 +103,7 @@ async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: s
         await record_build_draws(db, matches, actor_id=actor_id)
         await db.tournament_stages.update_one(
             {"id": stage["id"]},
-            {"$set": {"status": "ready", "updated_at": now_utc().isoformat()}},
+            {"$set": {"status": "ready", "updated_at": now_utc().isoformat(), **({"schedule_hint": "tree_changed"} if tree_changed else {})}},
         )
         changed_stages.append({
             "stage_id": stage["id"],

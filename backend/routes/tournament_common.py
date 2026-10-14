@@ -38,7 +38,8 @@ MAX_INITIAL_PREVIEW_MATCHES = 512
 TOURNAMENT_MUTATION_LOCKED_DETAIL = "Turnier ist gesperrt und kann nur noch angesehen oder geloescht werden."
 
 
-MATCH_PLAN_FIELDS = ("scheduled_at", "duration_minutes", "station_id", "admin_note", "map", "best_of")
+# Mit Herkunft (schedule_source): ein vorgeplanter Planer-Termin bleibt Planer-Termin, ein fester bleibt fest.
+MATCH_PLAN_FIELDS = ("scheduled_at", "duration_minutes", "station_id", "admin_note", "map", "best_of", "schedule_source")
 
 
 MATCH_PLAN_ACTIVE_STATUSES = {"preview", "pending", "ready", "scheduled", "in_progress", "waiting_result"}

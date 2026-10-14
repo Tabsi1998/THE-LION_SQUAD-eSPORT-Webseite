@@ -44,8 +44,9 @@ export function scheduleEntries(bracket) {
   const registrations = new Map((bracket?.registrations || []).map((reg) => [reg.id, reg]));
   const mineIds = new Set((bracket?.registrations || []).filter((reg) => reg?.is_mine).map((reg) => reg.id));
   const finder = finderFor(matches);
-  return matches
-    .filter((match) => !match?.is_preview)
+  // Solange der Baum Vorschau ist, die Vorschau (vorgeplant, Fabian live 14.10.) - sonst nur echte Spiele.
+  const real = matches.filter((match) => !match?.is_preview);
+  return (real.length ? real : matches)
     .map((match) => {
       const done = isDone(match);
       const winners = done ? winnerIds(match) : new Set();
@@ -75,7 +76,8 @@ export function scheduleEntries(bracket) {
         stationLabel: station,
         scheduledAt: match.scheduled_at || null,
         // Vom Planer nur vorhergesagt (die Plätze stehen noch nicht fest): „voraussichtlich“.
-        forecast: !!match.schedule_forecast && !done && !isLive(match),
+        // Vorschau-Baum: alles nur voraussichtlich - wer gegen wen spielt, kann sich bis zum Check-in-Ende noch ändern.
+        forecast: (!!match.schedule_forecast || !!match.is_preview) && !done && !isLive(match),
         startedAt: match.started_at || null,
         tone: statusTone(match),
         sides,
