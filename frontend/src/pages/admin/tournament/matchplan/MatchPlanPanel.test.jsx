@@ -169,7 +169,14 @@ describe("Ansicht springt nicht und bleibt nie leer", () => {
     const rows = within(screen.getByTestId("mp-order")).getAllByRole("row").slice(1);
     expect(rows).toHaveLength(14);
     expect(rows[0]).toHaveTextContent("noch ohne Zeit");
-    expect(screen.getByTestId("mp-plan-note")).toHaveTextContent("Turnierbaum ist noch eine Vorschau");
+    expect(screen.getByTestId("mp-plan-note")).toHaveTextContent("Vorschau: Du kannst schon vorplanen");
+    expect(screen.getByTestId("mp-plan-note")).toHaveTextContent("Nach dem Check-in einmal „Automatisch planen“");
+  });
+
+  it("nach dem Check-in-Ende mit geändertem Baum: Hinweis „neu planen“ (Vorplanen, Fabian live 14.10.)", () => {
+    const state = fixture.local.applied;
+    setup({ ...state, stages: state.stages.map((stage) => ({ ...stage, schedule_hint: "tree_changed" })) });
+    expect(screen.getByTestId("mp-plan-note")).toHaveTextContent("Der Baum hat sich beim Check-in-Ende geändert - neu planen");
   });
 
   it("scheitert die Anfrage an den Planer, steht eine Meldung da - die gespeicherten Spiele bleiben sichtbar", async () => {
