@@ -104,3 +104,57 @@ test("Abonnieren (#1189): webcal für Kalender-Apps, Google über „cid“", ()
   expect(urls.webcal).toBe("webcal://lionsquad.at/api/calendar/feed.ics");
   expect(urls.google).toBe("https://calendar.google.com/calendar/render?cid=webcal%3A%2F%2Flionsquad.at%2Fapi%2Fcalendar%2Ffeed.ics");
 });
+
+// #1062: Serverzeiten ohne Zone („2026-07-15T23:30:00“) gelten im Kalender wie überall in App und Web als Wiener Uhr
+// (asInstant, #943) - nie als Uhr des Geräts. Mit Zone gilt die Zone. Der CI-Rechner läuft in UTC; lokal zusätzlich mit
+// $env:TZ="America/Los_Angeles" bzw. "Asia/Tokyo" (PowerShell) prüfen - Git Bash reicht TZ nicht an Node weiter.
+test("zonenlose Serverzeit im Sommer und im Winter: Wiener Tag, Wiener Uhr - auf jedem Gerät", () => {
+  const summerLate = { id: "sommer", kind: "event" as const, title: "Sommer", start: "2026-07-15T23:30:00", end: "2026-07-16T01:00:00" };
+  const summerEarly = { id: "frueh", kind: "event" as const, title: "Früh", start: "2026-07-20T00:30:00" };
+  const winterLate = { id: "winter", kind: "tournament" as const, title: "Winter", start: "2026-01-15T23:30:00" };
+  const winterEarly = { id: "nacht", kind: "fastlap" as const, title: "Nacht", start: "2026-01-20T00:30:00" };
+  const map = itemsByDay([summerLate, summerEarly, winterLate, winterEarly]);
+  expect(map.get("2026-07-15")?.map((item) => item.id)).toEqual(["sommer"]);
+  expect(map.get("2026-07-16")?.map((item) => item.id)).toEqual(["sommer"]);
+  expect(map.get("2026-07-20")?.map((item) => item.id)).toEqual(["frueh"]);
+  expect(map.get("2026-07-19")).toBeUndefined();
+  expect(map.get("2026-01-15")?.map((item) => item.id)).toEqual(["winter"]);
+  expect(map.get("2026-01-16")).toBeUndefined();
+  expect(map.get("2026-01-20")?.map((item) => item.id)).toEqual(["nacht"]);
+  expect(map.get("2026-01-19")).toBeUndefined();
+
+  // Sommer: Wien = UTC+2, Winter: UTC+1 - dieselben Zeitpunkte wie mit ausgeschriebener Zone.
+  expect(calendarWindow(summerLate)?.start.toISOString()).toBe("2026-07-15T21:30:00.000Z");
+  expect(calendarWindow(winterLate)?.start.toISOString()).toBe("2026-01-15T22:30:00.000Z");
+  expect(calendarWindow(summerLate)?.start.getTime()).toBe(new Date("2026-07-15T23:30:00+02:00").getTime());
+  expect(icsFor({ ...summerLate, start: "2026-07-15T18:00:00", end: null })).toContain("DTSTART:20260715T160000Z");
+  expect(icsFor({ ...winterLate, start: "2026-01-15T18:00:00" })).toContain("DTSTART:20260115T170000Z");
+  expect(googleCalendarUrl({ ...winterLate, start: "2026-01-15T18:00:00" })).toContain("dates=20260115T170000Z%2F20260115T190000Z");
+});
+
+test("zonenlos an den Tagen der Zeitumstellung: der Wiener Tag stimmt, ein Wochenende über die Umstellung belegt seine drei Tage", () => {
+  const spring = { id: "fruehling", kind: "event" as const, title: "Nach der Umstellung", start: "2026-03-29T03:30:00" };
+  const autumn = { id: "herbst", kind: "event" as const, title: "Vor der Umstellung", start: "2026-10-25T01:30:00" };
+  const weekend = { id: "lan", kind: "event" as const, title: "LAN", start: "2026-10-24T18:00:00", end: "2026-10-26T12:00:00" };
+  expect(calendarWindow(spring)?.start.toISOString()).toBe("2026-03-29T01:30:00.000Z");
+  expect(calendarWindow(autumn)?.start.toISOString()).toBe("2026-10-24T23:30:00.000Z");
+  const map = itemsByDay([spring, autumn]);
+  expect(map.get("2026-03-29")?.map((item) => item.id)).toEqual(["fruehling"]);
+  expect(map.get("2026-10-25")?.map((item) => item.id)).toEqual(["herbst"]);
+  expect(map.get("2026-10-24")).toBeUndefined();
+  const { spans } = splitSpans([weekend]);
+  expect(spans[0]?.days).toEqual(["2026-10-24", "2026-10-25", "2026-10-26"]);
+  // Ende 12:00 Wien im Winter = 11:00 UTC; Beginn 18:00 Wien im Sommer = 16:00 UTC.
+  expect(calendarWindow(weekend)?.end.toISOString()).toBe("2026-10-26T11:00:00.000Z");
+  expect(calendarWindow(weekend)?.start.toISOString()).toBe("2026-10-24T16:00:00.000Z");
+});
+
+test("Termine eines Tages stehen nach ihrem Zeitpunkt - auch wenn die Server-Werte verschiedene Zonen tragen", () => {
+  const map = itemsByDay([
+    { id: "spaet", kind: "event", title: "11:30", start: "2026-10-03T09:30:00Z" },
+    { id: "frueh", kind: "tournament", title: "10:00", start: "2026-10-03T10:00:00+02:00" },
+    { id: "mittag", kind: "fastlap", title: "12:00", start: "2026-10-03T12:00:00" },
+    { id: "morgen", kind: "event", title: "08:00", start: "2026-10-03T06:00:00+00:00" },
+  ]);
+  expect(map.get("2026-10-03")?.map((item) => item.id)).toEqual(["morgen", "frueh", "spaet", "mittag"]);
+});
