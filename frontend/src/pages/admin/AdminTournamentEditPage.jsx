@@ -22,6 +22,7 @@ import { TournamentStaffPanel } from "./tournament/StaffPanel";
 import { TournamentStagesPanel } from "./tournament/StagesPanel";
 import { matchRights } from "@/lib/tournamentRights";
 import { PauseUntilControl, RoundSponsorsPanel } from "./tournament/TvTournamentPanel";
+import { HeatRebuildBar } from "./tournament/HeatRebuildBar";
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
 import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
 import { planAndApplySchedule } from "@/lib/schedulePlan";
@@ -537,6 +538,9 @@ export default function AdminTournamentEditPage() {
             )}
           </div>
         </div>
+
+        {/* Läufe umbauen (#1550): der Vorschlag des Servers, solange er offen ist - über allen Reitern sichtbar. */}
+        <HeatRebuildBar tournament={t} onDecided={load} />
 
         <div className="flex flex-wrap gap-2" data-testid="admin-tr-toolbar">
           {toolActions.length > 0 && (

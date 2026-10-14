@@ -179,6 +179,11 @@ CAPABILITIES: tuple[Capability, ...] = (
        ["POST /api/tournaments/{tid}/lead/no-show/{match_id}"], [GRAPH],
        note="#1551: nach der Frist schlägt der Server „kampflos verloren“ vor; die Turnierleitung bestätigt "
             "(Forfeit-Weg) oder verlängert."),
+    _c("structure.heat_rebuild", "FFA-Läufe zusammenlegen, ausgleichen, abkürzen",
+       ["POST /api/tournaments/{tid}/heat-rebuild/check", "POST /api/tournaments/{tid}/heat-rebuild/confirm",
+        "POST /api/tournaments/{tid}/heat-rebuild/reject"], [GRAPH],
+       note="#1550: Prüfung läuft nach Baubau und Ergebnis von selbst; im Modus „Vorschlag“ bestätigt oder lehnt "
+            "die Turnierleitung hier ab."),
 )
 
 

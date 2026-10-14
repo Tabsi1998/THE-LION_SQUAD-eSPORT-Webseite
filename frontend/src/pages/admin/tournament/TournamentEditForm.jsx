@@ -19,7 +19,7 @@ import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
 import { PrizeEditor, Txt } from "./PrizeEditor";
 import { DeadlineFields } from "./DeadlineFields";
 import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
-import { BRONZE_FORMATS, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, MATCHDAY_FORMATS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, TOURNAMENT_STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS } from "./shared";
+import { BRONZE_FORMATS, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, MATCHDAY_FORMATS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, TOURNAMENT_STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS } from "./shared";
 
 export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat }) {
   const dt = toDateTimeLocalInput;
@@ -70,6 +70,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     match_duration_minutes: source.match_duration_minutes || 30,
     bronze_match: !!source.bronze_match,
     grand_final_mode: source.grand_final_mode || "reset",
+    heat_rebuild_mode: source.heat_rebuild_mode || "suggest",
     seeding_mode: source.seeding_mode || "random",
     randomize_advancement_rounds: !!source.randomize_advancement_rounds,
     is_public: source.is_public !== false,
@@ -134,6 +135,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     match_duration_minutes: tournament.match_duration_minutes || 30,
     bronze_match: !!tournament.bronze_match,
     grand_final_mode: tournament.grand_final_mode || "reset",
+    heat_rebuild_mode: tournament.heat_rebuild_mode || "suggest",
     seeding_mode: tournament.seeding_mode || "random",
     randomize_advancement_rounds: !!tournament.randomize_advancement_rounds,
     is_public: tournament.is_public !== false,
@@ -382,6 +384,9 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             </div>
             {GRAND_FINAL_FORMATS.has(f.format) && (
               <SelectInput label="Grand Final" value={f.grand_final_mode} onChange={(v)=>set("grand_final_mode",v)} options={GRAND_FINAL_OPTIONS} hint={GRAND_FINAL_HINT} testId="tr-edit-grand-final" />
+            )}
+            {HEAT_REBUILD_FORMATS.has(f.format) && (
+              <SelectInput label="Läufe umbauen" value={f.heat_rebuild_mode} onChange={(v)=>set("heat_rebuild_mode",v)} options={HEAT_REBUILD_OPTIONS} hint={HEAT_REBUILD_HINT} testId="tr-edit-heat-rebuild" />
             )}
           </FormSection>
           {CUSTOM_BRACKET_FORMATS.has(f.format) && (
