@@ -54,6 +54,7 @@ DYNAMIC = {
     "services/member_activity.py:member_id_of:db[collection]": "dolibarr_links und dolibarr_identities",
     "services/ops_alerts.py:purge_old_logs:getattr(db, source)": "email_logs und audit_logs (Fristen)",
     "services/scheduler.py:_safe_status_transitions:db[collection_name]": "tournaments, f1_challenges und events",
+    "services/scheduler.py:_write_transition:db[collection_name]": "tournaments, f1_challenges und events (Statuswechsel)",
     "services/station_runtime.py:release_station_for_match:db[collection_name]": MATCHES,
     "services/unique_duplicates.py:_groups:getattr(db, collection)": "database.AUDIT_UNIQUE_INDEXES (Altdubletten, #1043)",
     "services/unique_duplicates.py:_unique_active:getattr(db, collection)": "database.AUDIT_UNIQUE_INDEXES (Altdubletten, #1043)",

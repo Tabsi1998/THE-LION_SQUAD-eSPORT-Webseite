@@ -54,7 +54,7 @@ def _single_replica(job_id: str, runner, lease_seconds: float = 60.0):
     async def job():
         try:
             from database import get_db
-            from services.mutation_lock import MutationLockBusy, mutation_lock
+            from services.mutation_lock import MutationLockBusy, MutationLockLost, mutation_lock
             try:
                 async with mutation_lock(
                     get_db(),
@@ -63,6 +63,9 @@ def _single_replica(job_id: str, runner, lease_seconds: float = 60.0):
                     lease_seconds=lease_seconds,
                 ):
                     await runner()
+            except MutationLockLost:
+                # Der Lauf wurde abgebrochen, bevor ein anderes Replikat übernehmen konnte (#1040); der nächste Takt holt nach.
+                logger.warning("[scheduler] %s stopped, lease lost during the run", job_id)
             except MutationLockBusy:
                 logger.debug("[scheduler] %s skipped, lease held by another replica", job_id)
         except Exception as exc:
@@ -837,6 +840,58 @@ async def _discord_status_changed(db, doc: dict, status: str) -> None:
         logger.warning("[scheduler] discord status %s: %s", doc.get("id"), type(exc).__name__)
 
 
+# Felder, auf denen die Entscheidung von _next_status beruht. Geschrieben wird nur, wenn sie seit dem Lesen
+# unverändert sind (#1041) - eine Pause, ein Abbruch oder ein verschobener Start von Hand gewinnt immer.
+_TRANSITION_FIELDS = {
+    "tournament": ("status", "start_date", "end_date", "auto_start_enabled", "registration_enabled", "is_invite_only",
+                   "registration_open_from", "registration_open_until", "check_in_from", "check_in_until"),
+    "f1": ("status", "start_date", "end_date", "online_registration_enabled", "registration_enabled",
+           "registration_open_from", "registration_open_until", "check_in_from", "check_in_until"),
+    "event": ("status", "start_date", "end_date", "has_registration", "registration_url",
+              "registration_opens_at", "registration_closes_at"),
+}
+STATUS_LOCK_WAIT_SECONDS = 1.0
+
+
+def _transition_guard(doc: dict, kind: str) -> dict:
+    """Filter für den Statuswechsel: derselbe Datensatz im selben Zustand, in dem er gelesen wurde."""
+    guard = {"id": doc["id"]}
+    for field in _TRANSITION_FIELDS[kind]:
+        guard[field] = doc.get(field)
+    return guard
+
+
+async def _write_transition(db, collection_name: str, kind: str, doc: dict, nxt: str, now_iso: str) -> bool:
+    result = await db[collection_name].update_one(
+        _transition_guard(doc, kind),
+        {"$set": {"status": nxt, "updated_at": now_iso}},
+    )
+    if getattr(result, "matched_count", 0) != 1:
+        logger.info("[scheduler] status %s %s skipped, changed in parallel", kind, doc.get("id"))
+        return False
+    return True
+
+
+async def _transition_tournament(db, stale: dict, now: datetime, now_iso: str) -> bool:
+    """Turniere wechseln unter derselben Schreibsperre wie die Turnierleitung und mit frisch gelesenem Stand."""
+    from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
+    try:
+        async with mutation_lock(db, tournament_write_resource(stale["id"]), wait_seconds=STATUS_LOCK_WAIT_SECONDS):
+            doc = await db.tournaments.find_one({"id": stale["id"]}, {"_id": 0})
+            nxt = _next_status(doc, now, "tournament") if doc else None
+            if not nxt or nxt == doc.get("status"):
+                return False
+            if not await _prepare_tournament_transition(db, doc, nxt):
+                return False
+            if not await _write_transition(db, "tournaments", "tournament", doc, nxt, now_iso):
+                return False
+    except MutationLockBusy:
+        logger.info("[scheduler] status tournament %s skipped, tournament busy", stale.get("id"))
+        return False
+    await _discord_status_changed(db, doc, nxt)
+    return True
+
+
 async def _safe_status_transitions():
     try:
         from database import get_db
@@ -852,16 +907,12 @@ async def _safe_status_transitions():
             )
             async for doc in cursor:
                 nxt = _next_status(doc, now, kind)
-                if nxt and nxt != doc.get("status"):
-                    if kind == "tournament" and not await _prepare_tournament_transition(db, doc, nxt):
-                        continue
-                    await db[collection_name].update_one(
-                        {"id": doc["id"]},
-                        {"$set": {"status": nxt, "updated_at": now_iso}},
-                    )
+                if not nxt or nxt == doc.get("status"):
+                    continue
+                if kind == "tournament":
+                    changed += await _transition_tournament(db, doc, now, now_iso)
+                elif await _write_transition(db, collection_name, kind, doc, nxt, now_iso):
                     changed += 1
-                    if kind == "tournament":
-                        await _discord_status_changed(db, doc, nxt)
         if changed:
             logger.info(f"[scheduler] status_transitions changed={changed}")
     except Exception as exc:

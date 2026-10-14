@@ -131,3 +131,21 @@ def test_job_failure_does_not_leak_the_lease(monkeypatch):
 
     asyncio.run(scheduler._single_replica("prize_expiry", failing_runner)())
     assert db.mutation_locks.document is None
+
+
+def test_run_stops_when_the_lease_is_lost(monkeypatch, caplog):
+    db = _FakeDb()
+    _patch_db(monkeypatch, db)
+    writes = []
+
+    async def runner():
+        # Ein anderes Replikat hält die Sperre inzwischen.
+        db.mutation_locks.document["owner"] = "anderes-replikat"
+        await asyncio.sleep(0.5)
+        writes.append("nach dem Verlust")
+
+    with caplog.at_level("WARNING", logger="tls.scheduler"):
+        asyncio.run(scheduler._single_replica("mail_queue", runner, lease_seconds=0.15)())
+    assert writes == []
+    assert db.mutation_locks.document["owner"] == "anderes-replikat"
+    assert any("lease lost" in record.getMessage() for record in caplog.records)
