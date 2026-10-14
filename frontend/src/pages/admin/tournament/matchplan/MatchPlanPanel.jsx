@@ -188,7 +188,9 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   };
   // Online und Liga: ohne Station, nur Start und Dauer - mit denselben Rechten je Spiel.
   const remoteEditor = (match, close) => editor({ id: match.id, key: match.match_key || "Spiel" }, close, { withStation: false });
-  const canEditMatch = (match) => Boolean(match) && !match.is_preview && matchRights(tournament, match).plan;
+  // Auch Vorschau-Spiele (Baum bis Check-in-Ende, Fabian live 14.10.): nie begonnen, und ihre Termine gehen mit in den
+  // fixen Baum - wer sie nicht ändern kann, bekommt sie nicht von einer gelöschten Station.
+  const canEditMatch = (match) => Boolean(match) && matchRights(tournament, match).plan;
 
   const release = async (item) => {
     const result = await moveMatch(item.id, { release: true });
