@@ -817,14 +817,14 @@ def _compact_entry_seed_slots(docs: list[dict], preview: bool) -> None:
                 doc["status"] = _ready_status_for_slots(doc.get("slots") or [], int((doc.get("settings") or {}).get("min_players") or 2))
 
 
-def _apply_auto_byes(docs: list[dict], draw_rng=None) -> None:
+def _apply_auto_byes(docs: list[dict], draw_rng=None, draw_now: bool = True) -> None:
     """Freilose beim Bau (#1549): ein Spiel mit genau einem Teilnehmer und keinem offenen Zufluss ist kampflos
     entschieden - der Sieger geht nur den Sieger-Weg weiter, nie ins Loser Bracket oder Spiel um Platz 3. Dieselbe
     Kette läuft später nach jedem Ergebnis (services/match_v2_results.resolve_walkovers). Gemischt (#1548): ist eine
     ganze Runde schon beim Bau kampflos entschieden, wird ihre Folgerunde gleich ausgelost."""
     by_id = {doc["id"]: doc for doc in docs}
     ordered = sorted(docs, key=lambda item: (item.get("round") or 0, item.get("order") or 0))
-    resolve_walkovers([doc["id"] for doc in ordered], by_id, {}, _now_utc().isoformat(), rng=draw_rng)
+    resolve_walkovers([doc["id"] for doc in ordered], by_id, {}, _now_utc().isoformat(), rng=draw_rng, draw_now=draw_now)
 
 
 def _reset_rule(spec: BracketMatchSpec, by_key: dict[str, BracketMatchSpec]) -> dict | None:
@@ -854,13 +854,16 @@ def _effective_qualifiers(doc: dict, default: int) -> int:
 def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: list[dict],
                                  preview: bool = False,
                                  rng: random.Random | None = None,
-                                 draw_rng=None) -> list[dict]:
-    """``rng``: Setzliste bei zufälligem Seeding. ``draw_rng``: das Los beim Mischen (#1548), sonst ``secrets``."""
+                                 draw_rng=None,
+                                 defer_draws: bool = False) -> list[dict]:
+    """``rng``: Setzliste bei zufälligem Seeding. ``draw_rng``: das Los beim Mischen (#1548), sonst ``secrets``.
+    ``defer_draws``: kein Los beim Bau (Strukturplan) - gelost wird beim Anwenden (``apply_deferred_draws``)."""
     settings = stage.get("settings") or {}
     shuffle = advancement_shuffle_enabled(tournament, settings)
     draw_rng = draw_rng or DRAW_RNG
     custom_schema = settings.get("schema") or settings.get("custom_schema") or settings.get("bracket_schema")
-    league_draw = shuffle and not preview and (stage.get("stage_type") or "") == "league" and not custom_schema
+    league_draw = (shuffle and not preview and not defer_draws
+                   and (stage.get("stage_type") or "") == "league" and not custom_schema)
     schema = _resolve_schema(tournament, stage, registrations, preview, draw_rng if league_draw else None)
     specs = parse_custom_bracket_schema(schema)
     _validate_stage_flow(tournament, stage, specs)
@@ -974,6 +977,6 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
     _compact_entry_seed_slots(docs, preview)
 
     if not preview:
-        _apply_auto_byes(docs, draw_rng)
+        _apply_auto_byes(docs, draw_rng, draw_now=not defer_draws)
 
     return sorted(docs, key=lambda m: (m["round"], m["order"]))

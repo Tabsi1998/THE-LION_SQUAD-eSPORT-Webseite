@@ -12,6 +12,7 @@ from services.tournament_permissions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.draw_records import record_build_draws
+from services.match_v2_results import apply_deferred_draws
 from services.competition_engine import CLASSIC, GRAPH, EngineSwitchRequired, decide_rebuild_engine
 from services.competition_formats import find_format_capability
 from services.competition_graph_validation import validate_competition_graph
@@ -159,8 +160,8 @@ async def _build_tournament_structure_plan(
                 generator_registrations,
                 preview=body.preview,
                 rng=rng,
-                # Auch das Los (Liga, #1548) folgt dem Startwert des Plans - Vorschau und Anwenden bauen dasselbe.
-                draw_rng=rng,
+                # Der Plan legt kein Los fest (#1548): reproduzierbar planen, gelost wird erst beim Anwenden.
+                defer_draws=True,
             )
         except BracketSchemaError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
@@ -326,6 +327,9 @@ async def apply_tournament_structure_plan(
             },
         )
 
+    if not body.preview and matches:
+        # Gemischt (#1548): erst jetzt wird gelost - mit ``secrets``, nicht mit dem Startwert des Plans.
+        apply_deferred_draws(matches, now_iso=now_utc().isoformat())
     try:
         result = await activate_structure_plan(
             db,

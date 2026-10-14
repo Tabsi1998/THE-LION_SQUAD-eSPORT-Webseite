@@ -708,7 +708,7 @@ def run_ready_draws(by_id: dict[str, dict], target_sets: dict[str, dict], now_is
 
 
 def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets: dict[str, dict], now_iso: str,
-                      *, rng=None, draws: list[dict] | None = None) -> None:
+                      *, rng=None, draws: list[dict] | None = None, draw_now: bool = True) -> None:
     """Die Freilos-Kette (#1549): ein Spiel ohne offenen Zufluss und mit höchstens einem Teilnehmer ist entschieden.
 
     Genau ein Teilnehmer: er kommt kampflos weiter - nur den Sieger-Weg (``W`` Platz 1); jeder andere Weg (Verlierer
@@ -780,7 +780,7 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
                 "updated_at": now_iso,
             })
             queue.append(target["id"])
-        for group in waiting_groups:
+        for group in waiting_groups if draw_now else []:
             for drawn_id in run_draw(group, by_id, target_sets, now_iso, rng=rng, draws=draws, trigger="walkover"):
                 seen.discard(drawn_id)
                 queue.append(drawn_id)
@@ -1103,13 +1103,25 @@ def _pair(match: dict) -> frozenset:
     return frozenset(slot.get("registration_id") or f"slot-{slot.get('slot')}" for slot in match.get("slots") or [])
 
 
-def build_league_redraw_application(stage_matches: list[dict], *, now_iso: str, rng=None) -> dict:
+LEAGUE_NOT_SHUFFLED_DETAIL = "Diese Liga ist nicht auf „Zufällig mischen“ gestellt – die Spieltage bleiben, wie sie sind."
+
+
+def _league_shuffled(matches: list[dict]) -> bool:
+    """Gemischt gebaut: das Ja an den Partien (beim Bau aus Turnier und Phase) oder schon eine Liga-Auslosung."""
+    return any((match.get("settings") or {}).get("randomize_advancement_rounds") is True
+               or (match.get("draw") or {}).get("kind") == "league" for match in matches)
+
+
+def build_league_redraw_application(stage_matches: list[dict], *, now_iso: str, rng=None, trigger: str = "redraw") -> dict:
     """Liga „Neu auslosen“ vor Spieltag 1 (#1548): Reihenfolge der Spieltage und Heimrecht neu, die Paarungen bleiben
-    (Kreismethode), jede Partie behält ihre Kennung. Die Rückrunde spiegelt die Hinrunde."""
+    (Kreismethode), jede Partie behält ihre Kennung. Die Rückrunde spiegelt die Hinrunde. Nur für gemischte Ligen - eine
+    Liga mit festem Baum bleibt unverändert (409)."""
     rng = rng or DRAW_RNG
     matches = [match for match in stage_matches if match.get("status") != "cancelled"]
     if not matches:
         raise MatchV2ResultError("Diese Phase hat keine Spieltage.", 404)
+    if not _league_shuffled(matches):
+        raise MatchV2ResultError(LEAGUE_NOT_SHUFFLED_DETAIL, 409)
     for match in matches:
         if _draw_started(match):
             raise MatchV2ResultError("Die Liga hat schon begonnen – neu auslosen geht nur vor Spieltag 1.", 409)
@@ -1132,7 +1144,7 @@ def build_league_redraw_application(stage_matches: list[dict], *, now_iso: str, 
             new_round[leg[old_index]] = numbers[0] + leg_index * len(leg) + position
     swap = {pair: rng.random() < 0.5 for pair in {_pair(match) for match in matches}}
     draw = {"id": str(uuid.uuid4()), "group": str(matches[0].get("section") or "LIGA"), "kind": "league",
-            "trigger": "redraw", "drawn_at": now_iso}
+            "trigger": trigger, "drawn_at": now_iso}
     target_sets: dict[str, dict] = {}
     assignments = []
     for match in sorted(matches, key=lambda row: (row.get("round") or 0, row.get("order") or 0)):
@@ -1151,3 +1163,20 @@ def build_league_redraw_application(stage_matches: list[dict], *, now_iso: str, 
     full = {**draw, "stage_id": matches[0].get("stage_id"), "tournament_id": matches[0].get("tournament_id"),
             "assignments": assignments}
     return {"target_sets": target_sets, "draw": full, "draws": [full]}
+
+
+def apply_deferred_draws(matches: list[dict], *, now_iso: str, rng=None) -> list[dict]:
+    """Das Los für einen ohne Auslosung gebauten Plan (Strukturplan „Anwenden“, #1548): der Plan selbst bleibt
+    reproduzierbar und legt nichts fest; gelost wird erst beim Anwenden - mit ``secrets``. Liga: Spieltage und Heimrecht;
+    K.-o./Läufe: jede Runde, die schon beim Bau ganz entschieden ist (Freilose). Ändert ``matches`` und gibt die
+    Auslosungen zurück."""
+    rng = rng or DRAW_RNG
+    draws: list[dict] = []
+    league = [match for match in matches if match.get("stage_type") == "league" and not match.get("is_preview")]
+    if league and _league_shuffled(league) and not any(match.get("draw") for match in league):
+        draws.extend(build_league_redraw_application(league, now_iso=now_iso, rng=rng, trigger="build")["draws"])
+    by_id = {match["id"]: match for match in matches if match.get("id") and not match.get("is_preview")}
+    drawn = run_ready_draws(by_id, {}, now_iso, rng=rng, draws=draws, trigger="walkover")
+    if drawn:
+        resolve_walkovers(drawn, by_id, {}, now_iso, rng=rng, draws=draws)
+    return draws
