@@ -1,5 +1,7 @@
-import { act, renderHook, waitFor } from "@testing-library/react-native";
-import { useKeyedLoad } from "./useKeyedLoad";
+import { useLayoutEffect } from "react";
+import { Text } from "react-native";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react-native";
+import { useKeyedLoad, type KeyedLoad } from "./useKeyedLoad";
 
 // Detailseiten (#1000): wechselt die Kennung, ist der alte Inhalt sofort weg; eine verspätete Antwort für die alte
 // Kennung überschreibt nie die neue; ein Fehler nach dem ersten Laden bleibt sichtbar, der letzte Stand ist gekennzeichnet.
@@ -148,4 +150,32 @@ test("mutate ändert nur den Stand der aktuellen Kennung", async () => {
     result.current.mutate((current) => ({ ...current, name: "neu" }));
   });
   expect(result.current.data).toEqual({ id: "a", name: "neu" });
+});
+
+// Wettlauf (#1570): Der Stand, den ein Nachladen als `previous` bekommt, muss schon stimmen, wenn das Bild mit den
+// geladenen Daten steht. Normale Effekte laufen erst nach dem Schreiben ins Bild (auf dem Gerät in einer späteren
+// Aufgabe) - wer in diesem Spalt nachlädt (Klick, Invalidierung, ein Layout-Effekt wie hier), bekäme `previous` ohne den
+// ersten Stand und zeigte einen ausgefallenen Teil leer statt mit seinem letzten Stand. Der Layout-Effekt der Probe
+// lädt im selben Commit nach, in dem die Daten ins Bild kommen: der Spalt entsteht so in jeder Umgebung, nicht nur unter Last.
+test("Nachladen im Commit des ersten Bilds kennt den ersten Stand schon (previous)", async () => {
+  const fetcher = jest.fn<Promise<{ id: string }>, [string, { id: string } | null]>()
+    .mockResolvedValueOnce({ id: "a" })
+    .mockRejectedValueOnce(http(500));
+  let load!: KeyedLoad<{ id: string }>;
+  let reloaded: Promise<void> | undefined;
+  function Probe() {
+    load = useKeyedLoad("a", fetcher);
+    useLayoutEffect(() => {
+      if (load.data && !reloaded) reloaded = load.reload();
+    });
+    return <Text>{load.data ? `Stand ${load.data.id}` : "leer"}</Text>;
+  }
+  await render(<Probe />);
+  await waitFor(() => expect(reloaded).toBeDefined());
+  await act(async () => { await reloaded; });
+  expect(screen.getByText("Stand a")).toBeTruthy();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(fetcher).toHaveBeenLastCalledWith("a", { id: "a" });
+  expect(load.data).toEqual({ id: "a" });
+  expect(load.stale).toBe(true);
 });
