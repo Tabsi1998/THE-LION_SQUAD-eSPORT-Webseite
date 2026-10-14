@@ -63,3 +63,26 @@ export function ownPath(url?: string | null): string | null {
   const parsed = new URL(text);
   return `${parsed.pathname || "/"}${parsed.search}`;
 }
+
+const API_ORIGIN = originOf(API_BASE_URL);
+
+/**
+ * Die Adresse für einen Abruf mit Anmeldung (#1054, #1060) - immer auf dem eigenen Server, sonst null. Token und
+ * Gerätekennung gehen nur dorthin: eine eigene Adresse (Server, lionsquad.at) wird auf den Server gelegt, ein relativer
+ * Pfad an ihn gehängt; jede andere Herkunft (fremder Host, Port oder Schema, protokoll-relativ) bekommt keine Adresse.
+ */
+export function authorizedUrl(value?: string | null): string | null {
+  const text = String(value || "").trim();
+  if (!text || !API_ORIGIN) return null;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(text) || text.startsWith("/") || text.startsWith("\\")) {
+    const path = ownPath(text);
+    return path ? `${API_ORIGIN}${path}` : null;
+  }
+  return isLocalPath(text) ? `${API_BASE_URL}/${text}` : null;
+}
+
+/** Geht ein Abruf an den eigenen Server (genau seine Origin)? Nur dann trägt er die Anmeldung (#1060). */
+export function isApiRequest(url?: string | null): boolean {
+  const text = String(url || "").trim();
+  return Boolean(text && API_ORIGIN && originOf(text) === API_ORIGIN);
+}

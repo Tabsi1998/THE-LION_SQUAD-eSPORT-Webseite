@@ -312,3 +312,26 @@ jobs:
       - name: Stop ephemeral stack
         if: always()
         run: docker compose down --volumes --remove-orphans
+
+  # Ein Name für die Pflicht-Prüfung in der GitHub-Regel für main: grün, wenn keine
+  # der Prüfungen oben fehlgeschlagen oder abgebrochen ist (übersprungene zählen als ok).
+  # So deckt die Regel auch die Browser-Tests ab, deren Matrix-Namen bei übersprungenen
+  # Läufen nicht aufgelöst werden.
+  ci-result:
+    name: CI-Ergebnis
+    needs: [changes, backend, frontend, frontend-e2e, mobile, container-smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ergebnis der Prüfungen
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Ergebnisse: $RESULTS"
+          for result in $RESULTS; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "Mindestens eine Prüfung ist nicht grün ($result)."; exit 1 ;;
+            esac
+          done
