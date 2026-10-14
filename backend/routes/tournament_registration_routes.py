@@ -29,6 +29,7 @@ from services.bracket_fill_in import (
     swapped,
 )
 from services.competition_versions import persist_competition_versions
+from services.heat_rebuild import evaluate_after_write
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from models import RegistrationCreate, RegistrationUpdate, RegistrationAdminCreate, now_utc, new_id
 from services import tournament_event_gate, tournament_fees
@@ -373,6 +374,8 @@ async def _place_fill_in(db, tid: str, reg: dict, actor_id: str | None) -> dict 
         placement = {"ok": True, "kind": "bye", "match_id": place["match"]["id"],
                      "reset_match_ids": sorted(match_id for match_id in changes if match_id != place["match"]["id"])}
     await _audit_tournament_action(db, "tournament.registration.fill_in", actor_id, tid, {"registration_id": reg["id"], **placement})
+    # Läufe zusammenlegen (#1550): die Belegung hat sich geändert - gleich prüfen (die Sperre hält der Aufrufer).
+    await evaluate_after_write(db, tid, actor_id=actor_id, trigger="fill_in")
     return placement
 
 

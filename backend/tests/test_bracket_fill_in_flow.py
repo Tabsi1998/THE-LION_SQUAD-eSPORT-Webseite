@@ -209,3 +209,19 @@ async def test_league_replacement_only_while_at_most_one_matchday_is_played(flow
     _user, refused = await add_late(flow, tournament, name="Zu spät", replace_registration_id=second_absent)
     assert refused.status_code == 409
     assert "Spieltag" in refused.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_a_fill_in_asks_for_a_heat_check_afterwards(flow, monkeypatch):
+    # Läufe zusammenlegen (#1550): ändert ein Nachrücker die Belegung, prüft der Server die Läufe gleich danach.
+    import routes.tournament_registration_routes as registration_routes
+    calls = []
+
+    async def spy(db, tid, *, actor_id, trigger):
+        calls.append((tid, trigger))
+
+    monkeypatch.setattr(registration_routes, "evaluate_after_write", spy)
+    _staff, tournament, _regs = await six_of_eight(flow)
+    _user, response = await add_late(flow, tournament)
+    assert response.json()["placement"]["kind"] == "bye"
+    assert calls == [(tournament["id"], "fill_in")]
