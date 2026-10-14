@@ -203,3 +203,31 @@ test("Mein Website-Profil (#260, Vereine 1.2): Felder des Vereins, nur Geändert
   expect(alert).toHaveBeenCalledWith("Gespeichert", expect.any(String));
   alert.mockRestore();
 });
+
+test("Meine Einwilligungen (#1537): der Abschnitt steht in der Mitgliedschaft, das Website-Profil führt dorthin", async () => {
+  const website = { available: true, consent: "profil", given: false, fields: [] };
+  const consents = { available: true, consents: [{ code: "profil", label: "Nennung im Mitgliederverzeichnis", state: "none", version: 0, current_version: 1,
+    moment: null, can_give: true, can_withdraw: false, text: "Ich bin mit der Nennung einverstanden.", given_text: null, text_changed: false }] };
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/membership/me") return Promise.resolve({ data: ledByDolibarr });
+    if (path === "/membership/me/website-profile") return Promise.resolve({ data: website });
+    if (path === "/membership/me/consents") return Promise.resolve({ data: consents });
+    return Promise.reject(new Error("nope"));
+  });
+  await render(<MyMembershipScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("membership-consents")).toBeTruthy());
+  expect(screen.getByTestId("consent-state-profil")).toHaveTextContent(/Noch nicht entschieden/);
+  expect(screen.getByTestId("membership-website-state")).toHaveTextContent(/Meine Einwilligungen/);
+  await fireEvent.press(screen.getByTestId("membership-website-to-consents"));
+});
+
+test("Meine Einwilligungen (#1537): nicht geladen heißt sichtbar nicht geladen", async () => {
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/membership/me") return Promise.resolve({ data: ledByDolibarr });
+    if (path === "/membership/me/consents") return Promise.resolve({ data: { available: false, reason: "timeout", text: "Die Mitgliederverwaltung antwortet gerade nicht." } });
+    return Promise.reject(new Error("nope"));
+  });
+  await render(<MyMembershipScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("consents-error")).toHaveTextContent(/nicht geladen/));
+  expect(screen.getByTestId("consents-retry")).toBeTruthy();
+});

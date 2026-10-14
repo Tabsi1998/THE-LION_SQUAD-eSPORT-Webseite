@@ -25,6 +25,7 @@
       "/vereine/applications/{external_id}",
       "/vereine/applications/{external_id}/withdraw",
       "/vereine/members/{id}/consents",
+      "/vereine/me/consents",
       "/vereine/statutes",
       "/vereine/statutes/{id}/pdf",
       "/vereine/identities/claim",

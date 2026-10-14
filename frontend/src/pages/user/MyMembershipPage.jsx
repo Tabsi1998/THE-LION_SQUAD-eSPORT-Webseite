@@ -12,7 +12,7 @@ import { MemberFileAccountsCard } from "@/pages/user/MemberFileAccountsCard";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet, Users, ShieldCheck } from "lucide-react";
-import { viennaDateTime } from "@/lib/vienna";
+import { viennaDate, viennaDateTime } from "@/lib/vienna";
 import { LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
 import { useLoad } from "@/hooks/useLoad";
 
@@ -464,23 +464,71 @@ const CONSENT_STATE = {
   none: () => "Noch nicht entschieden",
 };
 
-// Meine Einwilligungen (#329, Teil 1): je Zweck der Stand, der in der Mitgliederverwaltung steht.
+// Meine Einwilligungen (#329, Teil 1; #1537): je Zweck der Stand, der in der Mitgliederverwaltung steht.
 // Zustimmen nur nach dem Lesen der aktuellen Fassung (die Fassung geht mit), Widerrufen jederzeit -
-// auch wenn es inzwischen einen neuen Text gibt. Nichts davon ist Pflicht für die Mitgliedschaft.
+// auch wenn es inzwischen einen neuen Text gibt. Der Text der zugestimmten Fassung bleibt lesbar; bei
+// einer neuen Fassung stehen beide da (die alte, soweit die Website sie kennt). Ob ein Zweck Pflicht ist,
+// sagt das Modul nicht - die Karte sagt dazu nichts. Antwortet die Mitgliederverwaltung nicht, steht das da.
+const CONSENTS_HIDDEN = new Set(["not_connected", "not_linked"]);
+
+// Der Text einer früheren Fassung kommt nicht vom Modul; die Website kennt ihn nur, wenn sie ihn selbst einmal gelesen hat
+// (Codex-Prüfung #1547). Fehlt er, steht das ehrlich da - mit der aktuellen Fassung darunter.
+function missingGivenText(row) {
+  const which = row.moment ? `vom ${viennaDate(row.moment, { day: "2-digit", month: "2-digit", year: "numeric" })}` : row.version;
+  return `Den Text der Fassung ${which}, der du zugestimmt hast, haben wir nicht. Aktuelle Fassung:`;
+}
+
+function ConsentTexts({ row }) {
+  if (row.state === "given" && !row.text_changed) {
+    return (
+      <div data-testid={`consent-given-text-${row.code}`}>
+        <div className="text-[11px] font-bold uppercase tracking-wider text-white/45">Deine Fassung {row.version}</div>
+        <p className="mt-1 text-sm text-white/75 whitespace-pre-wrap">{row.given_text || row.text || "Der Text ist gerade nicht abrufbar."}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {row.state === "given" && (row.given_text ? (
+        <div data-testid={`consent-given-text-${row.code}`}>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-white/45">Zugestimmt hast du Fassung {row.version}</div>
+          <p className="mt-1 text-sm text-white/60 whitespace-pre-wrap">{row.given_text}</p>
+        </div>
+      ) : (
+        <div className="text-xs text-white/45" data-testid={`consent-given-missing-${row.code}`}>{missingGivenText(row)}</div>
+      ))}
+      <div data-testid={`consent-current-text-${row.code}`}>
+        {row.state === "given" && row.given_text && <div className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700]">Neue Fassung {row.current_version}</div>}
+        <p className="mt-1 text-sm text-white/75 whitespace-pre-wrap">{row.text || "Der Text ist gerade nicht abrufbar – bitte später noch einmal öffnen."}</p>
+      </div>
+    </div>
+  );
+}
+
 function ConsentsCard() {
   const [state, setState] = useState(null);
+  const [problem, setProblem] = useState(null);
   const [open, setOpen] = useState(null);
   const [busy, setBusy] = useState(false);
   const confirm = useConfirm();
   const load = useCallback(() => {
     api.get("/membership/me/consents").then(({ data }) => {
-      setState(data && data.available === true && Array.isArray(data.consents) ? data : null);
-    }).catch(() => setState(null));
+      if (data && data.available === true && Array.isArray(data.consents)) {
+        setState(data);
+        setProblem(null);
+      } else if (data && CONSENTS_HIDDEN.has(data.reason)) {
+        setState(null);
+        setProblem(null);
+      } else {
+        setProblem({ text: data?.text || "" });
+      }
+    }).catch((error) => setProblem({ text: formatApiError(error?.response?.data?.detail) || "" }));
   }, []);
   useEffect(() => { load(); }, [load]);
-  if (!state) return null;
+  if (!state && !problem) return null;
 
   const decide = async (row, decision) => {
+    if (decision === "given" && !await confirm({ title: `„${row.label}“ zustimmen?`, description: `Du stimmst der Fassung ${row.current_version} zu, die du gerade gelesen hast. Das gilt sofort in der Mitgliederverwaltung; widerrufen kannst du jederzeit.`, confirmLabel: "Zustimmen" })) return;
     if (decision === "withdrawn" && !await confirm({ title: `„${row.label}“ widerrufen?`, description: "Der Widerruf gilt sofort in der Mitgliederverwaltung. Du kannst später wieder zustimmen.", confirmLabel: "Widerrufen" })) return;
     setBusy(true);
     try {
@@ -501,38 +549,49 @@ function ConsentsCard() {
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-consents-card">
       <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-[#FFD700]" /> Meine Einwilligungen</h2>
-      <p className="mt-1 text-xs text-white/45">Freiwillig und jederzeit widerrufbar. Der Stand kommt aus der Mitgliederverwaltung; ein Widerruf gilt dort sofort.</p>
-      <div className="mt-4 space-y-3">
-        {state.consents.map((row) => (
-          <div key={row.code} className="border border-white/10 rounded-sm p-3" data-testid={`consent-${row.code}`}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="font-bold text-white">{row.label}</div>
-                <div className={`text-xs ${row.state === "given" ? "text-[#00FF88]" : row.state === "withdrawn" ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`consent-state-${row.code}`}>{(CONSENT_STATE[row.state] || CONSENT_STATE.none)(row)}</div>
-                {row.text_changed && <div className="mt-1 text-xs text-[#FFD700]" data-testid={`consent-changed-${row.code}`}>Der Text wurde seitdem geändert – bitte die neue Fassung lesen.</div>}
-              </div>
-              <div className="flex flex-wrap gap-2 shrink-0">
-                {row.can_give && open !== row.code && (
-                  <button type="button" onClick={() => setOpen(row.code)} disabled={busy} data-testid={`consent-open-${row.code}`} className="px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">{row.state === "given" ? "Neue Fassung lesen" : "Lesen und zustimmen"}</button>
-                )}
-                {row.can_withdraw && (
-                  <button type="button" onClick={() => decide(row, "withdrawn")} disabled={busy} data-testid={`consent-withdraw-${row.code}`} className="px-3 py-1.5 border border-white/15 text-white/70 hover:text-[#FF3B30] hover:border-[#FF3B30]/40 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">Widerrufen</button>
-                )}
-              </div>
-            </div>
-            {open === row.code && (
-              <div className="mt-3 border-t border-white/10 pt-3" data-testid={`consent-text-${row.code}`}>
-                <p className="text-sm text-white/75 whitespace-pre-wrap">{row.text}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => decide(row, "given")} disabled={busy} data-testid={`consent-give-${row.code}`} className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Ich stimme zu</button>
-                  <button type="button" onClick={() => setOpen(null)} disabled={busy} className="px-4 py-2 border border-white/15 text-white/60 rounded-sm text-xs font-bold uppercase tracking-wider">Abbrechen</button>
+      <p className="mt-1 text-xs text-white/45">Jederzeit widerrufbar. Der Stand kommt aus der Mitgliederverwaltung; ein Widerruf gilt dort sofort.</p>
+      {problem && (
+        <div className="mt-4 border border-[#FFD700]/30 rounded-sm p-3" role="alert" data-testid="consents-error">
+          <div className="text-sm text-white/80">Deine Einwilligungen wurden nicht geladen.</div>
+          {problem.text && <div className="mt-1 text-xs text-white/50">{problem.text}</div>}
+          <button type="button" onClick={load} data-testid="consents-retry" className="tls-btn tls-btn--secondary mt-3 inline-flex px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">Nochmal versuchen</button>
+        </div>
+      )}
+      {state && (
+        <div className="mt-4 space-y-3">
+          {state.consents.map((row) => (
+            <div key={row.code} className="border border-white/10 rounded-sm p-3" data-testid={`consent-${row.code}`}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-bold text-white">{row.label}</div>
+                  <div className={`text-xs ${row.state === "given" ? "text-[#00FF88]" : row.state === "withdrawn" ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`consent-state-${row.code}`}>{(CONSENT_STATE[row.state] || CONSENT_STATE.none)(row)}</div>
+                  {row.text_changed && <div className="mt-1 text-xs text-[#FFD700]" data-testid={`consent-changed-${row.code}`}>Text geändert – bitte die neue Fassung lesen.</div>}
+                </div>
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  {open !== row.code && (
+                    <button type="button" onClick={() => setOpen(row.code)} disabled={busy} data-testid={`consent-open-${row.code}`} className="px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">{!row.can_give ? "Text lesen" : row.state === "given" ? "Neue Fassung lesen" : "Lesen und zustimmen"}</button>
+                  )}
+                  {row.can_withdraw && (
+                    <button type="button" onClick={() => decide(row, "withdrawn")} disabled={busy} data-testid={`consent-withdraw-${row.code}`} className="px-3 py-1.5 border border-white/15 text-white/70 hover:text-[#FF3B30] hover:border-[#FF3B30]/40 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">Widerrufen</button>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
-        ))}
-        {!state.consents.length && <div className="text-sm text-white/45">Der Verein hat derzeit keine Einwilligungstexte hinterlegt.</div>}
-      </div>
+              {open === row.code && (
+                <div className="mt-3 border-t border-white/10 pt-3" data-testid={`consent-text-${row.code}`}>
+                  <ConsentTexts row={row} />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {row.can_give && row.text && (
+                      <button type="button" onClick={() => decide(row, "given")} disabled={busy} data-testid={`consent-give-${row.code}`} className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Ich stimme zu</button>
+                    )}
+                    <button type="button" onClick={() => setOpen(null)} disabled={busy} className="px-4 py-2 border border-white/15 text-white/60 rounded-sm text-xs font-bold uppercase tracking-wider">{row.can_give && row.text ? "Abbrechen" : "Schließen"}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          {!state.consents.length && <div className="text-sm text-white/45">Der Verein hat derzeit keine Einwilligungstexte hinterlegt.</div>}
+        </div>
+      )}
     </div>
   );
 }
