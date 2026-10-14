@@ -171,6 +171,11 @@ CAPABILITIES: tuple[Capability, ...] = (
     _c("lead.read", "Turnierleitung am Handy",
        ["GET /api/tournaments/{tid}/lead"], [GRAPH],
        note="#1156: offene Spiele für die Turnierleitung des Turniers - zuerst, was fehlt, dann nach Station."),
+    _c("structure.heat_rebuild", "FFA-Läufe zusammenlegen, ausgleichen, abkürzen",
+       ["POST /api/tournaments/{tid}/heat-rebuild/check", "POST /api/tournaments/{tid}/heat-rebuild/confirm",
+        "POST /api/tournaments/{tid}/heat-rebuild/reject"], [GRAPH],
+       note="#1550: Prüfung läuft nach Baubau und Ergebnis von selbst; im Modus „Vorschlag“ bestätigt oder lehnt "
+            "die Turnierleitung hier ab."),
 )
 
 

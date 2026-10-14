@@ -16,6 +16,7 @@ from services.tournament_permissions import READ_STAFF_ROLES, has_tournament_sta
 from services.tournament_rules import tournament_modes
 from services.permissions import is_confirmed_tournament_lead
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
+from services.heat_rebuild import evaluate_after_write
 from services.competition_engine import GRAPH, preferred_engine
 from services.competition_formats import find_format_capability
 from services.competition_versions import persist_competition_versions
@@ -682,6 +683,8 @@ async def _rebuild_checkin_bracket_after_staff_change(db, tournament: dict, acto
                 "participant_count": len(registrations),
             },
         )
+        # Unterbesetzte Läufe (#1550): nach jedem Neubau prüfen.
+        await evaluate_after_write(db, tid, actor_id=actor_id, trigger="checkin")
         return {
             "ok": True,
             "engine": "stages",

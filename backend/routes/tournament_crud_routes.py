@@ -220,6 +220,10 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
         suffix = f"?{urlencode({'access': access})}" if access else ""
         return RedirectResponse(url=f"/api/tournaments/{quote(str(t['slug']), safe='')}{suffix}", status_code=301)
     await _enrich_tournament(t, user)
+    if not (is_admin or is_assigned):
+        # Der Umbau-Vorschlag für die Läufe (#1550) ist Sache der Turnierleitung.
+        t.pop("heat_rebuild_plan", None)
+        t.pop("heat_rebuild_dismissed", None)
     # Was die Person hier darf (#1353): die Verwaltung zeigt Knöpfe nur nach diesen Feldern.
     t.update(await tournament_rights(user, t["id"]))
     if access_link:
