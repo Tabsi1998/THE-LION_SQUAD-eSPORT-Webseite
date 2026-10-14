@@ -482,7 +482,7 @@ async def escalate_overdue_proposals(db, tournament: dict, matches) -> int:
                 f"{label}: die Antwortfrist für den Terminvorschlag ist abgelaufen. Bitte einen Termin festlegen.",
                 url=f"/matches/{match.get('id')}",
                 kind="schedule_escalation",
-                meta={"category": "match_reminders", "dedupe_key": f"schedule_escalation:{match.get('id')}",
+                meta={"category": "tournament_updates", "dedupe_key": f"schedule_escalation:{match.get('id')}",
                       "match_id": match.get("id"), "tournament_id": tournament.get("id")},
             )
     return len(overdue)

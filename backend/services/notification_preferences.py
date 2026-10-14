@@ -159,6 +159,8 @@ NOTIFICATION_KIND_CATEGORY = {
     # Ergebnis melden (#1132): „bitte bestätigen“ an die Gegenseite; Streitfälle für die Turnierleitung.
     "match_report": "match_reminders",
     "match_attention": "tournament_updates",
+    # Antwortfrist eines Terminvorschlags abgelaufen (#1552): an die Turnierleitung.
+    "schedule_escalation": "tournament_updates",
     # Dispute (#1134): „Dispute zu deinem Spiel“ an die Spieler; entschieden kommt als Ergebnis (match_result).
     "match_dispute": "match_reminders",
     # Turnier-Anmeldung (#1133): eingegangen, bestätigt, abgelehnt, nachgerückt - und „Turnier beendet“.
