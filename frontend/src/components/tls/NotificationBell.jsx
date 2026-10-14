@@ -3,10 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { Bell, Check, Inbox, Trash2, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { refreshCrowns } from "@/components/tls/LevelAvatarFrame";
-import { useNotificationFeed } from "@/hooks/useNotificationFeed";
+import { notReadMessage, useNotificationFeed } from "@/hooks/useNotificationFeed";
 import { LoadNotice } from "@/components/tls/LoadState";
 import { isExternalUrl, notificationTarget, previewText } from "@/lib/notifications";
 import { NotificationRow } from "@/components/tls/NotificationRow";
@@ -51,6 +50,7 @@ export function NotificationBell() {
   const [tab, setTab] = useState("unread");
   const [shake, setShake] = useState(false);
   const boxRef = useRef(null);
+  const markReadRef = useRef(null);
 
   const openUrl = useCallback((url) => {
     if (!url) return;
@@ -60,6 +60,15 @@ export function NotificationBell() {
     }
     navigate(url);
   }, [navigate]);
+
+  const markOpened = useCallback(async (id) => {
+    const failed = (await markReadRef.current?.({ ids: [id] })) || [];
+    if (!failed.length) return;
+    toast.error(notReadMessage(1, 1), {
+      id: `notification-read-${id}`,
+      action: { label: "Nochmal versuchen", onClick: () => markOpened(id) },
+    });
+  }, []);
 
   const onFresh = useCallback((freshRows) => {
     setShake(true);
@@ -71,16 +80,21 @@ export function NotificationBell() {
         duration: 15000,
         action: target ? {
           label: "Öffnen",
+          // Sofort ans Ziel; „gelesen“ läuft über den Feed (#987, Rest aus #1543): lehnt der Server ab, ist sie wieder
+          // ungelesen und ein Hinweis bietet „Nochmal versuchen“ - statt es still zu verschlucken.
           onClick: async () => {
-            try { await api.post(`/admin/notifications/${item.id}/read`); } catch {}
             openUrl(target);
+            await markOpened(item.id);
           },
         } : undefined,
       });
     });
-  }, [openUrl]);
+  }, [openUrl, markOpened]);
 
   const feed = useNotificationFeed({ enabled: Boolean(user), onFresh });
+  useEffect(() => {
+    markReadRef.current = feed.markRead;
+  }, [feed.markRead]);
   const { items, bundles, unread, read } = feed;
 
   useEffect(() => {

@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { SkeletonList } from "../../components/ListState";
 import { MemberCardArt } from "../../components/MemberCardArt";
+import { MemberConsents } from "../../components/MemberConsents";
 import { MemberFileAccounts } from "../../components/MemberFileAccounts";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
@@ -50,6 +51,9 @@ export function MyMembershipScreen({ navigation }: Props) {
   // Eigenes Website-Profil (#260): liegt in der Vereinsakte, sichtbar nur mit Einwilligung.
   const [website, setWebsite] = useState<WebsiteProfile | null>(null);
   const [websiteDraft, setWebsiteDraft] = useState<Record<string, unknown>>({});
+  // Meine Einwilligungen (#1537): der Hinweis im Website-Profil führt dorthin.
+  const scrollRef = useRef<ScrollView>(null);
+  const consentsY = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     setError("");
@@ -221,6 +225,7 @@ export function MyMembershipScreen({ navigation }: Props) {
   return (
     <Screen padded={false}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.gold} />}
       >
@@ -288,6 +293,13 @@ export function MyMembershipScreen({ navigation }: Props) {
             <Heading>Bitte melde dich beim Verein</Heading>
             <Muted>Zu deinem Konto passen mehrere Einträge in der Mitgliederverwaltung. Die Vereinsverwaltung klärt das.</Muted>
           </Card>
+        ) : null}
+
+        {/* Meine Einwilligungen (#1537): wie im Web nur mit Zuordnung - Stand, Text, Zustimmen und Widerrufen. */}
+        {view?.led_by_dolibarr ? (
+          <View onLayout={(event) => { consentsY.current = event.nativeEvent.layout.y; }}>
+            <MemberConsents />
+          </View>
         ) : null}
 
         {identity ? (
@@ -396,6 +408,17 @@ export function MyMembershipScreen({ navigation }: Props) {
           <Card style={styles.card} testID="membership-website">
             <Heading>Mein Website-Profil</Heading>
             <Muted testID="membership-website-state">{websiteStateLine(website)}</Muted>
+            {website.consent && !website.given && view?.led_by_dolibarr ? (
+              <Pressable
+                onPress={() => scrollRef.current?.scrollTo({ y: Math.max(0, (consentsY.current ?? 0) - 12), animated: true })}
+                accessibilityRole="button"
+                testID="membership-website-to-consents"
+                style={({ pressed }) => [styles.inlineLink, pressed && styles.pressed]}
+              >
+                <Ionicons name="shield-checkmark-outline" color={colors.gold} size={16} />
+                <Body style={styles.inlineLinkText}>Zu „Meine Einwilligungen“</Body>
+              </Pressable>
+            ) : null}
             {!(website.fields ?? []).length ? <Muted testID="membership-website-empty">Der Verein hat noch keine Felder für das Website-Profil gewählt.</Muted> : null}
             {(website.fields ?? []).map((field) => (
               <View key={field.code} style={styles.field}>

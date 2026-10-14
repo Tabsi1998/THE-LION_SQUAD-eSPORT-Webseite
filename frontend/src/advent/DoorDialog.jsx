@@ -170,7 +170,7 @@ export function PrizeBlock({ day, prize, signedIn, onRaffle }) {
         {prize.can_enter && <button type="button" className="tls-adv-button" disabled={busy} onClick={() => act(true)} data-testid="advent-prize-enter">Mitmachen</button>}
         {prize.can_withdraw && <button type="button" className="tls-adv-button tls-adv-button--quiet" disabled={busy} onClick={() => act(false)} data-testid="advent-prize-withdraw">Teilnahme zurückziehen</button>}
         {!signedIn && prize.status === "open" && <Link to="/login" className="tls-adv-button" data-testid="advent-prize-login"><LogIn className="w-4 h-4" /> Anmelden</Link>}
-        {prize.won && <Link to="/me/prizes" className="tls-adv-button" data-testid="advent-prize-mine"><Gift className="w-4 h-4" /> Meine Gewinne</Link>}
+        {prize.won && <Link to="/my/prizes" className="tls-adv-button" data-testid="advent-prize-mine"><Gift className="w-4 h-4" /> Meine Gewinne</Link>}
       </div>
       {problem && <div className="tls-adv-note tls-adv-note--bad" role="alert" data-testid="advent-prize-problem">{problem}</div>}
       {Array.isArray(prize.terms) && prize.terms.length > 0 && (

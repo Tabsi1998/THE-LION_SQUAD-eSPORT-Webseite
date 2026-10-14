@@ -7,11 +7,12 @@ import { MemoryRouter } from "react-router-dom";
 
 const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn() };
+const confirmMock = vi.fn(async () => true);
 
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler", formatMemberSince: () => "1.1.2023" }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { display_name: "Paula" } }) }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
-vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 const invalidation = { reload: null };
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: (callback, resources = []) => { if (resources.includes("users")) invalidation.reload = callback; } }));
 vi.mock("sonner", () => ({ toast: toastMock }));
@@ -118,6 +119,90 @@ test("Einwilligungen aus der Mitgliederverwaltung: Stand, Zustimmen nur nach dem
   expect(screen.getByTestId("consent-state-fotos")).toHaveTextContent("Widerrufen");
   expect(screen.queryByTestId("consent-changed-fotos")).toBeNull();
   expect(toastMock.success).toHaveBeenCalledWith("Widerruf gespeichert.");
+});
+
+const ledMe = { membership, is_active_member: true, dolibarr: { connected: true, led_by_dolibarr: true, as_of: "2026-09-21T10:00:00+00:00", stale: false, functions: [], fee: { required: false, status: "not_required" }, link: { status: "verified" } } };
+
+test("Einwilligungen (#1537): der Text der zugestimmten Fassung bleibt lesbar, bei neuer Fassung stehen beide da", async () => {
+  const user = userEvent.setup();
+  const consents = [
+    { code: "newsletter", label: "Newsletter", state: "given", version: 3, current_version: 3, moment: "2026-01-10T10:00:00+01:00", can_give: false, can_withdraw: true, text: "Newsletter, Fassung 3.", given_text: "Newsletter, Fassung 3.", text_changed: false },
+    { code: "fotos", label: "Fotos", state: "given", version: 1, current_version: 2, moment: "2026-01-10T10:00:00+01:00", can_give: true, can_withdraw: true, text: "Fotos, Fassung 2.", given_text: "Fotos, Fassung 1.", text_changed: true },
+    { code: "spiel", label: "Spielberichte", state: "given", version: 1, current_version: 2, moment: "2026-01-10T10:00:00+01:00", can_give: true, can_withdraw: true, text: "Spielberichte, Fassung 2.", given_text: null, text_changed: true },
+  ];
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? { available: true, consents } : url === "/membership/me/directory" ? { eligible: false } : ledMe }));
+  renderPage();
+  const card = await screen.findByTestId("membership-consents-card");
+  // Solange das Modul kein Pflicht-Kennzeichen liefert, sagt die Karte nichts über Pflicht oder Freiwilligkeit.
+  expect(card).not.toHaveTextContent(/freiwillig|Pflicht/i);
+
+  // Erteilt, keine neue Fassung: kein Zustimmen, aber der Text ist lesbar.
+  expect(screen.queryByTestId("consent-give-newsletter")).toBeNull();
+  await user.click(screen.getByTestId("consent-open-newsletter"));
+  expect(screen.getByTestId("consent-given-text-newsletter")).toHaveTextContent("Newsletter, Fassung 3.");
+  expect(screen.queryByTestId("consent-give-newsletter")).toBeNull();
+
+  // Neue Fassung: die zugestimmte und die neue nebeneinander.
+  await user.click(screen.getByTestId("consent-open-fotos"));
+  expect(screen.getByTestId("consent-given-text-fotos")).toHaveTextContent("Fotos, Fassung 1.");
+  expect(screen.getByTestId("consent-given-text-fotos")).toHaveTextContent("Fassung 1");
+  expect(screen.getByTestId("consent-current-text-fotos")).toHaveTextContent("Fotos, Fassung 2.");
+  expect(screen.getByTestId("consent-give-fotos")).toBeInTheDocument();
+
+  // Die alte Fassung kennt die Website nicht: das steht da, und die aktuelle.
+  await user.click(screen.getByTestId("consent-open-spiel"));
+  expect(screen.getByTestId("consent-given-missing-spiel")).toHaveTextContent(/^Den Text der Fassung vom 10\.01\.2026, der du zugestimmt hast, haben wir nicht\. Aktuelle Fassung:$/);
+  expect(screen.getByTestId("consent-current-text-spiel")).toHaveTextContent("Spielberichte, Fassung 2.");
+});
+
+test("Einwilligungen (Codex-Prüfung #1547): auch „Ich stimme zu“ fragt nach – Abbrechen schickt nichts", async () => {
+  const user = userEvent.setup();
+  const consents = [{ code: "fotos", label: "Fotos", state: "none", version: 0, current_version: 2, moment: null, can_give: true, can_withdraw: false, text: "Fotos, Fassung 2.", given_text: null, text_changed: false }];
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? { available: true, consents } : url === "/membership/me/directory" ? { eligible: false } : ledMe }));
+  apiMock.post.mockResolvedValue({ data: { ok: true, result: { code: "fotos", state: "given", version: 2, recorded: true }, consents: [{ ...consents[0], state: "given", version: 2, can_give: false, can_withdraw: true, given_text: "Fotos, Fassung 2." }] } });
+  renderPage();
+  await user.click(await screen.findByTestId("consent-open-fotos"));
+  confirmMock.mockResolvedValueOnce(false);
+  await user.click(screen.getByTestId("consent-give-fotos"));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "„Fotos“ zustimmen?", confirmLabel: "Zustimmen" }));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  expect(screen.getByTestId("consent-state-fotos")).toHaveTextContent("Noch nicht entschieden");
+
+  await user.click(screen.getByTestId("consent-give-fotos"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/membership/me/consents", { code: "fotos", decision: "given", version: 2 }));
+  expect(confirmMock).toHaveBeenCalledTimes(2);
+});
+
+test("Einwilligungen (#1537): antwortet die Mitgliederverwaltung nicht, steht das da – mit „Nochmal versuchen“", async () => {
+  const user = userEvent.setup();
+  let answer = { available: false, reason: "unavailable", text: "Die Mitgliederverwaltung antwortet gerade nicht (nicht erreichbar)." };
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? answer : url === "/membership/me/directory" ? { eligible: false } : ledMe }));
+  renderPage();
+  const card = await screen.findByTestId("membership-consents-card");
+  expect(screen.getByTestId("consents-error")).toHaveTextContent("nicht geladen");
+  expect(screen.getByTestId("consents-error")).toHaveTextContent("antwortet gerade nicht");
+
+  answer = { available: true, consents: [{ code: "fotos", label: "Fotos", state: "none", version: 0, current_version: 1, moment: null, can_give: true, can_withdraw: false, text: "Fotos.", given_text: null, text_changed: false }] };
+  await user.click(screen.getByTestId("consents-retry"));
+  expect(await screen.findByTestId("consent-fotos")).toBeInTheDocument();
+  expect(card).toBeInTheDocument();
+  expect(screen.queryByTestId("consents-error")).toBeNull();
+});
+
+test("Einwilligungen (#1537): ein Netzfehler ist ein Fehler, keine verschwundene Karte; ohne Zuordnung bleibt sie weg", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/me/consents") throw new Error("Network Error");
+    return { data: url === "/membership/me/directory" ? { eligible: false } : ledMe };
+  });
+  const { unmount } = renderPage();
+  expect(await screen.findByTestId("consents-error")).toHaveTextContent("nicht geladen");
+  unmount();
+
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? { available: false, reason: "not_linked" } : url === "/membership/me/directory" ? { eligible: false } : ledMe }));
+  renderPage();
+  await screen.findByTestId("membership-fee-card").catch(() => null);
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/membership/me/consents"));
+  expect(screen.queryByTestId("membership-consents-card")).toBeNull();
 });
 
 test("ein gesperrter Eintrag zeigt nur den Hinweis", async () => {
