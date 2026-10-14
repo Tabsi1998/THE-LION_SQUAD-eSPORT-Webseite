@@ -3,27 +3,28 @@
 //
 // Linien kommen aus den echten Quellen der Plätze („W:A:1“ im Ziel, `advancement` in der Quelle), nicht aus der
 // Reihenfolge der Spiele - so stimmen sie auch zwischen Winner und Loser Bracket, ins Grand Final und in den Reset.
+import { FINAL_SECTIONS, LOSER_SECTIONS, sectionKey, sectionKind } from "@/lib/bracketSections";
 import { matchName } from "@/lib/bracketNames";
 import { absoluteRank, finderFor, normalizeSource } from "@/lib/slotSource";
 
 const DONE = new Set(["completed", "finished", "reported", "confirmed", "forfeit"]);
 const LIVE = new Set(["running", "in_progress"]);
-// Dieselben Namen wie der Server (services/round_labels.LOSER_SECTIONS) - bracketGraph.test.js hält beide gleich.
-export const LOSER_SECTIONS = new Set(["lb", "loser", "losers", "lower", "lower_bracket", "loser bracket", "looser"]);
-// Wie der Server (services/round_labels.FINAL_SECTIONS, #1591): „[FINAL]“ im Schema ist das Grand Final.
-export const FINAL_SECTIONS = new Set(["gf", "grand_final", "grand final", "final"]);
+// Abschnittsnamen aus einer Quelle mit dem Server (lib/bracketSections, #1591).
+export { FINAL_SECTIONS, LOSER_SECTIONS };
 
 const statusOf = (match) => String(match?.status || "").toLowerCase();
 export const isDone = (match) => DONE.has(statusOf(match));
 export const isLive = (match) => LIVE.has(statusOf(match));
 export const isCancelled = (match) => statusOf(match) === "cancelled";
 
-/** Grobe Lage eines Abschnitts: main, loser, final oder bronze. */
+/** Grobe Lage eines Abschnitts: main, loser, final oder bronze - wie `section_kind` am Server (Gruppen zählen als main).
+ * Ältere Bäume nennen das Spiel um Platz 3 auch „TP“ oder „Third Place“; das bleibt zusätzlich erkannt. */
 export function sectionGroup(section) {
-  const key = String(section || "MAIN").trim().toLowerCase();
-  if (LOSER_SECTIONS.has(key)) return "loser";
-  if (FINAL_SECTIONS.has(key)) return "final";
-  if (key === "bronze" || key === "tp" || key.includes("third") || key.includes("platz 3")) return "bronze";
+  const kind = sectionKind(section);
+  if (kind === "loser" || kind === "bronze") return kind;
+  if (kind === "grand_final") return "final";
+  const key = sectionKey(section);
+  if (key === "tp" || key.includes("third") || key.includes("platz 3")) return "bronze";
   return "main";
 }
 

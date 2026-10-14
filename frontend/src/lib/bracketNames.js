@@ -2,6 +2,7 @@
 // („# Runde 2“ im Loser Bracket, weil es zur Zeit der zweiten Runde beginnt); angezeigt wird je Abschnitt fortlaufend ab
 // 1. Ein Wort als Spiel-Kürzel („FINAL“) heißt wie seine Runde („Grand Final“). Ein geloster Platz zeigt, wer kommt:
 // „Weiter aus Runde 1“ (Lauf), „Sieger aus Viertelfinale“ (Duell) bzw. „Verlierer aus Runde 2“ - kurz, in einer Zeile.
+import { sectionKind } from "@/lib/bracketSections";
 import { describeSlot, normalizeSource } from "@/lib/slotSource";
 
 const GENERIC_ROUND = /^((?:Loser|Winner) )?Runde (\d+)$/i;
@@ -25,9 +26,11 @@ export function displayRoundLabels(matches = []) {
   });
 }
 
-/** Wie ein Spiel in Texten heißt: das Kürzel („A“, „LC“) - ist das Kürzel ein Wort („FINAL“), der Rundenname. */
+/** Wie ein Spiel in Texten heißt: das Kürzel („A“, „LC“). Das Grand Final heißt wie seine Runde („Grand Final“,
+ * „Grand Final Reset“), auch mit kurzem Kürzel (GF, GFR); ebenso ein Wort als Kürzel („FINAL“). */
 export function matchName(match) {
   const key = String(match?.match_key || "");
+  if (match?.round_label && sectionKind(match?.section) === "grand_final") return match.round_label;
   if (key.length <= 3 || /\d/.test(key)) return key;
   return match?.round_label || key;
 }
