@@ -165,22 +165,24 @@ async def test_a_repeated_event_is_answered_but_not_processed_again(flow, fake):
 
 
 @pytest.mark.asyncio
-async def test_a_failed_processing_does_not_swallow_the_event(flow, fake, monkeypatch):
+@pytest.mark.parametrize("queue, object_type, retried", [("queue_member", "membership", "queued"), ("queue_applications", "application", "applications")])
+async def test_a_failed_enqueue_answers_5xx_and_frees_the_event(flow, fake, monkeypatch, queue, object_type, retried):
     await connect_signed(flow)
-    body = body_of()
+    body = body_of(object_type=object_type)
 
     async def broken(*args, **kwargs):
-        raise RuntimeError("kaputt")
+        raise RuntimeError("Datenbank weg")
 
-    monkeypatch.setattr(vereine_webhooks, "queue_member", broken)
-    try:
-        failed = (await deliver(flow, body)).status_code
-    except RuntimeError:
-        failed = 500
-    assert failed == 500
+    original = getattr(vereine_webhooks, queue)
+    monkeypatch.setattr(vereine_webhooks, queue, broken)
+    failed = await deliver(flow, body)
+    assert failed.status_code == 503
     assert await flow.db.dolibarr_webhook_events.count_documents({}) == 0, "die Wiederholung des Moduls darf es noch einmal versuchen"
-    monkeypatch.setattr(vereine_webhooks, "queue_member", dolibarr_sync.queue_member)
-    assert (await deliver(flow, body)).json()["result"] == "queued"
+    assert await flow.db.dolibarr_pending.count_documents({}) == 0
+    monkeypatch.setattr(vereine_webhooks, queue, original)
+    again = await deliver(flow, body, stamp=int(time.time()) + 30)
+    assert again.status_code == 200 and again.json()["result"] == retried
+    assert await flow.db.dolibarr_pending.count_documents({}) == 1, "erst eingereiht, dann 200"
 
 
 @pytest.mark.asyncio
@@ -189,6 +191,27 @@ async def test_a_body_that_is_too_large_is_refused_before_it_is_read(flow, fake)
     body = body_of(padding="x" * (vereine_webhooks.MAX_BODY_BYTES + 1))
     assert (await deliver(flow, body)).status_code == 413
     assert await flow.db.dolibarr_webhook_events.count_documents({}) == 0
+
+
+async def chunked(body: bytes, size: int = 1024):
+    for start in range(0, len(body), size):
+        yield body[start:start + size]
+
+
+@pytest.mark.asyncio
+async def test_a_streamed_body_without_length_is_cut_off_at_the_limit(flow, fake):
+    """Ohne Content-Length (chunked, mehrere ASGI-Teile) greift die Grenze beim Lesen."""
+    await connect_signed(flow)
+    big = body_of(padding="x" * (vereine_webhooks.MAX_BODY_BYTES + 1))
+    headers = {"Content-Type": "application/json", "Vereine-Signature": header_for(big)}
+    answer = await flow.post(PATH, content=chunked(big), headers=headers)
+    assert answer.request.headers.get("content-length") is None and answer.request.headers.get("transfer-encoding") == "chunked"
+    assert answer.status_code == 413
+    assert await flow.db.dolibarr_webhook_events.count_documents({}) == 0
+    # Ein gültiger Body in mehreren Teilen wird zusammengesetzt und geprüft wie am Stück.
+    small = body_of()
+    answer = await flow.post(PATH, content=chunked(small, 50), headers={**headers, "Vereine-Signature": header_for(small)})
+    assert answer.status_code == 200 and answer.json()["result"] == "queued"
 
 
 @pytest.mark.asyncio
@@ -261,34 +284,43 @@ async def test_preview_mode_accepts_but_does_not_queue(flow, fake):
     assert await flow.db.dolibarr_pending.count_documents({}) == 0
 
 
-@pytest.mark.asyncio
-async def test_an_application_event_reads_open_applications_again(flow, fake, monkeypatch):
-    await connect_signed(flow)
-    calls = []
-
-    async def refresh_open(db, settings):
-        calls.append(settings["mode"])
-        return 1
-
-    monkeypatch.setattr(vereine_webhooks, "refresh_open_applications", refresh_open)
-    application = body_of(event_id="a" * 40, object_type="application", object_id=5, change="updated")
-    answer = await deliver(flow, application, event_id="a" * 40)
-    assert answer.status_code == 200 and answer.json()["result"] == "applications"
-    assert calls == ["live"], "nach der Antwort nachgelesen"
+async def make_due(flow, **fields):
+    await flow.db.dolibarr_pending.update_many({}, {"$set": {"due_at": "2000-01-01T00:00:00+00:00", **fields}})
 
 
 @pytest.mark.asyncio
-async def test_refreshing_open_applications_reads_their_state(flow, fake):
+async def test_an_application_event_is_queued_durably_and_retried(flow, fake, monkeypatch):
     await connect_signed(flow, applications_enabled=True)
+    monkeypatch.setattr(dolibarr_sync, "PENDING_DELAY_SECONDS", -1)
     await flow.db.membership_applications.insert_one({"id": "antrag-1", "user_id": "u1", "status": "pending", "external_id": "web-antrag-1",
                                                       "dolibarr": {"checked_at": "2099-01-01T00:00:00+00:00"}})
-    settings = await dolibarr_client.load_settings(flow.db)
-    # Die Fälschung kennt den Antrag nicht: der Fehler wird am Antrag vermerkt - der Beweis, dass nachgelesen wurde.
-    assert await vereine_webhooks.refresh_open_applications(flow.db, settings) == 1
+    application = body_of(event_id="a" * 40, object_type="application", object_id=5)
+    answer = await deliver(flow, application, event_id="a" * 40)
+    assert answer.status_code == 200 and answer.json()["result"] == "applications"
+    entry = await flow.db.dolibarr_pending.find_one({}, {"_id": 0})
+    assert entry["kind"] == "applications" and entry["attempts"] == 0, "vor der Antwort dauerhaft eingereiht"
+
+    # Dolibarr kennt den Antrag (noch) nicht: am Antrag vermerkt, der Eintrag bleibt mit einem Versuch mehr und Abstand.
+    assert (await vereine_webhooks.process_pending_applications(flow.db))["ok"] is False
+    entry = await flow.db.dolibarr_pending.find_one({}, {"_id": 0})
+    assert entry["attempts"] == 1 and entry["due_at"] > dolibarr_sync.now_utc().isoformat()
+    assert (await flow.db.membership_applications.find_one({"id": "antrag-1"}))["dolibarr"]["error"]
+
+    # Grenze: nach dem letzten Versuch fällt der Eintrag weg, der regelmäßige Lauf holt es nach.
+    await make_due(flow, attempts=dolibarr_sync.PENDING_MAX_ATTEMPTS - 1)
+    assert (await dolibarr_sync.process_pending(flow.db))["processed"] == 0, "der Mitglieder-Verarbeiter lässt den Eintrag liegen"
+    assert await flow.db.dolibarr_pending.count_documents({}) == 1
+    await vereine_webhooks.process_pending_applications(flow.db)
+    assert await flow.db.dolibarr_pending.count_documents({}) == 0
+
+    # Der nächste Hinweis: diesmal liest der Job den Stand.
+    fake.applications["web-antrag-1"] = {"external_id": "web-antrag-1", "status": "in_review", "received_at": "2026-10-14T08:00:00+02:00",
+                                         "decided_at": "", "reason": "", "member_id": 0, "member_ref": ""}
+    assert (await deliver(flow, body_of(event_id="b" * 40, object_type="application", object_id=5), event_id="b" * 40)).status_code == 200
+    assert (await vereine_webhooks.process_pending_applications(flow.db))["processed"] == 1
+    assert await flow.db.dolibarr_pending.count_documents({}) == 0
     doc = await flow.db.membership_applications.find_one({"id": "antrag-1"}, {"_id": 0})
-    assert doc["dolibarr"]["error"] and doc["dolibarr"]["checked_at"] != "2099-01-01T00:00:00+00:00"
-    await flow.db.settings.update_one({"id": "dolibarr"}, {"$set": {"applications_enabled": False}})
-    assert await vereine_webhooks.refresh_open_applications(flow.db, await dolibarr_client.load_settings(flow.db)) == 0
+    assert doc["dolibarr"]["application_status"] == "in_review" and "error" not in doc["dolibarr"]
 
 
 # ---------------------------------------------------------------- Einrichtung, alter Weg, Checks

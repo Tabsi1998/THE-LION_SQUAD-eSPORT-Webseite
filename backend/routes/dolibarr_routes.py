@@ -17,7 +17,7 @@ import hmac
 import secrets
 import time
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from auth import get_current_user, require_area, require_super
@@ -902,7 +902,7 @@ async def _read_limited(request: Request, limit: int) -> bytes | None:
 
 
 @public_router.post("/vereine-webhook")
-async def vereine_signed_webhook(request: Request, background: BackgroundTasks):
+async def vereine_signed_webhook(request: Request):
     """Signierter Hinweis des Vereinsmoduls (#1540): Kopf, Schlüssel, Zeitfenster, HMAC, Ereignis-Kennung -
     in dieser Reihenfolge (services/vereine_webhooks.py). Ohne Geheimnis bleibt die Tür zu (503)."""
     await enforce_rate_limit(request, "dolibarr:vereine-webhook", limit=120, window_seconds=60)
@@ -931,10 +931,11 @@ async def vereine_signed_webhook(request: Request, background: BackgroundTasks):
         vereine_webhooks.logger.info("[dolibarr] signierter Webhook %s… schon verarbeitet", event["event_id"][:12])
         return {"ok": True, "result": "duplicate"}
     try:
-        result = await vereine_webhooks.handle(db, settings, event, later=background.add_task)
-    except Exception:
+        result = await vereine_webhooks.handle(db, settings, event)
+    except Exception as exc:  # noqa: BLE001 - nicht eingereiht heißt: Kennung freigeben, das Modul wiederholt
         await vereine_webhooks.forget(db, settings, event["event_id"])
-        raise
+        vereine_webhooks.logger.warning("[dolibarr] signierter Webhook %s… nicht eingereiht: %s", event["event_id"][:12], type(exc).__name__)
+        raise HTTPException(503, "Gerade nicht verarbeitbar, bitte wiederholen.") from exc
     vereine_webhooks.logger.info("[dolibarr] signierter Webhook %s… %s/%s: %s", event["event_id"][:12], event["object_type"], event["change"], result)
     return {"ok": True, "result": result}
 

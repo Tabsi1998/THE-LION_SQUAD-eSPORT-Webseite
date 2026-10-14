@@ -120,7 +120,7 @@ PERSONAL: dict[str, Entry] = {
     "dolibarr_identities": Entry(DELETED, ("dolibarr_identities",)),
     "dolibarr_honours": Entry(DELETED, ("dolibarr_honours",)),
     "dolibarr_invoice_cache": Entry(DELETED, note="Zwischenspeicher der Rechnungen aus der Mitgliederverwaltung"),
-    "dolibarr_pending": Entry(KEPT, note="Abgleich mit der Mitgliederverwaltung je Mitgliedsnummer, ohne Konto"),
+    "dolibarr_pending": Entry(KEPT, note="Abgleich mit der Mitgliederverwaltung je Mitgliedsnummer (oder „offene Anträge nachlesen“), ohne Konto"),
     "dolibarr_participations": Entry(KEPT, note="Teilnahmen in der Mitgliederakte, je Mitgliedsnummer - Sache des Vereins"),
     "billing_orders": Entry(OVERWRITTEN, ("billing_orders",)),
     "billing_customers": Entry(DELETED, ("billing_customers",)),

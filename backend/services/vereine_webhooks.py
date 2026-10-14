@@ -31,9 +31,11 @@ from datetime import timedelta
 from pymongo.errors import DuplicateKeyError
 
 from models import now_utc
-from services.dolibarr_applications import coupled, refresh
-from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key
-from services.dolibarr_sync import queue_member
+from database import get_db
+from services.dolibarr_applications import refresh_open
+from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key, load_settings
+from services import dolibarr_sync
+from services.dolibarr_sync import queue_member, retry_or_drop
 from services.secret_store import decrypt_secret
 
 logger = logging.getLogger("tls.dolibarr.webhook")
@@ -55,6 +57,8 @@ EVENT_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,128}")
 # Objektarten des Moduls (Änderungsfeed). Die Kennung bei membership, fee und consent ist das Mitglied.
 OBJECT_TYPES = ("membership", "function", "fee", "application", "consent", "document", "ballot", "meeting")
 MEMBER_TYPES = ("membership", "fee", "consent")
+# Eintrag in dolibarr_pending, der statt eines Mitglieds die offenen Beitrittsanträge nachliest.
+APPLICATIONS_KIND = "applications"
 
 
 # ---------------------------------------------------------------- Prüfung
@@ -176,27 +180,51 @@ async def forget(db, settings: dict, event_id: str) -> None:
     await db.dolibarr_webhook_events.delete_one({"key": _key(settings, event_id)})
 
 
-async def refresh_open_applications(db, settings: dict) -> int:
-    """Ein Antrag hat sich geändert: offene Anträge gleich nachlesen statt beim nächsten Lauf."""
-    if not coupled(settings):
-        return 0
+def _applications_key(settings: dict) -> str:
+    return f"{instance_key(settings)}:{APPLICATIONS_KIND}"
+
+
+async def queue_applications(db, settings: dict) -> None:
+    """Ein Antrag hat sich geändert. Das Ereignis nennt den Antrag des Moduls, die Website kennt nur ihre external_id -
+    also alle offenen Anträge nachlesen. Eingereiht wie ein Mitglied: dauerhaft, mit Versuchen, Abstand und Grenze."""
+    now = now_utc()
+    await db.dolibarr_pending.update_one(
+        {"key": _applications_key(settings)},
+        {"$set": {"kind": APPLICATIONS_KIND, "instance": instance_key(settings),
+                  "due_at": (now + timedelta(seconds=dolibarr_sync.PENDING_DELAY_SECONDS)).isoformat()},
+         "$setOnInsert": {"attempts": 0, "created_at": now.isoformat()}},
+        upsert=True,
+    )
+
+
+async def process_pending_applications(db=None) -> dict:
+    """Der Job (mit process_pending alle 30 s): eingereihte Anträge nachlesen; was nicht lesbar war, später noch einmal."""
+    db = db if db is not None else get_db()
+    settings = await load_settings(db)
+    if settings["mode"] != "live":
+        return {"ok": False, "skipped": settings["mode"]}
+    entry = await db.dolibarr_pending.find_one({"key": _applications_key(settings), "due_at": {"$lte": now_utc().isoformat()}}, {"_id": 0})
+    if not entry:
+        return {"ok": True, "processed": 0}
     try:
         client = DolibarrClient(settings)
     except DolibarrError as exc:
-        logger.warning("[dolibarr] Anträge nicht nachlesbar: %s", exc.kind)
-        return 0
-    checked = 0
-    async for doc in db.membership_applications.find({"status": "pending", "external_id": {"$exists": True}}, {"_id": 0}):
-        await refresh(db, settings, client, doc, force=True)
-        checked += 1
-    return checked
+        await retry_or_drop(db, entry)
+        return {"ok": False, "error": exc.kind}
+    result = await refresh_open(db, settings, client)
+    if result["failed"]:
+        await retry_or_drop(db, entry)
+        return {"ok": False, **result}
+    await db.dolibarr_pending.delete_one({"key": entry["key"]})
+    return {"ok": True, "processed": 1, **result}
 
 
-async def handle(db, settings: dict, event: dict, later=None) -> str:
+async def handle(db, settings: dict, event: dict) -> str:
     """Gezielt verarbeiten. Liefert ``queued``, ``applications``, ``ignored`` oder ``skipped``.
 
-    ``later(func, *args)`` hängt Arbeit hinter die Antwort (FastAPI ``BackgroundTasks.add_task``), damit das Modul
-    nicht auf Dolibarr-Abfragen wartet; ohne ``later`` läuft sie gleich."""
+    Verarbeitet wird nie im Request, sondern dauerhaft eingereiht (``dolibarr_pending``, mit Versuchen, Abstand und
+    Grenze; der Job läuft alle 30 s). Erst nach dem Einreihen antwortet der Empfänger mit 200. Scheitert schon das
+    Einreihen, fliegt die Ausnahme durch: 5xx, die Ereignis-Kennung wird wieder vergessen, das Modul wiederholt."""
     if settings.get("mode") != "live":
         return "skipped"
     object_type = event["object_type"]
@@ -206,10 +234,8 @@ async def handle(db, settings: dict, event: dict, later=None) -> str:
         await queue_member(db, settings, event["object_id"])
         return "queued"
     if object_type == "application":
-        if later is not None:
-            later(refresh_open_applications, db, settings)
-        else:
-            await refresh_open_applications(db, settings)
+        # Die Kennung ist die des Moduls; die Website kennt nur ihre external_id - also alle offenen Anträge.
+        await queue_applications(db, settings)
         return "applications"
     # Funktionen holt der regelmäßige Abgleich, Abstimmungen und Versammlungen ein eigener Job;
     # unbekannte Arten eines neueren Moduls werden angenommen, damit das Modul nicht vergeblich wiederholt.
