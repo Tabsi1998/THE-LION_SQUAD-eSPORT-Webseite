@@ -278,6 +278,30 @@ async def test_a_station_of_another_tournament_counts_as_missing_like_in_the_pla
 
 
 @pytest.mark.asyncio
+async def test_releasing_works_while_the_bracket_is_still_a_preview(flow):
+    # Fabian live (14.10.): Baum noch Vorschau bis Check-in-Ende, alte Termine auf einer gelöschten Station. Vorschau-
+    # Spiele haben nie begonnen - Lösen gilt auch für sie. Sonst trägt das Check-in-Ende die alten Termine samt
+    # gelöschter Station in den fixen Baum mit (_collect_match_plan / _apply_match_plan).
+    tournament = await cup(flow, preview=True)
+    station = (await flow.post("/api/stations", json={"name": "Station A", "device_type": "switch", "tournament_id": tournament["id"]})).json()
+    preview = {match["match_key"]: match for match in await flow.matches(tournament) if match.get("is_preview")}
+    assert set(OLD_PLAN) <= set(preview)
+    for key, (clock, duration, on_station) in OLD_PLAN.items():
+        response = await flow.patch(f"/api/matches/{preview[key]['id']}", json={
+            "scheduled_at": vienna(clock), "station_id": station["id"] if on_station else None, "duration_minutes": duration})
+        assert response.status_code == 200, f"{key}: {response.text}"
+    await flow.db.stations.delete_one({"id": station["id"]})  # Altdaten: Station weg, Spiele behalten die Kennung
+    gone = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/release", json={"scope": "missing_stations"})
+    assert gone.status_code == 200, gone.text
+    assert gone.json()["released"] == 13
+    rest = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/release", json={"scope": "all"})
+    assert rest.json()["released"] == 1, "LF hing an keiner Station und war noch von Hand gesetzt"
+    for match in await flow.matches(tournament):
+        assert not match.get("station_id") and not match.get("scheduled_at"), match["match_key"]
+        assert match.get("is_preview"), "der Baum bleibt Vorschau"
+
+
+@pytest.mark.asyncio
 async def test_a_started_match_keeps_its_time_and_station(flow):
     tournament, _station, matches = await fabians_case(flow)
     await flow.db.matches_v2.update_one({"id": matches["A"]["id"]}, {"$set": {"status": "in_progress", "started_at": vienna("15:31")}})

@@ -574,6 +574,14 @@ describe("Alle Termine von Hand lösen - die alte Planung auf einmal zurück an 
     await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`/tournaments/${state.tournament.id}/schedule/release`, { scope: "missing_stations" }));
   });
 
+  it("auch solange der Baum Vorschau ist (bis Check-in-Ende) - Vorschau-Spiele haben nie begonnen", async () => {
+    const state = { ...fixture.orphan, matches: fixture.orphan.matches.map((match) => ({ ...match, is_preview: true })) };
+    setup(state);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Nur Spiele an gelöschten Stationen lösen" })).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Alle Termine von Hand lösen" })).toBeInTheDocument();
+    expect(screen.getByTestId("mp-plan-note")).toHaveTextContent("gehen dabei mit in den fixen Baum");
+  });
+
   it("ohne feste Termine oder ohne Planungsrecht kein Knopf", () => {
     setup(fixture.local.applied);
     expect(screen.queryByRole("button", { name: "Alle Termine von Hand lösen" })).toBeNull();
