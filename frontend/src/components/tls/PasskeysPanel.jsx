@@ -69,6 +69,9 @@ export function PasskeysPanel() {
               </li>
             ))}
           </ul>
+          {items.length > 0 && (
+            <p className="text-xs text-white/60" data-testid="passkeys-login-hint">Schlägt dein Browser den Passkey beim Login nicht im E-Mail-Feld vor? Wähle dort „Mit Passkey anmelden“ – so findest du auch Passkeys auf deinem Handy oder Sicherheitsschlüssel.</p>
+          )}
         </>
       )}
       {message && <p role="status" className={`text-sm ${failed ? "text-[#FF6B62]" : "text-[#29B6E8]"}`}>{message}</p>}

@@ -19,6 +19,8 @@ export function credentialOptions(options, registration = false) {
   for (const field of ["allowCredentials", "excludeCredentials"]) {
     if (options[field]) publicKey[field] = options[field].map((item) => ({ ...item, id: decodeCredentialBytes(item.id) }));
   }
+  // Ohne E-Mail (discoverable): keine Liste statt einer leeren - der Browser zeigt dann alle Passkeys dieser Website.
+  if (Array.isArray(publicKey.allowCredentials) && publicKey.allowCredentials.length === 0) delete publicKey.allowCredentials;
   if (registration) publicKey.user = { ...options.user, id: decodeCredentialBytes(options.user.id) };
   return publicKey;
 }
@@ -88,8 +90,22 @@ async function verifyLogin(options, credential, remember) {
   }
 }
 
+// Der Server merkt sich je Browser nur die jüngste Anmelde-Anfrage. Darum laufen die Anfragen nach Optionen
+// nacheinander: die Antwort einer abgebrochenen Anfrage darf nie die einer neueren überholen.
+let optionsQueue = Promise.resolve();
+
+function loginOptions() {
+  const request = optionsQueue.then(() => api.post("/auth/passkeys/login/options", {}, { skipInvalidation: true }));
+  optionsQueue = request.catch(() => {});
+  return request.then(({ data }) => data);
+}
+
+/**
+ * Der sichtbare Weg (#1520, FIDO-Empfehlung): „Mit Passkey anmelden“ öffnet den Dialog des Browsers - ohne E-Mail,
+ * mit allen Passkeys dieser Website, auch solchen auf dem Handy (QR-Code) oder einem Sicherheitsschlüssel.
+ */
 export async function signInWithPasskey({ remember = true } = {}) {
-  const { data: options } = await api.post("/auth/passkeys/login/options", {}, { skipInvalidation: true });
+  const options = await loginOptions();
   const credential = await navigator.credentials.get({ publicKey: credentialOptions(options) });
   return verifyLogin(options, credential, remember);
 }
@@ -105,8 +121,8 @@ export async function passkeyAutofillAvailable() {
 
 // Die Anfrage des Servers gilt fünf Minuten; so lange sitzt mancher vor dem Login.
 const AUTOFILL_REARM_MS = 4 * 60 * 1000;
-// Lehnt der Browser schneller ab, kann er den Vorschlag gar nicht zeigen - dann nicht immer wieder fragen.
-const AUTOFILL_INSTANT_REJECT_MS = 2000;
+// So lange wartet das Beenden höchstens darauf, dass der Browser die abgebrochene Anfrage auch abgeschlossen hat.
+const AUTOFILL_SETTLE_MS = 1000;
 
 async function runAlone(task) {
   try {
@@ -117,19 +133,22 @@ async function runAlone(task) {
 }
 
 /**
- * Der Browser schlägt gespeicherte Passkeys im E-Mail-Feld vor (#348, #1520) - statt eines eigenen Knopfs.
- * Die Anfrage bleibt im Hintergrund offen und wird vor Ablauf erneuert. `exclusive` lässt die Prüfung am
- * Server nur laufen, wenn nicht schon eine andere Anmeldung läuft (kein doppeltes Anmelden). Abbruch und eine
- * abgelehnte Auswahl bleiben still; `onError` hört nur, was der Server ablehnt. Danach endet der Vorschlag:
- * sonst böte der Browser denselben Passkey gleich wieder an. `onEnd` meldet, dass der Vorschlag nicht mehr
- * läuft und die Seite den Weg über „Mit Passkey anmelden“ zeigen soll; neu starten darf nur die Seite.
+ * Der Browser schlägt gespeicherte Passkeys im E-Mail-Feld vor (#348, #1520) - zusätzlich zum Knopf
+ * „Mit Passkey anmelden“: nicht jeder Browser zeigt jeden Passkey im Feld an (etwa einen vom Handy).
+ * Die Anfrage bleibt im Hintergrund offen und wird nur nach dem eigenen Ablauf-Timer erneuert. `exclusive` lässt
+ * die Prüfung am Server nur laufen, wenn nicht schon eine andere Anmeldung läuft (kein doppeltes Anmelden).
+ * Jedes andere Ende - Abbruch durch die Person, Ablehnung durch den Browser, Ablehnung durch den Server - beendet
+ * den Vorschlag endgültig (keine Schleife aus Optionen und Anfragen); still bleibt es bis auf `onError`, das nur
+ * hört, was der Server ablehnt. `onEnd` meldet das Ende; neu starten darf nur die Seite nach einer Handlung.
  * Liefert eine Funktion zum Beenden: beim Verlassen der Seite, beim Absenden des Passworts und bevor eine
- * eigene Passkey-Anfrage startet - es darf nur eine geben.
+ * eigene Passkey-Anfrage startet. Sie gibt ein Promise zurück, das erst erfüllt ist, wenn der Browser die
+ * Anfrage abgeschlossen hat (höchstens AUTOFILL_SETTLE_MS) - zwei WebAuthn-Anfragen zugleich lehnt er ab.
  */
 export function startPasskeyAutofill({ remember = () => true, exclusive = runAlone, onSignedIn, onError, onEnd }) {
   let stopped = false;
   let controller = null;
   let timer = null;
+  let pending = null;
   const end = () => {
     if (stopped) return;
     stopped = true;
@@ -140,25 +159,30 @@ export function startPasskeyAutofill({ remember = () => true, exclusive = runAlo
     controller = new AbortController();
     let options;
     try {
-      ({ data: options } = await api.post("/auth/passkeys/login/options", {}, { skipInvalidation: true }));
+      options = await loginOptions();
     } catch {
       end();
       return;
     }
     if (stopped) return;
-    const asked = Date.now();
+    let expired = false;
     let credential;
     try {
-      timer = setTimeout(() => controller.abort(), AUTOFILL_REARM_MS);
-      credential = await navigator.credentials.get({ publicKey: credentialOptions(options), mediation: "conditional", signal: controller.signal });
-    } catch (error) {
+      timer = setTimeout(() => { expired = true; controller.abort(); }, AUTOFILL_REARM_MS);
+      // Die Zeit regelt hier die Seite selbst (Erneuern vor Ablauf); ein Zeitlimit des Servers beendete den Vorschlag früher.
+      const { timeout: _timeout, ...publicKey } = credentialOptions(options);
+      const request = navigator.credentials.get({ publicKey, mediation: "conditional", signal: controller.signal });
+      pending = request.then(() => {}, () => {});
+      credential = await request;
+    } catch {
       if (stopped) return;
-      if (error?.name === "AbortError") { arm(); return; }
-      if (error?.name === "NotAllowedError" && Date.now() - asked >= AUTOFILL_INSTANT_REJECT_MS) { arm(); return; }
+      // Nur der eigene Ablauf erneuert; alles andere (auch ein Abbruch durch die Person) beendet.
+      if (expired) { arm(); return; }
       end();
       return;
     } finally {
       clearTimeout(timer);
+      pending = null;
     }
     if (stopped) return;
     const attempt = await exclusive(() => verifyLogin(options, credential, remember()));
@@ -177,6 +201,10 @@ export function startPasskeyAutofill({ remember = () => true, exclusive = runAlo
     stopped = true;
     clearTimeout(timer);
     controller?.abort();
+    if (!pending) return Promise.resolve();
+    let limit;
+    return Promise.race([pending, new Promise((resolve) => { limit = setTimeout(resolve, AUTOFILL_SETTLE_MS); })])
+      .finally(() => clearTimeout(limit));
   };
 }
 

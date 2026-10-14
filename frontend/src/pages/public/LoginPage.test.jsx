@@ -98,8 +98,8 @@ test("„Nicht mehr fragen“ gilt – und wer schon einen Passkey hat, wird gar
   expect(screen.queryByTestId("passkey-offer")).toBeNull();
 });
 
-// #1520: kein Knopf „Passkey verwenden“ mehr. Kann der Browser Passkeys im E-Mail-Feld vorschlagen, läuft das still
-// im Hintergrund; nur ohne diese Fähigkeit bleibt ein unauffälliger Link.
+// #1520: Kann der Browser Passkeys im E-Mail-Feld vorschlagen, läuft das still im Hintergrund. Der Knopf „Mit Passkey
+// anmelden“ steht trotzdem immer da (FIDO-Empfehlung): nicht jeder Browser zeigt jeden Passkey im Feld.
 function autofillStarted() {
   const stop = vi.fn();
   passkeys.passkeyAutofillAvailable.mockResolvedValue(true);
@@ -108,15 +108,76 @@ function autofillStarted() {
 }
 const autofillArgs = () => passkeys.startPasskeyAutofill.mock.calls.at(-1)[0];
 
-test("kann der Browser Passkeys vorschlagen, startet das beim Laden – ohne Knopf und ohne Link", async () => {
+test("kann der Browser Passkeys vorschlagen, startet das beim Laden – und der Knopf steht trotzdem da", async () => {
   autofillStarted();
   renderPage();
   await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1));
   expect(screen.getByTestId("login-email")).toHaveAttribute("autocomplete", "username webauthn");
-  expect(screen.queryByTestId("login-passkey")).toBeNull();
-  expect(screen.queryByRole("button", { name: /passkey/i })).toBeNull();
+  const button = await screen.findByTestId("login-passkey");
+  expect(button).toHaveTextContent("Mit Passkey anmelden");
+  expect(button.className).toMatch(/tls-btn/);
   expect(screen.getByText(/schlägt dein Browser ihn hier vor/)).toBeInTheDocument();
   expect(autofillArgs().remember()).toBe(true);
+});
+
+test("der Vorschlag wartet nicht auf den Status des Servers; sagt der Server nein, endet er und kein Knopf erscheint", async () => {
+  const stop = autofillStarted();
+  let answer;
+  apiMock.get.mockImplementation((url) => (url === "/auth/passkeys/status" ? new Promise((resolve) => { answer = resolve; }) : Promise.resolve({ data: [] })));
+  renderPage();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1));
+  expect(screen.queryByTestId("login-passkey")).toBeNull();
+  await act(async () => answer({ data: { enabled: false } }));
+  expect(stop).toHaveBeenCalled();
+  expect(screen.queryByTestId("login-passkey")).toBeNull();
+  expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1);
+});
+
+test("der Knopf beendet erst den Vorschlag, öffnet dann den Dialog; ein Abbruch startet den Vorschlag neu", async () => {
+  const stop = autofillStarted();
+  passkeys.signInWithPasskey.mockRejectedValue(Object.assign(new Error("Abgebrochen"), { name: "NotAllowedError" }));
+  const user = userEvent.setup();
+  renderPage();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1));
+  await user.click(await screen.findByTestId("login-passkey"));
+  expect(stop).toHaveBeenCalled();
+  expect(stop.mock.invocationCallOrder[0]).toBeLessThan(passkeys.signInWithPasskey.mock.invocationCallOrder[0]);
+  expect(passkeys.signInWithPasskey).toHaveBeenCalledWith({ remember: true });
+  expect(await screen.findByText("Abgebrochen")).toBeInTheDocument();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(2));
+});
+
+test("der Knopf öffnet den Dialog erst, wenn der Browser die stille Anfrage abgeschlossen hat", async () => {
+  let settled;
+  const stop = vi.fn(() => new Promise((resolve) => { settled = resolve; }));
+  passkeys.passkeyAutofillAvailable.mockResolvedValue(true);
+  passkeys.startPasskeyAutofill.mockReturnValue(stop);
+  passkeys.signInWithPasskey.mockResolvedValue({ id: "u1" });
+  const user = userEvent.setup();
+  renderPage();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1));
+  await user.click(await screen.findByTestId("login-passkey"));
+  expect(stop).toHaveBeenCalledTimes(1);
+  expect(passkeys.signInWithPasskey).not.toHaveBeenCalled();
+  await act(async () => settled());
+  await waitFor(() => expect(passkeys.signInWithPasskey).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.getByText("mitgliederbereich")).toBeInTheDocument());
+});
+
+test("prüft der Server gerade einen Passkey aus dem Vorschlag, startet der Knopf keine zweite Anmeldung", async () => {
+  autofillStarted();
+  const user = userEvent.setup();
+  renderPage();
+  await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalled());
+  const button = await screen.findByTestId("login-passkey");
+  let finish;
+  let running;
+  act(() => { running = autofillArgs().exclusive(() => new Promise((resolve) => { finish = resolve; })); });
+  await waitFor(() => expect(button).toBeDisabled());
+  await user.click(button);
+  expect(passkeys.signInWithPasskey).not.toHaveBeenCalled();
+  await act(async () => finish({ id: "u1" }));
+  expect(await running).toEqual({ started: true, value: { id: "u1" } });
 });
 
 test("ein gewählter Passkey meldet an und folgt dem Ziel; verlangt der Server einen Code, kommt der Schritt", async () => {
@@ -166,26 +227,26 @@ test("beim Verlassen der Seite endet der Vorschlag", async () => {
   expect(stop).toHaveBeenCalled();
 });
 
-test("ohne Vorschlag im Browser bleibt ein unauffälliger Link mit dem bisherigen Weg", async () => {
+test("ohne Vorschlag im Browser bleibt der Knopf mit dem Dialog des Browsers", async () => {
   passkeys.signInWithPasskey.mockResolvedValue({ id: "u1" });
   const user = userEvent.setup();
   renderPage();
   const link = await screen.findByTestId("login-passkey");
   expect(link).toHaveTextContent("Mit Passkey anmelden");
-  expect(link.className).not.toMatch(/tls-btn/);
   expect(passkeys.startPasskeyAutofill).not.toHaveBeenCalled();
   await user.click(link);
   await waitFor(() => expect(passkeys.signInWithPasskey).toHaveBeenCalledWith({ remember: true }));
   await waitFor(() => expect(screen.getByText("mitgliederbereich")).toBeInTheDocument());
 });
 
-test("endet der Vorschlag von selbst, erscheint der Link", async () => {
+test("endet der Vorschlag von selbst, verschwindet der Hinweis am Feld; der Knopf bleibt", async () => {
   autofillStarted();
   renderPage();
   await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalled());
-  expect(screen.queryByTestId("login-passkey")).toBeNull();
-  act(() => autofillArgs().onEnd());
   expect(await screen.findByTestId("login-passkey")).toBeInTheDocument();
+  act(() => autofillArgs().onEnd());
+  expect(screen.queryByText(/schlägt dein Browser ihn hier vor/)).toBeNull();
+  expect(screen.getByTestId("login-passkey")).toBeInTheDocument();
 });
 
 test("nach einer Server-Ablehnung startet der Vorschlag erst wieder beim Fokus aufs Feld – höchstens einmal", async () => {
@@ -206,7 +267,7 @@ test("nach einer Server-Ablehnung startet der Vorschlag erst wieder beim Fokus a
   act(() => autofillArgs().onEnd());
   await user.click(screen.getByTestId("login-password"));
   await user.click(screen.getByTestId("login-email"));
-  expect(await screen.findByTestId("login-passkey")).toBeInTheDocument();
+  expect(screen.getByTestId("login-passkey")).toBeInTheDocument();
   expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(2);
 });
 
