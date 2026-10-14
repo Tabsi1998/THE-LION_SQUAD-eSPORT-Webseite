@@ -468,7 +468,8 @@ async def pdf_f1_certificate(slug_or_id: str, user_id: str, track_id: Optional[s
         raise HTTPException(status_code=403, detail="Urkunden sind erst nach Challenge-Ende öffentlich.")
     lb = await f1_lb(c["id"], track_id, access, user)
     rows = lb.get("entries") or []
-    row = next((item for item in rows if item.get("user_id") == user_id), None)
+    # Gäste ohne Konto (#1585) stehen mit ``guest-<Kennung>`` in der Tabelle - ``participant_id`` ist bei allen der Schlüssel.
+    row = next((item for item in rows if (item.get("participant_id") or item.get("user_id")) == user_id), None)
     if not row:
         raise HTTPException(status_code=404, detail="Platzierung nicht gefunden.")
     if row not in _top_certificate_rows(rows):

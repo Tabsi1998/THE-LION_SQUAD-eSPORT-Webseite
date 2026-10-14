@@ -1319,5 +1319,29 @@
 .tv-best__right { display: grid; gap: calc(var(--tv-u) * 1.2); justify-items: end; }
 .tv-best__time { font-size: calc(var(--tv-u) * 8.6); line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
 .tv-best__gap { padding: 0.3em 0.7em; border: var(--tv-line-w) solid currentColor; border-radius: 2px; color: var(--tv-green); background: var(--tv-green-soft); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* Neue Bestzeit (#1585): einmal läuft ein ruhiger Glanz über das Band - nur transform, mit „Bewegung reduzieren“ nicht. */
+.tv-best { overflow: hidden; }
+.tv-best::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 35%, color-mix(in srgb, var(--tv-gold) 22%, transparent) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: tv-best-sheen 1.6s var(--tls-ease) 0.7s 1 forwards;
+}
+@keyframes tv-best-sheen { to { transform: translateX(120%); } }
+/* Am Start / Als Nächstes (#1585): wer fährt (mit Station und Versuch) und wer danach dran ist. Beim Wechsel rückt der
+   Nächste nach oben (framer-motion layoutId), der Versuchszähler tickt. */
+.tv-queue {
+  display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: calc(var(--tv-u) * 1.6);
+  padding: calc(var(--tv-u) * 0.9) calc(var(--tv-u) * 1.6);
+  border: var(--tv-line-w) solid var(--tv-line-strong); border-radius: 6px; background: var(--tv-panel);
+}
+.tv-queue__col { display: grid; align-content: start; gap: calc(var(--tv-u) * 0.5); min-width: 0; }
+.tv-queue__row { display: flex; align-items: baseline; gap: calc(var(--tv-u) * 1.2); min-width: 0; }
+.tv-queue__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; text-transform: uppercase; }
+.tv-queue__next { display: flex; flex-wrap: wrap; gap: calc(var(--tv-u) * 0.6) calc(var(--tv-u) * 1.4); min-width: 0; }
+.tv-queue__next .tv-queue__name { max-width: 100%; }
+.tv-queue__attempt { display: inline-grid; overflow: hidden; white-space: nowrap; color: var(--tv-accent); font-variant-numeric: tabular-nums; }
+.tv-queue__attempt > * { grid-area: 1 / 1; }
+.tv-screen[data-tv-contrast="1"] .tv-queue { background: #000000; border-color: var(--tv-line-strong); }
 .tv-station__call { display: flex; align-items: center; gap: calc(var(--tv-u) * 2); }
 .tv-station__call .tv-call__go { margin-top: 0; }

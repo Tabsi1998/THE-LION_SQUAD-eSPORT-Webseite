@@ -10,6 +10,7 @@ import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
+import { attemptsField, attemptsPayload } from "@/lib/fastLapEvent";
 
 // Nach „Ergebnisse veröffentlicht“ (#1584) ändern Wertungsregeln Rangfolge, Gewinne oder Saisonpunkte - nur mit
 // Begründung; danach gleicht der Server Gewinne und Punkte an. Dieselbe Liste wie SCORING_FIELDS in f1_routes.py.
@@ -46,8 +47,8 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
     block_club_member_results: !!source.block_club_member_results,
     allow_club_reference_times: source.allow_club_reference_times !== false,
     show_club_reference_times: source.show_club_reference_times !== false,
-    unlimited_attempts: source.unlimited_attempts !== false,
-    max_attempts: source.max_attempts || 0,
+    // Versuche je Person und Strecke (#1585): eine Zahl, leer = unbegrenzt.
+    attempts: attemptsField(source),
     site_banner_enabled: !!source.site_banner_enabled,
     season_weight: source.season_weight ?? 1,
     prize_places: source.prize_places || [],
@@ -68,7 +69,9 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
         const payload = { ...source };
         if (payload.block_club_member_results) payload.allow_club_reference_times = true;
         if (!payload.event_id) payload.event_id = null;
-        if (payload.unlimited_attempts) payload.max_attempts = null;
+        const attempts = attemptsPayload(payload.attempts);
+        delete payload.attempts;
+        if (!attempts.error) Object.assign(payload, attempts);
         if (!payload.registration_enabled) {
           payload.registration_open_from = null;
           payload.registration_open_until = null;
@@ -81,6 +84,8 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
         normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
         return payload;
       };
+      const attemptsCheck = attemptsPayload(form.attempts);
+      if (attemptsCheck.error) { toast.error(attemptsCheck.error); return; }
       const payload = normalizePayload(form);
       const patch = buildDirtyPayload(payload, normalizePayload(formFromChallenge()));
       if (!hasPayloadChanges(patch)) {
@@ -180,8 +185,7 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
             <TextField label="Fahrhilfen" value={form.assists_allowed} onChange={(v)=>set("assists_allowed", v)} />
             <TextField label="Controller-Typ" value={form.controller_type} onChange={(v)=>set("controller_type", v)} />
           </FormGrid>
-          <CheckField label="Unbegrenzte Versuche" checked={form.unlimited_attempts} onChange={(v)=>set("unlimited_attempts", v)} />
-          {!form.unlimited_attempts && <TextField label="Max Versuche" type="number" value={form.max_attempts} onChange={(v)=>set("max_attempts", Number(v))} className="md:max-w-xs" />}
+          <TextField label="Versuche je Person und Strecke" hint="Leer = unbegrenzt. Ungültige Runden zählen mit." type="number" value={form.attempts} onChange={(v)=>set("attempts", v)} testId="f1-edit-attempts" className="md:max-w-xs" />
         </FormSection>
 
         <FastLapPrizeEditor value={form.prize_places} onChange={(v)=>set("prize_places", v)} />
