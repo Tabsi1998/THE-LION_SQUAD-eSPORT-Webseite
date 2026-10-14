@@ -606,5 +606,50 @@
     }
    ]
   }
+ ],
+ "railsPerPhase": [
+  {
+   "state": "se8_mixed_open",
+   "how": "Zwei K.-o.-Phasen mit derselben Gruppe (#1561, Codex): zweite Phase = alle Spiele kopiert; Kennungen von Spielen und Anmeldungen bekommen den Anhang \"#2\" (auch advancement.to_match_id, results.registration_id, winner_id, source_result.from_match_id), stage_id der Kopie = \"phase-2\". Schienen je (stage_id, draw_group) getrennt; \"phase\" 1 = Original, 2 = Kopie.",
+   "rails": [
+    {
+     "phase": 1,
+     "group": "WB:2",
+     "sources": [
+      "A W",
+      "B W",
+      "C W",
+      "D W"
+     ],
+     "targets": [
+      "E",
+      "F"
+     ],
+     "drawn": false
+    },
+    {
+     "phase": 2,
+     "group": "WB:2",
+     "sources": [
+      "A W",
+      "B W",
+      "C W",
+      "D W"
+     ],
+     "targets": [
+      "E",
+      "F"
+     ],
+     "drawn": false
+    }
+   ],
+   "path": {
+    "phase": 1,
+    "player": "NeonFalke",
+    "rails": [
+     "1 WB:2:A"
+    ]
+   }
+  }
  ]
 }

@@ -100,14 +100,15 @@ describe("Gegner gemischt (#1548) am TV", () => {
     const { moments } = momentsFromChange(before.matches_v2, after.matches_v2);
     const draw = moments.find((moment) => moment.type === "draw");
     expect(draw).toBeTruthy();
-    expect(draw.rail).toBe("WB:2");
+    // Die Schiene je Phase (#1561): Phase und Gruppe.
+    expect(draw.rail).toMatch(/\/WB:2$/);
     // Alle vier Halbfinal-Plätze, jeder mit Herkunft aus source_result (nicht aus dem Schema-Platz).
     expect(draw.rows).toHaveLength(4);
     for (const row of draw.rows) {
       const match = after.matches_v2.find((entry) => entry.id === row.matchId);
       const slot = match.slots[row.slotIndex];
       expect(row.from.matchId).toBe(idOf(after, slot.source_result.from_match_key));
-      expect(row.rail).toBe("WB:2");
+      expect(row.rail).toBe(draw.rail);
     }
   });
 });

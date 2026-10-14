@@ -115,6 +115,37 @@ describe("gemeinsame Fälle (docs/bracket-cases.json)", () => {
     expect(all.filter((edge) => targets.has(edge.to) && !edge.rail)).toEqual([]);
   });
 
+  it.each(CASES.railsPerPhase || [])("Schienen je Phase getrennt: $state", ({ state, rails, path: expectedPath }) => {
+    const { tree, idOf } = helpers(state);
+    const tag = (id) => (id ? `${id}#2` : id);
+    const copy = structuredClone(tree.matches_v2).map((match) => ({
+      ...match, id: tag(match.id), stage_id: "phase-2",
+      advancement: (match.advancement || []).map((entry) => ({ ...entry, to_match_id: tag(entry.to_match_id) })),
+      slots: (match.slots || []).map((slot) => ({ ...slot, registration_id: tag(slot.registration_id), source_result: slot.source_result ? { ...slot.source_result, from_match_id: tag(slot.source_result.from_match_id) } : slot.source_result })),
+      results: (match.results || []).map((row) => ({ ...row, registration_id: tag(row.registration_id) })),
+      winner_id: tag(match.winner_id),
+    }));
+    const matches = [...tree.matches_v2, ...copy];
+    const keyOf = new Map(matches.map((match) => [match.id, match.match_key]));
+    const phaseOf = (id) => (String(id).endsWith("#2") ? 2 : 1);
+    const all = drawRails(matches);
+    expect(all.map((rail) => ({
+      phase: phaseOf(rail.targets[0]),
+      group: rail.group,
+      sources: rail.sources.map((source) => `${keyOf.get(source.id)} ${source.flow}`).sort(),
+      targets: rail.targets.map((id) => keyOf.get(id)).sort(),
+      drawn: rail.drawn,
+    })).sort((a, b) => a.phase - b.phase)).toEqual(rails);
+    const player = idOf.get(expectedPath.player);
+    const result = pathFor(expectedPath.phase === 2 ? tag(player) : player, matches, bracketEdges(matches));
+    const railOf = new Map(all.map((rail) => [rail.key, rail]));
+    expect([...(result.rails || [])].map((entry) => {
+      const rail = [...railOf.values()].find((candidate) => entry.startsWith(`${candidate.key}:`));
+      const source = entry.slice(rail.key.length + 1);
+      return `${phaseOf(rail.targets[0])} ${rail.group}:${keyOf.get(source)}`;
+    })).toEqual(expectedPath.rails);
+  });
+
   it("der erste Stand bewegt nichts, jede Bewegung hat einen eigenen Schlüssel", () => {
     const { tree } = helpers("ffa16_round1");
     expect(diffBracket(null, tree.matches_v2)).toEqual([]);

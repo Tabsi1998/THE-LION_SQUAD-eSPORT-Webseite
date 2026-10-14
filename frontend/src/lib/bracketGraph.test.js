@@ -4,7 +4,7 @@ import { clone, decide, doubleElimination, find, singleElimination } from "../..
 import FFA from "../../e2e/fixtures/ffaGenerated.json";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { LOSER_SECTIONS, bracketEdges, diffBracket, drawRails, heatExits, matchFate, orderEdges, pathFor, sectionGroup, soloAdvance } from "./bracketGraph";
+import { LOSER_SECTIONS, bracketEdges, diffBracket, drawRails, heatExits, matchFate, orderEdges, pathFor, railKey, sectionGroup, soloAdvance } from "./bracketGraph";
 
 // Turnierbaum neu (#1561): die Linien kommen aus den echten Quellen der Plätze („W:A:1“, `advancement`), nicht aus der
 // Reihenfolge der Spiele. Dazu: was mit einem Spiel geschah (entfällt, zusammengelegt), dein Weg und die Bewegungen,
@@ -214,7 +214,7 @@ describe("sectionGroup", () => {
 describe("Gemischte Runden: Sammelschiene", () => {
   const rail = (bracket) => {
     const key = keyOf(bracket);
-    return drawRails(bracket.matches_v2).map((entry) => ({ ...entry, sources: entry.sources.map((source) => `${key(source.id)} ${source.flow}`).sort(), targets: entry.targets.map(key).sort() }));
+    return drawRails(bracket.matches_v2).map(({ key: _key, stageId: _stage, ...entry }) => ({ ...entry, sources: entry.sources.map((source) => `${key(source.id)} ${source.flow}`).sort(), targets: entry.targets.map(key).sort() }));
   };
 
   it("die Schiene: alle Quellen mit Fluss, die Ziele, Klartext, noch nicht gelost", () => {
@@ -242,7 +242,7 @@ describe("Gemischte Runden: Sammelschiene", () => {
         for (const slot of target.slots.filter((row) => row.registration_id)) {
           const into = edges.filter((edge) => edge.to === target.id && edge.toSlot === slot.slot);
           expect(into, `${state} ${target.match_key}:${slot.slot}`).toHaveLength(1);
-          expect(into[0].rail).toBe(target.settings.draw_group);
+          expect(into[0].rail).toBe(railKey(target.stage_id, target.settings.draw_group));
           expect(byId.get(into[0].from).match_key).toBe(slot.source_result.from_match_key);
         }
       }
@@ -255,7 +255,7 @@ describe("Gemischte Runden: Sammelschiene", () => {
     const winner = a.results.find((row) => row.rank === 1).registration_id;
     const loser = a.results.find((row) => row.rank === 2).registration_id;
     const edgesBefore = bracketEdges(before.matches_v2);
-    expect([...(pathFor(winner, before.matches_v2, edgesBefore).rails || [])]).toEqual([`WB:2:${a.id}`]);
+    expect([...(pathFor(winner, before.matches_v2, edgesBefore).rails || [])]).toEqual([`${railKey(a.stage_id, "WB:2")}:${a.id}`]);
     expect(pathFor(loser, before.matches_v2, edgesBefore).rails).toBeUndefined();
     const after = ffa("se8_draw_after");
     const target = after.matches_v2.find((match) => match.slots.some((slot) => slot.source_result?.from_match_key === "C" && slot.registration_id));
@@ -263,7 +263,7 @@ describe("Gemischte Runden: Sammelschiene", () => {
     const edges = bracketEdges(after.matches_v2);
     const path = pathFor(player, after.matches_v2, edges);
     const real = edges.find((edge) => edge.from === find(after, "C").id && edge.to === target.id);
-    expect(real.rail).toBe("WB:2");
+    expect(real.rail).toBe(railKey(target.stage_id, "WB:2"));
     expect(path.edges.has(real.id)).toBe(true);
     expect(path.rails).toBeUndefined();
   });
@@ -289,5 +289,57 @@ describe("Gemischte Runden: Sammelschiene", () => {
     const bracket = ffa("ffa16");
     expect(drawRails(bracket.matches_v2)).toEqual([]);
     expect(bracketEdges(bracket.matches_v2).some((edge) => edge.rail)).toBe(false);
+  });
+});
+
+// Mehrere K.-o.-Phasen (#1561, Codex-Prüfung): gleich benannte Auslosungs-Gruppen („WB:2“) gehören je zu ihrer Phase.
+describe("Gemischte Runden in zwei Phasen", () => {
+  // Zweite Phase: dieselben Spiele mit eigenen Kennungen, eigener Phase und eigenen Anmeldungen.
+  const twoPhases = (state) => {
+    const one = ffa(state);
+    const tag = (id) => (id ? `${id}#2` : id);
+    const copy = structuredClone(one.matches_v2).map((match) => ({
+      ...match, id: tag(match.id), stage_id: tag(match.stage_id || "s"),
+      advancement: (match.advancement || []).map((entry) => ({ ...entry, to_match_id: tag(entry.to_match_id) })),
+      slots: (match.slots || []).map((slot) => ({ ...slot, registration_id: tag(slot.registration_id), source_result: slot.source_result ? { ...slot.source_result, from_match_id: tag(slot.source_result.from_match_id) } : slot.source_result })),
+      results: (match.results || []).map((row) => ({ ...row, registration_id: tag(row.registration_id) })),
+      winner_id: tag(match.winner_id),
+    }));
+    return [...one.matches_v2, ...copy];
+  };
+
+  it("zwei Phasen mit „WB:2“: zwei getrennte Schienen, jede nur mit Spielen ihrer Phase", () => {
+    const matches = twoPhases("se8_draw_before");
+    const rails = drawRails(matches);
+    expect(rails.map((rail) => rail.group)).toEqual(["WB:2", "WB:2"]);
+    expect(new Set(rails.map((rail) => rail.key)).size).toBe(2);
+    for (const rail of rails) {
+      const stages = new Set([...rail.sources.map((source) => source.id), ...rail.targets].map((id) => matches.find((match) => match.id === id).stage_id));
+      expect(stages.size).toBe(1);
+      expect(rail.sources).toHaveLength(4);
+      expect(rail.targets).toHaveLength(2);
+    }
+  });
+
+  it("Lauf-Ziele und dein Weg bleiben in der eigenen Phase", () => {
+    const matches = twoPhases("se8_draw_before");
+    const edges = bracketEdges(matches);
+    const a1 = matches.find((match) => match.match_key === "A" && !match.id.endsWith("#2"));
+    const e1 = matches.find((match) => match.match_key === "E" && !match.id.endsWith("#2"));
+    const rails = drawRails(matches);
+    const own = rails.find((rail) => rail.targets.includes(e1.id));
+    expect(rails.filter((rail) => rail.sources.some((source) => source.id === a1.id))).toEqual([own]);
+    const winner = a1.results.find((row) => row.rank === 1).registration_id;
+    expect([...(pathFor(winner, matches, edges).rails || [])]).toEqual([`${own.key}:${a1.id}`]);
+  });
+
+  it("nach der Auslosung: Linien tragen die Schiene ihrer Phase", () => {
+    const matches = twoPhases("se8_draw_after");
+    const rails = drawRails(matches);
+    for (const edge of bracketEdges(matches).filter((row) => row.rail)) {
+      const rail = rails.find((entry) => entry.key === edge.rail);
+      expect(rail, edge.id).toBeDefined();
+      expect(rail.targets).toContain(edge.to);
+    }
   });
 });

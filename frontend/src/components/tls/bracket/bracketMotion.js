@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { diffBracket, slotDraw } from "@/lib/bracketGraph";
+import { diffBracket, railKey, slotDraw } from "@/lib/bracketGraph";
 import { finderFor } from "@/lib/slotSource";
 import { EASE_MOVE, MOTION, motionAllowed } from "@/lib/motion";
 
@@ -75,7 +75,7 @@ export function withDrawOrigins(events, matches) {
     const origin = slot?.source_result?.from_match_key;
     if (!slotDraw(slot) || !origin) return event;
     const from = find(match)(origin);
-    return from ? { ...event, from: { matchId: from.id, registrationId: event.registrationId }, rail: slotDraw(slot).group || null } : event;
+    return from ? { ...event, from: { matchId: from.id, registrationId: event.registrationId }, rail: slotDraw(slot).group ? railKey(match.stage_id, slotDraw(slot).group) : null } : event;
   });
 }
 

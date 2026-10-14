@@ -633,6 +633,7 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
               className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : fresh != null ? "tls-bracket-line--fresh" : real ? "tls-bracket-line--real" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
               style={{ "--tls-i": line.column, ...(fresh != null ? { "--tls-fresh-delay": `${fresh.delay}ms`, "--tls-fresh-duration": `${fresh.duration}ms` } : null) }}
               data-rail-spine={line.spine || undefined}
+              data-rail-group={line.railGroup || undefined}
               data-real={real ? "1" : undefined}
               data-to-slot={line.toSlot || undefined}
               data-from={line.from}
@@ -801,6 +802,7 @@ function TvStageCanvas({ stage, multi, blocks, sections, regMap, podiumMap, comp
               className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : real ? "tls-bracket-line--real" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
               style={{ "--tls-i": line.column }}
               data-rail-spine={line.spine || undefined}
+              data-rail-group={line.railGroup || undefined}
               data-real={real ? "1" : undefined}
               data-from={line.from}
               data-to={line.to}

@@ -113,10 +113,13 @@ describe("Sammelschiene am TV (#1548, wie im Web-Baum)", () => {
     const data = state("se8_mixed");
     layoutRects(data);
     render(<BracketTree data={data} viewMode="tv" nodeRenderer={TvTreeNode} tvLayout={{ columns: 4 }} />);
-    expect(document.querySelector("[data-rail-spine='WB:2']")).not.toBeNull();
-    const branchesIn = paths().filter((path) => path.getAttribute("data-to") === "rail:WB:2" && !path.hasAttribute("data-rail-spine")).map((path) => path.getAttribute("data-from"));
+    // Je Phase getrennt (#1561): der Schlüssel ist Phase und Gruppe, die Gruppe steht dabei.
+    const spine = document.querySelector("[data-rail-group='WB:2']");
+    expect(spine).not.toBeNull();
+    const node = `rail:${spine.getAttribute("data-rail-spine")}`;
+    const branchesIn = paths().filter((path) => path.getAttribute("data-to") === node && !path.hasAttribute("data-rail-spine")).map((path) => path.getAttribute("data-from"));
     expect(new Set(branchesIn)).toEqual(new Set(["A", "B", "C", "D"].map((key) => idOf(data, key))));
-    const branchesOut = paths().filter((path) => path.getAttribute("data-from") === "rail:WB:2" && !path.hasAttribute("data-rail-spine")).map((path) => path.getAttribute("data-to"));
+    const branchesOut = paths().filter((path) => path.getAttribute("data-from") === node && !path.hasAttribute("data-rail-spine")).map((path) => path.getAttribute("data-to"));
     expect(new Set(branchesOut)).toEqual(new Set(["E", "F"].map((key) => idOf(data, key))));
     expect(line(idOf(data, "A"), idOf(data, "E"))).toBeNull();
   });
@@ -125,7 +128,7 @@ describe("Sammelschiene am TV (#1548, wie im Web-Baum)", () => {
     const data = state("se8_mixed_drawn");
     layoutRects(data);
     render(<BracketTree data={data} viewMode="tv" nodeRenderer={TvTreeNode} tvLayout={{ columns: 4 }} />);
-    expect(document.querySelector("[data-rail-spine='WB:2']")).not.toBeNull();
+    expect(document.querySelector("[data-rail-group='WB:2']")).not.toBeNull();
     const e = data.matches_v2.find((match) => match.match_key === "E");
     const from = idOf(data, e.slots[1].source_result.from_match_key);
     const real = line(from, e.id);

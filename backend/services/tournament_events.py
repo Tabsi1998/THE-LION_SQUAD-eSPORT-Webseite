@@ -228,9 +228,13 @@ def _plan_swiss(stage_matches: list[dict], matches: list[dict], by_id: dict[str,
 
 
 def _feeds_undrawn_draw(match: dict, by_id: dict[str, dict]) -> bool:
-    """Gemischt (#1548): leitet dieses Spiel in eine Runde weiter, die noch nicht ausgelost ist?"""
-    return any(group_awaits_draw(by_id.values(), draw_group_of(by_id.get(entry.get("to_match_id"))))
-               for entry in match.get("advancement") or [])
+    """Gemischt (#1548): leitet dieses Spiel in eine Runde weiter, die noch nicht ausgelost ist? ``by_id`` enthält alle
+    Phasen - die Gruppe zählt nur in der Phase des Folgespiels."""
+    for entry in match.get("advancement") or []:
+        target = by_id.get(entry.get("to_match_id"))
+        if target and group_awaits_draw(by_id.values(), draw_group_of(target), target.get("stage_id")):
+            return True
+    return False
 
 
 def _exclude_from_draw(match: dict, registration_id: str, now_iso: str, ops: list[dict]) -> None:
@@ -247,11 +251,11 @@ def _exclude_from_draw(match: dict, registration_id: str, now_iso: str, ops: lis
                 "round_name": match.get("round_name"), "registration_id": registration_id})
 
 
-def _drawn_seats(by_id: dict[str, dict], group: str, heat_id: str) -> list[tuple[dict, dict]]:
-    """Die ausgelosten Plätze, die dieser Lauf in der Gruppe belegt (auch frei gewordene) - nach seinem Rang."""
+def _drawn_seats(by_id: dict[str, dict], group: str, stage_id: str | None, heat_id: str) -> list[tuple[dict, dict]]:
+    """Die ausgelosten Plätze, die dieser Lauf in der Gruppe (seiner Phase) belegt - auch frei gewordene, nach Rang."""
     seats = [
         (target, slot)
-        for target in group_targets(by_id.values(), group) if target.get("status") != "cancelled"
+        for target in group_targets(by_id.values(), group, stage_id) if target.get("status") != "cancelled"
         for slot in target.get("slots") or []
         if (slot.get("source_result") or {}).get("from_match_id") == heat_id
         and (slot.get("source_result") or {}).get("flow") == "W"
@@ -268,14 +272,15 @@ def _readvance(heat: dict, by_id: dict[str, dict], registration_id: str, now_iso
     survivors = [row for row in sorted(heat.get("results") or [], key=lambda row: int(row.get("rank") or 0))
                  if row.get("registration_id") and row["registration_id"] not in gone and not row.get("forfeit")]
     entries = []
-    drawn_seats: dict[str, list[tuple[dict, dict]]] = {}
+    drawn_seats: dict[tuple, list[tuple[dict, dict]]] = {}
     for entry in sorted((e for e in heat.get("advancement") or [] if e.get("flow") == "W"), key=lambda e: int(e.get("rank") or 0)):
         target = by_id.get(entry.get("to_match_id"))
         group = draw_group_of(target)
         if group:
             # Gemischt (#1548): ausgelost sitzt der Weiterkommer nicht auf dem Platz aus dem Schema, sondern auf seinem
             # ausgelosten Platz - der k-te Weiterkommer dieses Laufs auf dem k-ten Platz, den der Lauf in der Gruppe hat.
-            seats = drawn_seats.setdefault(group, _drawn_seats(by_id, group, heat["id"]))
+            scope = (target.get("stage_id"), group)
+            seats = drawn_seats.setdefault(scope, _drawn_seats(by_id, group, target.get("stage_id"), heat["id"]))
             if not seats:
                 continue
             target, slot = seats.pop(0)

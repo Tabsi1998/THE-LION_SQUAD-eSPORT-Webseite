@@ -268,7 +268,7 @@ def _downstream(match: dict, stage_matches: list[dict]) -> list[dict]:
     for target in direct:
         group = draw_group_of(target)
         if group and isinstance(target.get("draw"), dict):
-            for mate in group_targets(stage_matches, group):
+            for mate in group_targets(stage_matches, group, target.get("stage_id")):
                 if mate.get("status") != "cancelled":
                     found.setdefault(mate["id"], mate)
     return list(found.values())

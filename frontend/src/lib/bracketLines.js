@@ -148,15 +148,17 @@ export function stageLines({ edges = [], rails = [], nodes, slotY = () => undefi
       }
     }
     const bus = routeBus({ sources, targets: targetIds.map((id) => ({ id, rect: nodes.get(id) })), slotYs, obstacles, corridors, gap, lanes });
-    buses.set(rail.group, bus);
+    // Je Phase getrennt (#1561): `key` = Phase und Gruppe; ältere Schienen ohne Schlüssel nehmen die Gruppe.
+    const railKey = rail.key || rail.group;
+    buses.set(railKey, bus);
     const column = columnOf.get(targetIds[0]) || 0;
-    const node = `rail:${rail.group}`;
-    add({ id: `${node}:spine`, from: node, to: node, flow: "W", spine: rail.group, column }, bus.spine);
+    const node = `rail:${railKey}`;
+    add({ id: `${node}:spine`, from: node, to: node, flow: "W", spine: railKey, railGroup: rail.group, column }, bus.spine);
     for (const source of sources) {
       const flow = rail.sources.find((entry) => entry.id === source.id)?.flow || "W";
-      add({ id: `${node}:in:${source.id}`, from: source.id, to: node, flow, cross: source.cross, scaffold: "in", railKey: `${rail.group}:${source.id}`, rail: rail.group, column: columnOf.get(source.id) || 0 }, bus.branchesIn.get(source.id));
+      add({ id: `${node}:in:${source.id}`, from: source.id, to: node, flow, cross: source.cross, scaffold: "in", railKey: `${railKey}:${source.id}`, rail: railKey, column: columnOf.get(source.id) || 0 }, bus.branchesIn.get(source.id));
     }
-    for (const id of targetIds) add({ id: `${node}:out:${id}`, from: node, to: id, flow: "W", scaffold: "out", rail: rail.group, column }, bus.branchesOut.get(id));
+    for (const id of targetIds) add({ id: `${node}:out:${id}`, from: node, to: id, flow: "W", scaffold: "out", rail: railKey, column }, bus.branchesOut.get(id));
   }
   for (const edge of edges) {
     const a = nodes.get(edge.from);
