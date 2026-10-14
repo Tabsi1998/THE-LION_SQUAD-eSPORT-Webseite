@@ -1,4 +1,6 @@
-import { categoryLabel, documentFileName, documentsLine, documentUrl, documentsDirectory, downloadErrorText, formatFileSize, invoiceFileName } from "./memberDocuments";
+import { Platform } from "react-native";
+import { API_BASE_URL } from "../config";
+import { categoryLabel, documentFileName, fetchAndOpen, documentsLine, documentUrl, documentsDirectory, downloadErrorText, formatFileSize, invoiceFileName } from "./memberDocuments";
 
 // Vereinsdokumente in der App (#341): private Dateien, klare Fehlertexte.
 
@@ -9,10 +11,11 @@ test("Dateiname im Cache: Kennung vorne, harmlose Zeichen, Endung aus Name oder 
   expect(documentFileName({ id: "d4", mime: "image/png" })).toBe("d4-dokument.png");
 });
 
-test("Adresse: view_url relativ zur API, absolute bleiben", () => {
-  expect(documentUrl({ id: "d1", view_url: "/api/documents/d1/view" })).toMatch(/^https?:\/\/.+\/api\/documents\/d1\/view$/);
-  expect(documentUrl({ id: "d1" })).toMatch(/\/api\/documents\/d1\/view$/);
-  expect(documentUrl({ id: "d1", view_url: "https://cdn.example/x.pdf" })).toBe("https://cdn.example/x.pdf");
+test("Adresse: view_url relativ zur API; eine Adresse anderer Herkunft gibt es nicht (#1054)", () => {
+  expect(documentUrl({ id: "d1", view_url: "/api/documents/d1/view" })).toBe(`${API_BASE_URL}/api/documents/d1/view`);
+  expect(documentUrl({ id: "d1" })).toBe(`${API_BASE_URL}/api/documents/d1/view`);
+  expect(documentUrl({ id: "d1", view_url: `${API_BASE_URL}/api/documents/d1/view` })).toBe(`${API_BASE_URL}/api/documents/d1/view`);
+  expect(documentUrl({ id: "d1", view_url: "https://cdn.example/x.pdf" })).toBeNull();
 });
 
 test("Fehlertexte sagen, woran es liegt", () => {
@@ -50,4 +53,19 @@ test("Zeile der eigenen Unterlagen", () => {
   expect(documentsLine([{ id: "a" }])).toBe("1 Dokument");
   expect(documentsLine([])).toBe("");
   expect(documentsLine(null)).toBe("");
+});
+
+// Dateiname und Adresse (#1054): die Kennung kommt vom Server und bleibt im eigenen Ordner und im eigenen Pfad.
+test("Kennung im Dateinamen und in der Adresse: nur harmlose Zeichen", () => {
+  for (const id of ["../../files/x", "..\\..\\x", "a/b", ".", "x".repeat(65), ""]) {
+    const name = documentFileName({ id, original_filename: "a.pdf" });
+    expect([id, /^[A-Za-z0-9._ -]+$/.test(name) && !name.includes("..")]).toEqual([id, true]);
+  }
+  expect(documentFileName({ id: "dolibarr-3_x", original_filename: "a.pdf" })).toBe("dolibarr-3_x-a.pdf");
+  expect(documentUrl({ id: "../../auth/x" })).toBe(`${API_BASE_URL}/api/documents/..%2F..%2Fauth%2Fx/view`);
+});
+
+test("ein Dateiname mit Pfadteilen lädt nicht", async () => {
+  Platform.OS = "android";
+  await expect(fetchAndOpen("/api/documents/d1/view", "../x.pdf", "application/pdf", "tok")).rejects.toThrow("konnte nicht geladen");
 });
