@@ -8,6 +8,8 @@ steht, was das **Event** darum herum tut.
 **Wo im Admin:**
 
 - **Admin → Content → Events** (`/admin/events`) – die Liste mit Suche und Filtern, **Neues Event**, je Zeile **Anm.**, **Rückblick**, **Bearbeiten**
+- **Anmeldungen & Einlass** (`/events/<name>/leitung`) – die Arbeitsseite für die Anmeldungen eines Events: Suche, „noch nicht da“,
+  Einchecken, Nachrücken, Nachricht an alle, Drucken. Erreichbar über **Anm.** in der Liste und auf der Event-Seite.
 - **Admin → Content → Events → Neues Event** bzw. **Bearbeiten** (`/admin/events/new`, `/admin/events/<id>`) – das Formular mit allem unten
 - **Admin → Content → Galerie** – Alben und eingesandte Fotos, siehe [Inhalte](inhalte.md)
 
@@ -169,14 +171,36 @@ Im Kasten **Anmeldung** den Haken **Registrierung/Anmeldung für dieses Event an
 4. **Stornieren** (leiser Link, mit Rückfrage) geht **bis zum Beginn** des Events und **nicht nach dem Check-in**. Danach bittet die
    Seite, sich an die Turnierleitung zu wenden. Die Regel gilt gleich auf Website, App und Discord.
 
-**Anmeldungen verwalten:** In der Events-Liste der Knopf **Anm.** (nur bei Events mit Anmeldung). Oben stehen **Reservierte Plätze**,
-**Anmeldungen**, **Begleitpersonen** und **Warteliste**, darunter jede Person mit Plätzen, Notiz und einem **Status** zum Ändern:
-**Angemeldet**, **Warteliste**, **Eingecheckt**, **Nicht erschienen**, **Storniert**.
+**Anmeldungen verwalten – Anmeldungen & Einlass:** In der Events-Liste führt der Knopf **Anm.** (nur bei Events mit Anmeldung) auf die
+Seite **Anmeldungen & Einlass** (`/events/<name>/leitung`); auf der Event-Seite steht für die Turnierleitung derselbe Link. Es gibt nur
+diese eine Liste der Anmeldungen.
 
-- **Nachrücken:** Eine Person von **Warteliste** auf **Angemeldet** setzen. Ist kein Platz frei, kommt „Kapazität wäre überschritten“.
-- **Eingecheckt** setzen heißt: die Person war da. Das bringt ihr einen Eintrag in der Jahreswertung, XP und kann Erfolge
+- **Oben, fest beim Scrollen:** der Zähler **„84 von 120 da“** (Personen; darunter die Plätze mit Begleitpersonen), das Suchfeld und
+  die Filter **Noch nicht da** (Start), **Da**, **Warteliste**, **Alle** – jeweils mit Anzahl.
+- **An der Tür (Handy):** Namen tippen (Groß/klein und Umlaute egal, „zoe“ findet „Zoë“), dann **Da**. Der Zähler stimmt sofort, das
+  Suchfeld ist wieder leer für den nächsten Namen. Unten und in der Zeile steht 10 Sekunden lang **Rückgängig**; danach ändert ihr den **Status** in den
+  Details der Person.
+- **Nachrücken:** Unter **Warteliste** der Knopf **Nachrücken**. Ist kein Platz frei, kommt „Kapazität wäre überschritten“.
+- **Details:** Ein Tipp auf den Namen zeigt Plätze, **Begleitpersonen** (mit − und +), die Notiz der Person, die Mail-Adresse **gekürzt**
+  (`p***@…`) und den **Status** zum Ändern: **Angemeldet**, **Da**, **Warteliste**, **Nicht erschienen**, **Storniert**. Am Handy
+  klappen die Details unter der Zeile auf, auf Tablet quer und PC stehen sie rechts neben der Liste.
+- **Da** (eingecheckt) heißt: die Person war da. Das bringt ihr einen Eintrag in der Jahreswertung, XP und kann Erfolge
   freischalten (siehe [Erfolge, Level und Jahreswertung](erfolge.md)).
 - **Storniert** oder **Nicht erschienen** beendet auch offene Rechnungsaufträge.
+- **Drucken:** eine schlichte Liste der Angemeldeten mit Kästchen zum Abhaken.
+
+**Nachricht an alle Angemeldeten:** Knopf **Nachricht an alle**. Text schreiben oder eine Vorlage antippen („Der Parkplatz ist
+gesperrt – bitte den Hintereingang nehmen.“), höchstens 1000 Zeichen. Darunter steht, an wie viele Personen sie geht. **Weiter**
+zeigt die Nachricht noch einmal mit der Zahl; erst **An … senden** schickt sie.
+
+- Empfänger sind alle mit **Angemeldet** oder **Da** – je Person einmal. Warteliste, Stornierte, Nicht erschienene sowie gesperrte,
+  deaktivierte und gelöschte Konten bekommen nichts.
+- Sie kommt als Benachrichtigung (Glocke, App, Push, Discord-Direktnachricht nach Einstellung) und als Mail, wenn die Person Mails zu
+  **Turnier-Updates** zulässt. Die Mail-Vorlage heißt **Event: Nachricht an alle** (System → E-Mail-Vorlagen).
+- Hat sich die Zahl der Angemeldeten zwischen Vorschau und Senden geändert, geht nichts hinaus – die Seite zeigt die neue Zahl, ihr
+  bestätigt noch einmal. Gleich nach einer Nachricht (1 Minute) geht keine zweite – weder beim selben Event noch von derselben
+  Person bei einem anderen Event.
+- Jede Nachricht steht unter der Liste bei **Nachrichten an alle** (wann, wer, an wie viele) und im Protokoll.
 
 ### 3.6 Kosten und Rechnung
 
@@ -300,9 +324,11 @@ Name, Bild und dem Ort: Event und Turniere, bei Teams mit Teamname. Wichtig für
 | „Dieses Event ist nicht öffentlich zugänglich“ | Die Person darf das Event nicht sehen (Community, Mitglieder, intern) | Sichtbarkeit ändern oder Speziallink |
 | Kein Anmelden-Knopf | Haken Anmeldung aus, Frist noch nicht offen oder schon vorbei, Entwurf, oder es gibt einen externen Anmeldelink | Haken, **Anmeldung öffnet** und **schließt** prüfen |
 | „Die Anmeldung ist aktuell nicht offen“ | Außerhalb der Frist | Fristen im Kasten Anmeldung ändern |
-| Person landet auf der Warteliste | Alle Plätze (mit Begleitpersonen) sind vergeben | **Max. Teilnehmer** erhöhen oder die Person unter **Anm.** auf **Angemeldet** setzen |
+| Person landet auf der Warteliste | Alle Plätze (mit Begleitpersonen) sind vergeben | **Max. Teilnehmer** erhöhen oder die Person unter **Anmeldungen & Einlass** nachrücken lassen |
 | „Kapazität wäre überschritten“ beim Nachrücken | Nicht genug freie Plätze | Plätze erhöhen oder erst eine andere Anmeldung stornieren |
-| Person kann nicht mehr stornieren | Das Event hat begonnen oder sie ist schon eingecheckt | In der Liste unter **Anm.** den Status auf **Storniert** setzen |
+| Person kann nicht mehr stornieren | Das Event hat begonnen oder sie ist schon eingecheckt | Unter **Anmeldungen & Einlass** in den Details den Status auf **Storniert** setzen |
+| „Die Zahl der Empfänger hat sich geändert“ | Zwischen Vorschau und Senden hat sich jemand an- oder abgemeldet | Neue Zahl prüfen und noch einmal senden |
+| „Gerade ist schon eine Nachricht an alle hinausgegangen“ | Innerhalb einer Minute wurde schon eine Nachricht geschickt | Kurz warten; doppelt antippen schickt nicht zweimal |
 | Mehrere Tage speichern nicht | Weniger als zwei Tage, doppeltes Datum, Beginn gleich Ende, Einlass nach dem Beginn | Die Meldung unter den Tagen lesen und korrigieren |
 | Event gilt nachts als „nicht laufend“ | Bei mehreren Tagen zählen nur die Tageszeiten | Gewollt; Zeiten je Tag prüfen |
 | Titel steht auf der Seite doppelt | Die Beschreibung beginnt mit dem Titel | Erste Zeile der Beschreibung löschen |
@@ -332,7 +358,7 @@ Ja. Es steht dann einzeln in der Liste.
 Nein, ein Turnier hat ein Event.
 
 **Rückt die Warteliste von selbst nach?**
-Nein. Ihr setzt die Person unter **Anm.** auf **Angemeldet**; der Preis wird dabei eingefroren.
+Nein. Ihr tippt unter **Anmeldungen & Einlass** bei der Person auf **Nachrücken**; der Preis wird dabei eingefroren.
 
 **Sehen Teilnehmende, wer sonst angemeldet ist?**
 Die Event-Seite zeigt eine Liste der Angemeldeten, wenn **Teilnehmer öffentlich anzeigen** an ist. Freunde sehen sich nur, wenn beide
