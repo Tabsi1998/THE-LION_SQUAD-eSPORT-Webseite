@@ -115,7 +115,8 @@ def configured_secrets(settings: dict) -> dict[str, str]:
             key_id, secret = key_id.strip(), secret.strip()
             if not sep or not KEY_ID_PATTERN.fullmatch(key_id) or len(secret) < MIN_SECRET_LENGTH:
                 # Ein kaputter Eintrag öffnet nichts - lieber gar kein Schlüssel als ein halber.
-                logger.warning("[dolibarr] %s ist nicht lesbar (erwartet: Schlüssel:Geheimnis, mehrere mit Komma)", SECRETS_ENV)
+                # Fester Name statt Variable: Die Meldung nennt nur die Einstellung, nie einen Wert daraus.
+                logger.warning("[dolibarr] DOLIBARR_WEBHOOK_SECRETS ist nicht lesbar (erwartet: Schlüssel:Geheimnis, mehrere mit Komma)")
                 parsed = {}
                 break
             parsed[key_id] = secret

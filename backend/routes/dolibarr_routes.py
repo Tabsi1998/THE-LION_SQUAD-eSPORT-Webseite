@@ -31,6 +31,7 @@ from services.dolibarr_links import OPEN_STATUSES, LinkConflict, close_link, lin
 from services.dolibarr_policy import DERIVABLE_AREAS, areas_from_functions, clean_policy_map, policy_active
 from services import dolibarr_identity, dolibarr_participations, vereine_webhooks
 from services.dolibarr_sync import DEFAULT_FIELD_MAP, FIELD_MAP_COLUMNS, STATE_ID, apply_summary, migration_preview, queue_member, run_sync, sync_state
+from services.log_safe import log_safe
 from services.membership_service import VALID_TYPES
 from services.permissions import user_has_area
 from services.rate_limit import enforce_rate_limit
@@ -927,15 +928,15 @@ async def vereine_signed_webhook(request: Request):
         vereine_webhooks.logger.warning("[dolibarr] signierter Webhook abgewiesen: Body nicht lesbar")
         raise HTTPException(400, "Unbekanntes Format.")
     if not await vereine_webhooks.remember(db, settings, event):
-        vereine_webhooks.logger.info("[dolibarr] signierter Webhook %s… schon verarbeitet", event["event_id"][:12])
+        vereine_webhooks.logger.info("[dolibarr] signierter Webhook %s… schon verarbeitet", log_safe(event["event_id"], 12))
         return {"ok": True, "result": "duplicate"}
     try:
         result = await vereine_webhooks.handle(db, settings, event)
     except Exception as exc:  # noqa: BLE001 - nicht eingereiht heißt: Kennung freigeben, das Modul wiederholt
         await vereine_webhooks.forget(db, settings, event["event_id"])
-        vereine_webhooks.logger.warning("[dolibarr] signierter Webhook %s… nicht eingereiht: %s", event["event_id"][:12], type(exc).__name__)
+        vereine_webhooks.logger.warning("[dolibarr] signierter Webhook %s… nicht eingereiht: %s", log_safe(event["event_id"], 12), type(exc).__name__)
         raise HTTPException(503, "Gerade nicht verarbeitbar, bitte wiederholen.") from exc
-    vereine_webhooks.logger.info("[dolibarr] signierter Webhook %s… %s/%s: %s", event["event_id"][:12], event["object_type"], event["change"], result)
+    vereine_webhooks.logger.info("[dolibarr] signierter Webhook %s… %s/%s: %s", log_safe(event["event_id"], 12), log_safe(event["object_type"], 40), log_safe(event["change"], 40), log_safe(result, 80))
     return {"ok": True, "result": result}
 
 
