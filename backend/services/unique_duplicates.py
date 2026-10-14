@@ -34,6 +34,10 @@ MANUAL = {
                                   "gilt, und die anderen im Finanzbereich stornieren.",
     "consent_decisions.open_decision": "Mehrere offene Einwilligungsaufträge für dieselbe Entscheidung - sie sind Nachweise "
                                        "und werden nie gelöscht: die überzähligen von Hand auf status „superseded“ setzen.",
+    "prize_pickups.fastlap_place_user": "Mehrere Fast-Lap-Gewinne für denselben Platz und dieselbe Person - unter Gewinne "
+                                        "prüfen, welcher gilt (ausgegebene nie löschen), die anderen von Hand entfernen.",
+    "season_points.fastlap_source_user": "Doppelte Saisonpunkte für dieselbe Fast-Lap-Strecke und Person - in der "
+                                         "Jahreswertung prüfen und die überzählige Zeile von Hand entfernen.",
 }
 # Index -> Reihenfolge, deren erste Zeile bleibt (sonst die älteste).
 KEEP_ORDER = {

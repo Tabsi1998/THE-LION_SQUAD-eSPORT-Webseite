@@ -231,9 +231,15 @@ test("fast-lap entry validates input and keeps one failed request visible", asyn
     contentType: "application/json",
     body: JSON.stringify({ track: challenge.tracks[0], entries: [] }),
   }));
-  await page.route("**/api/f1/challenges/challenge-1/assignable-users", (route) => route.fulfill({
+  // Fahrer über die Personensuche (#1584) - die ganze Kontoliste wird nicht mehr geladen.
+  let wholeListLoaded = false;
+  await page.route("**/api/f1/challenges/challenge-1/assignable-users", (route) => {
+    wholeListLoaded = true;
+    return route.fulfill({ contentType: "application/json", body: "[]" });
+  });
+  await page.route("**/api/admin/people/search**", (route) => route.fulfill({
     contentType: "application/json",
-    body: JSON.stringify([user]),
+    body: JSON.stringify([{ id: user.id, name: user.display_name || user.username, context: "Community" }]),
   }));
   await page.route("**/api/f1/challenges/challenge-1/times**", async (route) => {
     if (route.request().method() === "GET") {
@@ -246,7 +252,8 @@ test("fast-lap entry validates input and keeps one failed request visible", asyn
 
   await page.goto("/fastlap/test-fastlap");
   await acceptCookies(page);
-  await page.getByTestId("fastlap-user").selectOption(user.id);
+  await page.getByTestId("fastlap-user-search").fill("te");
+  await page.getByTestId(`fastlap-user-option-${user.id}`).click();
   await page.getByTestId("fastlap-time").fill("ungueltig");
   await page.getByTestId("fastlap-submit").click();
   await expect(page.locator("#fastlap-action-error")).toContainText("Ungültiges Zeitformat");
@@ -256,4 +263,5 @@ test("fast-lap entry validates input and keeps one failed request visible", asyn
   await dispatchDoubleSubmit(page, "fastlap-submit");
   await expect(page.locator("#fastlap-action-error")).toContainText("Zeit bereits erfasst");
   expect(submissions).toBe(1);
+  expect(wholeListLoaded).toBe(false);
 });

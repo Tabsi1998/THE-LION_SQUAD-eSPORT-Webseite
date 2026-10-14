@@ -74,3 +74,12 @@ test("anderer Streckenstand (Wechsel der Strecke): nichts wird verglichen", () =
   other.entries[0].time_ms = 1000;
   expect(compareBoards(board, other)).toEqual({ improved: [], added: [], best: null });
 });
+
+test("Gleichstand (#1584): wer die Bestzeit vorher hatte, sagt der Rang vom Server - die früher gefahrene Zeit", () => {
+  const entry = (user_id, display_name, rank) => ({ user_id, display_name, rank, time_ms: 80000, time_str: "1:20.000", penalty_seconds: 0 });
+  const previous = { track: { id: "t1" }, entries: [entry("bert", "Bert", 2), entry("anna", "Anna", 1)] };
+  const next = { track: { id: "t1" }, entries: [{ ...entry("carl", "Carl", 1), time_ms: 79000, time_str: "1:19.000" }, { ...entry("anna", "Anna", 2) }, entry("bert", "Bert", 3)] };
+  const change = compareBoards(previous, next);
+  expect(change.best).toMatchObject({ userId: "carl" });
+  expect(previousHolderText(change.best)).toBe("vorher Anna · 1:20.000");
+});

@@ -95,15 +95,9 @@ async def _visible_challenge(challenge: dict | None) -> bool:
 
 async def _ranked_fastlap_entries(challenge_id: str, track_id: str, user_id: str, public_only: bool) -> dict | None:
     db = get_db()
-    times = await db.f1_lap_times.find(
-        {
-            "challenge_id": challenge_id,
-            "track_id": track_id,
-            "is_invalid": {"$ne": True},
-            "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}],
-        },
-        {"_id": 0},
-    ).to_list(5000)
+    from services.fastlap_standings import official_times
+
+    times = await official_times(db, challenge_id, track_id)
     if public_only:
         challenge = await db.f1_challenges.find_one(
             {"id": challenge_id},
@@ -111,19 +105,13 @@ async def _ranked_fastlap_entries(challenge_id: str, track_id: str, user_id: str
         )
         if not await _visible_challenge(challenge):
             return None
-    best_by_user: dict[str, dict] = {}
-    for row in times:
-        uid = row.get("user_id")
-        if not uid:
-            continue
-        effective_ms = int(row.get("time_ms") or 0) + int(float(row.get("penalty_seconds") or 0) * 1000)
-        current = best_by_user.get(uid)
-        if not current or effective_ms < current["effective_ms"]:
-            best_by_user[uid] = {**row, "effective_ms": effective_ms}
-    ranked = sorted(best_by_user.values(), key=lambda item: item["effective_ms"])
-    for index, row in enumerate(ranked, start=1):
+    # Dieselbe Rangfolge wie die Tabelle (#1584): Gleichstand - die früher gefahrene Zeit vorn.
+    from services.fastlap_standings import rank_laps
+
+    ranked = rank_laps(times)
+    for row in ranked:
         if row.get("user_id") == user_id:
-            return {**row, "rank": index, "participant_count": len(ranked), "time_str": _time_str(row.get("effective_ms"))}
+            return {**row, "participant_count": len(ranked), "time_str": _time_str(row.get("effective_ms"))}
     return None
 
 

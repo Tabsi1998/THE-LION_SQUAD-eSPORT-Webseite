@@ -150,7 +150,9 @@ async def test_valid_values_pass_on_both_ways(flow):
     challenge_id, track_id, driver = await setup_challenge(flow)
     lap = await enter(flow, challenge_id, track_id, driver, penalty_seconds=2.5, admin_note=NOTE, proof_url="https://example.test/clip")
     assert lap.status_code == 200, lap.text
-    corrected = await correct(flow, lap.json()["id"], time_ms=60 * 60 * 1000, proof_url=None, penalty_seconds=3600)
+    # Eine Stunde ist erlaubt, wirkt aber unplausibel - sie geht mit Bestätigung durch (#1584).
+    corrected = await correct(flow, lap.json()["id"], time_ms=60 * 60 * 1000, proof_url=None, penalty_seconds=3600,
+                              confirm_implausible=True)
     assert corrected.status_code == 200, corrected.text
     saved = await stored(flow, lap.json()["id"])
     assert saved["time_ms"] == 60 * 60 * 1000 and saved["proof_url"] is None and saved["penalty_seconds"] == 3600
