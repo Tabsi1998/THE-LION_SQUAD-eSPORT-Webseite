@@ -20,7 +20,10 @@ from models import (
 )
 from services.notification_preferences import send_user_template
 from typing import Literal
-from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings as load_dolibarr_settings
+
+from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
+from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key as dolibarr_instance_key, load_settings as load_dolibarr_settings
 from services.dolibarr_links import link_for_user, public_link, verified_link
 from services.dolibarr_policy import MAX_STATE_AGE_HOURS, club_today
 from services.dolibarr_sync import try_auto_link
@@ -406,14 +409,35 @@ async def membership_meta():
     }
 
 
-# ---------- Meine Einwilligungen (#329, Teil 1) ----------
+# ---------- Meine Einwilligungen (#329, Teil 1; #1537) ----------
 # Die Einwilligungen eines Mitglieds führt Dolibarr; die Website zeigt den Stand, der dort steht,
 # und schickt jede Entscheidung dorthin - mit fester Vorgangskennung, damit ein zweites Senden
 # nichts doppelt speichert. Zustimmen nur mit der Textfassung, die die Person gesehen hat;
-# Widerrufen immer, auch wenn es inzwischen eine neue Fassung gibt. Ohne bestätigte Zuordnung
+# Widerrufen immer, auch wenn es inzwischen eine neue Fassung gibt. Ohne Weg zur Akte
 # oder ohne Anbindung gibt es hier nichts - und keinen lokalen zweiten Stand.
+#
+# Gelesen wird über den Self-Service des Moduls (`me/consents`, #1537): das Modul prüft selbst, für wen die Website
+# spricht - ab Vereine 1.4.0 über die bestätigte Zuordnung (Mitgliedsnummer), sonst über die Bindung per
+# Einladungscode mit der Fähigkeit „consents“. Kennt die Website die Modulversion noch nicht, liest sie für eine
+# bestätigte Zuordnung wie bisher über `members/{id}/consents`. Entscheiden geht nur über `members/{id}/consents`
+# (das Modul hat kein `POST me/consents`).
+#
+# Der Text: das Modul liefert nur die aktuelle Fassung je Zweck. Die Website legt jede Fassung, die sie je gelesen hat,
+# in `consent_text_versions` ab (Texte des Vereins, keine Personendaten) - so bleibt die Fassung lesbar, der jemand
+# zugestimmt hat, auch wenn der Verein den Text später ändert.
 
 CONSENT_FORM_NAME = "Website: Meine Mitgliedschaft"
+# Offene Aufträge: unterwegs oder ohne Antwort geblieben. Sie gehen beim nächsten Versuch mit derselben Kennung und
+# demselben Zeitpunkt noch einmal raus - das Modul erkennt die Kennung und speichert keinen zweiten Nachweis.
+OPEN_DECISION = ("sent", "pending")
+# Abgewiesen heißt: nichts gespeichert - der nächste Versuch ist ein neuer Auftrag.
+REJECTED_KINDS = {"bad_request", "conflict", "not_found", "forbidden", "unauthorized", "module_off"}
+CONSENT_REASON_TEXTS = {
+    "no_capability": "Deine Verbindung zur Vereinsakte umfasst die Einwilligungen nicht – der Vorstand schaltet die Fähigkeit "
+                     "„Einwilligungen“ in Dolibarr ein.",
+    "right_missing": dolibarr_identity.MEMBER_RIGHT_TEXT,
+    "not_bound": "Die Verbindung zur Vereinsakte gilt nicht mehr – bitte einen neuen Einladungscode einlösen.",
+}
 
 
 class ConsentDecisionBody(BaseModel):
@@ -423,56 +447,137 @@ class ConsentDecisionBody(BaseModel):
 
 
 async def _consent_context(db, user: dict):
-    """Anbindung live und Zuordnung bestätigt - sonst der Grund, warum es hier nichts gibt."""
+    """Anbindung live und ein Weg zur Akte mit Mitgliedsnummer - sonst der Grund, warum es hier nichts gibt.
+    ``access["mode"]``: ``member`` oder ``subject`` (über `me/consents`), ``legacy`` (Modulversion unbekannt, bestätigte Zuordnung)."""
     settings = await load_dolibarr_settings(db)
     if settings["mode"] != "live":
         return settings, None, None, "not_connected"
-    link = await verified_link(db, settings, user["id"])
-    if not link:
+    access = await dolibarr_identity.access_for(db, settings, user["id"])
+    if access is None:
+        link = await verified_link(db, settings, user["id"])
+        access = {"mode": "legacy", "member_id": link.get("member_id")} if link else None
+    elif access["mode"] == "subject" and "consents" not in access["capabilities"]:
+        return settings, access, None, "no_capability"
+    if not access or not access.get("member_id"):
         return settings, None, None, "not_linked"
     try:
         client = DolibarrClient(settings)
     except DolibarrError as exc:
-        return settings, link, None, exc.kind
-    return settings, link, client, None
+        return settings, access, None, exc.kind
+    return settings, access, client, None
 
 
-def _consent_view(row: dict, texts: dict[str, dict]) -> dict:
+def _consent_view(row: dict, texts: dict[str, dict], earlier: dict[str, str]) -> dict:
     code = str(row.get("code") or "")
     text = texts.get(code) or {}
+    state = row.get("state") or "none"
+    version, current_version = int(row.get("version") or 0), int(row.get("current_version") or 0)
+    # Der aktuelle Text nur in genau der Fassung, die das Modul als aktuell nennt - die geht beim Zustimmen zurück.
+    current_text = text.get("text") if text.get("text") and int(text.get("version") or 0) == current_version else None
+    given_text = None
+    if state == "given" and version:
+        given_text = current_text if version == current_version else earlier.get(code)
     return {
-        "code": code, "label": row.get("label") or text.get("label") or code, "state": row.get("state") or "none",
-        "version": int(row.get("version") or 0), "current_version": int(row.get("current_version") or 0), "moment": row.get("moment") or None,
+        "code": code, "label": row.get("label") or text.get("label") or code, "state": state,
+        "version": version, "current_version": current_version, "moment": row.get("moment") or None,
         "can_give": bool(row.get("can_give")), "can_withdraw": bool(row.get("can_withdraw")),
-        # Der aktuelle Text nur dort, wo eine Zustimmung möglich ist - genau die Fassung, die zurückgeschickt wird.
-        "text": text.get("text") if row.get("can_give") else None,
-        "text_changed": bool(row.get("state") == "given" and int(row.get("version") or 0) < int(row.get("current_version") or 0)),
+        "text": current_text,
+        # Der Text, dem die Person zugestimmt hat - None, wenn die Website diese Fassung nie gesehen hat.
+        "given_text": given_text,
+        "text_changed": bool(state == "given" and version < current_version),
     }
 
 
-async def _consent_list(client: DolibarrClient, member_id: int) -> list[dict]:
-    rows = await client.member_consents(member_id)
-    texts = {str(t.get("code") or ""): t for t in await client.consent_texts()}
-    return [_consent_view(row, texts) for row in rows if row.get("code")]
+async def _remember_texts(db, instance: str, texts: list[dict]) -> None:
+    """Jede gelesene Fassung einmal ablegen - die erste Lesung zählt, eine Fassung ändert sich im Modul nicht."""
+    for text in texts:
+        code, version = str(text.get("code") or ""), int(text.get("version") or 0)
+        if not code or not version or not text.get("text"):
+            continue
+        await db.consent_text_versions.update_one(
+            {"instance": instance, "code": code, "version": version},
+            {"$setOnInsert": {"instance": instance, "code": code, "version": version, "label": text.get("label") or code,
+                              "text": text["text"], "seen_at": now_utc().isoformat()}},
+            upsert=True,
+        )
+
+
+async def _earlier_texts(db, instance: str, rows: list[dict]) -> dict[str, str]:
+    """Die Texte der zugestimmten Fassungen, die nicht mehr aktuell sind - soweit die Website sie kennt."""
+    found: dict[str, str] = {}
+    for row in rows:
+        version = int(row.get("version") or 0)
+        if row.get("state") != "given" or not version or version == int(row.get("current_version") or 0):
+            continue
+        stored = await db.consent_text_versions.find_one({"instance": instance, "code": str(row.get("code") or ""), "version": version}, {"_id": 0, "text": 1})
+        if stored and stored.get("text"):
+            found[str(row["code"])] = stored["text"]
+    return found
+
+
+async def _consent_list(db, settings: dict, client: DolibarrClient, access: dict) -> list[dict]:
+    if access["mode"] == "legacy":
+        rows = await client.member_consents(int(access["member_id"]))
+    else:
+        rows = await client.my_consents(access["params"])
+    texts = await client.consent_texts()
+    instance = dolibarr_instance_key(settings)
+    await _remember_texts(db, instance, texts)
+    earlier = await _earlier_texts(db, instance, rows)
+    by_code = {str(t.get("code") or ""): t for t in texts}
+    return [_consent_view(row, by_code, earlier) for row in rows if row.get("code")]
 
 
 @router.get("/me/consents")
 async def my_consents(user: dict = Depends(get_current_user)):
     db = get_db()
-    settings, link, client, reason = await _consent_context(db, user)
+    settings, access, client, reason = await _consent_context(db, user)
     if reason:
-        return {"available": False, "reason": reason}
+        view = {"available": False, "reason": reason}
+        if reason in CONSENT_REASON_TEXTS:
+            view["text"] = CONSENT_REASON_TEXTS[reason]
+        return view
     try:
-        consents = await _consent_list(client, link["member_id"])
+        consents = await _consent_list(db, settings, client, access)
     except DolibarrError as exc:
-        return {"available": False, "reason": exc.kind, "text": exc.text}
+        if exc.kind == "forbidden" and access["mode"] != "legacy":
+            # Wie bei den eigenen Daten: über die Bindung heißt 403 Widerruf, über die Mitgliedsnummer fehlt das Recht.
+            await dolibarr_identity.forbidden(db, access)
+            reason = "right_missing" if access["mode"] == "member" else "not_bound"
+            return {"available": False, "reason": reason, "text": CONSENT_REASON_TEXTS[reason]}
+        return {"available": False, "reason": exc.kind, "text": f"Die Mitgliederverwaltung antwortet gerade nicht ({exc.text})."}
+    if access["mode"] != "legacy":
+        await dolibarr_identity.member_call_ok(db, access)
     return {"available": True, "as_of": now_utc().isoformat(), "consents": consents}
+
+
+async def _decision_record(db, user_id: str, member_id: int, code: str, decision: str, version: int | None) -> dict:
+    """Der Auftrag für diese Entscheidung: ein offener derselben Art wird wiederverwendet (dieselbe Kennung, derselbe
+    Zeitpunkt), sonst ein neuer - und offene Aufträge anderer Art zum selben Zweck gehen nie mehr raus.
+
+    Atomar (Codex-Prüfung #1547): ein Upsert auf den offenen Auftrag, abgesichert durch den eindeutigen partiellen Index
+    ``consent_decisions.open_decision`` (``database.AUDIT_UNIQUE_INDEXES``). Legen zwei gleichzeitige Klicks ihn beide
+    an, scheitert einer am Index (DuplicateKeyError) - für ihn ist es derselbe Auftrag, der zweite Durchgang findet ihn."""
+    query = {"user_id": user_id, "member_id": member_id, "code": code, "status": {"$in": list(OPEN_DECISION)}}
+    same = {"decision": decision, "version": version}
+    await db.consent_decisions.update_many({**query, "$nor": [same]}, {"$set": {"status": "superseded"}})
+    update = {
+        "$set": {"status": "sent"}, "$inc": {"attempts": 1},
+        "$setOnInsert": {"id": new_id(), "reference": f"web-c-{new_id()}", "created_at": now_utc().isoformat()},
+    }
+    for _attempt in range(3):
+        try:
+            return await db.consent_decisions.find_one_and_update(
+                {**query, **same}, update, upsert=True, sort=[("created_at", -1)], projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+        except DuplicateKeyError:
+            continue
+    raise HTTPException(409, "Diese Entscheidung ist gerade schon unterwegs - bitte kurz warten und die Seite neu laden.")
 
 
 @router.post("/me/consents")
 async def decide_my_consent(body: ConsentDecisionBody, user: dict = Depends(get_current_user)):
     db = get_db()
-    settings, link, client, reason = await _consent_context(db, user)
+    settings, access, client, reason = await _consent_context(db, user)
     if reason:
         raise HTTPException(409, "Deine Einwilligungen führt die Mitgliederverwaltung - dafür braucht dein Konto eine bestätigte Zuordnung.")
     code = body.code.strip()[:32]
@@ -480,28 +585,28 @@ async def decide_my_consent(body: ConsentDecisionBody, user: dict = Depends(get_
         raise HTTPException(400, "Zweck fehlt.")
     if body.decision == "given" and not body.version:
         raise HTTPException(400, "Zum Zustimmen gehört die Fassung des Textes, die dir gezeigt wurde.")
-    now = now_utc().isoformat()
-    record = {
-        "id": new_id(), "user_id": user["id"], "member_id": int(link["member_id"]), "code": code, "decision": body.decision,
-        "version": body.version if body.decision == "given" else None, "reference": f"web-c-{new_id()}", "created_at": now, "status": "sent",
-    }
-    await db.consent_decisions.insert_one(record)
-    payload = {"code": code, "decision": body.decision, "granted_at": now, "form": CONSENT_FORM_NAME, "reference": record["reference"]}
+    member_id = int(access["member_id"])
+    record = await _decision_record(db, user["id"], member_id, code, body.decision, int(body.version) if body.decision == "given" else None)
+    payload = {"code": code, "decision": body.decision, "granted_at": record["created_at"], "form": CONSENT_FORM_NAME, "reference": record["reference"]}
     if body.decision == "given":
-        payload["version"] = int(body.version)
+        payload["version"] = int(record["version"])
     try:
-        result = await client.decide_consent(link["member_id"], payload)
+        result = await client.decide_consent(member_id, payload)
     except DolibarrError as exc:
-        await db.consent_decisions.update_one({"id": record["id"]}, {"$set": {"status": "failed", "error": exc.kind}})
+        rejected = exc.kind in REJECTED_KINDS
+        await db.consent_decisions.update_one({"id": record["id"]}, {"$set": {"status": "failed" if rejected else "pending", "error": exc.kind}})
         if exc.kind == "bad_request":
             raise HTTPException(400, "Der Text hat sich inzwischen geändert - bitte die Seite neu laden und noch einmal lesen.")
         if exc.kind == "conflict":
             raise HTTPException(409, "Ein späterer Widerruf bleibt bestehen - die Zustimmung wurde nicht gespeichert.")
-        raise HTTPException(503, f"Mitgliederverwaltung nicht erreichbar - nichts geändert ({exc.text}).")
+        if rejected:
+            raise HTTPException(503, f"Die Mitgliederverwaltung hat das abgewiesen - nichts geändert ({exc.text}).")
+        raise HTTPException(503, f"Mitgliederverwaltung nicht erreichbar ({exc.text}) - noch nicht bestätigt. Versuch es gleich noch einmal: "
+                                 "derselbe Auftrag geht dann noch einmal raus, doppelt gespeichert wird nichts.")
     await db.consent_decisions.update_one({"id": record["id"]}, {"$set": {"status": "recorded" if result.get("recorded") else "duplicate", "result_state": result.get("state")}})
     await _audit(user["id"], f"consent.{body.decision}", user["id"], {"code": code, "version": result.get("version"), "reference": record["reference"]})
     try:
-        consents = await _consent_list(client, link["member_id"])
+        consents = await _consent_list(db, settings, client, access)
     except DolibarrError:
         consents = None
     return {"ok": True, "result": {"code": result.get("code"), "state": result.get("state"), "version": result.get("version"), "recorded": bool(result.get("recorded"))}, "consents": consents}
