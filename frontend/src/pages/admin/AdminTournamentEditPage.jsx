@@ -728,6 +728,8 @@ export default function AdminTournamentEditPage() {
           onChanged={load}
           onSaveMatchMeta={updateMatchV2Schedule}
           rightsForMatch={rightsForMatch}
+          tournament={t}
+          durationGame={bracket?.duration_game || null}
         />
       )}
       {activeTab === "edit" && isTournamentLead && (

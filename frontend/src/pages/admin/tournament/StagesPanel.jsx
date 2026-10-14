@@ -1,5 +1,5 @@
 // Turnier-Bearbeitung (#223): Stufen, Partien, Ergebnisse und Termine – der Betriebs-Reiter.
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { formatDateTime, toDateTimeLocalInput } from "@/lib/datetime";
@@ -10,14 +10,27 @@ import { Fld } from "./PrizeEditor";
 import { ResultWindowLoader } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { SelectField, modeLabel } from "./TournamentEditForm";
+import { durationSourceText, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
 import { DEFAULT_FFA_SCHEMA, EVENT_MODE_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, applyStageType, matchSectionKey, sectionSortIndex, sortMatchesForPlan, stageConfigFor, stationDisplay } from "./shared";
+
+// Die Dauer-Kette (#1554): Turnier, Phasen und das Spiel (Modi), damit jedes Feld sagen kann, was ohne eigenen Wert gilt.
+const DurationContext = createContext({ tournament: null, game: null, stageById: new Map() });
+
+function inheritedDuration(ctx, { stage = null, match = null } = {}) {
+  return matchDurationSource(match ? { ...match, duration_minutes: null } : {}, { stage, tournament: ctx.tournament, game: ctx.game });
+}
+
+function DurationSource({ own, inherited, testId }) {
+  const text = durationSourceText(inherited);
+  return <span className="block mt-1 text-[11px] text-white/45" data-testid={testId}>{own === "" ? text : `Leer lassen: ${text}`}</span>;
+}
 
 // Je Spiel (nach Codex-Prüfung): ein Einsatz für einzelne Spiele, Phasen, Gruppen oder Stationen zeigt seine Knöpfe nur dort.
 const NO_MATCH_RIGHTS = () => ({ plan: false, results: false });
 
 // Rechte je Turnier (#1353), wie sie der Server schickt: Einstellungen der Phasen nur für die Turnierleitung über alle
 // Turniere, Erzeugen mit dem Aufbau-Recht, Termin und Station mit dem Check-in-Recht, Ergebnisse mit dem Ergebnis-Recht.
-export function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], tournamentStartDate = null, canEditSettings = false, canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, onChanged, onSaveMatchMeta, mode = "operations" }) {
+export function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], tournamentStartDate = null, canEditSettings = false, canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, onChanged, onSaveMatchMeta, mode = "operations", tournament = null, durationGame = null }) {
   const showSettings = canEditSettings && mode === "settings";
   const showMatchList = mode !== "settings";
   const [createOpen, setCreateOpen] = useState(stages.length === 0);
@@ -28,13 +41,16 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
     match_size: 4,
     min_players: 2,
     qualifiers_per_match: 2,
-    duration_minutes: 30,
+    duration_minutes: "",
     event_mode: "",
     result_entry_mode: "",
     schedule_mode: "",
     schema: DEFAULT_FFA_SCHEMA,
   });
   const confirm = useConfirm();
+  const durationContext = useMemo(() => ({
+    tournament, game: durationGame, stageById: new Map((stages || []).map((stage) => [stage.id, stage])),
+  }), [tournament, durationGame, stages]);
   const regById = Object.fromEntries((registrations || []).map((r) => [r.id, r]));
   const config = stageConfigFor(form);
   const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
@@ -50,7 +66,7 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
           match_size: Number(form.match_size) || 4,
           min_players: Number(form.min_players) || 2,
           qualifiers_per_match: Number(form.qualifiers_per_match) || 1,
-          duration_minutes: Number(form.duration_minutes) || 30,
+          duration_minutes: ownDurationPayload(form.duration_minutes),
           event_mode: form.event_mode || null,
           result_entry_mode: form.result_entry_mode || null,
           schedule_mode: form.schedule_mode || null,
@@ -83,6 +99,7 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
   };
 
   return (
+    <DurationContext.Provider value={durationContext}>
     <div className="space-y-5">
       {mode === "settings" && (
         <div className="text-xs text-white/50 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
@@ -106,7 +123,10 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
               {config.showMatchSize && <Fld label="Spielgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />}
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId="stage-new-min" />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId="stage-new-qualifiers" />}
-              <Fld label="Spieldauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId="stage-new-duration" />
+              <div>
+                <Fld label="Spieldauer Min." type="number" min="1" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} placeholder={String(inheritedDuration(durationContext).minutes)} testId="stage-new-duration" />
+                <DurationSource own={form.duration_minutes} inherited={inheritedDuration(durationContext)} testId="stage-new-duration-source" />
+              </div>
               <SelectField label="Austragung" value={form.event_mode} onChange={(v)=>set("event_mode", v)} options={[["", "Vom Turnier erben"], ...EVENT_MODE_OPTIONS]} />
               <SelectField label="Ergebniserfassung" value={form.result_entry_mode} onChange={(v)=>set("result_entry_mode", v)} options={[["", "Vom Turnier erben"], ...RESULT_ENTRY_MODE_OPTIONS.filter(([value]) => value)]} />
               <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
@@ -157,11 +177,13 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
         )}
       </div>
     </div>
+    </DurationContext.Provider>
   );
 }
 
 function StageCard({ tournamentId, stage, matches, regById, stations = [], tournamentStartDate = null, canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, showSettings = false, showMatchList = true, onChanged, onDelete, onSaveMatchMeta }) {
   const settings = stage.settings || {};
+  const durationContext = useContext(DurationContext);
   const [activeSection, setActiveSection] = useState("all");
   const [form, setForm] = useState({
     name: stage.name || "",
@@ -171,7 +193,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
     match_size: settings.match_size || 4,
     min_players: settings.min_players || 2,
     qualifiers_per_match: settings.qualifiers_per_match || 2,
-    duration_minutes: settings.duration_minutes || stage.duration_minutes || 30,
+    duration_minutes: ownDurationInput(settings.duration_minutes),
     event_mode: settings.event_mode || "",
     result_entry_mode: settings.result_entry_mode || "",
     schedule_mode: settings.schedule_mode || "",
@@ -191,7 +213,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
       match_size: Number(form.match_size) || 4,
       min_players: Number(form.min_players) || 2,
       qualifiers_per_match: Number(form.qualifiers_per_match) || 1,
-      duration_minutes: Number(form.duration_minutes) || 30,
+      duration_minutes: ownDurationPayload(form.duration_minutes),
       event_mode: form.event_mode || null,
       result_entry_mode: form.result_entry_mode || null,
       schedule_mode: form.schedule_mode || null,
@@ -294,7 +316,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => generate({ preview: true })} disabled={!config.canGenerate} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Vorschau</button>
             <button type="button" onClick={() => generate({ preview: false })} disabled={!config.canGenerate} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Mit Teilnehmern generieren</button>
-            {showSettings && <button type="button" onClick={save} className="px-3 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-xs font-bold">Speichern</button>}
+            {showSettings && <button type="button" onClick={save} data-testid={`stage-save-${stage.id}`} className="px-3 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-xs font-bold">Speichern</button>}
             {showSettings && <button type="button" onClick={saveAndGeneratePreview} disabled={!config.canGenerate} className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Speichern & neu bauen</button>}
             {showSettings && <button type="button" onClick={onDelete} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm uppercase tracking-wider text-xs font-bold">Löschen</button>}
           </div>
@@ -314,7 +336,10 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], tourn
               {config.showMatchSize && <Fld label="Spielgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />}
               {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId={`stage-min-${stage.id}`} />}
               {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId={`stage-qualifiers-${stage.id}`} />}
-              <Fld label="Spieldauer Min." type="number" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} testId={`stage-duration-${stage.id}`} />
+              <div>
+                <Fld label="Spieldauer Min." type="number" min="1" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} placeholder={String(inheritedDuration(durationContext).minutes)} testId={`stage-duration-${stage.id}`} />
+                <DurationSource own={form.duration_minutes} inherited={inheritedDuration(durationContext)} testId={`stage-duration-source-${stage.id}`} />
+              </div>
               <SelectField label="Austragung" value={form.event_mode} onChange={(v)=>set("event_mode", v)} options={[["", "Vom Turnier erben"], ...EVENT_MODE_OPTIONS]} />
               <SelectField label="Ergebniserfassung" value={form.result_entry_mode} onChange={(v)=>set("result_entry_mode", v)} options={[["", "Vom Turnier erben"], ...RESULT_ENTRY_MODE_OPTIONS.filter(([value]) => value)]} />
               <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
@@ -440,15 +465,20 @@ function MatchV2Card({ match, regById, stations = [], tournamentStartDate = null
 }
 
 function MatchScheduleControls({ match, stations = [], defaultScheduledAt = null, onSave }) {
+  const durationContext = useContext(DurationContext);
+  const stage = durationContext.stageById.get(match.stage_id) || null;
+  // Eigener Wert nur am Spiel selbst; alles darunter (auch alte Werte in den Spiel-Einstellungen) ist geerbt (#1554).
+  const inherited = inheritedDuration(durationContext, { stage, match });
+  const effective = matchDurationSource(match, { stage, tournament: durationContext.tournament, game: durationContext.game });
   const plannedValue = match.scheduled_at || defaultScheduledAt;
   const [scheduledAt, setScheduledAt] = useState(toDateTimeLocalInput(plannedValue));
-  const [duration, setDuration] = useState(match.duration_minutes ?? match.settings?.duration_minutes ?? "");
+  const [duration, setDuration] = useState(ownDurationInput(match.duration_minutes));
   const [stationId, setStationId] = useState(match.station_id || "");
   useEffect(() => {
     setScheduledAt(toDateTimeLocalInput(match.scheduled_at || defaultScheduledAt));
-    setDuration(match.duration_minutes ?? match.settings?.duration_minutes ?? "");
+    setDuration(ownDurationInput(match.duration_minutes));
     setStationId(match.station_id || "");
-  }, [match.id, match.scheduled_at, defaultScheduledAt, match.duration_minutes, match.station_id, match.updated_at, match.settings?.duration_minutes]);
+  }, [match.id, match.scheduled_at, defaultScheduledAt, match.duration_minutes, match.station_id, match.updated_at]);
   return (
     <div className="mt-3 w-full border border-white/10 bg-[#0A0A0A] rounded-sm p-3 space-y-3">
       <div className="text-[10px] font-bold uppercase tracking-widest text-white/50">Matchplanung</div>
@@ -459,7 +489,8 @@ function MatchScheduleControls({ match, stations = [], defaultScheduledAt = null
         </label>
         <label className="block">
           <span className="block text-[10px] text-white/45 mb-1">Dauer Min.</span>
-          <input type="number" min="1" value={duration} onChange={(e)=>setDuration(e.target.value)} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder="z.B. 30" aria-label="Dauer in Minuten" />
+          <input type="number" min="1" value={duration} onChange={(e)=>setDuration(e.target.value)} className="w-full bg-[#121212] border border-white/10 px-2 py-1 rounded-sm text-xs" placeholder={String(inherited.minutes)} aria-label="Dauer in Minuten" />
+          <DurationSource own={duration} inherited={inherited} testId={`matchplan-duration-source-${match.id}`} />
         </label>
       </div>
       {stations.length > 0 && (
@@ -475,9 +506,9 @@ function MatchScheduleControls({ match, stations = [], defaultScheduledAt = null
           </select>
         </label>
       )}
-      {(match.scheduled_at || match.duration_minutes || match.settings?.duration_minutes || match.station_id) && (
-        <div className="text-[11px] text-white/45">
-          Gespeichert: {match.scheduled_at ? formatDateTime(match.scheduled_at) : "keine Startzeit"} - Dauer {match.duration_minutes ?? match.settings?.duration_minutes ?? "offen"} Min.{stationDisplay(match, stations) ? ` - Station ${stationDisplay(match, stations)}` : ""}
+      {(match.scheduled_at || match.station_id) && (
+        <div className="text-[11px] text-white/45" data-testid={`matchplan-saved-${match.id}`}>
+          Gespeichert: {match.scheduled_at ? formatDateTime(match.scheduled_at) : "keine Startzeit"} - Dauer {effective.minutes} Min.{stationDisplay(match, stations) ? ` - Station ${stationDisplay(match, stations)}` : ""}
         </div>
       )}
       <button type="button" onClick={() => onSave(match, { scheduled_at: scheduledAt, duration_minutes: duration, station_id: stationId })} className="w-full sm:w-auto px-4 py-2 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Planung speichern</button>

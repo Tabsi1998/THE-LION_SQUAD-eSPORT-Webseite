@@ -2,6 +2,8 @@
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator, model_validator
 from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime, timezone
+import re
+import unicodedata
 import uuid
 
 from match_rules import RESULT_MAX_SCORE, RESULT_MAX_TIME_MS
@@ -283,9 +285,110 @@ class TeamUpdate(BaseModel):
 
 # ---------- Games ----------
 GameKind = Literal["standalone", "series", "edition"]
+GAME_MODES_MAX = 20
+GAME_DEVICES_MAX = 10
+GAME_POINTS_MAX = 64
 
 
-class GameCreate(BaseModel):
+def _game_key(value) -> str:
+    """Kennung aus einem Namen: klein, ohne Umlaute und Sonderzeichen („Grand Prix (4 Rennen)“ → „grand_prix_4_rennen“)."""
+    text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii").lower()
+    return re.sub(r"[^a-z0-9]+", "_", text).strip("_")[:40]
+
+
+class GameMatchMode(BaseModel):
+    """Ein Spielmodus mit Dauer (#1554): „Grand Prix 4 Rennen“ 12 Min. je Spiel, oder 4 Min. je Einzelspiel (``per_game``),
+    dann zählt Best-of als Erwartungswert (siehe ``services/match_duration.py``)."""
+    mode: Optional[str] = None
+    label: str = Field(min_length=1, max_length=60)
+    minutes: int = Field(ge=1, le=600)
+    per_game: bool = False
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def _label(cls, value):
+        return str(value or "").strip()
+
+    @model_validator(mode="after")
+    def _key(self):
+        self.mode = _game_key(self.mode) or _game_key(self.label)
+        if not self.mode:
+            raise ValueError("Der Modus braucht einen Namen aus Buchstaben oder Ziffern.")
+        return self
+
+
+def _clean_game_modes(value):
+    if value is None:
+        return value
+    if len(value) > GAME_MODES_MAX:
+        raise ValueError(f"Höchstens {GAME_MODES_MAX} Modi je Spiel.")
+    keys = [mode.mode for mode in value]
+    if len(keys) != len(set(keys)):
+        raise ValueError("Jeder Modus braucht einen eigenen Namen.")
+    return value
+
+
+def _clean_station_devices(value):
+    """Geräte wie bei den Stationen (``stations.device_type``): klein, ohne Leerzeichen, jedes nur einmal."""
+    if value is None:
+        return value
+    cleaned: list[str] = []
+    for raw in value:
+        key = str(raw or "").strip().lower()
+        if not key:
+            continue
+        if not re.fullmatch(r"[a-z0-9_]{1,32}", key):
+            raise ValueError(f"Gerät „{raw}“: nur Kleinbuchstaben, Ziffern und _ (z. B. switch, switch2, pc, ps5, xbox).")
+        if key not in cleaned:
+            cleaned.append(key)
+    if len(cleaned) > GAME_DEVICES_MAX:
+        raise ValueError(f"Höchstens {GAME_DEVICES_MAX} Geräte je Spiel.")
+    return cleaned
+
+
+def _clean_points_table(value):
+    if value is None:
+        return value
+    if len(value) > GAME_POINTS_MAX:
+        raise ValueError(f"Höchstens {GAME_POINTS_MAX} Plätze in der Punktetabelle.")
+    if any(points < 0 or points > 1000 for points in value):
+        raise ValueError("Punkte je Platz: 0 bis 1000.")
+    return value
+
+
+class GameMatchData(BaseModel):
+    """Spiel-Daten für Turniere (#1554) - alles freiwillig, alte Spiele ohne diese Felder bleiben gültig."""
+    # Dauer je Modus; das Turnier wählt einen (``game_mode``), sonst gilt der erste.
+    match_modes: Optional[List[GameMatchMode]] = None
+    # Spieler je Lauf (Rennen, Lobby) vor Ort und online - füllt die Laufgröße im Turnierformular vor.
+    players_per_run_local: Optional[int] = Field(default=None, ge=1, le=64)
+    players_per_run_online: Optional[int] = Field(default=None, ge=1, le=64)
+    # Geräte für Stationen, passend zu ``stations.device_type`` - der Planer nimmt nur passende Stationen.
+    station_devices: Optional[List[str]] = None
+    # Aufbau-/Wechselzeit je Spiel an einer Station in Minuten - kommt zur Dauer aus dem Modus dazu.
+    setup_minutes: Optional[int] = Field(default=None, ge=0, le=120)
+    # Punkte je Platz, z. B. 15-12-10-9-… oder 4-3-2-1.
+    points_table: Optional[List[int]] = None
+    # Best-of-Vorgabe - füllt das Turnierformular vor.
+    default_best_of: Optional[int] = Field(default=None, ge=1, le=15)
+
+    @field_validator("match_modes")
+    @classmethod
+    def _modes(cls, value):
+        return _clean_game_modes(value)
+
+    @field_validator("station_devices")
+    @classmethod
+    def _devices(cls, value):
+        return _clean_station_devices(value)
+
+    @field_validator("points_table")
+    @classmethod
+    def _points(cls, value):
+        return _clean_points_table(value)
+
+
+class GameCreate(GameMatchData):
     name: str
     slug: Optional[str] = None
     kind: GameKind = "standalone"
@@ -311,7 +414,7 @@ class GameCreate(BaseModel):
     discord_role_name: Optional[str] = Field(default=None, max_length=100)
 
 
-class GameUpdate(BaseModel):
+class GameUpdate(GameMatchData):
     name: Optional[str] = None
     slug: Optional[str] = None
     kind: Optional[GameKind] = None
@@ -606,7 +709,10 @@ class TournamentCreate(BaseModel):
     prize_places: Optional[List[dict]] = None  # [{"group":"overall|winner|loser","place":1,"label":"1. Platz","value":"…"}]
     best_of: int = 1
     bronze_match: bool = False
-    match_duration_minutes: int = 30
+    # Leer: die Dauer kommt vom Spiel (Modus, #1554), sonst 30 Minuten - siehe services/match_duration.py.
+    match_duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
+    # Spielmodus des Games (``games.match_modes[].mode``) - leer: der erste Modus.
+    game_mode: Optional[str] = Field(default=None, max_length=40)
     stream_link: Optional[str] = None
     twitch_channel: Optional[str] = None
     twitch_enabled: bool = False
@@ -682,7 +788,8 @@ class TournamentUpdate(BaseModel):
     prize_places: Optional[List[dict]] = None
     best_of: Optional[int] = None
     bronze_match: Optional[bool] = None
-    match_duration_minutes: Optional[int] = None
+    match_duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
+    game_mode: Optional[str] = Field(default=None, max_length=40)
     stream_link: Optional[str] = None
     twitch_channel: Optional[str] = None
     twitch_enabled: Optional[bool] = None

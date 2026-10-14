@@ -17,6 +17,7 @@ from services.matchday_schedule import build_matchday_plan, current_matchday_num
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import standings_for_structure
 from services.private_fields import private_projection
+from services.match_duration import load_duration_game
 from routes.tournament_common import (
     _collect_plan_matches,
     _get_visible_tournament,
@@ -132,6 +133,8 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
         "matches_v2": matches_v2,
         "engine": "stage",
         "structure": structure,
+        # Die Spiel-Daten für die Dauer-Kette der Website (#1554, lib/matchDuration.js): Modi und Aufbauzeit des Games.
+        "duration_game": await load_duration_game(db, t),
     }
 
 

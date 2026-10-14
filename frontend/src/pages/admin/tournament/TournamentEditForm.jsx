@@ -16,6 +16,8 @@ import { useAuth } from "@/context/AuthContext";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
 import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
+import { durationSourceText, gameModes, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
+import { gamePresets } from "@/lib/gameMatchData";
 import { PrizeEditor, Txt } from "./PrizeEditor";
 import { BRONZE_FORMATS, CUSTOM_BRACKET_FORMATS, DEFAULT_FFA_SCHEMA, EVENT_MODE_OPTIONS, MATCHDAY_FORMATS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, TOURNAMENT_STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS } from "./shared";
 
@@ -65,7 +67,9 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     max_participants: source.max_participants || 16,
     min_participants: source.min_participants || 2,
     best_of: source.best_of || 1,
-    match_duration_minutes: source.match_duration_minutes || 30,
+    // Leer heißt: die Dauer kommt vom Spiel (Modus), sonst 30 Minuten (#1554).
+    match_duration_minutes: ownDurationInput(source.match_duration_minutes),
+    game_mode: source.game_mode || "",
     bronze_match: !!source.bronze_match,
     seeding_mode: source.seeding_mode || "random",
     randomize_advancement_rounds: !!source.randomize_advancement_rounds,
@@ -127,7 +131,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     max_participants: tournament.max_participants || 16,
     min_participants: tournament.min_participants || 2,
     best_of: tournament.best_of || 1,
-    match_duration_minutes: tournament.match_duration_minutes || 30,
+    match_duration_minutes: ownDurationInput(tournament.match_duration_minutes),
+    game_mode: tournament.game_mode || "",
     bronze_match: !!tournament.bronze_match,
     seeding_mode: tournament.seeding_mode || "random",
     randomize_advancement_rounds: !!tournament.randomize_advancement_rounds,
@@ -164,7 +169,6 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     match_size: stageSettings.match_size || (tournament.format === "ffa_custom_bracket" ? 4 : 2),
     min_players: stageSettings.min_players || 2,
     qualifiers_per_match: stageSettings.qualifiers_per_match || (tournament.format === "ffa_custom_bracket" ? 2 : 1),
-    duration_minutes: stageSettings.duration_minutes || tournament.match_duration_minutes || 30,
     schema: stageSettings.schema || (tournament.format === "ffa_custom_bracket" ? DEFAULT_FFA_SCHEMA : ""),
   });
   useEffect(() => {
@@ -173,6 +177,23 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(() => setEvents([]));
   }, []);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
+  // Spiel-Daten (#1554): woher die Dauer kommt, und was das Spiel für Best-of und Laufgröße vorschlägt.
+  const selectedGame = games.find((game) => game.id === f.game_id) || null;
+  const modes = gameModes(selectedGame);
+  const inherited = matchDurationSource({}, { tournament: { ...f, match_duration_minutes: null }, game: selectedGame });
+  const presets = gamePresets(selectedGame, f);
+  const runWhere = f.event_mode === "online" ? "online" : "vor Ort";
+  const setGame = (value) => {
+    const game = games.find((row) => row.id === value) || null;
+    const next = gamePresets(game, f);
+    setF((current) => ({
+      ...current,
+      game_id: value,
+      best_of: next.bestOf ?? current.best_of,
+      game_mode: gameModes(game).some((mode) => mode.mode === current.game_mode) ? current.game_mode : "",
+    }));
+    if (next.runSize && f.format === "ffa_custom_bracket") setStructure((current) => ({ ...current, match_size: next.runSize }));
+  };
   const applyRulePreset = (preset) => setF((x) => ({ ...x, ...preset.values }));
   const setStructureField = (k, v) => setStructure((x) => ({ ...x, [k]: v }));
   // Nach einem Formatwechsel folgt die Struktur wieder dem Format: der eigene
@@ -202,10 +223,12 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     if (!payload.stream_platform) payload.stream_platform = null;
     if (!payload.result_entry_mode) payload.result_entry_mode = null;
     if (!payload.schedule_mode) payload.schedule_mode = null;
+    payload.match_duration_minutes = ownDurationPayload(payload.match_duration_minutes);
+    payload.game_mode = payload.game_mode || null;
     payload.format_label = (payload.format_label || "").trim() || null;
     if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
     normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
-    ["team_size", "max_participants", "min_participants", "best_of", "match_duration_minutes",
+    ["team_size", "max_participants", "min_participants", "best_of",
       "matchday_days", "default_match_weekday", "match_schedule_response_hours", "match_break_minutes"].forEach((key) => {
       if (payload[key] !== "" && payload[key] != null) payload[key] = Number(payload[key]);
     });
@@ -228,8 +251,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
   // und würden nur die passenden Vorgaben überschreiben.
   const structurePayload = () => {
     const custom = CUSTOM_BRACKET_FORMATS.has(f.format);
+    // Keine Dauer in die Phase (#1554): ohne eigenen Wert folgen die Spiele dem Turnier und dem Spiel.
     const settings = {
-      duration_minutes: Number(f.match_duration_minutes) || 30,
       score_type: "points",
       calculation: "points",
     };
@@ -314,7 +337,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           <FormGrid>
             <TextField label="Titel" value={f.title} onChange={(v)=>set("title",v)} testId="tr-edit-title"/>
             <TextField label="Slug / URL" value={f.slug} onChange={(v)=>set("slug", slugify(v))} testId="tr-edit-slug"/>
-            <SelectInput label="Spiel" value={f.game_id} onChange={(v)=>set("game_id",v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} />
+            <SelectInput label="Spiel" value={f.game_id} onChange={setGame} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} />
             <TextField label="Plattform" value={f.platform} onChange={(v)=>set("platform",v)} testId="tr-edit-platform"/>
             <SelectInput label="Status" value={f.status} onChange={(v)=>set("status",v)} options={TOURNAMENT_STATUS_OPTIONS} />
             <SelectInput label="Sichtbarkeit" value={f.visibility} onChange={(v)=>set("visibility",v)} options={VISIBILITY_OPTIONS} />
@@ -363,8 +386,16 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <FormGrid cols={3}>
               <SelectInput label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />
               <CheckField label="Folgerunden zufällig mischen" hint="Runde 1 bleibt nach Check-in fix; qualifizierte Spieler werden in die nächste Runde zufällig auf freie Zielslots verteilt." checked={!!f.randomize_advancement_rounds} onChange={(v)=>set("randomize_advancement_rounds", v)} className="md:col-span-2" />
-              <TextField label="Best of" type="number" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"/>
-              <TextField label="Matchdauer Min." type="number" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"/>
+              {modes.length > 0 && (
+                <SelectInput label="Spielmodus" value={f.game_mode} onChange={(v)=>set("game_mode", v)} testId="tr-edit-game-mode"
+                  options={[["", `Erster Modus (${modes[0].label || "ohne Namen"})`], ...modes.map((mode) => [mode.mode, `${mode.label || mode.mode}${mode.minutes ? ` · ${mode.minutes} Min.${mode.per_game ? " je Spiel" : ""}` : ""}`])]}
+                  hint="Bestimmt die Dauer, wenn unten keine eigene steht." />
+              )}
+              <TextField label="Best of" type="number" min="1" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"
+                hint={presets.bestOf ? <span data-testid="tr-edit-bo-source">vom Spiel: Best of {presets.bestOf}</span> : null}/>
+              <TextField label="Matchdauer Min." type="number" min="1" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"
+                placeholder={String(inherited.minutes)}
+                hint={<span data-testid="tr-edit-duration-source">{f.match_duration_minutes === "" ? durationSourceText(inherited) : `Leer lassen: ${durationSourceText(inherited)}`}</span>}/>
               <TextField label="Mindestpause Min." type="number" min="0" max="240" value={f.match_break_minutes} onChange={(v)=>set("match_break_minutes",v)} hint="So lange hat ein Spieler zwischen zwei Spielen mindestens frei; der Planer hält das ein." testId="tr-edit-break"/>
               <SeasonWeightField value={f.season_weight} onChange={(v)=>set("season_weight",v)} />
             </FormGrid>
@@ -377,7 +408,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
               <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Freier Turnierbaum</div>
               <FormGrid cols={3}>
-                {f.format === "ffa_custom_bracket" && <TextField label="Spielgröße" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
+                {f.format === "ffa_custom_bracket" && <TextField label="Spielgröße" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size"
+                  hint={presets.runSize ? <span data-testid="tr-edit-stage-size-source">vom Spiel: {presets.runSize} je Lauf {runWhere}</span> : null} />}
                 {f.format === "ffa_custom_bracket" && <TextField label="Qualifizierte" type="number" value={structure.qualifiers_per_match} onChange={(v)=>setStructureField("qualifiers_per_match", v)} testId="tr-edit-stage-qualifiers" />}
               </FormGrid>
               <label className="block">

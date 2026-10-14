@@ -5,6 +5,7 @@ import { asInstant, viennaDateTime } from "@/lib/vienna";
 import { describeSlot, finderFor, initials } from "@/lib/slotSource";
 import { buildPodiumMap, lastStageId, normalizeSection } from "@/lib/bracketPodium";
 import { TV_LINE, treeBlockUnits, treeBox, treeScale } from "@/lib/tvType";
+import { effectiveMatchDuration } from "@/lib/matchDuration";
 
 /**
  * Turnierbaum (#399): K.-o.-Runden als Spalten mit gemessenen Verbindungslinien, Mehrspieler-
@@ -38,6 +39,8 @@ const FINISHED_TOURNAMENT = new Set(["completed", "results_published", "archived
 export { initials };
 // Wer in einen noch leeren Platz kommt (#1113): „Sieger aus A“ statt „—“. Setzplätze bleiben leer.
 const FinderContext = createContext(() => () => undefined);
+// Die Spieldauer je Spiel (#1554) - eine Funktion aus lib/matchDuration.js mit Phase, Turnier und Spiel der Antwort.
+const DurationContext = createContext((match) => effectiveMatchDuration(match));
 // TV (#1115): eine eigene Karte statt der Karte der Turnierseite, und wie viele Spalten ins Bild passen.
 const NodeRendererContext = createContext(null);
 const TvLayoutContext = createContext({ columns: 4, viewport: null, minZoom: 1, textSize: "normal" });
@@ -88,6 +91,13 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
   }, [registrations]);
   const mine = mineId || registrations.find((r) => r?.is_mine)?.id || null;
   const finder = useMemo(() => finderFor(matches_v2), [matches_v2]);
+  // Die Dauer-Kette (#1554): ohne eigenen Wert am Spiel gelten Phase, Turnier und Spiel (Modus) aus der Antwort.
+  const tournament = data?.tournament;
+  const durationGame = data?.duration_game;
+  const duration = useMemo(() => {
+    const stageById = new Map(stages.map((stage) => [stage?.id, stage]));
+    return (match) => effectiveMatchDuration(match, { stage: stageById.get(match?.stage_id), tournament, game: durationGame });
+  }, [stages, tournament, durationGame]);
   const tvColumns = tvLayout?.columns || 4;
   const tvViewportW = tvLayout?.viewport?.w || 0;
   const tvViewportH = tvLayout?.viewport?.h || 0;
@@ -104,6 +114,7 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
     <NodeRendererContext.Provider value={nodeRenderer}>
     <TvLayoutContext.Provider value={tvValue}>
     <FinderContext.Provider value={finder}>
+    <DurationContext.Provider value={duration}>
     <ChangedMatchesContext.Provider value={changedMatchIds || EMPTY_SET}>
       <MineContext.Provider value={mine}>
         <FinishedContext.Provider value={finished}>
@@ -123,6 +134,7 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
         </FinishedContext.Provider>
       </MineContext.Provider>
     </ChangedMatchesContext.Provider>
+    </DurationContext.Provider>
     </FinderContext.Provider>
     </TvLayoutContext.Provider>
     </NodeRendererContext.Provider>
@@ -624,7 +636,7 @@ function LiveStatus({ status }) {
 function MatchMeta({ match, compact = false }) {
   const time = formatNodeDateTime(match?.scheduled_at);
   const station = getStationLabel(match);
-  const duration = match?.duration_minutes || match?.settings?.duration_minutes;
+  const duration = useContext(DurationContext)(match);
   if (!time && !station && !duration) return null;
   return (
     <div className={`border-t border-white/5 bg-[#050505]/40 ${compact ? "px-2.5 py-1" : "px-3 py-1.5"} text-[11px] text-white/50 flex flex-wrap gap-x-3 gap-y-1`}>

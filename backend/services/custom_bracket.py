@@ -20,8 +20,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from services.match_duration import effective_match_duration
-
 
 ASSIGNMENT_RE = re.compile(r"^(?P<key>[A-Za-z0-9_.-]+)\s*=\s*\[(?P<slots>.*)\]\s*$")
 SECTION_RE = re.compile(r"^\[(?P<section>[A-Za-z0-9_. -]+)\]\s*$")
@@ -825,14 +823,12 @@ def build_matches_v2_from_schema(tournament: dict, stage: dict, registrations: l
                 "qualifiers_per_match": qualifiers_per_match,
                 "score_type": settings.get("score_type") or "points",
                 "calculation": settings.get("calculation") or "points",
-                "duration_minutes": effective_match_duration(stage=stage, tournament=tournament),
                 "randomize_advancement_rounds": bool(settings.get("randomize_advancement_rounds") or tournament.get("randomize_advancement_rounds")),
             },
             "status": "preview" if preview else ("ready" if not has_ref and filled_count >= min_players else "pending"),
             "is_preview": bool(preview),
             "generation_mode": "preview" if preview else "seeded",
             "scheduled_at": None,
-            "duration_minutes": effective_match_duration(stage=stage, tournament=tournament),
             "station_id": None,
             "created_at": now,
             "updated_at": now,

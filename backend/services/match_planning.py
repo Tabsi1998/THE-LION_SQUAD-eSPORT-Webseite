@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 
-from services.match_duration import effective_match_duration
+from services.match_duration import effective_match_duration, load_duration_game
 
 
 ACTIVE_PLANNING_STATUSES = {"preview", "pending", "ready", "scheduled", "in_progress", "waiting_result"}
@@ -50,9 +50,9 @@ def _parse_dt(value) -> datetime | None:
 
 
 def _duration_minutes(match: dict, updates: dict | None = None, *, tournament: dict | None = None,
-                      stages: dict[str, dict] | None = None) -> int:
+                      stages: dict[str, dict] | None = None, game: dict | None = None) -> int:
     stage = (stages or {}).get(match.get("stage_id") or "")
-    return effective_match_duration(match, stage=stage, tournament=tournament, updates=updates)
+    return effective_match_duration(match, stage=stage, tournament=tournament, game=game, updates=updates)
 
 
 def _overlaps(start_a: datetime, minutes_a: int, start_b: datetime, minutes_b: int) -> bool:
@@ -75,7 +75,8 @@ async def ensure_station_slot_available(db, current_match: dict, updates: dict, 
     # Die Dauer kennt Phase und Turnier (#1552) - vorher galt hier ohne Wert am Spiel immer 30.
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0}) or {}
     stages = {stage["id"]: stage for stage in await db.tournament_stages.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(200)}
-    duration = _duration_minutes(current_match, updates, tournament=tournament, stages=stages)
+    game = await load_duration_game(db, tournament)
+    duration = _duration_minutes(current_match, updates, tournament=tournament, stages=stages, game=game)
     queries = [
         ("matches_v2", {
             "tournament_id": tournament_id,
@@ -89,7 +90,7 @@ async def ensure_station_slot_available(db, current_match: dict, updates: dict, 
             other_start = _parse_dt(other.get("scheduled_at"))
             if not other_start:
                 continue
-            if _overlaps(scheduled_at, duration, other_start, _duration_minutes(other, tournament=tournament, stages=stages)):
+            if _overlaps(scheduled_at, duration, other_start, _duration_minutes(other, tournament=tournament, stages=stages, game=game)):
                 label = other.get("match_key") or other.get("round_name") or other.get("id")
                 raise HTTPException(
                     status_code=409,

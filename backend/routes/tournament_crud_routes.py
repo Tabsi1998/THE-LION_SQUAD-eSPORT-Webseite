@@ -358,6 +358,8 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         "stream_link", "twitch_channel", "discord_link", "location",
         "banner_url", "stream_platform", "stream_url", "stream_title", "format_label",
         "result_entry_mode", "schedule_mode",
+        # Leer: die Dauer bzw. der Modus kommt vom Spiel (#1554).
+        "match_duration_minutes", "game_mode",
     }
     updates = {k: v for k, v in raw_updates.items() if v is not None or k in nullable_fields}
     billing = await tournament_fees.billing_updates(raw_updates, existing, me)
