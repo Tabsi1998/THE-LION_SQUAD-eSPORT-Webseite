@@ -15,7 +15,7 @@
 /* Aufgerufen: der Block hebt sich einmal leicht an, der Rahmen leuchtet auf und bleibt ruhig sichtbar. */
 .tls-live-next { position: relative; }
 .tls-live-next[data-state="called"] {
-  animation: tls-live-lift var(--tls-motion-slow) var(--tls-ease) both;
+  animation: tls-live-lift var(--tls-motion-mid) var(--tls-ease) both;
 }
 .tls-live-next[data-state="called"]::after {
   content: "";

@@ -42,6 +42,7 @@ export default function TournamentLeadPage() {
   const [tab, setTab] = useState(null);
   const [movingId, setMovingId] = useState("");
   const [queue, setQueue] = useState(null);
+  const [queueLoaded, setQueueLoaded] = useState(false);
   const [busyStation, setBusyStation] = useState("");
   // Eigene Adresse je Fall (#1158, #1160): ?fall=<id> springt zum Fall.
   const fall = searchParams.get("fall") || "";
@@ -64,6 +65,8 @@ export default function TournamentLeadPage() {
       setQueue(view?.applies ? view : null);
     } catch {
       setQueue(null);
+    } finally {
+      setQueueLoaded(true);
     }
   }, [slug]);
 
@@ -81,7 +84,8 @@ export default function TournamentLeadPage() {
   const opened = everyone.find((item) => item.id === openId) || null;
   const attention = useMemo(() => data?.attention || [], [data]);
   const byId = useMemo(() => Object.fromEntries(matches.map((item) => [item.id, item])), [matches]);
-  const activeTab = tab || (fall || attention.length ? "attention" : queue ? "stations" : "results");
+  // Erst entscheiden, wenn klar ist, ob es vor Ort eine Warteschlange gibt - sonst springt der Reiter nach dem Laden.
+  const activeTab = tab || (fall || attention.length ? "attention" : queue ? "stations" : queueLoaded ? "results" : "");
   const freeStations = (data?.stations || []).filter((station) => station.status !== "broken" && !station.busy);
 
   // Umlegen (#1160): die wartenden Spiele einer defekten Station auf eine freie Station legen.
@@ -186,9 +190,9 @@ export default function TournamentLeadPage() {
         <h1 className="mt-1 font-heading text-2xl md:text-4xl font-black uppercase [overflow-wrap:anywhere]">{data?.tournament?.title || "…"}</h1>
 
         <div className="mt-6 flex items-center gap-1 overflow-x-auto border-b border-white/10" role="tablist" aria-label="Turnierleitung">
-          {[["attention", `Braucht Aufmerksamkeit (${attention.length})`, AlertTriangle], ...(queue ? [["stations", "Stationen", MonitorPlay]] : []), ["results", "Ergebnisse", ClipboardCheck]].map(([key, label, Icon]) => (
-            <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setTab(key)} className={`inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-xs sm:text-sm font-bold uppercase tracking-wider ${activeTab === key ? "border-[#29B6E8] text-white" : "border-transparent text-white/50"}`} data-testid={`lead-tab-${key}`}>
-              <Icon className={`w-4 h-4 ${key === "attention" && attention.length ? "text-[#FFD700]" : "text-[#29B6E8]"}`} /> {label}
+          {[["attention", <><span className={queue ? "hidden sm:inline" : ""}>Braucht </span>Aufmerksamkeit ({attention.length})</>, AlertTriangle], ...(queue ? [["stations", "Stationen", MonitorPlay]] : []), ["results", "Ergebnisse", ClipboardCheck]].map(([key, label, Icon]) => (
+            <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setTab(key)} className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 sm:gap-2 whitespace-nowrap border-b-2 px-2 sm:px-3 text-xs sm:text-sm font-bold uppercase tracking-wider ${activeTab === key ? "border-[#29B6E8] text-white" : "border-transparent text-white/50"}`} data-testid={`lead-tab-${key}`}>
+              <Icon className={`${queue ? "hidden sm:block" : ""} w-4 h-4 shrink-0 ${key === "attention" && attention.length ? "text-[#FFD700]" : "text-[#29B6E8]"}`} /> {label}
             </button>
           ))}
         </div>
@@ -199,6 +203,8 @@ export default function TournamentLeadPage() {
             <p className="mt-4 text-xs text-white/40">Die Reihenfolge rechnet der Server aus Plan, Linien und Stationen – wird eine Station frei, rückt das nächste bereite Spiel nach. „Aufrufen“ schickt den Spielern „Du bist dran“; „nicht erschienen“ greift nach der Frist ab dem Aufruf.</p>
           </div>
         ) : null}
+
+        {!activeTab ? <div className="py-10 text-center text-white/40">Wird geladen …</div> : null}
 
         {activeTab === "attention" ? (
           <div className="mt-5 space-y-3" data-testid="lead-attention">
