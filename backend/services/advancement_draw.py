@@ -5,8 +5,10 @@ im Schema - oder **Zufällig mischen**. Gemischt kommen alle Weiterkommer einer 
 gleichmäßig auf die Folgespiele verteilt. Keine Sperre gegen Wiedersehen, keine feste Verteilung.
 
 **Auslosungs-Gruppe** (``settings.draw_group`` am Folgespiel, z. B. ``WB:2``): die Spiele einer Sektion und Runde, in
-die andere Spiele weiterleiten. Im Doppel-K.-o. ist das Loser Bracket eine eigene Sektion - gemischt wird dort nur
-zwischen Spielen derselben Loser-Runde. Eine Gruppe mit nur einem Spiel gibt es nicht: laufen nur zwei Spiele in eines
+die andere Spiele weiterleiten. Der Name gilt je Phase - zwei gemischte K.-o.-Phasen haben beide ein ``WB:2``; eine
+Auslosung gehört immer zu genau einer Phase (``stage_id`` und Gruppe), mit eigenem Topf und eigenem Protokoll.
+Im Doppel-K.-o. ist das Loser Bracket eine eigene Sektion - gemischt wird dort nur zwischen Spielen derselben
+Loser-Runde. Eine Gruppe mit nur einem Spiel gibt es nicht: laufen nur zwei Spiele in eines
 zusammen (Finale, Grand Final, Spiel um Platz 3), ändert Mischen nichts, das Spiel bleibt beim festen Baum. Der Platz
 selbst trägt ``source.draw`` (Gruppe und Klartext „Runde 1“), damit Web, TV und App „Platz aus Runde 1“ zeigen.
 
@@ -39,15 +41,20 @@ def draw_group_of(match: dict | None) -> str | None:
     return str(value) if value else None
 
 
-def group_targets(matches: Iterable[dict], group: str) -> list[dict]:
-    """Die Folgespiele einer Gruppe (auch abgesagte - wer schreibt, lässt die selbst weg)."""
-    return [match for match in matches if draw_group_of(match) == group]
+# ``stage_id`` nicht angegeben: alle Phasen (nur für Listen, die ohnehin nur eine Phase enthalten).
+ANY_STAGE: Any = object()
 
 
-def group_sources(matches: Iterable[dict], group: str) -> list[dict]:
+def group_targets(matches: Iterable[dict], group: str, stage_id: Any = ANY_STAGE) -> list[dict]:
+    """Die Folgespiele einer Gruppe in einer Phase (auch abgesagte - wer schreibt, lässt die selbst weg)."""
+    return [match for match in matches if draw_group_of(match) == group
+            and (stage_id is ANY_STAGE or match.get("stage_id") == stage_id)]
+
+
+def group_sources(matches: Iterable[dict], group: str, stage_id: Any = ANY_STAGE) -> list[dict]:
     """Die Quellspiele einer Gruppe: alle Spiele, die in eines ihrer Folgespiele weiterleiten."""
     rows = list(matches)
-    target_ids = {match.get("id") for match in group_targets(rows, group)}
+    target_ids = {match.get("id") for match in group_targets(rows, group, stage_id)}
     return [
         match for match in rows
         if match.get("id") not in target_ids
@@ -63,7 +70,7 @@ def prerequisite_ids(match: dict, matches: Iterable[dict]) -> set[str]:
     rows = list(matches)
     group = draw_group_of(match)
     if group:
-        return {row["id"] for row in group_sources(rows, group) if row.get("id")}
+        return {row["id"] for row in group_sources(rows, group, match.get("stage_id")) if row.get("id")}
     return {
         row["id"] for row in rows
         if row.get("id") and row.get("id") != match.get("id")

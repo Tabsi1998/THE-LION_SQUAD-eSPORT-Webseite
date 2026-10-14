@@ -7,6 +7,10 @@
 //   slow  420 ms  größere Wege (Bild wächst, Linien zeichnen sich)
 export const MOTION = Object.freeze({ fast: 150, mid: 240, slow: 420, ease: Object.freeze([0.2, 0.7, 0.2, 1]) });
 
+// Bewegung über die Fläche (#1561): ein Name gleitet von Spiel zu Spiel - weich an, weich ab (strong ease-in-out).
+// Nur für Wege auf dem Bildschirm, nicht für Ein- und Ausblenden; dort bleibt MOTION.ease.
+export const EASE_MOVE = Object.freeze([0.77, 0, 0.175, 1]);
+
 /** Dauer in Sekunden - so nimmt framer-motion sie. */
 export function motionSeconds(key = "mid") {
   return (MOTION[key] ?? MOTION.mid) / 1000;

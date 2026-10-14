@@ -67,6 +67,10 @@ test("Kürzel aus zwei Buchstaben - auch zusammengeschrieben", () => {
   expect(initials("Neon Falke")).toBe("NF");
   expect(initials("lions_academy")).toBe("LA");
   expect(initials("  ")).toBe("");
+  // Emoji und Zeichen ohne Buchstaben zählen nicht (#1561, break-ui): „🦁 Löwenherz“ → L, nicht „🦁L“.
+  expect(initials("🦁 Löwenherz")).toBe("L");
+  expect(initials("[LSQ] Tabsi")).toBe("LT");
+  expect(initials("🦁")).toBe("");
 });
 
 test("Zeit und Dauer im Klartext, Station mit Wort", () => {

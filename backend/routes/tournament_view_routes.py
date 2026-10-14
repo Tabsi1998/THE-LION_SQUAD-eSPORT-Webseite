@@ -11,6 +11,7 @@ from services.access_links import touch_access_link, validate_access_link
 from services.tv_display import DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, display_bracket_payload, key_expired, seat_summary
 from services.public_phase import derive_public_phase
 from services.station_labels import attach_station_info
+from services.round_labels import attach_round_labels
 from services.match_public_view import public_match_view, public_stage_view, public_tournament_view
 from services.tournament_permissions import READ_STAFF_ROLES, require_tournament_staff_permission
 from services.matchday_schedule import build_matchday_plan, current_matchday_number
@@ -106,6 +107,8 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
     stages = read_model.stages
     matches_v2 = read_model.stage_matches
     await attach_station_info(db, matches_v2)
+    # Runden in Alltagsworten (#1259, #1561): eine Regel im Server für Website, App und TV.
+    attach_round_labels(matches_v2, stages, t)
     if not is_staff:
         # Wer das Turnier nicht leitet, sieht im Baum dieselben Felder wie auf der Spielseite.
         viewer_id = (user or {}).get("id")

@@ -12,7 +12,7 @@ const TEST_FILE = /\.(test|spec)\.[jt]sx?$/;
 const SOURCE_FILE = /\.(jsx?|tsx?|css)$/;
 
 // Grundlinie nach dem ersten Umbau aus #1305 (vorher 1170, 520 und 299 Stellen). Nur nach unten anpassen.
-const BASELINE = { "#FFD700": 1123, "#FF3B30": 492, "#00FF88": 286 };
+const BASELINE = { "#FFD700": 1103, "#FF3B30": 492, "#00FF88": 286 };
 
 function sourceFiles(dir) {
   return readdirSync(dir).flatMap((name) => {
