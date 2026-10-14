@@ -1,5 +1,6 @@
 import { effectiveMatchDuration } from "@/lib/matchDuration";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
+import { advancementModeOf, drawGroupOf, slotDrawn } from "@/lib/bracketGraph";
 
 // Matchplan-Seite (#1557): die Zeitleiste je Station. Hier wird nichts geplant - Zeit, Station und Warnungen kommen
 // vom Spielplaner (POST …/schedule/plan, services/match_scheduler.py) oder stehen gespeichert am Spiel. Diese Datei
@@ -14,6 +15,25 @@ const SKIPPED = new Set(["cancelled", "bye"]);
 const RUNNING = new Set(["in_progress", "running", "waiting_result"]);
 const FINAL_SECTIONS = new Set(["GF", "FINAL", "grand_final", "final"]);
 const LOSER_SECTIONS = new Set(["LB", "loser", "losers"]);
+
+/**
+ * Weiterkommen in vier Modi (#1590): wartet das Spiel auf ein Los je Runde? `ready` - Show, der Topf steht;
+ * `waiting` - noch nicht alle Quellspiele fertig bzw. noch nicht gelost; `instant` - Plätze füllen sich einzeln, der
+ * Termin ist nur Prognose; sonst `null`. Mit Plan zählt die Antwort des Planers, ohne Plan das Spiel selbst.
+ */
+export function drawStateOf(match, assignment = null) {
+  if (assignment && ("waiting_for_draw" in assignment || "draw_ready" in assignment)) {
+    if (assignment.draw_ready) return "ready";
+    if (assignment.waiting_for_draw) return "waiting";
+  }
+  const group = drawGroupOf(match);
+  if (!group) return null;
+  const mode = advancementModeOf(match);
+  if (mode === "instant") return (match.slots || []).some((slot) => slot?.status === "pending" && !slotDrawn(slot)) ? "instant" : null;
+  if (match.draw && typeof match.draw === "object") return null;
+  if ((match.slots || []).some(slotDrawn)) return null;
+  return match.draw_ready && typeof match.draw_ready === "object" ? "ready" : "waiting";
+}
 
 function instant(value) {
   if (value === null || value === undefined || value === "") return null;
@@ -103,6 +123,7 @@ export function buildTimeline({ matches = [], stations = [], stages = [], tourna
       fixed: FIXED_SOURCES.has(match.schedule_source),
       source: match.schedule_source || null,
       forecast: assignment ? Boolean(assignment.forecast) : Boolean(match.schedule_forecast),
+      draw: state === "planned" ? drawStateOf(match, assignment) : null,
       changed: Boolean(assignment?.changed),
       previous: assignment?.changed ? { start: instant(assignment.previous?.scheduled_at), stationId: assignment.previous?.station_id || null } : null,
       elapsedMinutes: null,

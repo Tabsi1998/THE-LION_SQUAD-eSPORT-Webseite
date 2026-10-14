@@ -23,7 +23,10 @@ function barLabel(item, laneName) {
   if (item.state === "running") parts.push(`läuft seit ${item.elapsedMinutes} Minuten`);
   if (item.state === "done") parts.push("erledigt");
   if (item.fixed) parts.push("fester Termin");
-  if (item.forecast) parts.push("Prognose, Spieler stehen noch nicht fest");
+  if (item.draw === "ready") parts.push("wartet auf Auslosung, der Topf steht");
+  else if (item.draw === "waiting") parts.push("wartet auf Auslosung");
+  else if (item.draw === "instant") parts.push("Prognose, das Los entscheidet");
+  else if (item.forecast) parts.push("Prognose, Spieler stehen noch nicht fest");
   for (const conflict of item.conflicts) parts.push(`Konflikt: ${conflict.text}`);
   return parts.join(", ");
 }

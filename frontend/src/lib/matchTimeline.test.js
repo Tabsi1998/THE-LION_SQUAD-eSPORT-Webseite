@@ -210,3 +210,30 @@ describe("Worst Case: 47 Spiele, 8 Stationen, eine defekt", () => {
     expect(timeline.items.filter((item) => item.conflicts.length)).toEqual([]);
   });
 });
+
+
+// Weiterkommen in vier Modi (#1590): was auf ein Los wartet, sagt das im Matchplan - aus der Planer-Antwort oder, ohne
+// Plan, aus dem Spiel selbst (Gruppe, Modus, Topf).
+describe("Zeitleiste: wartet auf Auslosung", () => {
+  const state = fixture.local.applied;
+  const withMode = (mode, extra = {}) => ({
+    ...state,
+    matches: state.matches.map((row) => (row.match_key === "E"
+      ? { ...row, settings: { ...row.settings, draw_group: "WB:2", advancement_mode: mode }, slots: row.slots.map((slot) => ({ ...slot, registration_id: null, status: "pending", source: { ...slot.source, draw: { group: "WB:2", label: "Runde 1" } } })), ...extra }
+      : row)),
+  });
+
+  it("ohne Plan: Auslosung nach der Runde wartet, Show mit Topf ist bereit, sofort zufällig ist nur Prognose", () => {
+    expect(byKey(timelineOf(withMode("draw_round"))).E.draw).toBe("waiting");
+    expect(byKey(timelineOf(withMode("draw_show"))).E.draw).toBe("waiting");
+    expect(byKey(timelineOf(withMode("draw_show", { draw_ready: { group: "WB:2", since: "2026-10-14T17:00:00+00:00" } }))).E.draw).toBe("ready");
+    expect(byKey(timelineOf(withMode("instant"))).E.draw).toBe("instant");
+    expect(byKey(timelineOf(withMode("draw_round", { draw: { id: "d1", group: "WB:2" } }))).E.draw).toBe(null);
+    expect(byKey(timelineOf(state)).E.draw).toBe(null);
+  });
+
+  it("mit Plan zählt die Antwort des Planers", () => {
+    const plan = { ...state.plan, assignments: state.plan.assignments.map((row) => (row.match_key === "E" ? { ...row, waiting_for_draw: true, draw_ready: true } : row)) };
+    expect(byKey(timelineOf(withMode("draw_show"), { plan })).E.draw).toBe("ready");
+  });
+});
