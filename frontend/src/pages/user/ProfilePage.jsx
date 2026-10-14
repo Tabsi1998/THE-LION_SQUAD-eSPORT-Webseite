@@ -5,10 +5,9 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { gameLabel } from "@/lib/gameLabels";
 import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Save, Crown, UserCircle } from "lucide-react";
+import { Crown, UserCircle } from "lucide-react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, TABS, notificationPreferenceKey, tabRedirect } from "./profile/constants";
-import { ACCOUNT_CHANGED_MESSAGE } from "@/lib/profileSaveQueue";
 import { applyGroupLevel } from "./profile/visibility";
 import { useProfileSave } from "./profile/useAutosave";
 import { ProfileNav } from "./profile/ProfileNav";
@@ -21,6 +20,7 @@ import { NotificationsTab } from "./profile/NotificationsTab";
 import { SecurityTab } from "./profile/SecurityTab";
 import { AppearanceTab } from "./profile/AppearanceTab";
 import { AboutTab } from "./profile/AboutTab";
+import { AutosaveStatus } from "./profile/SwitchRow";
 
 // Die Einstellungen (#1146): Rahmen, Formularzustand und Speichern. Jeder Reiter ist eine eigene Datei unter ./profile
 // (#253, Regel aus #223). Dieselben Gruppen in derselben Reihenfolge wie in der App - Darstellung, Benachrichtigungen,
@@ -28,11 +28,14 @@ import { AboutTab } from "./profile/AboutTab";
 // Rechnungen), hat seinen Ort woanders; alte Links leiten dorthin weiter. Am PC steht das Menü links und der Inhalt nutzt
 // die Breite; am Tablet und Handy bleibt die Reiterreihe oben.
 //
-// Reiter mit Textfeldern haben eine Speicherleiste; Privatsphäre und
-// Benachrichtigungen bestehen nur aus Schaltern und Auswahlfeldern und
-// speichern von selbst (#257).
+// Alles speichert von selbst (#257, #1048), einen Knopf „Speichern“ gibt es nicht: Textfelder nach einer kurzen Pause
+// oder beim Verlassen des Felds, Schalter und Auswahlfelder sofort. Reiter mit Textfeldern zeigen den Stand unten in
+// einer ruhigen Leiste, Privatsphäre und Benachrichtigungen oben. Bewusst bestätigt werden weiter Passwort, E-Mail,
+// Zwei-Faktor, Konto löschen und der Bild-Zuschnitt („Übernehmen“).
 
 const FORM_TABS = new Set(["basic", "gaming", "socials"]);
+// Regler speichern nach der Pause wie Text - jeder Zwischenwert beim Ziehen wäre sonst ein eigener Lauf.
+const SLIDER_SETTINGS = new Set(["ceremony_volume"]);
 // ?tab=sessions war der eigene Reiter für Geräte; seit #258 steckt er in
 // „Sicherheit“, alte Links landen dort.
 const TAB_ALIASES = { sessions: "security" };
@@ -59,18 +62,25 @@ export default function ProfilePage() {
     next.set("tab", nextTab);
     setParams(next);
   }, [params, setParams]);
-  // Formular und Speichern über eine Speicher-Warteschlange (#1048): Autosave und „Speichern“ laufen nacheinander.
+  // Formular und Speichern über eine Speicher-Warteschlange (#1048): jede Änderung speichert von selbst, nacheinander.
   const autosave = useProfileSave({ user, refresh });
-  const { form, setForm } = autosave;
-  const [saving, setSaving] = useState(false);
-  const submittingRef = useRef(false);
+  const { form, setForm, saveSoon, saveNow } = autosave;
   const [games, setGames] = useState([]);
 
   useEffect(() => {
     api.get("/games").then(({ data }) => setGames(Array.isArray(data) ? data : [])).catch(() => setGames([]));
   }, []);
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  // Text: speichert nach der Tipp-Pause (oder beim Verlassen des Felds, siehe onBlur am Formular).
+  const set = (k, v) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    saveSoon();
+  };
+  // Schalter, Auswahl, Datum, Bild: speichert sofort.
+  const setNow = (k, v) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    void saveNow();
+  };
 
   // Verknüpfte Plattform-Konten (#260): Liste vom Server; „Verknüpfen“ schickt den Browser zur
   // Plattform, die Rückkehr landet mit ?linked= oder ?link_error= hier und wird einmal gemeldet.
@@ -133,36 +143,35 @@ export default function ProfilePage() {
     if (platformLinks.available[linkParam]) startPlatformLink(linkParam);
     else toast.error(`${platformLinks.platforms[linkParam]?.label || linkParam} ist auf der Website noch nicht eingerichtet.`);
   }, [linkParam, platformLinks, params, setParams, startPlatformLink]);
-  // Schalter und Auswahlfelder auf Privatsphäre und Benachrichtigungen
-  // speichern kurz nach dem letzten Klick von selbst.
-  const setSetting = (k, v) => {
-    set(k, v);
-    autosave.schedule();
+  // Schalter und Auswahlfelder auf Privatsphäre und Benachrichtigungen speichern sofort, der Lautstärke-Regler nach der Pause.
+  const setSetting = (k, v) => (SLIDER_SETTINGS.has(k) ? set(k, v) : setNow(k, v));
+  const setGameId = (gameSlug, fieldKey, value) => {
+    setForm((f) => ({
+      ...f,
+      game_ids: {
+        ...(f.game_ids || {}),
+        [gameSlug]: { ...((f.game_ids || {})[gameSlug] || {}), [fieldKey]: value },
+      },
+    }));
+    saveSoon();
   };
-  const setGameId = (gameSlug, fieldKey, value) => setForm((f) => ({
-    ...f,
-    game_ids: {
-      ...(f.game_ids || {}),
-      [gameSlug]: { ...((f.game_ids || {})[gameSlug] || {}), [fieldKey]: value },
-    },
-  }));
   const setVisibility = (field, level) => {
     setForm((f) => ({
       ...f,
       profile_visibility: { ...(f.profile_visibility || {}), [field]: level },
     }));
-    autosave.schedule();
+    void saveNow();
   };
   const setVisibilityGroup = (group, level) => {
     setForm((f) => ({ ...f, profile_visibility: applyGroupLevel(f.profile_visibility, group, level) }));
-    autosave.schedule();
+    void saveNow();
   };
   const setNotificationPreference = (field, enabled) => {
     setForm((f) => ({
       ...f,
       notification_preferences: { ...(f.notification_preferences || {}), [field]: enabled },
     }));
-    autosave.schedule();
+    void saveNow();
   };
   const gameIdGroups = (() => {
     const groups = new Map();
@@ -200,35 +209,8 @@ export default function ProfilePage() {
     return topic.defaultOn !== false;
   };
 
-  // „Speichern“ (und „Erneut versuchen“): reiht sich hinter einen laufenden Autosave. Ein zweiter Klick, bevor der
-  // erste fertig ist, tut nichts - auch wenn React den Knopf noch nicht gesperrt hat.
-  const submit = async (e) => {
-    e?.preventDefault?.();
-    if (submittingRef.current) return;
-    const current = autosave.queue.getState();
-    if (!current.dirty && !current.busy) {
-      autosave.cancel();
-      toast.info("Keine Änderungen zum Speichern.");
-      return;
-    }
-    submittingRef.current = true;
-    setSaving(true);
-    try {
-      const result = await autosave.save();
-      if (result.ok) toast.success("Profil gespeichert.");
-      else if (result.reason === "account") toast.error(ACCOUNT_CHANGED_MESSAGE);
-      else if (result.error) toast.error(formatRequestError(result.error, "Profil konnte nicht gespeichert werden."));
-    } finally {
-      submittingRef.current = false;
-      setSaving(false);
-    }
-  };
-
   if (!user) return null;
 
-  // Die Speicherleiste zeigt, ob auf den Text-Reitern noch etwas ungespeichert ist - oder ob das Speichern scheiterte.
-  const dirty = autosave.dirty;
-  const saveFailed = autosave.status === "error" && !saving;
   return (
     <PublicLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
@@ -252,15 +234,21 @@ export default function ProfilePage() {
 
         <div className="mt-8 lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10 lg:items-start">
           <ProfileNav tab={tab} onSelect={setTab} onLogout={async () => {
-            // Ein wartender Autosave geht noch ins richtige Konto, danach wird abgemeldet.
-            if (autosave.pending) await autosave.save();
+            // Offenes geht noch ins richtige Konto, danach wird abgemeldet.
+            if (autosave.pending || autosave.dirty) await saveNow();
             if (await logout?.()) navigate("/");
           }} />
 
-          <form onSubmit={submit} className="mt-6 lg:mt-0 space-y-5 min-w-0">
-            {tab === "basic" && <BasicTab form={form} set={set} />}
-            {tab === "gaming" && <GamingTab form={form} set={set} setGameId={setGameId} gameIdGroups={gameIdGroups} />}
-            {tab === "socials" && <SocialsTab form={form} set={set} links={platformLinks} onLink={startPlatformLink} onUnlink={unlinkPlatform} />}
+          {/* Enter in einem Feld und das Verlassen eines Felds speichern sofort - es gibt keinen Speichern-Knopf. */}
+          <form
+            onSubmit={(e) => { e.preventDefault(); void saveNow(); }}
+            onBlur={() => { void saveNow(); }}
+            noValidate
+            className="mt-6 lg:mt-0 space-y-5 min-w-0"
+          >
+            {tab === "basic" && <BasicTab form={form} set={set} setNow={setNow} errors={autosave.fieldErrors} />}
+            {tab === "gaming" && <GamingTab form={form} set={set} setNow={setNow} setGameId={setGameId} gameIdGroups={gameIdGroups} />}
+            {tab === "socials" && <SocialsTab form={form} set={set} setNow={setNow} errors={autosave.fieldErrors} links={platformLinks} onLink={startPlatformLink} onUnlink={unlinkPlatform} />}
             {tab === "appearance" && <AppearanceTab />}
             {tab === "about" && <AboutTab />}
             {tab === "security" && <SecurityTab user={user} refresh={refresh} siteSettings={siteSettings} />}
@@ -286,20 +274,8 @@ export default function ProfilePage() {
             )}
 
             {FORM_TABS.has(tab) && (
-              <div className="sticky bottom-0 z-10 -mx-4 px-4 py-3 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 bg-[#050505]/95 backdrop-blur border-t border-white/10 flex flex-wrap items-center gap-3" data-testid="profile-save-bar">
-                <button type="submit" disabled={saving} data-testid="profile-save" className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-6 py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50 text-xs">
-                  <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
-                </button>
-                {saveFailed ? (
-                  <span role="alert" className="inline-flex flex-wrap items-center gap-2 text-xs text-warn" data-testid="profile-save-error">
-                    {formatRequestError(autosave.error, "Profil konnte nicht gespeichert werden.")} Deine Eingaben bleiben stehen.
-                    <button type="button" onClick={submit} data-testid="profile-save-retry" className="tls-hit min-h-11 px-3 border border-warn/30 rounded-sm font-bold uppercase tracking-wider hover:bg-warn/5">
-                      Erneut versuchen
-                    </button>
-                  </span>
-                ) : dirty ? (
-                  <span className="text-xs text-[#FFD700]" data-testid="profile-unsaved">Ungespeicherte Änderungen</span>
-                ) : null}
+              <div className="sticky bottom-0 z-10 -mx-4 px-4 py-2 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 bg-[#050505]/95 backdrop-blur border-t border-white/10 flex min-h-11 flex-wrap items-center gap-3" data-testid="profile-autosave-bar">
+                <AutosaveStatus status={autosave.status} message={autosave.message} onRetry={autosave.retry} />
               </div>
             )}
           </form>

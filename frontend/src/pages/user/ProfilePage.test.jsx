@@ -89,7 +89,11 @@ beforeEach(() => {
   authState.user = USER;
   apiMock.get.mockResolvedValue({ data: [] });
   apiMock.post.mockResolvedValue({ data: {} });
-  apiMock.patch.mockImplementation((_url, body) => Promise.resolve({ data: { ...USER, ...body } }));
+  let stored = USER;
+  apiMock.patch.mockImplementation((_url, body) => {
+    stored = { ...stored, ...body };
+    return Promise.resolve({ data: stored });
+  });
 });
 
 async function waitForForm() {
@@ -109,23 +113,108 @@ test("laedt die eigenen Profildaten in das Formular", async () => {
   expect(await openPrivacyTab(user)).not.toBeChecked();
 });
 
-test("speichert nur das tatsaechlich geaenderte Feld", async () => {
+// Ursache „Autosave geht nicht“ (#1048, nach #1528): Textfelder, Auswahlfelder und Bilder auf Grunddaten, Gaming und
+// Socials speicherten nur mit dem Knopf „Speichern“ - von selbst speicherten allein Privatsphäre und Benachrichtigungen.
+test("Grunddaten: Bio tippen speichert nach kurzer Pause von selbst - ohne Knopf", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await waitForForm();
+  expect(screen.queryByTestId("profile-save")).toBeNull();
+
+  await user.clear(screen.getByTestId("profile-bio"));
+  await user.type(screen.getByTestId("profile-bio"), "Von selbst.");
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
+  const [, payload, config] = apiMock.patch.mock.calls.at(-1);
+  // Nur das geänderte Feld, und der Server prüft, dass noch dasselbe Konto angemeldet ist.
+  expect(payload).toEqual({ bio: "Von selbst." });
+  expect(config.headers["X-Expected-User-Id"]).toBe("u-1");
+  expect(await screen.findByTestId("profile-autosave-status")).toHaveTextContent("Gespeichert ✓");
+});
+
+test("kein Knopf Speichern mehr - in keinem Reiter", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await waitForForm();
+  for (const name of [/Grunddaten/i, /Gaming/i, /Socials/i, /Privatsphäre/i, /Benachrichtigungen/i]) {
+    await user.click(screen.getByRole("button", { name }));
+    expect(screen.queryByTestId("profile-save")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Speicher/i })).toBeNull();
+    expect(screen.getByTestId("profile-autosave-status")).toBeInTheDocument();
+  }
+});
+
+test("Feld verlassen speichert sofort, ohne die Pause abzuwarten", async () => {
   const user = userEvent.setup();
   renderPage();
   await waitForForm();
 
-  await user.clear(screen.getByTestId("profile-bio"));
-  await user.type(screen.getByTestId("profile-bio"), "Neue Vorstellung.");
-  await user.click(screen.getByTestId("profile-save"));
-
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/users/me", expect.anything(), expect.anything()));
-  const [, payload, config] = apiMock.patch.mock.calls.at(-1);
-  expect(payload).toEqual({ bio: "Neue Vorstellung." });
-  // Der Server prüft, dass noch dasselbe Konto angemeldet ist (#1048).
-  expect(config.headers["X-Expected-User-Id"]).toBe("u-1");
+  await user.type(screen.getByTestId("profile-bio"), " Mehr.");
+  await user.tab();
+  // Gleich nach dem Verlassen - lange vor dem Ende der Tipp-Pause.
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 600 });
+  expect(apiMock.patch.mock.calls[0][1]).toEqual({ bio: "Kurze Vorstellung. Mehr." });
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  expect(apiMock.patch).toHaveBeenCalledTimes(1);
 });
 
-test("ein Schalter auf Privatsphaere speichert von selbst, ohne Speichern-Knopf", async () => {
+test("ein Auswahlfeld speichert sofort", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await waitForForm();
+
+  await user.selectOptions(screen.getByTestId("profile-country"), "AT");
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 600 });
+  expect(apiMock.patch.mock.calls[0][1]).toEqual({ country: "AT" });
+});
+
+test("ungültig speichert nicht: leerer Anzeigename hat den Hinweis am Feld, die Bio geht trotzdem", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await waitForForm();
+
+  await user.clear(screen.getByTestId("profile-display-name"));
+  expect(await screen.findByTestId("profile-display-name-error")).toHaveTextContent("Bitte gib einen Anzeigenamen ein");
+  expect(screen.getByTestId("profile-autosave-status")).toHaveTextContent("Nicht gespeichert");
+  expect(screen.getByTestId("profile-autosave-status")).toHaveAttribute("data-status", "invalid");
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+  // Die Eingabe bleibt stehen; ein anderes, gültiges Feld speichert ohne den Anzeigenamen.
+  expect(screen.getByTestId("profile-display-name")).toHaveValue("");
+  await user.type(screen.getByTestId("profile-bio"), " Mehr.");
+  await user.tab();
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][1]).toEqual({ bio: "Kurze Vorstellung. Mehr." });
+  // Die Antwort des Servers (mit dem alten Namen) überschreibt die offene Eingabe nicht.
+  await waitFor(() => expect(screen.getByTestId("profile-autosave-status")).toHaveAttribute("data-status", "invalid"));
+  expect(screen.getByTestId("profile-display-name")).toHaveValue("");
+
+  // Wieder gültig: jetzt geht der Name mit.
+  await user.type(screen.getByTestId("profile-display-name"), "Neuer Name");
+  await user.tab();
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
+  expect(apiMock.patch.mock.calls[1][1]).toEqual({ display_name: "Neuer Name" });
+  expect(screen.queryByTestId("profile-display-name-error")).toBeNull();
+});
+
+test("ungültige Website speichert nicht und zeigt den Hinweis", async () => {
+  const user = userEvent.setup();
+  renderPage(["/profile?tab=socials"]);
+  const field = await screen.findByTestId("profile-website");
+
+  await user.type(field, "keine adresse");
+  await user.tab();
+  expect(await screen.findByTestId("profile-website-error")).toHaveTextContent("https://lionsquad.at");
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+
+  await user.clear(field);
+  await user.type(field, "https://lionsquad.at/team");
+  await user.tab();
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][1]).toEqual({ website: "https://lionsquad.at/team" });
+});
+
+test("ein Schalter auf Privatsphaere speichert sofort, Gespeichert blendet wieder aus", async () => {
   const user = userEvent.setup();
   renderPage();
   await waitForForm();
@@ -133,14 +222,17 @@ test("ein Schalter auf Privatsphaere speichert von selbst, ohne Speichern-Knopf"
   await user.click(await openPrivacyTab(user));
   expect(screen.queryByTestId("profile-save")).toBeNull();
 
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 600 });
   const [, payload] = apiMock.patch.mock.calls.at(-1);
   expect(payload).toEqual({ privacy_public_profile: true });
-  await screen.findByText("Gespeichert.");
+  const status = screen.getByTestId("profile-autosave-status");
+  await waitFor(() => expect(status).toHaveTextContent("Gespeichert ✓"));
   expect(screen.getByTestId("profile-privacy")).toBeChecked();
+  // Nach gut zwei Sekunden wird der Hinweis wieder ruhig.
+  await waitFor(() => expect(status).toHaveTextContent("Änderungen speichern von selbst."), { timeout: 3500 });
 });
 
-test("die Schnellwahl Verein setzt alle Felder der Gruppe und schickt genau einen PATCH", async () => {
+test("die Schnellwahl Verein setzt alle Felder der Gruppe und speichert sie zusammen mit der Direktnachrichten-Wahl", async () => {
   const user = userEvent.setup();
   renderPage();
   await waitForForm();
@@ -155,15 +247,15 @@ test("die Schnellwahl Verein setzt alle Felder der Gruppe und schickt genau eine
   expect(screen.getByTestId("profile-vis-group-contact-members")).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByTestId("profile-vis-steam")).toHaveValue("public");
 
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
-  const [, payload] = apiMock.patch.mock.calls.at(-1);
-  expect(payload).toEqual({
+  await waitFor(() => expect(apiMock.patch.mock.calls.length).toBeGreaterThan(0), { timeout: 600 });
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  // Jeder Klick speichert sofort; zusammen ergibt das genau diese Änderung - und nichts doppelt.
+  const sent = Object.assign({}, ...apiMock.patch.mock.calls.map(([, body]) => body));
+  expect(sent).toEqual({
     profile_visibility: { email: "members", discord: "members", city: "members", country: "members" },
     dm_privacy: "friends",
   });
-  // Nach der Entprellung kommt kein zweiter Aufruf mehr.
-  await new Promise((resolve) => setTimeout(resolve, 900));
-  expect(apiMock.patch).toHaveBeenCalledTimes(1);
+  expect(apiMock.patch.mock.calls.length).toBeLessThanOrEqual(2);
 });
 
 test("ein einzelnes Feld anders als seine Gruppe zeigt die Gruppe als gemischt", async () => {
@@ -197,14 +289,14 @@ test("der Reiter Benachrichtigungen schaltet Kanaele und graut die Spalte aus", 
   expect(payload).toEqual({ notification_preferences: { push: false } });
 });
 
-test("ohne Aenderung wird nicht gespeichert", async () => {
+test("ohne Aenderung wird nicht gespeichert, auch nicht beim Verlassen eines Felds", async () => {
   const user = userEvent.setup();
   renderPage();
   await waitForForm();
 
-  await user.click(screen.getByTestId("profile-save"));
-
-  await waitFor(() => expect(toastMock.info).toHaveBeenCalledWith("Keine Änderungen zum Speichern."));
+  await user.click(screen.getByTestId("profile-bio"));
+  await user.tab();
+  await new Promise((resolve) => setTimeout(resolve, 1000));
   expect(apiMock.patch).not.toHaveBeenCalled();
 });
 
@@ -214,24 +306,32 @@ test("nach dem Speichern wird die Sitzung aktualisiert", async () => {
   await waitForForm();
 
   await user.type(screen.getByTestId("profile-bio"), " Ergaenzung.");
-  await user.click(screen.getByTestId("profile-save"));
+  await user.tab();
 
   await waitFor(() => expect(refreshMock).toHaveBeenCalled());
-  expect(toastMock.success).toHaveBeenCalledWith("Profil gespeichert.");
+  expect(toastMock.success).not.toHaveBeenCalled();
 });
 
-test("ein Speicherfehler meldet sich und laesst die Eingabe stehen", async () => {
+test("ein Speicherfehler zeigt Nicht gespeichert mit Erneut versuchen - die Eingabe bleibt", async () => {
   const user = userEvent.setup();
-  apiMock.patch.mockRejectedValue(new Error("Serverfehler"));
+  apiMock.patch.mockImplementationOnce(() => Promise.reject(new Error("Serverfehler")));
   renderPage();
   await waitForForm();
 
   await user.clear(screen.getByTestId("profile-bio"));
   await user.type(screen.getByTestId("profile-bio"), "Bleibt erhalten.");
-  await user.click(screen.getByTestId("profile-save"));
+  await user.tab();
 
-  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Profil konnte nicht gespeichert werden."));
+  const status = screen.getByTestId("profile-autosave-status");
+  await waitFor(() => expect(status).toHaveAttribute("data-status", "error"));
+  expect(status).toHaveTextContent("Nicht gespeichert.");
+  expect(status).toHaveClass("text-warn");
   expect(screen.getByTestId("profile-bio")).toHaveValue("Bleibt erhalten.");
+  await user.click(screen.getByTestId("profile-autosave-retry"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
+  expect(apiMock.patch.mock.calls[1][1]).toEqual({ bio: "Bleibt erhalten." });
+  await waitFor(() => expect(status).toHaveTextContent("Gespeichert ✓"));
+  expect(screen.queryByTestId("profile-autosave-retry")).toBeNull();
 });
 
 test("Grunddaten: ein Anzeigename statt zwei Namen, Land als Auswahl, Sicherheit nicht mehr hier", async () => {
@@ -316,8 +416,8 @@ test("?tab=inbox leitet zur eigenen Nachrichten-Seite weiter, mit to= direkt ins
   expect(screen.queryByRole("button", { name: /Inbox/i })).toBeNull();
 });
 
-// Speicher-Warteschlange (#1048): Autosave und „Speichern“ laufen hintereinander, nie gleichzeitig.
-test("ein zweiter Schalter wartet, bis der laufende Autosave fertig ist - nie zwei PATCH gleichzeitig", async () => {
+// Speicher-Warteschlange (#1048): alle Läufe gehen hintereinander, nie gleichzeitig.
+test("ein zweiter Schalter wartet, bis der laufende Lauf fertig ist - nie zwei PATCH gleichzeitig", async () => {
   const user = userEvent.setup();
   const first = deferredPatch();
   renderPage();
@@ -337,12 +437,12 @@ test("ein zweiter Schalter wartet, bis der laufende Autosave fertig ist - nie zw
   first.resolve({ ...USER, privacy_public_profile: true });
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2), { timeout: 2500 });
   expect(apiMock.patch.mock.calls[1][1]).toEqual({ privacy_achievements_public: false });
-  await screen.findByText("Gespeichert.");
+  await waitFor(() => expect(screen.getByTestId("profile-autosave-status")).toHaveTextContent("Gespeichert ✓"));
   expect(screen.getByTestId("profile-privacy")).toBeChecked();
   expect(screen.getByTestId("profile-privacy-achievements")).toHaveAttribute("aria-checked", "false");
 });
 
-test("Speichern während eines Autosaves reiht sich ein und schickt danach nur den Rest", async () => {
+test("Text während eines laufenden Laufs geht im nächsten mit - nur der Rest", async () => {
   const user = userEvent.setup();
   const first = deferredPatch();
   renderPage();
@@ -353,32 +453,30 @@ test("Speichern während eines Autosaves reiht sich ein und schickt danach nur d
   await user.click(screen.getByRole("button", { name: /Grunddaten/i }));
   await user.clear(screen.getByTestId("profile-bio"));
   await user.type(screen.getByTestId("profile-bio"), "Neu.");
-  await user.click(screen.getByTestId("profile-save"));
+  await user.tab();
   expect(apiMock.patch).toHaveBeenCalledTimes(1);
 
   first.resolve({ ...USER, privacy_public_profile: true });
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
   expect(apiMock.patch.mock.calls[1][1]).toEqual({ bio: "Neu." });
-  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Profil gespeichert."));
-  expect(toastMock.success).toHaveBeenCalledTimes(1);
   expect(screen.getByTestId("profile-bio")).toHaveValue("Neu.");
+  await new Promise((resolve) => setTimeout(resolve, 900));
   expect(apiMock.patch).toHaveBeenCalledTimes(2);
 });
 
-test("Doppelklick auf Speichern schickt genau einen PATCH", async () => {
+test("Enter im Feld speichert sofort; zweimal hintereinander schickt einen PATCH", async () => {
   const user = userEvent.setup();
   const first = deferredPatch();
   renderPage();
   await waitForForm();
-  await user.type(screen.getByTestId("profile-bio"), " Mehr.");
-  const form = screen.getByTestId("profile-save").closest("form");
-  // Zweimal abschicken, bevor React neu zeichnet - der Knopf ist dann noch nicht gesperrt.
+  await user.type(screen.getByTestId("profile-display-name"), " X");
+  const form = screen.getByTestId("profile-display-name").closest("form");
   fireEvent.submit(form);
   fireEvent.submit(form);
-  first.resolve({ ...USER, bio: "Kurze Vorstellung. Mehr." });
-  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Profil gespeichert."));
   expect(apiMock.patch).toHaveBeenCalledTimes(1);
-  expect(toastMock.info).not.toHaveBeenCalled();
+  first.resolve({ ...USER, display_name: "Lion Fan X" });
+  await waitFor(() => expect(screen.getByTestId("profile-autosave-status")).toHaveTextContent("Gespeichert ✓"));
+  expect(apiMock.patch).toHaveBeenCalledTimes(1);
 });
 
 test("Kontowechsel während des Speicherns: die alte Antwort landet nicht im neuen Konto", async () => {
@@ -388,7 +486,7 @@ test("Kontowechsel während des Speicherns: die alte Antwort landet nicht im neu
   await waitForForm();
   await user.clear(screen.getByTestId("profile-bio"));
   await user.type(screen.getByTestId("profile-bio"), "Von Konto eins.");
-  await user.click(screen.getByTestId("profile-save"));
+  await user.tab();
   expect(apiMock.patch).toHaveBeenCalledTimes(1);
 
   authState.user = { ...USER, id: "u-2", username: "zweites", bio: "Konto zwei." };
@@ -398,12 +496,11 @@ test("Kontowechsel während des Speicherns: die alte Antwort landet nicht im neu
   first.resolve({ ...USER, bio: "Von Konto eins." });
   await new Promise((resolve) => setTimeout(resolve, 50));
   expect(screen.getByTestId("profile-bio")).toHaveValue("Konto zwei.");
-  expect(screen.queryByTestId("profile-unsaved")).toBeNull();
   await new Promise((resolve) => setTimeout(resolve, 900));
   expect(apiMock.patch).toHaveBeenCalledTimes(1);
 });
 
-test("ein Fehler beim Autosave zeigt den Hinweis mit Erneut versuchen - die Eingabe bleibt", async () => {
+test("ein Fehler bei einem Schalter zeigt den Hinweis mit Erneut versuchen - die Stellung bleibt", async () => {
   const user = userEvent.setup();
   apiMock.patch.mockImplementationOnce(() => Promise.reject(new Error("Serverfehler")));
   renderPage();
@@ -412,60 +509,45 @@ test("ein Fehler beim Autosave zeigt den Hinweis mit Erneut versuchen - die Eing
   await user.click(toggle);
 
   await screen.findByText("Änderung konnte nicht gespeichert werden.", {}, { timeout: 2500 });
+  expect(screen.getByTestId("profile-autosave-status")).toHaveTextContent("Nicht gespeichert.");
   expect(toggle).toBeChecked();
   await user.click(screen.getByTestId("profile-autosave-retry"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
   expect(apiMock.patch.mock.calls[1][1]).toEqual({ privacy_public_profile: true });
-  await screen.findByText("Gespeichert.");
+  await waitFor(() => expect(screen.getByTestId("profile-autosave-status")).toHaveTextContent("Gespeichert ✓"));
   expect(screen.queryByTestId("profile-autosave-retry")).toBeNull();
 });
 
-test("ein Fehler beim Speichern zeigt in der Leiste Erneut versuchen", async () => {
+// Tab schließen oder neu laden (#1048, nach Codex-Prüfung): was noch in der Tipp-Pause wartet, geht sofort per
+// keepalive-fetch; nur was danach noch offen ist (gescheitert oder ungültig), löst die Warnung des Browsers aus.
+test("Tab wird verborgen: Text in der Tipp-Pause geht sofort per keepalive, nicht per axios", async () => {
   const user = userEvent.setup();
-  apiMock.patch.mockImplementationOnce(() => Promise.reject(new Error("Serverfehler")));
+  keepaliveMock.mockResolvedValueOnce({ ...USER, bio: "Kurze Vorstellung. Mehr." });
   renderPage();
   await waitForForm();
   await user.type(screen.getByTestId("profile-bio"), " Mehr.");
-  await user.click(screen.getByTestId("profile-save"));
-
-  expect(await screen.findByTestId("profile-save-error")).toHaveTextContent("Profil konnte nicht gespeichert werden.");
-  expect(screen.getByTestId("profile-bio")).toHaveValue("Kurze Vorstellung. Mehr.");
-  await user.click(screen.getByTestId("profile-save-retry"));
-  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Profil gespeichert."));
-  expect(apiMock.patch.mock.calls[1][1]).toEqual({ bio: "Kurze Vorstellung. Mehr." });
-  expect(screen.queryByTestId("profile-save-error")).toBeNull();
-});
-
-// Tab schließen oder neu laden (#1048, nach Codex-Prüfung): ein wartender Autosave geht sofort per keepalive-fetch,
-// offene Änderungen ohne laufende Anfrage lösen die Warnung des Browsers aus.
-test("Tab wird verborgen: ein wartender Autosave geht sofort per keepalive, nicht per axios", async () => {
-  const user = userEvent.setup();
-  keepaliveMock.mockResolvedValueOnce({ ...USER, privacy_public_profile: true });
-  renderPage();
-  await waitForForm();
-  await user.click(await openPrivacyTab(user));
   expect(keepaliveMock).not.toHaveBeenCalled();
 
   vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
   document.dispatchEvent(new Event("visibilitychange"));
   expect(keepaliveMock).toHaveBeenCalledTimes(1);
-  expect(keepaliveMock).toHaveBeenCalledWith("PATCH", "/users/me", { privacy_public_profile: true }, { "X-Expected-User-Id": "u-1" });
-  await screen.findByText("Gespeichert.");
+  expect(keepaliveMock).toHaveBeenCalledWith("PATCH", "/users/me", { bio: "Kurze Vorstellung. Mehr." }, { "X-Expected-User-Id": "u-1" });
+  await waitFor(() => expect(screen.getByTestId("profile-autosave-status")).toHaveTextContent("Gespeichert ✓"));
   await new Promise((resolve) => setTimeout(resolve, 900));
   expect(apiMock.patch).not.toHaveBeenCalled();
 });
 
-test("pagehide schickt den wartenden Autosave ebenfalls per keepalive", async () => {
+test("pagehide schickt Text in der Tipp-Pause ebenfalls per keepalive", async () => {
   const user = userEvent.setup();
-  keepaliveMock.mockResolvedValueOnce({ ...USER, privacy_public_profile: true });
+  keepaliveMock.mockResolvedValueOnce({ ...USER, bio: "Kurze Vorstellung. Mehr." });
   renderPage();
   await waitForForm();
-  await user.click(await openPrivacyTab(user));
+  await user.type(screen.getByTestId("profile-bio"), " Mehr.");
   window.dispatchEvent(new Event("pagehide"));
   expect(keepaliveMock).toHaveBeenCalledTimes(1);
 });
 
-test("beforeunload warnt bei offenen Änderungen, die nicht unterwegs sind - sonst nicht", async () => {
+test("beforeunload warnt nur, wenn wirklich etwas offen bleibt", async () => {
   const user = userEvent.setup();
   renderPage();
   await waitForForm();
@@ -473,19 +555,35 @@ test("beforeunload warnt bei offenen Änderungen, die nicht unterwegs sind - son
   window.dispatchEvent(clean);
   expect(clean.defaultPrevented).toBe(false);
 
+  // Text in der Tipp-Pause: geht per keepalive mit, keine Warnung.
+  keepaliveMock.mockReturnValueOnce(new Promise(() => {}));
   await user.type(screen.getByTestId("profile-bio"), " Mehr.");
-  const dirty = new Event("beforeunload", { cancelable: true });
-  window.dispatchEvent(dirty);
-  expect(dirty.defaultPrevented).toBe(true);
+  const pending = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(pending);
+  expect(keepaliveMock).toHaveBeenCalledTimes(1);
+  expect(pending.defaultPrevented).toBe(false);
+});
 
-  // Läuft das Speichern, ist die Änderung unterwegs - keine Warnung.
-  const first = deferredPatch();
-  await user.click(screen.getByTestId("profile-save"));
-  const saving = new Event("beforeunload", { cancelable: true });
-  window.dispatchEvent(saving);
-  expect(saving.defaultPrevented).toBe(false);
-  first.resolve({ ...USER, bio: "Kurze Vorstellung. Mehr." });
-  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Profil gespeichert."));
+test("beforeunload warnt bei einem gescheiterten Lauf und bei ungültiger Eingabe", async () => {
+  const user = userEvent.setup();
+  apiMock.patch.mockImplementationOnce(() => Promise.reject(new Error("Serverfehler")));
+  renderPage();
+  await waitForForm();
+  await user.type(screen.getByTestId("profile-bio"), " Mehr.");
+  await user.tab();
+  await waitFor(() => expect(screen.getByTestId("profile-autosave-status")).toHaveAttribute("data-status", "error"));
+  const failed = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(failed);
+  expect(failed.defaultPrevented).toBe(true);
+  expect(keepaliveMock).not.toHaveBeenCalled();
+
+  await user.click(screen.getByTestId("profile-autosave-retry"));
+  await waitFor(() => expect(screen.getByTestId("profile-autosave-status")).toHaveTextContent("Gespeichert ✓"));
+  await user.clear(screen.getByTestId("profile-display-name"));
+  await waitFor(() => expect(screen.getByTestId("profile-autosave-status")).toHaveAttribute("data-status", "invalid"));
+  const invalid = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(invalid);
+  expect(invalid.defaultPrevented).toBe(true);
 });
 
 // Freunde stehen seit #1143 unter Community → Spieler (/players); die Tafel ist dieselbe.
