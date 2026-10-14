@@ -8,6 +8,10 @@ import { startVitals } from "@/lib/vitals";
 import { mountStartSplash, shouldShowStartSplash } from "@/lib/startSplash";
 import { toast } from "sonner";
 import { applyWaitingServiceWorker, register as registerServiceWorker } from "@/serviceWorkerRegistration";
+import { captureOnsiteToken } from "@/lib/onsiteToken";
+
+// Vor-Ort-Zugang (#1592): der Code aus dem QR-Code verlässt die Adresse, bevor Statistik und Fehlerprotokoll starten.
+captureOnsiteToken();
 
 // Erster Start der installierten Website (#1324): der Löwe steht, bevor React die erste Seite zeigt.
 if (shouldShowStartSplash()) mountStartSplash();

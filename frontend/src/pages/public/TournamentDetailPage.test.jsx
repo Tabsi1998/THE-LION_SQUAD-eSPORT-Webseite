@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 // Startgeld (#319): die Seite nennt das Startgeld vor der Anmeldung, die Anmeldung geht nur mit
 // der Kostenübernahme raus, und danach sieht nur die anmeldende Person ihren Preis.
@@ -301,4 +301,66 @@ test("die Anmeldung lädt erst nach der Seite: kein zweiter Aufbau, der erste St
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/teams/my"));
   expect(title.isConnected).toBe(true);
   expect(screen.getByTestId("tournament-title")).toBe(title);
+});
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location-probe">{`${location.pathname}${location.search}`}</div>;
+}
+
+// Vor-Ort-Zugang (#1592): Wer den QR-Code eingelöst hat, aber das Turnier sonst nicht sieht, bekommt die schlanke Form.
+const SLIM = {
+  id: "t1", slug: "cup", title: "Herbst-Cup", status: "registration_open", registration_enabled: true,
+  participant_count: 5, max_participants: 16, team_mode: "solo", event_mode: "local", start_date: "2026-10-31T13:00:00+00:00",
+  game: { id: "g1", slug: "rl", name: "Rocket League", display_name: "Rocket League", player_id_fields: [] },
+  public_phase: { state: "registration_open", label: "Anmeldung" }, onsite_view: true,
+};
+
+test("schlanke Ansicht: Titel, Termin, Spiel, freie Plätze und „Mitspielen“ - sonst nichts nachgeladen", async () => {
+  mockApi(SLIM);
+  renderPage();
+  const view = await screen.findByTestId("onsite-tournament-view");
+  expect(view).toHaveTextContent("Herbst-Cup");
+  expect(view).toHaveTextContent("Rocket League");
+  expect(screen.getByTestId("onsite-seats")).toHaveTextContent("11 von 16 Plätzen frei");
+  expect(screen.getByTestId("onsite-start")).toHaveTextContent("31");
+  expect(screen.getByTestId("onsite-register-btn")).toHaveTextContent("Mitspielen");
+  expect(apiMock.get).not.toHaveBeenCalledWith("/tournaments/t1/registrations", expect.anything());
+  expect(screen.queryByTestId("tournament-bracket-link")).toBeNull();
+});
+
+test("schlanke Ansicht ohne Konto: „Mitspielen“ führt zu Login mit Rückweg ohne Code", async () => {
+  authUser = null;
+  const user = userEvent.setup();
+  mockApi(SLIM);
+  render(
+    <MemoryRouter initialEntries={["/tournaments/cup"]}>
+      <Routes>
+        <Route path="/tournaments/:slug" element={<TournamentDetailPage />} />
+        <Route path="/login" element={<LocationProbe />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  await user.click(await screen.findByTestId("onsite-register-btn"));
+  expect(await screen.findByTestId("location-probe")).toHaveTextContent("/login?next=%2Ftournaments%2Fcup");
+});
+
+test("schlanke Ansicht mit Konto: „Mitspielen“ meldet an", async () => {
+  const user = userEvent.setup();
+  mockApi(SLIM);
+  renderPage();
+  await user.click(await screen.findByTestId("onsite-register-btn"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/register", expect.objectContaining({ accept_rules: true }), expect.anything()));
+});
+
+test("schlanke Ansicht: voll heißt Warteliste, geschlossen heißt kein Knopf", async () => {
+  mockApi({ ...SLIM, participant_count: 16 });
+  const { unmount } = renderPage();
+  expect(await screen.findByTestId("onsite-seats")).toHaveTextContent("Alle Plätze belegt – Warteliste");
+  unmount();
+  mockApi({ ...SLIM, status: "check_in", public_phase: { state: "check_in", label: "Check-in" } });
+  renderPage();
+  await screen.findByTestId("onsite-tournament-view");
+  expect(screen.queryByTestId("onsite-register-btn")).toBeNull();
+  expect(screen.getByTestId("onsite-closed")).toBeInTheDocument();
 });

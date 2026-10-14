@@ -303,7 +303,8 @@ function BracketTv() {
   }
 
   const publicUrl = t ? `${window.location.origin}/tournaments/${t.slug || t.id}/bracket` : window.location.origin;
-  const registerUrl = t ? `${window.location.origin}/tournaments/${t.slug || t.id}` : window.location.origin;
+  // Vor-Ort-Zugang (#1592): solange er gilt, trägt der QR-Code ihn - auch Nicht-Mitglieder kommen so zur Anmeldung.
+  const registerUrl = data?.onsite_path ? `${window.location.origin}${data.onsite_path}` : t ? `${window.location.origin}/tournaments/${t.slug || t.id}` : window.location.origin;
   const parked = Boolean(champion) && championState.parked && championState.key === championKey(champion);
   const presented = plan.presented && screen === "playlist" ? presentedBy(t, matches, sponsors) : null;
   const sponsorShown = lowMoment?.moment.type === "sponsor"

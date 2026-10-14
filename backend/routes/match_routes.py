@@ -9,7 +9,7 @@ from services.chat_attachments import register_chat_access
 from services.permissions import is_confirmed_tournament_lead, is_tournament_lead, tournament_lead_filter
 from services import moderation_standing
 from auth import get_current_user, get_optional_user
-from services.visibility import lead_can_see
+from services.visibility import hide_unseen_event_links
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     READ_STAFF_ROLES,
@@ -393,13 +393,17 @@ async def _require_result_permission(user: dict, match: dict) -> None:
 async def _assert_match_visible(match: dict, user: dict | None) -> None:
     if await _can_read_match(match, user):
         return
+    # Dieselbe Regel wie für das Turnier (#1592): Teilnehmende sehen jedes Spiel ihres Turniers.
+    from routes.tournament_common import tournament_hidden_reason
+
     db = get_db()
     t = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if t.get("status") == "draft" or t.get("is_public") is False:
+    hidden = await tournament_hidden_reason(db, t, user)
+    if hidden == 404:
         raise HTTPException(status_code=404, detail="Match nicht gefunden")
-    if not await lead_can_see(user, t.get("visibility") or "public"):
+    if hidden:
         raise HTTPException(status_code=403, detail="Match ist nicht sichtbar")
 
 
@@ -636,6 +640,10 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     # Die Dauer, die gilt (#1554) - die App rechnet die Kette nicht selbst.
     duration_game = await load_duration_game(db, tournament)
     with_effective_durations([match, canonical_match], stages=[stage], tournament=tournament, game=duration_game)
+    if tournament and not await _sees_internal(match, user):
+        # Das Event am Turnier nur, wenn die Person es sehen darf (#1473, #1592).
+        tournament = dict(tournament)
+        await hide_unseen_event_links(db, user, [tournament])
     return {
         "match": match,
         "canonical_match": canonical_match,

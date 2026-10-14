@@ -168,7 +168,8 @@ CLUB_CONTENT = frozenset({
     "achievement_groups", "achievements", "advent_doors", "app_releases", "discord_guilds", "documents", "easter_eggs",
     "easter_hunts", "events", "f1_challenges", "f1_tracks", "gallery_albums", "game_servers", "helper_calls",
     "member_benefits", "references", "seasons", "settings", "site_banners", "stations", "sticker_packs", "stickers",
-    "team_invite_links", "tournament_awards", "tournament_groups", "tournament_stages", "tournaments",
+    "team_invite_links", "tournament_awards", "tournament_groups", "tournament_onsite_access", "tournament_stages",
+    "tournaments",
 })
 
 NO_PERSON = frozenset({

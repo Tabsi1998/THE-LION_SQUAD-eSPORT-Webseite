@@ -37,3 +37,9 @@ test("Schlüssel in Links gehen nie an die Statistik (#1110)", () => {
   expect(withoutSecretParams("/news?page=2")).toBe("/news?page=2");
   expect(withoutSecretParams("")).toBe("");
 });
+
+test("der Vor-Ort-Code hinter dem # erreicht keine Statistik (#1592)", () => {
+  expect(withoutSecretParams("https://club.example/vor-ort#geheimer-code-123")).toBe("https://club.example/vor-ort");
+  expect(withoutSecretParams("/vor-ort#geheimer-code-123")).toBe("/vor-ort");
+  expect(withoutSecretParams("/about#werte")).toBe("/about#werte");
+});

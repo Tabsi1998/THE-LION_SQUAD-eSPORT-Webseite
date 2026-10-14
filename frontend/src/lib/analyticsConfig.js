@@ -26,6 +26,11 @@ export function withoutSecretParams(url) {
   try {
     const parsed = new URL(text, "http://placeholder.invalid");
     let changed = false;
+    // Der Vor-Ort-Code (#1592) steht hinter dem „#“ - auf dieser Seite fällt der Anker immer weg.
+    if (parsed.pathname.replace(/\/+$/, "") === "/vor-ort" && parsed.hash) {
+      parsed.hash = "";
+      changed = true;
+    }
     for (const name of SECRET_PARAMS) {
       if (parsed.searchParams.has(name)) {
         parsed.searchParams.delete(name);

@@ -63,6 +63,8 @@ function BracketTvRoute({ station = false }) {
 import HomePage from "@/pages/public/HomePage";
 const TournamentsPage = lazy(() => import("@/pages/public/TournamentsPage"));
 const TournamentDetailPage = lazy(() => import("@/pages/public/TournamentDetailPage"));
+// Vor-Ort-Zugang (#1592): Ziel des QR-Codes auf TV und Aushang.
+const OnsiteAccessPage = lazy(() => import("@/pages/public/OnsiteAccessPage"));
 const TournamentBracketPage = lazy(() => import("@/pages/public/TournamentBracketPage"));
 const TournamentStandingsPage = lazy(() => import("@/pages/public/TournamentStandingsPage"));
 const TournamentSchedulePage = lazy(() => import("@/pages/public/TournamentSchedulePage"));
@@ -266,6 +268,7 @@ function App() {
           <Route path="/esports" element={<EsportsOverviewPage />} />
           <Route path="/tournaments" element={<TournamentsPage />} />
           <Route path="/tournaments/:slug" element={<TournamentDetailPage />} />
+          <Route path="/vor-ort" element={<OnsiteAccessPage />} />
           <Route path="/tournaments/:slug/bracket" element={<TournamentBracketPage />} />
           <Route path="/tournaments/:slug/matches" element={<TournamentSchedulePage />} />
           <Route path="/tournaments/:slug/standings" element={<TournamentStandingsPage />} />

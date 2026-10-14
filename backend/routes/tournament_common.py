@@ -430,19 +430,35 @@ async def _user_participates_in_tournament(db, tid: str, user: dict | None) -> b
     return tid in participant_ids
 
 
+async def tournament_hidden_reason(db, t: dict, user: dict | None) -> int | None:
+    """Die eine Sichtbarkeitsregel für Turnier-, Baum-, Spielplan- und Match-Routen (#1592) - ``None``: sichtbar,
+    sonst der Status (404 unbekannt, 403 nicht sichtbar).
+
+    Leitung und zugeordnete Helfer sehen alles. Teilnehmende sehen ihr Turnier immer - auch „Nur Mitglieder“ und „nicht
+    öffentlich“ (etwa über den Vor-Ort-Zugang angemeldete Begleitpersonen); mit der Abmeldung endet das. Alle anderen
+    nach der Sichtbarkeit. Was am Turnier hängt (das Event), bleibt hinter ``hide_unseen_event_links``."""
+    if _is_staff(user) or await _is_tournament_staff(t["id"], user):
+        return None
+    if t.get("status") == "draft":
+        return 404
+    if await _user_participates_in_tournament(db, t["id"], user):
+        return None
+    if t.get("is_public") is False:
+        return 404
+    if not await user_can_see(user, t.get("visibility") or "public"):
+        return 403
+    return None
+
+
 async def _get_visible_tournament(tid: str, user: dict | None) -> dict:
     db = get_db()
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    is_staff = _is_staff(user)
-    is_assigned = await _is_tournament_staff(tid, user)
-    if t.get("status") == "draft" and not (is_staff or is_assigned):
+    hidden = await tournament_hidden_reason(db, t, user)
+    if hidden == 404:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    is_participant = await _user_participates_in_tournament(db, tid, user)
-    if t.get("is_public") is False and not (is_staff or is_assigned or is_participant):
-        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if not (is_staff or is_assigned or is_participant) and not await user_can_see(user, t.get("visibility") or "public"):
+    if hidden:
         raise HTTPException(status_code=403, detail="Turnier ist nicht sichtbar")
     return t
 

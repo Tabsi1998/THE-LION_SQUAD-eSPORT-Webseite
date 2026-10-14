@@ -7,7 +7,9 @@ from fastapi.responses import StreamingResponse
 from database import get_db
 from models import now_utc
 from auth import get_current_user, get_optional_user
+from services import onsite_access
 from services.access_links import touch_access_link, validate_access_link
+from services.visibility import hide_unseen_event_links
 from services.tv_display import DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, display_bracket_payload, key_expired, seat_summary
 from services.public_phase import derive_public_phase
 from services.station_labels import attach_station_info
@@ -128,6 +130,9 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
     duration_game = await load_duration_game(db, t)
     with_effective_durations(matches_v2, stages=read_model.stages, tournament=t, game=duration_game)
     t["can_view_display"] = bool(is_staff)
+    if not is_staff:
+        # Das Event am Turnier nur, wenn die Person es sehen darf (#1473) - auch Teilnehmende ohne Mitgliedschaft (#1592).
+        await hide_unseen_event_links(db, user, [t])
     structure = read_model.structure_snapshot()
     observe_structure_read(structure, surface="bracket")
     return {
@@ -178,7 +183,7 @@ async def get_bracket_display(tid: str, key: str | None = None, me: dict | None 
         if key_expired(t, now_utc()):
             raise HTTPException(status_code=403, detail=KEY_EXPIRED)
         await touch_access_link(db, link)
-        return display_bracket_payload(await _build_bracket_payload(db, t, None, False))
+        return await _with_onsite_path(db, t, display_bracket_payload(await _build_bracket_payload(db, t, None, False)))
     if not me:
         raise HTTPException(status_code=401, detail="Nicht angemeldet")
     await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES)
@@ -188,6 +193,14 @@ async def get_bracket_display(tid: str, key: str | None = None, me: dict | None 
     payload = await _build_bracket_payload(db, t, me, True)
     # Wie mit Schlüssel: die belegten Plätze für den Anmelde-Bildschirm (#1123).
     payload["seats"] = seat_summary(t, payload.get("registrations"))
+    return await _with_onsite_path(db, t, payload)
+
+
+async def _with_onsite_path(db, t: dict, payload: dict) -> dict:
+    """Der Anmelde-Bildschirm zeigt im QR-Code den Vor-Ort-Zugang (#1592) - nur solange er gilt."""
+    payload["onsite_path"] = (
+        onsite_access.onsite_path(await onsite_access.ensure_token(db, t["id"])) if onsite_access.is_open(t) else None
+    )
     return payload
 
 
