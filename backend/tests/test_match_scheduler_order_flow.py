@@ -218,3 +218,54 @@ async def test_no_planned_match_starts_before_everything_it_waits_for_has_ended(
                     f"{fmt} {count}: {match.get('match_key')} um {start[match_id]:%H:%M} vor dem Ende von "
                     f"{by_id[previous_id].get('match_key')} ({end[previous_id]:%H:%M})")
     assert checked > 0
+
+
+# ---------------------------------------------------------------- Alle Termine von Hand lösen (Praxis 14.10.)
+
+async def audit_rows(flow, tournament):
+    return await flow.db.audit_logs.find({"action": "tournament.schedule.released", "target_id": tournament["id"]}, {"_id": 0}).to_list(10)
+
+
+@pytest.mark.asyncio
+async def test_releasing_all_manual_times_gives_every_unstarted_match_back_to_the_planner(flow):
+    tournament, _station, matches = await fabians_case(flow)
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/release", json={"scope": "all"})
+    assert response.status_code == 200, response.text
+    assert response.json()["released"] == 14
+    for match in await flow.matches(tournament):
+        assert match.get("scheduled_at") is None and match.get("station_id") is None and match.get("schedule_source") is None, match["match_key"]
+    assert (await by_key(flow, tournament))["G"].get("duration_minutes") == 30, "die eigene Dauer bleibt"
+    rows = await audit_rows(flow, tournament)
+    assert len(rows) == 1 and rows[0]["data"]["released"] == 14 and rows[0]["data"]["scope"] == "all"
+    await flow.post("/api/stations", json={"name": "Switch 1", "device_type": "switch", "tournament_id": tournament["id"]})
+    plan = (await flow.post(f"/api/tournaments/{tournament['id']}/schedule/plan")).json()
+    assert len(plan["assignments"]) == 14
+    assert not [item for item in plan["warnings"] if item["type"] in {"too_early", "unknown_station"}]
+
+
+@pytest.mark.asyncio
+async def test_releasing_only_the_deleted_station_keeps_the_others(flow):
+    tournament, _station, matches = await fabians_case(flow)
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/release", json={"scope": "missing_stations"})
+    assert response.status_code == 200, response.text
+    assert response.json()["released"] == 13
+    lf = (await by_key(flow, tournament))["LF"]
+    assert lf["schedule_source"] == "manual" and lf["scheduled_at"], "LF hing an keiner Station und bleibt fest"
+
+
+@pytest.mark.asyncio
+async def test_a_started_match_keeps_its_time_and_station(flow):
+    tournament, _station, matches = await fabians_case(flow)
+    await flow.db.matches_v2.update_one({"id": matches["A"]["id"]}, {"$set": {"status": "in_progress", "started_at": vienna("15:31")}})
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/release", json={"scope": "all"})
+    assert response.json()["released"] == 13
+    a = (await by_key(flow, tournament))["A"]
+    assert a["scheduled_at"] and a["station_id"] and a["schedule_source"] == "manual"
+
+
+@pytest.mark.asyncio
+async def test_only_the_planning_team_may_release(flow):
+    tournament, _station, _matches = await fabians_case(flow)
+    flow.act_as(await flow.add_user())
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/schedule/release", json={"scope": "all"})
+    assert response.status_code == 403
