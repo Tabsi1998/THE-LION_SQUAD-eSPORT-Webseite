@@ -128,7 +128,10 @@ def matchday_end(match: dict, tournament: dict | None) -> datetime | None:
 
 
 def agreed_outside_week(match: dict, tournament: dict | None) -> bool:
-    """Liga: ein Termin außerhalb der Spielwoche, dem der Gegner zugestimmt hat (#1569 lässt ihn stehen)."""
+    """Liga: ein Termin außerhalb der Spielwoche, dem der Gegner zugestimmt hat (#1569 lässt ihn stehen). Ein von der
+    Turnierleitung oder vom Spieltag-Job gesetzter Termin zählt nicht."""
+    if match.get("schedule_source") != "accepted":
+        return False
     window = _matchday_window(match, tournament)
     scheduled = _parse(match.get("scheduled_at"))
     return bool(window and scheduled and not window.contains(scheduled))
@@ -162,6 +165,6 @@ def auto_confirm_due(match: dict, tournament: dict | None, stage: dict | None = 
         due = reported + timedelta(hours=hours)
         week_end = None if agreed_outside_week(match, tournament) else matchday_end(match, tournament)
         if week_end and week_end < due:
-            due = max(week_end, reported + timedelta(hours=min(hours, LEAGUE_MIN_OBJECTION_HOURS)))
-        return due
+            due = week_end
+        return max(due, reported + timedelta(hours=LEAGUE_MIN_OBJECTION_HOURS))
     return reported + timedelta(minutes=setting("result_confirm_minutes_online", tournament, stage))

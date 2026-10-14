@@ -173,3 +173,22 @@ async def test_league_match_agreed_outside_its_week_counts_48_hours_from_the_rep
     assert (await sweep(flow.db, now=later(hours=25)))["confirmed"] == 0
     assert (await sweep(flow.db, now=later(hours=47)))["confirmed"] == 0
     assert (await sweep(flow.db, now=later(hours=49)))["confirmed"] == 1
+
+
+@pytest.mark.asyncio
+async def test_league_minimum_of_24_hours_holds_even_with_a_shorter_setting(flow):
+    _staff, _tournament, match, first, second, player = await league(flow, started_days_ago=0.5)
+    await flow.db.tournaments.update_one({"id": match["tournament_id"]}, {"$set": {"result_confirm_hours_league": 12}})
+    await report(flow, player[first], match, duel(first, second))
+    assert (await sweep(flow.db, now=later(hours=13)))["confirmed"] == 0, "12 Stunden eingestellt - der Gegner hat trotzdem 24"
+    assert (await sweep(flow.db, now=later(hours=25)))["confirmed"] == 1
+
+
+@pytest.mark.asyncio
+async def test_only_an_agreed_time_outside_the_week_lifts_the_week_limit(flow):
+    _staff, _tournament, match, first, second, player = await league(flow, started_days_ago=6)
+    # Von der Turnierleitung gesetzt, nicht mit dem Gegner vereinbart: das Wochenende bleibt die Obergrenze.
+    outside = (now_utc() - timedelta(days=6, hours=2)).isoformat()
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"scheduled_at": outside, "schedule_source": "manual"}})
+    await report(flow, player[first], match, duel(first, second))
+    assert (await sweep(flow.db, now=later(hours=25)))["confirmed"] == 1
