@@ -13,6 +13,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from models import now_utc
+from services.match_deadlines import matchday_end
 
 DISPUTE_WINDOW_MINUTES = 30
 DECIDED_STATUSES = {"completed", "forfeit"}
@@ -90,6 +91,14 @@ async def dispute_window(db, match: dict, now: datetime | None = None) -> dict:
     if not decided:
         return {"open": False, "until": None}
     until = decided + timedelta(minutes=DISPUTE_WINDOW_MINUTES)
+    # Ergebnis nach Frist (#1551): niemand hat bestätigt - der Einspruch bleibt bis zum Rundenende, in der Liga bis zum
+    # Ende der Spielwoche.
+    if (match.get("result_meta") or {}).get("auto_confirmed"):
+        tournament = await db.tournaments.find_one(
+            {"id": match.get("tournament_id")}, {"_id": 0, "format": 1, "start_date": 1, "matchday_days": 1})
+        round_end = matchday_end(match, tournament)
+        if round_end and round_end > until:
+            until = round_end
     for upcoming in await winner_next_matches(db, match):
         start = _parse(upcoming.get("scheduled_at"))
         if str(upcoming.get("status") or "") in STARTED_STATUSES or upcoming.get("started_at") or (start and start <= now):

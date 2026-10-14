@@ -7,6 +7,8 @@ Je Turnier eine Liste, die der Server jedes Mal frisch rechnet - Erledigtes vers
 - „Streitfall offen“ (``ds-<spiel>``): ein Dispute wartet auf Entscheidung (#1134, #1158). Knopf „Ansehen“.
 - „Meldungen weichen ab“ (``rc-<spiel>``): zwei Spieler-Meldungen passen nicht zusammen (#1132). Knopf „Eintragen“.
 - „Station defekt“ (``st-<station>``): eine defekte Station, auf die noch Spiele warten. Knopf „Umlegen“.
+- „Nicht erschienen?“ (``ns-<spiel>``): die Frist ist um, der Server schlägt „kampflos verloren“ vor (#1551). Knöpfe
+  „<Name> nicht erschienen“ und „Verlängern“; die Nachricht dazu schickt der Fristen-Job (match_deadline_sweep).
 
 Jeder Fall hat eine eigene Adresse: /tournaments/<slug>/leitung?fall=<id> - die Startseite der Verwaltung und die
 Benachrichtigungen verlinken genau dorthin.
@@ -23,6 +25,7 @@ import logging
 from datetime import datetime
 
 from models import now_utc
+from services.match_deadlines import NO_SHOW_RULE_TEXT
 from services.match_disputes import category_label, open_dispute
 from services.match_timing import OPEN_STATUSES, filled_slots, registration_name, timing
 from services.station_labels import attach_station_info, station_text
@@ -34,6 +37,7 @@ logger = logging.getLogger("tls.match_attention")
 
 ACTIVE_TOURNAMENT_STATUSES = {"check_in", "live", "paused"}
 WAITING_STATUSES = {"pending", "ready", "scheduled", "in_progress", "running", "waiting_result"}
+NO_SHOW_STATUSES = {"ready", "scheduled"}
 
 
 def _names(match: dict, regs_by_id: dict[str, dict]) -> str:
@@ -63,6 +67,16 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
             continue
         if isinstance(match.get("pending_result"), dict):
             continue
+        proposal = match.get("no_show_proposal")
+        if isinstance(proposal, dict) and not proposal.get("decision") and status in NO_SHOW_STATUSES and not match.get("started_at"):
+            items.append({**base, "id": f"ns-{match.get('id')}", "kind": "no_show", "title": "Nicht erschienen?",
+                          "detail": f"{proposal.get('minutes') or 0} Min. {NO_SHOW_RULE_TEXT.get(proposal.get('rule'), '')} um – "
+                                    "kampflos werten oder verlängern.",
+                          "action": "no_show", "since": proposal.get("due_at"),
+                          "participants": [{"registration_id": slot["registration_id"],
+                                            "name": registration_name(regs_by_id.get(slot["registration_id"]))}
+                                           for slot in filled_slots(match)]})
+            continue
         if reports_conflict(match.get("reports") or []):
             items.append({**base, "id": f"rc-{match.get('id')}", "kind": "report_conflict", "title": "Meldungen weichen ab",
                           "detail": "Die Spieler melden verschiedene Ergebnisse.", "action": "enter", "since": None})
@@ -88,7 +102,7 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
             "detail": f"{count} Spiel wartet darauf" if count == 1 else f"{count} Spiele warten darauf",
             "match_ids": [match.get("id") for match in waiting], "since": station.get("broken_at") or station.get("updated_at"),
         })
-    order = {"dispute": 0, "station_broken": 1, "result_missing": 2, "report_conflict": 3}
+    order = {"dispute": 0, "no_show": 1, "station_broken": 2, "result_missing": 3, "report_conflict": 4}
     items.sort(key=lambda item: (order.get(item["kind"], 9), -(item.get("overdue_minutes") or 0), item.get("station_text") or ""))
     return items
 

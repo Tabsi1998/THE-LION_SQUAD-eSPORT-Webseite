@@ -106,7 +106,9 @@ function hint(item, now) {
     const until = timeOf(source.paused_until);
     return until && until > now ? `Kurze Pause · weiter um ${clockText(until)}` : "Kurze Pause";
   }
-  if (status === "check_in" || status === "checkin_open" || (checkFrom !== null && checkFrom <= now && (checkUntil === null || now <= checkUntil) && now < item.from)) {
+  // Nach dem Check-in-Ende (#1551) bleibt der Status „Check-in“ bis zum Start - der Check-in läuft dann nicht mehr.
+  const checkInOpen = (status === "check_in" && !source.check_in_closed_at) || status === "checkin_open";
+  if (checkInOpen || (!source.check_in_closed_at && checkFrom !== null && checkFrom <= now && (checkUntil === null || now <= checkUntil) && now < item.from)) {
     return checkUntil ? `Check-in läuft bis ${clockText(checkUntil)} bei der Turnierleitung` : "Check-in läuft bei der Turnierleitung";
   }
   if (checkFrom !== null && checkFrom > now) return `Check-in ab ${clockText(checkFrom)} bei der Turnierleitung`;
